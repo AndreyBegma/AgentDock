@@ -58,12 +58,20 @@ assigns it on ingest. Unknown `type`s are stored and shown raw, never dropped.
 
 ### Usage (source `otel` / `transcript`)
 
+Schemas in `packages/shared/src/protocol/events/sessions.ts`; the wire rules
+are in [runner-protocol.md](runner-protocol.md#session-events). The envelope's
+`session.id` is the runtime's own session id.
+
 | Type | `data` |
 |---|---|
-| `llm.request` | `model, requestId, tokens: { input, output, cacheRead, cacheWrite5m, cacheWrite1h, reasoning }, durationMs, ttftMs?, querySource: main\|subagent\|auxiliary, agentName?` |
-| `tool.call` | `tool, durationMs, ok, decision?` |
+| `session.observed` | `cwd, startedAt, parsed, profileKey?, gitBranch?, title?, projectId?, slot?, parent?: { sessionId, toolUseId? }`. Not `session.appeared`, which is the runner's tmux event |
+| `llm.request` | `requestId, model, tokens: { input, output, cacheRead, cacheWrite5m, cacheWrite1h, reasoning }, querySource: main\|subagent\|auxiliary, promptId?, durationMs?, durationApprox?, ttftMs?, stopReason?, agentName?` |
+| `tool.call` | `toolUseId, tool, startedAt, promptId?, endedAt?, ok?, durationMs?, decision?, childSessionId?` |
 | `turn.started` / `turn.finished` | `promptId` |
 | `skill.activated` | `skill` |
+
+None of these carries prompt, response, thinking or tool-argument text
+([spec 12](../specs/12-agent-sessions.md) D9).
 
 ### GitHub (source `github`)
 

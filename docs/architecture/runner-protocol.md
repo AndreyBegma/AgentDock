@@ -210,6 +210,101 @@ always present on the wire.
 `runner.spool_truncated` (source `runner`) is emitted when the spool cap drops
 its oldest segment: `data` is `{ fromSeq, toSeq, bytes }` of what was lost.
 
+### Session events
+
+Schemas in `events/sessions.ts`; the rules are [spec 12](../specs/12-agent-sessions.md).
+Source `transcript`. Every one carries the envelope `session: { runtime, id }`,
+where `id` is the runtime's own session id. They hold names, ids, timing and
+token counts only: no prompt, response, thinking or tool-argument text (D9).
+
+| Type | `data` | Sent |
+|---|---|---|
+| `session.observed` | `cwd, startedAt, parsed, profileKey?, gitBranch?, title?, projectId?, slot?, parent?: { sessionId, toolUseId? }` | when the adapter first reads a transcript, and again when a field changes |
+| `turn.started` / `turn.finished` | `promptId` | per user prompt; the envelope `ts` is the moment |
+| `llm.request` | `requestId, model, tokens: { input, output, cacheRead, cacheWrite5m, cacheWrite1h, reasoning }, querySource, promptId?, durationMs?, durationApprox?, ttftMs?, stopReason?, agentName?` | once per `requestId`; re-sent with newer usage, the last wins (D4) |
+| `tool.call` | `toolUseId, tool, startedAt, promptId?, endedAt?, ok?, durationMs?, decision?, childSessionId?` | at the `tool_use`, and again with `endedAt`/`ok` at its result |
+
+- `projectId` and `slot` are the adapter's correlation (D6). `projectId` comes
+  from the watch list; the API stores it only when that project belongs to the
+  sending runner, otherwise the session has no project.
+- A subagent is linked by `parent` on its own `session.observed`, by
+  `childSessionId` on the spawning `tool.call`, or both. It takes its parent's
+  project and slot.
+- The API projects these into `sessions`, `turns`, `llm_requests` and
+  `tool_calls` with upserts on each table's natural key, so a resent event
+  changes nothing. A malformed one is skipped and logged; the raw event is
+  still stored.
+
+```json
+{
+  "type": "events",
+  "events": [
+    {
+      "v": 1,
+      "seq": 18240,
+      "ts": "2026-10-07T18:40:00.000Z",
+      "type": "session.observed",
+      "source": "transcript",
+      "session": { "runtime": "claude", "id": "0f6c1e2a-5d1b-4c4e-9a51-7f1d2b8e9c30" },
+      "data": {
+        "profileKey": "claude-blacktoorroot",
+        "cwd": "/home/archi/dev/.wt-AgentDock-i12-api",
+        "gitBranch": "feat/12-sessions-api",
+        "startedAt": "2026-10-07T18:40:00.000Z",
+        "parsed": true,
+        "projectId": "prj_agentdock",
+        "slot": "i12-api"
+      }
+    },
+    {
+      "v": 1,
+      "seq": 18241,
+      "ts": "2026-10-07T18:40:01.000Z",
+      "type": "turn.started",
+      "source": "transcript",
+      "session": { "runtime": "claude", "id": "0f6c1e2a-5d1b-4c4e-9a51-7f1d2b8e9c30" },
+      "data": { "promptId": "6c0d9a1e-0b47-4f0e-8f6e-2a7d4c1b9e55" }
+    },
+    {
+      "v": 1,
+      "seq": 18242,
+      "ts": "2026-10-07T18:40:04.120Z",
+      "type": "llm.request",
+      "source": "transcript",
+      "session": { "runtime": "claude", "id": "0f6c1e2a-5d1b-4c4e-9a51-7f1d2b8e9c30" },
+      "data": {
+        "requestId": "req_011CTkq7dZ3vH8YbXw4c2N1m",
+        "promptId": "6c0d9a1e-0b47-4f0e-8f6e-2a7d4c1b9e55",
+        "model": "claude-opus-5-5",
+        "tokens": { "input": 12, "output": 845, "cacheRead": 48211, "cacheWrite5m": 0, "cacheWrite1h": 3120, "reasoning": 210 },
+        "durationMs": 3120,
+        "durationApprox": true,
+        "stopReason": "tool_use",
+        "querySource": "main"
+      }
+    },
+    {
+      "v": 1,
+      "seq": 18243,
+      "ts": "2026-10-07T18:40:09.500Z",
+      "type": "tool.call",
+      "source": "transcript",
+      "session": { "runtime": "claude", "id": "0f6c1e2a-5d1b-4c4e-9a51-7f1d2b8e9c30" },
+      "data": {
+        "toolUseId": "toolu_01FqY1v3Lr8m2bJx7KcN4tHd",
+        "promptId": "6c0d9a1e-0b47-4f0e-8f6e-2a7d4c1b9e55",
+        "tool": "Task",
+        "startedAt": "2026-10-07T18:40:04.200Z",
+        "endedAt": "2026-10-07T18:40:09.500Z",
+        "ok": true,
+        "durationMs": 5300,
+        "childSessionId": "agent-a3f9c2"
+      }
+    }
+  ]
+}
+```
+
 ### `command`, `command.result`, `command.progress`
 
 `name` is any string on the wire: an unknown command is answered, not dropped.
