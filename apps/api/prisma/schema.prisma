@@ -108,6 +108,7 @@ model Runner {
   profiles     RuntimeProfile[]
   events       Event[]
   projects     Project[]
+  sessions     AgentSession[]
 
   @@map("runners")
 }
@@ -279,6 +280,7 @@ model Project {
   rounds         Round[]
   slots          Slot[]
   orchestrator   FleetOrchestrator?
+  sessions       AgentSession[]
 
   @@unique([runnerId, rootPath])
   @@map("projects")
@@ -490,4 +492,128 @@ model FleetOrchestrator {
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@map("fleet_orchestrators")
+}
+
+enum QuerySource {
+  main
+  subagent
+  auxiliary
+}
+
+/// `computed` from the price table, or `ingested` as reported by the runtime (#13).
+enum CostSource {
+  computed
+  ingested
+}
+
+/// An agent session found in a runtime's transcripts (docs/specs/12). Built from
+/// `session.observed`, `turn.*`, `llm.request` and `tool.call` events. No prompt,
+/// response or tool-argument text is stored (D9). A row created by an event that
+/// arrived before its `session.observed` has `cwd = ''` until that event comes.
+model AgentSession {
+  id              String    @id @default(cuid())
+  runnerId        String
+  runtime         Runtime
+  profileKey      String?
+  /// The runtime's own session id.
+  externalId      String
+  /// Null: no connected project contains `cwd` — visible to admins only (D10).
+  projectId       String?
+  slotName        String?
+  cwd             String
+  gitBranch       String?
+  title           String?
+  /// Distinct models used, in order of first use.
+  models          Json      @default("[]")
+  /// The session this subagent session belongs to.
+  parentSessionId String?
+  parsed          Boolean   @default(true)
+  startedAt       DateTime
+  lastEventAt     DateTime
+  endedAt         DateTime?
+
+  runner      Runner         @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+  project     Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  parent      AgentSession?  @relation("SessionParent", fields: [parentSessionId], references: [id], onDelete: SetNull)
+  children    AgentSession[] @relation("SessionParent")
+  turns       Turn[]
+  llmRequests LlmRequest[]
+  toolCalls   ToolCall[]
+  spawnedBy   ToolCall[]     @relation("ToolCallChild")
+
+  @@unique([runnerId, runtime, externalId])
+  @@index([projectId, startedAt])
+  @@index([parentSessionId])
+  @@map("sessions")
+}
+
+/// What one user prompt caused, keyed by the runtime's `promptId`.
+model Turn {
+  id        String    @id @default(cuid())
+  sessionId String
+  promptId  String
+  startedAt DateTime
+  endedAt   DateTime?
+
+  session     AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  llmRequests LlmRequest[]
+  toolCalls   ToolCall[]
+
+  @@unique([sessionId, promptId])
+  @@map("turns")
+}
+
+/// One LLM API request, deduped on `requestId`; the last usage seen wins (D4).
+/// The cost columns are declared here and filled by #13 (D8).
+model LlmRequest {
+  id             String      @id @default(cuid())
+  sessionId      String
+  turnId         String?
+  requestId      String
+  ts             DateTime
+  model          String
+  querySource    QuerySource
+  input          Int         @default(0)
+  output         Int         @default(0)
+  cacheRead      Int         @default(0)
+  cacheWrite5m   Int         @default(0)
+  cacheWrite1h   Int         @default(0)
+  /// Counted inside `output`; stored separately, never added twice.
+  reasoning      Int         @default(0)
+  durationMs     Int?
+  /// `durationMs` was derived from timestamps, not measured.
+  durationApprox Boolean     @default(false)
+  stopReason     String?
+  costUsd        Decimal?    @db.Decimal(14, 6)
+  priceVersion   Int?
+  costSource     CostSource?
+
+  session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  turn    Turn?        @relation(fields: [turnId], references: [id], onDelete: SetNull)
+
+  @@unique([sessionId, requestId])
+  @@index([ts])
+  @@index([model, ts])
+  @@map("llm_requests")
+}
+
+/// A tool use, closed by its result. `childSessionId`: the subagent it spawned.
+model ToolCall {
+  id             String    @id @default(cuid())
+  sessionId      String
+  turnId         String?
+  toolUseId      String
+  name           String
+  startedAt      DateTime
+  endedAt        DateTime?
+  ok             Boolean?
+  childSessionId String?
+
+  session      AgentSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  turn         Turn?         @relation(fields: [turnId], references: [id], onDelete: SetNull)
+  childSession AgentSession? @relation("ToolCallChild", fields: [childSessionId], references: [id], onDelete: SetNull)
+
+  @@unique([sessionId, toolUseId])
+  @@index([childSessionId])
+  @@map("tool_calls")
 }

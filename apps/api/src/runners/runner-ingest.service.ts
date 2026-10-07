@@ -9,6 +9,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { advanceCursor, type SeqRange } from './ack-cursor';
 import { tokenPrefix, verifyRunnerToken } from './credentials';
+import { RunnerEventSinks } from './runner-event-sinks';
 
 const json = (
   value: unknown,
@@ -20,7 +21,10 @@ const json = (
 /** What the gateway persists from a runner's socket (spec D5–D7). */
 @Injectable()
 export class RunnerIngestService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly sinks: RunnerEventSinks,
+  ) {}
 
   /**
    * The runner a token belongs to, or `null` for an unknown, revoked or
@@ -100,10 +104,13 @@ export class RunnerIngestService {
   }
 
   /**
-   * Stores a batch — a `(runnerId, seq)` already stored is skipped, so a resend
-   * after a reconnect changes nothing (D6) — and returns the new ack cursor.
+   * Hands a batch to the registered sinks, then stores it — a `(runnerId, seq)`
+   * already stored is skipped, so a resend after a reconnect changes nothing
+   * (D6) — and returns the new ack cursor. A throwing sink fails the batch
+   * before anything is stored: the ack holds and the runner resends it.
    */
   async events(runnerId: string, events: RunnerEvent[]): Promise<bigint> {
+    await this.sinks.dispatch(runnerId, events);
     await this.prisma.event.createMany({
       data: events.map((event) => ({
         runnerId,
