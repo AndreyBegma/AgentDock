@@ -36,6 +36,12 @@ export function PageNav({ user }: { user: PublicUser }) {
             Users
           </Link>
           <Link
+            href="/admin/runners"
+            className={buttonClassName({ variant: 'ghost' })}
+          >
+            Runners
+          </Link>
+          <Link
             href="/admin/settings"
             className={buttonClassName({ variant: 'ghost' })}
           >
