@@ -271,11 +271,14 @@ model Project {
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
 
-  runner         Runner          @relation(fields: [runnerId], references: [id], onDelete: Restrict)
-  defaultProfile RuntimeProfile? @relation(fields: [defaultProfileId], references: [id], onDelete: SetNull)
-  createdBy      User?           @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  runner         Runner             @relation(fields: [runnerId], references: [id], onDelete: Restrict)
+  defaultProfile RuntimeProfile?    @relation(fields: [defaultProfileId], references: [id], onDelete: SetNull)
+  createdBy      User?              @relation(fields: [createdById], references: [id], onDelete: SetNull)
   members        ProjectMember[]
   docsSource     DocsSource?
+  rounds         Round[]
+  slots          Slot[]
+  orchestrator   FleetOrchestrator?
 
   @@unique([runnerId, rootPath])
   @@map("projects")
@@ -320,4 +323,170 @@ model DocsSource {
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@map("docs_sources")
+}
+
+// ─── Fleet observation (docs/specs/11) ──────────────────────────────────────
+// Projections of fleet events. Every row is a pure function of the events: a
+// replayed event (`seq <= lastSeq`) changes nothing, and timestamps come from
+// event `ts`, never from the clock, so a replay leaves the rows identical (D8).
+
+/// `scraped`: parsed from a board file; `events`: from `events.jsonl` (M2.1).
+enum RoundSource {
+  scraped
+  events
+}
+
+enum SlotStatus {
+  dispatched
+  running
+  idle
+  prompt
+  quota
+  stale
+  ended
+}
+
+enum PaneState {
+  busy
+  prompt
+  idle
+  quota
+}
+
+enum PrState {
+  open
+  merged
+  closed
+}
+
+enum PrChecks {
+  pending
+  green
+  red
+}
+
+enum CheckpointKind {
+  picked_up
+  plan_ready
+  implementation_done
+  pr_open
+  blocked
+  misclassified
+  other
+}
+
+/// `unknown` is the absence of a row.
+enum OrchestratorStatus {
+  running
+  idle
+  absent
+}
+
+/// One orchestrator round: the header and four tables of `round-<HHMM>.md`.
+model Round {
+  id        String      @id @default(cuid())
+  projectId String
+  date      DateTime    @db.Date
+  /// `HHMM`.
+  label     String
+  base      String
+  occupied  Int
+  max       Int
+  free      Int
+  /// `{ dispatching, heldForLead, notDispatching, inFlight }`, rows keyed by column header.
+  decisions Json
+  source    RoundSource
+  boardPath String
+  /// Highest event `seq` applied; older ones are replays.
+  lastSeq   BigInt
+  createdAt DateTime
+  updatedAt DateTime
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, date, label])
+  @@map("rounds")
+}
+
+/// One run of a slot, from its brief or tmux session to its end. A name is
+/// reused by later runs, each a new row (`startedAt`). Ended slots are kept as
+/// history.
+model Slot {
+  id             String          @id @default(cuid())
+  projectId      String
+  name           String
+  issue          Int?
+  branch         String?
+  worktree       String
+  runtime        Runtime         @default(claude)
+  model          String?
+  modelWhy       String?
+  owns           Json
+  never          Json
+  lead           Boolean?
+  /// `YYYY-MM-DD/HHMM` of the brief that dispatched this run.
+  round          String?
+  /// Derived from the inputs below (spec 11 D8); never set on its own.
+  status         SlotStatus
+  /// null until the tmux session is first seen.
+  sessionAlive   Boolean?
+  pane           PaneState?
+  worktreeExists Boolean         @default(true)
+  ahead          Int?
+  behind         Int?
+  dirty          Boolean?
+  prNumber       Int?
+  prUrl          String?
+  prState        PrState?
+  prChecks       PrChecks?
+  prMergeable    Boolean?
+  lastCheckpoint CheckpointKind?
+  /// Highest event `seq` applied; older ones are replays.
+  lastSeq        BigInt
+  startedAt      DateTime
+  endedAt        DateTime?
+  updatedAt      DateTime
+
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  checkpoints SlotCheckpoint[]
+
+  @@unique([projectId, name, startedAt])
+  @@index([projectId, status])
+  @@map("slots")
+}
+
+/// A `##` heading of a slot's `.orchestrator-reply.md`. The file is
+/// append-only and has no timestamps, so a heading is identified by its
+/// position; `at` is when the runner first saw it.
+model SlotCheckpoint {
+  id       String         @id @default(cuid())
+  slotId   String
+  kind     CheckpointKind
+  heading  String
+  summary  String
+  position Int
+  at       DateTime
+
+  slot Slot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+
+  @@unique([slotId, position])
+  @@map("slot_checkpoints")
+}
+
+/// The orchestrator's presence on a project (D6) and the last board or brief
+/// the runner could not parse (D4). No row: nothing observed yet (`unknown`).
+model FleetOrchestrator {
+  projectId  String             @id
+  status     OrchestratorStatus
+  session    String?
+  /// When `status` last changed.
+  since      DateTime
+  /// `{ file, line, reason, at }` of the last `board.unparsed`, cleared by the next parsed round.
+  boardError Json?
+  lastSeq    BigInt
+  updatedAt  DateTime
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("fleet_orchestrators")
 }
