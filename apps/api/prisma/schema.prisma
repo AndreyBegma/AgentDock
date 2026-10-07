@@ -6,12 +6,66 @@ datasource db {
   provider = "postgresql"
 }
 
+enum Role {
+  admin
+  operator
+  viewer
+}
+
+enum UserStatus {
+  pending
+  active
+  rejected
+  disabled
+}
+
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String     @id @default(cuid())
+  email            String     @unique
+  name             String?
+  passwordHash     String
+  role             Role       @default(viewer)
+  status           UserStatus @default(pending)
+  approvedById     String?
+  approvedAt       DateTime?
+  failedLoginCount Int        @default(0)
+  lockedUntil      DateTime?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  approvedBy       User?         @relation("UserApprovals", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedUsers    User[]        @relation("UserApprovals")
+  sessions         UserSession[]
+  settingsUpdated  Setting[]
 
   @@map("users")
+}
+
+/// A login session. Named `UserSession` because `Session` is reserved for agent
+/// runtime sessions (docs/architecture/data-model.md).
+model UserSession {
+  id         String   @id @default(cuid())
+  tokenHash  String   @unique
+  userId     String
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  expiresAt  DateTime
+  ip         String?
+  userAgent  String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_sessions")
+}
+
+model Setting {
+  key         String   @id
+  value       Json
+  updatedAt   DateTime @updatedAt
+  updatedById String?
+
+  updatedBy User? @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@map("settings")
 }

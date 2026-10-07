@@ -14,16 +14,22 @@ User ─< ProjectMember >─ Project >─ Runner ─< RuntimeProfile
   │                        ├─< InstalledSkill
   │                        ├─< Budget
   │                        └─  DocsSource
+  ├─< UserSession (login sessions)
   ├─< AuditRecord
   └─< Notification
 Event (partitioned by month) · UsageRollup (hour × project × model × runtime)
 ModelPrice (versioned) · Webhook ─< WebhookDelivery · InboundTrigger
-Settings (registration open/closed, Telegram, …)
+Setting (key/value: registration open/closed, Telegram, …)
 ```
+
+`Session` is the agent runtime session. A login session is `UserSession`, so
+the two never share a name.
 
 | Entity | Key fields |
 |---|---|
-| `User` | email, passwordHash (argon2id), name, `status: pending\|active\|rejected\|disabled`, `role: admin\|operator\|viewer`, approvedBy, approvedAt, telegramChatId? |
+| `User` | email, passwordHash (argon2id), name, `status: pending\|active\|rejected\|disabled`, `role: admin\|operator\|viewer`, approvedBy, approvedAt, failedLoginCount, lockedUntil, telegramChatId? |
+| `UserSession` | userId, tokenHash (sha256 of the cookie token), createdAt, lastSeenAt, expiresAt, ip, userAgent — table `user_sessions` |
+| `Setting` | key (primary key), value (json), updatedBy — table `settings` |
 | `ProjectMember` | userId, projectId, role override (≤ global role) |
 | `Runner` | name, hostname, tokenHash, version, capabilities (json), lastSeenAt, revokedAt |
 | `RuntimeProfile` | runnerId, key, runtime, label, authenticated — mirrored from runner config |
