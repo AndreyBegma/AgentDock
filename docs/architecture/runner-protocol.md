@@ -14,7 +14,7 @@ schemas fails the build.
    (10 minutes, single use) and an install command.
 2. `agentdock-runner pair --server https://dock.example --code XXXX-XXXX`
 3. The runner posts `{ code, hostname, version, protocolVersion }` to
-   `POST <server>/api/runners/pair` (`PAIRING_PATH`). The API exchanges the code
+   `POST <server>/runners/pair` (`PAIRING_PATH`). The API exchanges the code
    for a long-lived runner token and the runner id: `{ runnerId, token }`. An
    invalid, expired or used code is a `400 { "error": "invalid_code" }`. The
    runner writes both to `~/.config/agentdock/runner.json` (mode 0600).
@@ -29,6 +29,10 @@ constant. Input is trimmed and upper-cased before validation: a person types it.
 server stores only its hash.
 
 ## Transport
+
+`<server>` is the API origin (in production the reverse proxy exposes it); the
+runner never goes through the web app's `/api` rewrite. Pairing and the socket
+both sit at the root of that origin.
 
 - The runner dials `wss://<server>/runner` with `Authorization: Bearer <token>`.
   Never the other way round: a runner behind NAT needs no open port.

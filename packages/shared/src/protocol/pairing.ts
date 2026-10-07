@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
-/** HTTP path the runner posts its pairing request to. */
-export const PAIRING_PATH = '/api/runners/pair';
+/** HTTP path, on the API origin, the runner posts its pairing request to. */
+export const PAIRING_PATH = '/runners/pair';
 
 /** Pairing code alphabet: no 0 O 1 I L, so a person reads it back unambiguously. */
 export const PAIRING_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
