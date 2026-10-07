@@ -5,6 +5,8 @@ import {
 } from '@agentdock/shared/protocol';
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { AuditService } from '../audit/audit.service';
+import { ANONYMOUS_ACTOR, type RequestOrigin } from '../audit/audit.types';
 import { PrismaService } from '../database/prisma.service';
 import {
   generateRunnerToken,
@@ -27,7 +29,12 @@ const invalidCode = () =>
     'The pairing code is invalid, expired or already used',
   );
 
-class InvalidCode extends Error {}
+/** `runnerId` when the code belonged to a runner — expired, used, or revoked. */
+class InvalidCode extends Error {
+  constructor(readonly runnerId: string | null = null) {
+    super('invalid pairing code');
+  }
+}
 
 /** `POST /runners/pair`: one-time code → long-lived runner token (spec D1, D2). */
 @Injectable()
@@ -37,11 +44,28 @@ export class PairingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly connections: RunnerConnections,
+    private readonly audit: AuditService,
   ) {}
 
-  async pair(dto: PairRunnerDto): Promise<PairingResponse> {
+  async pair(
+    dto: PairRunnerDto,
+    origin: RequestOrigin,
+  ): Promise<PairingResponse> {
+    // The code itself is never recorded — `code` is a redacted key anyway.
+    const denied = async (runnerId: string | null) => {
+      await this.audit.record({
+        actor: ANONYMOUS_ACTOR,
+        origin,
+        action: 'runner.pair',
+        target: { type: 'runner', id: runnerId },
+        after: { hostname: dto.hostname, version: dto.version },
+        result: 'denied',
+        meta: { reason: 'invalid_code' },
+      });
+      return invalidCode();
+    };
     const code = normalizePairingCode(dto.code);
-    if (!code) throw invalidCode();
+    if (!code) throw await denied(null);
     const codeHash = hashPairingCode(code);
 
     for (let attempt = 1; ; attempt += 1) {
@@ -56,9 +80,17 @@ export class PairingService {
           're-paired',
         );
         this.logger.log(`runner ${runnerId} paired`);
+        await this.audit.record({
+          actor: { type: 'runner', runnerId },
+          origin,
+          action: 'runner.pair',
+          target: { type: 'runner', id: runnerId },
+          after: { hostname: dto.hostname, version: dto.version },
+          result: 'ok',
+        });
         return { runnerId, token };
       } catch (error) {
-        if (error instanceof InvalidCode) throw invalidCode();
+        if (error instanceof InvalidCode) throw await denied(error.runnerId);
         const prefixTaken =
           error instanceof Prisma.PrismaClientKnownRequestError &&
           error.code === 'P2002';
@@ -84,13 +116,14 @@ export class PairingService {
           runner: { select: { revokedAt: true } },
         },
       });
-      if (!row || row.runner.revokedAt) throw new InvalidCode();
+      if (!row) throw new InvalidCode();
+      if (row.runner.revokedAt) throw new InvalidCode(row.runnerId);
       // Conditional: of two concurrent pairings with one code, one wins.
       const used = await tx.runnerPairingCode.updateMany({
         where: { id: row.id, usedAt: null, expiresAt: { gt: now } },
         data: { usedAt: now },
       });
-      if (used.count !== 1) throw new InvalidCode();
+      if (used.count !== 1) throw new InvalidCode(row.runnerId);
       await tx.runner.update({
         where: { id: row.runnerId },
         data: {

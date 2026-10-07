@@ -13,9 +13,13 @@ import {
   Param,
   Patch,
   Post,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { ThrottlerGuard } from '@nestjs/throttler';
+import type { Request } from 'express';
+import type { AuditContext } from '../audit/audit.types';
+import { AuditCtx, requestOrigin } from '../audit/audit-context';
 import type { AuthUser } from '../auth/auth-request';
 import { CurrentUser, Public, Roles } from '../auth/decorators';
 import { CreateRunnerDto, PairRunnerDto, RenameRunnerDto } from './dto';
@@ -32,8 +36,9 @@ export class AdminRunnersController {
   create(
     @Body() dto: CreateRunnerDto,
     @CurrentUser() admin: AuthUser,
+    @AuditCtx() ctx: AuditContext,
   ): Promise<PairingCodeResponse> {
-    return this.runners.create(dto.name, admin.id);
+    return this.runners.create(dto.name, admin.id, ctx);
   }
 
   @Get()
@@ -50,26 +55,36 @@ export class AdminRunnersController {
   rename(
     @Param('id') id: string,
     @Body() dto: RenameRunnerDto,
+    @AuditCtx() ctx: AuditContext,
   ): Promise<AdminRunner> {
-    return this.runners.rename(id, dto.name);
+    return this.runners.rename(id, dto.name, ctx);
   }
 
   @Post(':id/pairing-code')
   @HttpCode(200)
-  pairingCode(@Param('id') id: string): Promise<PairingCodeResponse> {
-    return this.runners.newPairingCode(id);
+  pairingCode(
+    @Param('id') id: string,
+    @AuditCtx() ctx: AuditContext,
+  ): Promise<PairingCodeResponse> {
+    return this.runners.newPairingCode(id, ctx);
   }
 
   @Post(':id/ping')
   @HttpCode(200)
-  ping(@Param('id') id: string): Promise<PingResult> {
-    return this.runners.ping(id);
+  ping(
+    @Param('id') id: string,
+    @AuditCtx() ctx: AuditContext,
+  ): Promise<PingResult> {
+    return this.runners.ping(id, ctx);
   }
 
   @Post(':id/revoke')
   @HttpCode(200)
-  revoke(@Param('id') id: string): Promise<AdminRunner> {
-    return this.runners.revoke(id);
+  revoke(
+    @Param('id') id: string,
+    @AuditCtx() ctx: AuditContext,
+  ): Promise<AdminRunner> {
+    return this.runners.revoke(id, ctx);
   }
 }
 
@@ -82,7 +97,10 @@ export class RunnerPairingController {
   @UseGuards(ThrottlerGuard)
   @Post(PAIRING_PATH)
   @HttpCode(200)
-  pair(@Body() dto: PairRunnerDto): Promise<PairingResponse> {
-    return this.pairing.pair(dto);
+  pair(
+    @Body() dto: PairRunnerDto,
+    @Req() request: Request,
+  ): Promise<PairingResponse> {
+    return this.pairing.pair(dto, requestOrigin(request));
   }
 }

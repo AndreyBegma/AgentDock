@@ -169,3 +169,47 @@ model Event {
   @@index([type, ts])
   @@map("events")
 }
+
+enum AuditActorType {
+  user
+  runner
+  system
+  anonymous
+}
+
+enum AuditResult {
+  ok
+  denied
+  error
+  requested
+}
+
+/// Append-only, hash-chained audit log (docs/specs/8). A trigger rejects UPDATE,
+/// DELETE and TRUNCATE. Actor and project ids are plain columns, not foreign
+/// keys: records outlive users and projects, and a SET NULL would be an UPDATE.
+model AuditRecord {
+  seq           BigInt         @id @default(autoincrement())
+  ts            DateTime       @default(now())
+  actorType     AuditActorType
+  actorUserId   String?
+  actorRunnerId String?
+  action        String
+  targetType    String
+  targetId      String?
+  projectId     String?
+  before        Json?
+  after         Json?
+  result        AuditResult
+  meta          Json?
+  /// `hash` of the previous record by `seq`; 64 zeros for the first.
+  prevHash      String
+  /// sha256(prevHash ‖ canonical(record)), hex.
+  hash          String         @unique
+
+  @@index([ts])
+  @@index([action, ts])
+  @@index([actorUserId, ts])
+  @@index([projectId, ts])
+  @@index([targetType, targetId])
+  @@map("audit_records")
+}

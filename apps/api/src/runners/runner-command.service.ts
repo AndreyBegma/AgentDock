@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { RUNNER_ERROR } from '@agentdock/shared';
+import { type AuditResult, RUNNER_ERROR } from '@agentdock/shared';
 import {
   type CommandErrorCode,
   type CommandName,
@@ -11,12 +11,16 @@ import {
   roleAtLeast,
 } from '@agentdock/shared/protocol';
 import { Injectable, Logger } from '@nestjs/common';
+import { AuditService } from '../audit/audit.service';
+import type { AuditContext } from '../audit/audit.types';
 import { type CommandOutcome, RunnerConnections } from './runner-connections';
 import { runnerError } from './runner-error';
 
 export interface SendOptions {
   /** The caller's role, checked against the command's minimum role. */
   role: Role;
+  /** Who sends it — a user, or `system` for scheduled work (spec 8 D8). */
+  ctx: AuditContext;
   /** Defaults to the command's own timeout, else 30 s. */
   timeoutMs?: number;
 }
@@ -35,7 +39,10 @@ export type CommandSendResult<N extends CommandName> =
 export class RunnerCommandService {
   private readonly logger = new Logger(RunnerCommandService.name);
 
-  constructor(private readonly connections: RunnerConnections) {}
+  constructor(
+    private readonly connections: RunnerConnections,
+    private readonly audit: AuditService,
+  ) {}
 
   async send<N extends CommandName>(
     runnerId: string,
@@ -48,7 +55,18 @@ export class RunnerCommandService {
       throw runnerError(400, RUNNER_ERROR.invalidCommand, parsed.error.message);
     }
     const definition = commands[name];
+    const id = `cmd_${randomUUID()}`;
+    const record = (result: AuditResult) =>
+      this.audit.record({
+        ...options.ctx,
+        action: 'runner.command',
+        target: { type: 'runner', id: runnerId },
+        after: { name, args: parsed.args },
+        result,
+        meta: { commandId: id },
+      });
     if (!roleAtLeast(options.role, definition.minRole)) {
+      await record('denied');
       throw runnerError(
         403,
         RUNNER_ERROR.forbidden,
@@ -56,10 +74,37 @@ export class RunnerCommandService {
       );
     }
 
+    // Recorded before it is sent, completed by a second record (spec D8).
+    await record('requested');
+    const result = await this.deliver(runnerId, id, name, parsed.args, options);
+    await this.audit.record({
+      ...options.ctx,
+      action: 'runner.command.result',
+      target: { type: 'runner', id: runnerId },
+      after:
+        result.status === 'ok'
+          ? { ok: true }
+          : {
+              ok: false,
+              error: result.status === 'error' ? result.error : 'unknown',
+            },
+      result: result.status === 'ok' ? 'ok' : 'error',
+      meta: { commandId: id, name },
+    });
+    return result;
+  }
+
+  private async deliver<N extends CommandName>(
+    runnerId: string,
+    id: string,
+    name: N,
+    args: unknown,
+    options: SendOptions,
+  ): Promise<CommandSendResult<N>> {
+    const definition = commands[name];
     const connection = this.connections.get(runnerId);
     if (!connection) return { status: 'unknown' };
 
-    const id = `cmd_${randomUUID()}`;
     const timeoutMs =
       options.timeoutMs ??
       ('timeoutMs' in definition && typeof definition.timeoutMs === 'number'
@@ -77,7 +122,7 @@ export class RunnerCommandService {
         clearTimeout(timer);
         resolve(o);
       });
-      if (!connection.send({ type: 'command', id, name, args: parsed.args })) {
+      if (!connection.send({ type: 'command', id, name, args })) {
         connection.forget(id);
         clearTimeout(timer);
         resolve({ kind: 'lost' });

@@ -13,6 +13,8 @@ import {
 } from '@agentdock/shared/protocol';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Prisma, type Runner } from '@prisma/client';
+import { AuditService } from '../audit/audit.service';
+import type { AuditContext } from '../audit/audit.types';
 import { PrismaService } from '../database/prisma.service';
 import { generatePairingCode, hashPairingCode } from './credentials';
 import { RunnerCommandService } from './runner-command.service';
@@ -51,10 +53,15 @@ export class RunnersService {
     private readonly prisma: PrismaService,
     private readonly connections: RunnerConnections,
     private readonly commands: RunnerCommandService,
+    private readonly audit: AuditService,
     @Inject(RUNNER_OPTIONS) private readonly options: RunnerOptions,
   ) {}
 
-  async create(name: string, adminId: string): Promise<PairingCodeResponse> {
+  async create(
+    name: string,
+    adminId: string,
+    ctx: AuditContext,
+  ): Promise<PairingCodeResponse> {
     const { runner, code, expiresAt } = await this.withFreshCode(async (tx) => {
       const created = await tx.runner.create({
         data: { name, createdById: adminId },
@@ -62,11 +69,21 @@ export class RunnersService {
       return { runner: created, ...(await this.issueCode(tx, created.id)) };
     });
     this.logger.log(`runner ${runner.id} created`);
+    await this.audit.record({
+      ...ctx,
+      action: 'runner.create',
+      target: { type: 'runner', id: runner.id },
+      after: { name: runner.name },
+      result: 'ok',
+    });
     return this.codeResponse(runner, code, expiresAt);
   }
 
   /** A new code for an unpaired or re-pairing runner; earlier unused ones die. */
-  async newPairingCode(id: string): Promise<PairingCodeResponse> {
+  async newPairingCode(
+    id: string,
+    ctx: AuditContext,
+  ): Promise<PairingCodeResponse> {
     const { runner, code, expiresAt } = await this.withFreshCode(async (tx) => {
       const found = await tx.runner.findUnique({
         where: { id },
@@ -81,6 +98,12 @@ export class RunnersService {
         );
       }
       return { runner: found, ...(await this.issueCode(tx, id)) };
+    });
+    await this.audit.record({
+      ...ctx,
+      action: 'runner.pairing_code',
+      target: { type: 'runner', id },
+      result: 'ok',
     });
     return this.codeResponse(runner, code, expiresAt, runner._count.profiles);
   }
@@ -129,13 +152,32 @@ export class RunnersService {
     };
   }
 
-  async rename(id: string, name: string): Promise<AdminRunner> {
+  async rename(
+    id: string,
+    name: string,
+    ctx: AuditContext,
+  ): Promise<AdminRunner> {
     const live = this.connections.get(id);
     try {
-      const runner = await this.prisma.runner.update({
-        where: { id },
-        data: { name },
-        include: activeProfiles,
+      const [before, runner] = await this.prisma.$transaction(async (tx) => {
+        const found = await tx.runner.findUniqueOrThrow({
+          where: { id },
+          select: { name: true },
+        });
+        const updated = await tx.runner.update({
+          where: { id },
+          data: { name },
+          include: activeProfiles,
+        });
+        return [found, updated] as const;
+      });
+      await this.audit.record({
+        ...ctx,
+        action: 'runner.rename',
+        target: { type: 'runner', id },
+        before: { name: before.name },
+        after: { name: runner.name },
+        result: 'ok',
       });
       return toAdminRunner(
         runner,
@@ -154,27 +196,37 @@ export class RunnersService {
   }
 
   /** D10: revokedAt set, socket closed 4401, row and events kept. */
-  async revoke(id: string): Promise<AdminRunner> {
-    const runner = await this.prisma.$transaction(async (tx) => {
+  async revoke(id: string, ctx: AuditContext): Promise<AdminRunner> {
+    const [before, runner] = await this.prisma.$transaction(async (tx) => {
       const found = await tx.runner.findUnique({ where: { id } });
       if (!found) throw notFound();
       await tx.runnerPairingCode.deleteMany({
         where: { runnerId: id, usedAt: null },
       });
       if (found.revokedAt) {
-        return tx.runner.findUniqueOrThrow({
+        const same = await tx.runner.findUniqueOrThrow({
           where: { id },
           include: activeProfiles,
         });
+        return [found, same] as const;
       }
-      return tx.runner.update({
+      const updated = await tx.runner.update({
         where: { id },
         data: { revokedAt: new Date() },
         include: activeProfiles,
       });
+      return [found, updated] as const;
     });
     this.connections.disconnect(id, RUNNER_CLOSE_CODES.unauthorized, 'revoked');
     this.logger.log(`runner ${id} revoked`);
+    await this.audit.record({
+      ...ctx,
+      action: 'runner.revoke',
+      target: { type: 'runner', id },
+      before: { revokedAt: before.revokedAt },
+      after: { revokedAt: runner.revokedAt },
+      result: 'ok',
+    });
     return toAdminRunner(
       runner,
       this.status(runner, undefined),
@@ -182,7 +234,7 @@ export class RunnersService {
     );
   }
 
-  async ping(id: string): Promise<PingResult> {
+  async ping(id: string, ctx: AuditContext): Promise<PingResult> {
     const runner = await this.prisma.runner.findUnique({
       where: { id },
       select: { revokedAt: true },
@@ -194,7 +246,7 @@ export class RunnersService {
       id,
       'runner.ping',
       {},
-      { role: 'admin', timeoutMs: this.options.pingTimeoutMs },
+      { role: 'admin', ctx, timeoutMs: this.options.pingTimeoutMs },
     );
     if (result.status === 'ok') {
       return { status: 'ok', rttMs: result.rttMs, ts: result.output.ts };
