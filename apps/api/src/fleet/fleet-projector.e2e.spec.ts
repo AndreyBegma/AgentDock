@@ -181,6 +181,34 @@ describe('fleet projector (e2e)', () => {
     expect((await slot()).id).toBe(rerun.id);
   });
 
+  it('appends a checkpoint without a position (events.jsonl), once', async () => {
+    await project(appeared());
+    const events = [
+      stream.next(
+        'slot.checkpoint',
+        { checkpoint: 'picked_up', summary: 'on it' },
+        { slot: 'i42', source: 'code-sentinel' },
+      ),
+      stream.next(
+        'slot.checkpoint',
+        { checkpoint: 'plan_ready', summary: 'plan' },
+        { slot: 'i42', source: 'code-sentinel' },
+      ),
+    ];
+    await project(...events);
+    await project(...events);
+    const row = await slot();
+    const checkpoints = await ctx.prisma.slotCheckpoint.findMany({
+      where: { slotId: row.id },
+      orderBy: { position: 'asc' },
+    });
+    expect(checkpoints.map((c) => [c.position, c.kind, c.heading])).toEqual([
+      [0, 'picked_up', 'picked_up'],
+      [1, 'plan_ready', 'plan_ready'],
+    ]);
+    expect(row.lastCheckpoint).toBe('plan_ready');
+  });
+
   it('creates checkpoints in order and sets lastCheckpoint and prUrl', async () => {
     await project(appeared());
     const checkpoint = (position: number, heading: string, kind: string) =>

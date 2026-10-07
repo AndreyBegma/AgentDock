@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   eventSchema,
   FLEET_EVENT_TYPES,
+  isFleetEventType,
   parseFleetEvent,
   type RunnerEvent,
+  runnerMessageSchema,
 } from '../protocol';
 import { checkpointFromHeading, rollupChecks } from './checks';
 
@@ -182,5 +186,22 @@ describe('fleet events', () => {
     expect(new Set(FLEET_EVENT_TYPES).size).toBe(FLEET_EVENT_TYPES.length);
     expect(FLEET_EVENT_TYPES).toContain('pane.busy');
     expect(FLEET_EVENT_TYPES).toContain('board.unparsed');
+  });
+
+  it('parses every fleet event documented in runner-protocol.md', () => {
+    const markdown = readFileSync(
+      join(__dirname, '../../../../docs/architecture/runner-protocol.md'),
+      'utf8',
+    );
+    const documented = [...markdown.matchAll(/```json\n([\s\S]*?)```/g)]
+      .map((m): unknown => JSON.parse(m[1]))
+      .filter((m) => (m as { type?: unknown }).type === 'events')
+      .map((m) => runnerMessageSchema.parse(m))
+      .flatMap((m) => (m.type === 'events' ? m.events : []))
+      .filter((e) => isFleetEventType(e.type));
+    expect(documented.length).toBeGreaterThan(0);
+    for (const e of documented) {
+      expect([e.type, parseFleetEvent(e)?.ok]).toEqual([e.type, true]);
+    }
   });
 });

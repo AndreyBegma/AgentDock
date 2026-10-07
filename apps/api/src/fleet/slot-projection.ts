@@ -191,17 +191,22 @@ export class SlotProjection {
     const { data } = event;
     const fields = {
       kind: data.checkpoint,
-      heading: data.heading,
+      heading: data.heading ?? data.checkpoint,
       summary: data.summary,
     };
+    // Without a position the checkpoint is appended; the `lastSeq` guard
+    // above keeps a replay from appending it twice.
+    const position =
+      data.position ??
+      ((
+        await this.tx.slotCheckpoint.aggregate({
+          where: { slotId: row.id },
+          _max: { position: true },
+        })
+      )._max.position ?? -1) + 1;
     await this.tx.slotCheckpoint.upsert({
-      where: { slotId_position: { slotId: row.id, position: data.position } },
-      create: {
-        slotId: row.id,
-        position: data.position,
-        at: applied.ts,
-        ...fields,
-      },
+      where: { slotId_position: { slotId: row.id, position } },
+      create: { slotId: row.id, position, at: applied.ts, ...fields },
       update: fields,
     });
     const last = await this.tx.slotCheckpoint.findFirstOrThrow({

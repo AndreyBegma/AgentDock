@@ -36,8 +36,14 @@ the two never share a name.
 | `RuntimeProfile` | runnerId, key (the profile `id` in the runner config), runtime, label (= key until the protocol carries one), binary?, env (paths only), args, authenticated, missing — mirrored from runner config, never deleted; unique `(runnerId, key)` — table `runtime_profiles` |
 | `Project` | runnerId (restrict — runners are revoked, never deleted), rootPath (the main checkout), repo (`owner/name`), displayName, baseBranch, baseSource `config\|origin_head\|gh\|default`, baseOverride?, readyLabelOverride?, defaultProfileId? (`SET NULL`; must be a profile of the same runner), mergeApproval (bool), codeSentinelConfig (json: the `orchestrator` block of `.code-analyzer-config.json` and/or its parse error), hasClaudeMd, hasAgentsMd, lastInspectedAt, createdBy? (`SET NULL` when that user is deleted) — unique `(runnerId, rootPath)` — table `projects` |
 | `DocsSource` | projectId (cascade, unique), kind `in_repo\|sibling_repo\|remote_repo\|none`, localPath?, repo?, isGitRepo, detectedBy?, evidence (json), classified (json: specs/adr/roadmap/reports paths), candidates (json), manual (an admin override, kept across refreshes) — table `docs_sources` |
-| `Round` | projectId, startedAt, label `HHMM`, occupied, max, decisions (json) |
-| `Slot` | projectId, name, issue, branch, worktree, runtime, model, modelWhy, status, prNumber, checks, lastCheckpoint, startedAt, endedAt |
+| `Round` | projectId (cascade), date, label `HHMM`, base, occupied, max, free, decisions (json: `dispatching`, `heldForLead`, `notDispatching`, `inFlight` rows keyed by column header), source `scraped\|events`, boardPath, lastSeq, createdAt, updatedAt — unique `(projectId, date, label)` — table `rounds` ([spec 11](../specs/11-fleet-observation.md)) |
+| `Slot` | one run of a slot: projectId (cascade), name, issue?, branch?, worktree, runtime, model?, modelWhy?, owns / never (json globs), lead?, round? (`YYYY-MM-DD/HHMM` of its brief), status `dispatched\|running\|idle\|prompt\|quota\|stale\|ended` (derived from sessionAlive?, pane?, worktreeExists, prState?), ahead?, behind?, dirty?, prNumber?, prUrl?, prChecks `pending\|green\|red`?, prMergeable?, lastCheckpoint?, lastSeq, startedAt, endedAt?, updatedAt — unique `(projectId, name, startedAt)`, index `(projectId, status)` — table `slots` |
+| `SlotCheckpoint` | slotId (cascade), kind, heading, summary, position (index of the heading in the reply file), at (first seen) — unique `(slotId, position)` — table `slot_checkpoints` |
+| `FleetOrchestrator` | projectId (primary key, cascade), status `running\|idle\|absent`? (null: never observed — `unknown`), session?, since?, boardError? (json: the last unparsed board or brief), lastSeq, updatedAt — table `fleet_orchestrators` |
+
+Fleet rows are projections of events: `lastSeq` is the highest event `seq`
+applied and timestamps come from event `ts`, so replaying events leaves them
+unchanged.
 | `Session` | runtime, externalId, projectId?, slotId?, runId?, cwd, model(s), startedAt, endedAt |
 | `LlmRequest` | sessionId, ts, model, token buckets, durationMs, costUsd, priceVersion, costSource `computed\|ingested` |
 | `Run` | kind, projectId, profileId, model, args, output `report\|pr`, status, result, prNumber?, triggeredBy (user / schedule / webhook) |

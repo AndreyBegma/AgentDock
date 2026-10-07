@@ -151,4 +151,19 @@ AndreyBegma/glass-ui#67. That is not a blocking dependency.
 | Show pane text snippets in the slot sheet before M2.3? | No — flags only |
 | Keep ended slots forever? | Yes, they are history (M2.6 builds on them) |
 
+## Notes from implementation
+
+i11-api, decided with the orchestrator on 2026-10-08:
+
+1. **Envelope source `scraped`.** `eventSourceSchema` gains `scraped`; until then the gateway would have rejected every markdown-derived event.
+2. **Event types beyond D7.** `pane.busy` (the pane shows `esc to interrupt` again — without it a slot never leaves `idle` or `prompt`) and `board.unparsed` (named by D4). Pane events carry `data.target: slot | orchestrator`, so the orchestrator's idle state has a carrier. Slot-scoped events name the slot in the envelope's `slot`; `data` does not repeat it. The shapes are in [event-schema.md → Fleet](../architecture/event-schema.md#fleet-spec-11).
+3. **`slot.checkpoint` carries `position`**, the index of the heading in the reply file. The file has no timestamps, so a rescan after a runner restart would otherwise duplicate every checkpoint; `slot_checkpoints` is unique on `(slotId, position)` instead of `(slotId, heading, at)`, and `at` is when the runner first saw it. `heading` and `position` are optional so a plugin `events.jsonl` checkpoint (M2.1) still parses; without a position it is appended.
+4. **Status is derived, never stored on its own.** `slots` keeps the inputs — `sessionAlive` (null until the session is first seen), `pane`, `worktreeExists`, `prState` — and `status` is a pure function of them (`deriveSlotStatus`). A new status, `dispatched`, covers a slot whose brief exists and whose session has not appeared yet. `round` (`YYYY-MM-DD/HHMM`) records the brief a run came from.
+5. **Runs.** A slot name is reused: an event belongs to the run whose `startedAt` is the latest at or before its `ts`. Only `session.appeared` (when the covering run is ended or absent) and `slot.dispatched` (for a round no run of that name carries, when the covering run already has a brief and has started, or is ended) start a new run. A brief that is rescanned updates the run that already carries its round.
+6. **Replays.** Every fleet row keeps `lastSeq`, the highest event `seq` applied; an event at or below it is skipped. Timestamps (`startedAt`, `endedAt`, `updatedAt`, `createdAt`, `at`, `since`) come from event `ts`, never the clock. Replaying the same events — in one batch or one at a time — leaves every row identical.
+7. **`fleet_orchestrators`** holds the orchestrator's presence (status null until observed, so the API reports `unknown`) and the last `board.unparsed`, shown on `GET /fleet` as `boardError` until the next board parses. Pane events for the orchestrator only count while it is `running` or `idle`: `pane.busy` → `running`, any other pane state → `idle`.
+8. **Ingest.** The projector is a runner event sink (`RunnerEventSinks`, owned by #12): each batch is projected before it is stored, in one transaction under a per-runner advisory lock. Data that does not fit is logged and skipped; a database failure fails the batch and the runner resends it. Changes publish `fleet` `{ kind, id }` on `project:<id>` after commit.
+9. **`orchestratorSession` is not a project setting yet.** It would alter `projects` and the watch list; the runner uses `agentdock-orchestrator`. Follow-up.
+10. **No audit actions.** The module only reads, so spec 8's retrofit table is unchanged.
+
 Depends on #10

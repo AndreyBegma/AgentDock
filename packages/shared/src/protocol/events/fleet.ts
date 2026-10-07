@@ -152,16 +152,18 @@ export const CHECKPOINT_SUMMARY_MAX_BYTES = 4096;
 
 export const slotCheckpointDataSchema = z.object({
   checkpoint: checkpointKindSchema,
-  /** The heading as written, without `## `. */
-  heading: z.string().min(1).max(500),
+  /** The heading as written, without `## `. Absent: the checkpoint's name. */
+  heading: z.string().min(1).max(500).optional(),
   /** The body under the heading, trimmed to `CHECKPOINT_SUMMARY_MAX_BYTES`. */
   summary: z.string().default(''),
   /**
-   * 0-based index of the heading among the file's `##` headings. The file is
-   * append-only and has no timestamps, so this identifies a checkpoint across
-   * rescans and runner restarts.
+   * 0-based index of the heading among the reply file's `##` headings. The
+   * file is append-only and has no timestamps, so this identifies a checkpoint
+   * across rescans and runner restarts; the reply collector always sends it.
+   * Absent (an `events.jsonl` checkpoint, emitted once): appended after the
+   * slot's last checkpoint.
    */
-  position: z.number().int().nonnegative(),
+  position: z.number().int().nonnegative().optional(),
   /** With `pr_open`: the URL from `pull request open — <url>`. */
   prUrl: z.url().optional(),
 });
