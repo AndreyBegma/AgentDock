@@ -1,0 +1,148 @@
+# Live read-only worker pane
+
+Issue: [#18](https://github.com/AndreyBegma/AgentDock/issues/18) · Roadmap: M2.3 ·
+Decisions: [ADR-0001](../adr/0001-control-plane-and-per-machine-runner.md),
+[ADR-0010](../adr/0010-typed-command-allowlist-on-the-runner.md),
+[runner-protocol.md](../architecture/runner-protocol.md) (`subscribe` / `pane`), [security.md](../architecture/security.md)
+
+## Summary
+
+The fleet page (#11) says *what state* a worker is in; this item lets a project
+member *watch* it: the terminal pane of a `cs-<slot>` session, streamed
+read-only into the slot sheet. The runner captures the pane only while someone
+is watching, sends only what changed, and stops when the last viewer leaves.
+Nothing can be typed into the pane from the browser — interactive attach is
+M3.6, admin-only.
+
+## Scope
+
+### In scope
+
+- Protocol messages `subscribe` / `unsubscribe` (server → runner) and `pane` (runner → server) for a slot, as already sketched in runner-protocol.md.
+- Runner pane streamer: `tmux capture-pane` at 1 s while subscribed, diff-only frames, viewer cap, idle stop.
+- API relay through `LiveService` on topic `pane:<projectId>:<slot>` with a membership authorizer.
+- Web pane panel in the slot sheet.
+
+### Out of scope
+
+- Input of any kind into the pane (M3.6).
+- The orchestrator's own session pane (only `cs-*` slots in this item).
+- Storing pane text. Frames are relayed, never persisted.
+
+## Decisions
+
+The person delegated all decisions on 2026-10-07; each below is the default
+taken, with its source.
+
+| # | Decision | Source |
+|---|---|---|
+| D1 | **Capture.** `tmux capture-pane -p -e -J -t cs-<slot> -S -<history>` every 1 s while at least one viewer is subscribed; `-e` keeps ANSI colour escapes, `-J` joins wrapped lines. History depth 2000 lines on the first frame, visible screen afterwards | runner-protocol.md; tmux man page [Confirmed] |
+| D2 | **Diff frames.** The first frame per subscription is `full { lines, cursor }`. Later frames are `patch { from, lines }` — replace lines from index `from` to the end — computed against the previous capture; no frame when nothing changed. A `full` is resent every 60 s and on resubscribe | new |
+| D3 | **Fan-out.** The runner keeps one capture loop per slot, regardless of how many API subscribers; the API keeps one runner subscription per slot and fans out to browser subscribers. When the last browser unsubscribes, the API sends `unsubscribe`; the runner stops the loop within 2 s | new |
+| D4 | **Limits.** Max 10 concurrent pane subscriptions per runner, 20 browser viewers per slot; over the cap → `error { code: "too_many_viewers" }`. Frame size capped at 256 KiB (lines truncated from the top) | new |
+| D5 | **Redaction.** Before sending, the runner masks strings that look like secrets (the same patterns as the plugin's trailer/secret guards: `ghp_…`, `sk-…`, `xox…`, `AKIA…`, `-----BEGIN … PRIVATE KEY-----`) with `•••`. Best-effort; documented as such | security.md |
+| D6 | **Authorization.** Topic `pane:<projectId>:<slot>` is registered with #9's `TopicAuthorizerRegistry`: allowed for any member of the project (viewer and up, #10 D11) and admins; the slot must belong to that project. The runner-side `subscribe` carries `{ projectId, root, slot }` and is checked against the watch list and the `.wt-<repo>-<slot>` rule (#10 D10) | ADR-0008, #9 D11 |
+| D7 | **Session end.** When `cs-<slot>` disappears the runner sends a final `pane { ended: true }` and drops the subscription; the web shows "session ended" with the last frame kept on screen | new |
+| D8 | **No persistence.** Frames are not written to `events` or any table. Audit records only `pane.watch_started` / `pane.watch_stopped` per user and slot (#8 action union) | security.md |
+| D9 | Slot session names: the runner accepts both `cs-<slot>` (current) and `cs-<prefix>--<slot>` (code-sentinel P11, [plugin#11](https://github.com/AndreyBegma/claude-code-plugin/issues/11)), parsing them in one shared helper `apps/runner/src/fleet/session-name.ts` owned by #11 (import it); a session belongs to a project only when its worktree path does. Other issues import the helper, never re-parse | #11 D12, plugin#11 |
+
+## Data / Schema
+
+None. No migration.
+
+## Protocol
+
+New file `packages/shared/src/protocol/pane.ts`, one export line in `index.ts`.
+
+| Direction | Type | Payload |
+|---|---|---|
+| S → R | `subscribe` | `{ id, kind: "pane", projectId, root, slot }` |
+| S → R | `unsubscribe` | `{ id }` |
+| R → S | `pane` | `{ id, frame: { type: "full", lines, cursor } \| { type: "patch", from, lines } \| { type: "ended" } }` |
+| R → S | `subscribe.error` | `{ id, code: "not_found" \| "too_many_viewers" \| "forbidden" }` |
+
+These replace the placeholder rows for `subscribe` / `unsubscribe` / `pane` in
+runner-protocol.md; i18-protocol updates that table.
+
+## API
+
+No REST endpoints. Browser clients subscribe on `/live` (#9) to
+`pane:<projectId>:<slot>` and receive `event` messages of type `pane.frame`
+(`data` = the frame) and `pane.ended`.
+
+## UI
+
+Slot sheet on `/projects/[projectId]/fleet` gains a **Pane** tab:
+
+- uses glass-ui `LogViewer` from [AndreyBegma/glass-ui#70](https://github.com/AndreyBegma/glass-ui/issues/70) (ANSI colours, follow-tail with pause, search) when released; until then a `<pre>` styled with tokens (`font-mono`, `bg-raised`, `text-ink-2`) that strips ANSI;
+- header: live dot (connected / reconnecting / ended), viewer count, "read-only" chip;
+- the panel subscribes when the tab opens and unsubscribes when it closes or the sheet closes.
+
+## Configuration
+
+| Key | Where | Meaning |
+|---|---|---|
+| `pane.intervalMs` | runner config | capture interval, default 1000 |
+| `pane.maxSubscriptions` | runner config | default 10 |
+
+## Acceptance criteria
+
+- [ ] With a fixture tmux session `cs-i42` printing a counter, a subscribed browser receives a `full` frame within 2 s and then only `patch` frames; when output stops, no frames are sent.
+- [ ] ANSI colour escapes reach the client unchanged (LogViewer) or are stripped (fallback `<pre>`), never shown as raw `\x1b[` text.
+- [ ] Opening the pane from two browsers starts exactly one capture loop on the runner; closing both stops it within 2 s (asserted by counting `capture-pane` invocations through a shim).
+- [ ] Killing `cs-i42` delivers `ended` and the last frame stays visible.
+- [ ] A frame containing `ghp_` followed by 36 characters is delivered masked.
+- [ ] The 11th concurrent subscription on one runner gets `too_many_viewers`.
+- [ ] No pane text is found in the database after a session (asserted by querying `events` and `audit_records`).
+- [ ] **Authorization:** a non-member of the project cannot subscribe to `pane:<projectId>:<slot>` (`forbidden`); a member of project A cannot subscribe to a slot of project B by naming it under A's id (`not_found`); there is no message type through which a browser can send input to the pane.
+- [ ] `bun run check`, `bun run test`, `bun run build` pass.
+
+## Parallel plan
+
+| Slot | Owns | Touches | Depends on | Lead | Model |
+|---|---|---|---|---|---|
+| i18-protocol | pane messages, runner-protocol.md table | packages/shared/src/protocol/pane.ts, packages/shared/src/protocol/messages.ts, packages/shared/src/protocol/index.ts, docs/architecture/runner-protocol.md | — | yes | opus |
+| i18-runner | capture loop, diff, redaction | apps/runner/src/pane/**, the runner message dispatcher from #5 (one registration line for `subscribe` / `unsubscribe`) | i18-protocol | no | sonnet |
+| i18-api | relay, authorizer, audit actions | apps/api/src/pane/**, apps/api/src/app.module.ts, packages/shared/src/audit/actions.ts | i18-protocol | no | opus |
+| i18-web | Pane tab | apps/web/src/app/(app)/projects/[projectId]/fleet/**, apps/web/src/lib/pane/** | i18-api | no | sonnet |
+
+i18-runner and i18-api run in parallel after the protocol lead merges.
+
+## Contention
+
+| Resource | Owner | Everyone else |
+|---|---|---|
+| packages/shared/src/protocol/messages.ts | i18-protocol | the message union is extended, not rewritten; #17 does not touch it. Keep both on conflict |
+| packages/shared/src/protocol/index.ts | i18-protocol | append-only; keep both |
+| apps/api/src/app.module.ts | i18-api | append-only; keep both imports |
+| packages/shared/src/audit/actions.ts | i18-api | append-only union from #8; keep both |
+| apps/web/src/app/(app)/projects/[projectId]/fleet/** | i18-web | also edited by #16 and #17 web slots — one open PR at a time (orchestrator Phase 2 holds the others `BLOCKED — work`) |
+| bun.lock | regenerated per [#5's rule](5-runner-daemon-and-protocol.md#contention) | — |
+
+Append-only registries shared across issues (keep both on conflict):
+`apps/api/src/app.module.ts`, `packages/shared/src/protocol/commands.ts`,
+`packages/shared/src/protocol/index.ts`, the runner command handler registry
+from #5, `apps/runner/src/collectors/index.ts`, `apps/web/src/components/shell/nav.ts`.
+`apps/api/prisma/schema.prisma` is not touched by this item.
+
+Cross-repository: prefers glass-ui `LogViewer` from AndreyBegma/glass-ui#70;
+not a blocking dependency.
+
+## Risks
+
+| Risk | Severity | Mitigation |
+|---|---|---|
+| Pane shows secrets typed or printed by an agent | high | read-only, members only, best-effort redaction (D5), no persistence (D8) |
+| 1 s capture loops load a busy machine | low | only while watched, one loop per slot, caps (D4) |
+| Wide ANSI-heavy panes produce large frames | low | patch frames, 256 KiB cap |
+
+## Open questions
+
+| Question | Default if nobody answers |
+|---|---|
+| Should viewers below operator see panes? | Yes — read-only, same as the rest of the fleet page |
+| Stream the orchestrator's own pane too? | Not in this item; candidate for the orchestrator card later |
+
+Depends on #9
+
+Depends on #11

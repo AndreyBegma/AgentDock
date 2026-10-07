@@ -56,6 +56,7 @@ taken, with its source.
 | D9 | **Live updates.** The web receives pushes through #9's `LiveService` on topic `project:<id>`. Each projection change publishes `{ kind: "slot" \| "round" \| "orchestrator", id }`, and clients refetch. | #9 |
 | D10 | **Authorization.** Every endpoint requires membership in the project (#10's project-access guard). No role beyond viewer is needed, because this item is read-only. | ADR-0008, #10 |
 | D11 | **Protocol export.** Each issue adds its own export line to `packages/shared/src/protocol/index.ts`. A conflict there is resolved by keeping both lines. | delegated rule shared with #12 |
+| D12 | Slot session names: the runner accepts both `cs-<slot>` (current) and `cs-<prefix>--<slot>` (code-sentinel P11, [plugin#11](https://github.com/AndreyBegma/claude-code-plugin/issues/11)), parsing them in one shared helper `apps/runner/src/fleet/session-name.ts` owned by #11; a session belongs to a project only when its worktree path does. Other issues import the helper, never re-parse | plugin#11 |
 
 ## Data / Schema
 
@@ -98,6 +99,7 @@ its brief's file name, `roundLabel` Json inside `decisions`.
 
 ## Acceptance criteria
 
+- [ ] `session-name.ts` parses `cs-i42-api` and `cs-agentdock--i42-api` to slot `i42-api`, ignores sessions whose worktree belongs to another repository, and is covered by unit tests.
 - [ ] With a fixture project (a temp git repo, a `.wt-<repo>-i42` worktree, a `cs-i42` tmux session running `sleep`), the fleet endpoint lists slot `i42` as `running` within 30 s, and as `stale` within 30 s after the session is killed while its branch has an unmerged commit.
 - [ ] Each pane fixture (trust dialog, bypass acceptance, credits menu, settings pre-approval, busy, empty prompt, quota banner) classifies to the same result as `watch.sh` on the same text.
 - [ ] Parsing a real-format `round-HHMM.md` and brief fixture yields the round header, every table row, the slot's model and reason, and the `owns:` / `never:` globs. A malformed board emits `board.unparsed` and the daemon keeps running.
@@ -106,7 +108,7 @@ its brief's file name, `roundLabel` Json inside `decisions`.
 - [ ] The orchestrator card shows `running` while `agentdock-orchestrator` runs in the project root and `absent` after it exits.
 - [ ] Replaying the same events twice produces identical `rounds`, `slots` and `slot_checkpoints` rows.
 - [ ] Projection changes reach an open fleet page without reload, within 5 s of ingest.
-- [ ] **Authorization:** a user who is not a member of project A gets 403 on every `/projects/A/fleet`, `/slots*` and `/rounds` route, even when they are a member of project B. Anonymous gets 401.
+- [ ] **Authorization:** a user who is not a member of project A gets 404 (per #10 D12) on every `/projects/A/fleet`, `/slots*` and `/rounds` route, even when they are a member of project B. Anonymous gets 401.
 - [ ] `bun run check`, `bun run test` and `bun run build` pass. Collectors are covered by fixture tests that need no real Claude session.
 
 ## Parallel plan
@@ -114,7 +116,7 @@ its brief's file name, `roundLabel` Json inside `decisions`.
 | Slot | Owns | Touches | Depends on | Lead | Model |
 |---|---|---|---|---|---|
 | i11-api | event types, schema, migration, projector, endpoints | packages/shared/src/protocol/events/fleet.ts, packages/shared/src/protocol/index.ts, apps/api/prisma/schema.prisma, apps/api/prisma/migrations/20261012000000_fleet/**, apps/api/src/fleet/**, apps/api/src/app.module.ts | — | yes | opus |
-| i11-runner | collectors | apps/runner/src/collectors/tmux/**, apps/runner/src/collectors/worktrees/**, apps/runner/src/collectors/board/**, apps/runner/src/collectors/replies/**, apps/runner/src/collectors/prs/**, apps/runner/src/collectors/orchestrator/**, apps/runner/src/collectors/fleet.ts | i11-api | no | opus |
+| i11-runner | collectors | apps/runner/src/collectors/tmux/**, apps/runner/src/fleet/session-name.ts, apps/runner/src/collectors/worktrees/**, apps/runner/src/collectors/board/**, apps/runner/src/collectors/replies/**, apps/runner/src/collectors/prs/**, apps/runner/src/collectors/orchestrator/**, apps/runner/src/collectors/fleet.ts | i11-api | no | opus |
 | i11-web | fleet page | apps/web/src/app/(app)/projects/[projectId]/fleet/**, apps/web/src/lib/fleet/**, apps/web/src/components/shell/nav.ts | i11-api | no | sonnet |
 
 i11-runner and i11-web are cut after i11-api merges (event types and API

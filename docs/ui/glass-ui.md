@@ -1,8 +1,7 @@
 # glass-ui in AgentDock
 
 [glass-ui](https://github.com/AndreyBegma/glass-ui) is the only component
-library (ADR-0011). Local checkout: `~/dev/glass-ui` (v0.15.0 at the time of
-writing).
+library (ADR-0011). Releases are tags on `main`, cut from `develop` through a release PR; `v0.21.0` ships the M1 desk primitives (glass-ui#67), `v0.22.0` the M2 activity primitives (#70), the next minor the M3 automation primitives (#74).
 
 ## Consumption
 
