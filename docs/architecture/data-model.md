@@ -31,8 +31,9 @@ the two never share a name.
 | `UserSession` | userId, tokenHash (sha256 of the cookie token), createdAt, lastSeenAt, expiresAt, ip, userAgent — table `user_sessions` |
 | `Setting` | key (primary key), value (json), updatedBy — table `settings` |
 | `ProjectMember` | userId, projectId, role override (≤ global role) |
-| `Runner` | name, hostname, tokenHash, version, capabilities (json), lastSeenAt, revokedAt |
-| `RuntimeProfile` | runnerId, key, runtime, label, authenticated — mirrored from runner config |
+| `Runner` | name, hostname, version, protocolVersion, os, arch, capabilities (json), tokenHash (argon2id), tokenPrefix (unique, first 8 chars), ackedSeq (highest contiguous event seq persisted), pairedAt, lastSeenAt, revokedAt, createdBy? — table `runners`; status is derived from the live socket, never stored |
+| `RunnerPairingCode` | runnerId, codeHash (sha256, unique), expiresAt, usedAt — table `runner_pairing_codes` |
+| `RuntimeProfile` | runnerId, key (the profile `id` in the runner config), runtime, label (= key until the protocol carries one), binary?, env (paths only), args, authenticated, missing — mirrored from runner config, never deleted; unique `(runnerId, key)` — table `runtime_profiles` |
 | `Project` | runnerId, rootPath, repo (`owner/name`), baseBranch, readyLabel, defaultProfileId, mergeApproval (bool), config (json snapshot of `.code-analyzer-config.json`) |
 | `DocsSource` | projectId, kind `in_repo\|sibling_repo\|remote_repo`, path/repo, detectedBy, specs/adr/roadmap paths, isGitRepo |
 | `Round` | projectId, startedAt, label `HHMM`, occupied, max, decisions (json) |
@@ -46,4 +47,4 @@ the two never share a name.
 | `AuditRecord` | ts, actorUserId?, actorRunnerId?, action, target, projectId?, before, after, result, prevHash, hash |
 | `Webhook` / `WebhookDelivery` | url, secret, events[], status, attempts, nextAttemptAt, responseCode |
 | `InboundTrigger` | name, secret, action (skill run / orchestrator next), projectId |
-| `Event` | runnerId, seq, ts, type, projectId?, slot?, issue?, data — unique `(runnerId, seq)` |
+| `Event` | runnerId, seq, ts, type, source, projectRepo?, projectRoot?, slot?, issue?, session? (json), data, receivedAt — unique `(runnerId, seq)`, index `(type, ts)`; projectId is added when projects land (M1.4) — table `events` |

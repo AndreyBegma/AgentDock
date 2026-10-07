@@ -115,9 +115,9 @@ describe('deriveStatus', () => {
   });
 
   it('is offline without a socket', () => {
-    expect(deriveStatus({ revokedAt: null, lastBeatAt: null }, now, stale)).toBe(
-      'offline',
-    );
+    expect(
+      deriveStatus({ revokedAt: null, lastBeatAt: null }, now, stale),
+    ).toBe('offline');
   });
 
   it('is online under 45 s since the last beat and stale from 45 s', () => {

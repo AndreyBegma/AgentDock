@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { PairingService } from './pairing.service';
+import { RunnerGateway } from './runner.gateway';
 import { RunnerCommandService } from './runner-command.service';
 import { RunnerConnections } from './runner-connections';
 import { RunnerIngestService } from './runner-ingest.service';
 import { defaultRunnerOptions, RUNNER_OPTIONS } from './runner-options';
-import { RunnerGateway } from './runner.gateway';
 import {
   AdminRunnersController,
   RunnerPairingController,

@@ -10,7 +10,12 @@ import type {
  * heartbeat is recent, `stale` when it is not, `offline` with no socket (or
  * never paired — see `pairedAt`), `revoked` once revoked (spec D5, D10).
  */
-export const RUNNER_STATUSES = ['online', 'stale', 'offline', 'revoked'] as const;
+export const RUNNER_STATUSES = [
+  'online',
+  'stale',
+  'offline',
+  'revoked',
+] as const;
 export type RunnerStatus = (typeof RUNNER_STATUSES)[number];
 
 /** A socket whose last heartbeat is older than this reads `stale` (spec D5). */

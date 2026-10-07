@@ -10,7 +10,9 @@ import { PrismaService } from '../database/prisma.service';
 import { advanceCursor, type SeqRange } from './ack-cursor';
 import { tokenPrefix, verifyRunnerToken } from './credentials';
 
-const json = (value: unknown): Prisma.InputJsonValue | typeof Prisma.JsonNull =>
+const json = (
+  value: unknown,
+): Prisma.InputJsonValue | typeof Prisma.JsonNull =>
   value === undefined || value === null
     ? Prisma.JsonNull
     : (value as Prisma.InputJsonValue);

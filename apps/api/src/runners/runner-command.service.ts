@@ -67,24 +67,22 @@ export class RunnerCommandService {
         : DEFAULT_COMMAND_TIMEOUT_MS);
     const sentAt = performance.now();
 
-    const outcome = await new Promise<CommandOutcome | 'timeout'>(
-      (resolve) => {
-        const timer = setTimeout(() => {
-          connection.forget(id);
-          resolve('timeout');
-        }, timeoutMs);
-        timer.unref();
-        connection.expect(id, (o) => {
-          clearTimeout(timer);
-          resolve(o);
-        });
-        if (!connection.send({ type: 'command', id, name, args: parsed.args })) {
-          connection.forget(id);
-          clearTimeout(timer);
-          resolve({ kind: 'lost' });
-        }
-      },
-    );
+    const outcome = await new Promise<CommandOutcome | 'timeout'>((resolve) => {
+      const timer = setTimeout(() => {
+        connection.forget(id);
+        resolve('timeout');
+      }, timeoutMs);
+      timer.unref();
+      connection.expect(id, (o) => {
+        clearTimeout(timer);
+        resolve(o);
+      });
+      if (!connection.send({ type: 'command', id, name, args: parsed.args })) {
+        connection.forget(id);
+        clearTimeout(timer);
+        resolve({ kind: 'lost' });
+      }
+    });
     const rttMs = Math.round(performance.now() - sentAt);
 
     if (outcome === 'timeout' || outcome.kind === 'lost') {

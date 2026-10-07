@@ -41,7 +41,7 @@ taken, with its source.
 |---|---|---|
 | D1 | Pairing code: 8 characters from an unambiguous alphabet, shown as `XXXX-XXXX`, valid 10 minutes, single use, stored as SHA-256. Creating a runner returns the code once together with the install / pair command | runner-protocol.md |
 | D2 | Runner token: 32 random bytes, base64url, returned once by `POST /runners/pair`; stored as argon2id hash plus a non-secret 8-character prefix (`tokenPrefix`) to find the row without scanning | security.md |
-| D3 | Gateway: `@nestjs/websockets` with the `ws` adapter on path `/runner`, same port as the API. Auth on upgrade from `Authorization: Bearer` (or the first-message `auth` fallback if #5 recorded it). Revoked or unknown token → close 4401. Protocol version mismatch → close 4400 with the supported version | runner-protocol.md |
+| D3 | Gateway: `@nestjs/websockets` with the `ws` adapter on path `/runner`, same port as the API. Auth from `Authorization: Bearer` on the upgrade request. The upgrade itself is accepted and a missing, unknown or revoked token is closed **4401** before any frame is processed — an HTTP 401 on the upgrade reaches the #5 daemon as 1006 and it would reconnect forever; 4401 is the code it stops on. Protocol version mismatch → close 4400 with the supported version. A first frame other than `hello` → close 1008 | runner-protocol.md; amended at implementation |
 | D4 | One live socket per runner; a new connection replaces the old one (old closed 4409) | new |
 | D5 | Status is derived: `online` while a socket is open and the last heartbeat is < 45 s old, `stale` after that, `offline` with no socket; `lastSeenAt` updated on every heartbeat | new — real connection state, not file mtimes (Mission Control lesson) |
 | D6 | Events persisted to `events` with unique `(runnerId, seq)`; duplicates ignored; `ack` sends the highest contiguous persisted `seq`. Partitioning by month is deferred until volume requires it (ADR-0007 allows it) | ADR-0007, runner-protocol.md |
@@ -57,10 +57,19 @@ New tables only; `runners.createdById` references `users` (from #3).
 
 | Table | Fields |
 |---|---|
-| `runners` | `id`, `name`, `hostname?`, `version?`, `protocolVersion?`, `os?`, `arch?`, `capabilities` Json?, `tokenHash?`, `tokenPrefix?` unique, `pairedAt?`, `lastSeenAt?`, `revokedAt?`, `createdById` → users, `createdAt`, `updatedAt` |
-| `runner_pairing_codes` | `id`, `runnerId` → runners, `codeHash` unique, `expiresAt`, `usedAt?` |
-| `runtime_profiles` | `id`, `runnerId` → runners, `key`, `runtime` (`claude` \| `codex`), `label`, `env` Json (paths only), `args` Json, `authenticated` Bool, `missing` Bool default false, `updatedAt`; unique `(runnerId, key)` |
-| `events` | `id` BigInt autoincrement, `runnerId` → runners, `seq` BigInt, `ts`, `type`, `source`, `projectRepo?`, `slot?`, `issue?` Int, `data` Json, `receivedAt`; unique `(runnerId, seq)`; index `(type, ts)` |
+| `runners` | `id`, `name`, `hostname?`, `version?`, `protocolVersion?`, `os?`, `arch?`, `capabilities` Json?, `tokenHash?`, `tokenPrefix?` unique, `ackedSeq` BigInt default 0, `pairedAt?`, `lastSeenAt?`, `revokedAt?`, `createdById?` → users (on delete set null), `createdAt`, `updatedAt` |
+| `runner_pairing_codes` | `id`, `runnerId` → runners, `codeHash` unique, `expiresAt`, `usedAt?`, `createdAt` |
+| `runtime_profiles` | `id`, `runnerId` → runners, `key`, `runtime` (`claude` \| `codex`), `label`, `binary?`, `env` Json (paths only), `args` Json, `authenticated` Bool, `missing` Bool default false, `updatedAt`; unique `(runnerId, key)` |
+| `events` | `id` BigInt autoincrement, `runnerId` → runners, `seq` BigInt, `ts`, `type`, `source`, `projectRepo?`, `projectRoot?`, `slot?`, `issue?` Int, `session` Json?, `data` Json, `receivedAt`; unique `(runnerId, seq)`; index `(type, ts)` |
+
+Amended at implementation (approved on #6):
+
+- `runners.ackedSeq` holds the ack cursor (`welcome.ackedSeq`, `ack.seq`), advanced with `GREATEST` so a replaced connection finishing late never moves it back. A persisted `runner.spool_truncated` range counts as filled (runner-protocol.md "Delivery guarantees").
+- `runners.createdById` is nullable with `ON DELETE SET NULL`: deleting the admin who created a runner must not fail or take the runner with it.
+- `runtime_profiles.key` and `label` are both the profile `id` — the merged `runtimeProfileSchema` has no label; `binary` is mirrored because the profile carries it.
+- `events.session` and `events.projectRoot` keep the envelope fields the table had dropped; data dropped on ingest cannot be recovered later (M1.5 projections need the session).
+- The admin API's response types live in `@agentdock/shared` (`packages/shared/src/runners/`): `AdminRunner`, `AdminRunnerDetail`, `PairingCodeResponse`, `PingResult`, `RunnerStatus`, `RUNNER_ERROR`.
+- A runner never paired reads `offline`, with `pairedAt: null`.
 
 ## API
 
@@ -71,7 +80,7 @@ New tables only; `runners.createdById` references `users` (from #3).
 | GET | `/admin/runners` | admin | list with derived status, version, profiles count |
 | GET | `/admin/runners/:id` | admin | detail: capabilities, profiles, last 50 events |
 | PATCH | `/admin/runners/:id` | admin | `{ name }` |
-| POST | `/admin/runners/:id/ping` | admin | sends `runner.ping` through `RunnerCommandService`; returns round-trip ms |
+| POST | `/admin/runners/:id/ping` | admin | sends `runner.ping` through `RunnerCommandService` (5 s timeout); `PingResult`: `{ status: 'ok', rttMs, ts }`, `{ status: 'error', error }`, or `{ status: 'unknown' }` — at once when offline or revoked, at the timeout when unanswered |
 | POST | `/admin/runners/:id/revoke` | admin | D10 |
 | POST | `/runners/pair` | public (`@Public()`), throttled 10/min/IP | `{ code, hostname, version, protocolVersion }` → `{ runnerId, token }`; invalid/expired/used → 400 `invalid_code` |
 | WS | `/runner` | runner token | gateway per D3–D7 |

@@ -98,6 +98,11 @@ export class RunnerConnections {
     }
   }
 
+  /** The open connections right now, by runner id. */
+  snapshot(): Map<string, LiveConnection> {
+    return new Map([...this.live].filter(([, c]) => c.isOpen));
+  }
+
   get(runnerId: string): LiveConnection | undefined {
     const connection = this.live.get(runnerId);
     return connection?.isOpen ? connection : undefined;

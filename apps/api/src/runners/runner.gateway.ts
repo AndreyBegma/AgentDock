@@ -8,10 +8,7 @@ import {
   runnerMessageSchema,
 } from '@agentdock/shared/protocol';
 import { Inject, Logger } from '@nestjs/common';
-import {
-  type OnGatewayConnection,
-  WebSocketGateway,
-} from '@nestjs/websockets';
+import { type OnGatewayConnection, WebSocketGateway } from '@nestjs/websockets';
 import type { RawData, WebSocket } from 'ws';
 import { bearerToken } from './credentials';
 import { LiveConnection, RunnerConnections } from './runner-connections';

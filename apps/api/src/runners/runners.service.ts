@@ -1,19 +1,22 @@
 import {
   type AdminRunner,
   type AdminRunnerDetail,
-  type PairingCodeResponse,
   PAIRING_CODE_TTL_MS,
+  type PairingCodeResponse,
   type PingResult,
   pairCommand,
   RUNNER_ERROR,
 } from '@agentdock/shared';
-import { type Capabilities, RUNNER_CLOSE_CODES } from '@agentdock/shared/protocol';
+import {
+  type Capabilities,
+  RUNNER_CLOSE_CODES,
+} from '@agentdock/shared/protocol';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Prisma, type Runner } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { generatePairingCode, hashPairingCode } from './credentials';
 import { RunnerCommandService } from './runner-command.service';
-import { RunnerConnections } from './runner-connections';
+import { type LiveConnection, RunnerConnections } from './runner-connections';
 import { runnerError } from './runner-error';
 import { toAdminEvent, toAdminProfile, toAdminRunner } from './runner-mapper';
 import { RUNNER_OPTIONS, type RunnerOptions } from './runner-options';
@@ -24,7 +27,8 @@ type Tx = Prisma.TransactionClient;
 const RECENT_EVENTS = 50;
 const ATTEMPTS = 3;
 
-const notFound = () => runnerError(404, RUNNER_ERROR.notFound, 'Runner not found');
+const notFound = () =>
+  runnerError(404, RUNNER_ERROR.notFound, 'Runner not found');
 
 const isUniqueViolation = (error: unknown): boolean =>
   error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -81,17 +85,27 @@ export class RunnersService {
     return this.codeResponse(runner, code, expiresAt, runner._count.profiles);
   }
 
+  // Every read takes the live sockets *before* the row: a socket goes live only
+  // after its `hello` is committed, so a socket seen here always comes with the
+  // row that `hello` wrote — never `online` next to the previous capabilities.
+
   async list(): Promise<AdminRunner[]> {
+    const live = this.connections.snapshot();
     const runners = await this.prisma.runner.findMany({
       orderBy: { createdAt: 'asc' },
       include: activeProfiles,
     });
     return runners.map((runner) =>
-      toAdminRunner(runner, this.status(runner), runner._count.profiles),
+      toAdminRunner(
+        runner,
+        this.status(runner, live.get(runner.id)),
+        runner._count.profiles,
+      ),
     );
   }
 
   async detail(id: string): Promise<AdminRunnerDetail> {
+    const live = this.connections.get(id);
     const runner = await this.prisma.runner.findUnique({
       where: { id },
       include: {
@@ -100,12 +114,11 @@ export class RunnersService {
       },
     });
     if (!runner) throw notFound();
-    const live = this.connections.get(id);
     const profiles = runner.profiles.map(toAdminProfile);
     return {
       ...toAdminRunner(
         runner,
-        this.status(runner),
+        this.status(runner, live),
         profiles.filter((p) => !p.missing).length,
       ),
       capabilities: (runner.capabilities ?? null) as Capabilities | null,
@@ -117,13 +130,18 @@ export class RunnersService {
   }
 
   async rename(id: string, name: string): Promise<AdminRunner> {
+    const live = this.connections.get(id);
     try {
       const runner = await this.prisma.runner.update({
         where: { id },
         data: { name },
         include: activeProfiles,
       });
-      return toAdminRunner(runner, this.status(runner), runner._count.profiles);
+      return toAdminRunner(
+        runner,
+        this.status(runner, live),
+        runner._count.profiles,
+      );
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -143,7 +161,12 @@ export class RunnersService {
       await tx.runnerPairingCode.deleteMany({
         where: { runnerId: id, usedAt: null },
       });
-      if (found.revokedAt) return tx.runner.findUniqueOrThrow({ where: { id }, include: activeProfiles });
+      if (found.revokedAt) {
+        return tx.runner.findUniqueOrThrow({
+          where: { id },
+          include: activeProfiles,
+        });
+      }
       return tx.runner.update({
         where: { id },
         data: { revokedAt: new Date() },
@@ -152,7 +175,11 @@ export class RunnersService {
     });
     this.connections.disconnect(id, RUNNER_CLOSE_CODES.unauthorized, 'revoked');
     this.logger.log(`runner ${id} revoked`);
-    return toAdminRunner(runner, this.status(runner), runner._count.profiles);
+    return toAdminRunner(
+      runner,
+      this.status(runner, undefined),
+      runner._count.profiles,
+    );
   }
 
   async ping(id: string): Promise<PingResult> {
@@ -175,8 +202,10 @@ export class RunnersService {
     return result;
   }
 
-  private status(runner: Pick<Runner, 'id' | 'revokedAt'>) {
-    const live = this.connections.get(runner.id);
+  private status(
+    runner: Pick<Runner, 'revokedAt'>,
+    live: LiveConnection | undefined,
+  ) {
     return deriveStatus(
       { revokedAt: runner.revokedAt, lastBeatAt: live?.lastBeatAt ?? null },
       Date.now(),
@@ -189,7 +218,9 @@ export class RunnersService {
     tx: Tx,
     runnerId: string,
   ): Promise<{ code: string; expiresAt: Date }> {
-    await tx.runnerPairingCode.deleteMany({ where: { runnerId, usedAt: null } });
+    await tx.runnerPairingCode.deleteMany({
+      where: { runnerId, usedAt: null },
+    });
     const code = generatePairingCode();
     const expiresAt = new Date(Date.now() + PAIRING_CODE_TTL_MS);
     await tx.runnerPairingCode.create({
@@ -216,7 +247,11 @@ export class RunnersService {
     profilesCount = 0,
   ): PairingCodeResponse {
     return {
-      runner: toAdminRunner(runner, this.status(runner), profilesCount),
+      runner: toAdminRunner(
+        runner,
+        this.status(runner, this.connections.get(runner.id)),
+        profilesCount,
+      ),
       pairingCode: code,
       expiresAt: expiresAt.toISOString(),
       command: pairCommand(serverOrigin(), code),

@@ -42,7 +42,11 @@ describe('runners admin and pairing (e2e)', () => {
   });
 
   const pair = (body: object) =>
-    ctx.http().post('/runners/pair').set('X-Forwarded-For', nextIp()).send(body);
+    ctx
+      .http()
+      .post('/runners/pair')
+      .set('X-Forwarded-For', nextIp())
+      .send(body);
 
   describe('authorization', () => {
     it.each([
@@ -255,14 +259,15 @@ describe('runners admin and pairing (e2e)', () => {
     it('404 on an unknown runner', async () => {
       expect((await admin.get('/admin/runners/nope')).status).toBe(404);
       expect(
-        (await admin.send('patch', '/admin/runners/nope', { name: 'x' })).status,
+        (await admin.send('patch', '/admin/runners/nope', { name: 'x' }))
+          .status,
       ).toBe(404);
       expect(
         (await admin.send('post', '/admin/runners/nope/revoke')).status,
       ).toBe(404);
-      expect((await admin.send('post', '/admin/runners/nope/ping')).status).toBe(
-        404,
-      );
+      expect(
+        (await admin.send('post', '/admin/runners/nope/ping')).status,
+      ).toBe(404);
     });
 
     it('pinging an offline runner answers unknown at once', async () => {

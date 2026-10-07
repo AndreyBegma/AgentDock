@@ -8,7 +8,7 @@ import {
   type ServerMessage,
   serverMessageSchema,
 } from '@agentdock/shared/protocol';
-import type { INestApplication } from '@nestjs/common';
+import type { INestApplication, LoggerService } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import type { App } from 'supertest/types';
@@ -37,12 +37,14 @@ export interface RunnerE2eContext extends E2eContext {
 /** The app, listening on an ephemeral port, with the runner timings overridden. */
 export const createRunnerE2eApp = async (
   options: Partial<RunnerOptions> = {},
+  logger?: LoggerService,
 ): Promise<RunnerE2eContext> => {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(RUNNER_OPTIONS)
     .useValue({ ...defaultRunnerOptions, ...options })
     .compile();
   const app = moduleRef.createNestApplication<INestApplication<App>>();
+  if (logger) app.useLogger(logger);
   configureApp(app);
   await app.listen(0, '127.0.0.1');
   const origin = (await app.getUrl()).replace(/\/+$/, '');
@@ -214,6 +216,39 @@ export class TestRunnerSocket {
     const waiters = this.waiters;
     this.waiters = [];
     for (const w of waiters) w();
+  }
+}
+
+/** Keeps every line the app logs, so a test can search them for secrets. */
+export class CapturingLogger implements LoggerService {
+  readonly lines: string[] = [];
+
+  private keep(level: string, message: unknown, rest: unknown[]): void {
+    this.lines.push(
+      [level, message, ...rest]
+        .map((part) =>
+          typeof part === 'string'
+            ? part
+            : (JSON.stringify(part) ?? String(part)),
+        )
+        .join(' '),
+    );
+  }
+
+  log(message: unknown, ...rest: unknown[]) {
+    this.keep('log', message, rest);
+  }
+  error(message: unknown, ...rest: unknown[]) {
+    this.keep('error', message, rest);
+  }
+  warn(message: unknown, ...rest: unknown[]) {
+    this.keep('warn', message, rest);
+  }
+  debug(message: unknown, ...rest: unknown[]) {
+    this.keep('debug', message, rest);
+  }
+  verbose(message: unknown, ...rest: unknown[]) {
+    this.keep('verbose', message, rest);
   }
 }
 

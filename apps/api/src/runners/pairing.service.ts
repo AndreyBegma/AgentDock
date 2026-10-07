@@ -78,7 +78,11 @@ export class PairingService {
       const now = new Date();
       const row = await tx.runnerPairingCode.findUnique({
         where: { codeHash },
-        select: { id: true, runnerId: true, runner: { select: { revokedAt: true } } },
+        select: {
+          id: true,
+          runnerId: true,
+          runner: { select: { revokedAt: true } },
+        },
       });
       if (!row || row.runner.revokedAt) throw new InvalidCode();
       // Conditional: of two concurrent pairings with one code, one wins.
