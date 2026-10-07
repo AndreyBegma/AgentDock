@@ -9,4 +9,4 @@ spec; large rows split into a `## Parallel plan` there.
 
 | Issue | Spec | Roadmap | Status |
 |---|---|---|---|
-| — | — | M1.1 Auth & access | not specified |
+| [#3](https://github.com/AndreyBegma/AgentDock/issues/3) | [3-auth-and-access](3-auth-and-access.md) | M1.1 Auth & access | queued |
