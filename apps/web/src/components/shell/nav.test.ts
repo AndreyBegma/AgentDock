@@ -12,17 +12,18 @@ describe('visibleNav', () => {
     expect(sections).toEqual(['overview']);
   });
 
-  test('an admin gets Runners, Users and Settings; Audit waits for its page', () => {
+  test('an admin gets Runners, Users, Audit and Settings', () => {
     expect(labels('admin', '/')).toEqual([
       'overview/Overview',
       'admin/Runners',
       'admin/Users',
+      'admin/Audit',
       'admin/Settings',
     ]);
   });
 
-  test('disabled entries are hidden for everyone', () => {
-    expect(labels('admin', '/').join()).not.toContain('Audit');
+  test('a viewer never sees Audit', () => {
+    expect(labels('viewer', '/').join()).not.toContain('Audit');
   });
 });
 

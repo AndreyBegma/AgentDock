@@ -142,8 +142,7 @@ export const NAV: NavSection[] = [
         label: 'Audit',
         icon: ScrollText,
         minRole: 'admin',
-        // The page arrives with #8's web half, which flips this.
-        enabled: false,
+        enabled: true,
       },
       {
         id: 'admin-settings',
