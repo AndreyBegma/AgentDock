@@ -5,8 +5,6 @@ import { Card } from 'glass-ui/card';
 import { toast } from 'glass-ui/toast';
 import { Toggle } from 'glass-ui/toggle';
 import { useEffect, useState } from 'react';
-import { AuthGate } from '../../../components/auth-gate';
-import { PageNav } from '../../../components/page-nav';
 import { api, describeError } from '../../../lib/api';
 
 function RegistrationCard() {
@@ -53,14 +51,5 @@ function RegistrationCard() {
 }
 
 export default function AdminSettingsPage() {
-  return (
-    <AuthGate requiredRole="admin">
-      {(user) => (
-        <>
-          <PageNav user={user} />
-          <RegistrationCard />
-        </>
-      )}
-    </AuthGate>
-  );
+  return <RegistrationCard />;
 }

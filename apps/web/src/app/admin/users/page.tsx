@@ -16,8 +16,7 @@ import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
 import { Tabs, TabsItem } from 'glass-ui/tabs';
 import { toast } from 'glass-ui/toast';
 import { useCallback, useEffect, useState } from 'react';
-import { AuthGate } from '../../../components/auth-gate';
-import { PageNav } from '../../../components/page-nav';
+import { useCurrentUser } from '../../../components/shell/user-context';
 import { api, describeError } from '../../../lib/api';
 
 const TABS: { status: UserStatus; label: string }[] = [
@@ -299,14 +298,5 @@ function UsersTable({ viewer }: { viewer: string }) {
 }
 
 export default function AdminUsersPage() {
-  return (
-    <AuthGate requiredRole="admin">
-      {(user) => (
-        <>
-          <PageNav user={user} />
-          <UsersTable viewer={user.id} />
-        </>
-      )}
-    </AuthGate>
-  );
+  return <UsersTable viewer={useCurrentUser().id} />;
 }

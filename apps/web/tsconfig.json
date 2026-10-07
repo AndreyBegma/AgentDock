@@ -5,6 +5,7 @@
     "moduleResolution": "bundler",
     "target": "es2023",
     "lib": ["dom", "dom.iterable", "esnext"],
+    "types": ["bun", "node"],
     "jsx": "preserve",
     "allowJs": true,
     "noEmit": true,

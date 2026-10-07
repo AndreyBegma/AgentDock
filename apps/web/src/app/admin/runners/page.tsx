@@ -9,8 +9,6 @@ import { Field, Input } from 'glass-ui/field';
 import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
 import { toast } from 'glass-ui/toast';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
-import { AuthGate } from '../../../components/auth-gate';
-import { PageNav } from '../../../components/page-nav';
 import { api } from '../../../lib/api';
 import {
   describeRunnerError,
@@ -228,14 +226,5 @@ function RunnersTable() {
 }
 
 export default function AdminRunnersPage() {
-  return (
-    <AuthGate requiredRole="admin">
-      {(user) => (
-        <>
-          <PageNav user={user} />
-          <RunnersTable />
-        </>
-      )}
-    </AuthGate>
-  );
+  return <RunnersTable />;
 }
