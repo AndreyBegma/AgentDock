@@ -60,6 +60,7 @@
       "src/**/*.(t|j)s"
     ],
     "coverageDirectory": "coverage",
+    "testTimeout": 30000,
     "projects": [
       {
         "displayName": "unit",
@@ -94,8 +95,7 @@
         "setupFiles": [
           "<rootDir>/test/e2e-env.ts"
         ],
-        "testEnvironment": "node",
-        "testTimeout": 30000
+        "testEnvironment": "node"
       }
     ]
   }

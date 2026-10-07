@@ -54,5 +54,5 @@ describe('admin:create (e2e)', () => {
     });
     expect(after).toEqual(before);
     expect(await ctx.prisma.user.count()).toBe(1);
-  });
+  }, 150_000); // two cold ts-node runs of the real script
 });
