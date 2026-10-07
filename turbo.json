@@ -28,7 +28,8 @@
         "APP_ENV",
         "PORT",
         "WEB_URL",
-        "API_URL"
+        "API_URL",
+        "AUDIT_VERIFY_CRON"
       ]
     },
     "db:migrate": {

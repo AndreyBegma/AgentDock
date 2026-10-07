@@ -21,7 +21,7 @@ assets are those machines. The main threats:
 | **User auth** | email + password (argon2id); httpOnly, Secure, SameSite=Lax cookie session stored server-side; CSRF token on state-changing requests; login rate limit and lockout; session revoke on password change |
 | **Registration** | first admin via `bun run admin:create` (CLI, interactive or env); public registration off by default, toggled by admin; new users `pending` until an admin approves and assigns a role in one action |
 | **Authorization** | global role × project membership, checked in the API on every request and every runner command |
-| **Audit** | append-only `AuditRecord`, each row hashes the previous (`hash = sha256(prevHash ‖ canonical(row))`); a verification job reports breaks; DB role for the app has no UPDATE/DELETE on the table |
+| **Audit** | append-only `AuditRecord`, each row hashes the previous (`hash = sha256(prevHash ‖ canonical(row))`); a verification job reports breaks; a database trigger rejects UPDATE, DELETE and TRUNCATE; secrets are redacted before hashing; in production the app's DB role should also have no UPDATE/DELETE on the table ([spec 8](../specs/8-audit-log.md)) |
 | **Webhooks** | inbound: HMAC-SHA256 over raw body + timestamp, 5-minute replay window, per-trigger secret; GitHub App: GitHub signature. Outbound: HMAC-SHA256 `X-AgentDock-Signature`, retries with jittered backoff, circuit breaker, delivery log |
 | **Skills** | registry calls proxied through the runner; content hashed and stored; install shows the diff of files it adds; install and run are operator+ and audited |
 | **Secrets at rest** | webhook secrets and Telegram bot token encrypted with an app key (`APP_ENCRYPTION_KEY`, AES-256-GCM) |

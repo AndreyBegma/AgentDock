@@ -11,6 +11,8 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
+import type { AuditContext } from '../audit/audit.types';
+import { AuditCtx } from '../audit/audit-context';
 import type { AuthUser } from '../auth/auth-request';
 import { CurrentUser, Roles } from '../auth/decorators';
 import { SettingsService } from '../settings/settings.service';
@@ -38,28 +40,36 @@ export class AdminUsersController {
     @Param('id') id: string,
     @Body() dto: ApproveUserDto,
     @CurrentUser() admin: AuthUser,
+    @AuditCtx() ctx: AuditContext,
   ): Promise<AdminUser> {
-    return this.users.approve(id, dto.role, admin.id);
+    return this.users.approve(id, dto.role, admin.id, ctx);
   }
 
   @Post(':id/reject')
   @HttpCode(200)
-  reject(@Param('id') id: string): Promise<AdminUser> {
-    return this.users.reject(id);
+  reject(
+    @Param('id') id: string,
+    @AuditCtx() ctx: AuditContext,
+  ): Promise<AdminUser> {
+    return this.users.reject(id, ctx);
   }
 
   @Patch(':id')
   update(
     @Param('id') id: string,
     @Body() dto: UpdateUserDto,
+    @AuditCtx() ctx: AuditContext,
   ): Promise<AdminUser> {
-    return this.users.update(id, dto);
+    return this.users.update(id, dto, ctx);
   }
 
   @Delete(':id')
   @HttpCode(204)
-  remove(@Param('id') id: string): Promise<void> {
-    return this.users.remove(id);
+  remove(
+    @Param('id') id: string,
+    @AuditCtx() ctx: AuditContext,
+  ): Promise<void> {
+    return this.users.remove(id, ctx);
   }
 }
 
@@ -77,9 +87,10 @@ export class AdminSettingsController {
   async setRegistration(
     @Body() dto: RegistrationStateDto,
     @CurrentUser() admin: AuthUser,
+    @AuditCtx() ctx: AuditContext,
   ): Promise<RegistrationState> {
     return {
-      open: await this.settings.setRegistrationOpen(dto.open, admin.id),
+      open: await this.settings.setRegistrationOpen(dto.open, admin.id, ctx),
     };
   }
 }
