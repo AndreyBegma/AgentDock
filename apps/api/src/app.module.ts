@@ -8,6 +8,7 @@ import { HealthController } from './health.controller';
 import { LiveModule } from './live/live.module';
 import { ProjectsModule } from './projects/projects.module';
 import { RunnersModule } from './runners/runners.module';
+import { SessionsModule } from './sessions/sessions.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { RunnersModule } from './runners/runners.module';
     RunnersModule,
     LiveModule,
     ProjectsModule,
+    SessionsModule,
   ],
   controllers: [HealthController],
 })

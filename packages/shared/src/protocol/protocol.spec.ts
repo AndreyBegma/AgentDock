@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import {
   commands,
   type HelloMessage,
+  isSessionEventType,
   messageSchema,
   PAIRING_CODE_ALPHABET,
   PROJECT_INSPECTION_TIMEOUT_MS,
@@ -11,10 +12,13 @@ import {
   pairingRequestSchema,
   pairingResponseSchema,
   parseCommand,
+  parseSessionEvent,
   projectInspectionSchema,
+  type RunnerEvent,
   roleAtLeast,
   runnerMessageSchema,
   runnerMessageTypes,
+  SESSION_EVENT_TYPES,
   serverMessageSchema,
   serverMessageTypes,
   spoolTruncatedDataSchema,
@@ -204,6 +208,91 @@ describe('messageSchema', () => {
       args: { cmd: 'rm -rf /' },
     });
     expect(parsed.type).toBe('command');
+  });
+});
+
+describe('session events', () => {
+  const documented = (): RunnerEvent[] =>
+    docExamples()
+      .filter((m) => typeOf(m) === 'events')
+      .flatMap((m) => (m as { events: RunnerEvent[] }).events)
+      .filter((e) => isSessionEventType(e.type));
+
+  it('documents every session event type, and each example parses', () => {
+    const events = documented();
+    const types = new Set(events.map((e) => e.type));
+    for (const type of SESSION_EVENT_TYPES) {
+      if (type === 'turn.finished') continue; // same data as turn.started
+      expect(types).toContain(type);
+    }
+    for (const event of events) {
+      const parsed = parseSessionEvent(event);
+      expect(parsed?.ok ? 'ok' : parsed?.error).toBe('ok');
+    }
+  });
+
+  const base: RunnerEvent = {
+    v: 1,
+    seq: 1,
+    ts: '2026-10-07T18:40:00.000Z',
+    type: 'tool.call',
+    source: 'transcript',
+    session: { runtime: 'claude', id: 's1' },
+    data: {
+      toolUseId: 'tu1',
+      tool: 'Bash',
+      startedAt: '2026-10-07T18:40:00.000Z',
+    },
+  };
+
+  it('is null for a type it does not own', () => {
+    expect(parseSessionEvent({ ...base, type: 'slot.checkpoint' })).toBeNull();
+  });
+
+  it('drops any field outside the schema, so no content leaks through (D9)', () => {
+    const parsed = parseSessionEvent({
+      ...base,
+      data: {
+        ...(base.data as object),
+        input: { command: 'cat SENTINEL-SECRET' },
+        output: 'SENTINEL-OUTPUT',
+      },
+    });
+    expect(parsed?.ok).toBe(true);
+    expect(JSON.stringify(parsed)).not.toContain('SENTINEL');
+  });
+
+  it('refuses an event without an envelope session, or with bad data', () => {
+    expect(parseSessionEvent({ ...base, session: undefined })?.ok).toBe(false);
+    expect(parseSessionEvent({ ...base, data: { toolUseId: 'tu1' } })?.ok).toBe(
+      false,
+    );
+    expect(
+      parseSessionEvent({
+        ...base,
+        type: 'llm.request',
+        data: {
+          requestId: 'r',
+          model: 'm',
+          querySource: 'main',
+          tokens: {
+            input: -1,
+            output: 0,
+            cacheRead: 0,
+            cacheWrite5m: 0,
+            cacheWrite1h: 0,
+            reasoning: 0,
+          },
+        },
+      })?.ok,
+    ).toBe(false);
+    expect(
+      parseSessionEvent({
+        ...base,
+        type: 'session.observed',
+        data: { cwd: 'relative', startedAt: base.ts, parsed: true },
+      })?.ok,
+    ).toBe(false);
   });
 });
 

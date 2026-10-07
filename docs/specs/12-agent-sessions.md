@@ -147,3 +147,22 @@ AndreyBegma/glass-ui#67. That is not a blocking dependency.
 | Show the session `customTitle` when present? | Yes, as `title` |
 
 Depends on #10
+
+## Notes from implementation
+
+i12-api, decided with the orchestrator on 2026-10-08:
+
+1. **Runner event sinks.** Session events reach the sessions module through `RunnerEventSinks` (`apps/api/src/runners/runner-event-sinks.ts`), which #11 uses too. `RunnerIngestService.events()` runs `dispatch` → `createMany` → `advanceAck`. A sink skips bad data and throws only for infrastructure failures. A throw fails the whole batch: nothing is stored, the ack holds, the gateway closes 1011 (not terminal for the runner), and the runner resends from `welcome.ackedSeq`. Sinks are idempotent, because a resent or replayed batch is dispatched again.
+2. **`session.observed`** is the event that carries a session's metadata and correlation, re-sent when a field changes. It is not `session.appeared`, which is the runner's tmux event. The `data` schemas of every session event are in `packages/shared/src/protocol/events/sessions.ts`, and the wire rules in [runner-protocol.md](../architecture/runner-protocol.md#session-events).
+3. **Backfill moved to i12-adapters.** `session.backfill` lands in `commands.ts` together with its runner handler, because `CommandHandlers` fails the runner build for a command without one. `POST /admin/runners/:id/backfill` moves with it. The request type `BackfillRequest` is in `packages/shared/src/sessions`. The `ingestSince` default (D11) is the runner's concern; the API does nothing for it.
+4. **`durationApprox`** on `llm_requests` records the open-question default: a duration derived from timestamps is marked approximate.
+
+Also as built:
+
+- **Ingest.** One transaction per batch, with an upsert on each table's natural key: `(runnerId, runtime, externalId)`, `(sessionId, promptId)`, `(sessionId, requestId)` (last usage wins, D4), `(sessionId, toolUseId)`. A `tool.call` re-sent at its result fills in `endedAt`/`ok` and never clears them. An event for a session not yet observed creates a placeholder row (`cwd = ''`) that `session.observed` completes. A malformed event, or one with an unknown runtime, is logged and skipped; its raw row is still stored in `events`.
+- **Correlation trust.** `session.observed.projectId` is stored only when that project belongs to the sending runner. Otherwise the session has no project, so a runner cannot place sessions in another runner's project.
+- **Subagents.** A child is linked by `parent` on its own `session.observed` or by `childSessionId` on the spawning `tool.call`, whichever arrives first. It takes its parent's project and slot, and a later change to a parent's project reaches all its descendants. So a subagent is always visible to the same people as its root.
+- **List.** `GET /sessions` returns root sessions (`parentSessionId` null), newest first, paged by `cursor` (a session id) and `limit` (default 50, max 200). `totals` and `subagents` cover the whole subtree; `turns` and `toolCalls` count the session's own. Without `projectId` it lists every project the caller can see, admins included. Unassigned sessions appear only with `unassigned=true`, which is admin-only: a non-admin gets **403** `forbidden`. `unassigned` together with `projectId` is 400 `invalid_filter`. A `projectId` the caller cannot see is 404.
+- **Tree.** `GET /sessions/:id` returns a `SessionTreeNode`: `turns` (each with its `requests` and `tools`), then `unattributed` (requests and tools with no turn), then `subagents` (child sessions no tool call links). A tool call that spawned a subagent carries it as `child`, and the tool call's totals are the child's. Every node's totals are the sum of its children's, so the root's totals equal the list's totals for that session. A session the caller cannot see is 404.
+- **Cost.** `costUsd` in totals is a decimal string summed over priced requests, and `null` until #13 prices one.
+- **Live.** After each batch, `sessions.changed { sessionIds }` is published on `project:<id>` for project sessions and on `admin` for unassigned ones.
