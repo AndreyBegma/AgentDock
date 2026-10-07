@@ -106,7 +106,7 @@ its brief's file name, `roundLabel` Json inside `decisions`.
 - [ ] The orchestrator card shows `running` while `agentdock-orchestrator` runs in the project root and `absent` after it exits.
 - [ ] Replaying the same events twice produces identical `rounds`, `slots` and `slot_checkpoints` rows.
 - [ ] Projection changes reach an open fleet page without reload, within 5 s of ingest.
-- [ ] **Authorization:** a user who is not a member of project A gets 403 on every `/projects/A/fleet`, `/slots*` and `/rounds` route, even when they are a member of project B. Anonymous gets 401.
+- [ ] **Authorization:** a user who is not a member of project A gets 404 (per #10 D12) on every `/projects/A/fleet`, `/slots*` and `/rounds` route, even when they are a member of project B. Anonymous gets 401.
 - [ ] `bun run check`, `bun run test` and `bun run build` pass. Collectors are covered by fixture tests that need no real Claude session.
 
 ## Parallel plan
