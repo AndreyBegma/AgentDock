@@ -2,6 +2,7 @@ import type { Role } from '@agentdock/shared';
 import {
   Activity,
   BarChart3,
+  FolderGit2,
   History,
   LayoutDashboard,
   ListChecks,
@@ -47,6 +48,14 @@ export const NAV: NavSection[] = [
         minRole: 'viewer',
         enabled: true,
       },
+      {
+        id: 'projects',
+        href: '/projects',
+        label: 'Projects',
+        icon: FolderGit2,
+        minRole: 'viewer',
+        enabled: true,
+      },
     ],
   },
   {
@@ -84,7 +93,7 @@ export const NAV: NavSection[] = [
         label: 'Settings',
         icon: Settings,
         minRole: 'viewer',
-        enabled: false,
+        enabled: true,
       },
     ],
   },

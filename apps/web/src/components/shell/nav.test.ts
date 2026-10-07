@@ -15,11 +15,22 @@ describe('visibleNav', () => {
   test('an admin gets Runners, Users, Audit and Settings', () => {
     expect(labels('admin', '/')).toEqual([
       'overview/Overview',
+      'overview/Projects',
       'admin/Runners',
       'admin/Users',
       'admin/Audit',
       'admin/Settings',
     ]);
+  });
+
+  test('a viewer sees Projects, and project Settings inside a project', () => {
+    expect(labels('viewer', '/')).toEqual([
+      'overview/Overview',
+      'overview/Projects',
+    ]);
+    expect(labels('viewer', '/projects/p1/settings')).toContain(
+      'project/Settings',
+    );
   });
 
   test('a viewer never sees Audit', () => {

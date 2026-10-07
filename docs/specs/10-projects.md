@@ -223,6 +223,13 @@ Also as built:
 - **Audit.** Contrary to "Out of scope" above, this item records its own actions. They are listed in [spec 8's retrofit table](8-audit-log.md#retrofit--actions-recorded-by-this-item).
 - **Live.** `project:<id>` is authorized by `ProjectAccessService.resolve`: an id that does not exist is `forbidden`, for admins too.
 
+i10-web:
+
+- **A project's home is `/projects/<id>`.** The switcher, the palette's "Go to project…" and the list rows all link there. Only `app/(app)/projects/[projectId]/page.tsx` redirects, to `/settings`, the one project page that exists. When #11 adds the fleet page it changes that one redirect and nothing else.
+- **Nav.** `Projects` (`/projects`, every role) joins Overview, and the project-scoped `Settings` entry is enabled. Fleet, Queue and History stay disabled until #11–#13.
+- **Errors.** `ApiError` carries `suggestedPath`, so the connect dialog offers "Use this path" after a `not_main_checkout` answer. A preview of a non-main checkout or a non-GitHub origin disables Connect, as the API would refuse it.
+- **Live.** The settings page subscribes to `project:<id>` and reloads on any frame. The API publishes none yet, so the list and the page otherwise poll or reload on action.
+
 Depends on #6
 
 Depends on #9
