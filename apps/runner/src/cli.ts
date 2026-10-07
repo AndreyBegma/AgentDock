@@ -36,7 +36,9 @@ export interface CliDeps {
 const USAGE = `Usage: agentdock-runner <command>
 
 Commands:
-  pair --server <url> --code <XXXX-XXXX>   pair this machine with an AgentDock server
+  pair --server <url> --code <XXXX-XXXX> [--no-detect]
+                                           pair this machine with an AgentDock server
+                                           (detects runtime profiles unless --no-detect)
   run                                      run the daemon in the foreground
   status                                   show config, connectivity and spool
   profiles [--detect [--write]]            list runtime profiles, or detect them
@@ -73,9 +75,14 @@ const pairCommand = async ({
   log,
   args,
 }: Context): Promise<number> => {
-  const { server, code } = flags(args, {
+  const {
+    server,
+    code,
+    'no-detect': noDetect,
+  } = flags(args, {
     server: { type: 'string' },
     code: { type: 'string' },
+    'no-detect': { type: 'boolean' },
   });
   if (!server || !code) throw new UsageError('pair needs --server and --code');
   const origin = normalizeServer(server);
@@ -94,17 +101,32 @@ const pairCommand = async ({
       previousRunnerId: config.runnerId,
     });
   }
+  // Existing profiles are never overwritten; detection fills an empty list only.
+  const detected =
+    !noDetect && config.profiles.length === 0
+      ? detectProfiles(deps.env, paths.home)
+      : null;
   saveConfig(paths.configFile, {
     ...config,
     server: origin,
     runnerId: paired.runnerId,
     token: paired.token,
+    profiles: detected ?? config.profiles,
   });
   log.info('paired', { runnerId: paired.runnerId, server: origin });
   out(
     deps,
     `Paired as ${paired.runnerId}. Config written to ${paths.configFile}`,
   );
+  if (detected) {
+    out(deps, `Detected ${detected.length} profiles:`);
+    for (const p of withAuthentication(detected, paths.home)) {
+      out(
+        deps,
+        `  ${p.id}  ${p.runtime}  ${p.authenticated ? 'authenticated' : 'not authenticated'}`,
+      );
+    }
+  }
   return EXIT.ok;
 };
 
@@ -123,6 +145,11 @@ const runCommand = async ({
     return EXIT.failure;
   }
   log.addSecret(config.token);
+  if (config.profiles.length === 0) {
+    log.warn(
+      'no runtime profiles configured; nothing can be launched. Run `agentdock-runner profiles --detect --write`',
+    );
+  }
   const reason = await runDaemon({
     config,
     home: paths.home,

@@ -10,7 +10,7 @@ capabilities and runtime profiles, spools events and answers typed commands
 
 | Command | What it does |
 |---|---|
-| `pair --server <api-origin> --code XXXX-XXXX` | exchanges a pairing code for a runner id and token |
+| `pair --server <api-origin> --code XXXX-XXXX [--no-detect]` | exchanges a pairing code for a runner id and token; when the config has no profiles yet, also detects and writes them (`--no-detect` skips it, existing profiles are never overwritten) |
 | `run` | the daemon, in the foreground |
 | `status` | config, spool and whether the server answers |
 | `profiles [--detect [--write]]` | configured profiles; `--detect` proposes them, `--write` stores the proposal |
