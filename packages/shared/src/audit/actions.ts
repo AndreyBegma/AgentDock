@@ -21,6 +21,14 @@ export const AUDIT_ACTIONS = [
   'runner.revoke',
   'runner.command',
   'runner.command.result',
+  'project.connect',
+  'project.delete',
+  'project.update',
+  'project.member_add',
+  'project.member_update',
+  'project.member_remove',
+  'project.docs_source_override',
+  'project.docs_source_reset',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
