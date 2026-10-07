@@ -7,9 +7,12 @@
     "start": "node dist/src/main",
     "start:dev": "nest start --watch",
     "lint": "biome lint src",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:cov": "jest --coverage",
+    "test": "jest --runInBand",
+    "test:unit": "jest --selectProjects unit",
+    "test:e2e": "jest --runInBand --selectProjects e2e",
+    "test:watch": "jest --watch --selectProjects unit",
+    "test:cov": "jest --runInBand --coverage",
+    "admin:create": "ts-node src/cli/admin-create.ts",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:generate": "prisma generate",
@@ -53,20 +56,47 @@
     "typescript": "^6.0.2"
   },
   "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "src/**/*.(t|j)s"
     ],
-    "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "coverageDirectory": "coverage",
+    "projects": [
+      {
+        "displayName": "unit",
+        "moduleFileExtensions": [
+          "js",
+          "json",
+          "ts"
+        ],
+        "rootDir": "src",
+        "testRegex": ".*\\.spec\\.ts$",
+        "testPathIgnorePatterns": [
+          "\\.e2e\\.spec\\.ts$"
+        ],
+        "transform": {
+          "^.+\\.ts$": "ts-jest"
+        },
+        "testEnvironment": "node"
+      },
+      {
+        "displayName": "e2e",
+        "moduleFileExtensions": [
+          "js",
+          "json",
+          "ts"
+        ],
+        "rootDir": "src",
+        "testRegex": ".*\\.e2e\\.spec\\.ts$",
+        "transform": {
+          "^.+\\.ts$": "ts-jest"
+        },
+        "globalSetup": "<rootDir>/test/global-setup.ts",
+        "setupFiles": [
+          "<rootDir>/test/e2e-env.ts"
+        ],
+        "testEnvironment": "node",
+        "testTimeout": 30000
+      }
+    ]
   }
 }
