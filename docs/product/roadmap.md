@@ -32,12 +32,12 @@ GitHub issue via `/code-sentinel:spec`; large rows split into waves there.
 
 | # | Item | Notes |
 |---|---|---|
-| M3.1 | Skills: skills.sh catalog, install, run with profile + model, report-or-PR | |
-| M3.2 | Cron schedules + missed-run policy | |
-| M3.3 | Webhooks: inbound triggers, outbound deliveries | |
-| M3.4 | GitHub App: issue / PR / check events | ADR-0004 |
-| M3.5 | Budgets: per project / per user, alert or hard stop | |
-| M3.6 | Interactive terminal attach (admin only, audited) | |
+| M3.1 | Skills: skills.sh catalog, install, run with profile + model, report-or-PR | · [#24](https://github.com/AndreyBegma/AgentDock/issues/24) |
+| M3.2 | Cron schedules + missed-run policy | · [#25](https://github.com/AndreyBegma/AgentDock/issues/25) |
+| M3.3 | Webhooks: inbound triggers, outbound deliveries | · [#26](https://github.com/AndreyBegma/AgentDock/issues/26) |
+| M3.4 | GitHub App: issue / PR / check events | ADR-0004 · [#27](https://github.com/AndreyBegma/AgentDock/issues/27) |
+| M3.5 | Budgets: per project / per user, alert or hard stop | · [#28](https://github.com/AndreyBegma/AgentDock/issues/28) |
+| M3.6 | Interactive terminal attach (admin only, audited) | · [#29](https://github.com/AndreyBegma/AgentDock/issues/29) |
 
 ## M4 — Codex
 
