@@ -1,6 +1,10 @@
 'use client';
 
-import { LIVE_CLOSE_CODES, type PublicUser } from '@agentdock/shared';
+import {
+  LIVE_CLOSE_CODES,
+  type ProjectSummary,
+  type PublicUser,
+} from '@agentdock/shared';
 import { Avatar } from 'glass-ui/avatar';
 import { Badge } from 'glass-ui/badge';
 import { Breadcrumb, type BreadcrumbItem } from 'glass-ui/breadcrumb';
@@ -23,7 +27,7 @@ import {
 import { NavRail, type NavRailGroup } from 'glass-ui/nav-rail';
 import { toast } from 'glass-ui/toast';
 import { useCommandPaletteShortcut } from 'glass-ui/use-command-palette-shortcut';
-import { LogOut, Palette, Search, User } from 'lucide-react';
+import { FolderGit2, LogOut, Palette, Search, User } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -145,6 +149,15 @@ export function AppShell({
   const [theme, setTheme] = useTheme();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const projectId = projectIdOf(pathname);
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+
+  useEffect(() => {
+    api<ProjectSummary[]>('/projects')
+      .then((list) => setProjects(Array.isArray(list) ? list : []))
+      .catch(() => {
+        // No project entries in the palette.
+      });
+  }, []);
 
   useCommandPaletteShortcut(() => setPaletteOpen(true));
 
@@ -208,6 +221,20 @@ export function AppShell({
       go.push({ id: 'go:/account', label: 'Account', hint: 'You', icon: User });
     }
     if (go.length > 0) result.push({ id: 'go', title: 'Go to', items: go });
+
+    const jump = projects
+      .filter((project) =>
+        matches(`project ${project.displayName} ${project.repo}`),
+      )
+      .map((project) => ({
+        id: `go:/projects/${project.id}`,
+        label: project.displayName,
+        hint: project.repo,
+        icon: FolderGit2,
+      }));
+    if (jump.length > 0) {
+      result.push({ id: 'projects', title: 'Go to project…', items: jump });
+    }
 
     const actions = [
       {

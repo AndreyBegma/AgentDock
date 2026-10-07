@@ -11,6 +11,8 @@ export class ApiError extends Error {
     readonly status: number,
     readonly code: AuthErrorCode | undefined,
     message: string,
+    /** With a projects `not_main_checkout`: the main checkout to use instead. */
+    readonly suggestedPath?: string,
   ) {
     super(message);
   }
@@ -53,12 +55,18 @@ export async function api<T = void>(
     const error = (await response.json().catch(() => null)) as
       | (Partial<Omit<ApiErrorBody, 'message'>> & {
           message?: string | string[];
+          suggestedPath?: string;
         })
       | null;
     const message = Array.isArray(error?.message)
       ? error.message.join('; ')
       : (error?.message ?? response.statusText);
-    throw new ApiError(response.status, error?.error, message);
+    throw new ApiError(
+      response.status,
+      error?.error,
+      message,
+      error?.suggestedPath,
+    );
   }
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;

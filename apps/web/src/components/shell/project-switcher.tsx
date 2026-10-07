@@ -1,18 +1,14 @@
 'use client';
 
+import type { ProjectSummary } from '@agentdock/shared';
 import { Combobox } from 'glass-ui/combobox';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 
-interface ProjectSummary {
-  id: string;
-  name: string;
-}
-
 /**
- * Project switcher (spec D3). `GET /api/projects` arrives with #10; until then
- * it answers 404 and this renders nothing, so it appears without a code change.
+ * Project switcher (spec 10 D3): the projects the caller may see, from
+ * `GET /api/projects`. Renders nothing while the list is empty or unavailable.
  */
 export function ProjectSwitcher({ projectId }: { projectId: string | null }) {
   const router = useRouter();
@@ -25,7 +21,7 @@ export function ProjectSwitcher({ projectId }: { projectId: string | null }) {
         if (!cancelled && Array.isArray(list)) setProjects(list);
       })
       .catch(() => {
-        // 404 before #10, or any failure: no switcher.
+        // No switcher; the Projects page still works.
       });
     return () => {
       cancelled = true;
@@ -38,11 +34,11 @@ export function ProjectSwitcher({ projectId }: { projectId: string | null }) {
     <Combobox
       options={projects.map((project) => ({
         value: project.id,
-        label: project.name,
+        label: project.displayName,
       }))}
       value={projectId}
       onValueChange={(id) => {
-        if (id) router.push(`/projects/${id}/fleet`);
+        if (id) router.push(`/projects/${id}`);
       }}
       placeholder="Project"
     />
