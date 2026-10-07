@@ -1,5 +1,6 @@
 import { Toaster } from 'glass-ui/toast';
 import type { Metadata } from 'next';
+import { THEME_BOOTSTRAP_SCRIPT } from '../components/shell/theme';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -13,11 +14,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" data-scale="desk" data-theme="dark">
+    // `data-theme` is set by the bootstrap script before first paint (spec D7),
+    // so React must not render or reconcile it.
+    <html lang="en" data-scale="desk" suppressHydrationWarning>
+      <head>
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: constant script, no user input */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }} />
+      </head>
       <body className="min-h-screen bg-ground text-ink">
-        <main id="main-content" className="mx-auto w-full max-w-4xl p-6">
-          {children}
-        </main>
+        {children}
         <Toaster />
       </body>
     </html>
