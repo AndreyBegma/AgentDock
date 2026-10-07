@@ -1,6 +1,17 @@
 # AgentDock
 
-Fullstack monorepo — Bun workspaces + Turborepo.
+Self-hosted control plane for Claude Code and Codex agent fleets driven by the
+Code Sentinel orchestrator. Fullstack monorepo — Bun workspaces + Turborepo.
+
+**The authority is [`docs/`](docs/README.md)** — product, architecture, ADRs,
+specs. Read the relevant ADRs before changing architecture; record a new
+decision as a new ADR in the same pull request. Everything in the repository is
+written in English.
+
+- UI: only [glass-ui](docs/ui/glass-ui.md) components; a missing one is added to
+  glass-ui, not written here (ADR-0011).
+- The control plane never reads a project's filesystem — that is the runner's
+  job (ADR-0001). The runner accepts typed commands only (ADR-0010).
 
 ## Structure
 
