@@ -72,6 +72,21 @@ taken, with its source.
 
 No new REST endpoints.
 
+### Wire details settled during implementation
+
+Decided with the orchestrator on 2026-10-07 while building the gateway; they
+refine D10–D13 and do not change them.
+
+| # | Detail |
+|---|---|
+| W1 | The `event` frame is `{ type: "event", topic, event, data, ts }`: `type` is already the frame discriminator (as in every other message), so the domain type D12 calls "`type` of `event`" travels in the field **`event`** (`runner.status`, …). `LiveService.publish(topic, type, data)` keeps its signature and fills `event` from `type`. |
+| W2 | A topic is `admin` or `<runner\|project\|user>:<id>` with `id` matching `[A-Za-z0-9_-]{1,64}`. |
+| W3 | Close codes: 4401 no/invalid session (also on re-validation), 4403 missing or foreign `Origin` (checked first, before the session), **4429** when the session already holds 5 sockets — the *new* socket is refused, the older ones stay. A frame over 64 KiB is closed 1009 by `ws` itself; a socket silent past the idle timeout is terminated. |
+| W4 | Error codes: `forbidden`, `unknown_topic`, `too_many_subscriptions`, and **`invalid_message`** — a frame that is not JSON, not a known message, or names a malformed topic. The socket stays open. Subscribing to a topic already held answers `subscribed` again; `unsubscribe` has no reply. |
+| W5 | Re-validation calls `SessionService.resolve` once per connected session every 60 s. It refreshes the session's `lastSeenAt` about once a minute, so an open, connected tab keeps its session from idling out: an open tab counts as activity. On a valid session each held subscription is re-authorized; one no longer allowed is dropped with `error { topic, code: "forbidden" }`. |
+| W6 | `runner:<id>` is role-only (admins), with no check that the runner exists (D11). |
+| W7 | `LiveService.publish` returns how many sockets it reached, and throws on a malformed topic or a frame over 64 KiB. |
+
 ## UI
 
 | Part | glass-ui | Behaviour |
