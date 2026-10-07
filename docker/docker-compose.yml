@@ -1,0 +1,23 @@
+name: agentdock
+
+services:
+  postgres:
+    image: postgres:16.5-alpine
+    container_name: agentdock-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set it in docker/.env}
+      POSTGRES_DB: agentdock
+    ports:
+      - "5421:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
