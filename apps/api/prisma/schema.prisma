@@ -1,5 +1,5 @@
 generator client {
-  provider        = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -33,10 +33,11 @@ model User {
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
-  approvedBy       User?         @relation("UserApprovals", fields: [approvedById], references: [id], onDelete: SetNull)
-  approvedUsers    User[]        @relation("UserApprovals")
-  sessions         UserSession[]
-  settingsUpdated  Setting[]
+  approvedBy      User?         @relation("UserApprovals", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedUsers   User[]        @relation("UserApprovals")
+  sessions        UserSession[]
+  settingsUpdated Setting[]
+  runnersCreated  Runner[]
 
   @@map("users")
 }
@@ -68,4 +69,103 @@ model Setting {
   updatedBy User? @relation(fields: [updatedById], references: [id], onDelete: SetNull)
 
   @@map("settings")
+}
+
+enum Runtime {
+  claude
+  codex
+}
+
+/// A machine running the agentdock-runner daemon (docs/specs/6). Status is
+/// derived from the live socket, never stored. Only hashes of the token live
+/// here; `tokenPrefix` is its first 8 characters, used to find the row.
+model Runner {
+  id              String    @id @default(cuid())
+  name            String
+  hostname        String?
+  version         String?
+  protocolVersion Int?
+  os              String?
+  arch            String?
+  capabilities    Json?
+  tokenHash       String?
+  tokenPrefix     String?   @unique
+  /// Highest contiguous event seq persisted — `welcome.ackedSeq` / `ack.seq`.
+  ackedSeq        BigInt    @default(0)
+  pairedAt        DateTime?
+  lastSeenAt      DateTime?
+  revokedAt       DateTime?
+  /// Nullable so deleting the admin who created it keeps the runner.
+  createdById     String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  createdBy    User?               @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  pairingCodes RunnerPairingCode[]
+  profiles     RuntimeProfile[]
+  events       Event[]
+
+  @@map("runners")
+}
+
+model RunnerPairingCode {
+  id        String    @id @default(cuid())
+  runnerId  String
+  /// SHA-256 of the normalised code; the code itself is shown once.
+  codeHash  String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  runner Runner @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+
+  @@index([runnerId])
+  @@map("runner_pairing_codes")
+}
+
+/// Mirrors the profiles of the runner's latest `hello` (ADR-0006). Rows absent
+/// from it are marked `missing`, never deleted: later runs reference them.
+model RuntimeProfile {
+  id            String   @id @default(cuid())
+  runnerId      String
+  /// The profile `id` from the runner config.
+  key           String
+  runtime       Runtime
+  label         String
+  binary        String?
+  /// Environment the runner sets — paths only, never credentials.
+  env           Json
+  args          Json
+  authenticated Boolean
+  missing       Boolean  @default(false)
+  updatedAt     DateTime @updatedAt
+
+  runner Runner @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+
+  @@unique([runnerId, key])
+  @@map("runtime_profiles")
+}
+
+/// An event envelope received from a runner (event-schema.md). Stored once per
+/// `(runnerId, seq)`; partitioning by month is deferred (ADR-0007).
+model Event {
+  id          BigInt   @id @default(autoincrement())
+  runnerId    String
+  seq         BigInt
+  ts          DateTime
+  type        String
+  source      String
+  projectRepo String?
+  projectRoot String?
+  slot        String?
+  issue       Int?
+  session     Json?
+  data        Json
+  receivedAt  DateTime @default(now())
+
+  runner Runner @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+
+  @@unique([runnerId, seq])
+  @@index([type, ts])
+  @@map("events")
 }
