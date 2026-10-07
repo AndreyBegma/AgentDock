@@ -81,9 +81,16 @@ Reshape `User` (table `users`) — it exists from the scaffold with `email`,
 | `lockedUntil` | DateTime? |
 | `createdAt`, `updatedAt` | existing |
 
-New `Session` (table `sessions`): `id` cuid, `tokenHash` String unique,
+New `UserSession` (table `user_sessions`): `id` cuid, `tokenHash` String unique,
 `userId` → `users.id` (cascade delete), `createdAt`, `lastSeenAt`, `expiresAt`,
-`ip` String?, `userAgent` String?. Index on `userId`.
+`ip` String?, `userAgent` String?. Index on `userId`. It is called `UserSession`, not
+`Session`, because [data-model.md](../architecture/data-model.md) already uses
+`Session` for agent runtime sessions. The API paths (`/auth/sessions`) and the
+`ad_session` cookie keep their names.
+
+`approvedById` and `settings.updatedById` are `ON DELETE SET NULL`. Before the
+columns are added, the migration deletes the scaffold seed's placeholder user,
+because it has no password.
 
 New `Setting` (table `settings`): `key` String primary key, `value` Json,
 `updatedAt`, `updatedById` String? → `users.id`.
@@ -138,6 +145,8 @@ Pages, plain layout (no app shell yet):
 | `API_URL` | `apps/web` | target of the `/api` rewrite (default `http://localhost:8180`) |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | `admin:create` only | non-interactive admin creation |
 | `APP_ENV` | `apps/api` (exists) | `production` → `Secure` cookies |
+| `TRUST_PROXY` | `apps/api` | Express `trust proxy` (default `loopback`). The per-IP login limit must see the client's address, not the address of the Next `/api` rewrite or the reverse proxy |
+| `TEST_DATABASE_URL` | `apps/api` tests | the database the e2e suite resets; its name must end in `_test` |
 
 Add each to the matching `.env.example`. `NEXT_PUBLIC_API_URL` is removed from
 `apps/web/.env.example` (D12).
@@ -187,7 +196,7 @@ issues (the runner, M1.3), not from splitting this one.
 | Risk | Severity | Mitigation |
 |---|---|---|
 | Security mistakes in session / CSRF handling | high | `opus` on i3-api; the acceptance criteria test each property; M1.2 adds audit |
-| `argon2` native build fails under Bun install scripts (`Blocked 2 postinstalls` seen in the scaffold) | medium | trust the package (`bun pm trust argon2`) or use `@node-rs/argon2` (prebuilt); the slot picks one and records why |
+| `argon2` native build fails under Bun install scripts (`Blocked 2 postinstalls` seen in the scaffold) | medium | **Resolved:** `@node-rs/argon2`. It ships prebuilt N-API binaries per platform as optional dependencies, so there is no postinstall to trust, and its default algorithm is argon2id |
 | glass-ui pinned via GitHub tag needs SSH/HTTPS access in worker worktrees | low | same remote access the workers already use for `git push` |
 | Later modules forget the guard | medium | `SessionGuard` is global; routes opt out with `@Public()` |
 
