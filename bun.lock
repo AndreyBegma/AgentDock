@@ -50,6 +50,21 @@
         "typescript": "^6.0.2",
       },
     },
+    "apps/runner": {
+      "name": "@agentdock/runner",
+      "version": "0.1.0",
+      "bin": {
+        "agentdock-runner": "./dist/agentdock-runner",
+      },
+      "dependencies": {
+        "@agentdock/shared": "workspace:*",
+        "zod": "4.6.5",
+      },
+      "devDependencies": {
+        "@types/bun": "1.4.0",
+        "typescript": "6.0.2",
+      },
+    },
     "apps/web": {
       "name": "@agentdock/web",
       "version": "0.0.1",
@@ -82,6 +97,8 @@
   },
   "packages": {
     "@agentdock/api": ["@agentdock/api@workspace:apps/api"],
+
+    "@agentdock/runner": ["@agentdock/runner@workspace:apps/runner"],
 
     "@agentdock/shared": ["@agentdock/shared@workspace:packages/shared"],
 
