@@ -6,10 +6,12 @@ import {
   type HelloMessage,
   messageSchema,
   PAIRING_CODE_ALPHABET,
+  PROJECT_INSPECTION_TIMEOUT_MS,
   pairingCodeSchema,
   pairingRequestSchema,
   pairingResponseSchema,
   parseCommand,
+  projectInspectionSchema,
   roleAtLeast,
   runnerMessageSchema,
   runnerMessageTypes,
@@ -273,6 +275,103 @@ describe('command allowlist', () => {
     expect(roleAtLeast('admin', 'operator')).toBe(true);
     expect(roleAtLeast('operator', 'operator')).toBe(true);
     expect(roleAtLeast('viewer', 'operator')).toBe(false);
+  });
+});
+
+describe('projects', () => {
+  /** The documented `project.inspect` result, from runner-protocol.md. */
+  const inspection = () => {
+    const result = docExamples().find(
+      (m) =>
+        typeOf(m) === 'command.result' &&
+        (m as { output?: { docs?: unknown } }).output?.docs !== undefined,
+    ) as { output: unknown } | undefined;
+    if (!result) throw new Error('no project.inspect result example');
+    return result.output;
+  };
+
+  it('documents a project.inspect result that matches ProjectInspection', () => {
+    const parsed = projectInspectionSchema.safeParse(inspection());
+    expect(parsed.error).toBeUndefined();
+  });
+
+  it('registers both commands with their minimum roles and a longer timeout', () => {
+    expect(commands['project.inspect'].minRole).toBe('admin');
+    expect(commands['project.refresh'].minRole).toBe('operator');
+    for (const name of ['project.inspect', 'project.refresh'] as const) {
+      expect(commands[name].timeoutMs).toBe(PROJECT_INSPECTION_TIMEOUT_MS);
+      expect(commands[name].result).toBe(projectInspectionSchema);
+    }
+  });
+
+  it('accepts only an absolute path, and nothing else, for project.inspect', () => {
+    expect(
+      parseCommand('project.inspect', { path: '/home/archi/dev/AgentDock' }).ok,
+    ).toBe(true);
+    for (const args of [
+      { path: 'dev/AgentDock' },
+      { path: '' },
+      {},
+      { path: '/x', recursive: true },
+    ]) {
+      const parsed = parseCommand('project.inspect', args);
+      expect([args, parsed.ok]).toEqual([args, false]);
+    }
+  });
+
+  it('requires projectId and an absolute root for project.refresh', () => {
+    expect(
+      parseCommand('project.refresh', { projectId: 'prj_1', root: '/r' }).ok,
+    ).toBe(true);
+    expect(parseCommand('project.refresh', { projectId: 'prj_1' }).ok).toBe(
+      false,
+    );
+    expect(
+      parseCommand('project.refresh', { projectId: 'prj_1', root: 'r' }).ok,
+    ).toBe(false);
+  });
+
+  it('rejects a docs rule or kind outside the enums', () => {
+    const base = inspection() as { docs: Record<string, unknown> };
+    for (const docs of [
+      { ...base.docs, kind: 'wiki' },
+      { ...base.docs, detectedBy: 'guess' },
+      { ...base.docs, repo: 'not a repo' },
+    ]) {
+      expect(projectInspectionSchema.safeParse({ ...base, docs }).success).toBe(
+        false,
+      );
+    }
+  });
+
+  it('applies the same config shape from welcome and config', () => {
+    const welcome = serverMessageSchema.parse(
+      docExamples().find((m) => typeOf(m) === 'welcome'),
+    );
+    if (welcome.type !== 'welcome') throw new Error('no welcome');
+    const config = serverMessageSchema.parse({
+      type: 'config',
+      config: welcome.config,
+    });
+    expect(config).toEqual({ type: 'config', config: welcome.config });
+    expect(runnerMessageSchema.safeParse(config).success).toBe(false);
+  });
+
+  it('answers path refusals with their own error codes', () => {
+    for (const code of [
+      'path_not_found',
+      'path_not_allowed',
+      'not_a_repository',
+    ]) {
+      expect(
+        messageSchema.safeParse({
+          type: 'command.result',
+          id: 'c1',
+          ok: false,
+          error: { code, message: 'x' },
+        }).success,
+      ).toBe(true);
+    }
   });
 });
 

@@ -44,20 +44,20 @@ The person delegated all decisions on 2026-10-07. Each entry below is the defaul
 | # | Decision | Source |
 |---|---|---|
 | D1 | Only an admin connects or deletes a project. The admin picks a runner (online) and an absolute path. The API sends `project.inspect`, shows the result as a preview, and stores the project only on confirm | ADR-0010 (inspect is admin-only in runner-protocol.md) |
-| D2 | `project.inspect` resolves `git rev-parse --path-format=absolute --git-common-dir` and requires the path to be the **main checkout**: its parent equals the toplevel. A linked worktree (e.g. `.wt-<repo>-<slot>`) is refused with `not_main_checkout` and the main checkout's path is suggested | orchestrator SKILL "Where things are" [Confirmed] |
+| D2 | `project.inspect` resolves `git rev-parse --path-format=absolute --git-common-dir` and requires the path to be the **main checkout**: its parent equals the toplevel. A linked worktree (e.g. `.wt-<repo>-<slot>`) is refused with `not_main_checkout` and the main checkout's path is suggested. The runner reports it rather than failing: `isMainCheckout: false` with `root` set to the main checkout, and docs detection skipped. The API refuses to connect it (409 `not_main_checkout`). A subdirectory of the main checkout is reported the same way | orchestrator SKILL "Where things are" [Confirmed] |
 | D3 | The repo comes from `origin`: `git@github.com:owner/name(.git)` or `https://github.com/owner/name(.git)` → `owner/name`. Any other host is returned with `forge: "unsupported"` and the API refuses to connect it (`unsupported_forge`). cockpit (`gitlab-fwg`) is the known example | ADR-0004; cockpit remote [Confirmed] |
 | D4 | The base branch comes from `orchestrator.base` in `.code-analyzer-config.json`. If that is absent, from `origin/HEAD`. If that is absent, `gh repo view --json defaultBranchRef`. If that fails, `main`. The project stores it and can override it | orchestrator SKILL configuration table [Confirmed] |
 | D5 | `.code-analyzer-config.json` is parsed and its `orchestrator` block stored as a JSON snapshot. Invalid JSON is reported (`configError`), not fatal. The presence of `CLAUDE.md` and `AGENTS.md` is reported | data-model.md |
-| D6 | Docs-source detection runs in this order and stops at the first hit. Every hit records `detectedBy` and evidence (file + line, or URL). The full list of candidates checked is returned for the preview:<br>1. `orchestrator.specDir`: a relative path inside the repository, a relative path outside it (`../x-documentation/prs`), or a GitHub URL<br>2. sibling folder `<parent>/<name>-documentation`, then `<parent>/<name>-docs`<br>3. same-owner remote `owner/<name>-documentation` or `owner/<name>-docs` via `gh repo view` (marked `remote_repo`, `localPath: null`)<br>4. GitHub URLs or local paths containing `documentation` or `docs` in `AGENTS.md`, `CLAUDE.md`, `README.md` (e.g. denitsa-app's `AGENTS.md` link to `denitsa-documentation`)<br>5. back-link: a sibling `*-documentation` / `*-docs` folder whose `README.md` names this repo or its path (luna-studio, cockpit)<br>6. in-repo `docs/` | ADR-0012; earlier findings for denitsa / luna / cockpit [Confirmed] |
+| D6 | Docs-source detection runs in this order and stops at the first hit. Every hit records `detectedBy` and evidence (file + line, or URL). The full list of candidates checked is returned for the preview:<br>1. `orchestrator.specDir`: a relative path inside the repository, a relative path outside it (`../x-documentation/prs`), or a GitHub URL<br>2. sibling folder `<parent>/<name>-documentation`, then `<parent>/<name>-docs`<br>3. same-owner remote `owner/<name>-documentation` or `owner/<name>-docs` via `gh repo view` (marked `remote_repo`, `localPath: null`)<br>4. GitHub URLs or local paths containing `documentation` or `docs` in `AGENTS.md`, `CLAUDE.md`, `README.md` (e.g. denitsa-app's `AGENTS.md` link to `denitsa-documentation`). A GitHub URL counts when it is a same-owner repo or a folder of that name sits beside the project; a local path counts only when it resolves to a direct child of the parent whose name contains `docs` / `documentation`<br>5. back-link: a sibling `*-documentation` / `*-docs` folder whose `README.md` names this repo or its path (luna-studio, cockpit). "Names" means the README contains `owner/name`, the absolute root, or the root's folder name as a whole word (not inside a longer word or hyphenated name)<br>6. in-repo `docs/` | ADR-0012; earlier findings for denitsa / luna / cockpit [Confirmed] |
 | D7 | Classification inside the found docs root goes one level deep, plus known nested names:<br>specs ← `specs/`, `prs/`, `stages/`, `docs/specs/`<br>adr ← `adr/`, `decisions/`, `decisions.md`, `*adr*`<br>roadmap ← `roadmap.md`, `ROADMAP.md`, `spec-queue.md`, `docs/roadmap*`<br>reports ← `bug-reports/`, `fixes/`, `verifications/`, `feature-plans/`<br>Each kind keeps every match (relative to the docs root). `isGitRepo` and the docs repo's own `owner/name` (if any) are recorded. Non-git folders (cockpit-docs) are `isGitRepo: false` | ADR-0012; denitsa-documentation and cockpit-docs layouts [Confirmed] |
 | D8 | Detection reads only:<br>• under the project root, its parent directory (siblings only, depth 1), and the found docs root (depth 2)<br>• the `README.md` files of sibling folders<br>• `gh repo view` for same-owner candidates<br>Nothing else on disk is read | ADR-0010 path confinement |
-| D9 | After a project is connected, the API adds its root to the runner's watch list. The runner keeps `projects[]` in its config (from #5, D3) as a cache. The authoritative list arrives in `welcome` (`{ id, root }[]`) on every connect. `project.refresh` re-runs inspection for a registered root and is allowed for operators of that project | runner-protocol.md |
+| D9 | After a project is connected, the API adds its root to the runner's watch list. The runner keeps `projects[]` in its config (from #5, D3) as a cache. The authoritative list arrives in `welcome` (`{ id, root }[]`) on every connect. While the runner is connected, the API sends the changed list as a `config` message (`{ type: "config", config: <welcome.config> }`), which the runner applies exactly like welcome's and which does not touch the ack cursor. `project.refresh` re-runs inspection for a registered root and is allowed for operators of that project | runner-protocol.md |
 | D10 | Path confinement: `project.inspect` accepts any absolute path that exists and is a directory, refuses symlinks that escape it, and is admin-only. Every other command that takes a path accepts only a registered project root, or a path under the root's parent that matches `.wt-<repo>-*` | ADR-0010 |
 | D11 | Roles: global role × membership.<br>• admins see and manage every project with no membership row.<br>• operators and viewers see only projects where they have a `project_members` row.<br>• A member's effective role is `min(global role, override)`, so an override can only lower it. Order: viewer < operator < admin | ADR-0008, data-model.md |
 | D12 | `ProjectAccessGuard` reads `:projectId` from route params and enforces D11. `@ProjectRole('operator')` sets the minimum effective role for the route. A project the caller cannot see returns **404**, not 403, so its existence is not revealed. Exported from `apps/api/src/projects/` for #11–#13 | new |
 | D13 | Project settings stored now:<br>• `defaultProfileId` (FK `runtime_profiles`, must belong to the project's runner)<br>• `baseOverride`, `readyLabelOverride`<br>• `mergeApproval` (bool, default false; used in M2.5)<br>• `displayName` | data-model.md, ADR-0006 |
 | D14 | A runner may hold many projects. A `(runnerId, rootPath)` pair is unique. The same `owner/repo` on two runners is two projects | new |
-| D15 | Deleting a project removes it, its members and its docs source, and sends the runner an updated watch list. It never touches the disk | new |
+| D15 | Deleting a project removes it, its members and its docs source, and sends the runner an updated watch list in a `config` message (D9). It never touches the disk | new |
 | D17 | This item registers the `project:<id>` topic authorizer with #9's `LiveService` (the same membership check as `ProjectAccessGuard`), so live subscriptions to a project follow the same access rule as its REST endpoints; it lives in `apps/api/src/projects/**` | #9 spec |
 | D16 | The runner gets a collector registry, `apps/runner/src/collectors/index.ts`: a `Collector` interface (`name`, `start(project, emit)`, `stop()`) and a list started for every project in the watch list and stopped when it leaves. This item registers no collector; #11 and #12 each append one registration line (keep both on conflict) | #11, #12 specs |
 
@@ -75,22 +75,24 @@ Owned by i10-runner, in `packages/shared/src/protocol/projects.ts`, with both co
 - `root`: the absolute main checkout
 - `gitCommonDir`
 - `isMainCheckout`
-- `remote`: `{ url, forge: "github" | "unsupported", repo: "owner/name" | null }`
+- `remote`: `{ url, forge: "github" | "unsupported", repo: "owner/name" | null }`. With no `origin`, `url` is null and `forge` is `unsupported`
 - `baseBranch`, plus `baseSource`: `config` | `origin_head` | `gh` | `default`
 - `codeSentinelConfig`: `{ orchestrator?: object, error?: string }`
 - `hasClaudeMd`, `hasAgentsMd`
 - `docs`, with these fields:
   - `kind`: `in_repo` | `sibling_repo` | `remote_repo` | `none`
-  - `localPath` (null when only remote)
+  - `localPath`: absolute for every kind, including `in_repo`; null when only remote, or `none`
   - `repo` (null when none)
   - `isGitRepo`
   - `detectedBy`: `spec_dir` | `sibling` | `same_owner_remote` | `text_link` | `back_link` | `in_repo`
   - `evidence`: `{ file?, line?, url? }[]`
   - `classified`: `{ specs: string[], adr: string[], roadmap: string[], reports: string[] }`
   - `candidates`: `{ rule, target, hit: boolean }[]`
-- `warnings: string[]`
+- `warnings: string[]`: sentences for the connect preview
 
-`welcome` gains `projects: { id, root }[]`. That is an additive field, and older runners ignore it.
+`welcome.config.projects: { id, root }[]` already existed in the protocol (#5); this item makes the runner act on it. The new S → R message `config` carries the same config mid-connection (D9). It is additive: an older runner logs it as an unknown message and picks the list up at its next `welcome`.
+
+Path refusals answer their own error codes, which the API maps to HTTP: `path_not_found` and `not_a_repository` → 422, `path_not_allowed` → 403. A non-main checkout is a result (`isMainCheckout: false`), not an error (D2). [runner-protocol.md](../architecture/runner-protocol.md#projects) has the details and an example.
 
 ## Data / Schema
 
