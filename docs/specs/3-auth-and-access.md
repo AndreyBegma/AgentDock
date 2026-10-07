@@ -178,7 +178,8 @@ issues (the runner, M1.3), not from splitting this one.
 |---|---|---|
 | apps/api/prisma/schema.prisma | i3-api | do not open it |
 | apps/api/prisma/migrations/20261008000000_auth/** | i3-api | — |
-| bun.lock, package.json (root) | i3-api, then i3-web after it merges | do not open while i3-api is live |
+| package.json (root) | i3-api, then i3-web after it merges | do not open while i3-api is live |
+| bun.lock | regenerated, never hand-merged — see [#5's rule](5-runner-daemon-and-protocol.md#contention) | #5 runs in parallel and also changes it |
 | packages/shared/src/index.ts | i3-api | i3-web imports, never edits |
 
 ## Risks
