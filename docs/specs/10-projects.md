@@ -204,6 +204,25 @@ These slots run in sequence. The API stores and serves exactly what `ProjectInsp
 | Should a project with no docs source be connectable? | Yes, with `kind: none` and a warning |
 | GitLab support? | Not until a forge adapter exists (ADR-0004) |
 
+## Notes from implementation
+
+i10-api, decided with the orchestrator on 2026-10-07:
+
+1. **`projects.createdById` and `project_members.addedById` are nullable, `ON DELETE SET NULL`.** A required foreign key would make deleting a user fail for any admin who ever connected a project or added a member. `runners.createdById` makes the same choice. `projects.runnerId` is `RESTRICT`, because runners are revoked and never deleted. `defaultProfileId` is `SET NULL`.
+2. **`DELETE /projects/:id/docs-source` re-inspects.** The schema keeps no copy of the detection an override replaced. So the API clears `manual` and runs inspection on the runner as admin (`project.refresh`), then stores what it detects. If the runner is offline, the answer is 409 `runner_offline` and nothing changes.
+3. **Admin bypass is absolute.** An admin's effective role is `admin` on every project, even with a membership row carrying a lower override. D11's `min(global, override)` applies to operators and viewers.
+4. **A manual override cannot be checked on disk** (ADR-0001). `isGitRepo` is `true` for `in_repo` and `remote_repo`, and for `sibling_repo` only when `repo` is given; otherwise it is `false`. `detectedBy` is null; `evidence`, `candidates` and `classified` are empty until the next detection. `in_repo` takes a `localPath` under the root and no `repo`. `sibling_repo` takes an absolute `localPath`. `remote_repo` takes a `repo` and no `localPath`. `none` takes neither. Anything else is 422 `invalid_docs_source`.
+5. **Member errors:** an unknown user is 422 `user_not_found`, a user who is not `active` is 422 `user_not_active`, and a duplicate is 409 `already_member`. An unknown member on `PATCH` / `DELETE` is 404.
+
+Also as built:
+
+- **Authorization order.** The routes that only an admin may call (`/admin/projects*`, `PATCH /projects/:id`, member writes, docs-source `PUT` / `DELETE`) carry `@Roles('admin')`. The global role guard checks it before membership is looked at, so a non-admin gets 403 whether or not the project exists, and nothing is revealed. Member routes use `ProjectAccessGuard` + `@ProjectRole(min)` (default `viewer`). Both are exported from `apps/api/src/projects/` together with `ProjectAccessService.resolve(user, projectId)` → `{ projectId, role } | null`, `visibleWhere(user)` and the `@ProjectAccess()` parameter decorator. Later modules import `ProjectsModule`.
+- **Runner errors on HTTP.** Offline (no open socket, checked before sending) or revoked → 409 `runner_offline`. No result in time → 504 `runner_timeout`. `path_not_found` / `not_a_repository` → 422. `path_not_allowed` → 403; on `refresh` the API first resends `config`. Any other runner error → 502 `runner_error`. An unknown runner on inspect / connect → 404.
+- **Connect** stores `rootPath = inspection.root`. `displayName` defaults to the repository name. Refresh updates the base, the config snapshot, `hasClaudeMd` / `hasAgentsMd` and `lastInspectedAt`, and updates `repo` only while `origin` still names one.
+- **Watch list.** `RunnerWatchList` in the runners module builds `welcome.config` and the `config` push. It serializes them per runner, so a list read earlier is never sent after one read later. The gateway attaches the socket and sends `welcome` in the same queued step.
+- **Audit.** Contrary to "Out of scope" above, this item records its own actions. They are listed in [spec 8's retrofit table](8-audit-log.md#retrofit--actions-recorded-by-this-item).
+- **Live.** `project:<id>` is authorized by `ProjectAccessService.resolve`: an id that does not exist is `forbidden`, for admins too.
+
 Depends on #6
 
 Depends on #9

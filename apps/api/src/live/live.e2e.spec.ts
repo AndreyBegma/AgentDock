@@ -167,10 +167,11 @@ describe('/live gateway (e2e)', () => {
           code: 'forbidden',
         });
       }
+      // #10 registers `project:`: a project the viewer is no member of.
       expect(await viewerSocket.subscribe('project:p1')).toEqual({
         type: 'error',
         topic: 'project:p1',
-        code: 'unknown_topic',
+        code: 'forbidden',
       });
 
       for (const topic of ['admin', 'runner:r1']) {
@@ -180,9 +181,10 @@ describe('/live gateway (e2e)', () => {
         type: 'error',
         code: 'forbidden',
       });
+      // Admins see every project, but `p1` does not exist.
       expect(await adminSocket.subscribe('project:p1')).toMatchObject({
         type: 'error',
-        code: 'unknown_topic',
+        code: 'forbidden',
       });
 
       // A forbidden subscription receives nothing.

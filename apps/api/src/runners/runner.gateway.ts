@@ -14,6 +14,7 @@ import { bearerToken } from './credentials';
 import { LiveConnection, RunnerConnections } from './runner-connections';
 import { RunnerIngestService } from './runner-ingest.service';
 import { RUNNER_OPTIONS, type RunnerOptions } from './runner-options';
+import { RunnerWatchList } from './runner-watch-list';
 
 /** Standard close codes the gateway uses besides `RUNNER_CLOSE_CODES`. */
 const POLICY_VIOLATION = 1008;
@@ -22,6 +23,7 @@ const INTERNAL_ERROR = 1011;
 interface Deps {
   ingest: RunnerIngestService;
   connections: RunnerConnections;
+  watchList: RunnerWatchList;
   options: RunnerOptions;
   logger: Logger;
 }
@@ -166,13 +168,15 @@ class RunnerSocket {
     clearTimeout(this.helloTimer);
     const live = new LiveConnection(runnerId, this.socket, Date.now());
     this.live = live;
-    this.deps.connections.attach(live);
-    live.send({
-      type: 'welcome',
-      runnerId,
-      config: { projects: [], pollIntervalsMs: {} },
-      ackedSeq: Number(acked),
+    // Attached and welcomed in one step, queued with the watch-list pushes:
+    // a project connected meanwhile is either in this list or pushed as
+    // `config` right after the welcome (spec 10 D9).
+    await this.deps.watchList.deliver(runnerId, (config) => {
+      if (this.closed) return;
+      this.deps.connections.attach(live);
+      live.send({ type: 'welcome', runnerId, config, ackedSeq: Number(acked) });
     });
+    if (this.closed) return;
     this.deps.logger.log(`runner ${runnerId} connected`);
   }
 
@@ -212,6 +216,7 @@ export class RunnerGateway implements OnGatewayConnection {
   constructor(
     private readonly ingest: RunnerIngestService,
     private readonly connections: RunnerConnections,
+    private readonly watchList: RunnerWatchList,
     @Inject(RUNNER_OPTIONS) private readonly options: RunnerOptions,
   ) {}
 
@@ -219,6 +224,7 @@ export class RunnerGateway implements OnGatewayConnection {
     new RunnerSocket(socket, request, {
       ingest: this.ingest,
       connections: this.connections,
+      watchList: this.watchList,
       options: this.options,
       logger: this.logger,
     });

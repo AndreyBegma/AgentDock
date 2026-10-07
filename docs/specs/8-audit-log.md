@@ -130,6 +130,18 @@ CREATE TRIGGER audit_records_no_truncate
 | `runner.revoke` | revoke | user (admin) | runner | `revokedAt` |
 | `runner.command` / `runner.command.result` | every `RunnerCommandService.send` | user / system | runner | after: `{ name, args }` / `{ ok, error? }` |
 | `user.create` | `bun run admin:create` | system | user | after: `{ email, role, status }`; `meta.via: "cli"` |
+| `project.connect` | connect a project ([#10](10-projects.md)) | user (admin) | project | after: `{ runnerId, rootPath, repo, displayName, docsKind }` |
+| `project.delete` | delete a project | user (admin) | project | before: `{ runnerId, rootPath, repo, displayName }` |
+| `project.update` | project settings | user (admin) | project | changed fields only |
+| `project.member_add` | add a member | user (admin) | user | after: `{ userId, roleOverride }` |
+| `project.member_update` | change a member's override | user (admin) | user | `roleOverride`; not recorded when unchanged |
+| `project.member_remove` | remove a member | user (admin) | user | before: `{ userId, roleOverride }` |
+| `project.docs_source_override` | manual docs source | user (admin) | project | `{ kind, localPath, repo, manual }` |
+| `project.docs_source_reset` | restore detection | user (admin) | project | `{ kind, localPath, repo, manual }` |
+
+Every `project.*` record carries `projectId`. `project.inspect` and
+`project.refresh` are runner commands, recorded as `runner.command` /
+`runner.command.result` like every other.
 
 Notes from implementation: failed admin mutations (404 / 409) are not recorded —
 only login and pairing record `denied`. A command refused for the caller's role

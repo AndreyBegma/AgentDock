@@ -33,11 +33,14 @@ model User {
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
-  approvedBy      User?         @relation("UserApprovals", fields: [approvedById], references: [id], onDelete: SetNull)
-  approvedUsers   User[]        @relation("UserApprovals")
+  approvedBy      User?           @relation("UserApprovals", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedUsers   User[]          @relation("UserApprovals")
   sessions        UserSession[]
   settingsUpdated Setting[]
   runnersCreated  Runner[]
+  projectsCreated Project[]
+  memberships     ProjectMember[] @relation("ProjectMembership")
+  membersAdded    ProjectMember[] @relation("ProjectMemberAddedBy")
 
   @@map("users")
 }
@@ -104,6 +107,7 @@ model Runner {
   pairingCodes RunnerPairingCode[]
   profiles     RuntimeProfile[]
   events       Event[]
+  projects     Project[]
 
   @@map("runners")
 }
@@ -140,7 +144,8 @@ model RuntimeProfile {
   missing       Boolean  @default(false)
   updatedAt     DateTime @updatedAt
 
-  runner Runner @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+  runner          Runner    @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+  defaultProjects Project[]
 
   @@unique([runnerId, key])
   @@map("runtime_profiles")
@@ -212,4 +217,107 @@ model AuditRecord {
   @@index([projectId, ts])
   @@index([targetType, targetId])
   @@map("audit_records")
+}
+
+/// Where a project's base branch came from (docs/specs/10 D4).
+enum BaseSource {
+  config
+  origin_head
+  gh
+  default
+}
+
+enum DocsSourceKind {
+  in_repo
+  sibling_repo
+  remote_repo
+  none
+}
+
+/// The docs-detection rule that found a docs source (docs/specs/10 D6).
+enum DocsRule {
+  spec_dir
+  sibling
+  same_owner_remote
+  text_link
+  back_link
+  in_repo
+}
+
+/// A git repository on a runner (docs/specs/10). `rootPath` is its main
+/// checkout; the same `owner/name` on two runners is two projects (D14).
+model Project {
+  id                 String     @id @default(cuid())
+  runnerId           String
+  rootPath           String
+  /// `owner/name` on GitHub — the only forge a project connects on (ADR-0004).
+  repo               String
+  displayName        String
+  baseBranch         String
+  baseSource         BaseSource
+  baseOverride       String?
+  readyLabelOverride String?
+  /// Must belong to `runnerId`; checked by the API.
+  defaultProfileId   String?
+  /// Stored for M2.5; nothing reads it yet.
+  mergeApproval      Boolean    @default(false)
+  /// The `orchestrator` block of `.code-analyzer-config.json` and/or its parse error.
+  codeSentinelConfig Json?
+  hasClaudeMd        Boolean
+  hasAgentsMd        Boolean
+  lastInspectedAt    DateTime
+  /// Nullable so deleting the admin who connected it keeps the project.
+  createdById        String?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  runner         Runner          @relation(fields: [runnerId], references: [id], onDelete: Restrict)
+  defaultProfile RuntimeProfile? @relation(fields: [defaultProfileId], references: [id], onDelete: SetNull)
+  createdBy      User?           @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  members        ProjectMember[]
+  docsSource     DocsSource?
+
+  @@unique([runnerId, rootPath])
+  @@map("projects")
+}
+
+/// An operator's or viewer's access to a project (D11). Admins need no row.
+model ProjectMember {
+  id           String   @id @default(cuid())
+  projectId    String
+  userId       String
+  /// Lowers the member's global role on this project; never raises it.
+  roleOverride Role?
+  /// Nullable so deleting the admin who added the member keeps the row.
+  addedById    String?
+  createdAt    DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation("ProjectMembership", fields: [userId], references: [id], onDelete: Cascade)
+  addedBy User?   @relation("ProjectMemberAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@map("project_members")
+}
+
+/// Where a project's documentation lives (ADR-0012). `manual`: set by an admin
+/// override, kept across refreshes.
+model DocsSource {
+  id         String         @id @default(cuid())
+  projectId  String         @unique
+  kind       DocsSourceKind
+  localPath  String?
+  repo       String?
+  isGitRepo  Boolean
+  detectedBy DocsRule?
+  evidence   Json
+  classified Json
+  candidates Json
+  manual     Boolean        @default(false)
+  updatedAt  DateTime       @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("docs_sources")
 }
