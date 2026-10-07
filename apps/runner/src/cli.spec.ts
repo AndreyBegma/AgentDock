@@ -118,6 +118,73 @@ describe('agentdock-runner CLI', () => {
       expect(output()).not.toContain(fresh);
     });
 
+    describe('profile detection', () => {
+      beforeEach(() => {
+        for (const name of ['a', 'b']) {
+          mkdirSync(join(home, '.claude-profiles', name), { recursive: true });
+        }
+        server.pairing = () =>
+          Response.json({ runnerId: 'rn_1', token: TOKEN });
+      });
+
+      it('writes and prints detected profiles when the config has none', async () => {
+        expect(await pairWith('ABCD-EFGH')).toBe(EXIT.ok);
+        const config = JSON.parse(readFileSync(paths().configFile, 'utf8'));
+        expect(
+          config.profiles.filter(
+            (p: { runtime: string }) => p.runtime === 'claude',
+          ),
+        ).toHaveLength(3);
+        expect(config.profiles).toHaveLength(4);
+        expect(stdout.join('')).toContain('claude-a');
+        expect(stdout.join('')).toContain('claude-b');
+        expect(stdout.join('')).toContain('claude-default');
+        expect(output()).not.toContain(TOKEN);
+      });
+
+      it('leaves existing profiles byte-identical', async () => {
+        const base = {
+          server: server.origin,
+          runnerId: 'rn_old',
+          token: TOKEN,
+          profiles: [
+            { id: 'mine', runtime: 'claude' as const, env: {}, args: [] },
+          ],
+          projects: [],
+          disabledCommands: [],
+          otlp: null,
+        };
+        saveConfig(paths().configFile, base);
+        const before = JSON.stringify(
+          JSON.parse(readFileSync(paths().configFile, 'utf8')).profiles,
+        );
+        expect(await pairWith('ABCD-EFGH')).toBe(EXIT.ok);
+        const after = JSON.stringify(
+          JSON.parse(readFileSync(paths().configFile, 'utf8')).profiles,
+        );
+        expect(after).toBe(before);
+        expect(stdout.join('')).not.toContain('Detected');
+      });
+
+      it('--no-detect writes no profiles', async () => {
+        const code = await runCli(
+          [
+            'pair',
+            '--server',
+            server.origin,
+            '--code',
+            'ABCD-EFGH',
+            '--no-detect',
+          ],
+          deps(),
+        );
+        expect(code).toBe(EXIT.ok);
+        const config = JSON.parse(readFileSync(paths().configFile, 'utf8'));
+        expect(config.profiles).toEqual([]);
+        expect(stdout.join('')).not.toContain('Detected');
+      });
+    });
+
     it('rejects a malformed code without calling the server', async () => {
       expect(await pairWith('O0O0-1111')).toBe(EXIT.failure);
       expect(server.pairingBodies).toEqual([]);
@@ -340,6 +407,37 @@ describe('agentdock-runner CLI', () => {
       await live();
       controller.abort();
       expect(await exit).toBe(EXIT.ok);
+    });
+
+    it('warns once at start when the profile list is empty', async () => {
+      saveConfig(paths().configFile, {
+        server: server.origin,
+        runnerId: 'rn_1',
+        token: TOKEN,
+        profiles: [],
+        projects: [],
+        disabledCommands: [],
+        otlp: null,
+      });
+      const { controller, exit, live } = start();
+      await live();
+      controller.abort();
+      expect(await exit).toBe(EXIT.ok);
+      const warnings = stderr
+        .join('')
+        .split('\n')
+        .filter((l) => l.includes('"level":"warn"'));
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain('profiles --detect --write');
+    });
+
+    it('does not warn when profiles exist', async () => {
+      paired();
+      const { controller, exit, live } = start();
+      await live();
+      controller.abort();
+      await exit;
+      expect(stderr.join('')).not.toContain('"level":"warn"');
     });
 
     it('exits with the terminal-close code when the token is revoked', async () => {
