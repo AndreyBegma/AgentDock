@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { capabilitiesSchema } from './capabilities';
 import { commandErrorCodeSchema } from './commands';
 import { eventSchema, seqCursorSchema } from './envelope';
+import { watchedProjectSchema } from './projects';
 
 /** An `events` batch carries at most this many events… */
 export const MAX_EVENTS_PER_BATCH = 500;
@@ -84,18 +85,30 @@ export const paneMessageSchema = z.object({
 
 // Server → runner
 
+/** What the server tells a runner to watch; carried by `welcome` and `config`. */
+export const runnerServerConfigSchema = z.object({
+  projects: z.array(watchedProjectSchema),
+  pollIntervalsMs: z.record(z.string().min(1), z.number().int().positive()),
+});
+export type RunnerServerConfig = z.infer<typeof runnerServerConfigSchema>;
+
 export const welcomeMessageSchema = z.object({
   ...base,
   type: z.literal('welcome'),
   runnerId: z.string().min(1),
-  config: z.object({
-    projects: z.array(
-      z.object({ id: z.string().min(1), root: z.string().min(1) }),
-    ),
-    pollIntervalsMs: z.record(z.string().min(1), z.number().int().positive()),
-  }),
+  config: runnerServerConfigSchema,
   /** Highest contiguous seq persisted; the runner resends everything above it. */
   ackedSeq: seqCursorSchema,
+});
+
+/**
+ * The config changed mid-connection (a project connected or deleted). Applied
+ * exactly like `welcome.config`; it does not touch the ack cursor.
+ */
+export const configMessageSchema = z.object({
+  ...base,
+  type: z.literal('config'),
+  config: runnerServerConfigSchema,
 });
 
 export const ackMessageSchema = z.object({
@@ -144,6 +157,7 @@ const runnerMessages = [
 
 const serverMessages = [
   welcomeMessageSchema,
+  configMessageSchema,
   ackMessageSchema,
   commandMessageSchema,
   subscribeMessageSchema,
@@ -173,6 +187,7 @@ export type CommandProgressMessage = z.infer<
 >;
 export type PaneMessage = z.infer<typeof paneMessageSchema>;
 export type WelcomeMessage = z.infer<typeof welcomeMessageSchema>;
+export type ConfigMessage = z.infer<typeof configMessageSchema>;
 export type AckMessage = z.infer<typeof ackMessageSchema>;
 export type CommandMessage = z.infer<typeof commandMessageSchema>;
 export type SubscribeMessage = z.infer<typeof subscribeMessageSchema>;

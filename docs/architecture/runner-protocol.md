@@ -54,6 +54,7 @@ both sit at the root of that origin.
 |---|---|---|
 | R → S | `hello` | runner version, protocol version, hostname, os, arch, capabilities, `lastAckedSeq` |
 | S → R | `welcome` | runner id, config (projects to watch, poll intervals), `ackedSeq` |
+| S → R | `config` | the same config as `welcome`, sent when it changes mid-connection |
 | R → S | `heartbeat` | every 15 s: load, tmux sessions count, collectors health |
 | R → S | `events` | `{ events: Event[] }` batch, ≤ 500 events and ≤ 256 KiB |
 | S → R | `ack` | `seq`: highest contiguous `seq` persisted |
@@ -123,6 +124,31 @@ one.
     "pollIntervalsMs": { "tmux": 2000, "worktrees": 10000 }
   },
   "ackedSeq": 18230
+}
+```
+
+`config.projects` is the runner's **watch list**: the projects whose roots it
+may refresh and whose collectors it runs, one instance per collector per
+project. `welcome` carries the authoritative list on every connect; the runner
+caches it in its config file so collectors run before the first connect.
+
+### `config`
+
+Sent when the config changes while the runner is connected — a project was
+connected or deleted. It carries the same object as `welcome.config` and is
+applied exactly like it; it does not touch the ack cursor. A reconnect's
+`welcome` still carries the full list, so a lost `config` heals there.
+
+```json
+{
+  "type": "config",
+  "config": {
+    "projects": [
+      { "id": "prj_agentdock", "root": "/home/archi/dev/AgentDock" },
+      { "id": "prj_denitsa", "root": "/home/archi/dev/denitsa-app" }
+    ],
+    "pollIntervalsMs": { "tmux": 2000, "worktrees": 10000 }
+  }
 }
 ```
 
@@ -215,6 +241,15 @@ its oldest segment: `data` is `{ fromSeq, toSeq, bytes }` of what was lost.
 | `invalid_args` | the args fail the command's schema |
 | `timeout` | the handler did not finish within the command's timeout (default 30 s) |
 | `internal` | the handler threw; `message` never carries a stack trace |
+| `path_not_found` | a path argument does not exist or is not a directory |
+| `path_not_allowed` | a path argument is outside what the command may touch: a symlink out of its root, or a root not on the watch list under that project |
+| `not_a_repository` | a path argument is not inside a git working tree |
+
+The API answers the three path codes with an HTTP error of the same name in
+the body: `path_not_found` and `not_a_repository` → **422** (the request is
+well-formed, the path is not usable), `path_not_allowed` → **403**. On
+`project.refresh`, `path_not_allowed` means the runner's watch list does not
+hold that project: the API resends `config` before the caller retries.
 
 ### `subscribe`, `unsubscribe`, `pane`
 
@@ -246,8 +281,8 @@ handler.
 |---|---|---|---|
 | `runner.ping` | — | viewer | implemented: → `{ pong: true, ts }` |
 | `runner.describe` | — | viewer | implemented: → `{ runnerVersion, hostname, os, arch, capabilities }` |
-| `project.inspect` | `path` | admin | planned |
-| `project.refresh` | `projectId` | operator | planned |
+| `project.inspect` | `path` | admin | implemented: → `ProjectInspection`, timeout 45 s |
+| `project.refresh` | `projectId, root` | operator | implemented: → `ProjectInspection`, timeout 45 s |
 | `orchestrator.start` | `projectId, profileId, mode: start\|next` | operator | planned |
 | `orchestrator.stop` | `projectId` | operator | planned |
 | `orchestrator.status` | `projectId` | viewer | planned |
@@ -265,6 +300,64 @@ Arguments are validated by schema on both sides (`parseCommand`). Commands
 without arguments take `{}` and reject any field. Paths are resolved and must
 sit under a registered project root or the runner's worktree parent. No
 command takes a shell string.
+
+### Projects
+
+Schemas in `projects.ts`; the rules are [spec 10](../specs/10-projects.md)
+D2–D8 and D10.
+
+- `project.inspect { path }` takes any existing absolute directory and is
+  admin-only. It never refuses a git checkout that is not the main one: it
+  reports `isMainCheckout: false` with `root` set to the main checkout to
+  connect instead, and skips docs detection. The API turns that into
+  `409 not_main_checkout`.
+- `project.refresh { projectId, root }` re-inspects a root only when the
+  watch list holds it under that `projectId`.
+- `remote.forge` is `github` for an `origin` on github.com, else
+  `unsupported` (also when there is no `origin`, `url: null`). The API refuses
+  to connect `unsupported` (`422 unsupported_forge`).
+- `docs.candidates` lists every place the D6 rules looked, in order, up to and
+  including the hit. `localPath` is absolute for every kind and `null` for
+  `remote_repo` and `none`; `classified` paths are relative to it.
+- `warnings` are sentences for the connect preview.
+
+```json
+{
+  "type": "command.result",
+  "id": "cmd_12",
+  "ok": true,
+  "output": {
+    "root": "/home/archi/dev/AgentDock",
+    "gitCommonDir": "/home/archi/dev/AgentDock/.git",
+    "isMainCheckout": true,
+    "remote": {
+      "url": "git@github.com:AndreyBegma/AgentDock",
+      "forge": "github",
+      "repo": "AndreyBegma/AgentDock"
+    },
+    "baseBranch": "develop",
+    "baseSource": "config",
+    "codeSentinelConfig": {
+      "orchestrator": { "base": "develop", "readyLabel": "cs:ready", "specDir": "docs/specs" }
+    },
+    "hasClaudeMd": true,
+    "hasAgentsMd": false,
+    "docs": {
+      "kind": "in_repo",
+      "localPath": "/home/archi/dev/AgentDock/docs",
+      "repo": "AndreyBegma/AgentDock",
+      "isGitRepo": true,
+      "detectedBy": "spec_dir",
+      "evidence": [{ "file": "/home/archi/dev/AgentDock/.code-analyzer-config.json", "line": 28 }],
+      "classified": { "specs": ["specs"], "adr": ["adr"], "roadmap": [], "reports": [] },
+      "candidates": [
+        { "rule": "spec_dir", "target": "/home/archi/dev/AgentDock/docs/specs", "hit": true }
+      ]
+    },
+    "warnings": []
+  }
+}
+```
 
 ## Delivery guarantees
 

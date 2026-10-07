@@ -11,7 +11,13 @@ import { createHandlers } from './commands/handlers';
 import { batches, RunnerConnection } from './connection';
 import { Spool } from './spool';
 import { FakeClock } from './testing/fake-clock';
-import { memoryLogger, TOKEN, tempDir, testEvent } from './testing/fixtures';
+import {
+  fakeExec,
+  memoryLogger,
+  TOKEN,
+  tempDir,
+  testEvent,
+} from './testing/fixtures';
 import { MockServer, until } from './testing/mock-server';
 
 const host = { hostname: 'test-host', os: 'linux', arch: 'x64' };
@@ -85,6 +91,8 @@ describe('RunnerConnection', () => {
           runnerVersion: '0.1.0',
           host,
           detectCapabilities: async () => capabilities,
+          exec: fakeExec({}),
+          watchedProjects: () => [],
         }),
         disabledCommands: [],
         clock,

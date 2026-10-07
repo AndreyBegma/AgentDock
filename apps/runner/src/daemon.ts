@@ -8,9 +8,10 @@ import {
 } from '@agentdock/shared/protocol';
 import { Backoff } from './backoff';
 import type { Clock } from './clock';
+import { CollectorRegistry, collectors } from './collectors';
 import { createDispatcher } from './commands/dispatcher';
 import { createHandlers } from './commands/handlers';
-import type { PairedConfig } from './config';
+import { loadConfig, type PairedConfig, saveConfig } from './config';
 import {
   type HeartbeatPayload,
   RunnerConnection,
@@ -20,12 +21,15 @@ import {
 import { detectCapabilities } from './detect/capabilities';
 import type { Exec } from './detect/exec';
 import { acquireLock } from './lock';
-import type { Logger } from './log';
+import { errorMessage, type Logger } from './log';
+import { WatchList } from './projects/watch-list';
 import { Spool } from './spool';
 import { RUNNER_VERSION } from './version';
 
 export interface DaemonOptions {
   config: PairedConfig;
+  /** Where `config` was read from; the watch list is cached back into it. */
+  configFile: string;
   home: string;
   spoolDir: string;
   host: Host;
@@ -72,12 +76,32 @@ export const runDaemon = async (
       return capabilities;
     };
 
+    // Collectors emit through the connection, which exists only below.
+    let connection: RunnerConnection | null = null;
+    const registry = new CollectorRegistry({
+      factories: collectors,
+      emit: (event) => connection?.emit(event),
+      log,
+    });
+    const watchList = new WatchList({
+      initial: config.projects,
+      registry,
+      persist: (projects) =>
+        saveConfig(options.configFile, {
+          ...loadConfig(options.configFile),
+          projects,
+        }),
+      log,
+    });
+
     const dispatch = createDispatcher({
       handlers: createHandlers({
         clock,
         runnerVersion: RUNNER_VERSION,
         host: options.host,
         detectCapabilities: redetect,
+        exec,
+        watchedProjects: () => watchList.current,
       }),
       disabledCommands: config.disabledCommands,
       clock,
@@ -93,7 +117,7 @@ export const runDaemon = async (
       };
     };
 
-    const connection = new RunnerConnection({
+    const live = new RunnerConnection({
       server: config.server,
       token: config.token,
       spool,
@@ -109,16 +133,26 @@ export const runDaemon = async (
       }),
       heartbeat,
       dispatch,
+      onConfig: (server) => {
+        watchList.apply(server.projects).catch((error) => {
+          log.error('cannot apply the watch list', {
+            error: errorMessage(error),
+          });
+        });
+      },
       createSocket: options.createSocket,
     });
+    connection = live;
 
-    const onAbort = () => connection.stop();
-    if (options.signal?.aborted) connection.stop();
+    const onAbort = () => live.stop();
+    if (options.signal?.aborted) live.stop();
     options.signal?.addEventListener('abort', onAbort, { once: true });
-    connection.start();
-    options.onStart?.(connection);
-    const reason = await connection.done;
+    await watchList.start();
+    live.start();
+    options.onStart?.(live);
+    const reason = await live.done;
     options.signal?.removeEventListener('abort', onAbort);
+    await registry.stop();
     return reason;
   } finally {
     release();

@@ -1,5 +1,11 @@
 import { z } from 'zod';
 import { capabilitiesSchema, hostSchema } from './capabilities';
+import {
+  PROJECT_INSPECTION_TIMEOUT_MS,
+  projectInspectArgsSchema,
+  projectInspectionSchema,
+  projectRefreshArgsSchema,
+} from './projects';
 
 /** Roles as plain strings, so this package does not depend on the auth module. */
 export const roleSchema = z.enum(['admin', 'operator', 'viewer']);
@@ -25,6 +31,12 @@ export const commandErrorCodeSchema = z.enum([
   'timeout',
   /** The handler threw; `message` carries no stack trace. */
   'internal',
+  /** A path argument does not exist, or is not a directory. */
+  'path_not_found',
+  /** A path argument is outside what the command may touch (D10). */
+  'path_not_allowed',
+  /** A path argument is not inside a git repository. */
+  'not_a_repository',
 ]);
 export type CommandErrorCode = z.infer<typeof commandErrorCodeSchema>;
 
@@ -58,6 +70,18 @@ export const commands = {
       capabilities: capabilitiesSchema,
     }),
     minRole: 'viewer',
+  },
+  'project.inspect': {
+    args: projectInspectArgsSchema,
+    result: projectInspectionSchema,
+    minRole: 'admin',
+    timeoutMs: PROJECT_INSPECTION_TIMEOUT_MS,
+  },
+  'project.refresh': {
+    args: projectRefreshArgsSchema,
+    result: projectInspectionSchema,
+    minRole: 'operator',
+    timeoutMs: PROJECT_INSPECTION_TIMEOUT_MS,
   },
 } as const satisfies Record<string, CommandDefinition>;
 

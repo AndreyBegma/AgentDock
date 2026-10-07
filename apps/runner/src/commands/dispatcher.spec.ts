@@ -5,8 +5,9 @@ import {
   DEFAULT_COMMAND_TIMEOUT_MS,
 } from '@agentdock/shared/protocol';
 import { FakeClock } from '../testing/fake-clock';
-import { memoryLogger } from '../testing/fixtures';
+import { fakeExec, memoryLogger } from '../testing/fixtures';
 import { type CommandHandlers, createDispatcher } from './dispatcher';
+import { CommandFailure } from './failure';
 import { createHandlers } from './handlers';
 
 const host = { hostname: 'test-host', os: 'linux', arch: 'x64' };
@@ -31,6 +32,8 @@ const setup = (
         codeSentinel: null,
         otlp: null,
       }),
+      exec: fakeExec({}),
+      watchedProjects: () => [{ id: 'prj_a', root: '/nowhere/a' }],
     }),
     ...overrides,
   };
@@ -125,5 +128,43 @@ describe('command dispatcher', () => {
     await Bun.sleep(0);
     clock.advance(DEFAULT_COMMAND_TIMEOUT_MS);
     expect((await pending).error?.code).toBe('timeout');
+  });
+
+  it('answers the code of a CommandFailure instead of internal', async () => {
+    const { run } = setup({
+      'runner.ping': () => {
+        throw new CommandFailure('path_not_allowed', 'nope');
+      },
+    });
+    expect((await run('runner.ping')).error).toEqual({
+      code: 'path_not_allowed',
+      message: 'nope',
+    });
+  });
+
+  it('refuses project.inspect with a relative path as invalid_args', async () => {
+    const { run } = setup();
+    expect(
+      (await run('project.inspect', { path: 'dev/AgentDock' })).error?.code,
+    ).toBe('invalid_args');
+  });
+
+  it('answers path_not_found for project.inspect of a missing directory', async () => {
+    const { run } = setup();
+    expect(
+      (await run('project.inspect', { path: '/nowhere/at/all' })).error?.code,
+    ).toBe('path_not_found');
+  });
+
+  it('refuses project.refresh of a root not registered under that project', async () => {
+    const { run } = setup();
+    for (const args of [
+      { projectId: 'prj_a', root: '/etc' },
+      { projectId: 'prj_b', root: '/nowhere/a' },
+    ]) {
+      expect((await run('project.refresh', args)).error?.code).toBe(
+        'path_not_allowed',
+      );
+    }
   });
 });

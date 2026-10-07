@@ -13,6 +13,7 @@ import {
 } from '@agentdock/shared/protocol';
 import type { Clock } from '../clock';
 import { errorMessage, type Logger } from '../log';
+import { CommandFailure } from './failure';
 
 /** One handler per allowlisted command; the compiler refuses a missing one. */
 export type CommandHandlers = {
@@ -102,6 +103,10 @@ export const createDispatcher = (options: DispatcherOptions): Dispatch => {
           'timeout',
           `${name} did not finish within ${timeoutMs} ms`,
         );
+      }
+      if (error instanceof CommandFailure) {
+        log.warn('command: refused', { id, name, code: error.code });
+        return failure(id, error.code, error.message);
       }
       log.error('command: handler failed', {
         id,

@@ -152,6 +152,7 @@ const runCommand = async ({
   }
   const reason = await runDaemon({
     config,
+    configFile: paths.configFile,
     home: paths.home,
     spoolDir: paths.spoolDir,
     host: deps.host,
