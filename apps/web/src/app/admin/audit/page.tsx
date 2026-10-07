@@ -221,7 +221,7 @@ function AuditView() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [selected, setSelected] = useState<AuditRecordView>();
 
-  /** Sends the visitor away as AuthGate does for the sibling pages. */
+  /** A 401 goes to sign-in, a 403 away from the admin area. */
   const handleAccess = useCallback(
     (err: unknown): boolean => {
       if (!(err instanceof ApiError)) return false;
