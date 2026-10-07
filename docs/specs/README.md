@@ -25,3 +25,9 @@ spec; large rows split into a `## Parallel plan` there.
 | [#20](https://github.com/AndreyBegma/AgentDock/issues/20) | [20-merge-approval-queue](20-merge-approval-queue.md) | M2.5 Merge approval queue | queued — after #11, #17 (plugin#8) |
 | [#21](https://github.com/AndreyBegma/AgentDock/issues/21) | [21-activity-feed-and-history](21-activity-feed-and-history.md) | M2.6 Activity & history | queued — after #8, #11, #12 |
 | [#22](https://github.com/AndreyBegma/AgentDock/issues/22) | [22-notifications-and-telegram](22-notifications-and-telegram.md) | M2.7 Notifications & Telegram | queued — after #8, #9, #10, #11 |
+| [#24](https://github.com/AndreyBegma/AgentDock/issues/24) | [24-skills](24-skills.md) | M3.1 Skills | queued — after #17, #21 |
+| [#25](https://github.com/AndreyBegma/AgentDock/issues/25) | [25-cron-schedules](25-cron-schedules.md) | M3.2 Cron schedules | queued — after #17, #24 |
+| [#26](https://github.com/AndreyBegma/AgentDock/issues/26) | [26-webhooks](26-webhooks.md) | M3.3 Webhooks | queued — after #8, #17, #21, #22, #24 |
+| [#27](https://github.com/AndreyBegma/AgentDock/issues/27) | [27-github-app](27-github-app.md) | M3.4 GitHub App | queued — after #11, #19, #26 |
+| [#28](https://github.com/AndreyBegma/AgentDock/issues/28) | [28-budgets](28-budgets.md) | M3.5 Budgets | queued — after #13, #17, #22, #24 |
+| [#29](https://github.com/AndreyBegma/AgentDock/issues/29) | [29-terminal-attach](29-terminal-attach.md) | M3.6 Terminal attach | queued — after #8, #18 |

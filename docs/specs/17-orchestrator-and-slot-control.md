@@ -52,6 +52,7 @@ taken, with its source.
 | D9 | **Roles.** `orchestrator.status`: viewer. `orchestrator.start`, `orchestrator.stop`, `slot.stop`, `slot.message`: operator of the project (#10 D11). These minimum roles are written into the protocol allowlist and checked by `RunnerCommandService` (#6 D8) and again by `ProjectAccessGuard` | runner-protocol.md, ADR-0008 |
 | D10 | **Log.** Every command sent by this item gets a `command_runs` row (`requested` → `ok` / `error` / `unknown`), so the UI shows "Stopping…" and the outcome, and history (#21) can list them. Audit (#8) records the same actions with actor and result: `orchestrator.start`, `orchestrator.stop`, `slot.stop`, `slot.message` (message text stored hashed in audit, full text only in `command_runs`) | #8 D5, security.md |
 | D11 | **Timeouts.** start 30 s (until the tmux session exists — not until Claude is ready), stop/slot.stop 10 s, message 10 s, status 5 s | #6 D8 |
+| D12 | Slot session names: the runner accepts both `cs-<slot>` (current) and `cs-<prefix>--<slot>` (code-sentinel P11, [plugin#11](https://github.com/AndreyBegma/claude-code-plugin/issues/11)), parsing them in one shared helper `apps/runner/src/fleet/session-name.ts` owned by #11 (import it); a session belongs to a project only when its worktree path does. Other issues import the helper, never re-parse | #11 D12, plugin#11 |
 
 ## Data / Schema
 

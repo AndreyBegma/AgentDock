@@ -44,6 +44,7 @@ taken, with its source.
 | D6 | **Authorization.** Topic `pane:<projectId>:<slot>` is registered with #9's `TopicAuthorizerRegistry`: allowed for any member of the project (viewer and up, #10 D11) and admins; the slot must belong to that project. The runner-side `subscribe` carries `{ projectId, root, slot }` and is checked against the watch list and the `.wt-<repo>-<slot>` rule (#10 D10) | ADR-0008, #9 D11 |
 | D7 | **Session end.** When `cs-<slot>` disappears the runner sends a final `pane { ended: true }` and drops the subscription; the web shows "session ended" with the last frame kept on screen | new |
 | D8 | **No persistence.** Frames are not written to `events` or any table. Audit records only `pane.watch_started` / `pane.watch_stopped` per user and slot (#8 action union) | security.md |
+| D9 | Slot session names: the runner accepts both `cs-<slot>` (current) and `cs-<prefix>--<slot>` (code-sentinel P11, [plugin#11](https://github.com/AndreyBegma/claude-code-plugin/issues/11)), parsing them in one shared helper `apps/runner/src/fleet/session-name.ts` owned by #11 (import it); a session belongs to a project only when its worktree path does. Other issues import the helper, never re-parse | #11 D12, plugin#11 |
 
 ## Data / Schema
 
