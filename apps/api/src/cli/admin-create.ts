@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import { createInterface } from 'node:readline/promises';
 import { Writable } from 'node:stream';
+import { AuditService } from '../audit/audit.service';
+import { SYSTEM_ACTOR } from '../audit/audit.types';
 import { PrismaService } from '../database/prisma.service';
 import { CreateAdminError, createAdmin } from './create-admin';
 
@@ -53,6 +55,14 @@ async function main() {
   const prisma = new PrismaService();
   try {
     const admin = await createAdmin(prisma, await readInput());
+    await new AuditService(prisma).record({
+      actor: SYSTEM_ACTOR,
+      action: 'user.create',
+      target: { type: 'user', id: admin.id },
+      after: { email: admin.email, role: admin.role, status: admin.status },
+      result: 'ok',
+      meta: { via: 'cli' },
+    });
     console.log(`Admin ${admin.email} created`);
   } finally {
     await prisma.$disconnect();

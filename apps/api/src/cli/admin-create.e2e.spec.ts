@@ -44,6 +44,18 @@ describe('admin:create (e2e)', () => {
     const before = await ctx.prisma.user.findUniqueOrThrow({
       where: { email: 'root@example.com' },
     });
+    const created = await ctx.prisma.auditRecord.findMany({
+      where: { action: 'user.create', targetId: before.id },
+    });
+    expect(created).toEqual([
+      expect.objectContaining({
+        actorType: 'system',
+        targetType: 'user',
+        result: 'ok',
+        after: { email: 'root@example.com', role: 'admin', status: 'active' },
+        meta: { via: 'cli' },
+      }),
+    ]);
 
     const second = runCli('root@example.com');
     expect(second.status).not.toBe(0);

@@ -1,6 +1,16 @@
-import { AUTH_ERROR, type PublicUser } from '@agentdock/shared';
-import { Injectable } from '@nestjs/common';
+import {
+  AUTH_ERROR,
+  type LoginDeniedReason,
+  type PublicUser,
+} from '@agentdock/shared';
+import { type HttpException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { AuditService } from '../audit/audit.service';
+import {
+  ANONYMOUS_ACTOR,
+  type RequestOrigin,
+  userActor,
+} from '../audit/audit.types';
 import { PrismaService } from '../database/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { authError } from './auth-error';
@@ -27,9 +37,10 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly sessions: SessionService,
     private readonly settings: SettingsService,
+    private readonly audit: AuditService,
   ) {}
 
-  async register(dto: RegisterDto): Promise<void> {
+  async register(dto: RegisterDto, origin: RequestOrigin): Promise<void> {
     if (!(await this.settings.isRegistrationOpen())) {
       throw authError(
         403,
@@ -39,8 +50,16 @@ export class AuthService {
     }
     const passwordHash = await hashPassword(dto.password);
     try {
-      await this.prisma.user.create({
+      const user = await this.prisma.user.create({
         data: { email: dto.email, name: dto.name || null, passwordHash },
+      });
+      await this.audit.record({
+        actor: ANONYMOUS_ACTOR,
+        origin,
+        action: 'auth.register',
+        target: { type: 'user', id: user.id },
+        after: { email: user.email, name: user.name, status: user.status },
+        result: 'ok',
       });
     } catch (error) {
       if (
@@ -58,10 +77,7 @@ export class AuthService {
    * account all fail the same way (spec D8, D9). Only a correct password on a
    * pending account says so, because it proves the caller owns the account.
    */
-  async login(
-    dto: LoginDto,
-    meta: { ip?: string; userAgent?: string },
-  ): Promise<LoginResult> {
+  async login(dto: LoginDto, origin: RequestOrigin): Promise<LoginResult> {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
@@ -69,14 +85,27 @@ export class AuthService {
       user?.passwordHash ?? null,
       dto.password,
     );
-    if (!user) throw invalidCredentials();
+    // Every refusal is recorded against the email, never the account: the
+    // record must not tell an auditor more than the response told the caller.
+    const deny = async (reason: LoginDeniedReason, error: HttpException) => {
+      await this.audit.record({
+        actor: ANONYMOUS_ACTOR,
+        origin,
+        action: 'auth.login',
+        target: { type: 'email', id: dto.email },
+        result: 'denied',
+        meta: { reason },
+      });
+      return error;
+    };
+    if (!user) throw await deny('invalid_credentials', invalidCredentials());
 
     const locked = user.lockedUntil !== null && user.lockedUntil > new Date();
-    if (locked) throw invalidCredentials();
+    if (locked) throw await deny('locked', invalidCredentials());
 
     if (!passwordOk) {
       await this.recordFailure(user.id);
-      throw invalidCredentials();
+      throw await deny('invalid_credentials', invalidCredentials());
     }
 
     if (user.failedLoginCount > 0 || user.lockedUntil !== null) {
@@ -86,15 +115,28 @@ export class AuthService {
       });
     }
     if (user.status === 'pending') {
-      throw authError(
-        403,
-        AUTH_ERROR.pendingApproval,
-        'Account is waiting for administrator approval',
+      throw await deny(
+        'pending_approval',
+        authError(
+          403,
+          AUTH_ERROR.pendingApproval,
+          'Account is waiting for administrator approval',
+        ),
       );
     }
-    if (user.status !== 'active') throw invalidCredentials();
+    if (user.status !== 'active') {
+      throw await deny('invalid_credentials', invalidCredentials());
+    }
 
-    const session = await this.sessions.create(user.id, meta);
+    const session = await this.sessions.create(user.id, origin);
+    await this.audit.record({
+      actor: userActor(user.id),
+      origin,
+      action: 'auth.login',
+      target: { type: 'user', id: user.id },
+      result: 'ok',
+      meta: { sessionId: session.sessionId },
+    });
     return { user: toPublicUser(user), session };
   }
 
@@ -116,7 +158,11 @@ export class AuthService {
   }
 
   /** Changes the caller's password and ends every other session of theirs (spec D11). */
-  async changePassword(auth: AuthContext, dto: ChangePasswordDto) {
+  async changePassword(
+    auth: AuthContext,
+    dto: ChangePasswordDto,
+    origin: RequestOrigin,
+  ) {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: auth.user.id },
     });
@@ -132,5 +178,12 @@ export class AuthService {
       data: { passwordHash: await hashPassword(dto.newPassword) },
     });
     await this.sessions.revokeAll(user.id, auth.sessionId);
+    await this.audit.record({
+      actor: userActor(user.id),
+      origin,
+      action: 'auth.password_change',
+      target: { type: 'user', id: user.id },
+      result: 'ok',
+    });
   }
 }

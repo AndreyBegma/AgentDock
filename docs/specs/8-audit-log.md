@@ -56,7 +56,7 @@ taken, with its source.
 | D9 | Failed logins are recorded with `actor: anonymous`, `target: { type: "email", id: <lower-cased email> }`, `result: denied`, and `meta.reason` (`invalid_credentials`, `locked`, `pending_approval`). The IP and user agent go into `meta` for every user-originated record | new |
 | D10 | `projectId` is a nullable string **without** a foreign key — projects arrive in #10 and audit rows must outlive any project | data-model.md; new |
 | D11 | Admin only: list, detail, verify, export. No role can modify or delete records through the API | ADR-0008 |
-| D12 | CSV export streams rows matching the current filters, UTF-8, RFC 4180 quoting, `before` / `after` / `meta` as JSON strings; capped at 100 000 rows per request | new |
+| D12 | CSV export streams rows matching the current filters, UTF-8, RFC 4180 quoting, `before` / `after` / `meta` as JSON strings; capped at 100 000 rows per request. A cell starting with `=`, `+`, `-`, `@`, tab or CR gets a leading `'` (OWASP CSV injection: a failed-login email is anonymous input); JSON columns start with `{`, `[` or `"` and are never altered | new; injection guard added during implementation (orchestrator, 2026-10-07) |
 
 ## Data / Schema
 
@@ -129,6 +129,13 @@ CREATE TRIGGER audit_records_no_truncate
 | `runner.rename` | rename | user (admin) | runner | `name` |
 | `runner.revoke` | revoke | user (admin) | runner | `revokedAt` |
 | `runner.command` / `runner.command.result` | every `RunnerCommandService.send` | user / system | runner | after: `{ name, args }` / `{ ok, error? }` |
+| `user.create` | `bun run admin:create` | system | user | after: `{ email, role, status }`; `meta.via: "cli"` |
+
+Notes from implementation: failed admin mutations (404 / 409) are not recorded —
+only login and pairing record `denied`. A command refused for the caller's role
+writes one `runner.command` / `denied`; arguments that fail the command's schema
+write nothing. A command with no answer (`unknown`) completes with
+`runner.command.result` / `error`, `after.error: "unknown"`.
 
 Admin endpoints of #3 that change nothing (lists, `GET`s) are not recorded.
 

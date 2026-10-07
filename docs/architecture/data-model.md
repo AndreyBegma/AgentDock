@@ -44,7 +44,7 @@ the two never share a name.
 | `Schedule` | projectId, cron, timezone, target (skill or orchestrator command), args, profileId, model, missedPolicy `skip\|catch_up`, enabled |
 | `Budget` | scope `project\|user`, scopeId, period `day\|week\|month`, limitUsd, action `alert\|stop` |
 | `ModelPrice` | version, modelName, matchPattern (regex), tiers (json), validFrom |
-| `AuditRecord` | ts, actorUserId?, actorRunnerId?, action, target, projectId?, before, after, result, prevHash, hash |
+| `AuditRecord` | seq (BigInt, chain order), ts, actorType, actorUserId?, actorRunnerId?, action, targetType, targetId?, projectId?, before, after, result, meta, prevHash, hash — actor and project ids are plain columns without foreign keys, so records outlive users and projects ([spec 8](../specs/8-audit-log.md)) |
 | `Webhook` / `WebhookDelivery` | url, secret, events[], status, attempts, nextAttemptAt, responseCode |
 | `InboundTrigger` | name, secret, action (skill run / orchestrator next), projectId |
 | `Event` | runnerId, seq, ts, type, source, projectRepo?, projectRoot?, slot?, issue?, session? (json), data, receivedAt — unique `(runnerId, seq)`, index `(type, ts)`; projectId is added when projects land (M1.4) — table `events` |
