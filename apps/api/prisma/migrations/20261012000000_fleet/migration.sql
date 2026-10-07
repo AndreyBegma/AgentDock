@@ -91,9 +91,9 @@ CREATE TABLE "slot_checkpoints" (
 -- CreateTable
 CREATE TABLE "fleet_orchestrators" (
     "projectId" TEXT NOT NULL,
-    "status" "OrchestratorStatus" NOT NULL,
+    "status" "OrchestratorStatus",
     "session" TEXT,
-    "since" TIMESTAMP(3) NOT NULL,
+    "since" TIMESTAMP(3),
     "boardError" JSONB,
     "lastSeq" BIGINT NOT NULL,
     "updatedAt" TIMESTAMP(3) NOT NULL,

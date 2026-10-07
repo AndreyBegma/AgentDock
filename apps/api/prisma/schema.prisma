@@ -375,7 +375,7 @@ enum CheckpointKind {
   other
 }
 
-/// `unknown` is the absence of a row.
+/// `unknown` is a null status (or no row).
 enum OrchestratorStatus {
   running
   idle
@@ -474,13 +474,14 @@ model SlotCheckpoint {
 }
 
 /// The orchestrator's presence on a project (D6) and the last board or brief
-/// the runner could not parse (D4). No row: nothing observed yet (`unknown`).
+/// the runner could not parse (D4).
 model FleetOrchestrator {
-  projectId  String             @id
-  status     OrchestratorStatus
+  projectId  String              @id
+  /// null (or no row): never observed — `unknown`.
+  status     OrchestratorStatus?
   session    String?
   /// When `status` last changed.
-  since      DateTime
+  since      DateTime?
   /// `{ file, line, reason, at }` of the last `board.unparsed`, cleared by the next parsed round.
   boardError Json?
   lastSeq    BigInt
