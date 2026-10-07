@@ -15,8 +15,7 @@ import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
 import { toast } from 'glass-ui/toast';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
-import { AuthGate } from '../../components/auth-gate';
-import { PageNav } from '../../components/page-nav';
+import { useCurrentUser } from '../../components/shell/user-context';
 import { api, describeError } from '../../lib/api';
 
 const formatTime = (iso: string) => new Date(iso).toLocaleString();
@@ -170,18 +169,12 @@ function Profile({ user }: { user: PublicUser }) {
 }
 
 export default function AccountPage() {
+  const user = useCurrentUser();
   return (
-    <AuthGate>
-      {(user) => (
-        <>
-          <PageNav user={user} />
-          <div className="flex flex-col gap-6">
-            <Profile user={user} />
-            <PasswordCard />
-            <SessionsCard />
-          </div>
-        </>
-      )}
-    </AuthGate>
+    <div className="flex flex-col gap-6">
+      <Profile user={user} />
+      <PasswordCard />
+      <SessionsCard />
+    </div>
   );
 }

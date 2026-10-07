@@ -6,7 +6,8 @@
     "build": "next build",
     "start": "next start -p 3517",
     "start:dev": "next dev --turbopack -p 3517",
-    "lint": "biome lint src"
+    "lint": "biome lint src",
+    "test": "bun test"
   },
   "dependencies": {
     "@agentdock/shared": "workspace:*",
@@ -26,6 +27,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.2",
+    "@types/bun": "1.4.0",
     "@types/node": "^22.15.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
