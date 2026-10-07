@@ -57,7 +57,7 @@ taken, with its source.
 | D10 | The last active admin cannot be demoted, disabled or deleted (409 `last_admin`) | new |
 | D11 | Disabling a user, changing their role, or changing a password revokes all of that user's sessions (except the current one for a self password change) | security.md |
 | D12 | Web reaches the API same-origin: Next rewrites `/api/:path*` → `${API_URL}/:path*`. Cookies are first-party; CORS is not relied on | new — avoids cross-port cookies; matches the reverse-proxy deployment (overview.md) |
-| D13 | Route protection in web: a Next `middleware.ts` redirects to `/login` when `ad_session` is absent; pages call `GET /api/auth/me` and redirect on 401 / `pending_approval` | new |
+| D13 | Route protection in web: a Next `proxy.ts` (Next 16's name for `middleware.ts`) redirects to `/login` when `ad_session` is absent; pages call `GET /api/auth/me` and redirect on 401 / `pending_approval` | new |
 | D14 | Shared contracts (DTO shapes, enums, error codes) live in `packages/shared/src/auth/` so web and api agree | CLAUDE.md (shared types in `packages/shared`) |
 
 ## Data / Schema
@@ -179,7 +179,7 @@ issues (the runner, M1.3), not from splitting this one.
 | Slot | Owns | Touches | Depends on | Lead | Model |
 |---|---|---|---|---|---|
 | i3-api | schema, migration, auth + admin modules, CLI, seed, shared contracts, root scripts | apps/api/**, packages/shared/src/auth/**, packages/shared/src/index.ts, package.json, bun.lock | — | yes | opus |
-| i3-web | glass-ui setup, `/api` rewrite, middleware, auth and admin pages | apps/web/**, bun.lock | i3-api | no | sonnet |
+| i3-web | glass-ui setup, `/api` rewrite, proxy, auth and admin pages | apps/web/**, bun.lock | i3-api | no | sonnet |
 
 ## Contention
 

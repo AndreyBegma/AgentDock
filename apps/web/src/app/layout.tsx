@@ -1,3 +1,4 @@
+import { Toaster } from 'glass-ui/toast';
 import type { Metadata } from 'next';
 import './globals.css';
 
@@ -12,8 +13,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="en" data-scale="desk" data-theme="dark">
+      <body className="min-h-screen bg-ground text-ink">
+        <main id="main-content" className="mx-auto w-full max-w-4xl p-6">
+          {children}
+        </main>
+        <Toaster />
+      </body>
     </html>
   );
 }
