@@ -28,6 +28,10 @@ export const RUNNER_ERROR = {
   notFound: 'not_found',
   /** The action is not allowed in the runner's state (e.g. a revoked runner). */
   invalidTransition: 'invalid_transition',
+  /** Not in the command allowlist, or its args fail the command's schema. */
+  invalidCommand: 'invalid_command',
+  /** The caller's role is below the command's minimum role. */
+  forbidden: 'forbidden',
 } as const;
 export type RunnerErrorCode = (typeof RUNNER_ERROR)[keyof typeof RUNNER_ERROR];
 

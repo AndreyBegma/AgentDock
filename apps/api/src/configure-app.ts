@@ -1,5 +1,6 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import { WsAdapter } from '@nestjs/platform-ws';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 
@@ -20,6 +21,9 @@ export const configureApp = (app: INestApplication): void => {
     'trust proxy',
     trustProxySetting(process.env.TRUST_PROXY),
   );
+
+  // The runner gateway (`/runner`) shares the API's port: plain `ws`, no socket.io.
+  app.useWebSocketAdapter(new WsAdapter(app));
 
   app.use(helmet());
   app.use(cookieParser());
