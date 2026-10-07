@@ -14,6 +14,7 @@ import { EXIT } from './service';
 import { FakeClock } from './testing/fake-clock';
 import { machineWithoutCodex, TOKEN, tempDir } from './testing/fixtures';
 import { MockServer, until } from './testing/mock-server';
+import { workspace } from './testing/projects';
 import { RUNNER_VERSION } from './version';
 
 const host = { hostname: 'test-host', os: 'linux', arch: 'x64' };
@@ -397,6 +398,70 @@ describe('agentdock-runner CLI', () => {
       expect(server.connected).toBe(true);
       controller.abort();
       expect(await exit).toBe(EXIT.ok);
+    });
+
+    it('watches the projects of welcome and config, caches them, and refreshes only those roots', async () => {
+      paired();
+      const project = workspace();
+      try {
+        const root = await project.repo('x', 'git@github.com:acme/x.git');
+        project.files({ 'x/docs/': '' });
+        const before = await project.run(root, 'status', '--porcelain');
+        server.welcome = () => ({
+          type: 'welcome',
+          runnerId: 'rn_1',
+          config: { projects: [{ id: 'prj_x', root }], pollIntervalsMs: {} },
+          ackedSeq: 0,
+        });
+        const machine = machineWithoutCodex();
+        const { controller, exit, live } = start((binary, args) =>
+          binary === 'git' && args[0] === '-C'
+            ? project.git(binary, args)
+            : machine(binary, args),
+        );
+        await live();
+        const cached = () =>
+          JSON.parse(readFileSync(paths().configFile, 'utf8')).projects;
+        await until(() => cached().length === 1);
+        expect(cached()).toEqual([{ id: 'prj_x', root }]);
+
+        server.send({
+          type: 'command',
+          id: 'r1',
+          name: 'project.refresh',
+          args: { projectId: 'prj_x', root },
+        });
+        const [refreshed] = await server.waitFor('command.result', 1);
+        expect(refreshed.ok).toBe(true);
+        expect(refreshed.output).toMatchObject({
+          root,
+          remote: { repo: 'acme/x' },
+          docs: { kind: 'in_repo' },
+        });
+
+        // The project is deleted on the server: the list empties, refresh is refused.
+        server.send({
+          type: 'config',
+          config: { projects: [], pollIntervalsMs: {} },
+        });
+        await until(() => cached().length === 0);
+        server.send({
+          type: 'command',
+          id: 'r2',
+          name: 'project.refresh',
+          args: { projectId: 'prj_x', root },
+        });
+        const results = await server.waitFor('command.result', 2);
+        expect(results[1].error?.code).toBe('path_not_allowed');
+
+        // Neither the watch list nor inspection touched the repository.
+        expect(await project.run(root, 'status', '--porcelain')).toBe(before);
+        controller.abort();
+        expect(await exit).toBe(EXIT.ok);
+        expect(server.invalid).toEqual([]);
+      } finally {
+        project.cleanup();
+      }
     });
 
     it('connects with no tools installed at all: codex null, still live', async () => {

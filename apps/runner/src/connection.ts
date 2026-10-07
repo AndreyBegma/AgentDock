@@ -6,6 +6,7 @@ import {
   RUNNER_CLOSE_CODES,
   type RunnerEvent,
   type RunnerMessage,
+  type RunnerServerConfig,
   type ServerMessage,
   serverMessageSchema,
   type UnsequencedEvent,
@@ -49,6 +50,8 @@ export interface ConnectionOptions {
   hello: () => Promise<HelloPayload>;
   heartbeat: () => Promise<HeartbeatPayload>;
   dispatch: Dispatch;
+  /** The server's config, from `welcome` on every connect and from `config` after. */
+  onConfig?: (config: RunnerServerConfig) => void;
   createSocket?: SocketFactory;
   heartbeatMs?: number;
 }
@@ -208,8 +211,15 @@ export class RunnerConnection {
         this.state = 'live';
         this.flush();
         this.startHeartbeat();
+        this.options.onConfig?.(message.config);
         return;
       }
+      case 'config':
+        log.info('config updated', {
+          projects: message.config.projects.length,
+        });
+        this.options.onConfig?.(message.config);
+        return;
       case 'ack':
         spool.ack(message.seq);
         return;
