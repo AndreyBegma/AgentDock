@@ -33,6 +33,6 @@ assets are those machines. The main threats:
 - Codex workers cannot be file-fenced inside the worktree the way `fence.py`
   fences Claude workers (ADR-0013); the pre-merge ownership check is
   after-the-fact.
-- The scaffold commits a local PostgreSQL password into
-  `docker/docker-compose.yml`. Move it to an env file before the repository is
-  pushed (tracked in M1.1).
+- The cs-init template writes the local PostgreSQL password inline into
+  `docker/docker-compose.yml`. AgentDock moved it to `docker/.env` (ignored);
+  the template fix is P10 in [plugin changes](../plugin/code-sentinel-changes.md).
