@@ -271,6 +271,10 @@ command takes a shell string.
 - Events: at-least-once; dedupe on `(runnerId, seq)`. A runner keeps unacked
   events in a local append-only spool (`~/.local/state/agentdock/spool/`), capped
   at 100 MB, oldest dropped with a `runner.spool_truncated` event.
+  Those events are gone and will never be resent, so a server that persists a
+  `runner.spool_truncated` event treats its `[fromSeq, toSeq]` range as filled
+  when it computes the highest contiguous `seq` — otherwise the ack cursor
+  stops below the hole forever and the spool never drains.
 - Commands: at-most-once. A command whose result never arrives is marked
   `unknown` after its timeout; the UI shows it, nothing retries a state change
   automatically.
