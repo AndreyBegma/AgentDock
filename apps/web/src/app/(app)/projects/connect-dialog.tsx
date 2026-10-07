@@ -54,10 +54,12 @@ function Preview({ inspection }: { inspection: ProjectInspection }) {
         <dd>{yesNo(inspection.hasAgentsMd)}</dd>
       </dl>
 
-      <section aria-label="Docs source">
-        <h3 className="mb-2 text-sm font-semibold">Docs source</h3>
-        <DocsDetails docs={inspection.docs} />
-      </section>
+      {inspection.isMainCheckout ? (
+        <section aria-label="Docs source">
+          <h3 className="mb-2 text-sm font-semibold">Docs source</h3>
+          <DocsDetails docs={inspection.docs} />
+        </section>
+      ) : null}
 
       {inspection.warnings.length > 0 ? (
         <ul
@@ -257,9 +259,24 @@ export function ConnectDialog({
           {inspection ? (
             <>
               {blocker ? (
-                <p role="alert" className="text-danger text-sm">
-                  {blocker}
-                </p>
+                <div
+                  role="alert"
+                  className="text-danger flex flex-wrap items-center gap-2 text-sm"
+                >
+                  <span>{blocker}</span>
+                  {inspection.isMainCheckout ? null : (
+                    <Button
+                      variant="glass"
+                      size="sm"
+                      onClick={() => {
+                        setPath(inspection.root);
+                        void inspect(undefined, inspection.root);
+                      }}
+                    >
+                      Use this path
+                    </Button>
+                  )}
+                </div>
               ) : null}
               <Preview inspection={inspection} />
             </>
