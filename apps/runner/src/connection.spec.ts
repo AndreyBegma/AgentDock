@@ -93,6 +93,7 @@ describe('RunnerConnection', () => {
           detectCapabilities: async () => capabilities,
           exec: fakeExec({}),
           watchedProjects: () => [],
+          profiles: () => [],
         }),
         disabledCommands: [],
         clock,

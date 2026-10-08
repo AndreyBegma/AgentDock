@@ -13,6 +13,7 @@ import {
   orchestratorStatusResultSchema,
   SLOT_MESSAGE_MAX_BYTES,
   slotMessageArgsSchema,
+  slotMessageResultSchema,
   slotNameSchema,
   slotStopArgsSchema,
 } from '../index';
@@ -190,6 +191,19 @@ describe('slot.stop and slot.message args', () => {
   });
 });
 
+describe('slot.message result', () => {
+  it('always says written, and whether the worker was poked', () => {
+    for (const delivered of [true, false]) {
+      expect(
+        slotMessageResultSchema.safeParse({ written: true, delivered }).success,
+      ).toBe(true);
+    }
+    expect(slotMessageResultSchema.safeParse({ written: true }).success).toBe(
+      false,
+    );
+  });
+});
+
 describe('controlCommands', () => {
   it('carries the D9 roles and D11 timeouts', () => {
     expect(
@@ -209,9 +223,9 @@ describe('controlCommands', () => {
     expect(CONTROL_TIMEOUTS_MS.start).toBe(30_000);
   });
 
-  it('is not in the allowlist until the runner registers its handlers', () => {
-    for (const name of Object.keys(controlCommands)) {
-      expect(Object.hasOwn(commands, name)).toBe(false);
+  it('is in the allowlist, as defined here', () => {
+    for (const [name, definition] of Object.entries(controlCommands)) {
+      expect(commands[name as keyof typeof controlCommands]).toBe(definition);
     }
   });
 

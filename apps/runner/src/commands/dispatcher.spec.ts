@@ -34,6 +34,7 @@ const setup = (
       }),
       exec: fakeExec({}),
       watchedProjects: () => [{ id: 'prj_a', root: '/nowhere/a' }],
+      profiles: () => [],
     }),
     ...overrides,
   };
