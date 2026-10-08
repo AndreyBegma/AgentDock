@@ -201,6 +201,12 @@ i17-api, decided with the orchestrator on 2026-10-08:
 22. **`orchestrator.status` has no run.** It is a read the UI polls; `RunnerCommandService` still audits it as `runner.command`.
 23. **Migration order.** `20261020000000_control` sorts before the already-merged `20261021000000_queue`. A database that applied `_queue` first gets `_control` applied out of order by `prisma migrate deploy`; the two touch distinct tables.
 
+i17-web, decided with the orchestrator on 2026-10-08:
+
+24. **Start is a button and a dialog, not a split button.** "Start…" opens a dialog with the command (`start` / `next`), the profile (read-only), the model and the permission mode. Only values that differ from the project's settings are sent as overrides, so an operator whose project was set to `bypassPermissions` by an admin can still start with the inherited value (note 21).
+25. **The profile is changed in settings, by an admin.** Listing a machine's profiles is the admin read `/admin/runners/:id`, so the *Orchestrator* tab offers the profile select to admins only; an operator sees the profile and edits the model and permission mode. `bypassPermissions` is offered to admins only, on the tab and in the start dialog; an operator sees it only as the current value an admin set.
+26. **Outcomes.** The POSTs are synchronous (note 17), so the person who clicked gets the toast from the response (`delivered: false` says the message waits in the worktree). `command_run.updated` drives the pending spinner for everyone on the project and announces a run another user finished. Error toasts come from the error code; `ApiError` does not yet keep `commandRunId`.
+
 Depends on #8
 
 Depends on #10
