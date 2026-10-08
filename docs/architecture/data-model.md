@@ -16,7 +16,10 @@ User ─< ProjectMember >─ Project >─ Runner ─< RuntimeProfile
   │                        └─  DocsSource
   ├─< UserSession (login sessions)
   ├─< AuditRecord
-  └─< Notification
+  ├─< Notification ─< NotificationDelivery
+  ├─< NotificationRule · NotificationMute (>─ Project)
+  └─  TelegramLink · TelegramLinkCode
+Runner ─< RunnerIncident · NotificationMatcherState (one row)
 Event (partitioned by month) · UsageRollup (hour × project × model × runtime)
 ModelPrice (versioned) · Webhook ─< WebhookDelivery · InboundTrigger
 Setting (key/value: registration open/closed, Telegram, …)
@@ -27,7 +30,7 @@ the two never share a name.
 
 | Entity | Key fields |
 |---|---|
-| `User` | email, passwordHash (argon2id), name, `status: pending\|active\|rejected\|disabled`, `role: admin\|operator\|viewer`, approvedBy, approvedAt, failedLoginCount, lockedUntil, telegramChatId? |
+| `User` | email, passwordHash (argon2id), name, `status: pending\|active\|rejected\|disabled`, `role: admin\|operator\|viewer`, approvedBy, approvedAt, failedLoginCount, lockedUntil — the Telegram chat is a `TelegramLink` row |
 | `UserSession` | userId, tokenHash (sha256 of the cookie token), createdAt, lastSeenAt, expiresAt, ip, userAgent — table `user_sessions` |
 | `Setting` | key (primary key), value (json), updatedBy — table `settings` |
 | `ProjectMember` | userId (cascade), projectId (cascade), roleOverride? — effective role is `min(global role, override)`, so an override only lowers it; admins need no row — addedBy? (`SET NULL` when that user is deleted), createdAt; unique `(projectId, userId)` — table `project_members` ([spec 10](../specs/10-projects.md)) |
@@ -49,6 +52,14 @@ the two never share a name.
 | `IssueFeed` | projectId (primary key, cascade), fetchedAt? / snapshotId? (the last snapshot part applied), unavailableReason? / unavailableAt? (the last `issues.unavailable`, cleared by the next snapshot), lastSeq, updatedAt — table `issue_feeds` |
 | `CommandRun` | one control command sent from the UI: projectId (cascade), runnerId (cascade), userId? (`SET NULL` when that user is deleted), command (`orchestrator.start\|orchestrator.stop\|slot.stop\|slot.message`), args (json, as sent — a message's full text lives only here), slot?, status `requested\|ok\|error\|unknown` (`unknown`: no answer within the timeout), error? (json `{ code, message }`), result? (json), requestedAt, finishedAt? — index `(projectId, requestedAt)` — table `command_runs` ([spec 17](../specs/17-orchestrator-and-slot-control.md)) |
 | `ProjectOrchestratorSettings` | projectId (primary key, cascade), profileId? (`SET NULL`; a profile of the project's runner — null falls back to the project's default profile), model (default `opus`), permissionMode `auto\|acceptEdits\|bypassPermissions\|manual` (default `auto`; `bypassPermissions` set by an admin only), updatedBy? (`SET NULL`), updatedAt — no row means the defaults — table `project_orchestrator_settings` |
+| `Notification` | userId (cascade), kind (shared `NotificationKind`), projectId? (cascade), runnerId? (`SET NULL`), slot?, issue?, title, body, link? (web path), eventId? (the event that created it), lastEventId? (the newest event folded in — a replay at or below it is not folded again), count (events folded in, D6), firstAt, lastAt, readAt?, muted (the project was muted when it arrived; never counted as unread) — unique `(eventId, userId, kind)`, index `(userId, readAt, lastAt)`, `(userId, lastAt, id)`, `(userId, kind, firstAt)` — table `notifications` ([spec 22](../specs/22-notifications-and-telegram.md)) |
+| `NotificationRule` | userId (cascade), kind, inApp, telegram, updatedAt — primary key `(userId, kind)`; no row means the D1 default — table `notification_rules` |
+| `NotificationMute` | userId (cascade), projectId (cascade), until? (null: until removed), createdAt — primary key `(userId, projectId)` — table `notification_mutes` |
+| `NotificationDelivery` | notificationId (cascade), userId (for the per-user rate limit), channel `telegram`, status `pending\|sent\|digested\|failed\|skipped`, attempts, nextAttemptAt? (due time, claim lease, 429 `retry_after`, or the digest's window end), lastError? (a skip reason `muted\|rule_off\|unlinked`, or the last send error), digestId?, sentAt?, createdAt — index `(status, nextAttemptAt)`, `(userId, channel, sentAt)`, `(digestId)` — table `notification_deliveries` |
+| `TelegramLink` | userId (primary key, cascade), chatId (BigInt, unique), username?, linkedAt — one private chat per user — table `telegram_links` |
+| `TelegramLinkCode` | userId (cascade), codeHash (sha256, unique), expiresAt, usedAt? — single use, 10 minutes — table `telegram_link_codes` |
+| `NotificationMatcherState` | one row (`id = 1`, checked): eventsCursor (every event with `id <=` it is matched), telegramUpdateOffset, updatedAt — table `notification_matcher_state` |
+| `RunnerIncident` | runnerId (cascade), openedAt, resolvedAt? — at most one open per runner (spec 22 D5) — table `runner_incidents` |
 | `Run` | one unit of agent work: kind `orchestrator_slot\|skill\|schedule`, projectId (cascade), slotId? (unique, cascade; an `orchestrator_slot` run's slot), issue?, title?, runtime?, model?, profileKey?, args? (json), output? `report\|pr`, status `running\|blocked\|waiting_person\|succeeded\|failed\|abandoned`, outcome? (last checkpoint summary), prNumber?, prUrl?, triggeredByType `orchestrator\|user\|schedule\|webhook`, triggeredById?, startedAt, endedAt?, durationMs?, slotSeq? (the slot's `lastSeq` the row was built from), updatedAt — a slot run is a pure function of its slot; tokens and cost are computed on read from `llm_requests` — index `(projectId, startedAt)`, `(projectId, status)` — table `runs` ([spec 21](../specs/21-activity-feed-and-history.md)) |
 | `ActivityItem` | one curated feed item: id (BigInt), ts (the source's), projectId? (cascade; null = admins only), category `fleet\|runner\|audit`, type, severity `info\|ok\|warn\|danger`, title, actorType `user\|runner\|orchestrator\|system`, actorId?, slot?, issue?, prNumber?, link?, data (json ≤ 4 KB, no secrets), sourceKind `event\|audit`, sourceId (`events.id` or `audit_records.seq`) — unique `(sourceKind, sourceId)`, index `(projectId, ts, id)`, `(ts, id)`, `(type, ts)`; deleted after 180 days — table `activity_items`; the projector's cursors are in `activity_projector_state` (one row: `eventsCursor`, `auditCursor`) ([spec 21](../specs/21-activity-feed-and-history.md)) |
 | `Schedule` | projectId, cron, timezone, target (skill or orchestrator command), args, profileId, model, missedPolicy `skip\|catch_up`, enabled |

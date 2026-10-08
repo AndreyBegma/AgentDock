@@ -45,6 +45,11 @@ model User {
   priceRecomputes             PriceRecompute[]
   commandRuns                 CommandRun[]
   orchestratorSettingsUpdated ProjectOrchestratorSettings[]
+  notifications               Notification[]
+  notificationRules           NotificationRule[]
+  notificationMutes           NotificationMute[]
+  telegramLink                TelegramLink?
+  telegramLinkCodes           TelegramLinkCode[]
 
   @@map("users")
 }
@@ -107,13 +112,15 @@ model Runner {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  createdBy    User?               @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  pairingCodes RunnerPairingCode[]
-  profiles     RuntimeProfile[]
-  events       Event[]
-  projects     Project[]
-  sessions     AgentSession[]
-  commandRuns  CommandRun[]
+  createdBy     User?               @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  pairingCodes  RunnerPairingCode[]
+  profiles      RuntimeProfile[]
+  events        Event[]
+  projects      Project[]
+  sessions      AgentSession[]
+  commandRuns   CommandRun[]
+  notifications Notification[]
+  incidents     RunnerIncident[]
 
   @@map("runners")
 }
@@ -302,6 +309,8 @@ model Project {
   orchestratorSettings ProjectOrchestratorSettings?
   activityItems        ActivityItem[]
   runs                 Run[]
+  notifications        Notification[]
+  notificationMutes    NotificationMute[]
 
   @@unique([runnerId, rootPath])
   @@map("projects")
@@ -942,6 +951,168 @@ model ProjectOrchestratorSettings {
   updatedBy User?           @relation(fields: [updatedById], references: [id], onDelete: SetNull)
 
   @@map("project_orchestrator_settings")
+}
+
+// ─── Notifications and Telegram (docs/specs/22) ─────────────────────────────
+
+/// A notification for one user (D11). `kind` is shared `NotificationKind`.
+/// Repeats of the same `(user, kind, project, slot)` within 15 minutes of
+/// `firstAt` fold into it — `count`, `lastAt` (D6). `eventId`: the event that
+/// created it; the unique key makes matching an event twice a no-op (D4).
+/// `lastEventId`: the newest event in it — the matcher goes in id order, so
+/// an event at or below it is a replay and is not folded again.
+model Notification {
+  id          BigInt    @id @default(autoincrement())
+  userId      String
+  kind        String
+  projectId   String?
+  /// Set-null so deleting a runner keeps its project's notifications.
+  runnerId    String?
+  slot        String?
+  issue       Int?
+  title       String
+  body        String
+  /// Path in the web app.
+  link        String?
+  eventId     BigInt?
+  lastEventId BigInt?
+  count       Int       @default(1)
+  firstAt     DateTime
+  lastAt      DateTime
+  readAt      DateTime?
+  /// The project was muted for the user when it arrived (D3).
+  muted       Boolean   @default(false)
+
+  user       User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project    Project?               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  runner     Runner?                @relation(fields: [runnerId], references: [id], onDelete: SetNull)
+  deliveries NotificationDelivery[]
+
+  @@unique([eventId, userId, kind])
+  @@index([userId, readAt, lastAt])
+  @@index([userId, lastAt, id])
+  /// The D6 fold lookup and the `queue.dry` interval.
+  @@index([userId, kind, firstAt])
+  @@map("notifications")
+}
+
+/// A user's choice for one kind (D3). No row: the D1 default.
+model NotificationRule {
+  userId    String
+  kind      String
+  inApp     Boolean
+  telegram  Boolean
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, kind])
+  @@map("notification_rules")
+}
+
+/// A user's mute of a project (D3). `until` null: until removed.
+model NotificationMute {
+  userId    String
+  projectId String
+  until     DateTime?
+  createdAt DateTime  @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([userId, projectId])
+  @@map("notification_mutes")
+}
+
+enum NotificationDeliveryChannel {
+  telegram
+}
+
+enum NotificationDeliveryStatus {
+  pending
+  sent
+  digested
+  failed
+  skipped
+}
+
+/// One notification's delivery on an outside channel (D6). `digested`: over
+/// the rate limit, sent inside the digest `digestId` once its window ends
+/// (`nextAttemptAt`); `sentAt` is set when that digest went out. `skipped`:
+/// never sent — `lastError` says why (shared `DeliverySkipReason`).
+model NotificationDelivery {
+  id             String                      @id @default(cuid())
+  notificationId BigInt
+  /// Denormalised from the notification for the per-user rate limit.
+  userId         String
+  channel        NotificationDeliveryChannel
+  status         NotificationDeliveryStatus
+  attempts       Int                         @default(0)
+  nextAttemptAt  DateTime?
+  lastError      String?
+  digestId       String?
+  sentAt         DateTime?
+  createdAt      DateTime                    @default(now())
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt])
+  @@index([userId, channel, sentAt])
+  @@index([digestId])
+  @@map("notification_deliveries")
+}
+
+/// The Telegram private chat a user linked (D9). One chat per user, one user per chat.
+model TelegramLink {
+  userId   String   @id
+  chatId   BigInt   @unique
+  username String?
+  linkedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("telegram_links")
+}
+
+/// A one-time `/start <code>` link code (D9): 10 minutes, single use. Only the
+/// SHA-256 of the code is stored.
+model TelegramLinkCode {
+  id        String    @id @default(cuid())
+  userId    String
+  codeHash  String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("telegram_link_codes")
+}
+
+/// The single row (`id = 1`) of the notification loops' positions (D4, D7).
+/// `eventsCursor`: every event with `id <=` it has been matched.
+model NotificationMatcherState {
+  id                   Int      @id @default(1)
+  eventsCursor         BigInt
+  telegramUpdateOffset BigInt   @default(0)
+  updatedAt            DateTime @updatedAt
+
+  @@map("notification_matcher_state")
+}
+
+/// A runner away for more than 5 minutes (D5). At most one open
+/// (`resolvedAt` null) per runner; the watcher holds a lock while it decides.
+model RunnerIncident {
+  id         String    @id @default(cuid())
+  runnerId   String
+  openedAt   DateTime
+  resolvedAt DateTime?
+
+  runner Runner @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+
+  @@index([runnerId, resolvedAt])
+  @@map("runner_incidents")
 }
 
 // ─── Activity feed and execution history (docs/specs/21) ────────────────────
