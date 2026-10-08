@@ -23,14 +23,21 @@ describe('visibleNav', () => {
     ]);
   });
 
-  test('a viewer sees Projects, and project Settings inside a project', () => {
+  test('a viewer sees Projects, and Fleet and Settings inside a project', () => {
     expect(labels('viewer', '/')).toEqual([
       'overview/Overview',
       'overview/Projects',
     ]);
-    expect(labels('viewer', '/projects/p1/settings')).toContain(
-      'project/Settings',
-    );
+    const inProject = labels('viewer', '/projects/p1/settings');
+    expect(inProject).toContain('project/Fleet');
+    expect(inProject).toContain('project/Settings');
+  });
+
+  test('Fleet links to the current project', () => {
+    const fleet = visibleNav('viewer', '/projects/p1/fleet')
+      .flatMap((section) => section.entries)
+      .find((entry) => entry.id === 'fleet');
+    expect(fleet?.resolvedHref).toBe('/projects/p1/fleet');
   });
 
   test('a viewer never sees Audit', () => {
