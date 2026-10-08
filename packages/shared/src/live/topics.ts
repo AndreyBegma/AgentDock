@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SLOT_NAME_MAX_LENGTH } from '../protocol/commands/control';
 
 /** WebSocket path the web app dials on the API for live updates. */
 export const LIVE_SOCKET_PATH = '/live';
@@ -25,13 +26,23 @@ export type LiveCloseCode =
 
 /** Topic prefixes that carry an id: `<prefix>:<id>`. */
 export const LIVE_TOPIC_PREFIXES = ['runner', 'project', 'user'] as const;
-export type LiveTopicPrefix = (typeof LIVE_TOPIC_PREFIXES)[number] | 'admin';
+export type LiveTopicPrefix =
+  | (typeof LIVE_TOPIC_PREFIXES)[number]
+  | 'admin'
+  | 'pane';
+
+const ID = '[A-Za-z0-9_-]{1,64}';
+/** `slotNameSchema`'s rule (protocol/commands/control.ts), as a fragment. */
+const SLOT = `[a-z0-9][a-z0-9-]{0,${SLOT_NAME_MAX_LENGTH - 1}}`;
 
 const topicPattern = new RegExp(
-  `^(?:admin|(?:${LIVE_TOPIC_PREFIXES.join('|')}):[A-Za-z0-9_-]{1,64})$`,
+  `^(?:admin|(?:${LIVE_TOPIC_PREFIXES.join('|')}):${ID}|pane:${ID}:${SLOT})$`,
 );
 
-/** `admin`, `runner:<id>`, `project:<id>` or `user:<id>`. */
+/**
+ * `admin`, `runner:<id>`, `project:<id>`, `user:<id>`, or
+ * `pane:<projectId>:<slot>` (spec 18) — whose id is `<projectId>:<slot>`.
+ */
 export const liveTopicSchema = z.string().regex(topicPattern);
 export type LiveTopic = z.infer<typeof liveTopicSchema>;
 

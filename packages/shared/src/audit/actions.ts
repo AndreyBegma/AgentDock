@@ -30,6 +30,8 @@ export const AUDIT_ACTIONS = [
   'project.docs_source_override',
   'project.docs_source_reset',
   'issue.create',
+  'pane.watch_started',
+  'pane.watch_stopped',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 

@@ -33,6 +33,10 @@ export const LIVE_ERROR_CODES = [
   'too_many_subscriptions',
   /** The frame is not JSON, not a known message, or names a malformed topic. */
   'invalid_message',
+  /** The topic names something that does not exist — a slot of another project (spec 18 D6). */
+  'not_found',
+  /** The topic's viewer cap is reached, here or on the runner (spec 18 D4). */
+  'too_many_viewers',
 ] as const;
 export const liveErrorCodeSchema = z.enum(LIVE_ERROR_CODES);
 export type LiveErrorCode = z.infer<typeof liveErrorCodeSchema>;
