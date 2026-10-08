@@ -9,7 +9,10 @@ import type { RunnerEvent } from '../envelope';
  *
  * Events derived from markdown (boards, briefs, reply files) carry
  * `source: "scraped"` (ADR-0002); events from tmux, git and `gh` carry
- * `source: "runner"`.
+ * `source: "runner"`; events read from Code Sentinel's `events.jsonl` carry
+ * `source: "code-sentinel"` once `normalizeCodeSentinelLine` (spec 16) has
+ * mapped them to these shapes — which is why the fields only the markdown
+ * knows (a brief's round, a board's base) are optional.
  */
 
 /** `YYYY-MM-DD`, the board's directory name. */
@@ -76,7 +79,8 @@ export type WorktreeChangedData = z.infer<typeof worktreeChangedDataSchema>;
 export const roundStartedDataSchema = z.object({
   date: roundDateSchema,
   round: roundLabelSchema,
-  base: z.string().min(1),
+  /** Absent from `events.jsonl`: the projector falls back to the project's base. */
+  base: z.string().min(1).optional(),
   occupied: count,
   max: count,
   free: count,
@@ -99,8 +103,12 @@ export const roundDecisionsSchema = z.object({
 export type RoundDecisions = z.infer<typeof roundDecisionsSchema>;
 
 export const roundDecidedDataSchema = z.object({
-  date: roundDateSchema,
-  round: roundLabelSchema,
+  /**
+   * `date` and `round` name the board. `events.jsonl` has neither: without
+   * both, the decisions belong to the project's latest round.
+   */
+  date: roundDateSchema.optional(),
+  round: roundLabelSchema.optional(),
   decisions: roundDecisionsSchema,
 });
 export type RoundDecidedData = z.infer<typeof roundDecidedDataSchema>;
@@ -117,11 +125,15 @@ export type BoardUnparsedData = z.infer<typeof boardUnparsedDataSchema>;
 export const slotRuntimeSchema = z.enum(['claude', 'codex']);
 export type SlotRuntime = z.infer<typeof slotRuntimeSchema>;
 
-/** A brief `round-<HHMM>-<slot>.md` (D4). */
+/**
+ * A brief `round-<HHMM>-<slot>.md` (D4), or `dispatch.sh`'s launch record from
+ * `events.jsonl`. The latter names the brief's worktree copy, so it has no
+ * `date` or `round` (spec 16 Q3).
+ */
 export const slotDispatchedDataSchema = z.object({
-  date: roundDateSchema,
-  round: roundLabelSchema,
-  briefPath: z.string().min(1),
+  date: roundDateSchema.optional(),
+  round: roundLabelSchema.optional(),
+  briefPath: z.string().min(1).optional(),
   branch: z.string().min(1).optional(),
   worktree: z.string().min(1).optional(),
   runtime: slotRuntimeSchema.default('claude'),
@@ -166,6 +178,8 @@ export const slotCheckpointDataSchema = z.object({
   position: z.number().int().nonnegative().optional(),
   /** With `pr_open`: the URL from `pull request open — <url>`. */
   prUrl: z.url().optional(),
+  /** The pull request number, when the writer knows it (`events.jsonl`). */
+  prNumber: z.number().int().positive().optional(),
 });
 export type SlotCheckpointData = z.infer<typeof slotCheckpointDataSchema>;
 
@@ -198,9 +212,29 @@ export type PrChecksChangedData = z.infer<typeof prChecksChangedDataSchema>;
 
 export const prClosedDataSchema = z.object({
   ...prFields,
-  merged: z.boolean(),
+  /** Absent when the writer only saw the PR leave the open list (`events.jsonl`). */
+  merged: z.boolean().optional(),
 });
 export type PrClosedData = z.infer<typeof prClosedDataSchema>;
+
+/**
+ * The orchestrator merged a slot's PR (`events.jsonl`). Matched to the
+ * envelope's slot, else the latest slot with that PR number, else its branch.
+ */
+export const prMergedDataSchema = z.object({
+  number: z.number().int().positive(),
+  branch: z.string().min(1).optional(),
+  method: z.string().min(1).optional(),
+});
+export type PrMergedData = z.infer<typeof prMergedDataSchema>;
+
+/** The orchestrator relaunched a misclassified slot on another model. */
+export const slotRedispatchedDataSchema = z.object({
+  fromModel: z.string().min(1).optional(),
+  toModel: z.string().min(1),
+  reason: z.string().max(4096).optional(),
+});
+export type SlotRedispatchedData = z.infer<typeof slotRedispatchedDataSchema>;
 
 /** The orchestrator's tmux pane appeared in the project root (D6). */
 export const orchestratorStartedDataSchema = z.object({
@@ -212,12 +246,108 @@ export type OrchestratorStartedData = z.infer<
 >;
 
 export const orchestratorStoppedDataSchema = z.object({
-  session: z.string().min(1),
+  /** Absent from `events.jsonl`, which records only the reason. */
+  session: z.string().min(1).optional(),
   reason: z.string().max(500).optional(),
 });
 export type OrchestratorStoppedData = z.infer<
   typeof orchestratorStoppedDataSchema
 >;
+
+const isoTs = z.iso.datetime();
+
+/**
+ * A slot in Code Sentinel's `state.json` (EVENTS.md). Every field is optional
+ * and unknown ones are dropped: the plugin may add fields within `v: 1`.
+ */
+export const codeSentinelStateSlotSchema = z.object({
+  issue: z.number().int().positive().nullish(),
+  branch: z.string().min(1).nullish(),
+  worktree: z.string().min(1).nullish(),
+  model: z.string().min(1).nullish(),
+  modelWhy: z.string().min(1).nullish(),
+  /** `running` · `blocked` · `pr_open` · `merged` · `stopped`, kept open. */
+  status: z.string().min(1).nullish(),
+  lastCheckpoint: z
+    .object({
+      /** A `CheckpointKind`; anything else is projected as `other`. */
+      checkpoint: z.string().min(1),
+      ts: isoTs.nullish(),
+      summary: z.string().nullish(),
+    })
+    .nullish(),
+  pr: z
+    .object({
+      number: z.number().int().positive().nullish(),
+      rollup: prChecksSchema.nullish(),
+      url: z.url().nullish(),
+      closed: z.boolean().nullish(),
+    })
+    .nullish(),
+  /** `ts` of the slot's last `slot.dispatched` — the run's start. */
+  dispatchedAt: isoTs.nullish(),
+  endedAt: isoTs.nullish(),
+});
+export type CodeSentinelStateSlot = z.infer<typeof codeSentinelStateSlotSchema>;
+
+/** Code Sentinel's `state.json`, schema `v: 1` (EVENTS.md). */
+export const codeSentinelStateSchema = z.object({
+  v: z.literal(1),
+  updatedAt: isoTs.nullish(),
+  repo: z.string().nullish(),
+  orchestrator: z
+    .object({
+      session: z.string().nullish(),
+      running: z.boolean().nullish(),
+      config: z.record(z.string(), z.unknown()).nullish(),
+      lastHeartbeat: isoTs.nullish(),
+    })
+    .nullish(),
+  round: z
+    .object({
+      label: z.string().nullish(),
+      occupied: count.nullish(),
+      max: count.nullish(),
+      free: count.nullish(),
+      board: z.string().nullish(),
+      decided: z.array(z.unknown()).nullish(),
+    })
+    .nullish(),
+  /** Keyed by slot name. */
+  slots: z.record(z.string(), codeSentinelStateSlotSchema).default({}),
+  personNeeded: z.array(z.unknown()).default([]),
+});
+export type CodeSentinelState = z.infer<typeof codeSentinelStateSchema>;
+
+/**
+ * `state.json` as read on every runner (re)connect and change (spec 16 D6).
+ * The projector upserts each listed slot; it never ends one from it.
+ */
+export const orchestratorSnapshotDataSchema = z.object({
+  state: codeSentinelStateSchema,
+});
+export type OrchestratorSnapshotData = z.infer<
+  typeof orchestratorSnapshotDataSchema
+>;
+
+/** Largest raw `line` an `events.unparsed` carries, in characters. */
+export const UNPARSED_LINE_MAX = 4096;
+
+/**
+ * A line of `events.jsonl` that was not applied (spec 16 D3): malformed JSON,
+ * a `v` the runner does not know, a missing `type`, `ts` or `eid`. Source
+ * `runner`; stored raw so drift in the plugin's format is visible.
+ */
+export const eventsUnparsedDataSchema = z.object({
+  /** Absolute path of the file the line came from. */
+  file: z.string().min(1),
+  /** The line as read, cut to `UNPARSED_LINE_MAX`. */
+  line: z.string().max(UNPARSED_LINE_MAX),
+  /** Byte offset of the line's start in the file. */
+  offset: count.optional(),
+  reason: z.string().min(1).max(500),
+});
+export type EventsUnparsedData = z.infer<typeof eventsUnparsedDataSchema>;
 
 /** A commit on a slot's branch carries an agent trailer. */
 export const commitTrailerFoundDataSchema = z.object({
@@ -241,8 +371,12 @@ export const fleetEventDataSchemas = {
   'pr.opened': prOpenedDataSchema,
   'pr.checks_changed': prChecksChangedDataSchema,
   'pr.closed': prClosedDataSchema,
+  'pr.merged': prMergedDataSchema,
+  'slot.redispatched': slotRedispatchedDataSchema,
   'orchestrator.started': orchestratorStartedDataSchema,
   'orchestrator.stopped': orchestratorStoppedDataSchema,
+  'orchestrator.snapshot': orchestratorSnapshotDataSchema,
+  'events.unparsed': eventsUnparsedDataSchema,
   'commit.trailer_found': commitTrailerFoundDataSchema,
 } as const;
 
@@ -258,8 +392,37 @@ export const SLOT_SCOPED_FLEET_EVENTS: readonly FleetEventType[] = [
   'worktree.changed',
   'slot.dispatched',
   'slot.checkpoint',
+  'slot.redispatched',
   'commit.trailer_found',
 ];
+
+/**
+ * Where Code Sentinel's own copy of a fact sits in an event's `data`: the
+ * plugin's `eid`, put there by `normalizeCodeSentinelLine`. The API dedupes on
+ * it per project root (spec 16 D5).
+ */
+export const PLUGIN_EVENT_ID_KEY = 'pluginEventId';
+
+/** `data.pluginEventId` of a `code-sentinel` event, else null. */
+export const pluginEventIdOf = (event: {
+  source: string;
+  data: unknown;
+}): string | null => {
+  if (event.source !== 'code-sentinel') return null;
+  if (typeof event.data !== 'object' || event.data === null) return null;
+  const id = (event.data as Record<string, unknown>)[PLUGIN_EVENT_ID_KEY];
+  return typeof id === 'string' && id.length > 0 ? id : null;
+};
+
+/** Stored in place of a plugin event the API already has (D5), so the ack still advances. */
+export const EVENTS_DUPLICATE_EVENT = 'events.duplicate';
+
+export const eventsDuplicateDataSchema = z.object({
+  pluginEventId: z.string().min(1),
+  /** The duplicate's own `type`. */
+  type: z.string().min(1),
+});
+export type EventsDuplicateData = z.infer<typeof eventsDuplicateDataSchema>;
 
 type FleetDataOf<T extends FleetEventType> = z.output<
   (typeof fleetEventDataSchemas)[T]
