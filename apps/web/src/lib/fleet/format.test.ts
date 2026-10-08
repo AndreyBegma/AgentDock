@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { ApiError } from '../api';
 import {
+  channelChip,
   describeFleetError,
   formatAge,
   formatAgo,
@@ -103,7 +104,32 @@ describe('errors', () => {
     expect(describeFleetError(err)).toContain('not a member');
     expect(isNotFound(new Error('x'))).toBe(false);
   });
+});
 
+describe('channelChip', () => {
+  test('events is ok', () => {
+    const chip = channelChip('events');
+    expect(chip.label).toBe('events');
+    expect(chip.tone).toBe('ok');
+    expect(chip.tooltip).toContain('events.jsonl');
+  });
+
+  test('scraped is neutral', () => {
+    const chip = channelChip('scraped');
+    expect(chip.label).toBe('scraped');
+    expect(chip.tone).toBe('neutral');
+    expect(chip.tooltip).toContain('markdown');
+  });
+
+  test('both is warn', () => {
+    const chip = channelChip('both');
+    expect(chip.label).toBe('both');
+    expect(chip.tone).toBe('warn');
+    expect(chip.tooltip).toContain('scraping');
+  });
+});
+
+describe('describeFleetError (slot)', () => {
   test('a missing slot has its own sentence', () => {
     const err = new ApiError(404, 'slot_not_found' as never, 'Slot not found');
     expect(describeFleetError(err)).toBe('That slot no longer exists.');

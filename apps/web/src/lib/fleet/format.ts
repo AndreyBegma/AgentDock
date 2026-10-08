@@ -1,5 +1,6 @@
 import {
   FLEET_ERROR,
+  type FleetChannel,
   type OrchestratorStatus,
   type SlotStatus,
 } from '@agentdock/shared';
@@ -34,6 +35,32 @@ export const ORCHESTRATOR_TONE: Record<OrchestratorStatus, Tone> = {
   absent: 'warn',
   unknown: 'neutral',
 };
+
+export const CHANNEL_TONE: Record<FleetChannel, Tone> = {
+  events: 'ok',
+  scraped: 'neutral',
+  both: 'warn',
+};
+
+export const CHANNEL_TOOLTIP: Record<FleetChannel, string> = {
+  events:
+    'Facts come from the Code Sentinel plugin’s events.jsonl; a plugin event arrived in the last 24 hours.',
+  scraped:
+    'No plugin events in the last 24 hours — facts are scraped from the orchestrator’s markdown boards, briefs and reply files.',
+  both: 'The plugin is sending events, but some fields it covers were last written by scraping markdown.',
+};
+
+export function channelChip(channel: FleetChannel): {
+  label: string;
+  tone: Tone;
+  tooltip: string;
+} {
+  return {
+    label: channel,
+    tone: CHANNEL_TONE[channel],
+    tooltip: CHANNEL_TOOLTIP[channel],
+  };
+}
 
 export const CHECKS_TONE: Record<PrChecks, Tone> = {
   pending: 'warn',
