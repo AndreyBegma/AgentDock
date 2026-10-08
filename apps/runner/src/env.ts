@@ -12,6 +12,8 @@ export interface Paths {
   configFile: string;
   /** `~/.local/state/agentdock/spool/` (D7). */
   spoolDir: string;
+  /** `~/.local/state/agentdock/offsets.json`: transcript read positions (spec 12 D5). */
+  offsetsFile: string;
   /** `~/.config/systemd/user/agentdock-runner.service` (D11). */
   serviceFile: string;
 }
@@ -29,6 +31,7 @@ export const resolvePaths = (env: Env): Paths => {
     configHome,
     configFile: join(configHome, 'agentdock', 'runner.json'),
     spoolDir: join(stateHome, 'agentdock', 'spool'),
+    offsetsFile: join(stateHome, 'agentdock', 'offsets.json'),
     serviceFile: join(
       configHome,
       'systemd',

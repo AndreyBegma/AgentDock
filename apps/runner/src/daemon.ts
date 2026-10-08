@@ -6,6 +6,8 @@ import {
   type Host,
   PROTOCOL_VERSION,
 } from '@agentdock/shared/protocol';
+import { adapters, SessionWatcher } from './adapters';
+import { resolveIngestSince } from './adapters/ingest-since';
 import { Backoff } from './backoff';
 import type { Clock } from './clock';
 import { CollectorRegistry, collectors } from './collectors';
@@ -32,6 +34,8 @@ export interface DaemonOptions {
   configFile: string;
   home: string;
   spoolDir: string;
+  /** Transcript read positions (spec 12 D5). */
+  offsetsFile: string;
   host: Host;
   exec: Exec;
   clock: Clock;
@@ -95,6 +99,26 @@ export const runDaemon = async (
       log,
     });
 
+    // Agent sessions (spec 12): one watcher over every runtime profile. A
+    // profile holds the sessions of every directory, so it is not a collector.
+    const sessions = config.sessions.enabled
+      ? new SessionWatcher({
+          adapters,
+          profiles: config.profiles,
+          home,
+          offsetsFile: options.offsetsFile,
+          ingestSince: resolveIngestSince(
+            config,
+            options.configFile,
+            clock,
+            log,
+          ),
+          emit: (event) => connection?.emit(event),
+          clock,
+          log,
+        })
+      : null;
+
     const dispatch = createDispatcher({
       handlers: createHandlers({
         clock,
@@ -103,6 +127,9 @@ export const runDaemon = async (
         detectCapabilities: redetect,
         exec,
         watchedProjects: () => watchList.current,
+        backfillSessions: sessions
+          ? (scope) => sessions.backfill(scope)
+          : undefined,
       }),
       disabledCommands: config.disabledCommands,
       clock,
@@ -135,6 +162,7 @@ export const runDaemon = async (
       heartbeat,
       dispatch,
       onConfig: (server) => {
+        sessions?.setProjects(server.projects).catch(() => {});
         watchList.apply(server.projects).catch((error) => {
           log.error('cannot apply the watch list', {
             error: errorMessage(error),
@@ -149,11 +177,16 @@ export const runDaemon = async (
     if (options.signal?.aborted) live.stop();
     options.signal?.addEventListener('abort', onAbort, { once: true });
     await watchList.start();
+    // Not awaited: a first scan of a large profile must not delay connecting.
+    sessions?.start(watchList.current).catch((error) => {
+      log.error('sessions: cannot start', { error: errorMessage(error) });
+    });
     live.start();
     options.onStart?.(live);
     const reason = await live.done;
     options.signal?.removeEventListener('abort', onAbort);
     await registry.stop();
+    await sessions?.stop();
     return reason;
   } finally {
     release();

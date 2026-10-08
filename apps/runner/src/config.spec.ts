@@ -23,6 +23,7 @@ describe('config', () => {
       disabledCommands: [],
       otlp: null,
       fleet: { pollSeconds: 15, prPollSeconds: 60 },
+      sessions: { enabled: true },
     });
   });
 

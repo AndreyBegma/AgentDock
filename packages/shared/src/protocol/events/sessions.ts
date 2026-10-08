@@ -116,6 +116,29 @@ export const toolCallDataSchema = z.object({
 });
 export type ToolCallData = z.infer<typeof toolCallDataSchema>;
 
+/**
+ * `session.backfill` (D11, admin): re-read transcripts modified after `since`
+ * from their start, for one project or for every session on the runner.
+ */
+export const sessionBackfillArgsSchema = z.strictObject({
+  projectId: id.optional(),
+  since: z.iso.datetime(),
+});
+export type SessionBackfillArgs = z.infer<typeof sessionBackfillArgsSchema>;
+
+/** How many transcripts were re-read, and how many events they produced. */
+export const sessionBackfillResultSchema = z.object({
+  files: count,
+  events: count,
+});
+export type SessionBackfillResult = z.infer<typeof sessionBackfillResultSchema>;
+
+/**
+ * The work is local, but a single profile can hold gigabytes of transcripts
+ * (3.8 GB measured on the reference machine) and `since` may cover all of it.
+ */
+export const SESSION_BACKFILL_TIMEOUT_MS = 600_000;
+
 export const sessionEventDataSchemas = {
   [SESSION_OBSERVED_EVENT]: sessionObservedDataSchema,
   [TURN_STARTED_EVENT]: turnDataSchema,

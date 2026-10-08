@@ -48,6 +48,16 @@ export const runnerConfigSchema = z.object({
       prPollSeconds: z.number().int().min(15).max(3600).default(60),
     })
     .default({ pollSeconds: 15, prPollSeconds: 60 }),
+  /**
+   * Agent sessions (spec 12). `ingestSince`: transcripts last modified before
+   * it are not read unless a backfill asks; `pair` sets it (D11).
+   */
+  sessions: z
+    .object({
+      enabled: z.boolean().default(true),
+      ingestSince: z.iso.datetime().optional(),
+    })
+    .prefault({}),
 });
 export type RunnerConfig = z.infer<typeof runnerConfigSchema>;
 
