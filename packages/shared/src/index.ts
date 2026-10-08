@@ -3,6 +3,7 @@ export * from './auth';
 export * from './control';
 export * from './fleet';
 export * from './live';
+export * from './notifications';
 export * from './projects';
 export * from './queue';
 export * from './runners';
