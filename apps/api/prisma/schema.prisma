@@ -45,6 +45,7 @@ model User {
   priceRecomputes             PriceRecompute[]
   commandRuns                 CommandRun[]
   orchestratorSettingsUpdated ProjectOrchestratorSettings[]
+  mergeApprovalsDecided       MergeApproval[]
 
   @@map("users")
 }
@@ -302,6 +303,7 @@ model Project {
   orchestratorSettings ProjectOrchestratorSettings?
   activityItems        ActivityItem[]
   runs                 Run[]
+  mergeApprovals       MergeApproval[]
 
   @@unique([runnerId, rootPath])
   @@map("projects")
@@ -1083,4 +1085,51 @@ model Run {
   @@index([projectId, startedAt])
   @@index([projectId, status])
   @@map("runs")
+}
+
+// ─── Merge approval queue (docs/specs/20-merge-approval-queue.md) ───────────
+
+/// `orchestrator`: the plugin emitted `pr.awaiting_approval`; `derived`: D2's fallback.
+enum ApprovalSource {
+  orchestrator
+  derived
+}
+
+enum ApprovalStatus {
+  waiting
+  approved
+  changes_requested
+  stale
+  merged
+  closed
+}
+
+/// The approval state of one pull request at one head. At most one row per
+/// PR is current (`waiting` | `approved`), enforced by the approvals module
+/// under a per-project advisory lock; the rest are history. `headSha` is null
+/// until a decision binds the row to a head (spec 20 notes, Q3).
+model MergeApproval {
+  id           String         @id @default(cuid())
+  projectId    String
+  prNumber     Int
+  slot         String?
+  issue        Int?
+  headSha      String?
+  source       ApprovalSource
+  status       ApprovalStatus
+  /// Nullable so deleting the user keeps the decision.
+  decidedById  String?
+  decidedAt    DateTime?
+  /// D7: the request-changes note.
+  note         String?
+  waitingSince DateTime
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  decidedBy User?   @relation(fields: [decidedById], references: [id], onDelete: SetNull)
+
+  @@index([projectId, prNumber])
+  @@index([projectId, status])
+  @@map("merge_approvals")
 }
