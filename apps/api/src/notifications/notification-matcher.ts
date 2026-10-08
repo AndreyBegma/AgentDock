@@ -124,10 +124,13 @@ export class NotificationMatcher
       where: { id: STATE_ID },
     });
     if (!state) {
-      // First start: nothing that happened before notifications existed is news.
-      const { _max } = await tx.event.aggregate({ _max: { id: true } });
+      // First start: nothing that happened before notifications existed is
+      // news. The sequence, not `max(id)`: ids already handed out (rows since
+      // deleted, inserts in flight) would otherwise read as a hole.
+      const [{ last }] = await tx.$queryRaw<{ last: bigint | null }[]>`
+        SELECT pg_sequence_last_value(pg_get_serial_sequence('events', 'id')::regclass) AS last`;
       await tx.notificationMatcherState.create({
-        data: { id: STATE_ID, eventsCursor: _max.id ?? 0n },
+        data: { id: STATE_ID, eventsCursor: last ?? 0n },
       });
       return { consumed: 0, written: [] };
     }

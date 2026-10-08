@@ -17,6 +17,7 @@ CREATE TABLE "notifications" (
     "body" TEXT NOT NULL,
     "link" TEXT,
     "eventId" BIGINT,
+    "lastEventId" BIGINT,
     "count" INTEGER NOT NULL DEFAULT 1,
     "firstAt" TIMESTAMP(3) NOT NULL,
     "lastAt" TIMESTAMP(3) NOT NULL,

@@ -956,26 +956,29 @@ model ProjectOrchestratorSettings {
 /// Repeats of the same `(user, kind, project, slot)` within 15 minutes of
 /// `firstAt` fold into it — `count`, `lastAt` (D6). `eventId`: the event that
 /// created it; the unique key makes matching an event twice a no-op (D4).
+/// `lastEventId`: the newest event in it — the matcher goes in id order, so
+/// an event at or below it is a replay and is not folded again.
 model Notification {
-  id        BigInt    @id @default(autoincrement())
-  userId    String
-  kind      String
-  projectId String?
+  id          BigInt    @id @default(autoincrement())
+  userId      String
+  kind        String
+  projectId   String?
   /// Set-null so deleting a runner keeps its project's notifications.
-  runnerId  String?
-  slot      String?
-  issue     Int?
-  title     String
-  body      String
+  runnerId    String?
+  slot        String?
+  issue       Int?
+  title       String
+  body        String
   /// Path in the web app.
-  link      String?
-  eventId   BigInt?
-  count     Int       @default(1)
-  firstAt   DateTime
-  lastAt    DateTime
-  readAt    DateTime?
+  link        String?
+  eventId     BigInt?
+  lastEventId BigInt?
+  count       Int       @default(1)
+  firstAt     DateTime
+  lastAt      DateTime
+  readAt      DateTime?
   /// The project was muted for the user when it arrived (D3).
-  muted     Boolean   @default(false)
+  muted       Boolean   @default(false)
 
   user       User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   project    Project?               @relation(fields: [projectId], references: [id], onDelete: Cascade)

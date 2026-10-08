@@ -122,6 +122,7 @@ export class NotificationWriter {
       const folded = input.fold
         ? await this.fold(tx, input, recipient.userId, channels.inApp)
         : null;
+      if (folded === 'replay') continue;
       if (folded !== null) {
         written.push({ userId: recipient.userId, notificationId: folded });
         continue;
@@ -140,6 +141,7 @@ export class NotificationWriter {
             body: input.body,
             link: input.link,
             eventId: input.eventId,
+            lastEventId: input.eventId,
             firstAt: input.at,
             lastAt: input.at,
             muted,
@@ -182,13 +184,16 @@ export class NotificationWriter {
    * D6: the same `(user, kind, project, slot)` whose `firstAt` is within 15
    * minutes takes the event — `count + 1`, `lastAt`, and unread again. No
    * second delivery: Telegram heard about it with the first.
+   *
+   * `'replay'`: the event is already in that notification (`eventId` at or
+   * below its `lastEventId` — the matcher goes in id order), so nothing changes.
    */
   private async fold(
     tx: Tx,
     input: NotificationInput,
     userId: string,
     inApp: boolean,
-  ): Promise<bigint | null> {
+  ): Promise<bigint | 'replay' | null> {
     const existing = await tx.notification.findFirst({
       where: {
         userId,
@@ -201,13 +206,21 @@ export class NotificationWriter {
         },
       },
       orderBy: { firstAt: 'desc' },
-      select: { id: true, lastAt: true },
+      select: { id: true, lastAt: true, lastEventId: true },
     });
     if (!existing) return null;
+    if (
+      input.eventId !== null &&
+      existing.lastEventId !== null &&
+      input.eventId <= existing.lastEventId
+    ) {
+      return 'replay';
+    }
     await tx.notification.update({
       where: { id: existing.id },
       data: {
         count: { increment: 1 },
+        lastEventId: input.eventId ?? existing.lastEventId,
         lastAt: existing.lastAt > input.at ? existing.lastAt : input.at,
         ...(inApp ? { readAt: null } : {}),
       },
