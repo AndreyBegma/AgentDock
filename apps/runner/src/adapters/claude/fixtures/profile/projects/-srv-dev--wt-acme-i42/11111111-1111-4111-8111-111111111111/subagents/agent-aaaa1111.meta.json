@@ -1,0 +1,6 @@
+{
+  "agentType": "Explore",
+  "description": "SENTINEL_AGENT_DESCRIPTION",
+  "toolUseId": "toolu_agent1",
+  "spawnDepth": 1
+}

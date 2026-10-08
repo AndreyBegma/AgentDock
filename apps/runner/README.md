@@ -29,6 +29,7 @@ Exit codes: `0` ok, `1` failure, `2` usage, `78` the server closed for good
 |---|---|
 | Config (mode 0600) | `$XDG_CONFIG_HOME/agentdock/runner.json`, default `~/.config/agentdock/runner.json` |
 | Event spool | `$XDG_STATE_HOME/agentdock/spool/`, default `~/.local/state/agentdock/spool/` |
+| Transcript offsets | `$XDG_STATE_HOME/agentdock/offsets.json`: how far each agent transcript was read |
 | systemd unit | `$XDG_CONFIG_HOME/systemd/user/agentdock-runner.service` |
 
 | Variable | Effect |
@@ -36,6 +37,12 @@ Exit codes: `0` ok, `1` failure, `2` usage, `78` the server closed for good
 | `AGENTDOCK_LOG` | `debug` \| `info` (default) \| `warn` \| `error`; logs are JSON lines on stderr, the token redacted |
 | `HOME`, `XDG_CONFIG_HOME`, `XDG_STATE_HOME` | where the files above live |
 | `CODEX_HOME` | the codex profile `profiles --detect` proposes |
+
+Agent sessions ([spec 12](../../docs/specs/12-agent-sessions.md)) are read from
+the transcripts of every profile in the config and sent as metadata only, with
+no prompt or tool text. `sessions.enabled` (default `true`) in `runner.json`
+turns this off. `sessions.ingestSince`, which `pair` sets, skips transcripts
+last modified before it. An admin backfill re-reads older ones.
 
 ## Development
 
