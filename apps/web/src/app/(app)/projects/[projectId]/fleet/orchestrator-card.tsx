@@ -1,7 +1,9 @@
 import type { FleetView } from '@agentdock/shared';
 import { Badge } from 'glass-ui/badge';
 import { Card } from 'glass-ui/card';
+import { Tooltip } from 'glass-ui/tooltip';
 import {
+  channelChip,
   formatAge,
   formatOccupancy,
   formatRoundHeader,
@@ -19,6 +21,7 @@ function Fact({ label, value }: { label: string; value: string }) {
 
 export function OrchestratorCard({ fleet }: { fleet: FleetView }) {
   const { orchestrator, latestRound, boardError } = fleet;
+  const channel = channelChip(fleet.fleetChannel);
   return (
     <Card pad="md" className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -36,6 +39,11 @@ export function OrchestratorCard({ fleet }: { fleet: FleetView }) {
             </span>
           ) : null}
         </span>
+        <Tooltip content={channel.tooltip}>
+          <button type="button" className="cursor-help">
+            <Badge tone={channel.tone} label={channel.label} />
+          </button>
+        </Tooltip>
       </div>
       <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Fact label="Base" value={fleet.base} />
