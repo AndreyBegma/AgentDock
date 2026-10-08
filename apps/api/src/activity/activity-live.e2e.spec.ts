@@ -84,6 +84,18 @@ describe('activity live pushes (e2e)', () => {
     }
     await resetDatabase(ctx.prisma);
     await resetActivity(ctx.prisma);
+    // A fresh projector starts at 0 and replays the whole source (spec 21 D2):
+    // `audit_records` is append-only and keeps every earlier suite's records,
+    // which would reach `admin` ahead of this test's own items. Start the
+    // cursors at the current maximum so the test sees only what it creates.
+    await ctx.prisma.$executeRaw`
+      INSERT INTO activity_projector_state (id, "eventsCursor", "auditCursor", "updatedAt")
+      VALUES (
+        'activity',
+        (SELECT COALESCE(MAX(id), 0) FROM events),
+        (SELECT COALESCE(MAX(seq), 0) FROM audit_records),
+        now()
+      )`;
     for (const loop of loops) loop.onApplicationBootstrap();
   };
 

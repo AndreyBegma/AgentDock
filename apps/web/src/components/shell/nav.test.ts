@@ -16,6 +16,7 @@ describe('visibleNav', () => {
     expect(labels('admin', '/')).toEqual([
       'overview/Overview',
       'overview/Projects',
+      'overview/Activity',
       'sessions/Sessions',
       'usage/Usage',
       'admin/Runners',
@@ -35,12 +36,15 @@ describe('visibleNav', () => {
     expect(labels('viewer', '/')).toEqual([
       'overview/Overview',
       'overview/Projects',
+      'overview/Activity',
       'sessions/Sessions',
       'usage/Usage',
     ]);
     const inProject = labels('viewer', '/projects/p1/settings');
     expect(inProject).toContain('project/Fleet');
     expect(inProject).toContain('project/Queue');
+    expect(inProject).toContain('project/Activity');
+    expect(inProject).toContain('project/History');
     expect(inProject).toContain('project/Settings');
   });
 

@@ -32,7 +32,11 @@
         "AUDIT_VERIFY_CRON",
         "ACTIVITY_POLL_MS",
         "ACTIVITY_GAP_GRACE_MS",
-        "ACTIVITY_RETENTION_DAYS"
+        "ACTIVITY_RETENTION_DAYS",
+        "APP_ENCRYPTION_KEY",
+        "APP_URL",
+        "TELEGRAM_POLL_TIMEOUT_S",
+        "TELEGRAM_API_BASE"
       ]
     },
     "db:migrate": {

@@ -42,6 +42,13 @@ export const AUDIT_ACTIONS = [
   'approval.approve',
   'approval.request_changes',
   'approval.void',
+  'notification.rules',
+  'notification.mute',
+  'telegram.configure',
+  'telegram.clear',
+  'telegram.link',
+  'telegram.unlink',
+  'telegram.approval',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
