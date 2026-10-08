@@ -172,3 +172,41 @@ i12-web, decided with the orchestrator on 2026-10-08:
 5. **Web live updates.** `useLive` follows one topic, so `/sessions` subscribes to `project:<id>` when a project filter is set, to `admin` when an admin filters `unassigned=true`, and otherwise polls the first page every 15 s (like `/projects`). `/sessions/[id]` subscribes to its session's `project:<id>`, or `admin` when it has no project, and reloads on `sessions.changed`.
 6. **Tree view.** glass-ui v0.20.6 has no `TraceTree` / `Waterfall`, so `/sessions/[id]` uses glass-ui `Tree` (session → turns → requests and tools → child sessions) with a detail panel for the selected node: its six token buckets, cost, facts and a time bar against the session's span. Switch to `TraceTree` / `Waterfall` when glass-ui#67 ships.
 7. **Filters.** `unassigned` excludes `projectId` in the form (the API answers 400 otherwise), and the "to" date is sent as the next local midnight because `to` is exclusive.
+
+i12-adapters, decided with the orchestrator on 2026-10-08:
+
+8. **Reasoning tokens (D3 [Unknown] resolved).** `output_tokens_details.thinking_tokens` is counted **inside** `output_tokens`. Evidence:
+   - Anthropic's extended-thinking documentation bills thinking as output tokens, and `usage.output_tokens` covers it.
+   - Across 80,901 requests in a local profile's transcripts, `thinking_tokens ≤ output_tokens` held every time and was strictly lower in all of them. It was read by counts only.
+
+   So `reasoning` = `thinking_tokens` is stored apart and never added to `output`. A consumer that totals the buckets leaves `reasoning` out ([event-schema.md](../architecture/event-schema.md)). #13 decides whether a price tier bills it separately.
+9. **One watcher, not a collector.**
+   - Collectors run once per watched project. A Claude profile holds the transcripts of every directory on the machine, so the runner runs one `SessionWatcher` for every profile in `config.profiles`. It is wired in `daemon.ts`, and `collectors/index.ts` is untouched.
+   - It sends sessions outside every project as well, with no `projectId`, and D10 keeps those admin-only.
+   - New files are seen through a recursive `fs.watch`, debounced by 1 s, with a 30 s rescan as the fallback.
+10. **Offsets carry parser state.** `$XDG_STATE_HOME/agentdock/offsets.json` stores, per file:
+    - the byte offset after the last complete line;
+    - the `session.observed` as last sent;
+    - the parser's small state: current `promptId`, last `requestId` and its usage signature, open tool uses, last timestamp.
+
+    A restart between a `tool_use` and its `tool_result`, or between two lines of one request, resumes correctly. The offsets are written after the events are spooled: a crash in between re-sends, and the API's upserts absorb that. A file shorter than its offset was replaced and is read anew.
+11. **Claude parsing as built.**
+    - **`cwd` is the directory the session started in**: the first `cwd` in the file. Later lines follow every `cd` the agent makes, 4 to 9 distinct runs per session in a local sample. Correlating on them would move a worker's session out of its project whenever it `cd`s into `/tmp`. D6's "the line's `cwd`" is read as the first line's.
+    - A turn starts at the first `user` line with a new `promptId`. It ends at a `system` line with `subtype: "turn_duration"`, or when the next prompt starts.
+    - `assistant` lines with `model: "<synthetic>"` (messages Claude Code writes itself, zero usage) are not requests.
+    - An `llm.request` is sent at the first line of a `requestId` and again only when its model, buckets or `stopReason` change.
+    - `durationMs` is the gap from the previous line, with `durationApprox: true`, which is the open-question default.
+    - A cache write with no `cache_creation` split counts as `cacheWrite5m`, the API's default TTL.
+    - A subagent is `<sessionId>/subagents/agent-<agentId>.jsonl`. Its session id is `agentId`, which is also `toolUseResult.agentId` on the spawning call (`childSessionId`). `parent.toolUseId` and `agentName` come from the sibling `.meta.json` (`toolUseId`, `agentType`), whose task description is never read.
+    - `querySource` is `subagent` for sidechain lines and `main` otherwise. `auxiliary` is not emitted yet.
+12. **Title.** `title` comes only from a `custom-title` line (`customTitle`), the name a person gave the session. `ai-title` is generated from the prompt, so it is content and is never sent (D9). That is the open-question default, narrowed to the custom title.
+13. **Codex.** Nothing is read from a Codex file. Each `<CODEX_HOME>/sessions/**/*.jsonl` is one session:
+    - id = the file name without `.jsonl`;
+    - `startedAt` = the file's mtime;
+    - `cwd` = the file's own directory. No line is parsed, so the real cwd is unknown, and this keeps the session out of every project (admin-only).
+14. **`ingestSince` and backfill.**
+    - `pair` writes `sessions.ingestSince` (D11). A config paired before this change gets the first daemon start's time, written back.
+    - `session.backfill` (admin, 600 s, because one measured profile is 3.8 GB of transcripts) re-reads from offset 0 every file modified after `since`. With `projectId`, it sends only the files whose `session.observed` correlates to it.
+    - It answers `{ files, events }` when done, and stays synchronous by decision.
+    - The API route checks that the runner exists and that `projectId` belongs to it before sending. See [runner-protocol.md](../architecture/runner-protocol.md#sessions) for the errors.
+15. **Not done here.** The `adapter.version` field in capabilities (Risks) needs `capabilities.ts`, which is outside this slot. The adapters carry `version` for when it is added.

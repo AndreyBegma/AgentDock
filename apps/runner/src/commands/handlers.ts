@@ -8,6 +8,10 @@ import type { Exec } from '../detect/exec';
 import type { ProjectFs } from '../projects/fs';
 import { inspectProject, refreshProject } from '../projects/inspect';
 import type { CommandHandlers } from './dispatcher';
+import {
+  type SessionBackfillContext,
+  sessionBackfill,
+} from './session-backfill';
 
 export interface HandlerContext {
   clock: Clock;
@@ -20,6 +24,8 @@ export interface HandlerContext {
   watchedProjects: () => readonly WatchedProject[];
   /** Tests inject a spying filesystem; the daemon uses the real one. */
   fs?: ProjectFs;
+  /** The session watcher's backfill; absent when sessions are disabled. */
+  backfillSessions?: SessionBackfillContext['backfill'];
 }
 
 /** One handler per allowlisted command; each later command adds its own here. */
@@ -35,5 +41,10 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
     'project.inspect': ({ path }) => inspectProject(path, deps),
     'project.refresh': (args) =>
       refreshProject(args, context.watchedProjects(), deps),
+    'session.backfill': (args) =>
+      sessionBackfill(args, {
+        backfill: context.backfillSessions,
+        watchedProjects: context.watchedProjects,
+      }),
   };
 };

@@ -444,7 +444,7 @@ handler.
 | `skill.search` | `query` | operator | planned |
 | `skill.install` | `projectId?, source, runtimes[]` | operator | planned |
 | `skill.run` | `projectId, skill, args, profileId, model, output: report\|pr` | operator | planned |
-| `session.backfill` | `projectId?, since` | admin | planned |
+| `session.backfill` | `projectId?, since` | admin | implemented: → `{ files, events }`, timeout 600 s |
 | `terminal.attach` (M3) | `projectId, slot` | admin | planned |
 
 Arguments are validated by schema on both sides (`parseCommand`). Commands
@@ -527,6 +527,28 @@ Schemas in `commands/control.ts` (`controlCommands`); the rules are
   requesting user's email.
 - `orchestrator.status.state` is `running | idle | prompt | quota`, or
   `absent` exactly when `present` is false.
+
+### Sessions
+
+Schemas in `events/sessions.ts`; the rules are [spec 12](../specs/12-agent-sessions.md)
+D11.
+
+- `session.backfill { projectId?, since }` re-reads every transcript modified
+  after `since` (an ISO date-time in UTC) from its first line, ignoring the
+  runner's `sessions.ingestSince`. The events go out as usual session events,
+  and the API's upserts absorb the ones it already has.
+- With `projectId`, only sessions correlated to that project are sent. A
+  `projectId` that is not on the runner's watch list is `path_not_allowed`. A
+  runner with `sessions.enabled: false` answers `disabled`.
+- It answers when the re-read is done, with how many files matched and how
+  many events were spooled. The 600 s timeout covers a profile holding
+  gigabytes of transcripts. Choose `since` so the events fit the spool's
+  100 MB cap. Past the cap, the oldest unacked events are dropped
+  (`runner.spool_truncated`).
+- `POST /admin/runners/:id/backfill` (admin) sends it. A runner without a
+  connection is `409 runner_offline`, no answer within the timeout is
+  `504 runner_timeout` (the re-read may still finish), a refusal is
+  `409 runner_refused`, and a failure is `502 runner_error`.
 
 ## Delivery guarantees
 
