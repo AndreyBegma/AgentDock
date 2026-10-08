@@ -305,8 +305,10 @@ describe('pane relay (e2e)', () => {
       await viewer.subscribe(topicA());
       const { id } = await desk.next('subscribe');
 
-      const lines = Array.from({ length: 2000 }, (_, i) =>
-        `\x1b[1m${String(i).padStart(4, '0')}\x1b[0m ${'x'.repeat(100)}`,
+      const lines = Array.from(
+        { length: 2000 },
+        (_, i) =>
+          `\x1b[1m${String(i).padStart(4, '0')}\x1b[0m ${'x'.repeat(100)}`,
       );
       desk.send({ type: 'pane', id, frame: full(lines) });
 
