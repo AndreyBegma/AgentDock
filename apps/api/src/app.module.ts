@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { AdminModule } from './admin/admin.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
+import { ControlModule } from './control';
 import { DatabaseModule } from './database/database.module';
 import { FleetModule } from './fleet';
 import { HealthController } from './health.controller';
@@ -32,6 +33,7 @@ import { UsageModule } from './usage/usage.module';
     UsageModule,
     PricesModule,
     QueueModule,
+    ControlModule,
   ],
   controllers: [HealthController],
 })

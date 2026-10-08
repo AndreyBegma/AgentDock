@@ -32,6 +32,11 @@ export const AUDIT_ACTIONS = [
   'prices.version_create',
   'prices.recompute',
   'issue.create',
+  'orchestrator.start',
+  'orchestrator.stop',
+  'orchestrator.settings',
+  'slot.stop',
+  'slot.message',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 

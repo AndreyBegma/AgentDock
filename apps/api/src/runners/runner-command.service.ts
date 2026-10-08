@@ -23,6 +23,12 @@ export interface SendOptions {
   ctx: AuditContext;
   /** Defaults to the command's own timeout, else 30 s. */
   timeoutMs?: number;
+  /**
+   * What the `runner.command` record shows as `args`; defaults to the args
+   * sent. For args the audit log must not hold verbatim — `slot.message`
+   * text is recorded hashed (spec 17 D10).
+   */
+  auditArgs?: object;
 }
 
 /**
@@ -61,7 +67,7 @@ export class RunnerCommandService {
         ...options.ctx,
         action: 'runner.command',
         target: { type: 'runner', id: runnerId },
-        after: { name, args: parsed.args },
+        after: { name, args: options.auditArgs ?? parsed.args },
         result,
         meta: { commandId: id },
       });
