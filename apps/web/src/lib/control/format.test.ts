@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { ApiError } from '../api';
 import {
+  commandRunIdOf,
   describeControlError,
   describeMessageSize,
   describeOutcome,
