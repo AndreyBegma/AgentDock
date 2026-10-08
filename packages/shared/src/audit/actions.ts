@@ -39,6 +39,13 @@ export const AUDIT_ACTIONS = [
   'orchestrator.settings',
   'slot.stop',
   'slot.message',
+  'notification.rules',
+  'notification.mute',
+  'telegram.configure',
+  'telegram.clear',
+  'telegram.link',
+  'telegram.unlink',
+  'telegram.approval',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 

@@ -10,6 +10,11 @@ import {
   unsubscribeMessageSchema,
 } from './pane';
 import { watchedProjectSchema } from './projects';
+import {
+  terminalCloseMessageSchema,
+  terminalDataMessageSchema,
+  terminalResizeMessageSchema,
+} from './terminal';
 
 /** An `events` batch carries at most this many events… */
 export const MAX_EVENTS_PER_BATCH = 500;
@@ -125,6 +130,12 @@ export const commandMessageSchema = z.object({
   args: z.unknown(),
 });
 
+/** Sent in both directions; listed once in `messageSchema`. */
+const bothWayMessages = [
+  terminalDataMessageSchema,
+  terminalCloseMessageSchema,
+] as const;
+
 const runnerMessages = [
   helloMessageSchema,
   heartbeatMessageSchema,
@@ -134,16 +145,20 @@ const runnerMessages = [
   paneMessageSchema,
   subscribeErrorMessageSchema,
   runLogMessageSchema,
+  ...bothWayMessages,
 ] as const;
 
-const serverMessages = [
+const serverOnlyMessages = [
   welcomeMessageSchema,
   configMessageSchema,
   ackMessageSchema,
   commandMessageSchema,
   anySubscribeMessageSchema,
   unsubscribeMessageSchema,
+  terminalResizeMessageSchema,
 ] as const;
+
+const serverMessages = [...serverOnlyMessages, ...bothWayMessages] as const;
 
 /** Messages the runner sends. An unknown `type` fails to parse. */
 export const runnerMessageSchema = z.discriminatedUnion('type', [
@@ -156,7 +171,7 @@ export const serverMessageSchema = z.discriminatedUnion('type', [
 /** Every message in either direction. */
 export const messageSchema = z.discriminatedUnion('type', [
   ...runnerMessages,
-  ...serverMessages,
+  ...serverOnlyMessages,
 ]);
 
 export type HelloMessage = z.infer<typeof helloMessageSchema>;

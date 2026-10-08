@@ -67,6 +67,9 @@ both sit at the root of that origin.
 | R → S | `pane` | `{ id, frame: { type: "full", lines, cursor } \| { type: "patch", from, lines } \| { type: "ended" } }` |
 | R → S | `run_log` | `{ id, frame: { type: "lines", backlog, lines: [{ kind, text }] } \| { type: "ended", phase } }` |
 | R → S | `subscribe.error` | `{ id, code: "not_found" \| "too_many_viewers" \| "forbidden" }` |
+| S ↔ R | `terminal.data` | `{ id, b64 }` — PTY bytes of an attach, ≤ 64 KiB decoded; S → R only on a `write` attach |
+| S → R | `terminal.resize` | `{ id, cols, rows }` |
+| S ↔ R | `terminal.close` | `{ id, reason: "client" \| "idle" \| "max_duration" \| "session_ended" \| "socket" }` |
 
 ### Sequence numbers
 
@@ -105,10 +108,16 @@ still connects.
         "args": [], "authenticated": true }
     ],
     "codeSentinel": { "version": "1.23.0", "path": "~/.claude-profiles/blacktoorroot/plugins/code-sentinel" },
-    "otlp": { "grpc": 4317, "http": 4318 }
+    "otlp": { "grpc": 4317, "http": 4318 },
+    "terminal": true
   }
 }
 ```
+
+`terminal` says whether the runner serves `terminal.attach`: it has Bun's PTY
+API (Bun ≥ 1.3.5, POSIX), tmux ≥ 3.2, and the command is not in
+`disabledCommands`. An absent `terminal` means `false`, because a runner older
+than the feature never sends it; read it with `terminalAvailable()`.
 
 A profile is runtime + optional `binary` (the runtime's own name when absent) +
 `env` + `args` + `authenticated` (ADR-0006).
@@ -399,7 +408,9 @@ token counts only: no prompt, response, thinking or tool-argument text (D9).
 | `already_running` | the tmux session the command would create already exists |
 | `unsupported_runtime` | the profile's runtime cannot run the command (a `codex` orchestrator) |
 | `unknown_profile` | `profileId` names no profile in the runner config |
-| `not_found` | the thing the command names does not exist: a skill, a run, or a run of another project |
+| `not_found` | the target the runner would resolve does not exist, or does not belong to that project: a terminal target, a skill, a run |
+| `busy` | a limit is reached: the runner's attach cap, or a `write` attach already holds the target |
+| `unsupported` | the machine cannot run the command: no PTY API, not POSIX, or tmux older than 3.2 |
 | `already_exists` | the target already exists: a `skills/<name>` branch, or a profile skill directory |
 | `changed_since_preview` | the skill's content at `commit` no longer hashes to the inspected `contentHash`; nothing was written |
 | `not_runnable` | the skill is refused as a run: the orchestrator or a worker |
@@ -547,6 +558,50 @@ never persists frames: the D10 report fields arrive in `skill_run.finished`.
 { "type": "run_log", "id": "run_91c2", "frame": { "type": "ended", "phase": "succeeded" } }
 ```
 
+### `terminal.data`, `terminal.resize`, `terminal.close`
+
+The byte stream of an interactive attach ([spec 29](../specs/29-terminal-attach.md)).
+The `terminal.attach` command opens it (see [Terminal](#terminal)), and its
+`id` arg names the stream: every message below carries that `id`. Schemas in
+`terminal.ts`. Unlike the rest of the protocol, these messages are **strict**:
+an unknown field fails to parse rather than being dropped, so nothing rides
+along with bytes headed for a live PTY.
+
+`terminal.data` carries PTY bytes as padded base64, 1 to
+`TERMINAL_MAX_DATA_BYTES` (64 KiB) decoded. Runner → server is the PTY's
+output. Server → runner is input, and only on a `write` attach: on a `read`
+attach the API drops input and the runner drops it again. Bytes are not
+filtered for control sequences; an attach is a raw terminal by design. Neither
+side stores or logs them; the runner logs byte counts only.
+
+```json
+{ "type": "terminal.data", "id": "term_4c1d", "b64": "G1szMm0kIBtbMG0=" }
+```
+
+`terminal.resize` resizes the PTY, within 10–500 columns and 2–200 rows. A
+`read` attach runs with `ignore-size`, so the agent's window keeps its size.
+
+```json
+{ "type": "terminal.resize", "id": "term_4c1d", "cols": 160, "rows": 48 }
+```
+
+`terminal.close` ends an attach, from either side. The runner then sends
+SIGHUP to the `tmux attach` client; no terminal path kills the target session.
+Nothing more is sent for that `id`. When the socket itself drops, the runner
+closes every attach of that connection, and the API audits the reason `socket`.
+
+| Reason | Sent by | When |
+|---|---|---|
+| `client` | server | the admin detached, or the browser socket closed |
+| `idle` | server | no input (`write`) or no traffic (`read`) for `TERMINAL_IDLE_TIMEOUT_SEC` (900 s) |
+| `max_duration` | server | the attach reached `TERMINAL_MAX_DURATION_SEC` (4 h) |
+| `session_ended` | runner | the `tmux attach` client exited |
+| `socket` | — | the API ↔ runner socket dropped; recorded, never sent |
+
+```json
+{ "type": "terminal.close", "id": "term_4c1d", "reason": "idle" }
+```
+
 ## Commands (allowlist)
 
 Only commands with status *implemented* exist in the `commands` object of the
@@ -575,7 +630,7 @@ handler.
 | `skill.run` | `runId, projectId, root, base, skill, args, profileKey, model, permissionMode, output: report\|pr, timeoutSec` | operator | defined, not in the map yet: → `{ phase: queued\|preparing, tmuxSession? }`, timeout 30 s |
 | `skill.cancel` | `runId, projectId` | operator | defined, not in the map yet: → `{ cancelled }`, timeout 15 s |
 | `session.backfill` | `projectId?, since` | admin | implemented: → `{ files, events }`, timeout 600 s |
-| `terminal.attach` (M3) | `projectId, slot` | admin | planned |
+| `terminal.attach` | `id, target: { kind: slot\|orchestrator\|skill_run, projectId, root, slot?\|runId? }, mode: read\|write, cols, rows` | admin | defined (`commands/terminal.ts`), not in the map yet: → `{ attached: true, session }`, timeout 10 s |
 
 Arguments are validated by schema on both sides (`parseCommand`). Commands
 without arguments take `{}` and reject any field. Paths are resolved and must
@@ -758,6 +813,63 @@ A run outlives `skill.run`. Its progress is two event types (`source: "runner"`)
 
 Each cut is flagged. The full patch stays in the run directory on the runner.
 `skillPhaseToRunStatus` maps phases onto #21's `runs.status`.
+
+### Terminal
+
+Schemas in `commands/terminal.ts`; the rules are [spec 29](../specs/29-terminal-attach.md)
+D1–D7 and D10. It is exported as `terminalCommands` but is **not** in the
+`commands` map yet: the map entry lands with the runner handler.
+
+- `terminal.attach { id, target, mode, cols, rows }` is admin only. `id` is
+  the stream id the server picked (`[A-Za-z0-9_-]`, at most 128), distinct
+  from the `command` message id.
+- `target` names a session by what it is, never by name, and an unknown field
+  fails to parse. The runner resolves it:
+  - `slot { projectId, root, slot }` → `cs-<slot>` (or
+    `cs-<prefix>--<slot>`), when the slot's worktree belongs to `root`;
+  - `orchestrator { projectId, root }` → the project's orchestrator session;
+  - `skill_run { projectId, root, runId }` → `agentdock-run-<shortid>` of a
+    live run of that project.
+- A target that does not resolve, or resolves into another project, is
+  `not_found`.
+- `mode: read` spawns `tmux attach-session -r -f ignore-size -t <session>`;
+  `write` spawns the plain `attach-session`. Both are argv, never a shell
+  string. Taking control is a second, separately audited attach.
+- `busy`: the runner already holds `TERMINAL_MAX_ATTACHES_PER_RUNNER` (2)
+  attaches, or a `write` attach already holds the target. `unsupported`: no
+  PTY API or tmux older than 3.2. `disabled`: the runner config lists
+  `terminal.attach`, and its capabilities report `terminal: false`.
+- The command answers once the PTY is running; the stream then outlives it
+  as `terminal.*` messages.
+
+```json
+{
+  "type": "command",
+  "id": "cmd_31",
+  "name": "terminal.attach",
+  "args": {
+    "id": "term_4c1d",
+    "target": {
+      "kind": "slot",
+      "projectId": "prj_agentdock",
+      "root": "/home/dev/agentdock",
+      "slot": "i42"
+    },
+    "mode": "read",
+    "cols": 160,
+    "rows": 48
+  }
+}
+```
+
+```json
+{
+  "type": "command.result",
+  "id": "cmd_31",
+  "ok": true,
+  "output": { "attached": true, "session": "cs-i42" }
+}
+```
 
 ## Delivery guarantees
 

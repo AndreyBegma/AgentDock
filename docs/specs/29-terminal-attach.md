@@ -171,6 +171,59 @@ Cross-repository: this item prefers glass-ui `Terminal` from AndreyBegma/glass-u
 | Record sessions (encrypted) for later review? | No — off, not built in this item |
 | Allow operators read-write on their own projects? | No — ADR-0010 keeps it admin-only |
 
+## Notes
+
+### From i29-protocol
+
+- **Where the schemas are.** The three stream messages, the browser text
+  frames (`terminalClientFrameSchema`) and the D5–D7 numbers are in
+  `packages/shared/src/protocol/terminal.ts`. The command, its target union
+  and `terminalCommands` are in `commands/terminal.ts`. Import the constants
+  (`TERMINAL_TICKET_TTL_MS`, `TERMINAL_IDLE_TIMEOUT_SEC_DEFAULT`,
+  `TERMINAL_MAX_DURATION_SEC_DEFAULT`, `TERMINAL_MAX_ATTACHES_PER_RUNNER`,
+  `TERMINAL_MAX_DATA_BYTES`, `TERMINAL_WS_PATH`, `TERMINAL_COLS`,
+  `TERMINAL_ROWS`) rather than repeating the numbers.
+- **`terminal.attach` is not in the `commands` map.** It is exported as
+  `terminalCommands`. The runner's `CommandHandlers`
+  (`apps/runner/src/commands/dispatcher.ts`) requires a handler for every key
+  of `commands`, so a map entry without its handler breaks the runner build
+  (#12's trap). i29-runner adds `...terminalCommands` to `commands` in
+  `commands.ts` together with the handler.
+- **`id` in the args is the stream id.** The server picks it per attach
+  (`[A-Za-z0-9_-]{1,128}`), and every `terminal.data`, `terminal.resize` and
+  `terminal.close` of that attach carries it. It is not the `command` message
+  id, which the `command.result` echoes as usual.
+- **`target` is a union on `kind`.** `slot` requires `slot` (the shared
+  `slotNameSchema`), `skill_run` requires `runId` (`[A-Za-z0-9_-]{1,64}`,
+  because it lands in a path), and `orchestrator` takes neither. Every object
+  is strict, so `session`, `command` or any other extra field fails with
+  `invalid_args`.
+- **The terminal messages are strict**, unlike the rest of the protocol,
+  where unknown fields are dropped. `terminal.data` checks padded base64 and
+  caps it at 64 KiB *decoded*, not just by string length. Resize is bounded to
+  10–500 columns and 2–200 rows, on attach and on resize. Control sequences
+  are not filtered; the spec names none, and the safety is D1 + D4 + D6.
+- **`terminal.data` and `terminal.close` go both ways.** They are in both
+  `runnerMessageSchema` and `serverMessageSchema`; `messageSchema` lists each
+  once. `terminal.resize` is server → runner only. The reason `socket` is for
+  the audit record: nobody can send it over a dropped socket.
+- **`capabilities.terminal` is optional.** Absent means `false`; read it with
+  `terminalAvailable(caps)`. A required field would break
+  `detectCapabilities` (runner) and the API test fixtures in this slot, and a
+  runner older than this feature does not send it anyway. i29-runner fills it
+  in `apps/runner/src/detect/capabilities.ts`: `true` only with Bun's PTY API,
+  POSIX, tmux ≥ 3.2, and `terminal.attach` not in `disabledCommands`.
+- **New error codes** in `commandErrorCodeSchema`: `not_found`, `busy`,
+  `unsupported` (`disabled` already existed). The runner's `busy` covers its
+  own limits; naming the admin who holds control is the API's job, from its
+  in-memory attach list (D9).
+- **Adding the messages needs no app edit.** The runner's and the API's
+  message switches have no exhaustiveness guard, so the new types compile and
+  are ignored until i29-runner adds `case 'terminal.data' / 'terminal.resize'
+  / 'terminal.close'` in `apps/runner/src/connection.ts`, and i29-api adds
+  `case 'terminal.data' / 'terminal.close'` in
+  `apps/api/src/runners/runner.gateway.ts`.
+
 Depends on #8
 
 Depends on #18
