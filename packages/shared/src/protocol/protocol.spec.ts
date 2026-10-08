@@ -295,6 +295,82 @@ describe('session events', () => {
       })?.ok,
     ).toBe(false);
   });
+
+  describe('llm.request OTel fields (spec 13 D6, D13, D15)', () => {
+    const request = (extra: object) =>
+      parseSessionEvent({
+        ...base,
+        type: 'llm.request',
+        data: {
+          requestId: 'r',
+          model: 'claude-sonnet-4-5-20250929',
+          querySource: 'main',
+          tokens: {
+            input: 10,
+            output: 5,
+            cacheRead: 0,
+            cacheWrite5m: 3,
+            cacheWrite1h: 0,
+            reasoning: 0,
+          },
+          ...extra,
+        },
+      });
+
+    it('keeps reportedCostUsd, cacheWriteTtlUnknown and source', () => {
+      const parsed = request({
+        reportedCostUsd: 0.0123,
+        cacheWriteTtlUnknown: true,
+        source: 'otel',
+      });
+      expect(parsed?.ok && parsed.event.data).toMatchObject({
+        reportedCostUsd: 0.0123,
+        cacheWriteTtlUnknown: true,
+        source: 'otel',
+      });
+    });
+
+    it('accepts a transcript event without them', () => {
+      expect(request({})?.ok).toBe(true);
+    });
+
+    it('refuses a negative reported cost and an unknown source', () => {
+      expect(request({ reportedCostUsd: -1 })?.ok).toBe(false);
+      expect(request({ source: 'metrics' })?.ok).toBe(false);
+    });
+
+    it('carries the envelope project and slot (D14)', () => {
+      const parsed = parseSessionEvent({
+        ...base,
+        type: 'llm.request',
+        project: { repo: 'acme/widget', root: '/srv/dev/widget' },
+        slot: 'i42',
+        data: {
+          requestId: 'r',
+          model: 'm',
+          querySource: 'main',
+          tokens: {
+            input: 1,
+            output: 1,
+            cacheRead: 0,
+            cacheWrite5m: 0,
+            cacheWrite1h: 0,
+            reasoning: 0,
+          },
+        },
+      });
+      expect(parsed?.ok && parsed.event).toMatchObject({
+        project: { repo: 'acme/widget', root: '/srv/dev/widget' },
+        slot: 'i42',
+      });
+    });
+
+    it('accepts a run of 1–128 characters', () => {
+      expect(request({ run: 'run-42' })?.ok).toBe(true);
+      expect(request({ run: '' })?.ok).toBe(false);
+      expect(request({ run: 'x'.repeat(129) })?.ok).toBe(false);
+    });
+  });
 });
 
 describe('unsequencedEventSchema', () => {

@@ -17,10 +17,12 @@ import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { LiveService } from '../live/live.service';
+import { CostService, type Pricer } from '../prices/cost.service';
 import {
   type RunnerEventSink,
   RunnerEventSinks,
 } from '../runners/runner-event-sinks';
+import { hourOf, RollupService } from '../usage/rollup.service';
 import { modelList } from './session-tree';
 
 type Tx = Prisma.TransactionClient;
@@ -42,10 +44,15 @@ class BatchContext {
   readonly turns = new Map<string, string>();
   /** Latest event time seen per session id. */
   readonly lastEventAt = new Map<string, Date>();
+  /** UTC hours (epoch ms) whose usage rollups this batch changed. */
+  readonly rollupHours = new Set<number>();
+  /** Sessions whose project or slot changed: their subtrees' hours are rebuilt too. */
+  readonly reattributed = new Set<string>();
 
   constructor(
     readonly tx: Tx,
     readonly runnerId: string,
+    readonly pricer: Pricer,
   ) {}
 
   touch(sessionId: string, at: Date): void {
@@ -70,6 +77,8 @@ export class SessionsIngestService implements RunnerEventSink, OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly sinks: RunnerEventSinks,
     private readonly live: LiveService,
+    private readonly cost: CostService,
+    private readonly rollups: RollupService,
   ) {}
 
   onModuleInit(): void {
@@ -99,7 +108,7 @@ export class SessionsIngestService implements RunnerEventSink, OnModuleInit {
 
     const touched = await this.prisma.$transaction(
       async (tx) => {
-        const ctx = new BatchContext(tx, runnerId);
+        const ctx = new BatchContext(tx, runnerId, await this.cost.current(tx));
         for (const event of parsed) await this.apply(ctx, event);
         for (const [id, at] of ctx.lastEventAt) {
           await tx.agentSession.updateMany({
@@ -107,6 +116,11 @@ export class SessionsIngestService implements RunnerEventSink, OnModuleInit {
             data: { lastEventAt: at },
           });
         }
+        // Spec 13 D8: the usage rollups of every hour this batch changed.
+        const moved = await this.rollups.hoursOfSessions(tx, [
+          ...ctx.reattributed,
+        ]);
+        await this.rollups.rebuildHours(tx, [...ctx.rollupHours, ...moved]);
         return [...ctx.lastEventAt.keys()];
       },
       { timeout: BATCH_TRANSACTION_TIMEOUT_MS },
@@ -140,6 +154,7 @@ export class SessionsIngestService implements RunnerEventSink, OnModuleInit {
         return;
       }
       case 'llm.request':
+        await this.attributeFromEnvelope(ctx, session, event);
         return this.request(ctx, session.id, event.data, at);
       case 'tool.call':
         return this.toolCall(ctx, runtime, session, event.data, at);
@@ -204,6 +219,7 @@ export class SessionsIngestService implements RunnerEventSink, OnModuleInit {
       }
     }
     let slotName = projectId === null ? null : (data.slot ?? null);
+    const before = { projectId: session.projectId, slotName: session.slotName };
 
     let parentSessionId: string | null = null;
     if (data.parent && data.parent.sessionId !== '') {
@@ -243,6 +259,38 @@ export class SessionsIngestService implements RunnerEventSink, OnModuleInit {
     });
     session.projectId = projectId;
     session.slotName = slotName;
+    if (before.projectId !== projectId || before.slotName !== slotName) {
+      ctx.reattributed.add(session.id);
+    }
+    await this.propagateProject(ctx, session);
+  }
+
+  /**
+   * Spec 13 D14: live OTel usually arrives before the transcript's
+   * `session.observed`, carrying the project and slot on its envelope. A
+   * project-less session takes them, but only for a project of the sending
+   * runner (the same trust rule as `session.observed`); a later
+   * `session.observed` still decides.
+   */
+  private async attributeFromEnvelope(
+    ctx: BatchContext,
+    session: SessionRef,
+    event: SessionEvent,
+  ): Promise<void> {
+    if (session.projectId !== null || !event.project) return;
+    const project = await ctx.tx.project.findFirst({
+      where: { runnerId: ctx.runnerId, rootPath: event.project.root },
+      select: { id: true },
+    });
+    if (!project) return;
+    const slotName = event.slot ?? null;
+    await ctx.tx.agentSession.update({
+      where: { id: session.id },
+      data: { projectId: project.id, slotName },
+    });
+    session.projectId = project.id;
+    session.slotName = slotName;
+    ctx.reattributed.add(session.id);
     await this.propagateProject(ctx, session);
   }
 
@@ -299,18 +347,65 @@ export class SessionsIngestService implements RunnerEventSink, OnModuleInit {
     const turnId = data.promptId
       ? await this.turn(ctx, sessionId, data.promptId, at)
       : null;
+    const source = data.source ?? 'transcript';
+    const reported =
+      data.reportedCostUsd !== undefined
+        ? { reportedCostUsd: new Prisma.Decimal(data.reportedCostUsd) }
+        : {};
+    const where = {
+      sessionId_requestId: { sessionId, requestId: data.requestId },
+    };
+    const previous = await ctx.tx.llmRequest.findUnique({
+      where,
+      select: { id: true, ts: true, source: true, durationApprox: true },
+    });
+
+    // Spec 13 D15: an OTel copy of a request the transcript already gave
+    // keeps the transcript's tokens (they split cache writes by TTL) and adds
+    // only what the transcript lacks: the runtime's cost and a measured duration.
+    if (previous?.source === 'transcript' && source === 'otel') {
+      await ctx.tx.llmRequest.update({
+        where: { id: previous.id },
+        data: {
+          ...reported,
+          ...(previous.durationApprox && data.durationMs !== undefined
+            ? { durationMs: data.durationMs, durationApprox: false }
+            : {}),
+          ...(turnId !== null ? { turnId } : {}),
+        },
+      });
+      return;
+    }
+
+    // Otherwise the incoming tokens win: D4's last usage from one producer,
+    // or the transcript's exact split over OTel's.
+    const measured =
+      previous?.source === 'otel' &&
+      source === 'transcript' &&
+      (data.durationMs === undefined || data.durationApprox === true);
     const fields = {
       ts: at,
       model: data.model,
       querySource: data.querySource,
       ...data.tokens,
-      durationMs: data.durationMs ?? null,
-      durationApprox: data.durationApprox ?? false,
+      ...(measured
+        ? {}
+        : {
+            durationMs: data.durationMs ?? null,
+            durationApprox: data.durationApprox ?? false,
+          }),
       stopReason: data.stopReason ?? null,
+      source,
+      cacheWriteTtlUnknown: data.cacheWriteTtlUnknown ?? false,
+      ...reported,
+      // Spec 13 D6: priced in the transaction that stores it.
+      ...ctx.pricer.price(data.model, data.tokens),
     };
-    // D4: the last usage seen for a requestId wins.
+    // A re-sent request may move to another hour: both hours are rebuilt.
+    if (previous) ctx.rollupHours.add(hourOf(previous.ts));
+    ctx.rollupHours.add(hourOf(at));
     await ctx.tx.llmRequest.upsert({
-      where: { sessionId_requestId: { sessionId, requestId: data.requestId } },
+      where,
       create: { sessionId, requestId: data.requestId, turnId, ...fields },
       update: { ...fields, ...(turnId !== null ? { turnId } : {}) },
     });
@@ -348,6 +443,12 @@ export class SessionsIngestService implements RunnerEventSink, OnModuleInit {
       );
       if (child.id !== session.id) {
         childSessionId = child.id;
+        if (
+          child.projectId !== session.projectId ||
+          child.slotName !== session.slotName
+        ) {
+          ctx.reattributed.add(child.id);
+        }
         await ctx.tx.agentSession.update({
           where: { id: child.id },
           data: {

@@ -29,6 +29,8 @@ export const AUDIT_ACTIONS = [
   'project.member_remove',
   'project.docs_source_override',
   'project.docs_source_reset',
+  'prices.version_create',
+  'prices.recompute',
   'issue.create',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
