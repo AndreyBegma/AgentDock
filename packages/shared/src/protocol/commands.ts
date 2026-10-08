@@ -42,6 +42,12 @@ export const commandErrorCodeSchema = z.enum([
   'path_not_allowed',
   /** A path argument is not inside a git repository. */
   'not_a_repository',
+  /** The tmux session the command would create already exists (spec 17 D2). */
+  'already_running',
+  /** The profile's runtime cannot run this command (a `codex` orchestrator). */
+  'unsupported_runtime',
+  /** `profileId` names no profile in the runner config. */
+  'unknown_profile',
 ]);
 export type CommandErrorCode = z.infer<typeof commandErrorCodeSchema>;
 

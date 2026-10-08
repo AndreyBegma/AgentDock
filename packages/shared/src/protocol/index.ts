@@ -1,5 +1,6 @@
 export * from './capabilities';
 export * from './commands';
+export * from './commands/control';
 export * from './commands/queue';
 export * from './envelope';
 export * from './events/fleet';
@@ -7,5 +8,6 @@ export * from './events/queue';
 export * from './events/sessions';
 export * from './messages';
 export * from './pairing';
+export * from './pane';
 export * from './projects';
 export * from './version';

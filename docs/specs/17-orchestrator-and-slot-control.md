@@ -167,6 +167,18 @@ i17-runner and i17-api run in parallel after the protocol lead merges.
 | Allow `stop all slots` in one click? | No — per slot; `orchestrator.stop` plus individual stops |
 | Restart the orchestrator automatically when it dies? | No — the UI shows `absent`; a schedule (M3.2) can do `next` |
 
+## Notes from implementation
+
+i17-protocol, decided with the orchestrator on 2026-10-08:
+
+1. **Registration.** The schemas live in `packages/shared/src/protocol/commands/control.ts` as `controlCommands`, and are **not** spread into `commands` in `commands.ts`. The runner's `CommandHandlers` (`apps/runner/src/commands/dispatcher.ts`) requires a handler for every key of `commands`, so a command added there without its handler breaks the runner build. i17-runner adds `...controlCommands` to `commands` in the same change as the handlers. Any later protocol slot follows the same rule: define and export, let the runner slot register.
+2. **Error codes.** `commandErrorCodeSchema` gains `already_running` (D2), `unsupported_runtime` (a `codex` profile) and `unknown_profile` (a `profileId` that is not in the runner config — the schema cannot know it). A slot whose worktree belongs to another project answers the existing `path_not_allowed`.
+3. **One slot-name rule.** `slotNameSchema` is `^[a-z0-9][a-z0-9-]*$`, at most 64 characters: no `/`, `.`, `:`, uppercase or leading `-`, so it is never a path, a tmux target expression or a flag. #18's `subscribe`/`unsubscribe`/`pane` import it rather than define their own.
+4. **`permissionMode: manual`** stays the protocol's word for the runtime's default, prompting mode; i17-runner maps it to the CLI's value. `model` is a model alias or id that never starts with `-`, because it lands in argv after `--model`.
+5. **`slot.message.text`** is at most 16 KB counted in UTF-8 bytes, non-blank; `from` is an email. The `From:` header and timestamp are added by the runner, outside that limit.
+6. **`orchestrator.status.state`** is the pane classification (`running | idle | prompt | quota`) or `absent`, which holds exactly when `present` is false. `orchestratorSessionName(repo)` is the D1 slug, shared by the runner (session name) and the API.
+7. **Presence detection.** #11 note 9 left `orchestratorSession` out of the project settings; the collector recognises the orchestrator by the `agentdock-orchestrator` session name *or* a `code-sentinel:orchestrator` command line in the project root. D2's argv carries the latter, so an `agentdock-orch-<slug>` session started here is detected without that setting.
+
 Depends on #8
 
 Depends on #10
