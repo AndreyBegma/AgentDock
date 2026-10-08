@@ -68,7 +68,7 @@ are in [runner-protocol.md](runner-protocol.md#session-events). The envelope's
 | Type | `data` |
 |---|---|
 | `session.observed` | `cwd, startedAt, parsed, profileKey?, gitBranch?, title?, projectId?, slot?, parent?: { sessionId, toolUseId? }`. Not `session.appeared`, which is the runner's tmux event |
-| `llm.request` | `requestId, model, tokens: { input, output, cacheRead, cacheWrite5m, cacheWrite1h, reasoning }, querySource: main\|subagent\|auxiliary, promptId?, durationMs?, durationApprox?, ttftMs?, stopReason?, agentName?` |
+| `llm.request` | `requestId, model, tokens: { input, output, cacheRead, cacheWrite5m, cacheWrite1h, reasoning }, querySource: main\|subagent\|auxiliary, promptId?, durationMs?, durationApprox?, ttftMs?, stopReason?, agentName?, reportedCostUsd?, cacheWriteTtlUnknown?, source?: transcript\|otel, run?` |
 | `tool.call` | `toolUseId, tool, startedAt, promptId?, endedAt?, ok?, durationMs?, decision?, childSessionId?` |
 | `turn.started` / `turn.finished` | `promptId` |
 | `skill.activated` | `skill` |
@@ -80,6 +80,19 @@ None of these carries prompt, response, thinking or tool-argument text
 Claude transcripts report it as `output_tokens_details.thinking_tokens` (see
 spec 12's implementation notes), so a consumer that sums buckets must leave
 `reasoning` out of the total.
+
+The same request can arrive twice: live from the runner's OTLP receiver
+(`source: otel`) and later from the transcript (`source: transcript`, the
+default when `source` is absent). Only OTel sends `reportedCostUsd` — the
+runtime's own cost estimate, stored for reference and never summed — and
+`cacheWriteTtlUnknown: true`, meaning the runtime did not split cache writes by
+TTL and all of them are in `cacheWrite5m`. The API keeps one `llm_request` per
+`(session, requestId)` and merges the two copies whatever their order: the
+transcript's tokens win (they carry the exact cache split), OTel fills only
+`reportedCostUsd` and a measured `durationMs`
+([spec 13](../specs/13-tokens-and-cost.md) D15). OTel may also send `run`, the
+`agentdock.run` resource attribute (D14); runs are a future entity, so the API
+accepts it and stores nothing yet.
 
 ### GitHub (source `github`)
 

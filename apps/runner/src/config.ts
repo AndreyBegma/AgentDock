@@ -36,9 +36,19 @@ export const runnerConfigSchema = z.object({
     .array(z.object({ id: z.string().min(1), root: z.string().min(1) }))
     .default([]),
   disabledCommands: z.array(z.string().min(1)).default([]),
-  /** OTLP receiver ports (reserved until collectors land). */
+  /**
+   * The OTLP receiver (spec 13 D11). `null`, the default, is the receiver on
+   * 127.0.0.1:4318. `http: null` is the default port; `grpc` is not served
+   * (D11) and stays reserved. `codexExperimental` maps Codex records, whose
+   * attribute names are not verified yet (D13).
+   */
   otlp: z
-    .object({ grpc: portSchema.nullable(), http: portSchema.nullable() })
+    .object({
+      enabled: z.boolean().optional(),
+      grpc: portSchema.nullable().default(null),
+      http: portSchema.nullable().default(null),
+      codexExperimental: z.boolean().optional(),
+    })
     .nullable()
     .default(null),
   /** Fleet collector intervals (spec 11), for every watched project. */

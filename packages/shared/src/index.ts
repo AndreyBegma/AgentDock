@@ -6,6 +6,7 @@ export * from './projects';
 export * from './queue';
 export * from './runners';
 export * from './sessions';
+export * from './usage';
 
 export const formatDate = (date: Date): string =>
   date.toISOString().split('T')[0];

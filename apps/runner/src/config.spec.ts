@@ -58,6 +58,20 @@ describe('config', () => {
     expect(config.disabledCommands).toEqual(['runner.describe']);
   });
 
+  it('reads the otlp key: null, partial and the #5 { grpc, http } shape', () => {
+    expect(loadConfig(path).otlp).toBeNull();
+    saveConfig(path, { otlp: { enabled: false } });
+    expect(loadConfig(path).otlp).toEqual({
+      enabled: false,
+      grpc: null,
+      http: null,
+    });
+    saveConfig(path, { otlp: { grpc: 4317, http: 4319 } });
+    expect(loadConfig(path).otlp).toEqual({ grpc: 4317, http: 4319 });
+    writeFileSync(path, JSON.stringify({ otlp: { http: 70_000 } }));
+    expect(() => loadConfig(path)).toThrow('otlp.http');
+  });
+
   it('names the invalid field without echoing its value', () => {
     saveConfig(path, loadConfig(path));
     writeFileSync(path, JSON.stringify({ token: 'not-a-token-but-secret' }));
