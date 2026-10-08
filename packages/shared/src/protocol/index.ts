@@ -1,5 +1,6 @@
 export * from './capabilities';
 export * from './commands';
+export * from './commands/control';
 export * from './envelope';
 export * from './events/fleet';
 export * from './events/sessions';
