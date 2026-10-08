@@ -8,10 +8,12 @@ import { FleetModule } from './fleet';
 import { HealthController } from './health.controller';
 import { LiveModule } from './live/live.module';
 import { PaneModule } from './pane';
+import { PricesModule } from './prices/prices.module';
 import { ProjectsModule } from './projects/projects.module';
 import { QueueModule } from './queue';
 import { RunnersModule } from './runners/runners.module';
 import { SessionsModule } from './sessions/sessions.module';
+import { UsageModule } from './usage/usage.module';
 
 @Module({
   imports: [
@@ -28,6 +30,8 @@ import { SessionsModule } from './sessions/sessions.module';
     ProjectsModule,
     FleetModule,
     SessionsModule,
+    UsageModule,
+    PricesModule,
     QueueModule,
     PaneModule,
   ],

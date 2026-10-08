@@ -129,9 +129,23 @@ export interface BoardErrorView {
   at: string;
 }
 
+/**
+ * Which channel the fleet is seen through (spec 16 D8):
+ * - `scraped` — markdown and tmux only, as under spec 11;
+ * - `events` — Code Sentinel's `events.jsonl` reported in the last 24 h;
+ * - `both` — it did, and a live slot or the latest round still carries a
+ *   plugin-covered field last written from markdown.
+ */
+export const FLEET_CHANNELS = ['scraped', 'events', 'both'] as const;
+export type FleetChannel = (typeof FLEET_CHANNELS)[number];
+
+/** How long one plugin event keeps a project on the `events` channel. */
+export const FLEET_CHANNEL_WINDOW_MS = 24 * 60 * 60 * 1000;
+
 /** `GET /projects/:id/fleet`. */
 export interface FleetView {
   projectId: string;
+  fleetChannel: FleetChannel;
   orchestrator: OrchestratorView;
   /** The latest round's base, else the project's base branch. */
   base: string;

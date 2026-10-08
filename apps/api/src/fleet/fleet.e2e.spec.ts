@@ -98,6 +98,7 @@ describe('fleet routes (e2e)', () => {
       .body as FleetView;
     expect(empty).toEqual({
       projectId: a,
+      fleetChannel: 'scraped',
       orchestrator: { status: 'unknown', session: null, since: null },
       base: 'develop',
       latestRound: null,
