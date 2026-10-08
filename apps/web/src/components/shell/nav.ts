@@ -78,7 +78,7 @@ export const NAV: NavSection[] = [
         label: 'Queue',
         icon: ListChecks,
         minRole: 'viewer',
-        enabled: false,
+        enabled: true,
       },
       {
         id: 'history',

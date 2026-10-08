@@ -157,6 +157,13 @@ i19-api, decided with the orchestrator on 2026-10-08:
 8. **Sink order.** `QueueModule` imports `FleetModule`, so the fleet sink registers (and projects a batch's rounds and slots) before the queue sink recomputes; an e2e test sends a snapshot and a round in one batch and gets the orchestrator's verdict. Any fleet event recomputes its project's queue.
 9. **Routes.** `GET /queue?state=&include=open` (`others` lists open issues without the ready label, without a state); `GET /queue/:number` answers `404 issue_not_found` for an issue that is not in the queue, and `history` holds its verdicts in the last 20 rounds.
 
+i19-web, 2026-10-08:
+
+- **Read-only board.** glass-ui v0.22.0's `Board` has no read-only mode: the drag affordance and the move menu remain until glass-ui gains a read-only Board (ADR-0011); state is never mutated by the UI — `onMove` is a no-op and the columns are derived from the API's items on every render, so a drop never sticks.
+- **Issue body is shown as plain text.** No markdown renderer is a dependency of the web app; the sheet shows the body in a preformatted block.
+- **The queue toggle is guarded client-side.** "Queue for the orchestrator" is disabled, with the missing piece spelled out, while the body fails the shared `specGap` rule, so the dialog normally never sends a request the API would answer `422 no_acceptance_criteria` / `no_parallel_plan`; `label_not_allowed` is prevented by offering only allowed labels. The dialog still renders every 422 reason (refused labels listed) and `503 command_unavailable` ("the runner part is not deployed yet") as sentences, for a rule that drifts or a stale label set.
+- **`ApiError.body`.** `lib/api.ts` keeps the parsed error body (additive, defaults to `null`) so a route's extra fields — `labels` of `label_not_allowed` — reach the UI.
+
 Depends on #10
 
 Depends on #11

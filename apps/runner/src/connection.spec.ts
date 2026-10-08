@@ -8,7 +8,7 @@ import {
 import { Backoff } from './backoff';
 import { createDispatcher } from './commands/dispatcher';
 import { createHandlers } from './commands/handlers';
-import { batches, RunnerConnection } from './connection';
+import { batches, type PaneHandler, RunnerConnection } from './connection';
 import { Spool } from './spool';
 import { FakeClock } from './testing/fake-clock';
 import {
@@ -64,7 +64,11 @@ describe('RunnerConnection', () => {
     return s;
   };
 
-  const connect = (origin: string, clock = new FakeClock()) => {
+  const connect = (
+    origin: string,
+    clock = new FakeClock(),
+    pane?: PaneHandler,
+  ) => {
     const { log, lines } = memoryLogger();
     const spool = Spool.open({ dir, log });
     connection = new RunnerConnection({
@@ -99,6 +103,7 @@ describe('RunnerConnection', () => {
         clock,
         log,
       }),
+      pane,
     });
     connection.start();
     return { clock, spool, lines, connection };
@@ -200,6 +205,47 @@ describe('RunnerConnection', () => {
     expect(byId.c2.ok).toBe(true);
     expect(connection.isLive).toBe(true);
     expect(s.invalid).toEqual([]);
+  });
+
+  it('hands pane subscribe / unsubscribe to the handler, sends its frames, and resets it on close', async () => {
+    const s = server();
+    const calls: string[] = [];
+    const pane: PaneHandler = {
+      subscribe: async (m) => {
+        calls.push(`subscribe ${m.id} ${m.slot}`);
+      },
+      unsubscribe: (id) => {
+        calls.push(`unsubscribe ${id}`);
+      },
+      reset: () => {
+        calls.push('reset');
+      },
+    };
+    const { connection } = connect(s.origin, new FakeClock(), pane);
+    await until(() => connection.isLive);
+    s.send({
+      type: 'subscribe',
+      id: 'p1',
+      kind: 'pane',
+      projectId: 'prj_1',
+      root: '/srv/widget',
+      slot: 'i42',
+    });
+    s.send({ type: 'unsubscribe', id: 'p1' });
+    await until(() => calls.length === 2);
+    expect(calls).toEqual(['subscribe p1 i42', 'unsubscribe p1']);
+
+    expect(
+      connection.sendMessage({
+        type: 'pane',
+        id: 'p1',
+        frame: { type: 'ended' },
+      }),
+    ).toBe(true);
+    await s.waitFor('pane');
+
+    s.close(1006);
+    await until(() => calls.includes('reset'));
   });
 });
 
