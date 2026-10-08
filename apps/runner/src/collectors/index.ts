@@ -1,5 +1,6 @@
 import { eventsCollector } from './events/events';
 import { fleetCollector } from './fleet';
+import { issuesCollector } from './issues/issues';
 import type { CollectorFactory } from './registry';
 
 export * from './registry';
@@ -11,4 +12,5 @@ export * from './registry';
 export const collectors: CollectorFactory[] = [
   fleetCollector, // spec 11
   eventsCollector(), // spec 16
+  issuesCollector(), // spec 19
 ];
