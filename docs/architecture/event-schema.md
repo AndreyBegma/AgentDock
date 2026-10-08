@@ -73,6 +73,11 @@ are in [runner-protocol.md](runner-protocol.md#session-events). The envelope's
 None of these carries prompt, response, thinking or tool-argument text
 ([spec 12](../specs/12-agent-sessions.md) D9).
 
+`tokens.reasoning` is counted inside `tokens.output`, never on top of it.
+Claude transcripts report it as `output_tokens_details.thinking_tokens` (see
+spec 12's implementation notes), so a consumer that sums buckets must leave
+`reasoning` out of the total.
+
 ### GitHub (source `github`)
 
 `issue.labeled`, `issue.closed`, `pr.opened`, `pr.checks_changed`
