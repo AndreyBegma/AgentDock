@@ -34,7 +34,7 @@ export interface QueueVerdict {
 export interface QueueBlocker {
   number: number;
   url: string;
-  /** Still open, or closed without a merged pull request. */
+  /** Open on GitHub; false when closed but not by a merged pull request. */
   open: boolean;
 }
 
@@ -126,6 +126,22 @@ export interface CreateIssueResult {
   /** Whether the ready label was added (D7). */
   queued: boolean;
   reason?: SpecGap;
+}
+
+/** `POST /projects/:id/queue/refresh`: the runner polled now. */
+export interface QueueRefreshResult {
+  /** False when GitHub answered `304`: nothing changed, nothing was emitted. */
+  changed: boolean;
+  fetchedAt: string;
+}
+
+/** The body of a queue route's error. */
+export interface QueueErrorBody {
+  statusCode: number;
+  error: QueueErrorCode;
+  message: string;
+  /** With `label_not_allowed`: the labels refused. */
+  labels?: string[];
 }
 
 /** Rounds a detail's `history` looks back over. */
