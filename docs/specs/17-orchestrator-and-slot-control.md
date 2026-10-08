@@ -81,7 +81,7 @@ New file `packages/shared/src/protocol/commands/control.ts`, one registration li
 | `orchestrator.stop` | `{ projectId, root }` | operator | `{ stopped: boolean }` |
 | `orchestrator.status` | `{ projectId, root }` | viewer | `{ present, state, session?, startedAt? }` |
 | `slot.stop` | `{ projectId, root, slot }` | operator | `{ stopped: boolean }` |
-| `slot.message` | `{ projectId, root, slot, text, from }` | operator | `{ written: true }` |
+| `slot.message` | `{ projectId, root, slot, text, from }` | operator | `{ written: true, delivered: boolean }` |
 
 `slot` matches `^[a-z0-9-]+$` (same rule as `dispatch.sh`).
 
@@ -178,6 +178,16 @@ i17-protocol, decided with the orchestrator on 2026-10-08:
 5. **`slot.message.text`** is at most 16 KB counted in UTF-8 bytes, non-blank; `from` is an email. The `From:` header and timestamp are added by the runner, outside that limit.
 6. **`orchestrator.status.state`** is the pane classification (`running | idle | prompt | quota`) or `absent`, which holds exactly when `present` is false. `orchestratorSessionName(repo)` is the D1 slug, shared by the runner (session name) and the API.
 7. **Presence detection.** #11 note 9 left `orchestratorSession` out of the project settings; the collector recognises the orchestrator by the `agentdock-orchestrator` session name *or* a `code-sentinel:orchestrator` command line in the project root. D2's argv carries the latter, so an `agentdock-orch-<slug>` session started here is detected without that setting.
+
+i17-runner, decided with the orchestrator on 2026-10-08:
+
+8. **Registration landed.** `commands` spreads `controlCommands`; the five handlers are in `apps/runner/src/control/` and registered in `createHandlers` in the same commit. The runner reads profiles through `HandlerContext.profiles` (the runner config's `profiles`).
+9. **Exact tmux targets.** Every `-t` the runner sends is `=<session>` (`=<session>:` for a pane). A bare name falls back to tmux's prefix match: with only `cs-i42` alive, `kill-session -t cs-i4` kills `cs-i42` (verified on tmux 3.7c).
+10. **`slot.message` reports delivery.** The result is `{ written: true, delivered }`. The message file is always written; `delivered` is true only when the worker's session was live and both `send-keys` calls ran. With no live session the file waits for the worker to be resumed, and the UI should say so rather than "sent".
+11. **`manual` → `--permission-mode default`.** The other three modes pass through unchanged. A profile without `binary` launches its runtime's name (`claude`).
+12. **The session name's `repo` (for i17-api).** The runner names the session `orchestratorSessionName(repo)` where `repo` is `owner/name` parsed from the root's `origin` remote, else the root's basename (#11's `resolveFleetProject`). The API should take the session name from the start result or `orchestrator.status`, not recompute it: for a project without a GitHub origin its idea of `repo` may differ.
+13. **Slot ownership.** A slot is this project's only when `git -C <root> worktree list` lists its `.wt-<repo>-<slot>` worktree (not prunable); otherwise `path_not_allowed`, before any tmux call. Its sessions are those `ownedSlot` (#11 D12) attributes to it, so `cs-<slot>` and this repository's `cs-<prefix>--<slot>` count, and another repository's prefix never does. `slot.stop` kills every session the slot owns and answers `{ stopped: false }` when none is live.
+14. **Atomic message write.** A temp file beside the target is opened with `wx` (mode 0600) and renamed over `.orchestrator-msg.md`, so a symlink at that path is replaced, never written through.
 
 Depends on #8
 

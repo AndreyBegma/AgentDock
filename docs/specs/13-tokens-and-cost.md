@@ -81,8 +81,12 @@ tables only; `llm_requests` (from #12) is written, not altered.
 | `price_recomputes` | `id`, `versionId`, `from`, `to`, `status` (`queued`\|`running`\|`done`\|`failed`), `processed`, `total`, `error?`, `createdById`, `createdAt`, `finishedAt?` |
 
 Columns this item fills on `llm_requests` (declared by #12): `costUsd`,
-`priceVersionId`, `costSource`, `reportedCostUsd`. If #12 named them
-differently, i13-api uses #12's names and updates this table.
+`priceVersion` (the version's `number`, as #12 named it — not
+`priceVersionId`), `costSource`. #12 declared no column for the runtime's own
+cost, so this migration adds the only alterations of an existing table, all on
+`llm_requests`: `reportedCostUsd` Decimal(14,6)?, `source`
+(`transcript`\|`otel`, default `transcript`) and `cacheWriteTtlUnknown`
+Boolean (default false) — the last two carry D15's merge.
 
 ## API
 
@@ -231,8 +235,8 @@ i13-otlp, decided with the orchestrator on 2026-10-08:
    - `cache_creation_tokens` → `cacheWrite5m`, with `cacheWriteTtlUnknown: true` when it is non-zero. The capture shows why: for the same request (`req_011CfpSesVaEqnspJvvovFo5`) OTel reports 155 cache-write tokens with no TTL, while the transcript has them as `ephemeral_1h_input_tokens`.
    - `querySource` [Inferred]: `sdk`, `repl_main_thread`, `main` or absent → `main`; `agent.name` present or `query_source` starting with `agent` → `subagent`; anything else → `auxiliary`. Only `sdk` was observed.
    - A record without `session.id`, `request_id` or `model` is dropped and counted in a warning.
-4. **Correlation (D14).** `agentdock.project` is a project id. It sets the envelope `project` only when it is on the runner's watch list (the same trust rule as `session.observed`). It is then resolved through git once per project, like the fleet collectors (`resolveFleetProject`), so `repo` is `owner/name`, else the root's basename. `agentdock.slot` → envelope `slot`. `agentdock.issue` → envelope `issue` when it is a positive integer. `agentdock.run` → `data.run`, which the shared schema strips until i13-api adds `run?: string`. The #12 adapters do not set the envelope `project`; they put `projectId` on `session.observed`. Whether the API reads the envelope correlation of an `llm.request` is i13-api's to settle.
-5. **Contract fields** sent per i13-api's extension of `llmRequestDataSchema`: `reportedCostUsd`, `cacheWriteTtlUnknown`, `source: 'otel'`, and `run` (pending). Each event's data is checked against the shared schema before it is spooled, but the object sent is the one built from the whitelist, so these fields reach the API once its parse accepts them.
+4. **Correlation (D14).** `agentdock.project` is a project id. It sets the envelope `project` only when it is on the runner's watch list (the same trust rule as `session.observed`). It is then resolved through git once per project, like the fleet collectors (`resolveFleetProject`), so `repo` is `owner/name`, else the root's basename. `agentdock.slot` → envelope `slot`. `agentdock.issue` → envelope `issue` when it is a positive integer. `agentdock.run` → `data.run` (at most 128 characters, as the shared schema allows). The #12 adapters do not set the envelope `project`; they put `projectId` on `session.observed`. The API reads the envelope `project` of an `llm.request` for a placeholder session, under the same watch-list trust rule (i13-api's notes).
+5. **Contract fields**, from i13-api's extension of `llmRequestDataSchema`: `reportedCostUsd`, `cacheWriteTtlUnknown`, `source: 'otel'` and `run`. What gets spooled is the shared schema's parsed output of the whitelist-built object, so the runner and the API agree on the shape by construction.
 6. **Receiver.**
    - `Bun.serve` on `127.0.0.1` only, plus a peer-address check (403 otherwise).
    - 413 when the declared length, the streamed body, or the gzip-inflated size exceeds 4 MiB. `Content-Encoding` other than gzip or identity is 415.
@@ -242,5 +246,108 @@ i13-otlp, decided with the orchestrator on 2026-10-08:
 7. **Codex (D13 [Unknown]).** Codex is not installed on the reference machine, so no capture exists. The mapping reads D13's names (`input_tokens`, `output_tokens`, `cached_input_tokens`, `reasoning_output_tokens`), with session `conversation.id`/`session.id` and request `request_id`/`response.id`, all unverified. It is off unless `otlp.codexExperimental` is set, and its tests are `it.skip` with the reason.
 8. **End-to-end dedupe (acceptance criterion).** This slot ships the runner half: the OTel and transcript copies of the captured requests carry the same `(session.id, requestId)` key, tested through the Claude adapter. Both orders through ingest are i13-api's.
 9. **Protobuf decoding.** `protobufjs` 8.8.0 (`protobufjs/light`) reads `otlp/proto/logs.json`, the JSON descriptor of opentelemetry-proto v1.11.1 (Apache-2.0, `otlp/proto/ATTRIBUTION.md`). OTLP/JSON is read directly, without `fromObject`, because it sends hex trace ids where protobufjs expects base64.
-10. **Command registration trap** (from #12, recorded at the orchestrator's request): `CommandHandlers` in `apps/runner/src/commands/dispatcher.ts` needs a handler for every key of `commands` in `packages/shared/src/protocol/commands.ts`. So a protocol or API slot defines and exports a command in its own file and leaves the `commands` map alone. The runner slot adds the map entry together with its handler. This slot adds no command.
+10. **Command registration trap**: recorded once, in i13-api's notes below. This slot adds no command either.
 
+i13-api, decided with the orchestrator on 2026-10-08:
+
+1. **Column names (D6).** #12 named the version column `priceVersion` and it
+   holds `price_versions.number`, not an id. #12 declared no column for the
+   runtime's cost, so `20261013000000_cost` adds `llm_requests.reportedCostUsd`,
+   plus `source` and `cacheWriteTtlUnknown` for note 6. These are the only
+   alterations of an existing table. An unpriced request stores
+   `costUsd = null`, `costSource = null`, and the version it was tried
+   against.
+2. **Rollups are rebuilt, not incremented (deviates from D8's mechanism).** Two
+   things make an increment wrong. #12's D4 lets a re-sent request replace its
+   usage, so an increment counts it twice. A request also often arrives before
+   its `session.observed`, and `propagateProject` moves whole subtrees to a
+   project later, so an increment leaves usage under the wrong project. So
+   every ingest batch collects the UTC hours it changed: the hours of the
+   requests it upserted (the old hour too, if a re-send moved the request),
+   and every hour holding requests of a session whose project or slot changed,
+   subtree included. It then rebuilds those hours from `llm_requests` with
+   `DELETE` + `INSERT … SELECT … GROUP BY`, inside the batch transaction
+   (`RollupService.rebuildHours`). Recompute uses the same call, per batch.
+   Concurrent rebuilds of one hour take `pg_advisory_xact_lock(13013, hour)` in
+   ascending order; under READ COMMITTED the statements after the lock see
+   the previous holder's commit. The table, the keys and the
+   `(hour, dimensionKey)` unique index are as D8 says. `dimensionKey` is
+   `json_build_array(projectId, runtime, model, slot, runId, issue)::text`.
+3. **Run and issue dimensions.** Runs are a future entity (data-model.md), so
+   `runId` is always empty and `dimension=run` returns the one empty group.
+   `issue` is the `issue` of the `slots` row matching the session's
+   `(projectId, slotName)` with the latest `startedAt <= request.ts`, read only
+   from those columns. A slot row created after its requests were rolled up
+   shows up after the next rebuild of those hours, for example a recompute.
+4. **Converter (D4).** The key map adds plain synonyms the file uses:
+   `input_tokens` → input; `output_tokens` → output; `input_cache_creation`,
+   `cache_write_tokens`, `input_cache_write_tokens` → cacheWrite5m;
+   `reasoning_tokens` → reasoning. D4's keys come first per bucket. A synonym
+   with a different price is reported as a conflict (none in the snapshot).
+   Langfuse tiers conditioned on request parameters (`service_tier`, `speed`:
+   fast, flex, priority) cannot be evaluated from usage and are dropped (122).
+   Its usage-detail thresholds (`(input|prompt|cached)`, `(input|cache_write)`,
+   `(input)`, all `gt`) become `{ bucket: "totalInput", op: "gt" }`. Tiers keep
+   Langfuse's priority order. A leading `(?i)` is stripped, and patterns
+   compile with the `i` flag. Model priority is 0 for every seeded price.
+   Snapshot: langfuse@`734cc86` (2026-10-07), 178 models → 161 prices. 17
+   models priced only by modality or as completions/embeddings (`text-*`,
+   `textembedding-*`, `gpt-4o-audio/realtime-*`, `gemini-live-*`) have no
+   input/output price and are dropped.
+5. **Unknown usage keys** in the snapshot, reported and dropped:
+   `cached_content_token_count`, `candidatesTokenCount`,
+   `candidates_token_count`, `groundingQueries`, `grounding_queries`,
+   `input_audio`, `input_audio_tokens`, `input_cached_audio_tokens`,
+   `input_cached_text_tokens`, `input_image`, `input_modality_1`, `input_text`,
+   `input_text_tokens`, `output_audio`, `output_audio_tokens`,
+   `output_modality_1`, `output_text`, `output_text_tokens`,
+   `promptTokenCount`, `prompt_token_count`, `thoughtsTokenCount`,
+   `thoughts_token_count`, `total`, `webSearchQueries`, `web_search_queries`.
+   `langfuse.spec.ts` fails when a new snapshot adds a key that is not listed
+   here.
+6. **Bucket fallbacks and reasoning (D5).** Checked against #12: `reasoning` is
+   `output_tokens_details.thinking_tokens`, already inside `output`. Cost is
+   `input·p_in + cacheRead·p_cr + cacheWrite5m·p_5m + cacheWrite1h·p_1h +
+   (output − reasoning)·p_out + reasoning·p_reasoning`. A bucket without a
+   price falls back: reasoning → output, cacheWrite1h → cacheWrite5m → input,
+   cacheWrite5m → input, cacheRead → input. Arithmetic is decimal, rounded
+   half-up to 6 places.
+7. **The `llm.request` contract and D15 merge are owned here.**
+   `llmRequestDataSchema` gains optional `reportedCostUsd` (≥ 0),
+   `cacheWriteTtlUnknown`, `source` (`transcript`\|`otel`, absent =
+   transcript) and `run` (1–128 chars, accepted and not stored, see note 3).
+   Merge per `(sessionId, requestId)`:
+   - Same producer: the last copy wins (#12 D4).
+   - Transcript after OTel: the transcript's tokens win (exact cache split),
+     `cacheWriteTtlUnknown` is cleared and the request is re-priced. OTel's
+     `reportedCostUsd` is kept, and so is its measured `durationMs` when the
+     transcript's is approximate or absent.
+   - OTel after transcript: the tokens and cost stay. Only `reportedCostUsd`
+     is filled, plus a measured duration where the transcript's was
+     approximate.
+8. **D14 envelope attribution.** `parseSessionEvent` now carries the
+   envelope's `project` and `slot`. On `llm.request`, a session with no
+   project takes the envelope project only when its `root` is the `rootPath`
+   of a project of the sending runner (the trust rule of
+   `session.observed`), together with the envelope `slot`. A later
+   `session.observed` still decides.
+9. **Recompute** runs in the API process, ordered by `(ts, id)` in batches of
+   `USAGE_RECOMPUTE_BATCH`. Each batch transaction re-prices its rows and
+   rebuilds their hours. A recompute left `queued` or `running` by a restart is
+   marked `failed` at boot. The one-at-a-time check (409) holds an advisory
+   lock. The range is `from <= ts < to`.
+10. **Usage API.** `from` is widened to the start of its UTC hour, because
+    rollups are hourly. `interval=hour` takes at most 31 days, other routes
+    400. Every bucket of the range is returned, empty ones as zero. `tokens`
+    in a point is input + output + cacheRead + cacheWrite5m + cacheWrite1h:
+    reasoning is inside output. For an admin, project-less usage is the `null`
+    group.
+11. **Command registration trap (from #12).** `CommandHandlers` in
+    `apps/runner/src/commands/dispatcher.ts` needs a handler for every key of
+    `commands` in `packages/shared/src/protocol/commands.ts`. A protocol or API
+    slot defines and exports its command definitions in its own file and does
+    not add them to the `commands` map. The runner slot of the same issue adds
+    the map entry together with the handler. This item adds no command.
+12. **Snapshot formatting.** The vendored JSON is byte-identical to upstream.
+    `apps/api/prisma/seed-data/biome.json` turns Biome off for that directory,
+    so `bun run check` does not ask for it to be reformatted.

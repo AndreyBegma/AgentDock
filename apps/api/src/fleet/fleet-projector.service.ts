@@ -14,6 +14,7 @@ import {
   RoundProjection,
 } from './round-projection';
 import { type SlotEvent, SlotProjection } from './slot-projection';
+import { projectSnapshot, type SnapshotEvent } from './snapshot-projection';
 
 /** A projection change, for the live push on `project:<projectId>` (D9). */
 export interface FleetChange extends FleetLiveChange {
@@ -29,7 +30,9 @@ const TRANSACTION_TIMEOUT_MS = 60_000;
  * event sink, before the batch is stored:
  * - data that does not fit is logged and skipped, never thrown;
  * - a database failure throws, which fails the batch so the runner resends;
- * - a resent or replayed event is a no-op (`lastSeq` on every row).
+ * - a resent or replayed event is a no-op (`lastSeq` on every row);
+ * - a field group last written by Code Sentinel is never overwritten from
+ *   markdown (spec 16 D7); `state.json` snapshots upsert slots (D6).
  */
 @Injectable()
 export class FleetProjector {
@@ -62,9 +65,21 @@ export class FleetProjector {
       (
         await this.prisma.project.findMany({
           where: { runnerId, rootPath: { in: roots } },
-          select: { id: true, rootPath: true },
+          select: {
+            id: true,
+            rootPath: true,
+            baseBranch: true,
+            baseOverride: true,
+          },
         })
-      ).map((p) => [p.rootPath, p]),
+      ).map((p) => [
+        p.rootPath,
+        {
+          id: p.id,
+          rootPath: p.rootPath,
+          base: p.baseOverride ?? p.baseBranch,
+        },
+      ]),
     );
 
     const changes = new Map<string, FleetChange>();
@@ -127,7 +142,20 @@ export class FleetProjector {
     applied: Applied,
   ): Promise<void> {
     const { event } = applied;
+    // The plugin's `watch.sh` copies of what the runner observes itself
+    // (`data.via: "watch"`) are kept in `events` only (spec 16).
+    if (
+      event.source === 'code-sentinel' &&
+      PLUGIN_ECHOED_TYPES.has(event.type)
+    ) {
+      return;
+    }
     switch (event.type) {
+      case 'orchestrator.snapshot':
+        return projectSnapshot(slots, applied as Applied<SnapshotEvent>);
+      case 'events.unparsed':
+        // Kept in `events` only: the line did not parse.
+        return;
       case 'round.started':
       case 'round.decided':
         return rounds.round(applied as Applied<RoundEvent>);
@@ -152,3 +180,14 @@ export class FleetProjector {
 }
 
 type ProjectEnvelope = NonNullable<RunnerEvent['project']>;
+
+const PLUGIN_ECHOED_TYPES: ReadonlySet<FleetEvent['type']> = new Set([
+  'session.appeared',
+  'session.vanished',
+  'pane.prompt',
+  'pane.idle',
+  'pane.quota_hit',
+  'pane.busy',
+  'worktree.changed',
+  'commit.trailer_found',
+]);
