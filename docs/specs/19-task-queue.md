@@ -165,6 +165,13 @@ i19-runner:
 13. **Pages and ETag.** Only page 1 is conditional; pages 2.. are read when it changed, up to 30 pages. After an outage the first read is unconditional, so a `304` cannot leave `issues.unavailable` showing. A `Depends on` target that is closed is looked up on the issue's timeline: a `closed` event with a `commit_id` plus a merged same-repository pull request that cross-references it is `pr`, anything else `manual`; a timeline that cannot be read is retried every tick.
 14. **`queue.pollSeconds`** is an option of `issuesCollector({ pollSeconds })`, default 60; it is not wired to the runner config file yet.
 
+i19-web, 2026-10-08:
+
+- **Read-only board.** glass-ui v0.22.0's `Board` has no read-only mode: the drag affordance and the move menu remain until glass-ui gains a read-only Board (ADR-0011); state is never mutated by the UI — `onMove` is a no-op and the columns are derived from the API's items on every render, so a drop never sticks.
+- **Issue body is shown as plain text.** No markdown renderer is a dependency of the web app; the sheet shows the body in a preformatted block.
+- **The queue toggle is guarded client-side.** "Queue for the orchestrator" is disabled, with the missing piece spelled out, while the body fails the shared `specGap` rule, so the dialog normally never sends a request the API would answer `422 no_acceptance_criteria` / `no_parallel_plan`; `label_not_allowed` is prevented by offering only allowed labels. The dialog still renders every 422 reason (refused labels listed) and `503 command_unavailable` ("the runner part is not deployed yet") as sentences, for a rule that drifts or a stale label set.
+- **`ApiError.body`.** `lib/api.ts` keeps the parsed error body (additive, defaults to `null`) so a route's extra fields — `labels` of `label_not_allowed` — reach the UI.
+
 Depends on #10
 
 Depends on #11

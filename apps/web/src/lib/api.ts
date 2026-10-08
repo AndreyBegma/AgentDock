@@ -13,6 +13,8 @@ export class ApiError extends Error {
     message: string,
     /** With a projects `not_main_checkout`: the main checkout to use instead. */
     readonly suggestedPath?: string,
+    /** The parsed error body, for fields a route adds (e.g. `labels`); null when it was not JSON. */
+    readonly body: Record<string, unknown> | null = null,
   ) {
     super(message);
   }
@@ -66,6 +68,7 @@ export async function api<T = void>(
       error?.error,
       message,
       error?.suggestedPath,
+      error as Record<string, unknown> | null,
     );
   }
   if (response.status === 204) return undefined as T;
