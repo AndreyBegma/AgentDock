@@ -63,7 +63,7 @@ that was taken, with its source.
 | D7 | **Run = headless session in its own worktree.** `skill.run` creates worktree `<parent>/.wt-<repo>-run-<shortid>` from `origin/<base>` on branch `run/<shortid>-<skill>`, then starts tmux session `agentdock-run-<shortid>` (never `cs-`). The session runs `agentdock-runner exec-run <runDir>` as an argv, not a shell string. That subcommand reads `run.json` and spawns the profile binary with:<br>• the profile env;<br>• `-p "/<skill> <args>"`;<br>• `--model <model>`;<br>• `--permission-mode <mode>`;<br>• `--output-format stream-json --verbose`.<br>stdout goes to `<runDir>/stream.jsonl`, stderr to `stderr.log`, and the exit code to `exit.json`. Running inside tmux means a runner restart does not kill the run. `<runDir>` is `$XDG_STATE_HOME/agentdock/runs/<runId>/`. | ADR-0006; #17 D1/D2 naming rule; Claude Code `-p` / `stream-json` [Confirmed in CLI help] |
 | D8 | **Skill invocation.** The prompt is `/<skill> <args>` for plugin, project and profile skills alike. `<skill>` is `<plugin>:<name>` for plugin skills. Skills with `disable-model-invocation: true` (e.g. `cs-orchestrator`) are user-invocable and are allowed here. `cs-orchestrator` and `cs-worker` are refused (`not_runnable`): the orchestrator has its own control path (#17), and a worker needs a brief. | plugin SKILL frontmatter [Confirmed]; ADR-0005 |
 | D9 | **Telemetry.** The session env gets `OTEL_RESOURCE_ATTRIBUTES=agentdock.project=…,agentdock.run=<runId>`. When the runner's OTLP receiver (#13) is on, it also gets `CLAUDE_CODE_ENABLE_TELEMETRY=1` plus the OTLP endpoint. The transcript collector (#12) links the session to the run by its worktree path. | ADR-0003; event-schema.md correlation |
-| D10 | **Output modes.** The mode is chosen per run.<br>**`report`:** when the session exits, the runner collects:<br>• the final `result` message from `stream.jsonl`;<br>• `git status --porcelain`;<br>• `git diff` against the base, capped at 1 MB and stored as `patch`.<br>It then removes the worktree and deletes the branch.<br>**`pr`:**<br>• if the tree has uncommitted changes, the runner commits them as `chore(skill): <skill> run <shortid>`, with no trailer;<br>• if the branch is ahead of the base, it pushes and runs `gh pr create` into the base with the report as the body;<br>• otherwise the run ends `succeeded` with "no changes".<br>In `pr` mode the worktree is kept until the PR closes. The runner's cleanup job removes it once `gh pr view` reports it merged or closed (checked every 10 minutes). | new |
+| D10 | **Output modes.** The mode is chosen per run.<br>**`report`:** when the session exits, the runner collects:<br>• the final `result` message from `stream.jsonl`;<br>• `git status --porcelain`;<br>• `git diff` against the base, stored as `patch` and capped at 128 KiB (see Notes; the full patch stays in the run directory).<br>It then removes the worktree and deletes the branch.<br>**`pr`:**<br>• if the tree has uncommitted changes, the runner commits them as `chore(skill): <skill> run <shortid>`, with no trailer;<br>• if the branch is ahead of the base, it pushes and runs `gh pr create` into the base with the report as the body;<br>• otherwise the run ends `succeeded` with "no changes".<br>In `pr` mode the worktree is kept until the PR closes. The runner's cleanup job removes it once `gh pr view` reports it merged or closed (checked every 10 minutes). | new |
 | D11 | **Limits.** Per run: timeout default 60 min, maximum 6 h; on timeout the runner kills the tmux session and the status becomes `timed_out`. Per runner: `skills.maxConcurrentRuns` (default 2); a run over the cap waits in `queued` (FIFO, by runner). `skill.cancel` kills the tmux session; the result is collected as in D10 and the phase becomes `cancelled`. | new |
 | D12 | **Status mapping onto #21's `runs`.** `skill_runs.phase` (`queued`, `preparing`, `running`, `collecting`, `succeeded`, `failed`, `cancelled`, `timed_out`) maps to `runs.status` as follows:<br>• `queued` / `preparing` / `running` / `collecting` → `running`;<br>• `succeeded` → `succeeded`;<br>• `failed` / `timed_out` → `failed`;<br>• `cancelled` → `abandoned`.<br>`runs` is written through #21's run service. This item only inserts and updates rows of kind `skill` and never alters the table. | #21 D7 |
 | D13 | **Live log.** The run detail page subscribes on `/live` to `run:<projectId>:<runId>`. The runner tails `stream.jsonl` while the API holds a subscription (the same `subscribe`/`unsubscribe` mechanism as #18, with `kind: "run_log"`) and sends rendered lines: assistant text, tool calls as one-line summaries, and the result. The full stream stays on the runner. Only the report fields of D10 are stored in the database. | #18 D3 (fan-out pattern) |
@@ -77,7 +77,7 @@ Migration directory: `apps/api/prisma/migrations/20261030000000_skills/`. New ta
 |---|---|
 | `installed_skills` | `id`, `runnerId` → runners, `projectId?` → projects, `profileKey?`, `scope` (`project` \| `profile` \| `plugin`), `runtime` (`claude` \| `codex`), `name`, `invocation` (e.g. `code-sentinel:spec`), `path`, `description?`, `source?`, `commit?`, `contentHash?`, `pluginVersion?`, `seenAt`; unique `(runnerId, scope, projectId, profileKey, runtime, name)` |
 | `skill_install_previews` | `id`, `runnerId`, `projectId?`, `userId` → users, `source`, `skillId`, `commit`, `contentHash`, `files` Json, `frontmatter` Json, `expiresAt`, `consumedAt?` |
-| `skill_runs` | `runId` PK → runs, `skill` (invocation), `args` String, `profileKey`, `model`, `permissionMode`, `output` (`report` \| `pr`), `phase`, `worktree?`, `branch?`, `tmuxSession?`, `timeoutSec`, `exitCode?`, `reportText?`, `changedFiles?` Json, `patch?` Text (≤ 1 MB), `prNumber?`, `prUrl?`, `queuedAt`, `startedAt?`, `finishedAt?` |
+| `skill_runs` | `runId` PK → runs, `skill` (invocation), `args` String, `profileKey`, `model`, `permissionMode`, `output` (`report` \| `pr`), `phase`, `worktree?`, `branch?`, `tmuxSession?`, `timeoutSec`, `exitCode?`, `reportText?`, `changedFiles?` Json, `patch?` Text (≤ 128 KiB), `prNumber?`, `prUrl?`, `queuedAt`, `startedAt?`, `finishedAt?` |
 
 ## Protocol
 
@@ -87,11 +87,11 @@ New file `packages/shared/src/protocol/commands/skills.ts`, with one registratio
 |---|---|---|---|
 | `skill.search` | `{ query }` (1–100 chars) | operator | `{ items: [{ id, source, skillId, name, installs }] }` |
 | `skill.inspect` | `{ source, skillId?, ref? }` | operator | `{ commit, skills: [{ skillId, frontmatter, files: [{ path, size, sha256 }], contentHash }] }` |
-| `skill.install` | `{ source, skillId, commit, contentHash, target: { scope: "project", projectId, root, runtime } \| { scope: "profile", profileKey, runtime } }` | operator / admin (profile) | `{ path, prUrl? }` |
+| `skill.install` | `{ source, skillId, commit, contentHash, target: { scope: "project", projectId, root, base, runtime } \| { scope: "profile", profileKey, runtime } }` | operator / admin (profile) | `{ path, prUrl? }` |
 | `skill.uninstall` | `{ profileKey, runtime, name }` (profile scope only) | admin | `{ removed: true }` |
 | `skill.list` | `{ projectId?, root? }` | viewer | `{ items: InstalledSkill[] }` |
 | `skill.run` | `{ runId, projectId, root, base, skill, args, profileKey, model, permissionMode, output, timeoutSec }` | operator | `{ phase: "queued" \| "preparing", tmuxSession? }` |
-| `skill.cancel` | `{ runId }` | operator | `{ cancelled: boolean }` |
+| `skill.cancel` | `{ runId, projectId }` | operator | `{ cancelled: boolean }` |
 
 Run progress after `skill.run` returns arrives as events (`skill_run.phase_changed`, `skill_run.finished` with D10 fields) through the normal event stream, not as `command.progress`. A run outlives the command that started it.
 
@@ -209,6 +209,29 @@ Non-member responses are 404 per #10 D12.
 | A headless run with a broad permission mode edits outside its worktree | medium | the session's cwd is the run worktree; `pr` mode surfaces every change as a diff; the Claude fence (`fence.py`) is not applied to runs — recorded as a gap (open question) |
 | skills.sh API shape changes | low | one mapping module; a recorded-response test fails loudly |
 | Runs pile up worktrees | low | the cleanup job; `report` mode removes immediately |
+
+## Notes
+
+Decided while landing the protocol slot (i24-protocol); the orchestrator approved each one on 2026-10-08.
+
+- **Registration trap.** `CommandHandlers` in `apps/runner/src/commands/dispatcher.ts` requires a handler for every key of `commands`. So `commands/skills.ts` defines and exports `skillCommands` but does **not** spread it into `commands`. i24-runner adds the map entry together with the handlers. `parseCommand('skill.*', …)` answers `unknown_command` until then.
+- **`skill_run.finished` is bounded (D10).** A 1 MB `patch` cannot cross the runner socket: its `maxPayload` is 512 KiB, an `events` batch is capped at 256 KiB, and the D10 fields travel in that event. The event carries:
+  - `patch` ≤ 128 KiB, with `patchTruncated`;
+  - `reportText` ≤ 32 KiB, with `reportTruncated`;
+  - `changedFiles` ≤ 200 entries, with `changedFilesTotal`;
+  - a whole `data` of ≤ 224 KiB.
+
+  The full patch stays in the run directory on the runner. `skill_runs.patch` stores what arrived.
+- **`base` on a project install target (D4).** The runner's watch list holds only `{ id, root }`, and the install PR targets the project base. The API sends `base`, as it does for `skill.run`.
+- **Per-scope role on `skill.install` (D14).** A command definition has one `minRole`, checked generically by the API. `skill.install` says `operator`. The API **must** also check `skillInstallMinRole(args)` (admin for profile scope) before sending — i24-api.
+- **`projectId` on `skill.cancel`.** The runner answers `not_found` for a run of another project. This is defense in depth behind the API's 404.
+- **Field rules.** Every argument is a strict object, so a host or URL key is `invalid_args`. `source`, `skillId`, invocations, refs, SHAs, run ids and file paths are patterned and bounded: no `..`, no leading `-`, no URL. The patterns are in `commands/skills.ts` and runner-protocol.md, *Skills*. `contentHash` is the SHA-256 of `skillContentHashInput(files)`. The install directory `<name>` is the `skillId`.
+- **New error codes.** `not_found`, `already_exists`, `changed_since_preview`, `not_runnable`, `too_large`, `upstream_unavailable`.
+- **Live log wiring (D13).**
+  - `subscribe` is now a union on `kind` (`anySubscribeMessageSchema`). `subscribeMessageSchema` / `SubscribeMessage` stay the pane variant, so #18's code keeps its meaning. The runner's connection hands only `kind: "pane"` to the pane streamer, and i24-runner routes `run_log`.
+  - The runner→server frame is the new `run_log` message.
+  - The live topic is `run:<projectId>:<runId>` (`runTopic`). Until i24-api registers a `run` authorizer, the API answers it `unknown_topic`.
+- **Events.** `skill_run.phase_changed` and `skill_run.finished` are in `events/skills.ts`. `skillPhaseToRunStatus` is D12.
 
 ## Open questions
 

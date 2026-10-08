@@ -50,6 +50,18 @@ export const commandErrorCodeSchema = z.enum([
   'unsupported_runtime',
   /** `profileId` names no profile in the runner config. */
   'unknown_profile',
+  /** The thing the command names does not exist: a skill, a run (spec 24). */
+  'not_found',
+  /** The target already exists: an install branch or directory (spec 24 D3/D4). */
+  'already_exists',
+  /** The skill's content no longer matches the inspected `contentHash` (spec 24 D3). */
+  'changed_since_preview',
+  /** The skill is refused as a run: the orchestrator or a worker (spec 24 D8). */
+  'not_runnable',
+  /** A skill is over `SKILL_MAX_FILES` or `SKILL_MAX_TOTAL_BYTES` (spec 24). */
+  'too_large',
+  /** The catalog or the forge did not answer (spec 24 D1/D2). */
+  'upstream_unavailable',
 ]);
 export type CommandErrorCode = z.infer<typeof commandErrorCodeSchema>;
 

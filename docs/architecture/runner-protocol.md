@@ -62,8 +62,10 @@ both sit at the root of that origin.
 | R → S | `command.result` | `{ id, ok, output?, error? }` |
 | R → S | `command.progress` | `{ id, chunk }` for streaming commands |
 | S → R | `subscribe` | `{ id, kind: "pane", projectId, root, slot }` — start streaming a slot's pane, read-only |
+| S → R | `subscribe` | `{ id, kind: "run_log", projectId, runId }` — start tailing a skill run's rendered log |
 | S → R | `unsubscribe` | `{ id }` |
 | R → S | `pane` | `{ id, frame: { type: "full", lines, cursor } \| { type: "patch", from, lines } \| { type: "ended" } }` |
+| R → S | `run_log` | `{ id, frame: { type: "lines", backlog, lines: [{ kind, text }] } \| { type: "ended", phase } }` |
 | R → S | `subscribe.error` | `{ id, code: "not_found" \| "too_many_viewers" \| "forbidden" }` |
 
 ### Sequence numbers
@@ -397,6 +399,12 @@ token counts only: no prompt, response, thinking or tool-argument text (D9).
 | `already_running` | the tmux session the command would create already exists |
 | `unsupported_runtime` | the profile's runtime cannot run the command (a `codex` orchestrator) |
 | `unknown_profile` | `profileId` names no profile in the runner config |
+| `not_found` | the thing the command names does not exist: a skill, a run, or a run of another project |
+| `already_exists` | the target already exists: a `skills/<name>` branch, or a profile skill directory |
+| `changed_since_preview` | the skill's content at `commit` no longer hashes to the inspected `contentHash`; nothing was written |
+| `not_runnable` | the skill is refused as a run: the orchestrator or a worker |
+| `too_large` | a skill is over `SKILL_MAX_FILES` (500) or `SKILL_MAX_TOTAL_BYTES` (5 MiB) |
+| `upstream_unavailable` | the catalog (skills.sh) or the forge (GitHub) did not answer |
 
 The API answers the three path codes with an HTTP error of the same name in
 the body: `path_not_found` and `not_a_repository` → **422** (the request is
@@ -484,6 +492,61 @@ that `id`. Its codes:
 { "type": "subscribe.error", "id": "pane_7f3a", "code": "too_many_viewers" }
 ```
 
+### `subscribe` with `kind: "run_log"`, `run_log`
+
+A skill run's live log ([spec 24](../specs/24-skills.md) D13). It uses the same
+`subscribe`, `unsubscribe` and `subscribe.error` messages as a pane; `subscribe`
+is a union on `kind` (`anySubscribeMessageSchema`), and
+`subscribeMessageSchema` stays the pane variant. The browser's topic is
+`run:<projectId>:<runId>` (`runTopic`); the API holds at most one runner
+subscription per run and relays its frames as `run_log.lines` and
+`run_log.ended`.
+
+```json
+{
+  "type": "subscribe",
+  "id": "run_91c2",
+  "kind": "run_log",
+  "projectId": "prj_agentdock",
+  "runId": "cmg1run0001"
+}
+```
+
+The runner checks that `runId` is a run of `projectId` (`not_found`
+otherwise), then tails the run's `stream.jsonl` and sends it **rendered**:
+
+- `assistant`: assistant text;
+- `tool`: a tool call, as a one-line summary;
+- `result`: the final result;
+- `system`: a note from the runner itself.
+
+The raw stream never leaves the runner. The first frames replay the newest
+`RUN_LOG_BACKLOG_LINES` (500) lines with `backlog: true`; live lines follow
+with `backlog: false`. A line is at most `RUN_LOG_LINE_MAX_CHARS` (4000)
+characters, and a serialized frame stays under `RUN_LOG_MAX_FRAME_BYTES`
+(48 KiB) — the browser socket's 64 KiB, less the relay envelope. `ended` is
+sent once the run is in a terminal phase, and nothing follows it. The server
+never persists frames: the D10 report fields arrive in `skill_run.finished`.
+
+```json
+{
+  "type": "run_log",
+  "id": "run_91c2",
+  "frame": {
+    "type": "lines",
+    "backlog": false,
+    "lines": [
+      { "kind": "assistant", "text": "Reading the issue and the spec." },
+      { "kind": "tool", "text": "Read docs/specs/24-skills.md" }
+    ]
+  }
+}
+```
+
+```json
+{ "type": "run_log", "id": "run_91c2", "frame": { "type": "ended", "phase": "succeeded" } }
+```
+
 ## Commands (allowlist)
 
 Only commands with status *implemented* exist in the `commands` object of the
@@ -504,9 +567,13 @@ handler.
 | `pr.approve` / `pr.requestChanges` | `projectId, pr, note?` | operator | planned |
 | `issue.create` | `projectId, title, body, labels, queue` | operator | defined (`commands/queue.ts`), not in the map yet: → `{ number, url, queued, reason? }`, timeout 45 s |
 | `issues.refresh` | `projectId` | operator | defined (`commands/queue.ts`), not in the map yet: → `{ changed, fetchedAt }`, timeout 45 s |
-| `skill.search` | `query` | operator | planned |
-| `skill.install` | `projectId?, source, runtimes[]` | operator | planned |
-| `skill.run` | `projectId, skill, args, profileId, model, output: report\|pr` | operator | planned |
+| `skill.search` | `query` | operator | defined (`commands/skills.ts`), not in the map yet: → `{ items: [{ id, source, skillId, name, installs }] }`, timeout 15 s |
+| `skill.inspect` | `source, skillId?, ref?` | operator | defined, not in the map yet: → `{ commit, skills: [{ skillId, path, frontmatter, files, contentHash }] }`, timeout 120 s |
+| `skill.install` | `source, skillId, commit, contentHash, target: { scope: project, projectId, root, base, runtime } \| { scope: profile, profileKey, runtime }` | operator; admin for profile scope | defined, not in the map yet: → `{ path, prUrl? }`, timeout 180 s |
+| `skill.uninstall` | `profileKey, runtime, name` | admin | defined, not in the map yet: → `{ removed: true }`, timeout 10 s |
+| `skill.list` | `projectId?, root?` | viewer | defined, not in the map yet: → `{ items: InstalledSkill[] }`, timeout 60 s |
+| `skill.run` | `runId, projectId, root, base, skill, args, profileKey, model, permissionMode, output: report\|pr, timeoutSec` | operator | defined, not in the map yet: → `{ phase: queued\|preparing, tmuxSession? }`, timeout 30 s |
+| `skill.cancel` | `runId, projectId` | operator | defined, not in the map yet: → `{ cancelled }`, timeout 15 s |
 | `session.backfill` | `projectId?, since` | admin | implemented: → `{ files, events }`, timeout 600 s |
 | `terminal.attach` (M3) | `projectId, slot` | admin | planned |
 
@@ -636,6 +703,61 @@ entry, so the map entry lands with the handler.
   usual; the result says whether it changed (`false` on a `304`).
 - The API sends them from one place, `apps/api/src/queue/queue-commands.ts`,
   which answers `503 command_unavailable` until they are in the map.
+
+### Skills
+
+Schemas in `commands/skills.ts` (`skillCommands`) and `events/skills.ts`; the
+rules are [spec 24](../specs/24-skills.md). Like the queue commands, they are
+**not** in the `commands` map until the runner registers their handlers.
+
+Every value can come from the public catalog and ends up in a path, an argv
+or a git ref, so every field is patterned and bounded. Nothing starts with
+`-`, nothing contains `..`, and no field is a URL or a shell string:
+
+- `source` is `owner/repo` on GitHub — `^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9_][A-Za-z0-9._-]*$`,
+  with no `..`. The runner clones only `https://github.com/<source>.git`, and
+  the catalog host is fixed in the runner config. A host or URL argument is an
+  unknown key, so it fails as `invalid_args`.
+- `skillId` / `name` (`skillNameSchema`) is the skill's directory name in every
+  install path and in the `skills/<name>` branch. `skill` (`skillInvocationSchema`)
+  is `<name>` or `<plugin>:<name>`. `ref` and `base` (`gitRefSchema`) are a
+  `git check-ref-format` subset. `commit` is a full SHA, and `contentHash` /
+  `sha256` are lower-case hex.
+- File paths in results are relative, with no `.`/`..`/empty segment and no
+  leading `/`.
+- `contentHash` is the SHA-256 of `skillContentHashInput(files)`: one
+  `path:sha256\n` line per file, sorted by path.
+- `skill.run.args` is at most 4 KiB with no NUL. It becomes part of one argv
+  element, `-p "/<skill> <args>"`, never a shell string. `model` reuses
+  `orchestratorModelSchema`, `permissionMode` reuses
+  `orchestratorPermissionModeSchema`, and `timeoutSec` is 60–21600.
+- `skill.install` has a static `minRole` of `operator`, because a definition
+  carries one role. A profile install needs admin: the API checks
+  `skillInstallMinRole(args)` before it sends the command.
+- `skill.cancel` carries `projectId`, and the runner answers `not_found` for a
+  run of another project.
+- `isRunnableSkill` refuses `code-sentinel:orchestrator`, `code-sentinel:worker`
+  (and their `cs-` names) with `not_runnable`.
+- A run's tmux session is `agentdock-run-<shortid>` (`skillRunSessionName`),
+  never `cs-`. Its branch is `run/<shortid>-<skill>`, with a plugin's `:`
+  written as `-` (`skillRunBranch`).
+
+A run outlives `skill.run`. Its progress is two event types (`source: "runner"`):
+
+| Type | `data` | Sent |
+|---|---|---|
+| `skill_run.phase_changed` | `runId, projectId, phase, at, tmuxSession?, worktree?, branch?` | on every phase transition, `queued` included |
+| `skill_run.finished` | `runId, projectId, phase (terminal), finishedAt, exitCode, reportText?, reportTruncated, changedFiles[] { status, path }, changedFilesTotal, patch?, patchTruncated, prNumber?, prUrl?, error?` | once, at a terminal phase |
+
+`skill_run.finished` must fit an `events` batch:
+
+- `patch` is at most 128 KiB;
+- `reportText` is at most 32 KiB;
+- `changedFiles` holds at most 200 entries;
+- the whole `data` is at most 224 KiB.
+
+Each cut is flagged. The full patch stays in the run directory on the runner.
+`skillPhaseToRunStatus` maps phases onto #21's `runs.status`.
 
 ## Delivery guarantees
 
