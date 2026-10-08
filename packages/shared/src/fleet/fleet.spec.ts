@@ -182,6 +182,59 @@ describe('fleet events', () => {
     ).toMatchObject({ ok: false });
   });
 
+  it('parses the spec 16 types: snapshot, unparsed, merged, redispatched', () => {
+    const snapshot = parseFleetEvent(
+      event(
+        'orchestrator.snapshot',
+        { state: { v: 1, slots: { 'i42-api': { model: 'opus' } } } },
+        { source: 'code-sentinel' },
+      ),
+    );
+    expect(snapshot).toMatchObject({
+      ok: true,
+      event: { data: { state: { slots: { 'i42-api': { model: 'opus' } } } } },
+    });
+    expect(
+      parseFleetEvent(
+        event('events.unparsed', {
+          file: '/srv/widget/.git/cs-orchestrator/events.jsonl',
+          line: '{"v":99}',
+          offset: 0,
+          reason: 'unsupported schema version 99',
+        }),
+      )?.ok,
+    ).toBe(true);
+    expect(parseFleetEvent(event('pr.merged', { number: 7 }))?.ok).toBe(true);
+    expect(
+      parseFleetEvent(event('slot.redispatched', { toModel: 'opus' }))?.ok,
+    ).toBe(false);
+    expect(
+      parseFleetEvent(
+        event('slot.redispatched', { toModel: 'opus' }, { slot: 'i42' }),
+      )?.ok,
+    ).toBe(true);
+  });
+
+  it('still requires what spec 11 collectors always send', () => {
+    expect(
+      parseFleetEvent(
+        event('round.started', {
+          date: '2026-10-08',
+          round: '1430',
+          occupied: 1,
+          max: 3,
+          free: 2,
+          boardPath: '/b.md',
+        }),
+      )?.ok,
+    ).toBe(true);
+    expect(
+      parseFleetEvent(
+        event('round.started', { round: '1430', boardPath: '/b.md' }),
+      )?.ok,
+    ).toBe(false);
+  });
+
   it('lists every type once', () => {
     expect(new Set(FLEET_EVENT_TYPES).size).toBe(FLEET_EVENT_TYPES.length);
     expect(FLEET_EVENT_TYPES).toContain('pane.busy');
