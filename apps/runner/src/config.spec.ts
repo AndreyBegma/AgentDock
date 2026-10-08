@@ -22,8 +22,19 @@ describe('config', () => {
       projects: [],
       disabledCommands: [],
       otlp: null,
+      fleet: { pollSeconds: 15, prPollSeconds: 60 },
       sessions: { enabled: true },
     });
+  });
+
+  it('fills fleet intervals and refuses one below the floor', () => {
+    saveConfig(path, { fleet: { pollSeconds: 30 } });
+    expect(loadConfig(path).fleet).toEqual({
+      pollSeconds: 30,
+      prPollSeconds: 60,
+    });
+    writeFileSync(path, JSON.stringify({ fleet: { pollSeconds: 1 } }));
+    expect(() => loadConfig(path)).toThrow('fleet.pollSeconds');
   });
 
   it('writes mode 0600 in a 0700 directory, atomically, and reads it back', () => {

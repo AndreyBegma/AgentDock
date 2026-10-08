@@ -1,0 +1,12 @@
+● Reading the projector so the runner emits what it expects.
+
+● Bash(bun test src/fleet)
+  ⎿  15 pass
+     0 fail
+
+✻ Compiling… (12s · ↓ 1.2k tokens · esc to interrupt)
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ >                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  ⏵⏵ bypass permissions on (shift+tab to cycle)

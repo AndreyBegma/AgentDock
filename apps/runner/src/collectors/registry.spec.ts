@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'bun:test';
+import type { Exec } from '../detect/exec';
 import { memoryLogger, testEvent } from '../testing/fixtures';
 import {
   type Collector,
+  type CollectorContext,
+  type CollectorFactory,
   CollectorRegistry,
+  DEFAULT_FLEET_SETTINGS,
   type Emit,
   type WatchedProject,
 } from './registry';
@@ -98,6 +102,35 @@ describe('CollectorRegistry', () => {
       'start a prj_a /dev/a',
       'start b prj_a /dev/a',
     ]);
+  });
+
+  it('hands every factory the context, with safe defaults', async () => {
+    const seen: CollectorContext[] = [];
+    const record: CollectorFactory = (context) => {
+      seen.push(context);
+      return { name: 'ctx', start: () => {}, stop: () => {} };
+    };
+    const { log } = memoryLogger();
+    const exec: Exec = async () => ({ code: 0, stdout: '', stderr: '' });
+    await new CollectorRegistry({
+      factories: [record],
+      emit: () => {},
+      log,
+      context: { exec, fleet: { pollSeconds: 30, prPollSeconds: 90 } },
+    }).setProjects([A]);
+    expect(seen[0]).toMatchObject({
+      exec,
+      log,
+      fleet: { pollSeconds: 30, prPollSeconds: 90 },
+    });
+
+    await new CollectorRegistry({
+      factories: [record],
+      emit: () => {},
+      log,
+    }).setProjects([A]);
+    expect(seen[1].fleet).toEqual(DEFAULT_FLEET_SETTINGS);
+    expect(await seen[1].exec('tmux', ['-V'])).toBeNull();
   });
 
   it('keeps the others running when one collector fails to start', async () => {

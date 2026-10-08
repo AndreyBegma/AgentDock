@@ -41,6 +41,13 @@ export const runnerConfigSchema = z.object({
     .object({ grpc: portSchema.nullable(), http: portSchema.nullable() })
     .nullable()
     .default(null),
+  /** Fleet collector intervals (spec 11), for every watched project. */
+  fleet: z
+    .object({
+      pollSeconds: z.number().int().min(5).max(3600).default(15),
+      prPollSeconds: z.number().int().min(15).max(3600).default(60),
+    })
+    .default({ pollSeconds: 15, prPollSeconds: 60 }),
   /**
    * Agent sessions (spec 12). `ingestSince`: transcripts last modified before
    * it are not read unless a backfill asks; `pair` sets it (D11).
