@@ -166,3 +166,9 @@ Also as built:
 - **Tree.** `GET /sessions/:id` returns a `SessionTreeNode`: `turns` (each with its `requests` and `tools`), then `unattributed` (requests and tools with no turn), then `subagents` (child sessions no tool call links). A tool call that spawned a subagent carries it as `child`, and the tool call's totals are the child's. Every node's totals are the sum of its children's, so the root's totals equal the list's totals for that session. A session the caller cannot see is 404.
 - **Cost.** `costUsd` in totals is a decimal string summed over priced requests, and `null` until #13 prices one.
 - **Live.** After each batch, `sessions.changed { sessionIds }` is published on `project:<id>` for project sessions and on `admin` for unassigned ones.
+
+i12-web, decided with the orchestrator on 2026-10-08:
+
+5. **Web live updates.** `useLive` follows one topic, so `/sessions` subscribes to `project:<id>` when a project filter is set, to `admin` when an admin filters `unassigned=true`, and otherwise polls the first page every 15 s (like `/projects`). `/sessions/[id]` subscribes to its session's `project:<id>`, or `admin` when it has no project, and reloads on `sessions.changed`.
+6. **Tree view.** glass-ui v0.20.6 has no `TraceTree` / `Waterfall`, so `/sessions/[id]` uses glass-ui `Tree` (session → turns → requests and tools → child sessions) with a detail panel for the selected node: its six token buckets, cost, facts and a time bar against the session's span. Switch to `TraceTree` / `Waterfall` when glass-ui#67 ships.
+7. **Filters.** `unassigned` excludes `projectId` in the form (the API answers 400 otherwise), and the "to" date is sent as the next local midnight because `to` is exclusive.
