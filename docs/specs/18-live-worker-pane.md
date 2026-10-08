@@ -180,6 +180,39 @@ not a blocking dependency.
   `runner.gateway.ts`, add `case 'subscribe.error':` beside it, and relay both
   to `paneTopic(…)`.
 
+### From i18-runner
+
+- **Where.** `apps/runner/src/pane/`: `streamer.ts` (subscriptions, one loop
+  per slot), `frame.ts` (diff, byte cap), `redact.ts` (D5). The connection
+  hands `subscribe` / `unsubscribe` to it and calls `reset()` whenever the
+  socket closes: subscriptions do not survive a reconnect, because the API
+  resubscribes every watched slot with new ids.
+- **History on every tick (deviation from "visible screen after").** A
+  patch's `from` indexes the previous frame, and a visible-only capture
+  cannot be aligned with a 2000-line buffer once output scrolls. Every tick
+  therefore captures `-S -2000`. **Known cost:** once the buffer is full, each
+  scroll shifts every index, so a tick's patch is about the whole frame —
+  up to 256 KiB/s per watched slot. Follow-up: `#{history_size}`-based
+  alignment of a visible-only capture.
+- **Authorization.** `(projectId, root)` must be one entry of the watch list
+  (`forbidden`). The slot is resolved with the #17 helper `resolveSlot`: no
+  `.wt-<repo>-<slot>` worktree, no live session attributed to the slot by
+  `ownedSlot`, or an unreadable repository all answer `not_found`. Every tmux
+  call targets `=<session>:`.
+- **Frames.** A new id is answered with a `full` on the next tick (at most
+  one interval); every id gets a `full` again every 60 s. Frames are
+  redacted before they are diffed, then capped from the top. The cursor
+  comes from `display-message` and is an index into `lines`. A capture that
+  times out skips the tick; a capture that fails ends the subscriptions.
+- **Limits.** Subscriptions still resolving count toward the 10-per-runner
+  cap. A repeated id is ignored; an `unsubscribe` that overtakes its
+  `subscribe` cancels it.
+- **No config keys yet.** `pane.intervalMs` and `pane.maxSubscriptions`
+  need `apps/runner/src/config.ts`; the shared constants are the values.
+  Follow-up.
+- **Redaction is best-effort.** A token split by an ANSI code, or a private
+  key whose `BEGIN` line has scrolled out of the capture, is not masked.
+
 Depends on #9
 
 Depends on #11
