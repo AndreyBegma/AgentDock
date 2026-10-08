@@ -41,6 +41,13 @@ export const runnerConfigSchema = z.object({
     .object({ grpc: portSchema.nullable(), http: portSchema.nullable() })
     .nullable()
     .default(null),
+  /** Fleet collector intervals (spec 11), for every watched project. */
+  fleet: z
+    .object({
+      pollSeconds: z.number().int().min(5).max(3600).default(15),
+      prPollSeconds: z.number().int().min(15).max(3600).default(60),
+    })
+    .default({ pollSeconds: 15, prPollSeconds: 60 }),
 });
 export type RunnerConfig = z.infer<typeof runnerConfigSchema>;
 
@@ -78,7 +85,10 @@ export const loadConfig = (path: string): RunnerConfig => {
 };
 
 /** Writes the config atomically with mode 0600: temp file, fsync, rename. */
-export const saveConfig = (path: string, config: RunnerConfig): void => {
+export const saveConfig = (
+  path: string,
+  config: z.input<typeof runnerConfigSchema>,
+): void => {
   const valid = runnerConfigSchema.parse(config);
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
