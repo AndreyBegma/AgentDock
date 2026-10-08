@@ -93,8 +93,8 @@ its brief's file name, `roundLabel` Json inside `decisions`.
 
 | Key | Where | Meaning |
 |---|---|---|
-| `fleet.pollSeconds` | runner config, per project | default 15 |
-| `fleet.prPollSeconds` | runner config, per project | default 60 |
+| `fleet.pollSeconds` | runner config (`runner.json`), every project (note 12) | default 15, min 5 |
+| `fleet.prPollSeconds` | runner config (`runner.json`), every project (note 12) | default 60, min 15 |
 | `orchestratorSession` | project settings (#10) | tmux session name used for presence, default `agentdock-orchestrator` |
 
 ## Acceptance criteria
@@ -165,5 +165,19 @@ i11-api, decided with the orchestrator on 2026-10-08:
 8. **Ingest.** The projector is a runner event sink (`RunnerEventSinks`, owned by #12): each batch is projected before it is stored, in one transaction under a per-runner advisory lock. Data that does not fit is logged and skipped; a database failure fails the batch and the runner resends it. Changes publish `fleet` `{ kind, id }` on `project:<id>` after commit.
 9. **`orchestratorSession` is not a project setting yet.** It would alter `projects` and the watch list; the runner uses `agentdock-orchestrator`. Follow-up.
 10. **No audit actions.** The module only reads, so spec 8's retrofit table is unchanged.
+
+i11-runner, decided with the orchestrator on 2026-10-08:
+
+11. **One `fleet` collector per project** (`apps/runner/src/collectors/fleet.ts`) composes the tmux, worktree, board, reply, PR and orchestrator watchers, so they share one slot book (briefs and worktrees) and one order per pass: briefs, then worktrees and sessions, then panes and the orchestrator, then reply files, then PRs. `CollectorFactory` now receives a `CollectorContext` (`exec`, `clock`, `log`, `fleet` intervals); the daemon passes it.
+12. **Intervals are global**, `runner.json` → `fleet.pollSeconds` (15) / `fleet.prPollSeconds` (60), not per project: the per-project list is the server's watch list, which the runner caches and overwrites. Board and reply files are rescanned every 60 s and on `fs.watch` of the board directory and each slot worktree.
+13. **The runner keeps no fleet state across restarts**, so the first pass decides:
+    - an owned worktree with no live session *and* an `.orchestrator-reply.md` (its worker ran) gets `session.vanished`; without a reply file nothing is said — it may be a brief whose session has not launched;
+    - no orchestrator found → `orchestrator.stopped` (`absent`, not `unknown`);
+    - every reply section and open PR is re-sent; the projector's `(slotId, position)` and replay rules make that a no-op.
+14. **Boards: the last 7 days of `cs-orchestrator/<date>/` only, and only the newest brief per slot name.** A first start would otherwise replay a year of rounds and leave every historical slot `dispatched`. A newest brief older than 10 minutes whose worktree does not exist gets `worktree.changed { exists: false }`, so the slot reads `ended`.
+15. **Session ownership** (D12, plugin#11 D4): a `cs-<slot>` or `cs-<prefix>--<slot>` session is the project's only when `.wt-<repo>-<slot>` is one of the root's `git worktree list` entries, and a prefixed name also needs this repository's prefix (plugin#11 D2 slug, or `.code-analyzer-config.json` → `orchestrator.sessionPrefix`).
+16. **Orchestrator presence** (D6): both rules also require the pane's current path to be the project root or inside it — otherwise one `agentdock-orchestrator` session would mark every watched project `running`. The command-line rule checks `pane_start_command`, then the pane's process tree (`ps -eo pid=,ppid=,args=`).
+17. **tmux prints a tab in a format as `_` without a UTF-8 locale** (a systemd user service has none), so `list-panes` fields are separated by `|:|`, with the free-form path and start command last. Found by the real-tmux test (private `-L` socket).
+18. **Known limit:** a PR merged while the runner was down is never seen as `pr.closed` — the runner no longer knows its number. Removing the slot's worktree still ends the slot.
 
 Depends on #10
