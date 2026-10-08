@@ -300,6 +300,8 @@ model Project {
   issueFeed            IssueFeed?
   commandRuns          CommandRun[]
   orchestratorSettings ProjectOrchestratorSettings?
+  activityItems        ActivityItem[]
+  runs                 Run[]
 
   @@unique([runnerId, rootPath])
   @@map("projects")
@@ -477,6 +479,7 @@ model Slot {
 
   project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
   checkpoints SlotCheckpoint[]
+  run         Run?
 
   @@unique([projectId, name, startedAt])
   @@index([projectId, status])
@@ -939,4 +942,145 @@ model ProjectOrchestratorSettings {
   updatedBy User?           @relation(fields: [updatedById], references: [id], onDelete: SetNull)
 
   @@map("project_orchestrator_settings")
+}
+
+// ─── Activity feed and execution history (docs/specs/21) ────────────────────
+// Projections of `events`, `audit_records` and `slots`, which are read only
+// here. Rebuildable from their sources within the `events` retention.
+
+enum ActivityCategory {
+  fleet
+  runner
+  audit
+}
+
+enum ActivitySeverity {
+  info
+  ok
+  warn
+  danger
+}
+
+enum ActivityActorType {
+  user
+  runner
+  orchestrator
+  system
+}
+
+enum ActivitySourceKind {
+  event
+  audit
+}
+
+/// One curated feed item (D1, D3), from an `events` row (`sourceId` = its `id`)
+/// or an `audit_records` row (`sourceId` = its `seq`). A replayed source row
+/// hits the unique key and changes nothing (D2).
+model ActivityItem {
+  id         BigInt             @id @default(autoincrement())
+  /// The source's own `ts`.
+  ts         DateTime
+  /// null: runner- or user-level, or the project is gone — admins only (D4).
+  projectId  String?
+  category   ActivityCategory
+  type       String
+  severity   ActivitySeverity
+  title      String
+  actorType  ActivityActorType
+  /// User id or runner id; null for the orchestrator, the system, an unknown user.
+  actorId    String?
+  slot       String?
+  issue      Int?
+  prNumber   Int?
+  link       String?
+  /// A few safe fields of the source, ≤ 4 KB; never secrets.
+  data       Json
+  sourceKind ActivitySourceKind
+  sourceId   BigInt
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceKind, sourceId])
+  @@index([projectId, ts, id])
+  @@index([ts, id])
+  @@index([type, ts])
+  @@map("activity_items")
+}
+
+/// Where the activity projector stopped (D2): one row, id `activity`.
+/// `eventsCursor`: every `events.id` up to it was considered. `auditCursor`:
+/// the same for `audit_records.seq`.
+model ActivityProjectorState {
+  id           String   @id
+  eventsCursor BigInt   @default(0)
+  auditCursor  BigInt   @default(0)
+  updatedAt    DateTime @updatedAt
+
+  @@map("activity_projector_state")
+}
+
+enum RunKind {
+  orchestrator_slot
+  skill
+  schedule
+}
+
+enum RunStatus {
+  running
+  blocked
+  waiting_person
+  succeeded
+  failed
+  abandoned
+}
+
+enum RunOutput {
+  report
+  pr
+}
+
+enum RunTrigger {
+  orchestrator
+  user
+  schedule
+  webhook
+}
+
+/// One unit of agent work (D7, data-model.md). An `orchestrator_slot` run is a
+/// pure function of its slot, rebuilt whenever the slot's `lastSeq` passes
+/// `slotSeq`. Tokens and cost are computed on read (D8).
+model Run {
+  id              String     @id @default(cuid())
+  kind            RunKind
+  projectId       String
+  slotId          String?    @unique
+  issue           Int?
+  title           String?
+  runtime         Runtime?
+  model           String?
+  profileKey      String?
+  args            Json?
+  output          RunOutput?
+  status          RunStatus
+  /// The last checkpoint's summary.
+  outcome         String?
+  prNumber        Int?
+  prUrl           String?
+  triggeredByType RunTrigger
+  triggeredById   String?
+  startedAt       DateTime
+  endedAt         DateTime?
+  durationMs      Int?
+  /// The slot's `lastSeq` this row was built from; null for other kinds.
+  slotSeq         BigInt?
+  /// The slot's `updatedAt` (event time) for a slot run, so a rebuild from the
+  /// same slot is identical.
+  updatedAt       DateTime
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  slot    Slot?   @relation(fields: [slotId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, startedAt])
+  @@index([projectId, status])
+  @@map("runs")
 }
