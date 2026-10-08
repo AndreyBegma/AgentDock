@@ -93,8 +93,8 @@ its brief's file name, `roundLabel` Json inside `decisions`.
 
 | Key | Where | Meaning |
 |---|---|---|
-| `fleet.pollSeconds` | runner config, per project | default 15 |
-| `fleet.prPollSeconds` | runner config, per project | default 60 |
+| `fleet.pollSeconds` | runner config (`runner.json`), every project (note 16) | default 15, min 5 |
+| `fleet.prPollSeconds` | runner config (`runner.json`), every project (note 16) | default 60, min 15 |
 | `orchestratorSession` | project settings (#10) | tmux session name used for presence, default `agentdock-orchestrator` |
 
 ## Acceptance criteria
@@ -172,5 +172,19 @@ i11-web, decided with the orchestrator on 2026-10-08:
 12. **`Table`, not `DataTable`.** glass-ui is pinned at v0.20.6, which has no `DataTable` (glass-ui#67). The slots table and the checkpoint list use `Table` and a plain list; swap them when the pinned version has them.
 13. **Active slots from `/fleet`, history from `/slots`.** The default view is `FleetView.slots` (not ended). "Show ended" switches to the paged `GET /slots` with `status` and `issue` filters. A `fleet` frame on `project:<id>` triggers one debounced (300 ms) refetch of the fleet, the history page and the open slot.
 14. **Issue links are derived, not stored.** A project has no repository URL yet, so `#N` links to `<repo of the slot's PR>/issues/N` when the slot has a PR URL and is plain text otherwise. Follow-up: link from the project's `repo` once the web has a GitHub base URL for it. Only `https:` URLs from events are rendered as anchors.
+
+i11-runner, decided with the orchestrator on 2026-10-08:
+
+15. **One `fleet` collector per project** (`apps/runner/src/collectors/fleet.ts`) composes the tmux, worktree, board, reply, PR and orchestrator watchers, so they share one slot book (briefs and worktrees) and one order per pass: briefs, then worktrees and sessions, then panes and the orchestrator, then reply files, then PRs. `CollectorFactory` now receives a `CollectorContext` (`exec`, `clock`, `log`, `fleet` intervals); the daemon passes it.
+16. **Intervals are global**, `runner.json` → `fleet.pollSeconds` (15) / `fleet.prPollSeconds` (60), not per project: the per-project list is the server's watch list, which the runner caches and overwrites. Board and reply files are rescanned every 60 s and on `fs.watch` of the board directory and each slot worktree.
+17. **The runner keeps no fleet state across restarts**, so the first pass decides:
+    - an owned worktree with no live session *and* an `.orchestrator-reply.md` (its worker ran) gets `session.vanished`; without a reply file nothing is said — it may be a brief whose session has not launched;
+    - no orchestrator found → `orchestrator.stopped` (`absent`, not `unknown`);
+    - every reply section and open PR is re-sent; the projector's `(slotId, position)` and replay rules make that a no-op.
+18. **Boards: the last 7 days of `cs-orchestrator/<date>/` only, and only the newest brief per slot name.** A first start would otherwise replay a year of rounds and leave every historical slot `dispatched`. A newest brief older than 10 minutes whose worktree does not exist gets `worktree.changed { exists: false }`, so the slot reads `ended`.
+19. **Session ownership** (D12, plugin#11 D4): a `cs-<slot>` or `cs-<prefix>--<slot>` session is the project's only when `.wt-<repo>-<slot>` is one of the root's `git worktree list` entries, and a prefixed name also needs this repository's prefix (plugin#11 D2 slug, or `.code-analyzer-config.json` → `orchestrator.sessionPrefix`).
+20. **Orchestrator presence** (D6): both rules also require the pane's current path to be the project root or inside it — otherwise one `agentdock-orchestrator` session would mark every watched project `running`. The command-line rule checks `pane_start_command`, then the pane's process tree (`ps -eo pid=,ppid=,args=`).
+21. **tmux prints a tab in a format as `_` without a UTF-8 locale** (a systemd user service has none), so `list-panes` fields are separated by `|:|`, with the free-form path and start command last. Found by the real-tmux test (private `-L` socket).
+22. **Known limit:** a PR merged while the runner was down is never seen as `pr.closed` — the runner no longer knows its number. Removing the slot's worktree still ends the slot.
 
 Depends on #10

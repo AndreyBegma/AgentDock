@@ -2,12 +2,34 @@ import type {
   UnsequencedEvent,
   WatchedProject,
 } from '@agentdock/shared/protocol';
+import { type Clock, systemClock } from '../clock';
+import type { Exec } from '../detect/exec';
 import { errorMessage, type Logger } from '../log';
 
 export type { WatchedProject };
 
 /** Hands an event to the connection, which spools and sends it. */
 export type Emit = (event: UnsequencedEvent) => void;
+
+/** Fleet polling intervals (spec 11 Configuration). */
+export interface FleetSettings {
+  pollSeconds: number;
+  prPollSeconds: number;
+}
+
+export const DEFAULT_FLEET_SETTINGS: FleetSettings = {
+  pollSeconds: 15,
+  prPollSeconds: 60,
+};
+
+/** What the daemon hands every collector it creates. */
+export interface CollectorContext {
+  /** Fixed-argv runner for local tools (`tmux`, `git`, `gh`) — never a shell. */
+  exec: Exec;
+  clock: Clock;
+  log: Logger;
+  fleet: FleetSettings;
+}
 
 /**
  * Something that watches one project and emits events (D16). One instance is
@@ -20,7 +42,7 @@ export interface Collector {
 }
 
 /** Creates a fresh collector for one project. */
-export type CollectorFactory = () => Collector;
+export type CollectorFactory = (context: CollectorContext) => Collector;
 
 interface Running {
   project: WatchedProject;
@@ -31,7 +53,11 @@ export interface CollectorRegistryOptions {
   factories: readonly CollectorFactory[];
   emit: Emit;
   log: Logger;
+  /** Default: no local tools (every exec answers "not installed"), the system clock, default intervals. */
+  context?: Partial<Omit<CollectorContext, 'log'>>;
 }
+
+const noTools: Exec = async () => null;
 
 /**
  * Keeps one instance of every registered collector running per watched
@@ -41,8 +67,16 @@ export interface CollectorRegistryOptions {
 export class CollectorRegistry {
   private readonly running = new Map<string, Running>();
   private queue: Promise<void> = Promise.resolve();
+  private readonly context: CollectorContext;
 
-  constructor(private readonly options: CollectorRegistryOptions) {}
+  constructor(private readonly options: CollectorRegistryOptions) {
+    this.context = {
+      exec: options.context?.exec ?? noTools,
+      clock: options.context?.clock ?? systemClock,
+      fleet: options.context?.fleet ?? DEFAULT_FLEET_SETTINGS,
+      log: options.log,
+    };
+  }
 
   /** The projects collectors are running for, in watch-list order. */
   get projects(): WatchedProject[] {
@@ -84,7 +118,7 @@ export class CollectorRegistry {
   private async startAll(running: Running): Promise<void> {
     const { log, emit } = this.options;
     for (const create of this.options.factories) {
-      const collector = create();
+      const collector = create(this.context);
       try {
         await collector.start(running.project, emit);
         running.collectors.push(collector);

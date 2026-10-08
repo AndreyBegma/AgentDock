@@ -1,0 +1,8 @@
+╭──────────────────────────────────────────────────────────────────────────────╮
+│                                                                              │
+│ Fable 5.1 now uses usage credits · you have $0.00 in credits                 │
+│                                                                              │
+│ ❯ 1. Switch to a different model                                             │
+│   2. Manage usage credits on claude.ai                                       │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
