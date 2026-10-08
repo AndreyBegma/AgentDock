@@ -22,7 +22,7 @@ export const utf8ByteLength = (text: string): number =>
 export function describeMessageSize(text: string): string {
   const bytes = utf8ByteLength(text);
   const kb = (n: number) => `${Math.round((n / 1024) * 10) / 10} KB`;
-  return `${kb(bytes)} of ${kb(MESSAGE_MAX_BYTES)}`;
+  return `${bytes < 1024 ? `${bytes} B` : kb(bytes)} of ${kb(MESSAGE_MAX_BYTES)}`;
 }
 
 export type MessageProblem = 'blank' | 'too_long';

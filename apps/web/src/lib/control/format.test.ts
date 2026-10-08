@@ -33,6 +33,10 @@ describe('utf8ByteLength / messageProblem', () => {
     );
   });
 
+  test('the size hint reads in bytes below 1 KB, never "0 KB"', () => {
+    expect(describeMessageSize('hello')).toBe('5 B of 16 KB');
+  });
+
   test('the size hint reads in KB', () => {
     expect(describeMessageSize('a'.repeat(1536))).toBe('1.5 KB of 16 KB');
   });
