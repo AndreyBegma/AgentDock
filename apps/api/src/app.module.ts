@@ -8,6 +8,7 @@ import { DatabaseModule } from './database/database.module';
 import { FleetModule } from './fleet';
 import { HealthController } from './health.controller';
 import { LiveModule } from './live/live.module';
+import { NotificationsModule } from './notifications';
 import { PaneModule } from './pane';
 import { PricesModule } from './prices/prices.module';
 import { ProjectsModule } from './projects/projects.module';
@@ -36,6 +37,7 @@ import { UsageModule } from './usage/usage.module';
     QueueModule,
     PaneModule,
     ControlModule,
+    NotificationsModule,
   ],
   controllers: [HealthController],
 })

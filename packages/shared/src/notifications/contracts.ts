@@ -75,6 +75,12 @@ export interface NotificationMuteView {
   createdAt: string;
 }
 
+/** `GET /notifications/mutes/:projectId` — `mute` null: not muted. */
+export interface NotificationMuteState {
+  projectId: string;
+  mute: NotificationMuteView | null;
+}
+
 /** `PUT /notifications/mutes/:projectId`. */
 export interface NotificationMuteUpdate {
   until?: string | null;
@@ -108,18 +114,18 @@ export const NOTIFICATION_DELIVERY_STATUSES = [
 export type NotificationDeliveryStatus =
   (typeof NOTIFICATION_DELIVERY_STATUSES)[number];
 
-/** Why a Telegram delivery was `skipped` — stored in `lastError`. */
-export const DELIVERY_SKIP_REASONS = [
-  'muted',
-  'rule_off',
-  'not_linked',
-] as const;
+/**
+ * Why a Telegram delivery was `skipped` — stored in `lastError`. A user with
+ * no linked chat gets no delivery row at all.
+ */
+export const DELIVERY_SKIP_REASONS = ['muted', 'rule_off', 'unlinked'] as const;
 export type DeliverySkipReason = (typeof DELIVERY_SKIP_REASONS)[number];
 
 export const NOTIFICATION_ERROR_CODES = [
   'notification_not_found',
   'project_not_found',
   'invalid_rule',
+  'invalid_cursor',
   'encryption_key_missing',
 ] as const;
 export type NotificationErrorCode = (typeof NOTIFICATION_ERROR_CODES)[number];
