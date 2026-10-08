@@ -76,6 +76,20 @@ describe('describeControlError', () => {
   });
 });
 
+describe('commandRunIdOf', () => {
+  test('reads the run id the API put in the error body', () => {
+    const error = new ApiError(409, undefined, 'x', undefined, {
+      commandRunId: 'run_1',
+    });
+    expect(commandRunIdOf(error)).toBe('run_1');
+  });
+
+  test('is undefined without a body, an id, or an ApiError', () => {
+    expect(commandRunIdOf(apiError(409, 'already_running'))).toBeUndefined();
+    expect(commandRunIdOf(new Error('x'))).toBeUndefined();
+  });
+});
+
 describe('describeOutcome', () => {
   const run = (over: Record<string, unknown>) =>
     ({

@@ -89,6 +89,13 @@ const isControlErrorCode = (
   code !== undefined &&
   (Object.values(CONTROL_ERROR) as string[]).includes(code);
 
+/** The run a failed request was recorded as, from the error body (#59). */
+export function commandRunIdOf(error: unknown): string | undefined {
+  if (!(error instanceof ApiError)) return undefined;
+  const id = error.body?.commandRunId;
+  return typeof id === 'string' && id !== '' ? id : undefined;
+}
+
 /** A sentence for a failed control request. */
 export function describeControlError(error: unknown): string {
   if (!(error instanceof ApiError)) return describeError(error);

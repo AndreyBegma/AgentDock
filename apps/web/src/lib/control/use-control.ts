@@ -9,7 +9,12 @@ import { toast } from 'glass-ui/toast';
 import { useCallback, useRef, useState } from 'react';
 import { api } from '../api';
 import { useLive } from '../live/use-live';
-import { describeControlError, describeOutcome, type Outcome } from './format';
+import {
+  commandRunIdOf,
+  describeControlError,
+  describeOutcome,
+  type Outcome,
+} from './format';
 import {
   applyRunEvent,
   isPending,
@@ -74,7 +79,11 @@ export function useControl(projectId: string) {
         if (outcome) show(outcome);
         return run;
       } catch (err) {
-        toast.error(describeControlError(err));
+        const runId = commandRunIdOf(err);
+        toast.error(
+          describeControlError(err),
+          runId ? { description: `Run ${runId}` } : undefined,
+        );
         return undefined;
       } finally {
         const at = own.current.indexOf(key);
