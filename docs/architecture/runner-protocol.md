@@ -210,6 +210,59 @@ always present on the wire.
 `runner.spool_truncated` (source `runner`) is emitted when the spool cap drops
 its oldest segment: `data` is `{ fromSeq, toSeq, bytes }` of what was lost.
 
+### Fleet events
+
+The fleet collectors (spec 11) send the types of
+[event-schema.md → Fleet](event-schema.md#fleet-spec-11) in ordinary `events`
+batches; their `data` schemas are `fleetEventDataSchemas` in
+`@agentdock/shared/protocol`. Markdown-derived events carry source `scraped`.
+The API projects each batch before storing it, so a fleet event whose `data`
+does not fit is stored but projects nothing; it never fails the batch.
+
+```json
+{
+  "type": "events",
+  "events": [
+    {
+      "v": 1,
+      "seq": 18240,
+      "ts": "2026-10-08T14:30:05.000Z",
+      "type": "session.appeared",
+      "source": "runner",
+      "project": { "repo": "AndreyBegma/AgentDock", "root": "/home/archi/dev/AgentDock" },
+      "slot": "i11-api",
+      "issue": 11,
+      "data": { "name": "cs-i11-api" }
+    },
+    {
+      "v": 1,
+      "seq": 18241,
+      "ts": "2026-10-08T14:31:10.000Z",
+      "type": "slot.checkpoint",
+      "source": "scraped",
+      "project": { "repo": "AndreyBegma/AgentDock", "root": "/home/archi/dev/AgentDock" },
+      "slot": "i11-api",
+      "data": {
+        "checkpoint": "pr_open",
+        "heading": "pull request open — https://github.com/AndreyBegma/AgentDock/pull/46",
+        "summary": "Projector and routes.",
+        "position": 3,
+        "prUrl": "https://github.com/AndreyBegma/AgentDock/pull/46"
+      }
+    },
+    {
+      "v": 1,
+      "seq": 18242,
+      "ts": "2026-10-08T14:31:15.000Z",
+      "type": "pane.idle",
+      "source": "runner",
+      "project": { "repo": "AndreyBegma/AgentDock", "root": "/home/archi/dev/AgentDock" },
+      "data": { "target": "orchestrator", "polls": 3 }
+    }
+  ]
+}
+```
+
 ### Session events
 
 Schemas in `events/sessions.ts`; the rules are [spec 12](../specs/12-agent-sessions.md).

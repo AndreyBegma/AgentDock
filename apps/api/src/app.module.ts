@@ -4,6 +4,7 @@ import { AdminModule } from './admin/admin.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { DatabaseModule } from './database/database.module';
+import { FleetModule } from './fleet';
 import { HealthController } from './health.controller';
 import { LiveModule } from './live/live.module';
 import { ProjectsModule } from './projects/projects.module';
@@ -23,6 +24,7 @@ import { SessionsModule } from './sessions/sessions.module';
     RunnersModule,
     LiveModule,
     ProjectsModule,
+    FleetModule,
     SessionsModule,
   ],
   controllers: [HealthController],
