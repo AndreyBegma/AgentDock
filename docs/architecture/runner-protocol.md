@@ -496,11 +496,11 @@ handler.
 | `runner.describe` | — | viewer | implemented: → `{ runnerVersion, hostname, os, arch, capabilities }` |
 | `project.inspect` | `path` | admin | implemented: → `ProjectInspection`, timeout 45 s |
 | `project.refresh` | `projectId, root` | operator | implemented: → `ProjectInspection`, timeout 45 s |
-| `orchestrator.start` | `projectId, root, profileId, model, permissionMode, mode: start\|next` | operator | defined (`commands/control.ts`); handler lands with i17-runner: → `{ session, startedAt }`, timeout 30 s |
-| `orchestrator.stop` | `projectId, root` | operator | defined; handler lands with i17-runner: → `{ stopped }`, timeout 10 s |
-| `orchestrator.status` | `projectId, root` | viewer | defined; handler lands with i17-runner: → `{ present, state, session?, startedAt? }`, timeout 5 s |
-| `slot.stop` | `projectId, root, slot` | operator | defined; handler lands with i17-runner: → `{ stopped }`, timeout 10 s |
-| `slot.message` | `projectId, root, slot, text, from` | operator | defined; handler lands with i17-runner: → `{ written: true }`, timeout 10 s |
+| `orchestrator.start` | `projectId, root, profileId, model, permissionMode, mode: start\|next` | operator | implemented (`commands/control.ts`): → `{ session, startedAt }`, timeout 30 s |
+| `orchestrator.stop` | `projectId, root` | operator | implemented: → `{ stopped }`, timeout 10 s |
+| `orchestrator.status` | `projectId, root` | viewer | implemented: → `{ present, state, session?, startedAt? }`, timeout 5 s |
+| `slot.stop` | `projectId, root, slot` | operator | implemented: → `{ stopped }`, timeout 10 s |
+| `slot.message` | `projectId, root, slot, text, from` | operator | implemented: → `{ written: true, delivered }`, timeout 10 s |
 | `pr.approve` / `pr.requestChanges` | `projectId, pr, note?` | operator | planned |
 | `issue.create` | `projectId, title, body, labels` | operator | planned |
 | `skill.search` | `query` | operator | planned |
@@ -575,8 +575,8 @@ D2–D8 and D10.
 ### Orchestrator and slot control
 
 Schemas in `commands/control.ts` (`controlCommands`); the rules are
-[spec 17](../specs/17-orchestrator-and-slot-control.md) D1–D12. They join the
-`commands` object together with their runner handlers.
+[spec 17](../specs/17-orchestrator-and-slot-control.md) D1–D12. `commands`
+spreads them in; the runner handlers live in `apps/runner/src/control/`.
 
 - `slot` is `slotNameSchema`: `^[a-z0-9][a-z0-9-]*$`, at most 64 characters —
   the one slot-name rule; `subscribe`, `unsubscribe` and `pane` reuse it. A slot
@@ -586,7 +586,10 @@ Schemas in `commands/control.ts` (`controlCommands`); the rules are
   runtime's default, prompting mode.
 - `slot.message.text` is at most 16 KB in UTF-8 and is written to the
   worktree's `.orchestrator-msg.md`, never typed into the pane; `from` is the
-  requesting user's email.
+  requesting user's email. The file is always written; `delivered` is true
+  only when the worker's session was live and the prompt was typed into it.
+- Every tmux target the runner sends is exact (`-t =<session>`): a bare name
+  falls back to a prefix match, so `cs-i4` would hit `cs-i42`.
 - `orchestrator.status.state` is `running | idle | prompt | quota`, or
   `absent` exactly when `present` is false.
 
