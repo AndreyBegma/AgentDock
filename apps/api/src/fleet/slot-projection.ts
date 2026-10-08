@@ -1,9 +1,4 @@
-import type { PaneState, PrState } from '@agentdock/shared';
-import type {
-  CheckpointKind,
-  PrChecks,
-  SlotRuntime,
-} from '@agentdock/shared/protocol';
+import type { CheckpointKind } from '@agentdock/shared/protocol';
 import { Prisma, type Slot } from '@prisma/client';
 import {
   guardGroups,
@@ -19,40 +14,16 @@ import {
   type Tx,
   worktreePath,
 } from './projection';
+import {
+  PANE_OF,
+  type RunSource,
+  SLOT_GROUPS,
+  type SlotPatch,
+  sourceOf,
+} from './slot-patch';
 import { deriveSlotStatus } from './slot-status';
 
-/** The columns a slot event may set; `status` and `endedAt` follow from them. */
-export interface SlotPatch {
-  issue?: number;
-  branch?: string;
-  worktree?: string;
-  runtime?: SlotRuntime;
-  model?: string | null;
-  modelWhy?: string | null;
-  owns?: string[];
-  never?: string[];
-  lead?: boolean | null;
-  round?: string;
-  sessionAlive?: boolean;
-  pane?: PaneState | null;
-  worktreeExists?: boolean;
-  ahead?: number | null;
-  behind?: number | null;
-  dirty?: boolean | null;
-  prNumber?: number;
-  prUrl?: string;
-  prState?: PrState;
-  prChecks?: PrChecks;
-  prMergeable?: boolean | null;
-  lastCheckpoint?: CheckpointKind;
-}
-
-/** Spec 16 D7: the columns of each field group the plugin reports. */
-const SLOT_GROUPS = {
-  model: ['model', 'modelWhy', 'owns', 'never', 'lead'],
-  checkpoint: ['lastCheckpoint'],
-  pr: ['prNumber', 'prUrl', 'prState', 'prChecks', 'prMergeable'],
-} as const satisfies Record<string, readonly (keyof SlotPatch)[]>;
+export type { SlotPatch } from './slot-patch';
 
 export type SlotEvent = EventOf<
   | 'session.appeared'
@@ -70,26 +41,6 @@ export type SlotEvent = EventOf<
   | 'pr.closed'
   | 'pr.merged'
 >;
-
-/** What a run is written from: a slot event, or a slot of a snapshot (D6). */
-type Source = Pick<Applied, 'ts' | 'seq'> & {
-  source: Applied['event']['source'];
-  issue?: number;
-};
-
-const sourceOf = (applied: Applied): Source => ({
-  ts: applied.ts,
-  seq: applied.seq,
-  source: applied.event.source,
-  issue: applied.event.issue,
-});
-
-const PANE_OF = {
-  'pane.prompt': 'prompt',
-  'pane.idle': 'idle',
-  'pane.quota_hit': 'quota',
-  'pane.busy': 'busy',
-} as const satisfies Record<string, PaneState>;
 
 /**
  * Projects slot events into `slots` and `slot_checkpoints` (spec 11 D8).
@@ -245,7 +196,7 @@ export class SlotProjection {
    */
   async upsertRun(
     name: string,
-    source: Source,
+    source: RunSource,
     dispatchedAt: string | null,
     options: { patch: SlotPatch; create?: boolean },
   ): Promise<void> {
@@ -429,7 +380,7 @@ export class SlotProjection {
 
   private async create(
     name: string,
-    source: Source,
+    source: RunSource,
     patch: SlotPatch,
     options: { startedAt?: Date; extra?: SlotSources } = {},
   ): Promise<void> {
@@ -468,7 +419,7 @@ export class SlotProjection {
 
   private async update(
     row: Slot,
-    source: Source,
+    source: RunSource,
     patch: SlotPatch,
     extra: SlotSources = {},
   ): Promise<void> {
