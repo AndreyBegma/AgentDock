@@ -28,18 +28,11 @@ export interface MapContext {
   now: () => string;
 }
 
-/**
- * `llm.request` data as the receiver sends it. `reportedCostUsd`,
- * `cacheWriteTtlUnknown`, `source` and `run` are the fields i13-api adds to
- * the shared schema (spec 13 D6, D13, D14); until it does, the API's parse
- * strips them.
- */
-export type OtelLlmRequestData = LlmRequestData & {
-  reportedCostUsd?: number;
-  cacheWriteTtlUnknown?: boolean;
-  source: 'otel';
-  run?: string;
-};
+/** `llm.request` data as the receiver builds it, before the shared parse. */
+type OtelLlmRequestData = LlmRequestData & { source: 'otel' };
+
+/** The shared schema's limit on `run` (spec 13 D14). */
+const MAX_RUN = 128;
 
 export interface MapResult {
   events: UnsequencedEvent[];
@@ -131,7 +124,7 @@ const correlation = (
   const issueText = str(record, 'agentdock.issue');
   const issue =
     issueText && /^\d+$/.test(issueText) ? Number(issueText) : undefined;
-  const run = str(record, 'agentdock.run')?.slice(0, MAX_ID);
+  const run = str(record, 'agentdock.run')?.slice(0, MAX_RUN);
   return {
     ...(project ? { project } : {}),
     ...(slot ? { slot } : {}),
@@ -259,18 +252,19 @@ export const mapLogRecords = (
     if (!mapper) continue;
     const mapped = mapper(record);
     const { run, ...envelope } = correlation(record, context);
-    const data: OtelLlmRequestData | null = mapped
-      ? { ...mapped.data, ...(run ? { run } : {}) }
+    // The shared schema's output is what is sent: the runner and the API
+    // agree on the shape by construction.
+    const parsed = mapped
+      ? llmRequestDataSchema.safeParse({
+          ...mapped.data,
+          ...(run ? { run } : {}),
+        })
       : null;
-    if (
-      !mapped ||
-      !data ||
-      mapped.sessionId.length > MAX_ID ||
-      !llmRequestDataSchema.safeParse(data).success
-    ) {
+    if (!mapped || !parsed?.success || mapped.sessionId.length > MAX_ID) {
       dropped += 1;
       continue;
     }
+    const data: LlmRequestData = parsed.data;
     events.push({
       v: EVENT_SCHEMA_VERSION,
       ts: timestamp(record, context.now),

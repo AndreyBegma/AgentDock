@@ -186,28 +186,57 @@ describe('otlp map — Claude Code (D13, D14)', () => {
 
     const { events } = mapLogRecords(records, context());
     expect(events).toHaveLength(4);
-    const sent = JSON.stringify(events);
-    for (const value of FORBIDDEN) expect(sent).not.toContain(value);
-    for (const key of ['prompt', 'tool_input', 'response', 'user.email']) {
-      expect(sent).not.toContain(`"${key}"`);
+    // Both what is spooled and what the API's parse makes of it.
+    const parsed = events.map((event, i) =>
+      parseSessionEvent({ ...event, seq: i + 1 }),
+    );
+    for (const sent of [JSON.stringify(events), JSON.stringify(parsed)]) {
+      for (const value of FORBIDDEN) expect(sent).not.toContain(value);
+      for (const key of ['prompt', 'tool_input', 'response', 'user.email']) {
+        expect(sent).not.toContain(`"${key}"`);
+      }
     }
-    for (const event of events) {
-      for (const key of Object.keys(event.data as object)) {
+    for (const result of parsed) {
+      expect(result?.ok).toBe(true);
+      if (!result?.ok) continue;
+      for (const key of Object.keys(result.event.data)) {
         expect(ALLOWED_DATA_KEYS.has(key)).toBe(true);
       }
     }
   });
 
-  it('passes the shared session-event parse', () => {
-    const { events } = mapLogRecords(decodeJson(fixtureJson()), context());
+  it('survives the shared session-event parse unchanged, contract fields included', () => {
+    const { events } = mapLogRecords(
+      [...decodeJson(fixtureJson()), ...decodeProtobuf(fixtureProtobuf())],
+      context(),
+    );
+    expect(events).toHaveLength(4);
     for (const [i, event] of events.entries()) {
       const parsed = parseSessionEvent({ ...event, seq: i + 1 });
       expect(parsed?.ok).toBe(true);
       if (!parsed?.ok) continue;
+      expect(parsed.event.type).toBe('llm.request');
+      expect(parsed.event.session).toEqual(event.session!);
+      // Nothing stripped: the API sees exactly what the runner spooled.
+      expect(parsed.event.data).toEqual(event.data as LlmRequestData);
       const data = parsed.event.data as LlmRequestData;
-      expect(data.requestId).toBe((event.data as LlmRequestData).requestId);
-      expect(data.tokens).toEqual((event.data as LlmRequestData).tokens);
+      expect(data.source).toBe('otel');
+      expect(data.run).toBe('run_fixture');
+      expect(data.reportedCostUsd).toBeGreaterThan(0);
     }
+    const second = parseSessionEvent({ ...events[1]!, seq: 1 });
+    expect(
+      second?.ok && (second.event.data as LlmRequestData).cacheWriteTtlUnknown,
+    ).toBe(true);
+  });
+
+  it('keeps agentdock.run within the shared schema limit', () => {
+    const { events, dropped } = mapLogRecords(
+      [record({ ...REQUEST, 'agentdock.run': 'r'.repeat(300) })],
+      context(),
+    );
+    expect(dropped).toBe(0);
+    expect((events[0]?.data as LlmRequestData).run).toHaveLength(128);
   });
 
   it('leaves the project off for an id outside the watch list, keeps slot and issue', () => {
