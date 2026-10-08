@@ -394,6 +394,9 @@ token counts only: no prompt, response, thinking or tool-argument text (D9).
 | `path_not_found` | a path argument does not exist or is not a directory |
 | `path_not_allowed` | a path argument is outside what the command may touch: a symlink out of its root, or a root not on the watch list under that project |
 | `not_a_repository` | a path argument is not inside a git working tree |
+| `already_running` | the tmux session the command would create already exists |
+| `unsupported_runtime` | the profile's runtime cannot run the command (a `codex` orchestrator) |
+| `unknown_profile` | `profileId` names no profile in the runner config |
 
 The API answers the three path codes with an HTTP error of the same name in
 the body: `path_not_found` and `not_a_repository` → **422** (the request is
@@ -493,11 +496,11 @@ handler.
 | `runner.describe` | — | viewer | implemented: → `{ runnerVersion, hostname, os, arch, capabilities }` |
 | `project.inspect` | `path` | admin | implemented: → `ProjectInspection`, timeout 45 s |
 | `project.refresh` | `projectId, root` | operator | implemented: → `ProjectInspection`, timeout 45 s |
-| `orchestrator.start` | `projectId, profileId, mode: start\|next` | operator | planned |
-| `orchestrator.stop` | `projectId` | operator | planned |
-| `orchestrator.status` | `projectId` | viewer | planned |
-| `slot.stop` | `projectId, slot` | operator | planned |
-| `slot.message` | `projectId, slot, text` | operator | planned |
+| `orchestrator.start` | `projectId, root, profileId, model, permissionMode, mode: start\|next` | operator | defined (`commands/control.ts`); handler lands with i17-runner: → `{ session, startedAt }`, timeout 30 s |
+| `orchestrator.stop` | `projectId, root` | operator | defined; handler lands with i17-runner: → `{ stopped }`, timeout 10 s |
+| `orchestrator.status` | `projectId, root` | viewer | defined; handler lands with i17-runner: → `{ present, state, session?, startedAt? }`, timeout 5 s |
+| `slot.stop` | `projectId, root, slot` | operator | defined; handler lands with i17-runner: → `{ stopped }`, timeout 10 s |
+| `slot.message` | `projectId, root, slot, text, from` | operator | defined; handler lands with i17-runner: → `{ written: true }`, timeout 10 s |
 | `pr.approve` / `pr.requestChanges` | `projectId, pr, note?` | operator | planned |
 | `issue.create` | `projectId, title, body, labels` | operator | planned |
 | `skill.search` | `query` | operator | planned |
@@ -568,6 +571,24 @@ D2–D8 and D10.
   }
 }
 ```
+
+### Orchestrator and slot control
+
+Schemas in `commands/control.ts` (`controlCommands`); the rules are
+[spec 17](../specs/17-orchestrator-and-slot-control.md) D1–D12. They join the
+`commands` object together with their runner handlers.
+
+- `slot` is `slotNameSchema`: `^[a-z0-9][a-z0-9-]*$`, at most 64 characters —
+  the one slot-name rule; `subscribe`, `unsubscribe` and `pane` reuse it. A slot
+  whose worktree is not under the command's project answers `path_not_allowed`.
+- `model` never starts with `-`; `permissionMode` is
+  `auto | acceptEdits | bypassPermissions | manual`, where `manual` is the
+  runtime's default, prompting mode.
+- `slot.message.text` is at most 16 KB in UTF-8 and is written to the
+  worktree's `.orchestrator-msg.md`, never typed into the pane; `from` is the
+  requesting user's email.
+- `orchestrator.status.state` is `running | idle | prompt | quota`, or
+  `absent` exactly when `present` is false.
 
 ### Sessions
 
