@@ -1,6 +1,7 @@
 import type { BoardErrorView } from '@agentdock/shared';
 import type { RoundDecisions } from '@agentdock/shared/protocol';
 import { type OrchestratorStatus, Prisma } from '@prisma/client';
+import { mayWrite, type RoundSources, readSources } from './field-sources';
 import type { Applied, Changes, EventOf, ProjectRef, Tx } from './projection';
 
 export type RoundEvent = EventOf<'round.started' | 'round.decided'>;
@@ -27,7 +28,9 @@ export const roundDate = (date: string): Date => new Date(`${date}T00:00:00Z`);
 /**
  * Projects board events into `rounds`, and orchestrator presence and board
  * errors into `fleet_orchestrators` (spec 11 D4, D6). Same replay rule as
- * slots: an event at or below a row's `lastSeq` changes nothing.
+ * slots: an event at or below a row's `lastSeq` changes nothing. A round's
+ * header and decisions, once reported by Code Sentinel, are not overwritten
+ * from the board (spec 16 D7) — except `base`, which the plugin never reports.
  */
 export class RoundProjection {
   constructor(
@@ -38,24 +41,39 @@ export class RoundProjection {
 
   async round(applied: Applied<RoundEvent>): Promise<void> {
     const { event, ts, seq } = applied;
-    const key = {
-      projectId: this.project.id,
-      date: roundDate(event.data.date),
-      label: event.data.round,
-    };
-    const row = await this.tx.round.findUnique({
-      where: { projectId_date_label: key },
-      select: { id: true, lastSeq: true },
-    });
+    const select = { id: true, lastSeq: true, sources: true } as const;
+    const { date, round } = event.data;
+    const key =
+      date && round
+        ? { projectId: this.project.id, date: roundDate(date), label: round }
+        : null;
+    // `round.decided` from `events.jsonl` names no board: the latest round.
+    const row = key
+      ? await this.tx.round.findUnique({
+          where: { projectId_date_label: key },
+          select,
+        })
+      : await this.tx.round.findFirst({
+          where: { projectId: this.project.id },
+          orderBy: [{ date: 'desc' }, { label: 'desc' }],
+          select,
+        });
     if (row && seq <= row.lastSeq) return;
+    const sources = readSources<RoundSources>(row?.sources ?? {});
 
     if (event.type === 'round.decided') {
       // The board's header always comes first; without it there is no round.
       if (!row) return;
+      const write = mayWrite(sources.decisions, event.source);
       await this.tx.round.update({
         where: { id: row.id },
         data: {
-          decisions: event.data.decisions as Prisma.InputJsonValue,
+          ...(write
+            ? {
+                decisions: event.data.decisions as Prisma.InputJsonValue,
+                sources: { ...sources, decisions: event.source },
+              }
+            : {}),
           lastSeq: seq,
           updatedAt: ts,
         },
@@ -63,29 +81,39 @@ export class RoundProjection {
       this.changed({ kind: 'round', id: row.id });
       return;
     }
+    if (!key) return;
 
+    // The header is the board's first line; a base the event lacks (the
+    // plugin's) keeps the one the round has, else the project's.
     const header = {
-      base: event.data.base,
       occupied: event.data.occupied,
       max: event.data.max,
       free: event.data.free,
       boardPath: event.data.boardPath,
       source: event.source === 'scraped' ? 'scraped' : 'events',
-      lastSeq: seq,
-      updatedAt: ts,
+      sources: { ...sources, header: event.source },
     } as const;
     const saved = row
       ? await this.tx.round.update({
           where: { id: row.id },
-          data: header,
+          data: {
+            ...(mayWrite(sources.header, event.source) ? header : {}),
+            // The plugin never reports a base, so the board's always counts.
+            ...(event.data.base ? { base: event.data.base } : {}),
+            lastSeq: seq,
+            updatedAt: ts,
+          },
           select: { id: true },
         })
       : await this.tx.round.create({
           data: {
             ...key,
             ...header,
+            base: event.data.base ?? this.project.base,
             decisions: EMPTY_DECISIONS as unknown as Prisma.InputJsonValue,
+            lastSeq: seq,
             createdAt: ts,
+            updatedAt: ts,
           },
           select: { id: true },
         });
@@ -110,7 +138,7 @@ export class RoundProjection {
         break;
       case 'orchestrator.stopped':
         status = 'absent';
-        session = event.data.session;
+        session = event.data.session ?? session;
         break;
       case 'board.unparsed': {
         const error: BoardErrorView = {

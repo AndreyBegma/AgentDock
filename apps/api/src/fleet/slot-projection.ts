@@ -4,7 +4,13 @@ import type {
   PrChecks,
   SlotRuntime,
 } from '@agentdock/shared/protocol';
-import type { Slot } from '@prisma/client';
+import { Prisma, type Slot } from '@prisma/client';
+import {
+  guardGroups,
+  readSources,
+  type SlotGroup,
+  type SlotSources,
+} from './field-sources';
 import {
   type Applied,
   type Changes,
@@ -16,7 +22,7 @@ import {
 import { deriveSlotStatus } from './slot-status';
 
 /** The columns a slot event may set; `status` and `endedAt` follow from them. */
-interface SlotPatch {
+export interface SlotPatch {
   issue?: number;
   branch?: string;
   worktree?: string;
@@ -41,6 +47,13 @@ interface SlotPatch {
   lastCheckpoint?: CheckpointKind;
 }
 
+/** Spec 16 D7: the columns of each field group the plugin reports. */
+const SLOT_GROUPS = {
+  model: ['model', 'modelWhy', 'owns', 'never', 'lead'],
+  checkpoint: ['lastCheckpoint'],
+  pr: ['prNumber', 'prUrl', 'prState', 'prChecks', 'prMergeable'],
+} as const satisfies Record<string, readonly (keyof SlotPatch)[]>;
+
 export type SlotEvent = EventOf<
   | 'session.appeared'
   | 'session.vanished'
@@ -50,11 +63,26 @@ export type SlotEvent = EventOf<
   | 'pane.busy'
   | 'worktree.changed'
   | 'slot.dispatched'
+  | 'slot.redispatched'
   | 'slot.checkpoint'
   | 'pr.opened'
   | 'pr.checks_changed'
   | 'pr.closed'
+  | 'pr.merged'
 >;
+
+/** What a run is written from: a slot event, or a slot of a snapshot (D6). */
+type Source = Pick<Applied, 'ts' | 'seq'> & {
+  source: Applied['event']['source'];
+  issue?: number;
+};
+
+const sourceOf = (applied: Applied): Source => ({
+  ts: applied.ts,
+  seq: applied.seq,
+  source: applied.event.source,
+  issue: applied.event.issue,
+});
 
 const PANE_OF = {
   'pane.prompt': 'prompt',
@@ -68,8 +96,10 @@ const PANE_OF = {
  *
  * A slot name is reused by later runs, each its own row. An event belongs to
  * the run that covers its `ts` — the latest row started at or before it. Only
- * a session appearing or a brief can start a run. An event at or below the
- * run's `lastSeq` was applied already, so a replay changes nothing.
+ * a session appearing or a dispatch can start a run. An event at or below the
+ * run's `lastSeq` was applied already, so a replay changes nothing. A field
+ * group last written by Code Sentinel is never overwritten from markdown
+ * (spec 16 D7).
  */
 export class SlotProjection {
   constructor(
@@ -84,37 +114,40 @@ export class SlotProjection {
       case 'session.appeared':
         return this.sessionAppeared(applied as Applied<typeof event>);
       case 'slot.dispatched':
-        return this.dispatched(applied as Applied<typeof event>);
+        return event.data.round === undefined || event.data.date === undefined
+          ? this.pluginDispatched(applied as Applied<typeof event>)
+          : this.dispatched(applied as Applied<typeof event>);
       case 'slot.checkpoint':
         return this.checkpoint(applied as Applied<typeof event>);
       case 'pr.opened':
       case 'pr.checks_changed':
       case 'pr.closed':
+      case 'pr.merged':
         return this.pullRequest(applied as Applied<typeof event>);
       default: {
         const row = await this.covering(this.slotName(event), applied.ts);
         if (!row || applied.seq <= row.lastSeq) return;
-        return this.update(row, applied, this.patchOf(event));
+        return this.update(row, sourceOf(applied), this.patchOf(event));
       }
     }
   }
 
   private patchOf(
-    event: Exclude<
-      SlotEvent,
-      EventOf<
-        | 'session.appeared'
-        | 'slot.dispatched'
-        | 'slot.checkpoint'
-        | 'pr.opened'
-        | 'pr.checks_changed'
-        | 'pr.closed'
-      >
+    event: EventOf<
+      | 'session.vanished'
+      | 'pane.prompt'
+      | 'pane.idle'
+      | 'pane.quota_hit'
+      | 'pane.busy'
+      | 'worktree.changed'
+      | 'slot.redispatched'
     >,
   ): SlotPatch {
     switch (event.type) {
       case 'session.vanished':
         return { sessionAlive: false, pane: null };
+      case 'slot.redispatched':
+        return { model: event.data.toModel };
       case 'worktree.changed': {
         const { data } = event;
         if (!data.exists) return { worktreeExists: false, worktree: data.path };
@@ -136,27 +169,20 @@ export class SlotProjection {
     applied: Applied<EventOf<'session.appeared'>>,
   ): Promise<void> {
     const patch: SlotPatch = { sessionAlive: true, pane: null };
-    const row = await this.covering(this.slotName(applied.event), applied.ts);
+    const name = this.slotName(applied.event);
+    const row = await this.covering(name, applied.ts);
     if (row && applied.seq <= row.lastSeq) return;
     if (!row || row.status === 'ended') {
-      return this.create(applied, patch);
+      return this.create(name, sourceOf(applied), patch);
     }
-    return this.update(row, applied, patch);
+    return this.update(row, sourceOf(applied), patch);
   }
 
-  /**
-   * A brief starts a run unless one already carries its round, or the covering
-   * run has no brief yet (its session appeared first) or is still waiting for
-   * its session (the brief was rewritten before launch).
-   */
-  private async dispatched(
-    applied: Applied<EventOf<'slot.dispatched'>>,
-  ): Promise<void> {
-    const { event } = applied;
-    const { data } = event;
-    const round = `${data.date}/${data.round}`;
-    const patch: SlotPatch = {
-      round,
+  private dispatchPatch(data: EventOf<'slot.dispatched'>['data']): SlotPatch {
+    return {
+      ...(data.date && data.round
+        ? { round: `${data.date}/${data.round}` }
+        : {}),
       runtime: data.runtime,
       model: data.model ?? null,
       modelWhy: data.modelWhy ?? null,
@@ -166,7 +192,21 @@ export class SlotProjection {
       ...(data.branch ? { branch: data.branch } : {}),
       ...(data.worktree ? { worktree: data.worktree } : {}),
     };
+  }
+
+  /**
+   * A brief starts a run unless one already carries its round, or the covering
+   * run has no brief yet (its session appeared first, or only the plugin
+   * reported it) or is still waiting for its session (the brief was rewritten
+   * before launch).
+   */
+  private async dispatched(
+    applied: Applied<EventOf<'slot.dispatched'>>,
+  ): Promise<void> {
+    const { event } = applied;
+    const patch = this.dispatchPatch(event.data);
     const name = this.slotName(event);
+    const round = `${event.data.date}/${event.data.round}`;
     const sameRound = await this.tx.slot.findFirst({
       where: { projectId: this.project.id, name, round },
       orderBy: { startedAt: 'desc' },
@@ -178,8 +218,57 @@ export class SlotProjection {
       (!sameRound &&
         (row.status === 'ended' ||
           (row.round !== null && row.status !== 'dispatched')));
-    if (newRun) return this.create(applied, patch);
-    return this.update(row, applied, patch);
+    if (newRun) return this.create(name, sourceOf(applied), patch);
+    return this.update(row, sourceOf(applied), patch);
+  }
+
+  /**
+   * `dispatch.sh`'s launch record names no round (spec 16 Q3). It belongs to
+   * the covering run unless that run ended or an earlier plugin dispatch
+   * already started it; a dispatch older than a known later run is history
+   * and changes nothing.
+   */
+  private async pluginDispatched(
+    applied: Applied<EventOf<'slot.dispatched'>>,
+  ): Promise<void> {
+    const name = this.slotName(applied.event);
+    const dispatchedAt = applied.ts.toISOString();
+    return this.upsertRun(name, sourceOf(applied), dispatchedAt, {
+      patch: this.dispatchPatch(applied.event.data),
+    });
+  }
+
+  /**
+   * Writes a run reported by Code Sentinel — a plugin dispatch, or a slot of
+   * `state.json` — started at `dispatchedAt` (spec 16 Q3, D6). `create: false`
+   * only updates a run that exists.
+   */
+  async upsertRun(
+    name: string,
+    source: Source,
+    dispatchedAt: string | null,
+    options: { patch: SlotPatch; create?: boolean },
+  ): Promise<void> {
+    const { patch } = options;
+    const row = await this.covering(name, source.ts);
+    if (row && source.seq <= row.lastSeq) return;
+    const prior = row
+      ? readSources<SlotSources>(row.sources).dispatchedAt
+      : undefined;
+    const startedAt = dispatchedAt ? new Date(dispatchedAt) : source.ts;
+    const extra: SlotSources = dispatchedAt ? { dispatchedAt } : {};
+    const sameRun =
+      row !== null &&
+      row.status !== 'ended' &&
+      (!prior || !dispatchedAt || prior >= dispatchedAt);
+    if (sameRun) return this.update(row, source, patch, extra);
+    if (options.create === false) return;
+    const later = await this.tx.slot.findFirst({
+      where: { projectId: this.project.id, name, startedAt: { gt: startedAt } },
+      select: { id: true },
+    });
+    if (later) return;
+    return this.create(name, source, patch, { startedAt, extra });
   }
 
   private async checkpoint(
@@ -189,50 +278,114 @@ export class SlotProjection {
     const row = await this.covering(this.slotName(event), applied.ts);
     if (!row || applied.seq <= row.lastSeq) return;
     const { data } = event;
-    const fields = {
-      kind: data.checkpoint,
-      heading: data.heading ?? data.checkpoint,
-      summary: data.summary,
-    };
-    // Without a position the checkpoint is appended; the `lastSeq` guard
-    // above keeps a replay from appending it twice.
-    const position =
-      data.position ??
-      ((
-        await this.tx.slotCheckpoint.aggregate({
-          where: { slotId: row.id },
-          _max: { position: true },
-        })
-      )._max.position ?? -1) + 1;
-    await this.tx.slotCheckpoint.upsert({
+    const sources = readSources<SlotSources>(row.sources);
+    const extra: SlotSources = {};
+    let position = data.position;
+    if (position === undefined && event.source === 'code-sentinel') {
+      position = await this.pluginPosition(row, data.checkpoint, sources);
+      extra.checkpoints = position + 1;
+    } else if (position === undefined) {
+      position = (await this.maxPosition(row.id)) + 1;
+    }
+    const existing = await this.tx.slotCheckpoint.findUnique({
       where: { slotId_position: { slotId: row.id, position } },
-      create: { slotId: row.id, position, at: applied.ts, ...fields },
-      update: fields,
+      select: { id: true },
     });
+    // Markdown never rewrites a checkpoint the plugin reported (D7); it may
+    // still add a heading the plugin has not sent.
+    const frozen =
+      event.source === 'scraped' && sources.checkpoint === 'code-sentinel';
+    if (!existing) {
+      await this.tx.slotCheckpoint.create({
+        data: {
+          slotId: row.id,
+          position,
+          at: applied.ts,
+          kind: data.checkpoint,
+          heading: data.heading ?? data.checkpoint,
+          summary: data.summary,
+        },
+      });
+    } else if (!frozen) {
+      await this.tx.slotCheckpoint.update({
+        where: { id: existing.id },
+        data: {
+          kind: data.checkpoint,
+          ...(data.heading ? { heading: data.heading } : {}),
+          summary: data.summary,
+        },
+      });
+    }
     const last = await this.tx.slotCheckpoint.findFirstOrThrow({
       where: { slotId: row.id },
       orderBy: { position: 'desc' },
       select: { kind: true },
     });
-    return this.update(row, applied, {
-      lastCheckpoint: last.kind,
-      ...(data.prUrl ? { prUrl: data.prUrl } : {}),
-    });
+    return this.update(
+      row,
+      sourceOf(applied),
+      {
+        lastCheckpoint: last.kind,
+        ...(data.prUrl ? { prUrl: data.prUrl } : {}),
+        ...(data.prNumber ? { prNumber: data.prNumber } : {}),
+      },
+      extra,
+    );
   }
 
-  /** A PR belongs to the event's slot, else to the latest run on its branch. */
+  /**
+   * A plugin checkpoint has no position. The worker writes the reply heading
+   * first and the event right after, so the k-th plugin checkpoint is the
+   * first heading of its kind from the last one it claimed on — the row the
+   * reply collector made for it, if it came first. Else it is appended.
+   */
+  private async pluginPosition(
+    row: Slot,
+    kind: CheckpointKind,
+    sources: SlotSources,
+  ): Promise<number> {
+    const from = sources.checkpoints ?? 0;
+    const match = await this.tx.slotCheckpoint.findFirst({
+      where: { slotId: row.id, kind, position: { gte: from } },
+      orderBy: { position: 'asc' },
+      select: { position: true },
+    });
+    if (match) return match.position;
+    return Math.max(from, (await this.maxPosition(row.id)) + 1);
+  }
+
+  private async maxPosition(slotId: string): Promise<number> {
+    const { _max } = await this.tx.slotCheckpoint.aggregate({
+      where: { slotId },
+      _max: { position: true },
+    });
+    return _max.position ?? -1;
+  }
+
+  /**
+   * A PR belongs to the event's slot, else to the latest run with its number
+   * (`pr.merged` has no branch), else to the latest run on its branch.
+   */
   private async pullRequest(
-    applied: Applied<EventOf<'pr.opened' | 'pr.checks_changed' | 'pr.closed'>>,
+    applied: Applied<
+      EventOf<'pr.opened' | 'pr.checks_changed' | 'pr.closed' | 'pr.merged'>
+    >,
   ): Promise<void> {
     const { event } = applied;
+    const { data } = event;
+    const latest = (where: Prisma.SlotWhereInput) =>
+      this.tx.slot.findFirst({
+        where: { projectId: this.project.id, ...where },
+        orderBy: { startedAt: 'desc' },
+      });
     const row = event.slot
       ? await this.covering(event.slot, applied.ts)
-      : await this.tx.slot.findFirst({
-          where: { projectId: this.project.id, branch: event.data.branch },
-          orderBy: { startedAt: 'desc' },
-        });
+      : ((event.type === 'pr.merged'
+          ? await latest({ prNumber: data.number })
+          : null) ??
+        (data.branch ? await latest({ branch: data.branch }) : null));
     if (!row || applied.seq <= row.lastSeq) return;
-    const patch: SlotPatch = { prNumber: event.data.number };
+    const patch: SlotPatch = { prNumber: data.number };
     switch (event.type) {
       case 'pr.opened':
         Object.assign(patch, {
@@ -249,10 +402,16 @@ export class SlotProjection {
         }
         break;
       case 'pr.closed':
-        patch.prState = event.data.merged ? 'merged' : 'closed';
+        // Without `merged` the writer only saw it leave the open list.
+        if (event.data.merged !== undefined) {
+          patch.prState = event.data.merged ? 'merged' : 'closed';
+        }
+        break;
+      case 'pr.merged':
+        patch.prState = 'merged';
         break;
     }
-    return this.update(row, applied, patch);
+    return this.update(row, sourceOf(applied), patch);
   }
 
   private covering(name: string, ts: Date): Promise<Slot | null> {
@@ -269,17 +428,19 @@ export class SlotProjection {
   }
 
   private async create(
-    applied: Applied<SlotEvent>,
+    name: string,
+    source: Source,
     patch: SlotPatch,
+    options: { startedAt?: Date; extra?: SlotSources } = {},
   ): Promise<void> {
-    const name = this.slotName(applied.event);
+    const guarded = guardGroups(SLOT_GROUPS, {}, source.source, patch);
     const fields = {
       sessionAlive: null,
       pane: null,
       worktreeExists: true,
       prState: null,
-      ...patch,
-      ...(applied.event.issue ? { issue: applied.event.issue } : {}),
+      ...guarded.patch,
+      ...(source.issue ? { issue: source.issue } : {}),
     };
     const status = deriveSlotStatus(fields);
     const row = await this.tx.slot.create({
@@ -290,11 +451,15 @@ export class SlotProjection {
         owns: [],
         never: [],
         ...fields,
+        sources: {
+          ...guarded.sources,
+          ...options.extra,
+        } as Prisma.InputJsonObject,
         status,
-        endedAt: status === 'ended' ? applied.ts : null,
-        lastSeq: applied.seq,
-        startedAt: applied.ts,
-        updatedAt: applied.ts,
+        endedAt: status === 'ended' ? source.ts : null,
+        lastSeq: source.seq,
+        startedAt: options.startedAt ?? source.ts,
+        updatedAt: source.ts,
       },
       select: { id: true },
     });
@@ -303,12 +468,20 @@ export class SlotProjection {
 
   private async update(
     row: Slot,
-    applied: Applied<SlotEvent>,
+    source: Source,
     patch: SlotPatch,
+    extra: SlotSources = {},
   ): Promise<void> {
+    const current = readSources<SlotSources>(row.sources);
+    const guarded = guardGroups<SlotGroup, SlotPatch>(
+      SLOT_GROUPS,
+      current,
+      source.source,
+      patch,
+    );
     const fields = {
-      ...patch,
-      ...(applied.event.issue ? { issue: applied.event.issue } : {}),
+      ...guarded.patch,
+      ...(source.issue ? { issue: source.issue } : {}),
     };
     const status = deriveSlotStatus({
       sessionAlive:
@@ -324,15 +497,20 @@ export class SlotProjection {
         ? null
         : row.status === 'ended'
           ? row.endedAt
-          : applied.ts;
+          : source.ts;
     await this.tx.slot.update({
       where: { id: row.id },
       data: {
         ...fields,
+        sources: {
+          ...current,
+          ...guarded.sources,
+          ...extra,
+        } as Prisma.InputJsonObject,
         status,
         endedAt,
-        lastSeq: applied.seq,
-        updatedAt: applied.ts,
+        lastSeq: source.seq,
+        updatedAt: source.ts,
       },
     });
     this.changed({ kind: 'slot', id: row.id });
