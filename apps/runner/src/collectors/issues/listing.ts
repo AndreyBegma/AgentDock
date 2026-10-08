@@ -7,6 +7,8 @@ import {
 import { z } from 'zod';
 import type { Exec } from '../../detect/exec';
 
+/** Each `gh api` call: a network round trip, well over the 5 s probe default. */
+export const GH_API_TIMEOUT_MS = 30_000;
 export const ISSUES_PAGE_SIZE = 100;
 /** A listing longer than this many pages is cut; 3000 open issues is not a queue. */
 export const ISSUES_MAX_PAGES = 30;
@@ -152,7 +154,9 @@ export const fetchListing = async (
     `repos/${repo}/issues?state=open&per_page=${ISSUES_PAGE_SIZE}&page=${page}`;
 
   const conditional = etag ? ['-H', `If-None-Match: ${etag}`] : [];
-  const first = await exec('gh', ['api', '-i', ...conditional, path(1)]);
+  const first = await exec('gh', ['api', '-i', ...conditional, path(1)], {
+    timeoutMs: GH_API_TIMEOUT_MS,
+  });
   if (!first) {
     return {
       kind: 'unavailable',
@@ -180,7 +184,9 @@ export const fetchListing = async (
     listing.pullRequests.push(...page.pullRequests);
     listing.open.push(...page.open);
     if (page.count < ISSUES_PAGE_SIZE || n >= ISSUES_MAX_PAGES) break;
-    const next = await exec('gh', ['api', path(n + 1)]);
+    const next = await exec('gh', ['api', path(n + 1)], {
+      timeoutMs: GH_API_TIMEOUT_MS,
+    });
     if (!next || next.code !== 0) {
       return {
         kind: 'unavailable',

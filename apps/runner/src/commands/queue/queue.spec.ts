@@ -7,12 +7,19 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
-import { issueCreateArgsSchema } from '@agentdock/shared/protocol';
+import {
+  issueCreateArgsSchema,
+  issueCreateCommand,
+} from '@agentdock/shared/protocol';
 import { IssuesRefreshers } from '../../collectors/issues/refresh';
 import type { Exec, ExecResult } from '../../detect/exec';
 import { tempDir } from '../../testing/fixtures';
 import { CommandFailure } from '../failure';
-import { issueCreate, parseCreated } from './issue-create';
+import {
+  GH_CREATE_TIMEOUT_MS,
+  issueCreate,
+  parseCreated,
+} from './issue-create';
 import { issuesRefresh } from './issues-refresh';
 
 const AC = '## Acceptance criteria\n- [ ] it works\n';
@@ -35,8 +42,13 @@ describe('issue.create', () => {
       'https://github.com/acme/widget/issues/14\n',
     ),
   ) => {
-    const calls: { binary: string; args: string[]; body?: string }[] = [];
-    const exec: Exec = async (binary, args) => {
+    const calls: {
+      binary: string;
+      args: string[];
+      body?: string;
+      timeoutMs?: number;
+    }[] = [];
+    const exec: Exec = async (binary, args, options) => {
       const list = [...args];
       if (binary === 'git') {
         return list.join(' ') === `-C ${root} remote get-url origin`
@@ -47,6 +59,7 @@ describe('issue.create', () => {
       calls.push({
         binary,
         args: list,
+        timeoutMs: options?.timeoutMs,
         body: file ? readFileSync(file, 'utf8') : undefined,
       });
       return create;
@@ -89,6 +102,14 @@ describe('issue.create', () => {
     expect(call.args.join(' ')).not.toContain('rm -rf');
     expect(call.body).toBe('a body; $(rm -rf /)');
     expect(readdirSync(temp)).toEqual([]);
+  });
+
+  it('gives gh a timeout under the command timeout and over the probe default', async () => {
+    const { calls, run } = setup();
+    await run();
+    expect(calls[0].timeoutMs).toBe(GH_CREATE_TIMEOUT_MS);
+    expect(GH_CREATE_TIMEOUT_MS).toBeGreaterThan(5_000);
+    expect(GH_CREATE_TIMEOUT_MS).toBeLessThan(issueCreateCommand.timeoutMs);
   });
 
   it('adds the ready label when queued and the body is complete', async () => {

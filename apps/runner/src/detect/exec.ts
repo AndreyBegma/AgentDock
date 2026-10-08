@@ -13,7 +13,13 @@ export interface ExecResult {
 export type Exec = (
   binary: string,
   args: readonly string[],
+  options?: ExecOptions,
 ) => Promise<ExecResult | null>;
+
+export interface ExecOptions {
+  /** Overrides the factory's timeout for this call (a network call to `gh`). */
+  timeoutMs?: number;
+}
 
 /** Capability probes give up after this long (D5). */
 export const EXEC_TIMEOUT_MS = 5_000;
@@ -27,7 +33,7 @@ const definedOnly = (env: Env): Record<string, string> =>
 
 export const createExec =
   (env: Env, timeoutMs = EXEC_TIMEOUT_MS): Exec =>
-  async (binary, args) => {
+  async (binary, args, options) => {
     const path = Bun.which(binary, { PATH: env.PATH ?? '' });
     if (!path) return null;
     try {
@@ -36,7 +42,7 @@ export const createExec =
         stdin: 'ignore',
         stdout: 'pipe',
         stderr: 'pipe',
-        timeout: timeoutMs,
+        timeout: options?.timeoutMs ?? timeoutMs,
         killSignal: 'SIGKILL',
       });
       const [stdout, stderr, code] = await Promise.all([

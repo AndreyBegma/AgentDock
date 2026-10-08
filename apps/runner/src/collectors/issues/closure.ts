@@ -1,6 +1,7 @@
 import type { IssueClosedData } from '@agentdock/shared/protocol';
 import { z } from 'zod';
 import type { Exec } from '../../detect/exec';
+import { GH_API_TIMEOUT_MS } from './listing';
 
 const TIMELINE_PAGE = 100;
 const TIMELINE_MAX_PAGES = 10;
@@ -66,10 +67,14 @@ export const fetchClosure = async (
 ): Promise<IssueClosedData | null> => {
   const events: TimelineEvent[] = [];
   for (let page = 1; page <= TIMELINE_MAX_PAGES; page++) {
-    const result = await exec('gh', [
-      'api',
-      `repos/${repo}/issues/${number}/timeline?per_page=${TIMELINE_PAGE}&page=${page}`,
-    ]);
+    const result = await exec(
+      'gh',
+      [
+        'api',
+        `repos/${repo}/issues/${number}/timeline?per_page=${TIMELINE_PAGE}&page=${page}`,
+      ],
+      { timeoutMs: GH_API_TIMEOUT_MS },
+    );
     if (!result || result.code !== 0) return null;
     let raw: unknown;
     try {

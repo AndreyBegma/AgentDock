@@ -9,6 +9,7 @@ import { FakeClock } from '../../testing/fake-clock';
 import { memoryLogger } from '../../testing/fixtures';
 import { DEFAULT_FLEET_SETTINGS } from '../registry';
 import { IssuesCollector } from './issues';
+import { GH_API_TIMEOUT_MS } from './listing';
 import { IssuesRefreshers } from './refresh';
 
 const PROJECT = { id: 'prj_1', root: '/srv/widget' };
@@ -43,7 +44,8 @@ const setup = (pollSeconds?: number) => {
   const gh: Record<string, ExecResult | null> = {};
   const calls: string[] = [];
   const events: UnsequencedEvent[] = [];
-  const exec: Exec = async (binary, args) => {
+  const timeouts: (number | undefined)[] = [];
+  const exec: Exec = async (binary, args, options) => {
     const key = args.join(' ');
     if (binary === 'git') {
       return key === '-C /srv/widget remote get-url origin'
@@ -51,6 +53,7 @@ const setup = (pollSeconds?: number) => {
         : { code: 1, stdout: '', stderr: '' };
     }
     calls.push(key);
+    timeouts.push(options?.timeoutMs);
     return gh[key] ?? null;
   };
   const clock = new FakeClock();
@@ -68,6 +71,7 @@ const setup = (pollSeconds?: number) => {
   return {
     gh,
     calls,
+    timeouts,
     events,
     ofType,
     collector,
@@ -99,6 +103,16 @@ describe('IssuesCollector', () => {
       { number: 1, body: '', labels: ['bug', 'x'] },
     ]);
     expect(data.pullRequests).toMatchObject([{ number: 2, body: 'Closes #1' }]);
+  });
+
+  it('gives every gh call a network-sized timeout', async () => {
+    const t = setup();
+    t.gh[ISSUES_1] = page(Array.from({ length: 100 }, (_, i) => item(i + 1)));
+    t.gh[ISSUES_2] = ok(JSON.stringify([item(101, 'Depends on #900')]));
+    await t.start();
+    expect(t.timeouts).toHaveLength(3);
+    expect(t.timeouts.every((ms) => ms === GH_API_TIMEOUT_MS)).toBe(true);
+    expect(GH_API_TIMEOUT_MS).toBeGreaterThan(5_000);
   });
 
   it('sends If-None-Match and emits nothing on a 304', async () => {

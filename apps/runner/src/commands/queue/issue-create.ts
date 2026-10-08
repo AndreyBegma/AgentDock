@@ -12,6 +12,9 @@ import { resolveFleetProject } from '../../fleet/project';
 import { CommandFailure } from '../failure';
 import { readyLabelOf, watchedById } from './project';
 
+/** Under the command's own 45 s, so a stuck `gh` fails here with a message, not as a dispatcher timeout. */
+export const GH_CREATE_TIMEOUT_MS = 40_000;
+
 export interface IssueCreateDeps {
   exec: Exec;
   watchedProjects: () => readonly WatchedProject[];
@@ -65,17 +68,21 @@ export const issueCreate = async (
   try {
     const bodyFile = join(dir, 'body.md');
     await writeFile(bodyFile, args.body, { mode: 0o600 });
-    const result = await deps.exec('gh', [
-      'issue',
-      'create',
-      '--repo',
-      fleet.github,
-      '--title',
-      args.title,
-      '--body-file',
-      bodyFile,
-      ...labels.flatMap((l) => ['--label', l]),
-    ]);
+    const result = await deps.exec(
+      'gh',
+      [
+        'issue',
+        'create',
+        '--repo',
+        fleet.github,
+        '--title',
+        args.title,
+        '--body-file',
+        bodyFile,
+        ...labels.flatMap((l) => ['--label', l]),
+      ],
+      { timeoutMs: GH_CREATE_TIMEOUT_MS },
+    );
     if (!result) {
       throw new Error('gh is not available or timed out');
     }
