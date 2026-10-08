@@ -18,6 +18,7 @@ import {
   roleAtLeast,
   runnerMessageSchema,
   runnerMessageTypes,
+  SESSION_BACKFILL_TIMEOUT_MS,
   SESSION_EVENT_TYPES,
   serverMessageSchema,
   serverMessageTypes,
@@ -364,6 +365,39 @@ describe('command allowlist', () => {
     expect(roleAtLeast('admin', 'operator')).toBe(true);
     expect(roleAtLeast('operator', 'operator')).toBe(true);
     expect(roleAtLeast('viewer', 'operator')).toBe(false);
+  });
+});
+
+describe('session.backfill', () => {
+  it('is admin-only with its own timeout', () => {
+    expect(commands['session.backfill'].minRole).toBe('admin');
+    expect(commands['session.backfill'].timeoutMs).toBe(
+      SESSION_BACKFILL_TIMEOUT_MS,
+    );
+  });
+
+  it('requires an ISO since, takes an optional projectId, and nothing else', () => {
+    const since = '2026-10-01T00:00:00.000Z';
+    expect(parseCommand('session.backfill', { since }).ok).toBe(true);
+    expect(
+      parseCommand('session.backfill', { since, projectId: 'prj_1' }).ok,
+    ).toBe(true);
+    for (const args of [
+      {},
+      { since: 'yesterday' },
+      { since, projectId: '' },
+      { since, path: '/etc' },
+    ]) {
+      const parsed = parseCommand('session.backfill', args);
+      expect(parsed.ok).toBe(false);
+      if (!parsed.ok) expect(parsed.error.code).toBe('invalid_args');
+    }
+  });
+
+  it('answers with counts', () => {
+    const { result } = commands['session.backfill'];
+    expect(result.safeParse({ files: 2, events: 40 }).success).toBe(true);
+    expect(result.safeParse({ files: -1, events: 0 }).success).toBe(false);
   });
 });
 

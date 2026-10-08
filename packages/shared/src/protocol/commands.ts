@@ -1,6 +1,11 @@
 import { z } from 'zod';
 import { capabilitiesSchema, hostSchema } from './capabilities';
 import {
+  SESSION_BACKFILL_TIMEOUT_MS,
+  sessionBackfillArgsSchema,
+  sessionBackfillResultSchema,
+} from './events/sessions';
+import {
   PROJECT_INSPECTION_TIMEOUT_MS,
   projectInspectArgsSchema,
   projectInspectionSchema,
@@ -82,6 +87,12 @@ export const commands = {
     result: projectInspectionSchema,
     minRole: 'operator',
     timeoutMs: PROJECT_INSPECTION_TIMEOUT_MS,
+  },
+  'session.backfill': {
+    args: sessionBackfillArgsSchema,
+    result: sessionBackfillResultSchema,
+    minRole: 'admin',
+    timeoutMs: SESSION_BACKFILL_TIMEOUT_MS,
   },
 } as const satisfies Record<string, CommandDefinition>;
 

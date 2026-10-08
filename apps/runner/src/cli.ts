@@ -112,6 +112,12 @@ const pairCommand = async ({
     runnerId: paired.runnerId,
     token: paired.token,
     profiles: detected ?? config.profiles,
+    // Sessions are ingested from pairing on, unless a backfill asks (D11).
+    sessions: {
+      ...config.sessions,
+      ingestSince:
+        config.sessions.ingestSince ?? new Date(deps.clock.now()).toISOString(),
+    },
   });
   log.info('paired', { runnerId: paired.runnerId, server: origin });
   out(
@@ -155,6 +161,7 @@ const runCommand = async ({
     configFile: paths.configFile,
     home: paths.home,
     spoolDir: paths.spoolDir,
+    offsetsFile: paths.offsetsFile,
     host: deps.host,
     exec: deps.exec ?? createExec(deps.env),
     clock: deps.clock,

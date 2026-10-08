@@ -41,6 +41,16 @@ export const runnerConfigSchema = z.object({
     .object({ grpc: portSchema.nullable(), http: portSchema.nullable() })
     .nullable()
     .default(null),
+  /**
+   * Agent sessions (spec 12). `ingestSince`: transcripts last modified before
+   * it are not read unless a backfill asks; `pair` sets it (D11).
+   */
+  sessions: z
+    .object({
+      enabled: z.boolean().default(true),
+      ingestSince: z.iso.datetime().optional(),
+    })
+    .prefault({}),
 });
 export type RunnerConfig = z.infer<typeof runnerConfigSchema>;
 
@@ -78,7 +88,10 @@ export const loadConfig = (path: string): RunnerConfig => {
 };
 
 /** Writes the config atomically with mode 0600: temp file, fsync, rename. */
-export const saveConfig = (path: string, config: RunnerConfig): void => {
+export const saveConfig = (
+  path: string,
+  config: z.input<typeof runnerConfigSchema>,
+): void => {
   const valid = runnerConfigSchema.parse(config);
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;

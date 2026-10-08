@@ -22,6 +22,7 @@ describe('config', () => {
       projects: [],
       disabledCommands: [],
       otlp: null,
+      sessions: { enabled: true },
     });
   });
 

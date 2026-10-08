@@ -1,4 +1,10 @@
-import type { QuerySource, Runtime, TokenBuckets } from '../protocol';
+import type {
+  QuerySource,
+  Runtime,
+  SessionBackfillArgs,
+  SessionBackfillResult,
+  TokenBuckets,
+} from '../protocol';
 
 /** Stable codes in the `error` field of a sessions route's error body. */
 export const SESSION_ERROR = {
@@ -148,14 +154,14 @@ export interface SessionTreeNode {
 export type SessionDetail = SessionTreeNode;
 
 /**
- * `POST /admin/runners/:id/backfill` (admin) — sends `session.backfill`.
- * Implemented with the command's runner handler (i12-adapters).
+ * `POST /admin/runners/:id/backfill` (admin): the `session.backfill` args.
+ * `since` is an ISO date-time; only transcripts modified after it are re-read
+ * (D11).
  */
-export interface BackfillRequest {
-  projectId?: string;
-  /** ISO date-time: only transcripts modified after it are re-read (D11). */
-  since: string;
-}
+export type BackfillRequest = SessionBackfillArgs;
+
+/** `POST /admin/runners/:id/backfill`: the runner's `session.backfill` result. */
+export type BackfillResponse = SessionBackfillResult;
 
 /** Live event on `project:<id>` when that project's sessions changed. */
 export const SESSIONS_CHANGED_LIVE_EVENT = 'sessions.changed';
