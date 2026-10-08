@@ -3,6 +3,9 @@
 import {
   FLEET_LIVE_EVENT,
   type FleetView,
+  type ProjectDetail,
+  projectRoleAtLeast,
+  type Role,
   SLOT_STATUSES,
   type SlotPage,
   type SlotStatus,
@@ -18,6 +21,7 @@ import { Toggle } from 'glass-ui/toggle';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../../../../lib/api';
+import { useControl } from '../../../../../lib/control/use-control';
 import {
   describeFleetError,
   isNotFound,
@@ -51,6 +55,16 @@ export default function FleetPage() {
   const [loadingMore, setLoadingMore] = useState(false);
 
   const [selected, setSelected] = useState<string>();
+
+  const [role, setRole] = useState<Role>('viewer');
+  const control = useControl(projectId);
+
+  // The effective role only decides which buttons are drawn; the API checks it.
+  useEffect(() => {
+    api<ProjectDetail>(`/projects/${projectId}`)
+      .then((project) => setRole(project.role))
+      .catch(() => setRole('viewer'));
+  }, [projectId]);
 
   const live = useLiveStatus();
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -162,7 +176,12 @@ export default function FleetPage() {
         </span>
       </div>
 
-      <OrchestratorCard fleet={fleet} />
+      <OrchestratorCard
+        fleet={fleet}
+        projectId={projectId}
+        control={control}
+        role={role}
+      />
 
       <section className="flex flex-col gap-4" aria-label="Slots">
         <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -246,6 +265,8 @@ export default function FleetPage() {
         projectId={projectId}
         name={selected}
         version={version}
+        control={control}
+        canOperate={projectRoleAtLeast(role, 'operator')}
         onClose={() => setSelected(undefined)}
       />
     </div>

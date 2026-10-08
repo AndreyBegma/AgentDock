@@ -1,4 +1,8 @@
-import type { FleetView } from '@agentdock/shared';
+import {
+  type FleetView,
+  projectRoleAtLeast,
+  type Role,
+} from '@agentdock/shared';
 import { Badge } from 'glass-ui/badge';
 import { Card } from 'glass-ui/card';
 import { Tooltip } from 'glass-ui/tooltip';
@@ -9,6 +13,7 @@ import {
   formatRoundHeader,
   ORCHESTRATOR_TONE,
 } from '../../../../../lib/fleet/format';
+import { OrchestratorControls } from './orchestrator-controls';
 
 function Fact({ label, value }: { label: string; value: string }) {
   return (
@@ -19,7 +24,17 @@ function Fact({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function OrchestratorCard({ fleet }: { fleet: FleetView }) {
+export function OrchestratorCard({
+  fleet,
+  projectId,
+  control,
+  role,
+}: {
+  fleet: FleetView;
+  projectId: string;
+  control: Parameters<typeof OrchestratorControls>[0]['control'];
+  role: Role;
+}) {
   const { orchestrator, latestRound, boardError } = fleet;
   const channel = channelChip(fleet.fleetChannel);
   return (
@@ -58,6 +73,12 @@ export function OrchestratorCard({ fleet }: { fleet: FleetView }) {
         />
         <Fact label="Session" value={orchestrator.session ?? '—'} />
       </dl>
+      <OrchestratorControls
+        projectId={projectId}
+        control={control}
+        canOperate={projectRoleAtLeast(role, 'operator')}
+        isAdmin={role === 'admin'}
+      />
       {boardError ? (
         <p role="alert" className="text-sm text-warn">
           The latest board could not be read: {boardError.reason} (

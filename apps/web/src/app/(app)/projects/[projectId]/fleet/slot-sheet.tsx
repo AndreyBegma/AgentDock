@@ -6,6 +6,7 @@ import { SheetContent, SheetRoot } from 'glass-ui/sheet';
 import { Skeleton } from 'glass-ui/skeleton';
 import { type ReactNode, useEffect, useState } from 'react';
 import { api } from '../../../../../lib/api';
+import type { useControl } from '../../../../../lib/control/use-control';
 import {
   CHECKPOINT_TONE,
   CHECKS_LABEL,
@@ -18,6 +19,7 @@ import {
   SLOT_STATUS_TONE,
   safeHttpsUrl,
 } from '../../../../../lib/fleet/format';
+import { SlotControls } from './slot-controls';
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -139,11 +141,16 @@ export function SlotSheet({
   projectId,
   name,
   version,
+  control,
+  canOperate,
   onClose,
 }: {
   projectId: string;
   name: string | undefined;
   version: number;
+  control: ReturnType<typeof useControl>;
+  /** Operators and above; the API decides regardless. */
+  canOperate: boolean;
   onClose: () => void;
 }) {
   const [slot, setSlot] = useState<SlotDetail>();
@@ -192,7 +199,12 @@ export function SlotSheet({
               {error}
             </p>
           ) : slot && slot.name === name ? (
-            <Detail slot={slot} />
+            <div className="flex flex-col gap-6">
+              <Detail slot={slot} />
+              {canOperate ? (
+                <SlotControls slot={slot.name} control={control} />
+              ) : null}
+            </div>
           ) : (
             <Skeleton className="h-64 w-full" />
           )}
