@@ -242,6 +242,26 @@ describe('claude adapter: parsing (D3)', () => {
     expect(observed).toEqual([first, { ...first, title: 'Fixture session' }]);
   });
 
+  it('keeps the directory the session started in when a later line has moved', () => {
+    const line = (cwd: string, ts: string) =>
+      JSON.stringify({ type: 'user', promptId: 'p-1', cwd, timestamp: ts });
+    const { events } = parseClaudeLines(
+      [
+        line('/srv/dev/.wt-acme-i42', '2026-10-01T10:00:00.000Z'),
+        line('/tmp', '2026-10-01T10:00:01.000Z'),
+      ],
+      { observed: null, parser: freshClaudeParserState() },
+      { source: main(), projects: [ACME] },
+    );
+    const observed = events.filter((e) => e.type === 'session.observed');
+    expect(observed).toHaveLength(1);
+    expect(observed[0].data).toMatchObject({
+      cwd: '/srv/dev/.wt-acme-i42',
+      projectId: 'prj_acme',
+      slot: 'i42',
+    });
+  });
+
   it('has no project for a session no watched project contains', async () => {
     const observed = ofType<SessionObservedData>(
       await read(main(), [{ id: 'prj_other', root: '/srv/dev/other' }]),

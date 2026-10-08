@@ -191,6 +191,7 @@ i12-adapters, decided with the orchestrator on 2026-10-08:
 
     A restart between a `tool_use` and its `tool_result`, or between two lines of one request, resumes correctly. The offsets are written after the events are spooled: a crash in between re-sends, and the API's upserts absorb that. A file shorter than its offset was replaced and is read anew.
 11. **Claude parsing as built.**
+    - **`cwd` is the directory the session started in**: the first `cwd` in the file. Later lines follow every `cd` the agent makes, 4 to 9 distinct runs per session in a local sample. Correlating on them would move a worker's session out of its project whenever it `cd`s into `/tmp`. D6's "the line's `cwd`" is read as the first line's.
     - A turn starts at the first `user` line with a new `promptId`. It ends at a `system` line with `subtype: "turn_duration"`, or when the next prompt starts.
     - `assistant` lines with `model: "<synthetic>"` (messages Claude Code writes itself, zero usage) are not requests.
     - An `llm.request` is sent at the first line of a `requestId` and again only when its model, buckets or `stopReason` change.

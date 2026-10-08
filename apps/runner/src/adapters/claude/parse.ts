@@ -318,8 +318,10 @@ export const parseClaudeLines = (
 
     const ts = isoTime(line.timestamp);
     if (!ts) continue;
+    // The directory the session was started in. Later lines follow every
+    // `cd`; correlating on them would move a session between projects.
     const cwd = text(line.cwd);
-    if (cwd) p.cwd = cwd;
+    if (cwd && !p.cwd) p.cwd = cwd;
     const gitBranch = text(line.gitBranch);
     if (gitBranch) p.gitBranch = gitBranch.slice(0, 255);
     if (!p.startedAt) p.startedAt = ts;
