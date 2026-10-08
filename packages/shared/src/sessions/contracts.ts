@@ -14,6 +14,14 @@ export const SESSION_ERROR = {
   forbidden: 'forbidden',
   /** `unassigned=true` together with `projectId`; an unknown `cursor`. */
   invalidFilter: 'invalid_filter',
+  /** Backfill: the runner has no open connection. */
+  runnerOffline: 'runner_offline',
+  /** Backfill: no result within the command's timeout; the outcome is unknown. */
+  runnerTimeout: 'runner_timeout',
+  /** Backfill: the runner refused it (sessions disabled, project not watched). */
+  runnerRefused: 'runner_refused',
+  /** Backfill: the runner failed while running it. */
+  runnerError: 'runner_error',
 } as const;
 export type SessionErrorCode =
   (typeof SESSION_ERROR)[keyof typeof SESSION_ERROR];
