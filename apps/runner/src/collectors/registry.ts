@@ -15,11 +15,14 @@ export type Emit = (event: UnsequencedEvent) => void;
 export interface FleetSettings {
   pollSeconds: number;
   prPollSeconds: number;
+  /** `events.jsonl` poll fallback (spec 16 D2); default 5. */
+  eventsPollSeconds?: number;
 }
 
 export const DEFAULT_FLEET_SETTINGS: FleetSettings = {
   pollSeconds: 15,
   prPollSeconds: 60,
+  eventsPollSeconds: 5,
 };
 
 /** What the daemon hands every collector it creates. */
