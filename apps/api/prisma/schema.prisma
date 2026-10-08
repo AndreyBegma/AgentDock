@@ -168,11 +168,19 @@ model Event {
   session     Json?
   data        Json
   receivedAt  DateTime @default(now())
+  /// `data.pluginEventId` of a `code-sentinel` event — the plugin's `eid`
+  /// (spec 16 D5). Null otherwise, and on an `events.duplicate`.
+  pluginEventId String?
 
   runner Runner @relation(fields: [runnerId], references: [id], onDelete: Cascade)
 
   @@unique([runnerId, seq])
+  /// One plugin event per project root. NULLs are distinct in PostgreSQL, so
+  /// this binds plugin events only — a partial index without a `WHERE`.
+  @@unique([projectRoot, pluginEventId])
   @@index([type, ts])
+  /// "A plugin event in the last 24 h" for `fleetChannel` (spec 16 D8).
+  @@index([projectRoot, source, receivedAt])
   @@map("events")
 }
 
@@ -399,6 +407,9 @@ model Round {
   decisions Json
   source    RoundSource
   boardPath String
+  /// Which source last wrote each field group: `{ header?, decisions? }`
+  /// (spec 16 D7). `scraped` never overwrites `code-sentinel`.
+  sources   Json        @default("{}")
   /// Highest event `seq` applied; older ones are replays.
   lastSeq   BigInt
   createdAt DateTime
@@ -443,6 +454,10 @@ model Slot {
   prChecks       PrChecks?
   prMergeable    Boolean?
   lastCheckpoint CheckpointKind?
+  /// Which source last wrote each field group — `{ model?, checkpoint?, pr? }`
+  /// — plus `dispatchedAt` (the plugin's dispatch `ts`) and `checkpoints`
+  /// (plugin checkpoints applied) for matching (spec 16 D7, Q3).
+  sources        Json            @default("{}")
   /// Highest event `seq` applied; older ones are replays.
   lastSeq        BigInt
   startedAt      DateTime
