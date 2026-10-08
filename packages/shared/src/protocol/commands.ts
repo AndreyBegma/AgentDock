@@ -50,6 +50,12 @@ export const commandErrorCodeSchema = z.enum([
   'unsupported_runtime',
   /** `profileId` names no profile in the runner config. */
   'unknown_profile',
+  /** The target the runner would resolve does not exist, or is not in that project (spec 29 D2). */
+  'not_found',
+  /** A limit is reached: attaches per runner, or a `write` attach already holds the target (spec 29 D7). */
+  'busy',
+  /** This machine cannot run the command: no PTY API, not POSIX, or tmux too old (spec 29 D3). */
+  'unsupported',
 ]);
 export type CommandErrorCode = z.infer<typeof commandErrorCodeSchema>;
 
