@@ -7,6 +7,7 @@ import { RunnerEventSinks } from './runner-event-sinks';
 import { RunnerIngestService } from './runner-ingest.service';
 import { defaultRunnerOptions, RUNNER_OPTIONS } from './runner-options';
 import { RunnerPresence } from './runner-presence';
+import { RunnerStreams } from './runner-streams';
 import { RunnerWatchList } from './runner-watch-list';
 import {
   AdminRunnersController,
@@ -27,15 +28,17 @@ import { RunnersService } from './runners.service';
     RunnerGateway,
     RunnerWatchList,
     RunnerPresence,
+    RunnerStreams,
   ],
   // Later items send commands to runners through this (spec D8); projects
   // (#10) push the watch list and read runner status; sessions (#12) and fleet
-  // (#11) register event sinks.
+  // (#11) register event sinks; the pane relay (#18) registers a stream listener.
   exports: [
     RunnerCommandService,
     RunnerWatchList,
     RunnerPresence,
     RunnerEventSinks,
+    RunnerStreams,
   ],
 })
 export class RunnersModule {}

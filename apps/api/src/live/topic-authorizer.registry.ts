@@ -9,14 +9,22 @@ import type { AuthUser } from '../auth';
 /**
  * Whether `user` may read `topic`. `id` is the part after the prefix (null
  * for `admin`). May query the database — #10's membership check will.
+ * `not_found`: the user may read the parent, but the topic names something
+ * that is not in it — a slot of another project (spec 18 D6).
  */
 export type TopicAuthorizer = (
   user: AuthUser,
   id: string | null,
   topic: LiveTopic,
-) => boolean | Promise<boolean>;
+) => TopicVerdict | Promise<TopicVerdict>;
 
-export type TopicDecision = 'allowed' | 'forbidden' | 'unknown_topic';
+export type TopicVerdict = boolean | 'not_found';
+
+export type TopicDecision =
+  | 'allowed'
+  | 'forbidden'
+  | 'not_found'
+  | 'unknown_topic';
 
 const adminOnly: TopicAuthorizer = (user) => user.role === 'admin';
 
@@ -47,6 +55,8 @@ export class TopicAuthorizerRegistry {
     const { prefix, id } = parseLiveTopic(topic);
     const authorize = this.authorizers.get(prefix);
     if (!authorize) return 'unknown_topic';
-    return (await authorize(user, id, topic)) ? 'allowed' : 'forbidden';
+    const verdict = await authorize(user, id, topic);
+    if (verdict === 'not_found') return 'not_found';
+    return verdict ? 'allowed' : 'forbidden';
   }
 }

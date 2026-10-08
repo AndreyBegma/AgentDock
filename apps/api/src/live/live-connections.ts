@@ -7,6 +7,7 @@ import {
 import { Injectable } from '@nestjs/common';
 import { WebSocket } from 'ws';
 import type { AuthUser } from '../auth';
+import { LiveTopicHookRegistry } from './live-topic-hooks';
 
 /** One authenticated `/live` socket and what it is subscribed to. */
 export class LiveClient {
@@ -62,6 +63,8 @@ export class LiveConnections {
   private readonly bySession = new Map<string, Set<LiveClient>>();
   private readonly byTopic = new Map<LiveTopic, Set<LiveClient>>();
 
+  constructor(private readonly hooks: LiveTopicHookRegistry) {}
+
   /** Registers `client`; false when its session already holds the maximum. */
   add(client: LiveClient): boolean {
     const siblings = this.bySession.get(client.sessionId) ?? new Set();
@@ -82,8 +85,10 @@ export class LiveConnections {
   subscribe(client: LiveClient, topic: LiveTopic): void {
     client.topics.add(topic);
     const subscribers = this.byTopic.get(topic) ?? new Set();
+    if (subscribers.has(client)) return;
     subscribers.add(client);
     this.byTopic.set(topic, subscribers);
+    this.hooks.joined(client, topic);
   }
 
   unsubscribe(client: LiveClient, topic: LiveTopic): void {
@@ -91,6 +96,7 @@ export class LiveConnections {
     const subscribers = this.byTopic.get(topic);
     if (!subscribers?.delete(client)) return;
     if (subscribers.size === 0) this.byTopic.delete(topic);
+    this.hooks.left(client, topic);
   }
 
   subscribers(topic: LiveTopic): LiveClient[] {
