@@ -39,6 +39,9 @@ export const AUDIT_ACTIONS = [
   'orchestrator.settings',
   'slot.stop',
   'slot.message',
+  'approval.approve',
+  'approval.request_changes',
+  'approval.void',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
