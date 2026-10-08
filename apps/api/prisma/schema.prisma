@@ -33,14 +33,16 @@ model User {
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
-  approvedBy      User?           @relation("UserApprovals", fields: [approvedById], references: [id], onDelete: SetNull)
-  approvedUsers   User[]          @relation("UserApprovals")
-  sessions        UserSession[]
-  settingsUpdated Setting[]
-  runnersCreated  Runner[]
-  projectsCreated Project[]
-  memberships     ProjectMember[] @relation("ProjectMembership")
-  membersAdded    ProjectMember[] @relation("ProjectMemberAddedBy")
+  approvedBy                  User?                         @relation("UserApprovals", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedUsers               User[]                        @relation("UserApprovals")
+  sessions                    UserSession[]
+  settingsUpdated             Setting[]
+  runnersCreated              Runner[]
+  projectsCreated             Project[]
+  memberships                 ProjectMember[]               @relation("ProjectMembership")
+  membersAdded                ProjectMember[]               @relation("ProjectMemberAddedBy")
+  commandRuns                 CommandRun[]
+  orchestratorSettingsUpdated ProjectOrchestratorSettings[]
 
   @@map("users")
 }
@@ -109,6 +111,7 @@ model Runner {
   events       Event[]
   projects     Project[]
   sessions     AgentSession[]
+  commandRuns  CommandRun[]
 
   @@map("runners")
 }
@@ -145,8 +148,9 @@ model RuntimeProfile {
   missing       Boolean  @default(false)
   updatedAt     DateTime @updatedAt
 
-  runner          Runner    @relation(fields: [runnerId], references: [id], onDelete: Cascade)
-  defaultProjects Project[]
+  runner               Runner                        @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+  defaultProjects      Project[]
+  orchestratorSettings ProjectOrchestratorSettings[]
 
   @@unique([runnerId, key])
   @@map("runtime_profiles")
@@ -272,18 +276,20 @@ model Project {
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
 
-  runner         Runner             @relation(fields: [runnerId], references: [id], onDelete: Restrict)
-  defaultProfile RuntimeProfile?    @relation(fields: [defaultProfileId], references: [id], onDelete: SetNull)
-  createdBy      User?              @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  members        ProjectMember[]
-  docsSource     DocsSource?
-  rounds         Round[]
-  slots          Slot[]
-  orchestrator   FleetOrchestrator?
-  sessions       AgentSession[]
-  issues         IssueCache[]
-  queueStates    QueueStateRow[]
-  issueFeed      IssueFeed?
+  runner               Runner                       @relation(fields: [runnerId], references: [id], onDelete: Restrict)
+  defaultProfile       RuntimeProfile?              @relation(fields: [defaultProfileId], references: [id], onDelete: SetNull)
+  createdBy            User?                        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  members              ProjectMember[]
+  docsSource           DocsSource?
+  rounds               Round[]
+  slots                Slot[]
+  orchestrator         FleetOrchestrator?
+  sessions             AgentSession[]
+  issues               IssueCache[]
+  queueStates          QueueStateRow[]
+  issueFeed            IssueFeed?
+  commandRuns          CommandRun[]
+  orchestratorSettings ProjectOrchestratorSettings?
 
   @@unique([runnerId, rootPath])
   @@map("projects")
@@ -727,4 +733,66 @@ model IssueFeed {
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@map("issue_feeds")
+}
+
+// ─── Orchestrator and slot control (docs/specs/17) ───────────────────────────
+
+enum CommandRunStatus {
+  requested
+  ok
+  error
+  unknown
+}
+
+/// The D3 permission modes; `manual` is the runtime's default, prompting mode.
+enum OrchestratorPermissionMode {
+  auto
+  acceptEdits
+  bypassPermissions
+  manual
+}
+
+/// A control command sent from the UI and how it ended (D10). `unknown`: the
+/// runner did not answer within the command's timeout.
+model CommandRun {
+  id          String           @id @default(cuid())
+  projectId   String
+  runnerId    String
+  /// Nullable so deleting the user keeps the log.
+  userId      String?
+  command     String
+  /// The command's args as sent — `slot.message` text included (D10).
+  args        Json
+  slot        String?
+  status      CommandRunStatus @default(requested)
+  /// `{ code, message? }` when `status` is `error`.
+  error       Json?
+  result      Json?
+  requestedAt DateTime         @default(now())
+  finishedAt  DateTime?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  runner  Runner  @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, requestedAt])
+  @@map("command_runs")
+}
+
+/// The project's orchestrator launch defaults (D3). No row: the D3 defaults
+/// and the project's default profile.
+model ProjectOrchestratorSettings {
+  projectId      String                     @id
+  /// Must belong to the project's runner; checked by the API.
+  profileId      String?
+  model          String                     @default("opus")
+  permissionMode OrchestratorPermissionMode @default(auto)
+  updatedById    String?
+  updatedAt      DateTime                   @updatedAt
+
+  project   Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  profile   RuntimeProfile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  updatedBy User?           @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@map("project_orchestrator_settings")
 }
