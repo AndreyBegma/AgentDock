@@ -40,6 +40,7 @@ describe('visibleNav', () => {
     ]);
     const inProject = labels('viewer', '/projects/p1/settings');
     expect(inProject).toContain('project/Fleet');
+    expect(inProject).toContain('project/Queue');
     expect(inProject).toContain('project/Settings');
   });
 
