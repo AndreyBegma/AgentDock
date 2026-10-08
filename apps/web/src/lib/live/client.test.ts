@@ -111,6 +111,55 @@ describe('LiveClient', () => {
     expect(b).toHaveLength(0);
   });
 
+  test('delivers a topic error to that topic only, events unchanged', () => {
+    const { client, sockets } = setup();
+    const events: LiveEventMessage[] = [];
+    const errorsA: string[] = [];
+    const errorsB: string[] = [];
+    client.subscribe(
+      'pane:p1:i18-web',
+      (m) => events.push(m),
+      (code) => errorsA.push(code),
+    );
+    client.subscribe(
+      'pane:p1:i18-api',
+      () => {},
+      (code) => errorsB.push(code),
+    );
+    client.subscribe('admin', () => {});
+    sockets[0]?.open();
+    sockets[0]?.receive({
+      type: 'error',
+      topic: 'pane:p1:i18-web',
+      code: 'forbidden',
+    });
+    sockets[0]?.receive({ type: 'error', code: 'invalid_message' });
+    sockets[0]?.receive({ type: 'error', topic: 'admin', code: 'forbidden' });
+    expect(errorsA).toEqual(['forbidden']);
+    expect(errorsB).toEqual([]);
+    expect(events).toHaveLength(0);
+    sockets[0]?.receive(event('pane:p1:i18-web'));
+    expect(events).toHaveLength(1);
+  });
+
+  test('stops delivering errors after unsubscribe', () => {
+    const { client, sockets } = setup();
+    const errors: string[] = [];
+    const off = client.subscribe(
+      'pane:p1:s',
+      () => {},
+      (code) => errors.push(code),
+    );
+    sockets[0]?.open();
+    off();
+    sockets[0]?.receive({
+      type: 'error',
+      topic: 'pane:p1:s',
+      code: 'not_found',
+    });
+    expect(errors).toEqual([]);
+  });
+
   test('shares one socket and one subscribe frame per topic', () => {
     const { client, sockets } = setup();
     client.subscribe('admin', () => {});

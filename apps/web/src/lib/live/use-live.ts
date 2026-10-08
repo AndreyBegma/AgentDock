@@ -1,6 +1,10 @@
 'use client';
 
-import type { LiveEventMessage, LiveTopic } from '@agentdock/shared';
+import type {
+  LiveErrorCode,
+  LiveEventMessage,
+  LiveTopic,
+} from '@agentdock/shared';
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { getLiveClient, type LiveSnapshot } from './client';
 
@@ -12,18 +16,27 @@ import { getLiveClient, type LiveSnapshot } from './client';
 export function useLive(
   topic: LiveTopic | null,
   onMessage: (message: LiveEventMessage) => void,
+  options?: {
+    /** The server refused the topic (`forbidden`, `not_found`, …) or dropped it. */
+    onError?: (code: LiveErrorCode) => void;
+  },
 ): void {
   const latest = useRef(onMessage);
+  const latestError = useRef(options?.onError);
   useEffect(() => {
     latest.current = onMessage;
+    latestError.current = options?.onError;
   });
+  const wantsErrors = options?.onError !== undefined;
 
   useEffect(() => {
     if (!topic) return;
-    return getLiveClient().subscribe(topic, (message) =>
-      latest.current(message),
+    return getLiveClient().subscribe(
+      topic,
+      (message) => latest.current(message),
+      wantsErrors ? (code) => latestError.current?.(code) : undefined,
     );
-  }, [topic]);
+  }, [topic, wantsErrors]);
 }
 
 const SERVER_SNAPSHOT: LiveSnapshot = {

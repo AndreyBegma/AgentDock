@@ -4,6 +4,7 @@ import type { SlotDetail } from '@agentdock/shared';
 import { Badge } from 'glass-ui/badge';
 import { SheetContent, SheetRoot } from 'glass-ui/sheet';
 import { Skeleton } from 'glass-ui/skeleton';
+import { Tabs, TabsItem } from 'glass-ui/tabs';
 import { type ReactNode, useEffect, useState } from 'react';
 import { api } from '../../../../../lib/api';
 import type { useControl } from '../../../../../lib/control/use-control';
@@ -19,7 +20,14 @@ import {
   SLOT_STATUS_TONE,
   safeHttpsUrl,
 } from '../../../../../lib/fleet/format';
+import { PanePanel } from './pane-panel';
 import { SlotControls } from './slot-controls';
+
+const SHEET_TABS = [
+  { id: 'detail', label: 'Details' },
+  { id: 'pane', label: 'Pane' },
+] as const;
+type SheetTab = (typeof SHEET_TABS)[number]['id'];
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -155,6 +163,13 @@ export function SlotSheet({
 }) {
   const [slot, setSlot] = useState<SlotDetail>();
   const [error, setError] = useState<string>();
+  const [tab, setTab] = useState<SheetTab>('detail');
+
+  // A different slot opens on its details, not on the previous slot's pane.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: name is the reset trigger
+  useEffect(() => {
+    setTab('detail');
+  }, [name]);
 
   // `version` only re-runs the fetch; the sheet keeps showing the old data meanwhile.
   // biome-ignore lint/correctness/useExhaustiveDependencies: version is a refetch trigger
@@ -200,10 +215,34 @@ export function SlotSheet({
             </p>
           ) : slot && slot.name === name ? (
             <div className="flex flex-col gap-6">
-              <Detail slot={slot} />
-              {canOperate ? (
-                <SlotControls slot={slot.name} control={control} />
-              ) : null}
+              <Tabs aria-label="Slot sections">
+                {SHEET_TABS.map(({ id, label }) => (
+                  <TabsItem
+                    key={id}
+                    current={tab === id}
+                    layoutId="slot-sheet-tab"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setTab(id)}
+                      aria-pressed={tab === id}
+                      className="relative flex w-full items-center justify-center px-3 py-2 text-sm font-medium"
+                    >
+                      {label}
+                    </button>
+                  </TabsItem>
+                ))}
+              </Tabs>
+              {tab === 'pane' ? (
+                <PanePanel projectId={projectId} slot={slot.name} />
+              ) : (
+                <>
+                  <Detail slot={slot} />
+                  {canOperate ? (
+                    <SlotControls slot={slot.name} control={control} />
+                  ) : null}
+                </>
+              )}
             </div>
           ) : (
             <Skeleton className="h-64 w-full" />

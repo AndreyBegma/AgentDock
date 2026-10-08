@@ -1,6 +1,7 @@
 import {
   LIVE_CLOSE_CODES,
   type LiveClientMessage,
+  type LiveErrorCode,
   type LiveEventMessage,
   type LiveTopic,
   liveServerMessageSchema,
@@ -16,6 +17,8 @@ export interface LiveSnapshot {
 }
 
 export type LiveHandler = (message: LiveEventMessage) => void;
+/** The server refused or ended the subscription to this topic. */
+export type LiveErrorHandler = (code: LiveErrorCode) => void;
 
 /** The slice of `WebSocket` the client uses; a test passes a fake. */
 export interface LiveSocket {
@@ -59,6 +62,7 @@ export function backoffDelay(attempt: number, random: () => number): number {
  */
 export class LiveClient {
   private readonly handlers = new Map<LiveTopic, Set<LiveHandler>>();
+  private readonly errorHandlers = new Map<LiveTopic, Set<LiveErrorHandler>>();
   private readonly listeners = new Set<() => void>();
   private readonly random: () => number;
   private readonly setTimer: (fn: () => void, ms: number) => unknown;
@@ -86,7 +90,11 @@ export class LiveClient {
     return () => this.listeners.delete(listener);
   };
 
-  subscribe(topic: LiveTopic, handler: LiveHandler): () => void {
+  subscribe(
+    topic: LiveTopic,
+    handler: LiveHandler,
+    onError?: LiveErrorHandler,
+  ): () => void {
     let set = this.handlers.get(topic);
     const first = !set;
     if (!set) {
@@ -94,6 +102,14 @@ export class LiveClient {
       this.handlers.set(topic, set);
     }
     set.add(handler);
+    if (onError) {
+      let errors = this.errorHandlers.get(topic);
+      if (!errors) {
+        errors = new Set();
+        this.errorHandlers.set(topic, errors);
+      }
+      errors.add(onError);
+    }
 
     if (first) this.send({ type: 'subscribe', topic });
     this.ensureConnected();
@@ -101,6 +117,11 @@ export class LiveClient {
     return () => {
       const current = this.handlers.get(topic);
       if (!current?.delete(handler)) return;
+      if (onError) {
+        const errors = this.errorHandlers.get(topic);
+        errors?.delete(onError);
+        if (errors?.size === 0) this.errorHandlers.delete(topic);
+      }
       if (current.size > 0) return;
       this.handlers.delete(topic);
       this.send({ type: 'unsubscribe', topic });
@@ -185,8 +206,16 @@ export class LiveClient {
       return;
     }
     const parsed = liveServerMessageSchema.safeParse(json);
-    if (!parsed.success || parsed.data.type !== 'event') return;
+    if (!parsed.success) return;
     const message = parsed.data;
+    if (message.type === 'error') {
+      if (!message.topic) return;
+      for (const handler of this.errorHandlers.get(message.topic) ?? []) {
+        handler(message.code);
+      }
+      return;
+    }
+    if (message.type !== 'event') return;
     for (const handler of this.handlers.get(message.topic) ?? []) {
       handler(message);
     }

@@ -256,6 +256,29 @@ not a blocking dependency.
 - **Redaction is best-effort.** A token split by an ANSI code, or a private
   key whose `BEGIN` line has scrolled out of the capture, is not masked.
 
+### From i18-web
+
+- **Where.** `apps/web/src/lib/pane/`: `reducer.ts` (pure `applyFrame`: `full`
+  replaces, `patch` replaces from `from` to the end, `ended` keeps the lines),
+  `use-pane.ts` (subscription + reducer), `format.ts` (error sentences). The
+  panel is `fleet/pane-panel.tsx`, mounted by the slot sheet only while its
+  **Pane** tab is selected, so switching tab, closing the sheet or leaving the
+  page unsubscribes.
+- **`useLive` gained topic errors (additive).** `useLive(topic, onMessage,
+  { onError })` and `LiveClient.subscribe(topic, handler, onError?)`: an
+  `error { topic, code }` message reaches the `onError` of that topic's
+  subscribers only. Before, the client dropped everything but `event`
+  messages, so `forbidden` / `not_found` / `too_many_viewers` were invisible.
+  Existing callers are unchanged.
+- **Rendering.** `LogViewer` lines use the line index as `id`: a patch replaces
+  the tail, so the same index is the same row. Every `pane.frame` is applied in
+  order, so a chunked `full` + `patch`es yields the original frame. ANSI colour
+  is rendered by `LogViewer` (no `<pre>` fallback).
+- **No viewer count.** There is no event for it (see i18-api follow-up).
+- **Not reachable from the UI:** `not_found` (a slot of another project under
+  this project's id) — the sheet only opens slots the project lists. Its
+  sentence is covered by the format mapping only.
+
 Depends on #9
 
 Depends on #11
