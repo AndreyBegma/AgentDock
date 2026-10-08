@@ -2,6 +2,12 @@ import { z } from 'zod';
 import { capabilitiesSchema } from './capabilities';
 import { commandErrorCodeSchema } from './commands';
 import { eventSchema, seqCursorSchema } from './envelope';
+import {
+  paneMessageSchema,
+  subscribeErrorMessageSchema,
+  subscribeMessageSchema,
+  unsubscribeMessageSchema,
+} from './pane';
 import { watchedProjectSchema } from './projects';
 
 /** An `events` batch carries at most this many events… */
@@ -71,18 +77,6 @@ export const commandProgressMessageSchema = z.object({
   chunk: z.string(),
 });
 
-export const paneMessageSchema = z.object({
-  ...base,
-  type: z.literal('pane'),
-  projectId: z.string().min(1),
-  slot: z.string().min(1),
-  lines: z.array(z.string()),
-  cursor: z.object({
-    x: z.number().int().nonnegative(),
-    y: z.number().int().nonnegative(),
-  }),
-});
-
 // Server → runner
 
 /** What the server tells a runner to watch; carried by `welcome` and `config`. */
@@ -130,22 +124,6 @@ export const commandMessageSchema = z.object({
   args: z.unknown(),
 });
 
-const paneTarget = {
-  ...base,
-  projectId: z.string().min(1),
-  slot: z.string().min(1),
-};
-
-export const subscribeMessageSchema = z.object({
-  ...paneTarget,
-  type: z.literal('subscribe'),
-});
-
-export const unsubscribeMessageSchema = z.object({
-  ...paneTarget,
-  type: z.literal('unsubscribe'),
-});
-
 const runnerMessages = [
   helloMessageSchema,
   heartbeatMessageSchema,
@@ -153,6 +131,7 @@ const runnerMessages = [
   commandResultMessageSchema,
   commandProgressMessageSchema,
   paneMessageSchema,
+  subscribeErrorMessageSchema,
 ] as const;
 
 const serverMessages = [
@@ -185,13 +164,10 @@ export type CommandResultMessage = z.infer<typeof commandResultMessageSchema>;
 export type CommandProgressMessage = z.infer<
   typeof commandProgressMessageSchema
 >;
-export type PaneMessage = z.infer<typeof paneMessageSchema>;
 export type WelcomeMessage = z.infer<typeof welcomeMessageSchema>;
 export type ConfigMessage = z.infer<typeof configMessageSchema>;
 export type AckMessage = z.infer<typeof ackMessageSchema>;
 export type CommandMessage = z.infer<typeof commandMessageSchema>;
-export type SubscribeMessage = z.infer<typeof subscribeMessageSchema>;
-export type UnsubscribeMessage = z.infer<typeof unsubscribeMessageSchema>;
 
 export type RunnerMessage = z.infer<typeof runnerMessageSchema>;
 export type ServerMessage = z.infer<typeof serverMessageSchema>;
