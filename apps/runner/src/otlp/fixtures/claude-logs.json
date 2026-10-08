@@ -1,0 +1,644 @@
+{
+  "resourceLogs": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "agentdock.project",
+            "value": { "stringValue": "prj_fixture" }
+          },
+          { "key": "agentdock.slot", "value": { "stringValue": "i42-api" } },
+          { "key": "agentdock.issue", "value": { "stringValue": "42" } },
+          { "key": "agentdock.run", "value": { "stringValue": "run_fixture" } },
+          { "key": "host.arch", "value": { "stringValue": "amd64" } },
+          { "key": "os.type", "value": { "stringValue": "linux" } },
+          {
+            "key": "os.version",
+            "value": { "stringValue": "6.19.10-300.fc44.x86_64" }
+          },
+          { "key": "service.name", "value": { "stringValue": "claude-code" } },
+          { "key": "service.version", "value": { "stringValue": "2.1.294" } }
+        ],
+        "droppedAttributesCount": 0
+      },
+      "scopeLogs": [
+        {
+          "scope": {
+            "name": "com.anthropic.claude_code.events",
+            "version": "2.1.294"
+          },
+          "logRecords": [
+            {
+              "timeUnixNano": "1791447583092000000",
+              "observedTimeUnixNano": "1791447583092000000",
+              "body": { "stringValue": "claude_code.user_prompt" },
+              "attributes": [
+                {
+                  "key": "agentdock.project",
+                  "value": { "stringValue": "prj_fixture" }
+                },
+                {
+                  "key": "agentdock.slot",
+                  "value": { "stringValue": "i42-api" }
+                },
+                { "key": "agentdock.issue", "value": { "stringValue": "42" } },
+                {
+                  "key": "agentdock.run",
+                  "value": { "stringValue": "run_fixture" }
+                },
+                {
+                  "key": "user.id",
+                  "value": {
+                    "stringValue": "fixture-user-id-0000000000000000000000000000000000000000000000000000"
+                  }
+                },
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "370042b4-4ba5-4ef6-87c8-7cf3ddba0367"
+                  }
+                },
+                {
+                  "key": "organization.id",
+                  "value": {
+                    "stringValue": "00000000-0000-4000-8000-0000000000a1"
+                  }
+                },
+                {
+                  "key": "user.email",
+                  "value": { "stringValue": "person@example.invalid" }
+                },
+                {
+                  "key": "user.account_uuid",
+                  "value": {
+                    "stringValue": "00000000-0000-4000-8000-0000000000a2"
+                  }
+                },
+                {
+                  "key": "user.account_id",
+                  "value": { "stringValue": "user_fixture_account" }
+                },
+                { "key": "terminal.type", "value": { "stringValue": "tmux" } },
+                {
+                  "key": "event.name",
+                  "value": { "stringValue": "user_prompt" }
+                },
+                {
+                  "key": "event.timestamp",
+                  "value": { "stringValue": "2026-10-08T08:19:43.092Z" }
+                },
+                { "key": "event.sequence", "value": { "intValue": 11 } },
+                {
+                  "key": "prompt.id",
+                  "value": {
+                    "stringValue": "9bf4356e-17e6-4ebe-a03e-ea698cc47bed"
+                  }
+                },
+                { "key": "prompt_length", "value": { "stringValue": "125" } },
+                {
+                  "key": "prompt",
+                  "value": {
+                    "stringValue": "Run the shell command: echo AGENTDOCK_SENTINEL_TOOL_7f3a — then reply with just the word done. AGENTDOCK_SENTINEL_PROMPT_9c1e"
+                  }
+                },
+                {
+                  "key": "prompt_text",
+                  "value": {
+                    "stringValue": "Run the shell command: echo AGENTDOCK_SENTINEL_TOOL_7f3a — then reply with just the word done. AGENTDOCK_SENTINEL_PROMPT_9c1e"
+                  }
+                },
+                {
+                  "key": "message.uuid",
+                  "value": {
+                    "stringValue": "1ab3b032-36a9-4d59-98f5-6964deba4fcb"
+                  }
+                }
+              ],
+              "droppedAttributesCount": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "agentdock.project",
+            "value": { "stringValue": "prj_fixture" }
+          },
+          { "key": "agentdock.slot", "value": { "stringValue": "i42-api" } },
+          { "key": "agentdock.issue", "value": { "stringValue": "42" } },
+          { "key": "agentdock.run", "value": { "stringValue": "run_fixture" } },
+          { "key": "host.arch", "value": { "stringValue": "amd64" } },
+          { "key": "os.type", "value": { "stringValue": "linux" } },
+          {
+            "key": "os.version",
+            "value": { "stringValue": "6.19.10-300.fc44.x86_64" }
+          },
+          { "key": "service.name", "value": { "stringValue": "claude-code" } },
+          { "key": "service.version", "value": { "stringValue": "2.1.294" } }
+        ],
+        "droppedAttributesCount": 0
+      },
+      "scopeLogs": [
+        {
+          "scope": {
+            "name": "com.anthropic.claude_code.events",
+            "version": "2.1.294"
+          },
+          "logRecords": [
+            {
+              "timeUnixNano": "1791447584500000000",
+              "observedTimeUnixNano": "1791447584500000000",
+              "body": { "stringValue": "claude_code.api_request" },
+              "attributes": [
+                {
+                  "key": "agentdock.project",
+                  "value": { "stringValue": "prj_fixture" }
+                },
+                {
+                  "key": "agentdock.slot",
+                  "value": { "stringValue": "i42-api" }
+                },
+                { "key": "agentdock.issue", "value": { "stringValue": "42" } },
+                {
+                  "key": "agentdock.run",
+                  "value": { "stringValue": "run_fixture" }
+                },
+                {
+                  "key": "user.id",
+                  "value": {
+                    "stringValue": "fixture-user-id-0000000000000000000000000000000000000000000000000000"
+                  }
+                },
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "370042b4-4ba5-4ef6-87c8-7cf3ddba0367"
+                  }
+                },
+                {
+                  "key": "organization.id",
+                  "value": {
+                    "stringValue": "00000000-0000-4000-8000-0000000000a1"
+                  }
+                },
+                {
+                  "key": "user.email",
+                  "value": { "stringValue": "person@example.invalid" }
+                },
+                {
+                  "key": "user.account_uuid",
+                  "value": {
+                    "stringValue": "00000000-0000-4000-8000-0000000000a2"
+                  }
+                },
+                {
+                  "key": "user.account_id",
+                  "value": { "stringValue": "user_fixture_account" }
+                },
+                { "key": "terminal.type", "value": { "stringValue": "tmux" } },
+                {
+                  "key": "event.name",
+                  "value": { "stringValue": "api_request" }
+                },
+                {
+                  "key": "event.timestamp",
+                  "value": { "stringValue": "2026-10-08T08:19:44.500Z" }
+                },
+                { "key": "event.sequence", "value": { "intValue": 13 } },
+                {
+                  "key": "prompt.id",
+                  "value": {
+                    "stringValue": "9bf4356e-17e6-4ebe-a03e-ea698cc47bed"
+                  }
+                },
+                {
+                  "key": "model",
+                  "value": { "stringValue": "claude-haiku-5-5" }
+                },
+                { "key": "input_tokens", "value": { "intValue": 2 } },
+                { "key": "output_tokens", "value": { "intValue": 101 } },
+                { "key": "cache_read_tokens", "value": { "intValue": 29281 } },
+                { "key": "cache_creation_tokens", "value": { "intValue": 0 } },
+                { "key": "cost_usd", "value": { "doubleValue": 0.00034351 } },
+                { "key": "cost_usd_micros", "value": { "intValue": 344 } },
+                { "key": "duration_ms", "value": { "intValue": 1330 } },
+                { "key": "ttft_ms", "value": { "intValue": 987 } },
+                {
+                  "key": "request_id",
+                  "value": { "stringValue": "req_011CfpSejQAmqSghrb3aA23n" }
+                },
+                {
+                  "key": "client_request_id",
+                  "value": {
+                    "stringValue": "a44fbc46-ca15-4ead-abbd-2a9c31681f8a"
+                  }
+                },
+                { "key": "speed", "value": { "stringValue": "normal" } },
+                { "key": "query_source", "value": { "stringValue": "sdk" } },
+                { "key": "effort", "value": { "stringValue": "medium" } }
+              ],
+              "droppedAttributesCount": 0
+            },
+            {
+              "timeUnixNano": "1791447584640000000",
+              "observedTimeUnixNano": "1791447584640000000",
+              "body": { "stringValue": "claude_code.tool_decision" },
+              "attributes": [
+                {
+                  "key": "agentdock.project",
+                  "value": { "stringValue": "prj_fixture" }
+                },
+                {
+                  "key": "agentdock.slot",
+                  "value": { "stringValue": "i42-api" }
+                },
+                { "key": "agentdock.issue", "value": { "stringValue": "42" } },
+                {
+                  "key": "agentdock.run",
+                  "value": { "stringValue": "run_fixture" }
+                },
+                {
+                  "key": "user.id",
+                  "value": {
+                    "stringValue": "fixture-user-id-0000000000000000000000000000000000000000000000000000"
+                  }
+                },
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "370042b4-4ba5-4ef6-87c8-7cf3ddba0367"
+                  }
+                },
+                {
+                  "key": "organization.id",
+                  "value": {
+                    "stringValue": "00000000-0000-4000-8000-0000000000a1"
+                  }
+                },
+                {
+                  "key": "user.email",
+                  "value": { "stringValue": "person@example.invalid" }
+                },
+                {
+                  "key": "user.account_uuid",
+                  "value": {
+                    "stringValue": "00000000-0000-4000-8000-0000000000a2"
+                  }
+                },
+                {
+                  "key": "user.account_id",
+                  "value": { "stringValue": "user_fixture_account" }
+                },
+                { "key": "terminal.type", "value": { "stringValue": "tmux" } },
+                {
+                  "key": "event.name",
+                  "value": { "stringValue": "tool_decision" }
+                },
+                {
+                  "key": "event.timestamp",
+                  "value": { "stringValue": "2026-10-08T08:19:44.640Z" }
+                },
+                { "key": "event.sequence", "value": { "intValue": 15 } },
+                {
+                  "key": "prompt.id",
+                  "value": {
+                    "stringValue": "9bf4356e-17e6-4ebe-a03e-ea698cc47bed"
+                  }
+                },
+                { "key": "decision", "value": { "stringValue": "accept" } },
+                { "key": "source", "value": { "stringValue": "config" } },
+                { "key": "tool_name", "value": { "stringValue": "Bash" } },
+                {
+                  "key": "tool_use_id",
+                  "value": { "stringValue": "toolu_01D5XngnxT5MnCVwSYBskd57" }
+                },
+                { "key": "tool_source", "value": { "stringValue": "builtin" } },
+                {
+                  "key": "tool_parameters",
+                  "value": {
+                    "stringValue": "{\"bash_command\":\"echo\",\"full_command\":\"echo AGENTDOCK_SENTINEL_TOOL_7f3a\",\"description\":\"Echo sentinel string\"}"
+                  }
+                }
+              ],
+              "droppedAttributesCount": 0
+            },
+            {
+              "timeUnixNano": "1791447584996000000",
+              "observedTimeUnixNano": "1791447584996000000",
+              "body": { "stringValue": "claude_code.tool_result" },
+              "attributes": [
+                {
+                  "key": "agentdock.project",
+                  "value": { "stringValue": "prj_fixture" }
+                },
+                {
+                  "key": "agentdock.slot",
+                  "value": { "stringValue": "i42-api" }
+                },
+                { "key": "agentdock.issue", "value": { "stringValue": "42" } },
+                {
+                  "key": "agentdock.run",
+                  "value": { "stringValue": "run_fixture" }
+                },
+                {
+                  "key": "user.id",
+                  "value": {
+                    "stringValue": "fixture-user-id-0000000000000000000000000000000000000000000000000000"
+                  }
+                },
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "370042b4-4ba5-4ef6-87c8-7cf3ddba0367"
+                  }
+                },
+                {
+                  "key": "organization.id",
+                  "value": {
+                    "stringValue": "00000000-0000-4000-8000-0000000000a1"
+                  }
+                },
+                {
+                  "key": "user.email",
+                  "value": { "stringValue": "person@example.invalid" }
+                },
+                {
+                  "key": "user.account_uuid",
+                  "value": {
+                    "stringValue": "00000000-0000-4000-8000-0000000000a2"
+                  }
+                },
+                {
+                  "key": "user.account_id",
+                  "value": { "stringValue": "user_fixture_account" }
+                },
+                { "key": "terminal.type", "value": { "stringValue": "tmux" } },
+                {
+                  "key": "event.name",
+                  "value": { "stringValue": "tool_result" }
+                },
+                {
+                  "key": "event.timestamp",
+                  "value": { "stringValue": "2026-10-08T08:19:44.996Z" }
+                },
+                { "key": "event.sequence", "value": { "intValue": 16 } },
+                {
+                  "key": "prompt.id",
+                  "value": {
+                    "stringValue": "9bf4356e-17e6-4ebe-a03e-ea698cc47bed"
+                  }
+                },
+                { "key": "tool_name", "value": { "stringValue": "Bash" } },
+                {
+                  "key": "tool_use_id",
+                  "value": { "stringValue": "toolu_01D5XngnxT5MnCVwSYBskd57" }
+                },
+                { "key": "success", "value": { "stringValue": "true" } },
+                { "key": "duration_ms", "value": { "stringValue": "351" } },
+                {
+                  "key": "tool_parameters",
+                  "value": {
+                    "stringValue": "{\"bash_command\":\"echo\",\"full_command\":\"echo AGENTDOCK_SENTINEL_TOOL_7f3a\",\"description\":\"Echo sentinel string\"}"
+                  }
+                },
+                {
+                  "key": "tool_input",
+                  "value": {
+                    "stringValue": "{\"command\":\"echo AGENTDOCK_SENTINEL_TOOL_7f3a\",\"description\":\"Echo sentinel string\"}"
+                  }
+                },
+                {
+                  "key": "tool_input_size_bytes",
+                  "value": { "stringValue": "84" }
+                },
+                {
+                  "key": "tool_result_size_bytes",
+                  "value": { "stringValue": "28" }
+                }
+              ],
+              "droppedAttributesCount": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "agentdock.project",
+            "value": { "stringValue": "prj_fixture" }
+          },
+          { "key": "agentdock.slot", "value": { "stringValue": "i42-api" } },
+          { "key": "agentdock.issue", "value": { "stringValue": "42" } },
+          { "key": "agentdock.run", "value": { "stringValue": "run_fixture" } },
+          { "key": "host.arch", "value": { "stringValue": "amd64" } },
+          { "key": "os.type", "value": { "stringValue": "linux" } },
+          {
+            "key": "os.version",
+            "value": { "stringValue": "6.19.10-300.fc44.x86_64" }
+          },
+          { "key": "service.name", "value": { "stringValue": "claude-code" } },
+          { "key": "service.version", "value": { "stringValue": "2.1.294" } }
+        ],
+        "droppedAttributesCount": 0
+      },
+      "scopeLogs": [
+        {
+          "scope": {
+            "name": "com.anthropic.claude_code.events",
+            "version": "2.1.294"
+          },
+          "logRecords": [
+            {
+              "timeUnixNano": "1791447585985000000",
+              "observedTimeUnixNano": "1791447585985000000",
+              "body": { "stringValue": "claude_code.api_request" },
+              "attributes": [
+                {
+                  "key": "agentdock.project",
+                  "value": { "stringValue": "prj_fixture" }
+                },
+                {
+                  "key": "agentdock.slot",
+                  "value": { "stringValue": "i42-api" }
+                },
+                { "key": "agentdock.issue", "value": { "stringValue": "42" } },
+                {
+                  "key": "agentdock.run",
+                  "value": { "stringValue": "run_fixture" }
+                },
+                {
+                  "key": "user.id",
+                  "value": {
+                    "stringValue": "fixture-user-id-0000000000000000000000000000000000000000000000000000"
+                  }
+                },
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "370042b4-4ba5-4ef6-87c8-7cf3ddba0367"
+                  }
+                },
+                {
+                  "key": "organization.id",
+                  "value": {
+                    "stringValue": "00000000-0000-4000-8000-0000000000a1"
+                  }
+                },
+                {
+                  "key": "user.email",
+                  "value": { "stringValue": "person@example.invalid" }
+                },
+                {
+                  "key": "user.account_uuid",
+                  "value": {
+                    "stringValue": "00000000-0000-4000-8000-0000000000a2"
+                  }
+                },
+                {
+                  "key": "user.account_id",
+                  "value": { "stringValue": "user_fixture_account" }
+                },
+                { "key": "terminal.type", "value": { "stringValue": "tmux" } },
+                {
+                  "key": "event.name",
+                  "value": { "stringValue": "api_request" }
+                },
+                {
+                  "key": "event.timestamp",
+                  "value": { "stringValue": "2026-10-08T08:19:45.985Z" }
+                },
+                { "key": "event.sequence", "value": { "intValue": 17 } },
+                {
+                  "key": "prompt.id",
+                  "value": {
+                    "stringValue": "9bf4356e-17e6-4ebe-a03e-ea698cc47bed"
+                  }
+                },
+                {
+                  "key": "model",
+                  "value": { "stringValue": "claude-haiku-5-5" }
+                },
+                { "key": "input_tokens", "value": { "intValue": 2 } },
+                { "key": "output_tokens", "value": { "intValue": 3 } },
+                { "key": "cache_read_tokens", "value": { "intValue": 29281 } },
+                {
+                  "key": "cache_creation_tokens",
+                  "value": { "intValue": 155 }
+                },
+                { "key": "cost_usd", "value": { "doubleValue": 0.00032551 } },
+                { "key": "cost_usd_micros", "value": { "intValue": 326 } },
+                { "key": "duration_ms", "value": { "intValue": 901 } },
+                { "key": "ttft_ms", "value": { "intValue": 884 } },
+                {
+                  "key": "request_id",
+                  "value": { "stringValue": "req_011CfpSesVaEqnspJvvovFo5" }
+                },
+                {
+                  "key": "client_request_id",
+                  "value": {
+                    "stringValue": "1ce3b661-a226-41cd-9eaf-4c6c0691da39"
+                  }
+                },
+                { "key": "speed", "value": { "stringValue": "normal" } },
+                { "key": "query_source", "value": { "stringValue": "sdk" } },
+                { "key": "effort", "value": { "stringValue": "medium" } }
+              ],
+              "droppedAttributesCount": 0
+            },
+            {
+              "timeUnixNano": "1791447585987000000",
+              "observedTimeUnixNano": "1791447585987000000",
+              "body": { "stringValue": "claude_code.assistant_response" },
+              "attributes": [
+                {
+                  "key": "agentdock.project",
+                  "value": { "stringValue": "prj_fixture" }
+                },
+                {
+                  "key": "agentdock.slot",
+                  "value": { "stringValue": "i42-api" }
+                },
+                { "key": "agentdock.issue", "value": { "stringValue": "42" } },
+                {
+                  "key": "agentdock.run",
+                  "value": { "stringValue": "run_fixture" }
+                },
+                {
+                  "key": "user.id",
+                  "value": {
+                    "stringValue": "fixture-user-id-0000000000000000000000000000000000000000000000000000"
+                  }
+                },
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "370042b4-4ba5-4ef6-87c8-7cf3ddba0367"
+                  }
+                },
+                {
+                  "key": "organization.id",
+                  "value": {
+                    "stringValue": "00000000-0000-4000-8000-0000000000a1"
+                  }
+                },
+                {
+                  "key": "user.email",
+                  "value": { "stringValue": "person@example.invalid" }
+                },
+                {
+                  "key": "user.account_uuid",
+                  "value": {
+                    "stringValue": "00000000-0000-4000-8000-0000000000a2"
+                  }
+                },
+                {
+                  "key": "user.account_id",
+                  "value": { "stringValue": "user_fixture_account" }
+                },
+                { "key": "terminal.type", "value": { "stringValue": "tmux" } },
+                {
+                  "key": "event.name",
+                  "value": { "stringValue": "assistant_response" }
+                },
+                {
+                  "key": "event.timestamp",
+                  "value": { "stringValue": "2026-10-08T08:19:45.987Z" }
+                },
+                { "key": "event.sequence", "value": { "intValue": 18 } },
+                {
+                  "key": "prompt.id",
+                  "value": {
+                    "stringValue": "9bf4356e-17e6-4ebe-a03e-ea698cc47bed"
+                  }
+                },
+                { "key": "response_length", "value": { "intValue": 4 } },
+                { "key": "response", "value": { "stringValue": "done" } },
+                {
+                  "key": "request_id",
+                  "value": { "stringValue": "req_011CfpSesVaEqnspJvvovFo5" }
+                },
+                {
+                  "key": "message.uuid",
+                  "value": {
+                    "stringValue": "67afe676-f0d0-4456-8614-6a20d94e0002"
+                  }
+                },
+                {
+                  "key": "model",
+                  "value": { "stringValue": "claude-haiku-5-5" }
+                },
+                { "key": "query_source", "value": { "stringValue": "sdk" } }
+              ],
+              "droppedAttributesCount": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
