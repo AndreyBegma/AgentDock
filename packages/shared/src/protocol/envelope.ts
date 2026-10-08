@@ -15,6 +15,8 @@ export const eventSourceSchema = z.enum([
   'otel',
   'transcript',
   'github',
+  /** Parsed from Code Sentinel's markdown, the ADR-0002 fallback (spec 11). */
+  'scraped',
 ]);
 export type EventSource = z.infer<typeof eventSourceSchema>;
 

@@ -78,6 +78,45 @@ None of these carries prompt, response, thinking or tool-argument text
 `issue.labeled`, `issue.closed`, `pr.opened`, `pr.checks_changed`
 (`rollup: pending|green|red`), `pr.closed`.
 
+### Fleet (spec 11)
+
+The schemas live in `packages/shared/src/protocol/events/fleet.ts`
+(`fleetEventDataSchemas`, `parseFleetEvent`); the API projects them into
+`rounds`, `slots`, `slot_checkpoints` and `fleet_orchestrators`. Until
+`events.jsonl` exists (M2.1) the runner's collectors emit them: from tmux, git
+and `gh` with source `runner`, from markdown (boards, briefs, reply files) with
+source `scraped` (ADR-0002). Where a row above names the same type, this table
+is the shape the runner and the API agree on.
+
+Slot-scoped events name the slot in the envelope's `slot` (and the issue in
+`issue`, when known); `data` does not repeat them. Pane events carry
+`target: slot | orchestrator` (default `slot`); a slot target needs the
+envelope `slot`.
+
+| Type | Envelope `slot` | `data` |
+|---|---|---|
+| `session.appeared` / `session.vanished` | required | `name` (tmux session), `pid?` |
+| `pane.prompt` | when `target: slot` | `target`, `dialog: trust\|bypass\|credits\|settings\|other` |
+| `pane.idle` | when `target: slot` | `target`, `polls` |
+| `pane.quota_hit` | when `target: slot` | `target` |
+| `pane.busy` | when `target: slot` | `target` — `esc to interrupt` is back: the pane left idle, prompt or quota |
+| `worktree.changed` | required | `path, exists, branch?, ahead?, behind?, dirty?` — `exists: false` once the directory is gone |
+| `round.started` | — | `date` (`YYYY-MM-DD`), `round` (`HHMM`), `base, occupied, max, free, boardPath` |
+| `round.decided` | — | `date, round, decisions: { dispatching, heldForLead, notDispatching, inFlight }`, each an array of rows keyed by column header as written |
+| `board.unparsed` | — | `file, line?, reason` — a board or brief that did not parse |
+| `slot.dispatched` | required | `date, round, briefPath, branch?, worktree?, runtime (claude), model?, modelWhy?, owns[], never[], lead?` |
+| `slot.checkpoint` | required | `checkpoint` (`picked_up` · `plan_ready` · `implementation_done` · `pr_open` · `blocked` · `misclassified` · `other`), `heading?`, `summary` (≤ 4 KB), `position?` (0-based index of the heading in the reply file — the reply collector always sends it; without it the checkpoint is appended), `prUrl?` |
+| `pr.opened` | optional | `number, branch, url, title, checks: pending\|green\|red, mergeable?` |
+| `pr.checks_changed` | optional | `number, branch, checks, mergeable?` |
+| `pr.closed` | optional | `number, branch, merged` |
+| `orchestrator.started` | — | `session` |
+| `orchestrator.stopped` | — | `session, reason?` |
+| `commit.trailer_found` | required | `sha` |
+
+A PR event without a `slot` is matched to the latest slot on its `branch`.
+`rollupChecks` and `checkpointFromHeading` in `@agentdock/shared` are the D3 and
+D5 rules, for the collectors to share.
+
 ## Correlation
 
 Sessions launched by the runner get

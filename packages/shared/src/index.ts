@@ -1,5 +1,6 @@
 export * from './audit';
 export * from './auth';
+export * from './fleet';
 export * from './live';
 export * from './projects';
 export * from './runners';
