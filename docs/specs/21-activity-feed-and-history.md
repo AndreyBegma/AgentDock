@@ -231,6 +231,24 @@ i21-api, decided with the orchestrator on 2026-10-08:
    but does not add them to the map. The runner slot of the same issue adds
    the map entry together with its handler. #21 adds no command.
 
+i21-web, decided with the orchestrator on 2026-10-08:
+
+10. **Live topics of the global feed are budgeted.** The `/live` socket is
+    shared by the whole tab and capped at `MAX_LIVE_SUBSCRIPTIONS` (50). The
+    global `/activity` page follows `project:<id>` for each of the caller's
+    projects only up to 10 (plus `admin` for an admin); with more projects it
+    subscribes to nothing and polls the first page every 15 s. A feed fixed or
+    filtered to one project is always live on that project's topic. The choice
+    is `planLive` in `apps/web/src/lib/activity/format.ts`.
+11. **"N new" pill.** A pushed item (or one found by the poll) is filtered
+    client-side against the applied filters and deduplicated by id. While the
+    top of the feed is on screen it is inserted at once; scrolled away, it
+    waits behind the pill, which inserts it and scrolls to the top.
+12. **Nav.** `nav.ts` had no Activity entries, so i21-web added both (global,
+    and the project tab) rather than flipping a flag. History was flipped on.
+13. **Cost cell.** "unpriced" when requests exist and none is priced, the sum
+    plus "+ N unpriced" when partly priced, "—" when the run has no requests.
+
 Depends on #11
 
 Depends on #12
