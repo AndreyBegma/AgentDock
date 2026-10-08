@@ -145,7 +145,7 @@ The StatTile, Sparkline and DataTable components come from
 
 | Variable / key | Where | Meaning |
 |---|---|---|
-| `otlp.enabled`, `otlp.httpPort` | runner config (`~/.config/agentdock/runner.json`) | receiver switch and port (default `true`, `4318`) |
+| `otlp.enabled`, `otlp.http`, `otlp.codexExperimental` | runner config (`~/.config/agentdock/runner.json`) | receiver switch, port and the experimental Codex mapping (default `true`, `4318`, `false`); `otlp: null` is all defaults. The port key is #5's reserved `http`, not `httpPort` |
 | `USAGE_RECOMPUTE_BATCH` | `apps/api` | recompute batch size (default 1000) |
 
 ## Acceptance criteria
@@ -217,6 +217,36 @@ and pinned in `apps/web` before i13-web starts.
 | Keep raw OTLP payloads for debugging? | No — only mapped events leave the runner (D16) |
 
 ## Notes from implementation
+
+i13-otlp, decided with the orchestrator on 2026-10-08:
+
+1. **Fixture captured (D13 for Claude Code [Confirmed]).** The capture came from Claude Code 2.1.294 running `claude -p --model haiku` with telemetry exported to a local capture server, one run in protobuf and one in JSON. It ran with `OTEL_LOG_USER_PROMPTS=1`, `OTEL_LOG_TOOL_DETAILS=1` and `agentdock.*` resource attributes. The fixtures are in `apps/runner/src/otlp/fixtures/`:
+   - `claude-logs.pb.base64` and `claude-logs.json`: the `user_prompt`, `api_request`, `tool_decision`, `tool_result` and `assistant_response` records of each run;
+   - `claude-transcript.jsonl`: the `user`/`assistant` lines of the JSON run's transcript.
+
+   Email, organization, account and user ids are replaced by placeholders. The prompt and tool sentinel strings are kept on purpose, for the D16 test. The scrub script is not in the repository.
+2. **`api_request` attributes as captured.** `model`, `input_tokens`, `output_tokens`, `cache_read_tokens`, `cache_creation_tokens`, `cost_usd` (double), `cost_usd_micros`, `duration_ms`, `ttft_ms`, `request_id` (the same `req_…` as the transcript's `requestId`, which is the D15 key), `client_request_id`, `prompt.id`, `session.id`, `query_source`, `speed`, `effort`, `event.timestamp`.
+   - Every record repeats the resource attributes, `agentdock.*` included, and carries `user.email`, `organization.id`, `user.account_uuid`, `user.account_id` and `user.id`.
+   - The same key can be typed differently per event: `duration_ms` is an `intValue` on `api_request` and a `stringValue` on `tool_result`.
+   - No `agent.name` was seen, because the capture has no subagent.
+3. **Mapping as built.**
+   - `ttftMs` is sent as well.
+   - `reasoning` is 0, since OTel has no thinking split. The transcript copy fills it (D15).
+   - `cache_creation_tokens` → `cacheWrite5m`, with `cacheWriteTtlUnknown: true` when it is non-zero. The capture shows why: for the same request (`req_011CfpSesVaEqnspJvvovFo5`) OTel reports 155 cache-write tokens with no TTL, while the transcript has them as `ephemeral_1h_input_tokens`.
+   - `querySource` [Inferred]: `sdk`, `repl_main_thread`, `main` or absent → `main`; `agent.name` present or `query_source` starting with `agent` → `subagent`; anything else → `auxiliary`. Only `sdk` was observed.
+   - A record without `session.id`, `request_id` or `model` is dropped and counted in a warning.
+4. **Correlation (D14).** `agentdock.project` is a project id. It sets the envelope `project` only when it is on the runner's watch list (the same trust rule as `session.observed`). It is then resolved through git once per project, like the fleet collectors (`resolveFleetProject`), so `repo` is `owner/name`, else the root's basename. `agentdock.slot` → envelope `slot`. `agentdock.issue` → envelope `issue` when it is a positive integer. `agentdock.run` → `data.run` (at most 128 characters, as the shared schema allows). The #12 adapters do not set the envelope `project`; they put `projectId` on `session.observed`. The API reads the envelope `project` of an `llm.request` for a placeholder session, under the same watch-list trust rule (i13-api's notes).
+5. **Contract fields**, from i13-api's extension of `llmRequestDataSchema`: `reportedCostUsd`, `cacheWriteTtlUnknown`, `source: 'otel'` and `run`. What gets spooled is the shared schema's parsed output of the whitelist-built object, so the runner and the API agree on the shape by construction.
+6. **Receiver.**
+   - `Bun.serve` on `127.0.0.1` only, plus a peer-address check (403 otherwise).
+   - 413 when the declared length, the streamed body, or the gzip-inflated size exceeds 4 MiB. `Content-Encoding` other than gzip or identity is 415.
+   - 503 when the spool throws, so the exporter retries.
+   - `/v1/metrics` and `/v1/traces` answer 200 and are not read.
+   - A port that cannot be bound is logged and the runner runs without the receiver. Capabilities then report `otlp: null`, otherwise `{ grpc: null, http: <bound port> }`. The daemon passes these to `detectCapabilities`, and `detect/` is unchanged.
+7. **Codex (D13 [Unknown]).** Codex is not installed on the reference machine, so no capture exists. The mapping reads D13's names (`input_tokens`, `output_tokens`, `cached_input_tokens`, `reasoning_output_tokens`), with session `conversation.id`/`session.id` and request `request_id`/`response.id`, all unverified. It is off unless `otlp.codexExperimental` is set, and its tests are `it.skip` with the reason.
+8. **End-to-end dedupe (acceptance criterion).** This slot ships the runner half: the OTel and transcript copies of the captured requests carry the same `(session.id, requestId)` key, tested through the Claude adapter. Both orders through ingest are i13-api's.
+9. **Protobuf decoding.** `protobufjs` 8.8.0 (`protobufjs/light`) reads `otlp/proto/logs.json`, the JSON descriptor of opentelemetry-proto v1.11.1 (Apache-2.0, `otlp/proto/ATTRIBUTION.md`). OTLP/JSON is read directly, without `fromObject`, because it sends hex trace ids where protobufjs expects base64.
+10. **Command registration trap**: recorded once, in i13-api's notes below. This slot adds no command either.
 
 i13-api, decided with the orchestrator on 2026-10-08:
 

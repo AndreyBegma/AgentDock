@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@agentdock/shared": "workspace:*",
+    "protobufjs": "8.8.0",
     "zod": "4.6.5"
   },
   "devDependencies": {

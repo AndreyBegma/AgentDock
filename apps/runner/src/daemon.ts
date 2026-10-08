@@ -24,6 +24,7 @@ import { detectCapabilities } from './detect/capabilities';
 import type { Exec } from './detect/exec';
 import { acquireLock } from './lock';
 import { errorMessage, type Logger } from './log';
+import { otlpSettings, startOtlpReceiver } from './otlp';
 import { WatchList } from './projects/watch-list';
 import { Spool } from './spool';
 import { RUNNER_VERSION } from './version';
@@ -71,7 +72,12 @@ export const runDaemon = async (
     log.info('spool opened', { ...spool.stats() });
 
     const redetect = async (): Promise<Capabilities> => {
-      const capabilities = await detectCapabilities({ exec, home, config });
+      const capabilities = await detectCapabilities({
+        exec,
+        home,
+        // The receiver's port as bound, not as configured (spec 13).
+        config: { profiles: config.profiles, otlp: otlpCapability() },
+      });
       log.info('capabilities detected', {
         claude: capabilities.runtimes.claude?.version ?? null,
         codex: capabilities.runtimes.codex?.version ?? null,
@@ -174,6 +180,20 @@ export const runDaemon = async (
     });
     connection = live;
 
+    // OTLP receiver (spec 13 D11): sessions with telemetry on report each
+    // request live, into the spool like every other event. Started before
+    // `hello`, which reports its port.
+    const otlp = startOtlpReceiver({
+      settings: otlpSettings(config.otlp),
+      emit: (event) => live.emit(event),
+      projects: () => watchList.current,
+      exec,
+      clock,
+      log,
+    });
+    const otlpCapability = (): Capabilities['otlp'] =>
+      otlp?.port ? { grpc: null, http: otlp.port } : null;
+
     const onAbort = () => live.stop();
     if (options.signal?.aborted) live.stop();
     options.signal?.addEventListener('abort', onAbort, { once: true });
@@ -188,6 +208,7 @@ export const runDaemon = async (
     options.signal?.removeEventListener('abort', onAbort);
     await registry.stop();
     await sessions?.stop();
+    await otlp?.stop();
     return reason;
   } finally {
     release();

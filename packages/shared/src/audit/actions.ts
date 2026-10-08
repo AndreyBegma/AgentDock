@@ -34,6 +34,11 @@ export const AUDIT_ACTIONS = [
   'issue.create',
   'pane.watch_started',
   'pane.watch_stopped',
+  'orchestrator.start',
+  'orchestrator.stop',
+  'orchestrator.settings',
+  'slot.stop',
+  'slot.message',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
