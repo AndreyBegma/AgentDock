@@ -11,6 +11,7 @@ import {
   messageProblem,
 } from '../../../../../lib/control/format';
 import type { useControl } from '../../../../../lib/control/use-control';
+import { PendingLabel } from './pending-label';
 
 /** Message worker and Stop slot of the slot sheet (spec 17 D6–D8). */
 export function SlotControls({
@@ -73,14 +74,20 @@ export function SlotControls({
           disabled={stopBusy}
           onClick={() => setStopping(true)}
         >
-          {stopBusy ? COMMAND_PENDING_LABEL['slot.stop'] : 'Stop slot'}
+          Stop slot
         </Button>
+        {stopBusy ? (
+          <PendingLabel label={COMMAND_PENDING_LABEL['slot.stop']} />
+        ) : null}
+        {sending ? (
+          <PendingLabel label={COMMAND_PENDING_LABEL['slot.message']} />
+        ) : null}
         <Button
           variant="solid"
           disabled={problem !== null || sending}
           onClick={send}
         >
-          {sending ? COMMAND_PENDING_LABEL['slot.message'] : 'Send message'}
+          Send message
         </Button>
       </div>
 

@@ -24,6 +24,7 @@ import {
 } from '../../../../../lib/control/format';
 import type { useControl } from '../../../../../lib/control/use-control';
 import { formatAge } from '../../../../../lib/fleet/format';
+import { PendingLabel } from './pending-label';
 
 type Control = ReturnType<typeof useControl>;
 
@@ -144,17 +145,25 @@ export function OrchestratorControls({
               disabled={startBusy || !settings}
               onClick={openStart}
             >
-              {startBusy
-                ? COMMAND_PENDING_LABEL['orchestrator.start']
-                : 'Start…'}
+              Start…
             </Button>
             <Button
               variant="glass"
               disabled={stopBusy}
               onClick={() => setStopping(true)}
             >
-              {stopBusy ? COMMAND_PENDING_LABEL['orchestrator.stop'] : 'Stop'}
+              Stop
             </Button>
+            {startBusy ? (
+              <PendingLabel
+                label={COMMAND_PENDING_LABEL['orchestrator.start']}
+              />
+            ) : null}
+            {stopBusy ? (
+              <PendingLabel
+                label={COMMAND_PENDING_LABEL['orchestrator.stop']}
+              />
+            ) : null}
           </>
         ) : null}
         <Button variant="ghost" disabled={refreshing} onClick={refresh}>
