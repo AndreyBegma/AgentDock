@@ -122,7 +122,9 @@ describe('computeQueue — D3, one row per acceptance criterion', () => {
     ).toBe('ready');
     expect(
       stateOf(
-        inputs({ issues: [issue(1, { labels: ['cs:ready', 'cs:in-flight'] })] }),
+        inputs({
+          issues: [issue(1, { labels: ['cs:ready', 'cs:in-flight'] })],
+        }),
       )?.shown.state,
     ).toBe('in_flight');
   });
@@ -153,9 +155,9 @@ describe('computeQueue — D3, one row per acceptance criterion', () => {
       stateOf(inputs({ issues: [i, issue(2, { labels: [] })] }))?.shown.state;
     expect(at(everything)).toBe('in_flight');
     expect(at({ ...everything, labels: ['cs:ready'] })).toBe('blocked_person');
-    expect(at({ ...everything, labels: ['cs:ready'], body: 'Depends on #2' })).toBe(
-      'blocked_work',
-    );
+    expect(
+      at({ ...everything, labels: ['cs:ready'], body: 'Depends on #2' }),
+    ).toBe('blocked_work');
   });
 
   it('BLOCKED — person for the cs:needs-person label', () => {
@@ -174,7 +176,10 @@ describe('computeQueue — how a dependency was closed', () => {
   const closed = (closedBy: CachedIssue['closedBy']) =>
     stateOf(
       inputs({
-        issues: [dependant, issue(2, { state: 'closed', labels: [], closedBy })],
+        issues: [
+          dependant,
+          issue(2, { state: 'closed', labels: [], closedBy }),
+        ],
       }),
     );
 
@@ -259,8 +264,8 @@ describe('computeQueue — scope and order (D6)', () => {
 
   it('lists the wave slots of a parallel plan', () => {
     const body = `${AC}\n## Parallel plan\n| Slot | Lead | Model |\n|---|---|---|\n| i1-api | yes | opus |\n`;
-    expect(stateOf(inputs({ issues: [issue(1, { body })] }))?.waveSlots).toEqual(
-      [{ slot: 'i1-api', lead: true, model: 'opus' }],
-    );
+    expect(
+      stateOf(inputs({ issues: [issue(1, { body })] }))?.waveSlots,
+    ).toEqual([{ slot: 'i1-api', lead: true, model: 'opus' }]);
   });
 });

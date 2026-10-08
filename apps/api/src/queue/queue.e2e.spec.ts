@@ -4,7 +4,12 @@ import {
   type QueueView,
 } from '@agentdock/shared';
 import type { RunnerEvent } from '@agentdock/shared/protocol';
-import { EventStream, REPO, ROOT, seedProject } from '../fleet/testing/fleet-e2e';
+import {
+  EventStream,
+  REPO,
+  ROOT,
+  seedProject,
+} from '../fleet/testing/fleet-e2e';
 import { allowedLiveOrigin } from '../live/live-options';
 import {
   createLiveE2eApp,
@@ -27,11 +32,7 @@ const FETCHED_AT = '2026-10-08T10:00:00.000Z';
 const url = (n: number, kind = 'issues') =>
   `https://github.com/${REPO}/${kind}/${n}`;
 
-const issue = (
-  number: number,
-  body = AC,
-  labels: string[] = ['cs:ready'],
-) => ({
+const issue = (number: number, body = AC, labels: string[] = ['cs:ready']) => ({
   number,
   title: `Issue ${number}`,
   labels,
@@ -98,9 +99,7 @@ describe('task queue (e2e)', () => {
         fetchedAt: data.fetchedAt ?? FETCHED_AT,
         part: data.part ?? 0,
         parts: data.parts ?? 1,
-        open:
-          data.open ??
-          [...issues, ...pullRequests].map((i) => i.number),
+        open: data.open ?? [...issues, ...pullRequests].map((i) => i.number),
         issues,
         pullRequests,
       },
@@ -199,9 +198,7 @@ describe('task queue (e2e)', () => {
       const view = await queue();
       expect(view.snapshotAt).toBe(FETCHED_AT);
       expect(view.readyLabel).toBe('cs:ready');
-      expect(
-        view.items.map((i) => [i.number, i.state, i.source]),
-      ).toEqual([
+      expect(view.items.map((i) => [i.number, i.state, i.source])).toEqual([
         [7, 'ready', 'computed'],
         [1, 'blocked_work', 'computed'],
         [3, 'blocked_person', 'computed'],
@@ -555,7 +552,12 @@ describe('task queue (e2e)', () => {
     it('refuses labels the repository does not use, and the ready label', async () => {
       const create = jest.spyOn(commands, 'createIssue');
       for (const labels of [['made-up'], ['CS:Ready']]) {
-        const response = await post({ title: 'x', body: AC, labels, queue: false });
+        const response = await post({
+          title: 'x',
+          body: AC,
+          labels,
+          queue: false,
+        });
         expect(response.status).toBe(422);
         expect(response.body).toMatchObject({
           error: 'label_not_allowed',

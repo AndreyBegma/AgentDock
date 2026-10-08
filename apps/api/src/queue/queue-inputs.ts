@@ -60,8 +60,7 @@ export const toCachedIssue = (row: IssueRow): CachedIssue => ({
 
 export const labelsOf = (row: Pick<IssueRow, 'labels'>): string[] =>
   strings(row.labels);
-export const assigneesOf = (row: IssueRow): string[] =>
-  strings(row.assignees);
+export const assigneesOf = (row: IssueRow): string[] => strings(row.assignees);
 
 /** The newest round of a project, by board date and `HHMM`. */
 export const latestRound = (db: Db, projectId: string) =>

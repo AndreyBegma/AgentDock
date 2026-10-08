@@ -1,7 +1,4 @@
-import {
-  QUEUE_LIVE_EVENT,
-  type QueueLiveChange,
-} from '@agentdock/shared';
+import { QUEUE_LIVE_EVENT, type QueueLiveChange } from '@agentdock/shared';
 import {
   type IssueClosedData,
   type IssuesSnapshotData,
@@ -67,7 +64,9 @@ export class QueueProjector {
       const parsed = parseQueueEvent(raw);
       if (!parsed) continue;
       if (!parsed.ok) {
-        this.logger.warn(`skipped queue event seq ${raw.seq}: ${parsed.reason}`);
+        this.logger.warn(
+          `skipped queue event seq ${raw.seq}: ${parsed.reason}`,
+        );
         continue;
       }
       queue.push(parsed.event);
@@ -107,7 +106,11 @@ export class QueueProjector {
   }
 
   /** Applies one event; true when it changed something a client shows. */
-  private apply(tx: Tx, project: ProjectRef, event: QueueEvent): Promise<boolean> {
+  private apply(
+    tx: Tx,
+    project: ProjectRef,
+    event: QueueEvent,
+  ): Promise<boolean> {
     const seq = BigInt(event.seq);
     switch (event.type) {
       case 'issues.snapshot':
@@ -115,7 +118,13 @@ export class QueueProjector {
       case 'issue.closed':
         return this.closed(tx, project, event.data, seq, new Date(event.ts));
       case 'issues.unavailable':
-        return this.unavailable(tx, project, event.data, seq, new Date(event.ts));
+        return this.unavailable(
+          tx,
+          project,
+          event.data,
+          seq,
+          new Date(event.ts),
+        );
     }
   }
 

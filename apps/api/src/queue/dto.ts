@@ -1,8 +1,5 @@
 import { QUEUE_STATES, type QueueState } from '@agentdock/shared';
-import {
-  ISSUE_LABELS_MAX,
-  ISSUE_TITLE_MAX,
-} from '@agentdock/shared/protocol';
+import { ISSUE_LABELS_MAX, ISSUE_TITLE_MAX } from '@agentdock/shared/protocol';
 import {
   ArrayMaxSize,
   IsArray,

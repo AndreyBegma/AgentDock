@@ -8,11 +8,7 @@ import {
   specGap,
 } from '@agentdock/shared';
 import { issueCreateArgsSchema } from '@agentdock/shared/protocol';
-import {
-  BadRequestException,
-  HttpException,
-  Injectable,
-} from '@nestjs/common';
+import { BadRequestException, HttpException, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import type { AuditContext } from '../audit/audit.types';
 import { PrismaService } from '../database/prisma.service';

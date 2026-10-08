@@ -60,8 +60,7 @@ export class QueueRecompute {
       if (before && same(before, row)) continue;
       const data = {
         ...row,
-        waveSlots:
-          row.waveSlots?.map((s) => ({ ...s })) ?? Prisma.DbNull,
+        waveSlots: row.waveSlots?.map((s) => ({ ...s })) ?? Prisma.DbNull,
         computedAt: now,
       };
       await tx.queueStateRow.upsert({

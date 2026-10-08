@@ -24,8 +24,8 @@ import {
   type ResolvedProjectAccess,
 } from '../projects';
 import { CreateIssueDto, QueueListQuery } from './dto';
-import { QueueQueryService } from './queue-query.service';
 import { QueueService } from './queue.service';
+import { QueueQueryService } from './queue-query.service';
 
 /**
  * The task queue (spec 19 "API"). Reading needs membership; filing an issue

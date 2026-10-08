@@ -162,7 +162,9 @@ const blockedOnWork = (
     blockers,
     verdict: {
       state: 'blocked_work',
-      why: blocks.map((b) => `depends on #${b.number}, which ${b.reason}`).join('; '),
+      why: blocks
+        .map((b) => `depends on #${b.number}, which ${b.reason}`)
+        .join('; '),
       clears: `${refs(blockers)} closed by a merged pull request`,
     },
   };

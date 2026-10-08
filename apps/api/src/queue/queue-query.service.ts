@@ -2,10 +2,10 @@ import {
   boardVerdicts,
   comparePriority,
   heldForLead,
+  type OpenIssueView,
   priorityOf,
   QUEUE_ERROR,
   QUEUE_HISTORY_ROUNDS,
-  type OpenIssueView,
   type QueueBlocker,
   type QueueHistoryEntry,
   type QueueIssueDetail,
@@ -19,6 +19,7 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { projectNotFound } from '../projects';
+import { queueError } from './queue-error';
 import {
   assigneesOf,
   decisionsOf,
@@ -27,7 +28,6 @@ import {
   latestRound,
   readyLabelOf,
 } from './queue-inputs';
-import { queueError } from './queue-error';
 
 type StateRow = Prisma.QueueStateRowGetPayload<object>;
 
@@ -42,7 +42,10 @@ const formatDate = (date: Date): string => date.toISOString().slice(0, 10);
 const waveSlotsOf = (value: Prisma.JsonValue): WaveSlot[] | null =>
   Array.isArray(value)
     ? value.flatMap((v) =>
-        v && typeof v === 'object' && !Array.isArray(v) && typeof v.slot === 'string'
+        v &&
+        typeof v === 'object' &&
+        !Array.isArray(v) &&
+        typeof v.slot === 'string'
           ? [
               {
                 slot: v.slot,
@@ -160,7 +163,11 @@ export class QueueQueryService {
   private async project(projectId: string) {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
-      select: { repo: true, readyLabelOverride: true, codeSentinelConfig: true },
+      select: {
+        repo: true,
+        readyLabelOverride: true,
+        codeSentinelConfig: true,
+      },
     });
     if (!project) throw projectNotFound();
     return project;
@@ -172,7 +179,9 @@ export class QueueQueryService {
     states: StateRow[],
   ): Promise<Map<number, IssueRow>> {
     const numbers = new Set(states.map((s) => s.issueNumber));
-    for (const s of states) for (const n of numbersOf(s.blockers)) numbers.add(n);
+    for (const s of states) {
+      for (const n of numbersOf(s.blockers)) numbers.add(n);
+    }
     const rows = await this.prisma.issueCache.findMany({
       where: { projectId, number: { in: [...numbers] } },
     });
