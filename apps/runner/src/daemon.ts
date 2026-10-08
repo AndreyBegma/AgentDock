@@ -25,6 +25,7 @@ import type { Exec } from './detect/exec';
 import { acquireLock } from './lock';
 import { errorMessage, type Logger } from './log';
 import { otlpSettings, startOtlpReceiver } from './otlp';
+import { PaneStreamer } from './pane';
 import { WatchList } from './projects/watch-list';
 import { Spool } from './spool';
 import { RUNNER_VERSION } from './version';
@@ -143,6 +144,16 @@ export const runDaemon = async (
       log,
     });
 
+    // Live pane (spec 18): frames go out through the connection, which exists
+    // only below; with the socket down they are dropped and `reset` ends them.
+    const pane = new PaneStreamer({
+      exec,
+      clock,
+      watchedProjects: () => watchList.current,
+      send: (message) => connection?.sendMessage(message) ?? false,
+      log,
+    });
+
     const heartbeat = async (): Promise<HeartbeatPayload> => {
       const [one, five, fifteen] = loadavg();
       return {
@@ -168,6 +179,7 @@ export const runDaemon = async (
       }),
       heartbeat,
       dispatch,
+      pane,
       onConfig: (server) => {
         sessions?.setProjects(server.projects).catch(() => {});
         watchList.apply(server.projects).catch((error) => {
@@ -206,6 +218,7 @@ export const runDaemon = async (
     options.onStart?.(live);
     const reason = await live.done;
     options.signal?.removeEventListener('abort', onAbort);
+    pane.stop();
     await registry.stop();
     await sessions?.stop();
     await otlp?.stop();

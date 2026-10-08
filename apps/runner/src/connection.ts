@@ -8,6 +8,7 @@ import {
   type RunnerMessage,
   type RunnerServerConfig,
   type ServerMessage,
+  type SubscribeMessage,
   serverMessageSchema,
   type UnsequencedEvent,
 } from '@agentdock/shared/protocol';
@@ -52,8 +53,18 @@ export interface ConnectionOptions {
   dispatch: Dispatch;
   /** The server's config, from `welcome` on every connect and from `config` after. */
   onConfig?: (config: RunnerServerConfig) => void;
+  /** Live pane subscriptions (spec 18); without it they are ignored. */
+  pane?: PaneHandler;
   createSocket?: SocketFactory;
   heartbeatMs?: number;
+}
+
+/** What the connection hands pane `subscribe` / `unsubscribe` to. */
+export interface PaneHandler {
+  subscribe(message: SubscribeMessage): Promise<void>;
+  unsubscribe(id: string): void;
+  /** The socket closed: subscriptions die with it, the server resubscribes. */
+  reset(): void;
 }
 
 type State = 'idle' | 'connecting' | 'open' | 'live' | 'stopped';
@@ -227,8 +238,10 @@ export class RunnerConnection {
         void this.options.dispatch(message).then((result) => this.send(result));
         return;
       case 'subscribe':
+        void this.options.pane?.subscribe(message);
+        return;
       case 'unsubscribe':
-        log.debug('pane capture is not available yet', { type: message.type });
+        this.options.pane?.unsubscribe(message.id);
         return;
     }
   }
@@ -262,6 +275,11 @@ export class RunnerConnection {
     }
   }
 
+  /** Sends a message when the socket is open; pane frames use it. */
+  sendMessage(message: RunnerMessage): boolean {
+    return this.send(message);
+  }
+
   private send(message: RunnerMessage): boolean {
     const socket = this.socket;
     if (!socket || socket.readyState !== WebSocket.OPEN) return false;
@@ -273,6 +291,7 @@ export class RunnerConnection {
     const { log, clock, backoff } = this.options;
     this.cancelHeartbeat();
     this.socket = null;
+    this.options.pane?.reset();
     if (this.state === 'stopped') return;
     if (TERMINAL_CLOSE_CODES.has(code)) {
       log.error('the server closed the connection for good', { code, reason });

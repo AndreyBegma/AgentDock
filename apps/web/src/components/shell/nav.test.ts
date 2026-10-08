@@ -9,19 +9,26 @@ const labels = (role: 'admin' | 'viewer', path: string) =>
 describe('visibleNav', () => {
   test('a viewer gets no Admin section', () => {
     const sections = visibleNav('viewer', '/').map((section) => section.id);
-    expect(sections).toEqual(['overview', 'sessions']);
+    expect(sections).toEqual(['overview', 'sessions', 'usage']);
   });
 
-  test('an admin gets Runners, Users, Audit and Settings', () => {
+  test('an admin gets Runners, Users, Audit, Prices and Settings', () => {
     expect(labels('admin', '/')).toEqual([
       'overview/Overview',
       'overview/Projects',
       'sessions/Sessions',
+      'usage/Usage',
       'admin/Runners',
       'admin/Users',
       'admin/Audit',
+      'admin/Prices',
       'admin/Settings',
     ]);
+  });
+
+  test('a viewer sees Usage but never Prices', () => {
+    expect(labels('viewer', '/')).toContain('usage/Usage');
+    expect(labels('viewer', '/').join()).not.toContain('Prices');
   });
 
   test('a viewer sees Projects, and Fleet and Settings inside a project', () => {
@@ -29,6 +36,7 @@ describe('visibleNav', () => {
       'overview/Overview',
       'overview/Projects',
       'sessions/Sessions',
+      'usage/Usage',
     ]);
     const inProject = labels('viewer', '/projects/p1/settings');
     expect(inProject).toContain('project/Fleet');
