@@ -9,6 +9,7 @@ import { HealthController } from './health.controller';
 import { LiveModule } from './live/live.module';
 import { PricesModule } from './prices/prices.module';
 import { ProjectsModule } from './projects/projects.module';
+import { QueueModule } from './queue';
 import { RunnersModule } from './runners/runners.module';
 import { SessionsModule } from './sessions/sessions.module';
 import { UsageModule } from './usage/usage.module';
@@ -30,6 +31,7 @@ import { UsageModule } from './usage/usage.module';
     SessionsModule,
     UsageModule,
     PricesModule,
+    QueueModule,
   ],
   controllers: [HealthController],
 })

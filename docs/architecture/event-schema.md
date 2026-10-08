@@ -135,6 +135,50 @@ A PR event without a `slot` is matched to the latest slot on its `branch`.
 `rollupChecks` and `checkpointFromHeading` in `@agentdock/shared` are the D3 and
 D5 rules, for the collectors to share.
 
+### Queue (spec 19)
+
+The schemas live in `packages/shared/src/protocol/events/queue.ts`
+(`queueEventDataSchemas`, `parseQueueEvent`); the API projects them into
+`issues_cache` and `issue_feeds` and recomputes `queue_states`. The runner's
+`issues` collector emits them with source `runner`. Every one needs the
+envelope `project`; none takes a `slot`. Where the GitHub row above names
+`issue.closed`, this table is the shape.
+
+| Type | `data` |
+|---|---|
+| `issues.snapshot` | `snapshotId, fetchedAt, part, parts, open[], issues[], pullRequests[]` — see below |
+| `issue.closed` | `number, closedBy: pr\|manual, pr?, closedAt?` — `pr` only with `closedBy: pr` |
+| `issues.unavailable` | `reason` (≤ 500 chars, the `gh` error) — the listing could not be read |
+
+**`issues.snapshot`** is emitted only when the listing changed: the collector
+polls `gh api -H 'If-None-Match: <etag>' 'repos/<owner>/<repo>/issues?state=open&per_page=100'`
+(paginated) every `queue.pollSeconds` (60), and a `304` emits nothing.
+
+- `issues[]`: `{ number, title, labels[], assignees[], body, updatedAt, url }`
+  for every open issue, ready-labelled or not (a `Depends on` may name any).
+  `body` is trimmed to 64 KB (`ISSUE_BODY_MAX_BYTES`); a `null` body is `""`.
+- `pullRequests[]`: the items of the same listing that carry a `pull_request`
+  key — `{ number, title, body, updatedAt, url }`, body trimmed to 16 KB
+  (`PULL_REQUEST_BODY_MAX_BYTES`). The API reads only their `Closes #n` /
+  `Fixes #n` / `Resolves #n` (`parseClosingRefs`).
+- `open[]`: every open issue **and** pull request number of the whole listing.
+- **Parts.** A listing whose `data` would exceed 192 KB
+  (`ISSUES_SNAPSHOT_PART_MAX_BYTES`, under the 256 KB batch cap) is split into
+  `parts` events sharing `snapshotId` and `fetchedAt`, `part` 0-based; each
+  issue and pull request is in exactly one part, and **every part carries the
+  complete `open[]`**. The API closes whatever is absent from `open[]` on each
+  part, so it never reassembles.
+
+**`issue.closed`** is emitted for every issue named in a `Depends on` line of
+an open issue that is not itself open, once per runner start: the collector
+reads `repos/<owner>/<repo>/issues/<n>/timeline` and reports `closedBy: pr`
+with the pull request's number when a merged pull request closed it, else
+`manual`. A dependency whose closure is not reported stays `BLOCKED — work`.
+
+`specGap`, `parseDependsOn`, `parseGate`, `parseClosingRefs` and
+`parseParallelPlan` in `@agentdock/shared` are the D3 body rules; the runner's
+`issue.create` handler uses the same `specGap`.
+
 ## Correlation
 
 Sessions launched by the runner get
