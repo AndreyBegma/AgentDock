@@ -6,5 +6,6 @@ export * from './events/fleet';
 export * from './events/sessions';
 export * from './messages';
 export * from './pairing';
+export * from './pane';
 export * from './projects';
 export * from './version';

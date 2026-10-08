@@ -61,8 +61,10 @@ both sit at the root of that origin.
 | S → R | `command` | `{ id, name, args }` — typed, see below |
 | R → S | `command.result` | `{ id, ok, output?, error? }` |
 | R → S | `command.progress` | `{ id, chunk }` for streaming commands |
-| S → R | `subscribe` / `unsubscribe` | live pane capture for a slot (read-only) |
-| R → S | `pane` | `{ projectId, slot, lines, cursor }` |
+| S → R | `subscribe` | `{ id, kind: "pane", projectId, root, slot }` — start streaming a slot's pane, read-only |
+| S → R | `unsubscribe` | `{ id }` |
+| R → S | `pane` | `{ id, frame: { type: "full", lines, cursor } \| { type: "patch", from, lines } \| { type: "ended" } }` |
+| R → S | `subscribe.error` | `{ id, code: "not_found" \| "too_many_viewers" \| "forbidden" }` |
 
 ### Sequence numbers
 
@@ -402,24 +404,84 @@ well-formed, the path is not usable), `path_not_allowed` → **403**. On
 `project.refresh`, `path_not_allowed` means the runner's watch list does not
 hold that project: the API resends `config` before the caller retries.
 
-### `subscribe`, `unsubscribe`, `pane`
+### `subscribe`, `unsubscribe`, `pane`, `subscribe.error`
+
+Live read-only view of a slot's tmux pane ([spec 18](../specs/18-live-worker-pane.md)).
+The server picks the `id` for each subscription. Every `pane` and
+`subscribe.error` for that subscription carries the same `id`, and
+`unsubscribe` names it. The API holds at most one runner subscription per slot
+and fans its frames out to browsers. The runner runs one capture loop per slot
+and stops it within `PANE_UNSUBSCRIBE_STOP_MS` (2 s) of the last `unsubscribe`.
+No message in either direction carries input to the pane.
 
 ```json
-{ "type": "subscribe", "projectId": "prj_agentdock", "slot": "i5-protocol" }
+{
+  "type": "subscribe",
+  "id": "pane_7f3a",
+  "kind": "pane",
+  "projectId": "prj_agentdock",
+  "root": "/home/dev/agentdock",
+  "slot": "i5-protocol"
+}
 ```
 
+`root` must be an absolute path the runner's watch list holds. `slot` follows
+`^[a-z0-9][a-z0-9-]*$` (max 64), because it ends up in a tmux target
+(`cs-<slot>`), where `:` and `.` have meaning. The runner also checks that the
+slot's worktree belongs to `root` (`.wt-<repo>-<slot>`).
+
 ```json
-{ "type": "unsubscribe", "projectId": "prj_agentdock", "slot": "i5-protocol" }
+{ "type": "unsubscribe", "id": "pane_7f3a" }
+```
+
+The runner captures every `PANE_CAPTURE_INTERVAL_MS` (1 s) while the
+subscription lives:
+
+- **`full`**: the first frame of a subscription, then again every 60 s. It
+  holds up to `PANE_HISTORY_LINES` (2000) lines of history and the cursor.
+- **`patch`**: replaces the previous frame's lines from index `from` to the end
+  with `lines`. The runner sends no frame when the pane has not changed.
+- **`ended`**: the `cs-<slot>` session is gone. The runner drops the
+  subscription after sending it, and the viewer keeps the last frame on screen.
+
+Lines keep their ANSI colour escapes (`capture-pane -e`). Before sending, the
+runner masks strings that look like secrets with `•••`; this is best-effort. A
+serialized frame stays under `PANE_MAX_FRAME_BYTES` (256 KiB); to fit, the
+runner drops lines from the top. The server never persists frames.
+
+```json
+{
+  "type": "pane",
+  "id": "pane_7f3a",
+  "frame": {
+    "type": "full",
+    "lines": ["$ bun run test", "\u001b[32m42 pass\u001b[0m"],
+    "cursor": { "x": 0, "y": 2 }
+  }
+}
 ```
 
 ```json
 {
   "type": "pane",
-  "projectId": "prj_agentdock",
-  "slot": "i5-protocol",
-  "lines": ["$ bun run test", "42 pass"],
-  "cursor": { "x": 0, "y": 2 }
+  "id": "pane_7f3a",
+  "frame": { "type": "patch", "from": 1, "lines": ["43 pass", "$ "] }
 }
+```
+
+```json
+{ "type": "pane", "id": "pane_7f3a", "frame": { "type": "ended" } }
+```
+
+`subscribe.error` refuses a subscription; the runner sends nothing more for
+that `id`. Its codes:
+
+- `not_found`: no `cs-<slot>` session, or the slot is not in that project.
+- `too_many_viewers`: the runner already holds `PANE_MAX_SUBSCRIPTIONS` (10).
+- `forbidden`: `root` is not on the watch list.
+
+```json
+{ "type": "subscribe.error", "id": "pane_7f3a", "code": "too_many_viewers" }
 ```
 
 ## Commands (allowlist)
