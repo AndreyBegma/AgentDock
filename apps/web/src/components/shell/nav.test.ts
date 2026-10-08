@@ -9,13 +9,14 @@ const labels = (role: 'admin' | 'viewer', path: string) =>
 describe('visibleNav', () => {
   test('a viewer gets no Admin section', () => {
     const sections = visibleNav('viewer', '/').map((section) => section.id);
-    expect(sections).toEqual(['overview']);
+    expect(sections).toEqual(['overview', 'sessions']);
   });
 
   test('an admin gets Runners, Users, Audit and Settings', () => {
     expect(labels('admin', '/')).toEqual([
       'overview/Overview',
       'overview/Projects',
+      'sessions/Sessions',
       'admin/Runners',
       'admin/Users',
       'admin/Audit',
@@ -27,6 +28,7 @@ describe('visibleNav', () => {
     expect(labels('viewer', '/')).toEqual([
       'overview/Overview',
       'overview/Projects',
+      'sessions/Sessions',
     ]);
     expect(labels('viewer', '/projects/p1/settings')).toContain(
       'project/Settings',
