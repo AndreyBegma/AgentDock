@@ -56,8 +56,10 @@ export const runnerConfigSchema = z.object({
     .object({
       pollSeconds: z.number().int().min(5).max(3600).default(15),
       prPollSeconds: z.number().int().min(15).max(3600).default(60),
+      /** `events.jsonl` poll fallback beside `fs.watch` (spec 16 D2). */
+      eventsPollSeconds: z.number().int().min(1).max(3600).default(5),
     })
-    .default({ pollSeconds: 15, prPollSeconds: 60 }),
+    .default({ pollSeconds: 15, prPollSeconds: 60, eventsPollSeconds: 5 }),
   /**
    * Agent sessions (spec 12). `ingestSince`: transcripts last modified before
    * it are not read unless a backfill asks; `pair` sets it (D11).

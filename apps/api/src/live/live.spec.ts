@@ -85,6 +85,15 @@ describe('TopicAuthorizerRegistry', () => {
     expect(await withProjects.decide(viewer, 'project:p2')).toBe('forbidden');
   });
 
+  it('passes an authorizer’s not_found through', async () => {
+    const withPanes = new TopicAuthorizerRegistry();
+    withPanes.register('pane', (_user, id) =>
+      id === 'p1:i42' ? true : 'not_found',
+    );
+    expect(await withPanes.decide(viewer, 'pane:p1:i42')).toBe('allowed');
+    expect(await withPanes.decide(viewer, 'pane:p1:b7')).toBe('not_found');
+  });
+
   it('refuses a second authorizer for the same prefix', () => {
     expect(() => registry.register('user', () => true)).toThrow(
       /already has an authorizer/,

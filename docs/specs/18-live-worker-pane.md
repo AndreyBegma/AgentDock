@@ -180,6 +180,49 @@ not a blocking dependency.
   `runner.gateway.ts`, add `case 'subscribe.error':` beside it, and relay both
   to `paneTopic(…)`.
 
+### From i18-api
+
+- **`/live` changes (additive).** `liveTopicSchema` accepts
+  `pane:<projectId>:<slot>`, the slot part with `slotNameSchema`'s rule;
+  `LiveTopicPrefix` gains `pane`. `LIVE_ERROR_CODES` gains `not_found` (the
+  slot is not the project's) and `too_many_viewers` (21st viewer of a slot, or
+  the runner's own cap). A non-member gets `forbidden` whether or not the
+  project exists.
+- **Authorization** (`apps/api/src/pane/pane-authorizer.ts`): the project rule
+  of #10 (`ProjectAccessService.resolve` — admins, and members of any role),
+  then a `slots` row with that `projectId` and `name`. `LiveMonitor`
+  re-checks it every minute, like every topic.
+- **A big frame arrives in pieces.** A `/live` message is at most 64 KiB, a
+  runner frame up to 256 KiB. The relay splits a frame that does not fit
+  using the frame semantics: `full { first lines, cursor }` then
+  `patch { from, rest }`, …; a long patch becomes consecutive patches. Applying
+  them in order yields the original. **i18-web: a `full` may be followed at
+  once by patches — apply every `pane.frame` in order, render after each or
+  batch per tick.** A single line over ~64 KiB is truncated.
+- **Late joiners.** Every browser that joins a watched slot makes the relay
+  `unsubscribe` the current id and `subscribe` a new one, so the runner sends a
+  fresh `full` (no frame cache, D8). Every viewer receives that `full`.
+  **i18-runner: never expect a second `subscribe` with the same id**; frames
+  still sent on the old id are dropped by the API.
+- **Runner offline / reconnect.** Watching an offline runner's slot is
+  accepted (`subscribed`) and nothing arrives; when the runner completes
+  `hello` the relay subscribes every watched slot of it again, with new ids.
+- **`ended`** → `pane.ended` (`data: null`); viewers stay on the topic and the
+  runner subscription is forgotten. The next viewer to join subscribes again.
+- **`subscribe.error`** → every viewer gets `error { topic, code }` and is
+  unsubscribed from the topic; no `unsubscribe` goes back.
+- **Wiring for later streams.** `RunnerStreams` (`apps/api/src/runners/`) is
+  the runner side — send `subscribe`/`unsubscribe`, hear `pane` /
+  `subscribe.error`, `connected` / `disconnected`. `LiveTopicHookRegistry`
+  (`apps/api/src/live/`) is the browser side — `admit` (cap), `joined`,
+  `left` for every way a socket gets on or off a topic.
+- **Audit**: `pane.watch_started` / `pane.watch_stopped`, actor the user,
+  target `{ type: 'slot', id: <slot name> }`, `projectId`; once per user per
+  slot however many tabs. No frame content is logged or stored.
+- **Follow-up:** the UI header's viewer count has no event (`PANE_LIVE_EVENTS`
+  has only `frame` and `ended`); a `pane.viewers` event is a protocol change
+  for a later item.
+
 ### From i18-runner
 
 - **Where.** `apps/runner/src/pane/`: `streamer.ts` (subscriptions, one loop
