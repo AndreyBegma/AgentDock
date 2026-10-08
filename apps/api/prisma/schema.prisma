@@ -33,14 +33,16 @@ model User {
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
-  approvedBy      User?           @relation("UserApprovals", fields: [approvedById], references: [id], onDelete: SetNull)
-  approvedUsers   User[]          @relation("UserApprovals")
+  approvedBy      User?            @relation("UserApprovals", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedUsers   User[]           @relation("UserApprovals")
   sessions        UserSession[]
   settingsUpdated Setting[]
   runnersCreated  Runner[]
   projectsCreated Project[]
-  memberships     ProjectMember[] @relation("ProjectMembership")
-  membersAdded    ProjectMember[] @relation("ProjectMemberAddedBy")
+  memberships     ProjectMember[]  @relation("ProjectMembership")
+  membersAdded    ProjectMember[]  @relation("ProjectMemberAddedBy")
+  priceVersions   PriceVersion[]
+  priceRecomputes PriceRecompute[]
 
   @@map("users")
 }
@@ -566,27 +568,35 @@ model Turn {
 /// One LLM API request, deduped on `requestId`; the last usage seen wins (D4).
 /// The cost columns are declared here and filled by #13 (D8).
 model LlmRequest {
-  id             String      @id @default(cuid())
-  sessionId      String
-  turnId         String?
-  requestId      String
-  ts             DateTime
-  model          String
-  querySource    QuerySource
-  input          Int         @default(0)
-  output         Int         @default(0)
-  cacheRead      Int         @default(0)
-  cacheWrite5m   Int         @default(0)
-  cacheWrite1h   Int         @default(0)
+  id                   String           @id @default(cuid())
+  sessionId            String
+  turnId               String?
+  requestId            String
+  ts                   DateTime
+  model                String
+  querySource          QuerySource
+  input                Int              @default(0)
+  output               Int              @default(0)
+  cacheRead            Int              @default(0)
+  cacheWrite5m         Int              @default(0)
+  cacheWrite1h         Int              @default(0)
   /// Counted inside `output`; stored separately, never added twice.
-  reasoning      Int         @default(0)
-  durationMs     Int?
+  reasoning            Int              @default(0)
+  durationMs           Int?
   /// `durationMs` was derived from timestamps, not measured.
-  durationApprox Boolean     @default(false)
-  stopReason     String?
-  costUsd        Decimal?    @db.Decimal(14, 6)
-  priceVersion   Int?
-  costSource     CostSource?
+  durationApprox       Boolean          @default(false)
+  stopReason           String?
+  costUsd              Decimal?         @db.Decimal(14, 6)
+  /// `price_versions.number` the cost was computed with.
+  priceVersion         Int?
+  costSource           CostSource?
+  /// The runtime's own cost estimate (Claude Code OTel `cost_usd`); for
+  /// reference only, never in totals (spec 13 D6).
+  reportedCostUsd      Decimal?         @db.Decimal(14, 6)
+  /// The producer whose token counts the row holds (spec 13 D15).
+  source               LlmRequestSource @default(transcript)
+  /// All cache writes are in `cacheWrite5m`: the runtime did not split them by TTL.
+  cacheWriteTtlUnknown Boolean          @default(false)
 
   session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   turn    Turn?        @relation(fields: [turnId], references: [id], onDelete: SetNull)
@@ -616,4 +626,123 @@ model ToolCall {
   @@unique([sessionId, toolUseId])
   @@index([childSessionId])
   @@map("tool_calls")
+}
+
+// ─── Tokens and API-equivalent cost (docs/specs/13) ─────────────────────────
+
+/**
+ * `langfuse_seed` is `langfuse-seed` in the database and the API (shared `PRICE_SOURCES`).
+ */
+enum PriceSource {
+  langfuse_seed @map("langfuse-seed")
+  admin
+}
+
+/**
+ * Which producer sent an `llm.request` (spec 13 D15).
+ */
+enum LlmRequestSource {
+  transcript
+  otel
+}
+
+enum RecomputeStatus {
+  queued
+  running
+  done
+  failed
+}
+
+/**
+ * An immutable snapshot of every model price (D2). Editing prices creates a
+ * new version; the highest `number` is current. Rows are never updated.
+ */
+model PriceVersion {
+  id          String      @id @default(cuid())
+  number      Int         @unique
+  source      PriceSource
+  note        String?
+  /// Nullable so deleting the admin who created it keeps the version.
+  createdById String?
+  createdAt   DateTime    @default(now())
+
+  createdBy  User?            @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  models     ModelPrice[]
+  recomputes PriceRecompute[]
+
+  @@map("price_versions")
+}
+
+/**
+ * One model's price in a version (D3): a case-insensitive regex on the model
+ * id, a priority (lower wins), and ordered tiers (shared `PriceTier[]`).
+ */
+model ModelPrice {
+  id           String @id @default(cuid())
+  versionId    String
+  modelName    String
+  matchPattern String
+  priority     Int
+  tiers        Json
+
+  version PriceVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@unique([versionId, modelName])
+  @@map("model_prices")
+}
+
+/**
+ * Usage per UTC hour × project × runtime × model × slot × run × issue (D8).
+ * `dimensionKey` joins the dimensions (absent ones empty) so the unique index
+ * has no nullable column. A pure aggregate of `llm_requests`: every write
+ * rebuilds whole hours from them (spec 13 notes, deviation from D8).
+ */
+model UsageRollup {
+  id               String   @id @default(cuid())
+  hour             DateTime @db.Timestamptz(3)
+  dimensionKey     String
+  projectId        String?
+  runtime          Runtime
+  model            String
+  slot             String?
+  runId            String?
+  issue            Int?
+  requests         Int
+  input            BigInt
+  output           BigInt
+  cacheRead        BigInt
+  cacheWrite5m     BigInt
+  cacheWrite1h     BigInt
+  reasoning        BigInt
+  costUsd          Decimal  @db.Decimal(14, 6)
+  unpricedRequests Int
+
+  @@unique([hour, dimensionKey])
+  @@index([projectId, hour])
+  @@index([hour])
+  @@map("usage_rollups")
+}
+
+/**
+ * A background re-pricing of `llm_requests` with `from <= ts < to` (D7).
+ */
+model PriceRecompute {
+  id          String          @id @default(cuid())
+  versionId   String
+  from        DateTime
+  to          DateTime
+  status      RecomputeStatus @default(queued)
+  processed   Int             @default(0)
+  total       Int             @default(0)
+  error       String?
+  /// Nullable so deleting the admin who started it keeps the record.
+  createdById String?
+  createdAt   DateTime        @default(now())
+  finishedAt  DateTime?
+
+  version   PriceVersion @relation(fields: [versionId], references: [id], onDelete: Restrict)
+  createdBy User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@map("price_recomputes")
 }
