@@ -90,6 +90,45 @@ describe('RunnerCommandService', () => {
     expect(recorded(audit)).toEqual([['runner.command', 'denied']]);
   });
 
+  it('records the args as sent unless auditArgs replaces them, and sends them unchanged', async () => {
+    const { service, sent, audit } = setup();
+    const args = {
+      projectId: 'p_1',
+      root: '/srv/dev/widget',
+      slot: 'i42',
+      text: 'a secret plan',
+      from: 'op@example.com',
+    };
+    const auditedArgs = () =>
+      audit.record.mock.calls
+        .filter(([entry]) => entry.action === 'runner.command')
+        .map(([entry]) => (entry.after as { args: unknown }).args);
+
+    void service.send('rn_1', 'slot.message', args, {
+      role: 'operator',
+      ctx,
+      timeoutMs: 10,
+    });
+    await flush();
+    expect(auditedArgs()).toEqual([args]);
+
+    audit.record.mockClear();
+    const hashed = { ...args, text: 'sha256:abc' };
+    void service.send('rn_1', 'slot.message', args, {
+      role: 'operator',
+      ctx,
+      timeoutMs: 10,
+      auditArgs: hashed,
+    });
+    await flush();
+    expect(auditedArgs()).toEqual([hashed]);
+    // The runner still gets the real text.
+    expect(sent.map((m) => (m as { args?: unknown }).args)).toEqual([
+      args,
+      args,
+    ]);
+  });
+
   it('is unknown at once for a runner with no socket', async () => {
     const { service, audit } = setup();
     await expect(
