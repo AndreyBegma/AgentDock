@@ -23,6 +23,7 @@ const setup = (
       detectCapabilities: () => Promise.reject(new Error('unused')),
       exec: fakeExec({}),
       watchedProjects: () => [ACME],
+      profiles: () => [],
       backfillSessions: backfill,
     }),
     disabledCommands: [],

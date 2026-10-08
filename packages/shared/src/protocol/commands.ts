@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { capabilitiesSchema, hostSchema } from './capabilities';
+import { controlCommands } from './commands/control';
 import {
   SESSION_BACKFILL_TIMEOUT_MS,
   sessionBackfillArgsSchema,
@@ -100,6 +101,7 @@ export const commands = {
     minRole: 'admin',
     timeoutMs: SESSION_BACKFILL_TIMEOUT_MS,
   },
+  ...controlCommands,
 } as const satisfies Record<string, CommandDefinition>;
 
 export type CommandName = keyof typeof commands;

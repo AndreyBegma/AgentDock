@@ -127,6 +127,7 @@ export const runDaemon = async (
         detectCapabilities: redetect,
         exec,
         watchedProjects: () => watchList.current,
+        profiles: () => config.profiles,
         backfillSessions: sessions
           ? (scope) => sessions.backfill(scope)
           : undefined,

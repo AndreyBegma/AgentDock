@@ -5,9 +5,9 @@ import { absolutePathSchema } from '../projects';
 /**
  * Orchestrator and slot control (docs/specs/17-orchestrator-and-slot-control.md).
  *
- * These definitions are not in `commands` yet: the runner's dispatcher requires
- * a handler for every key there, so the runner change that adds the handlers
- * also spreads `controlCommands` into the allowlist.
+ * `commands` spreads `controlCommands` into the allowlist. The runner's
+ * dispatcher requires a handler for every key there, so the map entry and the
+ * runner handlers land together.
  */
 
 /**
@@ -162,7 +162,15 @@ export const slotMessageArgsSchema = z.strictObject({
 });
 export type SlotMessageArgs = z.infer<typeof slotMessageArgsSchema>;
 
-export const slotMessageResultSchema = z.object({ written: z.literal(true) });
+/**
+ * The message file is always written. `delivered` is true only when the
+ * worker's session was live and the two `send-keys` calls ran; otherwise the
+ * file waits for the worker to be resumed.
+ */
+export const slotMessageResultSchema = z.object({
+  written: z.literal(true),
+  delivered: z.boolean(),
+});
 export type SlotMessageResult = z.infer<typeof slotMessageResultSchema>;
 
 /** The five control commands, with D9's minimum roles and D11's timeouts. */
