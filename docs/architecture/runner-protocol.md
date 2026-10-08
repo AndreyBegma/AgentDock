@@ -437,7 +437,8 @@ handler.
 | `slot.stop` | `projectId, slot` | operator | planned |
 | `slot.message` | `projectId, slot, text` | operator | planned |
 | `pr.approve` / `pr.requestChanges` | `projectId, pr, note?` | operator | planned |
-| `issue.create` | `projectId, title, body, labels` | operator | planned |
+| `issue.create` | `projectId, title, body, labels, queue` | operator | defined (`commands/queue.ts`), not in the map yet: → `{ number, url, queued, reason? }`, timeout 45 s |
+| `issues.refresh` | `projectId` | operator | defined (`commands/queue.ts`), not in the map yet: → `{ changed, fetchedAt }`, timeout 45 s |
 | `skill.search` | `query` | operator | planned |
 | `skill.install` | `projectId?, source, runtimes[]` | operator | planned |
 | `skill.run` | `projectId, skill, args, profileId, model, output: report\|pr` | operator | planned |
@@ -528,6 +529,27 @@ D11.
   connection is `409 runner_offline`, no answer within the timeout is
   `504 runner_timeout` (the re-read may still finish), a refusal is
   `409 runner_refused`, and a failure is `502 runner_error`.
+
+### Queue
+
+Schemas in `commands/queue.ts`; the rules are [spec 19](../specs/19-task-queue.md)
+D1 and D7. Both are exported as `issueCreateCommand` and
+`issuesRefreshCommand` (and together as `queueCommands`) but are **not** in
+the `commands` map: the runner's `CommandHandlers` needs a handler for every
+entry, so the map entry lands with the handler.
+
+- `issue.create { projectId, title, body, labels[], queue }` runs
+  `gh issue create --repo <owner/repo> --title … --body-file <tmp> --label …`
+  in the project's root (a `projectId` not on the watch list is
+  `path_not_allowed`). With `queue: true` it adds the ready label only when
+  `specGap(body, labels)` is null, and otherwise answers `queued: false` with
+  `reason: no_acceptance_criteria | no_parallel_plan`. `body` is at most
+  64 KB, `labels` at most 20.
+- `issues.refresh { projectId }` runs the `issues` collector's poll for that
+  project now. A changed listing goes out as `issues.snapshot` events as
+  usual; the result says whether it changed (`false` on a `304`).
+- The API sends them from one place, `apps/api/src/queue/queue-commands.ts`,
+  which answers `503 command_unavailable` until they are in the map.
 
 ## Delivery guarantees
 
