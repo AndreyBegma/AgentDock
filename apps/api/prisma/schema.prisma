@@ -281,6 +281,9 @@ model Project {
   slots          Slot[]
   orchestrator   FleetOrchestrator?
   sessions       AgentSession[]
+  issues         IssueCache[]
+  queueStates    QueueStateRow[]
+  issueFeed      IssueFeed?
 
   @@unique([runnerId, rootPath])
   @@map("projects")
@@ -616,4 +619,112 @@ model ToolCall {
   @@unique([sessionId, toolUseId])
   @@index([childSessionId])
   @@map("tool_calls")
+}
+
+// ─── Task queue (docs/specs/19-task-queue.md) ───────────────────────────────
+
+enum IssueKind {
+  issue
+  pull_request
+}
+
+enum IssueState {
+  open
+  closed
+}
+
+enum IssueClosedBy {
+  pr
+  manual
+}
+
+enum QueueState {
+  in_flight
+  ready
+  blocked_work
+  blocked_person
+  no_spec
+}
+
+enum QueueStateSource {
+  computed
+  orchestrator
+}
+
+/// The project's GitHub issues and open pull requests as the runner's `issues`
+/// collector last saw them (D2). A row absent from a snapshot's `open` list is closed.
+model IssueCache {
+  id          String         @id @default(cuid())
+  projectId   String
+  number      Int
+  /// Pull requests are kept only for their `Closes #n` (D3 `IN FLIGHT`).
+  kind        IssueKind      @default(issue)
+  title       String
+  state       IssueState
+  /// string[]
+  labels      Json
+  /// string[] of GitHub logins.
+  assignees   Json
+  /// Trimmed by the runner to 64 KB (16 KB for a pull request).
+  body        String
+  url         String
+  ghUpdatedAt DateTime
+  /// From `issue.closed`; null while open or not yet reported.
+  closedBy    IssueClosedBy?
+  closingPr   Int?
+  closedAt    DateTime?
+  /// When the row's content last changed — D4 compares a round against it.
+  snapshotAt  DateTime
+  /// Highest event `seq` applied; older ones are replays.
+  lastSeq     BigInt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, number])
+  @@index([projectId, state])
+  @@map("issues_cache")
+}
+
+/// The queue state of each open ready issue, recomputed on every change of its inputs.
+/// `state`/`why`/`clears` are AgentDock's own (D3); `source` says whether the
+/// orchestrator's fresher verdict (D4) is the one shown.
+model QueueStateRow {
+  id                 String           @id @default(cuid())
+  projectId          String
+  issueNumber        Int
+  state              QueueState
+  why                String
+  clears             String?
+  source             QueueStateSource
+  orchestratorState  QueueState?
+  orchestratorWhy    String?
+  orchestratorClears String?
+  /// Issue numbers named by `Depends on` that still block it.
+  blockers           Json
+  /// `{ slot, lead, model }[]` of the body's `## Parallel plan`; null without one.
+  waveSlots          Json?
+  computedAt         DateTime
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, issueNumber])
+  @@map("queue_states")
+}
+
+/// The `issues` collector's last poll of a project: when it fetched, and why it failed.
+model IssueFeed {
+  projectId         String    @id
+  /// `fetchedAt` of the last snapshot part applied; null before the first.
+  fetchedAt         DateTime?
+  snapshotId        String?
+  /// The last `issues.unavailable`, cleared by the next snapshot.
+  unavailableReason String?
+  unavailableAt     DateTime?
+  /// Highest `issues.snapshot` / `issues.unavailable` seq applied.
+  lastSeq           BigInt
+  updatedAt         DateTime  @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("issue_feeds")
 }
