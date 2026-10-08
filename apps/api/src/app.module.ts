@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ActivityModule } from './activity';
 import { AdminModule } from './admin/admin.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
@@ -7,6 +8,7 @@ import { ControlModule } from './control';
 import { DatabaseModule } from './database/database.module';
 import { FleetModule } from './fleet';
 import { HealthController } from './health.controller';
+import { HistoryModule } from './history';
 import { LiveModule } from './live/live.module';
 import { NotificationsModule } from './notifications';
 import { PaneModule } from './pane';
@@ -37,6 +39,8 @@ import { UsageModule } from './usage/usage.module';
     QueueModule,
     PaneModule,
     ControlModule,
+    ActivityModule,
+    HistoryModule,
     NotificationsModule,
   ],
   controllers: [HealthController],

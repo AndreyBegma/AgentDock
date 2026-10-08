@@ -182,6 +182,7 @@ i22-api, decided with the orchestrator on 2026-10-08:
 11. **Timers.** The matcher (2 s) and watcher (60 s) start at bootstrap except under `APP_ENV=test`, where the e2e suites call `tick()`; both take a `pg_try_advisory_xact_lock`, so a second API instance skips the pass.
 12. **Delivery rows.** One Telegram delivery is written per new notification for a user with a linked chat: `pending`, or `skipped` with `lastError` `muted` / `rule_off`. No link, no row. `unlinked` is set later when the chat was unlinked before sending.
 13. **Command registration trap (from #12, recorded for later slots).** `CommandHandlers` in `apps/runner/src/commands/dispatcher.ts` requires a handler for every key of `commands`: a protocol or API slot defines and exports its command schemas but does not add them to the map; the runner slot adds the entry with its handler. This item adds no runner command.
+14. **Follow-up — duplicated cursor logic.** #21 (merged first) has the same gap-aware cursor over `events` in `apps/api/src/activity/event-frontier.ts`, and the same root-then-repo project lookup in `apps/api/src/activity/resolve-project.ts`. The notification matcher keeps its own (`NotificationMatcher.holeExpired`, `ProjectCache`) so that this pull request does not refactor across modules. A follow-up should extract one shared frontier and resolver and have both projectors use them. Their state stays separate (`activity_projector_state`, `notification_matcher_state`): each consumer keeps its own cursor.
 
 ### What `i22-telegram` builds on
 

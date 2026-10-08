@@ -8,6 +8,7 @@ import type {
 } from '@agentdock/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import type { AuditContext } from '../audit/audit.types';
+import { RunnerCommandService } from '../runners/runner-command.service';
 import { queueError } from './queue-error';
 
 export interface QueueCommandOptions {
@@ -45,40 +46,34 @@ export const commandOutput = <T>(name: string, result: SendResult<T>): T => {
   }
 };
 
-const notWired = (name: string) =>
-  queueError(
-    503,
-    QUEUE_ERROR.commandUnavailable,
-    `${name} is not available on the runner yet`,
-  );
-
 /**
- * The one place the queue sends runner commands (spec 19 notes, Q1).
- *
- * `issue.create` and `issues.refresh` are defined in
- * `packages/shared/src/protocol/commands/queue.ts` but not yet entered in the
- * `commands` allowlist: the runner's `CommandHandlers` needs a handler for
- * every entry, and the handlers come with the runner slot of #19. Until then
- * both answer 503 `command_unavailable`. That slot adds the entries and
- * replaces each body with
- * `commandOutput(name, await this.commands.send(runnerId, name, args, options))`
- * on an injected `RunnerCommandService`.
+ * The one place the queue sends runner commands (spec 19 notes, 1).
+ * `issue.create` and `issues.refresh` are in the `commands` allowlist now that
+ * the runner registers their handlers.
  */
 @Injectable()
 export class QueueCommands {
+  constructor(private readonly commands: RunnerCommandService) {}
+
   async createIssue(
-    _runnerId: string,
-    _args: IssueCreateArgs,
-    _options: QueueCommandOptions,
+    runnerId: string,
+    args: IssueCreateArgs,
+    options: QueueCommandOptions,
   ): Promise<IssueCreateResult> {
-    throw notWired('issue.create');
+    return commandOutput(
+      'issue.create',
+      await this.commands.send(runnerId, 'issue.create', args, options),
+    );
   }
 
   async refreshIssues(
-    _runnerId: string,
-    _args: { projectId: string },
-    _options: QueueCommandOptions,
+    runnerId: string,
+    args: { projectId: string },
+    options: QueueCommandOptions,
   ): Promise<IssuesRefreshResult> {
-    throw notWired('issues.refresh');
+    return commandOutput(
+      'issues.refresh',
+      await this.commands.send(runnerId, 'issues.refresh', args, options),
+    );
   }
 }

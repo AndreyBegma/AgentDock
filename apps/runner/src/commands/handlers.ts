@@ -15,6 +15,8 @@ import type { Exec } from '../detect/exec';
 import type { ProjectFs } from '../projects/fs';
 import { inspectProject, refreshProject } from '../projects/inspect';
 import type { CommandHandlers } from './dispatcher';
+import { issueCreate } from './queue/issue-create';
+import { issuesRefresh } from './queue/issues-refresh';
 import {
   type SessionBackfillContext,
   sessionBackfill,
@@ -66,5 +68,12 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
     'orchestrator.status': (args) => orchestratorStatus(args, control),
     'slot.stop': (args) => stopSlot(args, control),
     'slot.message': (args) => messageSlot(args, control),
+    'issue.create': (args) =>
+      issueCreate(args, {
+        exec: context.exec,
+        watchedProjects: context.watchedProjects,
+      }),
+    'issues.refresh': (args) =>
+      issuesRefresh(args, { watchedProjects: context.watchedProjects }),
   };
 };

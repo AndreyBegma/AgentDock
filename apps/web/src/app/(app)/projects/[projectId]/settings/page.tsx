@@ -15,10 +15,12 @@ import { STATUS_TONE } from '../../../../../lib/runners/format';
 import { DocsTab } from './docs-tab';
 import { GeneralTab } from './general-tab';
 import { MembersTab } from './members-tab';
+import { OrchestratorTab } from './orchestrator-tab';
 
 const TABS = [
   { id: 'general', label: 'General' },
   { id: 'docs', label: 'Docs source' },
+  { id: 'orchestrator', label: 'Orchestrator' },
   { id: 'members', label: 'Members' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
@@ -106,6 +108,13 @@ export default function ProjectSettingsPage() {
           isAdmin={isAdmin}
           canRefresh={canOperate}
           onChanged={load}
+        />
+      ) : null}
+      {tab === 'orchestrator' ? (
+        <OrchestratorTab
+          project={project}
+          isAdmin={isAdmin}
+          canOperate={canOperate}
         />
       ) : null}
       {tab === 'members' ? (
