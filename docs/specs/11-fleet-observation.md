@@ -166,4 +166,11 @@ i11-api, decided with the orchestrator on 2026-10-08:
 9. **`orchestratorSession` is not a project setting yet.** It would alter `projects` and the watch list; the runner uses `agentdock-orchestrator`. Follow-up.
 10. **No audit actions.** The module only reads, so spec 8's retrofit table is unchanged.
 
+i11-web, decided with the orchestrator on 2026-10-08:
+
+11. **The project landing is the fleet page.** `/projects/[projectId]` redirects to `/fleet` (it was `/settings`); Settings stays in the project navigation.
+12. **`Table`, not `DataTable`.** glass-ui is pinned at v0.20.6, which has no `DataTable` (glass-ui#67). The slots table and the checkpoint list use `Table` and a plain list; swap them when the pinned version has them.
+13. **Active slots from `/fleet`, history from `/slots`.** The default view is `FleetView.slots` (not ended). "Show ended" switches to the paged `GET /slots` with `status` and `issue` filters. A `fleet` frame on `project:<id>` triggers one debounced (300 ms) refetch of the fleet, the history page and the open slot.
+14. **Issue links are derived, not stored.** A project has no repository URL yet, so `#N` links to `<repo of the slot's PR>/issues/N` when the slot has a PR URL and is plain text otherwise. Follow-up: link from the project's `repo` once the web has a GitHub base URL for it. Only `https:` URLs from events are rendered as anchors.
+
 Depends on #10
