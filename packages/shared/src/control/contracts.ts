@@ -152,6 +152,12 @@ export interface ControlErrorBody {
 export const COMMAND_RUN_LIVE_EVENT = 'command_run.updated';
 
 /**
+ * Its data: the run without `args`, which can hold a 16 KB message that
+ * escaping could push past the live frame limit. Read them over REST.
+ */
+export type CommandRunLiveEvent = Omit<CommandRunView, 'args'>;
+
+/**
  * Live event on `project:<id>` after a message reached a worker's worktree
  * (D8): the message bypassed the orchestrator. Durable record: the run.
  */
