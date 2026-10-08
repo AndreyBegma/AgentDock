@@ -22,7 +22,7 @@ describe('config', () => {
       projects: [],
       disabledCommands: [],
       otlp: null,
-      fleet: { pollSeconds: 15, prPollSeconds: 60 },
+      fleet: { pollSeconds: 15, prPollSeconds: 60, eventsPollSeconds: 5 },
       sessions: { enabled: true },
     });
   });
@@ -32,9 +32,12 @@ describe('config', () => {
     expect(loadConfig(path).fleet).toEqual({
       pollSeconds: 30,
       prPollSeconds: 60,
+      eventsPollSeconds: 5,
     });
     writeFileSync(path, JSON.stringify({ fleet: { pollSeconds: 1 } }));
     expect(() => loadConfig(path)).toThrow('fleet.pollSeconds');
+    writeFileSync(path, JSON.stringify({ fleet: { eventsPollSeconds: 0 } }));
+    expect(() => loadConfig(path)).toThrow('fleet.eventsPollSeconds');
   });
 
   it('writes mode 0600 in a 0700 directory, atomically, and reads it back', () => {

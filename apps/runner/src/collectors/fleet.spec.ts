@@ -83,7 +83,16 @@ const pane = (session: string, id: string, path: string) =>
 
 describe('FleetCollector', () => {
   it('is registered once in the collector list', () => {
-    expect(collectors).toHaveLength(1);
+    const names = collectors.map(
+      (create) =>
+        create({
+          exec: async () => null,
+          clock: new FakeClock(),
+          log: memoryLogger().log,
+          fleet: DEFAULT_FLEET_SETTINGS,
+        }).name,
+    );
+    expect(names.filter((name) => name === 'fleet')).toHaveLength(1);
   });
 
   it('reports a slot running, then stale with its unmerged commit after its session dies', async () => {
