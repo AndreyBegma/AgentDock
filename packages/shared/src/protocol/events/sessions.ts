@@ -79,9 +79,21 @@ export type SessionObservedData = z.infer<typeof sessionObservedDataSchema>;
 export const turnDataSchema = z.object({ promptId: id });
 export type TurnData = z.infer<typeof turnDataSchema>;
 
+/** Which producer sent an `llm.request` (spec 13 D15); absent means `transcript`. */
+export const llmRequestSourceSchema = z.enum(['transcript', 'otel']);
+export type LlmRequestSource = z.infer<typeof llmRequestSourceSchema>;
+
 /**
  * `llm.request`: one per distinct `requestId` (D4). The envelope's `ts` is the
- * request's time. Re-sent with newer usage, the last one wins.
+ * request's time. Re-sent with newer usage by the same producer, the last one
+ * wins; between producers the API merges (spec 13 D15).
+ *
+ * Spec 13 adds optional fields, sent by the runner's OTLP receiver only (`run`
+ * is documented on the field):
+ * `reportedCostUsd` — the runtime's own cost estimate (Claude Code `cost_usd`),
+ * stored for reference and never summed (D6); `cacheWriteTtlUnknown` — the
+ * runtime did not split cache writes by TTL, so all of them are in
+ * `cacheWrite5m` (D13); `source` — which producer sent the event.
  */
 export const llmRequestDataSchema = z.object({
   requestId: id,
@@ -95,6 +107,14 @@ export const llmRequestDataSchema = z.object({
   stopReason: z.string().min(1).max(64).optional(),
   querySource: querySourceSchema,
   agentName: name.optional(),
+  reportedCostUsd: z.number().nonnegative().finite().optional(),
+  cacheWriteTtlUnknown: z.boolean().optional(),
+  source: llmRequestSourceSchema.optional(),
+  /**
+   * The `agentdock.run` resource attribute (spec 13 D14). Runs are a future
+   * entity: the API accepts it and stores nothing yet.
+   */
+  run: z.string().min(1).max(128).optional(),
 });
 export type LlmRequestData = z.infer<typeof llmRequestDataSchema>;
 
@@ -151,6 +171,13 @@ interface SessionEventBase {
   ts: string;
   /** The runtime and the runtime's own session id, from the envelope. */
   session: { runtime: string; id: string };
+  /**
+   * The envelope's project and slot, when the producer knew them — the OTLP
+   * receiver's `agentdock.*` correlation (spec 13 D14). Transcript events
+   * carry theirs in `session.observed` instead.
+   */
+  project?: { repo: string; root: string };
+  slot?: string;
 }
 
 /** A session event with its `data` validated, discriminated by `type`. */
@@ -194,6 +221,10 @@ export const parseSessionEvent = (
       type: event.type,
       ts: event.ts,
       session: { runtime: event.session.runtime, id: event.session.id },
+      ...(event.project
+        ? { project: { repo: event.project.repo, root: event.project.root } }
+        : {}),
+      ...(event.slot ? { slot: event.slot } : {}),
       data: data.data,
     } as SessionEvent,
   };

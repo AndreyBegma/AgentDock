@@ -134,3 +134,68 @@ wait for it.
 | Turn off markdown scraping when events are present? | No — keep both; pane and worktree state only come from scraping |
 
 Depends on #11
+
+## Notes from implementation
+
+i16-api, decided with the orchestrator on 2026-10-08. Checked against plugin#5
+as merged: `skills/orchestrator/EVENTS.md` at claude-code-plugin@`bdce2e0`.
+
+1. **D4 was wrong about shapes.** The plugin uses AgentDock's type names but
+   not every `data` shape. Its envelope `session` has no `id`, and
+   `project.repo` can be null. `slot.dispatched` names the brief's worktree
+   copy (no date or round). `round.started` has `board` and no date or base.
+   `round.decided` has `rows` and no round. Checkpoints carry `url`/`pr`;
+   `pr.checks_changed` and `pr.closed` carry `pr`/`rollup` with no `merged`.
+   `pr.merged` and `slot.redispatched` are new types. Forwarded unchanged,
+   almost every plugin event would have failed `parseFleetEvent`.
+   **`normalizeCodeSentinelLine(line, project)`** in `@agentdock/shared`
+   (`src/fleet/code-sentinel.ts`) is now the one mapping. The runner's
+   `events` collector calls it per line and only adds `seq`; the contract is in
+   [event-schema.md → Code Sentinel](../architecture/event-schema.md#code-sentinel-eventsjsonl-spec-16).
+   The fleet schemas only got looser (optional fields, new types), so every
+   spec 11 event still parses.
+2. **D5's key is `eid`, a uuid4**, not a ULID `id`. The normalizer keeps it as
+   `data.pluginEventId`. The API dedupes on **`(projectRoot, pluginEventId)`**,
+   not `projectRepo`: the repo can be null, the watch list carries only the
+   root, and the projector resolves projects by root. The constraint is a plain
+   `@@unique` — PostgreSQL's NULLs are distinct, so it binds plugin events
+   only. A hand-written partial index would be invisible to Prisma, and the next
+   `migrate dev` would drop it.
+3. **A duplicate is stored, not dropped.** A re-read gives it a new `seq`; if
+   that seq were never stored, the ack cursor would stall for good. It is
+   stored as **`events.duplicate { pluginEventId, type }`** and never reaches
+   the sinks.
+4. **Run matching without a round (Q3).** A plugin `slot.dispatched` updates
+   the covering run, unless that run ended or already carries an earlier
+   plugin `dispatchedAt` (`slots.sources.dispatchedAt`) — then it starts a run.
+   A dispatch older than a known later run of the name is history and changes
+   nothing. The snapshot sets `dispatchedAt` from `state.json`'s own
+   `dispatchedAt` (the same event's `ts`), so a first read from offset 0 after
+   a snapshot does not fork runs.
+5. **Field groups (D7).** On slots: `model` (model, modelWhy, owns, never,
+   lead), `checkpoint` (lastCheckpoint and the checkpoint rows) and `pr`
+   (number, URL, state, checks, mergeable). On rounds: `header` and
+   `decisions`. Only `scraped` is held back; the runner's own `gh`/tmux
+   observations are not ranked. A round's `base` is outside the groups — the
+   plugin never reports it, so the board's counts, else the project's.
+6. **Plugin checkpoints have no position.** The worker appends the reply
+   heading and then emits the event. So a plugin checkpoint claims the first
+   heading of its kind at or after the last position it claimed
+   (`slots.sources.checkpoints`), else it is appended. Markdown may still add a
+   heading the plugin has not sent, but never rewrites one it did.
+7. **Echoes.** `watch.sh`'s `session.*`, `pane.*` and `commit.trailer_found`
+   (`via: "watch"`) duplicate what the runner sees. The projector ignores them
+   from `code-sentinel`; they stay in `events`.
+8. **Snapshot (D6)** upserts every live slot of `state.json`. A slot it lists
+   as ended updates an existing run but never creates one.
+9. **`fleetChannel` (D8)** is computed per request. It is `events` when a
+   `code-sentinel` event for the project's root was received in the last 24 h,
+   and `both` when, additionally, a live slot or the latest round has a
+   plugin-covered group last written by `scraped`. Index
+   `events(projectRoot, source, receivedAt)` keeps that lookup cheap.
+10. **Command registration trap (from #12).** `CommandHandlers` in the runner
+    requires a handler for every key of `commands` in
+    `packages/shared/src/protocol/commands.ts`. A protocol or API slot defines
+    and exports a command in its own file but does not add it to the map; the
+    runner slot of the same issue adds the entry together with its handler.
+    This item adds no command.

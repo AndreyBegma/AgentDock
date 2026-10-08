@@ -8,6 +8,8 @@ export type Tx = Prisma.TransactionClient;
 export interface ProjectRef {
   id: string;
   rootPath: string;
+  /** The project's base branch, for a round whose event names none (spec 16). */
+  base: string;
 }
 
 /** A parsed fleet event with its `ts` and `seq` in the types the rows use. */

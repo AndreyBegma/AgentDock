@@ -1,7 +1,9 @@
 import {
+  FLEET_CHANNEL_WINDOW_MS,
   FLEET_ERROR,
   FLEET_ROUNDS_MAX,
   FLEET_SLOTS_PAGE_DEFAULT,
+  type FleetChannel,
   type FleetView,
   type RoundView,
   type SlotDetail,
@@ -9,8 +11,14 @@ import {
   type SlotStatus,
 } from '@agentdock/shared';
 import { HttpException, Injectable } from '@nestjs/common';
+import type { Round, Slot } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { projectNotFound } from '../projects';
+import {
+  hasScrapedGroup,
+  PLUGIN_ROUND_GROUPS,
+  PLUGIN_SLOT_GROUPS,
+} from './field-sources';
 import {
   toBoardError,
   toOrchestratorView,
@@ -45,7 +53,12 @@ export class FleetQueryService {
     const [project, orchestrator, latestRound, slots] = await Promise.all([
       this.prisma.project.findUnique({
         where: { id: projectId },
-        select: { baseBranch: true, baseOverride: true },
+        select: {
+          baseBranch: true,
+          baseOverride: true,
+          rootPath: true,
+          runnerId: true,
+        },
       }),
       this.prisma.fleetOrchestrator.findUnique({ where: { projectId } }),
       this.prisma.round.findFirst({
@@ -60,12 +73,40 @@ export class FleetQueryService {
     if (!project) throw projectNotFound();
     return {
       projectId,
+      fleetChannel: await this.channel(project, latestRound, slots),
       orchestrator: toOrchestratorView(orchestrator),
       base: latestRound?.base ?? project.baseOverride ?? project.baseBranch,
       latestRound: latestRound ? toRoundHeader(latestRound) : null,
       boardError: toBoardError(orchestrator),
       slots: slots.map(toSlotSummary),
     };
+  }
+
+  /**
+   * Spec 16 D8: `events` once a Code Sentinel event for the project's root
+   * arrived in the last 24 h; `both` while a live slot or the latest round
+   * still carries a plugin-covered field last written from markdown.
+   */
+  private async channel(
+    project: { rootPath: string; runnerId: string },
+    latestRound: Round | null,
+    slots: Slot[],
+  ): Promise<FleetChannel> {
+    const recent = await this.prisma.event.findFirst({
+      where: {
+        projectRoot: project.rootPath,
+        runnerId: project.runnerId,
+        source: 'code-sentinel',
+        receivedAt: { gte: new Date(Date.now() - FLEET_CHANNEL_WINDOW_MS) },
+      },
+      select: { id: true },
+    });
+    if (!recent) return 'scraped';
+    const mixed =
+      slots.some((s) => hasScrapedGroup(s.sources, PLUGIN_SLOT_GROUPS)) ||
+      (latestRound !== null &&
+        hasScrapedGroup(latestRound.sources, PLUGIN_ROUND_GROUPS));
+    return mixed ? 'both' : 'events';
   }
 
   /** Newest first; the cursor is the id of the previous page's last slot. */

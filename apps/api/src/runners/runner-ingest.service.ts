@@ -1,5 +1,7 @@
 import {
+  EVENTS_DUPLICATE_EVENT,
   type HelloMessage,
+  pluginEventIdOf,
   type RunnerEvent,
   SPOOL_TRUNCATED_EVENT,
   spoolTruncatedDataSchema,
@@ -110,24 +112,89 @@ export class RunnerIngestService {
    * before anything is stored: the ack holds and the runner resends it.
    */
   async events(runnerId: string, events: RunnerEvent[]): Promise<bigint> {
-    await this.sinks.dispatch(runnerId, events);
+    const { fresh, duplicate } = await this.splitPluginDuplicates(events);
+    if (fresh.length > 0) await this.sinks.dispatch(runnerId, fresh);
+    const row = (event: RunnerEvent) => ({
+      runnerId,
+      seq: BigInt(event.seq),
+      ts: new Date(event.ts),
+      type: event.type,
+      source: event.source,
+      projectRepo: event.project?.repo ?? null,
+      projectRoot: event.project?.root ?? null,
+      slot: event.slot ?? null,
+      issue: event.issue ?? null,
+      session: event.session ?? Prisma.DbNull,
+    });
     await this.prisma.event.createMany({
-      data: events.map((event) => ({
-        runnerId,
-        seq: BigInt(event.seq),
-        ts: new Date(event.ts),
-        type: event.type,
-        source: event.source,
-        projectRepo: event.project?.repo ?? null,
-        projectRoot: event.project?.root ?? null,
-        slot: event.slot ?? null,
-        issue: event.issue ?? null,
-        session: event.session ?? Prisma.DbNull,
-        data: json(event.data),
-      })),
+      data: [
+        ...fresh.map((event) => ({
+          ...row(event),
+          data: json(event.data),
+          pluginEventId: pluginEventIdOf(event),
+        })),
+        // Its seq is stored so the ack advances; its data is not, so the
+        // events table holds each plugin event once (spec 16 D5).
+        ...duplicate.map(({ event, pluginEventId }) => ({
+          ...row(event),
+          type: EVENTS_DUPLICATE_EVENT,
+          data: { pluginEventId, type: event.type },
+        })),
+      ],
       skipDuplicates: true,
     });
     return this.advanceAck(runnerId);
+  }
+
+  /**
+   * Code Sentinel events the API already has — stored, or earlier in this
+   * batch — by `(project root, data.pluginEventId)` (spec 16 D5). A re-read of
+   * `events.jsonl` from offset 0 gives them new seqs; without this they would
+   * be projected again.
+   */
+  private async splitPluginDuplicates(events: RunnerEvent[]): Promise<{
+    fresh: RunnerEvent[];
+    duplicate: { event: RunnerEvent; pluginEventId: string }[];
+  }> {
+    const key = (root: string, id: string) => `${root}\0${id}`;
+    const ids = new Map<string, Set<string>>();
+    for (const event of events) {
+      const id = pluginEventIdOf(event);
+      const root = event.project?.root;
+      if (!id || !root) continue;
+      ids.set(root, (ids.get(root) ?? new Set()).add(id));
+    }
+    if (ids.size === 0) return { fresh: events, duplicate: [] };
+
+    const stored = await this.prisma.event.findMany({
+      where: {
+        OR: [...ids].map(([projectRoot, set]) => ({
+          projectRoot,
+          pluginEventId: { in: [...set] },
+        })),
+      },
+      select: { projectRoot: true, pluginEventId: true },
+    });
+    const seen = new Set(
+      stored.map((s) => key(s.projectRoot ?? '', s.pluginEventId ?? '')),
+    );
+    const fresh: RunnerEvent[] = [];
+    const duplicate: { event: RunnerEvent; pluginEventId: string }[] = [];
+    for (const event of events) {
+      const id = pluginEventIdOf(event);
+      const root = event.project?.root;
+      if (!id || !root) {
+        fresh.push(event);
+        continue;
+      }
+      if (seen.has(key(root, id))) {
+        duplicate.push({ event, pluginEventId: id });
+        continue;
+      }
+      seen.add(key(root, id));
+      fresh.push(event);
+    }
+    return { fresh, duplicate };
   }
 
   private async advanceAck(runnerId: string): Promise<bigint> {
