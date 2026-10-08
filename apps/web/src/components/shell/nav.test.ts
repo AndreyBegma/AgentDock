@@ -9,13 +9,14 @@ const labels = (role: 'admin' | 'viewer', path: string) =>
 describe('visibleNav', () => {
   test('a viewer gets no Admin section', () => {
     const sections = visibleNav('viewer', '/').map((section) => section.id);
-    expect(sections).toEqual(['overview']);
+    expect(sections).toEqual(['overview', 'sessions']);
   });
 
   test('an admin gets Runners, Users, Audit and Settings', () => {
     expect(labels('admin', '/')).toEqual([
       'overview/Overview',
       'overview/Projects',
+      'sessions/Sessions',
       'admin/Runners',
       'admin/Users',
       'admin/Audit',
@@ -23,14 +24,22 @@ describe('visibleNav', () => {
     ]);
   });
 
-  test('a viewer sees Projects, and project Settings inside a project', () => {
+  test('a viewer sees Projects, and Fleet and Settings inside a project', () => {
     expect(labels('viewer', '/')).toEqual([
       'overview/Overview',
       'overview/Projects',
+      'sessions/Sessions',
     ]);
-    expect(labels('viewer', '/projects/p1/settings')).toContain(
-      'project/Settings',
-    );
+    const inProject = labels('viewer', '/projects/p1/settings');
+    expect(inProject).toContain('project/Fleet');
+    expect(inProject).toContain('project/Settings');
+  });
+
+  test('Fleet links to the current project', () => {
+    const fleet = visibleNav('viewer', '/projects/p1/fleet')
+      .flatMap((section) => section.entries)
+      .find((entry) => entry.id === 'fleet');
+    expect(fleet?.resolvedHref).toBe('/projects/p1/fleet');
   });
 
   test('a viewer never sees Audit', () => {

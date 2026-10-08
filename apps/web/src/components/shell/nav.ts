@@ -69,7 +69,7 @@ export const NAV: NavSection[] = [
         label: 'Fleet',
         icon: Workflow,
         minRole: 'viewer',
-        enabled: false,
+        enabled: true,
       },
       {
         id: 'queue',
@@ -107,7 +107,7 @@ export const NAV: NavSection[] = [
         label: 'Sessions',
         icon: Activity,
         minRole: 'viewer',
-        enabled: false,
+        enabled: true,
       },
     ],
   },
