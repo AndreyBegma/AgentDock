@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { slotNameSchema } from './commands/control';
 import { absolutePathSchema } from './projects';
 
 /**
@@ -33,12 +34,6 @@ export const PANE_LIVE_EVENTS = {
   /** The session is gone; the last frame stays on screen (D7). */
   ended: 'pane.ended',
 } as const;
-
-// TODO(#17): replace with `slotNameSchema` from './commands/control' once it merges.
-const slotNameSchema = z
-  .string()
-  .max(64)
-  .regex(/^[a-z0-9][a-z0-9-]*$/);
 
 /** Chosen by the server per subscription; every reply to it echoes the id. */
 const subscriptionId = z.string().min(1);
