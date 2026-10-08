@@ -29,7 +29,10 @@
         "PORT",
         "WEB_URL",
         "API_URL",
-        "AUDIT_VERIFY_CRON"
+        "AUDIT_VERIFY_CRON",
+        "ACTIVITY_POLL_MS",
+        "ACTIVITY_GAP_GRACE_MS",
+        "ACTIVITY_RETENTION_DAYS"
       ]
     },
     "db:migrate": {

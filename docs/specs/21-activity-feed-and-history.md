@@ -60,8 +60,8 @@ Migration directory: `apps/api/prisma/migrations/20261023000000_history/`. New t
 | Table | Fields |
 |---|---|
 | `activity_items` | `id` BigInt autoincrement, `ts`, `projectId?` → projects (cascade delete), `category` (`fleet` \| `runner` \| `audit`), `type`, `severity` (`info` \| `ok` \| `warn` \| `danger`), `title`, `actorType` (`user` \| `runner` \| `orchestrator` \| `system`), `actorId?`, `slot?`, `issue?` Int, `prNumber?` Int, `link?`, `data` Json (≤ 4 KB, no secrets), `sourceKind` (`event` \| `audit`), `sourceId` BigInt; unique `(sourceKind, sourceId)`; index `(projectId, ts, id)`, `(ts, id)`, `(type, ts)` |
-| `activity_projector_state` | `id` (single row `"activity"`), `eventsCursor` BigInt, `auditCursor` BigInt, `slotsCursor` timestamptz, `updatedAt` |
-| `runs` | `id` cuid, `kind` (`orchestrator_slot` \| `skill` \| `schedule`), `projectId` → projects, `slotId?` → slots (unique), `issue?` Int, `title?`, `runtime?`, `model?`, `profileKey?`, `args?` Json, `output?` (`report` \| `pr`), `status`, `outcome?`, `prNumber?` Int, `prUrl?`, `triggeredByType` (`orchestrator` \| `user` \| `schedule` \| `webhook`), `triggeredById?`, `startedAt`, `endedAt?`, `durationMs?` Int, `updatedAt`; index `(projectId, startedAt)`, `(projectId, status)` |
+| `activity_projector_state` | `id` (single row `"activity"`), `eventsCursor` BigInt, `auditCursor` BigInt, `updatedAt` — no `slotsCursor`, see notes 1 |
+| `runs` | `id` cuid, `kind` (`orchestrator_slot` \| `skill` \| `schedule`), `projectId` → projects, `slotId?` → slots (unique), `issue?` Int, `title?`, `runtime?`, `model?`, `profileKey?`, `args?` Json, `output?` (`report` \| `pr`), `status`, `outcome?`, `prNumber?` Int, `prUrl?`, `triggeredByType` (`orchestrator` \| `user` \| `schedule` \| `webhook`), `triggeredById?`, `startedAt`, `endedAt?`, `durationMs?` Int, `slotSeq?` BigInt (notes 1), `updatedAt`; index `(projectId, startedAt)`, `(projectId, status)` |
 
 ## API
 
@@ -153,6 +153,83 @@ AndreyBegma/glass-ui#67. Neither is a blocking dependency.
 |---|---|
 | Should operators be able to hide noisy types per user? | Not here — filter bar only; per-user rules are #22's notifications |
 | Should a run aggregate several slots of one wave? | No — one run per slot; the issue groups them in the UI |
+
+## Notes from implementation
+
+i21-api, decided with the orchestrator on 2026-10-08:
+
+1. **D7: no `slotsCursor`; runs carry `slotSeq`.** `slots.updatedAt` is the
+   time of the slot's last *event* (spec 11 D8), not of its last write. So it
+   is not monotonic in write order: a runner that replays its spool writes old
+   timestamps, and a timestamp cursor would skip those writes forever. Every
+   slot write does raise `slots.lastSeq`. A run therefore stores the `lastSeq`
+   it was built from (`runs.slotSeq`). The projector rebuilds
+   `slots LEFT JOIN runs WHERE r.id IS NULL OR r."slotSeq" IS DISTINCT FROM s."lastSeq"`.
+   The backfill is the same query on first start. A slot run is a pure
+   function of its slot and its last checkpoint's summary, and its `updatedAt`
+   is the slot's, so a rebuild from scratch gives identical rows.
+2. **D2: the `events` cursor is gap-aware.** `events.id` comes from a
+   sequence, and two runners' concurrent inserts can commit out of id order.
+   With a plain `id > cursor`, a lower id that commits later would be skipped.
+   So the cursor only moves over a contiguous run of ids. A hole is waited on
+   for `ACTIVITY_GAP_GRACE_MS` (10 s), then treated as a rolled-back id.
+   Re-reads are idempotent through `(sourceKind, sourceId)`. The wait is per
+   API process, so a restart waits out an open hole again. `audit_records.seq`
+   needs none of this, because #8 serializes inserts under an advisory xact
+   lock, so seq order is commit order.
+3. **D4 resolves by `(runnerId, projectRoot)` first.** This is what #11's
+   projector uses, and it is unique (`projects @@unique([runnerId, rootPath])`).
+   `projectRepo` is not unique per runner, so it is used only when an event
+   has no root and exactly one project of the runner has that repo. An event
+   that names a project nobody connected gives no item; its cursor still
+   moves. An event that names no project at all (runner-level, e.g.
+   `runner.spool_truncated`) is project-less. An audit record of a deleted
+   project becomes project-less, so it is admins only.
+4. **Echoes and duplicates.** `events.duplicate` and `events.unparsed` are
+   never mapped. The plugin's `session.*`, `pane.*` and `commit.trailer_found`
+   (`via: "watch"`) are skipped, as in `FleetProjector`. A `scraped`
+   `round.started`, `slot.dispatched` or `slot.checkpoint` is skipped while the
+   project's plugin channel is live (spec 16 D8), i.e. the same runner and
+   root received a `code-sentinel` event within the 24 h before it. This is
+   judged on `receivedAt`, so a replay agrees. Without it, every checkpoint
+   would show twice.
+5. **D3 audit set.** `auth.register`, a refused `auth.login` (an `anonymous`
+   actor shows as an unknown user), `user.*`, `settings.registration`,
+   `runner.create|pairing_code|pair|rename|revoke`, `project.*`,
+   `issue.create`, `orchestrator.start|stop|settings`, `slot.stop|message`.
+   Excluded: a successful `auth.login`, `auth.logout`, `auth.password_change`,
+   `auth.session_revoke`, `runner.command(.result)` (shown through their
+   `orchestrator.*` / `slot.*` audit records), `pane.watch_*` and `prices.*`.
+   `data` keeps safe fields only. It never holds a `slot.message_sent` text or
+   an audit `before`/`after`.
+6. **D7 status mapping** (`deriveRunStatus` in `packages/shared/src/history`):
+   - PR merged → `succeeded`.
+   - Session gone (slot `stale` or `ended`): PR closed → `failed`; PR open →
+     `waiting_person`; no PR → `abandoned`.
+   - Session alive: a `blocked`/`misclassified` last checkpoint → `blocked`;
+     pane `prompt`/`quota`, or `idle` with an open PR → `waiting_person`;
+     otherwise `running`.
+
+   A finished run ends at the slot's `endedAt`, else at its last change. A
+   resumed slot is the same row, so its run goes back to `running`.
+7. **D8: unpriced cost.** `costUsd` sums the priced requests and is null while
+   none is priced (as `SessionTotals` in #12). `unpricedRequests` says how
+   partial it is. The requests come from `sessions` by `(projectId, slotName)`
+   within `[startedAt, endedAt]`. Once `llm_requests.run` from OTel
+   (#13 D14) fills `usage_rollups.runId`, the join in
+   `apps/api/src/history/run-usage.ts` is the one place to switch. That needs
+   no change to `llm_requests` here.
+8. **The poll loop does not start under `APP_ENV=test`.** Every e2e suite
+   boots the whole app, and a background writer would race their TRUNCATEs.
+   Suites call `tick()` on a projector of their own. One suite
+   (`activity-live.e2e.spec.ts`) overrides the options to run the real loop
+   and checks the 5 s push. `ACTIVITY_POLL_MS=0` also turns the loop off.
+9. **Command registration trap (found in #12).** `CommandHandlers` in
+   `apps/runner/src/commands/dispatcher.ts` requires a handler for every key of
+   `commands` in `packages/shared/src/protocol/commands.ts`. A protocol or API
+   slot therefore defines and exports its command definitions in its own file
+   but does not add them to the map. The runner slot of the same issue adds
+   the map entry together with its handler. #21 adds no command.
 
 Depends on #11
 
