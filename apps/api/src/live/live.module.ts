@@ -5,12 +5,14 @@ import { LiveService } from './live.service';
 import { LiveConnections } from './live-connections';
 import { LiveMonitor } from './live-monitor';
 import { defaultLiveOptions, LIVE_OPTIONS } from './live-options';
+import { LiveTopicHookRegistry } from './live-topic-hooks';
 import { TopicAuthorizerRegistry } from './topic-authorizer.registry';
 
 @Module({
   imports: [AuthModule],
   providers: [
     { provide: LIVE_OPTIONS, useValue: defaultLiveOptions },
+    LiveTopicHookRegistry,
     LiveConnections,
     TopicAuthorizerRegistry,
     LiveService,
@@ -18,7 +20,13 @@ import { TopicAuthorizerRegistry } from './topic-authorizer.registry';
     LiveGateway,
   ],
   // Domain modules publish through LiveService and register their topic
-  // prefix (`project:` in #10) with the registry.
-  exports: [LiveService, TopicAuthorizerRegistry],
+  // prefix (`project:` in #10) with the registry; `pane:` (#18) also hooks
+  // joins and leaves and unsubscribes sockets through LiveConnections.
+  exports: [
+    LiveService,
+    TopicAuthorizerRegistry,
+    LiveTopicHookRegistry,
+    LiveConnections,
+  ],
 })
 export class LiveModule {}

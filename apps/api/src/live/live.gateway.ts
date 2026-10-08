@@ -16,6 +16,7 @@ import { SessionService } from '../auth';
 import { cookieFrom, originAllowed } from './handshake';
 import { LiveClient, LiveConnections } from './live-connections';
 import { allowedLiveOrigin } from './live-options';
+import { LiveTopicHookRegistry } from './live-topic-hooks';
 import { TopicAuthorizerRegistry } from './topic-authorizer.registry';
 
 const INTERNAL_ERROR = 1011;
@@ -24,6 +25,7 @@ interface Deps {
   sessions: SessionService;
   connections: LiveConnections;
   authorizers: TopicAuthorizerRegistry;
+  hooks: LiveTopicHookRegistry;
   logger: Logger;
 }
 
@@ -144,8 +146,18 @@ class LiveSocket {
       return;
     }
     if (this.closed) return;
-    this.deps.connections.subscribe(client, topic);
+    // Checked after the await, so the count is the one the socket joins.
+    const refusal = this.deps.hooks.admit(
+      topic,
+      this.deps.connections.subscribers(topic).length,
+    );
+    if (refusal) {
+      client.send({ type: 'error', topic, code: refusal });
+      return;
+    }
+    // Acknowledged before the hooks run: the first event never beats it.
     client.send({ type: 'subscribed', topic });
+    this.deps.connections.subscribe(client, topic);
   }
 
   private close(code: number, reason: string): void {
@@ -181,6 +193,7 @@ export class LiveGateway implements OnGatewayConnection {
     private readonly sessions: SessionService,
     private readonly connections: LiveConnections,
     private readonly authorizers: TopicAuthorizerRegistry,
+    private readonly hooks: LiveTopicHookRegistry,
   ) {}
 
   handleConnection(socket: WebSocket, request: IncomingMessage): void {
@@ -188,6 +201,7 @@ export class LiveGateway implements OnGatewayConnection {
       sessions: this.sessions,
       connections: this.connections,
       authorizers: this.authorizers,
+      hooks: this.hooks,
       logger: this.logger,
     });
   }

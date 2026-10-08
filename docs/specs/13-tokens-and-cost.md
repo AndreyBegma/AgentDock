@@ -348,6 +348,20 @@ i13-api, decided with the orchestrator on 2026-10-08:
     slot defines and exports its command definitions in its own file and does
     not add them to the `commands` map. The runner slot of the same issue adds
     the map entry together with the handler. This item adds no command.
-12. **Snapshot formatting.** The vendored JSON is byte-identical to upstream.
+13. **Web (i13-web).** `/usage` follows the project filter into the URL
+    (`/usage?projectId=…`); a `projectId` the API answers 404 for shows
+    "Project not found". Charts are plain bars: cost per bucket stacked by
+    runtime. `interval` is `hour` for a range of up to two days, `day` beyond.
+    A group whose requests are all unpriced shows a blank cost, never `$0`.
+    The breakdown offers project, model, runtime, issue and slot (`run` has no
+    data, note 3).
+14. **Pattern tester (web).** `POST /admin/prices/test` evaluates the saved
+    current version only, so the "New version" editor checks a pattern against
+    a sample model id in the browser, and the test calculator is for the
+    version already saved. Seeded patterns start with the inline `(?i)` flag
+    (note 4 strips it only when the API compiles them); the browser drops it
+    the same way before building a `RegExp`. A stored pattern that is left
+    unchanged is not re-validated in the browser.
+15. **Snapshot formatting.** The vendored JSON is byte-identical to upstream.
     `apps/api/prisma/seed-data/biome.json` turns Biome off for that directory,
     so `bun run check` does not ask for it to be reformatted.

@@ -41,7 +41,7 @@ taken, with its source.
 | # | Decision | Source |
 |---|---|---|
 | D1 | **Location.** The collector reads `<git-common-dir>/cs-orchestrator/events.jsonl` and `<git-common-dir>/cs-orchestrator/state.json` for each watched project (`git-common-dir` from #10's inspection). It does not read dated board folders — #11's `board` collector keeps doing that | plugin P1/P2 [Confirmed in docs/plugin]; exact path [Unknown until plugin#5 merges] |
-| D2 | **Tailing.** `fs.watch` plus a 5 s poll fallback. The byte offset and the file's inode are persisted in `$XDG_STATE_HOME/agentdock/offsets.json` under key `events:<projectId>` (same file as #12, written atomically). If the inode changes or the file is shorter than the offset, the collector restarts from 0 and relies on dedupe (D5) | #12 D5 |
+| D2 | **Tailing.** `fs.watch` plus a 5 s poll fallback. The byte offset and the file's inode are persisted in `$XDG_STATE_HOME/agentdock/events-offsets.json` under key `events:<projectId>` (same `OffsetStore` class as #12's `offsets.json`, written atomically — but a file of its own, see Notes 11). If the inode changes or the file is shorter than the offset, the collector restarts from 0 and relies on dedupe (D5) | #12 D5 |
 | D3 | **Parsing.** Each line is parsed as the envelope from event-schema.md with schema version `v`. Lines with `v` greater than the runner understands, malformed JSON, or a missing `type` emit `events.unparsed { line, reason }` and are skipped; the collector never stops | ADR-0002 |
 | D4 | **Mapping.** Plugin events already use AgentDock's type names (`orchestrator.*`, `round.*`, `slot.*`, `pr.merged`, `issue.blocked`, `person.needed`). The runner only adds `seq`, sets `source: "code-sentinel"`, and fills `project` from the watch list. Unknown types are forwarded unchanged and stored raw (event-schema.md) | event-schema.md |
 | D5 | **Dedupe.** The plugin writes an `id` (ULID) on every event (plugin#5 requirement, stated in its spec). The API dedupes plugin events on `(projectId, data.pluginEventId)` in addition to `(runnerId, seq)`, so a re-read from offset 0 does not double-apply | new |
@@ -125,7 +125,7 @@ wait for it.
 |---|---|---|
 | plugin#5 lands a slightly different format than the fixtures | medium | fixtures copied from plugin#5's spec; `events.unparsed` makes drift visible; schema version `v` |
 | Two sources disagree and flip-flop | medium | field-group precedence (D7), plugin always wins |
-| Offsets file shared with #12 written concurrently | low | single writer module in the runner with atomic rename; both collectors go through it |
+| Offsets file shared with #12 written concurrently | low | not shared: the `events` collector keeps `events-offsets.json` (one store per file per process, atomic rename), because #12's `SessionWatcher` prunes every key that is not a transcript and rewrites the whole file |
 
 ## Open questions
 
@@ -199,3 +199,21 @@ as merged: `skills/orchestrator/EVENTS.md` at claude-code-plugin@`bdce2e0`.
     and exports a command in its own file but does not add it to the map; the
     runner slot of the same issue adds the entry together with its handler.
     This item adds no command.
+11. **Offsets file (i16-runner, decided with the orchestrator on 2026-10-08).**
+    D2 said "same file as #12". #12's `SessionWatcher` loads its own
+    `OffsetStore`, deletes every key that is not a transcript path and saves its
+    whole map, so a second writer's `events:<projectId>` keys would be lost. The
+    `events` collector therefore uses the same `OffsetStore` class over
+    `events-offsets.json` beside `offsets.json`. `FileState` has no inode field
+    and its schema strips unknown keys, so the inode rides in `parser`
+    (`{ inode }`). The offset is saved after the batch is emitted: a crash in
+    between re-reads, which D5's dedupe absorbs.
+12. **Snapshot timing.** Collectors have no reconnect hook, so the snapshot is
+    sent when the collector starts and whenever `state.json`'s content changes.
+    Events are spooled across a reconnect, so nothing is lost; a literal resend
+    per reconnect needs a hook in the connection (follow-up). An invalid
+    `state.json` is reported once as `events.unparsed` per distinct content.
+13. **Poll.** `fleet.eventsPollSeconds` (default 5, 1–3600) lives in the
+    runner's `fleet` config block and in `FleetSettings`. `fs.watch` on the
+    `cs-orchestrator` directory (debounced 200 ms) makes a typical append
+    visible sooner; the poll also arms the watch once the directory appears.

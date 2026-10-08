@@ -14,6 +14,7 @@ import { bearerToken } from './credentials';
 import { LiveConnection, RunnerConnections } from './runner-connections';
 import { RunnerIngestService } from './runner-ingest.service';
 import { RUNNER_OPTIONS, type RunnerOptions } from './runner-options';
+import { RunnerStreams } from './runner-streams';
 import { RunnerWatchList } from './runner-watch-list';
 
 /** Standard close codes the gateway uses besides `RUNNER_CLOSE_CODES`. */
@@ -24,6 +25,7 @@ interface Deps {
   ingest: RunnerIngestService;
   connections: RunnerConnections;
   watchList: RunnerWatchList;
+  streams: RunnerStreams;
   options: RunnerOptions;
   logger: Logger;
 }
@@ -150,8 +152,11 @@ class RunnerSocket {
         }
         return;
       case 'command.progress':
+        // Streaming command output lands with the item that uses it.
+        return;
       case 'pane':
-        // Streaming and pane capture land with the items that use them.
+      case 'subscribe.error':
+        this.deps.streams.deliver(runnerId, message);
         return;
     }
   }
@@ -177,6 +182,8 @@ class RunnerSocket {
       live.send({ type: 'welcome', runnerId, config, ackedSeq: Number(acked) });
     });
     if (this.closed) return;
+    // After the welcome: a `subscribe` sent from here is the runner's first.
+    this.deps.streams.connected(live);
     this.deps.logger.log(`runner ${runnerId} connected`);
   }
 
@@ -184,7 +191,7 @@ class RunnerSocket {
     if (this.closed) return;
     this.closed = true;
     clearTimeout(this.helloTimer);
-    if (this.live) this.deps.connections.detach(this.live);
+    if (this.live) this.detach(this.live);
     if (this.socket.readyState <= this.socket.OPEN) {
       this.socket.close(code, reason);
     }
@@ -194,8 +201,14 @@ class RunnerSocket {
     const wasLive = this.live !== null;
     this.closed = true;
     clearTimeout(this.helloTimer);
-    if (this.live) this.deps.connections.detach(this.live);
+    if (this.live) this.detach(this.live);
     if (wasLive) this.deps.logger.log(`runner ${this.runnerId} disconnected`);
+  }
+
+  /** Both close paths may run; the second finds nothing left to do. */
+  private detach(live: LiveConnection): void {
+    this.deps.connections.detach(live);
+    this.deps.streams.disconnected(live);
   }
 }
 
@@ -217,6 +230,7 @@ export class RunnerGateway implements OnGatewayConnection {
     private readonly ingest: RunnerIngestService,
     private readonly connections: RunnerConnections,
     private readonly watchList: RunnerWatchList,
+    private readonly streams: RunnerStreams,
     @Inject(RUNNER_OPTIONS) private readonly options: RunnerOptions,
   ) {}
 
@@ -225,6 +239,7 @@ export class RunnerGateway implements OnGatewayConnection {
       ingest: this.ingest,
       connections: this.connections,
       watchList: this.watchList,
+      streams: this.streams,
       options: this.options,
       logger: this.logger,
     });

@@ -48,7 +48,7 @@ describe('daemon — OTLP receiver (spec 13)', () => {
     projects: [{ id: 'prj_fixture', root: ROOT }],
     disabledCommands: [],
     otlp,
-    fleet: { pollSeconds: 15, prPollSeconds: 60 },
+    fleet: { pollSeconds: 15, prPollSeconds: 60, eventsPollSeconds: 5 },
     sessions: { enabled: false },
   });
 
