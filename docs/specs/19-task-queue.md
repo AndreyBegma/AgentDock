@@ -157,6 +157,14 @@ i19-api, decided with the orchestrator on 2026-10-08:
 8. **Sink order.** `QueueModule` imports `FleetModule`, so the fleet sink registers (and projects a batch's rounds and slots) before the queue sink recomputes; an e2e test sends a snapshot and a round in one batch and gets the orchestrator's verdict. Any fleet event recomputes its project's queue.
 9. **Routes.** `GET /queue?state=&include=open` (`others` lists open issues without the ready label, without a state); `GET /queue/:number` answers `404 issue_not_found` for an issue that is not in the queue, and `history` holds its verdicts in the last 20 rounds.
 
+i19-runner:
+
+10. **Registered.** `queueCommands` is spread into `commands` together with the two handlers (`apps/runner/src/commands/queue/`), and `QueueCommands` in the API now calls `RunnerCommandService.send`.
+11. **`issues.refresh` reaches the collector through `issuesRefreshers`** (`collectors/issues/refresh.ts`), a process-wide registry the collector fills on start; the daemon builds collectors and handlers separately and shares nothing else. A refresh ignores the ETag, so it always emits a snapshot (`changed: true`) unless `gh` fails, which answers `internal` with the `gh` error.
+12. **Ready label on create.** The runner reads `orchestrator.readyLabel` from `.code-analyzer-config.json`, else `cs:ready`. A project's `readyLabelOverride` (API-side) is not in `issue.create`'s args, so it does not reach the runner yet.
+13. **Pages and ETag.** Only page 1 is conditional; pages 2.. are read when it changed, up to 30 pages. After an outage the first read is unconditional, so a `304` cannot leave `issues.unavailable` showing. A `Depends on` target that is closed is looked up on the issue's timeline: a `closed` event with a `commit_id` plus a merged same-repository pull request that cross-references it is `pr`, anything else `manual`; a timeline that cannot be read is retried every tick.
+14. **`queue.pollSeconds`** is an option of `issuesCollector({ pollSeconds })`, default 60; it is not wired to the runner config file yet.
+
 i19-web, 2026-10-08:
 
 - **Read-only board.** glass-ui v0.22.0's `Board` has no read-only mode: the drag affordance and the move menu remain until glass-ui gains a read-only Board (ADR-0011); state is never mutated by the UI — `onMove` is a no-op and the columns are derived from the API's items on every render, so a drop never sticks.

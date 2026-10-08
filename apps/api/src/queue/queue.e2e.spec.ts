@@ -16,6 +16,7 @@ import {
   type LiveE2eContext,
   TestLiveSocket,
 } from '../live/testing/live-e2e';
+import { RunnerCommandService } from '../runners/runner-command.service';
 import { RunnerEventSinks } from '../runners/runner-event-sinks';
 import {
   createUser,
@@ -567,7 +568,44 @@ describe('task queue (e2e)', () => {
       expect(create).not.toHaveBeenCalled();
     });
 
-    it('answers 503 and audits an error while the runner command is not wired', async () => {
+    it('sends issue.create to the runner and returns its answer', async () => {
+      const send = jest.spyOn(ctx.app.get(RunnerCommandService), 'send');
+      send.mockResolvedValue({
+        status: 'ok',
+        output: { number: 14, url: url(14), queued: true },
+        rttMs: 3,
+      });
+      const response = await post({
+        title: 'x',
+        body: AC,
+        labels: ['enhancement'],
+        queue: true,
+      });
+      expect(response.status).toBe(201);
+      expect(response.body).toEqual({
+        number: 14,
+        url: url(14),
+        queued: true,
+      });
+      expect(send).toHaveBeenCalledWith(
+        runnerId,
+        'issue.create',
+        {
+          projectId: a,
+          title: 'x',
+          body: AC,
+          labels: ['enhancement'],
+          queue: true,
+        },
+        expect.objectContaining({ role: 'operator' }),
+      );
+      expect(await audits()).toMatchObject([{ result: 'ok' }]);
+    });
+
+    it('answers 503 and audits an error when the runner does not answer', async () => {
+      jest
+        .spyOn(ctx.app.get(RunnerCommandService), 'send')
+        .mockResolvedValue({ status: 'unknown' });
       const response = await post({
         title: 'x',
         body: AC,
@@ -577,6 +615,21 @@ describe('task queue (e2e)', () => {
       expect(response.status).toBe(503);
       expect(response.body.error).toBe('command_unavailable');
       expect(await audits()).toMatchObject([{ result: 'error' }]);
+    });
+
+    it('answers 502 when the runner fails the command', async () => {
+      jest.spyOn(ctx.app.get(RunnerCommandService), 'send').mockResolvedValue({
+        status: 'error',
+        error: { code: 'internal', message: 'gh issue create failed' },
+      });
+      const response = await post({
+        title: 'x',
+        body: AC,
+        labels: [],
+        queue: true,
+      });
+      expect(response.status).toBe(502);
+      expect(response.body.error).toBe('command_failed');
     });
 
     it('validates the body', async () => {
@@ -619,7 +672,31 @@ describe('task queue (e2e)', () => {
       );
     });
 
-    it('answers 503 while the runner command is not wired', async () => {
+    it('sends issues.refresh to the runner', async () => {
+      const send = jest.spyOn(ctx.app.get(RunnerCommandService), 'send');
+      send.mockResolvedValue({
+        status: 'ok',
+        output: { changed: false, fetchedAt: FETCHED_AT },
+        rttMs: 3,
+      });
+      const response = await operatorOfA.send(
+        'post',
+        `/projects/${a}/queue/refresh`,
+      );
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ changed: false, fetchedAt: FETCHED_AT });
+      expect(send).toHaveBeenCalledWith(
+        runnerId,
+        'issues.refresh',
+        { projectId: a },
+        expect.objectContaining({ role: 'operator' }),
+      );
+    });
+
+    it('answers 503 when the runner does not answer', async () => {
+      jest
+        .spyOn(ctx.app.get(RunnerCommandService), 'send')
+        .mockResolvedValue({ status: 'unknown' });
       const response = await operatorOfA.send(
         'post',
         `/projects/${a}/queue/refresh`,
