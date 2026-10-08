@@ -61,8 +61,10 @@ both sit at the root of that origin.
 | S → R | `command` | `{ id, name, args }` — typed, see below |
 | R → S | `command.result` | `{ id, ok, output?, error? }` |
 | R → S | `command.progress` | `{ id, chunk }` for streaming commands |
-| S → R | `subscribe` / `unsubscribe` | live pane capture for a slot (read-only) |
-| R → S | `pane` | `{ projectId, slot, lines, cursor }` |
+| S → R | `subscribe` | `{ id, kind: "pane", projectId, root, slot }` — start streaming a slot's pane, read-only |
+| S → R | `unsubscribe` | `{ id }` |
+| R → S | `pane` | `{ id, frame: { type: "full", lines, cursor } \| { type: "patch", from, lines } \| { type: "ended" } }` |
+| R → S | `subscribe.error` | `{ id, code: "not_found" \| "too_many_viewers" \| "forbidden" }` |
 
 ### Sequence numbers
 
@@ -402,24 +404,84 @@ well-formed, the path is not usable), `path_not_allowed` → **403**. On
 `project.refresh`, `path_not_allowed` means the runner's watch list does not
 hold that project: the API resends `config` before the caller retries.
 
-### `subscribe`, `unsubscribe`, `pane`
+### `subscribe`, `unsubscribe`, `pane`, `subscribe.error`
+
+Live read-only view of a slot's tmux pane ([spec 18](../specs/18-live-worker-pane.md)).
+The server picks the `id` for each subscription. Every `pane` and
+`subscribe.error` for that subscription carries the same `id`, and
+`unsubscribe` names it. The API holds at most one runner subscription per slot
+and fans its frames out to browsers. The runner runs one capture loop per slot
+and stops it within `PANE_UNSUBSCRIBE_STOP_MS` (2 s) of the last `unsubscribe`.
+No message in either direction carries input to the pane.
 
 ```json
-{ "type": "subscribe", "projectId": "prj_agentdock", "slot": "i5-protocol" }
+{
+  "type": "subscribe",
+  "id": "pane_7f3a",
+  "kind": "pane",
+  "projectId": "prj_agentdock",
+  "root": "/home/dev/agentdock",
+  "slot": "i5-protocol"
+}
 ```
 
+`root` must be an absolute path the runner's watch list holds. `slot` follows
+`^[a-z0-9][a-z0-9-]*$` (max 64), because it ends up in a tmux target
+(`cs-<slot>`), where `:` and `.` have meaning. The runner also checks that the
+slot's worktree belongs to `root` (`.wt-<repo>-<slot>`).
+
 ```json
-{ "type": "unsubscribe", "projectId": "prj_agentdock", "slot": "i5-protocol" }
+{ "type": "unsubscribe", "id": "pane_7f3a" }
+```
+
+The runner captures every `PANE_CAPTURE_INTERVAL_MS` (1 s) while the
+subscription lives:
+
+- **`full`**: the first frame of a subscription, then again every 60 s. It
+  holds up to `PANE_HISTORY_LINES` (2000) lines of history and the cursor.
+- **`patch`**: replaces the previous frame's lines from index `from` to the end
+  with `lines`. The runner sends no frame when the pane has not changed.
+- **`ended`**: the `cs-<slot>` session is gone. The runner drops the
+  subscription after sending it, and the viewer keeps the last frame on screen.
+
+Lines keep their ANSI colour escapes (`capture-pane -e`). Before sending, the
+runner masks strings that look like secrets with `•••`; this is best-effort. A
+serialized frame stays under `PANE_MAX_FRAME_BYTES` (256 KiB); to fit, the
+runner drops lines from the top. The server never persists frames.
+
+```json
+{
+  "type": "pane",
+  "id": "pane_7f3a",
+  "frame": {
+    "type": "full",
+    "lines": ["$ bun run test", "\u001b[32m42 pass\u001b[0m"],
+    "cursor": { "x": 0, "y": 2 }
+  }
+}
 ```
 
 ```json
 {
   "type": "pane",
-  "projectId": "prj_agentdock",
-  "slot": "i5-protocol",
-  "lines": ["$ bun run test", "42 pass"],
-  "cursor": { "x": 0, "y": 2 }
+  "id": "pane_7f3a",
+  "frame": { "type": "patch", "from": 1, "lines": ["43 pass", "$ "] }
 }
+```
+
+```json
+{ "type": "pane", "id": "pane_7f3a", "frame": { "type": "ended" } }
+```
+
+`subscribe.error` refuses a subscription; the runner sends nothing more for
+that `id`. Its codes:
+
+- `not_found`: no `cs-<slot>` session, or the slot is not in that project.
+- `too_many_viewers`: the runner already holds `PANE_MAX_SUBSCRIPTIONS` (10).
+- `forbidden`: `root` is not on the watch list.
+
+```json
+{ "type": "subscribe.error", "id": "pane_7f3a", "code": "too_many_viewers" }
 ```
 
 ## Commands (allowlist)
@@ -440,7 +502,8 @@ handler.
 | `slot.stop` | `projectId, root, slot` | operator | defined; handler lands with i17-runner: → `{ stopped }`, timeout 10 s |
 | `slot.message` | `projectId, root, slot, text, from` | operator | defined; handler lands with i17-runner: → `{ written: true }`, timeout 10 s |
 | `pr.approve` / `pr.requestChanges` | `projectId, pr, note?` | operator | planned |
-| `issue.create` | `projectId, title, body, labels` | operator | planned |
+| `issue.create` | `projectId, title, body, labels, queue` | operator | defined (`commands/queue.ts`), not in the map yet: → `{ number, url, queued, reason? }`, timeout 45 s |
+| `issues.refresh` | `projectId` | operator | defined (`commands/queue.ts`), not in the map yet: → `{ changed, fetchedAt }`, timeout 45 s |
 | `skill.search` | `query` | operator | planned |
 | `skill.install` | `projectId?, source, runtimes[]` | operator | planned |
 | `skill.run` | `projectId, skill, args, profileId, model, output: report\|pr` | operator | planned |
@@ -549,6 +612,27 @@ D11.
   connection is `409 runner_offline`, no answer within the timeout is
   `504 runner_timeout` (the re-read may still finish), a refusal is
   `409 runner_refused`, and a failure is `502 runner_error`.
+
+### Queue
+
+Schemas in `commands/queue.ts`; the rules are [spec 19](../specs/19-task-queue.md)
+D1 and D7. Both are exported as `issueCreateCommand` and
+`issuesRefreshCommand` (and together as `queueCommands`) but are **not** in
+the `commands` map: the runner's `CommandHandlers` needs a handler for every
+entry, so the map entry lands with the handler.
+
+- `issue.create { projectId, title, body, labels[], queue }` runs
+  `gh issue create --repo <owner/repo> --title … --body-file <tmp> --label …`
+  in the project's root (a `projectId` not on the watch list is
+  `path_not_allowed`). With `queue: true` it adds the ready label only when
+  `specGap(body, labels)` is null, and otherwise answers `queued: false` with
+  `reason: no_acceptance_criteria | no_parallel_plan`. `body` is at most
+  64 KB, `labels` at most 20.
+- `issues.refresh { projectId }` runs the `issues` collector's poll for that
+  project now. A changed listing goes out as `issues.snapshot` events as
+  usual; the result says whether it changed (`false` on a `304`).
+- The API sends them from one place, `apps/api/src/queue/queue-commands.ts`,
+  which answers `503 command_unavailable` until they are in the map.
 
 ## Delivery guarantees
 

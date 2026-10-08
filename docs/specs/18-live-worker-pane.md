@@ -143,6 +143,43 @@ not a blocking dependency.
 | Should viewers below operator see panes? | Yes — read-only, same as the rest of the fleet page |
 | Stream the orchestrator's own pane too? | Not in this item; candidate for the orchestrator card later |
 
+## Notes
+
+### From i18-protocol
+
+- **Where the schemas are.** All four messages, the frame union and the D1–D4
+  limits are in `packages/shared/src/protocol/pane.ts`. Import the constants
+  (`PANE_CAPTURE_INTERVAL_MS`, `PANE_MAX_SUBSCRIPTIONS`,
+  `PANE_MAX_VIEWERS_PER_SLOT`, `PANE_MAX_FRAME_BYTES`, …) rather than
+  repeating the numbers. The API and web share `paneTopic(projectId, slot)`
+  and `PANE_LIVE_EVENTS` (`pane.frame`, `pane.ended`). The #5 placeholders for
+  `subscribe` / `unsubscribe` / `pane` in `messages.ts` are replaced; the
+  exported names are the same.
+- **The server owns `id`.** The API picks one `id` per runner subscription,
+  meaning one per slot (D3). Every `pane` and `subscribe.error` echoes that
+  `id`, and `unsubscribe` carries only the `id`. Frames therefore do not repeat
+  `projectId` / `slot`: the API maps `id` back to its topic.
+- **`slot` is pattern-checked** with the shared slot-name rule
+  (`^[a-z0-9][a-z0-9-]*$`, max 64, the same `slotNameSchema` as the #17
+  control commands). The value reaches `tmux … -t cs-<slot>`, where `:` and `.`
+  are target syntax. Session-name parsing still goes through #11's
+  `session-name.ts` (D9).
+- **Adding a message type needs no app edit.** The runner's
+  `handle(ServerMessage)` switch (`apps/runner/src/connection.ts`) and the API's
+  `handle(RunnerMessage)` switch (`apps/api/src/runners/runner.gateway.ts`)
+  have no exhaustiveness guard. The new runner → server `subscribe.error`
+  therefore compiles on both sides and is ignored until i18-api handles it.
+  Messages are not like commands. Commands have #12's trap: a key in the
+  `commands` map without a runner handler breaks the runner build, because
+  `CommandHandlers` requires every key. So a protocol slot defines a command
+  but does not add it to that map; the runner slot adds the entry together
+  with its handler.
+- **What each side adds.** i18-runner: replace the `subscribe` /
+  `unsubscribe` no-op in `connection.ts` with a call into
+  `apps/runner/src/pane/`. i18-api: replace the `case 'pane':` no-op in
+  `runner.gateway.ts`, add `case 'subscribe.error':` beside it, and relay both
+  to `paneTopic(…)`.
+
 Depends on #9
 
 Depends on #11
