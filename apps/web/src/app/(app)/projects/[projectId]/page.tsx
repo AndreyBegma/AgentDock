@@ -1,8 +1,8 @@
 import { redirect } from 'next/navigation';
 
 /**
- * A project's home. Settings is the only project page today; the fleet page
- * (#11) changes this one redirect and nothing else.
+ * A project's home is its fleet (spec 11). This redirect is the one place the
+ * landing page is chosen; Settings stays in the project navigation.
  */
 export default async function ProjectHome({
   params,
@@ -10,5 +10,5 @@ export default async function ProjectHome({
   params: Promise<{ projectId: string }>;
 }) {
   const { projectId } = await params;
-  redirect(`/projects/${projectId}/settings`);
+  redirect(`/projects/${projectId}/fleet`);
 }
