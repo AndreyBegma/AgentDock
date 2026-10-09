@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  capabilitiesSchema,
   commands,
   type HelloMessage,
   isSessionEventType,
@@ -23,6 +24,7 @@ import {
   serverMessageSchema,
   serverMessageTypes,
   spoolTruncatedDataSchema,
+  terminalAvailable,
   unsequencedEventSchema,
 } from './index';
 
@@ -131,6 +133,19 @@ describe('messageSchema', () => {
       },
     };
     expect(messageSchema.safeParse(bare).success).toBe(true);
+  });
+
+  it('reads an absent terminal capability as false (spec 29 D10)', () => {
+    const { capabilities } = hello();
+    expect(terminalAvailable(capabilities)).toBe(true);
+    const { terminal: _, ...older } = capabilities;
+    const parsed = capabilitiesSchema.parse(older);
+    expect(terminalAvailable(parsed)).toBe(false);
+    expect(terminalAvailable({ ...capabilities, terminal: false })).toBe(false);
+    expect(
+      capabilitiesSchema.safeParse({ ...capabilities, terminal: 'yes' })
+        .success,
+    ).toBe(false);
   });
 
   it('rejects a negative seq cursor and a zero event seq', () => {
