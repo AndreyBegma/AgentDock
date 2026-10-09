@@ -233,6 +233,24 @@ Decided while landing the protocol slot (i24-protocol); the orchestrator approve
   - The live topic is `run:<projectId>:<runId>` (`runTopic`). Until i24-api registers a `run` authorizer, the API answers it `unknown_topic`.
 - **Events.** `skill_run.phase_changed` and `skill_run.finished` are in `events/skills.ts`. `skillPhaseToRunStatus` is D12.
 
+Decided while landing the runner slot (i24-runner); the orchestrator approved each one on 2026-10-09.
+
+- **When install reports `changed_since_preview` (D3).** A commit SHA pins the content, so a repository that changes after the preview shows up at install in one of two ways:
+  - `commit` can no longer be fetched, because the history was rewritten;
+  - the recomputed `contentHash` differs from the preview's.
+
+  Both answer `changed_since_preview`, and nothing is written.
+- **Cancel, timeout and failure in `pr` mode (D10, D11).** They collect the report fields (`reportText`, `changedFiles`, `patch`) but never push or open a PR. The worktree and branch are removed, and the full patch stays in the run directory. Only a `succeeded` `pr` run opens a PR.
+- **Catalog host (D1).** It is fixed in the runner's code. The runner config has no `skills.catalogHost` key. The configuration table's `skills.defaultTimeoutSec` lives in the API, because `skill.run` always carries `timeoutSec`. The runner keeps `skills.maxConcurrentRuns` and `skills.maxTimeoutSec`.
+- **Plugin inventory (D6).** It reads each claude profile's `plugins/installed_plugins.json`, which names the active install of each plugin inside `plugins/cache/`. Globbing the whole cache would also offer stale versions.
+- **`skill.run` checks the skill is installed (D8).** It must be one of the project's skills on its base, a skill of the run's profile, or a skill of that profile's plugins. Otherwise the answer is `not_found`.
+- **No hooks on the runner's own commits (D4, D10).** Install and run commits use `core.hooksPath=/dev/null` and `--no-verify`. No third-party code runs, and no hook can add an attribution trailer.
+- **Run directory (D7).** It is `$XDG_STATE_HOME/agentdock/runs/<runId>/`, beside the spool. It holds `state.json`, which lets a restarted runner resume the run, plus `run.json`, `stream.jsonl`, `stderr.log`, `exit.json` and `patch.diff`.
+- **Repository-root skills.** A `SKILL.md` at a repository's root is not offered by `skill.inspect`, because `inspectedSkillSchema.path` must be a non-empty directory. Symlinks inside a skill are never followed nor copied.
+- **Follow-ups not built here.**
+  - `terminal.attach` with a `skill_run` target still answers `unsupported`. The executor exposes `runSession(projectId, root, runId)` for it.
+  - The worktree collector sees `.wt-<repo>-run-*` and `.wt-<repo>-skill-*` as slots named `run-…` and `skill-…`. It should probably exclude them.
+
 ## Open questions
 
 | Question | Default if nobody answers |
