@@ -101,6 +101,9 @@ function crumbsFor(pathname: string): BreadcrumbItem[] {
   }
   known.set('/account', 'Account');
   known.set('/admin', 'Admin');
+  // The nav entry "Integrations" points at its first page.
+  known.set('/admin/integrations', 'Integrations');
+  known.set('/admin/integrations/telegram', 'Telegram');
 
   const segments = pathname.split('/').filter(Boolean);
   return segments.map((segment, index) => {
