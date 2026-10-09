@@ -1,11 +1,14 @@
 'use client';
 
-import type {
-  AdminRunnerDetail,
-  AdminRuntimeProfile,
-  ProjectDetail,
-  UpdateProjectRequest,
+import {
+  type AdminRunnerDetail,
+  type AdminRuntimeProfile,
+  configMergeApproval,
+  mergeApprovalMismatch,
+  type ProjectDetail,
+  type UpdateProjectRequest,
 } from '@agentdock/shared';
+import { Banner } from 'glass-ui/banner';
 import { Button } from 'glass-ui/button';
 import { Card } from 'glass-ui/card';
 import { DialogContent, DialogRoot } from 'glass-ui/dialog';
@@ -15,6 +18,7 @@ import { Toggle } from 'glass-ui/toggle';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useEffect, useState } from 'react';
 import { api } from '../../../../../lib/api';
+import { mismatchSentence } from '../../../../../lib/approvals/format';
 import {
   BASE_SOURCE_LABEL,
   describeProjectError,
@@ -33,6 +37,14 @@ export function GeneralTab({
   onChanged: () => void;
 }) {
   const router = useRouter();
+  // D1: judged on what is saved, not on the unsaved toggle.
+  const mergeApprovalNote = mismatchSentence(
+    {
+      agentdock: project.mergeApproval,
+      config: configMergeApproval(project.codeSentinelConfig),
+    },
+    mergeApprovalMismatch(project),
+  );
   const [displayName, setDisplayName] = useState(project.displayName);
   const [baseOverride, setBaseOverride] = useState(project.baseOverride ?? '');
   const [readyLabel, setReadyLabel] = useState(
@@ -184,7 +196,9 @@ export function GeneralTab({
               Merge approval
             </span>
             <p className="text-ink-3 text-xs">
-              Stored now; merge gating arrives with a later milestone.
+              Your intent: a person approves every pull request before the
+              orchestrator merges it. The orchestrator itself obeys the
+              project’s config.
             </p>
           </div>
           {isAdmin ? (
@@ -197,6 +211,11 @@ export function GeneralTab({
             <span className="text-sm">{mergeApproval ? 'on' : 'off'}</span>
           )}
         </div>
+        {mergeApprovalNote ? (
+          <Banner tone="warn" title="Merge approval settings disagree">
+            {mergeApprovalNote}
+          </Banner>
+        ) : null}
 
         {isAdmin ? (
           <div className="flex justify-between gap-2">
