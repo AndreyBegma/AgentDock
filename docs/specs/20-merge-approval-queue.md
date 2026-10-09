@@ -230,6 +230,34 @@ i20-api, decided with the orchestrator on 2026-10-08:
     settings page calls with the project detail it already has; an unread
     config is a mismatch only when AgentDock expects approval.
 
+i20-runner, 2026-10-09:
+
+12. **Registration.** `approvalCommands` is spread into `commands` in the same
+    commit as the four handlers (`apps/runner/src/commands/approvals/`) and
+    `ApprovalCommands` now sends through `RunnerCommandService`, so the 503
+    "not wired" answer is gone: 503 now means the runner did not answer.
+13. **The signal follows D5 and this issue's acceptance criteria, not the
+    plugin#8 draft.** `signal.ts` writes
+    `<git-common-dir>/cs-orchestrator/approvals/<pr>.json` =
+    `{ v: 1, pr, decision: "approved" | "changes_requested" | "stale", headSha,
+    note?, by, at }`, atomically (temp file in the same directory, then
+    `rename`, mode 0600). `headSha` is an addition to D5 so the file says which
+    head it binds. `pr.voidApproval` rewrites the file with `decision: "stale"`
+    and `by: "agentdock"`; it does not delete it. **Divergence:** the plugin#8
+    draft is `{ decision: "approve" | "request_changes", note, by, at }` with
+    no `v`, `pr` or `stale`. Until plugin#8 merges, no orchestrator reads this
+    file; when it lands, only `signal.ts` changes (its `SignalDecision`
+    spellings and, if needed, the path).
+14. **Nothing writes outside the approvals directory.** `signalPath` builds the
+    only target from an integer PR number, and `writeSignal` refuses any target
+    that is not a direct child of the approvals directory. `root` must equal
+    the watched project's root; the runner's spec snapshots the checkout, the
+    `.git` directory and the workspace around all three decision commands and
+    asserts the only new file is `cs-orchestrator/approvals/<pr>.json`.
+15. **Check state in `pr.inspect`.** Each `statusCheckRollup` entry is
+    classified with `rollupChecks([entry])` (`green` → pass, `pending` → wait,
+    `red` → fail), so `checks` and `checkList` cannot disagree.
+
 Depends on #11
 
 Depends on #17

@@ -624,10 +624,10 @@ handler.
 | `orchestrator.status` | `projectId, root` | viewer | implemented: → `{ present, state, session?, startedAt? }`, timeout 5 s |
 | `slot.stop` | `projectId, root, slot` | operator | implemented: → `{ stopped }`, timeout 10 s |
 | `slot.message` | `projectId, root, slot, text, from` | operator | implemented: → `{ written: true, delivered }`, timeout 10 s |
-| `pr.inspect` | `projectId, root, pr` | viewer | defined (`commands/approvals.ts`), not in the map yet: → `PrInspection` (head SHA, diff stats, ≤ 300 files, checks, mergeable), timeout 30 s |
-| `pr.approve` | `projectId, root, pr, headSha, by, at` | operator | defined (`commands/approvals.ts`), not in the map yet: → `{ written: true }`, timeout 10 s |
-| `pr.requestChanges` | `projectId, root, pr, headSha, by, at, note` | operator | defined (`commands/approvals.ts`), not in the map yet: → `{ written: true }`, timeout 10 s |
-| `pr.voidApproval` | `projectId, root, pr, headSha, at` | operator | defined (`commands/approvals.ts`), not in the map yet: → `{ written: true }`, timeout 10 s |
+| `pr.inspect` | `projectId, root, pr` | viewer | defined (`commands/approvals.ts`): → `PrInspection` (head SHA, diff stats, ≤ 300 files, checks, mergeable), timeout 30 s |
+| `pr.approve` | `projectId, root, pr, headSha, by, at` | operator | defined (`commands/approvals.ts`): → `{ written: true }`, timeout 10 s |
+| `pr.requestChanges` | `projectId, root, pr, headSha, by, at, note` | operator | defined (`commands/approvals.ts`): → `{ written: true }`, timeout 10 s |
+| `pr.voidApproval` | `projectId, root, pr, headSha, at` | operator | defined (`commands/approvals.ts`): → `{ written: true }`, timeout 10 s |
 | `issue.create` | `projectId, title, body, labels, queue` | operator | defined (`commands/queue.ts`), not in the map yet: → `{ number, url, queued, reason? }`, timeout 45 s |
 | `issues.refresh` | `projectId` | operator | defined (`commands/queue.ts`), not in the map yet: → `{ changed, fetchedAt }`, timeout 45 s |
 | `skill.search` | `query` | operator | defined (`commands/skills.ts`), not in the map yet: → `{ items: [{ id, source, skillId, name, installs }] }`, timeout 15 s |
@@ -771,8 +771,8 @@ entry, so the map entry lands with the handler.
 
 Schemas in `commands/approvals.ts`; the rules are
 [spec 20](../specs/20-merge-approval-queue.md) D4–D7. Exported together as
-`approvalCommands`, **not** in the `commands` map until the runner registers
-their handlers (the same trap as the queue commands).
+`approvalCommands` and spread into the `commands` map together with the
+runner's handlers (`apps/runner/src/commands/approvals/`).
 
 - `pr.inspect { projectId, root, pr }` runs `gh pr view <pr> --json
   additions,deletions,changedFiles,files,statusCheckRollup,mergeable,mergeStateStatus,url,title,body,state,headRefOid`
@@ -787,8 +787,13 @@ their handlers (the same trap as the queue commands).
   the signal's file format and path live only in the runner's
   `commands/approvals/signal.ts` (D5), and nothing these commands write is
   outside `<git-common-dir>/cs-orchestrator/approvals/`.
-- The API sends all four from `apps/api/src/approvals/approval-commands.ts`,
-  which answers `503 command_unavailable` until they are in the map. The API
+- The runner takes `root` only if it equals the watched project's root
+  (`path_not_allowed` otherwise), and `pr.inspect` runs `gh pr view <n> --repo
+  <owner/name>` with fixed argv. A `gh` that is missing, fails or prints
+  something unexpected answers `upstream_unavailable`.
+- The API sends all four from `apps/api/src/approvals/approval-commands.ts`
+  through `RunnerCommandService`; a runner that does not answer is `503
+  command_unavailable`, a runner error `502 command_failed`. The API
   re-reads the head with `pr.inspect` before every decision; a decision never
   reaches the runner for a head other than the one the person saw.
 

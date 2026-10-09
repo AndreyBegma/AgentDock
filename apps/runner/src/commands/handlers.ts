@@ -16,6 +16,12 @@ import { messageSlot, stopSlot } from '../control/slot';
 import type { Exec } from '../detect/exec';
 import type { ProjectFs } from '../projects/fs';
 import { inspectProject, refreshProject } from '../projects/inspect';
+import {
+  prApprove,
+  prRequestChanges,
+  prVoidApproval,
+} from './approvals/decide';
+import { prInspect } from './approvals/inspect';
 import type { CommandHandlers } from './dispatcher';
 import { CommandFailure } from './failure';
 import { issueCreate } from './queue/issue-create';
@@ -55,6 +61,11 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
     watchedProjects: context.watchedProjects,
     profiles: context.profiles,
   };
+  const approvals = {
+    exec: context.exec,
+    clock: context.clock,
+    watchedProjects: context.watchedProjects,
+  };
   return {
     'runner.ping': () => ({ pong: true, ts: isoNow(context.clock) }),
     'runner.describe': async () => ({
@@ -82,6 +93,10 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
       }),
     'issues.refresh': (args) =>
       issuesRefresh(args, { watchedProjects: context.watchedProjects }),
+    'pr.inspect': (args) => prInspect(args, approvals),
+    'pr.approve': (args) => prApprove(args, approvals),
+    'pr.requestChanges': (args) => prRequestChanges(args, approvals),
+    'pr.voidApproval': (args) => prVoidApproval(args, approvals),
     'terminal.attach': (args) => {
       if (!context.terminal) {
         throw new CommandFailure(
