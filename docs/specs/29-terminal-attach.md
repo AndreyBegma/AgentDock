@@ -262,6 +262,53 @@ Cross-repository: this item prefers glass-ui `Terminal` from AndreyBegma/glass-u
   Ending an attach sends SIGHUP, then SIGKILL after 2 s, to the attach client
   only.
 
+### From i29-api
+
+- **Where the contracts are.** The HTTP bodies, the `/terminal` close codes
+  (`TERMINAL_CLOSE_CODES`) and the frames the API sends to the browser
+  (`terminalServerFrameSchema`: `attached`, `error`, `closed`) are in
+  `packages/shared/src/terminal/contracts.ts`. Terminal output reaches the
+  browser as binary frames. The upgrade takes `?ticket=` and optionally
+  `cols` / `rows` (80 × 24 by default).
+- **Close codes.** `4000` means the attach ended, and the close reason is the
+  `TerminalCloseReason`. The refusals are:
+  `4400` (ticket missing, unknown, used, expired, or another session's),
+  `4401` (no valid session cookie), `4403` (foreign or missing `Origin`),
+  `4404` (project not visible, or the runner returned `not_found`), `4406` (the
+  user is no longer an admin), `4409` (`busy`), `4501`
+  (`unsupported` / `disabled`), and `4503` (the runner is offline or did not
+  answer).
+- **A ticket is bound to the session, not only the user.** The upgrade must
+  carry the session cookie that asked for the ticket. A ticket refused for any
+  reason is still used up.
+- **A revoked session ends the attach.** Every attach's session is
+  re-resolved every 60 s. If the session is gone, or its user is no longer an
+  admin, the attach closes with reason `client`, and the `terminal.detached`
+  record carries `meta.cause: 'session_revoked'`. The reason enum has no closer
+  value.
+- **Refused early.** `POST /terminal/tickets` answers 409 `unsupported` when
+  the project's runner reports `terminal: false`. It answers 409 `busy`, with
+  `heldBy`, when another admin holds the read-write attach of the target. The
+  upgrade checks `busy` again, and the runner checks everything again.
+- **Audit.** `terminal.attached` has result `ok`, `denied` (busy in the API) or
+  `error` (refused by the runner, or no answer), with `meta.refusal`. It is
+  not `code`, because the audit log redacts that key. `terminal.detached`
+  carries `after { reason, durationMs, bytesIn, bytesOut }` and
+  `meta { mode, droppedIn, cause? }`. Both records carry `ticketId` and
+  `streamId`. `bytesIn` counts only the input forwarded to the runner. Input
+  of a `read` attach, and input sent before the runner attached, is dropped and
+  counted in `droppedIn`.
+- **Idle.** A `write` attach idles on input bytes only, so the agent's output
+  does not keep it open. A `read` attach idles on traffic in either direction.
+- **The runner side.** The relay talks to runners through
+  `TerminalRunnerPort` (`apps/api/src/terminal/terminal-runner-port.ts`).
+  `RunnerTerminalPort` sends `terminal.attach` through `RunnerCommandService`
+  with the caller's role, so the attach also gets the usual `runner.command`
+  records (args only). Stream messages go out through `RunnerStreams.send`.
+  The runner gateway routes `terminal.data` / `terminal.close` through
+  `RunnerStreams.deliverTerminal` to the optional `terminal` method of a
+  stream listener, which only `TerminalRelay` implements.
+
 Depends on #8
 
 Depends on #18

@@ -179,9 +179,15 @@ i20-api, decided with the orchestrator on 2026-10-08:
    `pull request open` checkpoint for a PR with an `approved` row makes the
    sink fire a system-actor `pr.inspect` after its transaction, never blocking
    ingest. With the runner offline the void waits for the next check, and the
-   plugin's own freshness rule still refuses the stale approval. Follow-up
-   (filed by the orchestrator): the runner's PR collector emits `headSha` on
-   `pr.*` events.
+   plugin's own freshness rule still refuses the stale approval.
+   **Since #72** the runner's PR collector carries the head as `headSha` on
+   `pr.opened` and `pr.checks_changed`, and sends a `pr.checks_changed` when
+   only the head moved. A batch whose event carries a head voids an approval
+   bound to another head **inside the ingest transaction** — no `pr.inspect`;
+   the signal, audit and live event follow after commit. The same head is a
+   no-op. The system `pr.inspect` of (c) stays as the fallback for an event
+   with no head: the plugin's `pr.checks_changed`, a `pull request open`
+   checkpoint, and runners older than #72.
 4. **No `unique (projectId, prNumber, headSha)`.** A waiting row from
    `pr.awaiting_approval` has no head until someone decides, and "changes
    requested on H, then approved on H without a push" would collide. `headSha`
@@ -229,6 +235,34 @@ i20-api, decided with the orchestrator on 2026-10-08:
     `configMergeApproval(config)` in `@agentdock/shared` are what the web
     settings page calls with the project detail it already has; an unread
     config is a mismatch only when AgentDock expects approval.
+
+i20-runner, 2026-10-09:
+
+16. **Registration.** `approvalCommands` is spread into `commands` in the same
+    commit as the four handlers (`apps/runner/src/commands/approvals/`) and
+    `ApprovalCommands` now sends through `RunnerCommandService`, so the 503
+    "not wired" answer is gone: 503 now means the runner did not answer.
+17. **The signal follows D5 and this issue's acceptance criteria, not the
+    plugin#8 draft.** `signal.ts` writes
+    `<git-common-dir>/cs-orchestrator/approvals/<pr>.json` =
+    `{ v: 1, pr, decision: "approved" | "changes_requested" | "stale", headSha,
+    note?, by, at }`, atomically (temp file in the same directory, then
+    `rename`, mode 0600). `headSha` is an addition to D5 so the file says which
+    head it binds. `pr.voidApproval` rewrites the file with `decision: "stale"`
+    and `by: "agentdock"`; it does not delete it. **Divergence:** the plugin#8
+    draft is `{ decision: "approve" | "request_changes", note, by, at }` with
+    no `v`, `pr` or `stale`. Until plugin#8 merges, no orchestrator reads this
+    file; when it lands, only `signal.ts` changes (its `SignalDecision`
+    spellings and, if needed, the path).
+18. **Nothing writes outside the approvals directory.** `signalPath` builds the
+    only target from an integer PR number, and `writeSignal` refuses any target
+    that is not a direct child of the approvals directory. `root` must equal
+    the watched project's root; the runner's spec snapshots the checkout, the
+    `.git` directory and the workspace around all three decision commands and
+    asserts the only new file is `cs-orchestrator/approvals/<pr>.json`.
+19. **Check state in `pr.inspect`.** Each `statusCheckRollup` entry is
+    classified with `rollupChecks([entry])` (`green` → pass, `pending` → wait,
+    `red` → fail), so `checks` and `checkList` cannot disagree.
 
 i20-web:
 

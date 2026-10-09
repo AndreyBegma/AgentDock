@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import { capabilitiesSchema, hostSchema } from './capabilities';
+import { approvalCommands } from './commands/approvals';
 import { controlCommands } from './commands/control';
 import { queueCommands } from './commands/queue';
+import { skillCommands } from './commands/skills';
 import { terminalCommands } from './commands/terminal';
 import {
   SESSION_BACKFILL_TIMEOUT_MS,
@@ -123,8 +125,10 @@ export const commands = {
     timeoutMs: SESSION_BACKFILL_TIMEOUT_MS,
   },
   ...controlCommands,
+  ...approvalCommands,
   ...queueCommands,
   ...terminalCommands,
+  ...skillCommands,
 } as const satisfies Record<string, CommandDefinition>;
 
 export type CommandName = keyof typeof commands;

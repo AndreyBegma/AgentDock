@@ -63,10 +63,13 @@ const install = {
 } as const;
 
 describe('skill commands', () => {
-  it('are defined but not in the allowlist until the runner registers them', () => {
-    for (const name of Object.keys(skillCommands)) {
-      expect(Object.hasOwn(commands, name)).toBe(false);
-      expect(parseCommand(name, {}).ok).toBe(false);
+  it('are in the allowlist, registered with their runner handlers', () => {
+    for (const [name, definition] of Object.entries(skillCommands)) {
+      expect(Object.hasOwn(commands, name)).toBe(true);
+      expect(commands[name as keyof typeof commands]).toBe(definition);
+      const parsed = parseCommand(name, { unexpected: true });
+      expect(parsed.ok).toBe(false);
+      if (!parsed.ok) expect(parsed.error.code).toBe('invalid_args');
     }
   });
 

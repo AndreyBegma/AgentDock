@@ -193,6 +193,15 @@ const prFields = {
   branch: z.string().min(1),
 };
 
+/**
+ * `headRefOid`: the PR's head commit (spec 20 D6). Absent from older runners
+ * and from `events.jsonl`; the approvals sink then re-reads it with `pr.inspect`.
+ */
+const headShaSchema = z
+  .string()
+  .regex(/^[0-9a-f]{40}$/)
+  .optional();
+
 export const prOpenedDataSchema = z.object({
   ...prFields,
   url: z.url(),
@@ -200,13 +209,16 @@ export const prOpenedDataSchema = z.object({
   checks: prChecksSchema,
   /** `MERGEABLE` → true, `CONFLICTING` → false, `UNKNOWN` → absent. */
   mergeable: z.boolean().optional(),
+  headSha: headShaSchema,
 });
 export type PrOpenedData = z.infer<typeof prOpenedDataSchema>;
 
+/** Also sent when only the head moved (a push): `checks` is then unchanged. */
 export const prChecksChangedDataSchema = z.object({
   ...prFields,
   checks: prChecksSchema,
   mergeable: z.boolean().optional(),
+  headSha: headShaSchema,
 });
 export type PrChecksChangedData = z.infer<typeof prChecksChangedDataSchema>;
 

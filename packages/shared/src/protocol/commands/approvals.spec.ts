@@ -41,9 +41,10 @@ const inspection: PrInspection = {
 };
 
 describe('approval commands', () => {
-  it('are not in the allowlist until the runner registers their handlers', () => {
-    for (const name of Object.keys(approvalCommands)) {
-      expect(Object.hasOwn(commands, name)).toBe(false);
+  it('are all in the allowlist, registered together with the runner handlers', () => {
+    for (const [name, definition] of Object.entries(approvalCommands)) {
+      expect(Object.hasOwn(commands, name)).toBe(true);
+      expect(commands[name as keyof typeof commands]).toBe(definition);
     }
   });
 

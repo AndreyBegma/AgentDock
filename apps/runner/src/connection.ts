@@ -4,6 +4,7 @@ import {
   MAX_EVENTS_BATCH_BYTES,
   MAX_EVENTS_PER_BATCH,
   RUNNER_CLOSE_CODES,
+  type RunLogSubscribeMessage,
   type RunnerEvent,
   type RunnerMessage,
   type RunnerServerConfig,
@@ -60,6 +61,8 @@ export interface ConnectionOptions {
   pane?: PaneHandler;
   /** Interactive attach streams (spec 29); without it they are ignored. */
   terminal?: TerminalHandler;
+  /** Skill run logs (spec 24 D13); without it they are ignored. */
+  runLog?: RunLogHandler;
   createSocket?: SocketFactory;
   heartbeatMs?: number;
 }
@@ -67,6 +70,14 @@ export interface ConnectionOptions {
 /** What the connection hands pane `subscribe` / `unsubscribe` to. */
 export interface PaneHandler {
   subscribe(message: SubscribeMessage): Promise<void>;
+  unsubscribe(id: string): void;
+  /** The socket closed: subscriptions die with it, the server resubscribes. */
+  reset(): void;
+}
+
+/** What the connection hands `run_log` `subscribe` / `unsubscribe` to. */
+export interface RunLogHandler {
+  subscribe(message: RunLogSubscribeMessage): void;
   unsubscribe(id: string): void;
   /** The socket closed: subscriptions die with it, the server resubscribes. */
   reset(): void;
@@ -252,10 +263,19 @@ export class RunnerConnection {
         void this.options.dispatch(message).then((result) => this.send(result));
         return;
       case 'subscribe':
-        if (message.kind === 'pane') void this.options.pane?.subscribe(message);
+        switch (message.kind) {
+          case 'pane':
+            void this.options.pane?.subscribe(message);
+            return;
+          case 'run_log':
+            this.options.runLog?.subscribe(message);
+            return;
+        }
         return;
       case 'unsubscribe':
+        // Ids are the server's, unique across kinds: whoever holds it drops it.
         this.options.pane?.unsubscribe(message.id);
+        this.options.runLog?.unsubscribe(message.id);
         return;
       case 'terminal.data':
         this.options.terminal?.data(message);
@@ -315,6 +335,7 @@ export class RunnerConnection {
     this.cancelHeartbeat();
     this.socket = null;
     this.options.pane?.reset();
+    this.options.runLog?.reset();
     this.options.terminal?.reset();
     if (this.state === 'stopped') return;
     if (TERMINAL_CLOSE_CODES.has(code)) {
