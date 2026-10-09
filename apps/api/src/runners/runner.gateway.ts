@@ -158,6 +158,10 @@ class RunnerSocket {
       case 'subscribe.error':
         this.deps.streams.deliver(runnerId, message);
         return;
+      case 'terminal.data':
+      case 'terminal.close':
+        this.deps.streams.deliverTerminal(runnerId, message);
+        return;
     }
   }
 

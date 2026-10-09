@@ -304,9 +304,10 @@ Cross-repository: this item prefers glass-ui `Terminal` from AndreyBegma/glass-u
   `TerminalRunnerPort` (`apps/api/src/terminal/terminal-runner-port.ts`).
   `RunnerTerminalPort` sends `terminal.attach` through `RunnerCommandService`
   with the caller's role, so the attach also gets the usual `runner.command`
-  records (args only). Stream messages need `RunnerStreams.send` to accept the
-  terminal messages, and the runner gateway to route `terminal.data` /
-  `terminal.close` to `TerminalRelay.fromRunner`.
+  records (args only). Stream messages go out through `RunnerStreams.send`.
+  The runner gateway routes `terminal.data` / `terminal.close` through
+  `RunnerStreams.deliverTerminal` to the optional `terminal` method of a
+  stream listener, which only `TerminalRelay` implements.
 
 Depends on #8
 

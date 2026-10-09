@@ -1,6 +1,7 @@
 import type { TerminalAttachArgs } from '@agentdock/shared/protocol';
 import { Logger } from '@nestjs/common';
 import type { RunnerCommandService } from '../runners/runner-command.service';
+import type { RunnerStreams } from '../runners/runner-streams';
 import { RunnerTerminalPort } from './terminal-runner-port';
 
 const args: TerminalAttachArgs = {
@@ -14,7 +15,10 @@ const ctx = { actor: { type: 'user' as const, userId: 'u1' } };
 
 describe('RunnerTerminalPort.attach', () => {
   const port = (send: jest.Mock) =>
-    new RunnerTerminalPort({ send } as unknown as RunnerCommandService);
+    new RunnerTerminalPort(
+      { send } as unknown as RunnerCommandService,
+      {} as RunnerStreams,
+    );
 
   beforeEach(() => {
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});

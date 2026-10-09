@@ -346,7 +346,11 @@ export class TerminalRelay
   }
 
   message(_runnerId: string, _message: RunnerStreamMessage): void {
-    // Pane frames; terminal messages arrive through `fromRunner`.
+    // Pane frames; not ours.
+  }
+
+  terminal(runnerId: string, message: TerminalFromRunner): void {
+    this.fromRunner(runnerId, message);
   }
 
   /**

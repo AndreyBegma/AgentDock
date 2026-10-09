@@ -2,6 +2,9 @@ import type {
   PaneMessage,
   SubscribeErrorMessage,
   SubscribeMessage,
+  TerminalCloseMessage,
+  TerminalDataMessage,
+  TerminalResizeMessage,
   UnsubscribeMessage,
 } from '@agentdock/shared/protocol';
 import { Injectable, Logger } from '@nestjs/common';
@@ -9,8 +12,15 @@ import { type LiveConnection, RunnerConnections } from './runner-connections';
 
 /** Runner → server messages of a stream the server subscribed to. */
 export type RunnerStreamMessage = PaneMessage | SubscribeErrorMessage;
-/** Server → runner messages that open and close a stream. */
-export type RunnerStreamRequest = SubscribeMessage | UnsubscribeMessage;
+/** Server → runner messages that open and close a stream, and feed an attach (#29). */
+export type RunnerStreamRequest =
+  | SubscribeMessage
+  | UnsubscribeMessage
+  | TerminalDataMessage
+  | TerminalResizeMessage
+  | TerminalCloseMessage;
+/** Runner → server messages of a terminal attach (#29). */
+export type RunnerTerminalMessage = TerminalDataMessage | TerminalCloseMessage;
 
 /**
  * A consumer of runner streams — the pane relay (#18). Told when a runner's
@@ -26,6 +36,8 @@ export interface RunnerStreamListener {
   /** The runner's current socket closed. */
   disconnected(runnerId: string): void;
   message(runnerId: string, message: RunnerStreamMessage): void;
+  /** A terminal attach's bytes or close — the terminal relay (#29) only. */
+  terminal?(runnerId: string, message: RunnerTerminalMessage): void;
 }
 
 /**
@@ -68,6 +80,10 @@ export class RunnerStreams {
 
   deliver(runnerId: string, message: RunnerStreamMessage): void {
     this.each(message.type, (l) => l.message(runnerId, message));
+  }
+
+  deliverTerminal(runnerId: string, message: RunnerTerminalMessage): void {
+    this.each(message.type, (l) => l.terminal?.(runnerId, message));
   }
 
   private each(

@@ -8,6 +8,7 @@ import type {
 import { Injectable, Logger } from '@nestjs/common';
 import type { AuditContext } from '../audit/audit.types';
 import { RunnerCommandService } from '../runners/runner-command.service';
+import { RunnerStreams } from '../runners/runner-streams';
 
 /** How a `terminal.attach` ended — `RunnerCommandService.send`'s result, narrowed. */
 export type TerminalAttachOutcome =
@@ -44,17 +45,16 @@ export const TERMINAL_RUNNER_PORT = Symbol('TERMINAL_RUNNER_PORT');
  * The runner side of the relay. `terminal.attach` goes through
  * `RunnerCommandService`, so it is checked against the allowlist's minimum
  * role and gets the usual `runner.command` records (args only, no bytes).
- *
- * `send` is not wired yet: `RunnerStreams.send` accepts `subscribe` /
- * `unsubscribe` only, and gains the terminal messages in
- * `runners/runner-streams.ts` together with the gateway's
- * `case 'terminal.data' | 'terminal.close'` (spec 29 notes).
+ * Stream messages go out on the runner's socket through `RunnerStreams`.
  */
 @Injectable()
 export class RunnerTerminalPort implements TerminalRunnerPort {
   private readonly logger = new Logger(RunnerTerminalPort.name);
 
-  constructor(private readonly commands: RunnerCommandService) {}
+  constructor(
+    private readonly commands: RunnerCommandService,
+    private readonly streams: RunnerStreams,
+  ) {}
 
   async attach(
     runnerId: string,
@@ -86,7 +86,7 @@ export class RunnerTerminalPort implements TerminalRunnerPort {
     }
   }
 
-  send(): boolean {
-    return false;
+  send(runnerId: string, message: TerminalToRunner): boolean {
+    return this.streams.send(runnerId, message);
   }
 }

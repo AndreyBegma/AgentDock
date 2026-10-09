@@ -1,9 +1,4 @@
-import {
-  SESSION_COOKIE,
-  TERMINAL_CLOSE_CODES,
-  type TerminalServerFrame,
-  terminalServerFrameSchema,
-} from '@agentdock/shared';
+import { TERMINAL_CLOSE_CODES } from '@agentdock/shared';
 import {
   TERMINAL_WS_PATH,
   type TerminalAttachArgs,
@@ -12,7 +7,6 @@ import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import type { App } from 'supertest/types';
-import { WebSocket } from 'ws';
 import { AppModule } from '../app.module';
 import { configureApp } from '../configure-app';
 import { PrismaService } from '../database/prisma.service';
@@ -33,6 +27,10 @@ import {
   type TerminalRunnerPort,
   type TerminalToRunner,
 } from './terminal-runner-port';
+import {
+  waitFor as eventually,
+  TestTerminalSocket,
+} from './testing/terminal-e2e';
 
 const TICKET_TTL_MS = 400;
 const SECRET = 'typed-secret-marker-7731';
@@ -43,7 +41,10 @@ const json = (value: unknown): string =>
     typeof v === 'bigint' ? v.toString() : v,
   );
 
-/** The runner side, played by the test: the real one is wired with i29-runner. */
+/**
+ * The runner side, played in-process so these tests reach every refusal and
+ * limit directly; `terminal-runner.e2e.spec.ts` goes through a real runner socket.
+ */
 class FakeRunnerPort implements TerminalRunnerPort {
   readonly attaches: TerminalAttachArgs[] = [];
   readonly sent: TerminalToRunner[] = [];
@@ -68,65 +69,6 @@ class FakeRunnerPort implements TerminalRunnerPort {
     this.outcome = { status: 'ok', session: 'cs-i42' };
   }
 }
-
-interface Closed {
-  code: number;
-  reason: string;
-}
-
-/** A browser-like `/terminal` client. */
-class TestTerminalSocket {
-  readonly socket: WebSocket;
-  readonly closed: Promise<Closed>;
-  readonly frames: TerminalServerFrame[] = [];
-  readonly data: Buffer[] = [];
-
-  constructor(
-    url: string,
-    { token, origin }: { token?: string; origin?: string },
-  ) {
-    const headers: Record<string, string> = {};
-    if (token) headers.Cookie = `${SESSION_COOKIE}=${token}`;
-    if (origin) headers.Origin = origin;
-    this.socket = new WebSocket(url, { headers });
-    this.socket.on('message', (data, isBinary) => {
-      if (isBinary) {
-        this.data.push(data as Buffer);
-        return;
-      }
-      this.frames.push(
-        terminalServerFrameSchema.parse(JSON.parse(String(data))),
-      );
-    });
-    this.closed = new Promise((resolve) => {
-      this.socket.on('close', (code, reason) =>
-        resolve({ code, reason: reason.toString() }),
-      );
-    });
-    this.socket.on('error', () => {});
-  }
-
-  async frame<T extends TerminalServerFrame['type']>(
-    type: T,
-    ms = 5_000,
-  ): Promise<Extract<TerminalServerFrame, { type: T }>> {
-    const deadline = Date.now() + ms;
-    for (;;) {
-      const found = this.frames.find((f) => f.type === type);
-      if (found) return found as Extract<TerminalServerFrame, { type: T }>;
-      if (Date.now() > deadline) throw new Error(`no ${type} frame`);
-      await new Promise((resolve) => setTimeout(resolve, 10));
-    }
-  }
-}
-
-const eventually = async (check: () => boolean | Promise<boolean>) => {
-  const deadline = Date.now() + 5_000;
-  while (!(await check())) {
-    if (Date.now() > deadline) throw new Error('condition not met in time');
-    await new Promise((resolve) => setTimeout(resolve, 20));
-  }
-};
 
 describe('terminal attach (e2e)', () => {
   let ctx: E2eContext;
