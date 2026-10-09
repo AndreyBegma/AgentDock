@@ -186,5 +186,12 @@ function okOutcome(run: Run, subject: string): Outcome {
             text: `${subject} saved, but the worker’s session is not live. It waits in the worktree until the worker is resumed.`,
           }
         : { tone: 'success', text: `${subject} delivered.` };
+    case 'skill.install': {
+      const prUrl = typeof result.prUrl === 'string' ? result.prUrl : '';
+      return {
+        tone: 'success',
+        text: prUrl ? `Skill install opened ${prUrl}.` : 'Skill installed.',
+      };
+    }
   }
 }
