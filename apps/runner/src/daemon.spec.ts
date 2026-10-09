@@ -49,6 +49,7 @@ describe('daemon — OTLP receiver (spec 13)', () => {
     disabledCommands: [],
     otlp,
     fleet: { pollSeconds: 15, prPollSeconds: 60, eventsPollSeconds: 5 },
+    queue: { pollSeconds: 60 },
     sessions: { enabled: false },
     skills: { maxConcurrentRuns: 2, maxTimeoutSec: 21_600 },
   });

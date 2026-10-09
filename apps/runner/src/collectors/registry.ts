@@ -17,6 +17,8 @@ export interface FleetSettings {
   prPollSeconds: number;
   /** `events.jsonl` poll fallback (spec 16 D2); default 5. */
   eventsPollSeconds?: number;
+  /** `issues` collector poll (spec 19, `queue.pollSeconds`); default 60. */
+  queuePollSeconds?: number;
 }
 
 export const DEFAULT_FLEET_SETTINGS: FleetSettings = {

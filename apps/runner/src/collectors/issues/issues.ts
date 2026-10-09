@@ -69,7 +69,9 @@ export class IssuesCollector implements Collector {
     this.first = this.enqueue(false);
     this.timer = clock.setInterval(
       () => void this.enqueue(false),
-      (this.options.pollSeconds ?? DEFAULT_ISSUES_POLL_SECONDS) * 1000,
+      (this.options.pollSeconds ??
+        this.context.fleet.queuePollSeconds ??
+        DEFAULT_ISSUES_POLL_SECONDS) * 1000,
     );
   }
 

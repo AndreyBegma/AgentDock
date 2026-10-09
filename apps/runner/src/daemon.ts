@@ -125,7 +125,11 @@ export const runDaemon = async (
       factories: collectors,
       emit: (event) => connection?.emit(event),
       log,
-      context: { exec, clock, fleet: config.fleet },
+      context: {
+        exec,
+        clock,
+        fleet: { ...config.fleet, queuePollSeconds: config.queue.pollSeconds },
+      },
     });
     const watchList = new WatchList({
       initial: config.projects,

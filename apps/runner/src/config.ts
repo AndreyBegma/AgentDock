@@ -22,6 +22,10 @@ import { z } from 'zod';
 /** D11: skill runs per runner before the next one queues. */
 export const SKILL_RUNS_DEFAULT_MAX_CONCURRENT = 2;
 
+/** Spec 19 D1: `queue.pollSeconds` defaults to 60 and is never below 15. */
+export const QUEUE_POLL_DEFAULT_SECONDS = 60;
+export const QUEUE_POLL_MIN_SECONDS = 15;
+
 const portSchema = z.number().int().min(1).max(65_535);
 
 /** A profile as stored: `authenticated` is a machine fact, re-detected, never stored. */
@@ -65,6 +69,17 @@ export const runnerConfigSchema = z.object({
       eventsPollSeconds: z.number().int().min(1).max(3600).default(5),
     })
     .default({ pollSeconds: 15, prPollSeconds: 60, eventsPollSeconds: 5 }),
+  /** The task queue (spec 19): how often the `issues` collector polls GitHub. */
+  queue: z
+    .object({
+      pollSeconds: z
+        .number()
+        .int()
+        .min(QUEUE_POLL_MIN_SECONDS)
+        .max(3600)
+        .default(QUEUE_POLL_DEFAULT_SECONDS),
+    })
+    .prefault({}),
   /**
    * Agent sessions (spec 12). `ingestSince`: transcripts last modified before
    * it are not read unless a backfill asks; `pair` sets it (D11).

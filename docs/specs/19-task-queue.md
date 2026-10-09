@@ -163,7 +163,7 @@ i19-runner:
 11. **`issues.refresh` reaches the collector through `issuesRefreshers`** (`collectors/issues/refresh.ts`), a process-wide registry the collector fills on start; the daemon builds collectors and handlers separately and shares nothing else. A refresh ignores the ETag, so it always emits a snapshot (`changed: true`) unless `gh` fails, which answers `internal` with the `gh` error.
 12. **Ready label on create.** `issue.create` carries an optional `readyLabel`; the API always sends the project's effective one (`readyLabelOverride`, else the config snapshot's `orchestrator.readyLabel`, else `cs:ready`, D3). The runner uses `args.readyLabel` when present, and otherwise falls back to `orchestrator.readyLabel` from `.code-analyzer-config.json`, else `cs:ready` (an older API sends none). Fixed in #66.
 13. **Pages and ETag.** Only page 1 is conditional; pages 2.. are read when it changed, up to 30 pages. After an outage the first read is unconditional, so a `304` cannot leave `issues.unavailable` showing. A `Depends on` target that is closed is looked up on the issue's timeline: a `closed` event with a `commit_id` plus a merged same-repository pull request that cross-references it is `pr`, anything else `manual`; a timeline that cannot be read is retried every tick.
-14. **`queue.pollSeconds`** is an option of `issuesCollector({ pollSeconds })`, default 60; it is not wired to the runner config file yet.
+14. **`queue.pollSeconds`** is an option of `issuesCollector({ pollSeconds })`, default 60; it is also the runner config key `queue.pollSeconds` (minimum 15, maximum 3600), which reaches the collector as `FleetSettings.queuePollSeconds`; an explicit option wins. Fixed in #68.
 
 i19-web, 2026-10-08:
 
