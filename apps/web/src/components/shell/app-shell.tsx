@@ -39,6 +39,7 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { api, describeError } from '../../lib/api';
+import { navLabel } from '../../lib/approvals/format';
 import { useLiveStatus } from '../../lib/live/use-live';
 import { isActive, NAV, projectIdOf, visibleNav } from './nav';
 import { NotificationBell } from './notification-bell';
@@ -52,6 +53,7 @@ import {
   THEME_MODES,
   type ThemeMode,
 } from './theme';
+import { useWaitingApprovals } from './use-waiting-approvals';
 import { UserProvider } from './user-context';
 
 const COLLAPSE_QUERY = '(max-width: 1023px)';
@@ -178,12 +180,18 @@ export function AppShell({
     [user.role, pathname],
   );
 
+  // glass-ui's NavRailItem has no badge prop yet, so the count rides the label.
+  const waitingApprovals = useWaitingApprovals(projectId);
+
   const groups: NavRailGroup[] = sections.map((section) => ({
     id: section.id,
     title: section.title,
     items: section.entries.map((entry) => ({
       id: entry.id,
-      label: entry.label,
+      label:
+        entry.id === 'approvals'
+          ? navLabel(entry.label, waitingApprovals)
+          : entry.label,
       icon: entry.icon,
       href: entry.resolvedHref,
       active: isActive(entry.resolvedHref, pathname),
