@@ -4,6 +4,7 @@ import {
   commandResultMessageSchema,
   commands,
   DEFAULT_COMMAND_TIMEOUT_MS,
+  SKILL_TIMEOUTS_MS,
   TERMINAL_ATTACH_TIMEOUT_MS,
 } from '@agentdock/shared/protocol';
 import { FakeClock } from '../testing/fake-clock';
@@ -201,6 +202,53 @@ describe('command dispatcher', () => {
       expect((await run('terminal.attach', attachArgs)).error?.code).toBe(
         'unsupported',
       );
+    });
+  });
+
+  describe('skill.* (spec 24)', () => {
+    it('is in the allowlist with D14 roles and its own timeouts', () => {
+      expect(commands['skill.search'].minRole).toBe('operator');
+      expect(commands['skill.inspect'].minRole).toBe('operator');
+      expect(commands['skill.install'].minRole).toBe('operator');
+      expect(commands['skill.uninstall'].minRole).toBe('admin');
+      expect(commands['skill.list'].minRole).toBe('viewer');
+      expect(commands['skill.run'].minRole).toBe('operator');
+      expect(commands['skill.cancel'].minRole).toBe('operator');
+      expect(commands['skill.inspect'].timeoutMs).toBe(
+        SKILL_TIMEOUTS_MS.inspect,
+      );
+    });
+
+    it('refuses a host or URL argument as invalid_args', async () => {
+      const { run } = setup();
+      for (const args of [
+        { query: 'estimate', host: 'evil.example' },
+        { query: 'estimate', url: 'https://evil.example/api/search' },
+      ]) {
+        expect((await run('skill.search', args)).error?.code).toBe(
+          'invalid_args',
+        );
+      }
+      for (const source of [
+        'acme/../x',
+        'https://github.com/acme/x',
+        'gitlab.com/a/b',
+      ]) {
+        expect((await run('skill.inspect', { source })).error?.code).toBe(
+          'invalid_args',
+        );
+      }
+    });
+
+    it('answers unsupported on a runner without skills', async () => {
+      const { run } = setup();
+      expect(
+        (await run('skill.search', { query: 'estimate' })).error?.code,
+      ).toBe('unsupported');
+      expect(
+        (await run('skill.cancel', { runId: 'run_1', projectId: 'prj_a' }))
+          .error?.code,
+      ).toBe('unsupported');
     });
   });
 

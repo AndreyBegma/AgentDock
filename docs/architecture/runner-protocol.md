@@ -802,8 +802,8 @@ runner's handlers (`apps/runner/src/commands/approvals/`).
 ### Skills
 
 Schemas in `commands/skills.ts` (`skillCommands`) and `events/skills.ts`; the
-rules are [spec 24](../specs/24-skills.md). Like the queue commands, they are
-**not** in the `commands` map until the runner registers their handlers.
+rules are [spec 24](../specs/24-skills.md). `skillCommands` is spread into the
+`commands` map, and the runner serves it from `apps/runner/src/skills/`.
 
 Every value can come from the public catalog and ends up in a path, an argv
 or a git ref, so every field is patterned and bounded. Nothing starts with
@@ -853,6 +853,40 @@ A run outlives `skill.run`. Its progress is two event types (`source: "runner"`)
 
 Each cut is flagged. The full patch stays in the run directory on the runner.
 `skillPhaseToRunStatus` maps phases onto #21's `runs.status`.
+
+How the runner serves them:
+
+- **Network.** Search fetches only `https://skills.sh/api/search`. Inspect
+  and install fetch only `https://github.com/<source>.git`, with no
+  credential helper, no prompt and no LFS filter. A missing repository, ref
+  or skill is `not_found`; a forge or catalog failure is
+  `upstream_unavailable`.
+- **What a skill is.** A directory holding `SKILL.md`, at most three levels
+  below the repository root. A `SKILL.md` at the root itself is not offered,
+  because a skill's `path` must be a non-empty directory. Only regular files
+  are listed, hashed and copied. Symlinks are never followed, and an
+  upstream `.agentdock-skill.json` is ignored.
+- **Install.** Install fetches exactly `commit` and recomputes `contentHash`.
+  A commit the forge no longer serves, or a different hash, is
+  `changed_since_preview`, and nothing is written.
+  - A project install fails with `already_exists` when `skills/<name>` exists
+    locally or on origin, or the skill is already on `origin/<base>`.
+  - A profile install fails with `already_exists` when the directory exists.
+    Its runtime must match the profile's (`unsupported_runtime`).
+- **Inventory.** `skill.list` reads project skills from git on the
+  project's `origin/HEAD`. Plugin skills come from each claude profile's
+  `plugins/installed_plugins.json`, which names the active install.
+- **Run checks.** `skill.run` answers `not_found` unless the skill is
+  installed for that project and profile: on the base, in the profile, or in
+  the profile's plugins. A reused `runId` is `already_exists`. `timeoutSec`
+  is cut to the runner's `skills.maxTimeoutSec`.
+- **Run ends.** Cancel, timeout and failure collect the report fields
+  (`reportText`, `changedFiles`, `patch`) but never push or open a PR. Only
+  a `succeeded` `pr` run does.
+- **Run log.** `run_log` subscriptions are refused `not_found` for a run of
+  another project. Each one replays at most `RUN_LOG_BACKLOG_LINES` and
+  then tails `stream.jsonl` every 500 ms. Lines are redacted like pane
+  frames, and so is `reportText`.
 
 ### Terminal
 

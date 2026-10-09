@@ -11,6 +11,7 @@ import { createHandlers } from './commands/handlers';
 import {
   batches,
   type PaneHandler,
+  type RunLogHandler,
   RunnerConnection,
   type TerminalHandler,
 } from './connection';
@@ -74,6 +75,7 @@ describe('RunnerConnection', () => {
     clock = new FakeClock(),
     pane?: PaneHandler,
     terminal?: TerminalHandler,
+    runLog?: RunLogHandler,
   ) => {
     const { log, lines } = memoryLogger();
     const spool = Spool.open({ dir, log });
@@ -111,6 +113,7 @@ describe('RunnerConnection', () => {
       }),
       pane,
       terminal,
+      runLog,
     });
     connection.start();
     return { clock, spool, lines, connection };
@@ -253,6 +256,68 @@ describe('RunnerConnection', () => {
 
     s.close(1006);
     await until(() => calls.includes('reset'));
+  });
+
+  it('routes subscribe by kind: run_log to the run log, pane to the pane, unsubscribe and reset to both', async () => {
+    const s = server();
+    const calls: string[] = [];
+    const pane: PaneHandler = {
+      subscribe: async (m) => {
+        calls.push(`pane subscribe ${m.id}`);
+      },
+      unsubscribe: (id) => {
+        calls.push(`pane unsubscribe ${id}`);
+      },
+      reset: () => {
+        calls.push('pane reset');
+      },
+    };
+    const runLog: RunLogHandler = {
+      subscribe: (m) => {
+        calls.push(`run_log subscribe ${m.id} ${m.projectId} ${m.runId}`);
+      },
+      unsubscribe: (id) => {
+        calls.push(`run_log unsubscribe ${id}`);
+      },
+      reset: () => {
+        calls.push('run_log reset');
+      },
+    };
+    const { connection } = connect(
+      s.origin,
+      new FakeClock(),
+      pane,
+      undefined,
+      runLog,
+    );
+    await until(() => connection.isLive);
+    s.send({
+      type: 'subscribe',
+      id: 'r1',
+      kind: 'run_log',
+      projectId: 'prj_1',
+      runId: 'run_1',
+    });
+    s.send({ type: 'unsubscribe', id: 'r1' });
+    await until(() => calls.length === 3);
+    expect(calls).toEqual([
+      'run_log subscribe r1 prj_1 run_1',
+      'pane unsubscribe r1',
+      'run_log unsubscribe r1',
+    ]);
+
+    expect(
+      connection.sendMessage({
+        type: 'run_log',
+        id: 'r1',
+        frame: { type: 'ended', phase: 'succeeded' },
+      }),
+    ).toBe(true);
+    await s.waitFor('run_log');
+
+    s.close(1006);
+    await until(() => calls.includes('run_log reset'));
+    expect(calls).toContain('pane reset');
   });
 
   it('hands terminal.* to the handler, drops a frame with an extra field, sends its bytes, and resets it on close', async () => {

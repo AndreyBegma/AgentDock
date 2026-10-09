@@ -31,6 +31,7 @@ Exit codes: `0` ok, `1` failure, `2` usage, `78` the server closed for good
 | Event spool | `$XDG_STATE_HOME/agentdock/spool/`, default `~/.local/state/agentdock/spool/` |
 | Transcript offsets | `$XDG_STATE_HOME/agentdock/offsets.json`: how far each agent transcript was read |
 | `events.jsonl` offsets | `$XDG_STATE_HOME/agentdock/events-offsets.json`: byte offset and inode per project ([spec 16](../../docs/specs/16-consume-code-sentinel-events.md)); `fleet.eventsPollSeconds` (default 5) in `runner.json` sets the poll fallback |
+| Skill runs | `$XDG_STATE_HOME/agentdock/runs/<runId>/`: `state.json`, `run.json`, `stream.jsonl`, `stderr.log`, `exit.json`, `patch.diff` ([spec 24](../../docs/specs/24-skills.md)) |
 | systemd unit | `$XDG_CONFIG_HOME/systemd/user/agentdock-runner.service` |
 
 | Variable | Effect |
@@ -87,6 +88,30 @@ matched to its session by `session.id`.
 
 If the port is already taken, the error is logged and the runner keeps running
 without the receiver. `runner.describe` then reports `otlp: null`.
+
+### Skills
+
+The `skill.*` commands ([spec 24](../../docs/specs/24-skills.md)) search the
+public catalog at `https://skills.sh`, a host fixed in the runner. They clone
+skills only from `https://github.com/<owner>/<repo>.git`, install them by
+copying (never `npx`, never a symlink), and run them headless.
+
+- A project install is a pull request on `skills/<name>`, made from a
+  temporary worktree. A profile install writes
+  `<CLAUDE_CONFIG_DIR>/skills/<name>/` directly.
+- A run gets its own worktree `.wt-<repo>-run-<shortid>` and its own tmux
+  session `agentdock-run-<shortid>`. The session executes
+  `agentdock-runner exec-run <runDir>`, an internal subcommand that spawns the
+  profile binary from `run.json` as an argv. The run survives a runner
+  restart.
+- The runner's own commits skip the project's hooks and carry no trailer.
+
+`runner.json` key `skills`, every field optional:
+
+| Field | Default | Meaning |
+|---|---|---|
+| `maxConcurrentRuns` | `2` | runs over the cap wait in `queued`, oldest first |
+| `maxTimeoutSec` | `21600` | a run's `timeoutSec` above it is cut to it |
 
 ## Development
 
