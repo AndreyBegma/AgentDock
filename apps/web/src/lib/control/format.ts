@@ -116,6 +116,7 @@ const SUBJECT: Record<Run['command'], (slot: string | null) => string> = {
   'orchestrator.stop': () => 'Orchestrator stop',
   'slot.stop': (slot) => `Stopping slot ${slot ?? ''}`.trim(),
   'slot.message': (slot) => `Message to ${slot ?? 'the worker'}`,
+  'skill.install': () => 'Skill install',
 };
 
 export const COMMAND_PENDING_LABEL: Record<Run['command'], string> = {
@@ -123,6 +124,7 @@ export const COMMAND_PENDING_LABEL: Record<Run['command'], string> = {
   'orchestrator.stop': 'Stopping the orchestrator…',
   'slot.stop': 'Stopping the slot…',
   'slot.message': 'Sending the message…',
+  'skill.install': 'Installing the skill…',
 };
 
 export interface Outcome {
@@ -184,5 +186,12 @@ function okOutcome(run: Run, subject: string): Outcome {
             text: `${subject} saved, but the worker’s session is not live. It waits in the worktree until the worker is resumed.`,
           }
         : { tone: 'success', text: `${subject} delivered.` };
+    case 'skill.install': {
+      const prUrl = typeof result.prUrl === 'string' ? result.prUrl : '';
+      return {
+        tone: 'success',
+        text: prUrl ? `Skill install opened ${prUrl}.` : 'Skill installed.',
+      };
+    }
   }
 }

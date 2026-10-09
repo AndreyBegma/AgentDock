@@ -157,6 +157,21 @@ describe('describeOutcome', () => {
     expect(outcome?.text).toContain('already running');
   });
 
+  test('a project skill install links the pull request it opened', () => {
+    const outcome = describeOutcome(
+      run({
+        command: 'skill.install',
+        slot: null,
+        result: {
+          path: '.claude/skills/estimate',
+          prUrl: 'https://github.com/acme/app/pull/7',
+        },
+      }),
+    );
+    expect(outcome?.tone).toBe('success');
+    expect(outcome?.text).toContain('https://github.com/acme/app/pull/7');
+  });
+
   test('an unknown run says the outcome is unknown', () => {
     expect(describeOutcome(run({ status: 'unknown' }))?.text).toContain(
       'unknown',

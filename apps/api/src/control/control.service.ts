@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import {
   type AuditAction,
-  type CommandRunCommand,
   type CommandRunView,
+  type ControlRunCommand,
   type OrchestratorStatusView,
   type Role,
   SLOT_MESSAGE_SENT_LIVE_EVENT,
@@ -48,7 +48,7 @@ interface ProjectTarget {
 }
 
 /** One control action, as `execute` runs it. */
-interface Action<N extends CommandRunCommand> {
+interface Action<N extends ControlRunCommand> {
   command: N;
   slot?: string;
   /** The audit action of spec 17 D10. */
@@ -253,7 +253,7 @@ export class ControlService {
     return parsed.data;
   }
 
-  private async execute<N extends CommandRunCommand>(
+  private async execute<N extends ControlRunCommand>(
     caller: ControlCaller,
     action: Action<N>,
   ): Promise<CommandRunView> {

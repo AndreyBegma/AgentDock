@@ -51,6 +51,7 @@ model User {
   notificationMutes           NotificationMute[]
   telegramLink                TelegramLink?
   telegramLinkCodes           TelegramLinkCode[]
+  skillInstallPreviews        SkillInstallPreview[]
 
   @@map("users")
 }
@@ -113,15 +114,17 @@ model Runner {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  createdBy     User?               @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  pairingCodes  RunnerPairingCode[]
-  profiles      RuntimeProfile[]
-  events        Event[]
-  projects      Project[]
-  sessions      AgentSession[]
-  commandRuns   CommandRun[]
-  notifications Notification[]
-  incidents     RunnerIncident[]
+  createdBy            User?                 @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  pairingCodes         RunnerPairingCode[]
+  profiles             RuntimeProfile[]
+  events               Event[]
+  projects             Project[]
+  sessions             AgentSession[]
+  commandRuns          CommandRun[]
+  notifications        Notification[]
+  incidents            RunnerIncident[]
+  installedSkills      InstalledSkill[]
+  skillInstallPreviews SkillInstallPreview[]
 
   @@map("runners")
 }
@@ -313,6 +316,8 @@ model Project {
   mergeApprovals       MergeApproval[]
   notifications        Notification[]
   notificationMutes    NotificationMute[]
+  installedSkills      InstalledSkill[]
+  skillInstallPreviews SkillInstallPreview[]
 
   @@unique([runnerId, rootPath])
   @@map("projects")
@@ -1250,12 +1255,126 @@ model Run {
   /// same slot is identical.
   updatedAt       DateTime
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  slot    Slot?   @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  slot     Slot?     @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  skillRun SkillRun?
 
   @@index([projectId, startedAt])
   @@index([projectId, status])
   @@map("runs")
+}
+
+/// Skills (docs/specs/24).
+enum SkillScope {
+  project
+  profile
+  plugin
+}
+
+/// A skill run's phase on the runner (D12); `runs.status` follows it.
+enum SkillRunPhase {
+  queued
+  preparing
+  running
+  collecting
+  succeeded
+  failed
+  cancelled
+  timed_out
+}
+
+/// The skills a runner's last `skill.list` found (D6) — a cache, replaced per
+/// scan. Project rows carry `projectId`; profile and plugin rows `profileKey`.
+/// One of the two is always null, so the unique below cannot dedupe on its own
+/// (Postgres NULLs are distinct): the scan replaces rows in one transaction.
+model InstalledSkill {
+  id            String     @id @default(cuid())
+  runnerId      String
+  projectId     String?
+  profileKey    String?
+  scope         SkillScope
+  runtime       Runtime
+  name          String
+  /// `<name>`, or `<plugin>:<name>` for a plugin skill (D8).
+  invocation    String
+  path          String
+  description   String?
+  argumentHint  String?
+  /// From `.agentdock-skill.json` (D5); null on hand-written skills.
+  source        String?
+  commit        String?
+  contentHash   String?
+  pluginVersion String?
+  seenAt        DateTime
+
+  runner  Runner   @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([runnerId, scope, projectId, profileKey, runtime, name])
+  @@index([projectId])
+  @@map("installed_skills")
+}
+
+/// One inspected skill (D2), installable once by the user who inspected it
+/// until `expiresAt`. Install re-checks `contentHash` on the runner (D3).
+model SkillInstallPreview {
+  id          String    @id @default(cuid())
+  runnerId    String
+  projectId   String?
+  userId      String
+  source      String
+  skillId     String
+  commit      String
+  contentHash String
+  files       Json
+  frontmatter Json
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime
+  consumedAt  DateTime?
+
+  runner  Runner   @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("skill_install_previews")
+}
+
+/// The skill-specific half of a `runs` row of kind `skill` (D12). Only the D10
+/// report fields are stored; the stream stays on the runner (D13).
+model SkillRun {
+  runId             String                     @id
+  /// The invocation (`code-sentinel:spec`).
+  skill             String
+  args              String
+  profileKey        String
+  model             String
+  permissionMode    OrchestratorPermissionMode
+  output            RunOutput
+  phase             SkillRunPhase              @default(queued)
+  worktree          String?
+  branch            String?
+  tmuxSession       String?
+  timeoutSec        Int
+  exitCode          Int?
+  reportText        String?
+  reportTruncated   Boolean                    @default(false)
+  changedFiles      Json?
+  changedFilesTotal Int?
+  /// `git diff` against the base, at most 128 KiB; the full patch stays on the runner.
+  patch             String?
+  patchTruncated    Boolean                    @default(false)
+  error             String?
+  prNumber          Int?
+  prUrl             String?
+  queuedAt          DateTime                   @default(now())
+  startedAt         DateTime?
+  finishedAt        DateTime?
+
+  run Run @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([phase])
+  @@map("skill_runs")
 }
 
 // ─── Merge approval queue (docs/specs/20-merge-approval-queue.md) ───────────
