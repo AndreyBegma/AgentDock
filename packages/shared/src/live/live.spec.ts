@@ -5,6 +5,7 @@ import {
   liveServerMessageSchema,
   liveTopicSchema,
   parseLiveTopic,
+  runTopic,
 } from './index';
 
 describe('live topics', () => {
@@ -15,6 +16,8 @@ describe('live topics', () => {
     'user:7c0f-9a',
     'pane:cmg1a2b3c:i18-api',
     `pane:p1:${'s'.repeat(64)}`,
+    'run:p1:cmg1run0001',
+    `run:p1:${'R'.repeat(64)}`,
   ])('accepts %s', (topic) => {
     expect(liveTopicSchema.safeParse(topic).success).toBe(true);
   });
@@ -36,6 +39,11 @@ describe('live topics', () => {
     'pane:p1:a:b',
     `pane:p1:${'s'.repeat(65)}`,
     'project:p1:i18',
+    'run:p1',
+    'run:p1:',
+    'run:p1:a.b',
+    'run:p1:a:b',
+    `run:p1:${'r'.repeat(65)}`,
   ])('refuses %p', (topic) => {
     expect(liveTopicSchema.safeParse(topic).success).toBe(false);
   });
@@ -46,6 +54,16 @@ describe('live topics', () => {
     expect(parseLiveTopic('pane:p1:i18-api')).toEqual({
       prefix: 'pane',
       id: 'p1:i18-api',
+    });
+  });
+
+  it('builds run topics it accepts', () => {
+    const topic = runTopic('p_1', 'cmg1run0001');
+    expect(topic).toBe('run:p_1:cmg1run0001');
+    expect(liveTopicSchema.safeParse(topic).success).toBe(true);
+    expect(parseLiveTopic(topic)).toEqual({
+      prefix: 'run',
+      id: 'p_1:cmg1run0001',
     });
   });
 
