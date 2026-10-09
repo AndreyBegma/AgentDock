@@ -2,6 +2,7 @@ import type { Role } from '@agentdock/shared';
 import {
   Activity,
   BarChart3,
+  CalendarClock,
   FolderGit2,
   GitMerge,
   History,
@@ -134,6 +135,14 @@ export const NAV: NavSection[] = [
         enabled: true,
       },
       {
+        id: 'project-schedules',
+        href: '/projects/:projectId/schedules',
+        label: 'Schedules',
+        icon: CalendarClock,
+        minRole: 'viewer',
+        enabled: true,
+      },
+      {
         id: 'project-settings',
         href: '/projects/:projectId/settings',
         label: 'Settings',
@@ -188,6 +197,14 @@ export const NAV: NavSection[] = [
         href: '/admin/users',
         label: 'Users',
         icon: Users,
+        minRole: 'admin',
+        enabled: true,
+      },
+      {
+        id: 'admin-schedules',
+        href: '/admin/schedules',
+        label: 'Schedules',
+        icon: CalendarClock,
         minRole: 'admin',
         enabled: true,
       },

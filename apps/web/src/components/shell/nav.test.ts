@@ -22,6 +22,7 @@ describe('visibleNav', () => {
       'usage/Usage',
       'admin/Runners',
       'admin/Users',
+      'admin/Schedules',
       'admin/Audit',
       'admin/Prices',
       'admin/Integrations',
@@ -49,6 +50,7 @@ describe('visibleNav', () => {
     expect(inProject).toContain('project/Activity');
     expect(inProject).toContain('project/History');
     expect(inProject).toContain('project/Skills');
+    expect(inProject).toContain('project/Schedules');
     expect(inProject).toContain('project/Settings');
   });
 
