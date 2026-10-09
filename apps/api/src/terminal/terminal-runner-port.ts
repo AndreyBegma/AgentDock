@@ -5,8 +5,9 @@ import type {
   TerminalDataMessage,
   TerminalResizeMessage,
 } from '@agentdock/shared/protocol';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type { AuditContext } from '../audit/audit.types';
+import { RunnerCommandService } from '../runners/runner-command.service';
 
 /** How a `terminal.attach` ended — `RunnerCommandService.send`'s result, narrowed. */
 export type TerminalAttachOutcome =
@@ -40,25 +41,49 @@ export interface TerminalRunnerPort {
 export const TERMINAL_RUNNER_PORT = Symbol('TERMINAL_RUNNER_PORT');
 
 /**
- * The runner side of the relay, not wired yet (spec 29 notes).
+ * The runner side of the relay. `terminal.attach` goes through
+ * `RunnerCommandService`, so it is checked against the allowlist's minimum
+ * role and gets the usual `runner.command` records (args only, no bytes).
  *
- * - `attach`: `terminal.attach` is exported as `terminalCommands` but enters
- *   the `commands` allowlist only with its runner handler (i29-runner). Until
- *   then it answers `unsupported`; afterwards the body is
- *   `RunnerCommandService.send(runnerId, 'terminal.attach', args, { role: 'admin', ctx })`
- *   mapped to `TerminalAttachOutcome`.
- * - `send`: `RunnerStreams.send` accepts `subscribe` / `unsubscribe` only;
- *   it gains the terminal messages in `runners/runner-streams.ts`, together
- *   with the gateway's `case 'terminal.data' | 'terminal.close'`.
+ * `send` is not wired yet: `RunnerStreams.send` accepts `subscribe` /
+ * `unsubscribe` only, and gains the terminal messages in
+ * `runners/runner-streams.ts` together with the gateway's
+ * `case 'terminal.data' | 'terminal.close'` (spec 29 notes).
  */
 @Injectable()
 export class RunnerTerminalPort implements TerminalRunnerPort {
-  async attach(): Promise<TerminalAttachOutcome> {
-    return {
-      status: 'error',
-      code: 'unsupported',
-      message: 'terminal.attach is not available on the API yet',
-    };
+  private readonly logger = new Logger(RunnerTerminalPort.name);
+
+  constructor(private readonly commands: RunnerCommandService) {}
+
+  async attach(
+    runnerId: string,
+    args: TerminalAttachArgs,
+    { ctx }: { ctx: AuditContext },
+  ): Promise<TerminalAttachOutcome> {
+    try {
+      // The gateway let only an admin this far (D1); the allowlist checks it again.
+      const result = await this.commands.send(
+        runnerId,
+        'terminal.attach',
+        args,
+        { role: 'admin', ctx },
+      );
+      switch (result.status) {
+        case 'ok':
+          return { status: 'ok', session: result.output.session };
+        case 'error':
+          return { status: 'error', ...result.error };
+        case 'unknown':
+          return { status: 'unknown' };
+      }
+    } catch (error) {
+      // Invalid args or role: refused before anything was sent.
+      this.logger.warn(
+        `terminal.attach on runner ${runnerId} refused: ${(error as Error).message}`,
+      );
+      return { status: 'error', code: 'invalid_args' };
+    }
   }
 
   send(): boolean {
