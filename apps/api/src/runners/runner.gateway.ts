@@ -155,6 +155,7 @@ class RunnerSocket {
         // Streaming command output lands with the item that uses it.
         return;
       case 'pane':
+      case 'run_log':
       case 'subscribe.error':
         this.deps.streams.deliver(runnerId, message);
         return;
