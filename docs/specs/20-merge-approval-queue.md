@@ -230,6 +230,26 @@ i20-api, decided with the orchestrator on 2026-10-08:
     settings page calls with the project detail it already has; an unread
     config is a mismatch only when AgentDock expects approval.
 
+i20-web:
+
+12. **Nav badge rides the label.** glass-ui's `NavRailItem` has no badge or
+    count prop, and ADR-0011 forbids a local component, so the entry reads
+    `Approvals · 3` (plain `Approvals` at 0). The count is the number of
+    `waiting` rows in `GET /projects/:id/approvals`, refetched (debounced
+    300 ms) on the live `approvals` event. Follow-up: a `NavRailItem` badge
+    prop in glass-ui, then drop the label suffix.
+13. **Merge summary is plain text** (`whitespace-pre-wrap`, as the queue
+    sheet shows an issue body): the web app has no markdown renderer.
+14. **Decisions need an inspection.** The head SHA a decision binds to (D6)
+    is `inspection.headSha` from the detail. While `inspection` is null (the
+    runner does not handle `pr.inspect` yet, or could not answer) the sheet
+    shows the reason and disables Approve and Request changes; it never
+    sends a head it did not get from the API. A `503 command_unavailable`
+    on a decision is shown inside the dialog, a `409 head_moved` refetches
+    the detail.
+15. **D1 on the settings page** is judged on the saved project, not on the
+    unsaved toggle, with the same sentence as the approvals page.
+
 Depends on #11
 
 Depends on #17
