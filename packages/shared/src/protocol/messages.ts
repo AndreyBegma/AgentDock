@@ -3,12 +3,18 @@ import { capabilitiesSchema } from './capabilities';
 import { commandErrorCodeSchema } from './commands';
 import { eventSchema, seqCursorSchema } from './envelope';
 import {
+  anySubscribeMessageSchema,
   paneMessageSchema,
+  runLogMessageSchema,
   subscribeErrorMessageSchema,
-  subscribeMessageSchema,
   unsubscribeMessageSchema,
 } from './pane';
 import { watchedProjectSchema } from './projects';
+import {
+  terminalCloseMessageSchema,
+  terminalDataMessageSchema,
+  terminalResizeMessageSchema,
+} from './terminal';
 
 /** An `events` batch carries at most this many events… */
 export const MAX_EVENTS_PER_BATCH = 500;
@@ -124,6 +130,12 @@ export const commandMessageSchema = z.object({
   args: z.unknown(),
 });
 
+/** Sent in both directions; listed once in `messageSchema`. */
+const bothWayMessages = [
+  terminalDataMessageSchema,
+  terminalCloseMessageSchema,
+] as const;
+
 const runnerMessages = [
   helloMessageSchema,
   heartbeatMessageSchema,
@@ -132,16 +144,21 @@ const runnerMessages = [
   commandProgressMessageSchema,
   paneMessageSchema,
   subscribeErrorMessageSchema,
+  runLogMessageSchema,
+  ...bothWayMessages,
 ] as const;
 
-const serverMessages = [
+const serverOnlyMessages = [
   welcomeMessageSchema,
   configMessageSchema,
   ackMessageSchema,
   commandMessageSchema,
-  subscribeMessageSchema,
+  anySubscribeMessageSchema,
   unsubscribeMessageSchema,
+  terminalResizeMessageSchema,
 ] as const;
+
+const serverMessages = [...serverOnlyMessages, ...bothWayMessages] as const;
 
 /** Messages the runner sends. An unknown `type` fails to parse. */
 export const runnerMessageSchema = z.discriminatedUnion('type', [
@@ -154,7 +171,7 @@ export const serverMessageSchema = z.discriminatedUnion('type', [
 /** Every message in either direction. */
 export const messageSchema = z.discriminatedUnion('type', [
   ...runnerMessages,
-  ...serverMessages,
+  ...serverOnlyMessages,
 ]);
 
 export type HelloMessage = z.infer<typeof helloMessageSchema>;
@@ -175,4 +192,7 @@ export type Message = z.infer<typeof messageSchema>;
 export type MessageType = Message['type'];
 
 export const runnerMessageTypes = runnerMessages.map((s) => s.shape.type.value);
-export const serverMessageTypes = serverMessages.map((s) => s.shape.type.value);
+/** `subscribe` is a union by `kind`; its first option names the type. */
+export const serverMessageTypes = serverMessages.map((s) =>
+  'shape' in s ? s.shape.type.value : s.options[0].shape.type.value,
+);

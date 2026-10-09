@@ -45,8 +45,18 @@ export const capabilitiesSchema = z.object({
   otlp: z
     .object({ grpc: portSchema.nullable(), http: portSchema.nullable() })
     .nullable(),
+  /**
+   * Whether the runner can serve `terminal.attach` (spec 29 D3, D10): a PTY
+   * API, POSIX, tmux ≥ 3.2, and the command not in `disabledCommands`.
+   * Absent means `false` — a runner older than the feature never sends it.
+   */
+  terminal: z.boolean().optional(),
 });
 export type Capabilities = z.infer<typeof capabilitiesSchema>;
+
+/** Whether the UI may offer an attach on this runner; absent `terminal` is `false`. */
+export const terminalAvailable = (capabilities: Capabilities): boolean =>
+  capabilities.terminal === true;
 
 /** Facts about the host itself, sent next to the capabilities. */
 export const hostSchema = z.object({
