@@ -31,14 +31,35 @@ describe('skill commands', () => {
     );
   });
 
-  it('sends nothing while the allowlist has no skill commands, answering 503', async () => {
-    const send = jest.fn();
+  it('sends through RunnerCommandService now that the allowlist holds skill commands', async () => {
+    const send = jest
+      .fn()
+      .mockResolvedValue({ status: 'ok', output: { items: [] } });
     const commands = new SkillCommands(
       { send } as unknown as RunnerCommandService,
       { isConnected: () => true } as unknown as RunnerPresence,
     );
-    // i24-runner enters `skillCommands` into `commands` with its handlers;
-    // until then the protocol answers `unknown_command` for every one.
+    const options = {
+      role: 'admin' as const,
+      ctx: { actor: { type: 'system' as const } },
+    };
+    await expect(
+      commands.send('runner-1', 'skill.search', { query: 'x' }, options),
+    ).resolves.toEqual({ status: 'ok', output: { items: [] } });
+    expect(send).toHaveBeenCalledWith(
+      'runner-1',
+      'skill.search',
+      { query: 'x' },
+      options,
+    );
+  });
+
+  it('sends nothing to a runner that is not connected, answering 503', async () => {
+    const send = jest.fn();
+    const commands = new SkillCommands(
+      { send } as unknown as RunnerCommandService,
+      { isConnected: () => false } as unknown as RunnerPresence,
+    );
     const attempt = commands.send(
       'runner-1',
       'skill.search',
