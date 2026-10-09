@@ -140,6 +140,29 @@ describe('IssuesCollector', () => {
     t.collector.stop();
   });
 
+  it('polls every 60 s by default and at the context interval when set', async () => {
+    const stopped = async (fleet: typeof DEFAULT_FLEET_SETTINGS) => {
+      const clock = new FakeClock();
+      const collector = new IssuesCollector(
+        {
+          exec: async () => ({ code: 1, stdout: '', stderr: '' }),
+          clock,
+          log: memoryLogger().log,
+          fleet,
+        },
+        { refreshers: new IssuesRefreshers() },
+      );
+      await collector.start(PROJECT, () => {});
+      const delays = clock.pending();
+      collector.stop();
+      return delays;
+    };
+    expect(await stopped(DEFAULT_FLEET_SETTINGS)).toContain(60_000);
+    expect(
+      await stopped({ ...DEFAULT_FLEET_SETTINGS, queuePollSeconds: 120 }),
+    ).toContain(120_000);
+  });
+
   it('reads further pages only when the first changed', async () => {
     const t = setup();
     const full = Array.from({ length: 100 }, (_, i) => item(i + 1));
