@@ -53,7 +53,8 @@ export const issueCreate = async (
     );
   }
 
-  const readyLabel = readyLabelOf(project.root) ?? DEFAULT_READY_LABEL;
+  const readyLabel =
+    args.readyLabel ?? readyLabelOf(project.root) ?? DEFAULT_READY_LABEL;
   // The ready label is never taken from the caller: only `queue` may set it.
   const labels = args.labels.filter(
     (l) => l.toLowerCase() !== readyLabel.toLowerCase(),

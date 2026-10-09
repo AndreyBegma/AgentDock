@@ -70,12 +70,8 @@ export class QueueService {
         meta,
       });
 
-    const refused = await this.refusal(
-      projectId,
-      readyLabelOf(project),
-      dto,
-      labels,
-    );
+    const readyLabel = readyLabelOf(project);
+    const refused = await this.refusal(projectId, readyLabel, dto, labels);
     if (refused) {
       await record('denied', {}, { reason: refused.getResponse() });
       throw refused;
@@ -87,6 +83,7 @@ export class QueueService {
       body: dto.body,
       labels,
       queue: dto.queue,
+      readyLabel,
     });
     if (!args.success) {
       // What the DTO cannot see: the body's byte size, a blank title.

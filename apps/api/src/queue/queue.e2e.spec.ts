@@ -501,6 +501,7 @@ describe('task queue (e2e)', () => {
           body: AC,
           labels: ['area: api'],
           queue: true,
+          readyLabel: 'cs:ready',
         },
         expect.objectContaining({ role: 'operator' }),
       );
@@ -596,10 +597,33 @@ describe('task queue (e2e)', () => {
           body: AC,
           labels: ['enhancement'],
           queue: true,
+          readyLabel: 'cs:ready',
         },
         expect.objectContaining({ role: 'operator' }),
       );
       expect(await audits()).toMatchObject([{ result: 'ok' }]);
+    });
+
+    it("sends the project's readyLabelOverride, not cs:ready (#66)", async () => {
+      await ctx.prisma.project.update({
+        where: { id: a },
+        data: { readyLabelOverride: 'ready-now' },
+      });
+      const create = jest
+        .spyOn(commands, 'createIssue')
+        .mockResolvedValue({ number: 15, url: url(15), queued: true });
+      const response = await post({
+        title: 'x',
+        body: AC,
+        labels: ['enhancement'],
+        queue: true,
+      });
+      expect(response.status).toBe(201);
+      expect(create).toHaveBeenCalledWith(
+        runnerId,
+        expect.objectContaining({ queue: true, readyLabel: 'ready-now' }),
+        expect.anything(),
+      );
     });
 
     it('answers 503 and audits an error when the runner does not answer', async () => {

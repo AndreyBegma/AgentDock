@@ -623,7 +623,7 @@ handler.
 | `pr.approve` | `projectId, root, pr, headSha, by, at` | operator | defined (`commands/approvals.ts`), not in the map yet: → `{ written: true }`, timeout 10 s |
 | `pr.requestChanges` | `projectId, root, pr, headSha, by, at, note` | operator | defined (`commands/approvals.ts`), not in the map yet: → `{ written: true }`, timeout 10 s |
 | `pr.voidApproval` | `projectId, root, pr, headSha, at` | operator | defined (`commands/approvals.ts`), not in the map yet: → `{ written: true }`, timeout 10 s |
-| `issue.create` | `projectId, title, body, labels, queue` | operator | defined (`commands/queue.ts`), not in the map yet: → `{ number, url, queued, reason? }`, timeout 45 s |
+| `issue.create` | `projectId, title, body, labels, queue, readyLabel?` | operator | defined (`commands/queue.ts`), not in the map yet: → `{ number, url, queued, reason? }`, timeout 45 s |
 | `issues.refresh` | `projectId` | operator | defined (`commands/queue.ts`), not in the map yet: → `{ changed, fetchedAt }`, timeout 45 s |
 | `skill.search` | `query` | operator | defined (`commands/skills.ts`), not in the map yet: → `{ items: [{ id, source, skillId, name, installs }] }`, timeout 15 s |
 | `skill.inspect` | `source, skillId?, ref?` | operator | defined, not in the map yet: → `{ commit, skills: [{ skillId, path, frontmatter, files, contentHash }] }`, timeout 120 s |
@@ -749,13 +749,15 @@ D1 and D7. Both are exported as `issueCreateCommand` and
 the `commands` map: the runner's `CommandHandlers` needs a handler for every
 entry, so the map entry lands with the handler.
 
-- `issue.create { projectId, title, body, labels[], queue }` runs
+- `issue.create { projectId, title, body, labels[], queue, readyLabel? }` runs
   `gh issue create --repo <owner/repo> --title … --body-file <tmp> --label …`
   in the project's root (a `projectId` not on the watch list is
   `path_not_allowed`). With `queue: true` it adds the ready label only when
   `specGap(body, labels)` is null, and otherwise answers `queued: false` with
   `reason: no_acceptance_criteria | no_parallel_plan`. `body` is at most
-  64 KB, `labels` at most 20.
+  64 KB, `labels` at most 20. `readyLabel` (optional, 1–100 characters) is the
+  project's effective ready label, which the API always sends; absent, the
+  runner uses `orchestrator.readyLabel` from its config, else `cs:ready`.
 - `issues.refresh { projectId }` runs the `issues` collector's poll for that
   project now. A changed listing goes out as `issues.snapshot` events as
   usual; the result says whether it changed (`false` on a `304`).
