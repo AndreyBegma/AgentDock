@@ -62,6 +62,12 @@ export const AUDIT_ACTIONS = [
   'schedule.disable',
   'schedule.delete',
   'schedule.run_now',
+  'budget.create',
+  'budget.update',
+  'budget.delete',
+  'budget.override',
+  'budget.override_revoke',
+  'budget.recompute',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 

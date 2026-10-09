@@ -165,6 +165,67 @@ call per file.
 | Spend forecasting on the budget tab? | Not in this item |
 | Should viewers see project budgets? | Yes, read-only (D10) |
 
+## Notes from implementation
+
+i28-api, decided with the orchestrator on 2026-10-09:
+
+- **Amends D4 and D5: spend is rebuilt from `llm_requests`.** Every evaluation
+  (the debounced fast path, the 5-minute sweep, a gate check, a recompute)
+  recomputes the affected period's `spentUsd` and `unpricedRequests` from
+  `llm_requests`, using the D3 attribution and bounded by `[start, end)` and
+  scope. The figures stay stored on `budget_periods` for the UI. There are
+  two reasons:
+  - `usage_rollups` are UTC-hour buckets, so they can't cut a period that
+    starts at local midnight in a zone off the whole hour (Asia/Kolkata
+    +05:30, Australia/Adelaide);
+  - a running increment double-counts a re-sent request (spec 12 D4: the last
+    usage wins) and misses a session that moves project or slot afterwards.
+    That is the same reason #13 rebuilds rollups instead of incrementing them.
+
+  So "incremental equals from-scratch" holds by construction. The randomized
+  1 000-request test checks it anyway, with re-sends.
+- **409 body (D11, API).** The body follows every other API error:
+  `{ statusCode: 409, error: "budget_exceeded", message, budgetId, scope, resetsAt }`
+  (shared `BudgetExceededBody`). It uses `error` where this spec wrote `code`.
+  The refusal is thrown before a `command_runs` or `runs` row exists, so it is
+  not recorded as a command run.
+- **D6: one notification per threshold.** A threshold below 100 sends
+  `budget.threshold`. The 100 % threshold sends `budget.exceeded` only, not
+  both, so each threshold notifies exactly once. `budget.exceeded` is no
+  longer reserved, and `budget.threshold` is appended to the kinds.
+- **D11 call sites.** On develop they are `apps/api/src/control/control.service.ts`
+  (`ControlService.start`, which covers `mode: next` too),
+  `apps/api/src/skills/skill-run.service.ts` (`SkillRunService.start`, the
+  entry point #25 and #26 call) and `apps/api/src/usage/rollup.service.ts`
+  (`RollupService.rebuildHours`).
+  - Each injects its dependency `@Optional()`, so without this module the gate
+    is absent and everything is allowed.
+  - `BudgetsModule` is `@Global()`, so the control and skills modules do not
+    import it.
+- **D3 matching details.**
+  - A skill run's sessions are those on the project's runner whose cwd is the
+    run's `skill_runs.worktree` or below it.
+  - An orchestrator session matches only an `orchestrator.start` that ran
+    (`ok` or `unknown`).
+  - Subagent sessions count with their parent.
+- **Schedules (#25) go through the same gate.** A firing calls
+  `SkillRunService.start` or `ControlService.start`, so a stop budget refuses
+  it with the same 409. Spec 25 D12's `beforeFire` hook still allows
+  everything.
+  - A firing is project-only (D3). For a skill run, `triggeredByType` is
+    `schedule`.
+  - For an orchestrator start, the actor is `system`, so the gate checks
+    no user budget. A session started by a `command_runs` row that a
+    `schedule_firings.commandRunId` points to is nobody's, although the row
+    carries the creator's id.
+- **Gate freshness.** A gate check evaluates the budget itself, so the gate
+  has no detection lag. The lag in D5 applies to notifications and indicators
+  only.
+- **State** comes from the current spend: `exceeded` while spend ≥ limit,
+  `overridden` while that holds and an override is active. `firedThresholds`
+  is what has notified. If a price recompute lowers spend below a threshold,
+  that threshold does not notify again.
+
 Depends on #13
 
 Depends on #22

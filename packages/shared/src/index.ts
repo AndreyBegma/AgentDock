@@ -2,6 +2,7 @@ export * from './activity';
 export * from './approvals';
 export * from './audit';
 export * from './auth';
+export * from './budgets';
 export * from './control';
 export * from './fleet';
 export * from './history';

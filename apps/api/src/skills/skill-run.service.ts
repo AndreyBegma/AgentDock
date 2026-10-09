@@ -17,10 +17,11 @@ import {
   type SkillRunArgs,
   skillRunArgsSchema,
 } from '@agentdock/shared/protocol';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { z } from 'zod';
 import { AuditService } from '../audit/audit.service';
 import type { AuditContext } from '../audit/audit.types';
+import { BudgetGate } from '../budgets/budget-gate';
 import { PrismaService } from '../database/prisma.service';
 import { RunsQueryService } from '../history/runs-query.service';
 import { LiveService } from '../live/live.service';
@@ -69,6 +70,7 @@ export class SkillRunService {
     private readonly runs: RunsQueryService,
     private readonly live: LiveService,
     private readonly audit: AuditService,
+    @Optional() private readonly budgets?: BudgetGate,
   ) {}
 
   /**
@@ -134,6 +136,12 @@ export class SkillRunService {
       );
     }
     this.commands.assertReady(project.runnerId, 'skill.run');
+    // Spec 28 D7, D11: an exceeded stop budget refuses with 409
+    // `budget_exceeded`; only a person's run counts toward their budget (D3).
+    await this.budgets?.assertAllowed({
+      projectId,
+      userId: trigger.type === 'user' ? trigger.id : null,
+    });
 
     const now = new Date();
     const run = await this.prisma.run.create({
