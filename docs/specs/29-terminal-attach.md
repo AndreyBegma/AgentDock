@@ -309,6 +309,48 @@ Cross-repository: this item prefers glass-ui `Terminal` from AndreyBegma/glass-u
   `RunnerStreams.deliverTerminal` to the optional `terminal` method of a
   stream listener, which only `TerminalRelay` implements.
 
+### From i29-web
+
+- **Where it lives.** `apps/web/src/components/terminal/` holds the sheet
+  (`terminal-sheet.tsx`) and the attach itself (`terminal-view.tsx`).
+  `apps/web/src/lib/terminal/` holds the pure helpers (`format.ts`, tested)
+  and `useTerminalAvailable`. The Attach actions are in the fleet page's slot
+  sheet and orchestrator card.
+- **xterm, not glass-ui.** glass-ui v0.22.0 has no `Terminal` yet
+  (glass-ui#74), so the sheet uses `@xterm/xterm` 6.0.0 and
+  `@xterm/addon-fit` 0.11.0, pinned exactly and themed with token values read
+  from CSS variables. Replace `terminal-view.tsx`'s emulator when glass-ui
+  releases `Terminal`.
+- **Read-only is the default; control is a second attach.** The sheet always
+  opens in `read`. **Take control** and **Release** remount the view, which
+  closes the socket and requests a new ticket in the other mode, so the audit
+  trail shows two attaches. In `read` mode xterm has `disableStdin`, and the
+  API and the runner drop input anyway (D6).
+- **Bytes.** Output is written to xterm as raw `Uint8Array`s, never decoded
+  to a string first, so a multi-byte character split across frames is
+  intact. Input is UTF-8 encoded and split into frames of at most
+  `TERMINAL_MAX_DATA_BYTES` on character boundaries. There is no base64 in the
+  browser; base64 is only between the API and the runner.
+- **Detaching.** Closing the sheet, **Detach** or a remount sends a `close`
+  frame and closes the socket. The session is never touched.
+- **When Attach is drawn.** For an admin only, and only when the project's
+  runner reports `terminal: true` (`GET /admin/runners/:id`). Not for an
+  ended slot or an `absent` orchestrator. A refusal (`busy` with the holder's
+  email, `unsupported`, `not_found`, an expired ticket) is shown in the sheet
+  with **Attach again**; the close reason of an ended attach is shown the same
+  way.
+- **Socket URL.** Derived from `NEXT_PUBLIC_LIVE_URL` by replacing the path
+  with `/terminal`, so no new variable is needed.
+- **Follow-up: skill-run Attach.** Not part of this slot. i24-web owns
+  `projects/[projectId]/skills/**`, and the runner answers `unsupported` for
+  `skill_run` targets until it can resolve `agentdock-run-<shortid>`. The run
+  detail needs one `TerminalSheet` with a `skill_run` target (the sheet's
+  `TerminalTarget` needs a `{ kind: 'skill_run'; runId }` arm and the ticket
+  request already takes `runId`).
+- **Follow-up: "Attached by <name>" on the button.** `GET /terminal/active`
+  is not read by the web yet; a held attach is reported when the ticket is
+  refused as `busy`.
+
 Depends on #8
 
 Depends on #18
