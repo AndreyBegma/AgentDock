@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ActivityModule } from './activity';
 import { AdminModule } from './admin/admin.module';
+import { ApprovalsModule } from './approvals';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { ControlModule } from './control';
@@ -18,6 +19,7 @@ import { QueueModule } from './queue';
 import { RunnersModule } from './runners/runners.module';
 import { SessionsModule } from './sessions/sessions.module';
 import { SkillsModule } from './skills';
+import { TelegramModule } from './telegram';
 import { UsageModule } from './usage/usage.module';
 
 @Module({
@@ -42,7 +44,9 @@ import { UsageModule } from './usage/usage.module';
     ControlModule,
     ActivityModule,
     HistoryModule,
+    ApprovalsModule,
     NotificationsModule,
+    TelegramModule,
     SkillsModule,
   ],
   controllers: [HealthController],

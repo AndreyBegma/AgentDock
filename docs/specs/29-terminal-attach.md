@@ -224,6 +224,44 @@ Cross-repository: this item prefers glass-ui `Terminal` from AndreyBegma/glass-u
   `case 'terminal.data' / 'terminal.close'` in
   `apps/api/src/runners/runner.gateway.ts`.
 
+### From i29-runner
+
+- **Command registration trap (#12).** `CommandHandlers` in
+  `apps/runner/src/commands/dispatcher.ts` needs a handler for every key of
+  `commands`. A protocol or API slot therefore defines and exports a command
+  in its own file without adding it to the map. The runner slot adds the map
+  entry and the handler in the same commit. `terminal.attach` landed that way.
+- **Where it lives.** The code is in `apps/runner/src/terminal/`:
+  - `resolve.ts` resolves the target (D2). It reuses `watchedProject` /
+    `resolveSlot` from `control/target.ts` and the shared
+    `orchestratorSessionName`, and it maps their `path_not_allowed` /
+    `not_a_repository` to `not_found`.
+  - `pty.ts` builds the argv and does the Bun PTY spawn (D3, D4). It strips
+    `TMUX` / `TMUX_PANE` from the environment, so a runner started inside tmux
+    can still attach.
+  - `manager.ts` holds the limits and the streams (D6–D8).
+- **Read-only.** On a `read` attach the runner never writes to the PTY. Input
+  is only counted (`bytesDropped`).
+- **Limits on the runner.** Idle and maximum duration are enforced as a
+  backstop at the shared defaults (900 s / 4 h), with `terminal.close` sent
+  with the reason. The API's configured values are the primary limits. A
+  value above the defaults is capped by the runner.
+- **Follow-up: `terminal.maxAttachesPerRunner`** (Configuration). The runner
+  uses the constant `TERMINAL_MAX_ATTACHES_PER_RUNNER` (2), which can be
+  injected in tests. The runner config key is not added yet: `config.ts` was
+  outside this slot.
+- **Follow-up: `skill_run`** answers `unsupported` until #24's runner can
+  resolve `agentdock-run-<shortid>` of a live run of the project.
+- **Two names for one slot.** When both `cs-<slot>` and `cs-<prefix>--<slot>`
+  are live, the attach goes to the one that sorts first.
+- **`capabilities.terminal`** is added by the daemon's re-detection: it covers
+  both `hello` and `runner.describe`. The probe itself is
+  `terminalCapability()` in `detect/capabilities.ts`.
+- **Orphans.** Resolving can outlive the 10 s command timeout. In that case
+  no PTY is spawned, because the server has already given up on the command.
+  Ending an attach sends SIGHUP, then SIGKILL after 2 s, to the attach client
+  only.
+
 Depends on #8
 
 Depends on #18
