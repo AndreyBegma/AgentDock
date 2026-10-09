@@ -154,6 +154,25 @@ already exist. Honestly two slots in sequence.
 | Clock skew between API and runner | low | the API decides when to fire; the runner only executes |
 | `@nestjs/schedule` jobs without names make the system list useless | low | listed as `unnamed`; owners can name them later |
 
+## Notes
+
+Decided while landing the API slot (i25-api); the orchestrator approved each one on 2026-10-09.
+
+- **Q1 — an orchestrator target has no `runs` row.** `orchestrator.start` (#17) writes a `command_runs` row; nothing creates a `runs` row for it. An orchestrator firing links `commandRunId`, is `succeeded` when the command returns ok, `noop` on `already_running`, and is never `started`. The orchestrator's rounds are in history as their slots' runs (`triggeredByType: orchestrator`). The history criterion — `triggeredByType: schedule`, `triggeredById` = the schedule — holds for skill targets. D7 for an orchestrator target is `already_running → noop`.
+- **Q2 — no `events` rows.** The `events` table is runner-scoped (`runnerId` required, unique `(runnerId, seq)`) and has no API-sourced path. `schedule.fired` / `.skipped` / `.failed` / `.disabled` are published live on `project:<id>` beside `schedule.updated` / `schedule_firing.updated`; `schedule_firings` is the durable record. Follow-up: an API event source.
+- **Q3 — system jobs.** Only jobs on `SchedulerRegistry` are listed: today `audit-verification` (#8) and `activity-retention` (#21). Usage rollups (#13) and the notification loops (#22) run on plain timers and appear once their modules register them. Cron jobs carry their expression and dates; named intervals carry their name only. Follow-up: #13/#22 register with the registry.
+- **Q4 — leader election is tested in-process.** Two `SchedulerService` instances, each with its own lock connection: the second cannot lead while the first holds the lock, and takes over once the first's connection closes (a follower retries every 30 s).
+- **D8 `onBehalfOf`.** `AuditActor` has no `onBehalfOf`. Commands are sent as the `system` actor with the creator's project role; the person is reached through `runs.triggeredById → schedules.createdById` (skill) and `command_runs.userId` = creator (orchestrator). Follow-up: `onBehalfOf` on `AuditActor`.
+- **D10 admin notification.** Auto-disable is audited (`schedule.disable`, actor `system`) and published live; the admin notification is #22's follow-up, as D17 says for `schedule.disabled`.
+- **D11 counter.** +1 when a firing becomes `failed` (refused at fire time, or its run ends failed); reset to 0 only by a `succeeded` firing; `started`, `noop` and `skipped` leave it alone.
+- **D9 retry under `catch_up`.** A `cron` firing failed `runner_offline` rewinds `nextRunAt` to its occurrence. While the runner stays offline later ticks leave it (no new firing, no new failure); once it is back, D6 applies with that occurrence already recorded: it fires once as `catch_up`, or a newer one does. Past 24 hours it is skipped. A `catch_up` firing that fails offline is not retried again.
+- **D6 "missed by more than 24 hours"** is measured on the newest occurrence up to now: the one a `catch_up` would fire.
+- **D4 timezone validation.** On Node, `Intl.supportedValuesOf('timeZone')` lists canonical names only — it lacks `UTC` and has `Europe/Kiev` but not `Europe/Kyiv`. A name it does not list is accepted when it has the IANA shape (`Area/Location`, or `UTC`) and `Intl.DateTimeFormat` resolves it; offsets such as `+02:00` are refused.
+- **D4 DST.** `cron-parser` moves a local time a spring-forward skips to the next hour; the API drops that occurrence instead. A local time a fall-back repeats fires the first time only.
+- **D2 library versions.** `cron-parser` 5.10.1 (MIT) and `cronstrue` 3.27.0 (MIT, the preview's `description`), pinned exactly.
+- **D1 model default.** A skill target without `model` fires with `opus` (`SCHEDULE_DEFAULT_MODEL`) — #24 has no server-side default; it matches the orchestrator default.
+- **Stale `due`.** A firing still `due` ten minutes after its occurrence (the API stopped between commit and send) is `failed` with error `not_sent`, never resent (at-most-once, as runner commands are).
+
 ## Open questions
 
 | Question | Default if nobody answers |
