@@ -77,7 +77,10 @@ export const planClaim = ({
   const late = now.getTime() - newest.getTime();
   if (late <= SCHEDULE_MISSED_GRACE_MS) {
     return {
-      fire: { scheduledFor: newest, kind: newestRecorded ? 'catch_up' : 'cron' },
+      fire: {
+        scheduledFor: newest,
+        kind: newestRecorded ? 'catch_up' : 'cron',
+      },
       skipped: olderSkipped,
       nextRunAt,
     };

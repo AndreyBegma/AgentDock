@@ -113,7 +113,10 @@ export class CronSchedule {
       );
     }
     for (let i = 1; i < next.length; i++) {
-      if (next[i].getTime() - next[i - 1].getTime() < SCHEDULE_MIN_INTERVAL_MS) {
+      if (
+        next[i].getTime() - next[i - 1].getTime() <
+        SCHEDULE_MIN_INTERVAL_MS
+      ) {
         throw new CronError(
           SCHEDULES_ERROR.intervalTooShort,
           `Firings must be at least ${SCHEDULE_MIN_INTERVAL_MS / 60_000} minutes apart`,
@@ -209,8 +212,8 @@ export class CronSchedule {
       return false;
     }
     // Fall-back: the same local time happened `delta` earlier, at the old offset.
-    const delta = this.offsetMs(new Date(at.getTime() - 3 * 3_600_000)) -
-      this.offsetMs(at);
+    const delta =
+      this.offsetMs(new Date(at.getTime() - 3 * 3_600_000)) - this.offsetMs(at);
     if (delta > 0) {
       const earlier = this.wallClock(new Date(at.getTime() - delta));
       if (earlier.key === local.key) return false;

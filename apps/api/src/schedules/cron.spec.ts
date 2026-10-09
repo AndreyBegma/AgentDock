@@ -38,7 +38,14 @@ describe('CronSchedule.parse', () => {
   });
 
   it('refuses six fields, garbage and unknown macros (D2)', () => {
-    for (const cron of ['0 0 3 * * *', 'nope', '61 * * * *', '@reboot', '@yearly', '']) {
+    for (const cron of [
+      '0 0 3 * * *',
+      'nope',
+      '61 * * * *',
+      '@reboot',
+      '@yearly',
+      '',
+    ]) {
       expect(codeOf(() => CronSchedule.parse(cron, 'UTC', now))).toBe(
         'invalid_cron',
       );
@@ -60,9 +67,9 @@ describe('CronSchedule.parse', () => {
   });
 
   it('validates the timezone (D4)', () => {
-    expect(codeOf(() => CronSchedule.parse('0 3 * * *', 'Mars/Olympus', now))).toBe(
-      'invalid_timezone',
-    );
+    expect(
+      codeOf(() => CronSchedule.parse('0 3 * * *', 'Mars/Olympus', now)),
+    ).toBe('invalid_timezone');
     expect(codeOf(() => CronSchedule.parse('0 3 * * *', '+02:00', now))).toBe(
       'invalid_timezone',
     );
@@ -112,10 +119,18 @@ describe('CronSchedule DST (D4)', () => {
   it('counts firings in a closed range', () => {
     const schedule = CronSchedule.parse('0 * * * *', 'UTC');
     expect(
-      schedule.countBetween(at('2026-10-09T10:00:00Z'), at('2026-10-09T13:00:00Z'), 100),
+      schedule.countBetween(
+        at('2026-10-09T10:00:00Z'),
+        at('2026-10-09T13:00:00Z'),
+        100,
+      ),
     ).toBe(4);
     expect(
-      schedule.countBetween(at('2026-10-09T10:00:00Z'), at('2026-10-09T13:00:00Z'), 2),
+      schedule.countBetween(
+        at('2026-10-09T10:00:00Z'),
+        at('2026-10-09T13:00:00Z'),
+        2,
+      ),
     ).toBe(2);
   });
 });

@@ -104,8 +104,6 @@ export const SCHEDULES_ERROR = {
   intervalTooShort: 'interval_too_short',
   invalidTimezone: 'invalid_timezone',
   invalidTarget: 'invalid_target',
-  /** Run now while the previous run of the schedule is still running (D7). */
-  previousStillRunning: 'previous_still_running',
 } as const;
 export type SchedulesErrorCode =
   (typeof SCHEDULES_ERROR)[keyof typeof SCHEDULES_ERROR];
