@@ -21,8 +21,9 @@ User ─< ProjectMember >─ Project >─ Runner ─< RuntimeProfile
   └─  TelegramLink · TelegramLinkCode
 Runner ─< RunnerIncident · NotificationMatcherState (one row)
 Event (partitioned by month) · UsageRollup (hour × project × model × runtime)
-ModelPrice (versioned) · Webhook ─< WebhookDelivery · InboundTrigger
-Setting (key/value: registration open/closed, Telegram, …)
+ModelPrice (versioned) · Webhook ─< WebhookDelivery (>─ Event)
+Project ─< InboundTrigger ─< InboundDelivery (>─ Run)
+Setting (key/value: registration open/closed, Telegram, webhook targets, …)
 ```
 
 `Session` is the agent runtime session. A login session is `UserSession`, so
@@ -74,6 +75,8 @@ the two never share a name.
 | `UsageRollup` | hour (timestamptz, UTC), dimensionKey, projectId?, runtime, model, slot?, runId? (empty until runs exist), issue?, requests, input, output, cacheRead, cacheWrite5m, cacheWrite1h, reasoning (BigInt), costUsd (decimal 14,6), unpricedRequests — a pure aggregate of `llm_requests`, whole hours rebuilt on every write; no foreign keys — unique `(hour, dimensionKey)`, index `(projectId, hour)`, `(hour)` — table `usage_rollups` |
 | `PriceRecompute` | versionId (`RESTRICT`), from, to, status `queued\|running\|done\|failed`, processed, total, error?, createdById? (`SET NULL`), createdAt, finishedAt? — table `price_recomputes` |
 | `AuditRecord` | seq (BigInt, chain order), ts, actorType, actorUserId?, actorRunnerId?, action, targetType, targetId?, projectId?, before, after, result, meta, prevHash, hash — actor and project ids are plain columns without foreign keys, so records outlive users and projects ([spec 8](../specs/8-audit-log.md)) |
-| `Webhook` / `WebhookDelivery` | url, secret, events[], status, attempts, nextAttemptAt, responseCode |
-| `InboundTrigger` | name, secret, action (skill run / orchestrator next), projectId |
+| `InboundTrigger` | a signed `POST /hooks/<publicId>` that starts work: publicId (24 random characters, unique — never the cuid), name, projectId (cascade), action (json: `{ kind: skill, skill, args, profileKey?, model?, output }` \| `{ kind: orchestrator, mode: next }`), allowedPaths[], valuePattern? (null = the default), secret (ciphertext), previousSecret? (ciphertext), previousSecretUntil?, enabled, disabledReason?, bucketTokens, bucketRefilledAt (30/hour token bucket), createdById? (`SET NULL`; null = `creator_not_authorized`), createdAt, updatedAt — index `(projectId)` — table `inbound_triggers` ([spec 26](../specs/26-webhooks.md)) |
+| `InboundDelivery` | one received inbound delivery and the replay nonce: id (BigInt), triggerId (cascade), deliveryId (the caller's `X-AgentDock-Delivery`, ≤ 64), receivedAt, status `accepted\|skipped\|rejected\|started\|failed`, reason?, renderedArgs? (json), runId? (`SET NULL`), commandRunId?, sourceIp? — unique `(triggerId, deliveryId)`, index `(triggerId, receivedAt)`, `(receivedAt)`; deleted after 30 days — table `inbound_deliveries` |
+| `Webhook` | an outbound target: name, url, events[] (the spec 26 D9 catalogue), projectIds[] (empty = all), secret (ciphertext), enabled, circuitState `closed\|open\|half_open`, circuitOpenedAt?, consecutiveFailures, createdById? (`SET NULL`), createdAt, updatedAt — table `webhooks` |
+| `WebhookDelivery` | one event's delivery to one webhook: webhookId (cascade), eventId? (BigInt, `SET NULL`; null for `webhook.test`), eventType, payload (json, the fixed envelope), status `pending\|succeeded\|failed`, attempts, nextAttemptAt, lastAttemptAt?, responseCode?, responseBody? (≤ 2 KB), error?, createdAt — unique `(webhookId, eventId)` (the dispatcher's idempotency), index `(status, nextAttemptAt)`, `(webhookId, createdAt)`, `(createdAt)`; deleted after 30 days — table `webhook_deliveries`; the dispatcher's cursor is in `webhook_dispatcher_state` (one row, id `webhooks`: `eventsCursor`) |
 | `Event` | runnerId, seq, ts, type, source, projectRepo?, projectRoot?, slot?, issue?, session? (json), data, receivedAt, pluginEventId? (a Code Sentinel event's `eid`) — unique `(runnerId, seq)`, unique `(projectRoot, pluginEventId)` (binds plugin events only: NULLs are distinct), index `(type, ts)`, index `(projectRoot, source, receivedAt)`; projectId is added when projects land (M1.4) — table `events` |

@@ -62,6 +62,18 @@ export const AUDIT_ACTIONS = [
   'schedule.disable',
   'schedule.delete',
   'schedule.run_now',
+  'webhook.create',
+  'webhook.update',
+  'webhook.delete',
+  'webhook.rotate_secret',
+  'webhook.test',
+  'webhook.redeliver',
+  'webhook.circuit_close',
+  'trigger.create',
+  'trigger.update',
+  'trigger.delete',
+  'trigger.rotate_secret',
+  'settings.webhooks',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 

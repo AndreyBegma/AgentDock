@@ -54,6 +54,8 @@ model User {
   skillInstallPreviews        SkillInstallPreview[]
   schedulesCreated            Schedule[]                    @relation("ScheduleCreatedBy")
   schedulesUpdated            Schedule[]                    @relation("ScheduleUpdatedBy")
+  inboundTriggersCreated      InboundTrigger[]
+  webhooksCreated             Webhook[]
 
   @@map("users")
 }
@@ -191,7 +193,8 @@ model Event {
   /// (spec 16 D5). Null otherwise, and on an `events.duplicate`.
   pluginEventId String?
 
-  runner Runner @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+  runner            Runner            @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+  webhookDeliveries WebhookDelivery[]
 
   @@unique([runnerId, seq])
   /// One plugin event per project root. NULLs are distinct in PostgreSQL, so
@@ -321,6 +324,7 @@ model Project {
   installedSkills      InstalledSkill[]
   skillInstallPreviews SkillInstallPreview[]
   schedules            Schedule[]
+  inboundTriggers      InboundTrigger[]
 
   @@unique([runnerId, rootPath])
   @@map("projects")
@@ -1258,10 +1262,11 @@ model Run {
   /// same slot is identical.
   updatedAt       DateTime
 
-  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  slot     Slot?     @relation(fields: [slotId], references: [id], onDelete: Cascade)
-  skillRun SkillRun?
-  firings  ScheduleFiring[]
+  project           Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  slot              Slot?             @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  skillRun          SkillRun?
+  firings           ScheduleFiring[]
+  inboundDeliveries InboundDelivery[]
 
   @@index([projectId, startedAt])
   @@index([projectId, status])
@@ -1426,6 +1431,158 @@ model MergeApproval {
   @@index([projectId, prNumber])
   @@index([projectId, status])
   @@map("merge_approvals")
+}
+
+// ─── Webhooks (docs/specs/26-webhooks.md) ───────────────────────────────────
+
+/// What became of one inbound delivery (D2–D7). `accepted`: verified and
+/// recorded, the command not sent yet; `started`: the command was accepted and
+/// `runId` is set; `skipped`: D6's one live run; `rejected`: refused after it
+/// was recorded (`reason`); `failed`: the firing failed (`reason`).
+enum InboundDeliveryStatus {
+  accepted
+  skipped
+  rejected
+  started
+  failed
+}
+
+enum WebhookDeliveryStatus {
+  pending
+  succeeded
+  failed
+}
+
+/// D14.
+enum WebhookCircuitState {
+  closed
+  open
+  half_open
+}
+
+/// A signed `POST /hooks/<publicId>` that starts work on one project (D1–D6).
+/// `secret` / `previousSecret` are `SecretCipher` ciphertext (D17); the
+/// previous one verifies until `previousSecretUntil`. `bucketTokens` /
+/// `bucketRefilledAt` are D6's per-trigger token bucket.
+model InboundTrigger {
+  id                  String    @id @default(cuid())
+  /// D1: 24 random characters, the URL's id — never the cuid.
+  publicId            String    @unique
+  name                String
+  projectId           String
+  /// D3's closed union (shared `inboundTriggerActionSchema`).
+  action              Json
+  /// D4: the `payload.<path>`s the action's args may reference.
+  allowedPaths        String[]
+  /// D4: null means the shared default pattern.
+  valuePattern        String?
+  secret              String
+  previousSecret      String?
+  previousSecretUntil DateTime?
+  enabled             Boolean   @default(true)
+  disabledReason      String?
+  bucketTokens        Int
+  bucketRefilledAt    DateTime
+  /// Nullable so deleting the admin keeps the trigger; a null creator is
+  /// `creator_not_authorized` at fire time (D5).
+  createdById         String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  project    Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy  User?             @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  deliveries InboundDelivery[]
+
+  @@index([projectId])
+  @@map("inbound_triggers")
+}
+
+/// One received inbound delivery, and D2's nonce store: `(triggerId,
+/// deliveryId)` is unique, kept 24 hours for replay detection and 30 days in
+/// all (D18).
+model InboundDelivery {
+  id           BigInt                @id @default(autoincrement())
+  triggerId    String
+  /// The caller's `X-AgentDock-Delivery`, at most 64 characters.
+  deliveryId   String
+  receivedAt   DateTime              @default(now())
+  status       InboundDeliveryStatus
+  reason       String?
+  renderedArgs Json?
+  runId        String?
+  commandRunId String?
+  sourceIp     String?
+
+  trigger InboundTrigger @relation(fields: [triggerId], references: [id], onDelete: Cascade)
+  run     Run?           @relation(fields: [runId], references: [id], onDelete: SetNull)
+
+  @@unique([triggerId, deliveryId])
+  @@index([triggerId, receivedAt])
+  @@index([receivedAt])
+  @@map("inbound_deliveries")
+}
+
+/// An outbound target (D9–D15). `events` ⊆ the shared catalogue; `projectIds`
+/// empty means every project. `secret` is `SecretCipher` ciphertext (D17).
+model Webhook {
+  id                  String              @id @default(cuid())
+  name                String
+  url                 String
+  events              String[]
+  projectIds          String[]
+  secret              String
+  enabled             Boolean             @default(true)
+  circuitState        WebhookCircuitState @default(closed)
+  circuitOpenedAt     DateTime?
+  consecutiveFailures Int                 @default(0)
+  /// Nullable so deleting the admin keeps the webhook.
+  createdById         String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  createdBy  User?             @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  deliveries WebhookDelivery[]
+
+  @@map("webhooks")
+}
+
+/// One event's delivery to one webhook (D11, D12). `eventId` is null for a
+/// `webhook.test` delivery; `(webhookId, eventId)` makes the dispatcher
+/// idempotent. `responseBody` holds at most 2 KB.
+model WebhookDelivery {
+  id            String                @id @default(cuid())
+  webhookId     String
+  eventId       BigInt?
+  eventType     String
+  /// The D10 envelope, signed anew on every attempt.
+  payload       Json
+  status        WebhookDeliveryStatus @default(pending)
+  attempts      Int                   @default(0)
+  nextAttemptAt DateTime              @default(now())
+  lastAttemptAt DateTime?
+  responseCode  Int?
+  responseBody  String?
+  error         String?
+  createdAt     DateTime              @default(now())
+
+  webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  event   Event?  @relation(fields: [eventId], references: [id], onDelete: SetNull)
+
+  @@unique([webhookId, eventId])
+  @@index([status, nextAttemptAt])
+  @@index([webhookId, createdAt])
+  @@index([createdAt])
+  @@map("webhook_deliveries")
+}
+
+/// Where the outbound dispatcher stopped (D11): one row, id `webhooks`.
+/// Every `events.id` up to `eventsCursor` was considered.
+model WebhookDispatcherState {
+  id           String   @id
+  eventsCursor BigInt   @default(0)
+  updatedAt    DateTime @updatedAt
+
+  @@map("webhook_dispatcher_state")
 }
 
 // ─── Cron schedules (docs/specs/25-cron-schedules.md) ───────────────────────
