@@ -41,7 +41,7 @@ export interface ApprovalsCaller {
   ctx: AuditContext;
 }
 
-interface ProjectTarget {
+export interface ProjectTarget {
   id: string;
   runnerId: string;
   rootPath: string;
@@ -78,6 +78,38 @@ export const currentRow = (
     orderBy: { createdAt: 'desc' },
     include: APPROVAL_ROW_INCLUDE,
   });
+
+/**
+ * D6, under the caller's `lockApprovals`: the PR's head is no longer the one
+ * its approval was bound to. The approved row becomes `stale` and a new
+ * `waiting` row takes its place, so history keeps who approved which head.
+ * Returns the voided row; null when there is no approval on another head.
+ */
+export const voidApprovedRow = async (
+  tx: Tx,
+  projectId: string,
+  pr: number,
+  headSha: string,
+): Promise<ApprovalRow | null> => {
+  const row = await currentRow(tx, projectId, pr);
+  if (row?.status !== 'approved' || row.headSha === headSha) return null;
+  await tx.mergeApproval.update({
+    where: { id: row.id },
+    data: { status: 'stale' },
+  });
+  await tx.mergeApproval.create({
+    data: {
+      projectId,
+      prNumber: pr,
+      slot: row.slot,
+      issue: row.issue,
+      source: row.source,
+      status: 'waiting',
+      waitingSince: new Date(),
+    },
+  });
+  return row;
+};
 
 /**
  * The approval decisions (spec 20 D5–D8, D10): approve, request changes, and
@@ -340,11 +372,7 @@ export class ApprovalsService {
     return this.views.view(project.id, row);
   }
 
-  /**
-   * D6: the PR's head is no longer the one its approval was bound to. The
-   * approved row becomes `stale`, a new `waiting` row takes its place, the
-   * signal is withdrawn, and the void is audited as the system's.
-   */
+  /** D6 from a `pr.inspect`: void the approval if the head it read moved. */
   private async voidIfMoved(
     project: ProjectTarget,
     pr: number,
@@ -352,26 +380,28 @@ export class ApprovalsService {
   ): Promise<void> {
     const voided = await this.prisma.$transaction(async (tx) => {
       await lockApprovals(tx, project.id);
-      const row = await currentRow(tx, project.id, pr);
-      if (row?.status !== 'approved' || row.headSha === headSha) return null;
-      await tx.mergeApproval.update({
-        where: { id: row.id },
-        data: { status: 'stale' },
-      });
-      await tx.mergeApproval.create({
-        data: {
-          projectId: project.id,
-          prNumber: pr,
-          slot: row.slot,
-          issue: row.issue,
-          source: row.source,
-          status: 'waiting',
-          waitingSince: new Date(),
-        },
-      });
-      return row;
+      return voidApprovedRow(tx, project.id, pr, headSha);
     });
-    if (!voided?.headSha) return;
+    if (voided) await this.announceVoid(project, pr, voided, headSha);
+  }
+
+  /**
+   * D6, after `voidApprovedRow` committed: the signal is withdrawn, the void
+   * is audited as the system's and published. A signal the runner could not
+   * write is audited `written: false`; the plugin's freshness rule still
+   * refuses the stale approval.
+   */
+  async announceVoid(
+    project: ProjectTarget,
+    pr: number,
+    voided: ApprovalRow,
+    headSha: string,
+  ): Promise<void> {
+    if (!voided.headSha) return;
+    const key = `${project.id}:${pr}`;
+    if (this.inspections.get(key)?.value.headSha !== headSha) {
+      this.inspections.delete(key);
+    }
 
     const at = new Date().toISOString();
     let signal: object = { written: true };
