@@ -619,7 +619,10 @@ handler.
 | `orchestrator.status` | `projectId, root` | viewer | implemented: → `{ present, state, session?, startedAt? }`, timeout 5 s |
 | `slot.stop` | `projectId, root, slot` | operator | implemented: → `{ stopped }`, timeout 10 s |
 | `slot.message` | `projectId, root, slot, text, from` | operator | implemented: → `{ written: true, delivered }`, timeout 10 s |
-| `pr.approve` / `pr.requestChanges` | `projectId, pr, note?` | operator | planned |
+| `pr.inspect` | `projectId, root, pr` | viewer | defined (`commands/approvals.ts`), not in the map yet: → `PrInspection` (head SHA, diff stats, ≤ 300 files, checks, mergeable), timeout 30 s |
+| `pr.approve` | `projectId, root, pr, headSha, by, at` | operator | defined (`commands/approvals.ts`), not in the map yet: → `{ written: true }`, timeout 10 s |
+| `pr.requestChanges` | `projectId, root, pr, headSha, by, at, note` | operator | defined (`commands/approvals.ts`), not in the map yet: → `{ written: true }`, timeout 10 s |
+| `pr.voidApproval` | `projectId, root, pr, headSha, at` | operator | defined (`commands/approvals.ts`), not in the map yet: → `{ written: true }`, timeout 10 s |
 | `issue.create` | `projectId, title, body, labels, queue` | operator | defined (`commands/queue.ts`), not in the map yet: → `{ number, url, queued, reason? }`, timeout 45 s |
 | `issues.refresh` | `projectId` | operator | defined (`commands/queue.ts`), not in the map yet: → `{ changed, fetchedAt }`, timeout 45 s |
 | `skill.search` | `query` | operator | defined (`commands/skills.ts`), not in the map yet: → `{ items: [{ id, source, skillId, name, installs }] }`, timeout 15 s |
@@ -758,6 +761,31 @@ entry, so the map entry lands with the handler.
   usual; the result says whether it changed (`false` on a `304`).
 - The API sends them from one place, `apps/api/src/queue/queue-commands.ts`,
   which answers `503 command_unavailable` until they are in the map.
+
+### Merge approval
+
+Schemas in `commands/approvals.ts`; the rules are
+[spec 20](../specs/20-merge-approval-queue.md) D4–D7. Exported together as
+`approvalCommands`, **not** in the `commands` map until the runner registers
+their handlers (the same trap as the queue commands).
+
+- `pr.inspect { projectId, root, pr }` runs `gh pr view <pr> --json
+  additions,deletions,changedFiles,files,statusCheckRollup,mergeable,mergeStateStatus,url,title,body,state,headRefOid`
+  in the project's root. → `{ number, url, title, body (≤ 64 KB), state
+  open|merged|closed, headSha, additions, deletions, changedFiles, files[] (≤ 300,
+  filesTruncated), checks (the `rollupChecks` rollup), checkList[] { name, state
+  pass|wait|fail, url? }, mergeable, mergeStateStatus, fetchedAt }`.
+- `pr.approve { …, headSha, by, at }` and `pr.requestChanges { …, headSha, by,
+  at, note ≤ 4 KB }` write the approval signal the orchestrator reads
+  (plugin#8). `pr.voidApproval { …, headSha, at }` withdraws the signal for a
+  head that has been superseded (D6). The args carry the decision's **intent**;
+  the signal's file format and path live only in the runner's
+  `commands/approvals/signal.ts` (D5), and nothing these commands write is
+  outside `<git-common-dir>/cs-orchestrator/approvals/`.
+- The API sends all four from `apps/api/src/approvals/approval-commands.ts`,
+  which answers `503 command_unavailable` until they are in the map. The API
+  re-reads the head with `pr.inspect` before every decision; a decision never
+  reaches the runner for a head other than the one the person saw.
 
 ### Skills
 

@@ -43,7 +43,7 @@ taken, with its source.
 | D1 | **Two flags, one truth.** The orchestrator obeys `orchestrator.mergeApproval: true` in the project's `.code-analyzer-config.json` (P8). AgentDock's `projects.mergeApproval` (from #10) is the person's intent. When they differ (from #10's config snapshot), the project settings and the approvals page show a warning telling the person to set the config key. AgentDock never writes that file. | #10 D13; ADR-0010; delegated rule "never edit committed config" |
 | D2 | **Awaiting approval.** A PR is listed when **either** the plugin emitted `pr.awaiting_approval { pr, slot, issue }` (#16, source `code-sentinel`) **or**, with no events source, the project's config has `mergeApproval: true` and #11's slot projection shows the slot's PR `green` + mergeable + `pr_open` checkpoint and no merge. An event-sourced row is `source: orchestrator`; a derived one is `source: derived` and labelled as such. | ADR-0002 (events first, scraped fallback) |
 | D3 | **Merge summary** is the body of the slot's latest `pull request open — <url>` checkpoint from #11's `slot_checkpoints` (the worker's reply file). Missing → "no summary written". | worker SKILL.md; #11 D5 |
-| D4 | **Diff and checks.** On opening a PR row the API calls runner command `pr.inspect { projectId, pr }` (viewer) → `gh pr view <n> --json additions,deletions,changedFiles,files,statusCheckRollup,mergeable,mergeStateStatus,url,title,body`. Result cached 60 s. File list capped at 300 entries. | ADR-0010; `gh` [Confirmed] |
+| D4 | **Diff and checks.** On opening a PR row the API calls runner command `pr.inspect { projectId, root, pr }` (viewer) → `gh pr view <n> --json additions,deletions,changedFiles,files,statusCheckRollup,mergeable,mergeStateStatus,url,title,body,state,headRefOid` (`state` and `headRefOid` added for D6 — notes, 3). Result cached 60 s. File list capped at 300 entries. | ADR-0010; `gh` [Confirmed] |
 | D5 | **Approval signal (isolated).** `pr.approve` and `pr.requestChanges` write the signal agreed in plugin#8. Working assumption: a JSON file `<git-common-dir>/cs-orchestrator/approvals/<pr>.json` = `{ v: 1, pr, decision: "approved" \| "changes_requested", note?, by, at }`, written atomically (temp + rename). [Unknown — the exact contract is settled in plugin#8.] All knowledge of it lives in `apps/runner/src/commands/approvals/signal.ts`, so a contract change touches one file. If plugin#8 lands a different channel (e.g. `.orchestrator-msg.md` + poke), only that file changes. | P8; ADR-0005 |
 | D6 | **Decision is final per head SHA.** An approval records the PR head SHA at decision time. If the PR's head moves afterwards (a new push), the approval is void: the row returns to waiting, and the signal file is rewritten with `decision: "stale"`. | new — an approval of code nobody saw is not an approval |
 | D7 | **Request changes** requires a non-empty note (≤ 4 KB). | new |
@@ -58,7 +58,7 @@ Migration directory: `apps/api/prisma/migrations/20261022000000_approvals/`. New
 
 | Table | Fields |
 |---|---|
-| `merge_approvals` | `id`, `projectId` → projects, `prNumber` Int, `slot?`, `issue?` Int, `headSha`, `source` (`orchestrator` \| `derived`), `status` (`waiting` \| `approved` \| `changes_requested` \| `stale` \| `merged` \| `closed`), `decidedById?` → users, `decidedAt?`, `note?`, `waitingSince`, `updatedAt`; unique `(projectId, prNumber, headSha)`; index `(projectId, status)` |
+| `merge_approvals` | `id`, `projectId` → projects, `prNumber` Int, `slot?`, `issue?` Int, `headSha?`, `source` (`orchestrator` \| `derived`), `status` (`waiting` \| `approved` \| `changes_requested` \| `stale` \| `merged` \| `closed`), `decidedById?` → users, `decidedAt?`, `note?`, `waitingSince`, `createdAt`, `updatedAt`; index `(projectId, prNumber)`; index `(projectId, status)`. At most one *current* row (`waiting` \| `approved`) per PR, enforced in code under a per-project advisory lock — see notes, 4 |
 
 ## API
 
@@ -140,6 +140,95 @@ orchestrator reads it. That is not a blocking dependency for this issue.
 |---|---|
 | Require two approvers for some projects? | No — one operator |
 | Let the person approve from Telegram (M2.7)? | Not in this item; #22 links to the page |
+
+## Notes from implementation
+
+i20-api, decided with the orchestrator on 2026-10-08:
+
+1. **plugin#8 is not merged (D5).** Read at
+   [claude-code-plugin `develop` `0397e0093a`](https://github.com/AndreyBegma/claude-code-plugin/commit/0397e0093a):
+   no `approvals.py` there, and
+   [plugin#8](https://github.com/AndreyBegma/claude-code-plugin/issues/8) is
+   open. Its issue text already departs from D5's working assumption: the file
+   is `{ "decision": "approve" | "request_changes", "note", "by", "at" }`, with
+   no `v`, no `pr` and **no `stale`**, and plugin D3 voids an approval itself
+   when the file's `at` is older than the head commit's `committedDate`. So the
+   command contracts here carry **intent** (`pr.approve`, `pr.requestChanges`,
+   `pr.voidApproval`) and never the file's spelling; how a void shows in the
+   file (a `stale` decision, or removing it) is `signal.ts`'s call when
+   plugin#8 settles. The plugin's `pr.awaiting_approval` is not in
+   `normalizeCodeSentinelLine`'s mappers; it arrives raw with `data.pr` and the
+   approvals sink reads it as such.
+2. **Command registration trap.** `CommandHandlers` in
+   `apps/runner/src/commands/dispatcher.ts` needs a handler for every key of
+   `commands`, so the four commands are defined and exported from
+   `protocol/commands/approvals.ts` (`approvalCommands`) but **not** entered in
+   the map. The API sends them from one seam,
+   `apps/api/src/approvals/approval-commands.ts`, which answers
+   `503 command_unavailable` (audited as `error`) until i20-runner spreads
+   `approvalCommands` into `commands` and replaces each body with
+   `commandOutput(name, await send(...))`. Both files are outside i20-runner's
+   listed fence.
+3. **Where the head comes from (D6).** Nothing in AgentDock knew a PR's head
+   SHA: not the slot projection, not the runner's `gh pr list` fields, not
+   `pr.awaiting_approval`. `pr.inspect` therefore adds `headRefOid` and `state`
+   to D4's field list. The API reads the head (a) when a detail opens (cached
+   60 s), (b) uncached before every approve and request-changes — the
+   authority for `409 head_moved`, which carries the current `headSha` — and
+   (c) for voiding: a batch with a `pr.opened`, `pr.checks_changed` or
+   `pull request open` checkpoint for a PR with an `approved` row makes the
+   sink fire a system-actor `pr.inspect` after its transaction, never blocking
+   ingest. With the runner offline the void waits for the next check, and the
+   plugin's own freshness rule still refuses the stale approval. Follow-up
+   (filed by the orchestrator): the runner's PR collector emits `headSha` on
+   `pr.*` events.
+4. **No `unique (projectId, prNumber, headSha)`.** A waiting row from
+   `pr.awaiting_approval` has no head until someone decides, and "changes
+   requested on H, then approved on H without a push" would collide. `headSha`
+   is nullable; "at most one current row (`waiting` | `approved`) per PR" is
+   kept by the module under `pg_advisory_xact_lock('approvals:<projectId>')`.
+   A void (D6) turns the approved row `stale` and opens a new `waiting` row, so
+   history keeps who approved which head. `changes_requested` is never
+   current: the PR leaves the waiting list until the orchestrator announces it
+   again or (derived) its checks move.
+5. **A fourth command, `pr.voidApproval` (D6).** D6 rewrites the signal on a
+   void, which neither decision command does. It is operator-level and sent by
+   the system actor; its outcome is in the `approval.void` record's
+   `meta.signal`.
+6. **Derived rows (D2) are transition-triggered.** A derived row opens when a
+   `pr.opened`, `pr.checks_changed` or `pull request open` checkpoint arrives
+   for a PR whose latest slot is open, green, mergeable, not ended and has a
+   `pr_open` checkpoint, the config snapshot has `orchestrator.mergeApproval:
+   true`, and no `code-sentinel` event for the project arrived within the fleet
+   channel window (24 h) or in the batch. A waiting row whose slot leaves green
+   is dropped (it was never decided); a plugin event adopts a derived row as
+   `orchestrator`. `pr.merged` / `pr.closed` close the current row; a late
+   `pr.merged` turns a `closed` row `merged`. A batch resent after a lost ack is
+   skipped by `(runnerId, seq)` already in `events`.
+7. **422 from the service (D7).** The DTO's `note` is optional so the global
+   `ValidationPipe` does not answer 400; the service answers
+   `422 note_required` (missing or blank) and `422 note_too_long` (over 4096
+   UTF-8 bytes) before anything is sent.
+8. **Errors.** `404 approval_not_found` (no row for the PR),
+   `409 not_waiting` (no current row, or already approved at that head),
+   `409 pr_not_open`, `409 head_moved`, `503 command_unavailable`,
+   `502 command_failed`. Every refusal after validation is audited as
+   `denied`, a runner failure as `error`.
+9. **Audit (D8).** Actions `approval.approve`, `approval.request_changes`
+   (actor: the user) and `approval.void` (actor: system), target
+   `pull_request:<n>`, `after { pr, headSha, decision, note? }` —
+   `approval.void` adds `newHeadSha`.
+10. **D10 without the `events` table.** `events` is runner-sourced (unique
+    `runnerId, seq`), so the API cannot honestly append `pr.approval_decided`
+    there. It is published live on `project:<id>` as `pr.approval_decided`
+    `{ projectId, pr, headSha, decision, by, at, note }`, next to the
+    `approvals` refetch hint; the `merge_approvals` rows (and the audit log)
+    are the durable record #21 and #22 read. `ApprovalsService` is exported
+    for #22's approve buttons.
+11. **D1 helper.** `mergeApprovalMismatch(project)` and
+    `configMergeApproval(config)` in `@agentdock/shared` are what the web
+    settings page calls with the project detail it already has; an unread
+    config is a mismatch only when AgentDock expects approval.
 
 Depends on #11
 
