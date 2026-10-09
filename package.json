@@ -17,6 +17,7 @@
     "db:seed": "turbo run db:seed --filter=@agentdock/api",
     "db:studio": "cd apps/api && bunx prisma studio",
     "db:setup": "sh scripts/db-start-docker.sh",
+    "admin:create": "bun run --cwd apps/api admin:create",
     "format": "biome format --write .",
     "check": "biome check ."
   },

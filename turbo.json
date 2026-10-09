@@ -8,21 +8,48 @@
     },
     "lint": {},
     "test": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      "cache": false,
+      "passThroughEnv": [
+        "DATABASE_URL",
+        "TEST_DATABASE_URL",
+        "TRUST_PROXY",
+        "APP_ENV",
+        "BUN_BIN"
+      ]
     },
     "start:dev": {
       "cache": false,
       "persistent": true,
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      "passThroughEnv": [
+        "DATABASE_URL",
+        "TRUST_PROXY",
+        "APP_ENV",
+        "PORT",
+        "WEB_URL",
+        "API_URL",
+        "AUDIT_VERIFY_CRON",
+        "ACTIVITY_POLL_MS",
+        "ACTIVITY_GAP_GRACE_MS",
+        "ACTIVITY_RETENTION_DAYS",
+        "APP_ENCRYPTION_KEY",
+        "APP_URL",
+        "TELEGRAM_POLL_TIMEOUT_S",
+        "TELEGRAM_API_BASE"
+      ]
     },
     "db:migrate": {
-      "cache": false
+      "cache": false,
+      "passThroughEnv": ["DATABASE_URL"]
     },
     "db:generate": {
-      "cache": false
+      "cache": false,
+      "passThroughEnv": ["DATABASE_URL"]
     },
     "db:seed": {
-      "cache": false
+      "cache": false,
+      "passThroughEnv": ["DATABASE_URL"]
     }
   }
 }

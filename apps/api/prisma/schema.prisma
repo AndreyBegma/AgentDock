@@ -1,17 +1,1257 @@
 generator client {
-  provider        = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
 }
 
+enum Role {
+  admin
+  operator
+  viewer
+}
+
+enum UserStatus {
+  pending
+  active
+  rejected
+  disabled
+}
+
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String     @id @default(cuid())
+  email            String     @unique
+  name             String?
+  passwordHash     String
+  role             Role       @default(viewer)
+  status           UserStatus @default(pending)
+  approvedById     String?
+  approvedAt       DateTime?
+  failedLoginCount Int        @default(0)
+  lockedUntil      DateTime?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  approvedBy                  User?                         @relation("UserApprovals", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedUsers               User[]                        @relation("UserApprovals")
+  sessions                    UserSession[]
+  settingsUpdated             Setting[]
+  runnersCreated              Runner[]
+  projectsCreated             Project[]
+  memberships                 ProjectMember[]               @relation("ProjectMembership")
+  membersAdded                ProjectMember[]               @relation("ProjectMemberAddedBy")
+  priceVersions               PriceVersion[]
+  priceRecomputes             PriceRecompute[]
+  commandRuns                 CommandRun[]
+  orchestratorSettingsUpdated ProjectOrchestratorSettings[]
+  notifications               Notification[]
+  notificationRules           NotificationRule[]
+  notificationMutes           NotificationMute[]
+  telegramLink                TelegramLink?
+  telegramLinkCodes           TelegramLinkCode[]
 
   @@map("users")
+}
+
+/// A login session. Named `UserSession` because `Session` is reserved for agent
+/// runtime sessions (docs/architecture/data-model.md).
+model UserSession {
+  id         String   @id @default(cuid())
+  tokenHash  String   @unique
+  userId     String
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  expiresAt  DateTime
+  ip         String?
+  userAgent  String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_sessions")
+}
+
+model Setting {
+  key         String   @id
+  value       Json
+  updatedAt   DateTime @updatedAt
+  updatedById String?
+
+  updatedBy User? @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@map("settings")
+}
+
+enum Runtime {
+  claude
+  codex
+}
+
+/// A machine running the agentdock-runner daemon (docs/specs/6). Status is
+/// derived from the live socket, never stored. Only hashes of the token live
+/// here; `tokenPrefix` is its first 8 characters, used to find the row.
+model Runner {
+  id              String    @id @default(cuid())
+  name            String
+  hostname        String?
+  version         String?
+  protocolVersion Int?
+  os              String?
+  arch            String?
+  capabilities    Json?
+  tokenHash       String?
+  tokenPrefix     String?   @unique
+  /// Highest contiguous event seq persisted — `welcome.ackedSeq` / `ack.seq`.
+  ackedSeq        BigInt    @default(0)
+  pairedAt        DateTime?
+  lastSeenAt      DateTime?
+  revokedAt       DateTime?
+  /// Nullable so deleting the admin who created it keeps the runner.
+  createdById     String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  createdBy     User?               @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  pairingCodes  RunnerPairingCode[]
+  profiles      RuntimeProfile[]
+  events        Event[]
+  projects      Project[]
+  sessions      AgentSession[]
+  commandRuns   CommandRun[]
+  notifications Notification[]
+  incidents     RunnerIncident[]
+
+  @@map("runners")
+}
+
+model RunnerPairingCode {
+  id        String    @id @default(cuid())
+  runnerId  String
+  /// SHA-256 of the normalised code; the code itself is shown once.
+  codeHash  String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  runner Runner @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+
+  @@index([runnerId])
+  @@map("runner_pairing_codes")
+}
+
+/// Mirrors the profiles of the runner's latest `hello` (ADR-0006). Rows absent
+/// from it are marked `missing`, never deleted: later runs reference them.
+model RuntimeProfile {
+  id            String   @id @default(cuid())
+  runnerId      String
+  /// The profile `id` from the runner config.
+  key           String
+  runtime       Runtime
+  label         String
+  binary        String?
+  /// Environment the runner sets — paths only, never credentials.
+  env           Json
+  args          Json
+  authenticated Boolean
+  missing       Boolean  @default(false)
+  updatedAt     DateTime @updatedAt
+
+  runner               Runner                        @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+  defaultProjects      Project[]
+  orchestratorSettings ProjectOrchestratorSettings[]
+
+  @@unique([runnerId, key])
+  @@map("runtime_profiles")
+}
+
+/// An event envelope received from a runner (event-schema.md). Stored once per
+/// `(runnerId, seq)`; partitioning by month is deferred (ADR-0007).
+model Event {
+  id            BigInt   @id @default(autoincrement())
+  runnerId      String
+  seq           BigInt
+  ts            DateTime
+  type          String
+  source        String
+  projectRepo   String?
+  projectRoot   String?
+  slot          String?
+  issue         Int?
+  session       Json?
+  data          Json
+  receivedAt    DateTime @default(now())
+  /// `data.pluginEventId` of a `code-sentinel` event — the plugin's `eid`
+  /// (spec 16 D5). Null otherwise, and on an `events.duplicate`.
+  pluginEventId String?
+
+  runner Runner @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+
+  @@unique([runnerId, seq])
+  /// One plugin event per project root. NULLs are distinct in PostgreSQL, so
+  /// this binds plugin events only — a partial index without a `WHERE`.
+  @@unique([projectRoot, pluginEventId])
+  @@index([type, ts])
+  /// "A plugin event in the last 24 h" for `fleetChannel` (spec 16 D8).
+  @@index([projectRoot, source, receivedAt])
+  @@map("events")
+}
+
+enum AuditActorType {
+  user
+  runner
+  system
+  anonymous
+}
+
+enum AuditResult {
+  ok
+  denied
+  error
+  requested
+}
+
+/// Append-only, hash-chained audit log (docs/specs/8). A trigger rejects UPDATE,
+/// DELETE and TRUNCATE. Actor and project ids are plain columns, not foreign
+/// keys: records outlive users and projects, and a SET NULL would be an UPDATE.
+model AuditRecord {
+  seq           BigInt         @id @default(autoincrement())
+  ts            DateTime       @default(now())
+  actorType     AuditActorType
+  actorUserId   String?
+  actorRunnerId String?
+  action        String
+  targetType    String
+  targetId      String?
+  projectId     String?
+  before        Json?
+  after         Json?
+  result        AuditResult
+  meta          Json?
+  /// `hash` of the previous record by `seq`; 64 zeros for the first.
+  prevHash      String
+  /// sha256(prevHash ‖ canonical(record)), hex.
+  hash          String         @unique
+
+  @@index([ts])
+  @@index([action, ts])
+  @@index([actorUserId, ts])
+  @@index([projectId, ts])
+  @@index([targetType, targetId])
+  @@map("audit_records")
+}
+
+/// Where a project's base branch came from (docs/specs/10 D4).
+enum BaseSource {
+  config
+  origin_head
+  gh
+  default
+}
+
+enum DocsSourceKind {
+  in_repo
+  sibling_repo
+  remote_repo
+  none
+}
+
+/// The docs-detection rule that found a docs source (docs/specs/10 D6).
+enum DocsRule {
+  spec_dir
+  sibling
+  same_owner_remote
+  text_link
+  back_link
+  in_repo
+}
+
+/// A git repository on a runner (docs/specs/10). `rootPath` is its main
+/// checkout; the same `owner/name` on two runners is two projects (D14).
+model Project {
+  id                 String     @id @default(cuid())
+  runnerId           String
+  rootPath           String
+  /// `owner/name` on GitHub — the only forge a project connects on (ADR-0004).
+  repo               String
+  displayName        String
+  baseBranch         String
+  baseSource         BaseSource
+  baseOverride       String?
+  readyLabelOverride String?
+  /// Must belong to `runnerId`; checked by the API.
+  defaultProfileId   String?
+  /// Stored for M2.5; nothing reads it yet.
+  mergeApproval      Boolean    @default(false)
+  /// The `orchestrator` block of `.code-analyzer-config.json` and/or its parse error.
+  codeSentinelConfig Json?
+  hasClaudeMd        Boolean
+  hasAgentsMd        Boolean
+  lastInspectedAt    DateTime
+  /// Nullable so deleting the admin who connected it keeps the project.
+  createdById        String?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  runner               Runner                       @relation(fields: [runnerId], references: [id], onDelete: Restrict)
+  defaultProfile       RuntimeProfile?              @relation(fields: [defaultProfileId], references: [id], onDelete: SetNull)
+  createdBy            User?                        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  members              ProjectMember[]
+  docsSource           DocsSource?
+  rounds               Round[]
+  slots                Slot[]
+  orchestrator         FleetOrchestrator?
+  sessions             AgentSession[]
+  issues               IssueCache[]
+  queueStates          QueueStateRow[]
+  issueFeed            IssueFeed?
+  commandRuns          CommandRun[]
+  orchestratorSettings ProjectOrchestratorSettings?
+  activityItems        ActivityItem[]
+  runs                 Run[]
+  notifications        Notification[]
+  notificationMutes    NotificationMute[]
+
+  @@unique([runnerId, rootPath])
+  @@map("projects")
+}
+
+/// An operator's or viewer's access to a project (D11). Admins need no row.
+model ProjectMember {
+  id           String   @id @default(cuid())
+  projectId    String
+  userId       String
+  /// Lowers the member's global role on this project; never raises it.
+  roleOverride Role?
+  /// Nullable so deleting the admin who added the member keeps the row.
+  addedById    String?
+  createdAt    DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation("ProjectMembership", fields: [userId], references: [id], onDelete: Cascade)
+  addedBy User?   @relation("ProjectMemberAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@map("project_members")
+}
+
+/// Where a project's documentation lives (ADR-0012). `manual`: set by an admin
+/// override, kept across refreshes.
+model DocsSource {
+  id         String         @id @default(cuid())
+  projectId  String         @unique
+  kind       DocsSourceKind
+  localPath  String?
+  repo       String?
+  isGitRepo  Boolean
+  detectedBy DocsRule?
+  evidence   Json
+  classified Json
+  candidates Json
+  manual     Boolean        @default(false)
+  updatedAt  DateTime       @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("docs_sources")
+}
+
+// ─── Fleet observation (docs/specs/11) ──────────────────────────────────────
+// Projections of fleet events. Every row is a pure function of the events: a
+// replayed event (`seq <= lastSeq`) changes nothing, and timestamps come from
+// event `ts`, never from the clock, so a replay leaves the rows identical (D8).
+
+/// `scraped`: parsed from a board file; `events`: from `events.jsonl` (M2.1).
+enum RoundSource {
+  scraped
+  events
+}
+
+enum SlotStatus {
+  dispatched
+  running
+  idle
+  prompt
+  quota
+  stale
+  ended
+}
+
+enum PaneState {
+  busy
+  prompt
+  idle
+  quota
+}
+
+enum PrState {
+  open
+  merged
+  closed
+}
+
+enum PrChecks {
+  pending
+  green
+  red
+}
+
+enum CheckpointKind {
+  picked_up
+  plan_ready
+  implementation_done
+  pr_open
+  blocked
+  misclassified
+  other
+}
+
+/// `unknown` is a null status (or no row).
+enum OrchestratorStatus {
+  running
+  idle
+  absent
+}
+
+/// One orchestrator round: the header and four tables of `round-<HHMM>.md`.
+model Round {
+  id        String      @id @default(cuid())
+  projectId String
+  date      DateTime    @db.Date
+  /// `HHMM`.
+  label     String
+  base      String
+  occupied  Int
+  max       Int
+  free      Int
+  /// `{ dispatching, heldForLead, notDispatching, inFlight }`, rows keyed by column header.
+  decisions Json
+  source    RoundSource
+  boardPath String
+  /// Which source last wrote each field group: `{ header?, decisions? }`
+  /// (spec 16 D7). `scraped` never overwrites `code-sentinel`.
+  sources   Json        @default("{}")
+  /// Highest event `seq` applied; older ones are replays.
+  lastSeq   BigInt
+  createdAt DateTime
+  updatedAt DateTime
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, date, label])
+  @@map("rounds")
+}
+
+/// One run of a slot, from its brief or tmux session to its end. A name is
+/// reused by later runs, each a new row (`startedAt`). Ended slots are kept as
+/// history.
+model Slot {
+  id             String          @id @default(cuid())
+  projectId      String
+  name           String
+  issue          Int?
+  branch         String?
+  worktree       String
+  runtime        Runtime         @default(claude)
+  model          String?
+  modelWhy       String?
+  owns           Json
+  never          Json
+  lead           Boolean?
+  /// `YYYY-MM-DD/HHMM` of the brief that dispatched this run.
+  round          String?
+  /// Derived from the inputs below (spec 11 D8); never set on its own.
+  status         SlotStatus
+  /// null until the tmux session is first seen.
+  sessionAlive   Boolean?
+  pane           PaneState?
+  worktreeExists Boolean         @default(true)
+  ahead          Int?
+  behind         Int?
+  dirty          Boolean?
+  prNumber       Int?
+  prUrl          String?
+  prState        PrState?
+  prChecks       PrChecks?
+  prMergeable    Boolean?
+  lastCheckpoint CheckpointKind?
+  /// Which source last wrote each field group — `{ model?, checkpoint?, pr? }`
+  /// — plus `dispatchedAt` (the plugin's dispatch `ts`) and `checkpoints`
+  /// (plugin checkpoints applied) for matching (spec 16 D7, Q3).
+  sources        Json            @default("{}")
+  /// Highest event `seq` applied; older ones are replays.
+  lastSeq        BigInt
+  startedAt      DateTime
+  endedAt        DateTime?
+  updatedAt      DateTime
+
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  checkpoints SlotCheckpoint[]
+  run         Run?
+
+  @@unique([projectId, name, startedAt])
+  @@index([projectId, status])
+  @@map("slots")
+}
+
+/// A `##` heading of a slot's `.orchestrator-reply.md`. The file is
+/// append-only and has no timestamps, so a heading is identified by its
+/// position; `at` is when the runner first saw it.
+model SlotCheckpoint {
+  id       String         @id @default(cuid())
+  slotId   String
+  kind     CheckpointKind
+  heading  String
+  summary  String
+  position Int
+  at       DateTime
+
+  slot Slot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+
+  @@unique([slotId, position])
+  @@map("slot_checkpoints")
+}
+
+/// The orchestrator's presence on a project (D6) and the last board or brief
+/// the runner could not parse (D4).
+model FleetOrchestrator {
+  projectId  String              @id
+  /// null (or no row): never observed — `unknown`.
+  status     OrchestratorStatus?
+  session    String?
+  /// When `status` last changed.
+  since      DateTime?
+  /// `{ file, line, reason, at }` of the last `board.unparsed`, cleared by the next parsed round.
+  boardError Json?
+  lastSeq    BigInt
+  updatedAt  DateTime
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("fleet_orchestrators")
+}
+
+enum QuerySource {
+  main
+  subagent
+  auxiliary
+}
+
+/// `computed` from the price table, or `ingested` as reported by the runtime (#13).
+enum CostSource {
+  computed
+  ingested
+}
+
+/// An agent session found in a runtime's transcripts (docs/specs/12). Built from
+/// `session.observed`, `turn.*`, `llm.request` and `tool.call` events. No prompt,
+/// response or tool-argument text is stored (D9). A row created by an event that
+/// arrived before its `session.observed` has `cwd = ''` until that event comes.
+model AgentSession {
+  id              String    @id @default(cuid())
+  runnerId        String
+  runtime         Runtime
+  profileKey      String?
+  /// The runtime's own session id.
+  externalId      String
+  /// Null: no connected project contains `cwd` — visible to admins only (D10).
+  projectId       String?
+  slotName        String?
+  cwd             String
+  gitBranch       String?
+  title           String?
+  /// Distinct models used, in order of first use.
+  models          Json      @default("[]")
+  /// The session this subagent session belongs to.
+  parentSessionId String?
+  parsed          Boolean   @default(true)
+  startedAt       DateTime
+  lastEventAt     DateTime
+  endedAt         DateTime?
+
+  runner      Runner         @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+  project     Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  parent      AgentSession?  @relation("SessionParent", fields: [parentSessionId], references: [id], onDelete: SetNull)
+  children    AgentSession[] @relation("SessionParent")
+  turns       Turn[]
+  llmRequests LlmRequest[]
+  toolCalls   ToolCall[]
+  spawnedBy   ToolCall[]     @relation("ToolCallChild")
+
+  @@unique([runnerId, runtime, externalId])
+  @@index([projectId, startedAt])
+  @@index([parentSessionId])
+  @@map("sessions")
+}
+
+/// What one user prompt caused, keyed by the runtime's `promptId`.
+model Turn {
+  id        String    @id @default(cuid())
+  sessionId String
+  promptId  String
+  startedAt DateTime
+  endedAt   DateTime?
+
+  session     AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  llmRequests LlmRequest[]
+  toolCalls   ToolCall[]
+
+  @@unique([sessionId, promptId])
+  @@map("turns")
+}
+
+/// One LLM API request, deduped on `requestId`; the last usage seen wins (D4).
+/// The cost columns are declared here and filled by #13 (D8).
+model LlmRequest {
+  id                   String           @id @default(cuid())
+  sessionId            String
+  turnId               String?
+  requestId            String
+  ts                   DateTime
+  model                String
+  querySource          QuerySource
+  input                Int              @default(0)
+  output               Int              @default(0)
+  cacheRead            Int              @default(0)
+  cacheWrite5m         Int              @default(0)
+  cacheWrite1h         Int              @default(0)
+  /// Counted inside `output`; stored separately, never added twice.
+  reasoning            Int              @default(0)
+  durationMs           Int?
+  /// `durationMs` was derived from timestamps, not measured.
+  durationApprox       Boolean          @default(false)
+  stopReason           String?
+  costUsd              Decimal?         @db.Decimal(14, 6)
+  /// `price_versions.number` the cost was computed with.
+  priceVersion         Int?
+  costSource           CostSource?
+  /// The runtime's own cost estimate (Claude Code OTel `cost_usd`); for
+  /// reference only, never in totals (spec 13 D6).
+  reportedCostUsd      Decimal?         @db.Decimal(14, 6)
+  /// The producer whose token counts the row holds (spec 13 D15).
+  source               LlmRequestSource @default(transcript)
+  /// All cache writes are in `cacheWrite5m`: the runtime did not split them by TTL.
+  cacheWriteTtlUnknown Boolean          @default(false)
+
+  session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  turn    Turn?        @relation(fields: [turnId], references: [id], onDelete: SetNull)
+
+  @@unique([sessionId, requestId])
+  @@index([ts])
+  @@index([model, ts])
+  @@map("llm_requests")
+}
+
+/// A tool use, closed by its result. `childSessionId`: the subagent it spawned.
+model ToolCall {
+  id             String    @id @default(cuid())
+  sessionId      String
+  turnId         String?
+  toolUseId      String
+  name           String
+  startedAt      DateTime
+  endedAt        DateTime?
+  ok             Boolean?
+  childSessionId String?
+
+  session      AgentSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  turn         Turn?         @relation(fields: [turnId], references: [id], onDelete: SetNull)
+  childSession AgentSession? @relation("ToolCallChild", fields: [childSessionId], references: [id], onDelete: SetNull)
+
+  @@unique([sessionId, toolUseId])
+  @@index([childSessionId])
+  @@map("tool_calls")
+}
+
+// ─── Tokens and API-equivalent cost (docs/specs/13) ─────────────────────────
+
+/**
+ * `langfuse_seed` is `langfuse-seed` in the database and the API (shared `PRICE_SOURCES`).
+ */
+enum PriceSource {
+  langfuse_seed @map("langfuse-seed")
+  admin
+}
+
+/**
+ * Which producer sent an `llm.request` (spec 13 D15).
+ */
+enum LlmRequestSource {
+  transcript
+  otel
+}
+
+enum RecomputeStatus {
+  queued
+  running
+  done
+  failed
+}
+
+/**
+ * An immutable snapshot of every model price (D2). Editing prices creates a
+ * new version; the highest `number` is current. Rows are never updated.
+ */
+model PriceVersion {
+  id          String      @id @default(cuid())
+  number      Int         @unique
+  source      PriceSource
+  note        String?
+  /// Nullable so deleting the admin who created it keeps the version.
+  createdById String?
+  createdAt   DateTime    @default(now())
+
+  createdBy  User?            @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  models     ModelPrice[]
+  recomputes PriceRecompute[]
+
+  @@map("price_versions")
+}
+
+/**
+ * One model's price in a version (D3): a case-insensitive regex on the model
+ * id, a priority (lower wins), and ordered tiers (shared `PriceTier[]`).
+ */
+model ModelPrice {
+  id           String @id @default(cuid())
+  versionId    String
+  modelName    String
+  matchPattern String
+  priority     Int
+  tiers        Json
+
+  version PriceVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@unique([versionId, modelName])
+  @@map("model_prices")
+}
+
+/**
+ * Usage per UTC hour × project × runtime × model × slot × run × issue (D8).
+ * `dimensionKey` joins the dimensions (absent ones empty) so the unique index
+ * has no nullable column. A pure aggregate of `llm_requests`: every write
+ * rebuilds whole hours from them (spec 13 notes, deviation from D8).
+ */
+model UsageRollup {
+  id               String   @id @default(cuid())
+  hour             DateTime @db.Timestamptz(3)
+  dimensionKey     String
+  projectId        String?
+  runtime          Runtime
+  model            String
+  slot             String?
+  runId            String?
+  issue            Int?
+  requests         Int
+  input            BigInt
+  output           BigInt
+  cacheRead        BigInt
+  cacheWrite5m     BigInt
+  cacheWrite1h     BigInt
+  reasoning        BigInt
+  costUsd          Decimal  @db.Decimal(14, 6)
+  unpricedRequests Int
+
+  @@unique([hour, dimensionKey])
+  @@index([projectId, hour])
+  @@index([hour])
+  @@map("usage_rollups")
+}
+
+/**
+ * A background re-pricing of `llm_requests` with `from <= ts < to` (D7).
+ */
+model PriceRecompute {
+  id          String          @id @default(cuid())
+  versionId   String
+  from        DateTime
+  to          DateTime
+  status      RecomputeStatus @default(queued)
+  processed   Int             @default(0)
+  total       Int             @default(0)
+  error       String?
+  /// Nullable so deleting the admin who started it keeps the record.
+  createdById String?
+  createdAt   DateTime        @default(now())
+  finishedAt  DateTime?
+
+  version   PriceVersion @relation(fields: [versionId], references: [id], onDelete: Restrict)
+  createdBy User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@map("price_recomputes")
+}
+
+// ─── Task queue (docs/specs/19-task-queue.md) ───────────────────────────────
+
+enum IssueKind {
+  issue
+  pull_request
+}
+
+enum IssueState {
+  open
+  closed
+}
+
+enum IssueClosedBy {
+  pr
+  manual
+}
+
+enum QueueState {
+  in_flight
+  ready
+  blocked_work
+  blocked_person
+  no_spec
+}
+
+enum QueueStateSource {
+  computed
+  orchestrator
+}
+
+/// The project's GitHub issues and open pull requests as the runner's `issues`
+/// collector last saw them (D2). A row absent from a snapshot's `open` list is closed.
+model IssueCache {
+  id          String         @id @default(cuid())
+  projectId   String
+  number      Int
+  /// Pull requests are kept only for their `Closes #n` (D3 `IN FLIGHT`).
+  kind        IssueKind      @default(issue)
+  title       String
+  state       IssueState
+  /// string[]
+  labels      Json
+  /// string[] of GitHub logins.
+  assignees   Json
+  /// Trimmed by the runner to 64 KB (16 KB for a pull request).
+  body        String
+  url         String
+  ghUpdatedAt DateTime
+  /// From `issue.closed`; null while open or not yet reported.
+  closedBy    IssueClosedBy?
+  closingPr   Int?
+  closedAt    DateTime?
+  /// When the row's content last changed — D4 compares a round against it.
+  snapshotAt  DateTime
+  /// Highest event `seq` applied; older ones are replays.
+  lastSeq     BigInt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, number])
+  @@index([projectId, state])
+  @@map("issues_cache")
+}
+
+/// The queue state of each open ready issue, recomputed on every change of its inputs.
+/// `state`/`why`/`clears` are AgentDock's own (D3); `source` says whether the
+/// orchestrator's fresher verdict (D4) is the one shown.
+model QueueStateRow {
+  id                 String           @id @default(cuid())
+  projectId          String
+  issueNumber        Int
+  state              QueueState
+  why                String
+  clears             String?
+  source             QueueStateSource
+  orchestratorState  QueueState?
+  orchestratorWhy    String?
+  orchestratorClears String?
+  /// Issue numbers named by `Depends on` that still block it.
+  blockers           Json
+  /// `{ slot, lead, model }[]` of the body's `## Parallel plan`; null without one.
+  waveSlots          Json?
+  computedAt         DateTime
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, issueNumber])
+  @@map("queue_states")
+}
+
+/// The `issues` collector's last poll of a project: when it fetched, and why it failed.
+model IssueFeed {
+  projectId         String    @id
+  /// `fetchedAt` of the last snapshot part applied; null before the first.
+  fetchedAt         DateTime?
+  snapshotId        String?
+  /// The last `issues.unavailable`, cleared by the next snapshot.
+  unavailableReason String?
+  unavailableAt     DateTime?
+  /// Highest `issues.snapshot` / `issues.unavailable` seq applied.
+  lastSeq           BigInt
+  updatedAt         DateTime  @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("issue_feeds")
+}
+
+// ─── Orchestrator and slot control (docs/specs/17) ───────────────────────────
+
+enum CommandRunStatus {
+  requested
+  ok
+  error
+  unknown
+}
+
+/// The D3 permission modes; `manual` is the runtime's default, prompting mode.
+enum OrchestratorPermissionMode {
+  auto
+  acceptEdits
+  bypassPermissions
+  manual
+}
+
+/// A control command sent from the UI and how it ended (D10). `unknown`: the
+/// runner did not answer within the command's timeout.
+model CommandRun {
+  id          String           @id @default(cuid())
+  projectId   String
+  runnerId    String
+  /// Nullable so deleting the user keeps the log.
+  userId      String?
+  command     String
+  /// The command's args as sent — `slot.message` text included (D10).
+  args        Json
+  slot        String?
+  status      CommandRunStatus @default(requested)
+  /// `{ code, message? }` when `status` is `error`.
+  error       Json?
+  result      Json?
+  requestedAt DateTime         @default(now())
+  finishedAt  DateTime?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  runner  Runner  @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, requestedAt])
+  @@map("command_runs")
+}
+
+/// The project's orchestrator launch defaults (D3). No row: the D3 defaults
+/// and the project's default profile.
+model ProjectOrchestratorSettings {
+  projectId      String                     @id
+  /// Must belong to the project's runner; checked by the API.
+  profileId      String?
+  model          String                     @default("opus")
+  permissionMode OrchestratorPermissionMode @default(auto)
+  updatedById    String?
+  updatedAt      DateTime                   @updatedAt
+
+  project   Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  profile   RuntimeProfile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  updatedBy User?           @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@map("project_orchestrator_settings")
+}
+
+// ─── Notifications and Telegram (docs/specs/22) ─────────────────────────────
+
+/// A notification for one user (D11). `kind` is shared `NotificationKind`.
+/// Repeats of the same `(user, kind, project, slot)` within 15 minutes of
+/// `firstAt` fold into it — `count`, `lastAt` (D6). `eventId`: the event that
+/// created it; the unique key makes matching an event twice a no-op (D4).
+/// `lastEventId`: the newest event in it — the matcher goes in id order, so
+/// an event at or below it is a replay and is not folded again.
+model Notification {
+  id          BigInt    @id @default(autoincrement())
+  userId      String
+  kind        String
+  projectId   String?
+  /// Set-null so deleting a runner keeps its project's notifications.
+  runnerId    String?
+  slot        String?
+  issue       Int?
+  title       String
+  body        String
+  /// Path in the web app.
+  link        String?
+  eventId     BigInt?
+  lastEventId BigInt?
+  count       Int       @default(1)
+  firstAt     DateTime
+  lastAt      DateTime
+  readAt      DateTime?
+  /// The project was muted for the user when it arrived (D3).
+  muted       Boolean   @default(false)
+
+  user       User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project    Project?               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  runner     Runner?                @relation(fields: [runnerId], references: [id], onDelete: SetNull)
+  deliveries NotificationDelivery[]
+
+  @@unique([eventId, userId, kind])
+  @@index([userId, readAt, lastAt])
+  @@index([userId, lastAt, id])
+  /// The D6 fold lookup and the `queue.dry` interval.
+  @@index([userId, kind, firstAt])
+  @@map("notifications")
+}
+
+/// A user's choice for one kind (D3). No row: the D1 default.
+model NotificationRule {
+  userId    String
+  kind      String
+  inApp     Boolean
+  telegram  Boolean
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, kind])
+  @@map("notification_rules")
+}
+
+/// A user's mute of a project (D3). `until` null: until removed.
+model NotificationMute {
+  userId    String
+  projectId String
+  until     DateTime?
+  createdAt DateTime  @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([userId, projectId])
+  @@map("notification_mutes")
+}
+
+enum NotificationDeliveryChannel {
+  telegram
+}
+
+enum NotificationDeliveryStatus {
+  pending
+  sent
+  digested
+  failed
+  skipped
+}
+
+/// One notification's delivery on an outside channel (D6). `digested`: over
+/// the rate limit, sent inside the digest `digestId` once its window ends
+/// (`nextAttemptAt`); `sentAt` is set when that digest went out. `skipped`:
+/// never sent — `lastError` says why (shared `DeliverySkipReason`).
+model NotificationDelivery {
+  id             String                      @id @default(cuid())
+  notificationId BigInt
+  /// Denormalised from the notification for the per-user rate limit.
+  userId         String
+  channel        NotificationDeliveryChannel
+  status         NotificationDeliveryStatus
+  attempts       Int                         @default(0)
+  nextAttemptAt  DateTime?
+  lastError      String?
+  digestId       String?
+  sentAt         DateTime?
+  createdAt      DateTime                    @default(now())
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt])
+  @@index([userId, channel, sentAt])
+  @@index([digestId])
+  @@map("notification_deliveries")
+}
+
+/// The Telegram private chat a user linked (D9). One chat per user, one user per chat.
+model TelegramLink {
+  userId   String   @id
+  chatId   BigInt   @unique
+  username String?
+  linkedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("telegram_links")
+}
+
+/// A one-time `/start <code>` link code (D9): 10 minutes, single use. Only the
+/// SHA-256 of the code is stored.
+model TelegramLinkCode {
+  id        String    @id @default(cuid())
+  userId    String
+  codeHash  String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("telegram_link_codes")
+}
+
+/// The single row (`id = 1`) of the notification loops' positions (D4, D7).
+/// `eventsCursor`: every event with `id <=` it has been matched.
+model NotificationMatcherState {
+  id                   Int      @id @default(1)
+  eventsCursor         BigInt
+  telegramUpdateOffset BigInt   @default(0)
+  updatedAt            DateTime @updatedAt
+
+  @@map("notification_matcher_state")
+}
+
+/// A runner away for more than 5 minutes (D5). At most one open
+/// (`resolvedAt` null) per runner; the watcher holds a lock while it decides.
+model RunnerIncident {
+  id         String    @id @default(cuid())
+  runnerId   String
+  openedAt   DateTime
+  resolvedAt DateTime?
+
+  runner Runner @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+
+  @@index([runnerId, resolvedAt])
+  @@map("runner_incidents")
+}
+
+// ─── Activity feed and execution history (docs/specs/21) ────────────────────
+// Projections of `events`, `audit_records` and `slots`, which are read only
+// here. Rebuildable from their sources within the `events` retention.
+
+enum ActivityCategory {
+  fleet
+  runner
+  audit
+}
+
+enum ActivitySeverity {
+  info
+  ok
+  warn
+  danger
+}
+
+enum ActivityActorType {
+  user
+  runner
+  orchestrator
+  system
+}
+
+enum ActivitySourceKind {
+  event
+  audit
+}
+
+/// One curated feed item (D1, D3), from an `events` row (`sourceId` = its `id`)
+/// or an `audit_records` row (`sourceId` = its `seq`). A replayed source row
+/// hits the unique key and changes nothing (D2).
+model ActivityItem {
+  id         BigInt             @id @default(autoincrement())
+  /// The source's own `ts`.
+  ts         DateTime
+  /// null: runner- or user-level, or the project is gone — admins only (D4).
+  projectId  String?
+  category   ActivityCategory
+  type       String
+  severity   ActivitySeverity
+  title      String
+  actorType  ActivityActorType
+  /// User id or runner id; null for the orchestrator, the system, an unknown user.
+  actorId    String?
+  slot       String?
+  issue      Int?
+  prNumber   Int?
+  link       String?
+  /// A few safe fields of the source, ≤ 4 KB; never secrets.
+  data       Json
+  sourceKind ActivitySourceKind
+  sourceId   BigInt
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceKind, sourceId])
+  @@index([projectId, ts, id])
+  @@index([ts, id])
+  @@index([type, ts])
+  @@map("activity_items")
+}
+
+/// Where the activity projector stopped (D2): one row, id `activity`.
+/// `eventsCursor`: every `events.id` up to it was considered. `auditCursor`:
+/// the same for `audit_records.seq`.
+model ActivityProjectorState {
+  id           String   @id
+  eventsCursor BigInt   @default(0)
+  auditCursor  BigInt   @default(0)
+  updatedAt    DateTime @updatedAt
+
+  @@map("activity_projector_state")
+}
+
+enum RunKind {
+  orchestrator_slot
+  skill
+  schedule
+}
+
+enum RunStatus {
+  running
+  blocked
+  waiting_person
+  succeeded
+  failed
+  abandoned
+}
+
+enum RunOutput {
+  report
+  pr
+}
+
+enum RunTrigger {
+  orchestrator
+  user
+  schedule
+  webhook
+}
+
+/// One unit of agent work (D7, data-model.md). An `orchestrator_slot` run is a
+/// pure function of its slot, rebuilt whenever the slot's `lastSeq` passes
+/// `slotSeq`. Tokens and cost are computed on read (D8).
+model Run {
+  id              String     @id @default(cuid())
+  kind            RunKind
+  projectId       String
+  slotId          String?    @unique
+  issue           Int?
+  title           String?
+  runtime         Runtime?
+  model           String?
+  profileKey      String?
+  args            Json?
+  output          RunOutput?
+  status          RunStatus
+  /// The last checkpoint's summary.
+  outcome         String?
+  prNumber        Int?
+  prUrl           String?
+  triggeredByType RunTrigger
+  triggeredById   String?
+  startedAt       DateTime
+  endedAt         DateTime?
+  durationMs      Int?
+  /// The slot's `lastSeq` this row was built from; null for other kinds.
+  slotSeq         BigInt?
+  /// The slot's `updatedAt` (event time) for a slot run, so a rebuild from the
+  /// same slot is identical.
+  updatedAt       DateTime
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  slot    Slot?   @relation(fields: [slotId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, startedAt])
+  @@index([projectId, status])
+  @@map("runs")
 }

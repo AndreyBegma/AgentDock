@@ -1,0 +1,23 @@
+{
+  "name": "@agentdock/runner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "agentdock-runner": "./dist/agentdock-runner"
+  },
+  "scripts": {
+    "build": "tsc --noEmit && bun build --compile src/main.ts --outfile dist/agentdock-runner",
+    "lint": "biome lint src",
+    "test": "tsc --noEmit && bun test"
+  },
+  "dependencies": {
+    "@agentdock/shared": "workspace:*",
+    "protobufjs": "8.8.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.0",
+    "typescript": "6.0.2"
+  }
+}

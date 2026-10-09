@@ -53,7 +53,7 @@
 
 | Path | Role |
 |---|---|
-| `apps/api` | NestJS; REST for the UI, `/runner` WebSocket gateway, `/ui` WebSocket for live updates, webhook endpoints, schedulers |
+| `apps/api` | NestJS; REST for the UI, `/runner` WebSocket gateway, `/live` WebSocket for live updates (session cookie + origin check, authorized topics — [spec 9](../specs/9-application-shell-and-live-updates.md)), webhook endpoints, schedulers |
 | `apps/web` | Next.js App Router; talks only to `apps/api` |
 | `apps/runner` | Bun daemon; compiled with `bun build --compile`; config in `~/.config/agentdock/runner.json` |
 | `packages/shared` | protocol types: runner messages, event schema, command schema (zod), shared enums |
@@ -69,7 +69,8 @@
    `(runnerId, seq)`).
 4. The API persists, updates projections (slot state, session tree, usage
    rollups), evaluates budgets and notification rules, and fans out to UI
-   subscribers of that project.
+   subscribers of that project through `LiveService.publish` on the
+   `project:<id>` topic of `/live`.
 
 ## Command path
 
