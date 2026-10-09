@@ -2,7 +2,9 @@ import { describe, expect, it } from 'bun:test';
 import {
   type CommandResultMessage,
   commandResultMessageSchema,
+  commands,
   DEFAULT_COMMAND_TIMEOUT_MS,
+  TERMINAL_ATTACH_TIMEOUT_MS,
 } from '@agentdock/shared/protocol';
 import { FakeClock } from '../testing/fake-clock';
 import { fakeExec, memoryLogger } from '../testing/fixtures';
@@ -140,6 +142,65 @@ describe('command dispatcher', () => {
     expect((await run('runner.ping')).error).toEqual({
       code: 'path_not_allowed',
       message: 'nope',
+    });
+  });
+
+  describe('terminal.attach (spec 29)', () => {
+    const attachArgs = {
+      id: 'term_1',
+      target: {
+        kind: 'slot',
+        projectId: 'prj_a',
+        root: '/nowhere/a',
+        slot: 'i42',
+      },
+      mode: 'read',
+      cols: 120,
+      rows: 40,
+    };
+
+    it('is in the allowlist, admin only, under a 10 s timeout', () => {
+      expect(commands['terminal.attach'].minRole).toBe('admin');
+      expect(commands['terminal.attach'].timeoutMs).toBe(
+        TERMINAL_ATTACH_TIMEOUT_MS,
+      );
+    });
+
+    it('refuses a raw session name or a command anywhere in the args', async () => {
+      const { run } = setup();
+      for (const args of [
+        { ...attachArgs, session: 'cs-i42' },
+        { ...attachArgs, command: 'sh' },
+        { ...attachArgs, target: { ...attachArgs.target, session: 'cs-i42' } },
+        { ...attachArgs, target: { kind: 'session', name: 'cs-i42' } },
+        {
+          ...attachArgs,
+          target: {
+            kind: 'orchestrator',
+            projectId: 'prj_a',
+            root: '/nowhere/a',
+            command: 'sh',
+          },
+        },
+      ]) {
+        expect((await run('terminal.attach', args)).error?.code).toBe(
+          'invalid_args',
+        );
+      }
+    });
+
+    it('answers disabled when the runner config lists it', async () => {
+      const { run } = setup({}, ['terminal.attach']);
+      expect((await run('terminal.attach', attachArgs)).error?.code).toBe(
+        'disabled',
+      );
+    });
+
+    it('answers unsupported on a runner without an attach manager', async () => {
+      const { run } = setup();
+      expect((await run('terminal.attach', attachArgs)).error?.code).toBe(
+        'unsupported',
+      );
     });
   });
 

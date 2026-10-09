@@ -8,7 +8,12 @@ import {
 import { Backoff } from './backoff';
 import { createDispatcher } from './commands/dispatcher';
 import { createHandlers } from './commands/handlers';
-import { batches, type PaneHandler, RunnerConnection } from './connection';
+import {
+  batches,
+  type PaneHandler,
+  RunnerConnection,
+  type TerminalHandler,
+} from './connection';
 import { Spool } from './spool';
 import { FakeClock } from './testing/fake-clock';
 import {
@@ -68,6 +73,7 @@ describe('RunnerConnection', () => {
     origin: string,
     clock = new FakeClock(),
     pane?: PaneHandler,
+    terminal?: TerminalHandler,
   ) => {
     const { log, lines } = memoryLogger();
     const spool = Spool.open({ dir, log });
@@ -104,6 +110,7 @@ describe('RunnerConnection', () => {
         log,
       }),
       pane,
+      terminal,
     });
     connection.start();
     return { clock, spool, lines, connection };
@@ -243,6 +250,52 @@ describe('RunnerConnection', () => {
       }),
     ).toBe(true);
     await s.waitFor('pane');
+
+    s.close(1006);
+    await until(() => calls.includes('reset'));
+  });
+
+  it('hands terminal.* to the handler, drops a frame with an extra field, sends its bytes, and resets it on close', async () => {
+    const s = server();
+    const calls: string[] = [];
+    const terminal: TerminalHandler = {
+      data: (m) => {
+        calls.push(`data ${m.id} ${m.b64}`);
+      },
+      resize: (m) => {
+        calls.push(`resize ${m.id} ${m.cols}x${m.rows}`);
+      },
+      close: (m) => {
+        calls.push(`close ${m.id} ${m.reason}`);
+      },
+      reset: () => {
+        calls.push('reset');
+      },
+    };
+    const { connection } = connect(
+      s.origin,
+      new FakeClock(),
+      undefined,
+      terminal,
+    );
+    await until(() => connection.isLive);
+    // Strict: nothing may ride along with bytes headed for a PTY.
+    s.send({ type: 'terminal.data', id: 't1', b64: 'bHM=', session: 'x' });
+    s.send({ type: 'terminal.data', id: 't1', b64: 'bHM=' });
+    s.send({ type: 'terminal.resize', id: 't1', cols: 120, rows: 40 });
+    s.send({ type: 'terminal.close', id: 't1', reason: 'client' });
+    await until(() => calls.length === 3);
+    expect(calls).toEqual([
+      'data t1 bHM=',
+      'resize t1 120x40',
+      'close t1 client',
+    ]);
+
+    expect(
+      connection.sendMessage({ type: 'terminal.data', id: 't1', b64: 'b2s=' }),
+    ).toBe(true);
+    await s.waitFor('terminal.data');
+    expect(s.invalid).toEqual([]);
 
     s.close(1006);
     await until(() => calls.includes('reset'));
