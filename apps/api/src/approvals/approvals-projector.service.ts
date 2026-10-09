@@ -18,13 +18,13 @@ import {
   readApprovalEvents,
   type SlotState,
 } from './approval-rules';
-import type { ApprovalRow } from './approvals-mapper';
 import {
   ApprovalsService,
   lockApprovals,
   type ProjectTarget,
   voidApprovedRow,
 } from './approvals.service';
+import type { ApprovalRow } from './approvals-mapper';
 
 type Tx = Prisma.TransactionClient;
 
@@ -259,12 +259,7 @@ export class ApprovalsProjector {
           continue;
         }
         if (action.kind === 'void') {
-          const row = await voidApprovedRow(
-            tx,
-            project.id,
-            pr,
-            action.headSha,
-          );
+          const row = await voidApprovedRow(tx, project.id, pr, action.headSha);
           if (row) {
             outcome.voided.push({ pr, row, headSha: action.headSha });
             outcome.changed = true;
