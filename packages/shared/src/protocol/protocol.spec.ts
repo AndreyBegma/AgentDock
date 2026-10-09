@@ -24,6 +24,7 @@ import {
   serverMessageSchema,
   serverMessageTypes,
   spoolTruncatedDataSchema,
+  TERMINAL_ATTACH_TIMEOUT_MS,
   terminalAvailable,
   unsequencedEventSchema,
 } from './index';
@@ -456,6 +457,29 @@ describe('command allowlist', () => {
     expect(roleAtLeast('admin', 'operator')).toBe(true);
     expect(roleAtLeast('operator', 'operator')).toBe(true);
     expect(roleAtLeast('viewer', 'operator')).toBe(false);
+  });
+});
+
+describe('terminal.attach in the allowlist (spec 29)', () => {
+  it('is registered admin-only with its 10 s timeout, and parses only a typed target', () => {
+    expect(commands['terminal.attach'].minRole).toBe('admin');
+    expect(commands['terminal.attach'].timeoutMs).toBe(
+      TERMINAL_ATTACH_TIMEOUT_MS,
+    );
+    const args = {
+      id: 'term_1',
+      target: { kind: 'slot', projectId: 'prj_a', root: '/r', slot: 'i42' },
+      mode: 'read',
+      cols: 120,
+      rows: 40,
+    };
+    expect(parseCommand('terminal.attach', args).ok).toBe(true);
+    expect(
+      parseCommand('terminal.attach', {
+        ...args,
+        target: { ...args.target, session: 'cs-i42' },
+      }),
+    ).toMatchObject({ ok: false, error: { code: 'invalid_args' } });
   });
 });
 

@@ -1,6 +1,8 @@
 import type {
   Capabilities,
   Host,
+  TerminalAttachArgs,
+  TerminalAttachResult,
   WatchedProject,
 } from '@agentdock/shared/protocol';
 import { type Clock, isoNow } from '../clock';
@@ -15,6 +17,7 @@ import type { Exec } from '../detect/exec';
 import type { ProjectFs } from '../projects/fs';
 import { inspectProject, refreshProject } from '../projects/inspect';
 import type { CommandHandlers } from './dispatcher';
+import { CommandFailure } from './failure';
 import { issueCreate } from './queue/issue-create';
 import { issuesRefresh } from './queue/issues-refresh';
 import {
@@ -37,6 +40,10 @@ export interface HandlerContext {
   fs?: ProjectFs;
   /** The session watcher's backfill; absent when sessions are disabled. */
   backfillSessions?: SessionBackfillContext['backfill'];
+  /** Interactive attaches (spec 29); absent means this runner cannot attach. */
+  terminal?: {
+    attach(args: TerminalAttachArgs): Promise<TerminalAttachResult>;
+  };
 }
 
 /** One handler per allowlisted command; each later command adds its own here. */
@@ -75,5 +82,14 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
       }),
     'issues.refresh': (args) =>
       issuesRefresh(args, { watchedProjects: context.watchedProjects }),
+    'terminal.attach': (args) => {
+      if (!context.terminal) {
+        throw new CommandFailure(
+          'unsupported',
+          'this runner does not serve terminal attaches',
+        );
+      }
+      return context.terminal.attach(args);
+    },
   };
 };
