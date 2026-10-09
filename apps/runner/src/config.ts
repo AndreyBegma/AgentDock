@@ -14,8 +14,13 @@ import { dirname } from 'node:path';
 import {
   runnerTokenSchema,
   runtimeProfileSchema,
+  SKILL_RUN_MAX_TIMEOUT_SEC,
+  SKILL_RUN_MIN_TIMEOUT_SEC,
 } from '@agentdock/shared/protocol';
 import { z } from 'zod';
+
+/** D11: skill runs per runner before the next one queues. */
+export const SKILL_RUNS_DEFAULT_MAX_CONCURRENT = 2;
 
 const portSchema = z.number().int().min(1).max(65_535);
 
@@ -68,6 +73,27 @@ export const runnerConfigSchema = z.object({
     .object({
       enabled: z.boolean().default(true),
       ingestSince: z.iso.datetime().optional(),
+    })
+    .prefault({}),
+  /**
+   * Skill runs (spec 24 D11). A run over `maxConcurrentRuns` waits in
+   * `queued`; a `timeoutSec` above `maxTimeoutSec` is cut to it. The catalog
+   * host is not configurable: it is fixed in the runner (D1).
+   */
+  skills: z
+    .object({
+      maxConcurrentRuns: z
+        .number()
+        .int()
+        .min(1)
+        .max(32)
+        .default(SKILL_RUNS_DEFAULT_MAX_CONCURRENT),
+      maxTimeoutSec: z
+        .number()
+        .int()
+        .min(SKILL_RUN_MIN_TIMEOUT_SEC)
+        .max(SKILL_RUN_MAX_TIMEOUT_SEC)
+        .default(SKILL_RUN_MAX_TIMEOUT_SEC),
     })
     .prefault({}),
 });

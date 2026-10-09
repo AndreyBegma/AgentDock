@@ -16,6 +16,7 @@ import { messageSlot, stopSlot } from '../control/slot';
 import type { Exec } from '../detect/exec';
 import type { ProjectFs } from '../projects/fs';
 import { inspectProject, refreshProject } from '../projects/inspect';
+import type { SkillHandlers } from '../skills';
 import type { CommandHandlers } from './dispatcher';
 import { CommandFailure } from './failure';
 import { issueCreate } from './queue/issue-create';
@@ -44,7 +45,13 @@ export interface HandlerContext {
   terminal?: {
     attach(args: TerminalAttachArgs): Promise<TerminalAttachResult>;
   };
+  /** Skills (spec 24); absent means this runner does not serve them. */
+  skills?: SkillHandlers;
 }
+
+const noSkills = (): never => {
+  throw new CommandFailure('unsupported', 'this runner does not serve skills');
+};
 
 /** One handler per allowlisted command; each later command adds its own here. */
 export const createHandlers = (context: HandlerContext): CommandHandlers => {
@@ -91,5 +98,17 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
       }
       return context.terminal.attach(args);
     },
+    'skill.search': (args) =>
+      context.skills?.['skill.search'](args) ?? noSkills(),
+    'skill.inspect': (args) =>
+      context.skills?.['skill.inspect'](args) ?? noSkills(),
+    'skill.install': (args) =>
+      context.skills?.['skill.install'](args) ?? noSkills(),
+    'skill.uninstall': (args) =>
+      context.skills?.['skill.uninstall'](args) ?? noSkills(),
+    'skill.list': (args) => context.skills?.['skill.list'](args) ?? noSkills(),
+    'skill.run': (args) => context.skills?.['skill.run'](args) ?? noSkills(),
+    'skill.cancel': (args) =>
+      context.skills?.['skill.cancel'](args) ?? noSkills(),
   };
 };
