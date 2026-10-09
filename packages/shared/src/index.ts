@@ -10,6 +10,7 @@ export * from './notifications';
 export * from './projects';
 export * from './queue';
 export * from './runners';
+export * from './schedules';
 export * from './sessions';
 export * from './skills';
 export * from './terminal';

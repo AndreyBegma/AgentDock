@@ -17,6 +17,7 @@ import { PricesModule } from './prices/prices.module';
 import { ProjectsModule } from './projects/projects.module';
 import { QueueModule } from './queue';
 import { RunnersModule } from './runners/runners.module';
+import { SchedulesModule } from './schedules';
 import { SessionsModule } from './sessions/sessions.module';
 import { SkillsModule } from './skills';
 import { TelegramModule } from './telegram';
@@ -51,6 +52,7 @@ import { WebhooksModule } from './webhooks';
     TelegramModule,
     TerminalModule,
     SkillsModule,
+    SchedulesModule,
     WebhooksModule,
   ],
   controllers: [HealthController],

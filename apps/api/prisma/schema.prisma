@@ -52,6 +52,8 @@ model User {
   telegramLink                TelegramLink?
   telegramLinkCodes           TelegramLinkCode[]
   skillInstallPreviews        SkillInstallPreview[]
+  schedulesCreated            Schedule[]                    @relation("ScheduleCreatedBy")
+  schedulesUpdated            Schedule[]                    @relation("ScheduleUpdatedBy")
   inboundTriggersCreated      InboundTrigger[]
   webhooksCreated             Webhook[]
 
@@ -321,6 +323,7 @@ model Project {
   notificationMutes    NotificationMute[]
   installedSkills      InstalledSkill[]
   skillInstallPreviews SkillInstallPreview[]
+  schedules            Schedule[]
   inboundTriggers      InboundTrigger[]
 
   @@unique([runnerId, rootPath])
@@ -1259,9 +1262,10 @@ model Run {
   /// same slot is identical.
   updatedAt       DateTime
 
-  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  slot     Slot?     @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  project           Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  slot              Slot?             @relation(fields: [slotId], references: [id], onDelete: Cascade)
   skillRun          SkillRun?
+  firings           ScheduleFiring[]
   inboundDeliveries InboundDelivery[]
 
   @@index([projectId, startedAt])
@@ -1579,4 +1583,95 @@ model WebhookDispatcherState {
   updatedAt    DateTime @updatedAt
 
   @@map("webhook_dispatcher_state")
+}
+
+// ─── Cron schedules (docs/specs/25-cron-schedules.md) ───────────────────────
+
+enum ScheduleMissedPolicy {
+  skip
+  catch_up
+}
+
+enum ScheduleDisabledReason {
+  manual
+  failing
+  creator_not_authorized
+}
+
+enum ScheduleFiringKind {
+  cron
+  catch_up
+  manual
+}
+
+enum ScheduleFiringStatus {
+  due
+  started
+  noop
+  skipped
+  failed
+  succeeded
+}
+
+/// A skill run or an orchestrator start fired at the times of `cron` in
+/// `timezone` (D1–D4). The scheduler claims rows by `(enabled, nextRunAt)`.
+model Schedule {
+  id                  String                  @id @default(cuid())
+  projectId           String
+  name                String
+  /// D1: `{ kind: "skill", … }` or `{ kind: "orchestrator", mode }`.
+  target              Json
+  cron                String
+  /// An IANA name; fire times are stored in UTC (D4).
+  timezone            String
+  missedPolicy        ScheduleMissedPolicy    @default(skip)
+  enabled             Boolean                 @default(true)
+  disabledReason      ScheduleDisabledReason?
+  /// Null while disabled.
+  nextRunAt           DateTime?               @db.Timestamptz(3)
+  lastRunAt           DateTime?               @db.Timestamptz(3)
+  /// D11: failed firings since the last succeeded one.
+  consecutiveFailures Int                     @default(0)
+  /// A schedule acts with its creator's authority (D10); it goes with them.
+  createdById         String
+  updatedById         String?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  project   Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy User             @relation("ScheduleCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  updatedBy User?            @relation("ScheduleUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  firings   ScheduleFiring[]
+
+  @@index([enabled, nextRunAt])
+  @@index([projectId])
+  @@map("schedules")
+}
+
+/// One occurrence of a schedule (D5–D9, D15). The unique key keeps an
+/// occurrence from firing twice, whichever instance claims it.
+model ScheduleFiring {
+  id           BigInt               @id @default(autoincrement())
+  scheduleId   String
+  scheduledFor DateTime             @db.Timestamptz(3)
+  firedAt      DateTime?            @db.Timestamptz(3)
+  kind         ScheduleFiringKind
+  status       ScheduleFiringStatus
+  reason       String?
+  /// D6: the missed occurrences a `skipped` row stands for.
+  missedCount  Int                  @default(0)
+  /// The run a skill firing started (#21); runs outlive the schedule.
+  runId        String?
+  /// The `command_runs` row an orchestrator firing wrote (#17).
+  commandRunId String?
+  error        Json?
+  finishedAt   DateTime?            @db.Timestamptz(3)
+
+  schedule Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  run      Run?     @relation(fields: [runId], references: [id], onDelete: SetNull)
+
+  @@unique([scheduleId, scheduledFor, kind])
+  @@index([scheduleId, scheduledFor])
+  @@index([status])
+  @@map("schedule_firings")
 }
