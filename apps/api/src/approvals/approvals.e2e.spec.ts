@@ -148,12 +148,17 @@ describe('merge approval queue (e2e)', () => {
       { source: 'code-sentinel', slot: 'i42', issue: 42 },
     );
 
-  const checksChanged = (checks: 'pending' | 'green' | 'red' = 'green') =>
+  /** Without `headSha`: the plugin's, or an older runner's (#72). */
+  const checksChanged = (
+    checks: 'pending' | 'green' | 'red' = 'green',
+    headSha?: string,
+  ) =>
     stream.next('pr.checks_changed', {
       number: PR,
       branch: 'feat/42-widget',
       checks,
       mergeable: true,
+      ...(headSha ? { headSha } : {}),
     });
 
   const list = async (session = viewerOfA, query = '') => {
@@ -524,7 +529,60 @@ describe('merge approval queue (e2e)', () => {
       expect(record.result).toBe('error');
     });
 
-    it('voids an approval when the head moves: stale row, new waiting row, signal withdrawn, audited (D6)', async () => {
+    it('voids an approval from one event carrying the new head, without a pr.inspect (#72)', async () => {
+      expect((await approve(H1)).status).toBe(200);
+      jest.mocked(commands.inspect).mockClear();
+      const live = await liveOn(viewerOfA);
+
+      // A push after approval: the runner reports the new head, checks unchanged.
+      await ingest(checksChanged('green', H2));
+
+      // Voided in the ingest transaction: stale the moment the batch is in.
+      expect((await rows()).map((r) => [r.status, r.headSha])).toEqual([
+        ['stale', H1],
+        ['waiting', null],
+      ]);
+      const record = await eventually(
+        'the void is audited',
+        async () => (await audits('approval.void'))[0],
+      );
+      expect(record).toMatchObject({
+        actorType: 'system',
+        result: 'ok',
+        after: { pr: PR, headSha: H1, newHeadSha: H2, decision: 'stale' },
+        meta: { signal: { written: true } },
+      });
+      expect(commands.voidApproval).toHaveBeenCalledWith(
+        runnerId,
+        expect.objectContaining({ projectId: a, pr: PR, headSha: H1 }),
+        expect.objectContaining({ ctx: { actor: { type: 'system' } } }),
+      );
+      const decided = await nextNamed(live, APPROVAL_DECIDED_LIVE_EVENT);
+      expect(decided.data).toMatchObject({ decision: 'stale', headSha: H1 });
+      expect(commands.inspect).not.toHaveBeenCalled();
+
+      // The new head reported again: the waiting row is not approved, nothing more voids.
+      await ingest(checksChanged('green', H2));
+      expect(await rows()).toHaveLength(2);
+    });
+
+    it('keeps an approval whose event carries the approved head, and reads nothing (#72)', async () => {
+      expect((await approve(H1)).status).toBe(200);
+      jest.mocked(commands.inspect).mockClear();
+
+      await ingest(checksChanged('pending', H1));
+      await ingest(checksChanged('green', H1));
+
+      expect((await rows()).map((r) => [r.status, r.headSha])).toEqual([
+        ['approved', H1],
+      ]);
+      // A system head check would have been scheduled by now; give it time to show.
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      expect(commands.inspect).not.toHaveBeenCalled();
+      expect(commands.voidApproval).not.toHaveBeenCalled();
+    });
+
+    it('voids an approval when the head moves and the event carries no head — through pr.inspect (D6)', async () => {
       expect((await approve(H1)).status).toBe(200);
       const live = await liveOn(viewerOfA);
       head = H2;

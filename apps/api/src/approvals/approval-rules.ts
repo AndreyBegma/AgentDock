@@ -21,6 +21,8 @@ export interface PrTouch {
   closed: 'merged' | 'closed' | null;
   /** A `pr.opened`, `pr.checks_changed` or `pull request open` checkpoint. */
   moved: boolean;
+  /** The last head commit a `pr.opened` / `pr.checks_changed` carried (D6). */
+  headSha: string | null;
 }
 
 /** What one batch said about one project root. */
@@ -42,7 +44,7 @@ const positiveInt = (value: unknown): number | null =>
 const touchOf = (root: RootTouch, pr: number): PrTouch => {
   let touch = root.prs.get(pr);
   if (!touch) {
-    touch = { awaiting: null, closed: null, moved: false };
+    touch = { awaiting: null, closed: null, moved: false, headSha: null };
     root.prs.set(pr, touch);
   }
   return touch;
@@ -87,9 +89,12 @@ export const readApprovalEvents = (
     const root = rootOf(event.project.root);
     switch (fleet.type) {
       case 'pr.opened':
-      case 'pr.checks_changed':
-        touchOf(root, fleet.data.number).moved = true;
+      case 'pr.checks_changed': {
+        const touch = touchOf(root, fleet.data.number);
+        touch.moved = true;
+        if (fleet.data.headSha) touch.headSha = fleet.data.headSha;
         break;
+      }
       case 'pr.merged':
         touchOf(root, fleet.data.number).closed = 'merged';
         break;
@@ -117,6 +122,8 @@ export interface CurrentRow {
   id: string;
   status: Extract<ApprovalStatus, 'waiting' | 'approved'>;
   source: ApprovalSource;
+  /** The head an approval was bound to; null while waiting. */
+  headSha: string | null;
 }
 
 /** The PR's slot after the fleet projector applied the batch (#11). */
@@ -153,6 +160,7 @@ export type PrAction =
       issue: number | null;
     }
   | { kind: 'drop'; rowId: string }
+  | { kind: 'void'; rowId: string; headSha: string }
   | { kind: 'checkHead'; rowId: string };
 
 export interface PrPlanInput {
@@ -172,8 +180,10 @@ export interface PrPlanInput {
  * - merged or closed: the current row follows, and nothing new opens;
  * - `pr.awaiting_approval`: a `waiting` row (`orchestrator`), or a derived
  *   one adopted as the orchestrator's;
- * - the PR moved (checks, a reopened checkpoint): an `approved` row has its
- *   head re-read (D6); a `waiting` row whose slot is no longer green and
+ * - the PR moved (checks, a push, a reopened checkpoint): an `approved` row
+ *   bound to another head than the batch carried is voided (D6); without a
+ *   head in the batch (the plugin's events, older runners) the head is
+ *   re-read with `pr.inspect`; a `waiting` row whose slot is no longer green and
  *   mergeable is dropped — it was never decided; with no current row, D2's
  *   derived condition opens one. Derivation is transition-triggered, so a PR
  *   sent back with "request changes" is listed again only when it moves.
@@ -217,7 +227,11 @@ export const planPr = (input: PrPlanInput): PrAction[] => {
 
   if (!touch.moved) return actions;
   if (row?.status === 'approved') {
-    actions.push({ kind: 'checkHead', rowId: row.id });
+    if (!touch.headSha) {
+      actions.push({ kind: 'checkHead', rowId: row.id });
+    } else if (touch.headSha !== row.headSha) {
+      actions.push({ kind: 'void', rowId: row.id, headSha: touch.headSha });
+    }
   } else if (row?.status === 'waiting') {
     if (slot && !touch.awaiting && !awaitsByDerivation(slot.state)) {
       actions.push({ kind: 'drop', rowId: row.id });

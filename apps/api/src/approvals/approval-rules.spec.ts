@@ -41,8 +41,12 @@ const touch = (over: Partial<PrTouch> = {}): PrTouch => ({
   awaiting: null,
   closed: null,
   moved: false,
+  headSha: null,
   ...over,
 });
+
+const H1 = '1'.repeat(40);
+const H2 = '2'.repeat(40);
 
 const input = (over: Partial<PrPlanInput> = {}): PrPlanInput => ({
   touch: touch(),
@@ -91,6 +95,31 @@ describe('readApprovalEvents', () => {
     expect(prs?.get(4)?.closed).toBe('merged');
   });
 
+  it('keeps the last head a pr.opened or pr.checks_changed carried', () => {
+    const roots = readApprovalEvents([
+      event('pr.opened', {
+        number: 1,
+        branch: 'b',
+        url: 'https://github.com/acme/widget/pull/1',
+        title: 't',
+        checks: 'pending',
+        headSha: H1,
+      }),
+      event('pr.checks_changed', {
+        number: 1,
+        branch: 'b',
+        checks: 'green',
+        headSha: H2,
+      }),
+      // Without a head (the plugin's, an older runner's): the last one stands.
+      event('pr.checks_changed', { number: 1, branch: 'b', checks: 'red' }),
+      event('pr.checks_changed', { number: 2, branch: 'b', checks: 'green' }),
+    ]);
+    const prs = roots.get(ROOT)?.prs;
+    expect(prs?.get(1)).toMatchObject({ moved: true, headSha: H2 });
+    expect(prs?.get(2)).toMatchObject({ moved: true, headSha: null });
+  });
+
   it('keeps a pull-request-open checkpoint without a number by its slot', () => {
     const roots = readApprovalEvents([
       event(
@@ -136,7 +165,12 @@ describe('planPr', () => {
       planPr(
         input({
           touch: touch({ awaiting }),
-          current: { id: 'r1', status: 'waiting', source: 'derived' },
+          current: {
+            id: 'r1',
+            status: 'waiting',
+            source: 'derived',
+            headSha: null,
+          },
         }),
       ),
     ).toEqual([{ kind: 'adopt', rowId: 'r1', slot: 'i42', issue: 42 }]);
@@ -144,7 +178,12 @@ describe('planPr', () => {
       planPr(
         input({
           touch: touch({ awaiting }),
-          current: { id: 'r1', status: 'approved', source: 'orchestrator' },
+          current: {
+            id: 'r1',
+            status: 'approved',
+            source: 'orchestrator',
+            headSha: H1,
+          },
         }),
       ),
     ).toEqual([]);
@@ -186,7 +225,12 @@ describe('planPr', () => {
       planPr(
         input({
           touch: touch({ moved: true }),
-          current: { id: 'r1', status: 'waiting', source: 'orchestrator' },
+          current: {
+            id: 'r1',
+            status: 'waiting',
+            source: 'orchestrator',
+            headSha: null,
+          },
           slot: {
             name: 'i42',
             issue: 42,
@@ -197,15 +241,41 @@ describe('planPr', () => {
     ).toEqual([{ kind: 'drop', rowId: 'r1' }]);
   });
 
-  it('re-reads the head of an approved PR that moved (D6)', () => {
-    expect(
-      planPr(
-        input({
-          touch: touch({ moved: true }),
-          current: { id: 'r1', status: 'approved', source: 'orchestrator' },
-        }),
-      ),
-    ).toEqual([{ kind: 'checkHead', rowId: 'r1' }]);
+  describe('an approved PR that moved (D6)', () => {
+    const approved = {
+      id: 'r1',
+      status: 'approved' as const,
+      source: 'orchestrator' as const,
+      headSha: H1,
+    };
+
+    it('is voided from the event alone when it carries another head', () => {
+      expect(
+        planPr(
+          input({
+            touch: touch({ moved: true, headSha: H2 }),
+            current: approved,
+          }),
+        ),
+      ).toEqual([{ kind: 'void', rowId: 'r1', headSha: H2 }]);
+    });
+
+    it('stays approved, unread, when the event carries the approved head', () => {
+      expect(
+        planPr(
+          input({
+            touch: touch({ moved: true, headSha: H1 }),
+            current: approved,
+          }),
+        ),
+      ).toEqual([]);
+    });
+
+    it('has its head re-read when the event carries none (plugin, older runner)', () => {
+      expect(
+        planPr(input({ touch: touch({ moved: true }), current: approved })),
+      ).toEqual([{ kind: 'checkHead', rowId: 'r1' }]);
+    });
   });
 
   it('closes the current row on merge or close, and opens nothing', () => {
@@ -213,6 +283,7 @@ describe('planPr', () => {
       id: 'r1',
       status: 'approved' as const,
       source: 'orchestrator' as const,
+      headSha: H1,
     };
     expect(
       planPr(input({ touch: touch({ closed: 'merged', awaiting }), current })),

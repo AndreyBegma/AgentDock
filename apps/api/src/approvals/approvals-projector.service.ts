@@ -18,7 +18,13 @@ import {
   readApprovalEvents,
   type SlotState,
 } from './approval-rules';
-import { ApprovalsService, lockApprovals } from './approvals.service';
+import {
+  ApprovalsService,
+  lockApprovals,
+  type ProjectTarget,
+  voidApprovedRow,
+} from './approvals.service';
+import type { ApprovalRow } from './approvals-mapper';
 
 type Tx = Prisma.TransactionClient;
 
@@ -28,10 +34,20 @@ interface ProjectRef {
   codeSentinelConfig: Prisma.JsonValue;
 }
 
+/** An approval the batch voided (D6), announced once the transaction commits. */
+interface Voided {
+  pr: number;
+  row: ApprovalRow;
+  headSha: string;
+}
+
 /** What one project's batch changed, and which approved PRs need a head check. */
 interface ProjectOutcome {
+  target: ProjectTarget;
   changed: boolean;
+  /** Approved PRs that moved without a head in the batch: re-read with `pr.inspect`. */
   recheck: number[];
+  voided: Voided[];
 }
 
 /** A batch of 500 events is a few queries per PR; well under this. */
@@ -44,7 +60,8 @@ const TRANSACTION_TIMEOUT_MS = 60_000;
  * plugin events) or drop an undecided one; `pr.closed` / `pr.merged` close
  * the current row. Runs after the fleet sink, so slots already reflect the
  * batch. A replayed event is a no-op: its `(runnerId, seq)` is already stored.
- * Approved PRs that moved get their head re-read after the transaction (D6).
+ * An approved PR whose event carries another head is voided in the
+ * transaction; one that moved without a head has it re-read after (D6).
  */
 @Injectable()
 export class ApprovalsProjector {
@@ -63,8 +80,18 @@ export class ApprovalsProjector {
         const change: ApprovalsLiveChange = { kind: 'approvals', projectId };
         this.live.publish(`project:${projectId}`, APPROVALS_LIVE_EVENT, change);
       }
+      // Neither blocks ingest: the batch is acknowledged without waiting on
+      // the runner or gh.
+      for (const { pr, row, headSha } of outcome.voided) {
+        void this.approvals
+          .announceVoid(outcome.target, pr, row, headSha)
+          .catch((error: unknown) =>
+            this.logger.warn(
+              `void of PR #${pr} on project ${projectId} was not announced: ${String(error)}`,
+            ),
+          );
+      }
       if (outcome.recheck.length > 0) {
-        // Never blocks ingest: the batch is acknowledged without waiting on gh.
         void this.approvals.recheckHeads(projectId, outcome.recheck);
       }
     }
@@ -102,7 +129,13 @@ export class ApprovalsProjector {
       const outcome = await this.prisma.$transaction(
         async (tx) => {
           await lockApprovals(tx, project.id);
-          return this.apply(tx, project, touch, deriveAllowed, now);
+          return this.apply(
+            tx,
+            { ...project, runnerId },
+            touch,
+            deriveAllowed,
+            now,
+          );
         },
         { timeout: TRANSACTION_TIMEOUT_MS },
       );
@@ -156,7 +189,7 @@ export class ApprovalsProjector {
 
   private async apply(
     tx: Tx,
-    project: ProjectRef,
+    project: ProjectRef & ProjectTarget,
     touch: RootTouch,
     deriveAllowed: boolean,
     now: Date,
@@ -180,12 +213,21 @@ export class ApprovalsProjector {
           prNumber,
           existing
             ? { ...existing, moved: true }
-            : { awaiting: null, closed: null, moved: true },
+            : { awaiting: null, closed: null, moved: true, headSha: null },
         );
       }
     }
 
-    const outcome: ProjectOutcome = { changed: false, recheck: [] };
+    const outcome: ProjectOutcome = {
+      target: {
+        id: project.id,
+        runnerId: project.runnerId,
+        rootPath: project.rootPath,
+      },
+      changed: false,
+      recheck: [],
+      voided: [],
+    };
     for (const [pr, prTouch] of [...prs].sort(([a], [b]) => a - b)) {
       const current = await tx.mergeApproval.findFirst({
         where: {
@@ -194,7 +236,7 @@ export class ApprovalsProjector {
           status: { in: [...CURRENT_APPROVAL_STATUSES] },
         },
         orderBy: { createdAt: 'desc' },
-        select: { id: true, status: true, source: true },
+        select: { id: true, status: true, source: true, headSha: true },
       });
       const latest = current
         ? null
@@ -216,6 +258,14 @@ export class ApprovalsProjector {
           outcome.recheck.push(pr);
           continue;
         }
+        if (action.kind === 'void') {
+          const row = await voidApprovedRow(tx, project.id, pr, action.headSha);
+          if (row) {
+            outcome.voided.push({ pr, row, headSha: action.headSha });
+            outcome.changed = true;
+          }
+          continue;
+        }
         await this.perform(tx, project.id, pr, action);
         outcome.changed = true;
       }
@@ -227,7 +277,7 @@ export class ApprovalsProjector {
     tx: Tx,
     projectId: string,
     pr: number,
-    action: Exclude<PrAction, { kind: 'checkHead' }>,
+    action: Exclude<PrAction, { kind: 'checkHead' | 'void' }>,
   ): Promise<void> {
     switch (action.kind) {
       case 'create':

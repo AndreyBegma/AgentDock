@@ -179,9 +179,15 @@ i20-api, decided with the orchestrator on 2026-10-08:
    `pull request open` checkpoint for a PR with an `approved` row makes the
    sink fire a system-actor `pr.inspect` after its transaction, never blocking
    ingest. With the runner offline the void waits for the next check, and the
-   plugin's own freshness rule still refuses the stale approval. Follow-up
-   (filed by the orchestrator): the runner's PR collector emits `headSha` on
-   `pr.*` events.
+   plugin's own freshness rule still refuses the stale approval.
+   **Since #72** the runner's PR collector carries the head as `headSha` on
+   `pr.opened` and `pr.checks_changed`, and sends a `pr.checks_changed` when
+   only the head moved. A batch whose event carries a head voids an approval
+   bound to another head **inside the ingest transaction** — no `pr.inspect`;
+   the signal, audit and live event follow after commit. The same head is a
+   no-op. The system `pr.inspect` of (c) stays as the fallback for an event
+   with no head: the plugin's `pr.checks_changed`, a `pull request open`
+   checkpoint, and runners older than #72.
 4. **No `unique (projectId, prNumber, headSha)`.** A waiting row from
    `pr.awaiting_approval` has no head until someone decides, and "changes
    requested on H, then approved on H without a push" would collide. `headSha`
