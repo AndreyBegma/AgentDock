@@ -20,7 +20,13 @@ import {
   type SocketFactory,
   type StopReason,
 } from './connection';
-import { detectCapabilities } from './detect/capabilities';
+import {
+  detectCapabilities,
+  extractVersion,
+  ptyAvailable,
+  terminalCapability,
+  terminalUnsupported,
+} from './detect/capabilities';
 import type { Exec } from './detect/exec';
 import { acquireLock } from './lock';
 import { errorMessage, type Logger } from './log';
@@ -28,6 +34,7 @@ import { otlpSettings, startOtlpReceiver } from './otlp';
 import { PaneStreamer } from './pane';
 import { WatchList } from './projects/watch-list';
 import { Spool } from './spool';
+import { bunSpawnPty, type SpawnPty, TerminalManager } from './terminal';
 import { RUNNER_VERSION } from './version';
 
 export interface DaemonOptions {
@@ -44,6 +51,8 @@ export interface DaemonOptions {
   log: Logger;
   createSocket?: SocketFactory;
   random?: () => number;
+  /** Spawns the PTY of a terminal attach (spec 29); Bun's own by default. */
+  spawnPty?: SpawnPty;
   /** Aborting it stops the daemon cleanly. */
   signal?: AbortSignal;
   /** Called once the connection exists — tests reach it to emit events. */
@@ -79,12 +88,18 @@ export const runDaemon = async (
         // The receiver's port as bound, not as configured (spec 13).
         config: { profiles: config.profiles, otlp: otlpCapability() },
       });
+      const terminal = terminalCapability({
+        tmux: capabilities.tmux,
+        disabledCommands: config.disabledCommands,
+        pty: ptyAvailable(),
+      });
       log.info('capabilities detected', {
         claude: capabilities.runtimes.claude?.version ?? null,
         codex: capabilities.runtimes.codex?.version ?? null,
         profiles: capabilities.profiles.length,
+        terminal,
       });
-      return capabilities;
+      return { ...capabilities, terminal };
     };
 
     // Collectors emit through the connection, which exists only below.
@@ -126,6 +141,24 @@ export const runDaemon = async (
         })
       : null;
 
+    // Interactive attaches (spec 29): bytes go out through the connection,
+    // which exists only below; `reset` ends every attach when it drops.
+    const terminal = new TerminalManager({
+      exec,
+      clock,
+      log,
+      watchedProjects: () => watchList.current,
+      send: (message) => connection?.sendMessage(message) ?? false,
+      spawn: options.spawnPty ?? bunSpawnPty(process.env),
+      unsupported: async () => {
+        const tmux = await exec('tmux', ['-V']);
+        return terminalUnsupported(
+          tmux && tmux.code === 0 ? extractVersion(tmux.stdout) : null,
+          ptyAvailable(),
+        );
+      },
+    });
+
     const dispatch = createDispatcher({
       handlers: createHandlers({
         clock,
@@ -138,6 +171,7 @@ export const runDaemon = async (
         backfillSessions: sessions
           ? (scope) => sessions.backfill(scope)
           : undefined,
+        terminal,
       }),
       disabledCommands: config.disabledCommands,
       clock,
@@ -180,6 +214,7 @@ export const runDaemon = async (
       heartbeat,
       dispatch,
       pane,
+      terminal,
       onConfig: (server) => {
         sessions?.setProjects(server.projects).catch(() => {});
         watchList.apply(server.projects).catch((error) => {
@@ -219,6 +254,7 @@ export const runDaemon = async (
     const reason = await live.done;
     options.signal?.removeEventListener('abort', onAbort);
     pane.stop();
+    terminal.stop();
     await registry.stop();
     await sessions?.stop();
     await otlp?.stop();

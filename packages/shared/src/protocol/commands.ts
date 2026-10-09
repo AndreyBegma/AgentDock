@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { capabilitiesSchema, hostSchema } from './capabilities';
 import { controlCommands } from './commands/control';
 import { queueCommands } from './commands/queue';
+import { terminalCommands } from './commands/terminal';
 import {
   SESSION_BACKFILL_TIMEOUT_MS,
   sessionBackfillArgsSchema,
@@ -123,6 +124,7 @@ export const commands = {
   },
   ...controlCommands,
   ...queueCommands,
+  ...terminalCommands,
 } as const satisfies Record<string, CommandDefinition>;
 
 export type CommandName = keyof typeof commands;

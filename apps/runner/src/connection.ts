@@ -10,6 +10,9 @@ import {
   type ServerMessage,
   type SubscribeMessage,
   serverMessageSchema,
+  type TerminalCloseMessage,
+  type TerminalDataMessage,
+  type TerminalResizeMessage,
   type UnsequencedEvent,
 } from '@agentdock/shared/protocol';
 import type { Backoff } from './backoff';
@@ -55,6 +58,8 @@ export interface ConnectionOptions {
   onConfig?: (config: RunnerServerConfig) => void;
   /** Live pane subscriptions (spec 18); without it they are ignored. */
   pane?: PaneHandler;
+  /** Interactive attach streams (spec 29); without it they are ignored. */
+  terminal?: TerminalHandler;
   createSocket?: SocketFactory;
   heartbeatMs?: number;
 }
@@ -64,6 +69,15 @@ export interface PaneHandler {
   subscribe(message: SubscribeMessage): Promise<void>;
   unsubscribe(id: string): void;
   /** The socket closed: subscriptions die with it, the server resubscribes. */
+  reset(): void;
+}
+
+/** What the connection hands the `terminal.*` stream messages to. */
+export interface TerminalHandler {
+  data(message: TerminalDataMessage): void;
+  resize(message: TerminalResizeMessage): void;
+  close(message: TerminalCloseMessage): void;
+  /** The socket closed: every attach ends with it (spec 29 D7). */
   reset(): void;
 }
 
@@ -243,6 +257,15 @@ export class RunnerConnection {
       case 'unsubscribe':
         this.options.pane?.unsubscribe(message.id);
         return;
+      case 'terminal.data':
+        this.options.terminal?.data(message);
+        return;
+      case 'terminal.resize':
+        this.options.terminal?.resize(message);
+        return;
+      case 'terminal.close':
+        this.options.terminal?.close(message);
+        return;
     }
   }
 
@@ -275,7 +298,7 @@ export class RunnerConnection {
     }
   }
 
-  /** Sends a message when the socket is open; pane frames use it. */
+  /** Sends a message when the socket is open; pane frames and terminal bytes use it. */
   sendMessage(message: RunnerMessage): boolean {
     return this.send(message);
   }
@@ -292,6 +315,7 @@ export class RunnerConnection {
     this.cancelHeartbeat();
     this.socket = null;
     this.options.pane?.reset();
+    this.options.terminal?.reset();
     if (this.state === 'stopped') return;
     if (TERMINAL_CLOSE_CODES.has(code)) {
       log.error('the server closed the connection for good', { code, reason });

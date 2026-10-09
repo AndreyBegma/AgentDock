@@ -589,12 +589,17 @@ side stores or logs them; the runner logs byte counts only.
 SIGHUP to the `tmux attach` client; no terminal path kills the target session.
 Nothing more is sent for that `id`. When the socket itself drops, the runner
 closes every attach of that connection, and the API audits the reason `socket`.
+The runner also enforces the idle and maximum-duration limits itself, at the
+shared defaults (`TERMINAL_IDLE_TIMEOUT_SEC_DEFAULT`,
+`TERMINAL_MAX_DURATION_SEC_DEFAULT`), and sends `terminal.close` with that
+reason when it gets there first. An API configured above the defaults is
+therefore capped by the runner.
 
 | Reason | Sent by | When |
 |---|---|---|
 | `client` | server | the admin detached, or the browser socket closed |
-| `idle` | server | no input (`write`) or no traffic (`read`) for `TERMINAL_IDLE_TIMEOUT_SEC` (900 s) |
-| `max_duration` | server | the attach reached `TERMINAL_MAX_DURATION_SEC` (4 h) |
+| `idle` | server; runner as backstop | no input (`write`) or no traffic (`read`) for `TERMINAL_IDLE_TIMEOUT_SEC` (900 s) |
+| `max_duration` | server; runner as backstop | the attach reached `TERMINAL_MAX_DURATION_SEC` (4 h) |
 | `session_ended` | runner | the `tmux attach` client exited |
 | `socket` | — | the API ↔ runner socket dropped; recorded, never sent |
 
@@ -633,7 +638,7 @@ handler.
 | `skill.run` | `runId, projectId, root, base, skill, args, profileKey, model, permissionMode, output: report\|pr, timeoutSec` | operator | defined, not in the map yet: → `{ phase: queued\|preparing, tmuxSession? }`, timeout 30 s |
 | `skill.cancel` | `runId, projectId` | operator | defined, not in the map yet: → `{ cancelled }`, timeout 15 s |
 | `session.backfill` | `projectId?, since` | admin | implemented: → `{ files, events }`, timeout 600 s |
-| `terminal.attach` | `id, target: { kind: slot\|orchestrator\|skill_run, projectId, root, slot?\|runId? }, mode: read\|write, cols, rows` | admin | defined (`commands/terminal.ts`), not in the map yet: → `{ attached: true, session }`, timeout 10 s |
+| `terminal.attach` | `id, target: { kind: slot\|orchestrator\|skill_run, projectId, root, slot?\|runId? }, mode: read\|write, cols, rows` | admin | implemented: → `{ attached: true, session }`, timeout 10 s; `skill_run` answers `unsupported` until #24's runner lands |
 
 Arguments are validated by schema on both sides (`parseCommand`). Commands
 without arguments take `{}` and reject any field. Paths are resolved and must
@@ -845,8 +850,8 @@ Each cut is flagged. The full patch stays in the run directory on the runner.
 ### Terminal
 
 Schemas in `commands/terminal.ts`; the rules are [spec 29](../specs/29-terminal-attach.md)
-D1–D7 and D10. It is exported as `terminalCommands` but is **not** in the
-`commands` map yet: the map entry lands with the runner handler.
+D1–D7 and D10. It is exported as `terminalCommands` and spread into the
+`commands` map; the runner serves it from `apps/runner/src/terminal/`.
 
 - `terminal.attach { id, target, mode, cols, rows }` is admin only. `id` is
   the stream id the server picked (`[A-Za-z0-9_-]`, at most 128), distinct
@@ -857,9 +862,11 @@ D1–D7 and D10. It is exported as `terminalCommands` but is **not** in the
     `cs-<prefix>--<slot>`), when the slot's worktree belongs to `root`;
   - `orchestrator { projectId, root }` → the project's orchestrator session;
   - `skill_run { projectId, root, runId }` → `agentdock-run-<shortid>` of a
-    live run of that project.
+    live run of that project. Until #24's runner lands this answers
+    `unsupported`.
 - A target that does not resolve, or resolves into another project, is
-  `not_found`.
+  `not_found`. When both `cs-<slot>` and `cs-<prefix>--<slot>` are live, the
+  runner attaches to the one that sorts first.
 - `mode: read` spawns `tmux attach-session -r -f ignore-size -t <session>`;
   `write` spawns the plain `attach-session`. Both are argv, never a shell
   string. Taking control is a second, separately audited attach.
@@ -868,7 +875,13 @@ D1–D7 and D10. It is exported as `terminalCommands` but is **not** in the
   PTY API or tmux older than 3.2. `disabled`: the runner config lists
   `terminal.attach`, and its capabilities report `terminal: false`.
 - The command answers once the PTY is running; the stream then outlives it
-  as `terminal.*` messages.
+  as `terminal.*` messages. An attach still resolving its target counts
+  against the cap; a `terminal.close` for it, or a dropped socket, cancels it
+  before anything is spawned.
+- Ending an attach sends SIGHUP to the `tmux attach` client, then SIGKILL
+  after 2 s if it has not exited. The target session is never signalled.
+  The runner logs byte counts per attach (`bytesIn`, `bytesOut`,
+  `bytesDropped` for refused input on a `read` attach), never the bytes.
 
 ```json
 {
