@@ -115,6 +115,8 @@ export class PaneRelay implements LiveTopicHooks, RunnerStreamListener {
   }
 
   message(runnerId: string, message: RunnerStreamMessage): void {
+    // A skill run's log is the run log relay's (#24).
+    if (message.type === 'run_log') return;
     this.enqueue(async () => {
       const watch = this.watchOf(runnerId, message.id);
       if (!watch) return;
