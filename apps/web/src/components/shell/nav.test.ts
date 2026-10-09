@@ -17,6 +17,7 @@ describe('visibleNav', () => {
       'overview/Overview',
       'overview/Projects',
       'overview/Activity',
+      'overview/Skills',
       'sessions/Sessions',
       'usage/Usage',
       'admin/Runners',
@@ -47,7 +48,16 @@ describe('visibleNav', () => {
     expect(inProject).toContain('project/Approvals');
     expect(inProject).toContain('project/Activity');
     expect(inProject).toContain('project/History');
+    expect(inProject).toContain('project/Skills');
     expect(inProject).toContain('project/Settings');
+  });
+
+  test('the catalog is for operators; a viewer sees only the project inventory', () => {
+    expect(labels('viewer', '/').join()).not.toContain('overview/Skills');
+    const skills = visibleNav('viewer', '/projects/p1/fleet')
+      .flatMap((section) => section.entries)
+      .find((entry) => entry.id === 'project-skills');
+    expect(skills?.resolvedHref).toBe('/projects/p1/skills');
   });
 
   test('Fleet links to the current project', () => {

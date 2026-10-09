@@ -14,8 +14,10 @@ import {
   Server,
   Settings,
   ShieldCheck,
+  Sparkles,
   Tag,
   Users,
+  Wand2,
   Workflow,
 } from 'lucide-react';
 
@@ -68,6 +70,14 @@ export const NAV: NavSection[] = [
         minRole: 'viewer',
         enabled: true,
       },
+      {
+        id: 'skills-catalog',
+        href: '/skills',
+        label: 'Skills',
+        icon: Sparkles,
+        minRole: 'operator',
+        enabled: true,
+      },
     ],
   },
   {
@@ -112,6 +122,14 @@ export const NAV: NavSection[] = [
         href: '/projects/:projectId/history',
         label: 'History',
         icon: History,
+        minRole: 'viewer',
+        enabled: true,
+      },
+      {
+        id: 'project-skills',
+        href: '/projects/:projectId/skills',
+        label: 'Skills',
+        icon: Wand2,
         minRole: 'viewer',
         enabled: true,
       },
