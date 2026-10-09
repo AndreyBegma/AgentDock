@@ -116,6 +116,7 @@ const SUBJECT: Record<Run['command'], (slot: string | null) => string> = {
   'orchestrator.stop': () => 'Orchestrator stop',
   'slot.stop': (slot) => `Stopping slot ${slot ?? ''}`.trim(),
   'slot.message': (slot) => `Message to ${slot ?? 'the worker'}`,
+  'skill.install': () => 'Skill install',
 };
 
 export const COMMAND_PENDING_LABEL: Record<Run['command'], string> = {
@@ -123,6 +124,7 @@ export const COMMAND_PENDING_LABEL: Record<Run['command'], string> = {
   'orchestrator.stop': 'Stopping the orchestrator…',
   'slot.stop': 'Stopping the slot…',
   'slot.message': 'Sending the message…',
+  'skill.install': 'Installing the skill…',
 };
 
 export interface Outcome {
