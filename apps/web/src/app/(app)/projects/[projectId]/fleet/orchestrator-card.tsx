@@ -4,6 +4,7 @@ import {
   type Role,
 } from '@agentdock/shared';
 import { Badge } from 'glass-ui/badge';
+import { Button } from 'glass-ui/button';
 import { Card } from 'glass-ui/card';
 import { Tooltip } from 'glass-ui/tooltip';
 import {
@@ -29,11 +30,14 @@ export function OrchestratorCard({
   projectId,
   control,
   role,
+  onAttach,
 }: {
   fleet: FleetView;
   projectId: string;
   control: Parameters<typeof OrchestratorControls>[0]['control'];
   role: Role;
+  /** Admins on a runner that can attach; absent hides the action. */
+  onAttach?: () => void;
 }) {
   const { orchestrator, latestRound, boardError } = fleet;
   const channel = channelChip(fleet.fleetChannel);
@@ -73,6 +77,13 @@ export function OrchestratorCard({
         />
         <Fact label="Session" value={orchestrator.session ?? '—'} />
       </dl>
+      {onAttach && orchestrator.status !== 'absent' ? (
+        <div>
+          <Button variant="glass" size="sm" onClick={onAttach}>
+            Attach
+          </Button>
+        </div>
+      ) : null}
       <OrchestratorControls
         projectId={projectId}
         control={control}
