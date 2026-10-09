@@ -127,6 +127,10 @@ export const NOTIFICATION_ERROR_CODES = [
   'invalid_rule',
   'invalid_cursor',
   'encryption_key_missing',
+  'telegram_not_configured',
+  'telegram_not_linked',
+  'telegram_token_invalid',
+  'telegram_unavailable',
 ] as const;
 export type NotificationErrorCode = (typeof NOTIFICATION_ERROR_CODES)[number];
 
@@ -134,4 +138,45 @@ export interface NotificationErrorBody {
   statusCode: number;
   error: NotificationErrorCode;
   message: string;
+}
+
+/** `GET /notifications/telegram/link` — the caller's own link (D9). */
+export interface TelegramLinkStatus {
+  linked: boolean;
+  /** The Telegram username of the linked chat, when it has one. */
+  username: string | null;
+  linkedAt: string | null;
+  /** An admin has configured the bot: linking is possible. */
+  botConfigured: boolean;
+}
+
+/** `POST /notifications/telegram/link` — open `url` in Telegram within 10 minutes. */
+export interface TelegramLinkCode {
+  /** `https://t.me/<bot>?start=<one-time code>`. */
+  url: string;
+  expiresAt: string;
+}
+
+/** `GET|PUT|DELETE /admin/integrations/telegram` (D8). The token is never returned. */
+export interface TelegramIntegrationStatus {
+  configured: boolean;
+  botUsername: string | null;
+  /** `APP_ENCRYPTION_KEY` is set and usable; without it the bot cannot be configured. */
+  encryptionAvailable: boolean;
+  /** This API instance holds the poller lock and its loop is running. */
+  polling: boolean;
+  /** The poller's last error, redacted; null after a good poll. */
+  lastError: string | null;
+  lastPollAt: string | null;
+  linkedUsers: number;
+  /**
+   * `PUT` only: links removed because the token belongs to a different bot
+   * than before — those users must link again. 0 on a token rotation.
+   */
+  unlinkedUsers?: number;
+}
+
+/** `PUT /admin/integrations/telegram` — verified with `getMe` before it is stored. */
+export interface TelegramBotTokenUpdate {
+  token: string;
 }

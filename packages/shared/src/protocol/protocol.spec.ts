@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   capabilitiesSchema,
+  commandErrorCodeSchema,
   commands,
   type HelloMessage,
   isSessionEventType,
@@ -650,5 +651,30 @@ describe('pairing', () => {
       pairingResponseSchema.safeParse({ runnerId: 'r', token: 'short' })
         .success,
     ).toBe(false);
+  });
+});
+
+describe('skill error codes (spec 24)', () => {
+  it.each([
+    'not_found',
+    'already_exists',
+    'changed_since_preview',
+    'not_runnable',
+    'too_large',
+    'upstream_unavailable',
+  ])('answers %s in a command.result', (code) => {
+    expect(
+      runnerMessageSchema.safeParse({
+        type: 'command.result',
+        id: 'cmd_1',
+        ok: false,
+        error: { code },
+      }).success,
+    ).toBe(true);
+  });
+
+  it('keeps every error code unique', () => {
+    const codes = commandErrorCodeSchema.options;
+    expect(new Set(codes).size).toBe(codes.length);
   });
 });

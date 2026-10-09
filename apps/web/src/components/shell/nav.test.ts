@@ -12,7 +12,7 @@ describe('visibleNav', () => {
     expect(sections).toEqual(['overview', 'sessions', 'usage']);
   });
 
-  test('an admin gets Runners, Users, Audit, Prices and Settings', () => {
+  test('an admin gets Runners, Users, Audit, Prices, Integrations and Settings', () => {
     expect(labels('admin', '/')).toEqual([
       'overview/Overview',
       'overview/Projects',
@@ -23,6 +23,7 @@ describe('visibleNav', () => {
       'admin/Users',
       'admin/Audit',
       'admin/Prices',
+      'admin/Integrations',
       'admin/Settings',
     ]);
   });

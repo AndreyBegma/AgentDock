@@ -1,5 +1,9 @@
 import { z } from 'zod';
 import { slotNameSchema } from './commands/control';
+import {
+  skillRunIdSchema,
+  skillRunTerminalPhaseSchema,
+} from './commands/skills';
 import { absolutePathSchema } from './projects';
 
 /**
@@ -105,6 +109,77 @@ export const subscribeErrorMessageSchema = z.object({
   code: paneSubscribeErrorCodeSchema,
 });
 
+// Skill run live log (spec 24 D13): the same subscribe/unsubscribe mechanism,
+// `kind: "run_log"`. The runner tails the run's `stream.jsonl` and sends
+// rendered lines; the stream itself never leaves the runner.
+
+/** Rendered lines replayed to a new subscription, the newest ones (D13). */
+export const RUN_LOG_BACKLOG_LINES = 500;
+/** One rendered line, in characters; longer text is cut by the runner. */
+export const RUN_LOG_LINE_MAX_CHARS = 4000;
+/** Serialized frame cap, under the browser socket's `MAX_LIVE_MESSAGE_BYTES`. */
+export const RUN_LOG_MAX_FRAME_BYTES = 48 * 1024;
+
+/** Live event types the API relays on a `run:<projectId>:<runId>` topic. */
+export const RUN_LOG_LIVE_EVENTS = {
+  /** `data` is a `RunLogFrame` of type `lines`. */
+  lines: 'run_log.lines',
+  /** The run reached a terminal phase; `data` is the `ended` frame. */
+  ended: 'run_log.ended',
+} as const;
+
+/** Start tailing a skill run's log. The runner checks `runId` belongs to `projectId`. */
+export const runLogSubscribeMessageSchema = z.object({
+  type: z.literal('subscribe'),
+  id: subscriptionId,
+  kind: z.literal('run_log'),
+  projectId: z.string().min(1),
+  runId: skillRunIdSchema,
+});
+
+/**
+ * Every `subscribe` the server may send. `subscribeMessageSchema` stays the
+ * pane variant (#18), so its consumers keep their meaning.
+ */
+export const anySubscribeMessageSchema = z.discriminatedUnion('kind', [
+  subscribeMessageSchema,
+  runLogSubscribeMessageSchema,
+]);
+
+/** `assistant` text, a `tool` call as a one-line summary, the `result`, or a runner `system` note. */
+export const runLogLineSchema = z.object({
+  kind: z.enum(['assistant', 'tool', 'result', 'system']),
+  text: z.string().max(RUN_LOG_LINE_MAX_CHARS),
+});
+
+/**
+ * `backlog: true` on the frames that replay what was rendered before the
+ * subscription (split to fit `RUN_LOG_MAX_FRAME_BYTES`); `false` on live lines.
+ */
+export const runLogLinesFrameSchema = z.object({
+  type: z.literal('lines'),
+  backlog: z.boolean(),
+  lines: z.array(runLogLineSchema),
+});
+
+/** The run is over; nothing further is sent for this subscription. */
+export const runLogEndedFrameSchema = z.object({
+  type: z.literal('ended'),
+  phase: skillRunTerminalPhaseSchema,
+});
+
+export const runLogFrameSchema = z.discriminatedUnion('type', [
+  runLogLinesFrameSchema,
+  runLogEndedFrameSchema,
+]);
+
+/** Runner → server. Refusals use `subscribe.error`, as for panes. */
+export const runLogMessageSchema = z.object({
+  type: z.literal('run_log'),
+  id: subscriptionId,
+  frame: runLogFrameSchema,
+});
+
 export type PaneFullFrame = z.infer<typeof paneFullFrameSchema>;
 export type PanePatchFrame = z.infer<typeof panePatchFrameSchema>;
 export type PaneEndedFrame = z.infer<typeof paneEndedFrameSchema>;
@@ -116,3 +191,11 @@ export type SubscribeMessage = z.infer<typeof subscribeMessageSchema>;
 export type UnsubscribeMessage = z.infer<typeof unsubscribeMessageSchema>;
 export type PaneMessage = z.infer<typeof paneMessageSchema>;
 export type SubscribeErrorMessage = z.infer<typeof subscribeErrorMessageSchema>;
+export type PaneSubscribeMessage = SubscribeMessage;
+export type RunLogSubscribeMessage = z.infer<
+  typeof runLogSubscribeMessageSchema
+>;
+export type AnySubscribeMessage = z.infer<typeof anySubscribeMessageSchema>;
+export type RunLogLine = z.infer<typeof runLogLineSchema>;
+export type RunLogFrame = z.infer<typeof runLogFrameSchema>;
+export type RunLogMessage = z.infer<typeof runLogMessageSchema>;

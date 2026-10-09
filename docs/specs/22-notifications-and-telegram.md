@@ -81,6 +81,7 @@ Migration directory: `apps/api/prisma/migrations/20261024000000_notifications/`.
 | POST | `/notifications/read-all` | signed-in | marks all own read |
 | GET / PUT | `/notifications/rules` | signed-in | own rules for every kind (defaults filled in) |
 | GET / PUT / DELETE | `/notifications/mutes/:projectId` | project member | own mute for a project |
+| GET | `/notifications/telegram/link` | signed-in | own link: `{ linked, username, linkedAt, botConfigured }` — added in implementation, note 15 |
 | POST | `/notifications/telegram/link` | signed-in, bot configured | `{ url, expiresAt }` |
 | DELETE | `/notifications/telegram/link` | signed-in | unlink |
 | GET | `/admin/integrations/telegram` | admin | `{ configured, botUsername?, polling, linkedUsers }` |
@@ -194,6 +195,32 @@ The Telegram slot owns `apps/api/src/telegram/**`: the bot client, long polling 
 - **`NotificationsService`**, **`NotificationRulesService`** — for the test message and the "Telegram column disabled until linked" rule.
 - **Audit actions** in `packages/shared/src/audit/actions.ts`: `telegram.link`, `telegram.unlink`, `telegram.approval` (D12) are declared for this slot.
 - **Env** in `.env.example` and turbo `passThroughEnv`: `APP_URL`, `TELEGRAM_POLL_TIMEOUT_S`, `TELEGRAM_API_BASE` (read by this slot), `APP_ENCRYPTION_KEY`.
+
+i22-telegram, decided with the orchestrator on 2026-10-08:
+
+15. **Link status route (API amended).** `GET /notifications/telegram/link` answers the caller's own `TelegramLinkStatus` `{ linked, username, linkedAt, botConfigured }`, always 200. The web needs it for the Telegram card and for "Telegram column disabled until linked". The HTTP types (`TelegramLinkStatus`, `TelegramLinkCode`, `TelegramIntegrationStatus`, `TelegramBotTokenUpdate`) and the error codes `telegram_not_configured` (409), `telegram_not_linked` (409), `telegram_token_invalid` (400) and `telegram_unavailable` (502) are in `packages/shared/src/notifications/contracts.ts`.
+16. **One poller (D7).** The leader holds a session-level `pg_try_advisory_lock` on a `pg` connection of its own, not a transaction lock. The lock lives exactly as long as that connection, so a crashed instance frees it, and the 30 s long poll never pins a pooled Prisma connection inside a transaction. A follower retries every 30 s. Only the leader runs the `getUpdates` loop and the 2 s delivery timer. `GET /admin/integrations/telegram` reports `polling` (this instance leads and its loop runs), `lastError` (redacted) and `lastPollAt`. A heartbeat is logged every 60 polls. Nothing starts under `APP_ENV=test`: the suites call `acquire()`, `pollOnce()` and `deliverOnce()`.
+17. **Update offset.** It is written to `notification_matcher_state.telegramUpdateOffset` after each handled update, with `updateMany` only: the poller never creates the row, because a row created here would hand the matcher an `eventsCursor`. Until the matcher has created it (the first seconds of a fresh database), the offset lives in memory.
+18. **Linking (D9).**
+    - A code is 24 random bytes in base64url, and only its SHA-256 is stored. A new code deletes the user's older unused ones.
+    - Single use is a conditional `updateMany` (`usedAt` null, not expired) in the same transaction as the bind.
+    - A user disabled since the code was made gets the same answer as a bad code.
+    - A group chat is refused before the code is touched, so it stays usable.
+    - A chat linked to another user is refused. A user who links a second chat moves to it (one chat per user).
+    - The bot's replies are fixed text, sent without `parse_mode`. Anything that is not `/start` or `/stop` is ignored.
+    - `telegram.link` and `telegram.unlink` are audited with the user as actor and `meta.via` = `telegram` or `app`. The chat id is not stored in the audit.
+19. **Delivery (D6, D10).**
+    - Messages are MarkdownV2 with every reserved character escaped. A link target escapes only `)` and `\`. The message is built only from the stored title, body, project, slot and issue, plus an `APP_URL` link to the item's app path; links that are not a path are dropped.
+    - A 429 is reported with its `retry_after` and ends the pass: the limit is per bot, and the rest of the claim waits out its lease.
+    - 400 and 403 (blocked, chat gone) are permanent.
+    - A refused token (401/404) ends the pass without touching the rows, so nothing is lost while an admin fixes the bot.
+    - Every error text — `lastError`, logs, the admin's 502 — goes through `redactToken`. It removes the token and anything shaped like one, and a network error is reported in fixed words, never with its URL.
+20. **Bot replaced (D8 amended).**
+    - The settings row `telegram.linksBot` records which bot the links belong to; clearing the token keeps it.
+    - A `PUT` whose `getMe` username differs from it does three things in one transaction, after `BotTokenStore.set`: it deletes every `telegram_links` row and every open `telegram_link_codes` row, and zeroes the update offset. It then writes a second audit record, `telegram.unlink` on `setting:telegram.botToken`, with `after: { botUsername, previousBotUsername, unlinkedUsers }` and `meta.reason = 'bot_changed'`, and answers `unlinkedUsers`.
+    - The same username (a token rotation) keeps the links.
+    - `telegram.configure` itself is written by `BotTokenStore.set` with its fixed `after`. A crash between `set` and the transaction leaves stale links, which fail with 403 until an admin saves again.
+21. **Follow-up — D12 not built.** #20 had not merged when this slot was cut. `pr.awaiting_approval` messages link to the app and carry no Approve / Request changes buttons. A follow-up adds them through #20's approval service, with the role re-check per press, `telegram.approval` and `meta.via = "telegram"`.
 
 Depends on #9
 

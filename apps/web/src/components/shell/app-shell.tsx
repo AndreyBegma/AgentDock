@@ -39,8 +39,9 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { api, describeError } from '../../lib/api';
-import { useLive, useLiveStatus } from '../../lib/live/use-live';
+import { useLiveStatus } from '../../lib/live/use-live';
 import { isActive, NAV, projectIdOf, visibleNav } from './nav';
+import { NotificationBell } from './notification-bell';
 import { ProjectSwitcher } from './project-switcher';
 import {
   applyTheme,
@@ -100,6 +101,9 @@ function crumbsFor(pathname: string): BreadcrumbItem[] {
   }
   known.set('/account', 'Account');
   known.set('/admin', 'Admin');
+  // The nav entry "Integrations" points at its first page.
+  known.set('/admin/integrations', 'Integrations');
+  known.set('/admin/integrations/telegram', 'Telegram');
 
   const segments = pathname.split('/').filter(Boolean);
   return segments.map((segment, index) => {
@@ -161,8 +165,7 @@ export function AppShell({
 
   useCommandPaletteShortcut(() => setPaletteOpen(true));
 
-  // Holding a subscription is what keeps the socket (and the dot) alive.
-  useLive(`user:${user.id}`, () => {});
+  // The bell holds the `user:<id>` subscription that keeps the socket (and the dot) alive.
   const { status, closeCode } = useLiveStatus();
   useEffect(() => {
     if (status === 'offline' && closeCode === LIVE_CLOSE_CODES.unauthorized) {
@@ -312,6 +315,7 @@ export function AppShell({
               <Search size={14} aria-hidden="true" />
               <KeyHint keys="mod+k" />
             </Button>
+            <NotificationBell />
             <MenuRoot>
               <MenuTrigger asChild>
                 <button

@@ -3,9 +3,10 @@ import { capabilitiesSchema } from './capabilities';
 import { commandErrorCodeSchema } from './commands';
 import { eventSchema, seqCursorSchema } from './envelope';
 import {
+  anySubscribeMessageSchema,
   paneMessageSchema,
+  runLogMessageSchema,
   subscribeErrorMessageSchema,
-  subscribeMessageSchema,
   unsubscribeMessageSchema,
 } from './pane';
 import { watchedProjectSchema } from './projects';
@@ -143,6 +144,7 @@ const runnerMessages = [
   commandProgressMessageSchema,
   paneMessageSchema,
   subscribeErrorMessageSchema,
+  runLogMessageSchema,
   ...bothWayMessages,
 ] as const;
 
@@ -151,7 +153,7 @@ const serverOnlyMessages = [
   configMessageSchema,
   ackMessageSchema,
   commandMessageSchema,
-  subscribeMessageSchema,
+  anySubscribeMessageSchema,
   unsubscribeMessageSchema,
   terminalResizeMessageSchema,
 ] as const;
@@ -190,4 +192,7 @@ export type Message = z.infer<typeof messageSchema>;
 export type MessageType = Message['type'];
 
 export const runnerMessageTypes = runnerMessages.map((s) => s.shape.type.value);
-export const serverMessageTypes = serverMessages.map((s) => s.shape.type.value);
+/** `subscribe` is a union by `kind`; its first option names the type. */
+export const serverMessageTypes = serverMessages.map((s) =>
+  'shape' in s ? s.shape.type.value : s.options[0].shape.type.value,
+);

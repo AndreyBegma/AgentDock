@@ -17,6 +17,7 @@ import { ProjectsModule } from './projects/projects.module';
 import { QueueModule } from './queue';
 import { RunnersModule } from './runners/runners.module';
 import { SessionsModule } from './sessions/sessions.module';
+import { TelegramModule } from './telegram';
 import { UsageModule } from './usage/usage.module';
 
 @Module({
@@ -42,6 +43,7 @@ import { UsageModule } from './usage/usage.module';
     ActivityModule,
     HistoryModule,
     NotificationsModule,
+    TelegramModule,
   ],
   controllers: [HealthController],
 })

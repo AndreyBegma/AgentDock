@@ -252,7 +252,7 @@ export class RunnerConnection {
         void this.options.dispatch(message).then((result) => this.send(result));
         return;
       case 'subscribe':
-        void this.options.pane?.subscribe(message);
+        if (message.kind === 'pane') void this.options.pane?.subscribe(message);
         return;
       case 'unsubscribe':
         this.options.pane?.unsubscribe(message.id);
