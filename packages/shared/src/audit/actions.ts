@@ -51,6 +51,11 @@ export const AUDIT_ACTIONS = [
   'telegram.approval',
   'terminal.attached',
   'terminal.detached',
+  'skill.installed',
+  'skill.uninstalled',
+  'skill.run_started',
+  'skill.run_cancelled',
+  'skill.run_finished',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 

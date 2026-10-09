@@ -514,7 +514,7 @@ describe('merge approval queue (e2e)', () => {
       expect(commands.approve).toHaveBeenCalledTimes(1);
     });
 
-    it('answers 503 command_unavailable while the runner commands are not wired, and records the error', async () => {
+    it('answers 503 command_unavailable when the runner does not answer (real RunnerCommandService, no runner connected), and records the error', async () => {
       jest.restoreAllMocks();
       const response = await approve(H1);
       expect(response.status).toBe(503);

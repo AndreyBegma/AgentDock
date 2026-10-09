@@ -1,7 +1,8 @@
 import type {
+  AnySubscribeMessage,
   PaneMessage,
+  RunLogMessage,
   SubscribeErrorMessage,
-  SubscribeMessage,
   TerminalCloseMessage,
   TerminalDataMessage,
   TerminalResizeMessage,
@@ -11,10 +12,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import { type LiveConnection, RunnerConnections } from './runner-connections';
 
 /** Runner → server messages of a stream the server subscribed to. */
-export type RunnerStreamMessage = PaneMessage | SubscribeErrorMessage;
+export type RunnerStreamMessage =
+  | PaneMessage
+  | RunLogMessage
+  | SubscribeErrorMessage;
 /** Server → runner messages that open and close a stream, and feed an attach (#29). */
 export type RunnerStreamRequest =
-  | SubscribeMessage
+  | AnySubscribeMessage
   | UnsubscribeMessage
   | TerminalDataMessage
   | TerminalResizeMessage
@@ -23,7 +27,9 @@ export type RunnerStreamRequest =
 export type RunnerTerminalMessage = TerminalDataMessage | TerminalCloseMessage;
 
 /**
- * A consumer of runner streams — the pane relay (#18). Told when a runner's
+ * A consumer of runner streams — the pane relay (#18), the skill run log
+ * relay (#24). Every listener gets every message and keeps those whose
+ * subscription id it opened. Told when a runner's
  * socket comes and goes, because a stream does not survive a reconnect: the
  * runner forgets every subscription and the server subscribes again.
  * Handlers must not throw; work they start is their own to queue.

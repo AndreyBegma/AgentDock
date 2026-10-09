@@ -11,6 +11,7 @@ import type {
 } from '@agentdock/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import type { AuditContext } from '../audit/audit.types';
+import { RunnerCommandService } from '../runners/runner-command.service';
 import { approvalsError } from './approvals-error';
 
 export interface ApprovalCommandOptions {
@@ -48,56 +49,56 @@ export const commandOutput = <T>(name: string, result: SendResult<T>): T => {
   }
 };
 
-const notWired = (name: string) =>
-  approvalsError(
-    503,
-    APPROVALS_ERROR.commandUnavailable,
-    `${name} is not available on the runner yet`,
-  );
-
 /**
  * The one place the approvals module sends runner commands (spec 20 notes).
- *
- * `pr.inspect`, `pr.approve`, `pr.requestChanges` and `pr.voidApproval` are
- * defined in `packages/shared/src/protocol/commands/approvals.ts` but not yet
- * entered in the `commands` allowlist: the runner's `CommandHandlers` needs a
- * handler for every entry, and the handlers come with the runner slot of #20.
- * Until then each answers 503 `command_unavailable`. That slot spreads
- * `approvalCommands` into `commands` and replaces each body with
- * `commandOutput(name, await this.commands.send(runnerId, name, args, options))`
- * on an injected `RunnerCommandService`.
+ * `pr.inspect`, `pr.approve`, `pr.requestChanges` and `pr.voidApproval` are in
+ * the `commands` allowlist now that the runner registers their handlers.
  */
 @Injectable()
 export class ApprovalCommands {
+  constructor(private readonly commands: RunnerCommandService) {}
+
   async inspect(
-    _runnerId: string,
-    _args: PrInspectArgs,
-    _options: ApprovalCommandOptions,
+    runnerId: string,
+    args: PrInspectArgs,
+    options: ApprovalCommandOptions,
   ): Promise<PrInspection> {
-    throw notWired('pr.inspect');
+    return commandOutput(
+      'pr.inspect',
+      await this.commands.send(runnerId, 'pr.inspect', args, options),
+    );
   }
 
   async approve(
-    _runnerId: string,
-    _args: PrApproveArgs,
-    _options: ApprovalCommandOptions,
+    runnerId: string,
+    args: PrApproveArgs,
+    options: ApprovalCommandOptions,
   ): Promise<ApprovalSignalResult> {
-    throw notWired('pr.approve');
+    return commandOutput(
+      'pr.approve',
+      await this.commands.send(runnerId, 'pr.approve', args, options),
+    );
   }
 
   async requestChanges(
-    _runnerId: string,
-    _args: PrRequestChangesArgs,
-    _options: ApprovalCommandOptions,
+    runnerId: string,
+    args: PrRequestChangesArgs,
+    options: ApprovalCommandOptions,
   ): Promise<ApprovalSignalResult> {
-    throw notWired('pr.requestChanges');
+    return commandOutput(
+      'pr.requestChanges',
+      await this.commands.send(runnerId, 'pr.requestChanges', args, options),
+    );
   }
 
   async voidApproval(
-    _runnerId: string,
-    _args: PrVoidApprovalArgs,
-    _options: ApprovalCommandOptions,
+    runnerId: string,
+    args: PrVoidApprovalArgs,
+    options: ApprovalCommandOptions,
   ): Promise<ApprovalSignalResult> {
-    throw notWired('pr.voidApproval');
+    return commandOutput(
+      'pr.voidApproval',
+      await this.commands.send(runnerId, 'pr.voidApproval', args, options),
+    );
   }
 }

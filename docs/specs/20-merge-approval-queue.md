@@ -230,6 +230,54 @@ i20-api, decided with the orchestrator on 2026-10-08:
     settings page calls with the project detail it already has; an unread
     config is a mismatch only when AgentDock expects approval.
 
+i20-runner, 2026-10-09:
+
+16. **Registration.** `approvalCommands` is spread into `commands` in the same
+    commit as the four handlers (`apps/runner/src/commands/approvals/`) and
+    `ApprovalCommands` now sends through `RunnerCommandService`, so the 503
+    "not wired" answer is gone: 503 now means the runner did not answer.
+17. **The signal follows D5 and this issue's acceptance criteria, not the
+    plugin#8 draft.** `signal.ts` writes
+    `<git-common-dir>/cs-orchestrator/approvals/<pr>.json` =
+    `{ v: 1, pr, decision: "approved" | "changes_requested" | "stale", headSha,
+    note?, by, at }`, atomically (temp file in the same directory, then
+    `rename`, mode 0600). `headSha` is an addition to D5 so the file says which
+    head it binds. `pr.voidApproval` rewrites the file with `decision: "stale"`
+    and `by: "agentdock"`; it does not delete it. **Divergence:** the plugin#8
+    draft is `{ decision: "approve" | "request_changes", note, by, at }` with
+    no `v`, `pr` or `stale`. Until plugin#8 merges, no orchestrator reads this
+    file; when it lands, only `signal.ts` changes (its `SignalDecision`
+    spellings and, if needed, the path).
+18. **Nothing writes outside the approvals directory.** `signalPath` builds the
+    only target from an integer PR number, and `writeSignal` refuses any target
+    that is not a direct child of the approvals directory. `root` must equal
+    the watched project's root; the runner's spec snapshots the checkout, the
+    `.git` directory and the workspace around all three decision commands and
+    asserts the only new file is `cs-orchestrator/approvals/<pr>.json`.
+19. **Check state in `pr.inspect`.** Each `statusCheckRollup` entry is
+    classified with `rollupChecks([entry])` (`green` → pass, `pending` → wait,
+    `red` → fail), so `checks` and `checkList` cannot disagree.
+
+i20-web:
+
+12. **Nav badge rides the label.** glass-ui's `NavRailItem` has no badge or
+    count prop, and ADR-0011 forbids a local component, so the entry reads
+    `Approvals · 3` (plain `Approvals` at 0). The count is the number of
+    `waiting` rows in `GET /projects/:id/approvals`, refetched (debounced
+    300 ms) on the live `approvals` event. Follow-up: a `NavRailItem` badge
+    prop in glass-ui, then drop the label suffix.
+13. **Merge summary is plain text** (`whitespace-pre-wrap`, as the queue
+    sheet shows an issue body): the web app has no markdown renderer.
+14. **Decisions need an inspection.** The head SHA a decision binds to (D6)
+    is `inspection.headSha` from the detail. While `inspection` is null (the
+    runner does not handle `pr.inspect` yet, or could not answer) the sheet
+    shows the reason and disables Approve and Request changes; it never
+    sends a head it did not get from the API. A `503 command_unavailable`
+    on a decision is shown inside the dialog, a `409 head_moved` refetches
+    the detail.
+15. **D1 on the settings page** is judged on the saved project, not on the
+    unsaved toggle, with the same sentence as the approvals page.
+
 Depends on #11
 
 Depends on #17

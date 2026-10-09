@@ -18,6 +18,7 @@ import { ProjectsModule } from './projects/projects.module';
 import { QueueModule } from './queue';
 import { RunnersModule } from './runners/runners.module';
 import { SessionsModule } from './sessions/sessions.module';
+import { SkillsModule } from './skills';
 import { TelegramModule } from './telegram';
 import { TerminalModule } from './terminal';
 import { UsageModule } from './usage/usage.module';
@@ -48,6 +49,7 @@ import { UsageModule } from './usage/usage.module';
     NotificationsModule,
     TelegramModule,
     TerminalModule,
+    SkillsModule,
   ],
   controllers: [HealthController],
 })
