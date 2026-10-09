@@ -1,6 +1,10 @@
 'use client';
 
-import { type LiveErrorCode, type LiveTopic, runTopic } from '@agentdock/shared';
+import {
+  type LiveErrorCode,
+  type LiveTopic,
+  runTopic,
+} from '@agentdock/shared';
 import {
   RUN_LOG_LIVE_EVENTS,
   runLogFrameSchema,

@@ -1,9 +1,6 @@
 'use client';
 
-import {
-  RUN_UPDATED_LIVE_EVENT,
-  type SkillRunDetail,
-} from '@agentdock/shared';
+import { RUN_UPDATED_LIVE_EVENT, type SkillRunDetail } from '@agentdock/shared';
 import { Badge } from 'glass-ui/badge';
 import { Banner } from 'glass-ui/banner';
 import { Button } from 'glass-ui/button';
@@ -22,7 +19,10 @@ import { api } from '../../../../../../../lib/api';
 import { safeHttpsUrl } from '../../../../../../../lib/fleet/format';
 import { parseRunUpdate } from '../../../../../../../lib/history/format';
 import { useLive } from '../../../../../../../lib/live/use-live';
-import { formatDuration, formatTime } from '../../../../../../../lib/sessions/format';
+import {
+  formatDuration,
+  formatTime,
+} from '../../../../../../../lib/sessions/format';
 import {
   describeSkillsError,
   isActivePhase,
@@ -65,9 +65,7 @@ export default function SkillRunPage() {
   const load = useCallback(async () => {
     try {
       setRun(
-        await api<SkillRunDetail>(
-          `/projects/${projectId}/skill-runs/${runId}`,
-        ),
+        await api<SkillRunDetail>(`/projects/${projectId}/skill-runs/${runId}`),
       );
     } catch (err) {
       if (isNotFound(err)) setMissing(true);
@@ -150,7 +148,9 @@ export default function SkillRunPage() {
               tone={SKILL_PHASE_TONE[run.phase]}
               label={SKILL_PHASE_LABEL[run.phase]}
             />
-            {active ? <Spinner size="sm" label={SKILL_PHASE_LABEL[run.phase]} /> : null}
+            {active ? (
+              <Spinner size="sm" label={SKILL_PHASE_LABEL[run.phase]} />
+            ) : null}
           </h1>
           {active && canOperate ? (
             <Button variant="glass" onClick={() => setConfirming(true)}>
@@ -247,11 +247,7 @@ export default function SkillRunPage() {
               does.
             </p>
           ) : null}
-          <RunLogPanel
-            projectId={projectId}
-            runId={runId}
-            onEnded={load}
-          />
+          <RunLogPanel projectId={projectId} runId={runId} onEnded={load} />
         </section>
       ) : (
         <>

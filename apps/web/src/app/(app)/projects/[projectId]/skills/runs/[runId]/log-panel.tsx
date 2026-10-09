@@ -51,9 +51,7 @@ export function RunLogPanel({
           {log.endedPhase ? 'Run ended' : connected ? 'Live' : 'Reconnecting'}
         </span>
         <Chip size="sm">read-only</Chip>
-        {log.trimmed ? (
-          <Chip size="sm">older lines are not shown</Chip>
-        ) : null}
+        {log.trimmed ? <Chip size="sm">older lines are not shown</Chip> : null}
       </div>
       {error ? (
         <p role="alert" className="text-sm text-danger">

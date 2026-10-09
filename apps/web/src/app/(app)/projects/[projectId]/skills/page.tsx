@@ -140,9 +140,12 @@ export default function ProjectSkillsPage() {
     setUnavailable(false);
     try {
       setView(
-        await api<InstalledSkillsView>(`/projects/${projectId}/skills/refresh`, {
-          method: 'POST',
-        }),
+        await api<InstalledSkillsView>(
+          `/projects/${projectId}/skills/refresh`,
+          {
+            method: 'POST',
+          },
+        ),
       );
       toast.success('Skills rescanned.');
     } catch (err) {

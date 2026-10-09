@@ -8,6 +8,7 @@ import {
   EMPTY_RUN_FORM,
   formatBytes,
   groupBySkillScope,
+  installOutcome,
   isActivePhase,
   isCommandUnavailable,
   parseTimeoutMinutes,
@@ -149,12 +150,52 @@ describe('misc helpers', () => {
   });
   test('allowed-tools as a string or a list', () => {
     expect(allowedToolsOf({})).toEqual([]);
-    expect(allowedToolsOf({ 'allowed-tools': 'Read, Bash(git:*) Edit' })).toEqual([
-      'Read',
-      'Bash(git:*)',
-      'Edit',
-    ]);
+    expect(
+      allowedToolsOf({ 'allowed-tools': 'Read, Bash(git:*) Edit' }),
+    ).toEqual(['Read', 'Bash(git:*)', 'Edit']);
     expect(allowedToolsOf({ 'allowed-tools': ['Read'] })).toEqual(['Read']);
+  });
+});
+
+describe('installOutcome', () => {
+  test('pending while requested', () => {
+    expect(
+      installOutcome({ status: 'requested', result: null, error: null }).state,
+    ).toBe('pending');
+  });
+  test('ok with a pull request link; a non-https link is dropped', () => {
+    const ok = installOutcome({
+      status: 'ok',
+      result: { path: 'p', prUrl: 'https://github.com/o/r/pull/1' },
+      error: null,
+    });
+    expect(ok.state).toBe('done');
+    expect(ok.prUrl).toBe('https://github.com/o/r/pull/1');
+    expect(
+      installOutcome({
+        status: 'ok',
+        result: { prUrl: 'javascript:alert(1)' },
+        error: null,
+      }).prUrl,
+    ).toBeNull();
+  });
+  test('a runner code in the message gets its sentence', () => {
+    const failed = installOutcome({
+      status: 'error',
+      result: null,
+      error: { code: 'runner_error', message: 'changed_since_preview' },
+    });
+    expect(failed.state).toBe('failed');
+    expect(failed.text).toContain('nothing was written');
+  });
+  test('unknown outcome is a failure that says so', () => {
+    const unknown = installOutcome({
+      status: 'unknown',
+      result: null,
+      error: null,
+    });
+    expect(unknown.state).toBe('failed');
+    expect(unknown.text).toContain('unknown');
   });
 });
 

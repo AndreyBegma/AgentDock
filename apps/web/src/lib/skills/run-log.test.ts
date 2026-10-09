@@ -48,7 +48,10 @@ describe('applyRunLogFrame', () => {
   });
 
   test('the head is trimmed past the keep limit and flagged', () => {
-    const many = Array.from({ length: RUN_LOG_KEEP_LINES + 3 }, (_, i) => `l${i}`);
+    const many = Array.from(
+      { length: RUN_LOG_KEEP_LINES + 3 },
+      (_, i) => `l${i}`,
+    );
     const state = applyRunLogFrame(EMPTY_RUN_LOG, lines(false, ...many));
     expect(state.rows).toHaveLength(RUN_LOG_KEEP_LINES);
     expect(state.rows[0]?.text).toBe('l3');

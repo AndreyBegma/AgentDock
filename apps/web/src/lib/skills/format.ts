@@ -1,7 +1,7 @@
 import {
   type InstalledSkillView,
-  type SkillRunRequest,
   SKILLS_ERROR,
+  type SkillRunRequest,
 } from '@agentdock/shared';
 import {
   isTerminalSkillRunPhase,
@@ -15,6 +15,7 @@ import {
   type SkillScope,
 } from '@agentdock/shared/protocol';
 import { ApiError, describeError } from '../api';
+import { safeHttpsUrl } from '../fleet/format';
 
 type Tone = 'ok' | 'warn' | 'danger' | 'neutral';
 
@@ -90,7 +91,11 @@ export function profileKeysFrom(
   const keys = new Set<string>();
   if (defaultProfileId) keys.add(defaultProfileId);
   for (const item of items) {
-    if (item.scope === 'profile' && item.runtime === 'claude' && item.profileKey) {
+    if (
+      item.scope === 'profile' &&
+      item.runtime === 'claude' &&
+      item.profileKey
+    ) {
       keys.add(item.profileKey);
     }
   }
@@ -118,7 +123,8 @@ export const PERMISSION_MODE_WARNING: Partial<
 /** The warning for a mode other than `auto` (spec UI); null for `auto` and for "project default". */
 export const permissionWarning = (
   mode: OrchestratorPermissionMode | '',
-): string | null => (mode === '' ? null : (PERMISSION_MODE_WARNING[mode] ?? null));
+): string | null =>
+  mode === '' ? null : (PERMISSION_MODE_WARNING[mode] ?? null);
 
 export const utf8Bytes = (text: string): number =>
   new TextEncoder().encode(text).length;
@@ -262,6 +268,67 @@ export function describeSkillsError(error: unknown): string {
     if (error.status === 403) return 'Your role does not allow this.';
   }
   return describeError(error);
+}
+
+export interface InstallOutcome {
+  state: 'pending' | 'done' | 'failed';
+  text: string;
+  prUrl: string | null;
+}
+
+/**
+ * What a project install (a `command_runs` row, #17) came to. The runner’s
+ * own error code travels in the message (`runner_error`), so a recognised one
+ * gets its sentence and anything else is shown as it came.
+ */
+export function installOutcome(run: {
+  status: 'requested' | 'ok' | 'error' | 'unknown';
+  result: Record<string, unknown> | null;
+  error: { code: string; message?: string } | null;
+}): InstallOutcome {
+  switch (run.status) {
+    case 'requested':
+      return {
+        state: 'pending',
+        text: 'Installing — the runner is opening a pull request…',
+        prUrl: null,
+      };
+    case 'ok': {
+      const prUrl = safeHttpsUrl(
+        typeof run.result?.prUrl === 'string' ? run.result.prUrl : null,
+      );
+      return {
+        state: 'done',
+        text: prUrl
+          ? 'Installed: review and merge the pull request to use it.'
+          : 'Installed.',
+        prUrl,
+      };
+    }
+    case 'unknown':
+      return {
+        state: 'failed',
+        text: 'The runner never answered, so the outcome is unknown. Check the repository before installing again.',
+        prUrl: null,
+      };
+    case 'error': {
+      const message = run.error?.message ?? '';
+      const known = Object.values(SKILLS_ERROR).find((code) =>
+        message.includes(code),
+      );
+      return {
+        state: 'failed',
+        text: known
+          ? describeSkillsError(
+              new ApiError(0, known as never, message, undefined, {
+                error: known,
+              }),
+            )
+          : `The install failed. ${message}`.trim(),
+        prUrl: null,
+      };
+    }
+  }
 }
 
 export const isNotFound = (error: unknown): boolean =>
