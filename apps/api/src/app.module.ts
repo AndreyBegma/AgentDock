@@ -22,6 +22,7 @@ import { SkillsModule } from './skills';
 import { TelegramModule } from './telegram';
 import { TerminalModule } from './terminal';
 import { UsageModule } from './usage/usage.module';
+import { WebhooksModule } from './webhooks';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { UsageModule } from './usage/usage.module';
     TelegramModule,
     TerminalModule,
     SkillsModule,
+    WebhooksModule,
   ],
   controllers: [HealthController],
 })
