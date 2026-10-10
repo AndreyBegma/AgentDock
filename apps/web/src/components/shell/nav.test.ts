@@ -29,6 +29,7 @@ describe('visibleNav', () => {
       'admin/Integrations',
       'admin/Triggers',
       'admin/Webhooks',
+      'admin/GitHub App',
       'admin/Settings',
     ]);
   });
