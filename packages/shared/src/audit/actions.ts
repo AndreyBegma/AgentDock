@@ -80,6 +80,10 @@ export const AUDIT_ACTIONS = [
   'trigger.delete',
   'trigger.rotate_secret',
   'settings.webhooks',
+  'github_app.register',
+  'github_app.update_credentials',
+  'github_app.resync',
+  'github_app.delete',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 

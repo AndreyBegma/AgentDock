@@ -9,6 +9,7 @@ import { BudgetsModule } from './budgets';
 import { ControlModule } from './control';
 import { DatabaseModule } from './database/database.module';
 import { FleetModule } from './fleet';
+import { GitHubAppModule } from './github-app';
 import { HealthController } from './health.controller';
 import { HistoryModule } from './history';
 import { LiveModule } from './live/live.module';
@@ -55,6 +56,9 @@ import { WebhooksModule } from './webhooks';
     SkillsModule,
     SchedulesModule,
     BudgetsModule,
+    // Before WebhooksModule: its `POST /hooks/:publicId` would otherwise
+    // claim `/hooks/github` (spec 27 notes; pinned by an e2e test).
+    GitHubAppModule,
     WebhooksModule,
   ],
   controllers: [HealthController],

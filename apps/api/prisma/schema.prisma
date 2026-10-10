@@ -60,6 +60,7 @@ model User {
   budgetOverridesRevoked      BudgetOverride[]              @relation("BudgetOverrideRevokedBy")
   inboundTriggersCreated      InboundTrigger[]
   webhooksCreated             Webhook[]
+  githubAppsRegistered        GitHubApp[]
 
   @@map("users")
 }
@@ -330,6 +331,7 @@ model Project {
   schedules            Schedule[]
   budgets              Budget[]
   inboundTriggers      InboundTrigger[]
+  githubAppHealth      GitHubProjectHealth?
 
   @@unique([runnerId, rootPath])
   @@map("projects")
@@ -1773,4 +1775,98 @@ model BudgetOverride {
 
   @@index([budgetId, periodStart])
   @@map("budget_overrides")
+}
+
+// ─── GitHub App (spec 27) ───────────────────────────────────────────────────
+
+/// The one GitHub App of this instance (D1, D3). Secrets are `SecretCipher`
+/// ciphertext and never leave the API.
+model GitHubApp {
+  /// Always "app": one App per instance.
+  id                     String    @id @default("app")
+  appId                  Int
+  slug                   String
+  ownerLogin             String
+  privateKey             String
+  webhookSecret          String
+  /// Stored, unused: AgentDock does no OAuth (D3).
+  clientSecret           String?
+  /// False when the manifest had no `PUBLIC_URL` (D14).
+  hookActive             Boolean
+  signatureFailures      Int       @default(0)
+  lastDeliveryAt         DateTime?
+  /// D11 (c): a failure after the last verified delivery makes every project unhealthy.
+  lastSignatureFailureAt DateTime?
+  /// D11 (b): the last `GET /app/hook/deliveries` check, at resync.
+  hookCheckedAt          DateTime?
+  hookCheckOk            Boolean?
+  /// Nullable so deleting the admin keeps the registration.
+  registeredById         String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  registeredBy User? @relation(fields: [registeredById], references: [id], onDelete: SetNull)
+
+  @@map("github_app")
+}
+
+/// An installation of the App, as GitHub last listed it (D10).
+model GitHubInstallation {
+  /// GitHub's installation id.
+  id           Int      @id
+  accountLogin String
+  accountType  String
+  suspended    Boolean
+  syncedAt     DateTime
+  createdAt    DateTime @default(now())
+
+  repos GitHubInstallationRepo[]
+
+  @@map("github_installations")
+}
+
+/// A repository an installation can see. `fullName` is lower-cased (D7).
+model GitHubInstallationRepo {
+  installationId Int
+  /// BigInt: GitHub's repository ids are nearing the 32-bit limit.
+  repoId         BigInt
+  fullName       String
+
+  installation GitHubInstallation @relation(fields: [installationId], references: [id], onDelete: Cascade)
+
+  @@id([installationId, repoId])
+  @@index([fullName])
+  @@map("github_installation_repos")
+}
+
+/// A verified delivery, kept for dedupe by `X-GitHub-Delivery` (D6) and for
+/// D11's "recent delivery"; 14 days (D17).
+model GitHubDelivery {
+  deliveryId      String   @id
+  event           String
+  action          String?
+  /// Lower-cased `repository.full_name`.
+  fullName        String?
+  installationId  Int?
+  receivedAt      DateTime @default(now())
+  handled         Boolean
+  projectsMatched Int
+
+  @@index([installationId, receivedAt])
+  @@index([receivedAt])
+  @@map("github_deliveries")
+}
+
+/// A project's App health, recomputed every 5 minutes (D11).
+model GitHubProjectHealth {
+  projectId String   @id
+  covered   Boolean
+  /// `healthy` | `unhealthy` (shared `githubAppHealthSchema`).
+  state     String
+  reason    String?
+  checkedAt DateTime
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("github_project_health")
 }
