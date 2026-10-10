@@ -9,6 +9,7 @@ import type {
   OrchestratorPermissionMode,
 } from '@agentdock/shared/protocol';
 import { ApiError, describeError } from '../api';
+import { describeBudgetExceededError } from '../budgets/format';
 
 /** Spec 17 D7: the text of a message to a worker, counted in UTF-8 bytes. */
 export const MESSAGE_MAX_BYTES = 16 * 1024;
@@ -99,6 +100,8 @@ export function commandRunIdOf(error: unknown): string | undefined {
 /** A sentence for a failed control request. */
 export function describeControlError(error: unknown): string {
   if (!(error instanceof ApiError)) return describeError(error);
+  const budget = describeBudgetExceededError(error);
+  if (budget) return budget;
   const code = error.code as string | undefined;
   if (isControlErrorCode(code)) return CONTROL_ERROR_SENTENCE[code];
   if (error.status === 403) return CONTROL_ERROR_SENTENCE.forbidden;

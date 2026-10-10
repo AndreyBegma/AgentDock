@@ -18,6 +18,7 @@ import {
   Sparkles,
   Tag,
   Users,
+  Wallet,
   Wand2,
   Workflow,
 } from 'lucide-react';
@@ -205,6 +206,14 @@ export const NAV: NavSection[] = [
         href: '/admin/schedules',
         label: 'Schedules',
         icon: CalendarClock,
+        minRole: 'admin',
+        enabled: true,
+      },
+      {
+        id: 'admin-budgets',
+        href: '/admin/budgets',
+        label: 'Budgets',
+        icon: Wallet,
         minRole: 'admin',
         enabled: true,
       },

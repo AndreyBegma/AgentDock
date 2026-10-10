@@ -23,6 +23,7 @@ describe('visibleNav', () => {
       'admin/Runners',
       'admin/Users',
       'admin/Schedules',
+      'admin/Budgets',
       'admin/Audit',
       'admin/Prices',
       'admin/Integrations',

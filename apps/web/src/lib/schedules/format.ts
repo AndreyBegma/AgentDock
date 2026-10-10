@@ -10,6 +10,7 @@ import {
   type ScheduleView,
 } from '@agentdock/shared';
 import { ApiError, describeError } from '../api';
+import { describeBudgetExceededError } from '../budgets/format';
 
 type Tone = 'ok' | 'warn' | 'danger' | 'neutral';
 
@@ -263,6 +264,8 @@ export const isNotFound = (error: unknown): boolean =>
 
 /** Every schedules error as a sentence for the person. */
 export function describeSchedulesError(error: unknown): string {
+  const budget = describeBudgetExceededError(error);
+  if (budget) return budget;
   switch (errorCode(error)) {
     case SCHEDULES_ERROR.invalidCron:
       return 'That is not a valid cron expression. Use five fields: minute hour day month weekday.';

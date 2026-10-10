@@ -23,6 +23,7 @@ import { StatTile } from 'glass-ui/stat-tile';
 import { toast } from 'glass-ui/toast';
 import Link from 'next/link';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { BudgetStrip } from '../../../components/budgets/budget-chip';
 import { useCurrentUser } from '../../../components/shell/user-context';
 import { ApiError, api } from '../../../lib/api';
 import {
@@ -489,6 +490,13 @@ export default function UsagePage() {
           projects={projects}
         />
       </div>
+
+      <BudgetStrip
+        projects={
+          projectId ? projects.filter((p) => p.id === projectId) : projects
+        }
+        userId={user.id}
+      />
 
       {!range ? (
         <EmptyState
