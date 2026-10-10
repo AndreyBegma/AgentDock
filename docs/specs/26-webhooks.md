@@ -182,6 +182,15 @@ Recorded while building the core slot (i26-core).
 - **Who owns `GET/PUT /admin/settings/webhooks`.** The outbound slot (its controller); the core ships `WebhookSettingsService`.
 - **Module layout.** `WebhooksModule` imports `WebhooksCommonModule` and the `InboundWebhooksModule` / `OutboundWebhooksModule` stubs, which the inbound and outbound slots fill in without editing the parent module.
 
+Recorded while building the outbound slot (i26-outbound).
+
+- **`schedule.failed` / `schedule.disabled` are not delivered yet (gap).** Spec 25 (Notes, Q2) publishes them live only; the `events` table is runner-scoped and has no API-sourced rows, and D11's dispatcher reads `events` alone. A webhook may subscribe to both types, but nothing produces a delivery for them until an API event source exists. Follow-up issue, not built around here.
+- **Dispatcher (D11).** The first pass starts the cursor at the `events` sequence's last value, so history from before webhooks existed is not sent. The cursor moves through the activity projector's `EventFrontier` (a hole waits 10 s). A `scraped` `slot.checkpoint` / `slot.dispatched` that a live plugin channel shadows is skipped, as the activity feed skips it (spec 16 D8), so one checkpoint is one delivery. A runner event typed `webhook.test` is never forwarded. A project-less event matches only webhooks with `projectIds` empty. Event → project is `(runnerId, rootPath)`, then a `repo` unique on the runner.
+- **Delivery worker (D12, D14).** A claim pushes `nextAttemptAt` past a lease (request timeout + 60 s), so an attempt cut short by a crash is retried. An open circuit whose 15 minutes have passed moves to `half_open` and exactly one delivery is claimed as the probe; a probe older than the lease is taken as dead and another is allowed. `consecutiveFailures` and the circuit are updated under the webhook row's lock. A failure that is not the receiver's (`secret_unavailable`: the key is missing or changed) counts as an attempt but not toward the circuit. A disabled webhook's pending deliveries are held, not dropped. `webhook_deliveries.error` holds the `WEBHOOK_ATTEMPT_ERRORS` code only.
+- **Redeliver.** Sets the delivery back to `pending`, due now, error cleared; the attempt count keeps counting, so a `failed` delivery gets one more attempt. It is still held by an open circuit; `close-circuit` releases it. `test` creates a `webhook.test` delivery with envelope id `test_<delivery id>` and `project: null`.
+- **Retention (D18).** One job, `webhooks-retention` (daily 04:45), deletes both `webhook_deliveries` (by `createdAt`) and `inbound_deliveries` (by `receivedAt`); the inbound slot adds none.
+- **Admin API.** An unknown `projectIds` entry → 404 `not_found`; a bad delivery-log cursor → 400. `POST …/test` and `…/redeliver` answer 202 with the delivery; `close-circuit` and `rotate-secret` 200.
+
 ## Open questions
 
 | Question | Default if nobody answers |
