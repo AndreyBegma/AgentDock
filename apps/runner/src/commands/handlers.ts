@@ -25,6 +25,7 @@ import {
 import { prInspect } from './approvals/inspect';
 import type { CommandHandlers } from './dispatcher';
 import { CommandFailure } from './failure';
+import { type CollectorPollDeps, collectorPoll } from './github/collector-poll';
 import { issueCreate } from './queue/issue-create';
 import { issuesRefresh } from './queue/issues-refresh';
 import {
@@ -47,6 +48,8 @@ export interface HandlerContext {
   fs?: ProjectFs;
   /** The session watcher's backfill; absent when sessions are disabled. */
   backfillSessions?: SessionBackfillContext['backfill'];
+  /** `collector.poll` (spec 27): the collector registry's `pollNow`. */
+  pollCollectors?: CollectorPollDeps['pollNow'];
   /** Interactive attaches (spec 29); absent means this runner cannot attach. */
   terminal?: {
     attach(args: TerminalAttachArgs): Promise<TerminalAttachResult>;
@@ -100,6 +103,11 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
       }),
     'issues.refresh': (args) =>
       issuesRefresh(args, { watchedProjects: context.watchedProjects }),
+    'collector.poll': (args) =>
+      collectorPoll(args, {
+        watchedProjects: context.watchedProjects,
+        pollNow: context.pollCollectors ?? (async () => []),
+      }),
     'pr.inspect': (args) => prInspect(args, approvals),
     'pr.approve': (args) => prApprove(args, approvals),
     'pr.requestChanges': (args) => prRequestChanges(args, approvals),

@@ -4,10 +4,9 @@ import type { CommandDefinition } from '../commands';
 /**
  * GitHub App commands (docs/specs/27-github-app.md D13).
  *
- * `githubCommands` is defined and exported here, but entered in the
- * `commands` allowlist only together with its runner handler: the runner's
- * `CommandHandlers` needs a handler for every key of that map, so an entry
- * without one breaks the runner build (spec 27, notes).
+ * `githubCommands` is spread into the `commands` allowlist in the same change
+ * as the runner's handler: `CommandHandlers` needs a handler for every key of
+ * that map (spec 27, notes).
  */
 
 /** The collectors a GitHub delivery can ask the runner to poll now (D8). */
@@ -16,9 +15,10 @@ export const pollableCollectorSchema = z.enum(POLLABLE_COLLECTORS);
 export type PollableCollector = z.infer<typeof pollableCollectorSchema>;
 
 /**
- * `collector.poll` — restart the named collectors of one project through the
- * runner's registry (`stop()` then `start()`; each polls on start). Sent only
- * by the API's GitHub module as the system actor; no user route exposes it.
+ * `collector.poll` — poll the named collectors of one project now, through the
+ * runner's registry, without restarting them (`prs` and `worktrees` are steps
+ * of the `fleet` collector). Sent only by the API's GitHub module as the
+ * system actor; no user route exposes it.
  */
 export const collectorPollArgsSchema = z.strictObject({
   projectId: z.string().min(1),
@@ -33,7 +33,7 @@ export const collectorPollArgsSchema = z.strictObject({
 export type CollectorPollArgs = z.infer<typeof collectorPollArgsSchema>;
 
 export const collectorPollResultSchema = z.object({
-  /** The collectors actually restarted — a collector not running is absent. */
+  /** The collectors actually polled (the name is historical) — one not running is absent. */
   restarted: z.array(z.string().min(1)),
 });
 export type CollectorPollResult = z.infer<typeof collectorPollResultSchema>;
