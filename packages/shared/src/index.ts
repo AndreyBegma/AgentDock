@@ -16,6 +16,7 @@ export * from './sessions';
 export * from './skills';
 export * from './terminal';
 export * from './usage';
+export * from './webhooks';
 
 export const formatDate = (date: Date): string =>
   date.toISOString().split('T')[0];
