@@ -15,6 +15,7 @@ import { STATUS_TONE } from '../../../../../lib/runners/format';
 import { BudgetTab } from './budget/budget-tab';
 import { DocsTab } from './docs-tab';
 import { GeneralTab } from './general-tab';
+import { GitHubAppRow } from './github-app-row';
 import { MembersTab } from './members-tab';
 import { OrchestratorTab } from './orchestrator-tab';
 
@@ -109,7 +110,10 @@ export default function ProjectSettingsPage() {
       </Tabs>
 
       {tab === 'general' ? (
-        <GeneralTab project={project} isAdmin={isAdmin} onChanged={load} />
+        <div className="flex flex-col gap-4">
+          <GeneralTab project={project} isAdmin={isAdmin} onChanged={load} />
+          <GitHubAppRow projectId={project.id} />
+        </div>
       ) : null}
       {tab === 'docs' ? (
         <DocsTab
