@@ -182,6 +182,16 @@ Recorded while building the core slot (i26-core).
 - **Who owns `GET/PUT /admin/settings/webhooks`.** The outbound slot (its controller); the core ships `WebhookSettingsService`.
 - **Module layout.** `WebhooksModule` imports `WebhooksCommonModule` and the `InboundWebhooksModule` / `OutboundWebhooksModule` stubs, which the inbound and outbound slots fill in without editing the parent module.
 
+Recorded while building the inbound slot (i26-inbound).
+
+- **Hook order.** Trigger lookup (404, empty body) → signature (401) → in one transaction holding the trigger row `FOR UPDATE`: replay (409) → rate token (429, nothing recorded, so the caller may retry the same delivery id) → JSON parse and D4 rendering (422, recorded `rejected` with the D4 reason, or `invalid_json`) → creator (D5) → one live run (D6) → `accepted`. Every delivery that verifies and is not a replay spends a token, a 422 included, so a leaked secret cannot grow the table faster than 30 rows an hour.
+- **D5 / D6 answer 202.** `creator_not_authorized` (`failed`) and `previous_still_running` (`skipped`) are decided before the 202 and are its `status`. A delivery still `accepted` (its firing not settled) counts as a live run for 10 minutes, so two deliveries in quick succession start one run.
+- **D6 `beforeFire()`.** #25's `BeforeFire` takes a schedule and its firing, so triggers do not call it. #28 puts its `BudgetGate` inside `SkillRunService.start` and `ControlService.start`, which a firing calls, so triggers are gated there; a `409 budget_exceeded` is recorded `skipped` / `before_fire_denied`.
+- **Firing.** After the 202, `TriggerFirer` calls `SkillRunService.start` (trigger `{ type: webhook, id: <trigger cuid> }`, role `admin`, audit actor `system`) or `ControlService.start` (`mode: next`, the creator as the command run's user). `triggeredById` is the cuid, not the `publicId`: run history is visible to project viewers and the `publicId` is the URL. Outcomes: `started` (+ `runId` / `commandRunId`); `already_running` → `skipped` / `previous_still_running`; `runner_offline` / `command_unavailable` → `failed` / `runner_offline`; any other refusal → `failed` / `command_failed`. Shutdown waits for firings already past their 202.
+- **Auto-disable** (D5) is audited as `trigger.update` with actor `system`, `after: { enabled: false, disabledReason: "creator_not_authorized" }`. A `PATCH { enabled: false }` stores `disabledReason: "manual"`; enabling clears it.
+- **Retention** of `inbound_deliveries` (D18) is the outbound slot's daily job, which deletes both delivery tables.
+- **Dry run** answers 200 with `InboundDryRunResult` (`ok: false` carries the same `reason` / `path` the hook's 422 does).
+
 ## Open questions
 
 | Question | Default if nobody answers |
