@@ -12,6 +12,7 @@ import {
   Plug,
   Radio,
   ScrollText,
+  Send,
   Server,
   Settings,
   ShieldCheck,
@@ -20,6 +21,7 @@ import {
   Users,
   Wallet,
   Wand2,
+  Webhook,
   Workflow,
 } from 'lucide-react';
 
@@ -238,6 +240,22 @@ export const NAV: NavSection[] = [
         href: '/admin/integrations/telegram',
         label: 'Integrations',
         icon: Plug,
+        minRole: 'admin',
+        enabled: true,
+      },
+      {
+        id: 'admin-triggers',
+        href: '/admin/integrations/triggers',
+        label: 'Triggers',
+        icon: Webhook,
+        minRole: 'admin',
+        enabled: true,
+      },
+      {
+        id: 'admin-webhooks',
+        href: '/admin/integrations/webhooks',
+        label: 'Webhooks',
+        icon: Send,
         minRole: 'admin',
         enabled: true,
       },

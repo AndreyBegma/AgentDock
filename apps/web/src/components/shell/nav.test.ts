@@ -27,6 +27,8 @@ describe('visibleNav', () => {
       'admin/Audit',
       'admin/Prices',
       'admin/Integrations',
+      'admin/Triggers',
+      'admin/Webhooks',
       'admin/Settings',
     ]);
   });
