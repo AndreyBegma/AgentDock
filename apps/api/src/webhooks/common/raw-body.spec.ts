@@ -8,7 +8,9 @@ import {
 
 /** A server running the middleware, then answering what it captured. */
 const startServer = async (maxBytes = 64) => {
-  const middleware = rawBodyMiddleware(['/hooks'], maxBytes);
+  const middleware = rawBodyMiddleware(['/hooks'], maxBytes, {
+    '/hooks/big': 128,
+  });
   const server = http.createServer((req: RawBodyRequest, res) => {
     middleware(req, res, (error) => {
       if (error) {
@@ -112,6 +114,18 @@ describe('rawBodyMiddleware (D8)', () => {
       req.end('x'.repeat(40));
     });
     expect(status).toBe(413);
+  });
+
+  it('applies a path’s own limit to that exact path only (spec 27 D6)', async () => {
+    expect((await send(ctx.port, '/hooks/big', 'x'.repeat(128))).status).toBe(
+      200,
+    );
+    expect((await send(ctx.port, '/hooks/big', 'x'.repeat(129))).status).toBe(
+      413,
+    );
+    expect((await send(ctx.port, '/hooks/big/x', 'x'.repeat(65))).status).toBe(
+      413,
+    );
   });
 
   it('answers 415 to a compressed body', async () => {

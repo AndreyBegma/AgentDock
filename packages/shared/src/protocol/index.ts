@@ -2,6 +2,7 @@ export * from './capabilities';
 export * from './commands';
 export * from './commands/approvals';
 export * from './commands/control';
+export * from './commands/github';
 export * from './commands/queue';
 export * from './commands/skills';
 export * from './commands/terminal';

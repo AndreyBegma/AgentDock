@@ -1,5 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
+  GITHUB_HOOK_BODY_MAX_BYTES,
+  GITHUB_HOOK_PATH,
   INBOUND_BODY_MAX_BYTES,
   INBOUND_HOOK_PATH_PREFIX,
 } from '@agentdock/shared';
@@ -15,8 +17,16 @@ import {
  * app behave the same.
  */
 
-/** Path prefixes whose bodies are captured raw. #27 appends its own route. */
+/**
+ * Path prefixes whose bodies are captured raw. `/hooks/github` (#27) falls
+ * under `/hooks`; it differs only in its size limit.
+ */
 export const RAW_BODY_ROUTES: readonly string[] = [INBOUND_HOOK_PATH_PREFIX];
+
+/** Exact paths with their own size limit (spec 27 D6: GitHub's deliveries run larger). */
+export const RAW_BODY_LIMITS: Readonly<Record<string, number>> = {
+  [GITHUB_HOOK_PATH]: GITHUB_HOOK_BODY_MAX_BYTES,
+};
 
 /** A request that went through `rawBodyMiddleware`. */
 export interface RawBodyRequest extends IncomingMessage {
@@ -55,27 +65,28 @@ const isJson = (req: IncomingMessage): boolean => {
  * Connect-style middleware. Only `POST` with `Content-Type: application/json`
  * is read; anything else passes through unread and is refused downstream
  * (the CSRF guard answers 415 to a non-JSON public request). Over
- * `maxBytes` → 413; a compressed body → 415, since the signature covers the
- * bytes as sent.
+ * the path's limit (`limits`, else `defaultMaxBytes`) → 413; a compressed body
+ * → 415, since the signature covers the bytes as sent.
  */
 export const rawBodyMiddleware =
   (
     routes: readonly string[] = RAW_BODY_ROUTES,
-    maxBytes: number = INBOUND_BODY_MAX_BYTES,
+    defaultMaxBytes: number = INBOUND_BODY_MAX_BYTES,
+    limits: Readonly<Record<string, number>> = RAW_BODY_LIMITS,
   ) =>
   (
     req: RawBodyRequest,
     res: ServerResponse,
     next: (error?: unknown) => void,
   ) => {
-    if (
-      req.method !== 'POST' ||
-      !matches(pathOf(req), routes) ||
-      !isJson(req)
-    ) {
+    const path = pathOf(req);
+    if (req.method !== 'POST' || !matches(path, routes) || !isJson(req)) {
       next();
       return;
     }
+    const maxBytes = Object.hasOwn(limits, path)
+      ? limits[path]
+      : defaultMaxBytes;
     const tooLarge = () => {
       const message = `Body exceeds ${maxBytes} bytes`;
       sendError(res, 413, 'payload_too_large', message);
