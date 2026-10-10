@@ -15,6 +15,7 @@ import {
   type SkillScope,
 } from '@agentdock/shared/protocol';
 import { ApiError, describeError } from '../api';
+import { describeBudgetExceededError } from '../budgets/format';
 import { safeHttpsUrl } from '../fleet/format';
 
 type Tone = 'ok' | 'warn' | 'danger' | 'neutral';
@@ -225,6 +226,8 @@ export const COMMAND_UNAVAILABLE_TEXT =
 
 /** Every skills error as a sentence for the person. */
 export function describeSkillsError(error: unknown): string {
+  const budget = describeBudgetExceededError(error);
+  if (budget) return budget;
   switch (errorCode(error)) {
     case SKILLS_ERROR.commandUnavailable:
       return COMMAND_UNAVAILABLE_TEXT;

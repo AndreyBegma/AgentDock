@@ -8,6 +8,7 @@ import { Field, Input, Select, Textarea } from 'glass-ui/field';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { api } from '../../../../../lib/api';
+import { describeBudgetExceededError } from '../../../../../lib/budgets/format';
 import {
   PERMISSION_MODE_LABEL,
   permissionModesFor,
@@ -48,6 +49,8 @@ export function RunDialog({
   const [form, setForm] = useState<RunForm>(EMPTY_RUN_FORM);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
+  /** Set when the start was refused by a stop budget (409 `budget_exceeded`). */
+  const [budgetRefusal, setBudgetRefusal] = useState<string>();
 
   const problem = runFormProblem(form);
   const warning = permissionWarning(form.permissionMode);
@@ -58,6 +61,7 @@ export function RunDialog({
     if (busy) return;
     setForm(EMPTY_RUN_FORM);
     setError(undefined);
+    setBudgetRefusal(undefined);
     onOpenChange(false);
   };
 
@@ -65,6 +69,7 @@ export function RunDialog({
     if (!skill || problem) return;
     setBusy(true);
     setError(undefined);
+    setBudgetRefusal(undefined);
     try {
       const run = await api<SkillRunView>(`/projects/${projectId}/skill-runs`, {
         method: 'POST',
@@ -74,6 +79,7 @@ export function RunDialog({
       onOpenChange(false);
       router.push(`/projects/${projectId}/skills/runs/${run.runId}`);
     } catch (err) {
+      setBudgetRefusal(describeBudgetExceededError(err) ?? undefined);
       setError(describeSkillsError(err));
     } finally {
       setBusy(false);
@@ -214,7 +220,11 @@ export function RunDialog({
                 : RUN_FORM_PROBLEM_TEXT[problem]}
             </p>
           ) : null}
-          {error ? (
+          {budgetRefusal ? (
+            <Banner tone="danger" title="Budget used up">
+              {budgetRefusal}
+            </Banner>
+          ) : error ? (
             <p role="alert" className="text-sm text-danger">
               {error}
             </p>

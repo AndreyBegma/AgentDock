@@ -20,6 +20,7 @@ import { toast } from 'glass-ui/toast';
 import { Toggle } from 'glass-ui/toggle';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { BudgetExceededBanner } from '../../../../../components/budgets/exceeded-banner';
 import { TerminalSheet } from '../../../../../components/terminal/terminal-sheet';
 import type { TerminalTarget } from '../../../../../components/terminal/terminal-view';
 import { api } from '../../../../../lib/api';
@@ -187,6 +188,8 @@ export default function FleetPage() {
               : 'Offline'}
         </span>
       </div>
+
+      <BudgetExceededBanner projectId={projectId} />
 
       <OrchestratorCard
         fleet={fleet}
