@@ -1,4 +1,5 @@
 import type {
+  GitHubAppHealth,
   UnsequencedEvent,
   WatchedProject,
 } from '@agentdock/shared/protocol';
@@ -44,6 +45,18 @@ export interface Collector {
   readonly name: string;
   start(project: WatchedProject, emit: Emit): void | Promise<void>;
   stop(): void | Promise<void>;
+  /**
+   * Spec 27 D12: the project's GitHub App health is known at creation and
+   * whenever it changes. Absent means `unhealthy`. Only collectors that back
+   * off while the App is healthy implement it.
+   */
+  setGithubApp?(health: GitHubAppHealth | undefined): void;
+  /**
+   * Spec 27 D13: poll now, without restarting. Takes the pollable names
+   * (`issues`, `prs`, `worktrees`) and resolves with the ones this collector
+   * polled.
+   */
+  pollNow?(targets: readonly string[]): Promise<string[]>;
 }
 
 /** Creates a fresh collector for one project. */
@@ -98,6 +111,32 @@ export class CollectorRegistry {
     return work;
   }
 
+  /**
+   * Polls the named collectors of one project now, leaving every other
+   * collector alone; resolves with the names that were polled, in the order
+   * asked. Waits for a start or stop in progress, but not for other polls.
+   */
+  async pollNow(
+    projectId: string,
+    targets: readonly string[],
+  ): Promise<string[]> {
+    await this.queue;
+    const polled = new Set<string>();
+    for (const collector of this.running.get(projectId)?.collectors ?? []) {
+      if (!collector.pollNow) continue;
+      try {
+        for (const name of await collector.pollNow(targets)) polled.add(name);
+      } catch (error) {
+        this.options.log.error('collector: poll failed', {
+          collector: collector.name,
+          projectId,
+          error: errorMessage(error),
+        });
+      }
+    }
+    return targets.filter((name) => polled.has(name));
+  }
+
   /** Stops every collector of every project. */
   stop(): Promise<void> {
     return this.setProjects([]);
@@ -110,6 +149,12 @@ export class CollectorRegistry {
       if (!wanted || wanted.root !== running.project.root) {
         this.running.delete(id);
         await this.stopAll(running);
+      } else if (wanted.githubApp !== running.project.githubApp) {
+        // Health alone never restarts a project's collectors (spec 27 D12).
+        running.project = { ...running.project, githubApp: wanted.githubApp };
+        for (const collector of running.collectors) {
+          collector.setGithubApp?.(wanted.githubApp);
+        }
       }
     }
     for (const project of next.values()) {
@@ -124,6 +169,7 @@ export class CollectorRegistry {
     const { log, emit } = this.options;
     for (const create of this.options.factories) {
       const collector = create(this.context);
+      collector.setGithubApp?.(running.project.githubApp);
       try {
         await collector.start(running.project, emit);
         running.collectors.push(collector);

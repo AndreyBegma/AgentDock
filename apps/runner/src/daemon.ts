@@ -215,6 +215,8 @@ export const runDaemon = async (
         detectCapabilities: redetect,
         exec,
         watchedProjects: () => watchList.current,
+        pollCollectors: (projectId, targets) =>
+          registry.pollNow(projectId, targets),
         profiles: () => config.profiles,
         backfillSessions: sessions
           ? (scope) => sessions.backfill(scope)

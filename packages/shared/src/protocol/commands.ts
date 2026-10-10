@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { capabilitiesSchema, hostSchema } from './capabilities';
 import { approvalCommands } from './commands/approvals';
 import { controlCommands } from './commands/control';
+import { githubCommands } from './commands/github';
 import { queueCommands } from './commands/queue';
 import { skillCommands } from './commands/skills';
 import { terminalCommands } from './commands/terminal';
@@ -127,6 +128,7 @@ export const commands = {
   ...controlCommands,
   ...approvalCommands,
   ...queueCommands,
+  ...githubCommands,
   ...terminalCommands,
   ...skillCommands,
 } as const satisfies Record<string, CommandDefinition>;

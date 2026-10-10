@@ -140,6 +140,55 @@ describe('IssuesCollector', () => {
     t.collector.stop();
   });
 
+  it('polls every 10 minutes while the GitHub App is healthy, 60 s again when it is not (spec 27 D12)', async () => {
+    const t = setup();
+    t.gh[ISSUES_1] = page([item(1)]);
+    t.gh[ISSUES_1_ETAG] = notModified;
+    t.collector.setGithubApp('healthy');
+    await t.start();
+    expect(t.calls).toHaveLength(1);
+
+    const minute = async () => {
+      t.clock.advance(60_000);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    };
+    for (let i = 1; i < 10; i++) await minute();
+    expect(t.calls).toHaveLength(1);
+    await minute(); // the tenth minute
+    expect(t.calls).toHaveLength(2);
+    await minute();
+    expect(t.calls).toHaveLength(2);
+
+    // Unhealthy: the very next tick polls, with no restart.
+    t.collector.setGithubApp(undefined);
+    await minute();
+    expect(t.calls).toHaveLength(3);
+    await minute();
+    expect(t.calls).toHaveLength(4);
+    t.collector.stop();
+  });
+
+  it('polls now for collector.poll, only when issues is named, and counts as a poll', async () => {
+    const t = setup();
+    t.gh[ISSUES_1] = page([item(1)]);
+    t.gh[ISSUES_1_ETAG] = notModified;
+    t.collector.setGithubApp('healthy');
+    await t.start();
+    expect(await t.collector.pollNow(['prs', 'worktrees'])).toEqual([]);
+    expect(t.calls).toHaveLength(1);
+    expect(await t.collector.pollNow(['prs', 'issues'])).toEqual(['issues']);
+    expect(t.calls).toHaveLength(2);
+
+    t.clock.advance(9 * 60_000);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    t.clock.advance(60_000);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    // Ten minutes after the poll above, the regular tick is due again.
+    expect(t.calls).toHaveLength(3);
+    t.collector.stop();
+    expect(await t.collector.pollNow(['issues'])).toEqual([]);
+  });
+
   it('polls every 60 s by default and at the context interval when set', async () => {
     const stopped = async (fleet: typeof DEFAULT_FLEET_SETTINGS) => {
       const clock = new FakeClock();

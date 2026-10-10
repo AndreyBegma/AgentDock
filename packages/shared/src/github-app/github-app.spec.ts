@@ -95,9 +95,9 @@ describe('collector.poll (spec 27 D13)', () => {
     ).toBe(false);
   });
 
-  it('is entered in the allowlist only with its runner handler', () => {
-    // When the runner slot registers it, this expectation moves with it.
-    expect(Object.hasOwn(commands, 'collector.poll')).toBe(false);
+  it('is in the allowlist, admin-only, with its runner handler', () => {
+    expect(Object.hasOwn(commands, 'collector.poll')).toBe(true);
+    expect(commands['collector.poll'].minRole).toBe('admin');
   });
 });
 

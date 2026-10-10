@@ -38,13 +38,19 @@ export class WatchList {
 
   /** Applies the server's list: collectors follow it, the cache is rewritten when it changed. */
   async apply(projects: readonly WatchedProject[]): Promise<void> {
-    const next = projects.map((p) => ({ id: p.id, root: p.root }));
+    // The App health (spec 27 D12) lives in memory only: the config cache must
+    // not make a restarted runner trust a health the server has not confirmed.
+    const next = projects.map((p) => ({
+      id: p.id,
+      root: p.root,
+      ...(p.githubApp ? { githubApp: p.githubApp } : {}),
+    }));
     const changed = !same(this.projects, next);
     this.projects = next;
     if (changed) {
       this.options.log.info('watch list changed', { projects: next.length });
       try {
-        this.options.persist(next);
+        this.options.persist(next.map((p) => ({ id: p.id, root: p.root })));
       } catch (error) {
         this.options.log.warn('cannot cache the watch list', {
           error: errorMessage(error),

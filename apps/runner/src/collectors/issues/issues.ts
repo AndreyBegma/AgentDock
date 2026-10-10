@@ -1,5 +1,6 @@
 import { parseDependsOn } from '@agentdock/shared';
 import type {
+  GitHubAppHealth,
   IssueClosedData,
   IssuesRefreshResult,
   QueueEventType,
@@ -7,6 +8,7 @@ import type {
 import { type Cancel, isoNow } from '../../clock';
 import { type FleetProject, resolveFleetProject } from '../../fleet/project';
 import { errorMessage } from '../../log';
+import { AppPacing } from '../app-pacing';
 import type {
   Collector,
   CollectorContext,
@@ -55,11 +57,25 @@ export class IssuesCollector implements Collector {
   private stopped = false;
   private first: Promise<unknown> = Promise.resolve();
   private readonly refresher = () => this.refresh();
+  private readonly pacing: AppPacing;
 
   constructor(
     private readonly context: CollectorContext,
     private readonly options: IssuesCollectorOptions = {},
-  ) {}
+  ) {
+    this.pacing = new AppPacing(context.clock);
+  }
+
+  setGithubApp(health: GitHubAppHealth | undefined): void {
+    this.pacing.setHealth(health);
+  }
+
+  /** `collector.poll` (spec 27 D13): an ordinary conditional pass, now. */
+  async pollNow(targets: readonly string[]): Promise<string[]> {
+    if (this.stopped || !targets.includes('issues')) return [];
+    await this.enqueue(false);
+    return ['issues'];
+  }
 
   async start(watched: WatchedProject, emit: Emit): Promise<void> {
     const { exec, clock } = this.context;
@@ -68,7 +84,8 @@ export class IssuesCollector implements Collector {
     this.refreshers().register(watched.id, this.refresher);
     this.first = this.enqueue(false);
     this.timer = clock.setInterval(
-      () => void this.enqueue(false),
+      // Spec 27 D12: relaxed to 10 minutes while the GitHub App is healthy.
+      () => this.pacing.due() && void this.enqueue(false),
       (this.options.pollSeconds ??
         this.context.fleet.queuePollSeconds ??
         DEFAULT_ISSUES_POLL_SECONDS) * 1000,
@@ -119,6 +136,7 @@ export class IssuesCollector implements Collector {
 
   private async pass(force: boolean): Promise<PassResult> {
     if (this.stopped) return { kind: 'unchanged' };
+    this.pacing.polled();
     try {
       return await this.poll(force);
     } catch (error) {
