@@ -5,6 +5,7 @@ import { AdminModule } from './admin/admin.module';
 import { ApprovalsModule } from './approvals';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
+import { BudgetsModule } from './budgets';
 import { ControlModule } from './control';
 import { DatabaseModule } from './database/database.module';
 import { FleetModule } from './fleet';
@@ -53,6 +54,7 @@ import { WebhooksModule } from './webhooks';
     TerminalModule,
     SkillsModule,
     SchedulesModule,
+    BudgetsModule,
     WebhooksModule,
   ],
   controllers: [HealthController],

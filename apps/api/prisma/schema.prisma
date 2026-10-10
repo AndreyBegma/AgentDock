@@ -54,6 +54,10 @@ model User {
   skillInstallPreviews        SkillInstallPreview[]
   schedulesCreated            Schedule[]                    @relation("ScheduleCreatedBy")
   schedulesUpdated            Schedule[]                    @relation("ScheduleUpdatedBy")
+  budgets                     Budget[]                      @relation("BudgetUser")
+  budgetsCreated              Budget[]                      @relation("BudgetCreatedBy")
+  budgetOverrides             BudgetOverride[]              @relation("BudgetOverrideBy")
+  budgetOverridesRevoked      BudgetOverride[]              @relation("BudgetOverrideRevokedBy")
   inboundTriggersCreated      InboundTrigger[]
   webhooksCreated             Webhook[]
 
@@ -324,6 +328,7 @@ model Project {
   installedSkills      InstalledSkill[]
   skillInstallPreviews SkillInstallPreview[]
   schedules            Schedule[]
+  budgets              Budget[]
   inboundTriggers      InboundTrigger[]
 
   @@unique([runnerId, rootPath])
@@ -1674,4 +1679,98 @@ model ScheduleFiring {
   @@index([scheduleId, scheduledFor])
   @@index([status])
   @@map("schedule_firings")
+}
+
+// ─── Budgets (docs/specs/28-budgets.md) ─────────────────────────────────────
+
+enum BudgetScope {
+  project
+  user
+}
+
+enum BudgetPeriod {
+  day
+  week
+  month
+}
+
+enum BudgetAction {
+  alert
+  stop
+}
+
+/// A spend cap in API-equivalent dollars (D1). Exactly one of `projectId` /
+/// `userId` is set, matching `scope` (check constraint `budgets_scope_check`),
+/// and at most one budget per `(scope, projectId, userId, period)` is enabled
+/// (partial unique index `budgets_enabled_key`). Both live in the migration's
+/// SQL: Prisma cannot declare either.
+model Budget {
+  id          String       @id @default(cuid())
+  scope       BudgetScope
+  projectId   String?
+  userId      String?
+  period      BudgetPeriod
+  /// IANA zone the periods are cut in (D9).
+  timezone    String
+  limitUsd    Decimal      @db.Decimal(14, 4)
+  /// Sorted percents, 100 always present.
+  thresholds  Int[]
+  action      BudgetAction
+  enabled     Boolean      @default(true)
+  /// Nullable so deleting the admin who created it keeps the budget.
+  createdById String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  project   Project?          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User?             @relation("BudgetUser", fields: [userId], references: [id], onDelete: Cascade)
+  createdBy User?             @relation("BudgetCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  periods   BudgetPeriodRow[]
+  overrides BudgetOverride[]
+
+  @@index([projectId])
+  @@index([userId])
+  @@map("budgets")
+}
+
+/// One period of a budget, `[start, end)` (D9). `spentUsd` and
+/// `unpricedRequests` are rebuilt from `llm_requests` on every evaluation
+/// (spec 28 notes, amending D4/D5); `firedThresholds` only grows within the
+/// period, so each threshold notifies once.
+model BudgetPeriodRow {
+  id               String    @id @default(cuid())
+  budgetId         String
+  start            DateTime  @db.Timestamptz(3)
+  end              DateTime  @db.Timestamptz(3)
+  spentUsd         Decimal   @default(0) @db.Decimal(14, 6)
+  unpricedRequests Int       @default(0)
+  firedThresholds  Int[]     @default([])
+  exceededAt       DateTime? @db.Timestamptz(3)
+  reconciledAt     DateTime  @db.Timestamptz(3)
+
+  budget Budget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+
+  @@unique([budgetId, start])
+  @@map("budget_periods")
+}
+
+/// An admin lifting a `stop` budget for one period, until `until` (D8).
+model BudgetOverride {
+  id          String    @id @default(cuid())
+  budgetId    String
+  periodStart DateTime  @db.Timestamptz(3)
+  until       DateTime  @db.Timestamptz(3)
+  reason      String
+  /// Nullable so deleting the admin keeps the record.
+  byId        String?
+  createdAt   DateTime  @default(now())
+  revokedAt   DateTime? @db.Timestamptz(3)
+  revokedById String?
+
+  budget    Budget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  by        User?  @relation("BudgetOverrideBy", fields: [byId], references: [id], onDelete: SetNull)
+  revokedBy User?  @relation("BudgetOverrideRevokedBy", fields: [revokedById], references: [id], onDelete: SetNull)
+
+  @@index([budgetId, periodStart])
+  @@map("budget_overrides")
 }
