@@ -1,4 +1,5 @@
 import {
+  BUDGET_ERROR,
   INBOUND_DELIVERY_REASONS,
   type InboundDeliveryReason,
   SKILLS_ERROR,
@@ -12,9 +13,6 @@ import { PrismaService } from '../../database/prisma.service';
 import { SkillRunService } from '../../skills';
 import { InboundLive } from './inbound-live';
 import { parseAction } from './trigger-action';
-
-/** #28 D7: a gated start refused by a `stop` budget — 409 `budget_exceeded`. */
-export const BUDGET_EXCEEDED = 'budget_exceeded';
 
 /** How a firing ended, before it is written. */
 interface Outcome {
@@ -35,8 +33,7 @@ const errorBody = (
   const text = (key: string) =>
     typeof record[key] === 'string' ? (record[key] as string) : undefined;
   return {
-    // #28 documents `code`; every other API error carries `error`.
-    code: text('error') ?? text('code') ?? 'error',
+    code: text('error') ?? 'error',
     runId: text('runId'),
     commandRunId: text('commandRunId'),
   };
@@ -169,8 +166,8 @@ export class TriggerFirer {
       ...(body.commandRunId ? { commandRunId: body.commandRunId } : {}),
     };
     switch (body.code) {
-      // D6: #28's gate is the pre-fire hook (spec 26 notes).
-      case BUDGET_EXCEEDED:
+      // D6: #28's stop budget is the pre-fire hook (spec 26 notes).
+      case BUDGET_ERROR.exceeded:
         return {
           status: 'skipped',
           reason: INBOUND_DELIVERY_REASONS.beforeFireDenied,

@@ -3,8 +3,7 @@ import {
   type InboundTriggerWithSecret,
   WEBHOOK_HEADERS,
 } from '@agentdock/shared';
-import { HttpException } from '@nestjs/common';
-import { SkillRunService } from '../../skills';
+import { BudgetGate } from '../../budgets/budget-gate';
 import {
   createUser,
   type E2eContext,
@@ -457,24 +456,32 @@ describe('POST /hooks/:publicId (e2e, spec 26 D1–D7)', () => {
       expect(row).toMatchObject({ status: 'failed', reason: 'runner_offline' });
     });
 
-    it('a stop budget (#28: 409 budget_exceeded) → skipped before_fire_denied', async () => {
-      jest
-        .spyOn(ctx.app.get(SkillRunService), 'start')
-        .mockRejectedValue(
-          new HttpException(
-            { statusCode: 409, code: 'budget_exceeded', budgetId: 'b1' },
-            409,
-          ),
-        );
-      const trigger = await createTrigger();
+    it.each([
+      ['a skill', skillAction, ['ref', 'run.id']],
+      ['orchestrator next', { kind: 'orchestrator', mode: 'next' }, []],
+    ])('an exceeded stop budget (#28 D7) refuses %s → skipped before_fire_denied', async (_name, action, allowedPaths) => {
+      // The real gate inside the start paths, refusing as an exceeded budget does.
+      const gate = jest
+        .spyOn(ctx.app.get(BudgetGate), 'check')
+        .mockResolvedValue({
+          allowed: false,
+          budgetId: 'b1',
+          scope: 'project',
+          resetsAt: new Date(Date.now() + 3_600_000),
+        });
+      const trigger = await createTrigger({ action, allowedPaths });
       await deliver(trigger);
       await settle();
+      expect(gate).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId, userId: null }),
+      );
       const [row] = await deliveries(trigger.id);
       expect(row).toMatchObject({
         status: 'skipped',
         reason: 'before_fire_denied',
       });
       expect(runner.sent('skill.run')).toEqual([]);
+      expect(runner.sent('orchestrator.start')).toEqual([]);
     });
 
     it('a skill no longer installed → failed command_failed', async () => {
