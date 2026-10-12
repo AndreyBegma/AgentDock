@@ -52,7 +52,9 @@ export function TerminalSheet({
   });
 
   const targetKey = target
-    ? `${target.kind}:${'slot' in target ? target.slot : ''}`
+    ? `${target.kind}:${
+        'slot' in target ? target.slot : 'runId' in target ? target.runId : ''
+      }`
     : '';
   // Every target opens read-only, never in the previous target's mode.
   // biome-ignore lint/correctness/useExhaustiveDependencies: targetKey is the reset trigger
