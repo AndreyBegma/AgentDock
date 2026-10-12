@@ -48,6 +48,9 @@ export const slotWorktreePath = (root: string, slot: string): string => {
   return join(dirname(trimmed), `.wt-${basename(trimmed)}-${slot}`);
 };
 
+/** Skill runs and project installs (spec 24) create `.wt-<repo>-run-*` / `-skill-*`; they are not slots. */
+const NON_SLOT_WORKTREE = /^(?:run|skill)-/;
+
 /** The slot of a worktree path that follows the rule for `root`, else null. */
 export const slotOfWorktree = (root: string, path: string): string | null => {
   const trimmed = root.replace(/\/+$/, '');
@@ -56,6 +59,7 @@ export const slotOfWorktree = (root: string, path: string): string | null => {
   const name = basename(path);
   if (!name.startsWith(lead)) return null;
   const slot = name.slice(lead.length);
+  if (NON_SLOT_WORKTREE.test(slot)) return null;
   return SLOT.test(slot) ? slot : null;
 };
 
