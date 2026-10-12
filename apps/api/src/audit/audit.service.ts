@@ -78,6 +78,8 @@ export class AuditService {
         actorType: actor.type,
         actorUserId: actor.type === 'user' ? actor.userId : null,
         actorRunnerId: actor.type === 'runner' ? actor.runnerId : null,
+        actorOnBehalfOfId:
+          actor.type === 'system' ? (actor.onBehalfOf ?? null) : null,
         action: entry.action,
         targetType: entry.target.type,
         targetId: entry.target.id ?? null,
@@ -94,6 +96,7 @@ export class AuditService {
           actorType: actor.type,
           actorUserId: row.actorUserId,
           actorRunnerId: row.actorRunnerId,
+          actorOnBehalfOfId: row.actorOnBehalfOfId,
           action: row.action,
           targetType: row.targetType,
           targetId: row.targetId,

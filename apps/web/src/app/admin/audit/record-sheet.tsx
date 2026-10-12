@@ -57,9 +57,9 @@ export function RecordSheet({
             </Row>
             <Row label="Actor">
               {actorLabel(record)}
-              {record.actorUserId ? (
+              {(record.actorUserId ?? record.actorOnBehalfOfId) ? (
                 <span className="block font-mono text-xs text-ink-3">
-                  {record.actorUserId}
+                  {record.actorUserId ?? record.actorOnBehalfOfId}
                 </span>
               ) : null}
             </Row>

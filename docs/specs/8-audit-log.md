@@ -73,6 +73,7 @@ or `runners`:
 | `actorType` | enum `AuditActorType` (`user`, `runner`, `system`, `anonymous`) |
 | `actorUserId` | String? (plain column, no FK — see below) |
 | `actorRunnerId` | String? (plain column, no FK, same reason) |
+| `actorOnBehalfOfId` | String? (plain column, no FK, same reason) — #102, see below |
 | `action` | String |
 | `targetType` | String |
 | `targetId` | String? |
@@ -84,12 +85,36 @@ or `runners`:
 | `prevHash` | String (64 hex) |
 | `hash` | String (64 hex), unique |
 
-Indexes: `(ts)`, `(action, ts)`, `(actorUserId, ts)`, `(projectId, ts)`,
-`(targetType, targetId)`.
+Indexes: `(ts)`, `(action, ts)`, `(actorUserId, ts)`, `(actorOnBehalfOfId, ts)`,
+`(projectId, ts)`, `(targetType, targetId)`.
 
-`actorUserId` and `actorRunnerId` are stored as plain columns without foreign
-keys: deleting a user (#3 allows it) must not cascade into or be blocked by the
-audit table, and D3 forbids the `UPDATE` a `SET NULL` would perform.
+`actorUserId`, `actorRunnerId` and `actorOnBehalfOfId` are stored as plain
+columns without foreign keys: deleting a user (#3 allows it) must not cascade
+into or be blocked by the audit table, and D3 forbids the `UPDATE` a `SET NULL`
+would perform.
+
+### `onBehalfOf` (#102)
+
+A `system` actor may name the user it acted for: `{ type: "system", onBehalfOf:
+<userId> }`, stored as `actorOnBehalfOfId`. Schedule firings ([#25](25-cron-schedules.md)
+D8) and inbound webhook trigger firings ([#26](26-webhooks.md)) set it to the
+creator; the records a firing produces (`skill.run_started`, `orchestrator.*`,
+`runner.command`, …) carry it. Disabling a schedule or a trigger is the system's
+own decision and stays a plain `system` record.
+
+**Hash.** D1's canonical record includes the key `actorOnBehalfOfId` **only
+when it is non-null**. A record without it — every record written before #102,
+and every later record that has none — hashes byte-for-byte as before, so the
+existing chain verifies unchanged; setting, changing or clearing the field on a
+stored row breaks the chain at that row. Migration
+`20261106000000_audit_on_behalf_of` adds the nullable column and its index; no
+row is rewritten.
+
+**API and UI.** Records carry `actorOnBehalfOfId` and `actorOnBehalfOfEmail`
+(null once the user is deleted); the table and the detail sheet show "system on
+behalf of <email>". The CSV export appends `actorOnBehalfOfId` as its **last**
+column, so earlier columns keep their positions. The `actorUserId` filter is
+unchanged — it does not match `actorOnBehalfOfId`.
 
 Trigger SQL (appended to `migration.sql`):
 

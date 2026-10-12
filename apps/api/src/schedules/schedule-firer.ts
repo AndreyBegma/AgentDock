@@ -17,7 +17,7 @@ import type {
   ScheduleFiringStatus,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
-import { SYSTEM_ACTOR } from '../audit/audit.types';
+import { SYSTEM_ACTOR, systemActorFor } from '../audit/audit.types';
 import { ControlService } from '../control/control.service';
 import { PrismaService } from '../database/prisma.service';
 import { ProjectAccessService } from '../projects';
@@ -300,9 +300,8 @@ export class ScheduleFirer {
     role: Role,
     creator: { id: string; email: string },
   ): Promise<Outcome> {
-    // D8: sent as the system, with the creator's role; the person is
-    // reachable through the run's trigger (`triggeredById` → schedule).
-    const ctx = { actor: SYSTEM_ACTOR };
+    // D8: sent as the system on the creator's behalf, with the creator's role.
+    const ctx = { actor: systemActorFor(creator.id) };
     if (target.kind === 'skill') {
       const profileKey = await this.profileKey(target.profileId);
       const run = await this.skillRuns.start(

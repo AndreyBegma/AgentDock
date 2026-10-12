@@ -23,7 +23,7 @@ import {
   type Session,
 } from '../test/e2e-app';
 import { AuditService } from './audit.service';
-import type { AuditEntry } from './audit.types';
+import { type AuditEntry, systemActorFor } from './audit.types';
 import { AuditVerificationJob } from './audit-verification.job';
 import { AuditVerificationService } from './audit-verification.service';
 import { GENESIS_HASH } from './canonical';
@@ -637,6 +637,67 @@ describe('audit log (e2e)', () => {
       );
     });
 
+    it('onBehalfOf is stored and hashed; records with and without it verify; forging it breaks the chain (#102)', async () => {
+      await audit.record({
+        actor: { type: 'system' },
+        action: 'user.create',
+        target: { type: 'behalf-plain' },
+        result: 'ok',
+      });
+      await audit.record({
+        actor: systemActorFor('u-behalf'),
+        action: 'skill.run_started',
+        target: { type: 'behalf' },
+        result: 'ok',
+      });
+      const [plain, behalf] = await Promise.all(
+        ['behalf-plain', 'behalf'].map((targetType) =>
+          ctx.prisma.auditRecord.findFirstOrThrow({
+            where: { targetType },
+            orderBy: { seq: 'desc' },
+          }),
+        ),
+      );
+      expect(plain.actorOnBehalfOfId).toBeNull();
+      expect(behalf.actorOnBehalfOfId).toBe('u-behalf');
+      expect(
+        (await admin.send('post', '/admin/audit/verification')).body,
+      ).toMatchObject({ ok: true });
+
+      await ctx.prisma.$executeRawUnsafe(
+        'DROP TRIGGER audit_records_no_update_delete ON audit_records',
+      );
+      try {
+        await ctx.prisma.$executeRaw`
+          UPDATE audit_records SET "actorOnBehalfOfId" = 'u-forged'
+          WHERE seq = ${behalf.seq}`;
+        expect(
+          (await admin.send('post', '/admin/audit/verification')).body,
+        ).toMatchObject({ ok: false, firstBrokenSeq: behalf.seq.toString() });
+        await ctx.prisma.$executeRaw`
+          UPDATE audit_records SET "actorOnBehalfOfId" = 'u-behalf'
+          WHERE seq = ${behalf.seq}`;
+        // Adding it to a record written without it breaks the chain too.
+        await ctx.prisma.$executeRaw`
+          UPDATE audit_records SET "actorOnBehalfOfId" = 'u-forged'
+          WHERE seq = ${plain.seq}`;
+        expect(
+          (await admin.send('post', '/admin/audit/verification')).body,
+        ).toMatchObject({ ok: false, firstBrokenSeq: plain.seq.toString() });
+        await ctx.prisma.$executeRaw`
+          UPDATE audit_records SET "actorOnBehalfOfId" = NULL
+          WHERE seq = ${plain.seq}`;
+      } finally {
+        await ctx.prisma.$executeRawUnsafe(`
+          CREATE TRIGGER audit_records_no_update_delete
+            BEFORE UPDATE OR DELETE ON audit_records
+            FOR EACH ROW EXECUTE FUNCTION audit_records_immutable()`);
+      }
+      expect(
+        (await admin.send('post', '/admin/audit/verification')).body,
+      ).toMatchObject({ ok: true });
+    });
+
     it('the nightly job stores its result; GET returns it', async () => {
       expect(
         (
@@ -801,6 +862,39 @@ describe('audit log (e2e)', () => {
       expect(JSON.parse(first[col('after')])).toEqual(tricky);
       expect(JSON.parse(first[col('meta')])).toEqual({ via: 'test' });
       expect(second[col('after')]).toBe('');
+      // #102 appended its column last; earlier columns keep their positions.
+      expect(header.at(-1)).toBe('actorOnBehalfOfId');
+      expect(header.indexOf('hash')).toBe(14);
+    });
+
+    it('serves onBehalfOf with the user email; null once the user is deleted (#102)', async () => {
+      const user = await createUser(ctx.prisma, 'cron@example.com', 'admin');
+      await audit.record({
+        actor: systemActorFor(user.id),
+        action: 'skill.run_started',
+        target: { type: `${marker}-behalf` },
+        result: 'ok',
+      });
+      const read = async () =>
+        (
+          (
+            await admin
+              .get('/admin/audit')
+              .query({ targetType: `${marker}-behalf` })
+          ).body as AuditPage
+        ).items[0];
+      expect(await read()).toMatchObject<Partial<AuditRecordView>>({
+        actorType: 'system',
+        actorUserId: null,
+        actorEmail: null,
+        actorOnBehalfOfId: user.id,
+        actorOnBehalfOfEmail: 'cron@example.com',
+      });
+      await ctx.prisma.user.delete({ where: { id: user.id } });
+      expect(await read()).toMatchObject<Partial<AuditRecordView>>({
+        actorOnBehalfOfId: user.id,
+        actorOnBehalfOfEmail: null,
+      });
     });
 
     it('a deleted user keeps their records, readable by id', async () => {

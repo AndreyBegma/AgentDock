@@ -85,6 +85,47 @@ describe('computeHash', () => {
   });
 });
 
+describe('computeHash and onBehalfOf (#102)', () => {
+  // A system record as written before #102. The literal was computed by the
+  // code on `develop` before the field existed: a stored record must keep
+  // hashing to it, or verification breaks for every existing chain.
+  const PRE_102_HASH =
+    'beed6d84dd320a58b272877942c4daac0fe3a09a1257566524c2b37174bfe2a3';
+  const legacy: HashedFields = {
+    seq: 7n,
+    ts: new Date('2026-10-07T18:36:20.123Z'),
+    actorType: 'system',
+    actorUserId: null,
+    actorRunnerId: null,
+    action: 'skill.run',
+    targetType: 'run',
+    targetId: 'r_1',
+    projectId: 'p_1',
+    before: null,
+    after: { skill: 'review', args: '' },
+    result: 'ok',
+    meta: null,
+  };
+
+  it('a record without it hashes exactly as before — absent or null', () => {
+    expect(computeHash(GENESIS_HASH, legacy)).toBe(PRE_102_HASH);
+    expect(
+      computeHash(GENESIS_HASH, { ...legacy, actorOnBehalfOfId: null }),
+    ).toBe(PRE_102_HASH);
+  });
+
+  it('is covered by the hash when set', () => {
+    const forU1 = computeHash(GENESIS_HASH, {
+      ...legacy,
+      actorOnBehalfOfId: 'u_1',
+    });
+    expect(forU1).not.toBe(PRE_102_HASH);
+    expect(
+      computeHash(GENESIS_HASH, { ...legacy, actorOnBehalfOfId: 'u_2' }),
+    ).not.toBe(forU1);
+  });
+});
+
 describe('csv', () => {
   it('quotes per RFC 4180 and serialises objects as JSON', () => {
     expect(csvCell(null)).toBe('');

@@ -149,6 +149,13 @@ describe('POST /hooks/:publicId (e2e, spec 26 D1–D7)', () => {
       triggeredByType: 'webhook',
       triggeredById: trigger.id,
     });
+    // Spec 26 notes (#102): the system, on the trigger creator's behalf.
+    const [started] = await auditOf('skill.run_started');
+    expect(started).toMatchObject({
+      actorType: 'system',
+      actorUserId: null,
+      actorOnBehalfOfId: adminId,
+    });
   });
 
   it('hands the rendered args to the runner as one JSON string value, never as shell text (ADR-0010)', async () => {

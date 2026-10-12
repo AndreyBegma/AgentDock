@@ -1,10 +1,14 @@
 import type { AuditAction, AuditResult } from '@agentdock/shared';
 
-/** Who did it (spec D5). `anonymous`: no session — failed logins, registration. */
+/**
+ * Who did it (spec D5). `anonymous`: no session — failed logins, registration.
+ * `system.onBehalfOf`: the user the system acted for — a schedule's or a
+ * trigger's creator when it fires (#102).
+ */
 export type AuditActor =
   | { type: 'user'; userId: string }
   | { type: 'runner'; runnerId: string }
-  | { type: 'system' }
+  | { type: 'system'; onBehalfOf?: string }
   | { type: 'anonymous' };
 
 /** Where a request came from — merged into `meta` (spec D9). */
@@ -36,4 +40,10 @@ export const ANONYMOUS_ACTOR: AuditActor = { type: 'anonymous' };
 export const userActor = (userId: string): AuditActor => ({
   type: 'user',
   userId,
+});
+
+/** The system, acting for `userId`. */
+export const systemActorFor = (userId: string): AuditActor => ({
+  type: 'system',
+  onBehalfOf: userId,
 });

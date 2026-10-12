@@ -241,6 +241,8 @@ model AuditRecord {
   actorType     AuditActorType
   actorUserId   String?
   actorRunnerId String?
+  /// A `system` actor's principal (#102); hashed only when set.
+  actorOnBehalfOfId String?
   action        String
   targetType    String
   targetId      String?
@@ -257,6 +259,7 @@ model AuditRecord {
   @@index([ts])
   @@index([action, ts])
   @@index([actorUserId, ts])
+  @@index([actorOnBehalfOfId, ts])
   @@index([projectId, ts])
   @@index([targetType, targetId])
   @@map("audit_records")

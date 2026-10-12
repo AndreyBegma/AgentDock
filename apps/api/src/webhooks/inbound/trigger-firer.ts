@@ -7,7 +7,7 @@ import {
 import { ORCHESTRATOR_DEFAULTS } from '@agentdock/shared/protocol';
 import { HttpException, Injectable, Logger } from '@nestjs/common';
 import type { InboundDelivery, InboundDeliveryStatus } from '@prisma/client';
-import { SYSTEM_ACTOR } from '../../audit/audit.types';
+import { systemActorFor } from '../../audit/audit.types';
 import { ControlService } from '../../control/control.service';
 import { PrismaService } from '../../database/prisma.service';
 import { SkillRunService } from '../../skills';
@@ -118,9 +118,8 @@ export class TriggerFirer {
         reason: INBOUND_DELIVERY_REASONS.creatorNotAuthorized,
       };
     }
-    // Spec 26 notes: fired as the system, on behalf of an active admin; the
-    // run's trigger (`webhook`, the trigger's id) leads back to the person.
-    const ctx = { actor: SYSTEM_ACTOR };
+    // Spec 26 notes: fired as the system, on behalf of an active admin.
+    const ctx = { actor: systemActorFor(trigger.createdBy.id) };
     const action = parseAction(trigger.action);
     if (action.kind === 'skill') {
       if (typeof delivery.renderedArgs !== 'string') {
