@@ -15,7 +15,7 @@ const QUEUE_JOBS = new Set([SETTLE_SCHEDULER, RECONCILE_SCHEDULER]);
 /**
  * D13: the API's own jobs, read-only from `@nestjs/schedule`. The modules
  * that own them are not touched; a job outside the registry (a plain
- * `setInterval`) is not listed (spec 25 notes, Q3). The schedules queue's
+ * interval timer) is not listed (spec 25 notes, Q3). The schedules queue's
  * two job schedulers are listed too (spec 123 B20), unless Redis does not
  * answer — then the rest still list.
  */
