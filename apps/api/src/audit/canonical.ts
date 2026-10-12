@@ -67,6 +67,8 @@ export interface HashedFields {
   actorType: string;
   actorUserId: string | null;
   actorRunnerId: string | null;
+  /** Hashed only when set (#102), so a record without it hashes as before. */
+  actorOnBehalfOfId?: string | null;
   action: string;
   targetType: string;
   targetId: string | null;
@@ -85,6 +87,9 @@ export const computeHash = (prevHash: string, row: HashedFields): string => {
     actorType: row.actorType,
     actorUserId: row.actorUserId,
     actorRunnerId: row.actorRunnerId,
+    ...(row.actorOnBehalfOfId
+      ? { actorOnBehalfOfId: row.actorOnBehalfOfId }
+      : {}),
     action: row.action,
     targetType: row.targetType,
     targetId: row.targetId,

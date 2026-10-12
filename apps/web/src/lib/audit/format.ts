@@ -88,6 +88,10 @@ export function actorLabel(record: AuditRecordView): string {
       return record.actorEmail ?? record.actorUserId ?? 'deleted user';
     case 'runner':
       return `runner ${record.actorRunnerId ?? ''}`.trim();
+    case 'system':
+      return record.actorOnBehalfOfId
+        ? `system on behalf of ${record.actorOnBehalfOfEmail ?? record.actorOnBehalfOfId}`
+        : 'system';
     default:
       return record.actorType;
   }

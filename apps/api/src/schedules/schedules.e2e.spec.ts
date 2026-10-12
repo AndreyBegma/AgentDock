@@ -307,6 +307,13 @@ describe('schedules (e2e)', () => {
         triggeredByType: 'schedule',
         triggeredById: view.id,
       });
+      // D8 (#102): the system, on the creator's behalf.
+      const [started] = await auditOf('skill.run_started');
+      expect(started).toMatchObject({
+        actorType: 'system',
+        actorUserId: null,
+        actorOnBehalfOfId: operatorOfAId,
+      });
 
       // The run ends; the firing follows it.
       await ctx.prisma.run.update({

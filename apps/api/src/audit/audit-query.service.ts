@@ -30,6 +30,8 @@ const CSV_COLUMNS = [
   'meta',
   'prevHash',
   'hash',
+  // Appended (#102): positional readers of earlier exports keep working.
+  'actorOnBehalfOfId',
 ] as const satisfies readonly (keyof AuditRecord)[];
 
 export const auditNotFound = (): HttpException => {
@@ -121,7 +123,13 @@ export class AuditQueryService {
 
   private async toViews(rows: AuditRecord[]): Promise<AuditRecordView[]> {
     const ids = [
-      ...new Set(rows.flatMap((r) => (r.actorUserId ? [r.actorUserId] : []))),
+      ...new Set(
+        rows.flatMap((r) =>
+          [r.actorUserId, r.actorOnBehalfOfId].filter(
+            (id): id is string => id !== null,
+          ),
+        ),
+      ),
     ];
     const users = ids.length
       ? await this.prisma.user.findMany({
@@ -139,6 +147,10 @@ export class AuditQueryService {
         ? (emails.get(row.actorUserId) ?? null)
         : null,
       actorRunnerId: row.actorRunnerId,
+      actorOnBehalfOfId: row.actorOnBehalfOfId,
+      actorOnBehalfOfEmail: row.actorOnBehalfOfId
+        ? (emails.get(row.actorOnBehalfOfId) ?? null)
+        : null,
       action: row.action,
       targetType: row.targetType,
       targetId: row.targetId,
