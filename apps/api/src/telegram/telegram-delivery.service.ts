@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { BotTokenStore, TelegramDeliveryLedger } from '../notifications';
 import { formatDigest, formatMessage } from './markdown-v2';
+import { TelegramApprovalService } from './telegram-approval.service';
 import { TelegramApiError, TelegramClient } from './telegram-client';
 import { TELEGRAM_OPTIONS, type TelegramOptions } from './telegram-options';
 
@@ -48,6 +49,7 @@ export class TelegramDeliveryService {
     private readonly ledger: TelegramDeliveryLedger,
     private readonly tokens: BotTokenStore,
     private readonly client: TelegramClient,
+    private readonly approvals: TelegramApprovalService,
     @Inject(TELEGRAM_OPTIONS) private readonly options: TelegramOptions,
   ) {}
 
@@ -63,11 +65,22 @@ export class TelegramDeliveryService {
     const claim = await this.ledger.claim(now);
 
     for (const message of claim.messages) {
+      // D12: a PR awaiting approval goes out with the buttons when its head is known.
+      const offer =
+        message.content.kind === 'pr.awaiting_approval'
+          ? await this.approvals.offer(message.notificationId)
+          : null;
       try {
         await this.client.sendMessage(
           bot.token,
           message.chatId,
-          formatMessage(message.content, this.options.appUrl),
+          formatMessage(
+            message.content,
+            this.options.appUrl,
+            offer?.headSha ?? null,
+          ),
+          false,
+          offer?.replyMarkup,
         );
         await this.ledger.markSent(message.id, now);
         pass.sent += 1;
