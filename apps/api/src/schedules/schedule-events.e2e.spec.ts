@@ -23,7 +23,9 @@ import {
   type Session,
 } from '../test/e2e-app';
 import { recordFiringEvent } from './schedule-events';
-import { SchedulerService } from './scheduler.service';
+import { ScheduleFireProcessor } from './schedule-fire.processor';
+import { ScheduleMaintenance } from './schedule-maintenance';
+import { dueTick } from './testing/schedule-e2e';
 
 type Answer = CommandSendResult<CommandName>;
 
@@ -32,7 +34,7 @@ const at = (s: string) => new Date(s);
 /** Issue #99, ADR-0014: `schedule.*` recorded in `events` with `source` `api`. */
 describe('schedule events (e2e)', () => {
   let ctx: E2eContext;
-  let scheduler: SchedulerService;
+  let tick: (now: Date) => Promise<bigint[]>;
   let runnerId: string;
   let projectId: string;
   let creatorId: string;
@@ -69,10 +71,13 @@ describe('schedule events (e2e)', () => {
 
   beforeAll(async () => {
     ctx = await createE2eApp();
-    scheduler = ctx.app.get(SchedulerService);
+    tick = dueTick(
+      ctx.prisma,
+      ctx.app.get(ScheduleFireProcessor),
+      ctx.app.get(ScheduleMaintenance),
+    );
   });
   afterAll(async () => {
-    await scheduler.release();
     await ctx.app.close();
   });
   beforeEach(async () => {
@@ -98,7 +103,6 @@ describe('schedule events (e2e)', () => {
           rttMs: 1,
         } as Answer as never;
       });
-    expect(await scheduler.lead()).toBe(true);
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -122,7 +126,7 @@ describe('schedule events (e2e)', () => {
     const schedule = await scheduleDue(at('2026-10-09T10:00:00Z'), {
       target: { kind: 'orchestrator', mode: 'next' },
     });
-    await scheduler.tick(at('2026-10-09T10:00:05Z'));
+    await tick(at('2026-10-09T10:00:05Z'));
 
     const [firing] = await ctx.prisma.scheduleFiring.findMany({
       where: { scheduleId: schedule.id },
@@ -148,7 +152,7 @@ describe('schedule events (e2e)', () => {
     expect(rows[0].seq < 0n).toBe(true);
 
     // The settle already happened: settling again changes nothing.
-    await scheduler.tick(at('2026-10-09T10:00:30Z'));
+    await tick(at('2026-10-09T10:00:30Z'));
     expect(await serverEvents()).toHaveLength(1);
   });
 
@@ -181,7 +185,7 @@ describe('schedule events (e2e)', () => {
 
   it('a skipped claim writes schedule.skipped with its missed count', async () => {
     await scheduleDue(at('2026-10-09T10:00:00Z'));
-    await scheduler.tick(at('2026-10-09T12:30:00Z'));
+    await tick(at('2026-10-09T12:30:00Z'));
     const rows = await serverEvents();
     expect(rows.map((r) => [r.type, r.data])).toEqual([
       [
@@ -200,7 +204,7 @@ describe('schedule events (e2e)', () => {
         where: { id: schedule.id },
         data: { nextRunAt: due },
       });
-      await scheduler.tick(new Date(due.getTime() + 5000));
+      await tick(new Date(due.getTime() + 5000));
     }
     const rows = await serverEvents();
     expect(rows.map((r) => r.type)).toEqual([
@@ -259,7 +263,7 @@ describe('schedule events (e2e)', () => {
       },
     ]);
     await scheduleDue(at('2026-10-09T10:00:00Z'));
-    await scheduler.tick(at('2026-10-09T12:30:00Z'));
+    await tick(at('2026-10-09T12:30:00Z'));
     const seqs = (
       await ctx.prisma.event.findMany({
         where: { runnerId },

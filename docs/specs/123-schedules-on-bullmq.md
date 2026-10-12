@@ -60,7 +60,7 @@ here unless it names another source. Rows marked *(A)* are listed again under
 | B4 | **DST and timezone.** `cron.ts` (`CronSchedule`) is untouched and stays the only place an occurrence is computed. A spring-forward-skipped local time does not fire, and a fall-back-repeated one fires once (spec 25 D4). BullMQ never sees a cron pattern or a timezone, only an absolute timestamp. `cron.spec.ts` keeps passing unchanged. | spec 25 D4; B3 |
 | B5 | **The processor** (`ScheduleFireProcessor`, replacing `SchedulerService.tick` / `claimOne`), for one `fire` job:<br>1. In one PostgreSQL transaction, `SELECT … FROM schedules s JOIN projects p … WHERE s.id = $1 FOR UPDATE OF s`. This waits for the lock and never skips: two workers on one row serialize.<br>2. Apply B2. If the row is missing, disabled, or has a different `nextRunAt`, commit and complete.<br>3. D9 wait: if the occurrence has a `cron` firing `failed / runner_offline`, the policy is `catch_up`, the runner is still offline, and the occurrence is ≤ 24 h old, then commit with no writes and **re-delay this same job** (B7).<br>4. Otherwise run `planClaim` (`missed.ts`, unchanged) with `now` = processing time. Write the `skipped` / `due` firings with `skipDuplicates` on the unique key, advance `nextRunAt`, and write #99's `schedule.skipped` events. All of this goes in the same transaction, exactly as `claimOne` does today.<br>5. After commit, add the `fire` job for the new `nextRunAt` (B8).<br>6. Publish the skipped firings live, then call `ScheduleFirer.fire(dueId)` for the `due` firing.<br>7. If `fire` rewound `nextRunAt` to this occurrence (D9, `catch_up` with the runner offline), re-delay this same job (B7). The job added in step 5 is now stale and is removed. If its removal fails, B2 drops it. | spec 25 D5–D9; `scheduler.service.ts`, `missed.ts` |
 | B6 | **Runner commands stay at-most-once.** A job that runs twice (stalled-job recovery, a retry, a duplicate add) finds `nextRunAt` already advanced and does nothing. A `due` firing left by an instance that died between commit and send is still failed as `not_sent` after 10 minutes, never resent (spec 25 notes, "Stale `due`"). BullMQ's at-least-once delivery is absorbed by B2 and the unique key. It never reaches the runner. | spec 25 notes; ADR-0010 |
-| B7 | **D9 offline retry** is the same job moved back to delayed (`job.moveToDelayed` + `DelayedError`). The job keeps its id, so it cannot collide with a re-add. Delays: 30 s, 60 s, 120 s, 240 s, then every 300 s, until the occurrence is older than 24 h. After that, step 4's `planClaim` records it `skipped / missed_over_24h` (spec 25 D6). This replaces "later ticks leave it" with no change in behaviour. *(A)* | spec 25 D9 + notes |
+| B7 | **D9 offline retry** is the same job moved back to delayed (`job.moveToDelayed` + `DelayedError`). The job keeps its id, so it cannot collide with a re-add. Delays: 30 s, 60 s, 120 s, 240 s, then every 300 s, until the occurrence is older than 24 h. After that, step 4's `planClaim` claims it. The occurrence already holds its `failed / runner_offline` row, so nothing new is recorded, no command is sent, and `nextRunAt` moves to the next occurrence (`missed.ts`, `dueRecorded`). This replaces "later ticks leave it" with no change in behaviour. *(A)* | spec 25 D9 + notes |
 | B8 | **Timer sync** (`ScheduleTimers.sync(scheduleId, previousNextRunAt?)`). It removes the job for the previous `nextRunAt`, if any, and adds the job for the current one, if enabled. It is called after commit by `SchedulesService` create / update / enable / disable / delete, by `ScheduleFirer.disable` (auto-disable), and by B5 step 5. A failed sync (Redis down) is logged at `warn` and never fails the HTTP request or the firing. The reconciler repairs it within one period. *(A)* | ADR-0015 §2 |
 | B9 | **Reconciler**, a repeatable job `reconcile` every 60 s, plus once on bootstrap of each instance with the scheduler enabled:<br>(a) For every enabled schedule with `nextRunAt`, if job `fire-<id>-<ms>` is missing, or is `completed` / `failed` while the row still points at it, remove it and add it again. Delayed, waiting and active jobs are left alone.<br>(b) Remove every delayed `fire` job whose `(scheduleId, scheduledFor)` no longer matches a row.<br>It pages through rows and the delayed set in batches of 500 and logs counts (`added`, `removed`) at `info` when non-zero. Every repair is idempotent: deterministic ids make a racing double add a no-op. | ADR-0015 §2 |
 | B10 | **Maintenance job** `settle`, a repeatable job every 15 s: `settleFinishedRuns` and `failStaleDue` from today's tick, unchanged. Both repeatables are registered with `upsertJobScheduler` (`every`) on bootstrap. This is idempotent across instances, and BullMQ hands each repetition to one worker. This is the only use of BullMQ job schedulers. | spec 25 D8; notes |
@@ -88,6 +88,15 @@ here unless it names another source. Rows marked *(A)* are listed again under
 | #106 budget gate skips instead of failing | **Leaves.** `BeforeFire.check` is the same single call site (B13). It must not be confused with B7: a budget `skipped` is final and is never re-delayed. |
 | #107 `schedule.*` to outbound webhooks | **Leaves.** It depends on #99's `events` rows, which B15 keeps. |
 | #119 plain `setInterval` jobs to `SchedulerRegistry` | **Changes.** Its last bullet, the scheduler tick, is absorbed: the tick is deleted (B11), and the maintenance jobs are listed through B20. The other bullets stay with #119. |
+
+### Implementation notes (i123-schedules)
+
+These are choices the decisions above leave open. Each was approved by the orchestrator.
+
+- **The queue is registered only with a `REDIS_URL`.** `BullModule.registerQueue` builds the Queue eagerly, and BullMQ connects on construction. `schedules.module.ts` therefore wraps it in `ConditionalModule.registerWhen(…, env => !!env.REDIS_URL)`. The timers, reconciler, worker and system-jobs listing inject it `@Optional()` and do nothing without it (B19).
+- **The worker is created by hand** (`ScheduleWorker`), not with `@Processor`. `@nestjs/bullmq`'s explorer builds, and so connects, a Worker for every `@Processor` at init, even with `autorun: false`.
+- **Calls to Redis are bounded.** With `maxRetriesPerRequest: null`, a call waits as long as Redis is down. Timer sync and the system-jobs read therefore race a 2 s timeout, then log at `warn` with the schedule id (B8, B18). Every Queue and Worker has an `error` listener. On shutdown the worker gets 10 s to close gracefully and is then force-closed, because `Worker.close()` never returns while Redis is unreachable.
+- **`ensure` treats a `completed` or `failed` job with the target id as missing.** It removes it and adds it again, the B9(a) rule, so changing a cron and changing it back re-arms the timer at once.
 
 ## Data / Schema
 
@@ -138,6 +147,15 @@ and the structure table (`docker/ — PostgreSQL 16, Redis 7.4 :6421`).
   - #99's `events` rows are not duplicated by a replayed job.
 - `bun run test` fails with a clear message when `TEST_REDIS_URL` is
   unreachable, as it does for PostgreSQL. No silent skip.
+
+**As built (i123-schedules).** The e2e cases drive
+`ScheduleFireProcessor.handle(data, now)`, not `process(job, now)`.
+`process(job, token)` needs a real job and its lock token to call
+`moveToDelayed`, so it is a thin wrapper. `handle` returns the decision as
+`stale`, `redelay` with its delay, or `fired`, and the real-worker cases
+exercise `process`. "Old `tick` against the new processor" (Risks) is tested
+with a row lock held in a second transaction that advances `nextRunAt`. The
+`tick` code is deleted, so that is the shape it can take.
 
 ## Acceptance criteria
 
