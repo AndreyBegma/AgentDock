@@ -1,4 +1,9 @@
-import { draftFor, type MatchableEvent, oneLine } from './event-mapping';
+import {
+  draftFor,
+  type MatchableEvent,
+  oneLine,
+  projectLink,
+} from './event-mapping';
 
 const event = (overrides: Partial<MatchableEvent>): MatchableEvent => ({
   id: 1n,
@@ -122,6 +127,38 @@ describe('draftFor (spec 22 D1)', () => {
     expect(draftFor(decided([], []))?.kind).toBe('queue.dry');
     expect(draftFor(decided([{ Issue: '#1' }], []))).toBeNull();
     expect(draftFor(decided([], [{ Issue: '#2' }]))).toBeNull();
+  });
+
+  it('maps an API-recorded schedule.disabled, linking the schedules page', () => {
+    const disabled = event({
+      type: 'schedule.disabled',
+      source: 'api',
+      slot: null,
+      issue: null,
+      data: {
+        scheduleId: 's1',
+        scheduleName: 'Nightly triage',
+        firingId: '9',
+        disabledReason: 'failing',
+      },
+    });
+    expect(draftFor(disabled)).toMatchObject({
+      kind: 'schedule.disabled',
+      slot: null,
+      issue: null,
+      title: 'Schedule "Nightly triage" was disabled',
+      page: 'schedules',
+    });
+    expect(projectLink('p1', 'schedules')).toBe('/projects/p1/schedules');
+  });
+
+  it('does not let a runner forge schedule.disabled', () => {
+    expect(
+      draftFor(event({ type: 'schedule.disabled', source: 'runner' })),
+    ).toBeNull();
+    expect(
+      draftFor(event({ type: 'schedule.disabled', source: 'code-sentinel' })),
+    ).toBeNull();
   });
 
   it.each([
