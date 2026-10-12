@@ -79,8 +79,7 @@ describe('schedule events (e2e)', () => {
     await resetDatabase(ctx.prisma);
     await resetActivity(ctx.prisma);
     ({ runnerId, projectId } = await seedProject(ctx.prisma, '/srv/a'));
-    creatorId = (await createUser(ctx.prisma, 'admin@example.com', 'admin'))
-      .id;
+    creatorId = (await createUser(ctx.prisma, 'admin@example.com', 'admin')).id;
     admin = await login(ctx, 'admin@example.com');
     online = true;
     jest
@@ -218,15 +217,21 @@ describe('schedule events (e2e)', () => {
     });
     // One sequence, strictly decreasing, never a runner's.
     const seqs = rows.map((r) => r.seq);
-    expect(seqs.every((seq, i) => seq < 0n && (i === 0 || seq < seqs[i - 1])))
-      .toBe(true);
+    expect(
+      seqs.every((seq, i) => seq < 0n && (i === 0 || seq < seqs[i - 1])),
+    ).toBe(true);
 
     const projector = new ActivityProjector(
       ctx.prisma,
       ctx.app.get(LiveService),
       { ...ctx.app.get<ActivityOptions>(ACTIVITY_OPTIONS), gapGraceMs: 0 },
     );
-    expect(await projector.tick()).toBe(6);
+    // `tick()` also counts audit items, and `audit_records` outlives every
+    // suite's reset (#8's trigger): count the event items instead.
+    await projector.tick();
+    expect(
+      await ctx.prisma.activityItem.count({ where: { sourceKind: 'event' } }),
+    ).toBe(6);
     const feed = await admin.get(`/projects/${projectId}/activity`);
     expect(feed.status).toBe(200);
     const items = (feed.body as { items: ActivityItem[] }).items;

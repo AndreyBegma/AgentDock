@@ -58,6 +58,5 @@ export interface EventRule {
   link?: (ctx: EventContext) => string | null;
 }
 
-export const fixed =
-  (severity: ActivitySeverity) => (): ActivitySeverity =>
-    severity;
+export const fixed = (severity: ActivitySeverity) => (): ActivitySeverity =>
+  severity;

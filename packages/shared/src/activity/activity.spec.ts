@@ -281,9 +281,7 @@ describe('schedule events (spec 25 D17, ADR-0014)', () => {
     expect(eventSourceSchema.safeParse(API_EVENT_SOURCE).success).toBe(false);
     for (const type of SCHEDULE_EVENT_TYPES) {
       for (const source of eventSourceSchema.options) {
-        expect(
-          activityFromEvent(scheduled(type, {}, source), 'p1'),
-        ).toBeNull();
+        expect(activityFromEvent(scheduled(type, {}, source), 'p1')).toBeNull();
       }
     }
   });
