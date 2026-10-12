@@ -72,6 +72,7 @@ export interface TelegramChat {
 
 export interface TelegramUser {
   id: number;
+  is_bot?: boolean;
   username?: string;
 }
 
@@ -80,13 +81,35 @@ export interface TelegramMessage {
   chat: TelegramChat;
   from?: TelegramUser;
   text?: string;
+  /** The message this one answers; Telegram fills it, the sender cannot. */
+  reply_to_message?: TelegramMessage;
+}
+
+/** A press on an inline keyboard button (#82). */
+export interface TelegramCallbackQuery {
+  id: string;
+  from: TelegramUser;
+  /** The message that carried the button; absent when it is too old. */
+  message?: TelegramMessage;
+  data?: string;
 }
 
 /** The part of an `Update` this module reads; every other kind is skipped. */
 export interface TelegramUpdate {
   update_id: number;
   message?: TelegramMessage;
+  callback_query?: TelegramCallbackQuery;
 }
+
+export interface InlineKeyboardButton {
+  text: string;
+  callback_data: string;
+}
+
+/** What `sendMessage` may attach: buttons, or a prompt to reply to it. */
+export type TelegramReplyMarkup =
+  | { inline_keyboard: InlineKeyboardButton[][] }
+  | { force_reply: true; input_field_placeholder?: string };
 
 type ApiResponse =
   | { ok: true; result: unknown }
@@ -108,19 +131,36 @@ const isChat = (value: unknown): value is TelegramChat =>
   typeof value.id === 'number' &&
   typeof value.type === 'string';
 
-const isMessage = (value: unknown): value is TelegramMessage =>
+const isUser = (value: unknown): value is TelegramUser =>
+  isObject(value) &&
+  typeof value.id === 'number' &&
+  (value.is_bot === undefined || typeof value.is_bot === 'boolean');
+
+const isMessage = (value: unknown, depth = 0): value is TelegramMessage =>
   isObject(value) &&
   typeof value.message_id === 'number' &&
   isChat(value.chat) &&
   (value.text === undefined || typeof value.text === 'string') &&
-  (value.from === undefined ||
-    (isObject(value.from) && typeof value.from.id === 'number'));
+  (value.from === undefined || isUser(value.from)) &&
+  // Telegram never nests a reply inside a reply's `reply_to_message`.
+  (value.reply_to_message === undefined ||
+    (depth === 0 && isMessage(value.reply_to_message, depth + 1)));
+
+const isCallbackQuery = (value: unknown): value is TelegramCallbackQuery =>
+  isObject(value) &&
+  typeof value.id === 'string' &&
+  isUser(value.from) &&
+  (value.message === undefined || isMessage(value.message)) &&
+  (value.data === undefined || typeof value.data === 'string');
 
 const toUpdate = (value: unknown): TelegramUpdate | null => {
   if (!isObject(value) || typeof value.update_id !== 'number') return null;
   return {
     update_id: value.update_id,
     ...(isMessage(value.message) ? { message: value.message } : {}),
+    ...(isCallbackQuery(value.callback_query)
+      ? { callback_query: value.callback_query }
+      : {}),
   };
 };
 
@@ -144,8 +184,8 @@ const networkError = (error: unknown): TelegramApiError => {
 };
 
 /**
- * The Bot API over HTTPS (spec 22 D7): `getMe`, the `getUpdates` long poll and
- * `sendMessage`. Stateless — the token is passed per call, read from
+ * The Bot API over HTTPS (spec 22 D7): `getMe`, the `getUpdates` long poll,
+ * `sendMessage` and `answerCallbackQuery` (D12). Stateless — the token is passed per call, read from
  * `BotTokenStore` by the caller. The base URL is `TELEGRAM_API_BASE`, which
  * tests point at a fake server: nothing here ever reaches the real API in a
  * test.
@@ -183,7 +223,11 @@ export class TelegramClient {
     const result = await this.call(
       token,
       'getUpdates',
-      { offset, timeout: timeoutS, allowed_updates: ['message'] },
+      {
+        offset,
+        timeout: timeoutS,
+        allowed_updates: ['message', 'callback_query'],
+      },
       signal ? AbortSignal.any([signal, timeout]) : timeout,
     );
     if (!Array.isArray(result)) {
@@ -201,6 +245,7 @@ export class TelegramClient {
     chatId: bigint | number,
     text: string,
     plain = false,
+    replyMarkup?: TelegramReplyMarkup,
   ): Promise<void> {
     await this.call(token, 'sendMessage', {
       // A chat id fits a double (Telegram documents 52 significant bits).
@@ -208,6 +253,19 @@ export class TelegramClient {
       text,
       ...(plain ? {} : { parse_mode: 'MarkdownV2' }),
       link_preview_options: { is_disabled: true },
+      ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+    });
+  }
+
+  /** Stops the button's spinner; `text` shows as a short notice. */
+  async answerCallbackQuery(
+    token: string,
+    callbackQueryId: string,
+    text: string,
+  ): Promise<void> {
+    await this.call(token, 'answerCallbackQuery', {
+      callback_query_id: callbackQueryId,
+      text,
     });
   }
 

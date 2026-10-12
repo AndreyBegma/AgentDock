@@ -60,7 +60,8 @@ const readBody = (req: IncomingMessage): Promise<Record<string, unknown>> =>
 /**
  * A stand-in for the Bot API on 127.0.0.1 (spec 22: "Telegram is tested only
  * against the mock base URL"). It records every call, answers `getMe`,
- * `getUpdates` and `sendMessage` like Telegram does, refuses unknown tokens
+ * `getUpdates`, `sendMessage` and `answerCallbackQuery` like Telegram does,
+ * refuses unknown tokens
  * with 401, and plays scripted replies per method first.
  */
 export class FakeTelegram {
@@ -162,6 +163,8 @@ export class FakeTelegram {
           status: 200,
           body: { ok: true, result: { message_id: this.calls.length } },
         };
+      case 'answerCallbackQuery':
+        return { status: 200, body: { ok: true, result: true } };
       default:
         return {
           status: 404,
@@ -185,6 +188,53 @@ export const privateMessage = (
     chat: { id: chatId, type: 'private' },
     from: { id: chatId, is_bot: false, username },
     text,
+  },
+});
+
+/** A press on an inline button of a message the bot sent to a private chat. */
+export const callbackPress = (
+  updateId: number,
+  chatId: number,
+  data: string,
+) => ({
+  update_id: updateId,
+  callback_query: {
+    id: `cb${updateId}`,
+    from: { id: chatId, is_bot: false },
+    chat_instance: '1',
+    message: {
+      message_id: 1,
+      date: 0,
+      chat: { id: chatId, type: 'private' },
+      from: { id: BOT.id, is_bot: true, username: BOT.username },
+      text: 'PR waiting',
+    },
+    data,
+  },
+});
+
+/** A private message replying to `replyTo`, sent by `from` (default: the bot). */
+export const replyMessage = (
+  updateId: number,
+  chatId: number,
+  text: string | undefined,
+  replyTo: string,
+  from: { id: number; is_bot: boolean } = { id: BOT.id, is_bot: true },
+) => ({
+  update_id: updateId,
+  message: {
+    message_id: updateId,
+    date: 0,
+    chat: { id: chatId, type: 'private' },
+    from: { id: chatId, is_bot: false },
+    ...(text === undefined ? { sticker: { file_id: 'x' } } : { text }),
+    reply_to_message: {
+      message_id: 1,
+      date: 0,
+      chat: { id: chatId, type: 'private' },
+      from,
+      text: replyTo,
+    },
   },
 });
 
