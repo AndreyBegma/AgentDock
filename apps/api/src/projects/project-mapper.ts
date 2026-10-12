@@ -2,6 +2,7 @@ import type {
   DocsSourceView,
   ProjectDetail,
   ProjectMemberView,
+  ProjectRuntimeProfile,
   ProjectSummary,
   Role,
   RunnerStatus,
@@ -18,6 +19,7 @@ import type {
   Prisma,
   Project,
   ProjectMember,
+  RuntimeProfile,
   User,
 } from '@prisma/client';
 
@@ -132,4 +134,19 @@ export const toMemberView = (
   roleOverride: member.roleOverride,
   effectiveRole,
   createdAt: member.createdAt.toISOString(),
+});
+
+/** Field by field on purpose: binary, env and args carry machine paths. */
+export const toProjectRuntimeProfile = (
+  profile: Pick<
+    RuntimeProfile,
+    'id' | 'key' | 'runtime' | 'label' | 'authenticated'
+  >,
+  defaultProfileId: string | null,
+): ProjectRuntimeProfile => ({
+  key: profile.key,
+  runtime: profile.runtime,
+  label: profile.label,
+  authenticated: profile.authenticated,
+  isDefault: profile.id === defaultProfileId,
 });

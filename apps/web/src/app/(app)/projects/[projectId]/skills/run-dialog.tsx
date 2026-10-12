@@ -1,6 +1,10 @@
 'use client';
 
-import type { InstalledSkillView, SkillRunView } from '@agentdock/shared';
+import type {
+  InstalledSkillView,
+  ProjectRuntimeProfile,
+  SkillRunView,
+} from '@agentdock/shared';
 import { Banner } from 'glass-ui/banner';
 import { Button } from 'glass-ui/button';
 import { DialogContent, DialogRoot } from 'glass-ui/dialog';
@@ -17,6 +21,7 @@ import {
   describeSkillsError,
   EMPTY_RUN_FORM,
   permissionWarning,
+  profileOptionLabel,
   RUN_FORM_PROBLEM_TEXT,
   type RunForm,
   runFormProblem,
@@ -34,14 +39,14 @@ import {
 export function RunDialog({
   projectId,
   skill,
-  profileKeys,
+  profiles,
   isAdmin,
   onOpenChange,
 }: {
   projectId: string;
   skill: InstalledSkillView | null;
-  /** Profiles the person can pick; empty = "Project default" only. */
-  profileKeys: string[];
+  /** The runner's Claude profiles; empty = "Project default" only. */
+  profiles: ProjectRuntimeProfile[];
   isAdmin: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -138,9 +143,9 @@ export function RunDialog({
               onChange={(e) => set('profileKey', e.target.value)}
             >
               <option value="">Project default</option>
-              {profileKeys.map((key) => (
-                <option key={key} value={key}>
-                  {key}
+              {profiles.map((profile) => (
+                <option key={profile.key} value={profile.key}>
+                  {profileOptionLabel(profile)}
                 </option>
               ))}
             </Select>

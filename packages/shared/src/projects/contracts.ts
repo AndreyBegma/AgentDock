@@ -6,6 +6,7 @@ import type {
   DocsEvidence,
   DocsRule,
   DocsSourceKind,
+  Runtime,
 } from '../protocol';
 import type { RunnerStatus } from '../runners';
 
@@ -137,6 +138,21 @@ export interface ProjectMemberView {
   /** `min(globalRole, roleOverride)`. */
   effectiveRole: Role;
   createdAt: string;
+}
+
+/**
+ * A row of `GET /projects/:id/runtime-profiles` (operator+): a profile of the
+ * project's runner present in its latest `hello`. No binary, env or args —
+ * those carry machine paths and stay on the admin runner page.
+ */
+export interface ProjectRuntimeProfile {
+  /** The profile `id` in the runner config. */
+  key: string;
+  runtime: Runtime;
+  label: string;
+  authenticated: boolean;
+  /** The project's `defaultProfileId` points at this profile. */
+  isDefault: boolean;
 }
 
 /** `POST /admin/projects/inspect`. Answers a `ProjectInspection`. */
