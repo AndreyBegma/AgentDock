@@ -19,6 +19,7 @@ import {
   SCHEDULES_QUEUE,
   type SchedulesQueue,
   SETTLE_JOB,
+  within,
 } from './schedule-timers';
 import { SCHEDULER_OPTIONS, type SchedulerOptions } from './scheduler-options';
 
@@ -28,6 +29,9 @@ export const RECONCILE_SCHEDULER = 'schedules.reconcile';
 
 /** Retry of the bootstrap registration while Redis is down (B18). */
 const STARTUP_RETRY_MS = [1_000, 5_000, 15_000, 30_000, 60_000];
+
+/** How long shutdown waits for running jobs before it forces the worker closed. */
+const CLOSE_TIMEOUT_MS = 10_000;
 
 const message = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
@@ -73,7 +77,19 @@ export class ScheduleWorker implements OnApplicationBootstrap, OnModuleDestroy {
   async onModuleDestroy(): Promise<void> {
     this.stopped = true;
     clearTimeout(this.retry);
-    await Promise.all(this.workers.map((worker) => worker.close()));
+    await Promise.all(
+      this.workers.map(async (worker) => {
+        // A graceful close lets running jobs finish, but never returns while
+        // Redis is unreachable; then shutdown forces it (the jobs' locks
+        // expire and BullMQ hands them to another worker; B2 absorbs that).
+        try {
+          await within(worker.close(), CLOSE_TIMEOUT_MS);
+        } catch {
+          this.logger.warn('schedules worker did not close in time; forcing');
+          await worker.close(true);
+        }
+      }),
+    );
   }
 
   /** A worker on the `schedules` queue; e2e tests start their own. */
