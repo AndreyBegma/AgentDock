@@ -1,16 +1,14 @@
 'use client';
 
+import type { TelegramLinkCode, TelegramLinkStatus } from '@agentdock/shared';
 import { toast } from 'glass-ui/toast';
 import { useCallback, useEffect, useState } from 'react';
-import { ApiError, api, describeError } from '../api';
-import { isNotDeployed } from './format';
-import type { TelegramLinkStart, TelegramLinkState } from './types';
+import { api, describeError } from '../api';
 
 export type TelegramLinkView =
   | { status: 'loading' }
-  | { status: 'not-deployed' }
   | { status: 'error' }
-  | { status: 'ready'; state: TelegramLinkState };
+  | { status: 'ready'; state: TelegramLinkStatus };
 
 /** The caller's own Telegram link: state, start linking, unlink. */
 export function useTelegramLink() {
@@ -19,17 +17,13 @@ export function useTelegramLink() {
 
   const load = useCallback(async () => {
     try {
-      const state = await api<TelegramLinkState>(
+      const state = await api<TelegramLinkStatus>(
         '/notifications/telegram/link',
       );
       setView({ status: 'ready', state });
     } catch (error) {
-      if (error instanceof ApiError && isNotDeployed(error.status)) {
-        setView({ status: 'not-deployed' });
-      } else {
-        setView({ status: 'error' });
-        toast.error(describeError(error));
-      }
+      setView({ status: 'error' });
+      toast.error(describeError(error));
     }
   }, []);
 
@@ -38,10 +32,10 @@ export function useTelegramLink() {
   }, [load]);
 
   /** Asks for a one-time deep link; the caller opens it. Null on failure. */
-  const start = useCallback(async (): Promise<TelegramLinkStart | null> => {
+  const start = useCallback(async (): Promise<TelegramLinkCode | null> => {
     setBusy(true);
     try {
-      return await api<TelegramLinkStart>('/notifications/telegram/link', {
+      return await api<TelegramLinkCode>('/notifications/telegram/link', {
         method: 'POST',
       });
     } catch (error) {

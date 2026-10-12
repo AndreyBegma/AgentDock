@@ -240,7 +240,3 @@ export function ruleUpdate(
     ],
   };
 }
-
-/** Whether the Telegram routes answered "not deployed" rather than failed. */
-export const isNotDeployed = (status: number): boolean =>
-  status === 404 || status === 503;
