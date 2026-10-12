@@ -15,6 +15,7 @@ import { PrismaService } from '../database/prisma.service';
 import { RunnerPresence } from '../runners/runner-presence';
 import { CronSchedule } from './cron';
 import { planClaim } from './missed';
+import { recordFiringEvent } from './schedule-events';
 import { ScheduleFirer } from './schedule-firer';
 import { ScheduleLive } from './schedule-live';
 import { SCHEDULER_OPTIONS, type SchedulerOptions } from './scheduler-options';
@@ -255,9 +256,9 @@ export class SchedulerService
             },
           ],
           skipDuplicates: true,
-          select: { id: true },
         })
       : [];
+    for (const firing of skipped) await recordFiringEvent(tx, firing, now);
     const due = plan.fire
       ? await tx.scheduleFiring.createManyAndReturn({
           data: [

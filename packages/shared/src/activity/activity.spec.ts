@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'bun:test';
 import { AUDIT_ACTIONS } from '../audit';
-import { EVENTS_DUPLICATE_EVENT } from '../protocol';
+import {
+  API_EVENT_SOURCE,
+  EVENTS_DUPLICATE_EVENT,
+  eventSourceSchema,
+} from '../protocol';
+import { SCHEDULE_EVENT_TYPES } from '../schedules';
 import { ACTIVITY_DATA_MAX_BYTES } from './contracts';
 import {
   ACTIVITY_AUDIT_ACTIONS,
@@ -46,10 +51,17 @@ const SAMPLE: Record<string, unknown> = {
   'session.vanished': { name: 'cs-i21-api' },
 };
 
+/** Types the API records itself (ADR-0014): only `source` `api` shows them. */
+const API_ONLY = new Set(SCHEDULE_EVENT_TYPES);
+
 describe('the curated event map (spec 21 D3)', () => {
   it('maps every curated type to an item', () => {
     for (const type of ACTIVITY_EVENT_TYPES) {
-      const item = activityFromEvent(event(type, SAMPLE[type] ?? {}), 'p1');
+      const source = API_ONLY.has(type as never) ? API_EVENT_SOURCE : 'runner';
+      const item = activityFromEvent(
+        event(type, SAMPLE[type] ?? {}, { source }),
+        'p1',
+      );
       expect(item?.type).toBe(type);
       expect(item?.title.length).toBeGreaterThan(0);
     }
@@ -79,6 +91,10 @@ describe('the curated event map (spec 21 D3)', () => {
         'session.vanished',
         'commit.trailer_found',
         'runner.spool_truncated',
+        'schedule.fired',
+        'schedule.skipped',
+        'schedule.failed',
+        'schedule.disabled',
       ].sort(),
     );
   });
@@ -199,6 +215,75 @@ describe('the curated event map (spec 21 D3)', () => {
       link: '/admin/runners',
       title: 'Runner spool full: events 1–9 dropped',
     });
+  });
+});
+
+describe('schedule events (spec 25 D17, ADR-0014)', () => {
+  const scheduled = (type: string, data: object, source = API_EVENT_SOURCE) =>
+    event(
+      type,
+      { scheduleId: 's1', scheduleName: 'Nightly', firingId: '7', ...data },
+      { source, slot: null, issue: null },
+    );
+
+  it('makes the system the actor and links the project’s schedules', () => {
+    expect(
+      activityFromEvent(
+        scheduled('schedule.failed', {
+          status: 'failed',
+          reason: 'runner_offline',
+          kind: 'cron',
+          token: 'never kept',
+        }),
+        'p1',
+      ),
+    ).toEqual({
+      category: 'fleet',
+      type: 'schedule.failed',
+      severity: 'danger',
+      title: 'Schedule “Nightly” failed: runner offline',
+      actorType: 'system',
+      actorId: null,
+      slot: null,
+      issue: null,
+      prNumber: null,
+      link: '/projects/p1/schedules',
+      data: {
+        scheduleId: 's1',
+        scheduleName: 'Nightly',
+        firingId: '7',
+        status: 'failed',
+        reason: 'runner_offline',
+        kind: 'cron',
+      },
+    });
+  });
+
+  it('titles fired, skipped and disabled', () => {
+    const title = (type: string, data: object) =>
+      activityFromEvent(scheduled(type, data), 'p1')?.title;
+    expect(title('schedule.fired', { status: 'started', kind: 'cron' })).toBe(
+      'Schedule “Nightly” fired',
+    );
+    expect(title('schedule.fired', { status: 'noop', kind: 'manual' })).toBe(
+      'Schedule “Nightly” fired (run now): already running',
+    );
+    expect(
+      title('schedule.skipped', { reason: 'missed', missedCount: 3 }),
+    ).toBe('Schedule “Nightly” skipped 3 times: missed');
+    expect(
+      title('schedule.disabled', { disabledReason: 'creator_not_authorized' }),
+    ).toBe('Schedule “Nightly” disabled: creator not authorized');
+  });
+
+  it('shows none from a runner: only the API records them', () => {
+    // A runner cannot send `api` at all, so no runner row reaches the feed as one.
+    expect(eventSourceSchema.safeParse(API_EVENT_SOURCE).success).toBe(false);
+    for (const type of SCHEDULE_EVENT_TYPES) {
+      for (const source of eventSourceSchema.options) {
+        expect(activityFromEvent(scheduled(type, {}, source), 'p1')).toBeNull();
+      }
+    }
   });
 });
 

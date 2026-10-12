@@ -17,3 +17,4 @@ Numbered, never rewritten. A changed decision gets a new ADR that supersedes the
 | [0011](0011-glass-ui-is-the-component-library.md) | glass-ui is the component library |
 | [0012](0012-detect-where-a-projects-documentation-lives.md) | Detect where a project's documentation lives |
 | [0013](0013-codex-workers-and-their-fence.md) | Codex workers and their fence |
+| [0014](0014-server-originated-events-live-in-events.md) | Server-originated events live in `events` |

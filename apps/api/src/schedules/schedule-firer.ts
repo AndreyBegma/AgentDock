@@ -24,6 +24,7 @@ import { ProjectAccessService } from '../projects';
 import { RunnerPresence } from '../runners/runner-presence';
 import { SkillRunService } from '../skills';
 import { BeforeFire } from './before-fire';
+import { recordDisabledEvent, recordFiringEvent } from './schedule-events';
 import { ScheduleLive } from './schedule-live';
 import { parseTarget } from './target';
 
@@ -122,7 +123,7 @@ export class ScheduleFirer {
         reason: SCHEDULE_FIRING_REASONS.creatorNotAuthorized,
         sent: false,
       });
-      await this.disable(schedule, 'creator_not_authorized');
+      await this.disable(schedule, 'creator_not_authorized', firing.id);
       return settled;
     }
 
@@ -200,7 +201,11 @@ export class ScheduleFirer {
       });
       if (count === 0) return null;
       await this.count(tx, firing.scheduleId, outcome, now);
-      return tx.scheduleFiring.findUniqueOrThrow({ where: { id: firing.id } });
+      const row = await tx.scheduleFiring.findUniqueOrThrow({
+        where: { id: firing.id },
+      });
+      await recordFiringEvent(tx, row, now);
+      return row;
     });
     if (!updated) {
       return this.prisma.scheduleFiring.findUniqueOrThrow({
@@ -217,20 +222,30 @@ export class ScheduleFirer {
         schedule.enabled &&
         schedule.consecutiveFailures >= SCHEDULE_MAX_CONSECUTIVE_FAILURES
       ) {
-        await this.disable(schedule, 'failing');
+        await this.disable(schedule, 'failing', updated.id);
       }
     }
     return updated;
   }
 
-  /** D10, D11: disables a schedule on the system's behalf, audited. */
+  /**
+   * D10, D11: disables a schedule on the system's behalf, audited, and records
+   * `schedule.disabled` for `firingId`, the firing that caused it.
+   */
   async disable(
     schedule: Schedule,
     reason: Exclude<ScheduleDisabledReason, 'manual'>,
+    firingId: bigint,
   ): Promise<void> {
-    const { count } = await this.prisma.schedule.updateMany({
-      where: { id: schedule.id, enabled: true },
-      data: { enabled: false, disabledReason: reason, nextRunAt: null },
+    const now = new Date();
+    const count = await this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.schedule.updateMany({
+        where: { id: schedule.id, enabled: true },
+        data: { enabled: false, disabledReason: reason, nextRunAt: null },
+      });
+      if (count > 0)
+        await recordDisabledEvent(tx, schedule.id, firingId, reason, now);
+      return count;
     });
     if (count === 0) return;
     await this.audit.record({
