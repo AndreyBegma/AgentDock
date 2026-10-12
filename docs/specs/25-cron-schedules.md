@@ -1,5 +1,11 @@
 # Cron schedules for skills and orchestrator commands
 
+> **Machinery superseded:** the PostgreSQL tick loop and leader election below
+> are replaced by BullMQ on Redis — see [spec 123](123-schedules-on-bullmq.md)
+> and [ADR-0015](../adr/0015-schedules-run-on-bullmq.md). What a schedule does
+> (targets, cron/DST rules, missed runs, overlap, authorization) is unchanged
+> and stays defined here.
+
 Issue: [#25](https://github.com/AndreyBegma/AgentDock/issues/25) · Roadmap: M3.2 ·
 Decisions: [ADR-0005](../adr/0005-drive-the-cs-orchestrator-skill-do-not-reimplement-it.md),
 [ADR-0007](../adr/0007-postgresql-only.md),

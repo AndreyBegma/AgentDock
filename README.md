@@ -4,13 +4,13 @@
 
 - [Bun](https://bun.sh) 1.4.0+
 - Node.js 24+
-- Docker (for PostgreSQL)
+- Docker (for PostgreSQL and Redis)
 
 ## Getting started
 
 ```bash
 bun install
-bun run db:setup     # PostgreSQL on :5421, migrations, seed
+bun run db:setup     # PostgreSQL on :5421, Redis on :6421, migrations, seed
 bun run start:dev    # api → http://localhost:8180  ·  web → http://localhost:3517
 ```
 

@@ -19,5 +19,31 @@ services:
       timeout: 5s
       retries: 5
 
+  # BullMQ backend for cron schedules (ADR-0015). AOF keeps pending timers over
+  # a restart; `noeviction` is required by BullMQ. Not backed up: PostgreSQL is
+  # the source of truth and the reconciler rebuilds lost timers.
+  redis:
+    image: redis:7.4.11-alpine
+    container_name: agentdock-redis
+    restart: unless-stopped
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?set it in docker/.env}
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:?set it in docker/.env}
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory-policy noeviction
+    ports:
+      - "6421:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
 volumes:
   postgres_data:
+  redis_data:

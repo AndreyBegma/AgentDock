@@ -13,6 +13,7 @@
       "passThroughEnv": [
         "DATABASE_URL",
         "TEST_DATABASE_URL",
+        "TEST_REDIS_URL",
         "TRUST_PROXY",
         "APP_ENV",
         "BUN_BIN"
@@ -24,6 +25,8 @@
       "dependsOn": ["^build"],
       "passThroughEnv": [
         "DATABASE_URL",
+        "REDIS_URL",
+        "QUEUE_PREFIX",
         "TRUST_PROXY",
         "APP_ENV",
         "PORT",

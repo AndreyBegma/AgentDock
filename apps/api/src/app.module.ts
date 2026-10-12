@@ -6,6 +6,7 @@ import { ApprovalsModule } from './approvals';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { BudgetsModule } from './budgets';
+import { BullmqModule } from './bullmq';
 import { ControlModule } from './control';
 import { DatabaseModule } from './database/database.module';
 import { FleetModule } from './fleet';
@@ -34,6 +35,7 @@ import { WebhooksModule } from './webhooks';
       envFilePath: '.env',
     }),
     DatabaseModule,
+    BullmqModule,
     AuditModule,
     AuthModule,
     AdminModule,
