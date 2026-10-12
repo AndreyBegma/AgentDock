@@ -27,11 +27,6 @@ export function TelegramCard({ link }: { link: Link }) {
       </p>
       {view.status === 'loading' ? (
         <p className="text-ink-2 text-sm">Loading…</p>
-      ) : view.status === 'not-deployed' ? (
-        <Banner tone="info">
-          The Telegram part is not deployed yet. In-app notifications work as
-          usual.
-        </Banner>
       ) : view.status === 'error' ? (
         <Banner
           tone="warn"

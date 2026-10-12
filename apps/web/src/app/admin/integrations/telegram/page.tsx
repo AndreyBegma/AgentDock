@@ -1,5 +1,9 @@
 'use client';
 
+import type {
+  TelegramBotTokenUpdate,
+  TelegramIntegrationStatus,
+} from '@agentdock/shared';
 import { Banner } from 'glass-ui/banner';
 import { Button } from 'glass-ui/button';
 import { Card } from 'glass-ui/card';
@@ -7,11 +11,6 @@ import { Field, Input } from 'glass-ui/field';
 import { toast } from 'glass-ui/toast';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { ApiError, api, describeError } from '../../../../lib/api';
-import { isNotDeployed } from '../../../../lib/notifications/format';
-import type {
-  TelegramAdminStatus,
-  TelegramBotTokenUpdate,
-} from '../../../../lib/notifications/types';
 
 const PATH = '/admin/integrations/telegram';
 
@@ -36,8 +35,7 @@ function describeTelegramError(error: unknown): string {
 
 type View =
   | { status: 'loading' }
-  | { status: 'not-deployed' }
-  | { status: 'ready'; state: TelegramAdminStatus };
+  | { status: 'ready'; state: TelegramIntegrationStatus };
 
 export default function TelegramIntegrationPage() {
   const [view, setView] = useState<View>({ status: 'loading' });
@@ -49,14 +47,10 @@ export default function TelegramIntegrationPage() {
     try {
       setView({
         status: 'ready',
-        state: await api<TelegramAdminStatus>(PATH),
+        state: await api<TelegramIntegrationStatus>(PATH),
       });
     } catch (err) {
-      if (err instanceof ApiError && isNotDeployed(err.status)) {
-        setView({ status: 'not-deployed' });
-      } else {
-        toast.error(describeTelegramError(err));
-      }
+      toast.error(describeTelegramError(err));
     }
   }, []);
 
@@ -70,7 +64,7 @@ export default function TelegramIntegrationPage() {
     setError(undefined);
     try {
       const body: TelegramBotTokenUpdate = { token: token.trim() };
-      const state = await api<TelegramAdminStatus>(PATH, {
+      const state = await api<TelegramIntegrationStatus>(PATH, {
         method: 'PUT',
         body,
       });
@@ -116,14 +110,6 @@ export default function TelegramIntegrationPage() {
 
   if (view.status === 'loading') {
     return <p className="text-ink-2 text-sm">Loading…</p>;
-  }
-  if (view.status === 'not-deployed') {
-    return (
-      <Banner tone="info" title="Telegram">
-        The Telegram part is not deployed yet. In-app notifications work as
-        usual.
-      </Banner>
-    );
   }
 
   const { state } = view;
