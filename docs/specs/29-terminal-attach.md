@@ -224,6 +224,133 @@ Cross-repository: this item prefers glass-ui `Terminal` from AndreyBegma/glass-u
   `case 'terminal.data' / 'terminal.close'` in
   `apps/api/src/runners/runner.gateway.ts`.
 
+### From i29-runner
+
+- **Command registration trap (#12).** `CommandHandlers` in
+  `apps/runner/src/commands/dispatcher.ts` needs a handler for every key of
+  `commands`. A protocol or API slot therefore defines and exports a command
+  in its own file without adding it to the map. The runner slot adds the map
+  entry and the handler in the same commit. `terminal.attach` landed that way.
+- **Where it lives.** The code is in `apps/runner/src/terminal/`:
+  - `resolve.ts` resolves the target (D2). It reuses `watchedProject` /
+    `resolveSlot` from `control/target.ts` and the shared
+    `orchestratorSessionName`, and it maps their `path_not_allowed` /
+    `not_a_repository` to `not_found`.
+  - `pty.ts` builds the argv and does the Bun PTY spawn (D3, D4). It strips
+    `TMUX` / `TMUX_PANE` from the environment, so a runner started inside tmux
+    can still attach.
+  - `manager.ts` holds the limits and the streams (D6–D8).
+- **Read-only.** On a `read` attach the runner never writes to the PTY. Input
+  is only counted (`bytesDropped`).
+- **Limits on the runner.** Idle and maximum duration are enforced as a
+  backstop at the shared defaults (900 s / 4 h), with `terminal.close` sent
+  with the reason. The API's configured values are the primary limits. A
+  value above the defaults is capped by the runner.
+- **Follow-up: `terminal.maxAttachesPerRunner`** (Configuration). The runner
+  uses the constant `TERMINAL_MAX_ATTACHES_PER_RUNNER` (2), which can be
+  injected in tests. The runner config key is not added yet: `config.ts` was
+  outside this slot.
+- **Follow-up: `skill_run`** answers `unsupported` until #24's runner can
+  resolve `agentdock-run-<shortid>` of a live run of the project.
+- **Two names for one slot.** When both `cs-<slot>` and `cs-<prefix>--<slot>`
+  are live, the attach goes to the one that sorts first.
+- **`capabilities.terminal`** is added by the daemon's re-detection: it covers
+  both `hello` and `runner.describe`. The probe itself is
+  `terminalCapability()` in `detect/capabilities.ts`.
+- **Orphans.** Resolving can outlive the 10 s command timeout. In that case
+  no PTY is spawned, because the server has already given up on the command.
+  Ending an attach sends SIGHUP, then SIGKILL after 2 s, to the attach client
+  only.
+
+### From i29-api
+
+- **Where the contracts are.** The HTTP bodies, the `/terminal` close codes
+  (`TERMINAL_CLOSE_CODES`) and the frames the API sends to the browser
+  (`terminalServerFrameSchema`: `attached`, `error`, `closed`) are in
+  `packages/shared/src/terminal/contracts.ts`. Terminal output reaches the
+  browser as binary frames. The upgrade takes `?ticket=` and optionally
+  `cols` / `rows` (80 × 24 by default).
+- **Close codes.** `4000` means the attach ended, and the close reason is the
+  `TerminalCloseReason`. The refusals are:
+  `4400` (ticket missing, unknown, used, expired, or another session's),
+  `4401` (no valid session cookie), `4403` (foreign or missing `Origin`),
+  `4404` (project not visible, or the runner returned `not_found`), `4406` (the
+  user is no longer an admin), `4409` (`busy`), `4501`
+  (`unsupported` / `disabled`), and `4503` (the runner is offline or did not
+  answer).
+- **A ticket is bound to the session, not only the user.** The upgrade must
+  carry the session cookie that asked for the ticket. A ticket refused for any
+  reason is still used up.
+- **A revoked session ends the attach.** Every attach's session is
+  re-resolved every 60 s. If the session is gone, or its user is no longer an
+  admin, the attach closes with reason `client`, and the `terminal.detached`
+  record carries `meta.cause: 'session_revoked'`. The reason enum has no closer
+  value.
+- **Refused early.** `POST /terminal/tickets` answers 409 `unsupported` when
+  the project's runner reports `terminal: false`. It answers 409 `busy`, with
+  `heldBy`, when another admin holds the read-write attach of the target. The
+  upgrade checks `busy` again, and the runner checks everything again.
+- **Audit.** `terminal.attached` has result `ok`, `denied` (busy in the API) or
+  `error` (refused by the runner, or no answer), with `meta.refusal`. It is
+  not `code`, because the audit log redacts that key. `terminal.detached`
+  carries `after { reason, durationMs, bytesIn, bytesOut }` and
+  `meta { mode, droppedIn, cause? }`. Both records carry `ticketId` and
+  `streamId`. `bytesIn` counts only the input forwarded to the runner. Input
+  of a `read` attach, and input sent before the runner attached, is dropped and
+  counted in `droppedIn`.
+- **Idle.** A `write` attach idles on input bytes only, so the agent's output
+  does not keep it open. A `read` attach idles on traffic in either direction.
+- **The runner side.** The relay talks to runners through
+  `TerminalRunnerPort` (`apps/api/src/terminal/terminal-runner-port.ts`).
+  `RunnerTerminalPort` sends `terminal.attach` through `RunnerCommandService`
+  with the caller's role, so the attach also gets the usual `runner.command`
+  records (args only). Stream messages go out through `RunnerStreams.send`.
+  The runner gateway routes `terminal.data` / `terminal.close` through
+  `RunnerStreams.deliverTerminal` to the optional `terminal` method of a
+  stream listener, which only `TerminalRelay` implements.
+
+### From i29-web
+
+- **Where it lives.** `apps/web/src/components/terminal/` holds the sheet
+  (`terminal-sheet.tsx`) and the attach itself (`terminal-view.tsx`).
+  `apps/web/src/lib/terminal/` holds the pure helpers (`format.ts`, tested)
+  and `useTerminalAvailable`. The Attach actions are in the fleet page's slot
+  sheet and orchestrator card.
+- **xterm, not glass-ui.** glass-ui v0.22.0 has no `Terminal` yet
+  (glass-ui#74), so the sheet uses `@xterm/xterm` 6.0.0 and
+  `@xterm/addon-fit` 0.11.0, pinned exactly and themed with token values read
+  from CSS variables. Replace `terminal-view.tsx`'s emulator when glass-ui
+  releases `Terminal`.
+- **Read-only is the default; control is a second attach.** The sheet always
+  opens in `read`. **Take control** and **Release** remount the view, which
+  closes the socket and requests a new ticket in the other mode, so the audit
+  trail shows two attaches. In `read` mode xterm has `disableStdin`, and the
+  API and the runner drop input anyway (D6).
+- **Bytes.** Output is written to xterm as raw `Uint8Array`s, never decoded
+  to a string first, so a multi-byte character split across frames is
+  intact. Input is UTF-8 encoded and split into frames of at most
+  `TERMINAL_MAX_DATA_BYTES` on character boundaries. There is no base64 in the
+  browser; base64 is only between the API and the runner.
+- **Detaching.** Closing the sheet, **Detach** or a remount sends a `close`
+  frame and closes the socket. The session is never touched.
+- **When Attach is drawn.** For an admin only, and only when the project's
+  runner reports `terminal: true` (`GET /admin/runners/:id`). Not for an
+  ended slot or an `absent` orchestrator. A refusal (`busy` with the holder's
+  email, `unsupported`, `not_found`, an expired ticket) is shown in the sheet
+  with **Attach again**; the close reason of an ended attach is shown the same
+  way.
+- **Socket URL.** Derived from `NEXT_PUBLIC_LIVE_URL` by replacing the path
+  with `/terminal`, so no new variable is needed.
+- **Follow-up: skill-run Attach.** Not part of this slot. i24-web owns
+  `projects/[projectId]/skills/**`, and the runner answers `unsupported` for
+  `skill_run` targets until it can resolve `agentdock-run-<shortid>`. The run
+  detail needs one `TerminalSheet` with a `skill_run` target (the sheet's
+  `TerminalTarget` needs a `{ kind: 'skill_run'; runId }` arm and the ticket
+  request already takes `runId`).
+- **Follow-up: "Attached by <name>" on the button.** `GET /terminal/active`
+  is not read by the web yet; a held attach is reported when the ticket is
+  refused as `busy`.
+
 Depends on #8
 
 Depends on #18

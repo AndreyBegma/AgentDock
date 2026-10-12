@@ -56,4 +56,22 @@ describe('RunnerStreams', () => {
     s.deliver('r1', { type: 'subscribe.error', id: 'p1', code: 'not_found' });
     expect(calls).toEqual(['subscribe.error r1 p1']);
   });
+
+  it('delivers terminal messages only to listeners that take them (#29)', () => {
+    const s = streams();
+    const pane = listener();
+    const terminal = listener();
+    s.register(pane.l);
+    s.register({
+      ...terminal.l,
+      terminal: (id, m) => terminal.calls.push(`${m.type} ${id} ${m.id}`),
+    });
+    s.deliverTerminal('r1', {
+      type: 'terminal.close',
+      id: 'term_1',
+      reason: 'session_ended',
+    });
+    expect(pane.calls).toEqual([]);
+    expect(terminal.calls).toEqual(['terminal.close r1 term_1']);
+  });
 });

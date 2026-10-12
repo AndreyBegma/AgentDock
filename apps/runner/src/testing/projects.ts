@@ -4,6 +4,12 @@ import { createExec, type Exec, type ExecResult } from '../detect/exec';
 import { nodeFs, type ProjectFs } from '../projects/fs';
 import { tempDir } from './fixtures';
 
+/**
+ * Per-test timeout for suites that spawn real tmux or git. Bun's 5 s default
+ * is too tight on a loaded machine (load average 20–50 is routine here).
+ */
+export const REAL_PROCESS_TIMEOUT_MS = 20_000;
+
 /** git with no user or system config, so fixtures behave the same everywhere. */
 export const realGit = (home: string): Exec =>
   createExec({

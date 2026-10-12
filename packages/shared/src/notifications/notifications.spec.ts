@@ -38,10 +38,16 @@ describe('notification kinds (spec 22 D1)', () => {
     expect(defaultChannels('runner.online', 'admin').telegram).toBe(false);
   });
 
-  it('offers runner kinds to admins only and hides reserved kinds', () => {
+  it('offers runner kinds to admins only', () => {
     expect(kindsFor('operator')).not.toContain('runner.offline');
     expect(kindsFor('admin')).toContain('runner.offline');
-    expect(kindsFor('admin')).not.toContain('budget.exceeded');
+  });
+
+  it('offers the budget kinds to every role (spec 28 D6: user budgets)', () => {
+    for (const role of ['viewer', 'operator', 'admin'] as const) {
+      expect(kindsFor(role)).toContain('budget.threshold');
+      expect(kindsFor(role)).toContain('budget.exceeded');
+    }
   });
 
   it('returns a copy of the defaults', () => {

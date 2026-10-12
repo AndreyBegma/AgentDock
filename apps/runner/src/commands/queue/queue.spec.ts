@@ -134,6 +134,21 @@ describe('issue.create', () => {
     expect(calls[0].args).not.toContain('cs:ready');
   });
 
+  it("uses args.readyLabel over the runner's config and the default (#66)", async () => {
+    writeFileSync(
+      join(root, '.code-analyzer-config.json'),
+      JSON.stringify({ orchestrator: { readyLabel: 'agent:ready' } }),
+    );
+    const { calls, run } = setup();
+    const result = await run({ queue: true, readyLabel: 'ready-now' });
+    expect(result.queued).toBe(true);
+    expect(calls[0].args).toEqual(
+      expect.arrayContaining(['--label', 'ready-now']),
+    );
+    expect(calls[0].args).not.toContain('cs:ready');
+    expect(calls[0].args).not.toContain('agent:ready');
+  });
+
   it('creates it unlabelled when queued with an incomplete body', async () => {
     const { calls, run } = setup();
     const result = await run({ queue: true, body: 'Just an idea.' });

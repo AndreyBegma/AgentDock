@@ -23,8 +23,29 @@ describe('config', () => {
       disabledCommands: [],
       otlp: null,
       fleet: { pollSeconds: 15, prPollSeconds: 60, eventsPollSeconds: 5 },
+      queue: { pollSeconds: 60 },
       sessions: { enabled: true },
+      skills: { maxConcurrentRuns: 2, maxTimeoutSec: 21_600 },
     });
+  });
+
+  it('bounds skill runs and refuses a cap of zero', () => {
+    saveConfig(path, { skills: { maxConcurrentRuns: 1 } });
+    expect(loadConfig(path).skills).toEqual({
+      maxConcurrentRuns: 1,
+      maxTimeoutSec: 21_600,
+    });
+    expect(() =>
+      saveConfig(path, { skills: { maxConcurrentRuns: 0 } }),
+    ).toThrow();
+  });
+
+  it('defaults queue.pollSeconds to 60 and refuses one below 15', () => {
+    expect(loadConfig(path).queue).toEqual({ pollSeconds: 60 });
+    saveConfig(path, { queue: { pollSeconds: 15 } });
+    expect(loadConfig(path).queue).toEqual({ pollSeconds: 15 });
+    writeFileSync(path, JSON.stringify({ queue: { pollSeconds: 14 } }));
+    expect(() => loadConfig(path)).toThrow('queue.pollSeconds');
   });
 
   it('fills fleet intervals and refuses one below the floor', () => {

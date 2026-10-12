@@ -2,11 +2,14 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ActivityModule } from './activity';
 import { AdminModule } from './admin/admin.module';
+import { ApprovalsModule } from './approvals';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
+import { BudgetsModule } from './budgets';
 import { ControlModule } from './control';
 import { DatabaseModule } from './database/database.module';
 import { FleetModule } from './fleet';
+import { GitHubAppModule } from './github-app';
 import { HealthController } from './health.controller';
 import { HistoryModule } from './history';
 import { LiveModule } from './live/live.module';
@@ -16,8 +19,13 @@ import { PricesModule } from './prices/prices.module';
 import { ProjectsModule } from './projects/projects.module';
 import { QueueModule } from './queue';
 import { RunnersModule } from './runners/runners.module';
+import { SchedulesModule } from './schedules';
 import { SessionsModule } from './sessions/sessions.module';
+import { SkillsModule } from './skills';
+import { TelegramModule } from './telegram';
+import { TerminalModule } from './terminal';
 import { UsageModule } from './usage/usage.module';
+import { WebhooksModule } from './webhooks';
 
 @Module({
   imports: [
@@ -41,7 +49,17 @@ import { UsageModule } from './usage/usage.module';
     ControlModule,
     ActivityModule,
     HistoryModule,
+    ApprovalsModule,
     NotificationsModule,
+    TelegramModule,
+    TerminalModule,
+    SkillsModule,
+    SchedulesModule,
+    BudgetsModule,
+    // Before WebhooksModule: its `POST /hooks/:publicId` would otherwise
+    // claim `/hooks/github` (spec 27 notes; pinned by an e2e test).
+    GitHubAppModule,
+    WebhooksModule,
   ],
   controllers: [HealthController],
 })

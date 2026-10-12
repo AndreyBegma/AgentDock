@@ -45,11 +45,22 @@ model User {
   priceRecomputes             PriceRecompute[]
   commandRuns                 CommandRun[]
   orchestratorSettingsUpdated ProjectOrchestratorSettings[]
+  mergeApprovalsDecided       MergeApproval[]
   notifications               Notification[]
   notificationRules           NotificationRule[]
   notificationMutes           NotificationMute[]
   telegramLink                TelegramLink?
   telegramLinkCodes           TelegramLinkCode[]
+  skillInstallPreviews        SkillInstallPreview[]
+  schedulesCreated            Schedule[]                    @relation("ScheduleCreatedBy")
+  schedulesUpdated            Schedule[]                    @relation("ScheduleUpdatedBy")
+  budgets                     Budget[]                      @relation("BudgetUser")
+  budgetsCreated              Budget[]                      @relation("BudgetCreatedBy")
+  budgetOverrides             BudgetOverride[]              @relation("BudgetOverrideBy")
+  budgetOverridesRevoked      BudgetOverride[]              @relation("BudgetOverrideRevokedBy")
+  inboundTriggersCreated      InboundTrigger[]
+  webhooksCreated             Webhook[]
+  githubAppsRegistered        GitHubApp[]
 
   @@map("users")
 }
@@ -112,15 +123,17 @@ model Runner {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  createdBy     User?               @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  pairingCodes  RunnerPairingCode[]
-  profiles      RuntimeProfile[]
-  events        Event[]
-  projects      Project[]
-  sessions      AgentSession[]
-  commandRuns   CommandRun[]
-  notifications Notification[]
-  incidents     RunnerIncident[]
+  createdBy            User?                 @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  pairingCodes         RunnerPairingCode[]
+  profiles             RuntimeProfile[]
+  events               Event[]
+  projects             Project[]
+  sessions             AgentSession[]
+  commandRuns          CommandRun[]
+  notifications        Notification[]
+  incidents            RunnerIncident[]
+  installedSkills      InstalledSkill[]
+  skillInstallPreviews SkillInstallPreview[]
 
   @@map("runners")
 }
@@ -185,7 +198,8 @@ model Event {
   /// (spec 16 D5). Null otherwise, and on an `events.duplicate`.
   pluginEventId String?
 
-  runner Runner @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+  runner            Runner            @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+  webhookDeliveries WebhookDelivery[]
 
   @@unique([runnerId, seq])
   /// One plugin event per project root. NULLs are distinct in PostgreSQL, so
@@ -309,8 +323,15 @@ model Project {
   orchestratorSettings ProjectOrchestratorSettings?
   activityItems        ActivityItem[]
   runs                 Run[]
+  mergeApprovals       MergeApproval[]
   notifications        Notification[]
   notificationMutes    NotificationMute[]
+  installedSkills      InstalledSkill[]
+  skillInstallPreviews SkillInstallPreview[]
+  schedules            Schedule[]
+  budgets              Budget[]
+  inboundTriggers      InboundTrigger[]
+  githubAppHealth      GitHubProjectHealth?
 
   @@unique([runnerId, rootPath])
   @@map("projects")
@@ -1248,10 +1269,604 @@ model Run {
   /// same slot is identical.
   updatedAt       DateTime
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  slot    Slot?   @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  project           Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  slot              Slot?             @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  skillRun          SkillRun?
+  firings           ScheduleFiring[]
+  inboundDeliveries InboundDelivery[]
 
   @@index([projectId, startedAt])
   @@index([projectId, status])
   @@map("runs")
+}
+
+/// Skills (docs/specs/24).
+enum SkillScope {
+  project
+  profile
+  plugin
+}
+
+/// A skill run's phase on the runner (D12); `runs.status` follows it.
+enum SkillRunPhase {
+  queued
+  preparing
+  running
+  collecting
+  succeeded
+  failed
+  cancelled
+  timed_out
+}
+
+/// The skills a runner's last `skill.list` found (D6) — a cache, replaced per
+/// scan. Project rows carry `projectId`; profile and plugin rows `profileKey`.
+/// One of the two is always null, so the unique below cannot dedupe on its own
+/// (Postgres NULLs are distinct): the scan replaces rows in one transaction.
+model InstalledSkill {
+  id            String     @id @default(cuid())
+  runnerId      String
+  projectId     String?
+  profileKey    String?
+  scope         SkillScope
+  runtime       Runtime
+  name          String
+  /// `<name>`, or `<plugin>:<name>` for a plugin skill (D8).
+  invocation    String
+  path          String
+  description   String?
+  argumentHint  String?
+  /// From `.agentdock-skill.json` (D5); null on hand-written skills.
+  source        String?
+  commit        String?
+  contentHash   String?
+  pluginVersion String?
+  seenAt        DateTime
+
+  runner  Runner   @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([runnerId, scope, projectId, profileKey, runtime, name])
+  @@index([projectId])
+  @@map("installed_skills")
+}
+
+/// One inspected skill (D2), installable once by the user who inspected it
+/// until `expiresAt`. Install re-checks `contentHash` on the runner (D3).
+model SkillInstallPreview {
+  id          String    @id @default(cuid())
+  runnerId    String
+  projectId   String?
+  userId      String
+  source      String
+  skillId     String
+  commit      String
+  contentHash String
+  files       Json
+  frontmatter Json
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime
+  consumedAt  DateTime?
+
+  runner  Runner   @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("skill_install_previews")
+}
+
+/// The skill-specific half of a `runs` row of kind `skill` (D12). Only the D10
+/// report fields are stored; the stream stays on the runner (D13).
+model SkillRun {
+  runId             String                     @id
+  /// The invocation (`code-sentinel:spec`).
+  skill             String
+  args              String
+  profileKey        String
+  model             String
+  permissionMode    OrchestratorPermissionMode
+  output            RunOutput
+  phase             SkillRunPhase              @default(queued)
+  worktree          String?
+  branch            String?
+  tmuxSession       String?
+  timeoutSec        Int
+  exitCode          Int?
+  reportText        String?
+  reportTruncated   Boolean                    @default(false)
+  changedFiles      Json?
+  changedFilesTotal Int?
+  /// `git diff` against the base, at most 128 KiB; the full patch stays on the runner.
+  patch             String?
+  patchTruncated    Boolean                    @default(false)
+  error             String?
+  prNumber          Int?
+  prUrl             String?
+  queuedAt          DateTime                   @default(now())
+  startedAt         DateTime?
+  finishedAt        DateTime?
+
+  run Run @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([phase])
+  @@map("skill_runs")
+}
+
+// ─── Merge approval queue (docs/specs/20-merge-approval-queue.md) ───────────
+
+/// `orchestrator`: the plugin emitted `pr.awaiting_approval`; `derived`: D2's fallback.
+enum ApprovalSource {
+  orchestrator
+  derived
+}
+
+enum ApprovalStatus {
+  waiting
+  approved
+  changes_requested
+  stale
+  merged
+  closed
+}
+
+/// The approval state of one pull request at one head. At most one row per
+/// PR is current (`waiting` | `approved`), enforced by the approvals module
+/// under a per-project advisory lock; the rest are history. `headSha` is null
+/// until a decision binds the row to a head (spec 20 notes, Q3).
+model MergeApproval {
+  id           String         @id @default(cuid())
+  projectId    String
+  prNumber     Int
+  slot         String?
+  issue        Int?
+  headSha      String?
+  source       ApprovalSource
+  status       ApprovalStatus
+  /// Nullable so deleting the user keeps the decision.
+  decidedById  String?
+  decidedAt    DateTime?
+  /// D7: the request-changes note.
+  note         String?
+  waitingSince DateTime
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  decidedBy User?   @relation(fields: [decidedById], references: [id], onDelete: SetNull)
+
+  @@index([projectId, prNumber])
+  @@index([projectId, status])
+  @@map("merge_approvals")
+}
+
+// ─── Webhooks (docs/specs/26-webhooks.md) ───────────────────────────────────
+
+/// What became of one inbound delivery (D2–D7). `accepted`: verified and
+/// recorded, the command not sent yet; `started`: the command was accepted and
+/// `runId` is set; `skipped`: D6's one live run; `rejected`: refused after it
+/// was recorded (`reason`); `failed`: the firing failed (`reason`).
+enum InboundDeliveryStatus {
+  accepted
+  skipped
+  rejected
+  started
+  failed
+}
+
+enum WebhookDeliveryStatus {
+  pending
+  succeeded
+  failed
+}
+
+/// D14.
+enum WebhookCircuitState {
+  closed
+  open
+  half_open
+}
+
+/// A signed `POST /hooks/<publicId>` that starts work on one project (D1–D6).
+/// `secret` / `previousSecret` are `SecretCipher` ciphertext (D17); the
+/// previous one verifies until `previousSecretUntil`. `bucketTokens` /
+/// `bucketRefilledAt` are D6's per-trigger token bucket.
+model InboundTrigger {
+  id                  String    @id @default(cuid())
+  /// D1: 24 random characters, the URL's id — never the cuid.
+  publicId            String    @unique
+  name                String
+  projectId           String
+  /// D3's closed union (shared `inboundTriggerActionSchema`).
+  action              Json
+  /// D4: the `payload.<path>`s the action's args may reference.
+  allowedPaths        String[]
+  /// D4: null means the shared default pattern.
+  valuePattern        String?
+  secret              String
+  previousSecret      String?
+  previousSecretUntil DateTime?
+  enabled             Boolean   @default(true)
+  disabledReason      String?
+  bucketTokens        Int
+  bucketRefilledAt    DateTime
+  /// Nullable so deleting the admin keeps the trigger; a null creator is
+  /// `creator_not_authorized` at fire time (D5).
+  createdById         String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  project    Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy  User?             @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  deliveries InboundDelivery[]
+
+  @@index([projectId])
+  @@map("inbound_triggers")
+}
+
+/// One received inbound delivery, and D2's nonce store: `(triggerId,
+/// deliveryId)` is unique, kept 24 hours for replay detection and 30 days in
+/// all (D18).
+model InboundDelivery {
+  id           BigInt                @id @default(autoincrement())
+  triggerId    String
+  /// The caller's `X-AgentDock-Delivery`, at most 64 characters.
+  deliveryId   String
+  receivedAt   DateTime              @default(now())
+  status       InboundDeliveryStatus
+  reason       String?
+  renderedArgs Json?
+  runId        String?
+  commandRunId String?
+  sourceIp     String?
+
+  trigger InboundTrigger @relation(fields: [triggerId], references: [id], onDelete: Cascade)
+  run     Run?           @relation(fields: [runId], references: [id], onDelete: SetNull)
+
+  @@unique([triggerId, deliveryId])
+  @@index([triggerId, receivedAt])
+  @@index([receivedAt])
+  @@map("inbound_deliveries")
+}
+
+/// An outbound target (D9–D15). `events` ⊆ the shared catalogue; `projectIds`
+/// empty means every project. `secret` is `SecretCipher` ciphertext (D17).
+model Webhook {
+  id                  String              @id @default(cuid())
+  name                String
+  url                 String
+  events              String[]
+  projectIds          String[]
+  secret              String
+  enabled             Boolean             @default(true)
+  circuitState        WebhookCircuitState @default(closed)
+  circuitOpenedAt     DateTime?
+  consecutiveFailures Int                 @default(0)
+  /// Nullable so deleting the admin keeps the webhook.
+  createdById         String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  createdBy  User?             @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  deliveries WebhookDelivery[]
+
+  @@map("webhooks")
+}
+
+/// One event's delivery to one webhook (D11, D12). `eventId` is null for a
+/// `webhook.test` delivery; `(webhookId, eventId)` makes the dispatcher
+/// idempotent. `responseBody` holds at most 2 KB.
+model WebhookDelivery {
+  id            String                @id @default(cuid())
+  webhookId     String
+  eventId       BigInt?
+  eventType     String
+  /// The D10 envelope, signed anew on every attempt.
+  payload       Json
+  status        WebhookDeliveryStatus @default(pending)
+  attempts      Int                   @default(0)
+  nextAttemptAt DateTime              @default(now())
+  lastAttemptAt DateTime?
+  responseCode  Int?
+  responseBody  String?
+  error         String?
+  createdAt     DateTime              @default(now())
+
+  webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  event   Event?  @relation(fields: [eventId], references: [id], onDelete: SetNull)
+
+  @@unique([webhookId, eventId])
+  @@index([status, nextAttemptAt])
+  @@index([webhookId, createdAt])
+  @@index([createdAt])
+  @@map("webhook_deliveries")
+}
+
+/// Where the outbound dispatcher stopped (D11): one row, id `webhooks`.
+/// Every `events.id` up to `eventsCursor` was considered.
+model WebhookDispatcherState {
+  id           String   @id
+  eventsCursor BigInt   @default(0)
+  updatedAt    DateTime @updatedAt
+
+  @@map("webhook_dispatcher_state")
+}
+
+// ─── Cron schedules (docs/specs/25-cron-schedules.md) ───────────────────────
+
+enum ScheduleMissedPolicy {
+  skip
+  catch_up
+}
+
+enum ScheduleDisabledReason {
+  manual
+  failing
+  creator_not_authorized
+}
+
+enum ScheduleFiringKind {
+  cron
+  catch_up
+  manual
+}
+
+enum ScheduleFiringStatus {
+  due
+  started
+  noop
+  skipped
+  failed
+  succeeded
+}
+
+/// A skill run or an orchestrator start fired at the times of `cron` in
+/// `timezone` (D1–D4). The scheduler claims rows by `(enabled, nextRunAt)`.
+model Schedule {
+  id                  String                  @id @default(cuid())
+  projectId           String
+  name                String
+  /// D1: `{ kind: "skill", … }` or `{ kind: "orchestrator", mode }`.
+  target              Json
+  cron                String
+  /// An IANA name; fire times are stored in UTC (D4).
+  timezone            String
+  missedPolicy        ScheduleMissedPolicy    @default(skip)
+  enabled             Boolean                 @default(true)
+  disabledReason      ScheduleDisabledReason?
+  /// Null while disabled.
+  nextRunAt           DateTime?               @db.Timestamptz(3)
+  lastRunAt           DateTime?               @db.Timestamptz(3)
+  /// D11: failed firings since the last succeeded one.
+  consecutiveFailures Int                     @default(0)
+  /// A schedule acts with its creator's authority (D10); it goes with them.
+  createdById         String
+  updatedById         String?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  project   Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy User             @relation("ScheduleCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  updatedBy User?            @relation("ScheduleUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  firings   ScheduleFiring[]
+
+  @@index([enabled, nextRunAt])
+  @@index([projectId])
+  @@map("schedules")
+}
+
+/// One occurrence of a schedule (D5–D9, D15). The unique key keeps an
+/// occurrence from firing twice, whichever instance claims it.
+model ScheduleFiring {
+  id           BigInt               @id @default(autoincrement())
+  scheduleId   String
+  scheduledFor DateTime             @db.Timestamptz(3)
+  firedAt      DateTime?            @db.Timestamptz(3)
+  kind         ScheduleFiringKind
+  status       ScheduleFiringStatus
+  reason       String?
+  /// D6: the missed occurrences a `skipped` row stands for.
+  missedCount  Int                  @default(0)
+  /// The run a skill firing started (#21); runs outlive the schedule.
+  runId        String?
+  /// The `command_runs` row an orchestrator firing wrote (#17).
+  commandRunId String?
+  error        Json?
+  finishedAt   DateTime?            @db.Timestamptz(3)
+
+  schedule Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  run      Run?     @relation(fields: [runId], references: [id], onDelete: SetNull)
+
+  @@unique([scheduleId, scheduledFor, kind])
+  @@index([scheduleId, scheduledFor])
+  @@index([status])
+  @@map("schedule_firings")
+}
+
+// ─── Budgets (docs/specs/28-budgets.md) ─────────────────────────────────────
+
+enum BudgetScope {
+  project
+  user
+}
+
+enum BudgetPeriod {
+  day
+  week
+  month
+}
+
+enum BudgetAction {
+  alert
+  stop
+}
+
+/// A spend cap in API-equivalent dollars (D1). Exactly one of `projectId` /
+/// `userId` is set, matching `scope` (check constraint `budgets_scope_check`),
+/// and at most one budget per `(scope, projectId, userId, period)` is enabled
+/// (partial unique index `budgets_enabled_key`). Both live in the migration's
+/// SQL: Prisma cannot declare either.
+model Budget {
+  id          String       @id @default(cuid())
+  scope       BudgetScope
+  projectId   String?
+  userId      String?
+  period      BudgetPeriod
+  /// IANA zone the periods are cut in (D9).
+  timezone    String
+  limitUsd    Decimal      @db.Decimal(14, 4)
+  /// Sorted percents, 100 always present.
+  thresholds  Int[]
+  action      BudgetAction
+  enabled     Boolean      @default(true)
+  /// Nullable so deleting the admin who created it keeps the budget.
+  createdById String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  project   Project?          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User?             @relation("BudgetUser", fields: [userId], references: [id], onDelete: Cascade)
+  createdBy User?             @relation("BudgetCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  periods   BudgetPeriodRow[]
+  overrides BudgetOverride[]
+
+  @@index([projectId])
+  @@index([userId])
+  @@map("budgets")
+}
+
+/// One period of a budget, `[start, end)` (D9). `spentUsd` and
+/// `unpricedRequests` are rebuilt from `llm_requests` on every evaluation
+/// (spec 28 notes, amending D4/D5); `firedThresholds` only grows within the
+/// period, so each threshold notifies once.
+model BudgetPeriodRow {
+  id               String    @id @default(cuid())
+  budgetId         String
+  start            DateTime  @db.Timestamptz(3)
+  end              DateTime  @db.Timestamptz(3)
+  spentUsd         Decimal   @default(0) @db.Decimal(14, 6)
+  unpricedRequests Int       @default(0)
+  firedThresholds  Int[]     @default([])
+  exceededAt       DateTime? @db.Timestamptz(3)
+  reconciledAt     DateTime  @db.Timestamptz(3)
+
+  budget Budget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+
+  @@unique([budgetId, start])
+  @@map("budget_periods")
+}
+
+/// An admin lifting a `stop` budget for one period, until `until` (D8).
+model BudgetOverride {
+  id          String    @id @default(cuid())
+  budgetId    String
+  periodStart DateTime  @db.Timestamptz(3)
+  until       DateTime  @db.Timestamptz(3)
+  reason      String
+  /// Nullable so deleting the admin keeps the record.
+  byId        String?
+  createdAt   DateTime  @default(now())
+  revokedAt   DateTime? @db.Timestamptz(3)
+  revokedById String?
+
+  budget    Budget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  by        User?  @relation("BudgetOverrideBy", fields: [byId], references: [id], onDelete: SetNull)
+  revokedBy User?  @relation("BudgetOverrideRevokedBy", fields: [revokedById], references: [id], onDelete: SetNull)
+
+  @@index([budgetId, periodStart])
+  @@map("budget_overrides")
+}
+
+// ─── GitHub App (spec 27) ───────────────────────────────────────────────────
+
+/// The one GitHub App of this instance (D1, D3). Secrets are `SecretCipher`
+/// ciphertext and never leave the API.
+model GitHubApp {
+  /// Always "app": one App per instance.
+  id                     String    @id @default("app")
+  appId                  Int
+  slug                   String
+  ownerLogin             String
+  privateKey             String
+  webhookSecret          String
+  /// Stored, unused: AgentDock does no OAuth (D3).
+  clientSecret           String?
+  /// False when the manifest had no `PUBLIC_URL` (D14).
+  hookActive             Boolean
+  signatureFailures      Int       @default(0)
+  lastDeliveryAt         DateTime?
+  /// D11 (c): a failure after the last verified delivery makes every project unhealthy.
+  lastSignatureFailureAt DateTime?
+  /// D11 (b): the last `GET /app/hook/deliveries` check, at resync.
+  hookCheckedAt          DateTime?
+  hookCheckOk            Boolean?
+  /// Nullable so deleting the admin keeps the registration.
+  registeredById         String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  registeredBy User? @relation(fields: [registeredById], references: [id], onDelete: SetNull)
+
+  @@map("github_app")
+}
+
+/// An installation of the App, as GitHub last listed it (D10).
+model GitHubInstallation {
+  /// GitHub's installation id.
+  id           Int      @id
+  accountLogin String
+  accountType  String
+  suspended    Boolean
+  syncedAt     DateTime
+  createdAt    DateTime @default(now())
+
+  repos GitHubInstallationRepo[]
+
+  @@map("github_installations")
+}
+
+/// A repository an installation can see. `fullName` is lower-cased (D7).
+model GitHubInstallationRepo {
+  installationId Int
+  /// BigInt: GitHub's repository ids are nearing the 32-bit limit.
+  repoId         BigInt
+  fullName       String
+
+  installation GitHubInstallation @relation(fields: [installationId], references: [id], onDelete: Cascade)
+
+  @@id([installationId, repoId])
+  @@index([fullName])
+  @@map("github_installation_repos")
+}
+
+/// A verified delivery, kept for dedupe by `X-GitHub-Delivery` (D6) and for
+/// D11's "recent delivery"; 14 days (D17).
+model GitHubDelivery {
+  deliveryId      String   @id
+  event           String
+  action          String?
+  /// Lower-cased `repository.full_name`.
+  fullName        String?
+  installationId  Int?
+  receivedAt      DateTime @default(now())
+  handled         Boolean
+  projectsMatched Int
+
+  @@index([installationId, receivedAt])
+  @@index([receivedAt])
+  @@map("github_deliveries")
+}
+
+/// A project's App health, recomputed every 5 minutes (D11).
+model GitHubProjectHealth {
+  projectId String   @id
+  covered   Boolean
+  /// `healthy` | `unhealthy` (shared `githubAppHealthSchema`).
+  state     String
+  reason    String?
+  checkedAt DateTime
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("github_project_health")
 }

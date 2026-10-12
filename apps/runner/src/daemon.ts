@@ -1,6 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import { loadavg } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import {
   type Capabilities,
   type Host,
@@ -20,14 +20,26 @@ import {
   type SocketFactory,
   type StopReason,
 } from './connection';
-import { detectCapabilities } from './detect/capabilities';
+import {
+  detectCapabilities,
+  extractVersion,
+  ptyAvailable,
+  terminalCapability,
+  terminalUnsupported,
+} from './detect/capabilities';
 import type { Exec } from './detect/exec';
 import { acquireLock } from './lock';
 import { errorMessage, type Logger } from './log';
 import { otlpSettings, startOtlpReceiver } from './otlp';
 import { PaneStreamer } from './pane';
 import { WatchList } from './projects/watch-list';
+import {
+  createSkillHandlers,
+  RunLogStreamer,
+  SkillRunExecutor,
+} from './skills';
 import { Spool } from './spool';
+import { bunSpawnPty, type SpawnPty, TerminalManager } from './terminal';
 import { RUNNER_VERSION } from './version';
 
 export interface DaemonOptions {
@@ -44,11 +56,25 @@ export interface DaemonOptions {
   log: Logger;
   createSocket?: SocketFactory;
   random?: () => number;
+  /** Spawns the PTY of a terminal attach (spec 29); Bun's own by default. */
+  spawnPty?: SpawnPty;
+  /** Skill runs' directories (spec 24 D7); `<state>/agentdock/runs` beside the spool by default. */
+  runsDir?: string;
+  /** The argv that starts this runner; a skill run's session appends `exec-run <runDir>`. */
+  selfCommand?: readonly string[];
+  /** The skills.sh catalog is fetched with it; the global `fetch` by default. */
+  fetch?: typeof fetch;
   /** Aborting it stops the daemon cleanly. */
   signal?: AbortSignal;
   /** Called once the connection exists — tests reach it to emit events. */
   onStart?: (connection: RunnerConnection) => void;
 }
+
+/** This runner as an argv: the compiled binary, or bun with the entry script. */
+export const defaultSelfCommand = (): string[] =>
+  Bun.main.startsWith('/$bunfs/')
+    ? [process.execPath]
+    : [process.execPath, Bun.main];
 
 /** Counts tmux sessions; no tmux or no server means zero. */
 const countTmuxSessions = async (exec: Exec): Promise<number> => {
@@ -79,12 +105,18 @@ export const runDaemon = async (
         // The receiver's port as bound, not as configured (spec 13).
         config: { profiles: config.profiles, otlp: otlpCapability() },
       });
+      const terminal = terminalCapability({
+        tmux: capabilities.tmux,
+        disabledCommands: config.disabledCommands,
+        pty: ptyAvailable(),
+      });
       log.info('capabilities detected', {
         claude: capabilities.runtimes.claude?.version ?? null,
         codex: capabilities.runtimes.codex?.version ?? null,
         profiles: capabilities.profiles.length,
+        terminal,
       });
-      return capabilities;
+      return { ...capabilities, terminal };
     };
 
     // Collectors emit through the connection, which exists only below.
@@ -93,7 +125,11 @@ export const runDaemon = async (
       factories: collectors,
       emit: (event) => connection?.emit(event),
       log,
-      context: { exec, clock, fleet: config.fleet },
+      context: {
+        exec,
+        clock,
+        fleet: { ...config.fleet, queuePollSeconds: config.queue.pollSeconds },
+      },
     });
     const watchList = new WatchList({
       initial: config.projects,
@@ -126,6 +162,51 @@ export const runDaemon = async (
         })
       : null;
 
+    // Interactive attaches (spec 29): bytes go out through the connection,
+    // which exists only below; `reset` ends every attach when it drops.
+    const terminal = new TerminalManager({
+      exec,
+      clock,
+      log,
+      watchedProjects: () => watchList.current,
+      send: (message) => connection?.sendMessage(message) ?? false,
+      spawn: options.spawnPty ?? bunSpawnPty(process.env),
+      unsupported: async () => {
+        const tmux = await exec('tmux', ['-V']);
+        return terminalUnsupported(
+          tmux && tmux.code === 0 ? extractVersion(tmux.stdout) : null,
+          ptyAvailable(),
+        );
+      },
+    });
+
+    // Skills (spec 24): runs report through the connection, which exists only
+    // below; the executor starts once it does.
+    const skillsDeps = {
+      exec,
+      clock,
+      home,
+      profiles: () => config.profiles,
+      watchedProjects: () => watchList.current,
+      fetch: options.fetch ?? fetch,
+    };
+    const runs = new SkillRunExecutor({
+      deps: skillsDeps,
+      runsDir: options.runsDir ?? join(dirname(options.spoolDir), 'runs'),
+      selfCommand: options.selfCommand ?? defaultSelfCommand(),
+      maxConcurrentRuns: config.skills.maxConcurrentRuns,
+      maxTimeoutSec: config.skills.maxTimeoutSec,
+      emit: (event) => connection?.emit(event),
+      log,
+      otlpPort: () => otlp?.port ?? null,
+    });
+    const runLog = new RunLogStreamer({
+      runs,
+      send: (message) => connection?.sendMessage(message) ?? false,
+      clock,
+      log,
+    });
+
     const dispatch = createDispatcher({
       handlers: createHandlers({
         clock,
@@ -134,10 +215,14 @@ export const runDaemon = async (
         detectCapabilities: redetect,
         exec,
         watchedProjects: () => watchList.current,
+        pollCollectors: (projectId, targets) =>
+          registry.pollNow(projectId, targets),
         profiles: () => config.profiles,
         backfillSessions: sessions
           ? (scope) => sessions.backfill(scope)
           : undefined,
+        terminal,
+        skills: createSkillHandlers(skillsDeps, runs),
       }),
       disabledCommands: config.disabledCommands,
       clock,
@@ -180,6 +265,8 @@ export const runDaemon = async (
       heartbeat,
       dispatch,
       pane,
+      terminal,
+      runLog,
       onConfig: (server) => {
         sessions?.setProjects(server.projects).catch(() => {});
         watchList.apply(server.projects).catch((error) => {
@@ -210,6 +297,10 @@ export const runDaemon = async (
     if (options.signal?.aborted) live.stop();
     options.signal?.addEventListener('abort', onAbort, { once: true });
     await watchList.start();
+    // Runs a previous runner left are picked up; their events go to the spool.
+    await runs.start().catch((error) => {
+      log.error('skills: cannot resume runs', { error: errorMessage(error) });
+    });
     // Not awaited: a first scan of a large profile must not delay connecting.
     sessions?.start(watchList.current).catch((error) => {
       log.error('sessions: cannot start', { error: errorMessage(error) });
@@ -219,6 +310,10 @@ export const runDaemon = async (
     const reason = await live.done;
     options.signal?.removeEventListener('abort', onAbort);
     pane.stop();
+    runLog.stop();
+    // Sessions run on in tmux; the next start resumes watching them.
+    runs.stop();
+    terminal.stop();
     await registry.stop();
     await sessions?.stop();
     await otlp?.stop();

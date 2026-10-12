@@ -195,7 +195,8 @@ describe('notifications API (e2e)', () => {
         .body as NotificationRulesView;
       const kinds = viewer.rules.map((r) => r.kind);
       expect(kinds).not.toContain('runner.offline');
-      expect(kinds).not.toContain('budget.exceeded');
+      // Spec 28 D6: a viewer can hold a user budget.
+      expect(kinds).toContain('budget.exceeded');
       expect(
         viewer.rules.find((r) => r.kind === 'pr.awaiting_approval'),
       ).toMatchObject({

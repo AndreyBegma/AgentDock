@@ -12,17 +12,24 @@ describe('visibleNav', () => {
     expect(sections).toEqual(['overview', 'sessions', 'usage']);
   });
 
-  test('an admin gets Runners, Users, Audit, Prices and Settings', () => {
+  test('an admin gets Runners, Users, Audit, Prices, Integrations and Settings', () => {
     expect(labels('admin', '/')).toEqual([
       'overview/Overview',
       'overview/Projects',
       'overview/Activity',
+      'overview/Skills',
       'sessions/Sessions',
       'usage/Usage',
       'admin/Runners',
       'admin/Users',
+      'admin/Schedules',
+      'admin/Budgets',
       'admin/Audit',
       'admin/Prices',
+      'admin/Integrations',
+      'admin/Triggers',
+      'admin/Webhooks',
+      'admin/GitHub App',
       'admin/Settings',
     ]);
   });
@@ -43,9 +50,20 @@ describe('visibleNav', () => {
     const inProject = labels('viewer', '/projects/p1/settings');
     expect(inProject).toContain('project/Fleet');
     expect(inProject).toContain('project/Queue');
+    expect(inProject).toContain('project/Approvals');
     expect(inProject).toContain('project/Activity');
     expect(inProject).toContain('project/History');
+    expect(inProject).toContain('project/Skills');
+    expect(inProject).toContain('project/Schedules');
     expect(inProject).toContain('project/Settings');
+  });
+
+  test('the catalog is for operators; a viewer sees only the project inventory', () => {
+    expect(labels('viewer', '/').join()).not.toContain('overview/Skills');
+    const skills = visibleNav('viewer', '/projects/p1/fleet')
+      .flatMap((section) => section.entries)
+      .find((entry) => entry.id === 'project-skills');
+    expect(skills?.resolvedHref).toBe('/projects/p1/skills');
   });
 
   test('Fleet links to the current project', () => {

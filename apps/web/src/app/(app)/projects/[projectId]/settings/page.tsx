@@ -12,8 +12,10 @@ import { ApiError, api } from '../../../../../lib/api';
 import { useLive } from '../../../../../lib/live/use-live';
 import { describeProjectError } from '../../../../../lib/projects/format';
 import { STATUS_TONE } from '../../../../../lib/runners/format';
+import { BudgetTab } from './budget/budget-tab';
 import { DocsTab } from './docs-tab';
 import { GeneralTab } from './general-tab';
+import { GitHubAppRow } from './github-app-row';
 import { MembersTab } from './members-tab';
 import { OrchestratorTab } from './orchestrator-tab';
 
@@ -22,6 +24,7 @@ const TABS = [
   { id: 'docs', label: 'Docs source' },
   { id: 'orchestrator', label: 'Orchestrator' },
   { id: 'members', label: 'Members' },
+  { id: 'budget', label: 'Budget' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
 
@@ -45,6 +48,13 @@ export default function ProjectSettingsPage() {
     setProject(undefined);
     load();
   }, [load]);
+
+  // A link may carry the tab (`?tab=budget`, from the usage and fleet pages).
+  useEffect(() => {
+    const wanted = new URLSearchParams(window.location.search).get('tab');
+    const found = TABS.find(({ id }) => id === wanted);
+    if (found) setTab(found.id);
+  }, []);
 
   // The API publishes no project events yet; any that arrive reload the page.
   useLive(`project:${projectId}`, () => {
@@ -84,7 +94,7 @@ export default function ProjectSettingsPage() {
         </div>
       </div>
 
-      <Tabs aria-label="Project settings" className="max-w-lg">
+      <Tabs aria-label="Project settings" className="max-w-xl">
         {TABS.map(({ id, label }) => (
           <TabsItem key={id} current={tab === id} layoutId="project-tab">
             <button
@@ -100,7 +110,10 @@ export default function ProjectSettingsPage() {
       </Tabs>
 
       {tab === 'general' ? (
-        <GeneralTab project={project} isAdmin={isAdmin} onChanged={load} />
+        <div className="flex flex-col gap-4">
+          <GeneralTab project={project} isAdmin={isAdmin} onChanged={load} />
+          <GitHubAppRow projectId={project.id} />
+        </div>
       ) : null}
       {tab === 'docs' ? (
         <DocsTab
@@ -119,6 +132,9 @@ export default function ProjectSettingsPage() {
       ) : null}
       {tab === 'members' ? (
         <MembersTab projectId={project.id} isAdmin={isAdmin} />
+      ) : null}
+      {tab === 'budget' ? (
+        <BudgetTab projectId={project.id} isAdmin={isAdmin} />
       ) : null}
     </div>
   );

@@ -1,10 +1,16 @@
-import { afterEach, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it, setDefaultTimeout } from 'bun:test';
 import { join } from 'node:path';
 import { projectInspectionSchema } from '@agentdock/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import type { Exec } from '../detect/exec';
-import { gitWithFakeGh, workspace } from '../testing/projects';
+import {
+  gitWithFakeGh,
+  REAL_PROCESS_TIMEOUT_MS,
+  workspace,
+} from '../testing/projects';
 import { inspectProject, refreshProject } from './inspect';
+
+setDefaultTimeout(REAL_PROCESS_TIMEOUT_MS);
 
 let ws: ReturnType<typeof workspace>;
 afterEach(() => ws?.cleanup());

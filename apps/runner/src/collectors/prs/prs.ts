@@ -14,9 +14,12 @@ export interface ListedPr {
   url: string;
   mergeable?: string;
   statusCheckRollup?: CheckRollupEntry[] | null;
+  /** The head commit; absent when `gh` sends none or a malformed one. */
+  headRefOid?: string;
 }
 
-const LIST_FIELDS = 'number,headRefName,statusCheckRollup,mergeable,title,url';
+const LIST_FIELDS =
+  'number,headRefName,headRefOid,statusCheckRollup,mergeable,title,url';
 export const PR_LIST_LIMIT = 100;
 
 /** `MERGEABLE` → true, `CONFLICTING` → false, anything else → unknown. */
@@ -29,6 +32,11 @@ const listedPrSchema = z.object({
   title: z.string(),
   url: z.url(),
   mergeable: z.string().optional(),
+  headRefOid: z
+    .string()
+    .regex(/^[0-9a-f]{40}$/)
+    .optional()
+    .catch(undefined),
   statusCheckRollup: z
     .array(
       z.object({
@@ -60,6 +68,7 @@ interface Tracked {
   slot: string;
   checks: PrChecks;
   mergeable: boolean | undefined;
+  headSha: string | undefined;
 }
 
 export interface PrWatcherOptions {
@@ -73,7 +82,8 @@ export interface PrWatcherOptions {
 /**
  * Polls a project's open pull requests through the runner's own `gh` (D3) and
  * follows the ones on a slot's branch: `pr.opened` when one appears,
- * `pr.checks_changed` when its rolled-up checks or mergeability move,
+ * `pr.checks_changed` when its rolled-up checks, mergeability or head commit
+ * move (both carry the head as `headSha` when `gh` reports one),
  * `pr.closed` (merged or not) when it leaves the open list. Without a GitHub
  * remote or a working `gh` it reports once and tries again next poll.
  */
@@ -123,28 +133,34 @@ export class PrWatcher {
   private observe(pr: ListedPr, slot: string): void {
     const checks = rollupChecks(pr.statusCheckRollup ?? []);
     const mergeable = mergeableOf(pr.mergeable);
+    const headSha = pr.headRefOid;
     const previous = this.tracked.get(pr.number);
     this.tracked.set(pr.number, {
       branch: pr.headRefName,
       slot,
       checks,
       mergeable,
+      headSha,
     });
     const scope = { slot, issue: this.options.book.issue(slot) };
     const fields = { number: pr.number, branch: pr.headRefName, checks };
-    const withMergeable = mergeable === undefined ? {} : { mergeable };
+    const optional = {
+      ...(mergeable === undefined ? {} : { mergeable }),
+      ...(headSha === undefined ? {} : { headSha }),
+    };
     if (!previous) {
       this.options.emit(
         'pr.opened',
-        { ...fields, url: pr.url, title: pr.title, ...withMergeable },
+        { ...fields, url: pr.url, title: pr.title, ...optional },
         scope,
       );
-    } else if (previous.checks !== checks || previous.mergeable !== mergeable) {
-      this.options.emit(
-        'pr.checks_changed',
-        { ...fields, ...withMergeable },
-        scope,
-      );
+    } else if (
+      previous.checks !== checks ||
+      previous.mergeable !== mergeable ||
+      // A push alone (spec 20 D6): the approvals sink voids on the new head.
+      (headSha !== undefined && previous.headSha !== headSha)
+    ) {
+      this.options.emit('pr.checks_changed', { ...fields, ...optional }, scope);
     }
   }
 

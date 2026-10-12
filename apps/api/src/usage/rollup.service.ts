@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
+import { BudgetSweep } from '../budgets/budget-sweep';
 
 type Tx = Prisma.TransactionClient;
 
@@ -25,6 +26,8 @@ export const hourOf = (at: Date): number =>
  */
 @Injectable()
 export class RollupService {
+  constructor(@Optional() private readonly budgets?: BudgetSweep) {}
+
   /** Rebuilds the given UTC hours (epoch ms, any order, duplicates allowed) inside `tx`. */
   async rebuildHours(tx: Tx, hours: Iterable<number>): Promise<void> {
     const sorted = [...new Set([...hours].map((h) => hourOf(new Date(h))))]
@@ -74,6 +77,8 @@ export class RollupService {
         JOIN sessions s ON s.id = r."sessionId"
       ) q
       GROUP BY q.h, q."projectId", q.runtime, q.model, q.slot, q.issue`;
+    // Spec 28 D5: budgets re-evaluate these hours once this has committed.
+    this.budgets?.onUsage(sorted.map((h) => Date.parse(h)));
   }
 
   /** Every UTC hour from the one `from` falls in up to `to` (exclusive). */

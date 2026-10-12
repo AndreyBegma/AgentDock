@@ -24,10 +24,22 @@ export class RunnerWatchList {
     const projects = await this.prisma.project.findMany({
       where: { runnerId },
       orderBy: { createdAt: 'asc' },
-      select: { id: true, rootPath: true },
+      select: {
+        id: true,
+        rootPath: true,
+        githubAppHealth: { select: { state: true } },
+      },
     });
     return {
-      projects: projects.map((p) => ({ id: p.id, root: p.rootPath })),
+      projects: projects.map((p) => ({
+        id: p.id,
+        root: p.rootPath,
+        // Spec 27 D12: sent only when healthy — absent means `unhealthy`
+        // (60 s polling), the list every runner already understands.
+        ...(p.githubAppHealth?.state === 'healthy'
+          ? { githubApp: 'healthy' as const }
+          : {}),
+      })),
       pollIntervalsMs: {},
     };
   }

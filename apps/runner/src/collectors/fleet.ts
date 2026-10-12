@@ -1,4 +1,5 @@
 import { type FSWatcher, watch } from 'node:fs';
+import type { GitHubAppHealth } from '@agentdock/shared/protocol';
 import type { Cancel } from '../clock';
 import {
   type FleetEmitter,
@@ -8,6 +9,7 @@ import {
 } from '../fleet/project';
 import { SlotBook } from '../fleet/slots';
 import { errorMessage } from '../log';
+import { AppPacing } from './app-pacing';
 import { BoardWatcher } from './board/board';
 import { OrchestratorWatcher } from './orchestrator/orchestrator';
 import { PrWatcher } from './prs/prs';
@@ -65,11 +67,14 @@ export class FleetCollector implements Collector {
   private stopped = false;
   private first: Promise<void> = Promise.resolve();
   private tmuxDown = false;
+  private readonly pacing: AppPacing;
 
   constructor(
     private readonly context: CollectorContext,
     private readonly options: FleetCollectorOptions = {},
-  ) {}
+  ) {
+    this.pacing = new AppPacing(context.clock);
+  }
 
   async start(watched: WatchedProject, emit: Emit): Promise<void> {
     const { exec, clock, fleet } = this.context;
@@ -111,10 +116,33 @@ export class FleetCollector implements Collector {
         FILE_RESCAN_MS,
       ),
       clock.setInterval(
-        () => void this.guard('prs', () => this.prs()),
+        // Spec 27 D12: relaxed to 10 minutes while the GitHub App is healthy.
+        () => this.pacing.due() && void this.guard('prs', () => this.prs()),
         fleet.prPollSeconds * 1000,
       ),
     );
+  }
+
+  setGithubApp(health: GitHubAppHealth | undefined): void {
+    this.pacing.setHealth(health);
+  }
+
+  /** `collector.poll` (spec 27 D13): the named steps now, nothing restarted. */
+  async pollNow(targets: readonly string[]): Promise<string[]> {
+    const w = this.watchers;
+    if (!w || this.stopped) return [];
+    const polled: string[] = [];
+    if (targets.includes('prs')) {
+      await this.guard('prs', () => this.prs());
+      polled.push('prs');
+    }
+    if (targets.includes('worktrees')) {
+      await this.guard('worktrees', async () => {
+        await w.worktrees.poll();
+      });
+      polled.push('worktrees');
+    }
+    return polled;
   }
 
   /** Resolves once the first full pass after `start` has run. */
@@ -161,6 +189,7 @@ export class FleetCollector implements Collector {
   }
 
   async prs(): Promise<void> {
+    this.pacing.polled();
     await this.watchers?.prs.poll();
   }
 

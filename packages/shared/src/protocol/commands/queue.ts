@@ -33,6 +33,12 @@ export const issueCreateArgsSchema = z.strictObject({
   }),
   labels: z.array(z.string().min(1).max(100)).max(ISSUE_LABELS_MAX),
   queue: z.boolean(),
+  /**
+   * The project's effective ready label (override, else config snapshot, else
+   * `cs:ready`). Optional: an older API sends none and the runner falls back
+   * to its own config.
+   */
+  readyLabel: z.string().trim().min(1).max(100).optional(),
 });
 export type IssueCreateArgs = z.infer<typeof issueCreateArgsSchema>;
 

@@ -2,7 +2,10 @@ import { describe, expect, it } from 'bun:test';
 import {
   type CommandResultMessage,
   commandResultMessageSchema,
+  commands,
   DEFAULT_COMMAND_TIMEOUT_MS,
+  SKILL_TIMEOUTS_MS,
+  TERMINAL_ATTACH_TIMEOUT_MS,
 } from '@agentdock/shared/protocol';
 import { FakeClock } from '../testing/fake-clock';
 import { fakeExec, memoryLogger } from '../testing/fixtures';
@@ -140,6 +143,112 @@ describe('command dispatcher', () => {
     expect((await run('runner.ping')).error).toEqual({
       code: 'path_not_allowed',
       message: 'nope',
+    });
+  });
+
+  describe('terminal.attach (spec 29)', () => {
+    const attachArgs = {
+      id: 'term_1',
+      target: {
+        kind: 'slot',
+        projectId: 'prj_a',
+        root: '/nowhere/a',
+        slot: 'i42',
+      },
+      mode: 'read',
+      cols: 120,
+      rows: 40,
+    };
+
+    it('is in the allowlist, admin only, under a 10 s timeout', () => {
+      expect(commands['terminal.attach'].minRole).toBe('admin');
+      expect(commands['terminal.attach'].timeoutMs).toBe(
+        TERMINAL_ATTACH_TIMEOUT_MS,
+      );
+    });
+
+    it('refuses a raw session name or a command anywhere in the args', async () => {
+      const { run } = setup();
+      for (const args of [
+        { ...attachArgs, session: 'cs-i42' },
+        { ...attachArgs, command: 'sh' },
+        { ...attachArgs, target: { ...attachArgs.target, session: 'cs-i42' } },
+        { ...attachArgs, target: { kind: 'session', name: 'cs-i42' } },
+        {
+          ...attachArgs,
+          target: {
+            kind: 'orchestrator',
+            projectId: 'prj_a',
+            root: '/nowhere/a',
+            command: 'sh',
+          },
+        },
+      ]) {
+        expect((await run('terminal.attach', args)).error?.code).toBe(
+          'invalid_args',
+        );
+      }
+    });
+
+    it('answers disabled when the runner config lists it', async () => {
+      const { run } = setup({}, ['terminal.attach']);
+      expect((await run('terminal.attach', attachArgs)).error?.code).toBe(
+        'disabled',
+      );
+    });
+
+    it('answers unsupported on a runner without an attach manager', async () => {
+      const { run } = setup();
+      expect((await run('terminal.attach', attachArgs)).error?.code).toBe(
+        'unsupported',
+      );
+    });
+  });
+
+  describe('skill.* (spec 24)', () => {
+    it('is in the allowlist with D14 roles and its own timeouts', () => {
+      expect(commands['skill.search'].minRole).toBe('operator');
+      expect(commands['skill.inspect'].minRole).toBe('operator');
+      expect(commands['skill.install'].minRole).toBe('operator');
+      expect(commands['skill.uninstall'].minRole).toBe('admin');
+      expect(commands['skill.list'].minRole).toBe('viewer');
+      expect(commands['skill.run'].minRole).toBe('operator');
+      expect(commands['skill.cancel'].minRole).toBe('operator');
+      expect(commands['skill.inspect'].timeoutMs).toBe(
+        SKILL_TIMEOUTS_MS.inspect,
+      );
+    });
+
+    it('refuses a host or URL argument as invalid_args', async () => {
+      const { run } = setup();
+      for (const args of [
+        { query: 'estimate', host: 'evil.example' },
+        { query: 'estimate', url: 'https://evil.example/api/search' },
+      ]) {
+        expect((await run('skill.search', args)).error?.code).toBe(
+          'invalid_args',
+        );
+      }
+      for (const source of [
+        'acme/../x',
+        'https://github.com/acme/x',
+        'gitlab.com/a/b',
+      ]) {
+        expect((await run('skill.inspect', { source })).error?.code).toBe(
+          'invalid_args',
+        );
+      }
+    });
+
+    it('answers unsupported on a runner without skills', async () => {
+      const { run } = setup();
+      expect(
+        (await run('skill.search', { query: 'estimate' })).error?.code,
+      ).toBe('unsupported');
+      expect(
+        (await run('skill.cancel', { runId: 'run_1', projectId: 'prj_a' }))
+          .error?.code,
+      ).toBe('unsupported');
     });
   });
 

@@ -33,9 +33,9 @@ describe('terminal.attach', () => {
     expect(definition.timeoutMs).toBe(TERMINAL_ATTACH_TIMEOUT_MS);
   });
 
-  it('is defined but not yet in the commands map (the runner slot adds it with its handler)', () => {
-    expect(isCommandName('terminal.attach')).toBe(false);
-    expect(Object.keys(commands)).not.toContain('terminal.attach');
+  it('is in the commands map, added by the runner slot together with its handler', () => {
+    expect(isCommandName('terminal.attach')).toBe(true);
+    expect(Object.keys(commands)).toContain('terminal.attach');
   });
 
   it('accepts each target kind with its own field', () => {

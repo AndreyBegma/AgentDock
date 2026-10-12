@@ -3,6 +3,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { WsAdapter } from '@nestjs/platform-ws';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
+import { rawBodyMiddleware } from './webhooks/common/raw-body';
 
 /** Parses `TRUST_PROXY` into Express's `trust proxy` value. */
 export const trustProxySetting = (
@@ -27,6 +28,9 @@ export const configureApp = (app: INestApplication): void => {
 
   app.use(helmet());
   app.use(cookieParser());
+  // Before Nest's body parsers (registered at `init`): signed webhook routes
+  // keep their exact bytes and are parsed only after verification (spec 26 D8).
+  app.use(rawBodyMiddleware());
   app.enableCors({
     origin: process.env.WEB_URL ?? 'http://localhost:3517',
     credentials: true,

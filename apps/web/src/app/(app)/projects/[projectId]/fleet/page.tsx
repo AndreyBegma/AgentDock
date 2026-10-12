@@ -20,6 +20,9 @@ import { toast } from 'glass-ui/toast';
 import { Toggle } from 'glass-ui/toggle';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { BudgetExceededBanner } from '../../../../../components/budgets/exceeded-banner';
+import { TerminalSheet } from '../../../../../components/terminal/terminal-sheet';
+import type { TerminalTarget } from '../../../../../components/terminal/terminal-view';
 import { api } from '../../../../../lib/api';
 import { useControl } from '../../../../../lib/control/use-control';
 import {
@@ -29,6 +32,7 @@ import {
   slotsQuery,
 } from '../../../../../lib/fleet/format';
 import { useLive, useLiveStatus } from '../../../../../lib/live/use-live';
+import { useTerminalAvailable } from '../../../../../lib/terminal/use-terminal-available';
 import { OrchestratorCard } from './orchestrator-card';
 import { SlotSheet } from './slot-sheet';
 import { SlotsTable } from './slots-table';
@@ -57,12 +61,21 @@ export default function FleetPage() {
   const [selected, setSelected] = useState<string>();
 
   const [role, setRole] = useState<Role>('viewer');
+  const [runnerId, setRunnerId] = useState<string>();
+  const [attach, setAttach] = useState<{
+    target: TerminalTarget;
+    title: string;
+  }>();
   const control = useControl(projectId);
+  const canAttach = useTerminalAvailable(runnerId, role === 'admin');
 
   // The effective role only decides which buttons are drawn; the API checks it.
   useEffect(() => {
     api<ProjectDetail>(`/projects/${projectId}`)
-      .then((project) => setRole(project.role))
+      .then((project) => {
+        setRole(project.role);
+        setRunnerId(project.runnerId);
+      })
       .catch(() => setRole('viewer'));
   }, [projectId]);
 
@@ -176,11 +189,22 @@ export default function FleetPage() {
         </span>
       </div>
 
+      <BudgetExceededBanner projectId={projectId} />
+
       <OrchestratorCard
         fleet={fleet}
         projectId={projectId}
         control={control}
         role={role}
+        onAttach={
+          canAttach
+            ? () =>
+                setAttach({
+                  target: { kind: 'orchestrator' },
+                  title: 'Orchestrator',
+                })
+            : undefined
+        }
       />
 
       <section className="flex flex-col gap-4" aria-label="Slots">
@@ -268,6 +292,19 @@ export default function FleetPage() {
         control={control}
         canOperate={projectRoleAtLeast(role, 'operator')}
         onClose={() => setSelected(undefined)}
+        onAttach={
+          canAttach
+            ? (name) =>
+                setAttach({ target: { kind: 'slot', slot: name }, title: name })
+            : undefined
+        }
+      />
+
+      <TerminalSheet
+        projectId={projectId}
+        target={attach?.target}
+        title={attach?.title ?? ''}
+        onClose={() => setAttach(undefined)}
       />
     </div>
   );

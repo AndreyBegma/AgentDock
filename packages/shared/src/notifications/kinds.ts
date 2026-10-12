@@ -4,8 +4,8 @@ import type { Role } from '../auth';
  * Notification kinds (docs/specs/22-notifications-and-telegram.md D1). Closed
  * on purpose: a new kind is added here, with its source and defaults, where
  * review sees it. `runner.online` is the resolving item of a `runner.offline`
- * incident (spec 22 notes); `budget.exceeded` is reserved for M3.5 and never
- * emitted yet.
+ * incident (spec 22 notes). `budget.threshold` and `budget.exceeded` come from
+ * budgets (spec 28 D6) and have no project for a user budget.
  */
 export const NOTIFICATION_KINDS = [
   'person.needed',
@@ -17,6 +17,7 @@ export const NOTIFICATION_KINDS = [
   'runner.offline',
   'runner.online',
   'budget.exceeded',
+  'budget.threshold',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -105,10 +106,15 @@ export const NOTIFICATION_KIND_SPECS: Record<
   },
   'budget.exceeded': {
     scope: 'project',
-    source: 'budgets (M3.5)',
+    source: 'budgets (100 %)',
     channels: BOTH,
     defaults: ON_ON,
-    reserved: true,
+  },
+  'budget.threshold': {
+    scope: 'project',
+    source: 'budgets (each threshold)',
+    channels: BOTH,
+    defaults: ON_ON,
   },
 };
 

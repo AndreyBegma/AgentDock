@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   capabilitiesSchema,
+  commandErrorCodeSchema,
   commands,
   type HelloMessage,
   isSessionEventType,
@@ -24,6 +25,7 @@ import {
   serverMessageSchema,
   serverMessageTypes,
   spoolTruncatedDataSchema,
+  TERMINAL_ATTACH_TIMEOUT_MS,
   terminalAvailable,
   unsequencedEventSchema,
 } from './index';
@@ -459,6 +461,29 @@ describe('command allowlist', () => {
   });
 });
 
+describe('terminal.attach in the allowlist (spec 29)', () => {
+  it('is registered admin-only with its 10 s timeout, and parses only a typed target', () => {
+    expect(commands['terminal.attach'].minRole).toBe('admin');
+    expect(commands['terminal.attach'].timeoutMs).toBe(
+      TERMINAL_ATTACH_TIMEOUT_MS,
+    );
+    const args = {
+      id: 'term_1',
+      target: { kind: 'slot', projectId: 'prj_a', root: '/r', slot: 'i42' },
+      mode: 'read',
+      cols: 120,
+      rows: 40,
+    };
+    expect(parseCommand('terminal.attach', args).ok).toBe(true);
+    expect(
+      parseCommand('terminal.attach', {
+        ...args,
+        target: { ...args.target, session: 'cs-i42' },
+      }),
+    ).toMatchObject({ ok: false, error: { code: 'invalid_args' } });
+  });
+});
+
 describe('session.backfill', () => {
   it('is admin-only with its own timeout', () => {
     expect(commands['session.backfill'].minRole).toBe('admin');
@@ -626,5 +651,30 @@ describe('pairing', () => {
       pairingResponseSchema.safeParse({ runnerId: 'r', token: 'short' })
         .success,
     ).toBe(false);
+  });
+});
+
+describe('skill error codes (spec 24)', () => {
+  it.each([
+    'not_found',
+    'already_exists',
+    'changed_since_preview',
+    'not_runnable',
+    'too_large',
+    'upstream_unavailable',
+  ])('answers %s in a command.result', (code) => {
+    expect(
+      runnerMessageSchema.safeParse({
+        type: 'command.result',
+        id: 'cmd_1',
+        ok: false,
+        error: { code },
+      }).success,
+    ).toBe(true);
+  });
+
+  it('keeps every error code unique', () => {
+    const codes = commandErrorCodeSchema.options;
+    expect(new Set(codes).size).toBe(codes.length);
   });
 });

@@ -1,0 +1,43 @@
+{
+  "query": "estimate",
+  "searchType": "fuzzy",
+  "searchVersion": "algolia",
+  "skills": [
+    {
+      "id": "himself65/finance-skills/estimate-analysis",
+      "source": "himself65/finance-skills",
+      "skillId": "estimate-analysis",
+      "name": "estimate-analysis",
+      "installs": 2993
+    },
+    {
+      "id": "donchitos/claude-code-game-studios/estimate",
+      "source": "donchitos/claude-code-game-studios",
+      "skillId": "estimate",
+      "name": "estimate",
+      "installs": 401
+    },
+    {
+      "id": "ulpi-io/skills/cost-estimate",
+      "source": "ulpi-io/skills",
+      "skillId": "cost-estimate",
+      "name": "cost-estimate",
+      "installs": 299
+    },
+    {
+      "id": "evil/x/../../etc",
+      "source": "https://evil.example/x",
+      "skillId": "etc",
+      "name": "etc",
+      "installs": 1
+    },
+    {
+      "id": "evil/y/dotdot",
+      "source": "evil/y",
+      "skillId": "../dotdot",
+      "name": "dotdot",
+      "installs": 1
+    }
+  ],
+  "count": 5
+}

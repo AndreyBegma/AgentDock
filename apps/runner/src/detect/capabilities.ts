@@ -82,6 +82,58 @@ export const readCodeSentinel = (
   return null;
 };
 
+/** `a.b.c` ≥ `min`, comparing the leading numbers; an unparsable version is not. */
+export const versionAtLeast = (
+  version: string | null,
+  min: readonly number[],
+): boolean => {
+  const parts = version
+    ?.match(/^\d+(?:\.\d+)*/)?.[0]
+    .split('.')
+    .map(Number);
+  if (!parts) return false;
+  for (let i = 0; i < min.length; i++) {
+    const have = parts[i] ?? 0;
+    if (have !== min[i]) return have > (min[i] ?? 0);
+  }
+  return true;
+};
+
+/** `attach-session -f ignore-size` needs tmux 3.2 (spec 29 D4). */
+export const TERMINAL_MIN_TMUX = [3, 2] as const;
+/** `Bun.spawn({ terminal })` landed in Bun 1.3.5 (spec 29 D3). */
+export const TERMINAL_MIN_BUN = [1, 3, 5] as const;
+
+/** Whether this process has Bun's PTY API: a recent Bun, on POSIX. */
+export const ptyAvailable = (): boolean =>
+  process.platform !== 'win32' &&
+  typeof Bun.Terminal === 'function' &&
+  versionAtLeast(Bun.version, TERMINAL_MIN_BUN);
+
+/** Why `terminal.attach` cannot run here, or null when it can (D3). */
+export const terminalUnsupported = (
+  tmux: string | null,
+  pty: boolean,
+): string | null => {
+  if (!pty) return 'this runner has no PTY API (Bun ≥ 1.3.5 on POSIX)';
+  if (!versionAtLeast(tmux, TERMINAL_MIN_TMUX)) {
+    return `tmux ${tmux ?? 'is missing'}; attaching needs tmux ≥ 3.2`;
+  }
+  return null;
+};
+
+/**
+ * `capabilities.terminal` (spec 29 D3, D10): the machine can attach and the
+ * runner config does not list `terminal.attach` in `disabledCommands`.
+ */
+export const terminalCapability = (options: {
+  tmux: string | null;
+  disabledCommands: readonly string[];
+  pty: boolean;
+}): boolean =>
+  !options.disabledCommands.includes('terminal.attach') &&
+  terminalUnsupported(options.tmux, options.pty) === null;
+
 export interface DetectOptions {
   exec: Exec;
   home: string;

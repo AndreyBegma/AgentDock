@@ -130,8 +130,8 @@ envelope `slot`.
 | `slot.dispatched` | required | `date?, round?` (markdown only — without them the run is matched by `dispatchedAt`, spec 16 Q3), `briefPath?, branch?, worktree?, runtime (claude), model?, modelWhy?, owns[], never[], lead?` |
 | `slot.redispatched` | required | `fromModel?, toModel, reason?` — the slot's model becomes `toModel` |
 | `slot.checkpoint` | required | `checkpoint` (`picked_up` · `plan_ready` · `implementation_done` · `pr_open` · `blocked` · `misclassified` · `other`), `heading?`, `summary` (≤ 4 KB), `position?` (0-based index of the heading in the reply file — the reply collector always sends it; a `code-sentinel` checkpoint has none and claims the next heading of its kind, else is appended), `prUrl?`, `prNumber?` |
-| `pr.opened` | optional | `number, branch, url, title, checks: pending\|green\|red, mergeable?` |
-| `pr.checks_changed` | optional | `number, branch, checks, mergeable?` |
+| `pr.opened` | optional | `number, branch, url, title, checks: pending\|green\|red, mergeable?, headSha?` — `headSha`: the head commit (`headRefOid`, 40 lower-case hex); absent from runners before #72 and from `events.jsonl` |
+| `pr.checks_changed` | optional | `number, branch, checks, mergeable?, headSha?` — also sent when only the head moved (a push), with `checks` unchanged |
 | `pr.closed` | optional | `number, branch, merged?` — without `merged` the PR state is unchanged |
 | `pr.merged` | optional | `number, branch?, method?` |
 | `orchestrator.started` | — | `session` |

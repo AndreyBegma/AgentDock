@@ -20,7 +20,8 @@ import { TelegramDeliveryLedger } from './telegram-delivery-ledger';
 /**
  * Notifications (docs/specs/22): the event matcher, the runner watcher, the
  * in-app centre with its rules and mutes, and the bookkeeping the Telegram
- * module sends from. Exports what `apps/api/src/telegram/**` builds on.
+ * module sends from. Exports what `apps/api/src/telegram/**` builds on, and
+ * the writer budgets notify through (spec 28 D6).
  */
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { TelegramDeliveryLedger } from './telegram-delivery-ledger';
     TelegramDeliveryLedger,
     NotificationsService,
     NotificationRulesService,
+    NotificationWriter,
   ],
 })
 export class NotificationsModule {}

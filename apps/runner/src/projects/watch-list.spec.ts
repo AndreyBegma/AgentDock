@@ -54,6 +54,19 @@ describe('WatchList', () => {
     expect(registry.projects).toEqual([A, B]);
   });
 
+  it('passes the App health to the registry but never caches it (spec 27 D12)', async () => {
+    const { list, registry, persisted } = setup([A]);
+    await list.start();
+    await list.apply([{ ...A, githubApp: 'healthy' }, B]);
+    expect(persisted).toEqual([[A, B]]);
+    expect(registry.projects).toEqual([{ ...A, githubApp: 'healthy' }, B]);
+
+    // A health flip alone is applied, and is not a change to the cache.
+    await list.apply([A, B]);
+    expect(persisted).toEqual([[A, B]]);
+    expect(registry.projects).toEqual([A, B]);
+  });
+
   it('keeps applying the list when the cache cannot be written', async () => {
     const { log, lines } = memoryLogger();
     const registry = new CollectorRegistry({

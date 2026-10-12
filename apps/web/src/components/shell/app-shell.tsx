@@ -39,8 +39,10 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { api, describeError } from '../../lib/api';
-import { useLive, useLiveStatus } from '../../lib/live/use-live';
+import { navLabel } from '../../lib/approvals/format';
+import { useLiveStatus } from '../../lib/live/use-live';
 import { isActive, NAV, projectIdOf, visibleNav } from './nav';
+import { NotificationBell } from './notification-bell';
 import { ProjectSwitcher } from './project-switcher';
 import {
   applyTheme,
@@ -51,6 +53,7 @@ import {
   THEME_MODES,
   type ThemeMode,
 } from './theme';
+import { useWaitingApprovals } from './use-waiting-approvals';
 import { UserProvider } from './user-context';
 
 const COLLAPSE_QUERY = '(max-width: 1023px)';
@@ -100,6 +103,9 @@ function crumbsFor(pathname: string): BreadcrumbItem[] {
   }
   known.set('/account', 'Account');
   known.set('/admin', 'Admin');
+  // The nav entry "Integrations" points at its first page.
+  known.set('/admin/integrations', 'Integrations');
+  known.set('/admin/integrations/telegram', 'Telegram');
 
   const segments = pathname.split('/').filter(Boolean);
   return segments.map((segment, index) => {
@@ -161,8 +167,7 @@ export function AppShell({
 
   useCommandPaletteShortcut(() => setPaletteOpen(true));
 
-  // Holding a subscription is what keeps the socket (and the dot) alive.
-  useLive(`user:${user.id}`, () => {});
+  // The bell holds the `user:<id>` subscription that keeps the socket (and the dot) alive.
   const { status, closeCode } = useLiveStatus();
   useEffect(() => {
     if (status === 'offline' && closeCode === LIVE_CLOSE_CODES.unauthorized) {
@@ -175,12 +180,18 @@ export function AppShell({
     [user.role, pathname],
   );
 
+  // glass-ui's NavRailItem has no badge prop yet, so the count rides the label.
+  const waitingApprovals = useWaitingApprovals(projectId);
+
   const groups: NavRailGroup[] = sections.map((section) => ({
     id: section.id,
     title: section.title,
     items: section.entries.map((entry) => ({
       id: entry.id,
-      label: entry.label,
+      label:
+        entry.id === 'approvals'
+          ? navLabel(entry.label, waitingApprovals)
+          : entry.label,
       icon: entry.icon,
       href: entry.resolvedHref,
       active: isActive(entry.resolvedHref, pathname),
@@ -312,6 +323,7 @@ export function AppShell({
               <Search size={14} aria-hidden="true" />
               <KeyHint keys="mod+k" />
             </Button>
+            <NotificationBell />
             <MenuRoot>
               <MenuTrigger asChild>
                 <button

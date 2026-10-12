@@ -4,12 +4,16 @@ import {
   MAX_EVENTS_BATCH_BYTES,
   MAX_EVENTS_PER_BATCH,
   RUNNER_CLOSE_CODES,
+  type RunLogSubscribeMessage,
   type RunnerEvent,
   type RunnerMessage,
   type RunnerServerConfig,
   type ServerMessage,
   type SubscribeMessage,
   serverMessageSchema,
+  type TerminalCloseMessage,
+  type TerminalDataMessage,
+  type TerminalResizeMessage,
   type UnsequencedEvent,
 } from '@agentdock/shared/protocol';
 import type { Backoff } from './backoff';
@@ -55,6 +59,10 @@ export interface ConnectionOptions {
   onConfig?: (config: RunnerServerConfig) => void;
   /** Live pane subscriptions (spec 18); without it they are ignored. */
   pane?: PaneHandler;
+  /** Interactive attach streams (spec 29); without it they are ignored. */
+  terminal?: TerminalHandler;
+  /** Skill run logs (spec 24 D13); without it they are ignored. */
+  runLog?: RunLogHandler;
   createSocket?: SocketFactory;
   heartbeatMs?: number;
 }
@@ -64,6 +72,23 @@ export interface PaneHandler {
   subscribe(message: SubscribeMessage): Promise<void>;
   unsubscribe(id: string): void;
   /** The socket closed: subscriptions die with it, the server resubscribes. */
+  reset(): void;
+}
+
+/** What the connection hands `run_log` `subscribe` / `unsubscribe` to. */
+export interface RunLogHandler {
+  subscribe(message: RunLogSubscribeMessage): void;
+  unsubscribe(id: string): void;
+  /** The socket closed: subscriptions die with it, the server resubscribes. */
+  reset(): void;
+}
+
+/** What the connection hands the `terminal.*` stream messages to. */
+export interface TerminalHandler {
+  data(message: TerminalDataMessage): void;
+  resize(message: TerminalResizeMessage): void;
+  close(message: TerminalCloseMessage): void;
+  /** The socket closed: every attach ends with it (spec 29 D7). */
   reset(): void;
 }
 
@@ -238,10 +263,28 @@ export class RunnerConnection {
         void this.options.dispatch(message).then((result) => this.send(result));
         return;
       case 'subscribe':
-        void this.options.pane?.subscribe(message);
+        switch (message.kind) {
+          case 'pane':
+            void this.options.pane?.subscribe(message);
+            return;
+          case 'run_log':
+            this.options.runLog?.subscribe(message);
+            return;
+        }
         return;
       case 'unsubscribe':
+        // Ids are the server's, unique across kinds: whoever holds it drops it.
         this.options.pane?.unsubscribe(message.id);
+        this.options.runLog?.unsubscribe(message.id);
+        return;
+      case 'terminal.data':
+        this.options.terminal?.data(message);
+        return;
+      case 'terminal.resize':
+        this.options.terminal?.resize(message);
+        return;
+      case 'terminal.close':
+        this.options.terminal?.close(message);
         return;
     }
   }
@@ -275,7 +318,7 @@ export class RunnerConnection {
     }
   }
 
-  /** Sends a message when the socket is open; pane frames use it. */
+  /** Sends a message when the socket is open; pane frames and terminal bytes use it. */
   sendMessage(message: RunnerMessage): boolean {
     return this.send(message);
   }
@@ -292,6 +335,8 @@ export class RunnerConnection {
     this.cancelHeartbeat();
     this.socket = null;
     this.options.pane?.reset();
+    this.options.runLog?.reset();
+    this.options.terminal?.reset();
     if (this.state === 'stopped') return;
     if (TERMINAL_CLOSE_CODES.has(code)) {
       log.error('the server closed the connection for good', { code, reason });

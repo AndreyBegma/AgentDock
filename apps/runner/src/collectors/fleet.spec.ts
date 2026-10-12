@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it, spyOn } from 'bun:test';
 import { appendFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Exec, ExecResult } from '../detect/exec';
@@ -93,6 +93,50 @@ describe('FleetCollector', () => {
         }).name,
     );
     expect(names.filter((name) => name === 'fleet')).toHaveLength(1);
+  });
+
+  it('polls only the named steps for collector.poll, without a restart (spec 27 D13)', async () => {
+    const { collector, start } = await fixture();
+    await start();
+    const prs = spyOn(collector, 'prs');
+    expect(await collector.pollNow(['issues'])).toEqual([]);
+    expect(prs).toHaveBeenCalledTimes(0);
+    expect(await collector.pollNow(['issues', 'prs'])).toEqual(['prs']);
+    expect(prs).toHaveBeenCalledTimes(1);
+    expect(await collector.pollNow(['worktrees'])).toEqual(['worktrees']);
+    expect(prs).toHaveBeenCalledTimes(1);
+    expect(await collector.pollNow(['prs', 'worktrees'])).toEqual([
+      'prs',
+      'worktrees',
+    ]);
+    expect(prs).toHaveBeenCalledTimes(2);
+    collector.stop();
+    expect(await collector.pollNow(['prs'])).toEqual([]);
+  });
+
+  it('polls pull requests every 10 minutes while the GitHub App is healthy, 60 s again when not (spec 27 D12)', async () => {
+    const { collector, clock, start } = await fixture();
+    collector.setGithubApp('healthy');
+    await start();
+    const prs = spyOn(collector, 'prs');
+    for (let minute = 1; minute < 10; minute++) clock.advance(60_000);
+    expect(prs).toHaveBeenCalledTimes(0);
+    // A step still running when the next tick fires is skipped, so let it end.
+    const minute = async () => {
+      clock.advance(60_000);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    };
+    await minute(); // the tenth minute
+    expect(prs).toHaveBeenCalledTimes(1);
+    await minute();
+    expect(prs).toHaveBeenCalledTimes(1);
+
+    collector.setGithubApp(undefined);
+    await minute();
+    expect(prs).toHaveBeenCalledTimes(2);
+    await minute();
+    expect(prs).toHaveBeenCalledTimes(3);
+    collector.stop();
   });
 
   it('reports a slot running, then stale with its unmerged commit after its session dies', async () => {

@@ -2,6 +2,7 @@
 
 import type { SlotDetail } from '@agentdock/shared';
 import { Badge } from 'glass-ui/badge';
+import { Button } from 'glass-ui/button';
 import { SheetContent, SheetRoot } from 'glass-ui/sheet';
 import { Skeleton } from 'glass-ui/skeleton';
 import { Tabs, TabsItem } from 'glass-ui/tabs';
@@ -152,6 +153,7 @@ export function SlotSheet({
   control,
   canOperate,
   onClose,
+  onAttach,
 }: {
   projectId: string;
   name: string | undefined;
@@ -160,6 +162,8 @@ export function SlotSheet({
   /** Operators and above; the API decides regardless. */
   canOperate: boolean;
   onClose: () => void;
+  /** Admins on a runner that can attach; absent hides the action. */
+  onAttach?: (slot: string) => void;
 }) {
   const [slot, setSlot] = useState<SlotDetail>();
   const [error, setError] = useState<string>();
@@ -238,6 +242,24 @@ export function SlotSheet({
               ) : (
                 <>
                   <Detail slot={slot} />
+                  {onAttach && slot.status !== 'ended' ? (
+                    <div className="flex flex-col gap-2 border-t border-line pt-4">
+                      <h3 className="text-sm font-semibold">Terminal</h3>
+                      <p className="text-xs text-ink-2">
+                        Opens read-only. Taking control is a separate step, and
+                        every attach is audited.
+                      </p>
+                      <div>
+                        <Button
+                          variant="glass"
+                          size="sm"
+                          onClick={() => onAttach(slot.name)}
+                        >
+                          Attach
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
                   {canOperate ? (
                     <SlotControls slot={slot.name} control={control} />
                   ) : null}

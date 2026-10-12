@@ -21,10 +21,13 @@ export const COMMAND_RUN_STATUSES = [
 export type CommandRunStatus = (typeof COMMAND_RUN_STATUSES)[number];
 
 /** The control commands that get a `command_runs` row (status is a read, D10). */
-export type CommandRunCommand = Exclude<
+export type ControlRunCommand = Exclude<
   ControlCommandName,
   'orchestrator.status'
 >;
+
+/** Every command that gets a `command_runs` row: the control ones and a project skill install (spec 24). */
+export type CommandRunCommand = ControlRunCommand | 'skill.install';
 
 /** One control command sent from the UI, and its outcome. */
 export interface CommandRunView {

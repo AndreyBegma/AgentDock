@@ -9,6 +9,7 @@ import type {
   OrchestratorPermissionMode,
 } from '@agentdock/shared/protocol';
 import { ApiError, describeError } from '../api';
+import { describeBudgetExceededError } from '../budgets/format';
 
 /** Spec 17 D7: the text of a message to a worker, counted in UTF-8 bytes. */
 export const MESSAGE_MAX_BYTES = 16 * 1024;
@@ -99,6 +100,8 @@ export function commandRunIdOf(error: unknown): string | undefined {
 /** A sentence for a failed control request. */
 export function describeControlError(error: unknown): string {
   if (!(error instanceof ApiError)) return describeError(error);
+  const budget = describeBudgetExceededError(error);
+  if (budget) return budget;
   const code = error.code as string | undefined;
   if (isControlErrorCode(code)) return CONTROL_ERROR_SENTENCE[code];
   if (error.status === 403) return CONTROL_ERROR_SENTENCE.forbidden;
@@ -116,6 +119,7 @@ const SUBJECT: Record<Run['command'], (slot: string | null) => string> = {
   'orchestrator.stop': () => 'Orchestrator stop',
   'slot.stop': (slot) => `Stopping slot ${slot ?? ''}`.trim(),
   'slot.message': (slot) => `Message to ${slot ?? 'the worker'}`,
+  'skill.install': () => 'Skill install',
 };
 
 export const COMMAND_PENDING_LABEL: Record<Run['command'], string> = {
@@ -123,6 +127,7 @@ export const COMMAND_PENDING_LABEL: Record<Run['command'], string> = {
   'orchestrator.stop': 'Stopping the orchestrator…',
   'slot.stop': 'Stopping the slot…',
   'slot.message': 'Sending the message…',
+  'skill.install': 'Installing the skill…',
 };
 
 export interface Outcome {
@@ -184,5 +189,12 @@ function okOutcome(run: Run, subject: string): Outcome {
             text: `${subject} saved, but the worker’s session is not live. It waits in the worktree until the worker is resumed.`,
           }
         : { tone: 'success', text: `${subject} delivered.` };
+    case 'skill.install': {
+      const prUrl = typeof result.prUrl === 'string' ? result.prUrl : '';
+      return {
+        tone: 'success',
+        text: prUrl ? `Skill install opened ${prUrl}.` : 'Skill installed.',
+      };
+    }
   }
 }

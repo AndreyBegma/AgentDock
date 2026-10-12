@@ -29,22 +29,29 @@ export const LIVE_TOPIC_PREFIXES = ['runner', 'project', 'user'] as const;
 export type LiveTopicPrefix =
   | (typeof LIVE_TOPIC_PREFIXES)[number]
   | 'admin'
-  | 'pane';
+  | 'pane'
+  | 'run';
 
+/** Also `skillRunIdSchema`'s rule (protocol/commands/skills.ts). */
 const ID = '[A-Za-z0-9_-]{1,64}';
 /** `slotNameSchema`'s rule (protocol/commands/control.ts), as a fragment. */
 const SLOT = `[a-z0-9][a-z0-9-]{0,${SLOT_NAME_MAX_LENGTH - 1}}`;
 
 const topicPattern = new RegExp(
-  `^(?:admin|(?:${LIVE_TOPIC_PREFIXES.join('|')}):${ID}|pane:${ID}:${SLOT})$`,
+  `^(?:admin|(?:${LIVE_TOPIC_PREFIXES.join('|')}):${ID}|pane:${ID}:${SLOT}|run:${ID}:${ID})$`,
 );
 
 /**
- * `admin`, `runner:<id>`, `project:<id>`, `user:<id>`, or
- * `pane:<projectId>:<slot>` (spec 18) — whose id is `<projectId>:<slot>`.
+ * `admin`, `runner:<id>`, `project:<id>`, `user:<id>`,
+ * `pane:<projectId>:<slot>` (spec 18) — whose id is `<projectId>:<slot>` — or
+ * `run:<projectId>:<runId>`, a skill run's live log (spec 24 D13).
  */
 export const liveTopicSchema = z.string().regex(topicPattern);
 export type LiveTopic = z.infer<typeof liveTopicSchema>;
+
+/** Live topic of a skill run's log (spec 24 D13). */
+export const runTopic = (projectId: string, runId: string): string =>
+  `run:${projectId}:${runId}`;
 
 /** The parts of a well-formed topic; `id` is null for `admin`. */
 export const parseLiveTopic = (

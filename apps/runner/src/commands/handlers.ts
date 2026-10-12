@@ -1,6 +1,8 @@
 import type {
   Capabilities,
   Host,
+  TerminalAttachArgs,
+  TerminalAttachResult,
   WatchedProject,
 } from '@agentdock/shared/protocol';
 import { type Clock, isoNow } from '../clock';
@@ -14,7 +16,16 @@ import { messageSlot, stopSlot } from '../control/slot';
 import type { Exec } from '../detect/exec';
 import type { ProjectFs } from '../projects/fs';
 import { inspectProject, refreshProject } from '../projects/inspect';
+import type { SkillHandlers } from '../skills';
+import {
+  prApprove,
+  prRequestChanges,
+  prVoidApproval,
+} from './approvals/decide';
+import { prInspect } from './approvals/inspect';
 import type { CommandHandlers } from './dispatcher';
+import { CommandFailure } from './failure';
+import { type CollectorPollDeps, collectorPoll } from './github/collector-poll';
 import { issueCreate } from './queue/issue-create';
 import { issuesRefresh } from './queue/issues-refresh';
 import {
@@ -37,7 +48,19 @@ export interface HandlerContext {
   fs?: ProjectFs;
   /** The session watcher's backfill; absent when sessions are disabled. */
   backfillSessions?: SessionBackfillContext['backfill'];
+  /** `collector.poll` (spec 27): the collector registry's `pollNow`. */
+  pollCollectors?: CollectorPollDeps['pollNow'];
+  /** Interactive attaches (spec 29); absent means this runner cannot attach. */
+  terminal?: {
+    attach(args: TerminalAttachArgs): Promise<TerminalAttachResult>;
+  };
+  /** Skills (spec 24); absent means this runner does not serve them. */
+  skills?: SkillHandlers;
 }
+
+const noSkills = (): never => {
+  throw new CommandFailure('unsupported', 'this runner does not serve skills');
+};
 
 /** One handler per allowlisted command; each later command adds its own here. */
 export const createHandlers = (context: HandlerContext): CommandHandlers => {
@@ -47,6 +70,11 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
     clock: context.clock,
     watchedProjects: context.watchedProjects,
     profiles: context.profiles,
+  };
+  const approvals = {
+    exec: context.exec,
+    clock: context.clock,
+    watchedProjects: context.watchedProjects,
   };
   return {
     'runner.ping': () => ({ pong: true, ts: isoNow(context.clock) }),
@@ -75,5 +103,35 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
       }),
     'issues.refresh': (args) =>
       issuesRefresh(args, { watchedProjects: context.watchedProjects }),
+    'collector.poll': (args) =>
+      collectorPoll(args, {
+        watchedProjects: context.watchedProjects,
+        pollNow: context.pollCollectors ?? (async () => []),
+      }),
+    'pr.inspect': (args) => prInspect(args, approvals),
+    'pr.approve': (args) => prApprove(args, approvals),
+    'pr.requestChanges': (args) => prRequestChanges(args, approvals),
+    'pr.voidApproval': (args) => prVoidApproval(args, approvals),
+    'terminal.attach': (args) => {
+      if (!context.terminal) {
+        throw new CommandFailure(
+          'unsupported',
+          'this runner does not serve terminal attaches',
+        );
+      }
+      return context.terminal.attach(args);
+    },
+    'skill.search': (args) =>
+      context.skills?.['skill.search'](args) ?? noSkills(),
+    'skill.inspect': (args) =>
+      context.skills?.['skill.inspect'](args) ?? noSkills(),
+    'skill.install': (args) =>
+      context.skills?.['skill.install'](args) ?? noSkills(),
+    'skill.uninstall': (args) =>
+      context.skills?.['skill.uninstall'](args) ?? noSkills(),
+    'skill.list': (args) => context.skills?.['skill.list'](args) ?? noSkills(),
+    'skill.run': (args) => context.skills?.['skill.run'](args) ?? noSkills(),
+    'skill.cancel': (args) =>
+      context.skills?.['skill.cancel'](args) ?? noSkills(),
   };
 };

@@ -5,13 +5,17 @@ import { memoryLogger } from '../../testing/fixtures';
 import { PrWatcher, parsePrList } from './prs';
 
 const LIST =
-  'pr list --repo acme/widget --state open --limit 100 --json number,headRefName,statusCheckRollup,mergeable,title,url';
+  'pr list --repo acme/widget --state open --limit 100 --json number,headRefName,headRefOid,statusCheckRollup,mergeable,title,url';
+
+const H1 = '1'.repeat(40);
+const H2 = '2'.repeat(40);
 
 const pr = (
   number: number,
   branch: string,
   checks: object[],
   mergeable = 'MERGEABLE',
+  headRefOid?: unknown,
 ) => ({
   number,
   headRefName: branch,
@@ -19,6 +23,7 @@ const pr = (
   url: `https://github.com/acme/widget/pull/${number}`,
   mergeable,
   statusCheckRollup: checks,
+  ...(headRefOid === undefined ? {} : { headRefOid }),
 });
 
 const run = (conclusion: string | null, status = 'COMPLETED') => ({
@@ -106,6 +111,53 @@ describe('PrWatcher', () => {
     expect(changed.data).toMatchObject({ checks: 'green', mergeable: false });
   });
 
+  it('carries the head as headSha, and reports a push alone as pr.checks_changed', async () => {
+    const { watcher, events, list } = setup();
+    list([pr(7, 'feat/42-x', [], 'MERGEABLE', H1)]);
+    await watcher.poll();
+    await watcher.poll();
+    list([pr(7, 'feat/42-x', [], 'MERGEABLE', H2)]);
+    await watcher.poll();
+    expect(brief(events.take())).toEqual([
+      {
+        type: 'pr.opened',
+        slot: 'i42',
+        data: {
+          number: 7,
+          branch: 'feat/42-x',
+          url: 'https://github.com/acme/widget/pull/7',
+          title: 'PR 7',
+          checks: 'green',
+          mergeable: true,
+          headSha: H1,
+        },
+      },
+      {
+        type: 'pr.checks_changed',
+        slot: 'i42',
+        data: {
+          number: 7,
+          branch: 'feat/42-x',
+          checks: 'green',
+          mergeable: true,
+          headSha: H2,
+        },
+      },
+    ]);
+  });
+
+  it('leaves headSha out when gh sends no head or a malformed one, and still follows the PR', async () => {
+    const { watcher, events, list } = setup();
+    list([pr(7, 'feat/42-x', [], 'MERGEABLE', 'not-a-sha')]);
+    await watcher.poll();
+    list([pr(7, 'feat/42-x', [], 'CONFLICTING')]);
+    await watcher.poll();
+    const [opened, changed] = events.take();
+    expect(opened.data).not.toHaveProperty('headSha');
+    expect(changed.data).not.toHaveProperty('headSha');
+    expect(changed.data).toMatchObject({ mergeable: false });
+  });
+
   it('follows only branches of known slots', async () => {
     const { watcher, events, list } = setup();
     list([pr(8, 'chore/deps', [])]);
@@ -170,6 +222,10 @@ describe('parsePrList', () => {
         (p) => p.number,
       ),
     ).toEqual([7]);
+    expect(
+      parsePrList(JSON.stringify([pr(7, 'a', [], 'MERGEABLE', 42)]))?.[0]
+        ?.headRefOid,
+    ).toBeUndefined();
     expect(parsePrList('{}')).toBeNull();
     expect(parsePrList('not json')).toBeNull();
   });

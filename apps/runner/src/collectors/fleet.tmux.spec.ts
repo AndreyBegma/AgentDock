@@ -1,12 +1,14 @@
-import { afterEach, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it, setDefaultTimeout } from 'bun:test';
 import { join } from 'node:path';
 import { createExec, type Exec } from '../detect/exec';
 import { brief, recorder } from '../fleet/testing';
 import { FakeClock } from '../testing/fake-clock';
 import { memoryLogger } from '../testing/fixtures';
-import { workspace } from '../testing/projects';
+import { REAL_PROCESS_TIMEOUT_MS, workspace } from '../testing/projects';
 import { FleetCollector } from './fleet';
 import { DEFAULT_FLEET_SETTINGS } from './registry';
+
+setDefaultTimeout(REAL_PROCESS_TIMEOUT_MS);
 
 /**
  * Spec 11's fixture-project criterion against a real tmux: a temp repo, its

@@ -6,10 +6,19 @@ export const absolutePathSchema = z
   .min(1)
   .refine((p) => p.startsWith('/'), { message: 'must be an absolute path' });
 
+/**
+ * The GitHub App's health for a project (spec 27 D11, D12): `healthy` lets
+ * the runner relax its `issues` and `prs` collectors to 10 minutes.
+ */
+export const githubAppHealthSchema = z.enum(['healthy', 'unhealthy']);
+export type GitHubAppHealth = z.infer<typeof githubAppHealthSchema>;
+
 /** A project the runner watches (`welcome.config.projects`). */
 export const watchedProjectSchema = z.object({
   id: z.string().min(1),
   root: z.string().min(1),
+  /** Spec 27 D12. Absent means `unhealthy`: poll every 60 s. */
+  githubApp: githubAppHealthSchema.optional(),
 });
 export type WatchedProject = z.infer<typeof watchedProjectSchema>;
 

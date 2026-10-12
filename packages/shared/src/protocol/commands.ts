@@ -1,7 +1,11 @@
 import { z } from 'zod';
 import { capabilitiesSchema, hostSchema } from './capabilities';
+import { approvalCommands } from './commands/approvals';
 import { controlCommands } from './commands/control';
+import { githubCommands } from './commands/github';
 import { queueCommands } from './commands/queue';
+import { skillCommands } from './commands/skills';
+import { terminalCommands } from './commands/terminal';
 import {
   SESSION_BACKFILL_TIMEOUT_MS,
   sessionBackfillArgsSchema,
@@ -50,12 +54,25 @@ export const commandErrorCodeSchema = z.enum([
   'unsupported_runtime',
   /** `profileId` names no profile in the runner config. */
   'unknown_profile',
-  /** The target the runner would resolve does not exist, or is not in that project (spec 29 D2). */
+  /**
+   * The target the runner would resolve does not exist, or is not in that
+   * project: a terminal target (spec 29 D2), a skill or a run (spec 24).
+   */
   'not_found',
   /** A limit is reached: attaches per runner, or a `write` attach already holds the target (spec 29 D7). */
   'busy',
   /** This machine cannot run the command: no PTY API, not POSIX, or tmux too old (spec 29 D3). */
   'unsupported',
+  /** The target already exists: an install branch or directory (spec 24 D3/D4). */
+  'already_exists',
+  /** The skill's content no longer matches the inspected `contentHash` (spec 24 D3). */
+  'changed_since_preview',
+  /** The skill is refused as a run: the orchestrator or a worker (spec 24 D8). */
+  'not_runnable',
+  /** A skill is over `SKILL_MAX_FILES` or `SKILL_MAX_TOTAL_BYTES` (spec 24). */
+  'too_large',
+  /** The catalog or the forge did not answer (spec 24 D1/D2). */
+  'upstream_unavailable',
 ]);
 export type CommandErrorCode = z.infer<typeof commandErrorCodeSchema>;
 
@@ -109,7 +126,11 @@ export const commands = {
     timeoutMs: SESSION_BACKFILL_TIMEOUT_MS,
   },
   ...controlCommands,
+  ...approvalCommands,
   ...queueCommands,
+  ...githubCommands,
+  ...terminalCommands,
+  ...skillCommands,
 } as const satisfies Record<string, CommandDefinition>;
 
 export type CommandName = keyof typeof commands;

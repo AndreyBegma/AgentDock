@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'bun:test';
 import {
+  anySubscribeMessageSchema,
   messageSchema,
   PANE_LIVE_EVENTS,
   paneFrameSchema,
   paneMessageSchema,
   paneTopic,
+  RUN_LOG_LINE_MAX_CHARS,
+  RUN_LOG_LIVE_EVENTS,
+  runLogFrameSchema,
+  runLogMessageSchema,
+  runLogSubscribeMessageSchema,
   runnerMessageSchema,
   runnerMessageTypes,
   serverMessageSchema,
@@ -174,6 +180,103 @@ describe('message unions', () => {
     for (const type of ['pane.input', 'send-keys', 'pane.attach']) {
       expect(messageSchema.safeParse({ type, id: 'x' }).success).toBe(false);
     }
+  });
+});
+
+describe('run_log (spec 24 D13)', () => {
+  const runLog = {
+    type: 'subscribe',
+    id: 'run_1',
+    kind: 'run_log',
+    projectId: 'prj_1',
+    runId: 'cmg1run0001',
+  } as const;
+
+  it('keeps a pane subscription parsing exactly as before', () => {
+    expect(anySubscribeMessageSchema.parse(subscribe)).toEqual(subscribe);
+    expect(serverMessageSchema.parse(subscribe)).toEqual(subscribe);
+  });
+
+  it('parses a run log subscription through every union', () => {
+    expect(runLogSubscribeMessageSchema.parse(runLog)).toEqual(runLog);
+    expect(anySubscribeMessageSchema.parse(runLog)).toEqual(runLog);
+    expect(serverMessageSchema.parse(runLog)).toEqual(runLog);
+    expect(runnerMessageSchema.safeParse(runLog).success).toBe(false);
+  });
+
+  it('keeps the pane schema to panes', () => {
+    expect(subscribeMessageSchema.safeParse(runLog).success).toBe(false);
+  });
+
+  it.each([
+    ['without a runId', { ...runLog, runId: undefined }],
+    ['with a path-like runId', { ...runLog, runId: '../x' }],
+    ['with a pane slot instead', { ...runLog, runId: undefined, slot: 'i1' }],
+    ['without a projectId', { ...runLog, projectId: '' }],
+  ])('rejects a run log subscription %s', (_case, message) => {
+    expect(anySubscribeMessageSchema.safeParse(message).success).toBe(false);
+  });
+
+  it('rejects a pane subscription without its slot', () => {
+    expect(
+      anySubscribeMessageSchema.safeParse({ ...subscribe, slot: undefined })
+        .success,
+    ).toBe(false);
+  });
+
+  it('streams rendered lines and an end, runner to server only', () => {
+    const messages = [
+      {
+        type: 'run_log',
+        id: 'run_1',
+        frame: {
+          type: 'lines',
+          backlog: true,
+          lines: [
+            { kind: 'assistant', text: 'Reading the issue' },
+            { kind: 'tool', text: 'Read docs/specs/24-skills.md' },
+          ],
+        },
+      },
+      {
+        type: 'run_log',
+        id: 'run_1',
+        frame: { type: 'ended', phase: 'succeeded' },
+      },
+    ];
+    for (const m of messages) {
+      expect(runLogMessageSchema.safeParse(m).success).toBe(true);
+      expect(runnerMessageSchema.safeParse(m).success).toBe(true);
+      expect(serverMessageSchema.safeParse(m).success).toBe(false);
+    }
+    expect(runnerMessageTypes).toContain('run_log');
+  });
+
+  it.each([
+    { type: 'lines', lines: [] },
+    { type: 'lines', backlog: false, lines: [{ kind: 'raw', text: 'x' }] },
+    {
+      type: 'lines',
+      backlog: false,
+      lines: [
+        { kind: 'assistant', text: 'x'.repeat(RUN_LOG_LINE_MAX_CHARS + 1) },
+      ],
+    },
+    { type: 'ended', phase: 'running' },
+    { type: 'input', keys: 'y\n' },
+  ])('rejects frame %o', (frame) => {
+    expect(runLogFrameSchema.safeParse(frame).success).toBe(false);
+  });
+
+  it('lists subscribe once among server message types', () => {
+    expect(serverMessageTypes.filter((t) => t === 'subscribe')).toHaveLength(1);
+  });
+
+  it('names its relayed event types', () => {
+    expect(RUN_LOG_LIVE_EVENTS).toEqual({
+      lines: 'run_log.lines',
+      ended: 'run_log.ended',
+    });
   });
 });
 

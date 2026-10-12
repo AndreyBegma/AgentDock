@@ -1,13 +1,15 @@
-import { afterEach, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it, setDefaultTimeout } from 'bun:test';
 import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ConfigProfile } from '../config';
 import { createExec, type Exec } from '../detect/exec';
 import { FakeClock } from '../testing/fake-clock';
-import { workspace } from '../testing/projects';
+import { REAL_PROCESS_TIMEOUT_MS, workspace } from '../testing/projects';
 import type { ControlDeps } from './deps';
 import { startOrchestrator, stopOrchestrator } from './orchestrator';
 import { MESSAGE_FILE, messageSlot, stopSlot } from './slot';
+
+setDefaultTimeout(REAL_PROCESS_TIMEOUT_MS);
 
 /**
  * Spec 17's acceptance criteria against a real tmux. The server is private
@@ -24,9 +26,9 @@ afterEach(async () => {
   ws?.cleanup();
 });
 
-/** Polls `check` every 25 ms for up to 5 s. */
+/** Polls `check` every 25 ms for up to 15 s. */
 const eventually = async (check: () => boolean) => {
-  for (let i = 0; i < 200 && !check(); i++) await Bun.sleep(25);
+  for (let i = 0; i < 600 && !check(); i++) await Bun.sleep(25);
   return check();
 };
 
@@ -46,12 +48,20 @@ const fixture = async () => {
     );
   }
 
-  // The profile's binary: records its argv (one per line) and env, then sleeps.
+  // The profile's binary: records its env and argv (one per line), then
+  // sleeps. Each file is written under a temp name and renamed into place, and
+  // the argv file lands last — its existence means the whole record is there.
   const record = join(ws.ws, 'record');
   const binary = join(ws.ws, 'fake-claude');
   writeFileSync(
     binary,
-    '#!/bin/sh\nprintf \'%s\\n\' "$@" > "$RECORD.argv"\nenv > "$RECORD.env"\nexec sleep 600\n',
+    [
+      '#!/bin/sh',
+      'env > "$RECORD.env.tmp" && mv "$RECORD.env.tmp" "$RECORD.env"',
+      'printf \'%s\\n\' "$@" > "$RECORD.argv.tmp" && mv "$RECORD.argv.tmp" "$RECORD.argv"',
+      'exec sleep 600',
+      '',
+    ].join('\n'),
   );
   chmodSync(binary, 0o755);
   const profile: ConfigProfile = {
@@ -113,7 +123,7 @@ describe.skipIf(!tmuxInstalled)('control commands on a real tmux', () => {
 
     const started = await startOrchestrator(start, f.deps);
     expect(started.session).toBe(SESSION);
-    expect(await eventually(() => existsSync(`${f.record}.env`))).toBe(true);
+    expect(await eventually(() => existsSync(`${f.record}.argv`))).toBe(true);
 
     // argv as the binary received it: no shell re-split the prompt.
     expect(readFileSync(`${f.record}.argv`, 'utf8').split('\n')).toEqual([

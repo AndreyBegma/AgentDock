@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import {
   type AuditAction,
-  type CommandRunCommand,
   type CommandRunView,
+  type ControlRunCommand,
   type OrchestratorStatusView,
   type Role,
   SLOT_MESSAGE_SENT_LIVE_EVENT,
@@ -14,10 +14,11 @@ import {
   commands,
   slotNameSchema,
 } from '@agentdock/shared/protocol';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { z } from 'zod';
 import { AuditService } from '../audit/audit.service';
 import type { AuditContext } from '../audit/audit.types';
+import { BudgetGate } from '../budgets/budget-gate';
 import { PrismaService } from '../database/prisma.service';
 import { LiveService } from '../live/live.service';
 import { projectNotFound } from '../projects';
@@ -48,7 +49,7 @@ interface ProjectTarget {
 }
 
 /** One control action, as `execute` runs it. */
-interface Action<N extends CommandRunCommand> {
+interface Action<N extends ControlRunCommand> {
   command: N;
   slot?: string;
   /** The audit action of spec 17 D10. */
@@ -98,6 +99,7 @@ export class ControlService {
     private readonly runs: CommandRunsService,
     private readonly settings: OrchestratorSettingsService,
     @Inject(CONTROL_OPTIONS) private readonly options: ControlOptions,
+    @Optional() private readonly budgets?: BudgetGate,
   ) {}
 
   /** D2, D3: launches `/code-sentinel:orchestrator <mode>` in its own tmux session. */
@@ -109,6 +111,13 @@ export class ControlService {
       command: 'orchestrator.start',
       auditAction: 'orchestrator.start',
       prepare: async () => {
+        // Spec 28 D7, D11: an exceeded stop budget refuses start and next
+        // with 409 `budget_exceeded`, before a run is recorded or sent. A
+        // schedule firing (actor `system`) is project-only (D3).
+        await this.budgets?.assertAllowed({
+          projectId: caller.projectId,
+          userId: caller.ctx.actor.type === 'user' ? caller.user.id : null,
+        });
         const launch = await this.settings
           .resolveLaunch(caller.projectId, dto)
           .catch((error: unknown) => {
@@ -253,7 +262,7 @@ export class ControlService {
     return parsed.data;
   }
 
-  private async execute<N extends CommandRunCommand>(
+  private async execute<N extends ControlRunCommand>(
     caller: ControlCaller,
     action: Action<N>,
   ): Promise<CommandRunView> {

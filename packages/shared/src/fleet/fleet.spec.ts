@@ -215,6 +215,33 @@ describe('fleet events', () => {
     ).toBe(true);
   });
 
+  it('takes an optional head commit on pr.opened and pr.checks_changed (spec 20 D6)', () => {
+    const head = 'a'.repeat(40);
+    const opened = {
+      number: 7,
+      branch: 'feat/42-x',
+      url: 'https://github.com/acme/widget/pull/7',
+      title: 'PR 7',
+      checks: 'green',
+    };
+    const changed = { number: 7, branch: 'feat/42-x', checks: 'pending' };
+    for (const [type, data] of [
+      ['pr.opened', opened],
+      ['pr.checks_changed', changed],
+    ] as const) {
+      // An event from a runner older than the field still parses.
+      expect(parseFleetEvent(event(type, data))).toMatchObject({ ok: true });
+      expect(
+        parseFleetEvent(event(type, { ...data, headSha: head })),
+      ).toMatchObject({ ok: true, event: { data: { headSha: head } } });
+      for (const headSha of ['abc123', 'A'.repeat(40), 42]) {
+        expect(
+          parseFleetEvent(event(type, { ...data, headSha })),
+        ).toMatchObject({ ok: false });
+      }
+    }
+  });
+
   it('still requires what spec 11 collectors always send', () => {
     expect(
       parseFleetEvent(
