@@ -224,3 +224,33 @@ export interface ScheduleDisabledLiveEvent {
   scheduleId: string;
   reason: ScheduleDisabledReason;
 }
+
+/**
+ * The `schedule.*` types the API also records in `events` (D17, ADR-0014),
+ * with `source` `api` — one row per `<type>:<firingId>`.
+ */
+export const SCHEDULE_EVENT_TYPES = [
+  SCHEDULE_FIRED_LIVE_EVENT,
+  SCHEDULE_SKIPPED_LIVE_EVENT,
+  SCHEDULE_FAILED_LIVE_EVENT,
+  SCHEDULE_DISABLED_LIVE_EVENT,
+] as const;
+export type ScheduleEventType = (typeof SCHEDULE_EVENT_TYPES)[number];
+
+/** `data` of a recorded `schedule.*` event. */
+export interface ScheduleEventData {
+  scheduleId: string;
+  scheduleName: string;
+  /** The firing it reports; for `schedule.disabled`, the one that caused it. */
+  firingId: string;
+  /** Firing status (`schedule.fired|skipped|failed`). */
+  status?: ScheduleFiringStatus;
+  /** Firing reason, e.g. `runner_offline`. */
+  reason?: string;
+  kind?: ScheduleFiringKind;
+  scheduledFor?: string;
+  missedCount?: number;
+  runId?: string;
+  /** `schedule.disabled` only. */
+  disabledReason?: ScheduleDisabledReason;
+}

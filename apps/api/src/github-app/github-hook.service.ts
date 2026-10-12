@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
+import { nextServerEventSeq } from '../server-events';
 import { parseRawJson } from '../webhooks/common';
 import { CollectorPollSender } from './collector-poll-sender';
 import {
@@ -153,9 +154,8 @@ export class GitHubHookService implements OnApplicationShutdown {
         });
         for (const poll of polls) {
           const project = poll.project;
-          // D9 (spec notes): a negative seq of its own; the ack cursor never sees it.
-          const [{ seq }] = await tx.$queryRaw<{ seq: bigint }[]>`
-            SELECT -nextval('github_event_seq') AS seq`;
+          // D9 (spec notes), ADR-0014: a negative seq; the ack cursor never sees it.
+          const seq = await nextServerEventSeq(tx);
           await tx.event.create({
             data: {
               runnerId: project.runnerId,
