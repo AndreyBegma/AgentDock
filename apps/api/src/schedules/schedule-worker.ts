@@ -33,6 +33,9 @@ const STARTUP_RETRY_MS = [1_000, 5_000, 15_000, 30_000, 60_000];
 /** How long shutdown waits for running jobs before it forces the worker closed. */
 const CLOSE_TIMEOUT_MS = 10_000;
 
+/** The same worker error is logged at most this often. */
+const ERROR_LOG_INTERVAL_MS = 60_000;
+
 const message = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
@@ -104,7 +107,13 @@ export class ScheduleWorker implements OnApplicationBootstrap, OnModuleDestroy {
         concurrency: this.options.concurrency,
       },
     );
+    // ioredis retries about once a second while Redis is down: one line a
+    // minute per distinct error is enough to see the outage.
+    const logged = new Map<string, number>();
     worker.on('error', (error) => {
+      const last = logged.get(error.message) ?? 0;
+      if (Date.now() - last < ERROR_LOG_INTERVAL_MS) return;
+      logged.set(error.message, Date.now());
       this.logger.warn(`schedules worker: ${error.message}`);
     });
     worker.on('failed', (job, error) => {
