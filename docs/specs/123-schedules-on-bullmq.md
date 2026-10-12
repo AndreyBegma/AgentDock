@@ -26,7 +26,7 @@ changes. The person chose this on 2026-10-12. The reasons are in ADR-0015.
 ### In scope
 
 - A Redis service in `docker/docker-compose.yml`: pinned, password, AOF, `noeviction`.
-- A queue module in `apps/api` (`@nestjs/bullmq`) and its configuration (`REDIS_URL`).
+- A BullMQ module in `apps/api/src/bullmq` (`@nestjs/bullmq`) and its configuration (`REDIS_URL`).
 - The `schedules` queue:
   - a `fire` job per enabled schedule;
   - two repeatable maintenance jobs: settle finished runs and fail stale `due` firings, and reconcile timers with PostgreSQL;
@@ -54,7 +54,7 @@ here unless it names another source. Rows marked *(A)* are listed again under
 
 | # | Decision | Source |
 |---|---|---|
-| B1 | **Library.** `bullmq` through `@nestjs/bullmq` (both MIT), pinned exactly per `bunfig.toml`. BullMQ brings its own `ioredis`. The versions are the newest at least two weeks old when the slot starts [Unknown — the i123-queue slot pins them]. | ADR-0015 |
+| B1 | **Library.** `bullmq` through `@nestjs/bullmq` (both MIT), pinned exactly per `bunfig.toml`. BullMQ 6 declares `ioredis` an optional peer, so it is a direct dependency. Pinned: `bullmq` 6.3.9 (2026-09-25), `@nestjs/bullmq` 11.0.5 (2026-08-07; 12.0.0 is ESM-only and the API is CommonJS under Jest) and `ioredis` 5.11.1 (2026-06-04), the newest stable releases at least two weeks old when the i123-queue slot ran. | ADR-0015 |
 | B2 | **Authority.** `schedules.nextRunAt` is the only next-run time. A BullMQ job only says "check schedule *S* for occurrence *T*". The processor acts only when it holds the row lock and finds `enabled` and `nextRunAt = T`. Otherwise it completes the job and does nothing, and logs `stale timer` at debug. | ADR-0015 §2 |
 | B3 | **One delayed job per occurrence, computed by `CronSchedule`.** On queue `schedules`, job name `fire`, data `{ scheduleId, scheduledFor }` (ISO). Job id `fire-<scheduleId>-<scheduledFor epoch ms>`; no `:`, which BullMQ forbids in custom ids. Delay `max(0, nextRunAt − now)`. BullMQ job schedulers (`upsertJobScheduler` with `pattern` + `tz`) are not used for schedules. *(A)* | ADR-0015 §3 |
 | B4 | **DST and timezone.** `cron.ts` (`CronSchedule`) is untouched and stays the only place an occurrence is computed. A spring-forward-skipped local time does not fire, and a fall-back-repeated one fires once (spec 25 D4). BullMQ never sees a cron pattern or a timezone, only an absolute timestamp. `cron.spec.ts` keeps passing unchanged. | spec 25 D4; B3 |
@@ -69,7 +69,7 @@ here unless it names another source. Rows marked *(A)* are listed again under
 | B13 | **`beforeFire` and the budget gate.** Unchanged: `ScheduleFirer.fire` still calls `BeforeFire.check` first. #106 lands in `before-fire.ts` with no conflict in design. | spec 25 D12; #106 |
 | B14 | **Audit and live.** Unchanged. CRUD audit (spec 25 D16) is written by `SchedulesService` and auto-disable by `ScheduleFirer.disable`. Live `schedule.updated` / `schedule_firing.updated` go out through `ScheduleLive`. No audit or live call moves into a BullMQ event handler (`completed`, `failed`, `stalled`). | spec 25 D16–D17 |
 | B15 | **#99 events stay exactly-once.** Every `schedule.*` row in `events` is written inside the PostgreSQL transaction of the transition that causes it:<br>• the B5 step-4 claim writes `skipped`;<br>• `ScheduleFirer.settle` writes `fired` / `skipped` / `failed`;<br>• `disable` writes `disabled`.<br>Each is keyed `<type>:<firingId>` with `ON CONFLICT DO NOTHING`. A replayed job writes no firing (B2) and so no event. Nothing BullMQ does is a source of an event. | #99 plan (issue comment 6120856430) |
-| B16 | **Redis deployment.** Compose service `redis`, image `redis:7.4.2-alpine` [Unknown — the slot confirms the tag and that it is at least two weeks old], `container_name: agentdock-redis`, port `6421:6379`. `command: redis-server --requirepass ${REDIS_PASSWORD:?set it in docker/.env} --appendonly yes --appendfsync everysec --maxmemory-policy noeviction`, volume `redis_data:/data`, healthcheck `redis-cli -a $REDIS_PASSWORD ping`. `noeviction` is what BullMQ requires. *(A)* | ADR-0015 §5 |
+| B16 | **Redis deployment.** Compose service `redis`, image `redis:7.4.11-alpine` (the newest 7.4 patch tag verified with `docker manifest inspect`; later patches carry security fixes), `container_name: agentdock-redis`, port `6421:6379`. `command: redis-server --requirepass ${REDIS_PASSWORD:?set it in docker/.env} --appendonly yes --appendfsync everysec --maxmemory-policy noeviction`, volume `redis_data:/data`, healthcheck `redis-cli -a $REDIS_PASSWORD ping`. `noeviction` is what BullMQ requires. *(A)* | ADR-0015 §5 |
 | B17 | **Persistence and backup.** AOF (`everysec`) keeps pending timers across a Redis restart. Redis is not backed up. A lost or wiped Redis is rebuilt by B9 from PostgreSQL. Occurrences that fell due in between follow spec 25 D6, the same as an API outage. | ADR-0015 §5 |
 | B18 | **Redis down.** The API boots and keeps serving. `ioredis` reconnects forever (`maxRetriesPerRequest: null` on the worker connection, as BullMQ requires). Schedule CRUD succeeds, with B8 logging the failed sync. Nothing fires. When Redis returns, B9 runs within 60 s, or at once on the next boot. Each late occurrence is planned by `planClaim` (D6: within the 2-minute grace it fires as `cron`; otherwise `skip` or `catch_up`). The bootstrap reconcile retries in the background and never blocks boot. | ADR-0015 consequences *(A)* |
 | B19 | **Configuration.** `REDIS_URL` is required when the scheduler is enabled. Without it, the API fails to boot with `REDIS_URL is required unless SCHEDULER_ENABLED=false`. With `SCHEDULER_ENABLED=false` and no `REDIS_URL`, the instance runs no worker and syncs no timers, and logs that once. Under `APP_ENV=test` no worker or repeatable autostarts, the same as the current loop. Tests drive the processor, and the one Redis e2e starts its worker itself. Prefix `agentdock` (BullMQ's default is `bull`). *(A)* | `scheduler-options.ts`; CLAUDE.md (env documented in `.env.example`) |
@@ -161,7 +161,7 @@ and the structure table (`docker/ — PostgreSQL 16, Redis 7.4 :6421`).
 
 | Slot | Owns | Touches | Depends on | Lead | Model |
 |---|---|---|---|---|---|
-| i123-queue | Redis service, queue module (connection, prefix, config check, test helpers), env, test infra | docker/docker-compose.yml, docker/.env.example, scripts/db-start-docker.sh, apps/api/src/queue/**, apps/api/src/app.module.ts, apps/api/src/test/**, apps/api/.env.example, apps/api/package.json, bun.lock, README.md, CLAUDE.md | — | yes | sonnet |
+| i123-queue | Redis service, queue module (connection, prefix, config check, test helpers), env, test infra | docker/docker-compose.yml, docker/.env.example, scripts/db-start-docker.sh, apps/api/src/bullmq/**, apps/api/src/app.module.ts, apps/api/src/test/**, apps/api/.env.example, apps/api/package.json, bun.lock, README.md, CLAUDE.md | — | yes | sonnet |
 | i123-schedules | processor, timers, reconciler, maintenance jobs, leader-election removal, system-jobs rows, tests | apps/api/src/schedules/** | i123-queue, #99 | no | opus |
 
 Honestly two slots in sequence. `i123-queue` is mergeable alone: Redis runs
@@ -170,9 +170,9 @@ the files #99 is editing, so it is cut after #99 and i123-queue merge.
 
 What `i123-queue` exports for `i123-schedules`:
 
-- `QueueModule`, global, built on `BullModule.forRootAsync` from `REDIS_URL` with prefix `agentdock`;
+- `BullmqModule` in `apps/api/src/bullmq/` (not `src/queue/`: that is the task-queue module of #19), global, built on `BullModule.forRootAsync` from `REDIS_URL` with prefix `agentdock` (overridable by `QUEUE_PREFIX`, which the e2e suite sets per run);
 - `QUEUE_ENABLED`, a boolean provider: false when `SCHEDULER_ENABLED=false` and `REDIS_URL` is unset;
-- `testQueuePrefix()` and an obliterate helper for e2e teardown.
+- `testQueuePrefix()` and `obliterateQueues()` for e2e teardown (`src/bullmq/bullmq-testing.ts`), and `TEST_REDIS_URL` wiring in `src/test/`.
 
 `i123-schedules` registers its own queue with `BullModule.registerQueue({ name: 'schedules' })` inside `schedules.module.ts`.
 
@@ -212,7 +212,7 @@ Each one gives the decision, the alternative, and why.
 - **B8: a failed timer sync does not fail the request.** Alternative: return 503 when Redis is down. Rejected because PostgreSQL is the authority and B9 repairs within 60 s.
 - **B9: a 60 s reconcile period.** Alternative: boot-only reconcile. Rejected because a Redis restart without AOF, or a wipe, would then stop schedules until the next deploy.
 - **B12: retries and retention** (5 attempts, 24 h completed, 7 days failed). Alternative: BullMQ defaults (1 attempt, keep forever). Rejected because a transient PostgreSQL error should not wait for the reconciler, and Redis memory should stay bounded.
-- **B16: `redis:7.4.2-alpine`, host port 6421, password, AOF everysec.** Alternative: Valkey 8 (BSD). Rejected because the person asked for Redis. Port 6421 follows the repository's 5421 pattern.
+- **B16: `redis:7.4.11-alpine`, host port 6421, password, AOF everysec.** Alternative: Valkey 8 (BSD). Rejected because the person asked for Redis. Port 6421 follows the repository's 5421 pattern.
 - **B18 / B19: the API boots while Redis is down, but not without `REDIS_URL`.** Alternative: make Redis optional and fall back to the PostgreSQL tick. Rejected because two schedulers would have to be kept correct forever.
 - **B20: maintenance jobs listed as `kind: 'interval'`.** Alternative: a new `kind: 'queue'` in `SystemJobView`. Rejected because it would touch `packages/shared` and the web table for a label.
 - **B23: the webhook delivery queue stays on PostgreSQL.** This is the brief's default, and it is recorded in ADR-0015 §6.

@@ -21,7 +21,7 @@ apps/
   web/        — Next.js 16 (App Router, Turbopack), React 19, Tailwind 4   :3517
 packages/
   shared/     — @agentdock/shared — code shared by api and web
-docker/       — docker-compose: PostgreSQL 16                             :5421
+docker/       — docker-compose: PostgreSQL 16 :5421, Redis 7.4 :6421
 scripts/      — db-start-docker.sh (up → migrate → seed)
 ```
 
