@@ -583,6 +583,98 @@ describe('projects (e2e)', () => {
     });
   });
 
+  describe('runtime profiles', () => {
+    const BINARY = '/home/agent/.local/bin/claude';
+    const CONFIG_DIR = '/home/agent/.claude-profiles/main';
+
+    const seedProfile = (
+      id: string,
+      key: string,
+      data: { runtime?: 'claude' | 'codex'; missing?: boolean } = {},
+    ) =>
+      ctx.prisma.runtimeProfile.create({
+        data: {
+          runnerId: id,
+          key,
+          runtime: data.runtime ?? 'claude',
+          label: `${key} label`,
+          binary: BINARY,
+          env: { CLAUDE_CONFIG_DIR: CONFIG_DIR },
+          args: ['--settings', `${CONFIG_DIR}/settings.json`],
+          authenticated: true,
+          missing: data.missing ?? false,
+        },
+      });
+
+    it('answers operator and up, 403 to a viewer, 404 to a non-member', async () => {
+      const a = await seedProject('/srv/a');
+      const b = await seedProject('/srv/b');
+      await seedProfile(runnerId, 'claude-main');
+      const operator = await userSession('op@example.com', 'operator');
+      const viewer = await userSession('viewer@example.com', 'viewer');
+      const demoted = await userSession('demoted@example.com', 'operator');
+      await addMember(a.id, operator.id);
+      await addMember(a.id, viewer.id);
+      await addMember(a.id, demoted.id, 'viewer');
+      await addMember(b.id, viewer.id);
+      const path = `/projects/${a.id}/runtime-profiles`;
+
+      expect((await admin.get(path)).status).toBe(200);
+      expect((await operator.session.get(path)).status).toBe(200);
+      for (const session of [viewer.session, demoted.session]) {
+        const response = await session.get(path);
+        expect(response.status).toBe(403);
+        expect(response.body.error).toBe('forbidden');
+      }
+      for (const response of [
+        await operator.session.get(`/projects/${b.id}/runtime-profiles`),
+        await operator.session.get('/projects/prj_nope/runtime-profiles'),
+      ]) {
+        expect(response.status).toBe(404);
+        expect(response.body.error).toBe('not_found');
+      }
+      expect((await ctx.http().get(path)).status).toBe(401);
+    });
+
+    it("lists the runner's present profiles, marks the default, and carries no paths", async () => {
+      const a = await seedProject('/srv/a');
+      const other = await pairedRunner(ctx, admin, 'other');
+      const main = await seedProfile(runnerId, 'claude-main');
+      await seedProfile(runnerId, 'codex-main', { runtime: 'codex' });
+      await seedProfile(runnerId, 'claude-old', { missing: true });
+      await seedProfile(other.runnerId, 'claude-elsewhere');
+      await ctx.prisma.project.update({
+        where: { id: a.id },
+        data: { defaultProfileId: main.id },
+      });
+      const operator = await userSession('op@example.com', 'operator');
+      await addMember(a.id, operator.id);
+
+      const response = await operator.session.get(
+        `/projects/${a.id}/runtime-profiles`,
+      );
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual([
+        {
+          key: 'claude-main',
+          runtime: 'claude',
+          label: 'claude-main label',
+          authenticated: true,
+          isDefault: true,
+        },
+        {
+          key: 'codex-main',
+          runtime: 'codex',
+          label: 'codex-main label',
+          authenticated: true,
+          isDefault: false,
+        },
+      ]);
+      expect(response.text).not.toContain('/home/');
+      expect(response.text).not.toContain(main.id);
+    });
+  });
+
   describe('members', () => {
     it('adds, changes and removes members, refusing what it must', async () => {
       const a = await seedProject('/srv/a');

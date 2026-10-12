@@ -2,6 +2,7 @@ import {
   type DocsSourceOverrideRequest,
   effectiveProjectRole,
   type ProjectDetail,
+  type ProjectRuntimeProfile,
   type ProjectSummary,
   type Role,
 } from '@agentdock/shared';
@@ -23,6 +24,7 @@ import {
   EMPTY_CLASSIFIED,
   type ProjectWithRelations,
   toProjectDetail,
+  toProjectRuntimeProfile,
   toProjectSummary,
 } from './project-mapper';
 
@@ -201,6 +203,29 @@ export class ProjectsService {
 
   async detail(projectId: string, role: Role): Promise<ProjectDetail> {
     return this.toDetail(await this.load(projectId), role);
+  }
+
+  /** #97: the runner's present profiles, for the skill run dialog. */
+  async runtimeProfiles(projectId: string): Promise<ProjectRuntimeProfile[]> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { runnerId: true, defaultProfileId: true },
+    });
+    if (!project) throw projectNotFound();
+    const profiles = await this.prisma.runtimeProfile.findMany({
+      where: { runnerId: project.runnerId, missing: false },
+      select: {
+        id: true,
+        key: true,
+        runtime: true,
+        label: true,
+        authenticated: true,
+      },
+      orderBy: { key: 'asc' },
+    });
+    return profiles.map((profile) =>
+      toProjectRuntimeProfile(profile, project.defaultProfileId),
+    );
   }
 
   /** D13. `defaultProfileId` must be a profile of the project's runner. */
