@@ -31,3 +31,4 @@ spec; large rows split into a `## Parallel plan` there.
 | [#27](https://github.com/AndreyBegma/AgentDock/issues/27) | [27-github-app](27-github-app.md) | M3.4 GitHub App | queued — after #11, #19, #26 |
 | [#28](https://github.com/AndreyBegma/AgentDock/issues/28) | [28-budgets](28-budgets.md) | M3.5 Budgets | queued — after #13, #17, #22, #24 |
 | [#29](https://github.com/AndreyBegma/AgentDock/issues/29) | [29-terminal-attach](29-terminal-attach.md) | M3.6 Terminal attach | queued — after #8, #18 |
+| [#123](https://github.com/AndreyBegma/AgentDock/issues/123) | [123-schedules-on-bullmq](123-schedules-on-bullmq.md) | M3.2 rework: schedules on BullMQ (ADR-0015) | specified — after #99 |
