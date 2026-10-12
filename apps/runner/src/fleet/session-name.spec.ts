@@ -67,6 +67,18 @@ describe('worktree paths', () => {
     );
     expect(slotOfWorktree('/dev/AgentDock', '/dev/AgentDock')).toBeNull();
   });
+
+  it('does not treat skill run and install worktrees as slots (#93)', () => {
+    expect(
+      slotOfWorktree('/dev/AgentDock', '/dev/.wt-AgentDock-run-abc123'),
+    ).toBeNull();
+    expect(
+      slotOfWorktree('/dev/AgentDock', '/dev/.wt-AgentDock-skill-abc123'),
+    ).toBeNull();
+    expect(
+      slotOfWorktree('/dev/AgentDock', '/dev/.wt-AgentDock-runner-i42'),
+    ).toBe('runner-i42');
+  });
 });
 
 describe('ownedSlot', () => {

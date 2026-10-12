@@ -1,10 +1,10 @@
 'use client';
 
 import type {
-  AdminRunnerDetail,
   InstalledSkillsView,
   InstalledSkillView,
   ProjectDetail,
+  ProjectRuntimeProfile,
 } from '@agentdock/shared';
 import { Badge } from 'glass-ui/badge';
 import { Banner } from 'glass-ui/banner';
@@ -24,9 +24,9 @@ import {
   groupBySkillScope,
   isCommandUnavailable,
   isNotFound,
-  profileKeysFrom,
   provenanceLabel,
   SCOPE_LABEL,
+  skillRunProfiles,
 } from '../../../../../lib/skills/format';
 import { RunDialog } from './run-dialog';
 
@@ -94,7 +94,7 @@ export default function ProjectSkillsPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const [project, setProject] = useState<ProjectDetail>();
   const [view, setView] = useState<InstalledSkillsView>();
-  const [adminProfiles, setAdminProfiles] = useState<string[]>([]);
+  const [profiles, setProfiles] = useState<ProjectRuntimeProfile[]>([]);
   const [missing, setMissing] = useState(false);
   const [unavailable, setUnavailable] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -119,21 +119,15 @@ export default function ProjectSkillsPage() {
     load();
   }, [load]);
 
-  // Only an admin can read the runner's profile list; others get the keys the inventory knows.
-  const runnerId = project?.runnerId;
+  // The runner's profiles, for whoever can run a skill (operator and up).
   const isAdmin = project?.role === 'admin';
+  const canRun = project !== undefined && project.role !== 'viewer';
   useEffect(() => {
-    if (!isAdmin || !runnerId) return;
-    api<AdminRunnerDetail>(`/admin/runners/${runnerId}`)
-      .then((runner) =>
-        setAdminProfiles(
-          runner.profiles
-            .filter((p) => !p.missing && p.runtime === 'claude')
-            .map((p) => p.key),
-        ),
-      )
-      .catch(() => setAdminProfiles([]));
-  }, [isAdmin, runnerId]);
+    if (!canRun) return;
+    api<ProjectRuntimeProfile[]>(`/projects/${projectId}/runtime-profiles`)
+      .then((list) => setProfiles(skillRunProfiles(list)))
+      .catch(() => setProfiles([]));
+  }, [canRun, projectId]);
 
   const refresh = async () => {
     setRefreshing(true);
@@ -157,13 +151,6 @@ export default function ProjectSkillsPage() {
   };
 
   const groups = useMemo(() => groupBySkillScope(view?.items ?? []), [view]);
-  const profileKeys = useMemo(
-    () =>
-      isAdmin && adminProfiles.length > 0
-        ? adminProfiles
-        : profileKeysFrom(view?.items ?? [], project?.defaultProfileId ?? null),
-    [isAdmin, adminProfiles, view, project],
-  );
 
   if (missing) {
     return (
@@ -241,7 +228,7 @@ export default function ProjectSkillsPage() {
       <RunDialog
         projectId={projectId}
         skill={running}
-        profileKeys={profileKeys}
+        profiles={profiles}
         isAdmin={isAdmin}
         onOpenChange={(open) => {
           if (!open) setRunning(null);

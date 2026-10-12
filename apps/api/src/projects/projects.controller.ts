@@ -1,6 +1,7 @@
 import type {
   ProjectDetail,
   ProjectMemberView,
+  ProjectRuntimeProfile,
   ProjectSummary,
 } from '@agentdock/shared';
 import type { ProjectInspection } from '@agentdock/shared/protocol';
@@ -100,6 +101,16 @@ export class ProjectsController {
     @ProjectAccess() access: ResolvedProjectAccess,
   ): Promise<ProjectDetail> {
     return this.projects.detail(access.projectId, access.role);
+  }
+
+  /** #97: operator and up — a viewer cannot run a skill, so it gets 403. */
+  @Get(':projectId/runtime-profiles')
+  @ProjectRole('operator')
+  @UseGuards(ProjectAccessGuard)
+  runtimeProfiles(
+    @ProjectAccess() access: ResolvedProjectAccess,
+  ): Promise<ProjectRuntimeProfile[]> {
+    return this.projects.runtimeProfiles(access.projectId);
   }
 
   @Patch(':projectId')
