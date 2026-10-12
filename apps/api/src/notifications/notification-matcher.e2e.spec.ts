@@ -103,6 +103,85 @@ describe('notification matcher (e2e)', () => {
     expect(await rowsOf(disabled.id)).toHaveLength(0);
   });
 
+  describe('schedule.disabled (spec 25 D10)', () => {
+    const disabledEvent = (firingId: string, minute: number) => ({
+      type: 'schedule.disabled',
+      source: 'api' as const,
+      slot: null,
+      issue: null,
+      ts: at(minute),
+      data: {
+        scheduleId: 's1',
+        scheduleName: 'Nightly triage',
+        firingId,
+        disabledReason: 'failing',
+      },
+    });
+
+    it('reaches active admins only, with a link to the schedules', async () => {
+      const admin = await seedUser(ctx.prisma, 'ada@example.com', 'admin');
+      // An override only lowers a role (#10), so admins are the only admins.
+      const operator = await seedUser(
+        ctx.prisma,
+        'op@example.com',
+        'operator',
+        projectId,
+      );
+      const viewer = await seedUser(
+        ctx.prisma,
+        'vi@example.com',
+        'viewer',
+        projectId,
+      );
+      await insertEvent(ctx.prisma, runnerId, disabledEvent('1', 0));
+      expect(await matcher.tick()).toBe(1);
+
+      const rows = await rowsOf(admin.id);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        kind: 'schedule.disabled',
+        projectId,
+        link: `/projects/${projectId}/schedules`,
+        count: 1,
+      });
+      expect(await rowsOf(operator.id)).toHaveLength(0);
+      expect(await rowsOf(viewer.id)).toHaveLength(0);
+    });
+
+    it('notifies once per disable: a replay adds nothing, a re-enabled schedule that fails again notifies again', async () => {
+      const admin = await seedUser(ctx.prisma, 'ada@example.com', 'admin');
+      const first = await insertEvent(
+        ctx.prisma,
+        runnerId,
+        disabledEvent('1', 0),
+      );
+      await matcher.tick();
+      await ctx.prisma.notificationMatcherState.update({
+        where: { id: 1 },
+        data: { eventsCursor: first - 1n },
+      });
+      await matcher.tick();
+      expect(await rowsOf(admin.id)).toHaveLength(1);
+
+      // Re-enabled, then disabled again by another firing, minutes later.
+      await insertEvent(ctx.prisma, runnerId, disabledEvent('2', 5));
+      await matcher.tick();
+      const rows = await rowsOf(admin.id);
+      expect(rows).toHaveLength(2);
+      expect(rows.map((r) => r.count)).toEqual([1, 1]);
+    });
+
+    it('ignores a schedule.disabled forged by a runner', async () => {
+      const admin = await seedUser(ctx.prisma, 'ada@example.com', 'admin');
+      await insertEvent(ctx.prisma, runnerId, {
+        ...disabledEvent('1', 0),
+        source: 'runner',
+      });
+      await matcher.tick();
+      expect(await rowsOf(admin.id)).toHaveLength(0);
+    });
+  });
+
   it('produces nothing new when an event is matched again', async () => {
     const admin = await seedUser(ctx.prisma, 'ada@example.com', 'admin');
     const eventId = await insertEvent(

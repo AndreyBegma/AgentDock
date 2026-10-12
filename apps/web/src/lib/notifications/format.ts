@@ -23,6 +23,7 @@ export const KIND_LABEL: Record<NotificationKind, string> = {
   'runner.online': 'Runner back online',
   'budget.exceeded': 'Budget exceeded',
   'budget.threshold': 'Budget threshold reached',
+  'schedule.disabled': 'Schedule disabled',
 };
 
 export type KindTone = 'ok' | 'warn' | 'danger' | 'neutral';
@@ -38,6 +39,7 @@ export const KIND_TONE: Record<NotificationKind, KindTone> = {
   'runner.online': 'ok',
   'budget.exceeded': 'danger',
   'budget.threshold': 'warn',
+  'schedule.disabled': 'danger',
 };
 
 export interface FeedState {

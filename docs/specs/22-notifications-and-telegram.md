@@ -226,6 +226,11 @@ i22-telegram, decided with the orchestrator on 2026-10-08:
     - **Every press, and every note,** re-checks: the chat's link, that the notification was sent to that user, that the user is active, and `ProjectAccessService` role ≥ operator. It then calls `ApprovalsService` at the head from the button, so a moved head is `head_moved` as in the UI. Each outcome — refusal, #20's refusal, success — is audited as `telegram.approval` (actor the user, `meta.via = "telegram"`, `meta.reason` on a refusal); #20 audits the decision itself as well. A press from an unlinked chat has no actor and is only logged.
     - **Request changes** answers with a force-reply prompt whose last line carries the notification, PR and full head. The reply's `reply_to_message` — authored by the bot, in the same private chat — brings it back, so no state is kept. A reply without text is refused (`note_required`).
     - The keyboard stays on the message after a decision; a second press is refused by #20 (`not_waiting`).
+22. **`schedule.disabled` (D1, spec 25 D10), built by #103.** D1's union gains `schedule.disabled`: an automatic schedule disable, on / on.
+    - **Source.** The `events` row the API records inside the disable transaction (`type` `schedule.disabled`, `source` `api`, `dedupeKey` `schedule.disabled:<firingId>`). The matcher accepts it only with `source = api`; a runner or plugin row of that type notifies nobody.
+    - **Recipients.** A project kind (D2) narrowed to users whose effective role on the project is `admin`; an override only lowers a role (#10), so these are the active global admins. Operators and viewers get nothing. The kind carries `adminsOnly` in `NOTIFICATION_KIND_SPECS`.
+    - **Once per disable.** One event row per disable gives one notification per recipient. The kind is not folded (D6): a schedule that is re-enabled and disabled again by a later firing is a new item, even within 15 minutes. A replayed event adds nothing (`(eventId, userId, kind)` is unique).
+    - **Link** opens the project's schedules page; the text names the schedule and the reason, nothing else.
 
 Depends on #9
 

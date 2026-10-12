@@ -6,6 +6,8 @@ import type { Role } from '../auth';
  * review sees it. `runner.online` is the resolving item of a `runner.offline`
  * incident (spec 22 notes). `budget.threshold` and `budget.exceeded` come from
  * budgets (spec 28 D6) and have no project for a user budget.
+ * `schedule.disabled` comes from an automatic schedule disable (spec 25 D10)
+ * and goes to project admins and active admins only.
  */
 export const NOTIFICATION_KINDS = [
   'person.needed',
@@ -18,6 +20,7 @@ export const NOTIFICATION_KINDS = [
   'runner.online',
   'budget.exceeded',
   'budget.threshold',
+  'schedule.disabled',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -43,6 +46,8 @@ export interface NotificationKindSpec {
   defaults: ChannelSwitches;
   /** D1 defaults for a viewer, when they differ. */
   viewerDefaults?: ChannelSwitches;
+  /** Only recipients whose role on the project is `admin` receive it. */
+  adminsOnly?: true;
   /** Declared, never emitted yet. */
   reserved?: true;
 }
@@ -115,6 +120,13 @@ export const NOTIFICATION_KIND_SPECS: Record<
     source: 'budgets (each threshold)',
     channels: BOTH,
     defaults: ON_ON,
+  },
+  'schedule.disabled': {
+    scope: 'project',
+    source: 'schedule.disabled',
+    channels: BOTH,
+    defaults: ON_ON,
+    adminsOnly: true,
   },
 };
 

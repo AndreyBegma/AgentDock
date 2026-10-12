@@ -1,5 +1,9 @@
-import type { NotificationKind } from '@agentdock/shared';
 import {
+  type NotificationKind,
+  SCHEDULE_DISABLED_LIVE_EVENT,
+} from '@agentdock/shared';
+import {
+  API_EVENT_SOURCE,
   EVENTS_DUPLICATE_EVENT,
   parseFleetEvent,
   type RunnerEvent,
@@ -32,7 +36,7 @@ export interface NotificationDraft {
   title: string;
   body: string;
   /** Which project page the link opens. */
-  page: 'fleet' | 'overview';
+  page: 'fleet' | 'overview' | 'schedules';
 }
 
 /**
@@ -215,6 +219,27 @@ export const draftFor = (event: MatchableEvent): NotificationDraft | null => {
         page: 'overview',
       };
     }
+    case SCHEDULE_DISABLED_LIVE_EVENT: {
+      // Only the API records this (spec 25 D17); a runner must not forge it.
+      if (event.source !== API_EVENT_SOURCE) return null;
+      const name = oneLine(data.scheduleName, 80);
+      const reason = data.disabledReason;
+      return {
+        kind: 'schedule.disabled',
+        slot: null,
+        issue: null,
+        title: name
+          ? `Schedule "${name}" was disabled`
+          : 'A schedule was disabled',
+        body:
+          reason === 'failing'
+            ? 'It failed repeatedly, so it will not fire again until it is re-enabled.'
+            : reason === 'creator_not_authorized'
+              ? 'Its creator is no longer allowed to run it; it stays off until it is re-enabled.'
+              : 'It stays off until it is re-enabled.',
+        page: 'schedules',
+      };
+    }
     default:
       return null;
   }
@@ -224,5 +249,8 @@ export const draftFor = (event: MatchableEvent): NotificationDraft | null => {
 export const projectLink = (
   projectId: string,
   page: NotificationDraft['page'],
-): string =>
-  page === 'fleet' ? `/projects/${projectId}/fleet` : `/projects/${projectId}`;
+): string => {
+  if (page === 'fleet') return `/projects/${projectId}/fleet`;
+  if (page === 'schedules') return `/projects/${projectId}/schedules`;
+  return `/projects/${projectId}`;
+};
