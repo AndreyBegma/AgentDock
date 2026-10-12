@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'bun:test';
-import { type InstalledSkillView, SKILLS_ERROR } from '@agentdock/shared';
+import {
+  type InstalledSkillView,
+  type ProjectRuntimeProfile,
+  SKILLS_ERROR,
+} from '@agentdock/shared';
 import { ApiError } from '../api';
 import {
   allowedToolsOf,
@@ -13,9 +17,10 @@ import {
   isCommandUnavailable,
   parseTimeoutMinutes,
   permissionWarning,
-  profileKeysFrom,
+  profileOptionLabel,
   provenanceLabel,
   runFormProblem,
+  skillRunProfiles,
   toRunRequest,
 } from './format';
 
@@ -68,18 +73,32 @@ describe('provenanceLabel', () => {
   });
 });
 
-describe('profileKeysFrom', () => {
-  test('default plus claude profile keys, deduplicated and sorted', () => {
-    const keys = profileKeysFrom(
-      [
-        skill({ scope: 'profile', profileKey: 'work' }),
-        skill({ scope: 'profile', profileKey: 'work' }),
-        skill({ scope: 'profile', profileKey: 'cx', runtime: 'codex' }),
-        skill({ scope: 'project', profileKey: null }),
-      ],
-      'alpha',
-    );
+describe('run dialog profiles', () => {
+  const profile = (
+    over: Partial<ProjectRuntimeProfile>,
+  ): ProjectRuntimeProfile => ({
+    key: 'work',
+    runtime: 'claude',
+    label: 'Work',
+    authenticated: true,
+    isDefault: false,
+    ...over,
+  });
+
+  test('keeps only claude profiles, in the order the API gave', () => {
+    const keys = skillRunProfiles([
+      profile({ key: 'alpha' }),
+      profile({ key: 'cx', runtime: 'codex' }),
+      profile({ key: 'work' }),
+    ]).map((p) => p.key);
     expect(keys).toEqual(['alpha', 'work']);
+  });
+
+  test('marks the project default', () => {
+    expect(profileOptionLabel(profile({ isDefault: true }))).toBe(
+      'work (project default)',
+    );
+    expect(profileOptionLabel(profile({}))).toBe('work');
   });
 });
 

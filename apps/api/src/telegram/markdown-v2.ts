@@ -1,4 +1,5 @@
 import type { DeliveryContent } from '../notifications';
+import { shortSha } from './approval-actions';
 
 /** Telegram refuses longer texts; the rest of the budget is markup headroom. */
 export const TELEGRAM_TEXT_MAX = 4096;
@@ -13,6 +14,10 @@ const SPECIAL = /[_*[\]()~`>#+\-=|{}.!\\]/g;
 /** `text` as literal MarkdownV2: every reserved character escaped (D10). */
 export const escapeMarkdownV2 = (text: string): string =>
   text.replace(SPECIAL, (c) => `\\${c}`);
+
+/** Inside `` `code` ``: only `` ` `` and `\` are escaped there. */
+const escapeCode = (text: string): string =>
+  text.replace(/[`\\]/g, (c) => `\\${c}`);
 
 /** A URL inside `[text](url)`: only `)` and `\` are escaped there. */
 export const escapeLinkUrl = (url: string): string =>
@@ -46,11 +51,14 @@ const where = (content: DeliveryContent): string =>
 /**
  * One notification as a Telegram message (D10). Built only from the stored
  * title, body and names — never pane text, prompts or code — with every
- * character escaped, so nothing in them can become markup.
+ * character escaped, so nothing in them can become markup. `headSha`: the PR
+ * head its approval buttons are bound to (D12), shown so the person knows
+ * what they approve.
  */
 export const formatMessage = (
   content: DeliveryContent,
   appUrl: string | null,
+  headSha: string | null = null,
 ): string => {
   const about = where(content);
   const lines = [
@@ -59,6 +67,9 @@ export const formatMessage = (
     ...(about ? [`_${escapeMarkdownV2(about)}_`] : []),
     ...(content.count > 1
       ? [escapeMarkdownV2(`Happened ${content.count} times.`)]
+      : []),
+    ...(headSha
+      ? [`${escapeMarkdownV2('Head')} \`${escapeCode(shortSha(headSha))}\``]
       : []),
     ...linkLine('Open in AgentDock', appLink(appUrl, content.link)),
   ];

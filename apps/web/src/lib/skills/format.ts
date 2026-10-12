@@ -1,5 +1,6 @@
 import {
   type InstalledSkillView,
+  type ProjectRuntimeProfile,
   SKILLS_ERROR,
   type SkillRunRequest,
 } from '@agentdock/shared';
@@ -84,23 +85,16 @@ export function provenanceLabel(item: InstalledSkillView): string {
   return '—';
 }
 
-/** Claude runtime profile keys seen in the inventory; the operator's only list (plan, question 1). */
-export function profileKeysFrom(
-  items: InstalledSkillView[],
-  defaultProfileId: string | null,
-): string[] {
-  const keys = new Set<string>();
-  if (defaultProfileId) keys.add(defaultProfileId);
-  for (const item of items) {
-    if (
-      item.scope === 'profile' &&
-      item.runtime === 'claude' &&
-      item.profileKey
-    ) {
-      keys.add(item.profileKey);
-    }
-  }
-  return [...keys].sort();
+/** The runner's profiles a skill can run on: only Claude ones (#97). */
+export function skillRunProfiles(
+  profiles: ProjectRuntimeProfile[],
+): ProjectRuntimeProfile[] {
+  return profiles.filter((profile) => profile.runtime === 'claude');
+}
+
+/** A run dialog option: the key, and which one the project defaults to. */
+export function profileOptionLabel(profile: ProjectRuntimeProfile): string {
+  return profile.isDefault ? `${profile.key} (project default)` : profile.key;
 }
 
 export const SKILL_MODELS = ['opus', 'sonnet', 'haiku', 'fable'] as const;

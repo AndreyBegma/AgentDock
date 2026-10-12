@@ -36,6 +36,8 @@ export interface DeliveryContent {
 /** One message to send now. */
 export interface ClaimedDelivery {
   id: string;
+  /** The notification sent; #82's approval buttons point back at it. */
+  notificationId: bigint;
   userId: string;
   chatId: bigint;
   attempts: number;
@@ -207,6 +209,7 @@ export class TelegramDeliveryLedger {
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       select: {
         id: true,
+        notificationId: true,
         userId: true,
         attempts: true,
         notification: { select: CONTENT_SELECT },
@@ -306,6 +309,7 @@ export class TelegramDeliveryLedger {
         if (!sendNow.has(row.id)) continue;
         claimed.push({
           id: row.id,
+          notificationId: row.notificationId,
           userId,
           chatId,
           attempts: row.attempts,

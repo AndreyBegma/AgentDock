@@ -9,9 +9,14 @@ import { Client } from 'pg';
 import { PrismaService } from '../database/prisma.service';
 import { BotTokenStore } from '../notifications';
 import {
+  type ApprovalAnswer,
+  TelegramApprovalService,
+} from './telegram-approval.service';
+import {
   redactToken,
   TelegramApiError,
   TelegramClient,
+  type TelegramUpdate,
 } from './telegram-client';
 import { TelegramDeliveryService } from './telegram-delivery.service';
 import {
@@ -55,6 +60,9 @@ const safeMessage = (error: unknown, token?: string): string => {
   return redactToken(text.slice(0, 300), token);
 };
 
+/** The bot's own user id: the part of its token before the colon. */
+const botIdOf = (token: string): number => Number(token.split(':', 1)[0]);
+
 const sleep = (ms: number, signal: AbortSignal): Promise<void> =>
   new Promise((resolve) => {
     if (signal.aborted) return resolve();
@@ -76,7 +84,8 @@ const sleep = (ms: number, signal: AbortSignal): Promise<void> =>
  * The lock lives exactly as long as that connection, so a crashed instance
  * frees it, and a 30 s long poll never pins a pooled Prisma connection.
  *
- * The leader runs two loops: `getUpdates` for `/start` and `/stop`, with the
+ * The leader runs two loops: `getUpdates` for `/start`, `/stop` and the
+ * approval buttons and note replies (D12), with the
  * offset in `notification_matcher_state.telegramUpdateOffset`, and the
  * delivery timer. Neither starts under `APP_ENV=test`; suites call
  * `acquire()`, `pollOnce()` and `TelegramDeliveryService.deliverOnce()`.
@@ -102,6 +111,7 @@ export class TelegramPoller implements OnApplicationBootstrap, OnModuleDestroy {
     private readonly tokens: BotTokenStore,
     private readonly client: TelegramClient,
     private readonly linking: TelegramLinkingService,
+    private readonly approvals: TelegramApprovalService,
     private readonly delivery: TelegramDeliveryService,
     @Inject(TELEGRAM_OPTIONS) private readonly options: TelegramOptions,
   ) {}
@@ -197,21 +207,7 @@ export class TelegramPoller implements OnApplicationBootstrap, OnModuleDestroy {
         return { status: 'polled', updates: 0 };
       for (const update of updates) {
         if (generation !== this.generation) break;
-        const answer = await this.linking.handleUpdate(update);
-        if (answer) {
-          await this.client
-            .sendMessage(
-              bot.token,
-              answer.chatId,
-              LINK_REPLIES[answer.reply],
-              true,
-            )
-            .catch((error: unknown) => {
-              this.logger.warn(
-                `Telegram reply failed: ${safeMessage(error, bot.token)}`,
-              );
-            });
-        }
+        await this.handle(update, bot.token);
         await this.storeOffset(BigInt(update.update_id) + 1n);
       }
       this.lastError = null;
@@ -234,6 +230,57 @@ export class TelegramPoller implements OnApplicationBootstrap, OnModuleDestroy {
         waitMs: Math.max(retryAfterMs, this.options.idleMs),
       };
     }
+  }
+
+  /**
+   * One update: a button press or a note reply (D12), else `/start` / `/stop`.
+   * A reply that cannot be sent is logged; the update is still consumed.
+   */
+  private async handle(update: TelegramUpdate, token: string): Promise<void> {
+    const warn = (error: unknown) => {
+      this.logger.warn(`Telegram reply failed: ${safeMessage(error, token)}`);
+    };
+    if (update.callback_query) {
+      const answer = await this.approvals.handleCallback(update.callback_query);
+      await this.sendApprovalAnswer(token, answer).catch(warn);
+      return;
+    }
+    if (update.message) {
+      const answer = await this.approvals.handleNoteReply(
+        update.message,
+        botIdOf(token),
+      );
+      if (answer) {
+        await this.sendApprovalAnswer(token, answer).catch(warn);
+        return;
+      }
+    }
+    const reply = await this.linking.handleUpdate(update);
+    if (reply) {
+      await this.client
+        .sendMessage(token, reply.chatId, LINK_REPLIES[reply.reply], true)
+        .catch(warn);
+    }
+  }
+
+  private async sendApprovalAnswer(
+    token: string,
+    answer: ApprovalAnswer,
+  ): Promise<void> {
+    if (answer.callbackQueryId) {
+      await this.client.answerCallbackQuery(
+        token,
+        answer.callbackQueryId,
+        answer.notice ?? '',
+      );
+    }
+    await this.client.sendMessage(
+      token,
+      answer.chatId,
+      answer.text,
+      true,
+      answer.replyMarkup,
+    );
   }
 
   private async run(): Promise<void> {
