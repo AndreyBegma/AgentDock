@@ -21,6 +21,29 @@ const slot = (name: string): TerminalTarget => ({
   slot: name,
 });
 
+const skillRun = (runId: string): TerminalTarget => ({
+  kind: 'skill_run',
+  projectId: 'prj_1',
+  root,
+  runId,
+});
+
+interface RunningRun {
+  projectId: string;
+  root: string;
+  session: string;
+}
+
+/** `run_a` runs in prj_1; `run_b` runs in another project on this runner. */
+const RUNS: Record<string, RunningRun> = {
+  run_a: { projectId: 'prj_1', root, session: 'agentdock-run-abc123' },
+  run_b: {
+    projectId: 'prj_2',
+    root: '/srv/other',
+    session: 'agentdock-run-def456',
+  },
+};
+
 const args = (
   id: string,
   target: TerminalTarget = slot('i42'),
@@ -43,6 +66,8 @@ const setup = (
     maxAttaches?: number;
     unsupported?: string;
     spawnFails?: boolean;
+    /** Running skill runs by id; null: the runner has no executor. */
+    runs?: Record<string, RunningRun> | null;
   } = {},
 ) => {
   const fake = fakeTmux({
@@ -54,8 +79,20 @@ const setup = (
       'cs-i42': '',
       'cs-i7': '',
       'agentdock-orch-acme-widget': '',
+      'agentdock-run-abc123': '',
+      'agentdock-run-def456': '',
     },
   });
+  const runs = overrides.runs === undefined ? RUNS : overrides.runs;
+  // `SkillRunExecutor.runSession`: a running run, of this project and root only.
+  const runSession = runs
+    ? (projectId: string, runRoot: string, runId: string) => {
+        const run = runs[runId];
+        return run && run.projectId === projectId && run.root === runRoot
+          ? run.session
+          : null;
+      }
+    : undefined;
   const clock = new FakeClock();
   const { log, lines } = memoryLogger();
   const sent: TerminalOutbound[] = [];
@@ -92,6 +129,7 @@ const setup = (
     unsupported: overrides.unsupported
       ? async () => overrides.unsupported ?? null
       : undefined,
+    runSession,
     maxAttaches: overrides.maxAttaches,
     idleTimeoutMs: 60_000,
     maxDurationMs: 600_000,
@@ -151,6 +189,34 @@ describe('terminal.attach — spawn', () => {
       ),
     ).toEqual({ attached: true, session: 'agentdock-orch-acme-widget' });
     expect(ptys[0]?.options.argv.at(-1)).toBe('=agentdock-orch-acme-widget');
+  });
+
+  it('attaches read-only to the session of a running skill run of the project', async () => {
+    const { manager, ptys } = setup();
+    expect(await manager.attach(args('t1', skillRun('run_a')))).toEqual({
+      attached: true,
+      session: 'agentdock-run-abc123',
+    });
+    expect(ptys[0]?.options.argv).toEqual([
+      'tmux',
+      'attach-session',
+      '-r',
+      '-f',
+      'ignore-size',
+      '-t',
+      '=agentdock-run-abc123',
+    ]);
+  });
+
+  it('spawns the plain attach-session for a skill run in write', async () => {
+    const { manager, ptys } = setup();
+    await manager.attach(args('t1', skillRun('run_a'), 'write'));
+    expect(ptys[0]?.options.argv).toEqual([
+      'tmux',
+      'attach-session',
+      '-t',
+      '=agentdock-run-abc123',
+    ]);
   });
 
   it('picks the sorted-first session when both slot names are live', async () => {
@@ -217,20 +283,49 @@ describe('terminal.attach — target refusals (D2)', () => {
     ).toBe('not_found');
   });
 
-  it('answers unsupported for a skill run until #24 lands', async () => {
+  it("refuses another project's skill run under this project's id", async () => {
+    // run_b is running on this runner, but in prj_2.
+    const { manager, refusal, ptys } = setup();
+    expect(await refusal(manager.attach(args('t1', skillRun('run_b'))))).toBe(
+      'not_found',
+    );
+    expect(ptys).toHaveLength(0);
+  });
+
+  it('refuses a skill run of a project that is not watched', async () => {
+    // prj_2 is not on the watch list, even though run_b is its run.
     const { manager, refusal } = setup();
     expect(
       await refusal(
         manager.attach(
           args('t1', {
             kind: 'skill_run',
-            projectId: 'prj_1',
-            root,
-            runId: 'r1',
+            projectId: 'prj_2',
+            root: '/srv/other',
+            runId: 'run_b',
           }),
         ),
       ),
-    ).toBe('unsupported');
+    ).toBe('not_found');
+  });
+
+  it('refuses an unknown or finished run, and a run whose session is gone', async () => {
+    // run_a's record says running, but its tmux session has ended.
+    const { manager, refusal, ptys } = setup({ sessions: { 'cs-i42': '' } });
+    expect(await refusal(manager.attach(args('t1', skillRun('run_x'))))).toBe(
+      'not_found',
+    );
+    expect(await refusal(manager.attach(args('t2', skillRun('run_a'))))).toBe(
+      'not_found',
+    );
+    expect(ptys).toHaveLength(0);
+  });
+
+  it('answers unsupported for a skill run on a runner without an executor', async () => {
+    const { manager, refusal } = setup({ runs: null });
+    expect(await refusal(manager.attach(args('t1', skillRun('run_a'))))).toBe(
+      'unsupported',
+    );
   });
 
   it('answers unsupported when the machine cannot attach', async () => {
@@ -264,6 +359,16 @@ describe('terminal.attach — limits (D7)', () => {
     await manager.attach(args('t3', slot('i42'), 'read'));
     await manager.attach(args('t4', slot('i7'), 'write'));
     expect(manager.attachCount).toBe(3);
+  });
+
+  it('allows one write per skill run, as for a slot', async () => {
+    const { manager, refusal } = setup({ maxAttaches: 4 });
+    await manager.attach(args('t1', skillRun('run_a'), 'write'));
+    expect(
+      await refusal(manager.attach(args('t2', skillRun('run_a'), 'write'))),
+    ).toBe('busy');
+    await manager.attach(args('t3', skillRun('run_a'), 'read'));
+    expect(manager.attachCount).toBe(2);
   });
 
   it('refuses a stream id that is already attached', async () => {
