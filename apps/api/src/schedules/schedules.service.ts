@@ -26,6 +26,7 @@ import type {
 import { ScheduleFirer } from './schedule-firer';
 import { ScheduleLive } from './schedule-live';
 import { toFiringView, toScheduleView } from './schedule-mapper';
+import { ScheduleTimers } from './schedule-timers';
 import { scheduleNotFound, schedulesError } from './schedules-error';
 import { parseTarget } from './target';
 
@@ -73,6 +74,7 @@ export class SchedulesService {
     private readonly audit: AuditService,
     private readonly firer: ScheduleFirer,
     private readonly live: ScheduleLive,
+    private readonly timers: ScheduleTimers,
   ) {}
 
   preview(cron: string, timezone: string): SchedulePreviewView {
@@ -149,6 +151,8 @@ export class SchedulesService {
         createdById: caller.userId,
       },
     });
+    // Spec 123 B8: after commit; a Redis failure never fails the request.
+    await this.timers.sync(row.id);
     await this.record(
       caller,
       'schedule.create',
@@ -203,6 +207,7 @@ export class SchedulesService {
       ...(enabled && timing ? { nextRunAt: schedule.after(new Date()) } : {}),
     };
     const row = await this.prisma.schedule.update({ where: { id }, data });
+    await this.timers.sync(id, before.nextRunAt);
 
     const fieldsChanged =
       dto.name !== undefined ||
@@ -245,6 +250,7 @@ export class SchedulesService {
   ): Promise<void> {
     const row = await this.find(projectId, id);
     await this.prisma.schedule.delete({ where: { id } });
+    await this.timers.sync(id, row.nextRunAt);
     await this.record(
       caller,
       'schedule.delete',

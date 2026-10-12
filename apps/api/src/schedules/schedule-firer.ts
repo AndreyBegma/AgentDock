@@ -26,6 +26,7 @@ import { SkillRunService } from '../skills';
 import { BeforeFire } from './before-fire';
 import { recordDisabledEvent, recordFiringEvent } from './schedule-events';
 import { ScheduleLive } from './schedule-live';
+import { ScheduleTimers } from './schedule-timers';
 import { parseTarget } from './target';
 
 /** How a sent firing ended, before it is written. */
@@ -84,6 +85,7 @@ export class ScheduleFirer {
     private readonly beforeFire: BeforeFire,
     private readonly audit: AuditService,
     private readonly live: ScheduleLive,
+    private readonly timers: ScheduleTimers,
   ) {}
 
   /** Fires `firingId` if it is still `due`; returns the firing as it ends. */
@@ -248,6 +250,8 @@ export class ScheduleFirer {
       return count;
     });
     if (count === 0) return;
+    // Spec 123 B8: the disabled schedule's timer goes.
+    await this.timers.sync(schedule.id, schedule.nextRunAt);
     await this.audit.record({
       actor: SYSTEM_ACTOR,
       action: 'schedule.disable',
