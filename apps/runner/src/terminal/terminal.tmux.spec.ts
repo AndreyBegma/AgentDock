@@ -8,7 +8,11 @@ import { systemClock } from '../clock';
 import { createExec, type Exec } from '../detect/exec';
 import { memoryLogger } from '../testing/fixtures';
 import { workspace } from '../testing/projects';
-import { TerminalManager, type TerminalOutbound } from './manager';
+import {
+  TerminalManager,
+  type TerminalManagerOptions,
+  type TerminalOutbound,
+} from './manager';
 import { bunSpawnPty, type PtyProcess } from './pty';
 
 /**
@@ -78,7 +82,11 @@ const fixture = async () => {
   const sent: TerminalOutbound[] = [];
   const spawn = bunSpawnPty(env);
   const manager = (
-    limits: { idleTimeoutMs?: number; maxDurationMs?: number } = {},
+    limits: {
+      idleTimeoutMs?: number;
+      maxDurationMs?: number;
+      runSession?: TerminalManagerOptions['runSession'];
+    } = {},
   ) => {
     const m = new TerminalManager({
       exec,
@@ -126,7 +134,19 @@ const fixture = async () => {
     const close = sent.find((s) => s.type === 'terminal.close' && s.id === id);
     return close?.type === 'terminal.close' ? close.reason : null;
   };
-  return { manager, args, procs, sent, pane, alive, clients, type, closedWith };
+  return {
+    root,
+    tmux,
+    manager,
+    args,
+    procs,
+    sent,
+    pane,
+    alive,
+    clients,
+    type,
+    closedWith,
+  };
 };
 
 describe.skipIf(!tmuxInstalled)(
@@ -171,6 +191,81 @@ describe.skipIf(!tmuxInstalled)(
       expect(await eventually(async () => (await f.clients()) === '')).toBe(
         true,
       );
+    });
+
+    it('attaches to a skill run of the project: read drops input, write types, the session survives; another project is refused', async () => {
+      const f = await fixture();
+      const session = 'agentdock-run-abc123';
+      const created = await f.tmux(
+        'new-session',
+        '-d',
+        '-s',
+        session,
+        '-x',
+        '100',
+        '-y',
+        '30',
+        'cat',
+      );
+      expect(created?.code).toBe(0);
+      const run = (...args: string[]) => f.tmux(...args, '-t', `=${session}`);
+      const runPane = async () =>
+        (await f.tmux('capture-pane', '-p', '-t', `=${session}:`))?.stdout ??
+        '';
+      // `SkillRunExecutor.runSession`: run_a is running in prj_1 only.
+      const m = f.manager({
+        runSession: (projectId, runRoot, runId) =>
+          projectId === 'prj_1' && runRoot === f.root && runId === 'run_a'
+            ? session
+            : null,
+      });
+      const target = (runId: string, projectId = 'prj_1') => ({
+        id: `${runId}-${projectId}`,
+        target: {
+          kind: 'skill_run' as const,
+          projectId,
+          root: f.root,
+          runId,
+        },
+        cols: 100,
+        rows: 30,
+      });
+
+      // Another project's id, or a run that is not running: no client spawned.
+      await expect(
+        m.attach({ ...target('run_a', 'prj_2'), mode: 'read' }),
+      ).rejects.toMatchObject({ code: 'not_found' });
+      await expect(
+        m.attach({ ...target('run_x'), mode: 'read' }),
+      ).rejects.toMatchObject({ code: 'not_found' });
+      expect(f.procs).toHaveLength(0);
+
+      // Read-only: the pane streams, typed characters never reach the run.
+      const read = { ...target('run_a'), id: 'r1', mode: 'read' as const };
+      expect(await m.attach(read)).toEqual({ attached: true, session });
+      expect(
+        await eventually(
+          async () => ((await run('list-clients'))?.stdout ?? '').trim() !== '',
+        ),
+      ).toBe(true);
+      f.type(m, 'r1', 'readonly-run-input\r');
+      await Bun.sleep(300);
+      expect(await runPane()).not.toContain('readonly-run-input');
+      m.close({ type: 'terminal.close', id: 'r1', reason: 'client' });
+      expect(await exitsWithin(f.procs[0], 5000)).toBe(true);
+
+      // Take control: the typed command reaches the run's session.
+      const write = { ...target('run_a'), id: 'w1', mode: 'write' as const };
+      await m.attach(write);
+      f.type(m, 'w1', 'typed-into-run\r');
+      expect(
+        await eventually(async () =>
+          (await runPane()).includes('typed-into-run'),
+        ),
+      ).toBe(true);
+      m.close({ type: 'terminal.close', id: 'w1', reason: 'client' });
+      expect(await exitsWithin(f.procs[1], 5000)).toBe(true);
+      expect((await run('has-session'))?.code).toBe(0);
     });
 
     it('closes with idle and with max_duration, and the session survives both', async () => {

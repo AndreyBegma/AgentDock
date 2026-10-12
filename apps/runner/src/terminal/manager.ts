@@ -18,7 +18,7 @@ import { CommandFailure } from '../commands/failure';
 import type { Exec } from '../detect/exec';
 import { errorMessage, type Logger } from '../log';
 import { attachArgv, type PtyProcess, type SpawnPty } from './pty';
-import { resolveTerminalTarget } from './resolve';
+import { type ResolveDeps, resolveTerminalTarget } from './resolve';
 
 export type TerminalOutbound = TerminalDataMessage | TerminalCloseMessage;
 
@@ -38,6 +38,8 @@ export interface TerminalManagerOptions {
   unsupported?: () => Promise<string | null>;
   /** The tmux server: empty for the user's own, `['-L', name]` in tests. */
   tmuxServer?: readonly string[];
+  /** Resolves a `skill_run` target (`SkillRunExecutor.runSession`). */
+  runSession?: ResolveDeps['runSession'];
   maxAttaches?: number;
   idleTimeoutMs?: number;
   maxDurationMs?: number;
@@ -225,6 +227,7 @@ export class TerminalManager {
         exec: this.options.exec,
         watchedProjects: this.options.watchedProjects,
         tmuxServer: this.options.tmuxServer,
+        runSession: this.options.runSession,
       });
       if (this.pending.get(args.id) === true) {
         throw new Error(`stream ${args.id} was closed while attaching`);
