@@ -7,56 +7,35 @@ import type {
 import { Banner } from 'glass-ui/banner';
 import { Button } from 'glass-ui/button';
 import { Card } from 'glass-ui/card';
+import { DialogContent, DialogRoot } from 'glass-ui/dialog';
 import { Field, Input } from 'glass-ui/field';
+import { Skeleton } from 'glass-ui/skeleton';
 import { toast } from 'glass-ui/toast';
-import { type FormEvent, useCallback, useEffect, useState } from 'react';
-import { ApiError, api, describeError } from '../../../../lib/api';
+import Link from 'next/link';
+import { type FormEvent, useState } from 'react';
+import { AsyncSection } from '../../../../components/prerequisites/async-section';
+import { DisabledReason } from '../../../../components/prerequisites/disabled-reason';
+import { PrerequisiteBanner } from '../../../../components/prerequisites/prerequisite-banner';
+import { api, errorText } from '../../../../lib/api';
+import { ENCRYPTION_KEY_REMEDY } from '../../../../lib/prerequisites/copy';
+import { useErrorToast } from '../../../../lib/section/use-error-toast';
+import { useSection } from '../../../../lib/section/use-section';
+import {
+  describeTelegramError,
+  pollingNote,
+  removeBotConsequence,
+  TELEGRAM_LINK_PAGE,
+} from '../../../../lib/telegram/format';
 
 const PATH = '/admin/integrations/telegram';
 
-/** A sentence for the Telegram routes' own error codes; the generic one otherwise. */
-function describeTelegramError(error: unknown): string {
-  if (error instanceof ApiError) {
-    switch (String(error.code)) {
-      case 'encryption_key_missing':
-        return 'The server has no APP_ENCRYPTION_KEY, so it cannot store a bot token.';
-      case 'telegram_token_invalid':
-        return 'Telegram did not accept this token.';
-      case 'telegram_unavailable':
-        return 'Telegram could not be reached. Try again in a minute.';
-      case 'telegram_not_configured':
-        return 'The bot is not configured.';
-      case 'telegram_not_linked':
-        return 'Link your own Telegram on the Notifications page first; the test goes to your chat.';
-    }
-  }
-  return describeError(error);
-}
-
-type View =
-  | { status: 'loading' }
-  | { status: 'ready'; state: TelegramIntegrationStatus };
-
 export default function TelegramIntegrationPage() {
-  const [view, setView] = useState<View>({ status: 'loading' });
+  const section = useSection(() => api<TelegramIntegrationStatus>(PATH), []);
+  const showError = useErrorToast();
   const [token, setToken] = useState('');
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
-
-  const load = useCallback(async () => {
-    try {
-      setView({
-        status: 'ready',
-        state: await api<TelegramIntegrationStatus>(PATH),
-      });
-    } catch (err) {
-      toast.error(describeTelegramError(err));
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const [confirmRemove, setConfirmRemove] = useState(false);
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
@@ -70,14 +49,14 @@ export default function TelegramIntegrationPage() {
       });
       // The token is gone from the page the moment it is sent.
       setToken('');
-      setView({ status: 'ready', state });
+      section.setData(state);
       toast.success(
         state.unlinkedUsers
           ? `Bot saved. ${state.unlinkedUsers} linked user(s) must link again — it is a different bot.`
           : 'Bot saved.',
       );
     } catch (err) {
-      setError(describeTelegramError(err));
+      setError(errorText(describeTelegramError(err)));
     } finally {
       setBusy(false);
     }
@@ -86,11 +65,13 @@ export default function TelegramIntegrationPage() {
   const clear = async () => {
     setBusy(true);
     try {
-      await api(PATH, { method: 'DELETE' });
-      await load();
+      section.setData(
+        await api<TelegramIntegrationStatus>(PATH, { method: 'DELETE' }),
+      );
+      setConfirmRemove(false);
       toast.success('Bot token removed.');
     } catch (err) {
-      toast.error(describeTelegramError(err));
+      showError(describeTelegramError(err));
     } finally {
       setBusy(false);
     }
@@ -102,112 +83,192 @@ export default function TelegramIntegrationPage() {
       await api(`${PATH}/test`, { method: 'POST' });
       toast.success('Test message sent to your linked chat.');
     } catch (err) {
-      toast.error(describeTelegramError(err));
+      showError(describeTelegramError(err));
     } finally {
       setBusy(false);
     }
   };
 
-  if (view.status === 'loading') {
-    return <p className="text-ink-2 text-sm">Loading…</p>;
-  }
-
-  const { state } = view;
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-xl font-semibold">Telegram</h1>
+      <div>
+        <h1 className="text-xl font-semibold">Telegram</h1>
+        <p className="max-w-prose text-sm text-ink-2">
+          One bot for this instance. Each person links their own chat under
+          Account › Notifications, then gets the notifications they chose there.
+        </p>
+      </div>
 
-      {state.encryptionAvailable ? null : (
-        <Banner tone="warn" title="No encryption key">
-          Set <code>APP_ENCRYPTION_KEY</code> on the API (32 random bytes,
-          base64) before configuring the bot. The token is stored encrypted.
-        </Banner>
-      )}
+      <AsyncSection
+        section={section}
+        unavailable={{
+          title: 'The Telegram settings are not answering',
+          stillWorks: 'Notifications keep going out with the bot already set.',
+        }}
+        isEmpty={() => false}
+        empty={null}
+        skeleton={<Skeleton className="h-64 w-full" />}
+      >
+        {(state) => (
+          <>
+            {state.encryptionAvailable ? null : (
+              <PrerequisiteBanner
+                tone="warn"
+                title="No APP_ENCRYPTION_KEY on the server"
+                body={`The bot token is stored encrypted, so it cannot be set until the key is. ${ENCRYPTION_KEY_REMEDY}`}
+              />
+            )}
 
-      <Card pad="lg">
-        <h2 className="mb-4 text-lg font-bold">Status</h2>
-        <dl className="grid max-w-md grid-cols-[10rem_1fr] gap-y-2 text-sm">
-          <dt className="text-ink-3">Bot</dt>
-          <dd>
-            {state.configured
-              ? state.botUsername
-                ? `@${state.botUsername}`
-                : 'Configured'
-              : 'Not configured'}
-          </dd>
-          <dt className="text-ink-3">Polling</dt>
-          <dd>{state.polling ? 'Running' : 'Not running'}</dd>
-          <dt className="text-ink-3">Last poll</dt>
-          <dd>
-            {state.lastPollAt
-              ? new Date(state.lastPollAt).toLocaleString()
-              : '—'}
-          </dd>
-          <dt className="text-ink-3">Linked users</dt>
-          <dd>{state.linkedUsers}</dd>
-        </dl>
-        {state.lastError ? (
-          <div className="mt-4">
-            <Banner tone="warn" title="Last poller error">
-              {state.lastError}
-            </Banner>
-          </div>
-        ) : null}
-        {state.configured ? (
-          <div className="mt-4 flex gap-3">
-            <Button disabled={busy} onClick={() => void test()}>
-              Send test message
-            </Button>
-            <Button
-              variant="danger"
-              disabled={busy}
-              onClick={() => void clear()}
+            <Card pad="lg">
+              <h2 className="mb-4 text-lg font-bold">Status</h2>
+              <dl className="grid max-w-xl grid-cols-[10rem_1fr] gap-y-2 text-sm">
+                <dt className="text-ink-3">Bot</dt>
+                <dd>
+                  {state.configured
+                    ? state.botUsername
+                      ? `@${state.botUsername}`
+                      : 'Configured'
+                    : 'Not configured'}
+                </dd>
+                <dt className="text-ink-3">Polling</dt>
+                <dd>
+                  {state.polling ? 'Running' : 'Not running'}
+                  <div className="text-xs text-ink-3">{pollingNote(state)}</div>
+                </dd>
+                <dt className="text-ink-3">Last poll</dt>
+                <dd>
+                  {state.lastPollAt
+                    ? new Date(state.lastPollAt).toLocaleString()
+                    : '—'}
+                </dd>
+                <dt className="text-ink-3">Linked users</dt>
+                <dd>{state.linkedUsers}</dd>
+              </dl>
+              {state.lastError ? (
+                <div className="mt-4">
+                  <Banner tone="warn" title="Last poller error">
+                    {state.lastError}
+                  </Banner>
+                </div>
+              ) : null}
+              {state.configured ? (
+                <div className="mt-4 flex flex-col gap-1">
+                  <div className="flex gap-3">
+                    <Button disabled={busy} onClick={() => void test()}>
+                      Send test message
+                    </Button>
+                    <Button
+                      variant="danger"
+                      disabled={busy}
+                      onClick={() => setConfirmRemove(true)}
+                    >
+                      Remove bot
+                    </Button>
+                  </div>
+                  <p className="text-xs text-ink-2">
+                    The test goes to your own chat.{' '}
+                    <Link
+                      href={TELEGRAM_LINK_PAGE}
+                      className="text-ink underline underline-offset-2"
+                    >
+                      Link your Telegram
+                    </Link>{' '}
+                    first if you have not.
+                  </p>
+                </div>
+              ) : null}
+            </Card>
+
+            <Card pad="lg">
+              <h2 className="mb-4 text-lg font-bold">
+                {state.configured
+                  ? 'Replace the bot token'
+                  : 'Set the bot token'}
+              </h2>
+              <form onSubmit={save} className="flex max-w-md flex-col gap-4">
+                <Field
+                  label="Bot token"
+                  htmlFor="bot-token"
+                  required
+                  hint={
+                    state.configured
+                      ? 'The stored token is never shown. Enter a new one to replace it.'
+                      : 'From @BotFather in Telegram: send /newbot, then copy the token it gives you. It is verified with Telegram, then stored encrypted.'
+                  }
+                  error={error}
+                >
+                  <Input
+                    id="bot-token"
+                    type="password"
+                    autoComplete="off"
+                    spellCheck={false}
+                    required
+                    disabled={!state.encryptionAvailable}
+                    value={token}
+                    onChange={(e) => setToken(e.target.value)}
+                  />
+                </Field>
+                <div className="flex flex-col gap-1">
+                  <div>
+                    <Button
+                      type="submit"
+                      variant="solid"
+                      disabled={
+                        busy ||
+                        !state.encryptionAvailable ||
+                        token.trim() === ''
+                      }
+                      aria-describedby="bot-token-reason"
+                    >
+                      Save token
+                    </Button>
+                  </div>
+                  {!state.encryptionAvailable ? (
+                    <DisabledReason id="bot-token-reason">
+                      Setting a token needs APP_ENCRYPTION_KEY on the server —
+                      see the banner above.
+                    </DisabledReason>
+                  ) : token.trim() === '' ? (
+                    <DisabledReason id="bot-token-reason">
+                      Paste a token to save it.
+                    </DisabledReason>
+                  ) : null}
+                </div>
+              </form>
+            </Card>
+
+            <DialogRoot
+              open={confirmRemove}
+              onOpenChange={(open) => !open && !busy && setConfirmRemove(false)}
             >
-              Remove bot
-            </Button>
-          </div>
-        ) : null}
-      </Card>
-
-      <Card pad="lg">
-        <h2 className="mb-4 text-lg font-bold">
-          {state.configured ? 'Replace the bot token' : 'Set the bot token'}
-        </h2>
-        <form onSubmit={save} className="flex max-w-md flex-col gap-4">
-          <Field
-            label="Bot token"
-            htmlFor="bot-token"
-            hint={
-              state.configured
-                ? 'The stored token is never shown. Enter a new one to replace it.'
-                : 'From @BotFather. It is verified with Telegram, then stored encrypted.'
-            }
-            error={error}
-          >
-            <Input
-              id="bot-token"
-              type="password"
-              autoComplete="off"
-              spellCheck={false}
-              required
-              disabled={!state.encryptionAvailable}
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-            />
-          </Field>
-          <div>
-            <Button
-              type="submit"
-              variant="solid"
-              disabled={
-                busy || !state.encryptionAvailable || token.trim() === ''
-              }
-            >
-              Save token
-            </Button>
-          </div>
-        </form>
-      </Card>
+              <DialogContent
+                title="Remove the Telegram bot?"
+                description={removeBotConsequence(state)}
+                footer={
+                  <>
+                    <Button
+                      variant="glass"
+                      disabled={busy}
+                      onClick={() => setConfirmRemove(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="danger"
+                      disabled={busy}
+                      onClick={() => void clear()}
+                    >
+                      Remove bot
+                    </Button>
+                  </>
+                }
+              >
+                {null}
+              </DialogContent>
+            </DialogRoot>
+          </>
+        )}
+      </AsyncSection>
     </div>
   );
 }
