@@ -324,25 +324,29 @@ export default function AdminPricesPage() {
                     {modelTable(grouped.used)}
                   </section>
                 ) : null}
-                {grouped.rest.map((group) => (
-                  <Disclosure
-                    key={group.provider}
-                    open={
-                      filter.trim() !== '' || openGroups.has(group.provider)
-                    }
-                    onOpenChange={(open) => toggleGroup(group.provider, open)}
-                    trigger={
-                      <span className="text-sm font-semibold">
-                        {group.provider}
-                        <span className="ml-2 font-normal text-ink-3 num">
-                          {group.models.length}
+                {grouped.rest.map((group) => {
+                  const isOpen =
+                    filter.trim() !== '' || openGroups.has(group.provider);
+                  return (
+                    <Disclosure
+                      key={group.provider}
+                      open={isOpen}
+                      onOpenChange={(open) => toggleGroup(group.provider, open)}
+                      trigger={
+                        <span className="text-sm font-semibold">
+                          {group.provider}
+                          <span className="ml-2 font-normal text-ink-3 num">
+                            {group.models.length}
+                          </span>
                         </span>
-                      </span>
-                    }
-                  >
-                    <div className="pt-2">{modelTable(group.models)}</div>
-                  </Disclosure>
-                ))}
+                      }
+                    >
+                      {isOpen ? (
+                        <div className="pt-2">{modelTable(group.models)}</div>
+                      ) : null}
+                    </Disclosure>
+                  );
+                })}
               </div>
             )}
             {changes > 0 ? (

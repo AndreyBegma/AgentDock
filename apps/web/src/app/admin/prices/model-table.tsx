@@ -64,10 +64,9 @@ export function ModelTable({
     {
       id: 'pattern',
       header: 'Pattern',
-      width: '16rem',
       cell: (model) => (
         <code
-          className="block max-w-64 truncate font-mono text-xs text-ink-2"
+          className="block max-w-36 truncate font-mono text-xs text-ink-2"
           title={model.matchPattern}
         >
           {model.matchPattern}
@@ -88,7 +87,7 @@ export function ModelTable({
     },
     {
       id: 'cacheRead',
-      header: 'Cache read / 1M',
+      header: 'Cache / 1M',
       align: 'end',
       cell: (model) => price(defaultTier(model)?.prices.cacheRead),
     },
@@ -104,7 +103,7 @@ export function ModelTable({
                 .join('; ')
             : '—';
         return (
-          <span className="block max-w-48 truncate" title={text}>
+          <span className="block max-w-28 truncate" title={text}>
             {text}
           </span>
         );
