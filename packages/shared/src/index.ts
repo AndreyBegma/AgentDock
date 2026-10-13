@@ -9,6 +9,7 @@ export * from './github-app';
 export * from './history';
 export * from './live';
 export * from './notifications';
+export * from './planner';
 export * from './projects';
 export * from './queue';
 export * from './runners';

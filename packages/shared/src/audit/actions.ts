@@ -84,6 +84,13 @@ export const AUDIT_ACTIONS = [
   'github_app.update_credentials',
   'github_app.resync',
   'github_app.delete',
+  'plan.created',
+  'plan.shared',
+  'plan.revised',
+  'plan.sent',
+  'plan.task_reviewed',
+  'planner.instructions_updated',
+  'planner.settings_updated',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 

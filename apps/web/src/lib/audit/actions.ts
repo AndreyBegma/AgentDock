@@ -83,6 +83,13 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   'github_app.update_credentials': 'Entered GitHub App credentials',
   'github_app.resync': 'Resynced the GitHub App',
   'github_app.delete': 'Removed the GitHub App',
+  'plan.created': 'Started a plan',
+  'plan.shared': 'Shared a plan with the project',
+  'plan.revised': 'Revised a plan',
+  'plan.sent': 'Sent a plan to the fleet',
+  'plan.task_reviewed': 'Reviewed a planned task',
+  'planner.instructions_updated': 'Changed the planner instructions',
+  'planner.settings_updated': 'Changed the planner settings',
 };
 
 /** The action filter's groups: the prefix before the dot. */
@@ -107,6 +114,8 @@ export const ACTION_GROUP_LABEL: Record<string, string> = {
   'webhook.': 'Webhooks',
   'trigger.': 'Triggers',
   'github_app.': 'GitHub App',
+  'plan.': 'Plans',
+  'planner.': 'Planner',
 };
 
 /** An action code as words; a code this build does not know shows as it came. */
