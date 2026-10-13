@@ -1,8 +1,8 @@
 'use client';
 
-import { Badge } from 'glass-ui/badge';
-import { Chip } from 'glass-ui/chip';
-import { type LogLine, LogViewer } from 'glass-ui/log-viewer';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Chip } from '@andrewbehma/glass-ui/chip';
+import { type LogLine, LogViewer } from '@andrewbehma/glass-ui/log-viewer';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { rowText } from '../../../../../../../lib/skills/run-log';
 import { useRunLog } from '../../../../../../../lib/skills/use-run-log';

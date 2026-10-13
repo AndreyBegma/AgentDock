@@ -1,7 +1,7 @@
 import type { BudgetView } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Banner } from 'glass-ui/banner';
-import { Progress } from 'glass-ui/progress';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Banner } from '@andrewbehma/glass-ui/banner';
+import { Progress } from '@andrewbehma/glass-ui/progress';
 import type { ReactNode } from 'react';
 import {
   ACTION_LABEL,

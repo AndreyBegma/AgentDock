@@ -1,11 +1,11 @@
 'use client';
 
 import type { TerminalMode } from '@agentdock/shared/protocol';
-import { Badge } from 'glass-ui/badge';
-import { Banner } from 'glass-ui/banner';
-import { Button } from 'glass-ui/button';
-import { Chip } from 'glass-ui/chip';
-import { SheetContent, SheetRoot } from 'glass-ui/sheet';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Banner } from '@andrewbehma/glass-ui/banner';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { Chip } from '@andrewbehma/glass-ui/chip';
+import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import { useEffect, useState } from 'react';
 import {
   TERMINAL_PHASE_LABEL,
@@ -52,7 +52,9 @@ export function TerminalSheet({
   });
 
   const targetKey = target
-    ? `${target.kind}:${'slot' in target ? target.slot : ''}`
+    ? `${target.kind}:${
+        'slot' in target ? target.slot : 'runId' in target ? target.runId : ''
+      }`
     : '';
   // Every target opens read-only, never in the previous target's mode.
   // biome-ignore lint/correctness/useExhaustiveDependencies: targetKey is the reset trigger

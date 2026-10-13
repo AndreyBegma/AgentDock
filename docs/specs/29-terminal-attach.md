@@ -250,8 +250,7 @@ Cross-repository: this item prefers glass-ui `Terminal` from AndreyBegma/glass-u
   uses the constant `TERMINAL_MAX_ATTACHES_PER_RUNNER` (2), which can be
   injected in tests. The runner config key is not added yet: `config.ts` was
   outside this slot.
-- **Follow-up: `skill_run`** answers `unsupported` until #24's runner can
-  resolve `agentdock-run-<shortid>` of a live run of the project.
+- **`skill_run`** resolves since #92 (see "From i92").
 - **Two names for one slot.** When both `cs-<slot>` and `cs-<prefix>--<slot>`
   are live, the attach goes to the one that sorts first.
 - **`capabilities.terminal`** is added by the daemon's re-detection: it covers
@@ -341,15 +340,31 @@ Cross-repository: this item prefers glass-ui `Terminal` from AndreyBegma/glass-u
   way.
 - **Socket URL.** Derived from `NEXT_PUBLIC_LIVE_URL` by replacing the path
   with `/terminal`, so no new variable is needed.
-- **Follow-up: skill-run Attach.** Not part of this slot. i24-web owns
-  `projects/[projectId]/skills/**`, and the runner answers `unsupported` for
-  `skill_run` targets until it can resolve `agentdock-run-<shortid>`. The run
-  detail needs one `TerminalSheet` with a `skill_run` target (the sheet's
-  `TerminalTarget` needs a `{ kind: 'skill_run'; runId }` arm and the ticket
-  request already takes `runId`).
+- **Skill-run Attach** landed with #92 (see "From i92").
 - **Follow-up: "Attached by <name>" on the button.** `GET /terminal/active`
   is not read by the web yet; a held attach is reported when the ticket is
   refused as `busy`.
+
+### From i92
+
+- **Resolution.** `resolve.ts` resolves `skill_run` through
+  `SkillRunExecutor.runSession(projectId, root, runId)`, passed to
+  `TerminalManager` as `runSession` by the daemon. It answers the
+  `agentdock-run-<shortid>` session only for a run in phase `running` whose
+  record names the same project and root, after the watched-project check.
+  An unknown, queued, finished or another project's run is `not_found`, and
+  so is a run whose tmux session is already gone. A runner without an
+  executor answers `unsupported`.
+- **Same rules as a slot.** Read-only by default, write as a second attach,
+  one write per target (the API keys a run as `<projectId>:skill_run:<runId>`),
+  and the D7 limits all apply unchanged: they live in `TerminalManager` and
+  the relay, not in the resolver.
+- **Web.** The run detail page shows **Attach** for an admin while the run is
+  `running` and its runner reports `terminal: true`. It opens the shared
+  `TerminalSheet` with `{ kind: 'skill_run', runId }`. An attach still open
+  when the run ends closes with `session_ended`.
+- **API.** No change: the DTO, ticket target and relay already carried
+  `skill_run` from i29-api.
 
 Depends on #8
 

@@ -7,8 +7,8 @@
 │  apps/api (NestJS 11)                                                  │
 │    auth · projects · fleet · sessions · usage · skills · schedules     │
 │    webhooks · notifications (in-app, Telegram) · audit · GitHub App    │
-│        │ Prisma 7                                                      │
-│  PostgreSQL 16                                                         │
+│        │ Prisma 7                         │ BullMQ (schedule timers)   │
+│  PostgreSQL 16                     Redis 7.4                            │
 └────────▲───────────────────────────────────────────▲──────────────────┘
          │ WSS /runner (runner dials out, token auth) │ HTTPS webhooks
 ┌────────┴──────────── Runner (one per machine) ─────┐   GitHub, Telegram,
@@ -47,7 +47,9 @@
 6. **The runner obeys a schema, not a shell.** Commands are typed and
    allowlisted (ADR-0010).
 7. **One database.** PostgreSQL holds transactional data and the event /
-   usage time series, partitioned by month (ADR-0007).
+   usage time series, partitioned by month (ADR-0007). The one exception is
+   schedule timers: they are BullMQ jobs on Redis, and they are rebuilt from
+   PostgreSQL, which stays their source of truth (ADR-0015).
 
 ## Apps and packages
 
@@ -84,6 +86,6 @@
 ## Deployment (first target)
 
 The owner's server runs the control plane in Docker Compose (api, web,
-postgres) behind a TLS reverse proxy, and the runner as a systemd user service
+postgres, redis) behind a TLS reverse proxy, and the runner as a systemd user service
 on the same host, so it sees the same tmux server, worktrees and agent configs
 as the person.

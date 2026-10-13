@@ -1,6 +1,8 @@
 import { execFileSync } from 'node:child_process';
 import { Client } from 'pg';
+import { assertRedisReachable } from '../bullmq/bullmq-testing';
 import { API_ROOT, testDatabaseUrl } from './test-database';
+import { testRedisUrl } from './test-redis';
 
 const withoutParams = (url: URL): string => {
   const copy = new URL(url);
@@ -15,6 +17,15 @@ const withoutParams = (url: URL): string => {
  * would fail every agent-run `bun run test`.
  */
 export default async function globalSetup(): Promise<void> {
+  const redisUrl = testRedisUrl();
+  try {
+    await assertRedisReachable(redisUrl);
+  } catch (error) {
+    throw new Error(
+      `TEST_REDIS_URL is not reachable (${(error as Error).message}) — start it with \`bun run db:setup\`.`,
+    );
+  }
+
   const url = new URL(testDatabaseUrl());
   const name = url.pathname.replace(/^\//, '');
 

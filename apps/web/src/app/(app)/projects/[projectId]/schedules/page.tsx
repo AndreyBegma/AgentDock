@@ -3,26 +3,29 @@
 import type {
   AdminRunnerDetail,
   InstalledSkillsView,
-  ProjectDetail,
   ScheduleView,
 } from '@agentdock/shared';
 import {
   SCHEDULE_FIRING_UPDATED_LIVE_EVENT,
   SCHEDULE_UPDATED_LIVE_EVENT,
 } from '@agentdock/shared';
-import { Button } from 'glass-ui/button';
-import { DialogContent, DialogRoot } from 'glass-ui/dialog';
-import { EmptyState } from 'glass-ui/empty-state';
-import { Skeleton } from 'glass-ui/skeleton';
-import { toast } from 'glass-ui/toast';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { toast } from '@andrewbehma/glass-ui/toast';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AsyncSection } from '../../../../../components/prerequisites/async-section';
+import { RunnerOfflineBanner } from '../../../../../components/prerequisites/prerequisite-banner';
 import { api } from '../../../../../lib/api';
 import { useLive } from '../../../../../lib/live/use-live';
 import {
   describeSchedulesError,
   isNotFound,
 } from '../../../../../lib/schedules/format';
+import { useSection } from '../../../../../lib/section/use-section';
+import { useProjectDetail } from '../use-project-detail';
 import { type ProfileChoice, ScheduleDialog } from './schedule-dialog';
 import { ScheduleSheet } from './schedule-sheet';
 import { ScheduleTable } from './schedule-table';
@@ -68,11 +71,9 @@ function DeleteDialog({
 
 export default function ProjectSchedulesPage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const [project, setProject] = useState<ProjectDetail>();
-  const [schedules, setSchedules] = useState<ScheduleView[]>();
+  const project = useProjectDetail(projectId).data;
   const [skills, setSkills] = useState<string[]>([]);
   const [profiles, setProfiles] = useState<ProfileChoice[]>([]);
-  const [missing, setMissing] = useState(false);
   /** Bumped by a live push; the open sheet refetches on it. */
   const [version, setVersion] = useState(0);
   const [editing, setEditing] = useState<ScheduleView | null>(null);
@@ -82,24 +83,11 @@ export default function ProjectSchedulesPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const load = useCallback(async () => {
-    try {
-      const [detail, list] = await Promise.all([
-        api<ProjectDetail>(`/projects/${projectId}`),
-        api<ScheduleView[]>(`/projects/${projectId}/schedules`),
-      ]);
-      setProject(detail);
-      setSchedules(list);
-      setMissing(false);
-    } catch (err) {
-      if (isNotFound(err)) setMissing(true);
-      else toast.error(describeSchedulesError(err));
-    }
-  }, [projectId]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const schedules = useSection(
+    () => api<ScheduleView[]>(`/projects/${projectId}/schedules`),
+    [projectId],
+  );
+  const load = schedules.retry;
 
   useLive(`project:${projectId}`, (message) => {
     if (
@@ -162,11 +150,11 @@ export default function ProjectSchedulesPage() {
       try {
         await run();
         toast.success(done);
-        await load();
+        load();
         setVersion((v) => v + 1);
       } catch (err) {
         toast.error(describeSchedulesError(err));
-        await load();
+        load();
       } finally {
         setBusyId(null);
       }
@@ -220,48 +208,70 @@ export default function ProjectSchedulesPage() {
     setSelected((current) => (current === target.id ? undefined : current));
   };
 
-  if (missing) {
+  if (schedules.data === undefined && isNotFound(schedules.error)) {
     return (
       <EmptyState
         title="Project not found"
         description="It was removed, or you are not a member of it."
+        action={
+          <Link href="/projects" className="text-sm underline">
+            Open Projects
+          </Link>
+        }
       />
     );
   }
-  if (!project || !schedules) return <Skeleton className="h-64 w-full" />;
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Schedules</h1>
-          <p className="text-sm text-ink-2">
-            Skills and orchestrator commands that run on this project at fixed
-            times, with their creator’s authority.
-          </p>
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-semibold">Schedules</h1>
+            <p className="text-sm text-ink-2">
+              Skills and orchestrator commands that run on this project at fixed
+              times, with their creator’s authority.
+            </p>
+          </div>
+          {canOperate ? (
+            <Button onClick={() => setCreating(true)}>New schedule</Button>
+          ) : null}
         </div>
-        {canOperate ? (
-          <Button onClick={() => setCreating(true)}>New schedule</Button>
-        ) : null}
+        {project ? <RunnerOfflineBanner project={project} /> : null}
       </div>
 
-      {schedules.length === 0 ? (
-        <EmptyState
-          title="No schedules yet"
-          description={
-            canOperate
-              ? 'Create one to run a skill every night, or the orchestrator every hour.'
-              : 'An operator of this project can create one.'
-          }
-        />
-      ) : (
-        <ScheduleTable
-          schedules={schedules}
-          actions={actions}
-          busyId={busyId}
-          onOpen={(schedule) => setSelected(schedule.id)}
-        />
-      )}
+      <AsyncSection
+        section={schedules}
+        unavailable={{
+          title: 'Schedules could not be loaded',
+          stillWorks:
+            'Nothing was changed. Fleet and queue are still available.',
+        }}
+        empty={
+          <EmptyState
+            title="No schedules yet"
+            description={
+              canOperate
+                ? 'A schedule runs a skill, or starts the orchestrator, at fixed times, for example a skill every night or a new round every morning.'
+                : 'An operator of this project can create one.'
+            }
+            action={
+              canOperate ? (
+                <Button onClick={() => setCreating(true)}>New schedule</Button>
+              ) : undefined
+            }
+          />
+        }
+      >
+        {(list) => (
+          <ScheduleTable
+            schedules={list}
+            actions={actions}
+            busyId={busyId}
+            onOpen={(schedule) => setSelected(schedule.id)}
+          />
+        )}
+      </AsyncSection>
 
       <ScheduleDialog
         projectId={projectId}

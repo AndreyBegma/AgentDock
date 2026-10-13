@@ -239,6 +239,37 @@ describe('FleetCollector', () => {
     collector.stop();
   });
 
+  it('emits no slot events for skill run and install worktrees (#93)', async () => {
+    const { root, collector, events, start } = await fixture();
+    await ws.run(
+      root,
+      'worktree',
+      'add',
+      '-q',
+      '-b',
+      'run/1',
+      join(ws.ws, '.wt-widget-run-abc123'),
+    );
+    await ws.run(
+      root,
+      'worktree',
+      'add',
+      '-q',
+      '-b',
+      'skill/1',
+      join(ws.ws, '.wt-widget-skill-def456'),
+    );
+    await start();
+    const slots = new Set(
+      events
+        .take()
+        .map((e) => e.slot)
+        .filter((s) => s !== undefined),
+    );
+    expect([...slots]).toEqual(['i42']);
+    collector.stop();
+  });
+
   it('reports a removed worktree as gone', async () => {
     const { root, wt, collector, events, start } = await fixture();
     await start();

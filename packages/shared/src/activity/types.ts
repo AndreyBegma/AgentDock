@@ -5,6 +5,19 @@ import type {
   ActivitySeverity,
 } from './contracts';
 import { ACTIVITY_DATA_MAX_BYTES } from './contracts';
+import {
+  clip,
+  type Data,
+  type EventContext,
+  type EventRule,
+  fixed,
+  int,
+  record,
+  str,
+  TEXT_MAX,
+  TITLE_MAX,
+} from './rules';
+import { SCHEDULE_EVENT_RULES } from './schedule-rules';
 
 /**
  * The curated type map (docs/specs/21 D3): which runner events and audit
@@ -49,32 +62,6 @@ export interface ActivityDraft {
   data: Record<string, unknown>;
 }
 
-type Data = Record<string, unknown>;
-
-const record = (value: unknown): Data =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Data)
-    : {};
-
-const str = (data: Data, key: string): string | null => {
-  const value = data[key];
-  return typeof value === 'string' && value.length > 0 ? value : null;
-};
-
-const int = (data: Data, key: string): number | null => {
-  const value = data[key];
-  if (typeof value === 'number' && Number.isInteger(value)) return value;
-  if (typeof value === 'string' && /^\d+$/.test(value)) return Number(value);
-  return null;
-};
-
-/** At most `max` characters, with an ellipsis when cut. */
-const clip = (text: string, max: number): string =>
-  text.length <= max ? text : `${text.slice(0, max - 1)}…`;
-
-const TITLE_MAX = 200;
-const TEXT_MAX = 500;
-
 /** Keeps the listed keys that are present; long strings are clipped. */
 const pick = (data: Data, keys: readonly string[]): Data => {
   const out: Data = {};
@@ -96,30 +83,6 @@ export const boundActivityData = (data: Data): Data => {
   }
   return out;
 };
-
-interface EventContext {
-  event: ActivityEventSource;
-  data: Data;
-  /** The envelope slot, else `data.slot`. */
-  slot: string | null;
-  projectId: string | null;
-}
-
-interface EventRule {
-  category: ActivityCategory;
-  severity: (ctx: EventContext) => ActivitySeverity;
-  title: (ctx: EventContext) => string;
-  /** Safe fields kept in `data`. */
-  keep: readonly string[];
-  /** true: this occurrence is not worth an item. */
-  skip?: (ctx: EventContext) => boolean;
-  /** The orchestrator, not the runner, is the actor (D5). */
-  byOrchestrator?: boolean;
-  prNumber?: (ctx: EventContext) => number | null;
-  link?: (ctx: EventContext) => string | null;
-}
-
-const fixed = (severity: ActivitySeverity) => (): ActivitySeverity => severity;
 
 const who = (ctx: EventContext): string => ctx.slot ?? 'orchestrator';
 const prOf = (ctx: EventContext) => int(ctx.data, 'number');
@@ -331,6 +294,8 @@ const EVENT_RULES: Record<string, EventRule> = {
     keep: ['fromSeq', 'toSeq', 'bytes'],
     link: () => '/admin/runners',
   },
+  // Recorded by the API itself (ADR-0014).
+  ...SCHEDULE_EVENT_RULES,
 };
 
 /** Every event type the feed shows — the projector's `type IN (…)` filter. */
@@ -372,6 +337,7 @@ export const activityFromEvent = (
 ): ActivityDraft | null => {
   const rule = EVENT_RULES[event.type];
   if (!rule) return null;
+  if (rule.sources && !rule.sources.includes(event.source)) return null;
   if (
     event.source === 'code-sentinel' &&
     PLUGIN_ECHOED_EVENT_TYPES.has(event.type)
@@ -391,8 +357,12 @@ export const activityFromEvent = (
     type: event.type,
     severity: rule.severity(ctx),
     title: clip(rule.title(ctx), TITLE_MAX),
-    actorType: rule.byOrchestrator ? 'orchestrator' : 'runner',
-    actorId: rule.byOrchestrator ? null : event.runnerId,
+    actorType: rule.bySystem
+      ? 'system'
+      : rule.byOrchestrator
+        ? 'orchestrator'
+        : 'runner',
+    actorId: rule.bySystem || rule.byOrchestrator ? null : event.runnerId,
     slot: ctx.slot,
     issue: event.issue ?? int(data, 'issue'),
     prNumber: rule.prNumber?.(ctx) ?? null,

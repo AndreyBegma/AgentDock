@@ -7,21 +7,58 @@ import type {
   ProjectDetail,
 } from '@agentdock/shared';
 import type { ProjectInspection } from '@agentdock/shared/protocol';
-import { Button } from 'glass-ui/button';
-import { DialogContent, DialogRoot } from 'glass-ui/dialog';
-import { Field, Input, Select } from 'glass-ui/field';
-import { toast } from 'glass-ui/toast';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import { type FormEvent, useEffect, useState } from 'react';
+import { InstallGuideLink } from '../../../components/onboarding/runner-commands';
+import { DisabledReason } from '../../../components/prerequisites/disabled-reason';
+import { PrerequisiteBanner } from '../../../components/prerequisites/prerequisite-banner';
 import { api } from '../../../lib/api';
+import {
+  isRunnerOnline,
+  type RunnersFact,
+  runnersFact,
+} from '../../../lib/prerequisites/facts';
 import {
   BASE_SOURCE_LABEL,
   connectBlocker,
   describeProjectError,
+  noOnlineRunnerCopy,
   suggestedPathOf,
 } from '../../../lib/projects/format';
 import { DocsDetails } from './docs-details';
 
 const yesNo = (value: boolean) => (value ? 'found' : 'not found');
+
+/** While the dialog is open; the runner usually comes up in another window. */
+const RUNNERS_POLL_MS = 10_000;
+
+const REASON_ID = 'connect-project-reason';
+
+/** Above the form: why the runner list is empty, and the fix. */
+function NoOnlineRunner({ fleet }: { fleet: RunnersFact }) {
+  const copy = noOnlineRunnerCopy(fleet);
+  if (!copy) return null;
+  const { command, body, ...banner } = copy;
+  return (
+    <PrerequisiteBanner
+      {...banner}
+      body={
+        <>
+          {body}
+          {command ? (
+            <code className="ml-1 font-mono text-ink">{command}</code>
+          ) : null}
+          <InstallGuideLink>
+            How to install and start the runner
+          </InstallGuideLink>
+        </>
+      }
+    />
+  );
+}
 
 function Preview({ inspection }: { inspection: ProjectInspection }) {
   const { remote, codeSentinelConfig } = inspection;
@@ -42,11 +79,21 @@ function Preview({ inspection }: { inspection: ProjectInspection }) {
         </dd>
         <dt className="text-ink-2">Code Sentinel config</dt>
         <dd>
-          {codeSentinelConfig.error
-            ? `invalid: ${codeSentinelConfig.error}`
-            : codeSentinelConfig.orchestrator
-              ? 'found'
-              : 'not found'}
+          {codeSentinelConfig.error ? (
+            `invalid: ${codeSentinelConfig.error}`
+          ) : codeSentinelConfig.orchestrator ? (
+            'found'
+          ) : (
+            <>
+              not found
+              <span className="block text-xs text-ink-3">
+                You can still connect. The orchestrator (Fleet, Queue) stays off
+                until the repository has a{' '}
+                <code className="font-mono">.code-analyzer-config.json</code>{' '}
+                with an <code className="font-mono">orchestrator</code> block.
+              </span>
+            </>
+          )}
         </dd>
         <dt className="text-ink-2">CLAUDE.md</dt>
         <dd>{yesNo(inspection.hasClaudeMd)}</dd>
@@ -84,7 +131,8 @@ export function ConnectDialog({
   onClose: () => void;
   onConnected: (project: ProjectDetail) => void;
 }) {
-  const [runners, setRunners] = useState<AdminRunner[]>([]);
+  /** Every runner, unfiltered: the message about what is missing needs them. */
+  const [allRunners, setAllRunners] = useState<AdminRunner[]>();
   const [runnerId, setRunnerId] = useState('');
   const [path, setPath] = useState('');
   const [inspection, setInspection] = useState<ProjectInspection>();
@@ -98,18 +146,40 @@ export function ConnectDialog({
     setInspection(undefined);
     setError(undefined);
     setSuggested(undefined);
-    api<AdminRunner[]>('/admin/runners')
-      .then((list) => {
-        const online = list.filter((runner) => runner.status === 'online');
-        setRunners(online);
-        setRunnerId((current) =>
-          online.some((runner) => runner.id === current)
-            ? current
-            : (online[0]?.id ?? ''),
-        );
-      })
-      .catch((err) => toast.error(describeProjectError(err)));
+    let current = true;
+    let failedOnce = false;
+    const load = () =>
+      api<AdminRunner[]>('/admin/runners')
+        .then((list) => {
+          if (!current) return;
+          failedOnce = false;
+          setAllRunners(list);
+          const online = list.filter((runner) => isRunnerOnline(runner.status));
+          setRunnerId((selected) =>
+            online.some((runner) => runner.id === selected)
+              ? selected
+              : (online[0]?.id ?? ''),
+          );
+        })
+        .catch((err) => {
+          // One toast per outage, not one per poll.
+          if (current && !failedOnce) toast.error(describeProjectError(err));
+          failedOnce = true;
+        });
+    load();
+    // The admin is usually starting the runner in another window.
+    const timer = setInterval(load, RUNNERS_POLL_MS);
+    return () => {
+      current = false;
+      clearInterval(timer);
+    };
   }, [open]);
+
+  const runners = (allRunners ?? []).filter((runner) =>
+    isRunnerOnline(runner.status),
+  );
+  const fleet = allRunners ? runnersFact(allRunners) : undefined;
+  const selected = runners.find((runner) => runner.id === runnerId);
 
   const inspect = async (event?: FormEvent, usePath = path) => {
     event?.preventDefault();
@@ -153,6 +223,15 @@ export function ConnectDialog({
   };
 
   const blocker = inspection ? connectBlocker(inspection) : null;
+  const canInspect = runnerId !== '' && path.trim() !== '';
+  // Rule R1: a reason for each disabled button that is not just "busy".
+  const reason = busy
+    ? null
+    : !canInspect
+      ? 'Pick a runner and enter a path, then Inspect.'
+      : !inspection
+        ? 'Inspect the path first; Connect uses what it finds.'
+        : null;
 
   return (
     <DialogRoot
@@ -173,7 +252,8 @@ export function ConnectDialog({
               variant="glass"
               type="submit"
               form="inspect-project"
-              disabled={busy || !runnerId || !path.trim()}
+              disabled={busy || !canInspect}
+              aria-describedby={reason ? REASON_ID : undefined}
             >
               Inspect
             </Button>
@@ -181,6 +261,7 @@ export function ConnectDialog({
               variant="solid"
               onClick={connect}
               disabled={busy || !inspection || blocker !== null}
+              aria-describedby={reason ? REASON_ID : undefined}
             >
               Connect
             </Button>
@@ -188,6 +269,7 @@ export function ConnectDialog({
         }
       >
         <div className="flex flex-col gap-4">
+          {fleet ? <NoOnlineRunner fleet={fleet} /> : null}
           <form
             id="inspect-project"
             className="flex flex-col gap-3"
@@ -217,7 +299,7 @@ export function ConnectDialog({
               label="Path"
               htmlFor="connect-path"
               required
-              hint="Absolute path on the runner's machine."
+              hint={`Absolute path to an existing clone on ${selected?.hostname ?? selected?.name ?? "the runner's machine"}, e.g. /home/you/dev/my-repo. GitHub repositories only.`}
             >
               <Input
                 id="connect-path"
@@ -280,6 +362,12 @@ export function ConnectDialog({
               ) : null}
               <Preview inspection={inspection} />
             </>
+          ) : null}
+
+          {reason ? (
+            <div className="flex justify-end">
+              <DisabledReason id={REASON_ID}>{reason}</DisabledReason>
+            </div>
           ) : null}
         </div>
       </DialogContent>

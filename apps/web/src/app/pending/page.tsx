@@ -1,4 +1,4 @@
-import { buttonClassName } from 'glass-ui/button';
+import { buttonClassName } from '@andrewbehma/glass-ui/button';
 import Link from 'next/link';
 import { AuthCard } from '../../components/auth-card';
 

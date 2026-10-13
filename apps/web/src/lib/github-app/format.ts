@@ -1,10 +1,20 @@
 import {
   GITHUB_APP_ERROR,
+  type GITHUB_APP_EVENTS,
+  type GITHUB_APP_PERMISSIONS,
+  GITHUB_HOOK_PATH,
   GITHUB_LOGIN_PATTERN,
   type GitHubAppCredentialsRequest,
+  type GitHubAppView,
   type GitHubHealthReason,
 } from '@agentdock/shared';
 import { ApiError, describeError } from '../api';
+import {
+  ENCRYPTION_KEY_REMEDY,
+  PUBLIC_URL_REMEDY,
+} from '../prerequisites/copy';
+
+type Registered = Extract<GitHubAppView, { registered: true }>;
 
 type Tone = 'ok' | 'warn' | 'danger' | 'neutral';
 
@@ -16,8 +26,7 @@ export const HEALTH_TONE: Record<'healthy' | 'unhealthy', Tone> = {
 /** Why a project is `unhealthy`, as a sentence an admin can act on. */
 export const HEALTH_REASON_LABEL: Record<GitHubHealthReason, string> = {
   not_registered: 'No GitHub App is registered yet.',
-  hook_inactive:
-    'The App’s webhook is inactive — set PUBLIC_URL so GitHub can reach this server.',
+  hook_inactive: `The App’s webhook is inactive, so GitHub cannot reach this server. ${PUBLIC_URL_REMEDY}`,
   not_covered: 'The App is not installed on this repository.',
   installation_suspended: 'The App’s installation is suspended.',
   signature_failure:
@@ -31,8 +40,7 @@ const ERROR_SENTENCE: Record<string, string> = {
     'The registration link expired or was not started here. Start again.',
   [GITHUB_APP_ERROR.alreadyRegistered]:
     'An App is already registered. Delete it before registering another.',
-  [GITHUB_APP_ERROR.encryptionKeyMissing]:
-    'The server has no APP_ENCRYPTION_KEY, so it cannot store the App’s secrets.',
+  [GITHUB_APP_ERROR.encryptionKeyMissing]: `The server has no APP_ENCRYPTION_KEY, so it cannot store the App’s secrets. ${ENCRYPTION_KEY_REMEDY}`,
   [GITHUB_APP_ERROR.invalidCredentials]:
     'GitHub did not accept these credentials. Check the App ID and the private key.',
   [GITHUB_APP_ERROR.githubUnavailable]:
@@ -89,18 +97,91 @@ export const emptyCredentialsForm = (): CredentialsForm => ({
   webhookSecret: '',
 });
 
-export function credentialsProblem(form: CredentialsForm): string | null {
-  if (!/^\d+$/.test(form.appId.trim())) return 'The App ID is a number.';
+/** What is wrong with the form, and the field it belongs under. */
+export interface CredentialsProblem {
+  field: keyof CredentialsForm;
+  text: string;
+}
+
+export function credentialsProblem(
+  form: CredentialsForm,
+): CredentialsProblem | null {
+  if (!/^\d+$/.test(form.appId.trim()))
+    return { field: 'appId', text: 'The App ID is a number.' };
   if (!/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(form.slug.trim())) {
-    return 'The slug is the App’s name in its URL: letters, digits, hyphens.';
+    return {
+      field: 'slug',
+      text: 'The slug is the App’s name in its URL: letters, digits, hyphens.',
+    };
   }
   if (!form.privateKey.includes('BEGIN') || !form.privateKey.includes('KEY')) {
-    return 'The private key is the PEM file GitHub offered for download.';
+    return {
+      field: 'privateKey',
+      text: 'The private key is the PEM file GitHub offered for download.',
+    };
   }
   if (form.webhookSecret.trim() === '')
-    return 'The webhook secret is required.';
+    return { field: 'webhookSecret', text: 'The webhook secret is required.' };
   return null;
 }
+
+/**
+ * Where a server refusal of the manual credentials belongs: GitHub refusing
+ * the JWT points at the key; anything else is about the whole form.
+ */
+export function credentialsErrorField(
+  error: unknown,
+): keyof CredentialsForm | null {
+  return error instanceof ApiError &&
+    String(error.code) === GITHUB_APP_ERROR.invalidCredentials
+    ? 'privateKey'
+    : null;
+}
+
+/** The URL GitHub delivers to, or null without a `PUBLIC_URL` (D14). */
+export const githubWebhookUrl = (publicUrl: string | null): string | null =>
+  publicUrl ? `${publicUrl.replace(/\/+$/, '')}${GITHUB_HOOK_PATH}` : null;
+
+/**
+ * The App's Advanced settings page, where GitHub lists Recent deliveries and
+ * why each failed. An App owned by an organization lives under the
+ * organization; the view has no owner type, so an installation on the owner's
+ * account tells it, else the personal path.
+ */
+export function githubAppDeliveriesUrl(
+  app: Pick<Registered, 'slug' | 'ownerLogin' | 'installations'>,
+): string {
+  const owner = app.installations.find(
+    (i) => i.accountLogin.toLowerCase() === app.ownerLogin.toLowerCase(),
+  );
+  const slug = encodeURIComponent(app.slug);
+  return owner?.accountType === 'Organization'
+    ? `https://github.com/organizations/${encodeURIComponent(app.ownerLogin)}/settings/apps/${slug}/advanced`
+    : `https://github.com/settings/apps/${slug}/advanced`;
+}
+
+/** What the manual card lists, in GitHub's own words (spec D2). */
+export const PERMISSION_LABEL: Record<
+  keyof typeof GITHUB_APP_PERMISSIONS,
+  string
+> = {
+  metadata: 'Metadata',
+  issues: 'Issues',
+  pull_requests: 'Pull requests',
+  checks: 'Checks',
+  statuses: 'Commit statuses',
+  contents: 'Contents',
+};
+
+export const EVENT_LABEL: Record<(typeof GITHUB_APP_EVENTS)[number], string> = {
+  issues: 'Issues',
+  pull_request: 'Pull request',
+  pull_request_review: 'Pull request review',
+  check_suite: 'Check suite',
+  check_run: 'Check run',
+  status: 'Status',
+  push: 'Push',
+};
 
 export const toCredentialsRequest = (
   form: CredentialsForm,

@@ -1,12 +1,17 @@
 'use client';
 
-import type { InstalledSkillView, SkillRunView } from '@agentdock/shared';
-import { Banner } from 'glass-ui/banner';
-import { Button } from 'glass-ui/button';
-import { DialogContent, DialogRoot } from 'glass-ui/dialog';
-import { Field, Input, Select, Textarea } from 'glass-ui/field';
+import type {
+  InstalledSkillView,
+  ProjectRuntimeProfile,
+  SkillRunView,
+} from '@agentdock/shared';
+import { Banner } from '@andrewbehma/glass-ui/banner';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { Field, Input, Select, Textarea } from '@andrewbehma/glass-ui/field';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { DisabledReason } from '../../../../../components/prerequisites/disabled-reason';
 import { api } from '../../../../../lib/api';
 import { describeBudgetExceededError } from '../../../../../lib/budgets/format';
 import {
@@ -14,12 +19,15 @@ import {
   permissionModesFor,
 } from '../../../../../lib/control/format';
 import {
+  defaultProfileOptionLabel,
   describeSkillsError,
   EMPTY_RUN_FORM,
   permissionWarning,
+  profileOptionLabel,
   RUN_FORM_PROBLEM_TEXT,
   type RunForm,
   runFormProblem,
+  runProfileReason,
   SKILL_MODELS,
   SKILL_OUTPUT_LABEL,
   toRunRequest,
@@ -33,15 +41,21 @@ import {
  */
 export function RunDialog({
   projectId,
+  runnerName,
   skill,
-  profileKeys,
+  profiles,
+  profilesFailed = false,
   isAdmin,
   onOpenChange,
 }: {
   projectId: string;
+  /** Named in the remedy when the runner is too old. */
+  runnerName?: string | null;
   skill: InstalledSkillView | null;
-  /** Profiles the person can pick; empty = "Project default" only. */
-  profileKeys: string[];
+  /** The runner's Claude profiles; empty = the project default only. */
+  profiles: ProjectRuntimeProfile[];
+  /** The profiles could not be loaded: "no default" would be a guess. */
+  profilesFailed?: boolean;
   isAdmin: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -53,6 +67,12 @@ export function RunDialog({
   const [budgetRefusal, setBudgetRefusal] = useState<string>();
 
   const problem = runFormProblem(form);
+  const profileReason = runProfileReason(
+    form.profileKey,
+    profiles,
+    projectId,
+    profilesFailed,
+  );
   const warning = permissionWarning(form.permissionMode);
   const set = <K extends keyof RunForm>(key: K, value: RunForm[K]) =>
     setForm((current) => ({ ...current, [key]: value }));
@@ -66,7 +86,7 @@ export function RunDialog({
   };
 
   const submit = async () => {
-    if (!skill || problem) return;
+    if (!skill || problem || profileReason) return;
     setBusy(true);
     setError(undefined);
     setBudgetRefusal(undefined);
@@ -80,7 +100,7 @@ export function RunDialog({
       router.push(`/projects/${projectId}/skills/runs/${run.runId}`);
     } catch (err) {
       setBudgetRefusal(describeBudgetExceededError(err) ?? undefined);
-      setError(describeSkillsError(err));
+      setError(describeSkillsError(err, runnerName));
     } finally {
       setBusy(false);
     }
@@ -101,7 +121,10 @@ export function RunDialog({
             <Button variant="glass" disabled={busy} onClick={close}>
               Cancel
             </Button>
-            <Button disabled={busy || problem !== null} onClick={submit}>
+            <Button
+              disabled={busy || problem !== null || profileReason !== null}
+              onClick={submit}
+            >
               {busy ? 'Starting…' : 'Run'}
             </Button>
           </>
@@ -137,14 +160,19 @@ export function RunDialog({
               value={form.profileKey}
               onChange={(e) => set('profileKey', e.target.value)}
             >
-              <option value="">Project default</option>
-              {profileKeys.map((key) => (
-                <option key={key} value={key}>
-                  {key}
+              <option value="">{defaultProfileOptionLabel(profiles)}</option>
+              {profiles.map((profile) => (
+                <option key={profile.key} value={profile.key}>
+                  {profileOptionLabel(profile)}
                 </option>
               ))}
             </Select>
           </Field>
+          {profileReason ? (
+            <DisabledReason href={profileReason.href} cta={profileReason.cta}>
+              {profileReason.text}
+            </DisabledReason>
+          ) : null}
           <Field label="Model" htmlFor="skill-run-model">
             <Input
               id="skill-run-model"

@@ -1,8 +1,8 @@
 'use client';
 
 import type { QueueIssueDetail } from '@agentdock/shared';
-import { SheetContent, SheetRoot } from 'glass-ui/sheet';
-import { Skeleton } from 'glass-ui/skeleton';
+import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { type ReactNode, useEffect, useState } from 'react';
 import { api } from '../../../../../lib/api';
 import {

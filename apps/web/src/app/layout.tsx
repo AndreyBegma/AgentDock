@@ -1,4 +1,4 @@
-import { Toaster } from 'glass-ui/toast';
+import { Toaster } from '@andrewbehma/glass-ui/toast';
 import type { Metadata } from 'next';
 import { THEME_BOOTSTRAP_SCRIPT } from '../components/shell/theme';
 import './globals.css';

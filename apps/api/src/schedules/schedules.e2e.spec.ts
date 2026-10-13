@@ -21,10 +21,9 @@ import {
   resetDatabase,
   type Session,
 } from '../test/e2e-app';
-import { ScheduleFirer } from './schedule-firer';
-import { ScheduleLive } from './schedule-live';
-import { SchedulerService } from './scheduler.service';
-import { SCHEDULER_OPTIONS, type SchedulerOptions } from './scheduler-options';
+import { ScheduleFireProcessor } from './schedule-fire.processor';
+import { ScheduleMaintenance } from './schedule-maintenance';
+import { dueTick } from './testing/schedule-e2e';
 
 type Answer = CommandSendResult<CommandName>;
 const ok = (output: unknown): Answer =>
@@ -36,7 +35,7 @@ const at = (s: string) => new Date(s);
 
 describe('schedules (e2e)', () => {
   let ctx: E2eContext;
-  let scheduler: SchedulerService;
+  let tick: (now: Date) => Promise<bigint[]>;
   let runnerId: string;
   let a: string;
   let b: string;
@@ -105,10 +104,13 @@ describe('schedules (e2e)', () => {
 
   beforeAll(async () => {
     ctx = await createE2eApp();
-    scheduler = ctx.app.get(SchedulerService);
+    tick = dueTick(
+      ctx.prisma,
+      ctx.app.get(ScheduleFireProcessor),
+      ctx.app.get(ScheduleMaintenance),
+    );
   });
   afterAll(async () => {
-    await scheduler.release();
     await ctx.app.close();
   });
   beforeEach(async () => {
@@ -198,7 +200,6 @@ describe('schedules (e2e)', () => {
         if (!answer) throw new Error(`no answer for ${name}`);
         return answer() as never;
       });
-    expect(await scheduler.lead()).toBe(true);
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -281,9 +282,9 @@ describe('schedules (e2e)', () => {
       const due = at('2026-10-09T10:00:00Z');
       await dueAt(view.id, due);
 
-      const fired = await scheduler.tick(at('2026-10-09T10:00:10Z'));
+      const fired = await tick(at('2026-10-09T10:00:10Z'));
       expect(fired).toHaveLength(1);
-      expect(await scheduler.tick(at('2026-10-09T10:00:20Z'))).toEqual([]);
+      expect(await tick(at('2026-10-09T10:00:20Z'))).toEqual([]);
 
       const rows = await firings(view.id);
       expect(rows).toHaveLength(1);
@@ -307,13 +308,20 @@ describe('schedules (e2e)', () => {
         triggeredByType: 'schedule',
         triggeredById: view.id,
       });
+      // D8 (#102): the system, on the creator's behalf.
+      const [started] = await auditOf('skill.run_started');
+      expect(started).toMatchObject({
+        actorType: 'system',
+        actorUserId: null,
+        actorOnBehalfOfId: operatorOfAId,
+      });
 
       // The run ends; the firing follows it.
       await ctx.prisma.run.update({
         where: { id: rows[0].runId as string },
         data: { status: 'succeeded', endedAt: new Date() },
       });
-      await scheduler.tick(at('2026-10-09T10:01:00Z'));
+      await tick(at('2026-10-09T10:01:00Z'));
       expect((await firings(view.id))[0].status).toBe('succeeded');
     });
 
@@ -327,7 +335,7 @@ describe('schedules (e2e)', () => {
         target: { kind: 'orchestrator', mode: 'next' },
       });
       await dueAt(view.id, at('2026-10-09T10:00:00Z'));
-      await scheduler.tick(at('2026-10-09T10:00:05Z'));
+      await tick(at('2026-10-09T10:00:05Z'));
       const [first] = await firings(view.id);
       expect(first).toMatchObject({ status: 'succeeded' });
       expect(first.commandRunId).toBeTruthy();
@@ -339,7 +347,7 @@ describe('schedules (e2e)', () => {
         where: { id: view.id },
         data: { consecutiveFailures: 3 },
       });
-      await scheduler.tick(at('2026-10-09T11:00:05Z'));
+      await tick(at('2026-10-09T11:00:05Z'));
       const second = (await firings(view.id))[1];
       expect(second).toMatchObject({
         status: 'noop',
@@ -351,7 +359,7 @@ describe('schedules (e2e)', () => {
     it('missed by three with skip: one skipped firing, no command', async () => {
       const view = await createOk({ cron: '0 * * * *', timezone: 'UTC' });
       await dueAt(view.id, at('2026-10-09T10:00:00Z'), 'skip');
-      await scheduler.tick(at('2026-10-09T12:30:00Z'));
+      await tick(at('2026-10-09T12:30:00Z'));
       const rows = await firings(view.id);
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({ status: 'skipped', missedCount: 3 });
@@ -364,7 +372,7 @@ describe('schedules (e2e)', () => {
     it('missed by three with catch_up: one command for the newest, one skipped with missedCount 2', async () => {
       const view = await createOk({ cron: '0 * * * *', timezone: 'UTC' });
       await dueAt(view.id, at('2026-10-09T10:00:00Z'), 'catch_up');
-      await scheduler.tick(at('2026-10-09T12:30:00Z'));
+      await tick(at('2026-10-09T12:30:00Z'));
       const rows = await firings(view.id);
       expect(rows.map((r) => [r.status, r.kind, r.missedCount])).toEqual([
         ['skipped', 'cron', 2],
@@ -377,7 +385,7 @@ describe('schedules (e2e)', () => {
     it('missed by more than 24 hours with catch_up: skipped only', async () => {
       const view = await createOk({ cron: '0 3 * * 1', timezone: 'UTC' });
       await dueAt(view.id, at('2026-10-05T03:00:00Z'), 'catch_up');
-      await scheduler.tick(at('2026-10-07T03:00:00Z'));
+      await tick(at('2026-10-07T03:00:00Z'));
       const rows = await firings(view.id);
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({
@@ -390,9 +398,9 @@ describe('schedules (e2e)', () => {
     it('skips a firing while the previous run is still running (D7)', async () => {
       const view = await createOk({ cron: '0 * * * *', timezone: 'UTC' });
       await dueAt(view.id, at('2026-10-09T10:00:00Z'));
-      await scheduler.tick(at('2026-10-09T10:00:05Z'));
+      await tick(at('2026-10-09T10:00:05Z'));
       await dueAt(view.id, at('2026-10-09T11:00:00Z'));
-      await scheduler.tick(at('2026-10-09T11:00:05Z'));
+      await tick(at('2026-10-09T11:00:05Z'));
       const rows = await firings(view.id);
       expect(rows[1]).toMatchObject({
         status: 'skipped',
@@ -407,7 +415,7 @@ describe('schedules (e2e)', () => {
       for (let hour = 10; hour < 15; hour++) {
         const due = at(`2026-10-09T${hour}:00:00Z`);
         await dueAt(view.id, due);
-        await scheduler.tick(new Date(due.getTime() + 5000));
+        await tick(new Date(due.getTime() + 5000));
       }
       const rows = await firings(view.id);
       expect(rows.map((r) => [r.status, r.reason])).toEqual(
@@ -430,12 +438,12 @@ describe('schedules (e2e)', () => {
       const view = await createOk({ cron: '0 * * * *', timezone: 'UTC' });
       await dueAt(view.id, at('2026-10-09T10:00:00Z'), 'catch_up');
       online = false;
-      await scheduler.tick(at('2026-10-09T10:00:05Z'));
+      await tick(at('2026-10-09T10:00:05Z'));
       // Still offline: nothing new, nothing counted twice.
-      await scheduler.tick(at('2026-10-09T10:10:00Z'));
+      await tick(at('2026-10-09T10:10:00Z'));
       expect(await firings(view.id)).toHaveLength(1);
       online = true;
-      await scheduler.tick(at('2026-10-09T10:20:00Z'));
+      await tick(at('2026-10-09T10:20:00Z'));
       const rows = await firings(view.id);
       expect(rows.map((r) => [r.status, r.kind, r.reason])).toEqual([
         ['failed', 'cron', 'runner_offline'],
@@ -453,7 +461,7 @@ describe('schedules (e2e)', () => {
         data: { roleOverride: 'viewer' },
       });
       await dueAt(view.id, at('2026-10-09T10:00:00Z'));
-      await scheduler.tick(at('2026-10-09T10:00:05Z'));
+      await tick(at('2026-10-09T10:00:05Z'));
       expect((await firings(view.id))[0]).toMatchObject({
         status: 'failed',
         reason: 'creator_not_authorized',
@@ -472,7 +480,7 @@ describe('schedules (e2e)', () => {
         data: { status: 'disabled' },
       });
       await dueAt(view.id, at('2026-10-09T10:00:00Z'));
-      await scheduler.tick(at('2026-10-09T10:00:05Z'));
+      await tick(at('2026-10-09T10:00:05Z'));
       expect((await firings(view.id))[0].reason).toBe('creator_not_authorized');
     });
 
@@ -494,42 +502,38 @@ describe('schedules (e2e)', () => {
     });
   });
 
-  describe('leader election (D5)', () => {
-    it('only the lock holder ticks; when it goes, another takes over', async () => {
-      const options = ctx.app.get<SchedulerOptions>(SCHEDULER_OPTIONS);
-      expect(options.leaderRetryMs).toBeLessThanOrEqual(30_000);
-      const second = new SchedulerService(
-        ctx.prisma,
-        ctx.app.get(RunnerPresence),
-        ctx.app.get(ScheduleFirer),
-        ctx.app.get(ScheduleLive),
-        options,
-      );
-      try {
-        expect(await second.lead()).toBe(false);
-        expect(await second.tick()).toBeNull();
+  describe('no leader (spec 123 B2, B11)', () => {
+    it('one occurrence processed twice at once, then replayed: one firing, one command', async () => {
+      const view = await createOk({ cron: '0 * * * *', timezone: 'UTC' });
+      const due = at('2026-10-09T10:00:00Z');
+      await dueAt(view.id, due);
+      const processor = ctx.app.get(ScheduleFireProcessor);
+      const job = { scheduleId: view.id, scheduledFor: due.toISOString() };
 
-        const view = await createOk({ cron: '0 * * * *', timezone: 'UTC' });
-        await dueAt(view.id, at('2026-10-09T10:00:00Z'));
-        await scheduler.release();
-        expect(await second.lead()).toBe(true);
-        expect(await second.tick(at('2026-10-09T10:00:05Z'))).toHaveLength(1);
-        expect(await firings(view.id)).toHaveLength(1);
+      // Two workers on one row serialize on its lock; the second finds it moved.
+      const results = await Promise.all([
+        processor.handle(job, at('2026-10-09T10:00:05Z')),
+        processor.handle(job, at('2026-10-09T10:00:05Z')),
+      ]);
+      expect(results.map((r) => r.kind).sort()).toEqual(['fired', 'stale']);
+      // A stalled job's replay is stale too.
+      expect(await processor.handle(job, at('2026-10-09T10:00:30Z'))).toEqual({
+        kind: 'stale',
+      });
+      expect(await firings(view.id)).toHaveLength(1);
+      expect(sent('skill.run')).toHaveLength(1);
 
-        // The same occurrence written again is refused by the unique key.
-        await expect(
-          ctx.prisma.scheduleFiring.create({
-            data: {
-              scheduleId: view.id,
-              scheduledFor: at('2026-10-09T10:00:00Z'),
-              kind: 'cron',
-              status: 'due',
-            },
-          }),
-        ).rejects.toThrow();
-      } finally {
-        await second.release();
-      }
+      // The same occurrence written again is refused by the unique key.
+      await expect(
+        ctx.prisma.scheduleFiring.create({
+          data: {
+            scheduleId: view.id,
+            scheduledFor: due,
+            kind: 'cron',
+            status: 'due',
+          },
+        }),
+      ).rejects.toThrow();
     });
   });
 

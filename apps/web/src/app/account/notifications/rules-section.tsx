@@ -4,32 +4,39 @@ import type {
   NotificationChannel,
   NotificationRulesView,
 } from '@agentdock/shared';
-import { Card } from 'glass-ui/card';
-import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
-import { toast } from 'glass-ui/toast';
-import { Toggle } from 'glass-ui/toggle';
-import { useCallback, useEffect, useState } from 'react';
-import { api, describeError } from '../../../lib/api';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { Card } from '@andrewbehma/glass-ui/card';
+import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import {
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+} from '@andrewbehma/glass-ui/table';
+import { Toggle } from '@andrewbehma/glass-ui/toggle';
+import { api, describeError, describeErrorHint } from '../../../lib/api';
 import {
   type RuleRow,
   ruleRows,
   ruleUpdate,
 } from '../../../lib/notifications/format';
+import { useErrorToast } from '../../../lib/section/use-error-toast';
+import { useSection } from '../../../lib/section/use-section';
+
+const LINK_TELEGRAM = (
+  <a href="#telegram" className="text-ink underline underline-offset-2">
+    Link Telegram
+  </a>
+);
 
 export function RulesSection({ telegramLinked }: { telegramLinked: boolean }) {
-  const [view, setView] = useState<NotificationRulesView>();
-
-  const load = useCallback(async () => {
-    try {
-      setView(await api<NotificationRulesView>('/notifications/rules'));
-    } catch (error) {
-      toast.error(describeError(error));
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const rules = useSection(
+    () => api<NotificationRulesView>('/notifications/rules'),
+    [],
+  );
+  const showError = useErrorToast();
+  const view = rules.data;
 
   const change = async (
     row: RuleRow,
@@ -37,14 +44,14 @@ export function RulesSection({ telegramLinked }: { telegramLinked: boolean }) {
     value: boolean,
   ) => {
     try {
-      setView(
+      rules.setData(
         await api<NotificationRulesView>('/notifications/rules', {
           method: 'PUT',
           body: ruleUpdate(row, channel, value),
         }),
       );
     } catch (error) {
-      toast.error(describeError(error));
+      showError(describeErrorHint(error));
     }
   };
 
@@ -55,10 +62,24 @@ export function RulesSection({ telegramLinked }: { telegramLinked: boolean }) {
       <h2 className="mb-1 text-lg font-bold">Rules</h2>
       <p className="text-ink-2 mb-4 text-sm">
         Choose which kinds reach you, and where.
-        {telegramLinked ? '' : ' Link Telegram above to enable that column.'}
+        {telegramLinked ? null : (
+          <> {LINK_TELEGRAM} above to turn on the Telegram column.</>
+        )}
       </p>
       {view === undefined ? (
-        <p className="text-ink-2 text-sm">Loading…</p>
+        rules.error !== null && !rules.loading ? (
+          <SectionUnavailable
+            title="Your notification rules could not be loaded"
+            stillWorks={`${describeError(rules.error)} Notifications keep arriving with the rules you saved before.`}
+            action={
+              <Button variant="glass" size="sm" onClick={rules.retry}>
+                Try again
+              </Button>
+            }
+          />
+        ) : (
+          <Skeleton className="h-40 w-full" />
+        )
       ) : (
         <Table scroll>
           <TableHead>
@@ -98,17 +119,17 @@ export function RulesSection({ telegramLinked }: { telegramLinked: boolean }) {
                   {row.telegramNote === 'in-app only' ? (
                     <span className="text-ink-3 text-xs">in-app only</span>
                   ) : row.telegramDisabled ? (
-                    <span
-                      className="inline-flex items-center gap-2 opacity-50"
-                      inert
-                      title="Link Telegram to turn this on"
-                    >
-                      <Toggle
-                        checked={row.telegram}
-                        onChange={() => {}}
-                        labelledBy={`rule-${row.kind}-telegram`}
-                      />
-                      <span className="text-xs">link first</span>
+                    <span className="inline-flex items-center gap-2">
+                      <span className="inline-flex opacity-50" inert>
+                        <Toggle
+                          checked={row.telegram}
+                          onChange={() => {}}
+                          labelledBy={`rule-${row.kind}-telegram`}
+                        />
+                      </span>
+                      <span className="text-xs text-ink-2">
+                        {LINK_TELEGRAM} first
+                      </span>
                     </span>
                   ) : (
                     <Toggle

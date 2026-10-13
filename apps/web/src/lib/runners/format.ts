@@ -1,6 +1,11 @@
-import { RUNNER_ERROR, type RunnerStatus } from '@agentdock/shared';
+import {
+  type AdminRunner,
+  RUNNER_ERROR,
+  type RunnerStatus,
+} from '@agentdock/shared';
 import type { Capabilities } from '@agentdock/shared/protocol';
 import { ApiError, describeError } from '../api';
+import { RUN_COMMAND } from './install';
 
 type Tone = 'ok' | 'warn' | 'danger' | 'neutral';
 
@@ -12,12 +17,60 @@ export const STATUS_TONE: Record<RunnerStatus, Tone> = {
   revoked: 'danger',
 };
 
-/** A runner that never paired reads `offline` with `pairedAt: null`. */
+export const RUNNER_STATUS_LABEL: Record<RunnerStatus, string> = {
+  online: 'online',
+  stale: 'not responding',
+  offline: 'offline',
+  revoked: 'revoked',
+};
+
+/**
+ * A runner that never paired reads `offline` with `pairedAt: null`; one that
+ * paired but never connected has `lastSeenAt: null` (pass it to tell them apart).
+ */
 export function statusLabel(
   status: RunnerStatus,
   pairedAt: string | null,
+  lastSeenAt?: string | null,
 ): string {
-  return status === 'offline' && pairedAt === null ? 'not paired' : status;
+  if (status === 'offline' && pairedAt === null) return 'not paired';
+  if (status === 'offline' && lastSeenAt === null)
+    return 'paired · not running';
+  return RUNNER_STATUS_LABEL[status];
+}
+
+/** A next step: the sentence, and the command it names (rendered as code). */
+export interface RunnerRemedy {
+  text: string;
+  command?: string;
+}
+
+/**
+ * The next step for a runner that is not online, as one line under its
+ * status; null when it is online.
+ */
+export function runnerRemedy(
+  runner: Pick<AdminRunner, 'status' | 'pairedAt'>,
+): RunnerRemedy | null {
+  switch (runner.status) {
+    case 'online':
+      return null;
+    case 'revoked':
+      return {
+        text: 'Revoked: it cannot reconnect. To use the machine again, add a new runner.',
+      };
+    case 'stale':
+      return {
+        text: 'Its heartbeat stopped. Check the machine, then restart',
+        command: RUN_COMMAND,
+      };
+    case 'offline':
+      return runner.pairedAt === null
+        ? {
+            text: 'Not paired yet. Open Details for a new pairing code if the old one expired.',
+          }
+        : { text: 'Start it on its machine:', command: RUN_COMMAND };
+  }
 }
 
 export function formatLastSeen(iso: string | null, now = Date.now()): string {

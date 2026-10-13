@@ -171,6 +171,9 @@ export const runDaemon = async (
       watchedProjects: () => watchList.current,
       send: (message) => connection?.sendMessage(message) ?? false,
       spawn: options.spawnPty ?? bunSpawnPty(process.env),
+      // The executor is built below; it exists by the time a command arrives.
+      runSession: (projectId, root, runId) =>
+        runs.runSession(projectId, root, runId),
       unsupported: async () => {
         const tmux = await exec('tmux', ['-V']);
         return terminalUnsupported(

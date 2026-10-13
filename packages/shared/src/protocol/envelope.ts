@@ -20,6 +20,13 @@ export const eventSourceSchema = z.enum([
 ]);
 export type EventSource = z.infer<typeof eventSourceSchema>;
 
+/**
+ * `source` of an event the API records itself (ADR-0014). Deliberately not in
+ * `eventSourceSchema`: a runner can never send it, so a row with this source
+ * was written by the API.
+ */
+export const API_EVENT_SOURCE = 'api';
+
 const eventFields = {
   v: z.literal(EVENT_SCHEMA_VERSION),
   ts: z.iso.datetime(),

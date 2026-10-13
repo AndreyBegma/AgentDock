@@ -1,245 +1,44 @@
 'use client';
 
 import type {
-  CreatePriceVersionRequest,
   CurrentPricesResponse,
   ModelPriceInput,
-  PriceTestRequest,
-  PriceTestResponse,
   PriceVersionListResponse,
 } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Banner } from 'glass-ui/banner';
-import { Button } from 'glass-ui/button';
-import { DialogContent, DialogRoot } from 'glass-ui/dialog';
-import { EmptyState } from 'glass-ui/empty-state';
-import { Field, Input } from 'glass-ui/field';
-import { Skeleton } from 'glass-ui/skeleton';
-import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
-import { toast } from 'glass-ui/toast';
-import { useRouter } from 'next/navigation';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { Field, Input } from '@andrewbehma/glass-ui/field';
+import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import {
-  type FormEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+} from '@andrewbehma/glass-ui/table';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { DisabledReason } from '../../../components/prerequisites/disabled-reason';
 import { ApiError, api } from '../../../lib/api';
+import {
+  NO_VERSION_REASON,
+  PRICES_SEED_COMMAND,
+  SOURCE_LABEL,
+} from '../../../lib/prices/format';
 import {
   defaultTier,
   describeConditions,
   describeUsageError,
   formatPerMillion,
   formatTime,
-  formatUsd,
 } from '../../../lib/usage/format';
 import { ModelEditor } from './model-editor';
 import { RecomputeDialog } from './recompute-dialog';
-
-const TEST_BUCKETS = [
-  'input',
-  'output',
-  'cacheRead',
-  'cacheWrite5m',
-  'cacheWrite1h',
-  'reasoning',
-] as const;
-
-type Draft = {
-  upsert: Map<string, ModelPriceInput>;
-  remove: Set<string>;
-};
-
-const emptyDraft = (): Draft => ({ upsert: new Map(), remove: new Set() });
-
-function TestCalculator({ hasVersion }: { hasVersion: boolean }) {
-  const [model, setModel] = useState('');
-  const [tokens, setTokens] = useState<Record<string, string>>({});
-  const [result, setResult] = useState<PriceTestResponse>();
-  const [busy, setBusy] = useState(false);
-
-  const run = async (event: FormEvent) => {
-    event.preventDefault();
-    const counts: PriceTestRequest['tokens'] = {};
-    for (const bucket of TEST_BUCKETS) {
-      const text = tokens[bucket]?.trim();
-      if (!text) continue;
-      const value = Number(text);
-      if (!Number.isInteger(value) || value < 0) {
-        toast.error(`${bucket} must be a whole number, 0 or more.`);
-        return;
-      }
-      counts[bucket] = value;
-    }
-    setBusy(true);
-    try {
-      setResult(
-        await api<PriceTestResponse>('/admin/prices/test', {
-          method: 'POST',
-          body: { model: model.trim(), tokens: counts },
-        }),
-      );
-    } catch (err) {
-      toast.error(describeUsageError(err));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <section aria-labelledby="prices-test" className="mb-8">
-      <h2 id="prices-test" className="mb-1 text-sm font-medium">
-        Test calculator
-      </h2>
-      <p className="mb-3 text-xs text-ink-3">
-        Which price and tier the <em>current</em> version applies to a model id,
-        and what it costs. Save a draft as a new version to test its patterns.
-      </p>
-      <form
-        onSubmit={run}
-        className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-4"
-      >
-        <Field label="Model id" htmlFor="test-model">
-          <Input
-            id="test-model"
-            value={model}
-            maxLength={200}
-            placeholder="claude-sonnet-4-5-20250929"
-            onChange={(e) => setModel(e.target.value)}
-          />
-        </Field>
-        {TEST_BUCKETS.map((bucket) => (
-          <Field
-            key={bucket}
-            label={`${bucket} tokens`}
-            htmlFor={`test-${bucket}`}
-          >
-            <Input
-              id={`test-${bucket}`}
-              inputMode="numeric"
-              value={tokens[bucket] ?? ''}
-              onChange={(e) =>
-                setTokens((current) => ({
-                  ...current,
-                  [bucket]: e.target.value,
-                }))
-              }
-            />
-          </Field>
-        ))}
-        <div>
-          <Button
-            variant="glass"
-            type="submit"
-            disabled={busy || !model.trim() || !hasVersion}
-          >
-            {busy ? 'Testing…' : 'Test'}
-          </Button>
-        </div>
-      </form>
-      {result ? (
-        <p className="mt-3 text-sm" role="status">
-          {result.modelName === null ? (
-            <>
-              No pattern matches — this request would be{' '}
-              <strong>unpriced</strong>, not $0.
-            </>
-          ) : (
-            <>
-              v{result.version} · <strong>{result.modelName}</strong> · tier{' '}
-              <strong>{result.tier}</strong> · cost{' '}
-              <strong>{formatUsd(result.costUsd) || '—'}</strong>
-              {result.costUsd ? (
-                <span className="text-ink-3"> ({result.costUsd} USD)</span>
-              ) : null}
-            </>
-          )}
-        </p>
-      ) : null}
-    </section>
-  );
-}
-
-function SaveDialog({
-  open,
-  draft,
-  onClose,
-  onSaved,
-}: {
-  open: boolean;
-  draft: Draft;
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const [note, setNote] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string>();
-
-  useEffect(() => {
-    if (open) {
-      setNote('');
-      setError(undefined);
-    }
-  }, [open]);
-
-  const save = async (event: FormEvent) => {
-    event.preventDefault();
-    setBusy(true);
-    setError(undefined);
-    try {
-      const body: CreatePriceVersionRequest = {
-        note: note.trim(),
-        upsert: [...draft.upsert.values()],
-        remove: [...draft.remove],
-      };
-      await api('/admin/prices/versions', { method: 'POST', body });
-      toast.success('New price version created. It is now current.');
-      onSaved();
-    } catch (err) {
-      setError(describeUsageError(err));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <DialogRoot open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent
-        title="Save as a new version"
-        description="The current version is cloned, your changes applied, and the result becomes current. Requests already priced keep their cost until you recompute."
-      >
-        <form onSubmit={save} className="flex flex-col gap-3">
-          <p className="text-sm text-ink-2">
-            {draft.upsert.size} added or changed · {draft.remove.size} removed
-          </p>
-          <Field label="Note" htmlFor="version-note">
-            <Input
-              id="version-note"
-              value={note}
-              maxLength={500}
-              placeholder="What changed, and why"
-              onChange={(e) => setNote(e.target.value)}
-            />
-          </Field>
-          {error ? (
-            <p className="text-sm text-danger" role="alert">
-              {error}
-            </p>
-          ) : null}
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" type="button" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button variant="solid" type="submit" disabled={busy}>
-              {busy ? 'Saving…' : 'Create version'}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </DialogRoot>
-  );
-}
+import { type Draft, emptyDraft, SaveDialog } from './save-dialog';
+import { TestCalculator } from './test-calculator';
 
 export default function AdminPricesPage() {
   const router = useRouter();
@@ -251,8 +50,10 @@ export default function AdminPricesPage() {
   const [saving, setSaving] = useState(false);
   const [recomputing, setRecomputing] = useState(false);
   const [error, setError] = useState<string>();
+  const [loading, setLoading] = useState(true);
 
   const load = useCallback(() => {
+    setLoading(true);
     Promise.all([
       api<CurrentPricesResponse>('/admin/prices'),
       api<PriceVersionListResponse>('/admin/prices/versions'),
@@ -260,6 +61,7 @@ export default function AdminPricesPage() {
       .then(([prices, list]) => {
         setCurrent(prices);
         setVersions(list);
+        setError(undefined);
       })
       .catch((err: unknown) => {
         if (err instanceof ApiError && err.status === 401) {
@@ -267,7 +69,8 @@ export default function AdminPricesPage() {
         } else if (err instanceof ApiError && err.status === 403) {
           router.replace('/account');
         } else setError(describeUsageError(err));
-      });
+      })
+      .finally(() => setLoading(false));
   }, [router]);
 
   useEffect(load, [load]);
@@ -321,66 +124,112 @@ export default function AdminPricesPage() {
       return next;
     });
 
-  if (error) {
-    return (
-      <Banner tone="danger" title="Could not load prices">
-        {error}
-      </Banner>
-    );
-  }
-
   const version = current?.version ?? null;
+  // Rule R1: a reason only once the page knows there is no version.
+  const versionReason = current && !version ? NO_VERSION_REASON : null;
 
   return (
     <>
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-2 flex flex-wrap items-start justify-between gap-3">
         <h1 className="text-xl font-semibold">Prices</h1>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="glass"
-            onClick={() => setEditing({})}
-            disabled={!version}
-          >
-            Add model
-          </Button>
-          <Button
-            variant="glass"
-            onClick={() => setRecomputing(true)}
-            disabled={!version}
-          >
-            Recompute…
-          </Button>
-          <Button
-            variant="solid"
-            disabled={changes === 0}
-            onClick={() => setSaving(true)}
-          >
-            Save new version{changes > 0 ? ` (${changes})` : ''}
-          </Button>
+        <div className="flex flex-col items-end gap-1">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="glass"
+              onClick={() => setEditing({})}
+              disabled={!version}
+              aria-describedby={versionReason ? 'prices-reason' : undefined}
+            >
+              Add model
+            </Button>
+            <Button
+              variant="glass"
+              onClick={() => setRecomputing(true)}
+              disabled={!version}
+              aria-describedby={versionReason ? 'prices-reason' : undefined}
+            >
+              Re-price requests…
+            </Button>
+            <Button
+              variant="solid"
+              disabled={changes === 0}
+              aria-describedby={
+                changes === 0 ? 'prices-save-reason' : undefined
+              }
+              onClick={() => setSaving(true)}
+            >
+              Save new version{changes > 0 ? ` (${changes})` : ''}
+            </Button>
+          </div>
+          {versionReason ? (
+            <DisabledReason id="prices-reason">{versionReason}</DisabledReason>
+          ) : version && changes === 0 ? (
+            <DisabledReason id="prices-save-reason">
+              Add, edit or remove a model to save a new version.
+            </DisabledReason>
+          ) : null}
         </div>
       </div>
-      <p className="mb-4 text-sm text-ink-3">
+      <p className="mb-1 text-sm text-ink-3">
         Prices are versions: editing creates a new one cloned from the current
-        version. Requests keep the cost they were priced with until you
-        recompute a range.
+        version. Requests keep the cost they were priced with until you re-price
+        a range.
+      </p>
+      <p className="mb-4 text-xs text-ink-3">
+        Re-price requests changes stored costs. Budgets add those costs up
+        separately: after re-pricing, run{' '}
+        <Link
+          href="/admin/budgets"
+          className="text-ink underline underline-offset-2"
+        >
+          Recompute budget totals under Budgets
+        </Link>
+        .
       </p>
 
-      {!current ? (
-        <div className="flex flex-col gap-3" aria-busy="true">
-          <Skeleton className="h-6 w-64" />
-          <Skeleton className="h-40 w-full" />
+      {error ? (
+        <div className="mb-4">
+          <SectionUnavailable
+            title="Prices are not answering"
+            stillWorks={
+              current
+                ? 'What is shown below may be out of date. New requests are still priced on the server.'
+                : 'New requests are still priced on the server.'
+            }
+            detail={error}
+            action={
+              <Button
+                variant="glass"
+                size="sm"
+                disabled={loading}
+                onClick={load}
+              >
+                Try again
+              </Button>
+            }
+          />
         </div>
+      ) : null}
+
+      {!current ? (
+        error ? null : (
+          <div className="flex flex-col gap-3" aria-busy="true">
+            <Skeleton className="h-6 w-64" />
+            <Skeleton className="h-40 w-full" />
+          </div>
+        )
       ) : !version ? (
         <EmptyState
           title="No price version yet"
-          description="Run the database seed to create version 1 from the vendored Langfuse snapshot."
+          description="Without one, every request is unpriced and budgets cannot count it. Seed version 1 from the bundled Langfuse price list: run this in the AgentDock checkout, with the API’s database settings in apps/api/.env."
+          action={<CodeBlock code={PRICES_SEED_COMMAND} />}
         />
       ) : (
         <>
           <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
             <Badge tone="ok" label={`Current: v${version.number}`} />
             <span className="text-ink-2">
-              {version.source} · {formatTime(version.createdAt)} ·{' '}
+              {SOURCE_LABEL[version.source]} · {formatTime(version.createdAt)} ·{' '}
               {version.models} models
               {version.note ? ` · ${version.note}` : ''}
             </span>
@@ -400,10 +249,27 @@ export default function AdminPricesPage() {
 
           <div className="mb-8">
             {models.length === 0 ? (
-              <EmptyState
-                title="No models"
-                description="Nothing matches the filter."
-              />
+              filter.trim() !== '' ? (
+                <EmptyState
+                  title="No model matches the filter"
+                  description="Other models are hidden by the name or pattern filter."
+                  action={
+                    <Button variant="glass" onClick={() => setFilter('')}>
+                      Clear filter
+                    </Button>
+                  }
+                />
+              ) : (
+                <EmptyState
+                  title="Models this version prices"
+                  description="This version prices no model, so every request is unpriced. Add one."
+                  action={
+                    <Button variant="glass" onClick={() => setEditing({})}>
+                      Add model
+                    </Button>
+                  }
+                />
+              )
             ) : (
               <Table scroll>
                 <TableHead>
@@ -538,7 +404,7 @@ export default function AdminPricesPage() {
                           <Badge tone="ok" label="current" />
                         ) : null}
                       </TableCell>
-                      <TableCell>{v.source}</TableCell>
+                      <TableCell>{SOURCE_LABEL[v.source]}</TableCell>
                       <TableCell>{formatTime(v.createdAt)}</TableCell>
                       <TableCell>{v.createdBy?.email ?? '—'}</TableCell>
                       <TableCell>{v.models}</TableCell>

@@ -17,3 +17,8 @@ Numbered, never rewritten. A changed decision gets a new ADR that supersedes the
 | [0011](0011-glass-ui-is-the-component-library.md) | glass-ui is the component library |
 | [0012](0012-detect-where-a-projects-documentation-lives.md) | Detect where a project's documentation lives |
 | [0013](0013-codex-workers-and-their-fence.md) | Codex workers and their fence |
+| [0014](0014-server-originated-events-live-in-events.md) | Server-originated events live in `events` |
+| [0015](0015-schedules-run-on-bullmq.md) | Schedules run on BullMQ (amends ADR-0007) |
+| [0016](0016-staging-on-the-agent-host-behind-a-cloudflare-tunnel.md) | Staging on the agent host behind a Cloudflare tunnel |
+| [0017](0017-runner-distribution-homebrew-and-npm.md) | The runner ships as prebuilt binaries through Homebrew and npm |
+| [0018](0018-pull-requests-test-what-changed.md) | Pull requests test what changed; develop is not tested twice (amends ADR-0016) |

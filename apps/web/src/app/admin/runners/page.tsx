@@ -1,21 +1,32 @@
 'use client';
 
 import type { AdminRunner, PairingCodeResponse } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Button } from 'glass-ui/button';
-import { DialogContent, DialogRoot } from 'glass-ui/dialog';
-import { EmptyState } from 'glass-ui/empty-state';
-import { Field, Input } from 'glass-ui/field';
-import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
-import { toast } from 'glass-ui/toast';
-import { type FormEvent, useCallback, useEffect, useState } from 'react';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { Field, Input } from '@andrewbehma/glass-ui/field';
+import {
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+} from '@andrewbehma/glass-ui/table';
+import { toast } from '@andrewbehma/glass-ui/toast';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import { type FormEvent, useEffect, useState } from 'react';
+import { AsyncSection } from '../../../components/prerequisites/async-section';
 import { api } from '../../../lib/api';
 import {
   describeRunnerError,
   formatLastSeen,
+  runnerRemedy,
   STATUS_TONE,
   statusLabel,
 } from '../../../lib/runners/format';
+import { ADD_RUNNER_PARAM, INSTALL_PATH } from '../../../lib/runners/install';
+import { useSection } from '../../../lib/section/use-section';
 import { PairingDialog } from './pairing-dialog';
 import { RunnerSheet } from './runner-sheet';
 
@@ -100,25 +111,106 @@ function AddRunnerDialog({
   );
 }
 
+/** Status, and for a runner that is not online, the next step under it. */
+function StatusCell({ runner }: { runner: AdminRunner }) {
+  const remedy = runnerRemedy(runner);
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="inline-flex items-center gap-2">
+        <Badge dot tone={STATUS_TONE[runner.status]} aria-hidden="true" />
+        {statusLabel(runner.status, runner.pairedAt, runner.lastSeenAt)}
+      </span>
+      {remedy ? (
+        <span className="text-xs text-ink-2">
+          {remedy.text}
+          {remedy.command ? (
+            <code className="ml-1 font-mono text-ink">{remedy.command}</code>
+          ) : null}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function RunnerRows({
+  runners,
+  onDetails,
+}: {
+  runners: AdminRunner[];
+  onDetails: (id: string) => void;
+}) {
+  return (
+    <Table scroll>
+      <TableHead>
+        <TableRow>
+          <TableCell head>Name</TableCell>
+          <TableCell head>Status</TableCell>
+          <TableCell head>Hostname</TableCell>
+          <TableCell head>Version</TableCell>
+          <TableCell head>Profiles</TableCell>
+          <TableCell head>Last seen</TableCell>
+          <TableCell head>
+            <span className="sr-only">Actions</span>
+          </TableCell>
+        </TableRow>
+      </TableHead>
+      <tbody>
+        {runners.map((runner) => (
+          <TableRow key={runner.id}>
+            <TableCell>{runner.name}</TableCell>
+            <TableCell>
+              <StatusCell runner={runner} />
+            </TableCell>
+            <TableCell>{runner.hostname ?? '—'}</TableCell>
+            <TableCell>{runner.version ?? '—'}</TableCell>
+            <TableCell>{runner.profilesCount}</TableCell>
+            <TableCell>{formatLastSeen(runner.lastSeenAt)}</TableCell>
+            <TableCell>
+              <div className="flex justify-end">
+                <Button
+                  variant="glass"
+                  size="sm"
+                  aria-label={`Details for ${runner.name}`}
+                  onClick={() => onDetails(runner.id)}
+                >
+                  Details
+                </Button>
+              </div>
+            </TableCell>
+          </TableRow>
+        ))}
+      </tbody>
+    </Table>
+  );
+}
+
 function RunnersTable() {
-  const [runners, setRunners] = useState<AdminRunner[]>();
+  const section = useSection(() => api<AdminRunner[]>('/admin/runners'), []);
   const [adding, setAdding] = useState(false);
   const [pairing, setPairing] = useState<PairingCodeResponse | null>(null);
   const [selected, setSelected] = useState<string>();
+  const router = useRouter();
+  const pathname = usePathname();
 
-  const load = useCallback(async () => {
-    try {
-      setRunners(await api<AdminRunner[]>('/admin/runners'));
-    } catch (err) {
-      toast.error(describeRunnerError(err));
-    }
-  }, []);
-
+  const load = section.retry;
   useEffect(() => {
-    load();
     const timer = setInterval(load, POLL_MS);
     return () => clearInterval(timer);
   }, [load]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get(ADD_RUNNER_PARAM) === null) return;
+    setAdding(true);
+    params.delete(ADD_RUNNER_PARAM);
+    const rest = params.toString();
+    router.replace(rest ? `${pathname}?${rest}` : pathname);
+  }, [pathname, router]);
+
+  // The pairing dialog follows its runner through this page's poll.
+  const pairingRunner = pairing
+    ? section.data?.find((runner) => runner.id === pairing.runner.id)
+    : undefined;
 
   const showCode = (result: PairingCodeResponse) => {
     setAdding(false);
@@ -143,67 +235,46 @@ function RunnersTable() {
   return (
     <>
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">Runners</h1>
+        <div className="flex flex-col gap-1">
+          <h1 className="text-xl font-semibold">Runners</h1>
+          <p className="text-sm text-ink-2">
+            The AgentDock daemon on each machine that holds your repositories.
+          </p>
+        </div>
         <Button variant="solid" onClick={() => setAdding(true)}>
           Add runner
         </Button>
       </div>
 
-      {runners && runners.length === 0 ? (
-        <EmptyState
-          title="No runners yet"
-          description="Add a runner, then run the pairing command it gives you on the machine."
-        />
-      ) : (
-        <Table scroll>
-          <TableHead>
-            <TableRow>
-              <TableCell head>Name</TableCell>
-              <TableCell head>Status</TableCell>
-              <TableCell head>Hostname</TableCell>
-              <TableCell head>Version</TableCell>
-              <TableCell head>Profiles</TableCell>
-              <TableCell head>Last seen</TableCell>
-              <TableCell head>
-                <span className="sr-only">Actions</span>
-              </TableCell>
-            </TableRow>
-          </TableHead>
-          <tbody>
-            {(runners ?? []).map((runner) => (
-              <TableRow key={runner.id}>
-                <TableCell>{runner.name}</TableCell>
-                <TableCell>
-                  <span className="inline-flex items-center gap-2">
-                    <Badge
-                      dot
-                      tone={STATUS_TONE[runner.status]}
-                      aria-hidden="true"
-                    />
-                    {statusLabel(runner.status, runner.pairedAt)}
-                  </span>
-                </TableCell>
-                <TableCell>{runner.hostname ?? '—'}</TableCell>
-                <TableCell>{runner.version ?? '—'}</TableCell>
-                <TableCell>{runner.profilesCount}</TableCell>
-                <TableCell>{formatLastSeen(runner.lastSeenAt)}</TableCell>
-                <TableCell>
-                  <div className="flex justify-end">
-                    <Button
-                      variant="glass"
-                      size="sm"
-                      aria-label={`Details for ${runner.name}`}
-                      onClick={() => setSelected(runner.id)}
-                    >
-                      Details
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </tbody>
-        </Table>
-      )}
+      <AsyncSection
+        section={section}
+        unavailable={{ title: 'Runners are not answering' }}
+        empty={
+          <EmptyState
+            title="Pair your first runner"
+            description="A runner is the AgentDock daemon on the machine that holds your repositories: it runs the agents and reads the code, and it dials out to AgentDock, so the machine needs no open port. Add one to get a pairing command to run there."
+            action={
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button
+                  variant="solid"
+                  size="sm"
+                  onClick={() => setAdding(true)}
+                >
+                  Add runner
+                </Button>
+                <Link
+                  href={INSTALL_PATH}
+                  className={buttonClassName({ variant: 'glass', size: 'sm' })}
+                >
+                  How to install the runner
+                </Link>
+              </div>
+            }
+          />
+        }
+      >
+        {(runners) => <RunnerRows runners={runners} onDetails={setSelected} />}
+      </AsyncSection>
 
       <AddRunnerDialog
         open={adding}
@@ -212,6 +283,7 @@ function RunnersTable() {
       />
       <PairingDialog
         result={pairing}
+        runner={pairingRunner}
         onClose={() => setPairing(null)}
         onNewCode={reissue}
       />

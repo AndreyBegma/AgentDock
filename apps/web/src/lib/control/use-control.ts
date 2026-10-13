@@ -5,13 +5,14 @@ import {
   type CommandRunView,
   type OrchestratorStartRequest,
 } from '@agentdock/shared';
-import { toast } from 'glass-ui/toast';
+import { toast } from '@andrewbehma/glass-ui/toast';
+import { useRouter } from 'next/navigation';
 import { useCallback, useRef, useState } from 'react';
-import { api } from '../api';
+import { api, errorText, errorToastOptions } from '../api';
 import { useLive } from '../live/use-live';
 import {
   commandRunIdOf,
-  describeControlError,
+  describeControlErrorHint,
   describeOutcome,
   type Outcome,
 } from './format';
@@ -42,7 +43,8 @@ const show = ({ tone, text }: Outcome) => {
  * the project, and a run that finishes while this tab has no request of its own
  * in flight for it (somebody else's) is announced from the frame.
  */
-export function useControl(projectId: string) {
+export function useControl(projectId: string, isAdmin = false) {
+  const router = useRouter();
   const [pending, setPending] = useState<PendingRuns>(NO_PENDING_RUNS);
   const [inFlight, setInFlight] = useState<readonly string[]>([]);
   const own = useRef<string[]>([]);
@@ -80,10 +82,11 @@ export function useControl(projectId: string) {
         return run;
       } catch (err) {
         const runId = commandRunIdOf(err);
-        toast.error(
-          describeControlError(err),
-          runId ? { description: `Run ${runId}` } : undefined,
-        );
+        const hint = describeControlErrorHint(err, { projectId, isAdmin });
+        toast.error(errorText(hint), {
+          ...errorToastOptions(hint, (href) => router.push(href)),
+          ...(runId ? { description: `Run ${runId}` } : {}),
+        });
         return undefined;
       } finally {
         const at = own.current.indexOf(key);
@@ -91,7 +94,7 @@ export function useControl(projectId: string) {
         setInFlight(own.current);
       }
     },
-    [projectId],
+    [projectId, isAdmin, router],
   );
 
   return {

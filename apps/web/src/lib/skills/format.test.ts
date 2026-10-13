@@ -1,9 +1,14 @@
 import { describe, expect, test } from 'bun:test';
-import { type InstalledSkillView, SKILLS_ERROR } from '@agentdock/shared';
+import {
+  type InstalledSkillView,
+  type ProjectRuntimeProfile,
+  SKILLS_ERROR,
+} from '@agentdock/shared';
 import { ApiError } from '../api';
 import {
   allowedToolsOf,
   COMMAND_UNAVAILABLE_TEXT,
+  defaultProfileOptionLabel,
   describeSkillsError,
   EMPTY_RUN_FORM,
   formatBytes,
@@ -13,9 +18,12 @@ import {
   isCommandUnavailable,
   parseTimeoutMinutes,
   permissionWarning,
-  profileKeysFrom,
+  profileOptionLabel,
   provenanceLabel,
   runFormProblem,
+  runProfileReason,
+  skillRunProfiles,
+  skillRunsHref,
   toRunRequest,
 } from './format';
 
@@ -68,18 +76,32 @@ describe('provenanceLabel', () => {
   });
 });
 
-describe('profileKeysFrom', () => {
-  test('default plus claude profile keys, deduplicated and sorted', () => {
-    const keys = profileKeysFrom(
-      [
-        skill({ scope: 'profile', profileKey: 'work' }),
-        skill({ scope: 'profile', profileKey: 'work' }),
-        skill({ scope: 'profile', profileKey: 'cx', runtime: 'codex' }),
-        skill({ scope: 'project', profileKey: null }),
-      ],
-      'alpha',
-    );
+describe('run dialog profiles', () => {
+  const profile = (
+    over: Partial<ProjectRuntimeProfile>,
+  ): ProjectRuntimeProfile => ({
+    key: 'work',
+    runtime: 'claude',
+    label: 'Work',
+    authenticated: true,
+    isDefault: false,
+    ...over,
+  });
+
+  test('keeps only claude profiles, in the order the API gave', () => {
+    const keys = skillRunProfiles([
+      profile({ key: 'alpha' }),
+      profile({ key: 'cx', runtime: 'codex' }),
+      profile({ key: 'work' }),
+    ]).map((p) => p.key);
     expect(keys).toEqual(['alpha', 'work']);
+  });
+
+  test('marks the project default', () => {
+    expect(profileOptionLabel(profile({ isDefault: true }))).toBe(
+      'work (project default)',
+    );
+    expect(profileOptionLabel(profile({}))).toBe('work');
   });
 });
 
@@ -217,5 +239,46 @@ describe('errors', () => {
     expect(describeSkillsError(new ApiError(404, undefined, 'x'))).toContain(
       'member',
     );
+  });
+
+  test('skillRunsHref filters History to skill runs', () => {
+    expect(skillRunsHref('p1')).toBe('/projects/p1/history?kind=skill');
+  });
+
+  describe('runProfileReason', () => {
+    const profile = (key: string, isDefault: boolean) =>
+      ({ key, isDefault }) as ProjectRuntimeProfile;
+
+    test('a picked profile is always fine', () => {
+      expect(runProfileReason('work', [], 'p1')).toBeNull();
+    });
+
+    test('no pick and a default exists: fine, and the option says "Project default"', () => {
+      const profiles = [profile('work', true)];
+      expect(runProfileReason('', profiles, 'p1')).toBeNull();
+      expect(defaultProfileOptionLabel(profiles)).toBe('Project default');
+    });
+
+    test('no pick and no default: a reason that links to the settings', () => {
+      const profiles = [profile('work', false)];
+      const reason = runProfileReason('', profiles, 'p1');
+      expect(reason?.href).toBe('/projects/p1/settings?tab=orchestrator');
+      expect(defaultProfileOptionLabel(profiles)).toBe('(none set)');
+    });
+
+    test('profiles that failed to load are not read as "no default"', () => {
+      const reason = runProfileReason('', [], 'p1', true);
+      expect(reason?.text).toContain('could not be loaded');
+      expect(reason?.href).toBeUndefined();
+    });
+  });
+
+  test('an old runner is named and told to update, with no "yet"', () => {
+    const text = describeSkillsError(
+      new ApiError(503, SKILLS_ERROR.commandUnavailable as never, 'x'),
+      'laptop',
+    );
+    expect(text).toContain('Update the AgentDock runner on laptop');
+    expect(text).not.toContain('yet');
   });
 });

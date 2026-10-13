@@ -1,41 +1,47 @@
 'use client';
 
 import type { NotificationMuteView, ProjectSummary } from '@agentdock/shared';
-import { Button } from 'glass-ui/button';
-import { Card } from 'glass-ui/card';
-import { DateInput } from 'glass-ui/date-input';
-import { Field, Select } from 'glass-ui/field';
-import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
-import { toast } from 'glass-ui/toast';
-import { type FormEvent, useCallback, useEffect, useState } from 'react';
-import { api, describeError } from '../../../lib/api';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { Card } from '@andrewbehma/glass-ui/card';
+import { DateInput } from '@andrewbehma/glass-ui/date-input';
+import { Field, Select } from '@andrewbehma/glass-ui/field';
+import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import {
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+} from '@andrewbehma/glass-ui/table';
+import Link from 'next/link';
+import { type FormEvent, useState } from 'react';
+import { DisabledReason } from '../../../components/prerequisites/disabled-reason';
+import { api, describeError, describeErrorHint } from '../../../lib/api';
 import { fromDateInput, isFutureDay } from '../../../lib/notifications/format';
+import { useErrorToast } from '../../../lib/section/use-error-toast';
+import { useSection } from '../../../lib/section/use-section';
+
+interface Loaded {
+  projects: ProjectSummary[];
+  mutes: NotificationMuteView[];
+}
 
 export function MutesSection() {
-  const [mutes, setMutes] = useState<NotificationMuteView[]>();
-  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const section = useSection<Loaded>(async () => {
+    const [list, mine] = await Promise.all([
+      api<ProjectSummary[]>('/projects'),
+      api<NotificationMuteView[]>('/notifications/mutes'),
+    ]);
+    return { projects: Array.isArray(list) ? list : [], mutes: mine };
+  }, []);
+  const showError = useErrorToast();
   const [projectId, setProjectId] = useState('');
   const [until, setUntil] = useState('');
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
 
-  const load = useCallback(async () => {
-    try {
-      const [list, mine] = await Promise.all([
-        api<ProjectSummary[]>('/projects'),
-        api<NotificationMuteView[]>('/notifications/mutes'),
-      ]);
-      setProjects(Array.isArray(list) ? list : []);
-      setMutes(mine);
-    } catch (err) {
-      toast.error(describeError(err));
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
+  const projects = section.data?.projects ?? [];
+  const mutes = section.data?.mutes;
   const muted = new Set((mutes ?? []).map((mute) => mute.projectId));
   const candidates = projects.filter((project) => !muted.has(project.id));
 
@@ -55,9 +61,9 @@ export function MutesSection() {
       });
       setProjectId('');
       setUntil('');
-      await load();
+      section.retry();
     } catch (err) {
-      toast.error(describeError(err));
+      showError(describeErrorHint(err));
     } finally {
       setBusy(false);
     }
@@ -68,11 +74,23 @@ export function MutesSection() {
       await api(`/notifications/mutes/${encodeURIComponent(mute.projectId)}`, {
         method: 'DELETE',
       });
-      await load();
+      section.retry();
     } catch (err) {
-      toast.error(describeError(err));
+      showError(describeErrorHint(err));
     }
   };
+
+  // Why Mute is off, as the next step; "pick a project" is plain and needs no note.
+  const muteReason =
+    projectId || section.data === undefined ? null : projects.length === 0 ? (
+      <DisabledReason href="/projects" cta="Open Projects">
+        You are not a member of any project yet.
+      </DisabledReason>
+    ) : candidates.length === 0 ? (
+      <DisabledReason>Every project is already muted.</DisabledReason>
+    ) : (
+      <DisabledReason>Choose a project to mute it.</DisabledReason>
+    );
 
   return (
     <Card pad="lg">
@@ -81,41 +99,62 @@ export function MutesSection() {
         A muted project is still recorded here, but it does not count as unread
         and is never sent to Telegram.
       </p>
-      <form onSubmit={add} className="mb-4 flex flex-wrap items-end gap-3">
-        <Field label="Project" htmlFor="mute-project">
-          <Select
-            id="mute-project"
-            value={projectId}
-            onChange={(e) => setProjectId(e.target.value)}
+      <form onSubmit={add} className="mb-4 flex flex-col gap-2">
+        <div className="flex flex-wrap items-end gap-3">
+          <Field label="Project" htmlFor="mute-project">
+            <Select
+              id="mute-project"
+              value={projectId}
+              onChange={(e) => setProjectId(e.target.value)}
+            >
+              <option value="">Choose a project…</option>
+              {candidates.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.displayName}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field
+            label="Until (optional)"
+            htmlFor="mute-until"
+            hint="Empty: until you unmute."
+            error={error}
           >
-            <option value="">Choose a project…</option>
-            {candidates.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.displayName}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field
-          label="Until (optional)"
-          htmlFor="mute-until"
-          hint="Empty: until you unmute."
-          error={error}
-        >
-          <DateInput
-            id="mute-until"
-            value={until}
-            onChange={(e) => setUntil(e.target.value)}
-          />
-        </Field>
-        <Button type="submit" variant="solid" disabled={busy || !projectId}>
-          Mute
-        </Button>
+            <DateInput
+              id="mute-until"
+              value={until}
+              onChange={(e) => setUntil(e.target.value)}
+            />
+          </Field>
+          <Button type="submit" variant="solid" disabled={busy || !projectId}>
+            Mute
+          </Button>
+        </div>
+        {muteReason}
       </form>
-      {mutes === undefined ? (
-        <p className="text-ink-2 text-sm">Loading…</p>
-      ) : mutes.length === 0 ? (
-        <p className="text-ink-2 text-sm">No project is muted.</p>
+      {section.data === undefined ? (
+        section.error !== null && !section.loading ? (
+          <SectionUnavailable
+            title="Your muted projects could not be loaded"
+            stillWorks={`${describeError(section.error)} Nothing was unmuted.`}
+            action={
+              <Button variant="glass" size="sm" onClick={section.retry}>
+                Try again
+              </Button>
+            }
+          />
+        ) : (
+          <Skeleton className="h-16 w-full" />
+        )
+      ) : mutes === undefined || mutes.length === 0 ? (
+        <p className="text-ink-2 text-sm">
+          No project is muted. Mute a noisy one above;{' '}
+          <Link href="/projects" className="underline underline-offset-2">
+            all projects
+          </Link>{' '}
+          are listed on Projects.
+        </p>
       ) : (
         <Table scroll>
           <TableHead>
@@ -146,6 +185,19 @@ export function MutesSection() {
           </tbody>
         </Table>
       )}
+      {section.data !== undefined && section.error !== null ? (
+        <div className="mt-3">
+          <SectionUnavailable
+            title="The list could not be refreshed"
+            stillWorks={describeError(section.error)}
+            action={
+              <Button variant="glass" size="sm" onClick={section.retry}>
+                Try again
+              </Button>
+            }
+          />
+        </div>
+      ) : null}
     </Card>
   );
 }

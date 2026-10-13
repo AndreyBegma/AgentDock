@@ -8,11 +8,11 @@ import type {
   ProjectDetail,
 } from '@agentdock/shared';
 import type { OrchestratorPermissionMode } from '@agentdock/shared/protocol';
-import { Button } from 'glass-ui/button';
-import { Card } from 'glass-ui/card';
-import { Field, Input, Select } from 'glass-ui/field';
-import { Skeleton } from 'glass-ui/skeleton';
-import { toast } from 'glass-ui/toast';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { Card } from '@andrewbehma/glass-ui/card';
+import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { api } from '../../../../../lib/api';
 import {

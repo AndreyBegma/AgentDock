@@ -1,16 +1,18 @@
 'use client';
 
 import type { ApprovalDetail } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Banner } from 'glass-ui/banner';
-import { Button } from 'glass-ui/button';
-import { Disclosure } from 'glass-ui/disclosure';
-import { SheetContent, SheetRoot } from 'glass-ui/sheet';
-import { Skeleton } from 'glass-ui/skeleton';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Banner } from '@andrewbehma/glass-ui/banner';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { Disclosure } from '@andrewbehma/glass-ui/disclosure';
+import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { type ReactNode, useEffect, useState } from 'react';
+import { DisabledReason } from '../../../../../components/prerequisites/disabled-reason';
 import { api } from '../../../../../lib/api';
 import {
   deciderLabel,
+  decisionDisabledReason,
   describeApprovalError,
   formatDiffStat,
   SOURCE_LABEL,
@@ -34,11 +36,13 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 
 function Detail({
   projectId,
+  runnerName,
   detail,
   canOperate,
   onChanged,
 }: {
   projectId: string;
+  runnerName?: string | null;
   detail: ApprovalDetail;
   canOperate: boolean;
   onChanged: () => void;
@@ -50,8 +54,8 @@ function Detail({
   const href = safeHttpsUrl(inspection?.url ?? detail.url);
 
   const waiting = detail.status === 'waiting';
-  const decidable =
-    waiting && inspection !== null && inspection.state === 'open';
+  const decisionReason = decisionDisabledReason(inspection, runnerName);
+  const decidable = waiting && decisionReason === null;
 
   return (
     <dl className="flex flex-col gap-4">
@@ -63,7 +67,7 @@ function Detail({
           />
           <span className="text-xs text-ink-2">
             {SOURCE_LABEL[detail.source]}
-            {detail.source === 'derived' ? ' (derived by AgentDock)' : ''} ·
+            {detail.source === 'derived' ? ' (inferred by AgentDock)' : ''} ·
             waiting {formatAgo(detail.waitingSince)}
           </span>
         </span>
@@ -83,13 +87,9 @@ function Detail({
               Request changes
             </Button>
           </div>
-          {decidable ? null : (
-            <span className="text-xs text-ink-2">
-              {inspection
-                ? 'The pull request is no longer open on GitHub.'
-                : 'Decisions are disabled until the runner inspects the pull request: the decision binds to the head commit it reports.'}
-            </span>
-          )}
+          {decisionReason ? (
+            <DisabledReason>{decisionReason}</DisabledReason>
+          ) : null}
         </div>
       ) : null}
 
@@ -226,6 +226,7 @@ function Detail({
         <>
           <ApproveDialog
             projectId={projectId}
+            runnerName={runnerName}
             pr={detail.pr}
             headSha={inspection.headSha}
             open={approving}
@@ -234,6 +235,7 @@ function Detail({
           />
           <RequestChangesDialog
             projectId={projectId}
+            runnerName={runnerName}
             pr={detail.pr}
             headSha={inspection.headSha}
             open={requesting}
@@ -249,6 +251,7 @@ function Detail({
 /** The latest detail for PR `pr`, refetched when `version` changes (a live push). */
 export function ApprovalSheet({
   projectId,
+  runnerName,
   pr,
   title,
   canOperate,
@@ -257,6 +260,8 @@ export function ApprovalSheet({
   onChanged,
 }: {
   projectId: string;
+  /** The project's runner, named when a decision needs it. */
+  runnerName?: string | null;
   pr: number | undefined;
   title: string | null | undefined;
   canOperate: boolean;
@@ -278,12 +283,12 @@ export function ApprovalSheet({
         setError(undefined);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(describeApprovalError(err));
+        if (!cancelled) setError(describeApprovalError(err, runnerName));
       });
     return () => {
       cancelled = true;
     };
-  }, [projectId, pr, version]);
+  }, [projectId, pr, version, runnerName]);
 
   const close = () => {
     setDetail(undefined);
@@ -311,6 +316,7 @@ export function ApprovalSheet({
           ) : detail && detail.pr === pr ? (
             <Detail
               projectId={projectId}
+              runnerName={runnerName}
               detail={detail}
               canOperate={canOperate}
               onChanged={onChanged}

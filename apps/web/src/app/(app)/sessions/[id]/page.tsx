@@ -1,12 +1,19 @@
 'use client';
 
 import type { SessionDetail, SessionTotals } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { EmptyState } from 'glass-ui/empty-state';
-import { Skeleton } from 'glass-ui/skeleton';
-import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
-import { toast } from 'glass-ui/toast';
-import { Tree } from 'glass-ui/tree';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import {
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+} from '@andrewbehma/glass-ui/table';
+import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
+import { Tree } from '@andrewbehma/glass-ui/tree';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -151,6 +158,8 @@ export default function SessionPage() {
   const { id } = useParams<{ id: string }>();
   const [detail, setDetail] = useState<SessionDetail>();
   const [missing, setMissing] = useState(false);
+  // Any failure but "not found": say so and offer a retry, never a skeleton forever.
+  const [failure, setFailure] = useState<unknown>(null);
   const [expanded, setExpanded] = useState<string[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const seeded = useRef(false);
@@ -159,11 +168,12 @@ export default function SessionPage() {
     try {
       setDetail(await api<SessionDetail>(`/sessions/${id}`));
       setMissing(false);
+      setFailure(null);
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) {
         setMissing(true);
       } else {
-        toast.error(describeSessionError(err));
+        setFailure(err);
       }
     }
   }, [id]);
@@ -172,6 +182,7 @@ export default function SessionPage() {
     seeded.current = false;
     setDetail(undefined);
     setMissing(false);
+    setFailure(null);
     load();
   }, [load]);
 
@@ -201,11 +212,31 @@ export default function SessionPage() {
       <EmptyState
         title="Session not found"
         description="It does not exist, or you are not a member of its project."
-        action={<Link href="/sessions">Back to sessions</Link>}
+        action={
+          <Link
+            href="/sessions"
+            className={buttonClassName({ variant: 'glass' })}
+          >
+            Back to sessions
+          </Link>
+        }
       />
     );
   }
   if (!detail || !tree) {
+    if (failure !== null) {
+      return (
+        <SectionUnavailable
+          title="This session could not be loaded"
+          stillWorks={`${describeSessionError(failure)} The sessions list is unaffected.`}
+          action={
+            <Button variant="glass" size="sm" onClick={() => void load()}>
+              Try again
+            </Button>
+          }
+        />
+      );
+    }
     return (
       <div className="flex flex-col gap-3" aria-busy="true">
         <Skeleton className="h-8 w-64" />
@@ -230,9 +261,19 @@ export default function SessionPage() {
         <h1 className="mt-1 text-xl font-semibold">
           {s.title ?? s.externalId}
         </h1>
+        <p className="mt-1 text-sm text-ink-2">
+          One agent session: pick a turn, request or tool call in the tree to
+          see its tokens and timing.
+        </p>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-ink-2">
           <Badge tone="neutral" label={s.runtime} />
-          {s.parsed ? null : <Badge tone="warn" label="not parsed" />}
+          {s.parsed ? null : (
+            <Tooltip content="The runner reported this session, but its transcript has not been read yet. Turns, tokens and cost may be missing.">
+              <button type="button">
+                <Badge tone="warn" label="not yet read" />
+              </button>
+            </Tooltip>
+          )}
           <span>{s.projectName ?? 'No project'}</span>
           {s.slotName ? <span>· slot {s.slotName}</span> : null}
           {s.gitBranch ? <span>· {s.gitBranch}</span> : null}

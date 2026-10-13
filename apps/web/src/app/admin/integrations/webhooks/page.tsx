@@ -5,21 +5,27 @@ import type {
   WebhookView,
   WebhookWithSecret,
 } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Button } from 'glass-ui/button';
-import { EmptyState } from 'glass-ui/empty-state';
-import { Skeleton } from 'glass-ui/skeleton';
-import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
-import { toast } from 'glass-ui/toast';
-import { useCallback, useEffect, useState } from 'react';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import {
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+} from '@andrewbehma/glass-ui/table';
+import { toast } from '@andrewbehma/glass-ui/toast';
+import { useEffect, useState } from 'react';
+import { AsyncSection } from '../../../../components/prerequisites/async-section';
 import { api } from '../../../../lib/api';
 import { formatAgo } from '../../../../lib/fleet/format';
+import { useSection } from '../../../../lib/section/use-section';
 import {
   CIRCUIT_LABEL,
   CIRCUIT_TONE,
   DELIVERY_STATUS_LABEL,
   DELIVERY_STATUS_TONE,
-  describeWebhooksError,
   eventsLabel,
   urlHost,
 } from '../../../../lib/webhooks/format';
@@ -48,31 +54,17 @@ const revealWebhook = (
 });
 
 export default function AdminWebhooksPage() {
-  const [webhooks, setWebhooks] = useState<WebhookView[]>();
-  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const webhooks = useSection(() => api<WebhookView[]>('/admin/webhooks'), []);
+  const projects = useSection(() => api<ProjectSummary[]>('/projects'), []);
   const [editing, setEditing] = useState<WebhookView | 'new'>();
   const [selected, setSelected] = useState<string>();
   const [revealed, setRevealed] = useState<RevealedSecret | null>(null);
-
-  const load = useCallback(async () => {
-    try {
-      setWebhooks(await api<WebhookView[]>('/admin/webhooks'));
-    } catch (err) {
-      toast.error(describeWebhooksError(err));
-    }
-  }, []);
+  const reload = webhooks.retry;
 
   useEffect(() => {
-    void load();
-    const timer = setInterval(load, POLL_MS);
+    const timer = setInterval(reload, POLL_MS);
     return () => clearInterval(timer);
-  }, [load]);
-
-  useEffect(() => {
-    api<ProjectSummary[]>('/projects')
-      .then(setProjects)
-      .catch(() => undefined);
-  }, []);
+  }, [reload]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -81,88 +73,102 @@ export default function AdminWebhooksPage() {
           <h1 className="text-xl font-semibold">Webhooks</h1>
           <p className="max-w-prose text-sm text-ink-2">
             Outbound. AgentDock’s events are pushed to a URL you choose —
-            signed, retried with backoff, and held by a circuit breaker while
-            the receiver is down.
+            signed, retried with backoff, and paused for a while when the
+            receiver keeps failing.
           </p>
         </div>
         <Button onClick={() => setEditing('new')}>New webhook</Button>
       </div>
 
-      {!webhooks ? (
-        <Skeleton className="h-48 w-full" />
-      ) : webhooks.length === 0 ? (
-        <EmptyState
-          title="No webhooks"
-          description="Create one to send events to n8n, Slack or your own bot."
-        />
-      ) : (
-        <Table scroll>
-          <TableHead>
-            <TableRow>
-              <TableCell head>Name</TableCell>
-              <TableCell head>Target</TableCell>
-              <TableCell head>Events</TableCell>
-              <TableCell head>Circuit</TableCell>
-              <TableCell head>Last delivery</TableCell>
-              <TableCell head>
-                <span className="sr-only">Actions</span>
-              </TableCell>
-            </TableRow>
-          </TableHead>
-          <tbody>
-            {webhooks.map((webhook) => (
-              <TableRow key={webhook.id}>
-                <TableCell>
-                  <span className="font-medium">{webhook.name}</span>
-                  {webhook.enabled ? null : (
-                    <div className="text-xs text-ink-3">disabled</div>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <span className="font-mono text-sm">
-                    {urlHost(webhook.url)}
-                  </span>
-                </TableCell>
-                <TableCell>{eventsLabel(webhook.events)}</TableCell>
-                <TableCell>
-                  <Badge
-                    tone={CIRCUIT_TONE[webhook.circuitState]}
-                    label={CIRCUIT_LABEL[webhook.circuitState]}
-                  />
-                </TableCell>
-                <TableCell>
-                  {webhook.lastDelivery ? (
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        tone={DELIVERY_STATUS_TONE[webhook.lastDelivery.status]}
-                        label={
-                          DELIVERY_STATUS_LABEL[webhook.lastDelivery.status]
-                        }
-                      />
-                      <span className="text-xs text-ink-3">
-                        {formatAgo(webhook.lastDelivery.createdAt)}
-                      </span>
-                    </div>
-                  ) : (
-                    '—'
-                  )}
-                </TableCell>
-                <TableCell>
-                  <div className="flex justify-end">
-                    <Button
-                      variant="glass"
-                      size="sm"
-                      onClick={() => setSelected(webhook.id)}
-                    >
-                      Open
-                    </Button>
-                  </div>
+      <AsyncSection
+        section={webhooks}
+        unavailable={{
+          title: 'Webhooks are not answering',
+          stillWorks:
+            'Deliveries keep going out on the server; only this list is missing.',
+        }}
+        skeleton={<Skeleton className="h-48 w-full" />}
+        empty={
+          <EmptyState
+            title="Where AgentDock sends its events"
+            description="Create a webhook to send events — pull requests, blocked issues, agents waiting for a person — to n8n, Slack or your own bot."
+            action={
+              <Button onClick={() => setEditing('new')}>New webhook</Button>
+            }
+          />
+        }
+      >
+        {(list) => (
+          <Table scroll>
+            <TableHead>
+              <TableRow>
+                <TableCell head>Name</TableCell>
+                <TableCell head>Target</TableCell>
+                <TableCell head>Events</TableCell>
+                <TableCell head>Delivery</TableCell>
+                <TableCell head>Last delivery</TableCell>
+                <TableCell head>
+                  <span className="sr-only">Actions</span>
                 </TableCell>
               </TableRow>
-            ))}
-          </tbody>
-        </Table>
-      )}
+            </TableHead>
+            <tbody>
+              {list.map((webhook) => (
+                <TableRow key={webhook.id}>
+                  <TableCell>
+                    <span className="font-medium">{webhook.name}</span>
+                    {webhook.enabled ? null : (
+                      <div className="text-xs text-ink-3">disabled</div>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <span className="font-mono text-sm">
+                      {urlHost(webhook.url)}
+                    </span>
+                  </TableCell>
+                  <TableCell>{eventsLabel(webhook.events)}</TableCell>
+                  <TableCell>
+                    <Badge
+                      tone={CIRCUIT_TONE[webhook.circuitState]}
+                      label={CIRCUIT_LABEL[webhook.circuitState]}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    {webhook.lastDelivery ? (
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          tone={
+                            DELIVERY_STATUS_TONE[webhook.lastDelivery.status]
+                          }
+                          label={
+                            DELIVERY_STATUS_LABEL[webhook.lastDelivery.status]
+                          }
+                        />
+                        <span className="text-xs text-ink-3">
+                          {formatAgo(webhook.lastDelivery.createdAt)}
+                        </span>
+                      </div>
+                    ) : (
+                      '—'
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex justify-end">
+                      <Button
+                        variant="glass"
+                        size="sm"
+                        onClick={() => setSelected(webhook.id)}
+                      >
+                        Open
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </tbody>
+          </Table>
+        )}
+      </AsyncSection>
 
       <TargetsCard />
 
@@ -174,12 +180,12 @@ export default function AdminWebhooksPage() {
         onCreated={(created) => {
           setEditing(undefined);
           setRevealed(revealWebhook('Webhook created', created));
-          void load();
+          reload();
         }}
         onSaved={() => {
           setEditing(undefined);
           toast.success('Webhook saved');
-          void load();
+          reload();
         }}
       />
 
@@ -190,7 +196,7 @@ export default function AdminWebhooksPage() {
         onRotated={(rotated) =>
           setRevealed(revealWebhook('Secret rotated', rotated))
         }
-        onChanged={() => void load()}
+        onChanged={reload}
       />
 
       <SecretDialog revealed={revealed} onClose={() => setRevealed(null)} />

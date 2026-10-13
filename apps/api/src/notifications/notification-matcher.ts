@@ -1,4 +1,7 @@
-import { QUEUE_DRY_INTERVAL_MS } from '@agentdock/shared';
+import {
+  NOTIFICATION_KIND_SPECS,
+  QUEUE_DRY_INTERVAL_MS,
+} from '@agentdock/shared';
 import {
   Inject,
   Injectable,
@@ -6,6 +9,7 @@ import {
   type OnApplicationBootstrap,
   type OnModuleDestroy,
 } from '@nestjs/common';
+import { SchedulerRegistry } from '@nestjs/schedule';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import {
@@ -26,6 +30,7 @@ import { NotificationsService } from './notifications.service';
 
 type Tx = Prisma.TransactionClient;
 
+const JOB_NAME = 'notification-matcher';
 const STATE_ID = 1;
 const LOCK_KEY = 'notifications:matcher';
 const TRANSACTION_TIMEOUT_MS = 60_000;
@@ -73,6 +78,7 @@ export class NotificationMatcher
     private readonly prisma: PrismaService,
     private readonly writer: NotificationWriter,
     private readonly notifications: NotificationsService,
+    private readonly scheduler: SchedulerRegistry,
     @Inject(NOTIFICATION_OPTIONS) private readonly options: NotificationOptions,
   ) {}
 
@@ -85,10 +91,14 @@ export class NotificationMatcher
       });
     }, this.options.matcherIntervalMs);
     this.timer.unref();
+    this.scheduler.addInterval(JOB_NAME, this.timer);
   }
 
   onModuleDestroy(): void {
     clearInterval(this.timer);
+    if (this.scheduler.doesExist('interval', JOB_NAME)) {
+      this.scheduler.deleteInterval(JOB_NAME);
+    }
   }
 
   /**
@@ -193,7 +203,10 @@ export class NotificationMatcher
     ) {
       return [];
     }
-    const recipients = await this.writer.projectRecipients(tx, projectId);
+    const everyone = await this.writer.projectRecipients(tx, projectId);
+    const recipients = NOTIFICATION_KIND_SPECS[draft.kind].adminsOnly
+      ? everyone.filter((r) => r.role === 'admin')
+      : everyone;
     return this.writer.write(
       tx,
       this.input(draft, event, projectId),
@@ -217,7 +230,9 @@ export class NotificationMatcher
       link: projectLink(projectId, draft.page),
       eventId: event.id,
       at: event.ts,
-      fold: true,
+      // One item per disable: a second disable after a re-enable is news, not
+      // a repeat of the first (spec 25 D10).
+      fold: draft.kind !== 'schedule.disabled',
     };
   }
 

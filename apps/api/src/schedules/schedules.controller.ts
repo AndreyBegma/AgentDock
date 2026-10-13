@@ -147,7 +147,7 @@ export class AdminSchedulesController {
   }
 
   @Get('system-jobs')
-  systemJobs(): SystemJobView[] {
+  systemJobs(): Promise<SystemJobView[]> {
     return this.jobs.list();
   }
 }

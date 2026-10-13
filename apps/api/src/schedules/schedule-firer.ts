@@ -17,14 +17,16 @@ import type {
   ScheduleFiringStatus,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
-import { SYSTEM_ACTOR } from '../audit/audit.types';
+import { SYSTEM_ACTOR, systemActorFor } from '../audit/audit.types';
 import { ControlService } from '../control/control.service';
 import { PrismaService } from '../database/prisma.service';
 import { ProjectAccessService } from '../projects';
 import { RunnerPresence } from '../runners/runner-presence';
 import { SkillRunService } from '../skills';
 import { BeforeFire } from './before-fire';
+import { recordDisabledEvent, recordFiringEvent } from './schedule-events';
 import { ScheduleLive } from './schedule-live';
+import { ScheduleTimers } from './schedule-timers';
 import { parseTarget } from './target';
 
 /** How a sent firing ended, before it is written. */
@@ -83,6 +85,7 @@ export class ScheduleFirer {
     private readonly beforeFire: BeforeFire,
     private readonly audit: AuditService,
     private readonly live: ScheduleLive,
+    private readonly timers: ScheduleTimers,
   ) {}
 
   /** Fires `firingId` if it is still `due`; returns the firing as it ends. */
@@ -122,7 +125,7 @@ export class ScheduleFirer {
         reason: SCHEDULE_FIRING_REASONS.creatorNotAuthorized,
         sent: false,
       });
-      await this.disable(schedule, 'creator_not_authorized');
+      await this.disable(schedule, 'creator_not_authorized', firing.id);
       return settled;
     }
 
@@ -200,7 +203,11 @@ export class ScheduleFirer {
       });
       if (count === 0) return null;
       await this.count(tx, firing.scheduleId, outcome, now);
-      return tx.scheduleFiring.findUniqueOrThrow({ where: { id: firing.id } });
+      const row = await tx.scheduleFiring.findUniqueOrThrow({
+        where: { id: firing.id },
+      });
+      await recordFiringEvent(tx, row, now);
+      return row;
     });
     if (!updated) {
       return this.prisma.scheduleFiring.findUniqueOrThrow({
@@ -217,22 +224,34 @@ export class ScheduleFirer {
         schedule.enabled &&
         schedule.consecutiveFailures >= SCHEDULE_MAX_CONSECUTIVE_FAILURES
       ) {
-        await this.disable(schedule, 'failing');
+        await this.disable(schedule, 'failing', updated.id);
       }
     }
     return updated;
   }
 
-  /** D10, D11: disables a schedule on the system's behalf, audited. */
+  /**
+   * D10, D11: disables a schedule on the system's behalf, audited, and records
+   * `schedule.disabled` for `firingId`, the firing that caused it.
+   */
   async disable(
     schedule: Schedule,
     reason: Exclude<ScheduleDisabledReason, 'manual'>,
+    firingId: bigint,
   ): Promise<void> {
-    const { count } = await this.prisma.schedule.updateMany({
-      where: { id: schedule.id, enabled: true },
-      data: { enabled: false, disabledReason: reason, nextRunAt: null },
+    const now = new Date();
+    const count = await this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.schedule.updateMany({
+        where: { id: schedule.id, enabled: true },
+        data: { enabled: false, disabledReason: reason, nextRunAt: null },
+      });
+      if (count > 0)
+        await recordDisabledEvent(tx, schedule.id, firingId, reason, now);
+      return count;
     });
     if (count === 0) return;
+    // Spec 123 B8: the disabled schedule's timer goes.
+    await this.timers.sync(schedule.id, schedule.nextRunAt);
     await this.audit.record({
       actor: SYSTEM_ACTOR,
       action: 'schedule.disable',
@@ -285,9 +304,8 @@ export class ScheduleFirer {
     role: Role,
     creator: { id: string; email: string },
   ): Promise<Outcome> {
-    // D8: sent as the system, with the creator's role; the person is
-    // reachable through the run's trigger (`triggeredById` → schedule).
-    const ctx = { actor: SYSTEM_ACTOR };
+    // D8: sent as the system on the creator's behalf, with the creator's role.
+    const ctx = { actor: systemActorFor(creator.id) };
     if (target.kind === 'skill') {
       const profileKey = await this.profileKey(target.profileId);
       const run = await this.skillRuns.start(

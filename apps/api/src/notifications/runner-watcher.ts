@@ -5,6 +5,7 @@ import {
   type OnApplicationBootstrap,
   type OnModuleDestroy,
 } from '@nestjs/common';
+import { SchedulerRegistry } from '@nestjs/schedule';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { RunnerPresence } from '../runners/runner-presence';
@@ -20,6 +21,7 @@ import { NotificationsService } from './notifications.service';
 
 type Tx = Prisma.TransactionClient;
 
+const JOB_NAME = 'runner-watcher';
 const LOCK_KEY = 'notifications:runners';
 const RUNNERS_LINK = '/admin/runners';
 
@@ -44,6 +46,7 @@ export class RunnerWatcher implements OnApplicationBootstrap, OnModuleDestroy {
     private readonly presence: RunnerPresence,
     private readonly writer: NotificationWriter,
     private readonly notifications: NotificationsService,
+    private readonly scheduler: SchedulerRegistry,
     @Inject(NOTIFICATION_OPTIONS) private readonly options: NotificationOptions,
   ) {}
 
@@ -56,10 +59,14 @@ export class RunnerWatcher implements OnApplicationBootstrap, OnModuleDestroy {
       });
     }, this.options.watcherIntervalMs);
     this.timer.unref();
+    this.scheduler.addInterval(JOB_NAME, this.timer);
   }
 
   onModuleDestroy(): void {
     clearInterval(this.timer);
+    if (this.scheduler.doesExist('interval', JOB_NAME)) {
+      this.scheduler.deleteInterval(JOB_NAME);
+    }
   }
 
   /** One look at every runner. False when another pass holds the lock. */

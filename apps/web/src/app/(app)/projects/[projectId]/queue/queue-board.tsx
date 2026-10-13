@@ -1,5 +1,5 @@
 import type { QueueItemView } from '@agentdock/shared';
-import { Board } from 'glass-ui/board';
+import { Board } from '@andrewbehma/glass-ui/board';
 import { type BoardCard, boardColumns } from '../../../../../lib/queue/format';
 import { ComputedNote, IssueLink } from './state-cells';
 

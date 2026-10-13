@@ -197,14 +197,21 @@ model Event {
   /// `data.pluginEventId` of a `code-sentinel` event — the plugin's `eid`
   /// (spec 16 D5). Null otherwise, and on an `events.duplicate`.
   pluginEventId String?
+  /// Idempotency key of a server-originated row (`source` `api`, ADR-0014):
+  /// one row per `(source, dedupeKey)`. Null on runner rows.
+  dedupeKey     String?
 
   runner            Runner            @relation(fields: [runnerId], references: [id], onDelete: Cascade)
   webhookDeliveries WebhookDelivery[]
 
+  /// Runner rows have positive seqs; server-originated rows (ADR-0014) take
+  /// `-nextval('server_event_seq')`, so the two never meet.
   @@unique([runnerId, seq])
   /// One plugin event per project root. NULLs are distinct in PostgreSQL, so
   /// this binds plugin events only — a partial index without a `WHERE`.
   @@unique([projectRoot, pluginEventId])
+  /// One server-originated event per key; NULLs are distinct, as above.
+  @@unique([source, dedupeKey])
   @@index([type, ts])
   /// "A plugin event in the last 24 h" for `fleetChannel` (spec 16 D8).
   @@index([projectRoot, source, receivedAt])
@@ -234,6 +241,8 @@ model AuditRecord {
   actorType     AuditActorType
   actorUserId   String?
   actorRunnerId String?
+  /// A `system` actor's principal (#102); hashed only when set.
+  actorOnBehalfOfId String?
   action        String
   targetType    String
   targetId      String?
@@ -250,6 +259,7 @@ model AuditRecord {
   @@index([ts])
   @@index([action, ts])
   @@index([actorUserId, ts])
+  @@index([actorOnBehalfOfId, ts])
   @@index([projectId, ts])
   @@index([targetType, targetId])
   @@map("audit_records")

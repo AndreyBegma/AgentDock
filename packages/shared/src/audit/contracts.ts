@@ -32,6 +32,10 @@ export interface AuditRecordView {
   /** The actor's current email; null once the user is deleted (the id stays). */
   actorEmail: string | null;
   actorRunnerId: string | null;
+  /** A `system` actor's principal: the user it acted for (a schedule's or trigger's creator). */
+  actorOnBehalfOfId: string | null;
+  /** That user's current email; null once the user is deleted (the id stays). */
+  actorOnBehalfOfEmail: string | null;
   /** A dotted action; `AuditAction` for every record written by this version. */
   action: string;
   targetType: string;

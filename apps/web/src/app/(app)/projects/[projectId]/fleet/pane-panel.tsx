@@ -1,8 +1,8 @@
 'use client';
 
-import { Badge } from 'glass-ui/badge';
-import { Chip } from 'glass-ui/chip';
-import { type LogLine, LogViewer } from 'glass-ui/log-viewer';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Chip } from '@andrewbehma/glass-ui/chip';
+import { type LogLine, LogViewer } from '@andrewbehma/glass-ui/log-viewer';
 import { useMemo, useState } from 'react';
 import {
   PANE_CONNECTION_LABEL,

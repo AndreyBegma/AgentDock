@@ -1,18 +1,20 @@
 # glass-ui in AgentDock
 
 [glass-ui](https://github.com/AndreyBegma/glass-ui) is the only component
-library (ADR-0011). Releases are tags on `main`, cut from `develop` through a release PR; `v0.21.0` ships the M1 desk primitives (glass-ui#67), `v0.22.0` the M2 activity primitives (#70), the next minor the M3 automation primitives (#74).
+library (ADR-0011), consumed from npm as `@andrewbehma/glass-ui`. Releases are tags on `main`, cut from `develop` through a release PR and published to npm; `v0.21.0` ships the M1 desk primitives (glass-ui#67), `v0.22.0` the M2 activity primitives (#70), `0.23.0` the npm package with compiled `dist/` (#89), the next minor the M3 automation primitives (#74).
 
 ## Consumption
 
-- Dependency: `"glass-ui": "github:AndreyBegma/glass-ui#<tag>"`; local work via
-  `bun link`.
-- Next: `transpilePackages: ['glass-ui']` (it ships TypeScript source).
-- CSS: `@import "glass-ui/tokens.css"; @import "glass-ui/material.css";
-  @import "glass-ui/base.css";`
+- Dependency: `"@andrewbehma/glass-ui": "<version>"` in `apps/web`, pinned
+  exactly; local work via `bun link`.
+- Next: no `transpilePackages` entry — the package ships compiled `dist/`.
+- CSS: `@import "@andrewbehma/glass-ui/tokens.css";
+  @import "@andrewbehma/glass-ui/material.css";
+  @import "@andrewbehma/glass-ui/base.css";` — `tokens.css` declares the
+  Tailwind `@source` for the package, so nothing else is needed.
 - Root: `data-scale="desk"`, theme via `data-theme` (dark default),
   `data-material="flat"` fallback. `id="main-content"` on the main region.
-- Import by subpath (`glass-ui/button`), never the barrel.
+- Import by subpath (`@andrewbehma/glass-ui/button`), never the barrel.
 - Tokens only — no hex, `rgb()` or Tailwind palette colours. Glass for chrome
   (header, bars, sheets, dialogs, menus); rows and cards stay solid.
 

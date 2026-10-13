@@ -6,15 +6,21 @@ import type {
   SessionListResponse,
   SessionSummary,
 } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Button } from 'glass-ui/button';
-import { Checkbox } from 'glass-ui/checkbox';
-import { DateInput } from 'glass-ui/date-input';
-import { EmptyState } from 'glass-ui/empty-state';
-import { Field, Input, Select } from 'glass-ui/field';
-import { Skeleton } from 'glass-ui/skeleton';
-import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
-import { toast } from 'glass-ui/toast';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
+import { Checkbox } from '@andrewbehma/glass-ui/checkbox';
+import { DateInput } from '@andrewbehma/glass-ui/date-input';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
+import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import {
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+} from '@andrewbehma/glass-ui/table';
+import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import Link from 'next/link';
 import {
   type FormEvent,
@@ -26,17 +32,21 @@ import {
 import { useCurrentUser } from '../../../components/shell/user-context';
 import { api } from '../../../lib/api';
 import { useLive } from '../../../lib/live/use-live';
+import { useErrorToast } from '../../../lib/section/use-error-toast';
 import {
   cacheTokens,
   describeSessionError,
+  describeSessionHint,
   EMPTY_FILTERS,
   formatCost,
   formatDuration,
   formatTime,
   formatTokens,
+  hasSessionFilters,
   liveTopicFor,
   queryString,
   type SessionFilterForm,
+  sessionFormChanged,
   toQuery,
 } from '../../../lib/sessions/format';
 
@@ -48,6 +58,7 @@ function Filters({
   form,
   projects,
   isAdmin,
+  changed,
   onChange,
   onApply,
   onReset,
@@ -55,6 +66,8 @@ function Filters({
   form: SessionFilterForm;
   projects: ProjectSummary[];
   isAdmin: boolean;
+  /** The form holds filters that were not applied yet. */
+  changed: boolean;
   onChange: (patch: Partial<SessionFilterForm>) => void;
   onApply: () => void;
   onReset: () => void;
@@ -69,7 +82,13 @@ function Filters({
       onSubmit={submit}
       className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-4"
     >
-      <Field label="Project" htmlFor="sessions-project">
+      <Field
+        label="Project"
+        htmlFor="sessions-project"
+        hint={
+          form.unassigned ? 'Off while “Unassigned only” is ticked.' : undefined
+        }
+      >
         <Select
           id="sessions-project"
           value={form.projectId}
@@ -104,7 +123,11 @@ function Filters({
           onChange={(e) => onChange({ model: e.target.value })}
         />
       </Field>
-      <Field label="Slot" htmlFor="sessions-slot">
+      <Field
+        label="Slot"
+        htmlFor="sessions-slot"
+        hint="The name of an orchestrator slot, as shown in the Project / slot column."
+      >
         <Input
           id="sessions-slot"
           value={form.slot}
@@ -137,13 +160,18 @@ function Filters({
           onChange={(e) => onChange({ unassigned: e.target.checked })}
         />
       ) : null}
-      <div className="flex gap-2 sm:col-span-2 lg:col-span-4">
+      <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-4">
         <Button variant="solid" type="submit">
           Apply
         </Button>
         <Button variant="ghost" type="button" onClick={onReset}>
           Reset
         </Button>
+        {changed ? (
+          <p className="text-xs text-ink-2" role="status">
+            Filters changed. Press Apply to update the list.
+          </p>
+        ) : null}
       </div>
     </form>
   );
@@ -175,7 +203,14 @@ function SessionRow({ session }: { session: SessionSummary }) {
       <TableCell>
         <Badge tone="neutral" label={session.runtime} />
         {session.parsed ? null : (
-          <span className="ms-2 text-xs text-ink-3">not parsed</span>
+          <Tooltip content="The runner reported this session, but its transcript has not been read yet. Turns, tokens and cost may be missing.">
+            <button
+              type="button"
+              className="ms-2 cursor-help text-xs text-ink-3 underline decoration-dotted"
+            >
+              not yet read
+            </button>
+          </Tooltip>
         )}
       </TableCell>
       <TableCell>{session.models.join(', ') || '—'}</TableCell>
@@ -202,6 +237,9 @@ export default function SessionsPage() {
   const [items, setItems] = useState<SessionSummary[]>();
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  // A failed load is never "no sessions": keep what is on screen and say so.
+  const [failure, setFailure] = useState<unknown>(null);
+  const showError = useErrorToast();
   // Only the newest request may write: a slow older one must not overwrite.
   const generation = useRef(0);
 
@@ -214,15 +252,16 @@ export default function SessionsPage() {
       if (mine !== generation.current) return;
       setItems(page.items);
       setNextCursor(page.nextCursor);
+      setFailure(null);
     } catch (err) {
       if (mine !== generation.current) return;
-      setItems((current) => current ?? []);
-      toast.error(describeSessionError(err));
+      setFailure(err);
     }
   }, []);
 
   useEffect(() => {
     setItems(undefined);
+    setFailure(null);
     loadFirst(applied);
   }, [applied, loadFirst]);
 
@@ -258,7 +297,7 @@ export default function SessionsPage() {
       setItems((current) => [...(current ?? []), ...page.items]);
       setNextCursor(page.nextCursor);
     } catch (err) {
-      toast.error(describeSessionError(err));
+      showError(describeSessionHint(err));
     } finally {
       setLoadingMore(false);
     }
@@ -269,15 +308,33 @@ export default function SessionsPage() {
     setApplied({});
   };
 
+  const unavailable =
+    failure !== null ? (
+      <SectionUnavailable
+        title="Sessions are not answering"
+        stillWorks={`${describeSessionError(failure)} The filters above still work.`}
+        action={
+          <Button variant="glass" size="sm" onClick={() => loadFirst(applied)}>
+            Try again
+          </Button>
+        }
+      />
+    ) : null;
+
   return (
     <>
-      <h1 className="mb-4 text-xl font-semibold">Sessions</h1>
+      <h1 className="text-xl font-semibold">Sessions</h1>
+      <p className="mb-4 text-sm text-ink-2">
+        Every agent session your runners have reported, with its tokens and
+        cost.
+      </p>
 
       <div className="mb-6">
         <Filters
           form={form}
           projects={projects}
           isAdmin={isAdmin}
+          changed={sessionFormChanged(form, applied)}
           onChange={(patch) => setForm((c) => ({ ...c, ...patch }))}
           onApply={() => setApplied(toQuery(form))}
           onReset={reset}
@@ -285,17 +342,43 @@ export default function SessionsPage() {
       </div>
 
       {items === undefined ? (
-        <div className="flex flex-col gap-3" aria-busy="true">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-40 w-full" />
-        </div>
+        (unavailable ?? (
+          <div className="flex flex-col gap-3" aria-busy="true">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-40 w-full" />
+          </div>
+        ))
       ) : items.length === 0 ? (
-        <EmptyState
-          title="No sessions"
-          description="Nothing matches these filters, or no runner has reported a session yet."
-        />
+        <>
+          {unavailable}
+          {hasSessionFilters(applied) ? (
+            <EmptyState
+              title="No sessions match these filters"
+              description="Widen the date range or clear a filter to see more."
+              action={
+                <Button variant="glass" onClick={reset}>
+                  Clear filters
+                </Button>
+              }
+            />
+          ) : (
+            <EmptyState
+              title="No sessions yet"
+              description="A session appears here when an agent runs on a paired runner and reports its transcript."
+              action={
+                <Link
+                  href={isAdmin ? '/admin/runners' : '/projects'}
+                  className={buttonClassName({ variant: 'glass' })}
+                >
+                  {isAdmin ? 'Open Runners' : 'Open Projects'}
+                </Link>
+              }
+            />
+          )}
+        </>
       ) : (
         <>
+          {unavailable}
           <Table scroll>
             <TableHead>
               <TableRow>

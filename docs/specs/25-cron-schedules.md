@@ -1,5 +1,11 @@
 # Cron schedules for skills and orchestrator commands
 
+> **Machinery superseded:** the PostgreSQL tick loop and leader election below
+> are replaced by BullMQ on Redis — see [spec 123](123-schedules-on-bullmq.md)
+> and [ADR-0015](../adr/0015-schedules-run-on-bullmq.md). What a schedule does
+> (targets, cron/DST rules, missed runs, overlap, authorization) is unchanged
+> and stays defined here.
+
 Issue: [#25](https://github.com/AndreyBegma/AgentDock/issues/25) · Roadmap: M3.2 ·
 Decisions: [ADR-0005](../adr/0005-drive-the-cs-orchestrator-skill-do-not-reimplement-it.md),
 [ADR-0007](../adr/0007-postgresql-only.md),
@@ -159,7 +165,7 @@ already exist. Honestly two slots in sequence.
 Decided while landing the API slot (i25-api); the orchestrator approved each one on 2026-10-09.
 
 - **Q1 — an orchestrator target has no `runs` row.** `orchestrator.start` (#17) writes a `command_runs` row; nothing creates a `runs` row for it. An orchestrator firing links `commandRunId`, is `succeeded` when the command returns ok, `noop` on `already_running`, and is never `started`. The orchestrator's rounds are in history as their slots' runs (`triggeredByType: orchestrator`). The history criterion — `triggeredByType: schedule`, `triggeredById` = the schedule — holds for skill targets. D7 for an orchestrator target is `already_running → noop`.
-- **Q2 — no `events` rows.** The `events` table is runner-scoped (`runnerId` required, unique `(runnerId, seq)`) and has no API-sourced path. `schedule.fired` / `.skipped` / `.failed` / `.disabled` are published live on `project:<id>` beside `schedule.updated` / `schedule_firing.updated`; `schedule_firings` is the durable record. Follow-up: an API event source.
+- **Q2 — no `events` rows.** The `events` table is runner-scoped (`runnerId` required, unique `(runnerId, seq)`) and has no API-sourced path. `schedule.fired` / `.skipped` / `.failed` / `.disabled` are published live on `project:<id>` beside `schedule.updated` / `schedule_firing.updated`; `schedule_firings` is the durable record. Follow-up: an API event source. **Closed by #99 (ADR-0014):** each is also an `events` row with `source` `api` on the project's runner, `seq` from `server_event_seq`, key `<type>:<firingId>`, written in the firing's own transaction. The activity feed shows them with actor `system`.
 - **Q3 — system jobs.** Only jobs on `SchedulerRegistry` are listed: today `audit-verification` (#8) and `activity-retention` (#21). Usage rollups (#13) and the notification loops (#22) run on plain timers and appear once their modules register them. Cron jobs carry their expression and dates; named intervals carry their name only. Follow-up: #13/#22 register with the registry.
 - **Q4 — leader election is tested in-process.** Two `SchedulerService` instances, each with its own lock connection: the second cannot lead while the first holds the lock, and takes over once the first's connection closes (a follower retries every 30 s).
 - **D8 `onBehalfOf`.** `AuditActor` has no `onBehalfOf`. Commands are sent as the `system` actor with the creator's project role; the person is reached through `runs.triggeredById → schedules.createdById` (skill) and `command_runs.userId` = creator (orchestrator). Follow-up: `onBehalfOf` on `AuditActor`.

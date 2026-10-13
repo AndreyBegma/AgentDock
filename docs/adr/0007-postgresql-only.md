@@ -1,6 +1,6 @@
 # ADR-0007: PostgreSQL only
 
-Status: accepted · Date: 2026-10-07
+Status: accepted, amended by [ADR-0015](0015-schedules-run-on-bullmq.md) (schedules run on BullMQ / Redis) · Date: 2026-10-07
 
 ## Context
 

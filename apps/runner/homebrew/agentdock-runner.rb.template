@@ -1,0 +1,51 @@
+# Rendered from AgentDock's apps/runner/homebrew/agentdock-runner.rb.template
+# by apps/runner/scripts/render-formula.sh on every runner release (ADR-0017).
+# Change the template there, not this file.
+class AgentdockRunner < Formula
+  desc "Per-machine daemon of AgentDock, a control plane for agent fleets"
+  homepage "https://github.com/AndreyBegma/AgentDock"
+  version "@VERSION@"
+  license "MIT"
+
+  on_macos do
+    on_arm do
+      url "https://github.com/AndreyBegma/AgentDock/releases/download/runner-v@VERSION@/agentdock-runner-@VERSION@-darwin-arm64.tar.gz"
+      sha256 "@SHA256_DARWIN_ARM64@"
+    end
+    on_intel do
+      url "https://github.com/AndreyBegma/AgentDock/releases/download/runner-v@VERSION@/agentdock-runner-@VERSION@-darwin-x64.tar.gz"
+      sha256 "@SHA256_DARWIN_X64@"
+    end
+  end
+
+  on_linux do
+    on_arm do
+      url "https://github.com/AndreyBegma/AgentDock/releases/download/runner-v@VERSION@/agentdock-runner-@VERSION@-linux-arm64.tar.gz"
+      sha256 "@SHA256_LINUX_ARM64@"
+    end
+    on_intel do
+      url "https://github.com/AndreyBegma/AgentDock/releases/download/runner-v@VERSION@/agentdock-runner-@VERSION@-linux-x64.tar.gz"
+      sha256 "@SHA256_LINUX_X64@"
+    end
+  end
+
+  def install
+    bin.install "agentdock-runner"
+  end
+
+  # Exit 78 is a terminal close (protocol mismatch, revoked token, replaced):
+  # restarting can only loop. Service managers restart every non-zero exit, so
+  # the wrapper turns 78 into 0 and only an unsuccessful exit is restarted.
+  service do
+    run ["/bin/sh", "-c", '"$@"; c=$?; [ "$c" -eq 78 ] && exit 0; exit "$c"',
+         "agentdock-runner", opt_bin/"agentdock-runner", "run"]
+    keep_alive successful_exit: false
+    environment_variables PATH: std_service_path_env
+    log_path var/"log/agentdock-runner.log"
+    error_log_path var/"log/agentdock-runner.log"
+  end
+
+  test do
+    assert_match version.to_s, shell_output("#{bin}/agentdock-runner version")
+  end
+end

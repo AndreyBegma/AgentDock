@@ -243,7 +243,13 @@ export class GitHubRegistrationService {
   /** `GET /admin/github-app`. */
   async view(): Promise<GitHubAppView> {
     const app = await this.store.load();
-    if (!app) return { registered: false, publicUrl: this.options.publicUrl };
+    const encryptionAvailable = this.store.encryptionAvailable;
+    if (!app)
+      return {
+        registered: false,
+        publicUrl: this.options.publicUrl,
+        encryptionAvailable,
+      };
     const [installations, projects] = await Promise.all([
       this.prisma.gitHubInstallation.findMany({
         orderBy: { accountLogin: 'asc' },
@@ -264,6 +270,7 @@ export class GitHubRegistrationService {
     const iso = (at: Date | null) => at?.toISOString() ?? null;
     return {
       registered: true,
+      encryptionAvailable,
       appId: app.appId,
       slug: app.slug,
       ownerLogin: app.ownerLogin,

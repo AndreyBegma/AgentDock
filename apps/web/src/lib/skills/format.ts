@@ -1,5 +1,6 @@
 import {
   type InstalledSkillView,
+  type ProjectRuntimeProfile,
   SKILLS_ERROR,
   type SkillRunRequest,
 } from '@agentdock/shared';
@@ -16,6 +17,7 @@ import {
 } from '@agentdock/shared/protocol';
 import { ApiError, describeError } from '../api';
 import { describeBudgetExceededError } from '../budgets/format';
+import { updateRunnerText } from '../control/format';
 import { safeHttpsUrl } from '../fleet/format';
 
 type Tone = 'ok' | 'warn' | 'danger' | 'neutral';
@@ -84,24 +86,60 @@ export function provenanceLabel(item: InstalledSkillView): string {
   return '—';
 }
 
-/** Claude runtime profile keys seen in the inventory; the operator's only list (plan, question 1). */
-export function profileKeysFrom(
-  items: InstalledSkillView[],
-  defaultProfileId: string | null,
-): string[] {
-  const keys = new Set<string>();
-  if (defaultProfileId) keys.add(defaultProfileId);
-  for (const item of items) {
-    if (
-      item.scope === 'profile' &&
-      item.runtime === 'claude' &&
-      item.profileKey
-    ) {
-      keys.add(item.profileKey);
-    }
-  }
-  return [...keys].sort();
+/** The runner's profiles a skill can run on: only Claude ones (#97). */
+export function skillRunProfiles(
+  profiles: ProjectRuntimeProfile[],
+): ProjectRuntimeProfile[] {
+  return profiles.filter((profile) => profile.runtime === 'claude');
 }
+
+/** A run dialog option: the key, and which one the project defaults to. */
+export function profileOptionLabel(profile: ProjectRuntimeProfile): string {
+  return profile.isDefault ? `${profile.key} (project default)` : profile.key;
+}
+
+/** The option for "no explicit profile": the project's default, or honestly nothing. */
+export const defaultProfileOptionLabel = (
+  profiles: readonly ProjectRuntimeProfile[],
+): string =>
+  profiles.some((profile) => profile.isDefault)
+    ? 'Project default'
+    : '(none set)';
+
+export interface RunProfileReason {
+  text: string;
+  href?: string;
+  cta?: string;
+}
+
+/**
+ * Why Run is off before the form is even sent (rule R1): no profile is picked
+ * and the project has no default one, or the runner's profiles did not load.
+ * Null when a profile will be used.
+ */
+export function runProfileReason(
+  profileKey: string,
+  profiles: readonly ProjectRuntimeProfile[],
+  projectId: string,
+  profilesFailed = false,
+): RunProfileReason | null {
+  if (profileKey !== '') return null;
+  if (profilesFailed) {
+    return {
+      text: 'The runner’s runtime profiles could not be loaded, so Run cannot pick one. Close this dialog and reload the page.',
+    };
+  }
+  if (profiles.some((profile) => profile.isDefault)) return null;
+  return {
+    text: 'This project has no default runtime profile. Pick one here, or set a default.',
+    href: `/projects/${projectId}/settings?tab=orchestrator`,
+    cta: 'Set a default profile',
+  };
+}
+
+/** Where the runs of skills are listed. */
+export const skillRunsHref = (projectId: string): string =>
+  `/projects/${projectId}/history?kind=skill`;
 
 export const SKILL_MODELS = ['opus', 'sonnet', 'haiku', 'fable'] as const;
 
@@ -221,16 +259,21 @@ const errorCode = (error: unknown): string | undefined =>
 export const isCommandUnavailable = (error: unknown): boolean =>
   errorCode(error) === SKILLS_ERROR.commandUnavailable;
 
-export const COMMAND_UNAVAILABLE_TEXT =
-  'The runner does not handle skills yet, so nothing was sent.';
+export const commandUnavailableText = (runnerName?: string | null): string =>
+  `This runner is too old to handle skills, so nothing was sent. ${updateRunnerText(runnerName)}`;
+
+export const COMMAND_UNAVAILABLE_TEXT = commandUnavailableText();
 
 /** Every skills error as a sentence for the person. */
-export function describeSkillsError(error: unknown): string {
+export function describeSkillsError(
+  error: unknown,
+  runnerName?: string | null,
+): string {
   const budget = describeBudgetExceededError(error);
   if (budget) return budget;
   switch (errorCode(error)) {
     case SKILLS_ERROR.commandUnavailable:
-      return COMMAND_UNAVAILABLE_TEXT;
+      return commandUnavailableText(runnerName);
     case SKILLS_ERROR.skillNotFound:
       return 'That skill is not in this project’s inventory. Refresh the list.';
     case SKILLS_ERROR.previewNotFound:

@@ -1,12 +1,18 @@
 'use client';
 
 import type { AdminScheduleView, ScheduleView } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Button } from 'glass-ui/button';
-import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
-import { Toggle } from 'glass-ui/toggle';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Button } from '@andrewbehma/glass-ui/button';
+import {
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+} from '@andrewbehma/glass-ui/table';
+import { Toggle } from '@andrewbehma/glass-ui/toggle';
 import Link from 'next/link';
 import {
+  DISABLED_REASON_LABEL,
   describeTarget,
   FIRING_STATUS_LABEL,
   FIRING_STATUS_TONE,
@@ -72,7 +78,7 @@ export function ScheduleTable({
                 </button>
                 {schedule.disabledReason && !schedule.enabled ? (
                   <div className="text-xs text-warn">
-                    disabled: {schedule.disabledReason.replaceAll('_', ' ')}
+                    {DISABLED_REASON_LABEL[schedule.disabledReason]}
                   </div>
                 ) : null}
               </TableCell>

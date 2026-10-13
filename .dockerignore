@@ -1,0 +1,32 @@
+# Build context exclusions. Without this file node_modules, build output and —
+# the one that matters — apps/*/.env (database and Redis passwords) would ride
+# into every image layer.
+
+node_modules
+**/node_modules
+
+dist
+**/dist
+.next
+**/.next
+
+# A stale *.tsbuildinfo makes tsc believe everything is built and emit nothing
+# while dist/ is excluded above; the build then fails far from the cause.
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+.git
+.github
+.woodpecker
+.turbo
+**/.turbo
+.claude
+
+.env
+**/.env
+**/.env.local
+docker/.env
+
+**/*.log
+coverage
+**/coverage

@@ -1,9 +1,9 @@
 'use client';
 
 import { BUDGET_OVERRIDE_REASON_MAX, type BudgetView } from '@agentdock/shared';
-import { Button } from 'glass-ui/button';
-import { DialogContent, DialogRoot } from 'glass-ui/dialog';
-import { Field, Input, Textarea } from 'glass-ui/field';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { Field, Input, Textarea } from '@andrewbehma/glass-ui/field';
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import {
@@ -16,6 +16,7 @@ import {
   toLocalInput,
   toOverrideRequest,
 } from '../../lib/budgets/format';
+import { DisabledReason } from '../prerequisites/disabled-reason';
 
 /**
  * Lifts a stop budget until a time inside the current period (spec 28 D8).
@@ -79,14 +80,25 @@ export function OverrideDialog({
             : undefined
         }
         footer={
-          <>
-            <Button variant="glass" disabled={busy} onClick={close}>
-              Cancel
-            </Button>
-            <Button disabled={busy || problem !== null} onClick={submit}>
-              {busy ? 'Saving…' : 'Override'}
-            </Button>
-          </>
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex gap-2">
+              <Button variant="glass" disabled={busy} onClick={close}>
+                Cancel
+              </Button>
+              <Button
+                disabled={busy || problem !== null}
+                aria-describedby={problem ? 'override-reason' : undefined}
+                onClick={submit}
+              >
+                {busy ? 'Saving…' : 'Override'}
+              </Button>
+            </div>
+            {problem ? (
+              <DisabledReason id="override-reason">
+                {OVERRIDE_PROBLEM_TEXT[problem]}
+              </DisabledReason>
+            ) : null}
+          </div>
         }
       >
         <form
@@ -123,11 +135,6 @@ export function OverrideDialog({
               }
             />
           </Field>
-          {problem && (problem !== 'reason' || form.reason !== '') ? (
-            <p role="alert" className="text-sm text-danger">
-              {OVERRIDE_PROBLEM_TEXT[problem]}
-            </p>
-          ) : null}
           {error ? (
             <p role="alert" className="text-sm text-danger">
               {error}

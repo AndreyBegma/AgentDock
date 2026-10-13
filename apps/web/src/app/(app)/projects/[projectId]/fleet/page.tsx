@@ -3,39 +3,44 @@
 import {
   FLEET_LIVE_EVENT,
   type FleetView,
-  type ProjectDetail,
+  type OrchestratorSettingsView,
   projectRoleAtLeast,
-  type Role,
   SLOT_STATUSES,
   type SlotPage,
   type SlotStatus,
   type SlotSummary,
 } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Button } from 'glass-ui/button';
-import { EmptyState } from 'glass-ui/empty-state';
-import { Field, Input, Select } from 'glass-ui/field';
-import { Skeleton } from 'glass-ui/skeleton';
-import { toast } from 'glass-ui/toast';
-import { Toggle } from 'glass-ui/toggle';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import { Toggle } from '@andrewbehma/glass-ui/toggle';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BudgetExceededBanner } from '../../../../../components/budgets/exceeded-banner';
+import { AsyncSection } from '../../../../../components/prerequisites/async-section';
+import { RunnerOfflineBanner } from '../../../../../components/prerequisites/prerequisite-banner';
+import { LiveStatusBadge } from '../../../../../components/shell/live-status-badge';
 import { TerminalSheet } from '../../../../../components/terminal/terminal-sheet';
 import type { TerminalTarget } from '../../../../../components/terminal/terminal-view';
 import { api } from '../../../../../lib/api';
 import { useControl } from '../../../../../lib/control/use-control';
 import {
-  describeFleetError,
+  EMPTY_FLEET_DESCRIPTION,
   isNotFound,
   parseIssueFilter,
+  slotStatusOptions,
   slotsQuery,
 } from '../../../../../lib/fleet/format';
-import { useLive, useLiveStatus } from '../../../../../lib/live/use-live';
+import { useLive } from '../../../../../lib/live/use-live';
+import { useSection } from '../../../../../lib/section/use-section';
 import { useTerminalAvailable } from '../../../../../lib/terminal/use-terminal-available';
+import { useProjectDetail } from '../use-project-detail';
 import { OrchestratorCard } from './orchestrator-card';
 import { SlotSheet } from './slot-sheet';
 import { SlotsTable } from './slots-table';
+import { useControlReasons } from './use-control-reasons';
 
 const PAGE_SIZE = 50;
 /** Pushes arrive in bursts (one per projected batch); one refetch covers them. */
@@ -45,43 +50,33 @@ const AGE_TICK_MS = 30_000;
 
 export default function FleetPage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const [fleet, setFleet] = useState<FleetView>();
-  const [missing, setMissing] = useState(false);
-  /** Bumped by a live push; every fetch effect depends on it. */
+  /** Bumped by a live push; the fleet and the slot list depend on it. */
   const [version, setVersion] = useState(0);
   const [, setNow] = useState(0);
 
   const [showAll, setShowAll] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
   const [issueText, setIssueText] = useState('');
-  const [history, setHistory] = useState<SlotSummary[]>();
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
 
   const [selected, setSelected] = useState<string>();
+  const [startOpen, setStartOpen] = useState(false);
 
-  const [role, setRole] = useState<Role>('viewer');
-  const [runnerId, setRunnerId] = useState<string>();
   const [attach, setAttach] = useState<{
     target: TerminalTarget;
     title: string;
   }>();
-  const control = useControl(projectId);
-  const canAttach = useTerminalAvailable(runnerId, role === 'admin');
 
+  const detail = useProjectDetail(projectId);
+  const project = detail.data;
   // The effective role only decides which buttons are drawn; the API checks it.
-  useEffect(() => {
-    api<ProjectDetail>(`/projects/${projectId}`)
-      .then((project) => {
-        setRole(project.role);
-        setRunnerId(project.runnerId);
-      })
-      .catch(() => setRole('viewer'));
-  }, [projectId]);
+  const role = project?.role ?? 'viewer';
+  const isAdmin = role === 'admin';
+  const canOperate = projectRoleAtLeast(role, 'operator');
+  const control = useControl(projectId, isAdmin);
+  const canAttach = useTerminalAvailable(project?.runnerId, isAdmin);
 
-  const live = useLiveStatus();
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
   useLive(`project:${projectId}`, (message) => {
     if (message.event !== FLEET_LIVE_EVENT) return;
     clearTimeout(timer.current);
@@ -97,200 +92,266 @@ export default function FleetPage() {
     return () => clearInterval(id);
   }, []);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: version is a refetch trigger
-  useEffect(() => {
-    let cancelled = false;
-    api<FleetView>(`/projects/${projectId}/fleet`)
-      .then((view) => {
-        if (cancelled) return;
-        setFleet(view);
-        setMissing(false);
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        if (isNotFound(err)) setMissing(true);
-        else toast.error(describeFleetError(err));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId, version]);
+  const fleet = useSection(
+    () => api<FleetView>(`/projects/${projectId}/fleet`),
+    [projectId, version],
+  );
+  const settings = useSection(
+    () =>
+      api<OrchestratorSettingsView>(
+        `/projects/${projectId}/orchestrator/settings`,
+      ),
+    [projectId],
+  );
+  const reasons = useControlReasons({
+    projectId,
+    isAdmin,
+    project,
+    settings,
+    orchestrator: fleet.data?.orchestrator.status,
+  });
 
   const status = SLOT_STATUSES.find((s) => s === statusFilter);
   const issue = parseIssueFilter(issueText);
+  const filtered = status !== undefined || issue !== undefined;
 
   // The "all slots" view: first page for the filters, refetched on a push.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: version is a refetch trigger
-  useEffect(() => {
-    if (!showAll) return;
-    let cancelled = false;
-    api<SlotPage>(
-      `/projects/${projectId}/slots${slotsQuery({ status, issue, limit: PAGE_SIZE })}`,
-    )
-      .then((page) => {
-        if (cancelled) return;
-        setHistory(page.items);
-        setNextCursor(page.nextCursor);
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setHistory([]);
-        setNextCursor(null);
-        toast.error(describeFleetError(err));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId, showAll, status, issue, version]);
+  // Nothing while the view is off, so a toggle shows a skeleton, not an empty list.
+  const history = useSection<SlotPage | undefined>(
+    () =>
+      showAll
+        ? api<SlotPage>(
+            `/projects/${projectId}/slots${slotsQuery({ status, issue, limit: PAGE_SIZE })}`,
+          )
+        : Promise.resolve(undefined),
+    [projectId, showAll, status, issue, version],
+  );
 
-  const loadMore = useCallback(async () => {
-    if (!nextCursor) return;
+  const loadMore = async () => {
+    const cursor = history.data?.nextCursor;
+    if (!cursor) return;
     setLoadingMore(true);
     try {
       const page = await api<SlotPage>(
-        `/projects/${projectId}/slots${slotsQuery({ status, issue, cursor: nextCursor, limit: PAGE_SIZE })}`,
+        `/projects/${projectId}/slots${slotsQuery({ status, issue, cursor, limit: PAGE_SIZE })}`,
       );
-      setHistory((current) => [...(current ?? []), ...page.items]);
-      setNextCursor(page.nextCursor);
-    } catch (err) {
-      toast.error(describeFleetError(err));
+      history.setData((current) =>
+        current
+          ? {
+              items: [...current.items, ...page.items],
+              nextCursor: page.nextCursor,
+            }
+          : current,
+      );
+    } catch {
+      // The list stays as it is; the button is still there to try again.
     } finally {
       setLoadingMore(false);
     }
-  }, [projectId, nextCursor, status, issue]);
+  };
 
-  if (missing) {
+  if (fleet.data === undefined && isNotFound(fleet.error)) {
     return (
       <EmptyState
         title="Project not found"
         description="It was removed, or you are not a member of it."
+        action={
+          <Link href="/projects" className="text-sm underline">
+            Open Projects
+          </Link>
+        }
       />
     );
   }
-  if (!fleet) return <Skeleton className="h-64 w-full" />;
 
-  const slots = showAll ? history : fleet.slots;
+  const nobodyYet = (
+    <EmptyState
+      title="No active slots"
+      description={EMPTY_FLEET_DESCRIPTION}
+      action={
+        canOperate && reasons.start === null ? (
+          <Button variant="solid" onClick={() => setStartOpen(true)}>
+            Start the orchestrator
+          </Button>
+        ) : (
+          <Link
+            href={`/projects/${projectId}/queue`}
+            className="text-sm underline"
+          >
+            Open Queue
+          </Link>
+        )
+      }
+    />
+  );
+
+  const clearFilters = () => {
+    setStatusFilter('');
+    setIssueText('');
+  };
+
+  const slotsList = (slots: SlotSummary[]) => (
+    <SlotsTable slots={slots} onSelect={(s) => setSelected(s.name)} />
+  );
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">Fleet</h1>
-        <span className="inline-flex items-center gap-2 text-xs text-ink-2">
-          <Badge
-            dot
-            tone={live.status === 'connected' ? 'ok' : 'warn'}
-            aria-hidden="true"
-          />
-          {live.status === 'connected'
-            ? 'Live'
-            : live.status === 'reconnecting'
-              ? 'Reconnecting…'
-              : 'Offline'}
-        </span>
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-xl font-semibold">Fleet</h1>
+          <LiveStatusBadge />
+        </div>
+        {project ? <RunnerOfflineBanner project={project} /> : null}
       </div>
 
       <BudgetExceededBanner projectId={projectId} />
 
-      <OrchestratorCard
-        fleet={fleet}
-        projectId={projectId}
-        control={control}
-        role={role}
-        onAttach={
-          canAttach
-            ? () =>
-                setAttach({
-                  target: { kind: 'orchestrator' },
-                  title: 'Orchestrator',
-                })
-            : undefined
-        }
-      />
-
-      <section className="flex flex-col gap-4" aria-label="Slots">
-        <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="flex items-center gap-2 text-sm">
-            <Toggle
-              labelledBy="fleet-show-ended"
-              checked={showAll}
-              onChange={(checked) => {
-                setShowAll(checked);
-                setHistory(undefined);
-              }}
-            />
-            <span id="fleet-show-ended">Show ended</span>
-          </div>
-          {showAll ? (
-            <>
-              <Field label="Status" htmlFor="fleet-status">
-                <Select
-                  id="fleet-status"
-                  value={statusFilter}
-                  onChange={(e) => {
-                    setStatusFilter(e.target.value);
-                    setHistory(undefined);
-                  }}
-                >
-                  <option value="">Any status</option>
-                  {SLOT_STATUSES.map((s: SlotStatus) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="Issue" htmlFor="fleet-issue">
-                <Input
-                  id="fleet-issue"
-                  value={issueText}
-                  inputMode="numeric"
-                  placeholder="e.g. 42"
-                  maxLength={10}
-                  onChange={(e) => {
-                    setIssueText(e.target.value);
-                    setHistory(undefined);
-                  }}
-                />
-              </Field>
-            </>
-          ) : null}
-        </div>
-
-        {slots === undefined ? (
-          <Skeleton className="h-40 w-full" />
-        ) : slots.length === 0 ? (
-          <EmptyState
-            title={showAll ? 'No slots' : 'No active slots'}
-            description={
-              showAll
-                ? 'Nothing matches these filters.'
-                : 'Slots appear here once the orchestrator dispatches a round on this project.'
-            }
-          />
-        ) : (
+      <AsyncSection
+        section={fleet}
+        unavailable={{
+          title: 'The fleet could not be loaded',
+          stillWorks: 'The rest of the project is still available.',
+        }}
+        empty={null}
+        isEmpty={() => false}
+        skeleton={<Skeleton className="h-64 w-full" />}
+      >
+        {(view) => (
           <>
-            <SlotsTable slots={slots} onSelect={(s) => setSelected(s.name)} />
-            {showAll && nextCursor ? (
-              <div className="flex justify-center">
-                <Button
-                  variant="glass"
-                  disabled={loadingMore}
-                  onClick={loadMore}
-                >
-                  {loadingMore ? 'Loading…' : 'Load more'}
-                </Button>
+            <OrchestratorCard
+              fleet={view}
+              projectId={projectId}
+              control={control}
+              canOperate={canOperate}
+              isAdmin={isAdmin}
+              settings={settings}
+              reasons={reasons}
+              startOpen={startOpen}
+              onStartOpenChange={setStartOpen}
+              onAttach={
+                canAttach
+                  ? () =>
+                      setAttach({
+                        target: { kind: 'orchestrator' },
+                        title: 'Orchestrator',
+                      })
+                  : undefined
+              }
+            />
+
+            <section className="flex flex-col gap-4" aria-label="Slots">
+              <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="flex items-center gap-2 text-sm">
+                  <Toggle
+                    labelledBy="fleet-show-ended"
+                    checked={showAll}
+                    onChange={setShowAll}
+                  />
+                  <span id="fleet-show-ended">Show ended</span>
+                </div>
+                {showAll ? (
+                  <>
+                    <Field label="Status" htmlFor="fleet-status">
+                      <Select
+                        id="fleet-status"
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                      >
+                        <option value="">Any status</option>
+                        {slotStatusOptions().map(
+                          (o: { value: SlotStatus; label: string }) => (
+                            <option key={o.value} value={o.value}>
+                              {o.label}
+                            </option>
+                          ),
+                        )}
+                      </Select>
+                    </Field>
+                    <Field label="Issue" htmlFor="fleet-issue">
+                      <Input
+                        id="fleet-issue"
+                        value={issueText}
+                        inputMode="numeric"
+                        placeholder="e.g. 42"
+                        maxLength={10}
+                        onChange={(e) => setIssueText(e.target.value)}
+                      />
+                    </Field>
+                  </>
+                ) : null}
               </div>
-            ) : null}
+
+              {showAll ? (
+                <AsyncSection
+                  section={history}
+                  unavailable={{
+                    title: 'Slots could not be loaded',
+                    stillWorks: 'The active slots above are still current.',
+                  }}
+                  isEmpty={(page) =>
+                    page === undefined || page.items.length === 0
+                  }
+                  empty={
+                    filtered ? (
+                      <EmptyState
+                        title="No matching slots"
+                        description="No slot matches these filters."
+                        action={
+                          <Button variant="glass" onClick={clearFilters}>
+                            Clear filters
+                          </Button>
+                        }
+                      />
+                    ) : (
+                      <EmptyState
+                        title="No slots yet"
+                        description={EMPTY_FLEET_DESCRIPTION}
+                        action={
+                          <Link
+                            href={`/projects/${projectId}/queue`}
+                            className="text-sm underline"
+                          >
+                            Open Queue
+                          </Link>
+                        }
+                      />
+                    )
+                  }
+                  skeleton={<Skeleton className="h-40 w-full" />}
+                >
+                  {(page) => (
+                    <>
+                      {slotsList(page?.items ?? [])}
+                      {page?.nextCursor ? (
+                        <div className="flex justify-center">
+                          <Button
+                            variant="glass"
+                            disabled={loadingMore}
+                            onClick={loadMore}
+                          >
+                            {loadingMore ? 'Loading…' : 'Load more'}
+                          </Button>
+                        </div>
+                      ) : null}
+                    </>
+                  )}
+                </AsyncSection>
+              ) : view.slots.length === 0 ? (
+                nobodyYet
+              ) : (
+                slotsList(view.slots)
+              )}
+            </section>
           </>
         )}
-      </section>
+      </AsyncSection>
 
       <SlotSheet
         projectId={projectId}
         name={selected}
         version={version}
         control={control}
-        canOperate={projectRoleAtLeast(role, 'operator')}
+        canOperate={canOperate}
         onClose={() => setSelected(undefined)}
         onAttach={
           canAttach

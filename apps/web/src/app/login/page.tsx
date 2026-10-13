@@ -6,13 +6,15 @@ import {
   type PublicUser,
   type RegistrationState,
 } from '@agentdock/shared';
-import { Button } from 'glass-ui/button';
-import { Field, Input } from 'glass-ui/field';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { Field, Input } from '@andrewbehma/glass-ui/field';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useEffect, useState } from 'react';
 import { AuthCard } from '../../components/auth-card';
 import { ApiError, api, describeError } from '../../lib/api';
+import { INSTALL_PATH } from '../../lib/runners/install';
+import { safeNext } from './safe-next';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -35,7 +37,10 @@ export default function LoginPage() {
     try {
       const body: LoginRequest = { email, password };
       await api<PublicUser>('/auth/login', { method: 'POST', body });
-      router.replace('/account');
+      // Read at submit time: no `useSearchParams`, so no Suspense boundary.
+      router.replace(
+        safeNext(new URLSearchParams(window.location.search).get('next')),
+      );
     } catch (err) {
       if (err instanceof ApiError && err.code === AUTH_ERROR.pendingApproval) {
         router.replace('/pending');
@@ -81,6 +86,11 @@ export default function LoginPage() {
           </Link>
         </p>
       ) : null}
+      <p className="text-sm text-ink-2">
+        <Link href={INSTALL_PATH} className="text-ink underline">
+          How to install the runner
+        </Link>
+      </p>
     </AuthCard>
   );
 }

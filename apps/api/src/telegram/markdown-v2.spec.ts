@@ -82,6 +82,24 @@ describe('formatMessage (D10)', () => {
     );
   });
 
+  it('shows the head the approval buttons are bound to (D12)', () => {
+    expect(
+      formatMessage(
+        content({ kind: 'pr.awaiting_approval', title: 'PR #7 waits' }),
+        'https://dock.example.com',
+        'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678',
+      ),
+    ).toBe(
+      [
+        '*PR \\#7 waits*',
+        'A launch dialog waits for a person\\.',
+        '_widget · i42\\-api · \\#42_',
+        'Head `a1b2c3d`',
+        '[Open in AgentDock](https://dock.example.com/projects/p1/fleet)',
+      ].join('\n'),
+    );
+  });
+
   it('says how often a folded item happened, and drops the link without APP_URL', () => {
     const text = formatMessage(
       content({ count: 5, projectName: null, slot: null, issue: null }),

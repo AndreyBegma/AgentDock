@@ -1,0 +1,135 @@
+# Releases agentdock-runner (ADR-0017).
+#
+# Pushing the tag runner-v<version> builds the four binaries, creates the
+# GitHub Release with the tarballs and SHA256SUMS, publishes the npm packages
+# (the four platform packages before the wrapper) and pushes the Homebrew
+# formula to AndreyBegma/homebrew-tap. The tag must equal the version in
+# apps/runner/package.json; build-release.sh refuses anything else.
+#
+# A manual run is a dry run: it builds and stops before every publish step.
+# It starts only when the message given to the manual run contains
+# [runner-release], so a plain manual run of pipeline.yml does not start one
+# too. The gate reads the message, not a variable: Woodpecker 3.x passes the
+# variables of a manual run to the steps only, never to a workflow's `when`.
+# The message reaches `when` as CI_COMMIT_MESSAGE ("MANUAL: <message> @
+# <branch>"). Rehearse on a branch other than develop: a manual run on develop
+# also deploys staging through pipeline.yml.
+#
+# RUNNER_RELEASE_DRY_RUN=1 also stops a tag run before it publishes. It is read
+# by the step shells, where variables do arrive.
+#
+# Pull requests never run this workflow. The secrets github_release_token and
+# npm_token must be restricted to the tag and manual events in Woodpecker;
+# deploy/README.md lists them.
+
+when:
+  - event: tag
+    ref: refs/tags/runner-v*
+  - event: manual
+    evaluate: 'CI_COMMIT_MESSAGE contains "[runner-release]"'
+
+variables:
+  - &ci_image agentdock-ci:node-bun
+  - &docker_image docker:28-cli
+  - &caches
+    - /home/archi/ci-cache/agentdock/bun:/ci-cache/bun
+    - /home/archi/ci-cache/agentdock/turbo:/ci-cache/turbo
+  - &cache_env
+    BUN_INSTALL_CACHE_DIR: /ci-cache/bun
+    TURBO_CACHE_DIR: /ci-cache/turbo
+    TURBO_TELEMETRY_DISABLED: '1'
+  - &publish_when
+    - event: tag
+      ref: refs/tags/runner-v*
+
+steps:
+  # The same image pipeline.yml builds; built here too, so this workflow does
+  # not depend on another one (pipeline.yml does not run on tags).
+  - name: ci-image
+    image: *docker_image
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    commands:
+      - docker build -t agentdock-ci:node-bun deploy/ci-image
+
+  - name: install
+    image: *ci_image
+    volumes: *caches
+    environment: *cache_env
+    commands:
+      - bun install --frozen-lockfile
+
+  - name: test-runner
+    image: *ci_image
+    volumes: *caches
+    environment: *cache_env
+    commands:
+      - bunx turbo run test --filter=@agentdock/runner
+
+  - name: build-release
+    image: *ci_image
+    commands:
+      # Empty on a manual run, which has no tag to check.
+      - RUNNER_TAG="$${CI_COMMIT_TAG:-}" sh apps/runner/scripts/build-release.sh
+
+  - name: github-release
+    image: *ci_image
+    when: *publish_when
+    environment:
+      GH_TOKEN:
+        from_secret: github_release_token
+    commands:
+      - if [ "$${RUNNER_RELEASE_DRY_RUN:-}" = 1 ]; then echo 'dry run, not publishing'; exit 0; fi
+      - sh apps/runner/scripts/install-gh.sh
+      - cd apps/runner/release
+      - version=$${CI_COMMIT_TAG#runner-v}
+      # A re-run finds the release and replaces its assets.
+      - |
+        if ! gh release view "$${CI_COMMIT_TAG}" --repo AndreyBegma/AgentDock >/dev/null 2>&1; then
+          gh release create "$${CI_COMMIT_TAG}" --repo AndreyBegma/AgentDock --verify-tag \
+            --title "agentdock-runner $${version}" \
+            --notes "Install: brew install andreybegma/tap/agentdock-runner, or npm i -g agentdock-runner. Checksums: SHA256SUMS."
+        fi
+      - gh release upload "$${CI_COMMIT_TAG}" --repo AndreyBegma/AgentDock --clobber agentdock-runner-*.tar.gz SHA256SUMS
+
+  - name: npm-publish
+    image: *ci_image
+    when: *publish_when
+    environment:
+      NPM_TOKEN:
+        from_secret: npm_token
+    commands:
+      - if [ "$${RUNNER_RELEASE_DRY_RUN:-}" = 1 ]; then echo 'dry run, not publishing'; exit 0; fi
+      - npm config set //registry.npmjs.org/:_authToken "$${NPM_TOKEN}"
+      - version=$${CI_COMMIT_TAG#runner-v}
+      # Platform packages first: the wrapper's optionalDependencies name them.
+      # A version already on the registry is skipped, so a re-run resumes.
+      - |
+        for pkg in agentdock-runner-darwin-arm64 agentdock-runner-darwin-x64 agentdock-runner-linux-arm64 agentdock-runner-linux-x64 agentdock-runner; do
+          if npm view "$${pkg}@$${version}" version >/dev/null 2>&1; then
+            echo "$${pkg}@$${version} is already published"
+          else
+            npm publish --access public "apps/runner/release/npm/$${pkg}"
+          fi
+        done
+
+  - name: homebrew-tap
+    image: *ci_image
+    when: *publish_when
+    environment:
+      GH_TOKEN:
+        from_secret: github_release_token
+    commands:
+      - if [ "$${RUNNER_RELEASE_DRY_RUN:-}" = 1 ]; then echo 'dry run, not publishing'; exit 0; fi
+      - sh apps/runner/scripts/install-gh.sh
+      - gh auth setup-git
+      - version=$${CI_COMMIT_TAG#runner-v}
+      - git clone --depth 1 https://github.com/AndreyBegma/homebrew-tap.git /tmp/tap
+      - mkdir -p /tmp/tap/Formula
+      - cp apps/runner/release/agentdock-runner.rb /tmp/tap/Formula/agentdock-runner.rb
+      - cd /tmp/tap
+      - git config user.name 'AgentDock release'
+      - git config user.email 'release@agentdock.invalid'
+      - git add Formula/agentdock-runner.rb
+      - git diff --cached --quiet || git commit -m "agentdock-runner $${version}"
+      - git push origin HEAD

@@ -1,8 +1,13 @@
 import type { SlotSummary } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Button } from 'glass-ui/button';
-import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
-import { Tooltip } from 'glass-ui/tooltip';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Button } from '@andrewbehma/glass-ui/button';
+import {
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+} from '@andrewbehma/glass-ui/table';
+import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import {
   CHECKS_LABEL,
   CHECKS_TONE,
@@ -12,6 +17,7 @@ import {
   issueUrl,
   SLOT_STATUS_LABEL,
   SLOT_STATUS_TONE,
+  SLOT_TERM_HINT,
   safeHttpsUrl,
 } from '../../../../../lib/fleet/format';
 
@@ -41,7 +47,7 @@ function ModelCell({ slot }: { slot: SlotSummary }) {
       </button>
     </Tooltip>
   ) : (
-    <>{text}</>
+    text
   );
 }
 
@@ -102,7 +108,14 @@ export function SlotsTable({
             <TableCell>
               <span className="font-medium">{slot.name}</span>
               {slot.lead ? (
-                <span className="ml-2 text-xs text-ink-3">lead</span>
+                <Tooltip content={SLOT_TERM_HINT.lead}>
+                  <button
+                    type="button"
+                    className="ml-2 cursor-help text-xs text-ink-3"
+                  >
+                    lead
+                  </button>
+                </Tooltip>
               ) : null}
             </TableCell>
             <TableCell>

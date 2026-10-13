@@ -1,0 +1,23 @@
+# The single public origin of staging (ADR-0016). TLS ends at Cloudflare;
+# cloudflared connects here over plain HTTP inside the compose network.
+{
+	auto_https off
+	admin off
+	servers {
+		# Keep cloudflared's X-Forwarded-For / -Proto: it is the only client and
+		# sits on the private bridge. The API trusts this hop (TRUST_PROXY).
+		trusted_proxies static private_ranges
+	}
+}
+
+:80 {
+	# The API has no /api prefix of its own; the runner pairs with
+	# https://<host>/api and dials wss://<host>/api/runner.
+	handle_path /api/* {
+		reverse_proxy api:8180
+	}
+
+	handle {
+		reverse_proxy web:3517
+	}
+}

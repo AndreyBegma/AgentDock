@@ -7,11 +7,11 @@ import {
   type BudgetScope,
   type BudgetView,
 } from '@agentdock/shared';
-import { Button } from 'glass-ui/button';
-import { Combobox } from 'glass-ui/combobox';
-import { DialogContent, DialogRoot } from 'glass-ui/dialog';
-import { Field, Input, Select } from 'glass-ui/field';
-import { Toggle } from 'glass-ui/toggle';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { Combobox } from '@andrewbehma/glass-ui/combobox';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
+import { Toggle } from '@andrewbehma/glass-ui/toggle';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api';
 import {
@@ -31,6 +31,7 @@ import {
   toUpdateRequest,
 } from '../../lib/budgets/format';
 import { browserTimezone, timezoneOptions } from '../../lib/schedules/format';
+import { DisabledReason } from '../prerequisites/disabled-reason';
 
 export interface TargetChoice {
   id: string;
@@ -137,14 +138,25 @@ export function BudgetFormDialog({
         title={budget ? 'Edit budget' : 'New budget'}
         description="The limit is in API-equivalent dollars. The period resets by itself in the chosen timezone."
         footer={
-          <>
-            <Button variant="glass" disabled={busy} onClick={close}>
-              Cancel
-            </Button>
-            <Button disabled={busy || problem !== null} onClick={submit}>
-              {busy ? 'Saving…' : 'Save'}
-            </Button>
-          </>
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex gap-2">
+              <Button variant="glass" disabled={busy} onClick={close}>
+                Cancel
+              </Button>
+              <Button
+                disabled={busy || problem !== null}
+                aria-describedby={problem ? 'budget-save-reason' : undefined}
+                onClick={submit}
+              >
+                {busy ? 'Saving…' : 'Save'}
+              </Button>
+            </div>
+            {problem ? (
+              <DisabledReason id="budget-save-reason">
+                {BUDGET_FORM_PROBLEM_TEXT[problem]}
+              </DisabledReason>
+            ) : null}
+          </div>
         }
       >
         <form
@@ -287,11 +299,6 @@ export function BudgetFormDialog({
             <span id="budget-enabled">Enabled</span>
           </div>
 
-          {problem && (problem !== 'limit' || form.limit !== '') ? (
-            <p role="alert" className="text-sm text-danger">
-              {BUDGET_FORM_PROBLEM_TEXT[problem]}
-            </p>
-          ) : null}
           {error ? (
             <p role="alert" className="text-sm text-danger">
               {error}

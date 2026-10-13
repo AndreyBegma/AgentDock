@@ -26,7 +26,8 @@ import {
 
 export type TerminalTarget =
   | { kind: 'slot'; slot: string }
-  | { kind: 'orchestrator' };
+  | { kind: 'orchestrator' }
+  | { kind: 'skill_run'; runId: string };
 
 export interface TerminalStatus {
   phase: TerminalPhase;
@@ -59,6 +60,7 @@ export function TerminalView({
   const report = useRef(onStatus);
   report.current = onStatus;
   const slot = target.kind === 'slot' ? target.slot : undefined;
+  const runId = target.kind === 'skill_run' ? target.runId : undefined;
   const kind = target.kind;
 
   useEffect(() => {
@@ -125,6 +127,7 @@ export function TerminalView({
         projectId,
         mode,
         ...(slot ? { slot } : {}),
+        ...(runId ? { runId } : {}),
       };
       let ticket: TerminalTicketResponse;
       try {
@@ -198,7 +201,7 @@ export function TerminalView({
       disposed = true;
       cleanup();
     };
-  }, [projectId, kind, slot, mode]);
+  }, [projectId, kind, slot, runId, mode]);
 
   return (
     <div

@@ -10,17 +10,24 @@ import {
   type BudgetView,
   type ProjectSummary,
 } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Button } from 'glass-ui/button';
-import { DialogContent, DialogRoot } from 'glass-ui/dialog';
-import { EmptyState } from 'glass-ui/empty-state';
-import { Field, Select } from 'glass-ui/field';
-import { Skeleton } from 'glass-ui/skeleton';
-import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
-import { toast } from 'glass-ui/toast';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { Field, Select } from '@andrewbehma/glass-ui/field';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import {
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+} from '@andrewbehma/glass-ui/table';
+import { toast } from '@andrewbehma/glass-ui/toast';
+import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
 import { BudgetFormDialog } from '../../../components/budgets/budget-form-dialog';
 import { OverrideDialog } from '../../../components/budgets/override-dialog';
+import { AsyncSection } from '../../../components/prerequisites/async-section';
 import { api } from '../../../lib/api';
 import {
   ACTION_LABEL,
@@ -36,6 +43,7 @@ import {
   scopeName,
   unpricedHint,
 } from '../../../lib/budgets/format';
+import { useSection } from '../../../lib/section/use-section';
 
 /** The page polls; the budget tab is the one that listens to live events. */
 const POLL_MS = 15_000;
@@ -49,9 +57,14 @@ const query = (scope: BudgetScope | '', state: BudgetState | ''): string => {
 };
 
 export default function AdminBudgetsPage() {
-  const [budgets, setBudgets] = useState<BudgetView[]>();
   const [scope, setScope] = useState<BudgetScope | ''>('');
   const [state, setState] = useState<BudgetState | ''>('');
+  const budgets = useSection(
+    () => api<BudgetView[]>(`/admin/budgets${query(scope, state)}`),
+    [scope, state],
+  );
+  const load = budgets.retry;
+  const filtered = scope !== '' || state !== '';
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
 
@@ -61,18 +74,7 @@ export default function AdminBudgetsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [recomputing, setRecomputing] = useState(false);
 
-  const load = useCallback(async () => {
-    try {
-      setBudgets(
-        await api<BudgetView[]>(`/admin/budgets${query(scope, state)}`),
-      );
-    } catch (err) {
-      toast.error(describeBudgetsError(err));
-    }
-  }, [scope, state]);
-
   useEffect(() => {
-    void load();
     const timer = setInterval(load, POLL_MS);
     return () => clearInterval(timer);
   }, [load]);
@@ -105,7 +107,7 @@ export default function AdminBudgetsPage() {
     try {
       await action();
       toast.success(done);
-      await load();
+      load();
     } catch (err) {
       toast.error(describeBudgetsError(err));
     } finally {
@@ -141,7 +143,7 @@ export default function AdminBudgetsPage() {
       toast.success(
         `Recomputed ${result.periods} period${result.periods === 1 ? '' : 's'} of ${result.budgets} budget${result.budgets === 1 ? '' : 's'}`,
       );
-      await load();
+      load();
     } catch (err) {
       toast.error(describeBudgetsError(err));
     } finally {
@@ -157,7 +159,18 @@ export default function AdminBudgetsPage() {
           <p className="max-w-prose text-sm text-ink-2">
             Every project and user budget. A stop budget refuses new
             orchestrator starts and skill runs once used up; running workers are
-            never stopped. Recompute after prices were recalculated.
+            never stopped.
+          </p>
+          <p className="max-w-prose text-xs text-ink-3">
+            Recompute budget totals adds up spend again from the stored costs.
+            Run it after{' '}
+            <Link
+              href="/admin/prices"
+              className="text-ink underline underline-offset-2"
+            >
+              Re-price requests under Prices
+            </Link>{' '}
+            changed those costs.
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-3">
@@ -194,131 +207,162 @@ export default function AdminBudgetsPage() {
             </Select>
           </Field>
           <Button variant="glass" disabled={recomputing} onClick={recompute}>
-            {recomputing ? 'Recomputing…' : 'Recompute'}
+            {recomputing ? 'Recomputing…' : 'Recompute budget totals'}
           </Button>
           <Button onClick={() => setEditing('new')}>New budget</Button>
         </div>
       </div>
 
-      {!budgets ? (
-        <Skeleton className="h-48 w-full" />
-      ) : budgets.length === 0 ? (
-        <EmptyState
-          title="No budgets"
-          description={
-            scope || state
-              ? 'No budget matches these filters.'
-              : 'Create a project or user budget to cap spend.'
-          }
-        />
-      ) : (
-        <Table scroll>
-          <TableHead>
-            <TableRow>
-              <TableCell head>Scope</TableCell>
-              <TableCell head>Period</TableCell>
-              <TableCell head>Spent / limit</TableCell>
-              <TableCell head>State</TableCell>
-              <TableCell head>Action</TableCell>
-              <TableCell head>Resets</TableCell>
-              <TableCell head>
-                <span className="sr-only">Actions</span>
-              </TableCell>
-            </TableRow>
-          </TableHead>
-          <tbody>
-            {budgets.map((budget) => {
-              const current = budget.current;
-              const busy = busyId === budget.id;
-              const canOverride =
-                budget.action === 'stop' &&
-                budget.override === null &&
-                current?.state === 'exceeded';
-              return (
-                <TableRow key={budget.id}>
-                  <TableCell>
-                    <div className="font-medium">{scopeName(budget)}</div>
-                    <div className="text-xs text-ink-3">
-                      {SCOPE_LABEL[budget.scope]}
-                      {budget.enabled ? '' : ' · disabled'}
-                    </div>
-                  </TableCell>
-                  <TableCell>{PERIOD_LABEL[budget.period]}</TableCell>
-                  <TableCell>
-                    {current ? (
-                      <>
-                        {formatBudgetUsd(current.spentUsd)} /{' '}
-                        {formatLimit(budget.limitUsd)} (
-                        {formatPercent(current.percent)})
-                        {unpricedHint(current.unpricedRequests) ? (
-                          <div className="text-xs text-ink-3">
-                            {unpricedHint(current.unpricedRequests)}
-                          </div>
-                        ) : null}
-                      </>
-                    ) : (
-                      formatLimit(budget.limitUsd)
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      tone={budgetTone(current?.state)}
-                      label={current ? STATE_LABEL[current.state] : 'disabled'}
-                    />
-                    {budget.override ? (
+      <AsyncSection
+        section={budgets}
+        unavailable={{
+          title: 'Budgets are not answering',
+          stillWorks: 'Budgets keep refusing or allowing starts on the server.',
+        }}
+        skeleton={<Skeleton className="h-48 w-full" />}
+        empty={
+          filtered ? (
+            <EmptyState
+              title="No budget matches these filters"
+              description="Other budgets are hidden by the scope or state filter."
+              action={
+                <Button
+                  variant="glass"
+                  onClick={() => {
+                    setScope('');
+                    setState('');
+                  }}
+                >
+                  Clear filters
+                </Button>
+              }
+            />
+          ) : (
+            <EmptyState
+              title="Spending caps for projects and people"
+              description="A budget caps the API-equivalent spend of a project or a user per day, week or month, and alerts or refuses new starts when it is used up."
+              action={
+                <Button onClick={() => setEditing('new')}>New budget</Button>
+              }
+            />
+          )
+        }
+      >
+        {(list) => (
+          <Table scroll>
+            <TableHead>
+              <TableRow>
+                <TableCell head>Scope</TableCell>
+                <TableCell head>Period</TableCell>
+                <TableCell head>Spent / limit</TableCell>
+                <TableCell head>State</TableCell>
+                <TableCell head>Action</TableCell>
+                <TableCell head>Resets</TableCell>
+                <TableCell head>
+                  <span className="sr-only">Actions</span>
+                </TableCell>
+              </TableRow>
+            </TableHead>
+            <tbody>
+              {list.map((budget) => {
+                const current = budget.current;
+                const busy = busyId === budget.id;
+                const canOverride =
+                  budget.action === 'stop' &&
+                  budget.override === null &&
+                  current?.state === 'exceeded';
+                return (
+                  <TableRow key={budget.id}>
+                    <TableCell>
+                      <div className="font-medium">{scopeName(budget)}</div>
                       <div className="text-xs text-ink-3">
-                        until{' '}
-                        {formatMoment(budget.override.until, budget.timezone)}
+                        {SCOPE_LABEL[budget.scope]}
+                        {budget.enabled ? '' : ' · disabled'}
                       </div>
-                    ) : null}
-                  </TableCell>
-                  <TableCell>{ACTION_LABEL[budget.action]}</TableCell>
-                  <TableCell>
-                    {current ? formatMoment(current.end, budget.timezone) : '—'}
-                    <div className="text-xs text-ink-3">{budget.timezone}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap justify-end gap-2">
-                      {canOverride ? (
-                        <Button
-                          variant="glass"
-                          disabled={busy}
-                          onClick={() => setOverriding(budget)}
-                        >
-                          Override
-                        </Button>
-                      ) : null}
+                    </TableCell>
+                    <TableCell>{PERIOD_LABEL[budget.period]}</TableCell>
+                    <TableCell>
+                      {current ? (
+                        <>
+                          {formatBudgetUsd(current.spentUsd)} /{' '}
+                          {formatLimit(budget.limitUsd)} (
+                          {formatPercent(current.percent)})
+                          {unpricedHint(current.unpricedRequests) ? (
+                            <div className="text-xs text-ink-3">
+                              {unpricedHint(current.unpricedRequests)}
+                            </div>
+                          ) : null}
+                        </>
+                      ) : (
+                        formatLimit(budget.limitUsd)
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        tone={budgetTone(current?.state)}
+                        label={
+                          current ? STATE_LABEL[current.state] : 'disabled'
+                        }
+                      />
                       {budget.override ? (
+                        <div className="text-xs text-ink-3">
+                          until{' '}
+                          {formatMoment(budget.override.until, budget.timezone)}
+                        </div>
+                      ) : null}
+                    </TableCell>
+                    <TableCell>{ACTION_LABEL[budget.action]}</TableCell>
+                    <TableCell>
+                      {current
+                        ? formatMoment(current.end, budget.timezone)
+                        : '—'}
+                      <div className="text-xs text-ink-3">
+                        {budget.timezone}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap justify-end gap-2">
+                        {canOverride ? (
+                          <Button
+                            variant="glass"
+                            disabled={busy}
+                            onClick={() => setOverriding(budget)}
+                          >
+                            Override
+                          </Button>
+                        ) : null}
+                        {budget.override ? (
+                          <Button
+                            variant="glass"
+                            disabled={busy}
+                            onClick={() => revoke(budget)}
+                          >
+                            Revoke
+                          </Button>
+                        ) : null}
                         <Button
                           variant="glass"
                           disabled={busy}
-                          onClick={() => revoke(budget)}
+                          onClick={() => setEditing(budget)}
                         >
-                          Revoke
+                          Edit
                         </Button>
-                      ) : null}
-                      <Button
-                        variant="glass"
-                        disabled={busy}
-                        onClick={() => setEditing(budget)}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        variant="glass"
-                        disabled={busy}
-                        onClick={() => setDeleting(budget)}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </tbody>
-        </Table>
-      )}
+                        <Button
+                          variant="glass"
+                          disabled={busy}
+                          onClick={() => setDeleting(budget)}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </tbody>
+          </Table>
+        )}
+      </AsyncSection>
 
       <BudgetFormDialog
         open={editing !== undefined}
@@ -359,7 +403,11 @@ export default function AdminBudgetsPage() {
               <Button variant="glass" onClick={() => setDeleting(undefined)}>
                 Cancel
               </Button>
-              <Button disabled={busyId !== null} onClick={remove}>
+              <Button
+                variant="danger"
+                disabled={busyId !== null}
+                onClick={remove}
+              >
                 Delete
               </Button>
             </>

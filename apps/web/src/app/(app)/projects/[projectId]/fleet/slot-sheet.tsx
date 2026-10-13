@@ -1,11 +1,11 @@
 'use client';
 
 import type { SlotDetail } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Button } from 'glass-ui/button';
-import { SheetContent, SheetRoot } from 'glass-ui/sheet';
-import { Skeleton } from 'glass-ui/skeleton';
-import { Tabs, TabsItem } from 'glass-ui/tabs';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import { Tabs, TabsItem } from '@andrewbehma/glass-ui/tabs';
 import { type ReactNode, useEffect, useState } from 'react';
 import { api } from '../../../../../lib/api';
 import type { useControl } from '../../../../../lib/control/use-control';
@@ -19,6 +19,7 @@ import {
   formatRound,
   SLOT_STATUS_LABEL,
   SLOT_STATUS_TONE,
+  SLOT_TERM_HINT,
   safeHttpsUrl,
 } from '../../../../../lib/fleet/format';
 import { PanePanel } from './pane-panel';
@@ -30,10 +31,20 @@ const SHEET_TABS = [
 ] as const;
 type SheetTab = (typeof SHEET_TABS)[number]['id'];
 
-function Row({ label, children }: { label: string; children: ReactNode }) {
+function Row({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  /** One line that says what the term means. */
+  hint?: string;
+  children: ReactNode;
+}) {
   return (
     <div className="flex flex-col gap-1">
       <dt className="text-xs font-medium text-ink-2">{label}</dt>
+      {hint ? <p className="text-xs text-ink-3">{hint}</p> : null}
       <dd className="break-all text-sm">{children}</dd>
     </div>
   );
@@ -62,10 +73,15 @@ function Detail({ slot }: { slot: SlotDetail }) {
           label={SLOT_STATUS_LABEL[slot.status]}
         />
       </Row>
-      <Row label="Brief">
+      <Row label="Brief" hint={SLOT_TERM_HINT.brief}>
         {slot.round ? formatRound(slot.round) : '—'} · {slot.runtime} ·{' '}
         {slot.model ?? 'model unknown'}
         {slot.lead ? ' · lead' : ''}
+        {slot.lead ? (
+          <span className="block text-xs text-ink-3">
+            {SLOT_TERM_HINT.lead}
+          </span>
+        ) : null}
         {slot.modelWhy ? (
           <span className="block text-ink-2">{slot.modelWhy}</span>
         ) : null}
@@ -109,10 +125,10 @@ function Detail({ slot }: { slot: SlotDetail }) {
           </span>
         )}
       </Row>
-      <Row label="Owns">
+      <Row label="Owns" hint={SLOT_TERM_HINT.owns}>
         <Globs globs={slot.owns} />
       </Row>
-      <Row label="Never">
+      <Row label="Never" hint={SLOT_TERM_HINT.never}>
         <Globs globs={slot.never} />
       </Row>
       <Row label="Checkpoints">

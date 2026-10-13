@@ -15,6 +15,15 @@ export interface ResolveDeps {
   watchedProjects: () => readonly WatchedProject[];
   /** The tmux server: empty for the user's own, `['-L', name]` in tests. */
   tmuxServer?: readonly string[];
+  /**
+   * The session of a running skill run of this project, or null
+   * (`SkillRunExecutor.runSession`). Absent: skill runs are `unsupported`.
+   */
+  runSession?: (
+    projectId: string,
+    root: string,
+    runId: string,
+  ) => string | null;
 }
 
 /** Codes of the shared resolvers that mean "not a target of this project". */
@@ -68,11 +77,20 @@ const resolve = async (
       }
       return session;
     }
-    case 'skill_run':
-      // Skill-run sessions (#24 D7) are not resolvable until #24's runner lands.
-      throw new CommandFailure(
-        'unsupported',
-        'attaching to a skill run is not supported by this runner yet',
-      );
+    case 'skill_run': {
+      if (!deps.runSession) {
+        throw new CommandFailure(
+          'unsupported',
+          'attaching to a skill run is not supported by this runner',
+        );
+      }
+      // Only a running run of this very project (#24 D7); the executor checks
+      // the project and root against the run's own record.
+      const session = deps.runSession(project.id, project.root, target.runId);
+      if (!session || !(await tmux.find(session))) {
+        throw notFound(`run ${target.runId} of ${project.id} is not running`);
+      }
+      return session;
+    }
   }
 };

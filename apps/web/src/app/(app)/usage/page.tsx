@@ -8,19 +8,23 @@ import type {
   UsageSummaryResponse,
   UsageTimeseriesResponse,
 } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Banner } from 'glass-ui/banner';
-import { DataTable, type DataTableSort, sortRows } from 'glass-ui/data-table';
-import { DateInput } from 'glass-ui/date-input';
-import { EmptyState } from 'glass-ui/empty-state';
-import { Field, Select } from 'glass-ui/field';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
+import {
+  DataTable,
+  type DataTableSort,
+  sortRows,
+} from '@andrewbehma/glass-ui/data-table';
+import { DateInput } from '@andrewbehma/glass-ui/date-input';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { Field, Select } from '@andrewbehma/glass-ui/field';
+import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
 import {
   SegmentedControl,
   SegmentedControlItem,
-} from 'glass-ui/segmented-control';
-import { Sparkline } from 'glass-ui/sparkline';
-import { StatTile } from 'glass-ui/stat-tile';
-import { toast } from 'glass-ui/toast';
+} from '@andrewbehma/glass-ui/segmented-control';
+import { Sparkline } from '@andrewbehma/glass-ui/sparkline';
+import { StatTile } from '@andrewbehma/glass-ui/stat-tile';
 import Link from 'next/link';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { BudgetStrip } from '../../../components/budgets/budget-chip';
@@ -250,14 +254,55 @@ function CostBars({
   );
 }
 
+/** R3: "no usage in this project" is not "no usage has ever been recorded". */
+function UsageEmpty({
+  projectId,
+  isAdmin,
+  onClearProject,
+}: {
+  projectId: string;
+  isAdmin: boolean;
+  onClearProject: () => void;
+}) {
+  if (projectId) {
+    return (
+      <EmptyState
+        title="No usage for this project in this range"
+        description="Try a longer range, or look at all your projects."
+        action={
+          <Button variant="glass" onClick={onClearProject}>
+            Show all projects
+          </Button>
+        }
+      />
+    );
+  }
+  return (
+    <EmptyState
+      title="No usage in this range"
+      description="Usage is recorded when an agent runs on a paired runner. Try a longer range, or connect a project and runner first."
+      action={
+        <Link
+          href={isAdmin ? '/admin/runners' : '/projects'}
+          className={buttonClassName({ variant: 'glass' })}
+        >
+          {isAdmin ? 'Open Runners' : 'Open Projects'}
+        </Link>
+      }
+    />
+  );
+}
+
 function BreakdownTable({
   dimension,
   rows,
   loading,
+  empty,
 }: {
   dimension: UsageDimension;
   rows: UsageBreakdownRow[];
   loading: boolean;
+  empty: ReactNode;
 }) {
   const [sort, setSort] = useState<DataTableSort | null>({
     columnId: 'cost',
@@ -351,12 +396,7 @@ function BreakdownTable({
       sort={sort}
       onSortChange={setSort}
       loading={loading}
-      emptyState={
-        <EmptyState
-          title="No usage"
-          description="Nothing was recorded in this range."
-        />
-      }
+      emptyState={empty}
     />
   );
 }
@@ -376,6 +416,7 @@ export default function UsagePage() {
   const [dimension, setDimension] = useState<UsageDimension>('project');
   const [data, setData] = useState<Data>();
   const [error, setError] = useState<string>();
+  const [attempt, setAttempt] = useState(0);
   const [notFound, setNotFound] = useState(false);
 
   // The browser's zone is known only on the client; start on UTC for the server render.
@@ -411,6 +452,7 @@ export default function UsagePage() {
     [preset, fromDate, toDate],
   );
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` reloads on Try again
   useEffect(() => {
     if (!range) return;
     let cancelled = false;
@@ -442,13 +484,12 @@ export default function UsagePage() {
         if (err instanceof ApiError && err.status === 404) setNotFound(true);
         else {
           setError(describeUsageError(err));
-          toast.error(describeUsageError(err));
         }
       });
     return () => {
       cancelled = true;
     };
-  }, [range, projectId, tz, dimension]);
+  }, [range, projectId, tz, dimension, attempt]);
 
   const interval = range ? intervalFor(range) : 'day';
   const totals = data?.summary.totals;
@@ -509,9 +550,19 @@ export default function UsagePage() {
           description="It does not exist, or you are not a member of it."
         />
       ) : error ? (
-        <Banner tone="danger" title="Could not load usage">
-          {error}
-        </Banner>
+        <SectionUnavailable
+          title="Usage is not answering"
+          stillWorks={`${error} The filters above still work.`}
+          action={
+            <Button
+              variant="glass"
+              size="sm"
+              onClick={() => setAttempt((n) => n + 1)}
+            >
+              Try again
+            </Button>
+          }
+        />
       ) : (
         <>
           <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -565,7 +616,9 @@ export default function UsagePage() {
               value={formatCount(totals?.unpricedRequests ?? 0)}
               hint={
                 totals && totals.unpricedRequests > 0
-                  ? 'No price matches the model — not counted as $0'
+                  ? isAdmin
+                    ? 'No price matches the model, so not counted as $0. Fix it under Admin › Prices.'
+                    : 'No price matches the model, so not counted as $0. An administrator fixes it under Admin › Prices.'
                   : 'Every request has a price'
               }
               href={
@@ -591,9 +644,10 @@ export default function UsagePage() {
               data.byRuntime.series.length > 0 ? (
                 <CostBars series={data.byRuntime} interval={interval} />
               ) : (
-                <EmptyState
-                  title="No usage"
-                  description="Nothing was recorded in this range."
+                <UsageEmpty
+                  projectId={projectId}
+                  isAdmin={isAdmin}
+                  onClearProject={() => chooseProject('')}
                 />
               )
             ) : (
@@ -619,10 +673,37 @@ export default function UsagePage() {
                 ))}
               </SegmentedControl>
             </div>
+            {totals && totals.unpricedRequests > 0 ? (
+              <p className="mb-2 text-xs text-ink-2">
+                {formatCount(totals.unpricedRequests)} requests have no price,
+                so their cost is left out.{' '}
+                {isAdmin ? (
+                  <>
+                    Add the model under{' '}
+                    <Link
+                      href="/admin/prices"
+                      className="text-ink underline underline-offset-2"
+                    >
+                      Admin › Prices
+                    </Link>
+                    .
+                  </>
+                ) : (
+                  'An administrator adds the model under Admin › Prices.'
+                )}
+              </p>
+            ) : null}
             <BreakdownTable
               dimension={dimension}
               rows={data?.breakdown.rows ?? []}
               loading={!data}
+              empty={
+                <UsageEmpty
+                  projectId={projectId}
+                  isAdmin={isAdmin}
+                  onClearProject={() => chooseProject('')}
+                />
+              }
             />
           </section>
         </>

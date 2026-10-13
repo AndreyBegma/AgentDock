@@ -1,4 +1,4 @@
-import { Spinner } from 'glass-ui/spinner';
+import { Spinner } from '@andrewbehma/glass-ui/spinner';
 
 /** A spinner with the sentence of the command still in flight. */
 export function PendingLabel({ label }: { label: string }) {

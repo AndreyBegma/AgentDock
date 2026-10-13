@@ -1,4 +1,4 @@
-import { Card } from 'glass-ui/card';
+import { Card } from '@andrewbehma/glass-ui/card';
 import type { ReactNode } from 'react';
 
 /** Centered card shared by the unauthenticated pages, which have no shell. */

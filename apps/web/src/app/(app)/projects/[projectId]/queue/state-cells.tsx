@@ -1,6 +1,6 @@
 import type { QueueItemView } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Tooltip } from 'glass-ui/tooltip';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import {
   computedNote,
   STATE_TONE,
@@ -18,14 +18,14 @@ export function SourceDot({ item }: { item: QueueItemView }) {
   const label = sourceLabel(item);
   return (
     <Tooltip content={label}>
-      <span className="inline-flex items-center">
+      <button type="button" className="inline-flex cursor-help items-center">
         <Badge
           dot
           tone={item.source === 'orchestrator' ? 'ok' : 'neutral'}
           aria-hidden="true"
         />
         <span className="sr-only">{label}</span>
-      </span>
+      </button>
     </Tooltip>
   );
 }

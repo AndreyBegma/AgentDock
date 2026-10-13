@@ -1,15 +1,15 @@
 'use client';
 
 import type { ApproveRequest, RequestChangesRequest } from '@agentdock/shared';
-import { Banner } from 'glass-ui/banner';
-import { Button } from 'glass-ui/button';
-import { DialogContent, DialogRoot } from 'glass-ui/dialog';
-import { Field, Textarea } from 'glass-ui/field';
-import { toast } from 'glass-ui/toast';
+import { Banner } from '@andrewbehma/glass-ui/banner';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { Field, Textarea } from '@andrewbehma/glass-ui/field';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import { useState } from 'react';
 import { api } from '../../../../../lib/api';
 import {
-  COMMAND_UNAVAILABLE_TEXT,
+  commandUnavailableText,
   describeApprovalError,
   isCommandUnavailable,
   movedHead,
@@ -20,23 +20,31 @@ import {
 const NOTE_MAX_BYTES = 4096;
 
 /** What a failed decision looks like in a dialog: the runner seam gets a Banner. */
-function DecisionError({ error }: { error: unknown }) {
+function DecisionError({
+  error,
+  runnerName,
+}: {
+  error: unknown;
+  runnerName?: string | null;
+}) {
   if (isCommandUnavailable(error)) {
     return (
-      <Banner tone="warn" title="The runner cannot take decisions yet">
-        {COMMAND_UNAVAILABLE_TEXT}
+      <Banner tone="warn" title="This runner is too old to take decisions">
+        {commandUnavailableText(runnerName)}
       </Banner>
     );
   }
   return (
     <p role="alert" className="text-sm text-danger">
-      {describeApprovalError(error)}
+      {describeApprovalError(error, runnerName)}
     </p>
   );
 }
 
 interface DialogProps {
   projectId: string;
+  /** Named in the remedy when the runner is too old. */
+  runnerName?: string | null;
   pr: number;
   /** The head the person saw — what the decision binds to (D6). */
   headSha: string;
@@ -48,6 +56,7 @@ interface DialogProps {
 
 export function ApproveDialog({
   projectId,
+  runnerName,
   pr,
   headSha,
   open,
@@ -112,7 +121,9 @@ export function ApproveDialog({
             <code className="font-mono text-xs">{headSha.slice(0, 12)}</code>. A
             later push voids it.
           </p>
-          {error ? <DecisionError error={error} /> : null}
+          {error ? (
+            <DecisionError error={error} runnerName={runnerName} />
+          ) : null}
         </div>
       </DialogContent>
     </DialogRoot>
@@ -121,6 +132,7 @@ export function ApproveDialog({
 
 export function RequestChangesDialog({
   projectId,
+  runnerName,
   pr,
   headSha,
   open,
@@ -204,7 +216,9 @@ export function RequestChangesDialog({
           >
             {noteBytes(note)} / {NOTE_MAX_BYTES} bytes
           </span>
-          {error ? <DecisionError error={error} /> : null}
+          {error ? (
+            <DecisionError error={error} runnerName={runnerName} />
+          ) : null}
         </form>
       </DialogContent>
     </DialogRoot>

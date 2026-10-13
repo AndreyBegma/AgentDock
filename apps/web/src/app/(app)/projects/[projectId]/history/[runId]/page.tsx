@@ -5,13 +5,18 @@ import {
   type RunDetail,
   type RunSession,
 } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { EmptyState } from 'glass-ui/empty-state';
-import { KeyValueList } from 'glass-ui/key-value-list';
-import { Skeleton } from 'glass-ui/skeleton';
-import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
-import { Timeline } from 'glass-ui/timeline';
-import { toast } from 'glass-ui/toast';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { KeyValueList } from '@andrewbehma/glass-ui/key-value-list';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import {
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+} from '@andrewbehma/glass-ui/table';
+import { Timeline } from '@andrewbehma/glass-ui/timeline';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -29,6 +34,7 @@ import {
   costLabel,
   parseRunUpdate,
   prLabel,
+  RUN_KIND_LABEL,
   RUN_STATUS_LABEL,
   RUN_STATUS_TONE,
   runLabel,
@@ -40,6 +46,7 @@ import {
   formatDuration,
   formatTime,
 } from '../../../../../../lib/sessions/format';
+import { ProjectRunnerBanner } from '../../project-runner-banner';
 
 const REFETCH_DEBOUNCE_MS = 300;
 
@@ -154,13 +161,16 @@ export default function RunDetailPage() {
           label={RUN_STATUS_LABEL[run.status]}
         />
       </h1>
+      <div className="mb-4">
+        <ProjectRunnerBanner projectId={projectId} />
+      </div>
 
       <section className="mb-8">
         <h2 className="mb-2 text-sm font-semibold">Summary</h2>
         <KeyValueList
           items={[
             { key: 'title', label: 'Title', value: run.title ?? '—' },
-            { key: 'kind', label: 'Kind', value: run.kind.replace('_', ' ') },
+            { key: 'kind', label: 'Kind', value: RUN_KIND_LABEL[run.kind] },
             {
               key: 'runtime',
               label: 'Runtime / model',

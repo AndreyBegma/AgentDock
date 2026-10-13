@@ -10,8 +10,11 @@ import {
   filterItems,
   gapSentence,
   parseStateFilter,
+  queueEmptyDescription,
   queueHint,
+  queueUnavailableCopy,
   refusedLabels,
+  roundFooter,
   safeHttpsUrl,
   stateLabel,
 } from './format';
@@ -193,9 +196,9 @@ describe('describeQueueError', () => {
     );
   });
 
-  test('command_unavailable says the runner part is not deployed', () => {
+  test('command_unavailable without a runner name still says to update it', () => {
     expect(describeQueueError(apiError(503, 'command_unavailable'))).toContain(
-      'runner part is not deployed yet',
+      'Update the AgentDock runner on the project’s machine',
     );
   });
 
@@ -214,6 +217,39 @@ describe('misc', () => {
     expect(safeHttpsUrl('https://github.com/o/r/issues/1')).not.toBeNull();
     expect(safeHttpsUrl('javascript:alert(1)')).toBeNull();
     expect(safeHttpsUrl(null)).toBeNull();
+  });
+
+  test('an old runner is named and told to update, with no developer wording', () => {
+    const text = describeQueueError(
+      new ApiError(503, 'command_unavailable' as never, 'x'),
+      'laptop',
+    );
+    expect(text).toContain('Update the AgentDock runner on laptop');
+    expect(text).not.toContain('not deployed');
+  });
+
+  test('the empty queue says how an issue gets in, and notes a missing snapshot', () => {
+    const seen = queueEmptyDescription('ready', '2026-10-13T10:00:00Z');
+    expect(seen).toContain('“ready” label');
+    expect(seen).toContain('Acceptance criteria');
+    expect(seen).not.toContain('first snapshot');
+    expect(queueEmptyDescription('ready', null)).toContain('first snapshot');
+  });
+
+  test('an unreadable queue names the cause and the runner', () => {
+    const admin = queueUnavailableCopy({ reason: 'bad token' }, 'laptop', true);
+    expect(admin.body).toContain('bad token');
+    expect(admin.body).toContain('laptop');
+    expect(admin.href).toBe('/admin/runners');
+    expect(
+      queueUnavailableCopy({ reason: 'x' }, null, false).href,
+    ).toBeUndefined();
+  });
+
+  test('the round footer explains the dot', () => {
+    expect(roundFooter({ date: '2026-10-13', round: '1030' })).toContain(
+      'green dot',
+    );
   });
 
   test('stateLabel is the board wording', () => {

@@ -1,20 +1,30 @@
 'use client';
 
-import { RUN_UPDATED_LIVE_EVENT, type SkillRunDetail } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Banner } from 'glass-ui/banner';
-import { Button } from 'glass-ui/button';
-import { CodeBlock } from 'glass-ui/code-block';
-import { DialogContent, DialogRoot } from 'glass-ui/dialog';
-import { EmptyState } from 'glass-ui/empty-state';
-import { KeyValueList } from 'glass-ui/key-value-list';
-import { Skeleton } from 'glass-ui/skeleton';
-import { Spinner } from 'glass-ui/spinner';
-import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
-import { toast } from 'glass-ui/toast';
+import {
+  type ProjectDetail,
+  RUN_UPDATED_LIVE_EVENT,
+  type SkillRunDetail,
+} from '@agentdock/shared';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Banner } from '@andrewbehma/glass-ui/banner';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { KeyValueList } from '@andrewbehma/glass-ui/key-value-list';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import { Spinner } from '@andrewbehma/glass-ui/spinner';
+import {
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+} from '@andrewbehma/glass-ui/table';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { TerminalSheet } from '../../../../../../../components/terminal/terminal-sheet';
 import { api } from '../../../../../../../lib/api';
 import { safeHttpsUrl } from '../../../../../../../lib/fleet/format';
 import { parseRunUpdate } from '../../../../../../../lib/history/format';
@@ -31,6 +41,8 @@ import {
   SKILL_PHASE_LABEL,
   SKILL_PHASE_TONE,
 } from '../../../../../../../lib/skills/format';
+import { useTerminalAvailable } from '../../../../../../../lib/terminal/use-terminal-available';
+import { ProjectRunnerBanner } from '../../../project-runner-banner';
 import { RunLogPanel } from './log-panel';
 
 const REFETCH_DEBOUNCE_MS = 300;
@@ -60,6 +72,9 @@ export default function SkillRunPage() {
   const [confirming, setConfirming] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [role, setRole] = useState<string>();
+  const [runnerId, setRunnerId] = useState<string>();
+  const [attaching, setAttaching] = useState(false);
+  const canAttach = useTerminalAvailable(runnerId, role === 'admin');
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const load = useCallback(async () => {
@@ -78,8 +93,11 @@ export default function SkillRunPage() {
   }, [load]);
 
   useEffect(() => {
-    api<{ role: string }>(`/projects/${projectId}`)
-      .then((project) => setRole(project.role))
+    api<ProjectDetail>(`/projects/${projectId}`)
+      .then((project) => {
+        setRole(project.role);
+        setRunnerId(project.runnerId);
+      })
       .catch(() => setRole('viewer'));
   }, [projectId]);
 
@@ -152,11 +170,22 @@ export default function SkillRunPage() {
               <Spinner size="sm" label={SKILL_PHASE_LABEL[run.phase]} />
             ) : null}
           </h1>
-          {active && canOperate ? (
-            <Button variant="glass" onClick={() => setConfirming(true)}>
-              Cancel run
-            </Button>
-          ) : null}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* The runner resolves a run's session only while it is running. */}
+            {run.phase === 'running' && canAttach ? (
+              <Button variant="glass" onClick={() => setAttaching(true)}>
+                Attach
+              </Button>
+            ) : null}
+            {active && canOperate ? (
+              <Button variant="glass" onClick={() => setConfirming(true)}>
+                Cancel run
+              </Button>
+            ) : null}
+          </div>
+        </div>
+        <div className="mt-3">
+          <ProjectRunnerBanner projectId={projectId} />
         </div>
       </div>
 
@@ -359,6 +388,13 @@ export default function SkillRunPage() {
           />
         )}
       </section>
+
+      <TerminalSheet
+        projectId={projectId}
+        target={attaching ? { kind: 'skill_run', runId } : undefined}
+        title={`/${run.skill}`}
+        onClose={() => setAttaching(false)}
+      />
 
       <DialogRoot
         open={confirming}

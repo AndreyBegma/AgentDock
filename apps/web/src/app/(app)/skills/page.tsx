@@ -8,15 +8,22 @@ import type {
   SkillPreviewView,
 } from '@agentdock/shared';
 import type { SkillCatalogItem } from '@agentdock/shared/protocol';
-import { Banner } from 'glass-ui/banner';
-import { Card } from 'glass-ui/card';
-import { EmptyState } from 'glass-ui/empty-state';
-import { Field, SearchField, Select } from 'glass-ui/field';
-import { Skeleton } from 'glass-ui/skeleton';
-import { Spinner } from 'glass-ui/spinner';
-import { toast } from 'glass-ui/toast';
+import { Banner } from '@andrewbehma/glass-ui/banner';
+import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
+import { Card } from '@andrewbehma/glass-ui/card';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { Field, SearchField, Select } from '@andrewbehma/glass-ui/field';
+import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import { Spinner } from '@andrewbehma/glass-ui/spinner';
+import { toast } from '@andrewbehma/glass-ui/toast';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { api } from '../../../lib/api';
+import { RunnerOfflineBanner } from '../../../components/prerequisites/prerequisite-banner';
+import { useCurrentUser } from '../../../components/shell/user-context';
+import { api, describeError } from '../../../lib/api';
+import { isRunnerOnline } from '../../../lib/prerequisites/facts';
+import { useSection } from '../../../lib/section/use-section';
 import {
   COMMAND_UNAVAILABLE_TEXT,
   describeSkillsError,
@@ -26,8 +33,31 @@ import { InspectSheet } from './inspect-sheet';
 
 const SEARCH_DEBOUNCE_MS = 400;
 
+/** A runner's state as the project option shows it; online needs no note. */
+const runnerNote = (project: ProjectSummary): string =>
+  isRunnerOnline(project.runnerStatus)
+    ? ''
+    : project.runnerStatus === 'revoked'
+      ? ' (revoked)'
+      : ' (offline)';
+
+interface Loaded {
+  /** Everything the person is a member of. */
+  all: number;
+  /** Where they may install or run skills: operator or admin. */
+  operable: ProjectSummary[];
+}
+
 export default function SkillsCatalogPage() {
-  const [projects, setProjects] = useState<ProjectSummary[]>();
+  const isGlobalAdmin = useCurrentUser().role === 'admin';
+  const section = useSection<Loaded>(async () => {
+    const all = await api<ProjectSummary[]>('/projects');
+    return {
+      all: all.length,
+      operable: all.filter((p) => p.role !== 'viewer'),
+    };
+  }, []);
+  const projects = section.data?.operable;
   const [projectId, setProjectId] = useState('');
   const [query, setQuery] = useState('');
   const [items, setItems] = useState<SkillCatalogItem[]>();
@@ -40,17 +70,9 @@ export default function SkillsCatalogPage() {
 
   // The catalog goes through a runner: the runner of a project the person can operate.
   useEffect(() => {
-    api<ProjectSummary[]>('/projects')
-      .then((all) => {
-        const operable = all.filter((p) => p.role !== 'viewer');
-        setProjects(operable);
-        setProjectId((current) => current || operable[0]?.id || '');
-      })
-      .catch((err) => {
-        toast.error(describeSkillsError(err));
-        setProjects([]);
-      });
-  }, []);
+    const first = section.data?.operable[0]?.id;
+    if (first) setProjectId((current) => current || first);
+  }, [section.data]);
 
   const project = projects?.find((p) => p.id === projectId);
   const runnerId = project?.runnerId;
@@ -134,12 +156,48 @@ export default function SkillsCatalogPage() {
     }
   };
 
-  if (!projects) return <Skeleton className="h-64 w-full" />;
+  if (!projects) {
+    if (section.error !== null && !section.loading) {
+      return (
+        <SectionUnavailable
+          title="Your projects could not be loaded"
+          stillWorks={`${describeError(section.error)} Skills need a project's runner, so the catalog waits for this.`}
+          action={
+            <Button variant="glass" size="sm" onClick={section.retry}>
+              Try again
+            </Button>
+          }
+        />
+      );
+    }
+    return <Skeleton className="h-64 w-full" />;
+  }
   if (projects.length === 0 || !project) {
+    const noProjects = section.data?.all === 0;
+    if (noProjects && isGlobalAdmin) {
+      return (
+        <EmptyState
+          title="Connect a project first"
+          description="Skills are installed and run through a project's runner, so the catalog needs at least one project."
+          action={
+            <Link
+              href="/projects"
+              className={buttonClassName({ variant: 'solid' })}
+            >
+              Connect project
+            </Link>
+          }
+        />
+      );
+    }
     return (
       <EmptyState
-        title="No project to install into"
-        description="Installing and running skills needs the operator role on a project. Ask an administrator for access."
+        title={noProjects ? 'No project yet' : 'No project to install into'}
+        description={
+          noProjects
+            ? 'Ask an administrator to add you to a project. Skills are installed and run through a project.'
+            : 'Installing and running skills needs the operator role on a project. Ask an administrator for access.'
+        }
       />
     );
   }
@@ -154,6 +212,8 @@ export default function SkillsCatalogPage() {
         </p>
       </div>
 
+      <RunnerOfflineBanner project={project} />
+
       <div className="flex flex-wrap items-end gap-4">
         <Field label="Project" htmlFor="skills-project">
           <Select
@@ -164,6 +224,7 @@ export default function SkillsCatalogPage() {
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.displayName} · {p.runnerName}
+                {runnerNote(p)}
               </option>
             ))}
           </Select>

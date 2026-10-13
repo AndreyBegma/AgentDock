@@ -1,9 +1,10 @@
 'use client';
 
 import type { AuditRecordView } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { SheetContent, SheetRoot } from 'glass-ui/sheet';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import type { ReactNode } from 'react';
+import { actionLabel, RESULT_LABEL } from '../../../lib/audit/actions';
 import {
   actorLabel,
   formatTime,
@@ -48,18 +49,21 @@ export function RecordSheet({
       {record ? (
         <SheetContent
           side="right"
-          title={record.action}
-          description={`Record #${record.seq} · ${formatTime(record.ts)}`}
+          title={actionLabel(record.action)}
+          description={`${record.action} · record #${record.seq} · ${formatTime(record.ts)}`}
         >
           <dl className="flex flex-col gap-4">
             <Row label="Result">
-              <Badge tone={RESULT_TONE[record.result]} label={record.result} />
+              <Badge
+                tone={RESULT_TONE[record.result]}
+                label={RESULT_LABEL[record.result]}
+              />
             </Row>
             <Row label="Actor">
               {actorLabel(record)}
-              {record.actorUserId ? (
+              {(record.actorUserId ?? record.actorOnBehalfOfId) ? (
                 <span className="block font-mono text-xs text-ink-3">
-                  {record.actorUserId}
+                  {record.actorUserId ?? record.actorOnBehalfOfId}
                 </span>
               ) : null}
             </Row>

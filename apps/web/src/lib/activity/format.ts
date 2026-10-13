@@ -6,7 +6,7 @@ import {
   type ActivitySeverity,
   MAX_LIVE_SUBSCRIPTIONS,
 } from '@agentdock/shared';
-import type { TimelineItem } from 'glass-ui/timeline';
+import type { TimelineItem } from '@andrewbehma/glass-ui/timeline';
 import { ApiError } from '../api';
 
 /** Projects the global feed follows live; past it the page polls (the socket is shared, cap 50). */
@@ -81,6 +81,16 @@ export function toActivityQuery(form: ActivityFilterForm): ActivityQuery {
   if (to) query.to = to;
   return query;
 }
+
+/** Whether a query narrows the feed at all (none: "nothing yet", some: "no matches"). */
+export const hasActivityFilters = (query: ActivityQuery): boolean =>
+  Object.values(query).some((value) => value !== undefined && value !== '');
+
+/** Whether the form holds filters that were not applied yet. */
+export const activityFormChanged = (
+  form: ActivityFilterForm,
+  applied: ActivityQuery,
+): boolean => queryString(toActivityQuery(form)) !== queryString(applied);
 
 export function queryString(
   query: object,

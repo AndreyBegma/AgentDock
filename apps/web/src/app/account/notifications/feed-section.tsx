@@ -1,12 +1,14 @@
 'use client';
 
-import { Button } from 'glass-ui/button';
-import { Card } from 'glass-ui/card';
-import { EmptyState } from 'glass-ui/empty-state';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { Card } from '@andrewbehma/glass-ui/card';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
 import {
   SegmentedControl,
   SegmentedControlItem,
-} from 'glass-ui/segmented-control';
+} from '@andrewbehma/glass-ui/segmented-control';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { useState } from 'react';
 import { NotificationItem } from '../../../components/shell/notification-item';
 import { useCurrentUser } from '../../../components/shell/user-context';
@@ -57,21 +59,42 @@ export function FeedSection() {
         </div>
       </div>
       {feed.failed ? (
-        <EmptyState
-          title="Could not load notifications"
-          action={<Button onClick={() => void feed.reload()}>Try again</Button>}
-        />
-      ) : feed.items.length === 0 ? (
-        <EmptyState
-          title={feed.loading ? 'Loading…' : 'Nothing here'}
-          description={
-            feed.loading
-              ? undefined
-              : tab === 'unread'
-                ? 'Everything has been read.'
-                : 'Things only a person can clear will show up here.'
-          }
-        />
+        <div className="mb-3">
+          <SectionUnavailable
+            title="Notifications are not answering"
+            stillWorks={
+              feed.items.length > 0
+                ? 'The rows below may be out of date.'
+                : 'Your rules and mutes below still work.'
+            }
+            action={
+              <Button
+                variant="glass"
+                size="sm"
+                disabled={feed.loading}
+                onClick={() => void feed.reload()}
+              >
+                Try again
+              </Button>
+            }
+          />
+        </div>
+      ) : null}
+      {feed.items.length === 0 ? (
+        feed.failed ? null : feed.loading ? (
+          <Skeleton className="h-24 w-full" />
+        ) : (
+          <EmptyState
+            title={
+              tab === 'unread' ? 'Everything has been read' : 'Nothing here yet'
+            }
+            description={
+              tab === 'unread'
+                ? 'New notifications that need you will show up here.'
+                : 'You are told here when a slot is blocked, a runner drops, a budget is hit or a pull request waits for you. Choose which kinds below.'
+            }
+          />
+        )
       ) : (
         <ul className="divide-line divide-y">
           {feed.items.map((item) => (
