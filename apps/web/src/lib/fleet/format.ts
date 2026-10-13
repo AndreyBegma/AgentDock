@@ -268,6 +268,36 @@ export function boardErrorHint(error: {
   return `The latest board could not be read: ${error.reason} (${where}). Fix that file in the project, then the next round picks it up.`;
 }
 
+/**
+ * Stop makes sense only while there is a session to stop; `absent` is known to
+ * be not running, so the button is not drawn. `unknown` keeps it — nothing was
+ * observed yet, and the control reasons say what is missing.
+ */
+export const showStopControl = (status: OrchestratorStatus): boolean =>
+  status !== 'absent';
+
+/** A board error split for a banner: a short title, the detail and the file to fix. */
+export function boardErrorView(error: {
+  reason: string;
+  file: string;
+  line?: number | null;
+}): { title: string; detail: string; path: string } {
+  const path = `${error.file}${error.line ? `:${error.line}` : ''}`;
+  return {
+    title: 'The orchestrator’s board could not be read',
+    detail: `${error.reason} (${path}). Fix that file in the project, then the next round picks it up.`,
+    path,
+  };
+}
+
+/** What "scraped" means, in a sentence, for whoever sees the chip. */
+export const CHANNEL_EXPLANATION: Record<FleetChannel, string | null> = {
+  events: null,
+  scraped:
+    'Scraped: AgentDock is reading the orchestrator’s markdown files because the Code Sentinel plugin sent no events in the last 24 hours. The facts are right but can lag a minute or two.',
+  both: 'Mixed: some facts come from plugin events, the rest from scraping the orchestrator’s markdown files.',
+};
+
 /** The slot-status filter: every status by its label, in the order they happen. */
 export const slotStatusOptions = (): { value: SlotStatus; label: string }[] =>
   (Object.keys(SLOT_STATUS_LABEL) as SlotStatus[]).map((value) => ({

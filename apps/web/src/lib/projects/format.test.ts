@@ -7,9 +7,25 @@ import {
   describeProjectError,
   docsKindLabel,
   docsOverrideRequest,
+  githubAppState,
   noOnlineRunnerCopy,
   suggestedPathOf,
 } from './format';
+
+describe('githubAppState', () => {
+  test('one state: not covered wins, then healthy, then needs attention', () => {
+    expect(githubAppState({ covered: false, state: 'healthy' }).label).toBe(
+      'Not covered',
+    );
+    expect(githubAppState({ covered: true, state: 'healthy' })).toEqual({
+      label: 'Healthy',
+      tone: 'ok',
+    });
+    expect(githubAppState({ covered: true, state: 'unhealthy' }).tone).toBe(
+      'warn',
+    );
+  });
+});
 
 const inspection = (
   patch: Partial<ProjectInspection> = {},

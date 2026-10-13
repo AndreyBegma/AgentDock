@@ -1,25 +1,35 @@
 import { describe, expect, test } from 'bun:test';
-import { isActive, projectIdOf, visibleNav } from './nav';
+import { activeEntryId, isActive, projectIdOf, visibleNav } from './nav';
 
 const labels = (role: 'admin' | 'viewer', path: string) =>
   visibleNav(role, path).flatMap((section) =>
     section.entries.map((entry) => `${section.id}/${entry.label}`),
   );
 
+const activeAt = (role: 'admin' | 'viewer', path: string) =>
+  activeEntryId(visibleNav(role, path), path);
+
 describe('visibleNav', () => {
-  test('a viewer gets no Admin section', () => {
+  test('a viewer gets the workspace and no Admin section', () => {
     const sections = visibleNav('viewer', '/').map((section) => section.id);
-    expect(sections).toEqual(['overview', 'sessions', 'usage']);
+    expect(sections).toEqual(['workspace']);
   });
 
-  test('an admin gets Runners, Users, Audit, Prices, Integrations and Settings', () => {
+  test('the workspace comes first, then the project, then Admin', () => {
+    const sections = visibleNav('admin', '/projects/p1/fleet').map(
+      (section) => section.id,
+    );
+    expect(sections).toEqual(['workspace', 'project', 'admin']);
+  });
+
+  test('an admin gets the workspace and the Admin pages, Integrations once', () => {
     expect(labels('admin', '/')).toEqual([
-      'overview/Overview',
-      'overview/Projects',
-      'overview/Activity',
-      'overview/Skills',
-      'sessions/Sessions',
-      'usage/Usage',
+      'workspace/Overview',
+      'workspace/Projects',
+      'workspace/Activity',
+      'workspace/Sessions',
+      'workspace/Usage',
+      'workspace/Skills',
       'admin/Runners',
       'admin/Users',
       'admin/Schedules',
@@ -27,39 +37,47 @@ describe('visibleNav', () => {
       'admin/Audit',
       'admin/Prices',
       'admin/Integrations',
-      'admin/Triggers',
-      'admin/Webhooks',
-      'admin/GitHub App',
       'admin/Settings',
     ]);
   });
 
+  test('Integrations opens the hub, not one of its pages', () => {
+    const integrations = visibleNav('admin', '/')
+      .flatMap((section) => section.entries)
+      .find((entry) => entry.id === 'integrations');
+    expect(integrations?.resolvedHref).toBe('/admin/integrations');
+  });
+
   test('a viewer sees Usage but never Prices', () => {
-    expect(labels('viewer', '/')).toContain('usage/Usage');
+    expect(labels('viewer', '/')).toContain('workspace/Usage');
     expect(labels('viewer', '/').join()).not.toContain('Prices');
   });
 
   test('a viewer sees Projects, and Fleet and Settings inside a project', () => {
     expect(labels('viewer', '/')).toEqual([
-      'overview/Overview',
-      'overview/Projects',
-      'overview/Activity',
-      'sessions/Sessions',
-      'usage/Usage',
+      'workspace/Overview',
+      'workspace/Projects',
+      'workspace/Activity',
+      'workspace/Sessions',
+      'workspace/Usage',
     ]);
     const inProject = labels('viewer', '/projects/p1/settings');
-    expect(inProject).toContain('project/Fleet');
-    expect(inProject).toContain('project/Queue');
-    expect(inProject).toContain('project/Approvals');
-    expect(inProject).toContain('project/Activity');
-    expect(inProject).toContain('project/History');
-    expect(inProject).toContain('project/Skills');
-    expect(inProject).toContain('project/Schedules');
-    expect(inProject).toContain('project/Settings');
+    for (const page of [
+      'Fleet',
+      'Queue',
+      'Approvals',
+      'Activity',
+      'History',
+      'Skills',
+      'Schedules',
+      'Settings',
+    ]) {
+      expect(inProject).toContain(`project/${page}`);
+    }
   });
 
   test('the catalog is for operators; a viewer sees only the project inventory', () => {
-    expect(labels('viewer', '/').join()).not.toContain('overview/Skills');
+    expect(labels('viewer', '/').join()).not.toContain('workspace/Skills');
     const skills = visibleNav('viewer', '/projects/p1/fleet')
       .flatMap((section) => section.entries)
       .find((entry) => entry.id === 'project-skills');
@@ -78,6 +96,50 @@ describe('visibleNav', () => {
   });
 });
 
+describe('activeEntryId: one active item', () => {
+  test('inside a project only the sub-page is active, never Projects', () => {
+    expect(activeAt('admin', '/projects/p1/fleet')).toBe('fleet');
+    expect(activeAt('admin', '/projects/p1/history/r1')).toBe('history');
+    expect(activeAt('admin', '/projects/p1/skills/runs/r1')).toBe(
+      'project-skills',
+    );
+  });
+
+  test('/projects is active only on the list itself', () => {
+    expect(activeAt('viewer', '/projects')).toBe('projects');
+    expect(activeAt('viewer', '/projects/p1')).toBeNull();
+  });
+
+  test('the project Activity does not light the workspace Activity', () => {
+    expect(activeAt('viewer', '/activity')).toBe('activity');
+    expect(activeAt('viewer', '/projects/p1/activity')).toBe(
+      'project-activity',
+    );
+  });
+
+  test('the Integrations hub stays active on its pages', () => {
+    expect(activeAt('admin', '/admin/integrations')).toBe('integrations');
+    expect(activeAt('admin', '/admin/integrations/webhooks')).toBe(
+      'integrations',
+    );
+  });
+
+  test('a session detail lights Sessions; a page outside the rail lights nothing', () => {
+    expect(activeAt('viewer', '/sessions/s1')).toBe('sessions');
+    expect(activeAt('viewer', '/account')).toBeNull();
+  });
+
+  test('exactly one entry matches on every page of the rail', () => {
+    const path = '/projects/p1/queue';
+    const sections = visibleNav('admin', path);
+    const id = activeEntryId(sections, path);
+    const marked = sections
+      .flatMap((section) => section.entries)
+      .filter((entry) => entry.id === id);
+    expect(marked).toHaveLength(1);
+  });
+});
+
 describe('projectIdOf / isActive', () => {
   test('reads the project id only under /projects', () => {
     expect(projectIdOf('/projects/p1/fleet')).toBe('p1');
@@ -89,5 +151,10 @@ describe('projectIdOf / isActive', () => {
     expect(isActive('/', '/admin/users')).toBe(false);
     expect(isActive('/admin/users', '/admin/users')).toBe(true);
     expect(isActive('/admin/users', '/admin/users-x')).toBe(false);
+  });
+
+  test('an exact entry does not match the pages below it', () => {
+    expect(isActive('/projects', '/projects/p1', true)).toBe(false);
+    expect(isActive('/projects', '/projects', true)).toBe(true);
   });
 });

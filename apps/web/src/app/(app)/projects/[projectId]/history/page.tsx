@@ -18,28 +18,34 @@ import { toast } from '@andrewbehma/glass-ui/toast';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { PageHeader } from '../../../../../components/page-header/page-header';
 import { AsyncSection } from '../../../../../components/prerequisites/async-section';
+import { ScrollX } from '../../../../../components/scroll-x/scroll-x';
 import {
   isNotFound,
   PAGE_SIZE,
   queryString,
 } from '../../../../../lib/activity/format';
 import { api, describeError } from '../../../../../lib/api';
-import { formatAgo } from '../../../../../lib/fleet/format';
+import { formatDate } from '../../../../../lib/format';
+import { Time } from '../../../../../lib/format/time';
 import {
+  abandonedHiddenLabel,
   costLabel,
   EMPTY_RUN_FILTERS,
   hasRunFilters,
   parseRunUpdate,
   prLabel,
+  READABLE_BADGE,
   RUN_KIND_LABEL,
   RUN_STATUS_LABEL,
   RUN_STATUS_TONE,
   type RunFilterForm,
   runFiltersDirty,
   runFiltersFromKind,
-  runLabel,
+  runTitle,
   runtimeLabel,
+  splitAbandoned,
   tokensLabel,
   toRunQuery,
 } from '../../../../../lib/history/format';
@@ -59,6 +65,8 @@ export default function HistoryPage() {
   /** Bumped by a live push; the list reloads. */
   const [version, setVersion] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [showAbandoned, setShowAbandoned] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const base = `/projects/${projectId}/runs`;
@@ -124,7 +132,7 @@ export default function HistoryPage() {
             href={`/projects/${projectId}/history/${run.id}`}
             className="underline-offset-2 hover:underline"
           >
-            {runLabel(run)}
+            {runTitle(run)}
           </Link>
         ),
       },
@@ -143,6 +151,7 @@ export default function HistoryPage() {
         header: 'Status',
         cell: (run) => (
           <Badge
+            className={READABLE_BADGE}
             tone={RUN_STATUS_TONE[run.status]}
             label={RUN_STATUS_LABEL[run.status]}
           />
@@ -153,28 +162,26 @@ export default function HistoryPage() {
         id: 'duration',
         header: 'Duration',
         align: 'end',
-        cell: (run) => formatDuration(run.durationMs),
+        cell: (run) => (
+          <span className="num">{formatDuration(run.durationMs)}</span>
+        ),
       },
       {
         id: 'tokens',
         header: 'Tokens',
         align: 'end',
-        cell: (run) => tokensLabel(run.usage),
+        cell: (run) => <span className="num">{tokensLabel(run.usage)}</span>,
       },
       {
         id: 'cost',
         header: 'Cost',
         align: 'end',
-        cell: (run) => costLabel(run.usage),
+        cell: (run) => <span className="num">{costLabel(run.usage)}</span>,
       },
       {
         id: 'started',
         header: 'Started',
-        cell: (run) => (
-          <span title={new Date(run.startedAt).toLocaleString()}>
-            {formatAgo(run.startedAt)}
-          </span>
-        ),
+        cell: (run) => <Time value={run.startedAt} />,
       },
     ],
     [projectId],
@@ -192,6 +199,12 @@ export default function HistoryPage() {
 
   const dirty = runFiltersDirty(form, applied);
   const filtered = Object.keys(applied).length > 0;
+  // Filtering for abandoned runs is asking to see them.
+  const revealAbandoned = showAbandoned || applied.status === 'abandoned';
+  const range =
+    applied.from || applied.to
+      ? `${applied.from ? formatDate(applied.from, 'date') : 'the start'} – ${applied.to ? formatDate(new Date(Date.parse(applied.to) - 1), 'date') : 'now'}`
+      : null;
 
   if (runs.data === undefined && isNotFound(runs.error)) {
     return (
@@ -209,14 +222,31 @@ export default function HistoryPage() {
 
   return (
     <>
-      <h1 className="mb-4 text-xl font-semibold">History</h1>
+      <PageHeader
+        title="History"
+        description="Every run of this project: worker slots, skills and schedules."
+        className="mb-4"
+      />
       <div className="mb-4">
         <ProjectRunnerBanner projectId={projectId} />
       </div>
 
+      <div className="mb-3 sm:hidden">
+        <Button
+          variant="glass"
+          type="button"
+          aria-expanded={filtersOpen}
+          aria-controls="history-filters"
+          onClick={() => setFiltersOpen((open) => !open)}
+        >
+          {filtersOpen ? 'Hide filters' : filtered ? 'Filters (on)' : 'Filters'}
+        </Button>
+      </div>
+
       <form
+        id="history-filters"
         onSubmit={submit}
-        className="mb-6 grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-5"
+        className={`${filtersOpen ? 'grid' : 'hidden'} mb-6 grid-cols-1 items-end gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-5`}
       >
         <Field label="Kind" htmlFor="history-kind">
           <Select
@@ -328,29 +358,62 @@ export default function HistoryPage() {
           />
         }
       >
-        {(page) => (
-          <>
-            <DataTable
-              rows={page.items}
-              getRowId={(run) => run.id}
-              columns={columns}
-              onRowActivate={(run) =>
-                router.push(`/projects/${projectId}/history/${run.id}`)
-              }
-            />
-            {page.nextCursor ? (
-              <div className="mt-4 flex justify-center">
-                <Button
-                  variant="glass"
-                  disabled={loadingMore}
-                  onClick={loadMore}
-                >
-                  {loadingMore ? 'Loading…' : 'Load more'}
-                </Button>
-              </div>
-            ) : null}
-          </>
-        )}
+        {(page) => {
+          const { visible, hidden } = splitAbandoned(
+            page.items,
+            revealAbandoned,
+          );
+          return (
+            <>
+              {range ? (
+                <p className="mb-2 text-sm text-ink-2">Started {range}</p>
+              ) : null}
+              {hidden > 0 || (showAbandoned && !applied.status) ? (
+                <div className="mb-3 flex flex-wrap items-center gap-2 text-sm text-ink-2">
+                  {hidden > 0
+                    ? abandonedHiddenLabel(hidden)
+                    : 'Showing abandoned runs'}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    type="button"
+                    onClick={() => setShowAbandoned((show) => !show)}
+                  >
+                    {showAbandoned ? 'Hide' : 'Show'}
+                  </Button>
+                </div>
+              ) : null}
+              {visible.length === 0 ? (
+                <EmptyState
+                  title="Only abandoned runs so far"
+                  description="Abandoned runs are hidden by default."
+                />
+              ) : (
+                <ScrollX label="Runs">
+                  <DataTable
+                    rows={visible}
+                    getRowId={(run) => run.id}
+                    columns={columns}
+                    onRowActivate={(run) =>
+                      router.push(`/projects/${projectId}/history/${run.id}`)
+                    }
+                  />
+                </ScrollX>
+              )}
+              {page.nextCursor ? (
+                <div className="mt-4 flex justify-center">
+                  <Button
+                    variant="glass"
+                    disabled={loadingMore}
+                    onClick={loadMore}
+                  >
+                    {loadingMore ? 'Loading…' : 'Load more'}
+                  </Button>
+                </div>
+              ) : null}
+            </>
+          );
+        }}
       </AsyncSection>
     </>
   );

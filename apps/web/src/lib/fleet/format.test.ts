@@ -3,6 +3,8 @@ import { SLOT_STATUSES } from '@agentdock/shared';
 import { ApiError } from '../api';
 import {
   boardErrorHint,
+  boardErrorView,
+  CHANNEL_EXPLANATION,
   channelChip,
   describeFleetError,
   describeFleetErrorHint,
@@ -17,6 +19,7 @@ import {
   ORCHESTRATOR_STATUS_LABEL,
   parseIssueFilter,
   safeHttpsUrl,
+  showStopControl,
   slotStatusOptions,
   slotsQuery,
 } from './format';
@@ -149,6 +152,30 @@ describe('labels', () => {
     });
     expect(text).toContain('BOARD.md:4');
     expect(text).toContain('Fix that file');
+  });
+
+  test('a board error splits into a title, a detail and the path to copy', () => {
+    const view = boardErrorView({
+      reason: 'bad table',
+      file: 'BOARD.md',
+      line: 4,
+    });
+    expect(view.path).toBe('BOARD.md:4');
+    expect(view.detail).toContain('bad table');
+    expect(boardErrorView({ reason: 'x', file: 'A.md' }).path).toBe('A.md');
+  });
+
+  test('Stop is drawn unless the orchestrator is known to be absent', () => {
+    expect(showStopControl('running')).toBe(true);
+    expect(showStopControl('idle')).toBe(true);
+    expect(showStopControl('unknown')).toBe(true);
+    expect(showStopControl('absent')).toBe(false);
+  });
+
+  test('scraped is explained, events needs no explanation', () => {
+    expect(CHANNEL_EXPLANATION.events).toBeNull();
+    expect(CHANNEL_EXPLANATION.scraped).toContain('markdown');
+    expect(CHANNEL_EXPLANATION.both).toContain('plugin events');
   });
 
   test('the channel badge names a mixed channel', () => {

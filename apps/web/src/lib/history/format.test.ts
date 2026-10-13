@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { RUN_KINDS, type RunUsage } from '@agentdock/shared';
 import {
+  abandonedHiddenLabel,
   costLabel,
   EMPTY_RUN_FILTERS,
   hasRunFilters,
@@ -10,10 +11,46 @@ import {
   runFiltersDirty,
   runFiltersFromKind,
   runLabel,
+  runTitle,
   runtimeLabel,
+  splitAbandoned,
   tokensLabel,
   toRunQuery,
 } from './format';
+
+describe('runTitle', () => {
+  const base = { issue: null, slot: null, title: null, kind: 'skill' } as const;
+  test('own title wins', () => {
+    expect(runTitle({ ...base, title: '  Estimate  ' })).toBe('Estimate');
+  });
+  test('falls back to issue and slot, then to the kind', () => {
+    expect(runTitle({ ...base, issue: 155, slot: 'i155' })).toBe('#155 · i155');
+    expect(runTitle(base)).toBe(RUN_KIND_LABEL.skill);
+  });
+});
+
+describe('splitAbandoned', () => {
+  const runs = [
+    { status: 'succeeded' },
+    { status: 'abandoned' },
+    { status: 'abandoned' },
+  ] as const;
+  test('hides abandoned and counts them', () => {
+    const { visible, hidden } = splitAbandoned(runs, false);
+    expect(visible).toHaveLength(1);
+    expect(hidden).toBe(2);
+  });
+  test('shows everything when asked', () => {
+    expect(splitAbandoned(runs, true)).toEqual({
+      visible: [...runs],
+      hidden: 0,
+    });
+  });
+  test('the sentence agrees in number', () => {
+    expect(abandonedHiddenLabel(1)).toBe('1 abandoned run hidden');
+    expect(abandonedHiddenLabel(43)).toBe('43 abandoned runs hidden');
+  });
+});
 
 const usage = (patch: Partial<RunUsage> = {}): RunUsage => ({
   input: 1000,

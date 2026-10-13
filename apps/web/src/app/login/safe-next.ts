@@ -18,3 +18,16 @@ export function safeNext(next: string | null | undefined): string {
   if (next === '/login' || next.startsWith('/login?')) return HOME_PATH;
   return next;
 }
+
+/**
+ * Where `/login` sends a visitor who is already signed in: `?next=` when it
+ * is safe, else `/`. Null — show the form — when nobody is signed in. `next`
+ * is the raw search param, so a repeated `?next=` (an array) is refused.
+ */
+export function signedInRedirect(
+  signedIn: boolean,
+  next: string | string[] | undefined,
+): string | null {
+  if (!signedIn) return null;
+  return safeNext(typeof next === 'string' ? next : null);
+}
