@@ -19,6 +19,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { BudgetExceededBanner } from '../../../../../components/budgets/exceeded-banner';
+import { PageHeader } from '../../../../../components/page-header/page-header';
 import { AsyncSection } from '../../../../../components/prerequisites/async-section';
 import { RunnerOfflineBanner } from '../../../../../components/prerequisites/prerequisite-banner';
 import { LiveStatusBadge } from '../../../../../components/shell/live-status-badge';
@@ -197,10 +198,12 @@ export default function FleetPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-xl font-semibold">Fleet</h1>
-          <LiveStatusBadge />
-        </div>
+        <PageHeader
+          className="mb-0"
+          title="Fleet"
+          description="The orchestrator and the worker slots running on this project."
+          actions={<LiveStatusBadge />}
+        />
         {project ? <RunnerOfflineBanner project={project} /> : null}
       </div>
 

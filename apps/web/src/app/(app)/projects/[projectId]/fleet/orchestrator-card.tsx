@@ -1,17 +1,23 @@
+'use client';
+
 import type {
   FleetView,
   OrchestratorSettingsView,
   OrchestratorStatus,
 } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
+import { Disclosure } from '@andrewbehma/glass-ui/disclosure';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
-import type { ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 import { PrerequisiteBanner } from '../../../../../components/prerequisites/prerequisite-banner';
 import { orchestratorSettingsHref } from '../../../../../lib/control/reasons';
 import {
-  boardErrorHint,
+  boardErrorView,
+  CHANNEL_EXPLANATION,
   channelChip,
   FLEET_FACT_HINT,
   formatAge,
@@ -20,6 +26,7 @@ import {
   ORCHESTRATOR_STATUS_HINT,
   ORCHESTRATOR_STATUS_LABEL,
   ORCHESTRATOR_TONE,
+  showStopControl,
 } from '../../../../../lib/fleet/format';
 import type { Section } from '../../../../../lib/section/use-section';
 import { OrchestratorControls } from './orchestrator-controls';
@@ -75,6 +82,9 @@ export function OrchestratorCard({
 }) {
   const { orchestrator, latestRound, boardError } = fleet;
   const channel = channelChip(fleet.fleetChannel);
+  const channelNote = CHANNEL_EXPLANATION[fleet.fleetChannel];
+  const boardIssue = boardError ? boardErrorView(boardError) : null;
+  const [detailOpen, setDetailOpen] = useState(false);
   const status: OrchestratorStatus = orchestrator.status;
   const profileMissing = settings.data?.effectiveProfile === null;
   return (
@@ -104,6 +114,9 @@ export function OrchestratorCard({
           </button>
         </Tooltip>
       </div>
+      {channelNote ? (
+        <p className="max-w-prose text-xs text-ink-3">{channelNote}</p>
+      ) : null}
       {profileMissing ? (
         <PrerequisiteBanner
           tone="warn"
@@ -143,13 +156,39 @@ export function OrchestratorCard({
         isAdmin={isAdmin}
         settings={settings.data}
         reasons={reasons}
+        showStop={showStopControl(status)}
         startOpen={startOpen}
         onStartOpenChange={onStartOpenChange}
       />
-      {boardError ? (
-        <p role="alert" className="text-sm text-warn">
-          {boardErrorHint(boardError)}
-        </p>
+      {boardIssue ? (
+        <Banner
+          tone="warn"
+          title={boardIssue.title}
+          action={
+            <Button
+              variant="glass"
+              size="sm"
+              onClick={() => {
+                navigator.clipboard
+                  .writeText(boardIssue.path)
+                  .then(() => toast.success('Path copied.'))
+                  .catch(() => toast.error('Could not copy the path.'));
+              }}
+            >
+              Copy path
+            </Button>
+          }
+        >
+          <Disclosure
+            className="mt-1 border-0 bg-transparent"
+            triggerClassName="px-0 py-1"
+            open={detailOpen}
+            onOpenChange={setDetailOpen}
+            trigger={detailOpen ? 'Hide detail' : 'Show detail'}
+          >
+            <p className="mt-1 text-sm">{boardIssue.detail}</p>
+          </Disclosure>
+        </Banner>
       ) : null}
     </Card>
   );
