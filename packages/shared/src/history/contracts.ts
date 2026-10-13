@@ -11,7 +11,13 @@ import type {
  * this item a run is an orchestrator slot; skill and schedule runs (M3) add
  * rows of their own kinds.
  */
-export const RUN_KINDS = ['orchestrator_slot', 'skill', 'schedule'] as const;
+export const RUN_KINDS = [
+  'orchestrator_slot',
+  'skill',
+  'schedule',
+  /** A Planner turn (docs/specs/172-planner.md D14). */
+  'plan',
+] as const;
 export type RunKind = (typeof RUN_KINDS)[number];
 
 /**

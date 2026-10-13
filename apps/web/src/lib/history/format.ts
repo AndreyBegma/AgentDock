@@ -41,6 +41,7 @@ export const RUN_KIND_LABEL: Record<RunKind, string> = {
   orchestrator_slot: 'Orchestrator slot',
   skill: 'Skill run',
   schedule: 'Scheduled start',
+  plan: 'Planner turn',
 };
 
 export const isRunKind = (value: string): value is RunKind =>
