@@ -25,3 +25,9 @@ Health check: `curl http://localhost:8180/health`
 | `packages/shared` | `@agentdock/shared` | shared TypeScript |
 
 See `CLAUDE.md` for all commands and conventions.
+
+## CI and staging
+
+Woodpecker runs `.woodpecker/pipeline.yml` on every pull request. A push to
+`develop` deploys https://staging-agentdock.luna-realm.com — see
+[deploy/README.md](deploy/README.md).

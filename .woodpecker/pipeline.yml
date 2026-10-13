@@ -1,0 +1,118 @@
+# AgentDock CI and staging (ADR-0016).
+#
+# Every pull request and every push to develop/main runs the checks. A push to
+# develop then builds the staging images on the agent host's Docker daemon and
+# replaces the containers of /home/archi/stacks/agentdock-staging
+# (https://staging-agentdock.luna-realm.com). No registry, no ssh: the agents
+# run on the staging host, and the steps that need it get the Docker socket.
+#
+# The repository is public. Host mounts need it "trusted → volumes" in
+# Woodpecker, and pull requests from forks must wait for approval
+# (require_approval: forks) — an unapproved fork would otherwise reach the
+# Docker socket of the host. deploy/README.md lists the repository settings.
+
+when:
+  - event: pull_request
+  - event: push
+    branch: [develop, main]
+  - event: manual
+
+variables:
+  - &ci_image agentdock-ci:node-bun
+  - &docker_image docker:28-cli
+  - &socket
+    - /var/run/docker.sock:/var/run/docker.sock
+  # The stack directory at the host's own path, so the compose file's relative
+  # paths mean the same thing inside the step as they do to the daemon.
+  - &socket_and_staging
+    - /var/run/docker.sock:/var/run/docker.sock
+    - /home/archi/stacks/agentdock-staging:/home/archi/stacks/agentdock-staging
+  # Caches that outlive a run: the workspace volume dies with the pipeline.
+  - &caches
+    - /home/archi/ci-cache/agentdock/bun:/ci-cache/bun
+    - /home/archi/ci-cache/agentdock/turbo:/ci-cache/turbo
+  - &cache_env
+    BUN_INSTALL_CACHE_DIR: /ci-cache/bun
+    TURBO_CACHE_DIR: /ci-cache/turbo
+    TURBO_TELEMETRY_DISABLED: '1'
+
+services:
+  - name: postgres
+    image: postgres:16.5-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ci
+      POSTGRES_DB: agentdock
+  - name: redis
+    image: redis:7.4.11-alpine
+    commands:
+      - redis-server --requirepass ci --maxmemory-policy noeviction
+
+steps:
+  - name: ci-image
+    image: *docker_image
+    volumes: *socket
+    commands:
+      - docker build -t agentdock-ci:node-bun deploy/ci-image
+
+  - name: install
+    image: *ci_image
+    depends_on: [ci-image]
+    volumes: *caches
+    environment: *cache_env
+    commands:
+      - bun --version
+      - bun install --frozen-lockfile
+      - bun run db:generate
+
+  - name: check
+    image: *ci_image
+    depends_on: [install]
+    commands:
+      - bun run check
+
+  - name: build
+    image: *ci_image
+    depends_on: [install]
+    volumes: *caches
+    environment: *cache_env
+    commands:
+      - bun run build -- --concurrency=2
+
+  - name: test
+    image: *ci_image
+    depends_on: [build]
+    volumes: *caches
+    environment:
+      <<: *cache_env
+      TEST_DATABASE_URL: postgresql://postgres:ci@postgres:5432/agentdock_test?schema=public
+      TEST_REDIS_URL: redis://:ci@redis:6379/1
+      DATABASE_URL: postgresql://postgres:ci@postgres:5432/agentdock?schema=public
+      APP_ENV: test
+    commands:
+      - until node -e "require('net').connect(5432,'postgres').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"; do sleep 1; done
+      - bun run test
+
+  - name: build-staging
+    image: *docker_image
+    depends_on: [check, test]
+    when:
+      - event: push
+        branch: develop
+      - event: manual
+        branch: develop
+    volumes: *socket
+    commands:
+      - sh deploy/staging/build-staging.sh
+
+  - name: deploy-staging
+    image: *docker_image
+    depends_on: [build-staging]
+    when:
+      - event: push
+        branch: develop
+      - event: manual
+        branch: develop
+    volumes: *socket_and_staging
+    commands:
+      - sh deploy/staging/refresh.sh
