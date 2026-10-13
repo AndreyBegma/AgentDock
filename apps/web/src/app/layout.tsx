@@ -1,3 +1,4 @@
+// Throwaway (#140 measurement a): a web-only change. Never merged.
 import { Toaster } from 'glass-ui/toast';
 import type { Metadata } from 'next';
 import { THEME_BOOTSTRAP_SCRIPT } from '../components/shell/theme';
