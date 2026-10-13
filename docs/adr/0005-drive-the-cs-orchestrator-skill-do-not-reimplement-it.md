@@ -1,6 +1,6 @@
 # ADR-0005: Drive the cs-orchestrator skill, do not reimplement it
 
-Status: accepted · Date: 2026-10-07
+Status: accepted · Date: 2026-10-07 · Scoped by [ADR-0019](0019-planner-instructions-live-in-agentdock.md)
 
 ## Context
 
