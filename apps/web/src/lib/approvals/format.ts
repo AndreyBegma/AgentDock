@@ -7,6 +7,7 @@ import {
 } from '@agentdock/shared';
 import { APPROVAL_NOTE_MAX_BYTES } from '@agentdock/shared/protocol';
 import { ApiError, describeError } from '../api';
+import { updateRunnerText } from '../control/format';
 
 type Tone = 'ok' | 'warn' | 'danger' | 'neutral';
 
@@ -30,13 +31,13 @@ export const STATUS_TONE: Record<ApprovalStatus, Tone> = {
 
 export const SOURCE_LABEL: Record<ApprovalSource, string> = {
   orchestrator: 'orchestrator',
-  derived: 'derived',
+  derived: 'inferred',
 };
 
 export const SOURCE_TOOLTIP: Record<ApprovalSource, string> = {
   orchestrator: 'The orchestrator announced that this pull request waits.',
   derived:
-    'No plugin events: AgentDock derived this from a green, mergeable slot with an open pull request.',
+    'The orchestrator did not announce it: AgentDock inferred it from a slot with green checks and an open, mergeable pull request.',
 };
 
 /** The sidebar label: `Approvals`, or `Approvals · 3` while PRs wait. */
@@ -95,11 +96,16 @@ export function movedHead(error: unknown): string | undefined {
 export const isCommandUnavailable = (error: unknown): boolean =>
   errorCode(error) === APPROVALS_ERROR.commandUnavailable;
 
-export const COMMAND_UNAVAILABLE_TEXT =
-  'The runner does not handle approvals yet, so nothing was sent. Nothing was decided.';
+export const commandUnavailableText = (runnerName?: string | null): string =>
+  `This runner is too old to carry out approvals, so nothing was sent and nothing was decided. ${updateRunnerText(runnerName)}`;
+
+export const COMMAND_UNAVAILABLE_TEXT = commandUnavailableText();
 
 /** Every approvals error as a sentence for the person. */
-export function describeApprovalError(error: unknown): string {
+export function describeApprovalError(
+  error: unknown,
+  runnerName?: string | null,
+): string {
   switch (errorCode(error)) {
     case APPROVALS_ERROR.headMoved:
       return 'The pull request has a newer commit than the one you reviewed. Nothing was sent; review the new head and decide again.';
@@ -114,7 +120,7 @@ export function describeApprovalError(error: unknown): string {
     case APPROVALS_ERROR.noteTooLong:
       return `The note is over ${APPROVAL_NOTE_MAX_BYTES / 1024} KB.`;
     case APPROVALS_ERROR.commandUnavailable:
-      return COMMAND_UNAVAILABLE_TEXT;
+      return commandUnavailableText(runnerName);
     case APPROVALS_ERROR.commandFailed:
       return `The runner could not complete the request: ${error instanceof ApiError ? error.message : 'unknown error'}`;
     default:

@@ -1,8 +1,11 @@
 import { describe, expect, test } from 'bun:test';
+import { SLOT_STATUSES } from '@agentdock/shared';
 import { ApiError } from '../api';
 import {
+  boardErrorHint,
   channelChip,
   describeFleetError,
+  describeFleetErrorHint,
   formatAge,
   formatAgo,
   formatAheadBehind,
@@ -10,8 +13,11 @@ import {
   formatRound,
   isNotFound,
   issueUrl,
+  ORCHESTRATOR_STATUS_HINT,
+  ORCHESTRATOR_STATUS_LABEL,
   parseIssueFilter,
   safeHttpsUrl,
+  slotStatusOptions,
   slotsQuery,
 } from './format';
 
@@ -106,6 +112,50 @@ describe('errors', () => {
   });
 });
 
+describe('describeFleetErrorHint', () => {
+  test('a missing project links to Projects', () => {
+    const hint = describeFleetErrorHint(new ApiError(404, undefined, 'x'));
+    expect(hint.href).toBe('/projects');
+    expect(hint.cta).toBe('Open Projects');
+  });
+
+  test('the string helper is the hint’s text', () => {
+    const error = new ApiError(400, undefined, 'bad');
+    expect(describeFleetError(error)).toBe(describeFleetErrorHint(error).text);
+  });
+});
+
+describe('labels', () => {
+  test('every orchestrator status has a label and a hint', () => {
+    for (const status of ['running', 'idle', 'absent', 'unknown'] as const) {
+      expect(ORCHESTRATOR_STATUS_LABEL[status]).not.toBe(status);
+      expect(ORCHESTRATOR_STATUS_HINT[status].length).toBeGreaterThan(10);
+    }
+  });
+
+  test('the status filter offers every slot status by its label', () => {
+    const options = slotStatusOptions();
+    expect(options.length).toBe(SLOT_STATUSES.length);
+    expect(options.find((o) => o.value === 'prompt')?.label).toBe(
+      'waiting on a prompt',
+    );
+  });
+
+  test('a board error says where and what to do', () => {
+    const text = boardErrorHint({
+      reason: 'bad table',
+      file: 'BOARD.md',
+      line: 4,
+    });
+    expect(text).toContain('BOARD.md:4');
+    expect(text).toContain('Fix that file');
+  });
+
+  test('the channel badge names a mixed channel', () => {
+    expect(channelChip('both').label).toBe('events + scraped');
+  });
+});
+
 describe('channelChip', () => {
   test('events is ok', () => {
     const chip = channelChip('events');
@@ -123,7 +173,7 @@ describe('channelChip', () => {
 
   test('both is warn', () => {
     const chip = channelChip('both');
-    expect(chip.label).toBe('both');
+    expect(chip.label).toBe('events + scraped');
     expect(chip.tone).toBe('warn');
     expect(chip.tooltip).toContain('scraping');
   });

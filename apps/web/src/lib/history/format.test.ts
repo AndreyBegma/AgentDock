@@ -1,9 +1,14 @@
 import { describe, expect, test } from 'bun:test';
-import type { RunUsage } from '@agentdock/shared';
+import { RUN_KINDS, type RunUsage } from '@agentdock/shared';
 import {
   costLabel,
+  EMPTY_RUN_FILTERS,
+  hasRunFilters,
   parseRunUpdate,
   prLabel,
+  RUN_KIND_LABEL,
+  runFiltersDirty,
+  runFiltersFromKind,
   runLabel,
   runtimeLabel,
   tokensLabel,
@@ -21,6 +26,39 @@ const usage = (patch: Partial<RunUsage> = {}): RunUsage => ({
   costUsd: '1.5',
   unpricedRequests: 0,
   ...patch,
+});
+
+describe('run kinds and filters', () => {
+  test('every kind has a label without underscores', () => {
+    for (const kind of RUN_KINDS) {
+      expect(RUN_KIND_LABEL[kind]).not.toContain('_');
+    }
+  });
+
+  test('a ?kind= link opens the filter; an unknown kind is ignored', () => {
+    expect(runFiltersFromKind('skill').kind).toBe('skill');
+    expect(runFiltersFromKind('nonsense').kind).toBe('');
+    expect(runFiltersFromKind(null)).toEqual(EMPTY_RUN_FILTERS);
+  });
+
+  test('the kind filter reaches the query', () => {
+    expect(toRunQuery({ ...EMPTY_RUN_FILTERS, kind: 'skill' }).kind).toBe(
+      'skill',
+    );
+  });
+
+  test('no filter set is "nothing yet", any filter set is "no matches"', () => {
+    expect(hasRunFilters(EMPTY_RUN_FILTERS)).toBe(false);
+    expect(hasRunFilters({ ...EMPTY_RUN_FILTERS, status: 'failed' })).toBe(
+      true,
+    );
+  });
+
+  test('typed but unapplied filters are dirty', () => {
+    const form = { ...EMPTY_RUN_FILTERS, status: 'failed' };
+    expect(runFiltersDirty(form, {})).toBe(true);
+    expect(runFiltersDirty(form, { status: 'failed' })).toBe(false);
+  });
 });
 
 describe('costLabel', () => {
@@ -73,12 +111,10 @@ describe('labels', () => {
 
 describe('toRunQuery / parseRunUpdate', () => {
   test('keeps a known status only', () => {
-    expect(toRunQuery({ status: 'failed', fromDate: '', toDate: '' })).toEqual({
+    expect(toRunQuery({ ...EMPTY_RUN_FILTERS, status: 'failed' })).toEqual({
       status: 'failed',
     });
-    expect(toRunQuery({ status: 'nope', fromDate: '', toDate: '' })).toEqual(
-      {},
-    );
+    expect(toRunQuery({ ...EMPTY_RUN_FILTERS, status: 'nope' })).toEqual({});
   });
   test('run.updated payload', () => {
     expect(parseRunUpdate({ id: 'r1', status: 'running' })).toEqual({

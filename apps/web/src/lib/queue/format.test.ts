@@ -193,9 +193,9 @@ describe('describeQueueError', () => {
     );
   });
 
-  test('command_unavailable says the runner part is not deployed', () => {
+  test('command_unavailable without a runner name still says to update it', () => {
     expect(describeQueueError(apiError(503, 'command_unavailable'))).toContain(
-      'runner part is not deployed yet',
+      'Update the AgentDock runner on the project’s machine',
     );
   });
 
@@ -214,6 +214,15 @@ describe('misc', () => {
     expect(safeHttpsUrl('https://github.com/o/r/issues/1')).not.toBeNull();
     expect(safeHttpsUrl('javascript:alert(1)')).toBeNull();
     expect(safeHttpsUrl(null)).toBeNull();
+  });
+
+  test('an old runner is named and told to update, with no developer wording', () => {
+    const text = describeQueueError(
+      new ApiError(503, 'command_unavailable' as never, 'x'),
+      'laptop',
+    );
+    expect(text).toContain('Update the AgentDock runner on laptop');
+    expect(text).not.toContain('not deployed');
   });
 
   test('stateLabel is the board wording', () => {

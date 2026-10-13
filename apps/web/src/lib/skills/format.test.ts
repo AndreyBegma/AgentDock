@@ -237,4 +237,13 @@ describe('errors', () => {
       'member',
     );
   });
+
+  test('an old runner is named and told to update, with no "yet"', () => {
+    const text = describeSkillsError(
+      new ApiError(503, SKILLS_ERROR.commandUnavailable as never, 'x'),
+      'laptop',
+    );
+    expect(text).toContain('Update the AgentDock runner on laptop');
+    expect(text).not.toContain('yet');
+  });
 });

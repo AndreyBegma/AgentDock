@@ -12,6 +12,7 @@ import {
   specGap,
 } from '@agentdock/shared';
 import { ApiError, describeError } from '../api';
+import { updateRunnerText } from '../control/format';
 
 type Tone = 'ok' | 'warn' | 'danger' | 'neutral';
 
@@ -181,7 +182,10 @@ export const isIssueNotFound = (error: unknown): boolean =>
   errorCode(error) === QUEUE_ERROR.issueNotFound;
 
 /** Every queue error as a sentence for the person; the server's text last. */
-export function describeQueueError(error: unknown): string {
+export function describeQueueError(
+  error: unknown,
+  runnerName?: string | null,
+): string {
   switch (errorCode(error)) {
     case QUEUE_ERROR.noAcceptanceCriteria:
       return 'The body has no acceptance criteria, so the issue cannot be queued. Add an “## Acceptance criteria” section with at least one “- [ ]” item, or file it without queueing.';
@@ -194,7 +198,7 @@ export function describeQueueError(error: unknown): string {
         : 'Some of the labels are not allowed. Pick labels that exist on the repository.';
     }
     case QUEUE_ERROR.commandUnavailable:
-      return 'The runner part is not deployed yet, so the issue cannot be sent to GitHub. Nothing was created.';
+      return `This runner is too old to create issues, so nothing was sent to GitHub. ${updateRunnerText(runnerName)}`;
     case QUEUE_ERROR.commandFailed:
       return `The runner could not complete the request: ${error instanceof ApiError ? error.message : 'unknown error'}`;
     case QUEUE_ERROR.issueNotFound:

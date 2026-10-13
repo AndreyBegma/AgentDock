@@ -10,6 +10,8 @@ import {
   navLabel,
   noteBytes,
   noteError,
+  SOURCE_LABEL,
+  SOURCE_TOOLTIP,
 } from './format';
 
 const apiError = (
@@ -98,6 +100,20 @@ describe('error mapping', () => {
     const error = apiError(503, 'command_unavailable');
     expect(isCommandUnavailable(error)).toBe(true);
     expect(describeApprovalError(error)).toBe(COMMAND_UNAVAILABLE_TEXT);
+  });
+
+  test('an old runner is named and told to update, with no "yet"', () => {
+    const text = describeApprovalError(
+      apiError(503, 'command_unavailable'),
+      'laptop',
+    );
+    expect(text).toContain('Update the AgentDock runner on laptop');
+    expect(text).not.toContain('yet');
+  });
+
+  test('inferred, not derived, is what the list says', () => {
+    expect(SOURCE_LABEL.derived).toBe('inferred');
+    expect(SOURCE_TOOLTIP.derived).toContain('inferred');
   });
 
   test('the remaining codes map to sentences', () => {
