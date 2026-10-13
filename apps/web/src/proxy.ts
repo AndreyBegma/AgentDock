@@ -1,6 +1,7 @@
 import { SESSION_COOKIE } from '@agentdock/shared';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { HOME_PATH, safeNext } from './app/login/safe-next';
 
 const PUBLIC_PATHS = ['/login', '/register', '/pending'];
 
@@ -13,7 +14,11 @@ export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (PUBLIC_PATHS.includes(pathname)) return NextResponse.next();
   if (request.cookies.has(SESSION_COOKIE)) return NextResponse.next();
-  return NextResponse.redirect(new URL('/login', request.url));
+  const login = new URL('/login', request.url);
+  // Login sends the user back here; it accepts only a same-origin path.
+  const next = safeNext(`${pathname}${request.nextUrl.search}`);
+  if (next !== HOME_PATH) login.searchParams.set('next', next);
+  return NextResponse.redirect(login);
 }
 
 export const config = {
