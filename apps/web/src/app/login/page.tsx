@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation';
 import { type FormEvent, useEffect, useState } from 'react';
 import { AuthCard } from '../../components/auth-card';
 import { ApiError, api, describeError } from '../../lib/api';
+import { safeNext } from './safe-next';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -35,7 +36,10 @@ export default function LoginPage() {
     try {
       const body: LoginRequest = { email, password };
       await api<PublicUser>('/auth/login', { method: 'POST', body });
-      router.replace('/account');
+      // Read at submit time: no `useSearchParams`, so no Suspense boundary.
+      router.replace(
+        safeNext(new URLSearchParams(window.location.search).get('next')),
+      );
     } catch (err) {
       if (err instanceof ApiError && err.code === AUTH_ERROR.pendingApproval) {
         router.replace('/pending');

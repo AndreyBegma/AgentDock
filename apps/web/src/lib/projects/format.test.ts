@@ -7,6 +7,7 @@ import {
   describeProjectError,
   docsKindLabel,
   docsOverrideRequest,
+  noOnlineRunnerCopy,
   suggestedPathOf,
 } from './format';
 
@@ -61,6 +62,43 @@ describe('connectBlocker', () => {
   });
 });
 
+describe('noOnlineRunnerCopy', () => {
+  test('none paired: pair one first, with a link', () => {
+    expect(noOnlineRunnerCopy({ kind: 'none' })).toMatchObject({
+      title: 'No runner is paired.',
+      href: '/admin/runners',
+      cta: 'Pair a runner',
+    });
+  });
+
+  test('paired but offline: names it and the command to start it', () => {
+    expect(
+      noOnlineRunnerCopy({
+        kind: 'offline',
+        runners: [{ id: 'r1', name: 'laptop', hostname: 'laptop.local' }],
+      }),
+    ).toMatchObject({
+      title: 'laptop is offline.',
+      body: 'Start it on that machine:',
+      command: 'agentdock-runner run',
+    });
+    expect(
+      noOnlineRunnerCopy({
+        kind: 'offline',
+        runners: [
+          { id: 'a', name: 'laptop', hostname: null },
+          { id: 'b', name: 'server', hostname: null },
+        ],
+      })?.title,
+    ).toBe('laptop, server are offline.');
+  });
+
+  test('nothing while a runner is online', () => {
+    expect(noOnlineRunnerCopy({ kind: 'online', online: 1 })).toBeNull();
+    expect(noOnlineRunnerCopy({ kind: 'unknown' })).toBeNull();
+  });
+});
+
 describe('errors', () => {
   const error = (code: string, suggestedPath?: string) =>
     new ApiError(409, code as never, 'raw', suggestedPath);
@@ -68,6 +106,36 @@ describe('errors', () => {
   test('a known code is a sentence, not the raw message', () => {
     expect(describeProjectError(error(PROJECT_ERROR.runnerOffline))).toContain(
       'offline',
+    );
+  });
+
+  test('runner offline says how to start it', () => {
+    expect(describeProjectError(error(PROJECT_ERROR.runnerOffline))).toContain(
+      'agentdock-runner run',
+    );
+  });
+
+  test("runner error carries the server's message, without the command name", () => {
+    const failed = new ApiError(
+      502,
+      PROJECT_ERROR.runnerError as never,
+      'project.inspect: git exited with 128',
+    );
+    expect(describeProjectError(failed)).toBe(
+      'The runner could not complete that: git exited with 128',
+    );
+  });
+
+  test('path not allowed names the rule, or falls back to the server message', () => {
+    const refused = (message: string) =>
+      new ApiError(403, PROJECT_ERROR.pathNotAllowed as never, message);
+    expect(
+      describeProjectError(
+        refused('/w/app is not a registered root of project p1'),
+      ),
+    ).toContain("not registered this path as the project's root");
+    expect(describeProjectError(refused('outside the allowed roots'))).toBe(
+      'The runner does not allow that path: outside the allowed roots',
     );
   });
 
