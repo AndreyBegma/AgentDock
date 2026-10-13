@@ -12,16 +12,13 @@ import { DialogContent, DialogRoot } from 'glass-ui/dialog';
 import { toast } from 'glass-ui/toast';
 import Link from 'next/link';
 import { type ReactNode, useEffect, useState } from 'react';
+import {
+  InstallCommands,
+  KeepOnlineCommands,
+} from '../../../components/onboarding/runner-commands';
 import { isRunnerOnline } from '../../../lib/prerequisites/facts';
 import { formatCountdown } from '../../../lib/runners/format';
-import {
-  INSTALL_COMMANDS,
-  keepOnlineCommands,
-  pairingServers,
-  platformOf,
-  RUN_COMMAND,
-  RUNNER_README_URL,
-} from '../../../lib/runners/install';
+import { pairingServers } from '../../../lib/runners/install';
 
 async function copy(text: string, what: string) {
   try {
@@ -105,7 +102,6 @@ export function PairingDialog({
     result && servers?.alternative
       ? pairCommand(servers.alternative, result.pairingCode)
       : null;
-  const platform = platformOf(runner?.os);
 
   return (
     <DialogRoot
@@ -158,25 +154,7 @@ export function PairingDialog({
             <ol className="flex flex-col gap-4">
               <Step number={1} title="Install the runner">
                 <p>Skip this if it is already installed.</p>
-                {INSTALL_COMMANDS.map((item) => (
-                  <CodeBlock
-                    key={item.command}
-                    code={item.command}
-                    language={item.label}
-                  />
-                ))}
-                <p>
-                  Neither available?{' '}
-                  <a
-                    href={RUNNER_README_URL}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-ink underline underline-offset-2"
-                  >
-                    Build it from source
-                  </a>
-                  .
-                </p>
+                <InstallCommands />
               </Step>
 
               <Step number={2} title="Pair it">
@@ -235,13 +213,7 @@ export function PairingDialog({
 
               <Step number={3} title="Keep it online">
                 <p>Start it, and leave it running:</p>
-                <CodeBlock code={RUN_COMMAND} />
-                <p>
-                  Or run it as a service, so it survives logouts and reboots:
-                </p>
-                {keepOnlineCommands(platform).map((line) => (
-                  <CodeBlock key={line} code={line} />
-                ))}
+                <KeepOnlineCommands />
                 {!online ? (
                   <p aria-live="polite">
                     This dialog says so when the runner comes online.

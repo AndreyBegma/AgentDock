@@ -22,43 +22,22 @@ export const RUN_COMMAND = 'agentdock-runner run';
 export const PROFILES_DETECT_COMMAND =
   'agentdock-runner profiles --detect --write';
 
-export type RunnerPlatform = 'macos' | 'linux' | 'unknown';
-
 /**
- * The platform to give a hint for: the runner's own `os` when it reported one,
- * else a guess from the browser's user agent (the admin often installs on the
- * machine they are reading this on).
+ * How to keep the daemon running across logouts and reboots. It depends on how
+ * the runner was installed, not on the OS (ADR-0017): Homebrew runs it as a
+ * brew service; `install-service` writes a systemd user unit on Linux and a
+ * launchd agent on macOS.
  */
-export function platformOf(
-  os: string | null | undefined,
-  userAgent = '',
-): RunnerPlatform {
-  const known = (os ?? '').toLowerCase();
-  if (known === 'darwin' || known === 'macos') return 'macos';
-  if (known === 'linux') return 'linux';
-  if (known) return 'unknown';
-  if (/Macintosh|Mac OS X/.test(userAgent)) return 'macos';
-  if (/Linux|X11/.test(userAgent) && !/Android/.test(userAgent)) return 'linux';
-  return 'unknown';
-}
-
-/**
- * How to keep the daemon running across logouts and reboots.
- * `install-service` writes a systemd user unit, so it is Linux only (spec 5).
- */
-export function keepOnlineCommands(platform: RunnerPlatform): string[] {
-  switch (platform) {
-    case 'macos':
-      return ['brew services start agentdock-runner'];
-    case 'linux':
-      return ['agentdock-runner install-service'];
-    case 'unknown':
-      return [
-        'agentdock-runner install-service',
-        'brew services start agentdock-runner',
-      ];
-  }
-}
+export const KEEP_ONLINE_COMMANDS = [
+  {
+    label: 'Installed with Homebrew',
+    command: 'brew services start agentdock-runner',
+  },
+  {
+    label: 'Installed with npm',
+    command: 'agentdock-runner install-service',
+  },
+] as const;
 
 /** The `--server` value of a pairing command, or null when it has none. */
 export function serverOfCommand(command: string): string | null {

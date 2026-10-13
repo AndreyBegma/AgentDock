@@ -2,51 +2,16 @@
 
 import { buttonClassName } from 'glass-ui/button';
 import { Card } from 'glass-ui/card';
-import { CodeBlock } from 'glass-ui/code-block';
 import { Progress } from 'glass-ui/progress';
 import { Check, Circle } from 'lucide-react';
 import Link from 'next/link';
-import { type ReactNode, useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import type { RunnersFact } from '../../lib/prerequisites/facts';
-import {
-  INSTALL_COMMANDS,
-  keepOnlineCommands,
-  platformOf,
-  RUN_COMMAND,
-  RUNNER_README_URL,
-  type RunnerPlatform,
-} from '../../lib/runners/install';
+import { InstallCommands, KeepOnlineCommands } from './runner-commands';
 import { currentStep, type GettingStarted as State, type Step } from './steps';
 
-/** The browser's platform, read after mount so the server render matches. */
-function useBrowserPlatform(): RunnerPlatform {
-  const [platform, setPlatform] = useState<RunnerPlatform>('unknown');
-  useEffect(() => {
-    setPlatform(platformOf(null, navigator.userAgent));
-  }, []);
-  return platform;
-}
-
-function Commands({ commands }: { commands: readonly string[] }) {
-  return (
-    <div className="flex flex-col gap-2">
-      {commands.map((command) => (
-        <CodeBlock key={command} code={command} />
-      ))}
-    </div>
-  );
-}
-
 /** What to do for the step the checklist is on. */
-function StepBody({
-  step,
-  runners,
-  platform,
-}: {
-  step: Step;
-  runners: RunnersFact;
-  platform: RunnerPlatform;
-}) {
+function StepBody({ step, runners }: { step: Step; runners: RunnersFact }) {
   switch (step.id) {
     case 'install':
       return (
@@ -55,19 +20,7 @@ function StepBody({
             The runner is the AgentDock daemon. It runs agents and reads the
             repositories on its machine. Install it with one of:
           </p>
-          <Commands commands={INSTALL_COMMANDS.map((item) => item.command)} />
-          <p>
-            Neither available?{' '}
-            <a
-              href={RUNNER_README_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="text-ink underline underline-offset-2"
-            >
-              Build it from source
-            </a>
-            .
-          </p>
+          <InstallCommands />
         </>
       );
     case 'pair':
@@ -86,9 +39,7 @@ function StepBody({
               ? `${idle.map((runner) => runner.name).join(', ')} ${idle.length === 1 ? 'is' : 'are'} paired but not running. Start it on that machine:`
               : 'Start the runner on its machine:'}
           </p>
-          <Commands commands={[RUN_COMMAND]} />
-          <p>To keep it running after you log out or reboot:</p>
-          <Commands commands={keepOnlineCommands(platform)} />
+          <KeepOnlineCommands />
         </>
       );
     }
@@ -174,7 +125,6 @@ export function GettingStarted({
   state: State;
   runners: RunnersFact;
 }) {
-  const platform = useBrowserPlatform();
   const current = currentStep(state);
   const required = state.steps.filter((step) => !step.optional);
   const optional = state.steps.filter((step) => step.optional);
@@ -202,7 +152,7 @@ export function GettingStarted({
             number={index + 1}
             open={step.id === current?.id}
           >
-            <StepBody step={step} runners={runners} platform={platform} />
+            <StepBody step={step} runners={runners} />
           </StepRow>
         ))}
       </ol>

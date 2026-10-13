@@ -1,38 +1,22 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  INSTALL_COMMANDS,
   isLocalUrl,
-  keepOnlineCommands,
+  KEEP_ONLINE_COMMANDS,
   pairingServers,
-  platformOf,
   serverOfCommand,
 } from './install';
 
-describe('platformOf', () => {
-  test("the runner's own os wins over the browser", () => {
-    expect(platformOf('darwin', 'X11; Linux x86_64')).toBe('macos');
-    expect(platformOf('linux', 'Macintosh; Intel Mac OS X')).toBe('linux');
-    expect(platformOf('win32', 'Macintosh')).toBe('unknown');
-  });
-
-  test('without one, the browser is the guess', () => {
-    expect(
-      platformOf(null, 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)'),
-    ).toBe('macos');
-    expect(platformOf(null, 'Mozilla/5.0 (X11; Linux x86_64)')).toBe('linux');
-    expect(platformOf(null, 'Mozilla/5.0 (Linux; Android 14)')).toBe('unknown');
-    expect(platformOf(undefined)).toBe('unknown');
-  });
-});
-
-describe('keepOnlineCommands', () => {
-  test('install-service is Linux only; macOS uses brew services', () => {
-    expect(keepOnlineCommands('linux')).toEqual([
+describe('install and keep-online commands', () => {
+  test('one keep-online command per install method, in the same order', () => {
+    expect(INSTALL_COMMANDS.map((item) => item.label)).toEqual([
+      'Homebrew',
+      'npm',
+    ]);
+    expect(KEEP_ONLINE_COMMANDS.map((item) => item.command)).toEqual([
+      'brew services start agentdock-runner',
       'agentdock-runner install-service',
     ]);
-    expect(keepOnlineCommands('macos')).toEqual([
-      'brew services start agentdock-runner',
-    ]);
-    expect(keepOnlineCommands('unknown')).toHaveLength(2);
   });
 });
 

@@ -56,8 +56,10 @@ A fresh install has an admin and nothing else. The path to a first project
      `npm i -g agentdock-runner`; building from source: `apps/runner/README.md`);
   3. pair a runner — done when a runner that is not revoked has paired;
   4. keep it online — done when any runner is online; the hint is
-     `agentdock-runner install-service` on Linux, `brew services start
-     agentdock-runner` on macOS;
+     `agentdock-runner run`, then a service by install method (ADR-0017):
+     `brew services start agentdock-runner` for Homebrew,
+     `agentdock-runner install-service` (systemd on Linux, launchd on macOS)
+     for npm;
   5. connect a project — done when one exists.
 
   Optional, not counted: install the GitHub App, invite teammates. The step in
