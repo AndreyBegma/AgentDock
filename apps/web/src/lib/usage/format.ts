@@ -5,8 +5,16 @@ import {
   type UsageDimension,
   type UsageInterval,
   type UsageRangeQuery,
+  type UsageTimeseriesResponse,
 } from '@agentdock/shared';
+import type { ChartSeries } from '@andrewbehma/glass-ui/chart';
 import { ApiError, describeError } from '../api';
+import {
+  formatCost,
+  formatDate,
+  formatNumber,
+  formatTokens as formatTokenCount,
+} from '../format';
 
 export const RANGE_PRESETS = ['24h', '7d', '30d', 'custom'] as const;
 export type RangePreset = (typeof RANGE_PRESETS)[number];
@@ -97,15 +105,7 @@ export function timeZones(): string[] {
 
 /** Blank when there is no price at all — never `$0.00` for an unpriced figure. */
 export function formatUsd(costUsd: string | null): string {
-  if (costUsd === null) return '';
-  const value = Number(costUsd);
-  if (!Number.isFinite(value)) return '';
-  if (value === 0) return '$0.00';
-  if (value < 0.01) return '<$0.01';
-  return `$${value.toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  return formatCost(costUsd);
 }
 
 /**
@@ -122,16 +122,11 @@ export function costOrBlank(
 }
 
 export function formatCount(n: number): string {
-  return n.toLocaleString('en-US');
+  return formatNumber(n);
 }
 
 export function formatTokens(n: number): string {
-  if (n < 1_000) return String(n);
-  const trim = (v: number) =>
-    v >= 100 ? v.toFixed(0) : v.toFixed(1).replace(/\.0$/, '');
-  if (n < 1_000_000) return `${trim(n / 1_000)}k`;
-  if (n < 1_000_000_000) return `${trim(n / 1_000_000)}M`;
-  return `${trim(n / 1_000_000_000)}B`;
+  return formatTokenCount(n);
 }
 
 export const DIMENSION_LABEL: Record<UsageDimension, string> = {
@@ -163,20 +158,62 @@ export function groupLabel(
   return dimension === 'project' ? 'No project (machine-wide)' : 'None';
 }
 
-export function formatDay(iso: string, interval: UsageInterval): string {
-  const date = new Date(iso);
+/**
+ * Spend from sessions that ran outside every project's repository — on a
+ * runner, but in no checkout AgentDock knows. Admins see it; members do not.
+ */
+export const MACHINE_WIDE_HINT =
+  'Sessions that ran on a runner outside every project’s repository, so no project can be charged with them.';
+
+/** A bucket's start: "Oct 13" per day, "Oct 13, 14:00" per hour. */
+export function formatDay(
+  value: string | number | Date,
+  interval: UsageInterval,
+): string {
   return interval === 'hour'
-    ? date.toLocaleString(undefined, {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    ? `${formatDate(value, 'day')}, ${formatDate(value, 'time').slice(0, 5)}`
+    : formatDate(value, 'day');
 }
 
-export const formatTime = (iso: string): string =>
-  new Date(iso).toLocaleString();
+export const formatTime = (iso: string): string => formatDate(iso, 'datetime');
+
+/**
+ * A trend line's values, or null when it would say nothing: fewer than two
+ * non-zero points is a flat line, which reads as "no data" or a fake trend.
+ */
+export function sparkValues(values: number[]): number[] | null {
+  const finite = values.map((v) => (Number.isFinite(v) ? v : 0));
+  return finite.filter((v) => v !== 0).length >= 2 ? finite : null;
+}
+
+/** One stacked bar series per runtime; zero buckets stay zero, never a gap. */
+export function costChartSeries(
+  response: Pick<UsageTimeseriesResponse, 'series'>,
+): ChartSeries[] {
+  return response.series.map((series, index) => ({
+    id: series.key ?? `series-${index}`,
+    name: series.label ?? series.key ?? 'Unknown runtime',
+    kind: 'bar',
+    color: RUNTIME_COLOR[series.key ?? ''] ?? 'series-3',
+    points: series.points.map((point) => {
+      const cost = Number(point.costUsd);
+      return { x: point.t, y: Number.isFinite(cost) ? cost : 0 };
+    }),
+  }));
+}
+
+const RUNTIME_COLOR: Record<string, ChartSeries['color']> = {
+  claude: 'series-1',
+  codex: 'series-2',
+};
+
+/** The y-axis: whole dollars when the scale allows it, cents below $10. */
+export const formatAxisCost = (value: number): string =>
+  value === 0
+    ? '$0'
+    : Math.abs(value) >= 10
+      ? `$${formatNumber(value, 0)}`
+      : formatCost(value);
 
 export function describeUsageError(error: unknown): string {
   if (error instanceof ApiError) {
