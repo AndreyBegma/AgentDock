@@ -57,7 +57,9 @@ function PrCell({ slot }: { slot: SlotSummary }) {
   if (slot.prNumber === null) return <>—</>;
   const href = safeHttpsUrl(slot.prUrl);
   return (
-    <span className="inline-flex items-center gap-2">
+    // `relative`: the sr-only label is absolutely positioned, and without an
+    // anchor inside the table's scroller it escapes it and widens the page.
+    <span className="relative inline-flex items-center gap-2">
       {href ? (
         <a
           href={href}
