@@ -11,6 +11,7 @@ import {
 } from '@agentdock/shared';
 import { ApiError, describeError } from '../api';
 import { describeBudgetExceededError } from '../budgets/format';
+import { MODE_SHORT } from '../control/format';
 
 type Tone = 'ok' | 'warn' | 'danger' | 'neutral';
 
@@ -70,7 +71,9 @@ export const SCHEDULE_MODELS = ['opus', 'sonnet', 'haiku', 'fable'] as const;
 
 /** One line for the table: what the schedule fires. */
 export function describeTarget(target: ScheduleTarget): string {
-  if (target.kind === 'orchestrator') return `orchestrator ${target.mode}`;
+  if (target.kind === 'orchestrator') {
+    return `orchestrator: ${MODE_SHORT[target.mode]}`;
+  }
   const args = target.args.trim().replace(/\s+/g, ' ');
   if (args === '') return target.skill;
   return `${target.skill} ${args.length > 60 ? `${args.slice(0, 59)}…` : args}`;

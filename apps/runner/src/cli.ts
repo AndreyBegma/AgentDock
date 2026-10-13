@@ -13,7 +13,7 @@ import { LockError } from './lock';
 import { createLogger, errorMessage, type Logger, parseLogLevel } from './log';
 import { PairingError, pair } from './pairing';
 import { normalizeServer, ServerUrlError } from './server-url';
-import { EXIT, serviceUnit } from './service';
+import { EXIT, launchAgentPlist, serviceUnit } from './service';
 import { Spool } from './spool';
 import { RUNNER_VERSION } from './version';
 
@@ -42,8 +42,9 @@ Commands:
   run                                      run the daemon in the foreground
   status                                   show config, connectivity and spool
   profiles [--detect [--write]]            list runtime profiles, or detect them
-  install-service                          write the systemd user unit
-  version                                  print the version
+  install-service                          write the systemd user unit (Linux)
+                                           or the launchd agent (macOS)
+  version                                  print the version and the target
 `;
 
 class UsageError extends Error {}
@@ -249,6 +250,22 @@ const installServiceCommand = async ({
   args,
 }: Context): Promise<number> => {
   flags(args, {});
+  if (deps.host.os === 'darwin') {
+    mkdirSync(dirname(paths.launchAgentFile), { recursive: true });
+    mkdirSync(dirname(paths.launchAgentLog), { recursive: true });
+    writeFileSync(
+      paths.launchAgentFile,
+      launchAgentPlist(deps.execStart, paths.launchAgentLog, deps.env.PATH),
+      { mode: 0o644 },
+    );
+    out(deps, `Wrote ${paths.launchAgentFile}`);
+    out(
+      deps,
+      `Load it with: launchctl bootstrap gui/$UID ${paths.launchAgentFile}`,
+    );
+    out(deps, `Logs: ${paths.launchAgentLog}`);
+    return EXIT.ok;
+  }
   mkdirSync(dirname(paths.serviceFile), { recursive: true });
   writeFileSync(paths.serviceFile, serviceUnit(deps.execStart), {
     mode: 0o644,
@@ -276,7 +293,7 @@ export const runCli = async (
 ): Promise<number> => {
   const [command, ...args] = argv;
   if (command === 'version' || command === '--version' || command === '-v') {
-    out(deps, RUNNER_VERSION);
+    out(deps, `${RUNNER_VERSION} ${deps.host.os}-${deps.host.arch}`);
     return EXIT.ok;
   }
   if (command === 'help' || command === '--help' || command === '-h') {

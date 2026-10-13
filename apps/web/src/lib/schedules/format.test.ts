@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import type { ScheduleView } from '@agentdock/shared';
 import { ApiError } from '../api';
 import {
+  DISABLED_REASON_LABEL,
   describeSchedulesError,
   describeTarget,
   emptyScheduleForm,
@@ -44,10 +45,26 @@ const schedule = (overrides: Partial<ScheduleView> = {}): ScheduleView => ({
 const apiError = (status: number, code?: string) =>
   new ApiError(status, code as never, 'server message');
 
+describe('DISABLED_REASON_LABEL', () => {
+  test('every reason reads as a sentence, never an enum', () => {
+    for (const reason of [
+      'manual',
+      'failing',
+      'creator_not_authorized',
+    ] as const) {
+      expect(DISABLED_REASON_LABEL[reason]).not.toContain('_');
+      expect(DISABLED_REASON_LABEL[reason]).toMatch(/^Disabled/);
+    }
+  });
+});
+
 describe('describeTarget', () => {
   test('an orchestrator target names its mode', () => {
     expect(describeTarget({ kind: 'orchestrator', mode: 'next' })).toBe(
-      'orchestrator next',
+      'orchestrator: next queued issue',
+    );
+    expect(describeTarget({ kind: 'orchestrator', mode: 'start' })).toBe(
+      'orchestrator: new round',
     );
   });
 

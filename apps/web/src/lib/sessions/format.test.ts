@@ -7,12 +7,15 @@ import type {
 import {
   barGeometry,
   buildTree,
+  describeSessionHint,
   EMPTY_FILTERS,
   formatCost,
   formatDuration,
   formatTokens,
+  hasSessionFilters,
   liveTopicFor,
   queryString,
+  sessionFormChanged,
   sumTotals,
   tokenSum,
   toQuery,
@@ -196,5 +199,28 @@ describe('sumTotals / barGeometry', () => {
     expect(barGeometry([0, 50], 0, 100)).toEqual({ left: 0, width: 50 });
     expect(barGeometry([40, 40], 0, 100).width).toBe(0.5);
     expect(barGeometry([150, 200], 0, 100)).toEqual({ left: 100, width: 0 });
+  });
+});
+
+describe('filters and hints', () => {
+  test('a query with no value is not a filter', () => {
+    expect(hasSessionFilters({})).toBe(false);
+    expect(hasSessionFilters({ model: 'x' })).toBe(true);
+  });
+
+  test('a form differing from what was applied is changed', () => {
+    expect(sessionFormChanged(EMPTY_FILTERS, {})).toBe(false);
+    expect(sessionFormChanged({ ...EMPTY_FILTERS, slot: ' i42 ' }, {})).toBe(
+      true,
+    );
+    expect(
+      sessionFormChanged({ ...EMPTY_FILTERS, slot: 'i42' }, { slot: 'i42' }),
+    ).toBe(false);
+  });
+
+  test('a failure without a fix is just text', () => {
+    expect(describeSessionHint(new Error('x'))).toEqual({
+      text: 'Could not reach the server.',
+    });
   });
 });

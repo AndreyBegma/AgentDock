@@ -3,9 +3,11 @@ import { ApiError } from '../api';
 import {
   commandRunIdOf,
   describeControlError,
+  describeControlErrorHint,
   describeMessageSize,
   describeOutcome,
   MESSAGE_MAX_BYTES,
+  MODE_LABEL,
   messageProblem,
   permissionModesFor,
   utf8ByteLength,
@@ -73,6 +75,53 @@ describe('describeControlError', () => {
   test('a network failure is not an ApiError', () => {
     expect(describeControlError(new TypeError('fetch failed'))).toBe(
       'Could not reach the server.',
+    );
+  });
+});
+
+describe('describeControlErrorHint', () => {
+  test('runner offline says how to start it and links admins to Runners', () => {
+    const hint = describeControlErrorHint(apiError(409, 'runner_offline'), {
+      isAdmin: true,
+    });
+    expect(hint.text).toContain('agentdock-runner run');
+    expect(hint.href).toBe('/admin/runners');
+    expect(hint.cta).toBe('Open Runners');
+  });
+
+  test('runner offline has no link for a non-admin', () => {
+    const hint = describeControlErrorHint(apiError(409, 'runner_offline'));
+    expect(hint.href).toBeUndefined();
+    expect(hint.cta).toBeUndefined();
+  });
+
+  test('no profile links to this project’s orchestrator settings', () => {
+    const hint = describeControlErrorHint(apiError(422, 'no_profile'), {
+      projectId: 'p1',
+    });
+    expect(hint.href).toBe('/projects/p1/settings?tab=orchestrator');
+  });
+
+  test('a runner failure carries the server message', () => {
+    expect(
+      describeControlErrorHint(apiError(502, 'runner_error')).text,
+    ).toContain('server text');
+  });
+
+  test('the string helper is the hint’s text', () => {
+    const error = apiError(409, 'runner_offline');
+    expect(describeControlError(error)).toBe(
+      describeControlErrorHint(error).text,
+    );
+  });
+});
+
+describe('MODE_LABEL', () => {
+  test('start and next read the same everywhere, without board jargon', () => {
+    expect(MODE_LABEL.start).toContain('new round');
+    expect(MODE_LABEL.next).toContain('next queued issue');
+    expect(`${MODE_LABEL.start}${MODE_LABEL.next}`.toLowerCase()).not.toContain(
+      'board',
     );
   });
 });

@@ -29,6 +29,7 @@ import {
   costLabel,
   parseRunUpdate,
   prLabel,
+  RUN_KIND_LABEL,
   RUN_STATUS_LABEL,
   RUN_STATUS_TONE,
   runLabel,
@@ -40,6 +41,7 @@ import {
   formatDuration,
   formatTime,
 } from '../../../../../../lib/sessions/format';
+import { ProjectRunnerBanner } from '../../project-runner-banner';
 
 const REFETCH_DEBOUNCE_MS = 300;
 
@@ -154,13 +156,16 @@ export default function RunDetailPage() {
           label={RUN_STATUS_LABEL[run.status]}
         />
       </h1>
+      <div className="mb-4">
+        <ProjectRunnerBanner projectId={projectId} />
+      </div>
 
       <section className="mb-8">
         <h2 className="mb-2 text-sm font-semibold">Summary</h2>
         <KeyValueList
           items={[
             { key: 'title', label: 'Title', value: run.title ?? '—' },
-            { key: 'kind', label: 'Kind', value: run.kind.replace('_', ' ') },
+            { key: 'kind', label: 'Kind', value: RUN_KIND_LABEL[run.kind] },
             {
               key: 'runtime',
               label: 'Runtime / model',

@@ -5,7 +5,7 @@ import {
   type SlotStatus,
 } from '@agentdock/shared';
 import type { CheckpointKind, PrChecks } from '@agentdock/shared/protocol';
-import { ApiError, describeError } from '../api';
+import { ApiError, describeError, type ErrorHint } from '../api';
 
 type Tone = 'ok' | 'warn' | 'danger' | 'neutral';
 
@@ -56,7 +56,7 @@ export function channelChip(channel: FleetChannel): {
   tooltip: string;
 } {
   return {
-    label: channel,
+    label: CHANNEL_LABEL[channel],
     tone: CHANNEL_TONE[channel],
     tooltip: CHANNEL_TOOLTIP[channel],
   };
@@ -198,13 +198,83 @@ export const isSlotNotFound = (error: unknown): boolean =>
   error instanceof ApiError &&
   (error.code as string | undefined) === FLEET_ERROR.slotNotFound;
 
-export function describeFleetError(error: unknown): string {
-  if (isSlotNotFound(error)) return 'That slot no longer exists.';
+export function describeFleetErrorHint(error: unknown): ErrorHint {
+  if (isSlotNotFound(error)) return { text: 'That slot no longer exists.' };
   if (error instanceof ApiError && error.status === 404) {
-    return 'This project no longer exists, or you are not a member of it.';
+    return {
+      text: 'This project no longer exists, or you are not a member of it.',
+      href: '/projects',
+      cta: 'Open Projects',
+    };
   }
   if (error instanceof ApiError && error.status === 400) {
-    return `Invalid filter: ${error.message}`;
+    return { text: `Invalid filter: ${error.message}` };
   }
-  return describeError(error);
+  return { text: describeError(error) };
 }
+
+export const describeFleetError = (error: unknown): string =>
+  describeFleetErrorHint(error).text;
+
+/** The orchestrator's state as the card says it: what it means, not the enum. */
+export const ORCHESTRATOR_STATUS_LABEL: Record<OrchestratorStatus, string> = {
+  running: 'Running',
+  idle: 'Idle',
+  absent: 'Not running',
+  unknown: 'Status unknown',
+};
+
+export const ORCHESTRATOR_STATUS_HINT: Record<OrchestratorStatus, string> = {
+  running: 'The orchestrator session is alive and working on a round.',
+  idle: 'The orchestrator session is alive but waiting for input.',
+  absent:
+    'No orchestrator session was found on the project’s machine. Start it to dispatch work.',
+  unknown:
+    'AgentDock has not heard from the project’s machine yet, so it cannot say.',
+};
+
+/** One-line hints for the orchestrator card’s facts. */
+export const FLEET_FACT_HINT = {
+  base: 'The branch pull requests are opened against.',
+  slots: 'Slots in use out of the most the orchestrator runs at once.',
+  lastRound:
+    'A round is one pass of the orchestrator: it reads the queue and dispatches workers.',
+  session:
+    'The tmux session the orchestrator runs in on the project’s machine.',
+} as const;
+
+/** The channel badge’s name, for people who have not read the plugin docs. */
+export const CHANNEL_LABEL: Record<FleetChannel, string> = {
+  events: 'events',
+  scraped: 'scraped',
+  both: 'events + scraped',
+};
+
+/** One line under each slot-sheet term. */
+export const SLOT_TERM_HINT = {
+  brief: 'The task the orchestrator gave this worker.',
+  owns: 'Files and folders this worker may change.',
+  never: 'Files and folders this worker must not open.',
+  lead: 'A lead slot also owns shared files, such as the schema, that others wait on.',
+} as const;
+
+/** What to do about a board that could not be read. */
+export function boardErrorHint(error: {
+  reason: string;
+  file: string;
+  line?: number | null;
+}): string {
+  const where = `${error.file}${error.line ? `:${error.line}` : ''}`;
+  return `The latest board could not be read: ${error.reason} (${where}). Fix that file in the project, then the next round picks it up.`;
+}
+
+/** The slot-status filter: every status by its label, in the order they happen. */
+export const slotStatusOptions = (): { value: SlotStatus; label: string }[] =>
+  (Object.keys(SLOT_STATUS_LABEL) as SlotStatus[]).map((value) => ({
+    value,
+    label: SLOT_STATUS_LABEL[value],
+  }));
+
+/** The empty fleet in one sentence (rule R3); "no matches" is a separate message. */
+export const EMPTY_FLEET_DESCRIPTION =
+  'A slot is one worker on one issue. The orchestrator fills slots each round, so they appear here once it dispatches work on this project.';

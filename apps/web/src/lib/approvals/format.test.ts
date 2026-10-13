@@ -1,8 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 import { ApiError } from '../api';
 import {
+  approvalSettingsHref,
   COMMAND_UNAVAILABLE_TEXT,
+  decisionDisabledReason,
   describeApprovalError,
+  emptyWaitingCopy,
   formatDiffStat,
   isCommandUnavailable,
   mismatchSentence,
@@ -10,6 +13,8 @@ import {
   navLabel,
   noteBytes,
   noteError,
+  SOURCE_LABEL,
+  SOURCE_TOOLTIP,
 } from './format';
 
 const apiError = (
@@ -81,6 +86,32 @@ describe('mismatchSentence', () => {
   });
 });
 
+describe('empty list and decision reasons', () => {
+  test('with approval off the empty state says so', () => {
+    expect(emptyWaitingCopy(false).title).toBe('Merge approval is off');
+    expect(emptyWaitingCopy(true).title).toBe('Nothing is waiting');
+  });
+
+  test('the settings link opens the General tab of this project', () => {
+    expect(approvalSettingsHref('p1')).toBe(
+      '/projects/p1/settings?tab=general',
+    );
+  });
+
+  test('no inspection: plain words, the runner named', () => {
+    const text = decisionDisabledReason(null, 'laptop');
+    expect(text).toContain('runner on laptop');
+    expect(text).not.toContain('inspects');
+  });
+
+  test('a closed pull request cannot be decided; an open one can', () => {
+    expect(decisionDisabledReason({ state: 'closed' })).toContain(
+      'no longer open',
+    );
+    expect(decisionDisabledReason({ state: 'open' })).toBeNull();
+  });
+});
+
 describe('error mapping', () => {
   test('head_moved carries the new head and says nothing was sent', () => {
     const head = 'a'.repeat(40);
@@ -98,6 +129,20 @@ describe('error mapping', () => {
     const error = apiError(503, 'command_unavailable');
     expect(isCommandUnavailable(error)).toBe(true);
     expect(describeApprovalError(error)).toBe(COMMAND_UNAVAILABLE_TEXT);
+  });
+
+  test('an old runner is named and told to update, with no "yet"', () => {
+    const text = describeApprovalError(
+      apiError(503, 'command_unavailable'),
+      'laptop',
+    );
+    expect(text).toContain('Update the AgentDock runner on laptop');
+    expect(text).not.toContain('yet');
+  });
+
+  test('inferred, not derived, is what the list says', () => {
+    expect(SOURCE_LABEL.derived).toBe('inferred');
+    expect(SOURCE_TOOLTIP.derived).toContain('inferred');
   });
 
   test('the remaining codes map to sentences', () => {

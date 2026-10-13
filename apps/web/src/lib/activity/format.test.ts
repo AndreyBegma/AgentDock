@@ -1,7 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 import type { ActivityItem } from '@agentdock/shared';
 import {
+  activityFormChanged,
   actorName,
+  EMPTY_ACTIVITY_FILTERS,
+  hasActivityFilters,
   itemMeta,
   LIVE_PROJECT_BUDGET,
   matchesQuery,
@@ -188,5 +191,25 @@ describe('presentation', () => {
     );
     expect(t.tone).toBe('danger');
     expect(t.href).toBe('/projects/p1/fleet');
+  });
+});
+
+describe('filters', () => {
+  test('a query with no value is not a filter', () => {
+    expect(hasActivityFilters({})).toBe(false);
+    expect(hasActivityFilters({ type: 'pr.merged' })).toBe(true);
+  });
+
+  test('a form differing from what was applied is changed', () => {
+    expect(activityFormChanged(EMPTY_ACTIVITY_FILTERS, {})).toBe(false);
+    expect(
+      activityFormChanged({ ...EMPTY_ACTIVITY_FILTERS, actor: 'bob' }, {}),
+    ).toBe(true);
+    expect(
+      activityFormChanged(
+        { ...EMPTY_ACTIVITY_FILTERS, actor: 'bob' },
+        { actor: 'bob' },
+      ),
+    ).toBe(false);
   });
 });

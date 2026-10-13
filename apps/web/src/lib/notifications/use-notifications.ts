@@ -4,10 +4,10 @@ import type {
   NotificationPage,
   NotificationReadResult,
 } from '@agentdock/shared';
-import { toast } from 'glass-ui/toast';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api, describeError } from '../api';
+import { api, describeErrorHint } from '../api';
 import { useLive } from '../live/use-live';
+import { useErrorToast } from '../section/use-error-toast';
 import {
   applyNew,
   applyRead,
@@ -56,6 +56,7 @@ export function useNotifications(
   options: Options = {},
 ): NotificationFeed {
   const { unreadOnly = false, limit, capped = false } = options;
+  const showError = useErrorToast();
   const [feed, setFeed] = useState<FeedState>(EMPTY_FEED);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -71,10 +72,11 @@ export function useNotifications(
       setFeed({ items: page.items, unreadCount: page.unreadCount });
       setCursor(page.nextCursor);
       setFailed(false);
-    } catch (error) {
+    } catch {
+      // The feed and the bell render `failed` with a Try again; a toast on top
+      // would vanish and say the same thing. The rows already shown stay.
       if (mine !== generation.current) return;
       setFailed(true);
-      toast.error(describeError(error));
     } finally {
       if (mine === generation.current) setLoading(false);
     }
@@ -121,9 +123,9 @@ export function useNotifications(
       });
       setCursor(page.nextCursor);
     } catch (error) {
-      toast.error(describeError(error));
+      showError(describeErrorHint(error));
     }
-  }, [cursor, unreadOnly, limit]);
+  }, [cursor, unreadOnly, limit, showError]);
 
   const markRead = useCallback(
     async (id: string) => {
@@ -141,10 +143,10 @@ export function useNotifications(
           ),
         );
       } catch (error) {
-        toast.error(describeError(error));
+        showError(describeErrorHint(error));
       }
     },
-    [unreadOnly],
+    [unreadOnly, showError],
   );
 
   const markAllRead = useCallback(async () => {
@@ -162,9 +164,9 @@ export function useNotifications(
         ),
       );
     } catch (error) {
-      toast.error(describeError(error));
+      showError(describeErrorHint(error));
     }
-  }, [unreadOnly]);
+  }, [unreadOnly, showError]);
 
   return {
     ...feed,
