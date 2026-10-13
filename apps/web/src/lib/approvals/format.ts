@@ -6,6 +6,7 @@ import {
   type MergeApprovalFlags,
 } from '@agentdock/shared';
 import { APPROVAL_NOTE_MAX_BYTES } from '@agentdock/shared/protocol';
+import type { RailBadge } from '@andrewbehma/glass-ui/nav-rail';
 import { ApiError, describeError } from '../api';
 import { updateRunnerText } from '../control/format';
 
@@ -40,9 +41,16 @@ export const SOURCE_TOOLTIP: Record<ApprovalSource, string> = {
     'The orchestrator did not announce it: AgentDock inferred it from a slot with green checks and an open, mergeable pull request.',
 };
 
-/** The sidebar label: `Approvals`, or `Approvals · 3` while PRs wait. */
-export const navLabel = (base: string, waiting: number): string =>
-  waiting > 0 ? `${base} · ${waiting}` : base;
+/** The rail's count on Approvals while PRs wait; nothing at zero. */
+export const approvalsBadge = (waiting: number): RailBadge | undefined =>
+  waiting > 0
+    ? {
+        count: waiting,
+        tone: 'warn',
+        label:
+          waiting === 1 ? '1 waiting approval' : `${waiting} waiting approvals`,
+      }
+    : undefined;
 
 /** `+12 −3` */
 export const formatDiffStat = (additions: number, deletions: number): string =>

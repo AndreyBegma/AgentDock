@@ -291,6 +291,40 @@ export function visibleNav(role: Role, pathname: string): VisibleSection[] {
   return sections;
 }
 
+/**
+ * The phone's tab bar (#163): five places, the rest behind More. Outside a
+ * project the workspace's five; inside one, the project's working pages.
+ */
+const TAB_IDS = {
+  workspace: ['overview', 'projects', 'activity', 'sessions', 'usage'],
+  project: ['fleet', 'queue', 'approvals', 'project-activity', 'history'],
+} as const;
+
+export interface TabBarSplit {
+  /** In bar order; only entries the role can see. */
+  tabs: VisibleEntry[];
+  /** Everything else, by section, the current project's first. */
+  more: VisibleSection[];
+}
+
+export function tabBarSplit(sections: readonly VisibleSection[]): TabBarSplit {
+  const inProject = sections.some((section) => section.id === 'project');
+  const ids: readonly string[] = TAB_IDS[inProject ? 'project' : 'workspace'];
+  const entries = sections.flatMap((section) => section.entries);
+  const tabs = ids.flatMap((id) => entries.filter((entry) => entry.id === id));
+  const rest = sections
+    .map((section) => ({
+      ...section,
+      entries: section.entries.filter((entry) => !ids.includes(entry.id)),
+    }))
+    .filter((section) => section.entries.length > 0);
+  const more = [
+    ...rest.filter((section) => section.id === 'project'),
+    ...rest.filter((section) => section.id !== 'project'),
+  ];
+  return { tabs, more };
+}
+
 export const isActive = (
   href: string,
   pathname: string,

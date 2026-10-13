@@ -11,7 +11,6 @@ import {
   MenuSeparator,
   MenuTrigger,
 } from '@andrewbehma/glass-ui/menu';
-import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import { ChevronsUpDown, FolderGit2, List } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { RUNNER_STATUS_LABEL, STATUS_TONE } from '../../lib/runners/format';
@@ -30,17 +29,15 @@ function RunnerDot({ project }: { project: ProjectSummary }) {
 /**
  * Project switcher (spec 10 D3, #159): a button with the current project's
  * name, its runner's status and a chevron, opening the projects the caller may
- * see. `compact` is the collapsed rail's icon. Renders nothing while there are
- * no projects; the Projects page still works.
+ * see: at the head of the rail, and in More's sheet on a phone (#163).
+ * Renders nothing while there are no projects; the Projects page still works.
  */
 export function ProjectSwitcher({
   projects,
   projectId,
-  compact = false,
 }: {
   projects: readonly ProjectSummary[];
   projectId: string | null;
-  compact?: boolean;
 }) {
   const router = useRouter();
   if (projects.length === 0) return null;
@@ -50,25 +47,7 @@ export function ProjectSwitcher({
     ? `Switch project, current: ${current.displayName}, runner ${RUNNER_STATUS_LABEL[current.runnerStatus]}`
     : 'Choose a project';
 
-  const trigger = compact ? (
-    <button
-      type="button"
-      aria-label={label}
-      className={buttonClassName({
-        variant: 'ghost',
-        size: 'md',
-        icon: true,
-        className: 'relative mx-auto',
-      })}
-    >
-      <FolderGit2 size={18} aria-hidden="true" />
-      {current ? (
-        <span className="absolute right-1.5 top-1.5">
-          <RunnerDot project={current} />
-        </span>
-      ) : null}
-    </button>
-  ) : (
+  const trigger = (
     <button
       type="button"
       aria-label={label}
@@ -99,13 +78,7 @@ export function ProjectSwitcher({
 
   return (
     <MenuRoot>
-      {compact ? (
-        <Tooltip content={current?.displayName ?? 'Projects'} side="right">
-          <MenuTrigger asChild>{trigger}</MenuTrigger>
-        </Tooltip>
-      ) : (
-        <MenuTrigger asChild>{trigger}</MenuTrigger>
-      )}
+      <MenuTrigger asChild>{trigger}</MenuTrigger>
       <MenuContent align="start" className="max-h-[60vh] overflow-y-auto">
         <MenuLabel>Projects</MenuLabel>
         {projects.map((project) => (
