@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'bun:test';
-import type { QueueItemView, QueueState, QueueView } from '@agentdock/shared';
+import {
+  QUEUE_STATES,
+  type QueueItemView,
+  type QueueState,
+  type QueueView,
+} from '@agentdock/shared';
 import { ApiError } from '../api';
 import {
   allowedLabels,
@@ -9,12 +14,14 @@ import {
   describeQueueError,
   filterItems,
   gapSentence,
+  heldForLeadSummary,
   parseStateFilter,
   queueEmptyDescription,
   queueHint,
   queueUnavailableCopy,
   refusedLabels,
   roundFooter,
+  STATE_CHIP_LABEL,
   safeHttpsUrl,
   stateLabel,
 } from './format';
@@ -59,6 +66,24 @@ const apiError = (
   code: string,
   body: Record<string, unknown> = {},
 ) => new ApiError(status, code as never, 'raw', undefined, body);
+
+describe('chip labels and the held-for-lead count', () => {
+  test('every state has a sentence-case chip label', () => {
+    for (const label of Object.values(STATE_CHIP_LABEL)) {
+      expect(label).not.toBe(label.toUpperCase());
+      expect(label).not.toContain('—');
+    }
+    expect(Object.keys(STATE_CHIP_LABEL).sort()).toEqual(
+      [...QUEUE_STATES].sort(),
+    );
+  });
+
+  test('the held summary counts slots and says they are not issues', () => {
+    expect(heldForLeadSummary(1)).toStartWith('1 slot held.');
+    expect(heldForLeadSummary(3)).toStartWith('3 slots held.');
+    expect(heldForLeadSummary(3)).toContain('apart from the issues');
+  });
+});
 
 describe('state filter', () => {
   const items = [item(1, 'ready'), item(2, 'blocked_work'), item(3, 'ready')];

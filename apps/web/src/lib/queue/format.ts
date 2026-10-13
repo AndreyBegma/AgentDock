@@ -28,6 +28,15 @@ export const STATE_TONE: Record<QueueState, Tone> = {
 export const stateLabel = (state: QueueState): string =>
   QUEUE_STATE_LABELS[state];
 
+/** The filter chips, in sentence case ("BLOCKED — person" is the board's own spelling). */
+export const STATE_CHIP_LABEL: Record<QueueState, string> = {
+  in_flight: 'In flight',
+  ready: 'Ready',
+  blocked_work: 'Blocked by work',
+  blocked_person: 'Blocked by a person',
+  no_spec: 'No spec',
+};
+
 /** The board's five columns, in the order the orchestrator reads them. */
 export const BOARD_STATE_ORDER: readonly QueueState[] = [
   'ready',
@@ -131,6 +140,14 @@ export function queueEmptyDescription(
 /** The `Held for a lead` heading, in one sentence. */
 export const HELD_FOR_LEAD_HINT =
   'Slots the orchestrator has planned but not dispatched. Each waits on another slot, usually a lead, and goes out when the condition in the last column is met.';
+
+/**
+ * Held slots are slots of the orchestrator's plan, not issues of the queue, so
+ * they never add up with the chips above; say so next to the count.
+ */
+export function heldForLeadSummary(count: number): string {
+  return `${count} ${count === 1 ? 'slot' : 'slots'} held. These are slots from the orchestrator’s plan, counted apart from the issues above — a held slot may belong to an issue that is already in the queue.`;
+}
 
 /** The footer under the list: whose verdict the dots show. */
 export const roundFooter = (round: { date: string; round: string }): string =>

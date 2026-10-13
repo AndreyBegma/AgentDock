@@ -8,6 +8,7 @@ import { Tabs, TabsItem } from '@andrewbehma/glass-ui/tabs';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
+import { PageHeader } from '../../../../../components/page-header/page-header';
 import { ApiError, api } from '../../../../../lib/api';
 import { useLive } from '../../../../../lib/live/use-live';
 import { describeProjectError } from '../../../../../lib/projects/format';
@@ -76,10 +77,12 @@ export default function ProjectSettingsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">{project.displayName}</h1>
-          <p className="text-ink-2 flex flex-wrap items-center gap-2 text-sm">
+      <PageHeader
+        className="mb-0"
+        eyebrow="Settings"
+        title={project.displayName}
+        description={
+          <span className="flex flex-wrap items-center gap-2">
             {project.repo}
             <span className="inline-flex items-center gap-1">
               <Badge
@@ -90,9 +93,9 @@ export default function ProjectSettingsPage() {
               {project.runnerName} ({project.runnerStatus})
             </span>
             <span>· your role: {project.role}</span>
-          </p>
-        </div>
-      </div>
+          </span>
+        }
+      />
 
       <Tabs aria-label="Project settings" className="max-w-xl">
         {TABS.map(({ id, label }) => (
@@ -101,7 +104,12 @@ export default function ProjectSettingsPage() {
               type="button"
               onClick={() => setTab(id)}
               aria-pressed={tab === id}
-              className="relative flex w-full items-center justify-center px-3 py-2 text-sm font-medium"
+              aria-current={tab === id ? 'page' : undefined}
+              className={`relative flex w-full items-center justify-center px-3 py-2 text-sm whitespace-nowrap ${
+                tab === id
+                  ? 'font-semibold text-ink'
+                  : 'font-medium text-ink-3 hover:text-ink-2'
+              }`}
             >
               {label}
             </button>
