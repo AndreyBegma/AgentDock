@@ -82,7 +82,11 @@ export function PlannerTab({
               sent to the fleet.
               {isAdmin ? '' : ' Only a project admin can change this.'}
             </p>
-            <SegmentedControl role="group" aria-label="Specification output">
+            <SegmentedControl
+              role="group"
+              aria-label="Specification output"
+              className="max-w-sm"
+            >
               {PLANNER_SPEC_OUTPUTS.map((value) => (
                 <SegmentedControlItem
                   key={value}

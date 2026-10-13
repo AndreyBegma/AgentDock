@@ -41,7 +41,7 @@ function useColumns() {
       {
         id: 'project',
         header: 'Project',
-        width: 'minmax(7rem, 1fr)',
+        width: '7.5rem',
         cell: (r: TaskRow) => (
           <Badge
             hue={projectHue(r.projectId)}
@@ -53,19 +53,22 @@ function useColumns() {
       {
         id: 'plan',
         header: 'Plan',
-        width: 'minmax(8rem, 1fr)',
-        cell: (r: TaskRow) => <span className="truncate">{r.planTitle}</span>,
+        width: '9rem',
+        cell: (r: TaskRow) => (
+          <span className="block max-w-32 truncate" title={r.planTitle}>
+            {r.planTitle}
+          </span>
+        ),
       },
       {
         id: 'task',
         header: 'Task',
-        width: 'minmax(14rem, 2.5fr)',
         cell: (r: TaskRow) => (
-          <span className="flex min-w-0 items-center gap-2">
-            <code className="shrink-0 text-xs text-ink-3">{r.key}</code>
+          <span className="block max-w-72 min-w-44 whitespace-normal">
+            <code className="me-2 text-xs text-ink-3">{r.key}</code>
             <Link
               href={taskPlannerHref(r)}
-              className="truncate font-medium underline-offset-2 hover:underline"
+              className="font-medium underline-offset-2 hover:underline"
               // The row opens the task too; one activation, not two.
               onClick={(event) => event.stopPropagation()}
               tabIndex={-1}
@@ -78,6 +81,7 @@ function useColumns() {
       {
         id: 'kind',
         header: 'Kind',
+        width: '6.5rem',
         cell: (r: TaskRow) => (
           <span className="inline-flex items-center gap-1.5">
             {r.kind === 'bug' ? (
@@ -92,6 +96,7 @@ function useColumns() {
       {
         id: 'status',
         header: 'Status',
+        width: '9.5rem',
         cell: (r: TaskRow) => {
           const status = rowStatus(r);
           return (
@@ -105,6 +110,7 @@ function useColumns() {
       {
         id: 'issue',
         header: 'Issue',
+        width: '4.5rem',
         cell: (r: TaskRow) => {
           const url = r.issue ? safeHttpsUrl(r.issue.url) : null;
           if (!r.issue) return <span className="text-ink-3">—</span>;
@@ -117,7 +123,8 @@ function useColumns() {
       },
       {
         id: 'pr',
-        header: 'Pull request',
+        header: 'PR',
+        width: '4.5rem',
         cell: (r: TaskRow) => {
           const pr = r.issue?.prNumber ?? null;
           if (pr === null) return <span className="text-ink-3">—</span>;
@@ -132,6 +139,7 @@ function useColumns() {
       {
         id: 'updated',
         header: 'Updated',
+        width: '6.5rem',
         align: 'end' as const,
         cell: (r: TaskRow) => <Time value={r.updatedAt} />,
       },
