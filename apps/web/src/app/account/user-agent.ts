@@ -15,6 +15,7 @@ const BROWSERS: readonly [name: string, pattern: RegExp][] = [
   ['Opera', /\b(?:OPR|OPiOS)\/(\d+)/],
   ['Samsung Internet', /\bSamsungBrowser\/(\d+)/],
   ['Firefox', /\b(?:Firefox|FxiOS)\/(\d+)/],
+  ['Headless Chrome', /\bHeadlessChrome\/(\d+)/],
   ['Chrome', /\b(?:Chrome|CriOS)\/(\d+)/],
   ['Safari', /\bVersion\/(\d+)(?:[.\d]*)? (?:Mobile\/\S+ )?Safari\//],
 ];

@@ -25,6 +25,11 @@ describe('parseUserAgent', () => {
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 Edg/150.0.3000.1',
       ),
     ).toBe('Edge 150 on Windows');
+    expect(
+      label(
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36',
+      ),
+    ).toBe('Headless Chrome 152 on Linux');
   });
 
   test('phones are mobile', () => {

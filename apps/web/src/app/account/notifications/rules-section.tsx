@@ -25,6 +25,10 @@ const LINK_TELEGRAM = (
   </a>
 );
 
+/** The label and the two channel columns, shared by the headers and the rows. */
+const RULE_GRID =
+  'grid grid-cols-[minmax(0,1fr)_3rem_3.75rem] gap-x-3 sm:grid-cols-[1fr_6rem_6rem]';
+
 export function RulesSection({ telegramLinked }: { telegramLinked: boolean }) {
   const rules = useSection(
     () => api<NotificationRulesView>('/notifications/rules'),
@@ -82,7 +86,9 @@ export function RulesSection({ telegramLinked }: { telegramLinked: boolean }) {
               key={section.group}
               aria-labelledby={`rules-${section.group}`}
             >
-              <div className="grid grid-cols-[1fr_4.5rem_4.5rem] items-end gap-x-3 border-b border-line pb-2 sm:grid-cols-[1fr_6rem_6rem]">
+              <div
+                className={`${RULE_GRID} items-end border-b border-line pb-2`}
+              >
                 <h3
                   id={`rules-${section.group}`}
                   className="text-sm font-semibold text-ink"
@@ -123,14 +129,19 @@ function RuleLine({
   ) => void;
 }) {
   return (
-    <li className="grid grid-cols-[1fr_4.5rem_4.5rem] items-center gap-x-3 py-3 sm:grid-cols-[1fr_6rem_6rem]">
-      <div className="min-w-0" title={`From ${row.source}`}>
-        <span id={`rule-${row.kind}`} className="block text-sm">
-          {row.label}
-        </span>
-        <span className="text-ink-3 text-xs">e.g. {row.example}</span>
-      </div>
-      <div>
+    <li className={`${RULE_GRID} items-center gap-y-0.5 py-3`}>
+      {/* Phones: the example spans the row under the toggles (R4). */}
+      <span
+        id={`rule-${row.kind}`}
+        title={`From ${row.source}`}
+        className="col-start-1 row-start-1 min-w-0 text-sm"
+      >
+        {row.label}
+      </span>
+      <span className="text-ink-3 col-span-3 row-start-2 text-xs sm:col-span-1">
+        e.g. {row.example}
+      </span>
+      <div className="col-start-2 row-start-1 sm:row-span-2">
         <span id={`rule-${row.kind}-inapp`} className="sr-only">
           {row.label}, in-app
         </span>
@@ -144,7 +155,7 @@ function RuleLine({
           />
         )}
       </div>
-      <div>
+      <div className="col-start-3 row-start-1 sm:row-span-2">
         <span id={`rule-${row.kind}-telegram`} className="sr-only">
           {row.label}, Telegram
         </span>

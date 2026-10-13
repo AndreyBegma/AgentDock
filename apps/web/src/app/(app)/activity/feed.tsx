@@ -129,7 +129,7 @@ function ItemMeta({
         </Chip>
       ) : null}
       {item.prNumber !== null ? (
-        <Chip size="sm" tone="ok" className="text-[11px]">
+        <Chip size="sm" className="text-[11px]">
           PR #{item.prNumber}
         </Chip>
       ) : null}
@@ -137,6 +137,11 @@ function ItemMeta({
     </span>
   );
 }
+
+/** A title that wraps anywhere: a checkpoint heading may carry a long URL (R4). */
+const Title = ({ text }: { text: string }) => (
+  <span className="[overflow-wrap:anywhere]">{text}</span>
+);
 
 interface Names {
   projects: ReadonlyMap<string, string>;
@@ -157,7 +162,7 @@ function toEntry(item: ActivityItem, names: Names, fixed: boolean) {
     tone: severityTone(item.severity),
     icon: CATEGORY_ICON[item.category],
     actor: name ? { name } : undefined,
-    title: item.title,
+    title: <Title text={item.title} />,
     meta: (
       <ItemMeta item={item} projectName={projectNameOf(item, names, fixed)} />
     ),
@@ -208,7 +213,7 @@ function toEntries(
       tone: severityTone(worst.severity),
       icon: CATEGORY_ICON[newest.category],
       actor: name ? { name } : undefined,
-      title: newest.title,
+      title: <Title text={newest.title} />,
       meta: (
         <ItemMeta
           item={newest}
@@ -229,11 +234,14 @@ function toEntries(
 function MoreFilters({
   form,
   actors,
+  categoryHere,
   onApply,
 }: {
   form: ActivityFilterForm;
   /** Who caused the items loaded so far, by id → name. */
   actors: ReadonlyMap<string, string>;
+  /** Phones: Category moves in here, beside the project select it crowds (R4). */
+  categoryHere: boolean;
   onApply: (patch: Partial<ActivityFilterForm>) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -247,6 +255,7 @@ function MoreFilters({
   const submit = (event: FormEvent) => {
     event.preventDefault();
     onApply({
+      category: draft.category,
       type: draft.type,
       actor: draft.actor,
       slot: draft.slot.trim(),
@@ -273,6 +282,24 @@ function MoreFilters({
       </PopoverTrigger>
       <PopoverContent title="More filters" align="end" className="w-80">
         <form onSubmit={submit} className="flex flex-col gap-3">
+          {categoryHere ? (
+            <div className="sm:hidden">
+              <Field label="Category" htmlFor="activity-category">
+                <Select
+                  id="activity-category"
+                  value={draft.category}
+                  onChange={(e) => set({ category: e.target.value })}
+                >
+                  <option value="">Any category</option>
+                  {ACTIVITY_CATEGORIES.map((category) => (
+                    <option key={category} value={category}>
+                      {CATEGORY_LABEL[category]}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+          ) : null}
           <Field label="Type" htmlFor="activity-type">
             <Select
               id="activity-type"
@@ -379,7 +406,7 @@ function FeedToolbar({
               aria-label="Project"
               value={form.projectId}
               onChange={(e) => onChange({ projectId: e.target.value })}
-              className="w-44"
+              className="w-36 sm:w-44"
             >
               <option value="">All my projects</option>
               {projects.map((project) => (
@@ -393,7 +420,7 @@ function FeedToolbar({
             aria-label="Category"
             value={form.category}
             onChange={(e) => onChange({ category: e.target.value })}
-            className="w-36"
+            className={showProject ? 'hidden w-36 sm:flex' : 'w-36'}
           >
             <option value="">Any category</option>
             {ACTIVITY_CATEGORIES.map((category) => (
@@ -406,7 +433,12 @@ function FeedToolbar({
       }
       actions={
         <div className="flex items-center gap-1">
-          <MoreFilters form={form} actors={actors} onApply={onChange} />
+          <MoreFilters
+            form={form}
+            actors={actors}
+            categoryHere={showProject}
+            onApply={onChange}
+          />
           {filtered ? (
             <Button variant="ghost" size="sm" onClick={onReset}>
               Reset

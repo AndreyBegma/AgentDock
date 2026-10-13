@@ -20,7 +20,7 @@ import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { Spinner } from '@andrewbehma/glass-ui/spinner';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { PageHeader } from '../../../components/page-header/page-header';
 import { RunnerOfflineBanner } from '../../../components/prerequisites/prerequisite-banner';
 import { useCurrentUser } from '../../../components/shell/user-context';
@@ -147,6 +147,20 @@ interface Loaded {
   operable: ProjectSummary[];
 }
 
+/** The page header over every state, the empty and failed ones included. */
+function CatalogPage({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        className="mb-0!"
+        title="Skills"
+        description="Search the public skills.sh catalog. The runner looks it up and clones the repository; nothing is installed until you confirm."
+      />
+      {children}
+    </div>
+  );
+}
+
 export default function SkillsCatalogPage() {
   const isGlobalAdmin = useCurrentUser().role === 'admin';
   const section = useSection<Loaded>(async () => {
@@ -258,57 +272,61 @@ export default function SkillsCatalogPage() {
   if (!projects) {
     if (section.error !== null && !section.loading) {
       return (
-        <SectionUnavailable
-          title="Your projects could not be loaded"
-          stillWorks={`${describeError(section.error)} Skills need a project's runner, so the catalog waits for this.`}
-          action={
-            <Button variant="glass" size="sm" onClick={section.retry}>
-              Try again
-            </Button>
-          }
-        />
+        <CatalogPage>
+          <SectionUnavailable
+            title="Your projects could not be loaded"
+            stillWorks={`${describeError(section.error)} Skills need a project's runner, so the catalog waits for this.`}
+            action={
+              <Button variant="glass" size="sm" onClick={section.retry}>
+                Try again
+              </Button>
+            }
+          />
+        </CatalogPage>
       );
     }
-    return <Skeleton className="h-64 w-full" />;
+    return (
+      <CatalogPage>
+        <Skeleton className="h-64 w-full" />
+      </CatalogPage>
+    );
   }
   if (projects.length === 0 || !project) {
     const noProjects = section.data?.all === 0;
     if (noProjects && isGlobalAdmin) {
       return (
-        <EmptyState
-          title="Connect a project first"
-          description="Skills are installed and run through a project's runner, so the catalog needs at least one project."
-          action={
-            <Link
-              href="/projects"
-              className={buttonClassName({ variant: 'solid' })}
-            >
-              Connect project
-            </Link>
-          }
-        />
+        <CatalogPage>
+          <EmptyState
+            title="Connect a project first"
+            description="Skills are installed and run through a project's runner, so the catalog needs at least one project."
+            action={
+              <Link
+                href="/projects"
+                className={buttonClassName({ variant: 'solid' })}
+              >
+                Connect project
+              </Link>
+            }
+          />
+        </CatalogPage>
       );
     }
     return (
-      <EmptyState
-        title={noProjects ? 'No project yet' : 'No project to install into'}
-        description={
-          noProjects
-            ? 'Ask an administrator to add you to a project. Skills are installed and run through a project.'
-            : 'Installing and running skills needs the operator role on a project. Ask an administrator for access.'
-        }
-      />
+      <CatalogPage>
+        <EmptyState
+          title={noProjects ? 'No project yet' : 'No project to install into'}
+          description={
+            noProjects
+              ? 'Ask an administrator to add you to a project. Skills are installed and run through a project.'
+              : 'Installing and running skills needs the operator role on a project. Ask an administrator for access.'
+          }
+        />
+      </CatalogPage>
     );
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <PageHeader
-        className="mb-0!"
-        title="Skills"
-        description="Search the public skills.sh catalog. The runner looks it up and clones the repository; nothing is installed until you confirm."
-      />
-
+    <CatalogPage>
       <RunnerOfflineBanner project={project} />
 
       <div className="flex flex-wrap items-end gap-4">
@@ -397,6 +415,6 @@ export default function SkillsCatalogPage() {
         isAdmin={isAdmin}
         onClose={() => setPreview(null)}
       />
-    </div>
+    </CatalogPage>
   );
 }
