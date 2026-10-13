@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { SESSION_COOKIE } from '@agentdock/shared';
 import { NextRequest } from 'next/server';
-import { proxy } from './proxy';
+import { config, PUBLIC_FILES, proxy } from './proxy';
 
 const ORIGIN = 'https://dock.example.com';
 
@@ -41,5 +41,21 @@ describe('proxy', () => {
 
   test('a session lets every route through', () => {
     expect(redirectOf(visit('/admin/runners', true))).toBeNull();
+  });
+
+  test('the app icons load signed out (the login tab has its favicon)', () => {
+    for (const path of ['/icon.svg', '/apple-icon', '/favicon.ico']) {
+      expect(redirectOf(visit(path))).toBeNull();
+    }
+    expect(redirectOf(visit('/icon.svg?f0e1d2c3'))).toBeNull();
+  });
+
+  test('the matcher skips the icons and nothing that merely starts like them', () => {
+    const matches = (path: string) =>
+      config.matcher.some((pattern) => new RegExp(`^${pattern}$`).test(path));
+    for (const path of PUBLIC_FILES) expect(matches(path)).toBe(false);
+    for (const path of ['/', '/icon.svg/x', '/apple-icons', '/admin/runners']) {
+      expect(matches(path)).toBe(true);
+    }
   });
 });

@@ -45,6 +45,21 @@ where to fix it (issue #132). The shared pieces live in `apps/web`:
 | A missing prerequisite is a banner with a link | `PrerequisiteBanner { tone, title, body, href, cta }`; facts from `usePrerequisites()` (`lib/prerequisites/`); `RunnerOfflineBanner` under a project page's h1; `serverEnvRemedy` for a server variable |
 | An error toast carries its fix | a `describe…Error` helper may return `{ text, href?, cta? }`; `useErrorToast()` adds an action that navigates |
 
+## Look and feel (issue #159)
+
+Every screen builds on the same shared pieces. A screen does not write its own
+version of one of them.
+
+| Rule | Piece |
+|---|---|
+| One page title shape | `PageHeader { title, description?, actions?, eyebrow?, id? }` (`components/page-header/`): the h1 is 28 px, semibold, with tight tracking, and the actions sit on the right and wrap below on a phone. The browser title comes from the root template `%s · AgentDock` |
+| Dates and numbers are formatted in one place, in one locale (`en-US`, the browser's timezone) | `lib/format`: `formatDate(v, 'date' \| 'day' \| 'datetime' \| 'time')`, `formatRelative`, `formatAbsolute`, `formatDuration`, `formatNumber`, `formatCost` (blank when unpriced, `<$0.01`), `formatTokens` (k/M/B) and `pluralize`. A missing value is `''`, never "Invalid Date". `<Time value format?>` (`lib/format/time`) shows relative text, puts the exact instant in `title` and `dateTime`, and updates every minute |
+| Figures line up | the `num` class (tabular numerals, right-aligned in a `td`/`th`). glass-ui `Table` is already tabular |
+| Nothing scrolls the page sideways at 390 px | `ScrollX { edgeClassName?, label? }` (`components/scroll-x/`) wraps a wide table. It is glass-ui `ScrollHintRow`, with a fade only on the side that has more. Use `from-surface` inside a card |
+| Agent-written text is rendered, never dumped | `Markdown { children, compact? }` (`components/markdown/`): react-markdown with GFM. Raw HTML is dropped, links pass `safeHref` (http(s), mailto, in-app paths), bare URLs become links, fenced code goes to glass-ui `CodeBlock`, tables sit in `ScrollX`, and headings are demoted below the page h1 |
+| The brand is one mark | `Logomark { size, accent?, title? }` and `Wordmark { size, accent? }` (`components/brand/`). `app/icon.svg` and `app/apple-icon.tsx` draw the same geometry (`LOGOMARK_PATH`) |
+| Type | Inter (`--font-inter`, after SF Pro in glass-ui's `--font-sans`) and JetBrains Mono (`--font-mono`), both through `next/font` in the root layout. Code, ids and commands use `font-mono` |
+
 **Live updates.** The header dot reads the UI WebSocket. After more than 5 s
 without it, the shell shows a warn banner — "Live updates paused. This page may
 be out of date." with Reload. A page that shows the socket's state uses

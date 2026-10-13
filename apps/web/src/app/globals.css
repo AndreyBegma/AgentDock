@@ -2,3 +2,26 @@
 @import "@andrewbehma/glass-ui/tokens.css";
 @import "@andrewbehma/glass-ui/material.css";
 @import "@andrewbehma/glass-ui/base.css";
+
+/* Code, ids, hashes and commands: JetBrains Mono, injected by `next/font` in
+   the root layout. glass-ui defines no mono stack of its own. Unlayered, so it
+   wins over Tailwind's default `--font-mono` from the theme layer; the
+   `font-mono` utility and `code`/`pre` read the variable. */
+:root {
+  --font-mono:
+    var(--font-jetbrains-mono), ui-monospace, "SF Mono", Menlo, Consolas,
+    monospace;
+}
+
+/* A figure in a column (issue #159, R3): tabular numerals, and right-aligned
+   when it is a table cell, so digits line up and do not jitter on update. */
+@layer utilities {
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+
+  td.num,
+  th.num {
+    text-align: right;
+  }
+}
