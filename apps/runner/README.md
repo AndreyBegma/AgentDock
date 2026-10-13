@@ -40,7 +40,8 @@ apps/runner/dist/agentdock-runner version
 
 `sh apps/runner/scripts/build-release.sh` builds all four targets, the
 tarballs, `SHA256SUMS`, the npm packages and the Homebrew formula into
-`apps/runner/release/`, and publishes nothing. Releasing is in
+`apps/runner/release/`, and publishes nothing. It builds `@agentdock/shared`
+first, so it works on a clean checkout. Releasing is in
 [deploy/README.md](../../deploy/README.md#releasing-the-runner).
 
 ## Commands

@@ -7,9 +7,16 @@
 # apps/runner/package.json; build-release.sh refuses anything else.
 #
 # A manual run is a dry run: it builds and stops before every publish step.
-# It starts only with the variable RUNNER_RELEASE=1, so a plain manual run of
-# pipeline.yml does not start one too. RUNNER_RELEASE_DRY_RUN=1 also stops a
-# tag run before it publishes.
+# It starts only when the message given to the manual run contains
+# [runner-release], so a plain manual run of pipeline.yml does not start one
+# too. The gate reads the message, not a variable: Woodpecker 3.x passes the
+# variables of a manual run to the steps only, never to a workflow's `when`.
+# The message reaches `when` as CI_COMMIT_MESSAGE ("MANUAL: <message> @
+# <branch>"). Rehearse on a branch other than develop: a manual run on develop
+# also deploys staging through pipeline.yml.
+#
+# RUNNER_RELEASE_DRY_RUN=1 also stops a tag run before it publishes. It is read
+# by the step shells, where variables do arrive.
 #
 # Pull requests never run this workflow. The secrets github_release_token and
 # npm_token must be restricted to the tag and manual events in Woodpecker;
@@ -19,7 +26,7 @@ when:
   - event: tag
     ref: refs/tags/runner-v*
   - event: manual
-    evaluate: 'RUNNER_RELEASE == "1"'
+    evaluate: 'CI_COMMIT_MESSAGE contains "[runner-release]"'
 
 variables:
   - &ci_image agentdock-ci:node-bun

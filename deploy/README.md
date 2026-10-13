@@ -88,10 +88,15 @@ platform packages before `agentdock-runner`. Last, it pushes
 
 1. **Bump** `version` in `apps/runner/package.json` and merge it. The tag must
    match it exactly, or `build-release` fails.
-2. **Rehearse** (optional). Run the pipeline by hand with the variable
-   `RUNNER_RELEASE=1`. It builds everything and stops before every publish
-   step. Without that variable, a manual run does not start the release
-   workflow. Locally, `sh apps/runner/scripts/build-release.sh` does the same.
+2. **Rehearse** (optional). Run the pipeline by hand with a message that
+   contains `[runner-release]`, for example `runner dry run [runner-release]`.
+   It builds everything and stops before every publish step. Without that
+   marker in the message, a manual run does not start the release workflow.
+   Use a branch other than `develop`: a manual run on `develop` also deploys
+   staging through `pipeline.yml`. The marker is in the message, not a
+   variable, because Woodpecker 3.x does not pass a manual run's variables to
+   a workflow's `when`. Locally, `sh apps/runner/scripts/build-release.sh` does
+   the same.
 3. **Tag and push** the merged commit:
    ```sh
    git tag runner-v0.1.0 <commit>
