@@ -86,7 +86,11 @@ describe('refusingBudget', () => {
   const over = (action: 'alert' | 'stop', state: 'exceeded' | 'overridden') =>
     budget({
       action,
-      current: { ...(budget().current as never), state, percent: 120 },
+      current: {
+        ...(budget().current as NonNullable<BudgetView['current']>),
+        state,
+        percent: 120,
+      },
     });
 
   test('only an enabled, exceeded stop budget refuses', () => {
