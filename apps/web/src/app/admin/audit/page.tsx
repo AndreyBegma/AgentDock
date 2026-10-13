@@ -12,11 +12,13 @@ import {
   USER_STATUSES,
 } from '@agentdock/shared';
 import { Badge } from 'glass-ui/badge';
+import { Banner } from 'glass-ui/banner';
 import { Button, buttonClassName } from 'glass-ui/button';
 import { Combobox } from 'glass-ui/combobox';
 import { DateInput } from 'glass-ui/date-input';
 import { EmptyState } from 'glass-ui/empty-state';
 import { Field, Input, Select } from 'glass-ui/field';
+import { SectionUnavailable } from 'glass-ui/section-unavailable';
 import { Skeleton } from 'glass-ui/skeleton';
 import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
 import { toast } from 'glass-ui/toast';
@@ -24,14 +26,23 @@ import { useRouter } from 'next/navigation';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { ApiError, api } from '../../../lib/api';
 import {
+  ACTION_LABEL,
+  actionGroupLabel,
+  actionLabel,
+  RESULT_LABEL,
+} from '../../../lib/audit/actions';
+import {
   type AuditFilterForm,
   actionGroups,
   actorLabel,
+  brokenChainCopy,
   describeAuditError,
   describeVerification,
   EMPTY_FILTERS,
+  filtersPending,
   filtersQuery,
   formatTime,
+  hasFilters,
   RESULT_TONE,
   targetLabel,
   toFilters,
@@ -43,9 +54,11 @@ const ACTION_GROUPS = actionGroups(AUDIT_ACTIONS);
 
 function ChainStatus({
   verification,
+  exportHref,
   onVerified,
 }: {
   verification: AuditVerification | null | undefined;
+  exportHref: string;
   onVerified: (v: AuditVerification) => void;
 }) {
   const [busy, setBusy] = useState(false);
@@ -58,7 +71,8 @@ function ChainStatus({
       });
       onVerified(result);
       if (result.ok) toast.success('The chain is intact.');
-      else toast.error(`The chain is broken at seq ${result.firstBrokenSeq}.`);
+      else
+        toast.error(`The chain is broken at record ${result.firstBrokenSeq}.`);
     } catch (err) {
       toast.error(describeAuditError(err));
     } finally {
@@ -67,25 +81,48 @@ function ChainStatus({
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      {verification === undefined ? (
-        <Skeleton className="h-6 w-64" />
-      ) : verification === null ? (
-        <Badge tone="neutral" label="Not verified yet" />
-      ) : (
-        <>
-          <Badge
-            tone={verification.ok ? 'ok' : 'danger'}
-            label={verification.ok ? 'Verified ✓' : 'Broken ✗'}
-          />
-          <span className="text-sm text-ink-2">
-            {describeVerification(verification)}
-          </span>
-        </>
-      )}
-      <Button variant="glass" size="sm" disabled={busy} onClick={verify}>
-        {busy ? 'Verifying…' : 'Verify now'}
-      </Button>
+    <div className="flex flex-col gap-3">
+      {verification && !verification.ok ? (
+        <Banner
+          tone="danger"
+          title="The audit chain is broken"
+          action={
+            <a
+              href={exportHref}
+              download
+              className={buttonClassName({ variant: 'glass', size: 'sm' })}
+            >
+              Export CSV
+            </a>
+          }
+        >
+          {brokenChainCopy(verification)}
+        </Banner>
+      ) : null}
+      <div className="flex flex-wrap items-center gap-3">
+        {verification === undefined ? (
+          <Skeleton className="h-6 w-64" />
+        ) : verification === null ? (
+          <Badge tone="neutral" label="Not verified yet" />
+        ) : (
+          <>
+            <Badge
+              tone={verification.ok ? 'ok' : 'danger'}
+              label={verification.ok ? 'Verified ✓' : 'Broken ✗'}
+            />
+            <span className="text-sm text-ink-2">
+              {describeVerification(verification)}
+            </span>
+          </>
+        )}
+        <Button variant="glass" size="sm" disabled={busy} onClick={verify}>
+          {busy ? 'Verifying…' : 'Verify now'}
+        </Button>
+      </div>
+      <p className="text-xs text-ink-3">
+        Each record carries a hash of the one before it, so a record changed or
+        deleted in the database breaks the chain from there on.
+      </p>
     </div>
   );
 }
@@ -93,12 +130,15 @@ function ChainStatus({
 function Filters({
   form,
   users,
+  pending,
   onChange,
   onApply,
   onReset,
 }: {
   form: AuditFilterForm;
   users: AdminUser[];
+  /** The form differs from the applied filters. */
+  pending: boolean;
   onChange: (patch: Partial<AuditFilterForm>) => void;
   onApply: () => void;
   onReset: () => void;
@@ -137,11 +177,11 @@ function Filters({
         >
           <option value="">Any action</option>
           {ACTION_GROUPS.map((group) => (
-            <optgroup key={group} label={group}>
-              <option value={group}>{group}* (all)</option>
+            <optgroup key={group} label={actionGroupLabel(group)}>
+              <option value={group}>All {actionGroupLabel(group)}</option>
               {AUDIT_ACTIONS.filter((a) => a.startsWith(group)).map((a) => (
                 <option key={a} value={a}>
-                  {a}
+                  {ACTION_LABEL[a]}
                 </option>
               ))}
             </optgroup>
@@ -157,7 +197,7 @@ function Filters({
           <option value="">Any result</option>
           {AUDIT_RESULTS.map((r) => (
             <option key={r} value={r}>
-              {r}
+              {RESULT_LABEL[r]}
             </option>
           ))}
         </Select>
@@ -196,13 +236,18 @@ function Filters({
           onChange={(e) => onChange({ projectId: e.target.value })}
         />
       </Field>
-      <div className="flex gap-2 sm:col-span-2 lg:col-span-4">
+      <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-4">
         <Button variant="solid" type="submit">
           Apply
         </Button>
         <Button variant="ghost" type="button" onClick={onReset}>
           Reset
         </Button>
+        {pending ? (
+          <span className="text-xs text-ink-2" role="status">
+            Filters changed — Apply to update the list.
+          </span>
+        ) : null}
       </div>
     </form>
   );
@@ -220,6 +265,8 @@ function AuditView() {
   >();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [selected, setSelected] = useState<AuditRecordView>();
+  const [loadError, setLoadError] = useState<string>();
+  const [attempt, setAttempt] = useState(0);
 
   /** A 401 goes to sign-in, a 403 away from the admin area. */
   const handleAccess = useCallback(
@@ -242,9 +289,11 @@ function AuditView() {
   );
 
   // First page for the applied filters; a newer apply wins over a slow older one.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` is Try again
   useEffect(() => {
     let cancelled = false;
     setItems(undefined);
+    setLoadError(undefined);
     loadPage(filters)
       .then((page) => {
         if (cancelled) return;
@@ -253,14 +302,13 @@ function AuditView() {
       })
       .catch((err: unknown) => {
         if (cancelled || handleAccess(err)) return;
-        setItems([]);
-        setNextCursor(null);
-        toast.error(describeAuditError(err));
+        // Rule R2: a failure is said as one, never as "no records".
+        setLoadError(describeAuditError(err));
       });
     return () => {
       cancelled = true;
     };
-  }, [filters, loadPage, handleAccess]);
+  }, [filters, loadPage, handleAccess, attempt]);
 
   useEffect(() => {
     api<AuditVerificationState>('/admin/audit/verification')
@@ -303,36 +351,74 @@ function AuditView() {
   return (
     <>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">Audit log</h1>
+        <div>
+          <h1 className="text-xl font-semibold">Audit log</h1>
+          <p className="max-w-prose text-sm text-ink-2">
+            Every sign-in, admin change and command sent to a runner, in order.
+            Records cannot be edited here.
+          </p>
+        </div>
         <a href={exportHref} download className={buttonClassName()}>
           Export CSV
         </a>
       </div>
 
       <div className="mb-6">
-        <ChainStatus verification={verification} onVerified={setVerification} />
+        <ChainStatus
+          verification={verification}
+          exportHref={exportHref}
+          onVerified={setVerification}
+        />
       </div>
 
       <div className="mb-6">
         <Filters
           form={form}
           users={users}
+          pending={filtersPending(form, filters)}
           onChange={(patch) => setForm((c) => ({ ...c, ...patch }))}
           onApply={() => setFilters(toFilters(form))}
           onReset={reset}
         />
       </div>
 
-      {items === undefined ? (
+      {loadError ? (
+        <SectionUnavailable
+          title="The audit log is not answering"
+          stillWorks="Actions are still recorded on the server."
+          detail={loadError}
+          action={
+            <Button
+              variant="glass"
+              size="sm"
+              onClick={() => setAttempt((n) => n + 1)}
+            >
+              Try again
+            </Button>
+          }
+        />
+      ) : items === undefined ? (
         <div className="flex flex-col gap-3" aria-busy="true">
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-40 w-full" />
         </div>
       ) : items.length === 0 ? (
-        <EmptyState
-          title="No records"
-          description="Nothing matches these filters."
-        />
+        hasFilters(filters) ? (
+          <EmptyState
+            title="Nothing matches these filters"
+            description="Other records are hidden by the filters above."
+            action={
+              <Button variant="glass" onClick={reset}>
+                Reset filters
+              </Button>
+            }
+          />
+        ) : (
+          <EmptyState
+            title="Every sign-in and admin change"
+            description="Records appear here as people sign in and change things. There are none yet."
+          />
+        )
       ) : (
         <>
           <Table scroll>
@@ -353,12 +439,17 @@ function AuditView() {
                 <TableRow key={record.seq}>
                   <TableCell>{formatTime(record.ts)}</TableCell>
                   <TableCell>{actorLabel(record)}</TableCell>
-                  <TableCell>{record.action}</TableCell>
+                  <TableCell>
+                    {actionLabel(record.action)}
+                    <div className="font-mono text-xs text-ink-3">
+                      {record.action}
+                    </div>
+                  </TableCell>
                   <TableCell>{targetLabel(record)}</TableCell>
                   <TableCell>
                     <Badge
                       tone={RESULT_TONE[record.result]}
-                      label={record.result}
+                      label={RESULT_LABEL[record.result]}
                     />
                   </TableCell>
                   <TableCell>
