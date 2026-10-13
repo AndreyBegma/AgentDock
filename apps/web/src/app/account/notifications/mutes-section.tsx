@@ -17,6 +17,7 @@ import Link from 'next/link';
 import { type FormEvent, useState } from 'react';
 import { DisabledReason } from '../../../components/prerequisites/disabled-reason';
 import { api, describeError, describeErrorHint } from '../../../lib/api';
+import { Time } from '../../../lib/format/time';
 import { fromDateInput, isFutureDay } from '../../../lib/notifications/format';
 import { useErrorToast } from '../../../lib/section/use-error-toast';
 import { useSection } from '../../../lib/section/use-section';
@@ -171,9 +172,11 @@ export function MutesSection() {
               <TableRow key={mute.projectId}>
                 <TableCell>{mute.projectName}</TableCell>
                 <TableCell>
-                  {mute.until
-                    ? new Date(mute.until).toLocaleDateString()
-                    : 'Until removed'}
+                  {mute.until ? (
+                    <Time value={mute.until} format="date" />
+                  ) : (
+                    'Until removed'
+                  )}
                 </TableCell>
                 <TableCell>
                   <Button size="sm" onClick={() => void remove(mute)}>

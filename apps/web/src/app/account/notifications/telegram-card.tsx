@@ -4,6 +4,7 @@ import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { useState } from 'react';
+import { formatDate } from '../../../lib/format';
 import type { useTelegramLink } from '../../../lib/notifications/use-telegram-link';
 
 type Link = ReturnType<typeof useTelegramLink>;
@@ -45,7 +46,7 @@ export function TelegramCard({ link }: { link: Link }) {
             Linked
             {view.state.username ? ` as @${view.state.username}` : ''}
             {view.state.linkedAt
-              ? ` · since ${new Date(view.state.linkedAt).toLocaleDateString()}`
+              ? ` · since ${formatDate(view.state.linkedAt, 'date')}`
               : ''}
           </span>
           <Button
@@ -84,8 +85,7 @@ export function TelegramCard({ link }: { link: Link }) {
               >
                 open the link
               </a>{' '}
-              (valid until {new Date(pending.expiresAt).toLocaleTimeString()}),
-              then{' '}
+              (valid until {formatDate(pending.expiresAt, 'time')}), then{' '}
               <button
                 type="button"
                 className="underline"

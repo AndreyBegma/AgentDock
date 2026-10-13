@@ -9,6 +9,7 @@ import {
   type NotificationRuleView,
   type NotificationView,
 } from '@agentdock/shared';
+import { formatRelative } from '../format';
 
 export const BELL_LIMIT = 20;
 
@@ -24,6 +25,44 @@ export const KIND_LABEL: Record<NotificationKind, string> = {
   'budget.exceeded': 'Budget exceeded',
   'budget.threshold': 'Budget threshold reached',
   'schedule.disabled': 'Schedule disabled',
+};
+
+/** What a notification of the kind reads like, under the rule's name. */
+export const KIND_EXAMPLE: Record<NotificationKind, string> = {
+  'person.needed': 'The orchestrator asks “which base branch?”',
+  'slot.blocked': 'Slot i19 · luna-watch is blocked',
+  'pane.prompt': 'Slot i19 is waiting for a yes or no',
+  'quota.hit': 'Slot i19 hit its usage limit',
+  'queue.dry': 'luna-watch has no issue left to dispatch',
+  'pr.awaiting_approval': 'PR #157 is ready and waits for your approval',
+  'runner.offline': 'Runner build-box went offline',
+  'runner.online': 'Runner build-box is back online',
+  'budget.exceeded': 'luna-watch spent its whole monthly budget',
+  'budget.threshold': 'luna-watch reached 80 % of its monthly budget',
+  'schedule.disabled': 'The nightly review schedule was turned off',
+};
+
+export type RuleGroup = 'fleet' | 'runners' | 'budgets' | 'schedules';
+
+export const RULE_GROUP_LABEL: Record<RuleGroup, string> = {
+  fleet: 'Orchestrator and slots',
+  runners: 'Runners',
+  budgets: 'Budgets',
+  schedules: 'Schedules',
+};
+
+const KIND_GROUP: Record<NotificationKind, RuleGroup> = {
+  'person.needed': 'fleet',
+  'slot.blocked': 'fleet',
+  'pane.prompt': 'fleet',
+  'quota.hit': 'fleet',
+  'queue.dry': 'fleet',
+  'pr.awaiting_approval': 'fleet',
+  'runner.offline': 'runners',
+  'runner.online': 'runners',
+  'budget.exceeded': 'budgets',
+  'budget.threshold': 'budgets',
+  'schedule.disabled': 'schedules',
 };
 
 export type KindTone = 'ok' | 'warn' | 'danger' | 'neutral';
@@ -128,21 +167,9 @@ export function parseReadLive(
   return data as unknown as NotificationReadLive;
 }
 
-const MINUTE = 60_000;
-const HOUR = 60 * MINUTE;
-const DAY = 24 * HOUR;
-
-/** "just now", "5 min ago", "3 h ago", "2 d ago", then the date. */
-export function relativeTime(iso: string, now: number = Date.now()): string {
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return '';
-  const age = Math.max(0, now - then);
-  if (age < MINUTE) return 'just now';
-  if (age < HOUR) return `${Math.floor(age / MINUTE)} min ago`;
-  if (age < DAY) return `${Math.floor(age / HOUR)} h ago`;
-  if (age < 7 * DAY) return `${Math.floor(age / DAY)} d ago`;
-  return new Date(then).toLocaleDateString();
-}
+/** "just now", "5 min ago", "3 h ago", "2 d ago", then the date — the app's one formatter (R3). */
+export const relativeTime = (iso: string, now: number = Date.now()): string =>
+  formatRelative(iso, now);
 
 /** A link from the API is a path in this app; anything else is not followed. */
 export const safeLink = (link: string | null): string | null =>
@@ -186,6 +213,9 @@ export function isFutureDay(value: string, now: number = Date.now()): boolean {
 export interface RuleRow {
   kind: NotificationKind;
   label: string;
+  /** A sample of what arrives, in words. */
+  example: string;
+  /** The events behind it: for a tooltip only, never the visible text (R2). */
   source: string;
   inApp: boolean;
   telegram: boolean;
@@ -211,6 +241,7 @@ export function ruleRows(
     return {
       kind: rule.kind,
       label: KIND_LABEL[rule.kind],
+      example: KIND_EXAMPLE[rule.kind],
       source: NOTIFICATION_KIND_SPECS[rule.kind].source,
       inApp: rule.inApp,
       telegram: hasTelegram && rule.telegram,
@@ -223,6 +254,23 @@ export function ruleRows(
           : 'unlinked',
     };
   });
+}
+
+export interface RuleSection {
+  group: RuleGroup;
+  label: string;
+  rows: RuleRow[];
+}
+
+/** The rules by area, in a fixed order; an area with no rule is left out. */
+export function ruleSections(rows: readonly RuleRow[]): RuleSection[] {
+  return (Object.keys(RULE_GROUP_LABEL) as RuleGroup[])
+    .map((group) => ({
+      group,
+      label: RULE_GROUP_LABEL[group],
+      rows: rows.filter((row) => KIND_GROUP[row.kind] === group),
+    }))
+    .filter((section) => section.rows.length > 0);
 }
 
 /** Flip one channel of one kind; the body of the `PUT /notifications/rules`. */

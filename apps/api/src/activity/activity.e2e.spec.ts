@@ -268,6 +268,62 @@ describe('activity feed (e2e)', () => {
         expect.objectContaining({ checkpoint: 'plan_ready' }),
       ]);
     });
+
+    it('shows a reply section once when the runner re-sends it at the same position', async () => {
+      const section = (
+        slot: string,
+        position: number,
+        checkpoint: string,
+        summary: string,
+      ) =>
+        stream.next(
+          'slot.checkpoint',
+          { checkpoint, heading: checkpoint, summary, position },
+          { slot, source: 'scraped' },
+        );
+      // A runner restart rescans the reply file and re-sends every section
+      // (spec 11 note 17); a rewritten section is re-sent with its new text.
+      await store(
+        section('i21', 0, 'picked_up', 'i21'),
+        section('i21', 1, 'plan_ready', 'the plan'),
+        section('i22', 0, 'picked_up', 'i22'),
+      );
+      await store(
+        section('i21', 0, 'picked_up', 'i21'),
+        section('i21', 1, 'plan_ready', 'the plan, edited'),
+        section('i21', 2, 'pr_open', 'the pull request'),
+      );
+      await projector.tick();
+      const shown = async () =>
+        (await eventItems()).map((i) => `${i.slot}:${i.title}`);
+      expect(await shown()).toEqual([
+        'i21:i21: picked_up',
+        'i21:i21: plan_ready',
+        'i22:i22: picked_up',
+        'i21:i21: pr_open',
+      ]);
+
+      // A re-dispatch starts a new reply file, so position 0 is a new section.
+      await store(
+        stream.next(
+          'slot.dispatched',
+          { model: 'opus' },
+          { slot: 'i21', source: 'scraped' },
+        ),
+        section('i21', 0, 'picked_up', 'i21, again'),
+      );
+      await projector.tick();
+      const titles = await shown();
+      expect(titles.filter((t) => t === 'i21:i21: picked_up')).toHaveLength(2);
+
+      // A replay from cursor 0 agrees.
+      const before = await itemRows(ctx.prisma);
+      await ctx.prisma.$executeRawUnsafe(
+        'TRUNCATE TABLE activity_items, activity_projector_state',
+      );
+      await restart().tick();
+      expect(await itemRows(ctx.prisma)).toEqual(before);
+    });
   });
 
   describe('audit records', () => {
