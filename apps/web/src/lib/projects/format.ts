@@ -9,6 +9,9 @@ import type {
   ProjectInspection,
 } from '@agentdock/shared/protocol';
 import { ApiError, describeError } from '../api';
+import { type PrerequisiteCopy, RUNNERS_PAGE } from '../prerequisites/copy';
+import type { RunnersFact } from '../prerequisites/facts';
+import { RUN_COMMAND } from '../runners/install';
 
 export const DOCS_KIND_LABEL: Record<DocsSourceKind, string> = {
   in_repo: 'In the repository',
@@ -37,6 +40,20 @@ export const BASE_SOURCE_LABEL: Record<BaseSource, string> = {
 export const docsKindLabel = (kind: DocsSourceKind | null): string =>
   kind === null ? '—' : DOCS_KIND_LABEL[kind];
 
+/**
+ * `path_not_allowed` carries the runner's message. The one rule the runner
+ * enforces on a project root is its watch list (`project.refresh`); the API
+ * re-sends that list on this refusal, so a retry succeeds.
+ */
+function pathNotAllowedText(message: string): string {
+  if (/is not a registered root of project/.test(message)) {
+    return "The runner has not registered this path as the project's root yet. AgentDock has sent it again; try again in a moment.";
+  }
+  return message
+    ? `The runner does not allow that path: ${message}`
+    : 'The runner does not allow that path.';
+}
+
 /** A sentence for the user; falls back to the shared wording. */
 export function describeProjectError(error: unknown): string {
   if (error instanceof ApiError) {
@@ -44,17 +61,22 @@ export function describeProjectError(error: unknown): string {
       case PROJECT_ERROR.notFound:
         return 'This project no longer exists, or you are not a member of it.';
       case PROJECT_ERROR.runnerOffline:
-        return 'The runner is offline. Bring it back online and try again.';
+        return `The runner is offline. Start "${RUN_COMMAND}" on its machine (or keep it running as a service), then try again.`;
       case PROJECT_ERROR.runnerTimeout:
         return 'The runner did not answer in time. Try again.';
-      case PROJECT_ERROR.runnerError:
-        return 'The runner could not complete that.';
+      case PROJECT_ERROR.runnerError: {
+        // The API prefixes the command name ("project.inspect: …").
+        const detail = error.message.replace(/^[a-z]+(\.[a-z]+)+:\s*/, '');
+        return detail
+          ? `The runner could not complete that: ${detail}`
+          : 'The runner could not complete that.';
+      }
       case PROJECT_ERROR.pathNotFound:
         return 'That path does not exist on the runner, or is not a directory.';
       case PROJECT_ERROR.notARepository:
         return 'That path is not inside a git repository.';
       case PROJECT_ERROR.pathNotAllowed:
-        return 'The runner does not allow that path.';
+        return pathNotAllowedText(error.message);
       case PROJECT_ERROR.notMainCheckout:
         return 'That is a linked worktree or a subdirectory, not the main checkout.';
       case PROJECT_ERROR.unsupportedForge:
@@ -74,6 +96,47 @@ export function describeProjectError(error: unknown): string {
     }
   }
   return describeError(error);
+}
+
+/** A `PrerequisiteCopy` that may end in a command to run. */
+export interface RunnerNoticeCopy extends PrerequisiteCopy {
+  command?: string;
+}
+
+/**
+ * Above the Connect form when no runner can be reached: none paired → pair
+ * one; paired but offline → start it. Null while any runner is online.
+ */
+export function noOnlineRunnerCopy(
+  fleet: RunnersFact,
+): RunnerNoticeCopy | null {
+  switch (fleet.kind) {
+    case 'none':
+      return {
+        tone: 'warn',
+        title: 'No runner is paired.',
+        body: 'Projects live on a runner, the AgentDock daemon on the machine that holds your repositories. Pair one first.',
+        href: RUNNERS_PAGE,
+        cta: 'Pair a runner',
+      };
+    case 'offline': {
+      const names = fleet.runners.map((runner) => runner.name);
+      const several = names.length > 1;
+      return {
+        tone: 'warn',
+        title: `${names.join(', ')} ${several ? 'are' : 'is'} offline.`,
+        body: several
+          ? 'Start one of them on its machine:'
+          : 'Start it on that machine:',
+        command: RUN_COMMAND,
+        href: RUNNERS_PAGE,
+        cta: 'Open Runners',
+      };
+    }
+    case 'online':
+    case 'unknown':
+      return null;
+  }
 }
 
 /** The main checkout the API suggests with a `not_main_checkout` refusal. */
