@@ -171,6 +171,7 @@ export class ActivityProjector
         const named = row.projectRoot !== null || row.projectRepo !== null;
         if (!projectId && named) continue;
         if (await this.shadowedByPlugin(tx, row)) continue;
+        if (await this.resentSection(tx, row)) continue;
         const draft = activityFromEvent(row, projectId);
         if (draft)
           items.push(newItem(draft, row.ts, projectId, 'event', row.id));
@@ -284,6 +285,50 @@ export class ActivityProjector
     return live;
   }
 
+  /**
+   * A reply section the runner sent before. A rescan re-sends every section
+   * of a reply file, and a rewritten one comes again with its new text (spec
+   * 11 notes 3 and 17); `FleetProjector` folds them on `(slotId, position)`.
+   * Here the first event at a position is the item, unless a `slot.dispatched`
+   * of the slot came after it: a re-dispatch starts a new reply file. Judged
+   * on lower ids only, so a replay agrees.
+   */
+  private async resentSection(
+    tx: Tx,
+    row: {
+      id: bigint;
+      runnerId: string;
+      type: string;
+      projectRoot: string | null;
+      slot: string | null;
+      data: Prisma.JsonValue;
+    },
+  ): Promise<boolean> {
+    if (row.type !== 'slot.checkpoint') return false;
+    if (row.projectRoot === null || row.slot === null) return false;
+    const position = sectionPosition(row.data);
+    if (position === null) return false;
+    const [{ resent }] = await tx.$queryRaw<{ resent: boolean }[]>`
+      SELECT EXISTS (
+        SELECT 1 FROM events earlier
+        WHERE earlier."runnerId" = ${row.runnerId}
+          AND earlier."projectRoot" = ${row.projectRoot}
+          AND earlier.slot = ${row.slot}
+          AND earlier.type = 'slot.checkpoint'
+          AND earlier.data->>'position' = ${String(position)}
+          AND earlier.id < ${row.id}
+          AND NOT EXISTS (
+            SELECT 1 FROM events dispatch
+            WHERE dispatch."runnerId" = ${row.runnerId}
+              AND dispatch."projectRoot" = ${row.projectRoot}
+              AND dispatch.slot = ${row.slot}
+              AND dispatch.type = 'slot.dispatched'
+              AND dispatch.id > earlier.id AND dispatch.id < ${row.id}
+          )
+      ) AS resent`;
+    return resent;
+  }
+
   /** Pushes fresh items on `project:<id>`, or `admin` for project-less ones (D9). */
   private async publish(
     created: Prisma.ActivityItemGetPayload<object>[],
@@ -327,6 +372,17 @@ export const resolveProject = (
     return byRepo.length === 1 ? byRepo[0].id : null;
   }
   return null;
+};
+
+/** A reply section's 0-based index, or null for a checkpoint without one. */
+export const sectionPosition = (data: Prisma.JsonValue): number | null => {
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+    return null;
+  }
+  const { position } = data;
+  return typeof position === 'number' && Number.isInteger(position)
+    ? position
+    : null;
 };
 
 const newItem = (
