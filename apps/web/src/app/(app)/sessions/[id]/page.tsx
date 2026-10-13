@@ -317,7 +317,7 @@ export default function SessionPage() {
         <Badge tone="neutral" label={formatCost(detail.totals.costUsd)} />
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(18rem,2fr)]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <ScrollX className="min-w-0">
           <TraceTree
             aria-label="Session trace: turns, model requests and tool calls over time"

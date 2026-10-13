@@ -406,6 +406,10 @@ function BreakdownTable({
     [rows, columns, sort, dimension],
   );
 
+  // The empty state sits outside the scroll box: inside the table's minimum
+  // width it would be cut off at 390 px.
+  if (!loading && sorted.length === 0) return empty;
+
   return (
     <ScrollX label="Usage breakdown">
       <DataTable
@@ -678,20 +682,24 @@ export default function UsagePage() {
               <h2 id="usage-breakdown" className="text-sm font-medium">
                 Breakdown
               </h2>
-              <ScrollX>
-                <SegmentedControl aria-label="Breakdown by">
-                  {BREAKDOWN_DIMENSIONS.map((d) => (
-                    <Segment
-                      key={d}
-                      layoutId="usage-dimension"
-                      active={dimension === d}
-                      onSelect={() => setDimension(d)}
-                    >
-                      {DIMENSION_LABEL[d]}
-                    </Segment>
-                  ))}
-                </SegmentedControl>
-              </ScrollX>
+              {/* A flex item sizes to its content; the cap keeps the
+                  segments scrolling inside the row at 390 px. */}
+              <div className="min-w-0 max-w-full">
+                <ScrollX>
+                  <SegmentedControl aria-label="Breakdown by">
+                    {BREAKDOWN_DIMENSIONS.map((d) => (
+                      <Segment
+                        key={d}
+                        layoutId="usage-dimension"
+                        active={dimension === d}
+                        onSelect={() => setDimension(d)}
+                      >
+                        {DIMENSION_LABEL[d]}
+                      </Segment>
+                    ))}
+                  </SegmentedControl>
+                </ScrollX>
+              </div>
             </div>
             {totals && totals.unpricedRequests > 0 ? (
               <p className="mb-2 text-xs text-ink-2">
