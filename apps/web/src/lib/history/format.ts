@@ -1,5 +1,7 @@
 import {
+  RUN_KINDS,
   RUN_STATUSES,
+  type RunKind,
   type RunListQuery,
   type RunStatus,
   type RunSummary,
@@ -32,20 +34,49 @@ export const RUN_STATUS_LABEL: Record<RunStatus, string> = {
 export const isRunStatus = (value: string): value is RunStatus =>
   (RUN_STATUSES as readonly string[]).includes(value);
 
+/** What started a run, in words (rule R5): never the enum or a `replace('_', ' ')`. */
+export const RUN_KIND_LABEL: Record<RunKind, string> = {
+  orchestrator_slot: 'Orchestrator slot',
+  skill: 'Skill run',
+  schedule: 'Scheduled start',
+};
+
+export const isRunKind = (value: string): value is RunKind =>
+  (RUN_KINDS as readonly string[]).includes(value);
+
 export interface RunFilterForm {
+  kind: string;
   status: string;
   fromDate: string;
   toDate: string;
 }
 
 export const EMPTY_RUN_FILTERS: RunFilterForm = {
+  kind: '',
   status: '',
   fromDate: '',
   toDate: '',
 };
 
+/** The form a `?kind=` link opens with: an unknown kind is ignored, not an error. */
+export const runFiltersFromKind = (kind: string | null): RunFilterForm => ({
+  ...EMPTY_RUN_FILTERS,
+  kind: kind !== null && isRunKind(kind) ? kind : '',
+});
+
+/** Whether any filter narrows the list; decides "no matches" versus "nothing yet". */
+export const hasRunFilters = (form: RunFilterForm): boolean =>
+  Object.values(form).some((value) => value !== '');
+
+/** The filters typed but not applied yet (rule: filter forms show unapplied changes). */
+export const runFiltersDirty = (
+  form: RunFilterForm,
+  applied: RunListQuery,
+): boolean => JSON.stringify(toRunQuery(form)) !== JSON.stringify(applied);
+
 export function toRunQuery(form: RunFilterForm): RunListQuery {
   const query: RunListQuery = {};
+  if (isRunKind(form.kind)) query.kind = form.kind;
   if (isRunStatus(form.status)) query.status = form.status;
   const from = dayBoundary(form.fromDate, false);
   const to = dayBoundary(form.toDate, true);

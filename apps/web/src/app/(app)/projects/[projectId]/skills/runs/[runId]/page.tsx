@@ -37,6 +37,7 @@ import {
   SKILL_PHASE_TONE,
 } from '../../../../../../../lib/skills/format';
 import { useTerminalAvailable } from '../../../../../../../lib/terminal/use-terminal-available';
+import { ProjectRunnerBanner } from '../../../project-runner-banner';
 import { RunLogPanel } from './log-panel';
 
 const REFETCH_DEBOUNCE_MS = 300;
@@ -177,6 +178,9 @@ export default function SkillRunPage() {
               </Button>
             ) : null}
           </div>
+        </div>
+        <div className="mt-3">
+          <ProjectRunnerBanner projectId={projectId} />
         </div>
       </div>
 

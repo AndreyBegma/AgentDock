@@ -4,22 +4,24 @@ import {
   APPROVALS_LIVE_EVENT,
   type ApprovalItemView,
   type ApprovalsView,
-  type ProjectDetail,
 } from '@agentdock/shared';
 import { Badge } from 'glass-ui/badge';
 import { Banner } from 'glass-ui/banner';
-import { Button } from 'glass-ui/button';
+import { Button, buttonClassName } from 'glass-ui/button';
 import { EmptyState } from 'glass-ui/empty-state';
-import { Skeleton } from 'glass-ui/skeleton';
 import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
-import { toast } from 'glass-ui/toast';
 import { Tooltip } from 'glass-ui/tooltip';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { AsyncSection } from '../../../../../components/prerequisites/async-section';
+import { RunnerOfflineBanner } from '../../../../../components/prerequisites/prerequisite-banner';
+import { LiveStatusBadge } from '../../../../../components/shell/live-status-badge';
 import { api } from '../../../../../lib/api';
 import {
+  approvalSettingsHref,
   deciderLabel,
-  describeApprovalError,
+  emptyWaitingCopy,
   isNotFound,
   mismatchSentence,
   SOURCE_LABEL,
@@ -32,8 +34,10 @@ import {
   CHECKS_TONE,
   formatAgo,
 } from '../../../../../lib/fleet/format';
-import { useLive, useLiveStatus } from '../../../../../lib/live/use-live';
+import { useLive } from '../../../../../lib/live/use-live';
 import { safeHttpsUrl } from '../../../../../lib/queue/format';
+import { useSection } from '../../../../../lib/section/use-section';
+import { useProjectDetail } from '../use-project-detail';
 import { ApprovalSheet } from './approval-sheet';
 
 /** Pushes arrive in bursts; one refetch covers them. */
@@ -104,15 +108,11 @@ function ActionCell({
 
 export default function ApprovalsPage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const [view, setView] = useState<ApprovalsView>();
-  const [role, setRole] = useState<ProjectDetail['role']>();
-  const [missing, setMissing] = useState(false);
-  /** Bumped by a live push; every fetch effect depends on it. */
+  /** Bumped by a live push; the approvals and the sheet depend on it. */
   const [version, setVersion] = useState(0);
   const [, setNow] = useState(0);
   const [selected, setSelected] = useState<ApprovalItemView>();
 
-  const live = useLiveStatus();
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useLive(`project:${projectId}`, (message) => {
@@ -131,86 +131,113 @@ export default function ApprovalsPage() {
   }, []);
 
   // The role gates the buttons; the API stays the authority (403 on a viewer).
-  useEffect(() => {
-    let cancelled = false;
-    api<ProjectDetail>(`/projects/${projectId}`)
-      .then((project) => {
-        if (!cancelled) setRole(project.role);
-      })
-      .catch(() => {
-        if (!cancelled) setRole('viewer');
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId]);
+  const project = useProjectDetail(projectId).data;
+  const canOperate = project !== undefined && project.role !== 'viewer';
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: version is a refetch trigger
-  useEffect(() => {
-    let cancelled = false;
-    api<ApprovalsView>(`/projects/${projectId}/approvals`)
-      .then((next) => {
-        if (cancelled) return;
-        setView(next);
-        setMissing(false);
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        if (isNotFound(err)) setMissing(true);
-        else toast.error(describeApprovalError(err));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId, version]);
+  const approvals = useSection(
+    () => api<ApprovalsView>(`/projects/${projectId}/approvals`),
+    [projectId, version],
+  );
 
-  if (missing) {
+  if (approvals.data === undefined && isNotFound(approvals.error)) {
     return (
       <EmptyState
         title="Project not found"
         description="It was removed, or you are not a member of it."
+        action={
+          <Link href="/projects" className="text-sm underline">
+            Open Projects
+          </Link>
+        }
       />
     );
   }
-  if (!view) return <Skeleton className="h-64 w-full" />;
-
-  const canOperate = role !== undefined && role !== 'viewer';
-  const mismatch = mismatchSentence(view.mergeApproval, view.configMismatch);
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Approvals</h1>
-          <p className="text-sm text-ink-2">
-            Pull requests that wait for a person before the orchestrator merges
-            them. AgentDock never merges itself.
-          </p>
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-semibold">Approvals</h1>
+            <p className="text-sm text-ink-2">
+              Pull requests that wait for a person before the orchestrator
+              merges them. AgentDock never merges itself.
+            </p>
+          </div>
+          <LiveStatusBadge />
         </div>
-        <span className="inline-flex items-center gap-2 text-xs text-ink-2">
-          <Badge
-            dot
-            tone={live.status === 'connected' ? 'ok' : 'warn'}
-            aria-hidden="true"
-          />
-          {live.status === 'connected'
-            ? 'Live'
-            : live.status === 'reconnecting'
-              ? 'Reconnecting…'
-              : 'Offline'}
-        </span>
+        {project ? <RunnerOfflineBanner project={project} /> : null}
       </div>
 
+      <AsyncSection
+        section={approvals}
+        unavailable={{
+          title: 'Approvals could not be loaded',
+          stillWorks:
+            'Nothing was decided. Fleet and queue are still available.',
+        }}
+        empty={null}
+        isEmpty={() => false}
+      >
+        {(view) => (
+          <ApprovalsBody
+            view={view}
+            projectId={projectId}
+            onSelect={setSelected}
+          />
+        )}
+      </AsyncSection>
+
+      <ApprovalSheet
+        projectId={projectId}
+        runnerName={project?.runnerName}
+        pr={selected?.pr}
+        title={selected?.title}
+        canOperate={canOperate}
+        version={version}
+        onClose={() => setSelected(undefined)}
+        onChanged={() => setVersion((v) => v + 1)}
+      />
+    </div>
+  );
+}
+
+function ApprovalsBody({
+  view,
+  projectId,
+  onSelect: setSelected,
+}: {
+  view: ApprovalsView;
+  projectId: string;
+  onSelect: (item: ApprovalItemView) => void;
+}) {
+  const mismatch = mismatchSentence(view.mergeApproval, view.configMismatch);
+  const empty = emptyWaitingCopy(view.mergeApproval.agentdock);
+  const settingsLink = (
+    <Link
+      href={approvalSettingsHref(projectId)}
+      className={buttonClassName({ variant: 'glass', size: 'sm' })}
+    >
+      Open Settings
+    </Link>
+  );
+  return (
+    <>
       {mismatch ? (
-        <Banner tone="warn" title="Merge approval settings disagree">
+        <Banner
+          tone="warn"
+          title="Merge approval settings disagree"
+          action={settingsLink}
+        >
           {mismatch}
         </Banner>
       ) : null}
 
       {view.waiting.length === 0 ? (
         <EmptyState
-          title="Nothing is waiting"
-          description="No pull request waits for approval right now. New ones appear here by themselves."
+          title={empty.title}
+          description={empty.description}
+          action={view.mergeApproval.agentdock ? undefined : settingsLink}
         />
       ) : (
         <Table scroll>
@@ -311,16 +338,6 @@ export default function ApprovalsPage() {
           </Table>
         )}
       </section>
-
-      <ApprovalSheet
-        projectId={projectId}
-        pr={selected?.pr}
-        title={selected?.title}
-        canOperate={canOperate}
-        version={version}
-        onClose={() => setSelected(undefined)}
-        onChanged={() => setVersion((v) => v + 1)}
-      />
-    </div>
+    </>
   );
 }

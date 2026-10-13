@@ -7,12 +7,12 @@ UI WebSocket.
 | Screen | Content | Milestone |
 |---|---|---|
 | **Overview** | for an admin, the Getting started checklist until setup is done (see "First run"); your projects with their runner's status; later: running slots, blocked on a person, merged today, cost today/7d (StatTiles) | M1 |
-| **Project → Fleet** | orchestrator status + controls; slots table (slot, issue, runtime/model, checkpoint, PR + checks, age); slot detail: brief, fence, checkpoints, live pane, sessions, cost | M1 / M2 |
-| **Project → Queue** | ready issues with computed state and reason; held-for-lead; Board view; create issue | M2 |
-| **Project → Approvals** | green PRs awaiting a person when merge approval is on | M2 |
-| **Project → History** | rounds, slots, runs with outcome, duration, PR, cost | M2 |
-| **Project → Skills** | installed skills, run a skill (profile, model, args, report/PR), runs | M3 |
-| **Project → Schedules** | cron rules, next runs, last results | M3 |
+| **Project → Fleet** | the project's runner banner when it is offline; orchestrator status + controls (Start and Stop say why they are off and link to the fix: runner offline, no runtime profile, already running, not running); slots table (slot, issue, runtime/model, checkpoint, PR + checks, age); an empty fleet explains slots and rounds; slot detail: brief, fence, checkpoints, live pane, sessions, cost, with a hint under each term | M1 / M2 |
+| **Project → Queue** | runner banner; ready issues with computed state and reason; an unreadable queue is a banner naming the cause; an empty queue says how an issue gets in; held-for-lead and the round footer are explained; Board view; create issue | M2 |
+| **Project → Approvals** | runner banner; green PRs awaiting a person when merge approval is on; with approval off the empty state says so and links to Settings; the mismatch banner links to Settings; a decision that cannot be taken says why | M2 |
+| **Project → History** | runner banner; rounds, slots, runs with outcome, duration, PR, cost; filtered by kind (`?kind=skill`), status and dates, with unapplied changes shown; "no matches" and "nothing yet" are different | M2 |
+| **Project → Skills** | runner banner; installed skills, run a skill (profile, model, args, report/PR); Run says why it is off when the project has no default profile; Rescan on the empty state; Recent runs link; runs | M3 |
+| **Project → Schedules** | runner banner; cron rules, next runs, last results; a disabled schedule says why in a sentence; the empty state carries New schedule | M3 |
 | **Project → Settings** | docs source, base, ready label, default profile, merge approval, runtime policy, budget, members | M1+ |
 | **Sessions** | all sessions (filtered by access): runtime, model, project/slot, tokens, cost; session detail with TraceTree. A failed load is "Sessions are not answering" with Try again, never an empty list; no matches offers Clear filters, nothing yet points to Runners (admin) or Projects; unapplied filter changes are flagged; "not yet read" explains an unparsed transcript | M1 |
 | **Activity** | global feed with filters (project, type, actor); same load-failure, no-matches and nothing-yet states as Sessions | M2 |
