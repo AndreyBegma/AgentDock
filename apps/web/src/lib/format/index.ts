@@ -99,8 +99,7 @@ export function formatRelative(
   if (age < DAY) return phrase(`${Math.floor(age / HOUR)} h`);
   if (age < 2 * DAY) return delta >= 0 ? 'yesterday' : 'tomorrow';
   if (age < 7 * DAY) return phrase(`${Math.floor(age / DAY)} d`);
-  const sameYear =
-    new Date(time).getFullYear() === new Date(now).getFullYear();
+  const sameYear = new Date(time).getFullYear() === new Date(now).getFullYear();
   return formatDate(time, sameYear ? 'day' : 'date');
 }
 
