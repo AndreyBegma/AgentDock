@@ -1,0 +1,15 @@
+{
+  "name": "agentdock-runner-{{os}}-{{arch}}",
+  "version": "{{version}}",
+  "description": "The agentdock-runner binary for {{os}}-{{arch}}. Install agentdock-runner instead.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AndreyBegma/AgentDock.git",
+    "directory": "apps/runner"
+  },
+  "os": ["{{os}}"],
+  "cpu": ["{{arch}}"],
+  "files": ["bin/agentdock-runner"],
+  "preferUnplugged": true
+}

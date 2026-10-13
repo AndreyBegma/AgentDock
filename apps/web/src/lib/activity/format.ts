@@ -82,6 +82,16 @@ export function toActivityQuery(form: ActivityFilterForm): ActivityQuery {
   return query;
 }
 
+/** Whether a query narrows the feed at all (none: "nothing yet", some: "no matches"). */
+export const hasActivityFilters = (query: ActivityQuery): boolean =>
+  Object.values(query).some((value) => value !== undefined && value !== '');
+
+/** Whether the form holds filters that were not applied yet. */
+export const activityFormChanged = (
+  form: ActivityFilterForm,
+  applied: ActivityQuery,
+): boolean => queryString(toActivityQuery(form)) !== queryString(applied);
+
 export function queryString(
   query: object,
   extra: { cursor?: string; limit?: number } = {},

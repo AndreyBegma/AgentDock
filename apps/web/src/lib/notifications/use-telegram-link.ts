@@ -3,7 +3,8 @@
 import type { TelegramLinkCode, TelegramLinkStatus } from '@agentdock/shared';
 import { toast } from 'glass-ui/toast';
 import { useCallback, useEffect, useState } from 'react';
-import { api, describeError } from '../api';
+import { api, describeErrorHint } from '../api';
+import { useErrorToast } from '../section/use-error-toast';
 
 export type TelegramLinkView =
   | { status: 'loading' }
@@ -14,6 +15,7 @@ export type TelegramLinkView =
 export function useTelegramLink() {
   const [view, setView] = useState<TelegramLinkView>({ status: 'loading' });
   const [busy, setBusy] = useState(false);
+  const showError = useErrorToast();
 
   const load = useCallback(async () => {
     try {
@@ -21,9 +23,9 @@ export function useTelegramLink() {
         '/notifications/telegram/link',
       );
       setView({ status: 'ready', state });
-    } catch (error) {
+    } catch {
+      // The card shows the failure with a Try again; a toast would only repeat it.
       setView({ status: 'error' });
-      toast.error(describeError(error));
     }
   }, []);
 
@@ -39,12 +41,12 @@ export function useTelegramLink() {
         method: 'POST',
       });
     } catch (error) {
-      toast.error(describeError(error));
+      showError(describeErrorHint(error));
       return null;
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [showError]);
 
   const unlink = useCallback(async () => {
     setBusy(true);
@@ -53,11 +55,11 @@ export function useTelegramLink() {
       await load();
       toast.success('Telegram unlinked.');
     } catch (error) {
-      toast.error(describeError(error));
+      showError(describeErrorHint(error));
     } finally {
       setBusy(false);
     }
-  }, [load]);
+  }, [load, showError]);
 
   return { view, busy, reload: load, start, unlink };
 }

@@ -27,6 +27,8 @@ describe('compiled binary', () => {
       stderr: 'pipe',
     });
     expect(run.exitCode).toBe(0);
-    expect(run.stdout.toString()).toBe(`${RUNNER_VERSION}\n`);
+    expect(run.stdout.toString()).toBe(
+      `${RUNNER_VERSION} ${process.platform}-${process.arch}\n`,
+    );
   }, 60_000);
 });
