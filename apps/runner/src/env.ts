@@ -16,6 +16,10 @@ export interface Paths {
   offsetsFile: string;
   /** `~/.config/systemd/user/agentdock-runner.service` (D11). */
   serviceFile: string;
+  /** `~/Library/LaunchAgents/com.agentdock.runner.plist` on macOS (ADR-0017). */
+  launchAgentFile: string;
+  /** `~/Library/Logs/agentdock-runner.log`: the launchd agent's stdout and stderr. */
+  launchAgentLog: string;
 }
 
 /** An XDG variable counts only when it is an absolute path (XDG Base Directory spec). */
@@ -38,6 +42,13 @@ export const resolvePaths = (env: Env): Paths => {
       'user',
       'agentdock-runner.service',
     ),
+    launchAgentFile: join(
+      home,
+      'Library',
+      'LaunchAgents',
+      'com.agentdock.runner.plist',
+    ),
+    launchAgentLog: join(home, 'Library', 'Logs', 'agentdock-runner.log'),
   };
 };
 

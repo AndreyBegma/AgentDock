@@ -50,9 +50,9 @@ describe('agentdock-runner CLI', () => {
   const paths = () => resolvePaths({ HOME: home });
   const output = () => stdout.join('') + stderr.join('');
 
-  it('version prints the package version', async () => {
+  it('version prints the package version and the target', async () => {
     expect(await runCli(['version'], deps())).toBe(EXIT.ok);
-    expect(stdout.join('')).toBe(`${RUNNER_VERSION}\n`);
+    expect(stdout.join('')).toBe(`${RUNNER_VERSION} linux-x64\n`);
     expect(RUNNER_VERSION).toBe('0.1.0');
   });
 
@@ -272,6 +272,26 @@ describe('agentdock-runner CLI', () => {
     expect(stdout.join('')).toContain(
       'systemctl --user enable --now agentdock-runner',
     );
+  });
+
+  it('install-service on macOS writes a launchd agent and prints how to load it', async () => {
+    const mac = deps({
+      host: { ...host, os: 'darwin', arch: 'arm64' },
+      env: { HOME: home, PATH: '/opt/homebrew/bin:/usr/bin' },
+    });
+    expect(await runCli(['install-service'], mac)).toBe(EXIT.ok);
+    const plist = readFileSync(paths().launchAgentFile, 'utf8');
+    expect(paths().launchAgentFile).toBe(
+      join(home, 'Library', 'LaunchAgents', 'com.agentdock.runner.plist'),
+    );
+    expect(plist).toContain(
+      '<string>/opt/agentdock/agentdock-runner</string>\n    <string>run</string>',
+    );
+    expect(plist).toContain(`<string>${paths().launchAgentLog}</string>`);
+    expect(stdout.join('')).toContain(
+      `launchctl bootstrap gui/$UID ${paths().launchAgentFile}`,
+    );
+    expect(() => statSync(paths().serviceFile)).toThrow();
   });
 
   it('status reports the config, spool and reachability without the token', async () => {
