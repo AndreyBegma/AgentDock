@@ -1,0 +1,27 @@
+{
+  "name": "agentdock-runner",
+  "version": "0.0.0-dev",
+  "description": "The per-machine daemon of AgentDock, a control plane for Claude Code and Codex agent fleets",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AndreyBegma/AgentDock.git",
+    "directory": "apps/runner"
+  },
+  "bin": {
+    "agentdock-runner": "bin/agentdock-runner.js"
+  },
+  "files": [
+    "bin/agentdock-runner.js",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "optionalDependencies": {
+    "agentdock-runner-darwin-arm64": "0.0.0-dev",
+    "agentdock-runner-darwin-x64": "0.0.0-dev",
+    "agentdock-runner-linux-arm64": "0.0.0-dev",
+    "agentdock-runner-linux-x64": "0.0.0-dev"
+  }
+}

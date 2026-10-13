@@ -63,3 +63,50 @@ Nothing is published on the host. The stack runs on its own compose network
 - **`530` / error 1033** from the public URL means the hostname exists but no
   cloudflared connector is running. Check that `TUNNEL_TOKEN` is set and look
   at `docker logs agentdock-staging-cloudflared`.
+
+## Releasing the runner
+
+Decision: [ADR-0017](../docs/adr/0017-runner-distribution-homebrew-and-npm.md).
+A tag `runner-v<version>` runs `.woodpecker/release-runner.yml`. The workflow
+tests the runner, builds the four binaries and creates the GitHub Release with
+the tarballs and `SHA256SUMS`. It then publishes the npm packages, the four
+platform packages before `agentdock-runner`. Last, it pushes
+`Formula/agentdock-runner.rb` to `AndreyBegma/homebrew-tap`.
+
+### One-time setup
+
+1. Create the public repository `AndreyBegma/homebrew-tap` with a `Formula/`
+   directory.
+2. Add two Woodpecker secrets to `AndreyBegma/AgentDock`, each restricted to the
+   **tag** and **manual** events:
+   - `github_release_token`: a GitHub token with *contents: write* on
+     `AgentDock` and on `homebrew-tap`;
+   - `npm_token`: an npm automation token for the account that owns
+     `agentdock-runner` and `agentdock-runner-{darwin,linux}-{arm64,x64}`.
+
+### Each release
+
+1. **Bump** `version` in `apps/runner/package.json` and merge it. The tag must
+   match it exactly, or `build-release` fails.
+2. **Rehearse** (optional). Run the pipeline by hand with the variable
+   `RUNNER_RELEASE=1`. It builds everything and stops before every publish
+   step. Without that variable, a manual run does not start the release
+   workflow. Locally, `sh apps/runner/scripts/build-release.sh` does the same.
+3. **Tag and push** the merged commit:
+   ```sh
+   git tag runner-v0.1.0 <commit>
+   git push origin runner-v0.1.0
+   ```
+4. **Verify:**
+   - the Release `runner-v<version>` has four tarballs and `SHA256SUMS`;
+   - `npm view agentdock-runner@<version> optionalDependencies` names the four
+     platform packages at that version;
+   - `brew update && brew install andreybegma/tap/agentdock-runner` then
+     `agentdock-runner version` prints `<version> <os>-<arch>`. Check it on
+     Apple Silicon for the first release. If Gatekeeper refuses the binary,
+     ad-hoc signing (`codesign --sign -`) goes into `build-release.sh`.
+
+A step that fails can be re-run. The Release assets are replaced, a version
+already on npm is skipped, and an unchanged formula is not committed again.
+`RUNNER_RELEASE_DRY_RUN=1` in the environment stops a tag run before it
+publishes.
