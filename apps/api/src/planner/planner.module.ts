@@ -1,0 +1,41 @@
+import { Module } from '@nestjs/common';
+import { LiveModule } from '../live/live.module';
+import { ProjectsModule } from '../projects';
+import { RunnersModule } from '../runners/runners.module';
+import { PlanService } from './plan.service';
+import { PlanDocsSink } from './plan-docs-sink';
+import { PlanSendService } from './plan-send.service';
+import { PlanStore } from './plan-store';
+import { PlanTurnService } from './plan-turn.service';
+import { PlanTurnProjector } from './plan-turn-projector';
+import {
+  PlannerAdminController,
+  TasksController,
+} from './planner-admin.controller';
+import { PlannerCommands } from './planner-commands';
+import { PlannerInstructionsService } from './planner-instructions.service';
+import { PlansController } from './plans.controller';
+import { TasksQueryService } from './tasks-query.service';
+
+/**
+ * The Planner (docs/specs/172-planner.md): plans, turns, review, revise,
+ * send to fleet, `/tasks`, and the instructions and settings editors. Turn
+ * results arrive as `plan_turn.*` events (`PlanTurnProjector`); a docs pull
+ * request's merge queues the features (`PlanDocsSink`).
+ */
+@Module({
+  imports: [LiveModule, ProjectsModule, RunnersModule],
+  controllers: [PlansController, PlannerAdminController, TasksController],
+  providers: [
+    PlanDocsSink,
+    PlanSendService,
+    PlanService,
+    PlanStore,
+    PlanTurnProjector,
+    PlanTurnService,
+    PlannerCommands,
+    PlannerInstructionsService,
+    TasksQueryService,
+  ],
+})
+export class PlannerModule {}
