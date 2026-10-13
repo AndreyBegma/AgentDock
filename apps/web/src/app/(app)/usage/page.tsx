@@ -10,6 +10,7 @@ import type {
 } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
+import { Chart } from '@andrewbehma/glass-ui/chart';
 import {
   DataTable,
   type DataTableSort,
@@ -23,30 +24,39 @@ import {
   SegmentedControl,
   SegmentedControlItem,
 } from '@andrewbehma/glass-ui/segmented-control';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { Sparkline } from '@andrewbehma/glass-ui/sparkline';
 import { StatTile } from '@andrewbehma/glass-ui/stat-tile';
+import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { BudgetStrip } from '../../../components/budgets/budget-chip';
+import { PageHeader } from '../../../components/page-header/page-header';
+import { ScrollX } from '../../../components/scroll-x/scroll-x';
 import { useCurrentUser } from '../../../components/shell/user-context';
 import { ApiError, api } from '../../../lib/api';
 import {
   BREAKDOWN_DIMENSIONS,
   browserZone,
+  costChartSeries,
   costOrBlank,
   customRange,
   DIMENSION_LABEL,
   describeUsageError,
+  formatAxisCost,
   formatCount,
   formatDay,
   formatTokens,
   formatUsd,
   groupLabel,
   intervalFor,
+  MACHINE_WIDE_HINT,
   presetRange,
   RANGE_PRESETS,
   type RangePreset,
   rangeQuery,
+  sparkValues,
   timeZones,
   type UsageRange,
 } from '../../../lib/usage/format';
@@ -56,11 +66,6 @@ const PRESET_LABEL: Record<RangePreset, string> = {
   '7d': '7 d',
   '30d': '30 d',
   custom: 'Custom',
-};
-
-const RUNTIME_BAR: Record<string, string> = {
-  claude: 'bg-ink',
-  codex: 'bg-ink-3',
 };
 
 function Segment({
@@ -124,7 +129,7 @@ function Filters({
 }) {
   const zones = useMemo(() => timeZones(), []);
   return (
-    <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="flex flex-wrap items-end gap-3 [&>*]:min-w-0 [&>*:not(:first-child)]:flex-[1_1_12rem]">
       <Field label="Range">
         <SegmentedControl aria-label="Time range">
           {RANGE_PRESETS.map((p) => (
@@ -190,66 +195,66 @@ function Filters({
   );
 }
 
-/** Cost per bucket, stacked by runtime — plain bars until the chart primitives land (M3). */
-function CostBars({
+/** Cost per bucket (zero-filled by the API), stacked by runtime. */
+function CostChart({
   series,
   interval,
 }: {
   series: UsageTimeseriesResponse;
   interval: 'hour' | 'day';
 }) {
-  const labels = series.series[0]?.points.map((p) => p.t) ?? [];
-  const stacks = labels.map((t, i) => {
-    const parts = series.series.map((s) => ({
-      runtime: s.key ?? 'unknown',
-      cost: Number(s.points[i]?.costUsd ?? 0),
-    }));
-    return { t, parts, total: parts.reduce((sum, p) => sum + p.cost, 0) };
-  });
-  const max = Math.max(0, ...stacks.map((s) => s.total));
+  const chartSeries = useMemo(() => costChartSeries(series), [series]);
   return (
-    <div>
-      <div
-        className="flex h-40 items-end gap-1"
-        role="img"
-        aria-label="Cost over time, stacked by runtime"
-      >
-        {stacks.map((stack) => (
-          <div
-            key={stack.t}
-            className="flex h-full min-w-px flex-1 flex-col-reverse"
-            title={`${formatDay(stack.t, interval)} · ${formatUsd(String(stack.total)) || '$0.00'}`}
-          >
-            {stack.parts.map((part) => (
-              <div
-                key={part.runtime}
-                className={RUNTIME_BAR[part.runtime] ?? 'bg-ink-2'}
-                style={{
-                  height: max > 0 ? `${(part.cost / max) * 100}%` : '0%',
-                }}
-              />
+    <Chart
+      label={`Cost per ${interval}, stacked by runtime`}
+      series={chartSeries}
+      x="time"
+      stacked
+      height={220}
+      yMin={0}
+      formatX={(x) => formatDay(x, interval)}
+      formatY={formatAxisCost}
+      formatTooltip={({ x, entries }) => {
+        const total = entries.reduce((sum, e) => sum + (e.y ?? 0), 0);
+        return (
+          <div className="flex min-w-40 flex-col gap-1 text-xs">
+            <div className="font-medium">{formatDay(x, interval)}</div>
+            {entries.map((entry) => (
+              <div key={entry.series.id} className="flex justify-between gap-4">
+                <span className="text-ink-2">{entry.series.name}</span>
+                <span className="num">{formatUsd(String(entry.y ?? 0))}</span>
+              </div>
             ))}
+            {entries.length > 1 ? (
+              <div className="flex justify-between gap-4 border-t border-line pt-1">
+                <span>Total</span>
+                <span className="num font-medium">
+                  {formatUsd(String(total))}
+                </span>
+              </div>
+            ) : null}
           </div>
-        ))}
-      </div>
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-ink-3">
-        <span>{labels[0] ? formatDay(labels[0], interval) : ''}</span>
-        <span className="flex gap-3">
-          {series.series.map((s) => (
-            <span key={s.key ?? 'none'} className="flex items-center gap-1">
-              <span
-                className={`inline-block size-2 rounded-full ${RUNTIME_BAR[s.key ?? ''] ?? 'bg-ink-2'}`}
-              />
-              {s.label ?? s.key ?? 'unknown'}
-            </span>
-          ))}
-        </span>
-        <span>
-          {labels.length > 0
-            ? formatDay(labels[labels.length - 1] ?? '', interval)
-            : ''}
-        </span>
-      </div>
+        );
+      }}
+    />
+  );
+}
+
+/** A tile's trend: clipped to the tile, and absent when it would be a flat line. */
+function Trend({
+  values,
+  label,
+  tone,
+}: {
+  values: number[];
+  label: string;
+  tone?: 'neutral' | 'ok' | 'warn' | 'danger';
+}) {
+  const shown = sparkValues(values);
+  if (!shown) return null;
+  return (
+    <div className="max-w-full overflow-hidden">
+      <Sparkline values={shown} width={120} area tone={tone} label={label} />
     </div>
   );
 }
@@ -304,6 +309,7 @@ function BreakdownTable({
   loading: boolean;
   empty: ReactNode;
 }) {
+  const router = useRouter();
   const [sort, setSort] = useState<DataTableSort | null>({
     columnId: 'cost',
     direction: 'desc',
@@ -317,16 +323,20 @@ function BreakdownTable({
         sortable: true,
         cell: (row: UsageBreakdownRow) => {
           const text = groupLabel(dimension, row.label, row.key);
-          return dimension === 'project' && row.key ? (
-            <Link
-              href={`/projects/${row.key}/fleet`}
-              className="underline-offset-2 hover:underline"
-            >
-              {text}
-            </Link>
-          ) : (
-            text
-          );
+          if (dimension === 'project' && !row.key) {
+            return (
+              <Tooltip content={MACHINE_WIDE_HINT}>
+                <button
+                  type="button"
+                  className="cursor-help text-start underline decoration-dotted underline-offset-2"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  {text}
+                </button>
+              </Tooltip>
+            );
+          }
+          return text;
         },
       },
       {
@@ -334,22 +344,30 @@ function BreakdownTable({
         header: 'Cost',
         sortable: true,
         align: 'end' as const,
-        cell: (row: UsageBreakdownRow) =>
-          costOrBlank(row.costUsd, row.requests, row.unpricedRequests) || '—',
+        cell: (row: UsageBreakdownRow) => (
+          <span className="num">
+            {costOrBlank(row.costUsd, row.requests, row.unpricedRequests) ||
+              '—'}
+          </span>
+        ),
       },
       {
         id: 'requests',
         header: 'Requests',
         sortable: true,
         align: 'end' as const,
-        cell: (row: UsageBreakdownRow) => formatCount(row.requests),
+        cell: (row: UsageBreakdownRow) => (
+          <span className="num">{formatCount(row.requests)}</span>
+        ),
       },
       {
         id: 'tokens',
         header: 'Tokens',
         sortable: true,
         align: 'end' as const,
-        cell: (row: UsageBreakdownRow) => formatTokens(tokensOf(row)),
+        cell: (row: UsageBreakdownRow) => (
+          <span className="num">{formatTokens(tokensOf(row))}</span>
+        ),
       },
       {
         id: 'unpriced',
@@ -389,15 +407,23 @@ function BreakdownTable({
   );
 
   return (
-    <DataTable
-      rows={sorted}
-      getRowId={(row) => `${row.key ?? ''}|${row.projectId ?? ''}`}
-      columns={columns}
-      sort={sort}
-      onSortChange={setSort}
-      loading={loading}
-      emptyState={empty}
-    />
+    <ScrollX label="Usage breakdown">
+      <DataTable
+        rows={sorted}
+        getRowId={(row) => `${row.key ?? ''}|${row.projectId ?? ''}`}
+        columns={columns}
+        sort={sort}
+        onSortChange={setSort}
+        onRowActivate={(row) => {
+          // A project row opens the project; a slot, issue or run row opens its project.
+          const target = dimension === 'project' ? row.key : row.projectId;
+          if (target) router.push(`/projects/${target}/fleet`);
+        }}
+        loading={loading}
+        emptyState={empty}
+        className="min-w-[36rem]"
+      />
+    </ScrollX>
   );
 }
 
@@ -508,11 +534,10 @@ export default function UsagePage() {
 
   return (
     <>
-      <h1 className="mb-1 text-xl font-semibold">Usage</h1>
-      <p className="mb-4 text-sm text-ink-3">
-        API-equivalent cost — what these tokens would cost at public API prices.
-        You run on subscriptions; this is not a bill.
-      </p>
+      <PageHeader
+        title="Usage"
+        description="API-equivalent cost — what these tokens would cost at public API prices. You run on subscriptions; this is not a bill."
+      />
 
       <div className="mb-6">
         <Filters
@@ -578,10 +603,8 @@ export default function UsagePage() {
                   : undefined
               }
             >
-              <Sparkline
+              <Trend
                 values={points.map((p) => Number(p.costUsd))}
-                width={140}
-                area
                 label="Cost over the range"
               />
             </StatTile>
@@ -590,10 +613,8 @@ export default function UsagePage() {
               loading={!data}
               value={formatCount(totals?.requests ?? 0)}
             >
-              <Sparkline
+              <Trend
                 values={points.map((p) => p.requests)}
-                width={140}
-                area
                 label="Requests over the range"
               />
             </StatTile>
@@ -603,10 +624,8 @@ export default function UsagePage() {
               value={formatTokens(tokenTotal)}
               hint="Reasoning is inside output"
             >
-              <Sparkline
+              <Trend
                 values={points.map((p) => p.tokens)}
-                width={140}
-                area
                 label="Tokens over the range"
               />
             </StatTile>
@@ -627,10 +646,9 @@ export default function UsagePage() {
                   : undefined
               }
             >
-              <Sparkline
+              <Trend
                 values={points.map((p) => p.unpricedRequests)}
-                width={140}
-                tone={totals && totals.unpricedRequests > 0 ? 'warn' : 'ok'}
+                tone="warn"
                 label="Unpriced requests over the range"
               />
             </StatTile>
@@ -642,7 +660,7 @@ export default function UsagePage() {
             </h2>
             {data ? (
               data.byRuntime.series.length > 0 ? (
-                <CostBars series={data.byRuntime} interval={interval} />
+                <CostChart series={data.byRuntime} interval={interval} />
               ) : (
                 <UsageEmpty
                   projectId={projectId}
@@ -651,7 +669,7 @@ export default function UsagePage() {
                 />
               )
             ) : (
-              <div className="h-40 animate-pulse rounded-surface bg-hover" />
+              <Skeleton className="h-[220px] w-full" />
             )}
           </section>
 
@@ -660,18 +678,20 @@ export default function UsagePage() {
               <h2 id="usage-breakdown" className="text-sm font-medium">
                 Breakdown
               </h2>
-              <SegmentedControl aria-label="Breakdown by">
-                {BREAKDOWN_DIMENSIONS.map((d) => (
-                  <Segment
-                    key={d}
-                    layoutId="usage-dimension"
-                    active={dimension === d}
-                    onSelect={() => setDimension(d)}
-                  >
-                    {DIMENSION_LABEL[d]}
-                  </Segment>
-                ))}
-              </SegmentedControl>
+              <ScrollX>
+                <SegmentedControl aria-label="Breakdown by">
+                  {BREAKDOWN_DIMENSIONS.map((d) => (
+                    <Segment
+                      key={d}
+                      layoutId="usage-dimension"
+                      active={dimension === d}
+                      onSelect={() => setDimension(d)}
+                    >
+                      {DIMENSION_LABEL[d]}
+                    </Segment>
+                  ))}
+                </SegmentedControl>
+              </ScrollX>
             </div>
             {totals && totals.unpricedRequests > 0 ? (
               <p className="mb-2 text-xs text-ink-2">
