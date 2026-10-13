@@ -7,6 +7,7 @@ import {
 } from '@agentdock/shared';
 import { Avatar } from 'glass-ui/avatar';
 import { Badge } from 'glass-ui/badge';
+import { Banner } from 'glass-ui/banner';
 import { Breadcrumb, type BreadcrumbItem } from 'glass-ui/breadcrumb';
 import { Button } from 'glass-ui/button';
 import {
@@ -41,6 +42,7 @@ import {
 import { api, describeError } from '../../lib/api';
 import { navLabel } from '../../lib/approvals/format';
 import { useLiveStatus } from '../../lib/live/use-live';
+import { liveDotLabel, useLivePaused } from './live-status';
 import { isActive, NAV, projectIdOf, visibleNav } from './nav';
 import { NotificationBell } from './notification-bell';
 import { ProjectSwitcher } from './project-switcher';
@@ -120,18 +122,9 @@ function crumbsFor(pathname: string): BreadcrumbItem[] {
   });
 }
 
-const LIVE_DOT: Record<
-  'connected' | 'reconnecting' | 'offline',
-  { tone: 'ok' | 'warn' | 'neutral'; label: string }
-> = {
-  connected: { tone: 'ok', label: 'Live updates connected' },
-  reconnecting: { tone: 'warn', label: 'Live updates reconnecting' },
-  offline: { tone: 'neutral', label: 'Live updates offline' },
-};
-
-function ConnectionDot() {
-  const { status } = useLiveStatus();
-  const { tone, label } = LIVE_DOT[status];
+function ConnectionDot({ status, paused }: ReturnType<typeof useLivePaused>) {
+  const label = liveDotLabel(status, paused);
+  const tone = status === 'connected' ? 'ok' : 'warn';
   return (
     <span className="inline-flex items-center gap-2" title={label}>
       <Badge dot tone={tone} aria-hidden="true" />
@@ -169,6 +162,7 @@ export function AppShell({
 
   // The bell holds the `user:<id>` subscription that keeps the socket (and the dot) alive.
   const { status, closeCode } = useLiveStatus();
+  const live = useLivePaused();
   useEffect(() => {
     if (status === 'offline' && closeCode === LIVE_CLOSE_CODES.unauthorized) {
       router.replace('/login');
@@ -313,7 +307,7 @@ export function AppShell({
                 </Link>
               )}
             />
-            <ConnectionDot />
+            <ConnectionDot {...live} />
             <Button
               variant="ghost"
               size="sm"
@@ -364,6 +358,24 @@ export function AppShell({
               </MenuContent>
             </MenuRoot>
           </header>
+
+          {live.paused && closeCode !== LIVE_CLOSE_CODES.unauthorized ? (
+            <Banner
+              tone="warn"
+              title="Live updates paused."
+              action={
+                <Button
+                  variant="glass"
+                  size="sm"
+                  onClick={() => window.location.reload()}
+                >
+                  Reload
+                </Button>
+              }
+            >
+              This page may be out of date.
+            </Banner>
+          ) : null}
 
           <main id="main-content" className="mx-auto w-full max-w-5xl pb-6">
             {children}
