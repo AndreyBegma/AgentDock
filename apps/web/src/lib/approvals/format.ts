@@ -80,6 +80,45 @@ export function mismatchSentence(
   return 'The project config asks the orchestrator to wait for approval, but AgentDock’s merge approval is off. Turn it on in the project settings so the queue is not forgotten.';
 }
 
+/** Where merge approval is switched on and off. */
+export const approvalSettingsHref = (projectId: string): string =>
+  `/projects/${projectId}/settings?tab=general`;
+
+/** The empty list, said honestly: with approval off nothing is ever expected here. */
+export function emptyWaitingCopy(mergeApproval: boolean): {
+  title: string;
+  description: string;
+} {
+  return mergeApproval
+    ? {
+        title: 'Nothing is waiting',
+        description:
+          'No pull request waits for approval right now. New ones appear here by themselves.',
+      }
+    : {
+        title: 'Merge approval is off',
+        description:
+          'The orchestrator merges green pull requests without asking, so nothing waits here. Turn merge approval on in the project settings to review each one first.',
+      };
+}
+
+/**
+ * Why Approve and Request changes are off, in plain words; null when they work.
+ * A decision binds to the head commit the runner reports, so no inspection
+ * means no decision.
+ */
+export function decisionDisabledReason(
+  inspection: { state: string } | null,
+  runnerName?: string | null,
+): string | null {
+  if (inspection === null) {
+    return `AgentDock has not seen this pull request’s latest commit yet. A decision applies to exactly the commit you reviewed, so it waits until the runner${runnerName ? ` on ${runnerName}` : ''} reports it. If this stays, check that the runner is online.`;
+  }
+  return inspection.state === 'open'
+    ? null
+    : 'The pull request is no longer open on GitHub.';
+}
+
 export const isNotFound = (error: unknown): boolean =>
   error instanceof ApiError && error.status === 404;
 

@@ -1,8 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 import { ApiError } from '../api';
 import {
+  approvalSettingsHref,
   COMMAND_UNAVAILABLE_TEXT,
+  decisionDisabledReason,
   describeApprovalError,
+  emptyWaitingCopy,
   formatDiffStat,
   isCommandUnavailable,
   mismatchSentence,
@@ -80,6 +83,32 @@ describe('mismatchSentence', () => {
     expect(
       mismatchSentence({ agentdock: false, config: true }, true),
     ).toContain('AgentDock’s merge approval is off');
+  });
+});
+
+describe('empty list and decision reasons', () => {
+  test('with approval off the empty state says so', () => {
+    expect(emptyWaitingCopy(false).title).toBe('Merge approval is off');
+    expect(emptyWaitingCopy(true).title).toBe('Nothing is waiting');
+  });
+
+  test('the settings link opens the General tab of this project', () => {
+    expect(approvalSettingsHref('p1')).toBe(
+      '/projects/p1/settings?tab=general',
+    );
+  });
+
+  test('no inspection: plain words, the runner named', () => {
+    const text = decisionDisabledReason(null, 'laptop');
+    expect(text).toContain('runner on laptop');
+    expect(text).not.toContain('inspects');
+  });
+
+  test('a closed pull request cannot be decided; an open one can', () => {
+    expect(decisionDisabledReason({ state: 'closed' })).toContain(
+      'no longer open',
+    );
+    expect(decisionDisabledReason({ state: 'open' })).toBeNull();
   });
 });
 
