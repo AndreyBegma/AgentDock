@@ -19,6 +19,7 @@ import { GeneralTab } from './general-tab';
 import { GitHubAppRow } from './github-app-row';
 import { MembersTab } from './members-tab';
 import { OrchestratorTab } from './orchestrator-tab';
+import { PlannerTab } from './planner-tab';
 
 const TABS = [
   { id: 'general', label: 'General' },
@@ -26,6 +27,7 @@ const TABS = [
   { id: 'orchestrator', label: 'Orchestrator' },
   { id: 'members', label: 'Members' },
   { id: 'budget', label: 'Budget' },
+  { id: 'planner', label: 'Planner' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
 
@@ -97,7 +99,7 @@ export default function ProjectSettingsPage() {
         }
       />
 
-      <Tabs aria-label="Project settings" className="max-w-xl">
+      <Tabs aria-label="Project settings" className="max-w-2xl">
         {TABS.map(({ id, label }) => (
           <TabsItem key={id} current={tab === id} layoutId="project-tab">
             <button
@@ -143,6 +145,9 @@ export default function ProjectSettingsPage() {
       ) : null}
       {tab === 'budget' ? (
         <BudgetTab projectId={project.id} isAdmin={isAdmin} />
+      ) : null}
+      {tab === 'planner' ? (
+        <PlannerTab projectId={project.id} isAdmin={isAdmin} />
       ) : null}
     </div>
   );

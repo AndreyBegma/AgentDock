@@ -3,6 +3,7 @@ import {
   PLAN_TASK_LIVE_STATUSES,
   PLAN_TASK_STATUSES,
   PLANNER_ERROR,
+  type PlannerSpecOutput,
   type PlanTaskKind,
   type PlanTaskLiveStatus,
   type PlanTaskStatus,
@@ -70,6 +71,19 @@ export function rowStatus(
   if (row.issue && row.issue.liveStatus === null) return 'issued';
   return row.status;
 }
+
+/** D10: how a feature's specification is published. */
+export const SPEC_OUTPUT_LABEL: Record<PlannerSpecOutput, string> = {
+  docs_pr: 'Docs pull request',
+  issue_body: 'Issue body',
+};
+
+export const SPEC_OUTPUT_HINT: Record<PlannerSpecOutput, string> = {
+  docs_pr:
+    'One docs pull request carries every feature specification into the project’s spec directory. Feature issues are queued once it merges; bugs are queued at once. Needs a spec directory in the project’s docs source.',
+  issue_body:
+    'The issue body is the whole specification, and every issue is queued at once.',
+};
 
 /** The filters of `/tasks`, all kept in the URL (spec 172 acceptance criteria). */
 export interface TaskFilters {
