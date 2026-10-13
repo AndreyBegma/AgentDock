@@ -10,16 +10,6 @@ import { ApiError, describeError, type ErrorHint } from '../api';
 
 type Tone = 'ok' | 'warn' | 'danger' | 'neutral';
 
-export const SLOT_STATUS_TONE: Record<SlotStatus, Tone> = {
-  dispatched: 'neutral',
-  running: 'ok',
-  idle: 'neutral',
-  prompt: 'warn',
-  quota: 'danger',
-  stale: 'danger',
-  ended: 'neutral',
-};
-
 export const SLOT_STATUS_LABEL: Record<SlotStatus, string> = {
   dispatched: 'dispatched',
   running: 'running',
@@ -55,13 +45,6 @@ export const attentionBadge = (count: number): RailBadge | undefined =>
             : `${count} slots need attention`,
       }
     : undefined;
-
-export const ORCHESTRATOR_TONE: Record<OrchestratorStatus, Tone> = {
-  running: 'ok',
-  idle: 'neutral',
-  absent: 'warn',
-  unknown: 'neutral',
-};
 
 export const CHANNEL_TONE: Record<FleetChannel, Tone> = {
   events: 'ok',

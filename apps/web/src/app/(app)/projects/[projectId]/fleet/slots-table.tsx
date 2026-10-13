@@ -1,5 +1,6 @@
 import type { SlotSummary } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
+import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import {
   Table,
   TableCell,
@@ -15,12 +16,12 @@ import {
   formatAheadBehind,
   issueUrl,
   SLOT_STATUS_LABEL,
-  SLOT_STATUS_TONE,
   SLOT_TERM_HINT,
   safeHttpsUrl,
 } from '../../../../../lib/fleet/format';
 import { Time } from '../../../../../lib/format/time';
-import { READABLE_BADGE } from '../../../../../lib/history/format';
+import { slotHue } from '../../../../../lib/hue';
+import { SLOT_PILL_STATUS } from '../../../../../lib/status/pill';
 
 function IssueCell({ slot }: { slot: SlotSummary }) {
   if (slot.issue === null) return <>—</>;
@@ -113,6 +114,13 @@ export function SlotsTable({
               }}
             >
               <TableCell>
+                {/* The slot's identity colour, the same in every view (#163). */}
+                <Badge
+                  dot
+                  hue={slotHue(slot.name)}
+                  aria-hidden="true"
+                  className="mr-2"
+                />
                 <button
                   type="button"
                   className="text-start font-medium underline-offset-2 hover:underline"
@@ -139,9 +147,9 @@ export function SlotsTable({
                 <ModelCell slot={slot} />
               </TableCell>
               <TableCell>
-                <Badge
-                  className={READABLE_BADGE}
-                  tone={SLOT_STATUS_TONE[slot.status]}
+                <StatusPill
+                  size="md"
+                  status={SLOT_PILL_STATUS[slot.status]}
                   label={SLOT_STATUS_LABEL[slot.status]}
                 />
               </TableCell>

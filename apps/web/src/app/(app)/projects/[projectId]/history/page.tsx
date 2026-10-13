@@ -8,12 +8,12 @@ import {
   type RunPage,
   type RunSummary,
 } from '@agentdock/shared';
-import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { type Column, DataTable } from '@andrewbehma/glass-ui/data-table';
 import { DateInput } from '@andrewbehma/glass-ui/date-input';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Field, Select } from '@andrewbehma/glass-ui/field';
+import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -36,10 +36,8 @@ import {
   hasRunFilters,
   parseRunUpdate,
   prLabel,
-  READABLE_BADGE,
   RUN_KIND_LABEL,
   RUN_STATUS_LABEL,
-  RUN_STATUS_TONE,
   type RunFilterForm,
   runFiltersDirty,
   runFiltersFromKind,
@@ -52,6 +50,7 @@ import {
 import { useLive } from '../../../../../lib/live/use-live';
 import { useSection } from '../../../../../lib/section/use-section';
 import { formatDuration } from '../../../../../lib/sessions/format';
+import { RUN_PILL_STATUS } from '../../../../../lib/status/pill';
 import { ProjectRunnerBanner } from '../project-runner-banner';
 
 /** Pushes arrive in bursts; one refetch covers them. */
@@ -150,9 +149,9 @@ export default function HistoryPage() {
         id: 'status',
         header: 'Status',
         cell: (run) => (
-          <Badge
-            className={READABLE_BADGE}
-            tone={RUN_STATUS_TONE[run.status]}
+          <StatusPill
+            size="md"
+            status={RUN_PILL_STATUS[run.status]}
             label={RUN_STATUS_LABEL[run.status]}
           />
         ),

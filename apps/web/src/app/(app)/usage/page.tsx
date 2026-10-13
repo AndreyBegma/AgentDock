@@ -595,7 +595,9 @@ export default function UsagePage() {
       ) : (
         <>
           <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {/* One hue per figure, the same as on Overview for cost (#163). */}
             <StatTile
+              hue={4}
               label="API-equivalent cost"
               loading={!data}
               value={
@@ -613,6 +615,7 @@ export default function UsagePage() {
               />
             </StatTile>
             <StatTile
+              hue={1}
               label="Requests"
               loading={!data}
               value={formatCount(totals?.requests ?? 0)}
@@ -623,6 +626,7 @@ export default function UsagePage() {
               />
             </StatTile>
             <StatTile
+              hue={7}
               label="Tokens"
               loading={!data}
               value={formatTokens(tokenTotal)}
@@ -634,6 +638,7 @@ export default function UsagePage() {
               />
             </StatTile>
             <StatTile
+              hue={5}
               label="Unpriced requests"
               loading={!data}
               value={formatCount(totals?.unpricedRequests ?? 0)}

@@ -9,6 +9,7 @@ import { Badge } from '@andrewbehma/glass-ui/badge';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { KeyValueList } from '@andrewbehma/glass-ui/key-value-list';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import {
   Table,
   TableCell,
@@ -38,16 +39,15 @@ import {
   costLabel,
   parseRunUpdate,
   prLabel,
-  READABLE_BADGE,
   RUN_KIND_LABEL,
   RUN_STATUS_LABEL,
-  RUN_STATUS_TONE,
   runTitle,
   runtimeLabel,
   tokensLabel,
 } from '../../../../../../lib/history/format';
 import { useLive } from '../../../../../../lib/live/use-live';
 import { formatDuration } from '../../../../../../lib/sessions/format';
+import { RUN_PILL_STATUS } from '../../../../../../lib/status/pill';
 import { ProjectRunnerBanner } from '../../project-runner-banner';
 import { ActorIcon } from './actor-icon';
 
@@ -167,9 +167,9 @@ export default function RunDetailPage() {
           <>
             {runTitle(run)}
             <span className="sr-only"> — </span>
-            <Badge
-              className={READABLE_BADGE}
-              tone={RUN_STATUS_TONE[run.status]}
+            <StatusPill
+              size="md"
+              status={RUN_PILL_STATUS[run.status]}
               label={RUN_STATUS_LABEL[run.status]}
             />
           </>
