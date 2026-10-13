@@ -2,6 +2,9 @@
 
 **One place to see, steer, approve and pay for every AI coding agent you run.**
 
+**[agentdock.luna-realm.com](https://agentdock.luna-realm.com/)**: what AgentDock is, at a glance.
+
+[![Website](https://img.shields.io/badge/website-agentdock.luna--realm.com-black)](https://agentdock.luna-realm.com/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![agentdock-runner on npm](https://img.shields.io/npm/v/agentdock-runner?label=agentdock-runner)](https://www.npmjs.com/package/agentdock-runner)
 [![@andrewbehma/glass-ui on npm](https://img.shields.io/npm/v/@andrewbehma/glass-ui?label=%40andrewbehma%2Fglass-ui)](https://www.npmjs.com/package/@andrewbehma/glass-ui)

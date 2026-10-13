@@ -1,6 +1,6 @@
 # agentdock-runner
 
-The per-machine daemon of [AgentDock](https://github.com/AndreyBegma/AgentDock),
+The per-machine daemon of [AgentDock](https://agentdock.luna-realm.com/),
 a self-hosted control plane for Claude Code and Codex agent fleets. It pairs
 with an AgentDock server, reports the machine's runtimes and answers typed
 commands.
@@ -27,4 +27,6 @@ brew install andreybegma/tap/agentdock-runner
 brew services start agentdock-runner
 ```
 
-Documentation: [apps/runner](https://github.com/AndreyBegma/AgentDock/tree/main/apps/runner).
+- Website: [agentdock.luna-realm.com](https://agentdock.luna-realm.com/).
+- Source: [github.com/AndreyBegma/AgentDock](https://github.com/AndreyBegma/AgentDock).
+- Documentation: [apps/runner](https://github.com/AndreyBegma/AgentDock/tree/main/apps/runner).
