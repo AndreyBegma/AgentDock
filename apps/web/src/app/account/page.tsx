@@ -13,21 +13,23 @@ import { Card } from '@andrewbehma/glass-ui/card';
 import { Field, Input } from '@andrewbehma/glass-ui/field';
 import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
-import {
-  Table,
-  TableCell,
-  TableHead,
-  TableRow,
-} from '@andrewbehma/glass-ui/table';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import { Monitor, Smartphone } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useState } from 'react';
+import { PageHeader } from '../../components/page-header/page-header';
 import { useCurrentUser } from '../../components/shell/user-context';
 import { api, describeError, describeErrorHint } from '../../lib/api';
+import { Time } from '../../lib/format/time';
 import { useErrorToast } from '../../lib/section/use-error-toast';
 import { useSection } from '../../lib/section/use-section';
+import { parseUserAgent } from './user-agent';
 
-const formatTime = (iso: string) => new Date(iso).toLocaleString();
+const ROLE_LABEL: Record<PublicUser['role'], string> = {
+  admin: 'Administrator',
+  operator: 'Operator',
+  viewer: 'Viewer',
+};
 
 function PasswordCard() {
   const [currentPassword, setCurrentPassword] = useState('');
@@ -131,41 +133,50 @@ function SessionsCard() {
           <Skeleton className="h-24 w-full" />
         )
       ) : (
-        <Table scroll>
-          <TableHead>
-            <TableRow>
-              <TableCell head>Device</TableCell>
-              <TableCell head>IP</TableCell>
-              <TableCell head>Signed in</TableCell>
-              <TableCell head>Last active</TableCell>
-              <TableCell head>
-                <span className="sr-only">Actions</span>
-              </TableCell>
-            </TableRow>
-          </TableHead>
-          <tbody>
-            {sessions.map((session) => (
-              <TableRow key={session.id}>
-                <TableCell>
-                  <span className="mr-2">{session.userAgent ?? 'Unknown'}</span>
-                  {session.current ? <Badge tone="ok" label="current" /> : null}
-                </TableCell>
-                <TableCell>{session.ip ?? '—'}</TableCell>
-                <TableCell>{formatTime(session.createdAt)}</TableCell>
-                <TableCell>{formatTime(session.lastSeenAt)}</TableCell>
-                <TableCell>
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    onClick={() => revoke(session)}
-                  >
-                    {session.current ? 'Sign out' : 'Revoke'}
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </tbody>
-        </Table>
+        <ul className="divide-y divide-line">
+          {sessions.map((session) => {
+            const device = parseUserAgent(session.userAgent);
+            const Icon = device.mobile ? Smartphone : Monitor;
+            return (
+              <li
+                key={session.id}
+                className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3"
+              >
+                <Icon
+                  size={18}
+                  className="shrink-0 text-ink-3"
+                  aria-hidden="true"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2 text-sm text-ink">
+                    <span title={session.userAgent ?? undefined}>
+                      {device.label}
+                    </span>
+                    {session.current ? (
+                      <Badge tone="ok" label="This device" />
+                    ) : null}
+                  </div>
+                  <div className="text-xs text-ink-3">
+                    {session.ip ? (
+                      <span className="font-mono">{session.ip}</span>
+                    ) : (
+                      'IP unknown'
+                    )}{' '}
+                    · signed in <Time value={session.createdAt} /> · active{' '}
+                    <Time value={session.lastSeenAt} />
+                  </div>
+                </div>
+                <Button
+                  variant={session.current ? 'glass' : 'danger'}
+                  size="sm"
+                  onClick={() => revoke(session)}
+                >
+                  {session.current ? 'Sign out' : 'Revoke'}
+                </Button>
+              </li>
+            );
+          })}
+        </ul>
       )}
     </Card>
   );
@@ -181,7 +192,7 @@ function Profile({ user }: { user: PublicUser }) {
         <dt className="text-ink-3">Name</dt>
         <dd>{user.name ?? '—'}</dd>
         <dt className="text-ink-3">Role</dt>
-        <dd>{user.role}</dd>
+        <dd>{ROLE_LABEL[user.role] ?? user.role}</dd>
       </dl>
     </Card>
   );
@@ -190,16 +201,16 @@ function Profile({ user }: { user: PublicUser }) {
 export default function AccountPage() {
   const user = useCurrentUser();
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-xl font-semibold">Account</h1>
-        <p className="text-sm text-ink-2">
-          Your profile, password and the devices signed in as you.
-        </p>
+    <div>
+      <PageHeader
+        title="Account"
+        description="Your profile, password and the devices signed in as you."
+      />
+      <div className="flex flex-col gap-6">
+        <Profile user={user} />
+        <PasswordCard />
+        <SessionsCard />
       </div>
-      <Profile user={user} />
-      <PasswordCard />
-      <SessionsCard />
     </div>
   );
 }

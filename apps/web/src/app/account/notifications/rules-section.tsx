@@ -8,17 +8,12 @@ import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
-import {
-  Table,
-  TableCell,
-  TableHead,
-  TableRow,
-} from '@andrewbehma/glass-ui/table';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
 import { api, describeError, describeErrorHint } from '../../../lib/api';
 import {
   type RuleRow,
   ruleRows,
+  ruleSections,
   ruleUpdate,
 } from '../../../lib/notifications/format';
 import { useErrorToast } from '../../../lib/section/use-error-toast';
@@ -81,69 +76,102 @@ export function RulesSection({ telegramLinked }: { telegramLinked: boolean }) {
           <Skeleton className="h-40 w-full" />
         )
       ) : (
-        <Table scroll>
-          <TableHead>
-            <TableRow>
-              <TableCell head>Kind</TableCell>
-              <TableCell head>In-app</TableCell>
-              <TableCell head>Telegram</TableCell>
-            </TableRow>
-          </TableHead>
-          <tbody>
-            {rows.map((row) => (
-              <TableRow key={row.kind}>
-                <TableCell>
-                  <span id={`rule-${row.kind}`} className="block">
-                    {row.label}
-                  </span>
-                  <span className="text-ink-3 text-xs">{row.source}</span>
-                </TableCell>
-                <TableCell>
-                  <span id={`rule-${row.kind}-inapp`} className="sr-only">
-                    {row.label}, in-app
-                  </span>
-                  {row.inAppDisabled ? (
-                    <span className="text-ink-3 text-xs">—</span>
-                  ) : (
-                    <Toggle
-                      checked={row.inApp}
-                      onChange={(value) => void change(row, 'inApp', value)}
-                      labelledBy={`rule-${row.kind}-inapp`}
-                    />
-                  )}
-                </TableCell>
-                <TableCell>
-                  <span id={`rule-${row.kind}-telegram`} className="sr-only">
-                    {row.label}, Telegram
-                  </span>
-                  {row.telegramNote === 'in-app only' ? (
-                    <span className="text-ink-3 text-xs">in-app only</span>
-                  ) : row.telegramDisabled ? (
-                    <span className="inline-flex items-center gap-2">
-                      <span className="inline-flex opacity-50" inert>
-                        <Toggle
-                          checked={row.telegram}
-                          onChange={() => {}}
-                          labelledBy={`rule-${row.kind}-telegram`}
-                        />
-                      </span>
-                      <span className="text-xs text-ink-2">
-                        {LINK_TELEGRAM} first
-                      </span>
-                    </span>
-                  ) : (
-                    <Toggle
-                      checked={row.telegram}
-                      onChange={(value) => void change(row, 'telegram', value)}
-                      labelledBy={`rule-${row.kind}-telegram`}
-                    />
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-          </tbody>
-        </Table>
+        <div className="flex flex-col gap-6">
+          {ruleSections(rows).map((section) => (
+            <section
+              key={section.group}
+              aria-labelledby={`rules-${section.group}`}
+            >
+              <div className="grid grid-cols-[1fr_4.5rem_4.5rem] items-end gap-x-3 border-b border-line pb-2 sm:grid-cols-[1fr_6rem_6rem]">
+                <h3
+                  id={`rules-${section.group}`}
+                  className="text-sm font-semibold text-ink"
+                >
+                  {section.label}
+                </h3>
+                <span className="text-xs text-ink-3">In-app</span>
+                <span className="text-xs text-ink-3">Telegram</span>
+              </div>
+              <ul className="divide-y divide-line">
+                {section.rows.map((row) => (
+                  <RuleLine
+                    key={row.kind}
+                    row={row}
+                    onChange={(r, channel, value) =>
+                      void change(r, channel, value)
+                    }
+                  />
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
       )}
     </Card>
+  );
+}
+
+function RuleLine({
+  row,
+  onChange,
+}: {
+  row: RuleRow;
+  onChange: (
+    row: RuleRow,
+    channel: NotificationChannel,
+    value: boolean,
+  ) => void;
+}) {
+  return (
+    <li className="grid grid-cols-[1fr_4.5rem_4.5rem] items-center gap-x-3 py-3 sm:grid-cols-[1fr_6rem_6rem]">
+      <div className="min-w-0" title={`From ${row.source}`}>
+        <span id={`rule-${row.kind}`} className="block text-sm">
+          {row.label}
+        </span>
+        <span className="text-ink-3 text-xs">e.g. {row.example}</span>
+      </div>
+      <div>
+        <span id={`rule-${row.kind}-inapp`} className="sr-only">
+          {row.label}, in-app
+        </span>
+        {row.inAppDisabled ? (
+          <span className="text-ink-3 text-xs">—</span>
+        ) : (
+          <Toggle
+            checked={row.inApp}
+            onChange={(value) => onChange(row, 'inApp', value)}
+            labelledBy={`rule-${row.kind}-inapp`}
+          />
+        )}
+      </div>
+      <div>
+        <span id={`rule-${row.kind}-telegram`} className="sr-only">
+          {row.label}, Telegram
+        </span>
+        {row.telegramNote === 'in-app only' ? (
+          <span className="text-ink-3 text-xs" title="In-app only">
+            In-app only
+          </span>
+        ) : row.telegramDisabled ? (
+          <span
+            className="inline-flex opacity-50"
+            inert
+            title="Link Telegram first"
+          >
+            <Toggle
+              checked={row.telegram}
+              onChange={() => {}}
+              labelledBy={`rule-${row.kind}-telegram`}
+            />
+          </span>
+        ) : (
+          <Toggle
+            checked={row.telegram}
+            onChange={(value) => onChange(row, 'telegram', value)}
+            labelledBy={`rule-${row.kind}-telegram`}
+          />
+        )}
+      </div>
+    </li>
   );
 }
