@@ -2,8 +2,11 @@ import { describe, expect, test } from 'bun:test';
 import type { ModelPriceInput } from '@agentdock/shared';
 import {
   compilePattern,
+  costChartSeries,
   costOrBlank,
   customRange,
+  formatAxisCost,
+  formatDay,
   formatUsd,
   formFromModel,
   groupLabel,
@@ -13,6 +16,7 @@ import {
   perToken,
   presetRange,
   rangeQuery,
+  sparkValues,
 } from './format';
 
 describe('ranges', () => {
@@ -74,6 +78,68 @@ describe('money', () => {
     expect(groupLabel('issue', null, '13')).toBe('#13');
     expect(groupLabel('project', 'AgentDock', 'p1')).toBe('AgentDock');
   });
+});
+
+describe('trends', () => {
+  test('a sparkline needs at least two non-zero points', () => {
+    expect(sparkValues([])).toBeNull();
+    expect(sparkValues([0, 0, 0])).toBeNull();
+    expect(sparkValues([0, 4, 0])).toBeNull();
+    expect(sparkValues([0, 4, 0, 1])).toEqual([0, 4, 0, 1]);
+  });
+
+  test('a non-finite point is drawn as zero, not dropped', () => {
+    expect(sparkValues([1, Number.NaN, 2])).toEqual([1, 0, 2]);
+  });
+
+  test('the cost chart gets one bar series per runtime, zero days kept', () => {
+    const series = costChartSeries({
+      series: [
+        {
+          key: 'claude',
+          label: 'Claude Code',
+          points: [
+            point('2026-10-12T00:00:00.000Z', '1.50'),
+            point('2026-10-13T00:00:00.000Z', '0'),
+          ],
+        },
+        {
+          key: null,
+          label: null,
+          points: [point('2026-10-12T00:00:00Z', 'x')],
+        },
+      ],
+    });
+    expect(series[0]).toMatchObject({
+      id: 'claude',
+      name: 'Claude Code',
+      kind: 'bar',
+      color: 'series-1',
+    });
+    expect(series[0]?.points.map((p) => p.y)).toEqual([1.5, 0]);
+    expect(series[1]?.name).toBe('Unknown runtime');
+    expect(series[1]?.points[0]?.y).toBe(0);
+  });
+
+  test('the y-axis reads in dollars', () => {
+    expect(formatAxisCost(0)).toBe('$0');
+    expect(formatAxisCost(2.5)).toBe('$2.50');
+    expect(formatAxisCost(1200)).toBe('$1,200');
+  });
+
+  test('a bucket label is a day, or a day and an hour', () => {
+    const t = new Date(2026, 9, 13, 14, 0).toISOString();
+    expect(formatDay(t, 'day')).toBe('Oct 13');
+    expect(formatDay(t, 'hour')).toBe('Oct 13, 14:00');
+  });
+});
+
+const point = (t: string, costUsd: string) => ({
+  t,
+  costUsd,
+  tokens: 0,
+  requests: 0,
+  unpricedRequests: 0,
 });
 
 describe('price forms', () => {
