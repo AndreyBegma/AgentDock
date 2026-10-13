@@ -1,6 +1,6 @@
 import { Card } from '@andrewbehma/glass-ui/card';
 import type { ReactNode } from 'react';
-import { Wordmark } from './brand';
+import { SiteLink, Wordmark } from './brand';
 
 /** The line under the wordmark on every page without a shell. */
 export const TAGLINE =
@@ -53,6 +53,7 @@ export function AuthCard({
           </div>
           {children}
         </Card>
+        <SiteLink />
       </div>
     </main>
   );

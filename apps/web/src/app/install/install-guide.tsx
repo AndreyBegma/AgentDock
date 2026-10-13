@@ -20,7 +20,7 @@ import {
 import Link from 'next/link';
 import { type ReactNode, useEffect, useState } from 'react';
 import { HeroGlow } from '../../components/auth-card';
-import { Wordmark } from '../../components/brand';
+import { SiteLink, Wordmark } from '../../components/brand';
 import { api } from '../../lib/api';
 import {
   ADD_RUNNER_PATH,
@@ -467,6 +467,7 @@ export function InstallGuide() {
             </dl>
           </Section>
         </div>
+        <SiteLink />
       </main>
     </div>
   );
