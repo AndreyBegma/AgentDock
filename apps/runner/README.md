@@ -6,6 +6,43 @@ capabilities and runtime profiles, spools events and answers typed commands
 ([runner-protocol.md](../../docs/architecture/runner-protocol.md),
 [spec #5](../../docs/specs/5-runner-daemon-and-protocol.md)).
 
+## Install
+
+Prebuilt binaries exist for `darwin-arm64`, `darwin-x64`, `linux-x64` and
+`linux-arm64` ([ADR-0017](../../docs/adr/0017-runner-distribution-homebrew-and-npm.md)).
+
+**Homebrew** (macOS and Linux):
+
+```sh
+brew install andreybegma/tap/agentdock-runner
+agentdock-runner pair --server https://<agentdock-host>/api --code XXXX-XXXX
+brew services start agentdock-runner
+```
+
+**npm** (or `bun add -g agentdock-runner`):
+
+```sh
+npm i -g agentdock-runner
+agentdock-runner pair --server https://<agentdock-host>/api --code XXXX-XXXX
+agentdock-runner install-service
+```
+
+`install-service` writes a systemd user unit on Linux and a launchd agent on
+macOS, then prints the command that starts it.
+
+**From source** (needs Bun):
+
+```sh
+git clone https://github.com/AndreyBegma/AgentDock && cd AgentDock
+bun install && bun run build
+apps/runner/dist/agentdock-runner version
+```
+
+`sh apps/runner/scripts/build-release.sh` builds all four targets, the
+tarballs, `SHA256SUMS`, the npm packages and the Homebrew formula into
+`apps/runner/release/`, and publishes nothing. Releasing is in
+[deploy/README.md](../../deploy/README.md#releasing-the-runner).
+
 ## Commands
 
 | Command | What it does |
@@ -14,14 +51,17 @@ capabilities and runtime profiles, spools events and answers typed commands
 | `run` | the daemon, in the foreground |
 | `status` | config, spool and whether the server answers |
 | `profiles [--detect [--write]]` | configured profiles; `--detect` proposes them, `--write` stores the proposal |
-| `install-service` | writes the systemd user unit and prints how to enable it |
-| `version` | prints the version |
+| `install-service` | writes the systemd user unit (Linux) or the launchd agent (macOS) and prints how to start it |
+| `version` | prints the version and the target, e.g. `0.1.0 darwin-arm64` |
 
 `<api-origin>` is the API, not the web app: pairing is `POST <api-origin>/runners/pair`,
 the socket `<api-origin>/runner`.
 
 Exit codes: `0` ok, `1` failure, `2` usage, `78` the server closed for good
 (protocol mismatch, revoked token, replaced) — the unit does not restart it.
+launchd and `brew services` cannot exclude one exit code, so they run the daemon
+through a `/bin/sh` wrapper that turns 78 into 0 and restart only an
+unsuccessful exit.
 
 ## Files and environment
 
@@ -33,7 +73,9 @@ Exit codes: `0` ok, `1` failure, `2` usage, `78` the server closed for good
 | `events.jsonl` offsets | `$XDG_STATE_HOME/agentdock/events-offsets.json`: byte offset and inode per project ([spec 16](../../docs/specs/16-consume-code-sentinel-events.md)); `fleet.eventsPollSeconds` (default 5) in `runner.json` sets the poll fallback |
 | Queue poll | `queue.pollSeconds` in `runner.json` (default 60, minimum 15): how often the `issues` collector polls GitHub for a project's open issues ([spec 19](../../docs/specs/19-task-queue.md)) |
 | Skill runs | `$XDG_STATE_HOME/agentdock/runs/<runId>/`: `state.json`, `run.json`, `stream.jsonl`, `stderr.log`, `exit.json`, `patch.diff` ([spec 24](../../docs/specs/24-skills.md)) |
-| systemd unit | `$XDG_CONFIG_HOME/systemd/user/agentdock-runner.service` |
+| systemd unit (Linux) | `$XDG_CONFIG_HOME/systemd/user/agentdock-runner.service` |
+| launchd agent (macOS) | `~/Library/LaunchAgents/com.agentdock.runner.plist`, logging to `~/Library/Logs/agentdock-runner.log`; it keeps the `PATH` `install-service` ran with |
+| Homebrew service logs | `$(brew --prefix)/var/log/agentdock-runner.log` |
 
 | Variable | Effect |
 |---|---|
