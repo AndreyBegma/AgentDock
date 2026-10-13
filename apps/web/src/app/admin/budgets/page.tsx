@@ -27,6 +27,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { BudgetFormDialog } from '../../../components/budgets/budget-form-dialog';
 import { OverrideDialog } from '../../../components/budgets/override-dialog';
+import { PageHeader } from '../../../components/page-header/page-header';
 import { AsyncSection } from '../../../components/prerequisites/async-section';
 import { api } from '../../../lib/api';
 import {
@@ -151,28 +152,34 @@ export default function AdminBudgetsPage() {
     }
   };
 
+  // Nothing to filter or recompute until a first budget exists.
+  const noBudgets = budgets.data?.length === 0 && !filtered;
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Budgets</h1>
-          <p className="max-w-prose text-sm text-ink-2">
-            Every project and user budget. A stop budget refuses new
-            orchestrator starts and skill runs once used up; running workers are
-            never stopped.
-          </p>
-          <p className="max-w-prose text-xs text-ink-3">
-            Recompute budget totals adds up spend again from the stored costs.
-            Run it after{' '}
-            <Link
-              href="/admin/prices"
-              className="text-ink underline underline-offset-2"
-            >
-              Re-price requests under Prices
-            </Link>{' '}
-            changed those costs.
-          </p>
-        </div>
+      <PageHeader
+        title="Budgets"
+        description={
+          noBudgets
+            ? 'Spending caps for projects and people.'
+            : 'A stop budget refuses new orchestrator starts and skill runs once used up; running workers are never stopped.'
+        }
+        actions={
+          noBudgets ? null : (
+            <>
+              <Button
+                variant="glass"
+                disabled={recomputing}
+                onClick={recompute}
+              >
+                {recomputing ? 'Recomputing…' : 'Recompute totals'}
+              </Button>
+              <Button onClick={() => setEditing('new')}>New budget</Button>
+            </>
+          )
+        }
+      />
+      {noBudgets ? null : (
         <div className="flex flex-wrap items-end gap-3">
           <Field label="Scope" htmlFor="budgets-scope">
             <Select
@@ -206,12 +213,19 @@ export default function AdminBudgetsPage() {
               ))}
             </Select>
           </Field>
-          <Button variant="glass" disabled={recomputing} onClick={recompute}>
-            {recomputing ? 'Recomputing…' : 'Recompute budget totals'}
-          </Button>
-          <Button onClick={() => setEditing('new')}>New budget</Button>
+          <p className="max-w-prose pb-2 text-xs text-ink-3">
+            Recompute totals adds up spend again from stored costs — run it
+            after{' '}
+            <Link
+              href="/admin/prices"
+              className="text-ink underline underline-offset-2"
+            >
+              re-pricing requests
+            </Link>
+            .
+          </p>
         </div>
-      </div>
+      )}
 
       <AsyncSection
         section={budgets}
@@ -239,8 +253,8 @@ export default function AdminBudgetsPage() {
             />
           ) : (
             <EmptyState
-              title="Spending caps for projects and people"
-              description="A budget caps the API-equivalent spend of a project or a user per day, week or month, and alerts or refuses new starts when it is used up."
+              title="No budgets yet"
+              description="Cap what a project or a person may spend per day, week or month."
               action={
                 <Button onClick={() => setEditing('new')}>New budget</Button>
               }
@@ -348,7 +362,7 @@ export default function AdminBudgetsPage() {
                           Edit
                         </Button>
                         <Button
-                          variant="glass"
+                          variant="danger"
                           disabled={busy}
                           onClick={() => setDeleting(budget)}
                         >
