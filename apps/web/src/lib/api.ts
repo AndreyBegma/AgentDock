@@ -75,6 +75,47 @@ export async function api<T = void>(
   return (await response.json()) as T;
 }
 
+/**
+ * An error as the user reads it: the sentence, and where to go to fix it.
+ * `href` and `cta` come together or not at all.
+ */
+export interface ErrorHint {
+  text: string;
+  href?: string;
+  cta?: string;
+}
+
+/** What a `describe…Error` helper returns: a sentence, or a sentence with a fix. */
+export type Described = string | ErrorHint;
+
+export const toErrorHint = (described: Described): ErrorHint =>
+  typeof described === 'string' ? { text: described } : described;
+
+export const errorText = (described: Described): string =>
+  typeof described === 'string' ? described : described.text;
+
+/**
+ * The sonner options for a toast built from a hint: an action that navigates
+ * to the fix when the hint names one.
+ */
+export function errorToastOptions(
+  described: Described,
+  navigate: (href: string) => void,
+): { action?: { label: string; onClick: () => void } } {
+  const { href, cta } = toErrorHint(described);
+  if (!href || !cta) return {};
+  return { action: { label: cta, onClick: () => navigate(href) } };
+}
+
+/** `describeError` as a hint, with a link where the fix lives on another page. */
+export function describeErrorHint(error: unknown): ErrorHint {
+  const text = describeError(error);
+  if (error instanceof ApiError && error.code === AUTH_ERROR.forbidden) {
+    return { text, href: '/', cta: 'Go to Overview' };
+  }
+  return { text };
+}
+
 /** A sentence for the user; the server's message only as a last resort. */
 export function describeError(error: unknown): string {
   if (!(error instanceof ApiError)) return 'Could not reach the server.';
