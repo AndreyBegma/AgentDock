@@ -10,8 +10,11 @@ import {
   filterItems,
   gapSentence,
   parseStateFilter,
+  queueEmptyDescription,
   queueHint,
+  queueUnavailableCopy,
   refusedLabels,
+  roundFooter,
   safeHttpsUrl,
   stateLabel,
 } from './format';
@@ -223,6 +226,30 @@ describe('misc', () => {
     );
     expect(text).toContain('Update the AgentDock runner on laptop');
     expect(text).not.toContain('not deployed');
+  });
+
+  test('the empty queue says how an issue gets in, and notes a missing snapshot', () => {
+    const seen = queueEmptyDescription('ready', '2026-10-13T10:00:00Z');
+    expect(seen).toContain('“ready” label');
+    expect(seen).toContain('Acceptance criteria');
+    expect(seen).not.toContain('first snapshot');
+    expect(queueEmptyDescription('ready', null)).toContain('first snapshot');
+  });
+
+  test('an unreadable queue names the cause and the runner', () => {
+    const admin = queueUnavailableCopy({ reason: 'bad token' }, 'laptop', true);
+    expect(admin.body).toContain('bad token');
+    expect(admin.body).toContain('laptop');
+    expect(admin.href).toBe('/admin/runners');
+    expect(
+      queueUnavailableCopy({ reason: 'x' }, null, false).href,
+    ).toBeUndefined();
+  });
+
+  test('the round footer explains the dot', () => {
+    expect(roundFooter({ date: '2026-10-13', round: '1030' })).toContain(
+      'green dot',
+    );
   });
 
   test('stateLabel is the board wording', () => {

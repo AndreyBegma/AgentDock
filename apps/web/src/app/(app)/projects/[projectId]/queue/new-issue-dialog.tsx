@@ -22,12 +22,15 @@ export function NewIssueDialog({
   projectId,
   open,
   labelChoices,
+  runnerName,
   onOpenChange,
   onCreated,
 }: {
   projectId: string;
   open: boolean;
   labelChoices: string[];
+  /** Named when the runner is too old to create issues. */
+  runnerName?: string | null;
   onOpenChange: (open: boolean) => void;
   onCreated: () => void;
 }) {
@@ -74,7 +77,7 @@ export function NewIssueDialog({
       onOpenChange(false);
       onCreated();
     } catch (err) {
-      setError(describeQueueError(err));
+      setError(describeQueueError(err, runnerName));
     } finally {
       setBusy(false);
     }

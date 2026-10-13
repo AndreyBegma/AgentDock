@@ -114,6 +114,44 @@ export const sourceLabel = (item: Pick<QueueItemView, 'source'>): string =>
     ? 'Verdict from the orchestrator’s latest round'
     : 'Computed by AgentDock from the issues';
 
+/**
+ * What fills the queue (rule R3), and how an issue gets in. Before the first
+ * snapshot the runner has not looked yet, which is a different reason.
+ */
+export function queueEmptyDescription(
+  readyLabel: string,
+  snapshotAt: string | null,
+): string {
+  const how = `An open issue joins the queue when it carries the “${readyLabel}” label and has an “## Acceptance criteria” section. Add the label on GitHub, or create an issue here.`;
+  return snapshotAt
+    ? how
+    : `The runner has not sent its first snapshot of the issues yet. ${how}`;
+}
+
+/** The `Held for a lead` heading, in one sentence. */
+export const HELD_FOR_LEAD_HINT =
+  'Slots the orchestrator has planned but not dispatched. Each waits on another slot, usually a lead, and goes out when the condition in the last column is met.';
+
+/** The footer under the list: whose verdict the dots show. */
+export const roundFooter = (round: { date: string; round: string }): string =>
+  `A green dot marks the orchestrator’s verdict from round ${round.date} ${round.round}. Without one, AgentDock computes the state from the issues.`;
+
+/** The banner for a queue the runner could not read (rule R4): the cause and the fix. */
+export function queueUnavailableCopy(
+  unavailable: { reason: string },
+  runnerName: string | null,
+  isAdmin: boolean,
+): { title: string; body: string; href?: string; cta?: string } {
+  const where = runnerName
+    ? `The runner ${runnerName}`
+    : 'The project’s runner';
+  return {
+    title: 'The queue could not be refreshed',
+    body: `${where} could not read this project’s issues: ${unavailable.reason}. The list below is the last snapshot. Fix the cause on that machine, then press Refresh.`,
+    ...(isAdmin ? { href: '/admin/runners', cta: 'Open Runners' } : {}),
+  };
+}
+
 /** Only `https:` links become anchors; the URL came from a GitHub payload. */
 export function safeHttpsUrl(url: string | null): string | null {
   if (url === null) return null;
