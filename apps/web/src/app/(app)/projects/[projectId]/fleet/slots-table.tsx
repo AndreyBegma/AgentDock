@@ -12,6 +12,7 @@ import {
   issueUrl,
   SLOT_STATUS_LABEL,
   SLOT_STATUS_TONE,
+  SLOT_TERM_HINT,
   safeHttpsUrl,
 } from '../../../../../lib/fleet/format';
 
@@ -102,7 +103,14 @@ export function SlotsTable({
             <TableCell>
               <span className="font-medium">{slot.name}</span>
               {slot.lead ? (
-                <span className="ml-2 text-xs text-ink-3">lead</span>
+                <Tooltip content={SLOT_TERM_HINT.lead}>
+                  <button
+                    type="button"
+                    className="ml-2 cursor-help text-xs text-ink-3"
+                  >
+                    lead
+                  </button>
+                </Tooltip>
               ) : null}
             </TableCell>
             <TableCell>

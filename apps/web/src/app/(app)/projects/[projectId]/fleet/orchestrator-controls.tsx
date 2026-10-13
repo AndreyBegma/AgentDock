@@ -12,21 +12,47 @@ import type {
 import { Button } from 'glass-ui/button';
 import { DialogContent, DialogRoot } from 'glass-ui/dialog';
 import { Field, Input, Select } from 'glass-ui/field';
-import { toast } from 'glass-ui/toast';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { DisabledReason } from '../../../../../components/prerequisites/disabled-reason';
 import { api } from '../../../../../lib/api';
 import {
   COMMAND_PENDING_LABEL,
-  describeControlError,
+  describeControlErrorHint,
   MODE_LABEL,
   PERMISSION_MODE_LABEL,
   permissionModesFor,
 } from '../../../../../lib/control/format';
+import type { ControlReason } from '../../../../../lib/control/reasons';
 import type { useControl } from '../../../../../lib/control/use-control';
 import { formatAge } from '../../../../../lib/fleet/format';
+import { useErrorToast } from '../../../../../lib/section/use-error-toast';
 import { PendingLabel } from './pending-label';
+import type { ControlReasons } from './use-control-reasons';
 
 type Control = ReturnType<typeof useControl>;
+
+/**
+ * The reason lines under Start and Stop. One shared reason (the runner is
+ * offline) is said once; different ones are each named after their button.
+ */
+function reasonLinesFor({ start, stop }: ControlReasons) {
+  const lines: { id: string; prefix: string; reason: ControlReason }[] = [];
+  const ids: { start?: string; stop?: string } = {};
+  if (start && stop && start.text === stop.text) {
+    lines.push({ id: 'orch-reason', prefix: '', reason: start });
+    ids.start = ids.stop = 'orch-reason';
+    return { lines, ids };
+  }
+  if (start) {
+    lines.push({ id: 'orch-start-reason', prefix: 'Start: ', reason: start });
+    ids.start = 'orch-start-reason';
+  }
+  if (stop) {
+    lines.push({ id: 'orch-stop-reason', prefix: 'Stop: ', reason: stop });
+    ids.stop = 'orch-stop-reason';
+  }
+  return { lines, ids };
+}
 
 /** Start, Stop and status refresh of the orchestrator (spec 17 D2–D5). */
 export function OrchestratorControls({
@@ -34,38 +60,31 @@ export function OrchestratorControls({
   control,
   canOperate,
   isAdmin,
+  settings,
+  reasons,
+  startOpen: starting,
+  onStartOpenChange: setStarting,
 }: {
   projectId: string;
   control: Control;
   canOperate: boolean;
   isAdmin: boolean;
+  /** Loaded by the page; undefined while loading or when it failed. */
+  settings: OrchestratorSettingsView | undefined;
+  /** Why Start and Stop are off, when the reason will not clear by itself. */
+  reasons: ControlReasons;
+  startOpen: boolean;
+  onStartOpenChange: (open: boolean) => void;
 }) {
-  const [settings, setSettings] = useState<OrchestratorSettingsView>();
   const [status, setStatus] = useState<OrchestratorStatusView>();
   const [refreshing, setRefreshing] = useState(false);
-  const [starting, setStarting] = useState(false);
   const [stopping, setStopping] = useState(false);
+  const showError = useErrorToast();
 
   const [mode, setMode] = useState<OrchestratorMode>('start');
   const [model, setModel] = useState('');
   const [permissionMode, setPermissionMode] =
     useState<OrchestratorPermissionMode>('auto');
-
-  useEffect(() => {
-    let cancelled = false;
-    api<OrchestratorSettingsView>(
-      `/projects/${projectId}/orchestrator/settings`,
-    )
-      .then((view) => {
-        if (!cancelled) setSettings(view);
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) toast.error(describeControlError(err));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId]);
 
   const refresh = async () => {
     setRefreshing(true);
@@ -76,7 +95,7 @@ export function OrchestratorControls({
         ),
       );
     } catch (err) {
-      toast.error(describeControlError(err));
+      showError(describeControlErrorHint(err, { projectId, isAdmin }));
     } finally {
       setRefreshing(false);
     }
@@ -111,6 +130,7 @@ export function OrchestratorControls({
   const startBusy = control.busy('orchestrator.start');
   const stopBusy = control.busy('orchestrator.stop');
   const modes = permissionModesFor(isAdmin);
+  const { lines: reasonLines, ids: reasonIds } = reasonLinesFor(reasons);
 
   return (
     <div className="flex flex-col gap-3">
@@ -121,7 +141,7 @@ export function OrchestratorControls({
             <dd className="text-sm">
               {settings.effectiveProfile
                 ? `${settings.effectiveProfile.label} (${settings.effectiveProfile.runtime})`
-                : 'none set'}
+                : '(none set)'}
             </dd>
           </div>
           <div className="flex flex-col gap-1">
@@ -142,14 +162,16 @@ export function OrchestratorControls({
           <>
             <Button
               variant="solid"
-              disabled={startBusy || !settings}
+              disabled={startBusy || !settings || reasons.start !== null}
+              aria-describedby={reasonIds.start}
               onClick={openStart}
             >
               Start…
             </Button>
             <Button
               variant="glass"
-              disabled={stopBusy}
+              disabled={stopBusy || reasons.stop !== null}
+              aria-describedby={reasonIds.stop}
               onClick={() => setStopping(true)}
             >
               Stop
@@ -179,6 +201,20 @@ export function OrchestratorControls({
           </span>
         ) : null}
       </div>
+
+      {canOperate
+        ? reasonLines.map(({ id, prefix, reason }) => (
+            <DisabledReason
+              key={id}
+              id={id}
+              href={reason.href}
+              cta={reason.cta}
+            >
+              {prefix}
+              {reason.text}
+            </DisabledReason>
+          ))
+        : null}
 
       <DialogRoot open={starting} onOpenChange={setStarting}>
         <DialogContent
@@ -219,7 +255,7 @@ export function OrchestratorControls({
               <Input
                 id="orch-profile"
                 readOnly
-                value={settings?.effectiveProfile?.label ?? 'none set'}
+                value={settings?.effectiveProfile?.label ?? '(none set)'}
               />
             </Field>
             <Field label="Model" htmlFor="orch-model">
