@@ -1,13 +1,36 @@
 # Deployment
 
-Decision: [ADR-0016](../docs/adr/0016-staging-on-the-agent-host-behind-a-cloudflare-tunnel.md).
+Decisions: [ADR-0016](../docs/adr/0016-staging-on-the-agent-host-behind-a-cloudflare-tunnel.md),
+[ADR-0018](../docs/adr/0018-pull-requests-test-what-changed.md).
+
+## CI — what each pipeline runs
+
+`.woodpecker/pipeline.yml` runs `check` (Biome) and `build` in full every time.
+Which tests run depends on the event:
+
+| Event | `test` |
+|---|---|
+| pull request | the packages changed since the merge base with the target branch, plus their dependents |
+| pull request touching a root file: `package.json`, `bun.lock`, `turbo.json`, `tsconfig.json`, `biome.json`, `.woodpecker/**`, `deploy/ci-image/**` | the full suite |
+| pull request touching only `docs/**`, `*.md`, `.github/**` | none, and `build` is skipped too; `check` still gives the status |
+| push to `develop` | none: the pull request already tested it (ADR-0018) |
+| push to `main`, manual run | the full suite |
+
+The `test` step prints the mode it took (`test mode: affected (…)` or
+`test mode: full (<reason>)`). When it cannot find the merge base, it runs the
+full suite. To test everything on a branch, run the pipeline by hand.
+
+The CI PostgreSQL is throwaway. Its data directory is on tmpfs, and it runs
+with `fsync`, `synchronous_commit` and `full_page_writes` off. The `test` step
+prints those three settings.
 
 ## Staging — https://staging-agentdock.luna-realm.com
 
-Every push to `develop` runs `.woodpecker/pipeline.yml`. If the checks pass,
-`build-staging` builds `agentdock-api:staging` and `agentdock-web:staging` on
-the agent host. `deploy-staging` then replaces the containers in
-`/home/archi/stacks/agentdock-staging`.
+Every push to `develop` runs `.woodpecker/pipeline.yml`. Once `check` and
+`build` pass, `build-staging` builds `agentdock-api:staging` and
+`agentdock-web:staging` on the agent host. `deploy-staging` then replaces the
+containers in `/home/archi/stacks/agentdock-staging`. On a manual run on
+`develop`, the deploy also waits for the full test suite.
 
 ```
 Cloudflare ──tunnel──▶ cloudflared ──▶ proxy (Caddy :80) ─┬─ /api/* ─▶ api :8180 ─▶ postgres, redis
@@ -25,7 +48,7 @@ Nothing is published on the host. The stack runs on its own compose network
    line: `TUNNEL_TOKEN=...`.
 2. **Woodpecker.** Activate `AndreyBegma/AgentDock` and apply these settings:
    - *Trusted → volumes*: on. The steps mount the Docker socket, the stack
-     directory and the caches.
+     directory and the caches, and the postgres service mounts a tmpfs.
    - *Require approval*: forks. The repository is public.
    - *Cancel previous pipelines*: push, pull_request.
    - Timeout: 60 min.
