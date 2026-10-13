@@ -76,7 +76,8 @@ export interface PlanTurnView {
 export interface PlanTaskIssueView {
   number: number;
   url: string;
-  liveStatus: PlanTaskLiveStatus;
+  /** Null: issued but not queued yet — a feature waiting for its docs pull request (D10). */
+  liveStatus: PlanTaskLiveStatus | null;
   prNumber: number | null;
   prUrl: string | null;
 }
