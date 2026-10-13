@@ -228,11 +228,20 @@ export interface GitHubInstallationView {
   repos: GitHubInstallationRepoView[];
 }
 
-/** `GET /admin/github-app`. Secrets never leave the API. */
+/**
+ * `GET /admin/github-app`. Secrets never leave the API. `encryptionAvailable`:
+ * `APP_ENCRYPTION_KEY` is set and usable; without it no App can be registered
+ * or re-entered (D3).
+ */
 export type GitHubAppView =
-  | { registered: false; publicUrl: string | null }
+  | {
+      registered: false;
+      publicUrl: string | null;
+      encryptionAvailable: boolean;
+    }
   | {
       registered: true;
+      encryptionAvailable: boolean;
       appId: number;
       slug: string;
       ownerLogin: string;
