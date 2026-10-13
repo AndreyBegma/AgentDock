@@ -1,12 +1,32 @@
 'use client';
 
 import { CodeBlock } from 'glass-ui/code-block';
+import Link from 'next/link';
 import {
   INSTALL_COMMANDS,
+  INSTALL_PATH,
   KEEP_ONLINE_COMMANDS,
   RUN_COMMAND,
   RUNNER_README_URL,
 } from '../../lib/runners/install';
+
+/** The public page with every step and the troubleshooting (issue #145). */
+export function InstallGuideLink({
+  children = 'Full install guide and troubleshooting',
+}: {
+  children?: string;
+}) {
+  return (
+    <p>
+      <Link
+        href={INSTALL_PATH}
+        className="text-ink underline underline-offset-2"
+      >
+        {children}
+      </Link>
+    </p>
+  );
+}
 
 /** Homebrew or npm, and where to build from source. */
 export function InstallCommands() {

@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation';
 import { type FormEvent, useEffect, useState } from 'react';
 import { AuthCard } from '../../components/auth-card';
 import { ApiError, api, describeError } from '../../lib/api';
+import { INSTALL_PATH } from '../../lib/runners/install';
 import { safeNext } from './safe-next';
 
 export default function LoginPage() {
@@ -85,6 +86,11 @@ export default function LoginPage() {
           </Link>
         </p>
       ) : null}
+      <p className="text-sm text-ink-2">
+        <Link href={INSTALL_PATH} className="text-ink underline">
+          How to install the runner
+        </Link>
+      </p>
     </AuthCard>
   );
 }

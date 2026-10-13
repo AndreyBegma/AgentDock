@@ -1,7 +1,10 @@
+import { pairCommand } from '@agentdock/shared';
+
 /**
  * The commands a first-time admin runs on the machine that holds the
  * repositories (issue #132). Fixed by the runner distribution; this module
- * only shows them, so the checklist and the pairing dialog say the same thing.
+ * only shows them, so the checklist, the pairing dialog and `/install` say the
+ * same thing.
  */
 export const INSTALL_COMMANDS = [
   {
@@ -10,6 +13,46 @@ export const INSTALL_COMMANDS = [
   },
   { label: 'npm', command: 'npm i -g agentdock-runner' },
 ] as const;
+
+/** The npm package installed with Bun instead; shown on `/install` only. */
+export const BUN_INSTALL_COMMAND = 'bun add -g agentdock-runner';
+
+/** Where npm puts global packages; their commands are in its `bin`. */
+export const NPM_PREFIX_COMMAND = 'npm prefix -g';
+
+/** Prints the version and the target, e.g. `0.1.0 darwin-arm64`. */
+export const VERSION_COMMAND = 'agentdock-runner version';
+
+/** The prebuilt targets (ADR-0017). */
+export const RUNNER_PLATFORMS = [
+  'macOS arm64',
+  'macOS x64',
+  'Linux arm64',
+  'Linux x64',
+] as const;
+
+/** What the runner looks for on its machine and reports as capabilities. */
+export const RUNNER_REQUIREMENTS = [
+  { tool: 'tmux', why: 'every run gets its own tmux session' },
+  { tool: 'git', why: 'every run gets its own worktree' },
+  { tool: 'gh', why: 'the GitHub CLI, signed in with gh auth login' },
+  {
+    tool: 'Claude Code and/or Codex',
+    why: 'the runtimes the agents run on (claude, codex)',
+  },
+] as const;
+
+/** The public page about the runner (issue #145). */
+export const INSTALL_PATH = '/install';
+
+/** The query parameter that opens Runners' Add runner dialog. */
+export const ADD_RUNNER_PARAM = 'add';
+
+/** Runners, with the Add runner dialog open. */
+export const ADD_RUNNER_PATH = `/admin/runners?${ADD_RUNNER_PARAM}=1`;
+
+/** Stands in for the code an administrator generates. */
+export const PAIRING_CODE_PLACEHOLDER = 'XXXX-XXXX';
 
 /** Building from source, for a machine with neither. */
 export const RUNNER_README_URL =
@@ -72,4 +115,28 @@ export function pairingServers(
   if (!server || server === primary) return { primary, alternative: null };
   if (isLocalUrl(origin)) return { primary: server, alternative: primary };
   return { primary, alternative: isLocalUrl(server) ? null : server };
+}
+
+/**
+ * Every command `/install` shows for a page served from `origin`. The server
+ * is `<origin>/api`, as the pairing dialog builds it; the page has no
+ * pairing command from the API, so there is no alternative to offer.
+ */
+export function installGuide(origin: string) {
+  const { primary: server } = pairingServers(origin, '');
+  return {
+    install: [
+      ...INSTALL_COMMANDS,
+      { label: 'Bun', command: BUN_INSTALL_COMMAND },
+    ],
+    version: VERSION_COMMAND,
+    server,
+    pair: pairCommand(server, PAIRING_CODE_PLACEHOLDER),
+    keepOnline: KEEP_ONLINE_COMMANDS,
+    run: RUN_COMMAND,
+    profiles: PROFILES_DETECT_COMMAND,
+    health: `${server}/health`,
+    healthCheck: `curl ${server}/health`,
+    npmPrefix: NPM_PREFIX_COMMAND,
+  };
 }

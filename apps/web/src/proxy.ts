@@ -2,8 +2,10 @@ import { SESSION_COOKIE } from '@agentdock/shared';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { HOME_PATH, safeNext } from './app/login/safe-next';
+import { INSTALL_PATH } from './lib/runners/install';
 
-const PUBLIC_PATHS = ['/login', '/register', '/pending'];
+/** Exact paths only: a prefix would open everything under it. */
+const PUBLIC_PATHS = ['/login', '/register', '/pending', INSTALL_PATH];
 
 /**
  * Route protection (spec D13). Next 16 renamed `middleware` to `proxy`; this is

@@ -12,6 +12,7 @@ import { DialogContent, DialogRoot } from 'glass-ui/dialog';
 import { Field, Input, Select } from 'glass-ui/field';
 import { toast } from 'glass-ui/toast';
 import { type FormEvent, useEffect, useState } from 'react';
+import { InstallGuideLink } from '../../../components/onboarding/runner-commands';
 import { DisabledReason } from '../../../components/prerequisites/disabled-reason';
 import { PrerequisiteBanner } from '../../../components/prerequisites/prerequisite-banner';
 import { api } from '../../../lib/api';
@@ -50,6 +51,9 @@ function NoOnlineRunner({ fleet }: { fleet: RunnersFact }) {
           {command ? (
             <code className="ml-1 font-mono text-ink">{command}</code>
           ) : null}
+          <InstallGuideLink>
+            How to install and start the runner
+          </InstallGuideLink>
         </>
       }
     />
