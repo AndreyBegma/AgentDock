@@ -27,6 +27,7 @@ import {
   type WebhookView,
 } from '@agentdock/shared';
 import { ApiError, describeError } from '../api';
+import { ENCRYPTION_KEY_REMEDY } from '../prerequisites/copy';
 
 type Tone = 'ok' | 'warn' | 'danger' | 'neutral';
 
@@ -60,10 +61,11 @@ export const DELIVERY_STATUS_TONE: Record<WebhookDeliveryStatus, Tone> = {
   failed: 'danger',
 };
 
+/** The circuit breaker in plain words: whether deliveries are going out. */
 export const CIRCUIT_LABEL: Record<WebhookCircuitState, string> = {
-  closed: 'closed',
-  open: 'open',
-  half_open: 'half-open',
+  closed: 'Delivering',
+  open: 'Delivery paused (receiver failing)',
+  half_open: 'Trying the receiver again',
 };
 
 export const CIRCUIT_TONE: Record<WebhookCircuitState, Tone> = {
@@ -125,7 +127,7 @@ const ATTEMPT_ERROR_LABEL: Record<string, string> = {
   [WEBHOOK_ATTEMPT_ERRORS.network]: 'the connection failed',
   [WEBHOOK_ATTEMPT_ERRORS.httpStatus]: 'the receiver answered with an error',
   [WEBHOOK_ATTEMPT_ERRORS.secretUnavailable]:
-    'the secret could not be opened — check APP_ENCRYPTION_KEY',
+    'the secret could not be opened — APP_ENCRYPTION_KEY in the API’s environment is missing or changed; restore it and restart the API',
 };
 
 export const attemptErrorLabel = (error: string | null): string | null =>
@@ -142,8 +144,7 @@ const ERROR_SENTENCE: Record<string, string> = {
   [WEBHOOKS_ERROR.invalidUrl]:
     'Enter an absolute http(s) URL without a user name or password.',
   [WEBHOOKS_ERROR.unresolvable]: 'That host name does not resolve.',
-  [WEBHOOKS_ERROR.encryptionKeyMissing]:
-    'The server has no APP_ENCRYPTION_KEY, so it cannot store a secret.',
+  [WEBHOOKS_ERROR.encryptionKeyMissing]: `The server has no APP_ENCRYPTION_KEY, so it cannot store a secret. ${ENCRYPTION_KEY_REMEDY}`,
   [WEBHOOKS_ERROR.invalidTarget]:
     'An allowlist entry is neither a host name, an IP address nor a CIDR.',
   [WEBHOOKS_ERROR.rateLimited]: 'Too many deliveries. Try again later.',
@@ -191,10 +192,10 @@ export const eventsLabel = (events: readonly string[]): string =>
 export function actionSummary(action: InboundTriggerAction): string {
   return action.kind === 'skill'
     ? `skill ${action.skill}`
-    : `orchestrator ${action.mode}`;
+    : 'next orchestrator round';
 }
 
-/** Minutes left of an open circuit, or null when it is not open. */
+/** Minutes left until a paused webhook tries again, or null when it is not paused. */
 export function circuitReopensIn(
   view: Pick<WebhookView, 'circuitState' | 'circuitOpenedAt'>,
   now = Date.now(),

@@ -4,6 +4,7 @@ import type { WebhookSettingsView } from '@agentdock/shared';
 import { Button } from 'glass-ui/button';
 import { Card } from 'glass-ui/card';
 import { Field, Textarea } from 'glass-ui/field';
+import { SectionUnavailable } from 'glass-ui/section-unavailable';
 import { toast } from 'glass-ui/toast';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../../../lib/api';
@@ -20,6 +21,7 @@ export function TargetsCard() {
   const [saved, setSaved] = useState<string[]>();
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
+  const [loadError, setLoadError] = useState<string>();
 
   const load = useCallback(async () => {
     try {
@@ -28,8 +30,9 @@ export function TargetsCard() {
       );
       setSaved(settings.allowedPrivateTargets);
       setText(settings.allowedPrivateTargets.join('\n'));
+      setLoadError(undefined);
     } catch (err) {
-      toast.error(describeWebhooksError(err));
+      setLoadError(describeWebhooksError(err));
     }
   }, []);
 
@@ -80,6 +83,18 @@ export function TargetsCard() {
             are resolved at send time. A listed host may also use plain http.
           </p>
         </div>
+        {loadError && saved === undefined ? (
+          <SectionUnavailable
+            title="The allowlist is not answering"
+            stillWorks="Webhooks keep using the allowlist the server has."
+            detail={loadError}
+            action={
+              <Button variant="glass" size="sm" onClick={load}>
+                Try again
+              </Button>
+            }
+          />
+        ) : null}
         <Field
           label="Hosts and CIDRs"
           htmlFor="webhook-targets"

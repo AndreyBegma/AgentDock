@@ -15,6 +15,7 @@ import { CodeBlock } from 'glass-ui/code-block';
 import { DialogContent, DialogRoot } from 'glass-ui/dialog';
 import { EmptyState } from 'glass-ui/empty-state';
 import { Field, Select } from 'glass-ui/field';
+import { SectionUnavailable } from 'glass-ui/section-unavailable';
 import { SheetContent, SheetRoot } from 'glass-ui/sheet';
 import { Skeleton } from 'glass-ui/skeleton';
 import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
@@ -64,6 +65,7 @@ export function WebhookSheet({
   const [status, setStatus] = useState<WebhookDeliveryStatus | ''>('');
   const [confirm, setConfirm] = useState<Confirm>();
   const [busy, setBusy] = useState(false);
+  const [loadError, setLoadError] = useState<string>();
 
   const logPath = useCallback(
     (cursor?: string) => {
@@ -86,8 +88,10 @@ export function WebhookSheet({
       setWebhook(view);
       setDeliveries(page.items);
       setNextCursor(page.nextCursor);
+      setLoadError(undefined);
     } catch (err) {
-      toast.error(describeWebhooksError(err));
+      // Rule R2: what is on screen stays; the failure is said above it.
+      setLoadError(describeWebhooksError(err));
     }
   }, [webhookId, logPath]);
 
@@ -96,6 +100,7 @@ export function WebhookSheet({
       setWebhook(undefined);
       setDeliveries(undefined);
       setConfirm(undefined);
+      setLoadError(undefined);
       return;
     }
     void load();
@@ -189,11 +194,31 @@ export function WebhookSheet({
             title={webhook?.name ?? 'Webhook'}
             description={webhook?.url}
           >
-            {!webhook ? (
-              <div className="flex flex-col gap-3" aria-busy="true">
-                <Skeleton className="h-6 w-40" />
-                <Skeleton className="h-32 w-full" />
+            {loadError ? (
+              <div className="mb-4">
+                <SectionUnavailable
+                  title="This webhook is not answering"
+                  stillWorks={
+                    webhook
+                      ? 'What is shown below may be out of date.'
+                      : 'Deliveries keep going out on the server.'
+                  }
+                  detail={loadError}
+                  action={
+                    <Button variant="glass" size="sm" onClick={load}>
+                      Try again
+                    </Button>
+                  }
+                />
               </div>
+            ) : null}
+            {!webhook ? (
+              loadError ? null : (
+                <div className="flex flex-col gap-3" aria-busy="true">
+                  <Skeleton className="h-6 w-40" />
+                  <Skeleton className="h-32 w-full" />
+                </div>
+              )
             ) : (
               <div className="flex flex-col gap-6">
                 <div className="flex flex-wrap items-center gap-2">
@@ -203,7 +228,7 @@ export function WebhookSheet({
                   />
                   <Badge
                     tone={CIRCUIT_TONE[webhook.circuitState]}
-                    label={`circuit ${CIRCUIT_LABEL[webhook.circuitState]}`}
+                    label={CIRCUIT_LABEL[webhook.circuitState]}
                   />
                   {reopens ? (
                     <span className="text-xs text-ink-3">{reopens}</span>
@@ -229,9 +254,11 @@ export function WebhookSheet({
                       variant="glass"
                       size="sm"
                       disabled={busy}
-                      onClick={() => post('/close-circuit', 'Circuit closed')}
+                      onClick={() =>
+                        post('/close-circuit', 'Deliveries resumed')
+                      }
                     >
-                      Close circuit
+                      Resume deliveries
                     </Button>
                   ) : null}
                   <Button
@@ -293,10 +320,34 @@ export function WebhookSheet({
                   </div>
                   {!deliveries ? (
                     <Skeleton className="h-24 w-full" />
+                  ) : deliveries.length === 0 && status !== '' ? (
+                    <EmptyState
+                      title={`No ${DELIVERY_STATUS_LABEL[status]} deliveries`}
+                      description="Other deliveries are hidden by the status filter."
+                      action={
+                        <Button
+                          variant="glass"
+                          size="sm"
+                          onClick={() => setStatus('')}
+                        >
+                          Show all
+                        </Button>
+                      }
+                    />
                   ) : deliveries.length === 0 ? (
                     <EmptyState
-                      title="No deliveries"
-                      description="Use Test to send a webhook.test event."
+                      title="Every request sent to this URL"
+                      description="Deliveries appear when a subscribed event happens. Send a webhook.test event to check the receiver now."
+                      action={
+                        <Button
+                          variant="glass"
+                          size="sm"
+                          disabled={busy}
+                          onClick={() => post('/test', 'Test delivery queued')}
+                        >
+                          Send test
+                        </Button>
+                      }
                     />
                   ) : (
                     <Table scroll>
@@ -421,6 +472,7 @@ export function WebhookSheet({
                 Cancel
               </Button>
               <Button
+                variant="danger"
                 disabled={busy}
                 onClick={confirm === 'rotate' ? rotate : remove}
               >
