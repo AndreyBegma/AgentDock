@@ -5,7 +5,6 @@ import {
   CalendarClock,
   FolderGit2,
   GitMerge,
-  GitPullRequest,
   History,
   LayoutDashboard,
   ListChecks,
@@ -13,7 +12,6 @@ import {
   Plug,
   Radio,
   ScrollText,
-  Send,
   Server,
   Settings,
   ShieldCheck,
@@ -22,7 +20,6 @@ import {
   Users,
   Wallet,
   Wand2,
-  Webhook,
   Workflow,
 } from 'lucide-react';
 
@@ -36,20 +33,28 @@ export interface NavEntry {
   minRole: Role;
   /** Flipped to `true` by the issue that builds the page (spec D4). */
   enabled: boolean;
+  /**
+   * Active only on `href` itself, never on a page below it: `/projects` is a
+   * list, and inside a project the project's own entry is the active one.
+   */
+  exact?: boolean;
 }
 
 export interface NavSection {
-  id: 'overview' | 'project' | 'sessions' | 'usage' | 'admin';
+  id: 'workspace' | 'project' | 'admin';
+  /** The project section is titled with the project's name by the shell. */
   title: string;
   /** Shown only under `/projects/[projectId]`. */
   projectScoped?: boolean;
+  /** Folded into one expandable group unless one of its pages is open. */
+  collapsible?: boolean;
   entries: NavEntry[];
 }
 
 export const NAV: NavSection[] = [
   {
-    id: 'overview',
-    title: 'Overview',
+    id: 'workspace',
+    title: 'Workspace',
     entries: [
       {
         id: 'overview',
@@ -58,6 +63,7 @@ export const NAV: NavSection[] = [
         icon: LayoutDashboard,
         minRole: 'viewer',
         enabled: true,
+        exact: true,
       },
       {
         id: 'projects',
@@ -66,12 +72,29 @@ export const NAV: NavSection[] = [
         icon: FolderGit2,
         minRole: 'viewer',
         enabled: true,
+        exact: true,
       },
       {
         id: 'activity',
         href: '/activity',
         label: 'Activity',
         icon: Radio,
+        minRole: 'viewer',
+        enabled: true,
+      },
+      {
+        id: 'sessions',
+        href: '/sessions',
+        label: 'Sessions',
+        icon: Activity,
+        minRole: 'viewer',
+        enabled: true,
+      },
+      {
+        id: 'usage',
+        href: '/usage',
+        label: 'Usage',
+        icon: BarChart3,
         minRole: 'viewer',
         enabled: true,
       },
@@ -157,36 +180,9 @@ export const NAV: NavSection[] = [
     ],
   },
   {
-    id: 'sessions',
-    title: 'Sessions',
-    entries: [
-      {
-        id: 'sessions',
-        href: '/sessions',
-        label: 'Sessions',
-        icon: Activity,
-        minRole: 'viewer',
-        enabled: true,
-      },
-    ],
-  },
-  {
-    id: 'usage',
-    title: 'Usage',
-    entries: [
-      {
-        id: 'usage',
-        href: '/usage',
-        label: 'Usage',
-        icon: BarChart3,
-        minRole: 'viewer',
-        enabled: true,
-      },
-    ],
-  },
-  {
     id: 'admin',
     title: 'Admin',
+    collapsible: true,
     entries: [
       {
         id: 'runners',
@@ -236,35 +232,12 @@ export const NAV: NavSection[] = [
         minRole: 'admin',
         enabled: true,
       },
+      // The hub: GitHub App, Telegram, webhooks and triggers are its pages.
       {
         id: 'integrations',
-        href: '/admin/integrations/telegram',
+        href: '/admin/integrations',
         label: 'Integrations',
         icon: Plug,
-        minRole: 'admin',
-        enabled: true,
-      },
-      {
-        id: 'admin-triggers',
-        href: '/admin/integrations/triggers',
-        label: 'Triggers',
-        icon: Webhook,
-        minRole: 'admin',
-        enabled: true,
-      },
-      {
-        id: 'admin-webhooks',
-        href: '/admin/integrations/webhooks',
-        label: 'Webhooks',
-        icon: Send,
-        minRole: 'admin',
-        enabled: true,
-      },
-      {
-        id: 'admin-github-app',
-        href: '/admin/integrations/github',
-        label: 'GitHub App',
-        icon: GitPullRequest,
         minRole: 'admin',
         enabled: true,
       },
@@ -318,7 +291,29 @@ export function visibleNav(role: Role, pathname: string): VisibleSection[] {
   return sections;
 }
 
-export const isActive = (href: string, pathname: string): boolean =>
-  href === '/'
-    ? pathname === '/'
-    : pathname === href || pathname.startsWith(`${href}/`);
+export const isActive = (
+  href: string,
+  pathname: string,
+  exact = href === '/',
+): boolean => pathname === href || (!exact && pathname.startsWith(`${href}/`));
+
+/**
+ * The one entry to mark active at `pathname`: of those that match, the one
+ * with the longest href, so a page below two entries lights only the closer.
+ * Null when no entry matches (`/account`).
+ */
+export function activeEntryId(
+  sections: readonly VisibleSection[],
+  pathname: string,
+): string | null {
+  let best: VisibleEntry | null = null;
+  for (const section of sections) {
+    for (const entry of section.entries) {
+      if (!isActive(entry.resolvedHref, pathname, entry.exact)) continue;
+      if (!best || entry.resolvedHref.length > best.resolvedHref.length) {
+        best = entry;
+      }
+    }
+  }
+  return best?.id ?? null;
+}

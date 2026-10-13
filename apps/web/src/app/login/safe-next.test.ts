@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { safeNext } from './safe-next';
+import { safeNext, signedInRedirect } from './safe-next';
 
 describe('safeNext', () => {
   test('a same-origin path is kept, with its query', () => {
@@ -27,5 +27,25 @@ describe('safeNext', () => {
   test('never back to the login page', () => {
     expect(safeNext('/login')).toBe('/');
     expect(safeNext('/login?next=/x')).toBe('/');
+  });
+});
+
+describe('signedInRedirect', () => {
+  test('signed out, the form shows', () => {
+    expect(signedInRedirect(false, '/projects')).toBeNull();
+    expect(signedInRedirect(false, undefined)).toBeNull();
+  });
+
+  test('signed in, to next or home', () => {
+    expect(signedInRedirect(true, '/admin/runners?add=1')).toBe(
+      '/admin/runners?add=1',
+    );
+    expect(signedInRedirect(true, undefined)).toBe('/');
+  });
+
+  test('signed in, an unsafe or repeated next goes home', () => {
+    expect(signedInRedirect(true, '//evil.example')).toBe('/');
+    expect(signedInRedirect(true, ['/a', '/b'])).toBe('/');
+    expect(signedInRedirect(true, '/login')).toBe('/');
   });
 });

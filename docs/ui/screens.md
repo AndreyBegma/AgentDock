@@ -4,6 +4,24 @@ Information architecture for `apps/web`. Layout: `NavRail` on the left, project
 switcher at its top, `CommandPalette` on ⌘K, live updates everywhere over the
 UI WebSocket.
 
+**The shell** (`components/shell/`). A skip link comes first. The rail has three
+sections: Workspace (Overview, Projects, Activity, Sessions, Usage, Skills),
+then the open project's pages under its name, then Admin, folded into one
+group. That group unfolds by itself on an admin page and remembers its state
+per browser. Exactly one item is active: the longest matching href wins, and
+`/` and `/projects` match only exactly. Integrations goes to the hub,
+`/admin/integrations`. The active item is scrolled into view, and the rail
+fades at whichever edge has more. The project switcher is a button with the
+project's name, its runner's status and a chevron. Breadcrumbs come from data
+(`crumbsFor`): the project's name, `#155 · i155` for a run, the session's
+title. An unknown id is never title-cased. Client pages take the tab title
+from the last crumb. Below 1024 px the rail keeps its tooltips, and the top
+bar shows the page title with a back link. The palette (⌘K) lists the
+project's pages as "Project › Page", Recent sessions and runs, and Admin as a
+group of its own, so no group label repeats on its rows. Gaps waiting on
+glass-ui: NavRail has no collapsible group, no scroll fade and no badge, so
+those are stop-gaps here.
+
 | Screen | Content | Milestone |
 |---|---|---|
 | **Overview** | for an admin, the Getting started checklist until setup is done (see "First run"); your projects with their runner's status; later: running slots, blocked on a person, merged today, cost today/7d (StatTiles) | M1 |
@@ -19,11 +37,13 @@ UI WebSocket.
 | **Usage** | cost/tokens by project, model, runtime, user, day; price table (admin). Unpriced requests say an administrator fixes them under Admin › Prices; an empty range for one project offers "Show all projects" | M1 / M3 |
 | **Skills catalog** | skills.sh search, details, install. With no project an admin sees "Connect a project first"; project options show the runner's state and an offline runner gets the shared banner | M3 |
 | **Account** | profile, password, signed-in devices | M1 |
-| **Install** (`/install`, public) | no shell, works signed out: what the runner is and what it needs (tmux, git, signed-in `gh`, Claude Code and/or Codex); install (Homebrew, npm or Bun, from source; macOS and Linux, arm64 and x64) and `agentdock-runner version`; pair with this server (the command built from the page's origin + `/api`, the code's 10-minute TTL; an admin gets Add runner → `/admin/runners?add=1`); keep it running; profiles; troubleshooting. Every command comes from `lib/runners/install.ts`. Linked from Login, Getting started, the pairing dialog, the Connect dialog's runner banner, the Runners empty state and the runner-offline banner | M1 |
 | **Runners** (admin) | pair (numbered install / pair / keep-online steps), status with the next step for a runner that is not online; the table shows profiles, capabilities and "load 1/5/15 min" inline, and the whole row opens the sheet (visible Close; Revoke is confirmed and sits in its Danger zone) | M1 |
 | **Users** (admin) | opens on Active (or the first tab with accounts), a count on every tab, the registration switch above them; pending approvals, roles with a one-line hint each, disable, delete (says what goes with the account); a change to or from admin is confirmed; your own row cannot be disabled or deleted; an empty Pending tab says when registration is closed and points to the switch above | M1 |
 | **Settings** (admin) | no page of its own: the registration toggle is the "Open registration" card on Users, above the tabs it governs; `/admin/settings` redirects to Users | M1 |
 | **Integrations** (admin) | overview of the four integrations, each with an icon, its status (a failed one reads "Status unavailable") and one primary action ("Set up …" or "Manage …"); the pages open under their own titles; webhooks loads the project list only when its dialog opens; GitHub App, Telegram bot, webhooks + delivery log, inbound triggers | M2 / M3 |
+| **Login / Register / Pending** (public) | a branded, centred hero (logomark, wordmark, one line on what AgentDock is) over the form card (`components/auth-card.tsx`). A signed-in user on `/login` is sent to a safe `next` or `/`, decided on the server from `/auth/me`. A stale cookie or an API that is down still shows the form | M1 |
+| **Not found** | branded 404 with Back to Overview and Projects | M1 |
+| **Install** (`/install`, public) | no shell, works signed out, and reads like a product page: the value proposition, the system choice (macOS / Linux), then a numbered stepper Install → Pair → Keep running, with 15 px body text. What the runner is and what it needs (tmux, git, signed-in `gh`, Claude Code and/or Codex); install (Homebrew, npm or Bun, from source; macOS and Linux, arm64 and x64) and `agentdock-runner version`; pair with this server (the command built from the page's origin + `/api`, the code's 10-minute TTL; an admin gets Add runner → `/admin/runners?add=1`); keep it running; profiles; troubleshooting. Every command comes from `lib/runners/install.ts`. Linked from Login, Getting started, the pairing dialog, the Connect dialog's runner banner, the Runners empty state and the runner-offline banner | M1 |
 | **GitHub App** (admin) | without `APP_ENCRYPTION_KEY` a banner, and both register paths off with a reason; the manual card lists permissions, events, the absolute webhook URL and where GitHub shows the App ID and key; an inactive or failing webhook links to the App's Recent deliveries | M2 |
 | **Telegram** (admin) | bot status with what "Polling" means; Remove bot is confirmed with who stops getting notifications; the test message links to Account › Notifications for linking | M2 |
 | **Webhooks / Triggers** (admin) | Save always shows why it is off; "Delivery paused (receiver failing)" and Resume deliveries; event descriptions; the trigger's absolute URL with copy | M3 |
