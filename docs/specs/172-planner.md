@@ -357,12 +357,14 @@ default timeout is 20 min.
 | i172-contract | contract, types, default instructions, schema, migration, protocol commands | packages/shared/src/planner/**, packages/shared/src/protocol/commands/planner.ts, packages/shared/src/protocol/commands.ts, packages/shared/src/index.ts, apps/api/prisma/schema.prisma, apps/api/prisma/migrations/20261107000000_planner/** | — | yes | opus |
 | i172-runner | the `plan.*` commands on the runner | apps/runner/src/planner/**, apps/runner/src/commands/handlers.ts | i172-contract | no | opus |
 | i172-api | the planner API module | apps/api/src/planner/**, apps/api/src/app.module.ts | i172-contract | no | opus |
-| i172-web-planner | the Planner page | apps/web/src/app/(app)/projects/[projectId]/planner/**, apps/web/src/lib/planner/**, apps/web/src/components/planner/** | i172-contract | no | opus |
-| i172-web-tasks | `/tasks`, the instruction editors, nav, screen docs | apps/web/src/app/(app)/tasks/**, apps/web/src/lib/tasks/**, apps/web/src/app/admin/planner/**, apps/web/src/app/(app)/projects/[projectId]/settings/**, apps/web/src/components/shell/nav.ts, apps/web/src/components/shell/nav.test.ts, docs/ui/screens.md | i172-contract | no | sonnet |
+| i172-web-planner | the Planner page | apps/web/src/app/(app)/projects/[projectId]/planner/**, apps/web/src/lib/planner/**, apps/web/src/components/planner/** | i172-contract, #163 | no | opus |
+| i172-web-tasks | `/tasks`, the instruction editors, nav, screen docs | apps/web/src/app/(app)/tasks/**, apps/web/src/lib/tasks/**, apps/web/src/app/admin/planner/**, apps/web/src/app/(app)/projects/[projectId]/settings/**, apps/web/src/components/shell/nav.ts, apps/web/src/components/shell/nav.test.ts, docs/ui/screens.md | i172-contract, #163 | no | sonnet |
 
-**What cannot be parallelised:** the lead goes first. The other four run
-together once it has merged. The web slots build against the shared types and
-the documented API, with fixtures, and do not wait for `i172-api`.
+**What cannot be parallelised:** the lead goes first. `i172-runner` and
+`i172-api` follow as soon as it has merged. The two web slots also wait for
+#163, which brings glass-ui ≥ 0.27 (FlowGraph) and the navy palette into
+`apps/web`. The web slots build against the shared types and the documented
+API, with fixtures, and do not wait for `i172-api`.
 
 ## Contention
 
@@ -404,5 +406,4 @@ the documented API, with fixtures, and do not wait for `i172-api`.
   read-only. Follow-up work is a new plan, which can link the old one in its
   brief.
 
-Depends on #163
-Depends on glass-ui#94 (FlowGraph, released and adopted in apps/web)
+Depends on #163 (the web slots only; see the Parallel plan)
