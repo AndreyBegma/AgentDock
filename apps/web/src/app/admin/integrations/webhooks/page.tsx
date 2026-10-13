@@ -17,9 +17,10 @@ import {
 } from '@andrewbehma/glass-ui/table';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { useEffect, useState } from 'react';
+import { PageHeader } from '../../../../components/page-header/page-header';
 import { AsyncSection } from '../../../../components/prerequisites/async-section';
 import { api } from '../../../../lib/api';
-import { formatAgo } from '../../../../lib/fleet/format';
+import { Time } from '../../../../lib/format/time';
 import { useSection } from '../../../../lib/section/use-section';
 import {
   CIRCUIT_LABEL,
@@ -55,8 +56,15 @@ const revealWebhook = (
 
 export default function AdminWebhooksPage() {
   const webhooks = useSection(() => api<WebhookView[]>('/admin/webhooks'), []);
-  const projects = useSection(() => api<ProjectSummary[]>('/projects'), []);
   const [editing, setEditing] = useState<WebhookView | 'new'>();
+  // Only the create/edit dialog needs the project list: fetch it when one opens.
+  const projects = useSection(
+    () =>
+      editing === undefined
+        ? new Promise<ProjectSummary[]>(() => undefined)
+        : api<ProjectSummary[]>('/projects'),
+    [editing === undefined],
+  );
   const [selected, setSelected] = useState<string>();
   const [revealed, setRevealed] = useState<RevealedSecret | null>(null);
   const reload = webhooks.retry;
@@ -68,17 +76,12 @@ export default function AdminWebhooksPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Webhooks</h1>
-          <p className="max-w-prose text-sm text-ink-2">
-            Outbound. AgentDock’s events are pushed to a URL you choose —
-            signed, retried with backoff, and paused for a while when the
-            receiver keeps failing.
-          </p>
-        </div>
-        <Button onClick={() => setEditing('new')}>New webhook</Button>
-      </div>
+      <PageHeader
+        className="mb-0"
+        title="Webhooks"
+        description="Outbound. AgentDock’s events are pushed to a URL you choose — signed, retried with backoff, and paused for a while when the receiver keeps failing."
+        actions={<Button onClick={() => setEditing('new')}>New webhook</Button>}
+      />
 
       <AsyncSection
         section={webhooks}
@@ -145,7 +148,7 @@ export default function AdminWebhooksPage() {
                           }
                         />
                         <span className="text-xs text-ink-3">
-                          {formatAgo(webhook.lastDelivery.createdAt)}
+                          <Time value={webhook.lastDelivery.createdAt} />
                         </span>
                       </div>
                     ) : (

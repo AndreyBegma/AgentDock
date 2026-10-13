@@ -26,6 +26,7 @@ import { useState } from 'react';
 import { PageHeader } from '../../../components/page-header/page-header';
 import { AsyncSection } from '../../../components/prerequisites/async-section';
 import { DisabledReason } from '../../../components/prerequisites/disabled-reason';
+import { ScrollX } from '../../../components/scroll-x/scroll-x';
 import { useCurrentUser } from '../../../components/shell/user-context';
 import { api, describeError } from '../../../lib/api';
 import { Time } from '../../../lib/format/time';
@@ -235,30 +236,36 @@ function UsersTable({ viewer }: { viewer: string }) {
         <RegistrationCard section={registration} />
       </div>
 
-      <Tabs aria-label="Account status" className="mb-4 max-w-lg">
-        {TABS.map(({ status, label }) => (
-          <TabsItem key={status} current={tab === status} layoutId="users-tab">
-            <button
-              type="button"
-              onClick={() => setTab(status)}
-              aria-pressed={tab === status}
-              className="relative flex w-full items-center justify-center gap-2 px-3 py-2 text-sm font-medium"
+      <ScrollX className="mb-4 max-w-lg">
+        <Tabs aria-label="Account status">
+          {TABS.map(({ status, label }) => (
+            <TabsItem
+              key={status}
+              current={tab === status}
+              layoutId="users-tab"
             >
-              {label}
-              {section.data ? (
-                <Badge
-                  tone={
-                    status === 'pending' && counts.pending > 0
-                      ? 'warn'
-                      : 'neutral'
-                  }
-                  count={counts[status]}
-                />
-              ) : null}
-            </button>
-          </TabsItem>
-        ))}
-      </Tabs>
+              <button
+                type="button"
+                onClick={() => setTab(status)}
+                aria-pressed={tab === status}
+                className="relative flex w-full items-center justify-center gap-2 px-3 py-2 text-sm font-medium"
+              >
+                {label}
+                {section.data ? (
+                  <Badge
+                    tone={
+                      status === 'pending' && counts.pending > 0
+                        ? 'warn'
+                        : 'neutral'
+                    }
+                    count={counts[status]}
+                  />
+                ) : null}
+              </button>
+            </TabsItem>
+          ))}
+        </Tabs>
+      </ScrollX>
 
       <AsyncSection
         section={section}
@@ -273,110 +280,116 @@ function UsersTable({ viewer }: { viewer: string }) {
         }
       >
         {(list) => (
-          <Table scroll>
-            <TableHead>
-              <TableRow>
-                <TableCell head>Email</TableCell>
-                <TableCell head>Name</TableCell>
-                <TableCell head>Role</TableCell>
-                <TableCell head>Registered</TableCell>
-                <TableCell head>
-                  <span className="sr-only">Actions</span>
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <tbody>
-              {list
-                .filter((user) => user.status === tab)
-                .map((user) => {
-                  const own = user.id === viewer;
-                  return (
-                    <TableRow key={user.id}>
-                      <TableCell>
-                        {user.email}
-                        {own ? (
-                          <Badge className="ml-2" tone="neutral" label="you" />
-                        ) : null}
-                      </TableCell>
-                      <TableCell>{user.name ?? '—'}</TableCell>
-                      <TableCell>
-                        {user.status === 'pending'
-                          ? roleSelect(user, (role) =>
-                              setRoles((c) => ({ ...c, [user.id]: role })),
-                            )
-                          : user.status === 'active'
-                            ? roleSelect(user, (role) => pickRole(user, role))
-                            : ROLE_LABEL[user.role]}
-                      </TableCell>
-                      <TableCell>
-                        <Time value={user.createdAt} />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex justify-end gap-2">
-                          {user.status === 'pending' ? (
-                            <>
-                              <Button
-                                variant="solid"
-                                size="sm"
-                                onClick={() => approve(user)}
-                              >
-                                Approve
-                              </Button>
+          <ScrollX className="relative">
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell head>Email</TableCell>
+                  <TableCell head>Name</TableCell>
+                  <TableCell head>Role</TableCell>
+                  <TableCell head>Registered</TableCell>
+                  <TableCell head>
+                    <span className="sr-only">Actions</span>
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <tbody>
+                {list
+                  .filter((user) => user.status === tab)
+                  .map((user) => {
+                    const own = user.id === viewer;
+                    return (
+                      <TableRow key={user.id}>
+                        <TableCell>
+                          {user.email}
+                          {own ? (
+                            <Badge
+                              className="ml-2"
+                              tone="neutral"
+                              label="you"
+                            />
+                          ) : null}
+                        </TableCell>
+                        <TableCell>{user.name ?? '—'}</TableCell>
+                        <TableCell>
+                          {user.status === 'pending'
+                            ? roleSelect(user, (role) =>
+                                setRoles((c) => ({ ...c, [user.id]: role })),
+                              )
+                            : user.status === 'active'
+                              ? roleSelect(user, (role) => pickRole(user, role))
+                              : ROLE_LABEL[user.role]}
+                        </TableCell>
+                        <TableCell>
+                          <Time value={user.createdAt} />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex justify-end gap-2">
+                            {user.status === 'pending' ? (
+                              <>
+                                <Button
+                                  variant="solid"
+                                  size="sm"
+                                  onClick={() => approve(user)}
+                                >
+                                  Approve
+                                </Button>
+                                <Button
+                                  variant="danger"
+                                  size="sm"
+                                  onClick={() =>
+                                    setConfirm({ user, action: 'reject' })
+                                  }
+                                >
+                                  Reject
+                                </Button>
+                              </>
+                            ) : null}
+                            {own ? (
+                              <DisabledReason>{OWN_ROW_REASON}</DisabledReason>
+                            ) : null}
+                            {user.status === 'active' && !own ? (
                               <Button
                                 variant="danger"
                                 size="sm"
                                 onClick={() =>
-                                  setConfirm({ user, action: 'reject' })
+                                  setConfirm({ user, action: 'disable' })
                                 }
                               >
-                                Reject
+                                Disable
                               </Button>
-                            </>
-                          ) : null}
-                          {own ? (
-                            <DisabledReason>{OWN_ROW_REASON}</DisabledReason>
-                          ) : null}
-                          {user.status === 'active' && !own ? (
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              onClick={() =>
-                                setConfirm({ user, action: 'disable' })
-                              }
-                            >
-                              Disable
-                            </Button>
-                          ) : null}
-                          {user.status === 'disabled' ? (
-                            <Button
-                              variant="glass"
-                              size="sm"
-                              onClick={() => enable(user)}
-                            >
-                              Enable
-                            </Button>
-                          ) : null}
-                          {(user.status === 'active' ||
-                            user.status === 'disabled' ||
-                            user.status === 'rejected') &&
-                          !own ? (
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              onClick={() =>
-                                setConfirm({ user, action: 'delete' })
-                              }
-                            >
-                              Delete
-                            </Button>
-                          ) : null}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-            </tbody>
-          </Table>
+                            ) : null}
+                            {user.status === 'disabled' ? (
+                              <Button
+                                variant="glass"
+                                size="sm"
+                                onClick={() => enable(user)}
+                              >
+                                Enable
+                              </Button>
+                            ) : null}
+                            {(user.status === 'active' ||
+                              user.status === 'disabled' ||
+                              user.status === 'rejected') &&
+                            !own ? (
+                              <Button
+                                variant="danger"
+                                size="sm"
+                                onClick={() =>
+                                  setConfirm({ user, action: 'delete' })
+                                }
+                              >
+                                Delete
+                              </Button>
+                            ) : null}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+              </tbody>
+            </Table>
+          </ScrollX>
         )}
       </AsyncSection>
 
