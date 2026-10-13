@@ -29,7 +29,7 @@ describe('actorLabel', () => {
     expect(actorLabel(record({}))).toBe('system');
   });
 
-  test('the system on behalf of a user: email, else the id', () => {
+  test('the system on behalf of a user: email, else a deleted user', () => {
     expect(
       actorLabel(
         record({
@@ -39,11 +39,11 @@ describe('actorLabel', () => {
       ),
     ).toBe('system on behalf of ops@example.com');
     expect(actorLabel(record({ actorOnBehalfOfId: 'u_1' }))).toBe(
-      'system on behalf of u_1',
+      'system on behalf of a deleted user',
     );
   });
 
-  test('a user and a runner are unchanged', () => {
+  test('a user by email, a runner by name and never by id', () => {
     expect(
       actorLabel(
         record({
@@ -55,6 +55,12 @@ describe('actorLabel', () => {
     ).toBe('a@example.com');
     expect(
       actorLabel(record({ actorType: 'runner', actorRunnerId: 'rn_1' })),
-    ).toBe('runner rn_1');
+    ).toBe('runner');
+    expect(
+      actorLabel(
+        record({ actorType: 'runner', actorRunnerId: 'rn_1' }),
+        new Map([['runner:rn_1', 'build-box']]),
+      ),
+    ).toBe('runner build-box');
   });
 });

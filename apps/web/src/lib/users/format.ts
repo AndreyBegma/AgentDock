@@ -1,4 +1,15 @@
-import type { AdminUser, Role } from '@agentdock/shared';
+import type { AdminUser, Role, UserStatus } from '@agentdock/shared';
+
+/**
+ * The tab the Users page opens on: Active, or the first tab that has rows.
+ * Pending carries a warn count on its tab, so a waiting approval is seen.
+ */
+export function defaultUsersTab(
+  counts: Record<UserStatus, number>,
+): UserStatus {
+  const order: UserStatus[] = ['active', 'pending', 'disabled', 'rejected'];
+  return order.find((status) => counts[status] > 0) ?? 'active';
+}
 
 export const ROLE_LABEL: Record<Role, string> = {
   admin: 'Admin',

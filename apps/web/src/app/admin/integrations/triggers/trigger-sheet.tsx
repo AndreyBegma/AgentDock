@@ -26,7 +26,7 @@ import {
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../../../lib/api';
-import { formatAgo } from '../../../../lib/fleet/format';
+import { Time } from '../../../../lib/format/time';
 import { useLive } from '../../../../lib/live/use-live';
 import { triggerUrl } from '../../../../lib/webhooks/events';
 import {
@@ -220,7 +220,10 @@ export function TriggerSheet({
                   {detail.previousSecretUntil ? (
                     <span className="text-xs text-ink-3">
                       previous secret also valid until{' '}
-                      {new Date(detail.previousSecretUntil).toLocaleString()}
+                      <Time
+                        value={detail.previousSecretUntil}
+                        format="datetime"
+                      />
                     </span>
                   ) : null}
                 </div>
@@ -351,7 +354,9 @@ export function TriggerSheet({
                       <tbody>
                         {detail.deliveries.map((d) => (
                           <TableRow key={d.id}>
-                            <TableCell>{formatAgo(d.receivedAt)}</TableCell>
+                            <TableCell>
+                              <Time value={d.receivedAt} />
+                            </TableCell>
                             <TableCell>
                               <Badge
                                 tone={INBOUND_STATUS_TONE[d.status]}

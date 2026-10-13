@@ -1,5 +1,31 @@
 import { describe, expect, test } from 'bun:test';
-import { runnerRemedy, statusLabel } from './format';
+import {
+  formatLoad,
+  profilesSummary,
+  runnerRemedy,
+  statusLabel,
+} from './format';
+
+describe('formatLoad', () => {
+  test('two decimals, slash separated', () => {
+    expect(formatLoad([0.4, 1, 0.256])).toBe('0.40 / 1.00 / 0.26');
+  });
+});
+
+describe('profilesSummary', () => {
+  test('lists the first labels and counts the rest', () => {
+    const p = (label: string, missing = false) => ({ label, missing });
+    expect(profilesSummary([])).toBe('');
+    expect(profilesSummary([p('work'), p('home')])).toBe('work, home');
+    expect(profilesSummary([p('a'), p('b'), p('c'), p('d')])).toBe('a, b +2');
+  });
+
+  test('skips profiles the runner no longer reports', () => {
+    expect(
+      profilesSummary([{ label: 'old', missing: true }, { label: 'new' }]),
+    ).toBe('new');
+  });
+});
 
 describe('statusLabel', () => {
   test('never paired, paired but never connected, and the rest', () => {

@@ -27,7 +27,7 @@ import {
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../../../lib/api';
-import { formatAgo } from '../../../../lib/fleet/format';
+import { Time } from '../../../../lib/format/time';
 import { useLive } from '../../../../lib/live/use-live';
 import {
   attemptErrorLabel,
@@ -375,7 +375,7 @@ export function WebhookSheet({
                                 {d.eventType}
                               </span>
                               <div className="text-xs text-ink-3">
-                                {formatAgo(d.createdAt)}
+                                <Time value={d.createdAt} />
                               </div>
                             </TableCell>
                             <TableCell>
@@ -394,9 +394,11 @@ export function WebhookSheet({
                             </TableCell>
                             <TableCell>{d.attempts}</TableCell>
                             <TableCell>
-                              {d.status === 'pending'
-                                ? new Date(d.nextAttemptAt).toLocaleTimeString()
-                                : '—'}
+                              {d.status === 'pending' ? (
+                                <Time value={d.nextAttemptAt} />
+                              ) : (
+                                '—'
+                              )}
                             </TableCell>
                             <TableCell>
                               <div className="flex justify-end">
