@@ -1,20 +1,25 @@
 import { describe, expect, test } from 'bun:test';
 import type { ActivityItem } from '@agentdock/shared';
 import {
-  activityFormChanged,
   actorName,
   EMPTY_ACTIVITY_FILTERS,
+  formFromSearch,
+  formSearch,
+  groupRows,
   hasActivityFilters,
   itemMeta,
   LIVE_PROJECT_BUDGET,
   matchesQuery,
   mergeItems,
+  moreFilterCount,
   parseLiveItem,
   planLive,
   queryString,
   safeLink,
+  TYPE_OPTIONS,
   toActivityQuery,
   toTimelineItem,
+  typeLabel,
 } from './format';
 
 const item = (patch: Partial<ActivityItem> = {}): ActivityItem => ({
@@ -164,15 +169,19 @@ describe('presentation', () => {
     );
     expect(actorName(item({ actorType: 'user' }))).toBe('unknown user');
     expect(actorName(item({ actorType: 'system' }))).toBe('system');
-    expect(
-      actorName(item({ actorType: 'runner', actorId: 'abcdef123456' })),
-    ).toBe('runner abcdef12');
+    const runner = item({ actorType: 'runner', actorId: 'cmv6f76c2000101' });
+    expect(actorName(runner, new Map([['cmv6f76c2000101', 'luna']]))).toBe(
+      'luna',
+    );
+    // Never a raw id (R2).
+    expect(actorName(runner)).toBe('runner');
+    expect(actorName(runner, new Map())).toBe('runner');
   });
 
-  test('meta lists project, slot, issue and PR', () => {
+  test('meta lists project, slot, issue and PR, but no event code', () => {
     const names = new Map([['p1', 'Alpha']]);
     expect(itemMeta(item({ slot: 'i1', issue: 7, prNumber: 9 }), names)).toBe(
-      'Fleet · Alpha · slot i1 · #7 · PR #9 · pr.opened',
+      'Fleet · Alpha · slot i1 · #7 · PR #9',
     );
     expect(itemMeta(item({ projectId: null }), names)).toContain('no project');
   });
@@ -200,16 +209,98 @@ describe('filters', () => {
     expect(hasActivityFilters({ type: 'pr.merged' })).toBe(true);
   });
 
-  test('a form differing from what was applied is changed', () => {
-    expect(activityFormChanged(EMPTY_ACTIVITY_FILTERS, {})).toBe(false);
+  test('the URL round-trips the form, in days', () => {
+    const form = {
+      ...EMPTY_ACTIVITY_FILTERS,
+      projectId: 'p1',
+      category: 'fleet',
+      slot: 'i154',
+      fromDate: '2026-10-01',
+    };
+    const search = formSearch(form);
+    expect(search).toBe('?project=p1&category=fleet&slot=i154&from=2026-10-01');
+    expect(formFromSearch(new URLSearchParams(search))).toEqual(form);
+    expect(formSearch(EMPTY_ACTIVITY_FILTERS)).toBe('');
+  });
+
+  test('an unreadable URL value is dropped', () => {
     expect(
-      activityFormChanged({ ...EMPTY_ACTIVITY_FILTERS, actor: 'bob' }, {}),
-    ).toBe(true);
-    expect(
-      activityFormChanged(
-        { ...EMPTY_ACTIVITY_FILTERS, actor: 'bob' },
-        { actor: 'bob' },
+      formFromSearch(
+        new URLSearchParams('category=bogus&from=yesterday&slot=%20i1%20'),
       ),
-    ).toBe(false);
+    ).toEqual({ ...EMPTY_ACTIVITY_FILTERS, slot: 'i1' });
+    expect(
+      formFromSearch(new URLSearchParams(`type=${'x'.repeat(201)}`)),
+    ).toEqual(EMPTY_ACTIVITY_FILTERS);
+  });
+
+  test('"More filters" counts what it holds', () => {
+    expect(moreFilterCount(EMPTY_ACTIVITY_FILTERS)).toBe(0);
+    expect(
+      moreFilterCount({
+        ...EMPTY_ACTIVITY_FILTERS,
+        projectId: 'p1',
+        slot: 'i1',
+        toDate: '2026-10-02',
+      }),
+    ).toBe(2);
+  });
+});
+
+describe('typeLabel', () => {
+  test('reads an event code as words', () => {
+    expect(typeLabel('pr.checks_changed')).toBe('PR checks changed');
+    expect(typeLabel('slot.checkpoint')).toBe('Slot checkpoint');
+    expect(typeLabel('runner.pairing_code')).toBe('Runner pairing code');
+  });
+
+  test('every option has a label and no code is listed twice', () => {
+    const values = TYPE_OPTIONS.map((o) => o.value);
+    expect(new Set(values).size).toBe(values.length);
+    expect(TYPE_OPTIONS.every((o) => o.label !== '')).toBe(true);
+  });
+});
+
+describe('groupRows', () => {
+  const at = (hour: number) => new Date(2026, 9, 13, hour, 0, 0).toISOString();
+
+  test('folds consecutive items of one slot on one day', () => {
+    const rows = groupRows([
+      item({ id: '5', slot: 'i154', ts: at(15) }),
+      item({ id: '4', slot: 'i154', ts: at(14) }),
+      item({ id: '3', slot: 'i154', ts: at(13) }),
+      item({ id: '2', slot: 'i140', ts: at(12) }),
+      item({ id: '1', slot: 'i154', ts: at(11) }),
+    ]);
+    expect(rows.map((r) => r.kind)).toEqual(['group', 'item', 'item']);
+    const [group] = rows;
+    expect(group).toMatchObject({ id: 'group-3', label: 'i154' });
+    if (group.kind === 'group') {
+      expect(group.items.map((i) => i.id)).toEqual(['5', '4', '3']);
+    }
+  });
+
+  test('groups by PR when there is no slot, never across days or subjects', () => {
+    const rows = groupRows([
+      item({ id: '4', prNumber: 96, ts: at(15) }),
+      item({ id: '3', prNumber: 96, ts: at(14) }),
+      item({ id: '2', ts: at(13) }),
+      item({ id: '1', ts: at(12) }),
+      item({ id: '0', prNumber: 96, ts: new Date(2026, 9, 12).toISOString() }),
+    ]);
+    expect(rows.map((r) => (r.kind === 'group' ? r.label : r.item.id))).toEqual(
+      ['PR #96', '2', '1', '0'],
+    );
+  });
+
+  test('the group id survives newer items arriving on top', () => {
+    const older = [
+      item({ id: '2', slot: 'i1', ts: at(12) }),
+      item({ id: '1', slot: 'i1', ts: at(11) }),
+    ];
+    const newer = [item({ id: '3', slot: 'i1', ts: at(13) }), ...older];
+    const id = (rows: ReturnType<typeof groupRows>) =>
+      rows[0].kind === 'group' ? rows[0].id : null;
+    expect(id(groupRows(newer))).toBe(id(groupRows(older)));
   });
 });
