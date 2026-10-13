@@ -19,9 +19,16 @@ UI WebSocket.
 | **Usage** | cost/tokens by project, model, runtime, user, day; price table (admin) | M1 / M3 |
 | **Skills catalog** | skills.sh search, details, install | M3 |
 | **Runners** (admin) | pair, status, capabilities, profiles, revoke | M1 |
-| **Users** (admin) | pending approvals, roles, disable, registration toggle | M1 |
-| **Integrations** (admin) | GitHub App, Telegram bot, webhooks + delivery log, inbound triggers | M2 / M3 |
-| **Audit** (admin) | filterable log, chain verification status | M1 |
+| **Users** (admin) | pending approvals, roles with a one-line hint each, disable, delete (says what goes with the account); a change to or from admin is confirmed; your own row cannot be disabled or deleted; an empty Pending tab says when registration is closed and links to Settings | M1 |
+| **Settings** (admin) | registration toggle | M1 |
+| **Integrations** (admin) | overview of the four integrations with their status (a failed one reads "Status unavailable"); GitHub App, Telegram bot, webhooks + delivery log, inbound triggers | M2 / M3 |
+| **GitHub App** (admin) | without `APP_ENCRYPTION_KEY` a banner, and both register paths off with a reason; the manual card lists permissions, events, the absolute webhook URL and where GitHub shows the App ID and key; an inactive or failing webhook links to the App's Recent deliveries | M2 |
+| **Telegram** (admin) | bot status with what "Polling" means; Remove bot is confirmed with who stops getting notifications; the test message links to Account › Notifications for linking | M2 |
+| **Webhooks / Triggers** (admin) | Save always shows why it is off; "Delivery paused (receiver failing)" and Resume deliveries; event descriptions; the trigger's absolute URL with copy | M3 |
+| **Budgets** (admin) | every budget; "Recompute budget totals", linked to Prices' "Re-price requests" | M3 |
+| **Prices** (admin) | price versions, model table, test calculator, "Re-price requests"; with no version, the seed command | M3 |
+| **Schedules** (admin) | every project's schedules (created on the project) and the API's system jobs, in UTC | M3 |
+| **Audit** (admin) | filterable log with labelled actions; chain verification status — a broken chain says what it means and what to do | M1 |
 | **Notifications** | in-app centre; Telegram link | M2 |
 
 ## States every screen follows
