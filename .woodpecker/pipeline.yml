@@ -1,10 +1,25 @@
-# AgentDock CI and staging (ADR-0016).
+# AgentDock CI and staging (ADR-0016, ADR-0018).
 #
-# Every pull request and every push to develop/main runs the checks. A push to
-# develop then builds the staging images on the agent host's Docker daemon and
-# replaces the containers of /home/archi/stacks/agentdock-staging
+# `check` (Biome) and `build` run in full on every pipeline. `test` depends on
+# the event:
+#   - pull request: only the packages changed since the merge base with the
+#     target branch, plus their dependents (turbo `--filter=...[base]`). The
+#     full suite runs instead when a root file every package depends on
+#     changed, or when the merge base cannot be found. The step prints which
+#     mode it took.
+#   - push to main, manual run: the full suite.
+#   - push to develop: no tests. The pull request already ran them, and there
+#     is no production yet (ADR-0018).
+# A pull request that changes only docs (docs/**, *.md, .github/**) skips
+# `build` and `test`. `check` still runs, so it still reports a status.
+#
+# A push to develop then builds the staging images on the agent host's Docker
+# daemon and replaces the containers of /home/archi/stacks/agentdock-staging
 # (https://staging-agentdock.luna-realm.com). No registry, no ssh: the agents
 # run on the staging host, and the steps that need it get the Docker socket.
+#
+# The CI Postgres holds throwaway data. It runs on tmpfs, with fsync,
+# synchronous_commit and full_page_writes off.
 #
 # The repository is public. Host mounts need it "trusted → volumes" in
 # Woodpecker, and pull requests from forks must wait for approval
@@ -35,14 +50,24 @@ variables:
     BUN_INSTALL_CACHE_DIR: /ci-cache/bun
     TURBO_CACHE_DIR: /ci-cache/turbo
     TURBO_TELEMETRY_DISABLED: '1'
+  # A pull request that touches only these skips `build` and `test`.
+  - &docs_only
+    exclude: ['docs/**', '**/*.md', '.github/**']
 
 services:
+  # Throwaway data: no durability. tmpfs is an undocumented step/service field
+  # in Woodpecker 3.18, mapped to the docker backend's HostConfig.Tmpfs. It
+  # needs "trusted → volumes", like the host mounts below.
   - name: postgres
     image: postgres:16.5-alpine
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ci
       POSTGRES_DB: agentdock
+    tmpfs:
+      - /var/lib/postgresql/data:size=1g
+    commands:
+      - docker-entrypoint.sh postgres -c fsync=off -c synchronous_commit=off -c full_page_writes=off
   - name: redis
     image: redis:7.4.11-alpine
     commands:
@@ -74,14 +99,26 @@ steps:
   - name: build
     image: *ci_image
     depends_on: [install]
+    when:
+      - event: pull_request
+        path: *docs_only
+      - event: [push, manual]
     volumes: *caches
     environment: *cache_env
     commands:
       - bun run build -- --concurrency=2
 
+  # `$$` keeps a variable from Woodpecker's own substitution, so the shell
+  # expands it.
   - name: test
     image: *ci_image
     depends_on: [build]
+    when:
+      - event: pull_request
+        path: *docs_only
+      - event: push
+        branch: main
+      - event: manual
     volumes: *caches
     environment:
       <<: *cache_env
@@ -91,11 +128,37 @@ steps:
       APP_ENV: test
     commands:
       - until node -e "require('net').connect(5432,'postgres').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"; do sleep 1; done
-      - bun run test
+      - (cd apps/api && node -e "const c=new (require('pg').Client)({connectionString:'postgresql://postgres:ci@postgres:5432/agentdock'});c.connect().then(()=>c.query(\"select name, setting from pg_settings where name in ('fsync','synchronous_commit','full_page_writes')\")).then(r=>{for(const s of r.rows)console.log('postgres '+s.name+'='+s.setting);return c.end()})")
+      # A shallow clone has no merge base: fetch the target branch's history
+      # (commits only, no trees). Any failure means the full suite, never none.
+      - |
+        FILTER=""
+        if [ "$${CI_PIPELINE_EVENT}" = pull_request ]; then
+          TARGET="$${CI_COMMIT_TARGET_BRANCH:-develop}"
+          UNSHALLOW=""
+          [ "$$(git rev-parse --is-shallow-repository)" = true ] && UNSHALLOW=--unshallow
+          if git fetch --no-tags --quiet $${UNSHALLOW} --filter=tree:0 origin "+refs/heads/$${TARGET}:refs/remotes/origin/$${TARGET}" \
+            && BASE="$$(git merge-base HEAD "origin/$${TARGET}")"; then
+            ROOT="$$(git diff --name-only "$${BASE}" HEAD | grep -E '^(package\.json|bun\.lock|turbo\.json|tsconfig\.json|biome\.json|\.woodpecker/|deploy/ci-image/)' || true)"
+            if [ -n "$${ROOT}" ]; then
+              echo "test mode: full (root files changed since $${BASE}:" $${ROOT} ")"
+            else
+              FILTER="--filter=...[$${BASE}]"
+              echo "test mode: affected (packages changed since merge base $${BASE} with origin/$${TARGET}, and their dependents)"
+            fi
+          else
+            echo "test mode: full (no merge base with origin/$${TARGET})"
+          fi
+        else
+          echo "test mode: full ($${CI_PIPELINE_EVENT} event)"
+        fi
+        bun run test $${FILTER}
 
+  # On a push to develop `test` is filtered out and the optional dependency is
+  # dropped. On a manual run, the deploy waits for the full suite.
   - name: build-staging
     image: *docker_image
-    depends_on: [check, test]
+    depends_on: [check, build, { name: test, optional: true }]
     when:
       - event: push
         branch: develop

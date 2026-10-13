@@ -21,3 +21,4 @@ Numbered, never rewritten. A changed decision gets a new ADR that supersedes the
 | [0015](0015-schedules-run-on-bullmq.md) | Schedules run on BullMQ (amends ADR-0007) |
 | [0016](0016-staging-on-the-agent-host-behind-a-cloudflare-tunnel.md) | Staging on the agent host behind a Cloudflare tunnel |
 | [0017](0017-runner-distribution-homebrew-and-npm.md) | The runner ships as prebuilt binaries through Homebrew and npm |
+| [0018](0018-pull-requests-test-what-changed.md) | Pull requests test what changed; develop is not tested twice (amends ADR-0016) |
