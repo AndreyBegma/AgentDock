@@ -1,9 +1,9 @@
 'use client';
 
 import type { GitHubProjectAppStatus } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Card } from 'glass-ui/card';
-import { Skeleton } from 'glass-ui/skeleton';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Card } from '@andrewbehma/glass-ui/card';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { useEffect, useState } from 'react';
 import { api } from '../../../../../lib/api';
 import { formatAgo } from '../../../../../lib/fleet/format';

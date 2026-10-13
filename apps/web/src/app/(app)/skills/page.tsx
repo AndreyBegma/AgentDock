@@ -8,15 +8,15 @@ import type {
   SkillPreviewView,
 } from '@agentdock/shared';
 import type { SkillCatalogItem } from '@agentdock/shared/protocol';
-import { Banner } from 'glass-ui/banner';
-import { Button, buttonClassName } from 'glass-ui/button';
-import { Card } from 'glass-ui/card';
-import { EmptyState } from 'glass-ui/empty-state';
-import { Field, SearchField, Select } from 'glass-ui/field';
-import { SectionUnavailable } from 'glass-ui/section-unavailable';
-import { Skeleton } from 'glass-ui/skeleton';
-import { Spinner } from 'glass-ui/spinner';
-import { toast } from 'glass-ui/toast';
+import { Banner } from '@andrewbehma/glass-ui/banner';
+import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
+import { Card } from '@andrewbehma/glass-ui/card';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { Field, SearchField, Select } from '@andrewbehma/glass-ui/field';
+import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import { Spinner } from '@andrewbehma/glass-ui/spinner';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { RunnerOfflineBanner } from '../../../components/prerequisites/prerequisite-banner';

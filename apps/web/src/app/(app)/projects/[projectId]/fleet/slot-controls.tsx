@@ -1,8 +1,8 @@
 'use client';
 
-import { Button } from 'glass-ui/button';
-import { DialogContent, DialogRoot } from 'glass-ui/dialog';
-import { Field, Textarea } from 'glass-ui/field';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { Field, Textarea } from '@andrewbehma/glass-ui/field';
 import { useState } from 'react';
 import {
   COMMAND_PENDING_LABEL,

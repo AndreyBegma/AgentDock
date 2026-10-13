@@ -1,14 +1,19 @@
 'use client';
 
 import type { SessionDetail, SessionTotals } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Button, buttonClassName } from 'glass-ui/button';
-import { EmptyState } from 'glass-ui/empty-state';
-import { SectionUnavailable } from 'glass-ui/section-unavailable';
-import { Skeleton } from 'glass-ui/skeleton';
-import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
-import { Tooltip } from 'glass-ui/tooltip';
-import { Tree } from 'glass-ui/tree';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import {
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+} from '@andrewbehma/glass-ui/table';
+import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
+import { Tree } from '@andrewbehma/glass-ui/tree';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';

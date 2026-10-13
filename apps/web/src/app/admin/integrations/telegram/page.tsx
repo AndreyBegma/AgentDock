@@ -4,13 +4,13 @@ import type {
   TelegramBotTokenUpdate,
   TelegramIntegrationStatus,
 } from '@agentdock/shared';
-import { Banner } from 'glass-ui/banner';
-import { Button } from 'glass-ui/button';
-import { Card } from 'glass-ui/card';
-import { DialogContent, DialogRoot } from 'glass-ui/dialog';
-import { Field, Input } from 'glass-ui/field';
-import { Skeleton } from 'glass-ui/skeleton';
-import { toast } from 'glass-ui/toast';
+import { Banner } from '@andrewbehma/glass-ui/banner';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { Card } from '@andrewbehma/glass-ui/card';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { Field, Input } from '@andrewbehma/glass-ui/field';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import Link from 'next/link';
 import { type FormEvent, useState } from 'react';
 import { AsyncSection } from '../../../../components/prerequisites/async-section';

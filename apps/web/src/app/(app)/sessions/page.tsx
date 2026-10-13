@@ -6,16 +6,21 @@ import type {
   SessionListResponse,
   SessionSummary,
 } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Button, buttonClassName } from 'glass-ui/button';
-import { Checkbox } from 'glass-ui/checkbox';
-import { DateInput } from 'glass-ui/date-input';
-import { EmptyState } from 'glass-ui/empty-state';
-import { Field, Input, Select } from 'glass-ui/field';
-import { SectionUnavailable } from 'glass-ui/section-unavailable';
-import { Skeleton } from 'glass-ui/skeleton';
-import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
-import { Tooltip } from 'glass-ui/tooltip';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
+import { Checkbox } from '@andrewbehma/glass-ui/checkbox';
+import { DateInput } from '@andrewbehma/glass-ui/date-input';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
+import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import {
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+} from '@andrewbehma/glass-ui/table';
+import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import Link from 'next/link';
 import {
   type FormEvent,

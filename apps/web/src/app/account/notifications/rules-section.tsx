@@ -4,12 +4,17 @@ import type {
   NotificationChannel,
   NotificationRulesView,
 } from '@agentdock/shared';
-import { Button } from 'glass-ui/button';
-import { Card } from 'glass-ui/card';
-import { SectionUnavailable } from 'glass-ui/section-unavailable';
-import { Skeleton } from 'glass-ui/skeleton';
-import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
-import { Toggle } from 'glass-ui/toggle';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { Card } from '@andrewbehma/glass-ui/card';
+import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import {
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+} from '@andrewbehma/glass-ui/table';
+import { Toggle } from '@andrewbehma/glass-ui/toggle';
 import { api, describeError, describeErrorHint } from '../../../lib/api';
 import {
   type RuleRow,

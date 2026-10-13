@@ -1,6 +1,6 @@
 'use client';
 
-import { CodeBlock } from 'glass-ui/code-block';
+import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
 import Link from 'next/link';
 import {
   INSTALL_COMMANDS,

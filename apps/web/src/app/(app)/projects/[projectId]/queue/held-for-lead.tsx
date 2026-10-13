@@ -1,5 +1,10 @@
 import type { HeldForLeadRow } from '@agentdock/shared';
-import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
+import {
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+} from '@andrewbehma/glass-ui/table';
 import { HELD_FOR_LEAD_HINT } from '../../../../../lib/queue/format';
 
 /** D5: the orchestrator's latest `Held for a lead` table, as written. */

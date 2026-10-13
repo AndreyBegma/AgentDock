@@ -9,13 +9,13 @@ import {
   type LiveTopic,
   type ProjectSummary,
 } from '@agentdock/shared';
-import { Button, buttonClassName } from 'glass-ui/button';
-import { DateInput } from 'glass-ui/date-input';
-import { EmptyState } from 'glass-ui/empty-state';
-import { Field, Input, Select } from 'glass-ui/field';
-import { SectionUnavailable } from 'glass-ui/section-unavailable';
-import { Skeleton } from 'glass-ui/skeleton';
-import { Timeline } from 'glass-ui/timeline';
+import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
+import { DateInput } from '@andrewbehma/glass-ui/date-input';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
+import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import { Timeline } from '@andrewbehma/glass-ui/timeline';
 import Link from 'next/link';
 import {
   type FormEvent,

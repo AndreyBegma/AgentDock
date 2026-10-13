@@ -9,10 +9,10 @@ import {
   SCHEDULE_FIRING_UPDATED_LIVE_EVENT,
   SCHEDULE_UPDATED_LIVE_EVENT,
 } from '@agentdock/shared';
-import { Button } from 'glass-ui/button';
-import { DialogContent, DialogRoot } from 'glass-ui/dialog';
-import { EmptyState } from 'glass-ui/empty-state';
-import { toast } from 'glass-ui/toast';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';

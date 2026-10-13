@@ -5,14 +5,19 @@ import type {
   ModelPriceInput,
   PriceVersionListResponse,
 } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Button } from 'glass-ui/button';
-import { CodeBlock } from 'glass-ui/code-block';
-import { EmptyState } from 'glass-ui/empty-state';
-import { Field, Input } from 'glass-ui/field';
-import { SectionUnavailable } from 'glass-ui/section-unavailable';
-import { Skeleton } from 'glass-ui/skeleton';
-import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { Field, Input } from '@andrewbehma/glass-ui/field';
+import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import {
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+} from '@andrewbehma/glass-ui/table';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';

@@ -6,7 +6,7 @@ import {
   type ActivitySeverity,
   MAX_LIVE_SUBSCRIPTIONS,
 } from '@agentdock/shared';
-import type { TimelineItem } from 'glass-ui/timeline';
+import type { TimelineItem } from '@andrewbehma/glass-ui/timeline';
 import { ApiError } from '../api';
 
 /** Projects the global feed follows live; past it the page polls (the socket is shared, cap 50). */

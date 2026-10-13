@@ -1,14 +1,14 @@
 'use client';
 
-import { Button } from 'glass-ui/button';
-import { Card } from 'glass-ui/card';
-import { EmptyState } from 'glass-ui/empty-state';
-import { SectionUnavailable } from 'glass-ui/section-unavailable';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { Card } from '@andrewbehma/glass-ui/card';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
 import {
   SegmentedControl,
   SegmentedControlItem,
-} from 'glass-ui/segmented-control';
-import { Skeleton } from 'glass-ui/skeleton';
+} from '@andrewbehma/glass-ui/segmented-control';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { useState } from 'react';
 import { NotificationItem } from '../../../components/shell/notification-item';
 import { useCurrentUser } from '../../../components/shell/user-context';

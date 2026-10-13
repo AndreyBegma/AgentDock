@@ -1,8 +1,8 @@
 'use client';
 
-import { Banner } from 'glass-ui/banner';
-import { Button } from 'glass-ui/button';
-import { Card } from 'glass-ui/card';
+import { Banner } from '@andrewbehma/glass-ui/banner';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { Card } from '@andrewbehma/glass-ui/card';
 import { useState } from 'react';
 import type { useTelegramLink } from '../../../lib/notifications/use-telegram-link';
 

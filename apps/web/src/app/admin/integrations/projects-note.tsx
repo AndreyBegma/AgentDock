@@ -1,8 +1,8 @@
 'use client';
 
 import type { ProjectSummary } from '@agentdock/shared';
-import { Banner } from 'glass-ui/banner';
-import { Button } from 'glass-ui/button';
+import { Banner } from '@andrewbehma/glass-ui/banner';
+import { Button } from '@andrewbehma/glass-ui/button';
 import { DisabledReason } from '../../../components/prerequisites/disabled-reason';
 import type { Section } from '../../../lib/section/use-section';
 

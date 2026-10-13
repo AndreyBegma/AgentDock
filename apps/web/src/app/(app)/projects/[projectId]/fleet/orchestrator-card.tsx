@@ -3,10 +3,10 @@ import type {
   OrchestratorSettingsView,
   OrchestratorStatus,
 } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Button } from 'glass-ui/button';
-import { Card } from 'glass-ui/card';
-import { Tooltip } from 'glass-ui/tooltip';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { Card } from '@andrewbehma/glass-ui/card';
+import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import type { ReactNode } from 'react';
 import { PrerequisiteBanner } from '../../../../../components/prerequisites/prerequisite-banner';
 import { orchestratorSettingsHref } from '../../../../../lib/control/reasons';

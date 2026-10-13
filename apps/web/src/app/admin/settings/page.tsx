@@ -1,10 +1,10 @@
 'use client';
 
 import type { RegistrationState } from '@agentdock/shared';
-import { Card } from 'glass-ui/card';
-import { Skeleton } from 'glass-ui/skeleton';
-import { toast } from 'glass-ui/toast';
-import { Toggle } from 'glass-ui/toggle';
+import { Card } from '@andrewbehma/glass-ui/card';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import { toast } from '@andrewbehma/glass-ui/toast';
+import { Toggle } from '@andrewbehma/glass-ui/toggle';
 import { AsyncSection } from '../../../components/prerequisites/async-section';
 import { api, describeError } from '../../../lib/api';
 import { useSection } from '../../../lib/section/use-section';

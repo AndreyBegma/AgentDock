@@ -5,13 +5,18 @@ import {
   type RunDetail,
   type RunSession,
 } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { EmptyState } from 'glass-ui/empty-state';
-import { KeyValueList } from 'glass-ui/key-value-list';
-import { Skeleton } from 'glass-ui/skeleton';
-import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
-import { Timeline } from 'glass-ui/timeline';
-import { toast } from 'glass-ui/toast';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { KeyValueList } from '@andrewbehma/glass-ui/key-value-list';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import {
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+} from '@andrewbehma/glass-ui/table';
+import { Timeline } from '@andrewbehma/glass-ui/timeline';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';

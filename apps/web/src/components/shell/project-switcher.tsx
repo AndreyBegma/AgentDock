@@ -1,7 +1,7 @@
 'use client';
 
 import type { ProjectSummary } from '@agentdock/shared';
-import { Combobox } from 'glass-ui/combobox';
+import { Combobox } from '@andrewbehma/glass-ui/combobox';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';

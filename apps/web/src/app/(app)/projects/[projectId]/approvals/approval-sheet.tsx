@@ -1,12 +1,12 @@
 'use client';
 
 import type { ApprovalDetail } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Banner } from 'glass-ui/banner';
-import { Button } from 'glass-ui/button';
-import { Disclosure } from 'glass-ui/disclosure';
-import { SheetContent, SheetRoot } from 'glass-ui/sheet';
-import { Skeleton } from 'glass-ui/skeleton';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Banner } from '@andrewbehma/glass-ui/banner';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { Disclosure } from '@andrewbehma/glass-ui/disclosure';
+import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { type ReactNode, useEffect, useState } from 'react';
 import { DisabledReason } from '../../../../../components/prerequisites/disabled-reason';
 import { api } from '../../../../../lib/api';

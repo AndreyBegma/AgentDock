@@ -1,11 +1,11 @@
 'use client';
 
 import type { SlotDetail } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Button } from 'glass-ui/button';
-import { SheetContent, SheetRoot } from 'glass-ui/sheet';
-import { Skeleton } from 'glass-ui/skeleton';
-import { Tabs, TabsItem } from 'glass-ui/tabs';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import { Tabs, TabsItem } from '@andrewbehma/glass-ui/tabs';
 import { type ReactNode, useEffect, useState } from 'react';
 import { api } from '../../../../../lib/api';
 import type { useControl } from '../../../../../lib/control/use-control';

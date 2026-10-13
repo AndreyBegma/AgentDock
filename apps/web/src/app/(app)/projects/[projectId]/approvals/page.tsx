@@ -5,12 +5,17 @@ import {
   type ApprovalItemView,
   type ApprovalsView,
 } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Banner } from 'glass-ui/banner';
-import { Button, buttonClassName } from 'glass-ui/button';
-import { EmptyState } from 'glass-ui/empty-state';
-import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
-import { Tooltip } from 'glass-ui/tooltip';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Banner } from '@andrewbehma/glass-ui/banner';
+import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import {
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+} from '@andrewbehma/glass-ui/table';
+import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';

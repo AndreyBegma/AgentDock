@@ -5,11 +5,11 @@ import {
   type PairingCodeResponse,
   pairCommand,
 } from '@agentdock/shared';
-import { Banner } from 'glass-ui/banner';
-import { Button, buttonClassName } from 'glass-ui/button';
-import { CodeBlock } from 'glass-ui/code-block';
-import { DialogContent, DialogRoot } from 'glass-ui/dialog';
-import { toast } from 'glass-ui/toast';
+import { Banner } from '@andrewbehma/glass-ui/banner';
+import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
+import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import Link from 'next/link';
 import { type ReactNode, useEffect, useState } from 'react';
 import {

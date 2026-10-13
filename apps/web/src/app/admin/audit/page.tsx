@@ -11,17 +11,22 @@ import {
   type AuditVerificationState,
   USER_STATUSES,
 } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Banner } from 'glass-ui/banner';
-import { Button, buttonClassName } from 'glass-ui/button';
-import { Combobox } from 'glass-ui/combobox';
-import { DateInput } from 'glass-ui/date-input';
-import { EmptyState } from 'glass-ui/empty-state';
-import { Field, Input, Select } from 'glass-ui/field';
-import { SectionUnavailable } from 'glass-ui/section-unavailable';
-import { Skeleton } from 'glass-ui/skeleton';
-import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
-import { toast } from 'glass-ui/toast';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Banner } from '@andrewbehma/glass-ui/banner';
+import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
+import { Combobox } from '@andrewbehma/glass-ui/combobox';
+import { DateInput } from '@andrewbehma/glass-ui/date-input';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
+import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import {
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+} from '@andrewbehma/glass-ui/table';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { ApiError, api } from '../../../lib/api';

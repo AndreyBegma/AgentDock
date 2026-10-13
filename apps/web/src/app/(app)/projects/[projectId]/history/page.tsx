@@ -8,13 +8,13 @@ import {
   type RunPage,
   type RunSummary,
 } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Button } from 'glass-ui/button';
-import { type Column, DataTable } from 'glass-ui/data-table';
-import { DateInput } from 'glass-ui/date-input';
-import { EmptyState } from 'glass-ui/empty-state';
-import { Field, Select } from 'glass-ui/field';
-import { toast } from 'glass-ui/toast';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { type Column, DataTable } from '@andrewbehma/glass-ui/data-table';
+import { DateInput } from '@andrewbehma/glass-ui/date-input';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { Field, Select } from '@andrewbehma/glass-ui/field';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';

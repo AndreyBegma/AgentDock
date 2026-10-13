@@ -1,7 +1,7 @@
 'use client';
 
 import type { TelegramLinkCode, TelegramLinkStatus } from '@agentdock/shared';
-import { toast } from 'glass-ui/toast';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import { useCallback, useEffect, useState } from 'react';
 import { api, describeErrorHint } from '../api';
 import { useErrorToast } from '../section/use-error-toast';

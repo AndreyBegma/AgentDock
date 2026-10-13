@@ -6,10 +6,10 @@ import {
   type InboundTriggerWithSecret,
   type ProjectSummary,
 } from '@agentdock/shared';
-import { Banner } from 'glass-ui/banner';
-import { Button } from 'glass-ui/button';
-import { DialogContent, DialogRoot } from 'glass-ui/dialog';
-import { Field, Input, Select, Textarea } from 'glass-ui/field';
+import { Banner } from '@andrewbehma/glass-ui/banner';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { Field, Input, Select, Textarea } from '@andrewbehma/glass-ui/field';
 import { useEffect, useState } from 'react';
 import { DisabledReason } from '../../../../components/prerequisites/disabled-reason';
 import { api } from '../../../../lib/api';

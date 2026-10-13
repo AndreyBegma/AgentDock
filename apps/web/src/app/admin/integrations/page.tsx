@@ -6,10 +6,10 @@ import type {
   TelegramIntegrationStatus,
   WebhookView,
 } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { buttonClassName } from 'glass-ui/button';
-import { Card } from 'glass-ui/card';
-import { Skeleton } from 'glass-ui/skeleton';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { buttonClassName } from '@andrewbehma/glass-ui/button';
+import { Card } from '@andrewbehma/glass-ui/card';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import Link from 'next/link';
 import { api } from '../../../lib/api';
 import {

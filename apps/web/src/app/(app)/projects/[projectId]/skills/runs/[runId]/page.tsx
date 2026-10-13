@@ -5,17 +5,22 @@ import {
   RUN_UPDATED_LIVE_EVENT,
   type SkillRunDetail,
 } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Banner } from 'glass-ui/banner';
-import { Button } from 'glass-ui/button';
-import { CodeBlock } from 'glass-ui/code-block';
-import { DialogContent, DialogRoot } from 'glass-ui/dialog';
-import { EmptyState } from 'glass-ui/empty-state';
-import { KeyValueList } from 'glass-ui/key-value-list';
-import { Skeleton } from 'glass-ui/skeleton';
-import { Spinner } from 'glass-ui/spinner';
-import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
-import { toast } from 'glass-ui/toast';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Banner } from '@andrewbehma/glass-ui/banner';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { KeyValueList } from '@andrewbehma/glass-ui/key-value-list';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import { Spinner } from '@andrewbehma/glass-ui/spinner';
+import {
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+} from '@andrewbehma/glass-ui/table';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';

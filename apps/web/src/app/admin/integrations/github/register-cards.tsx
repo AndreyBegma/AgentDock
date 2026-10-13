@@ -7,12 +7,12 @@ import {
   type GitHubManifestRequest,
   type GitHubManifestResponse,
 } from '@agentdock/shared';
-import { Banner } from 'glass-ui/banner';
-import { Button } from 'glass-ui/button';
-import { Card } from 'glass-ui/card';
-import { CodeBlock } from 'glass-ui/code-block';
-import { Field, Input, Textarea } from 'glass-ui/field';
-import { toast } from 'glass-ui/toast';
+import { Banner } from '@andrewbehma/glass-ui/banner';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { Card } from '@andrewbehma/glass-ui/card';
+import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
+import { Field, Input, Textarea } from '@andrewbehma/glass-ui/field';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { DisabledReason } from '../../../../components/prerequisites/disabled-reason';
 import { api } from '../../../../lib/api';

@@ -1,9 +1,12 @@
 'use client';
 
 import { PAIRING_CODE_TTL_MS, type PublicUser } from '@agentdock/shared';
-import { buttonClassName } from 'glass-ui/button';
-import { Card } from 'glass-ui/card';
-import { CodeBlock, type CodeBlockProps } from 'glass-ui/code-block';
+import { buttonClassName } from '@andrewbehma/glass-ui/button';
+import { Card } from '@andrewbehma/glass-ui/card';
+import {
+  CodeBlock,
+  type CodeBlockProps,
+} from '@andrewbehma/glass-ui/code-block';
 import Link from 'next/link';
 import { type ReactNode, useEffect, useState } from 'react';
 import { api } from '../../lib/api';

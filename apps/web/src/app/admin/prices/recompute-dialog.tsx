@@ -5,13 +5,13 @@ import type {
   RecomputeProgress,
   RecomputeRequest,
 } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Banner } from 'glass-ui/banner';
-import { Button } from 'glass-ui/button';
-import { DateInput } from 'glass-ui/date-input';
-import { DialogContent, DialogRoot } from 'glass-ui/dialog';
-import { Field, Select } from 'glass-ui/field';
-import { Progress } from 'glass-ui/progress';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Banner } from '@andrewbehma/glass-ui/banner';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { DateInput } from '@andrewbehma/glass-ui/date-input';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { Field, Select } from '@andrewbehma/glass-ui/field';
+import { Progress } from '@andrewbehma/glass-ui/progress';
 import Link from 'next/link';
 import { type FormEvent, useEffect, useState } from 'react';
 import { DisabledReason } from '../../../components/prerequisites/disabled-reason';

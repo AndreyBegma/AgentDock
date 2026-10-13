@@ -1,11 +1,11 @@
 'use client';
 
 import type { WebhookSettingsView } from '@agentdock/shared';
-import { Button } from 'glass-ui/button';
-import { Card } from 'glass-ui/card';
-import { Field, Textarea } from 'glass-ui/field';
-import { SectionUnavailable } from 'glass-ui/section-unavailable';
-import { toast } from 'glass-ui/toast';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { Card } from '@andrewbehma/glass-ui/card';
+import { Field, Textarea } from '@andrewbehma/glass-ui/field';
+import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../../../lib/api';
 import {

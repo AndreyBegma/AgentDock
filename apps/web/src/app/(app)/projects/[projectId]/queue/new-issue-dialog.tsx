@@ -1,12 +1,12 @@
 'use client';
 
 import type { CreateIssueRequest, CreateIssueResult } from '@agentdock/shared';
-import { Button } from 'glass-ui/button';
-import { Combobox } from 'glass-ui/combobox';
-import { DialogContent, DialogRoot } from 'glass-ui/dialog';
-import { Field, Input, Textarea } from 'glass-ui/field';
-import { toast } from 'glass-ui/toast';
-import { Toggle } from 'glass-ui/toggle';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { Combobox } from '@andrewbehma/glass-ui/combobox';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { Field, Input, Textarea } from '@andrewbehma/glass-ui/field';
+import { toast } from '@andrewbehma/glass-ui/toast';
+import { Toggle } from '@andrewbehma/glass-ui/toggle';
 import { useState } from 'react';
 import { api } from '../../../../../lib/api';
 import {

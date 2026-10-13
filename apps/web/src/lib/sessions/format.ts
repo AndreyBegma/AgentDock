@@ -8,7 +8,7 @@ import {
   type SessionTurnNode,
 } from '@agentdock/shared';
 import type { Runtime } from '@agentdock/shared/protocol';
-import type { TreeItem } from 'glass-ui/tree';
+import type { TreeItem } from '@andrewbehma/glass-ui/tree';
 import { ApiError, describeError, type ErrorHint } from '../api';
 
 /** `1234` → `1.2k`, `2_500_000` → `2.5M`. */

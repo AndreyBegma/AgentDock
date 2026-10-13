@@ -1,8 +1,13 @@
 import type { SlotSummary } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Button } from 'glass-ui/button';
-import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
-import { Tooltip } from 'glass-ui/tooltip';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Button } from '@andrewbehma/glass-ui/button';
+import {
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+} from '@andrewbehma/glass-ui/table';
+import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import {
   CHECKS_LABEL,
   CHECKS_TONE,
