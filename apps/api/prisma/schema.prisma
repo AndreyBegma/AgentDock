@@ -61,6 +61,10 @@ model User {
   inboundTriggersCreated      InboundTrigger[]
   webhooksCreated             Webhook[]
   githubAppsRegistered        GitHubApp[]
+  plannerInstructions         PlannerInstructions[]
+  plannerSettingsUpdated      PlannerSettings[]
+  plans                       Plan[]
+  planTurns                   PlanTurn[]
 
   @@map("users")
 }
@@ -342,6 +346,9 @@ model Project {
   budgets              Budget[]
   inboundTriggers      InboundTrigger[]
   githubAppHealth      GitHubProjectHealth?
+  plannerInstructions  PlannerInstructions[]
+  plannerSettings      PlannerSettings?
+  plans                Plan[]
 
   @@unique([runnerId, rootPath])
   @@map("projects")
@@ -1225,6 +1232,8 @@ enum RunKind {
   orchestrator_slot
   skill
   schedule
+  /// A Planner turn (docs/specs/172 D14).
+  plan
 }
 
 enum RunStatus {
@@ -1282,6 +1291,7 @@ model Run {
   project           Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
   slot              Slot?             @relation(fields: [slotId], references: [id], onDelete: Cascade)
   skillRun          SkillRun?
+  planTurn          PlanTurn?
   firings           ScheduleFiring[]
   inboundDeliveries InboundDelivery[]
 
@@ -1879,4 +1889,211 @@ model GitHubProjectHealth {
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@map("github_project_health")
+}
+
+// ─── Planner (spec 172) ─────────────────────────────────────────────────────
+
+/// Shared `PLAN_MODES` (D2).
+enum PlanMode {
+  batch
+  dialogue
+}
+
+/// Shared `PLAN_VISIBILITIES` (D12).
+enum PlanVisibility {
+  private
+  project
+}
+
+/// Shared `PLAN_STATUSES`.
+enum PlanStatus {
+  clarifying
+  drafting
+  reviewing
+  sending
+  sent
+  archived
+}
+
+/// Shared `PLAN_TASK_KINDS` (D4).
+enum PlanTaskKind {
+  bug
+  feature
+}
+
+/// Shared `PLAN_TASK_STATUSES` (D6, D9).
+enum PlanTaskStatus {
+  draft
+  needs_talk
+  ready
+  approved
+  rejected
+  rewrite_requested
+  issued
+}
+
+/// Shared `PLAN_TURN_ACTIONS` (D16).
+enum PlanTurnAction {
+  decompose
+  clarify
+  grill
+  write
+  revise
+}
+
+/// Shared `PLAN_TURN_PHASES`.
+enum PlanTurnPhase {
+  queued
+  running
+  succeeded
+  failed
+  cancelled
+}
+
+/// Shared `PLANNER_SPEC_OUTPUTS` (D10).
+enum PlannerSpecOutput {
+  docs_pr
+  issue_body
+}
+
+/// The planner's instructions, one row per saved version (D11, ADR-0019).
+/// `projectId` null is the global default; a project row is that project's
+/// override. Unique `(projectId, version)`, and — Postgres treating NULLs as
+/// distinct — a partial unique index on `version` for the global rows (in the
+/// migration).
+model PlannerInstructions {
+  id        String   @id @default(cuid())
+  projectId String?
+  version   Int
+  body      String
+  /// Null for the seeded version 1, and when the author is deleted.
+  authorId  String?
+  createdAt DateTime @default(now())
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author  User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  plans   Plan[]
+
+  @@unique([projectId, version])
+  @@map("planner_instructions")
+}
+
+/// A project's planner settings (D10). No row: `docs_pr` when the project has
+/// a `specDir`, `issue_body` otherwise.
+model PlannerSettings {
+  projectId   String            @id
+  specOutput  PlannerSpecOutput
+  /// Nullable so deleting the admin keeps the settings.
+  updatedById String?
+  updatedAt   DateTime          @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  updatedBy User?   @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@map("planner_settings")
+}
+
+/// A plan: a brief and its tasks, across versions (D1, D9). One Claude
+/// session per plan (`sessionId`, D3); its read-only worktree (D15).
+model Plan {
+  id              String         @id @default(cuid())
+  projectId       String
+  /// Nullable so deleting the author keeps a sent plan's record; a private
+  /// plan without an author is readable by nobody (D12).
+  authorId        String?
+  title           String
+  brief           String
+  mode            PlanMode
+  visibility      PlanVisibility @default(private)
+  status          PlanStatus
+  version         Int            @default(1)
+  sessionId       String         @db.Uuid
+  /// The instructions version the plan runs with (D11).
+  instructionsId  String
+  contractVersion Int
+  profileKey      String
+  model           String
+  worktree        String?
+  docsPrNumber    Int?
+  docsPrUrl       String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  sentAt          DateTime?
+
+  project      Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author       User?               @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  instructions PlannerInstructions @relation(fields: [instructionsId], references: [id], onDelete: Restrict)
+  tasks        PlanTask[]
+  turns        PlanTurn[]
+
+  @@index([projectId, updatedAt])
+  @@index([authorId])
+  @@map("plans")
+}
+
+/// A task of one plan version (D4, D9). `key` is stable across versions;
+/// approved tasks are carried into the next version `frozen`. After it is
+/// issued, its live status is derived, never stored ("Data / Schema").
+model PlanTask {
+  id             String         @id @default(cuid())
+  planId         String
+  /// Stable within the plan (`t3`); `dependsOn` holds keys.
+  key            String
+  planVersion    Int
+  kind           PlanTaskKind
+  title          String
+  summary        String
+  dependsOn      String[]       @default([])
+  status         PlanTaskStatus @default(draft)
+  /// The current round's `PlanQuestion[]` (shared `planQuestionSchema`).
+  questions      Json           @default("[]")
+  document       String?
+  rewriteComment String?
+  frozen         Boolean        @default(false)
+  /// The fork of the plan session this task's conversation runs in (D3).
+  sessionId      String?        @db.Uuid
+  issueNumber    Int?
+  issueUrl       String?
+  queuedAt       DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  plan  Plan       @relation(fields: [planId], references: [id], onDelete: Cascade)
+  turns PlanTurn[]
+
+  @@unique([planId, key, planVersion])
+  @@index([planId, planVersion])
+  @@index([issueNumber])
+  @@map("plan_tasks")
+}
+
+/// One headless turn (D3, D17): a `runs` row of kind `plan` (D14). A turn
+/// whose output fails the contract keeps `resultText` and applies nothing.
+model PlanTurn {
+  id         String         @id @default(cuid())
+  planId     String
+  /// Set for a task's grill or write turn.
+  taskId     String?
+  runId      String         @unique
+  action     PlanTurnAction
+  /// Nullable so deleting the author keeps the turn.
+  authorId   String?
+  /// `{ message?, answers? }` (shared `planTurnInputSchema`).
+  input      Json
+  /// The validated contract output.
+  output     Json?
+  resultText String?
+  phase      PlanTurnPhase  @default(queued)
+  error      String?
+  createdAt  DateTime       @default(now())
+  finishedAt DateTime?
+
+  plan   Plan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+  task   PlanTask? @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  run    Run       @relation(fields: [runId], references: [id], onDelete: Cascade)
+  author User?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([planId, createdAt])
+  @@index([taskId, createdAt])
+  @@map("plan_turns")
 }

@@ -1,4 +1,3 @@
-import type { PlannerViolationReason } from './contract';
 import type {
   PlanAnswer,
   PlanMode,
@@ -65,10 +64,9 @@ export interface PlanTurnView {
   author: PlanUserRef;
   input: PlanTurnInput;
   phase: PlanTurnPhase;
-  /** `contract_violation`, or the runner's error code. */
+  /** `contract_violation: <reason>: <message>`, or the runner's error. */
   error: string | null;
-  /** Set with `error: 'contract_violation'`. */
-  violation: PlannerViolationReason | null;
+  /** Kept for a `contract_violation`, shown raw in a `Disclosure`. */
   resultText: string | null;
   createdAt: string;
   finishedAt: string | null;

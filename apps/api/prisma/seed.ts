@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { REGISTRATION_SETTING_KEY } from '@agentdock/shared';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
+import { seedPlannerInstructions } from '../src/database/seed-planner-instructions';
 import { describeConversion, seedPrices } from '../src/prices/seed-prices';
 
 const prisma = new PrismaClient({
@@ -25,6 +26,13 @@ async function main() {
   } else {
     console.log('Prices: a version exists, left unchanged');
   }
+
+  const planner = await seedPlannerInstructions(prisma);
+  console.log(
+    planner.created
+      ? 'Planner instructions version 1 created from default-instructions.md'
+      : 'Planner instructions: a global version exists, left unchanged',
+  );
 
   console.log('Seed complete');
 }
