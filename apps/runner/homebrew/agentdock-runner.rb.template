@@ -3,7 +3,7 @@
 # Change the template there, not this file.
 class AgentdockRunner < Formula
   desc "Per-machine daemon of AgentDock, a control plane for agent fleets"
-  homepage "https://github.com/AndreyBegma/AgentDock"
+  homepage "https://agentdock.luna-realm.com/"
   version "@VERSION@"
   license "MIT"
 
