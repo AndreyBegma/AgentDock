@@ -18,9 +18,10 @@ import {
 } from '@andrewbehma/glass-ui/table';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { PageHeader } from '../../../components/page-header/page-header';
 import { AsyncSection } from '../../../components/prerequisites/async-section';
 import { api } from '../../../lib/api';
-import { formatAgo } from '../../../lib/fleet/format';
+import { Time } from '../../../lib/format/time';
 import { formatFireTime } from '../../../lib/schedules/format';
 import { useSection } from '../../../lib/section/use-section';
 import { ScheduleSheet } from '../../(app)/projects/[projectId]/schedules/schedule-sheet';
@@ -104,7 +105,7 @@ function SystemJobs() {
                     {formatFireTime(job.nextRunAt, 'UTC', true)}
                   </TableCell>
                   <TableCell>
-                    {job.lastRunAt ? formatAgo(job.lastRunAt) : '—'}
+                    <Time value={job.lastRunAt} />
                   </TableCell>
                 </TableRow>
               ))}
@@ -132,10 +133,11 @@ export default function AdminSchedulesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Schedules</h1>
-          <p className="max-w-prose text-sm text-ink-2">
+      <PageHeader
+        className="mb-0"
+        title="Schedules"
+        description={
+          <>
             Every project’s schedules. Create and edit them on the project’s own
             Schedules page, under{' '}
             <Link
@@ -145,28 +147,30 @@ export default function AdminSchedulesPage() {
               Projects
             </Link>
             . Each schedule’s times are in the timezone shown under it.
-          </p>
-        </div>
-        <Field label="Show" htmlFor="schedules-filter">
-          <Select
-            id="schedules-filter"
-            value={filter}
-            onChange={(e) =>
-              setFilter(
-                e.target.value === 'on'
-                  ? 'on'
-                  : e.target.value === 'off'
-                    ? 'off'
-                    : 'all',
-              )
-            }
-          >
-            <option value="all">All</option>
-            <option value="on">Enabled</option>
-            <option value="off">Disabled</option>
-          </Select>
-        </Field>
-      </div>
+          </>
+        }
+        actions={
+          <Field label="Show" htmlFor="schedules-filter">
+            <Select
+              id="schedules-filter"
+              value={filter}
+              onChange={(e) =>
+                setFilter(
+                  e.target.value === 'on'
+                    ? 'on'
+                    : e.target.value === 'off'
+                      ? 'off'
+                      : 'all',
+                )
+              }
+            >
+              <option value="all">All</option>
+              <option value="on">Enabled</option>
+              <option value="off">Disabled</option>
+            </Select>
+          </Field>
+        }
+      />
 
       <AsyncSection
         section={schedules}

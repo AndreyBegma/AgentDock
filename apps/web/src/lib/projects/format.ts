@@ -13,6 +13,17 @@ import { type PrerequisiteCopy, RUNNERS_PAGE } from '../prerequisites/copy';
 import type { RunnersFact } from '../prerequisites/facts';
 import { RUN_COMMAND } from '../runners/install';
 
+/** The GitHub App card's single state (healthy + covered and the like collapse into one). */
+export function githubAppState(status: {
+  covered: boolean;
+  state: 'healthy' | 'unhealthy';
+}): { label: string; tone: 'ok' | 'warn' | 'neutral' } {
+  if (!status.covered) return { label: 'Not covered', tone: 'neutral' };
+  return status.state === 'healthy'
+    ? { label: 'Healthy', tone: 'ok' }
+    : { label: 'Needs attention', tone: 'warn' };
+}
+
 export const DOCS_KIND_LABEL: Record<DocsSourceKind, string> = {
   in_repo: 'In the repository',
   sibling_repo: 'Sibling repository',

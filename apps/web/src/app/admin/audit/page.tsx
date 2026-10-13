@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  type AdminRunner,
   type AdminUser,
   AUDIT_ACTIONS,
   AUDIT_RESULTS,
@@ -9,26 +10,26 @@ import {
   type AuditRecordView,
   type AuditVerification,
   type AuditVerificationState,
+  type ProjectSummary,
   USER_STATUSES,
+  type WebhookView,
 } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { Combobox } from '@andrewbehma/glass-ui/combobox';
+import { type Column, DataTable } from '@andrewbehma/glass-ui/data-table';
 import { DateInput } from '@andrewbehma/glass-ui/date-input';
+import { Disclosure } from '@andrewbehma/glass-ui/disclosure';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
 import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
-import {
-  Table,
-  TableCell,
-  TableHead,
-  TableRow,
-} from '@andrewbehma/glass-ui/table';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
+import { PageHeader } from '../../../components/page-header/page-header';
+import { ScrollX } from '../../../components/scroll-x/scroll-x';
 import { ApiError, api } from '../../../lib/api';
 import {
   ACTION_LABEL,
@@ -46,12 +47,16 @@ import {
   EMPTY_FILTERS,
   filtersPending,
   filtersQuery,
-  formatTime,
   hasFilters,
   RESULT_TONE,
-  targetLabel,
   toFilters,
 } from '../../../lib/audit/format';
+import {
+  buildNameIndex,
+  type NameIndex,
+  targetDisplay,
+} from '../../../lib/audit/targets';
+import { Time } from '../../../lib/format/time';
 import { RecordSheet } from './record-sheet';
 
 const PAGE_SIZE = 50;
@@ -125,8 +130,9 @@ function ChainStatus({
         </Button>
       </div>
       <p className="text-xs text-ink-3">
-        Each record carries a hash of the one before it, so a record changed or
-        deleted in the database breaks the chain from there on.
+        Verify now re-checks every record against the hash of the one before it.
+        A record changed or deleted in the database breaks the chain from there
+        on. The server also checks on a schedule; this runs the check now.
       </p>
     </div>
   );
@@ -153,27 +159,13 @@ function Filters({
     onApply();
   };
 
+  const [more, setMore] = useState(false);
+
   return (
     <form
       onSubmit={submit}
       className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-4"
     >
-      <Field label="From" htmlFor="audit-from">
-        <DateInput
-          id="audit-from"
-          value={form.fromDate}
-          max={form.toDate || undefined}
-          onChange={(e) => onChange({ fromDate: e.target.value })}
-        />
-      </Field>
-      <Field label="To" htmlFor="audit-to">
-        <DateInput
-          id="audit-to"
-          value={form.toDate}
-          min={form.fromDate || undefined}
-          onChange={(e) => onChange({ toDate: e.target.value })}
-        />
-      </Field>
       <Field label="Action" htmlFor="audit-action">
         <Select
           id="audit-action"
@@ -216,44 +208,73 @@ function Filters({
           options={users.map((u) => ({ value: u.id, label: u.email }))}
         />
       </Field>
-      <Field label="Target type" htmlFor="audit-target-type">
-        <Input
-          id="audit-target-type"
-          value={form.targetType}
-          maxLength={100}
-          placeholder="e.g. runner"
-          onChange={(e) => onChange({ targetType: e.target.value })}
-        />
-      </Field>
-      <Field label="Target id" htmlFor="audit-target-id">
-        <Input
-          id="audit-target-id"
-          value={form.targetId}
-          maxLength={320}
-          onChange={(e) => onChange({ targetId: e.target.value })}
-        />
-      </Field>
-      <Field label="Project id" htmlFor="audit-project">
-        <Input
-          id="audit-project"
-          value={form.projectId}
-          maxLength={200}
-          onChange={(e) => onChange({ projectId: e.target.value })}
-        />
-      </Field>
-      <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-4">
+      <div className="flex flex-wrap items-center gap-2">
         <Button variant="solid" type="submit">
           Apply
         </Button>
         <Button variant="ghost" type="button" onClick={onReset}>
           Reset
         </Button>
-        {pending ? (
-          <span className="text-xs text-ink-2" role="status">
-            Filters changed — Apply to update the list.
-          </span>
-        ) : null}
       </div>
+      <div className="sm:col-span-2 lg:col-span-4">
+        <Disclosure
+          open={more}
+          onOpenChange={setMore}
+          trigger={<span className="text-sm">More filters</span>}
+        >
+          <div className="grid grid-cols-1 items-end gap-3 pt-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Field label="From" htmlFor="audit-from">
+              <DateInput
+                id="audit-from"
+                value={form.fromDate}
+                max={form.toDate || undefined}
+                onChange={(e) => onChange({ fromDate: e.target.value })}
+              />
+            </Field>
+            <Field label="To" htmlFor="audit-to">
+              <DateInput
+                id="audit-to"
+                value={form.toDate}
+                min={form.fromDate || undefined}
+                onChange={(e) => onChange({ toDate: e.target.value })}
+              />
+            </Field>
+            <Field label="Target type" htmlFor="audit-target-type">
+              <Input
+                id="audit-target-type"
+                value={form.targetType}
+                maxLength={100}
+                placeholder="e.g. runner"
+                onChange={(e) => onChange({ targetType: e.target.value })}
+              />
+            </Field>
+            <Field label="Target id" htmlFor="audit-target-id">
+              <Input
+                id="audit-target-id"
+                value={form.targetId}
+                maxLength={320}
+                onChange={(e) => onChange({ targetId: e.target.value })}
+              />
+            </Field>
+            <Field label="Project id" htmlFor="audit-project">
+              <Input
+                id="audit-project"
+                value={form.projectId}
+                maxLength={200}
+                onChange={(e) => onChange({ projectId: e.target.value })}
+              />
+            </Field>
+          </div>
+        </Disclosure>
+      </div>
+      {pending ? (
+        <span
+          className="text-xs text-ink-2 sm:col-span-2 lg:col-span-4"
+          role="status"
+        >
+          Filters changed — Apply to update the list.
+        </span>
+      ) : null}
     </form>
   );
 }
@@ -353,20 +374,81 @@ function AuditView() {
 
   const exportHref = `/api/admin/audit/export.csv${filtersQuery(filters)}`;
 
+  // Names for ids (rule R2): fetched once, the page works without them.
+  const [names, setNames] = useState<NameIndex>(new Map());
+  useEffect(() => {
+    Promise.all([
+      api<AdminRunner[]>('/admin/runners').catch(() => []),
+      api<ProjectSummary[]>('/projects').catch(() => []),
+      api<WebhookView[]>('/admin/webhooks').catch(() => []),
+    ]).then(([runner, project, webhook]) =>
+      setNames(buildNameIndex({ user: users, runner, project, webhook })),
+    );
+  }, [users]);
+
+  const columns: Column<AuditRecordView>[] = [
+    {
+      id: 'time',
+      header: 'Time',
+      cell: (record) => (
+        <Time
+          value={record.ts}
+          format="datetime"
+          className="num whitespace-nowrap"
+        />
+      ),
+    },
+    {
+      id: 'actor',
+      header: 'Actor',
+      cell: (record) => (
+        <span className="truncate">{actorLabel(record, names)}</span>
+      ),
+    },
+    {
+      id: 'action',
+      header: 'Action',
+      cell: (record) => (
+        <span className="truncate" title={record.action}>
+          {actionLabel(record.action)}
+        </span>
+      ),
+    },
+    {
+      id: 'target',
+      header: 'Target',
+      cell: (record) => {
+        const target = targetDisplay(record, names);
+        return (
+          <span className="truncate" title={target.title}>
+            {target.text}
+          </span>
+        );
+      },
+    },
+    {
+      id: 'result',
+      header: 'Result',
+      cell: (record) => (
+        <Badge
+          tone={RESULT_TONE[record.result]}
+          label={RESULT_LABEL[record.result]}
+        />
+      ),
+    },
+  ];
+
   return (
     <>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Audit log</h1>
-          <p className="max-w-prose text-sm text-ink-2">
-            Every sign-in, admin change and command sent to a runner, in order.
-            Records cannot be edited here.
-          </p>
-        </div>
-        <a href={exportHref} download className={buttonClassName()}>
-          Export CSV
-        </a>
-      </div>
+      <PageHeader
+        title="Audit log"
+        description="Every sign-in, admin change and command sent to a runner, in order. Records cannot be edited here."
+        actions={
+          <a href={exportHref} download className={buttonClassName()}>
+            Export CSV
+          </a>
+        }
+      />
 
       <div className="mb-6">
         <ChainStatus
@@ -426,53 +508,16 @@ function AuditView() {
         )
       ) : (
         <>
-          <Table scroll>
-            <TableHead>
-              <TableRow>
-                <TableCell head>Time</TableCell>
-                <TableCell head>Actor</TableCell>
-                <TableCell head>Action</TableCell>
-                <TableCell head>Target</TableCell>
-                <TableCell head>Result</TableCell>
-                <TableCell head>
-                  <span className="sr-only">Details</span>
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <tbody>
-              {items.map((record) => (
-                <TableRow key={record.seq}>
-                  <TableCell>{formatTime(record.ts)}</TableCell>
-                  <TableCell>{actorLabel(record)}</TableCell>
-                  <TableCell>
-                    {actionLabel(record.action)}
-                    <div className="font-mono text-xs text-ink-3">
-                      {record.action}
-                    </div>
-                  </TableCell>
-                  <TableCell>{targetLabel(record)}</TableCell>
-                  <TableCell>
-                    <Badge
-                      tone={RESULT_TONE[record.result]}
-                      label={RESULT_LABEL[record.result]}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex justify-end">
-                      <Button
-                        variant="glass"
-                        size="sm"
-                        aria-label={`Details for record ${record.seq}`}
-                        onClick={() => setSelected(record)}
-                      >
-                        Details
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </tbody>
-          </Table>
+          <ScrollX>
+            <DataTable
+              rows={items}
+              getRowId={(record) => record.seq}
+              columns={columns}
+              onRowActivate={setSelected}
+              stickyHeader={false}
+              rowHeight={52}
+            />
+          </ScrollX>
           {nextCursor ? (
             <div className="mt-4 flex justify-center">
               <Button variant="glass" disabled={loadingMore} onClick={loadMore}>
@@ -483,7 +528,11 @@ function AuditView() {
         </>
       )}
 
-      <RecordSheet record={selected} onClose={() => setSelected(undefined)} />
+      <RecordSheet
+        record={selected}
+        names={names}
+        onClose={() => setSelected(undefined)}
+      />
     </>
   );
 }

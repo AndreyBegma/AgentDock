@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { ROLES } from '@agentdock/shared';
 import {
+  defaultUsersTab,
   deleteUserCopy,
   ROLE_HINT,
   roleChangeCopy,
@@ -35,4 +36,25 @@ test('delete copy says what goes and what stays', () => {
   const text = deleteUserCopy({ email: 'a@x' });
   expect(text).toContain('schedules they created');
   expect(text).toContain('stays');
+});
+
+describe('defaultUsersTab', () => {
+  const counts = { pending: 0, active: 0, disabled: 0, rejected: 0 };
+
+  test('opens on Active when it has accounts', () => {
+    expect(defaultUsersTab({ ...counts, active: 3, pending: 2 })).toBe(
+      'active',
+    );
+  });
+
+  test('falls to the first tab with rows', () => {
+    expect(defaultUsersTab({ ...counts, pending: 1 })).toBe('pending');
+    expect(defaultUsersTab({ ...counts, rejected: 4, disabled: 1 })).toBe(
+      'disabled',
+    );
+  });
+
+  test('is Active when nothing exists', () => {
+    expect(defaultUsersTab(counts)).toBe('active');
+  });
 });

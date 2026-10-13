@@ -6,6 +6,8 @@ import {
   type AuditVerification,
 } from '@agentdock/shared';
 import { ApiError, describeError } from '../api';
+import { formatDate } from '../format';
+import { type NameIndex, runnerActorName } from './targets';
 
 type Tone = 'ok' | 'warn' | 'danger' | 'neutral';
 
@@ -82,29 +84,27 @@ export function actionGroups(actions: readonly string[]): string[] {
   return [...new Set(actions.map((a) => `${a.split('.')[0]}.`))];
 }
 
-export function actorLabel(record: AuditRecordView): string {
+/** The actor by name (rule R2): an id is never the text, only a tooltip. */
+export function actorLabel(
+  record: AuditRecordView,
+  index: NameIndex = new Map(),
+): string {
   switch (record.actorType) {
     case 'user':
-      return record.actorEmail ?? record.actorUserId ?? 'deleted user';
+      return record.actorEmail ?? 'deleted user';
     case 'runner':
-      return `runner ${record.actorRunnerId ?? ''}`.trim();
+      return runnerActorName(record, index);
     case 'system':
       return record.actorOnBehalfOfId
-        ? `system on behalf of ${record.actorOnBehalfOfEmail ?? record.actorOnBehalfOfId}`
+        ? `system on behalf of ${record.actorOnBehalfOfEmail ?? 'a deleted user'}`
         : 'system';
     default:
       return record.actorType;
   }
 }
 
-export function targetLabel(record: AuditRecordView): string {
-  return record.targetId
-    ? `${record.targetType} · ${record.targetId}`
-    : record.targetType;
-}
-
 export function formatTime(iso: string): string {
-  return new Date(iso).toLocaleString();
+  return formatDate(iso, 'datetime');
 }
 
 export function describeVerification(v: AuditVerification): string {

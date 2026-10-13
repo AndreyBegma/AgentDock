@@ -19,6 +19,7 @@ import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { PageHeader } from '../../../../../components/page-header/page-header';
 import { AsyncSection } from '../../../../../components/prerequisites/async-section';
 import { RunnerOfflineBanner } from '../../../../../components/prerequisites/prerequisite-banner';
 import { LiveStatusBadge } from '../../../../../components/shell/live-status-badge';
@@ -34,11 +35,8 @@ import {
   STATUS_LABEL,
   STATUS_TONE,
 } from '../../../../../lib/approvals/format';
-import {
-  CHECKS_LABEL,
-  CHECKS_TONE,
-  formatAgo,
-} from '../../../../../lib/fleet/format';
+import { CHECKS_LABEL, CHECKS_TONE } from '../../../../../lib/fleet/format';
+import { Time } from '../../../../../lib/format/time';
 import { useLive } from '../../../../../lib/live/use-live';
 import { safeHttpsUrl } from '../../../../../lib/queue/format';
 import { useSection } from '../../../../../lib/section/use-section';
@@ -161,16 +159,12 @@ export default function ApprovalsPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-semibold">Approvals</h1>
-            <p className="text-sm text-ink-2">
-              Pull requests that wait for a person before the orchestrator
-              merges them. AgentDock never merges itself.
-            </p>
-          </div>
-          <LiveStatusBadge />
-        </div>
+        <PageHeader
+          className="mb-0"
+          title="Approvals"
+          description="Pull requests that wait for a person before the orchestrator merges them. AgentDock never merges itself."
+          actions={<LiveStatusBadge />}
+        />
         {project ? <RunnerOfflineBanner project={project} /> : null}
       </div>
 
@@ -277,7 +271,9 @@ function ApprovalsBody({
                 <TableCell>
                   <ChecksCell item={item} />
                 </TableCell>
-                <TableCell>{formatAgo(item.waitingSince)}</TableCell>
+                <TableCell>
+                  <Time value={item.waitingSince} />
+                </TableCell>
                 <TableCell>
                   <SourceBadge item={item} />
                 </TableCell>
@@ -290,11 +286,9 @@ function ApprovalsBody({
         </Table>
       )}
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">Recent decisions</h2>
-        {view.recent.length === 0 ? (
-          <p className="text-sm text-ink-2">No decision yet.</p>
-        ) : (
+      {view.recent.length > 0 ? (
+        <section className="flex flex-col gap-3">
+          <h2 className="text-lg font-semibold">Recent decisions</h2>
           <Table scroll>
             <TableHead>
               <TableRow>
@@ -327,7 +321,7 @@ function ApprovalsBody({
                   </TableCell>
                   <TableCell>{deciderLabel(item)}</TableCell>
                   <TableCell>
-                    {formatAgo(item.decidedAt ?? item.updatedAt)}
+                    <Time value={item.decidedAt ?? item.updatedAt} />
                   </TableCell>
                   <TableCell>
                     <span className="line-clamp-2 break-words">
@@ -341,8 +335,8 @@ function ApprovalsBody({
               ))}
             </tbody>
           </Table>
-        )}
-      </section>
+        </section>
+      ) : null}
     </>
   );
 }

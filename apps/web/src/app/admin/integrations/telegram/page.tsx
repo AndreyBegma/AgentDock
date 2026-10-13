@@ -13,10 +13,12 @@ import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import Link from 'next/link';
 import { type FormEvent, useState } from 'react';
+import { PageHeader } from '../../../../components/page-header/page-header';
 import { AsyncSection } from '../../../../components/prerequisites/async-section';
 import { DisabledReason } from '../../../../components/prerequisites/disabled-reason';
 import { PrerequisiteBanner } from '../../../../components/prerequisites/prerequisite-banner';
 import { api, errorText } from '../../../../lib/api';
+import { Time } from '../../../../lib/format/time';
 import { ENCRYPTION_KEY_REMEDY } from '../../../../lib/prerequisites/copy';
 import { useErrorToast } from '../../../../lib/section/use-error-toast';
 import { useSection } from '../../../../lib/section/use-section';
@@ -91,13 +93,11 @@ export default function TelegramIntegrationPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-xl font-semibold">Telegram</h1>
-        <p className="max-w-prose text-sm text-ink-2">
-          One bot for this instance. Each person links their own chat under
-          Account › Notifications, then gets the notifications they chose there.
-        </p>
-      </div>
+      <PageHeader
+        className="mb-0"
+        title="Telegram"
+        description="One bot for this instance. Each person links their own chat under Account › Notifications, then gets the notifications they chose there."
+      />
 
       <AsyncSection
         section={section}
@@ -137,9 +137,7 @@ export default function TelegramIntegrationPage() {
                 </dd>
                 <dt className="text-ink-3">Last poll</dt>
                 <dd>
-                  {state.lastPollAt
-                    ? new Date(state.lastPollAt).toLocaleString()
-                    : '—'}
+                  <Time value={state.lastPollAt} />
                 </dd>
                 <dt className="text-ink-3">Linked users</dt>
                 <dd>{state.linkedUsers}</dd>

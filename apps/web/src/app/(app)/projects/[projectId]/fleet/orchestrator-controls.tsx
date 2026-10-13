@@ -12,6 +12,8 @@ import type {
 import { Button } from '@andrewbehma/glass-ui/button';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
+import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
+import { RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { DisabledReason } from '../../../../../components/prerequisites/disabled-reason';
 import { api } from '../../../../../lib/api';
@@ -62,6 +64,7 @@ export function OrchestratorControls({
   isAdmin,
   settings,
   reasons,
+  showStop,
   startOpen: starting,
   onStartOpenChange: setStarting,
 }: {
@@ -73,6 +76,8 @@ export function OrchestratorControls({
   settings: OrchestratorSettingsView | undefined;
   /** Why Start and Stop are off, when the reason will not clear by itself. */
   reasons: ControlReasons;
+  /** False while the orchestrator is known to be absent: nothing to stop. */
+  showStop: boolean;
   startOpen: boolean;
   onStartOpenChange: (open: boolean) => void;
 }) {
@@ -130,7 +135,9 @@ export function OrchestratorControls({
   const startBusy = control.busy('orchestrator.start');
   const stopBusy = control.busy('orchestrator.stop');
   const modes = permissionModesFor(isAdmin);
-  const { lines: reasonLines, ids: reasonIds } = reasonLinesFor(reasons);
+  const { lines: reasonLines, ids: reasonIds } = reasonLinesFor(
+    showStop ? reasons : { ...reasons, stop: null },
+  );
 
   return (
     <div className="flex flex-col gap-3">
@@ -168,14 +175,16 @@ export function OrchestratorControls({
             >
               Start…
             </Button>
-            <Button
-              variant="glass"
-              disabled={stopBusy || reasons.stop !== null}
-              aria-describedby={reasonIds.stop}
-              onClick={() => setStopping(true)}
-            >
-              Stop
-            </Button>
+            {showStop ? (
+              <Button
+                variant="glass"
+                disabled={stopBusy || reasons.stop !== null}
+                aria-describedby={reasonIds.stop}
+                onClick={() => setStopping(true)}
+              >
+                Stop
+              </Button>
+            ) : null}
             {startBusy ? (
               <PendingLabel
                 label={COMMAND_PENDING_LABEL['orchestrator.start']}
@@ -188,9 +197,20 @@ export function OrchestratorControls({
             ) : null}
           </>
         ) : null}
-        <Button variant="ghost" disabled={refreshing} onClick={refresh}>
-          {refreshing ? 'Checking…' : 'Refresh status'}
-        </Button>
+        <Tooltip content={refreshing ? 'Checking…' : 'Refresh status'}>
+          <Button
+            variant="ghost"
+            icon
+            aria-label="Refresh status"
+            disabled={refreshing}
+            onClick={refresh}
+          >
+            <RefreshCw
+              aria-hidden="true"
+              className={`size-4 ${refreshing ? 'animate-spin' : ''}`}
+            />
+          </Button>
+        </Tooltip>
         {status ? (
           <span className="text-sm text-ink-2" role="status">
             {status.present

@@ -16,10 +16,11 @@ import {
 } from '@andrewbehma/glass-ui/table';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { useEffect, useState } from 'react';
+import { PageHeader } from '../../../../components/page-header/page-header';
 import { AsyncSection } from '../../../../components/prerequisites/async-section';
 import { PrerequisiteBanner } from '../../../../components/prerequisites/prerequisite-banner';
 import { api } from '../../../../lib/api';
-import { formatAgo } from '../../../../lib/fleet/format';
+import { Time } from '../../../../lib/format/time';
 import {
   describeCallbackError,
   describeGitHubAppError,
@@ -34,7 +35,7 @@ import { ManualCard, RegisterCard } from './register-cards';
 
 type Registered = Extract<GitHubAppView, { registered: true }>;
 
-const when = (iso: string | null): string => (iso ? formatAgo(iso) : '—');
+const when = (iso: string | null) => <Time value={iso} />;
 
 /** Rule R4: without a key nothing can be stored, or a stored App opened. */
 function NoKeyBanner({ registered }: { registered: boolean }) {
@@ -103,14 +104,11 @@ export default function GitHubAppPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-xl font-semibold">GitHub App</h1>
-        <p className="max-w-prose text-sm text-ink-2">
-          A read-only App that tells AgentDock the moment an issue, pull request
-          or check changes. Without it everything still works — runners poll
-          GitHub every 60 s.
-        </p>
-      </div>
+      <PageHeader
+        className="mb-0"
+        title="GitHub App"
+        description="A read-only App that tells AgentDock the moment an issue, pull request or check changes. Without it everything still works — runners poll GitHub every 60 s."
+      />
 
       {callbackError ? (
         <Banner tone="danger" title="Registration failed">
@@ -238,9 +236,11 @@ function AppDetails({
       {app.signatureFailures > 0 ? (
         <Banner tone="warn" title="Signature failures">
           {app.signatureFailures} delivery(ies) failed the signature check
-          {app.lastSignatureFailureAt
-            ? `, the last ${formatAgo(app.lastSignatureFailureAt)}`
-            : ''}
+          {app.lastSignatureFailureAt ? (
+            <>
+              , the last <Time value={app.lastSignatureFailureAt} />
+            </>
+          ) : null}
           . The webhook secret here and on GitHub may differ: set a new secret
           on GitHub, then remove the App here and enter its credentials by hand
           with that secret.
@@ -379,7 +379,9 @@ function AppDetails({
                     </ul>
                   )}
                 </TableCell>
-                <TableCell>{formatAgo(installation.syncedAt)}</TableCell>
+                <TableCell>
+                  <Time value={installation.syncedAt} />
+                </TableCell>
               </TableRow>
             ))}
           </tbody>

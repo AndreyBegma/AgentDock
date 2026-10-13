@@ -16,20 +16,26 @@ import {
   TableRow,
 } from '@andrewbehma/glass-ui/table';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
+import { Play } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
+import { PageHeader } from '../../../../../components/page-header/page-header';
 import { AsyncSection } from '../../../../../components/prerequisites/async-section';
 import { RunnerOfflineBanner } from '../../../../../components/prerequisites/prerequisite-banner';
+import { ScrollX } from '../../../../../components/scroll-x/scroll-x';
 import { api } from '../../../../../lib/api';
-import { formatAgo } from '../../../../../lib/fleet/format';
+import { Time } from '../../../../../lib/format/time';
 import { useSection } from '../../../../../lib/section/use-section';
 import {
   commandUnavailableText,
+  dedupeSkills,
   describeSkillsError,
   groupBySkillScope,
   isCommandUnavailable,
   isNotFound,
+  profilesLabel,
   provenanceLabel,
   SCOPE_LABEL,
   skillRunProfiles,
@@ -47,56 +53,77 @@ function SkillRows({
   canOperate: boolean;
   onRun: (skill: InstalledSkillView) => void;
 }) {
+  const rows = dedupeSkills(items);
   return (
-    <Table scroll>
-      <TableHead>
-        <TableRow>
-          <TableCell head>Skill</TableCell>
-          <TableCell head>Runtime</TableCell>
-          <TableCell head>Source</TableCell>
-          <TableCell head>Description</TableCell>
-          {canOperate ? <TableCell head>Run</TableCell> : null}
-        </TableRow>
-      </TableHead>
-      <tbody>
-        {items.map((item) => (
-          <TableRow key={item.id}>
-            <TableCell>
-              <span className="font-mono text-sm">{item.invocation}</span>
-              {item.scope === 'profile' && item.profileKey ? (
-                <div className="text-xs text-ink-3">
-                  profile {item.profileKey}
-                </div>
-              ) : null}
-            </TableCell>
-            <TableCell>
-              <Badge tone="neutral" label={item.runtime} />
-            </TableCell>
-            <TableCell>{provenanceLabel(item)}</TableCell>
-            <TableCell>
-              <span className="line-clamp-2 text-sm text-ink-2">
-                {item.description ?? '—'}
-              </span>
-            </TableCell>
+    <ScrollX label="Skills" edgeClassName="from-surface">
+      <Table>
+        <TableHead>
+          <TableRow>
+            <TableCell head>Skill</TableCell>
+            <TableCell head>Runtime</TableCell>
+            <TableCell head>Source</TableCell>
+            <TableCell head>Description</TableCell>
             {canOperate ? (
-              <TableCell>
-                {item.runnable && item.runtime === 'claude' ? (
-                  <Button size="sm" onClick={() => onRun(item)}>
-                    Run
-                  </Button>
-                ) : (
-                  <span className="text-xs text-ink-3">
-                    {item.runnable
-                      ? 'Only Claude skills can run here'
-                      : 'Not runnable from here'}
-                  </span>
-                )}
+              <TableCell head>
+                <span className="sr-only">Run</span>
               </TableCell>
             ) : null}
           </TableRow>
-        ))}
-      </tbody>
-    </Table>
+        </TableHead>
+        <tbody>
+          {rows.map(({ skill: item, profiles }) => (
+            <TableRow key={item.id} className="group">
+              <TableCell>
+                <span className="font-mono text-sm break-normal whitespace-nowrap">
+                  {item.invocation}
+                </span>
+                {profiles.length > 0 ? (
+                  <div className="text-xs text-ink-3">
+                    <Tooltip content={profiles.join(', ')}>
+                      <button type="button" className="cursor-help">
+                        {profilesLabel(profiles)}
+                      </button>
+                    </Tooltip>
+                  </div>
+                ) : null}
+              </TableCell>
+              <TableCell>
+                <Badge tone="neutral" label={item.runtime} />
+              </TableCell>
+              <TableCell className="whitespace-nowrap">
+                {provenanceLabel(item)}
+              </TableCell>
+              <TableCell>
+                <span className="line-clamp-2 min-w-48 text-sm text-ink-2">
+                  {item.description ?? '—'}
+                </span>
+              </TableCell>
+              {canOperate ? (
+                <TableCell className="text-end">
+                  {item.runnable && item.runtime === 'claude' ? (
+                    <Tooltip content={`Run ${item.invocation}`}>
+                      <Button
+                        size="sm"
+                        icon
+                        aria-label={`Run ${item.invocation}`}
+                        className="opacity-100 transition-opacity focus-visible:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-focus-within:opacity-100 [@media(hover:hover)]:group-hover:opacity-100"
+                        onClick={() => onRun(item)}
+                      >
+                        <Play aria-hidden="true" className="size-4" />
+                      </Button>
+                    </Tooltip>
+                  ) : (
+                    <span className="text-xs text-ink-3">
+                      {item.runnable ? 'Claude only' : 'Not runnable'}
+                    </span>
+                  )}
+                </TableCell>
+              ) : null}
+            </TableRow>
+          ))}
+        </tbody>
+      </Table>
+    </ScrollX>
   );
 }
 
@@ -170,36 +197,43 @@ export default function ProjectSkillsPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-semibold">Skills</h1>
-            <p className="text-sm text-ink-2">
+        <PageHeader
+          className="mb-0"
+          title="Skills"
+          description={
+            <>
               Skills installed in this project, in the runner’s runtime profiles
               and in its plugins.{' '}
-              {view
-                ? view.scannedAt
-                  ? `Scanned ${formatAgo(view.scannedAt)}.`
-                  : 'Not scanned yet.'
-                : null}{' '}
+              {view ? (
+                view.scannedAt ? (
+                  <>
+                    Scanned <Time value={view.scannedAt} />.
+                  </>
+                ) : (
+                  'Not scanned yet.'
+                )
+              ) : null}{' '}
               <Link
                 href={skillRunsHref(projectId)}
                 className="underline underline-offset-2"
               >
                 Recent runs
               </Link>
-            </p>
-          </div>
-          {canOperate ? (
-            <div className="flex gap-2">
-              <Button variant="glass" disabled={refreshing} onClick={refresh}>
-                {refreshing ? 'Scanning…' : 'Rescan'}
-              </Button>
-              <Link href="/skills">
-                <Button>Find skills</Button>
-              </Link>
-            </div>
-          ) : null}
-        </div>
+            </>
+          }
+          actions={
+            canOperate ? (
+              <>
+                <Button variant="glass" disabled={refreshing} onClick={refresh}>
+                  {refreshing ? 'Scanning…' : 'Rescan'}
+                </Button>
+                <Link href="/skills">
+                  <Button>Find skills</Button>
+                </Link>
+              </>
+            ) : undefined
+          }
+        />
         {project ? <RunnerOfflineBanner project={project} /> : null}
       </div>
 
@@ -244,7 +278,7 @@ export default function ProjectSkillsPage() {
               >
                 {SCOPE_LABEL[group.scope]}{' '}
                 <span className="font-normal text-ink-3">
-                  ({group.items.length})
+                  ({dedupeSkills(group.items).length})
                 </span>
               </h2>
               <SkillRows

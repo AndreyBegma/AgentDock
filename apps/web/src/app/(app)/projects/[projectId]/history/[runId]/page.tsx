@@ -20,6 +20,8 @@ import { toast } from '@andrewbehma/glass-ui/toast';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Markdown } from '../../../../../../components/markdown/markdown';
+import { PageHeader } from '../../../../../../components/page-header/page-header';
 import {
   isNotFound,
   toTimelineItem,
@@ -30,23 +32,24 @@ import {
   CHECKPOINT_TONE,
   safeHttpsUrl,
 } from '../../../../../../lib/fleet/format';
+import { formatNumber } from '../../../../../../lib/format';
+import { Time } from '../../../../../../lib/format/time';
 import {
   costLabel,
   parseRunUpdate,
   prLabel,
+  READABLE_BADGE,
   RUN_KIND_LABEL,
   RUN_STATUS_LABEL,
   RUN_STATUS_TONE,
-  runLabel,
+  runTitle,
   runtimeLabel,
   tokensLabel,
 } from '../../../../../../lib/history/format';
 import { useLive } from '../../../../../../lib/live/use-live';
-import {
-  formatDuration,
-  formatTime,
-} from '../../../../../../lib/sessions/format';
+import { formatDuration } from '../../../../../../lib/sessions/format';
 import { ProjectRunnerBanner } from '../../project-runner-banner';
+import { ActorIcon } from './actor-icon';
 
 const REFETCH_DEBOUNCE_MS = 300;
 
@@ -85,10 +88,14 @@ function SessionsTable({ sessions }: { sessions: RunSession[] }) {
             <TableCell>
               <Badge tone="neutral" label={session.runtime} />
             </TableCell>
-            <TableCell>{formatTime(session.startedAt)}</TableCell>
-            <TableCell>{session.usage.requests}</TableCell>
-            <TableCell>{tokensLabel(session.usage)}</TableCell>
-            <TableCell>{costLabel(session.usage)}</TableCell>
+            <TableCell>
+              <Time value={session.startedAt} />
+            </TableCell>
+            <TableCell className="num">
+              {formatNumber(session.usage.requests)}
+            </TableCell>
+            <TableCell className="num">{tokensLabel(session.usage)}</TableCell>
+            <TableCell className="num">{costLabel(session.usage)}</TableCell>
           </TableRow>
         ))}
       </tbody>
@@ -146,21 +153,28 @@ export default function RunDetailPage() {
   const prUrl = safeHttpsUrl(run.prUrl);
   return (
     <>
-      <div className="mb-1 text-sm text-ink-3">
-        <Link
-          href={`/projects/${projectId}/history`}
-          className="underline-offset-2 hover:underline"
-        >
-          History
-        </Link>
-      </div>
-      <h1 className="mb-4 flex items-center gap-3 text-xl font-semibold">
-        {runLabel(run)}
-        <Badge
-          tone={RUN_STATUS_TONE[run.status]}
-          label={RUN_STATUS_LABEL[run.status]}
-        />
-      </h1>
+      <PageHeader
+        className="mb-4"
+        eyebrow={
+          <Link
+            href={`/projects/${projectId}/history`}
+            className="underline-offset-2 hover:underline"
+          >
+            ← History
+          </Link>
+        }
+        title={
+          <>
+            {runTitle(run)}
+            <span className="sr-only"> — </span>
+            <Badge
+              className={READABLE_BADGE}
+              tone={RUN_STATUS_TONE[run.status]}
+              label={RUN_STATUS_LABEL[run.status]}
+            />
+          </>
+        }
+      />
       <div className="mb-4">
         <ProjectRunnerBanner projectId={projectId} />
       </div>
@@ -169,7 +183,7 @@ export default function RunDetailPage() {
         <h2 className="mb-2 text-sm font-semibold">Summary</h2>
         <KeyValueList
           items={[
-            { key: 'title', label: 'Title', value: run.title ?? '—' },
+            { key: 'title', label: 'Title', value: runTitle(run) },
             { key: 'kind', label: 'Kind', value: RUN_KIND_LABEL[run.kind] },
             {
               key: 'runtime',
@@ -192,23 +206,35 @@ export default function RunDetailPage() {
                 prLabel(run)
               ),
             },
-            { key: 'outcome', label: 'Outcome', value: run.outcome ?? '—' },
+            {
+              key: 'outcome',
+              label: 'Outcome',
+              value: run.outcome ? (
+                <Markdown compact>{run.outcome}</Markdown>
+              ) : (
+                '—'
+              ),
+            },
             {
               key: 'started',
               label: 'Started',
-              value: formatTime(run.startedAt),
+              value: <Time value={run.startedAt} format="datetime" />,
             },
             {
               key: 'ended',
               label: 'Ended',
-              value: run.endedAt ? formatTime(run.endedAt) : '—',
+              value: <Time value={run.endedAt} format="datetime" />,
             },
             {
               key: 'duration',
               label: 'Duration',
               value: formatDuration(run.durationMs),
             },
-            { key: 'requests', label: 'Requests', value: run.usage.requests },
+            {
+              key: 'requests',
+              label: 'Requests',
+              value: formatNumber(run.usage.requests),
+            },
             { key: 'tokens', label: 'Tokens', value: tokensLabel(run.usage) },
             { key: 'cost', label: 'Cost', value: costLabel(run.usage) },
           ]}
@@ -223,7 +249,11 @@ export default function RunDetailPage() {
             at: checkpoint.at,
             tone: CHECKPOINT_TONE[checkpoint.kind],
             title: checkpoint.heading || CHECKPOINT_LABEL[checkpoint.kind],
-            meta: checkpoint.summary || CHECKPOINT_LABEL[checkpoint.kind],
+            meta: checkpoint.summary ? (
+              <Markdown compact>{checkpoint.summary}</Markdown>
+            ) : (
+              CHECKPOINT_LABEL[checkpoint.kind]
+            ),
           }))}
           dayHeadingLevel={3}
           empty={<EmptyState title="No checkpoints" />}
@@ -238,7 +268,11 @@ export default function RunDetailPage() {
       <section>
         <h2 className="mb-2 text-sm font-semibold">Related activity</h2>
         <Timeline
-          items={run.activity.map((item) => toTimelineItem(item))}
+          items={run.activity.map((item) => ({
+            ...toTimelineItem(item),
+            actor: undefined,
+            icon: <ActorIcon type={item.actorType} />,
+          }))}
           dayHeadingLevel={3}
           empty={<EmptyState title="No related activity" />}
         />

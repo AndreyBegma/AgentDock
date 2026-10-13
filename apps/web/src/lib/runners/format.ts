@@ -67,7 +67,7 @@ export function runnerRemedy(
     case 'offline':
       return runner.pairedAt === null
         ? {
-            text: 'Not paired yet. Open Details for a new pairing code if the old one expired.',
+            text: 'Not paired yet. Open the runner for a new pairing code if the old one expired.',
           }
         : { text: 'Start it on its machine:', command: RUN_COMMAND };
   }
@@ -83,6 +83,24 @@ export function formatLastSeen(iso: string | null, now = Date.now()): string {
   const hours = Math.round(minutes / 60);
   if (hours < 48) return `${hours} h ago`;
   return new Date(iso).toLocaleDateString();
+}
+
+/** "0.42 / 0.51 / 0.60" with its meaning, for a heartbeat's 1/5/15 min load. */
+export function formatLoad(load: readonly number[]): string {
+  return load.map((value) => value.toFixed(2)).join(' / ');
+}
+
+export const LOAD_LABEL = 'load 1/5/15 min';
+
+/** Profile labels for a table cell: "work, personal +2"; '' for none. */
+export function profilesSummary(
+  profiles: readonly { label: string; missing?: boolean }[],
+  show = 2,
+): string {
+  const present = profiles.filter((profile) => !profile.missing);
+  const names = present.slice(0, show).map((profile) => profile.label);
+  const rest = present.length - names.length;
+  return rest > 0 ? `${names.join(', ')} +${rest}` : names.join(', ');
 }
 
 /** `m:ss` until `expiresAt`; `null` once it has passed. */
@@ -125,6 +143,18 @@ export function capabilityRows(
         : 'off',
     },
   ];
+}
+
+/** What the machine can run, for a table cell: "claude · codex · gh"; '' for nothing. */
+export function capabilitySummary(capabilities: Capabilities): string {
+  const { gh, runtimes } = capabilities;
+  return [
+    runtimes.claude?.version ? 'claude' : null,
+    runtimes.codex?.version ? 'codex' : null,
+    gh?.authenticated ? 'gh' : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 /** A sentence for the user; falls back to the shared auth wording. */

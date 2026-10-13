@@ -75,6 +75,48 @@ export function groupBySkillScope(items: InstalledSkillView[]): SkillGroup[] {
   })).filter((group) => group.items.length > 0);
 }
 
+/** One skill as shown: the same skill found in several profiles is one row. */
+export interface SkillRow {
+  /** The first inventory entry of the skill; what a run starts from. */
+  skill: InstalledSkillView;
+  /** The profiles it was found in (empty for a project skill). */
+  profiles: string[];
+}
+
+/**
+ * The same plugin skill is installed in every profile that enables the plugin
+ * (125 inventory rows for 25 skills). Same scope, runtime, invocation and
+ * content is one skill; the profiles it lives in are kept for the tooltip.
+ */
+export function dedupeSkills(items: InstalledSkillView[]): SkillRow[] {
+  const rows = new Map<string, SkillRow>();
+  for (const item of items) {
+    const key = [
+      item.scope,
+      item.runtime,
+      item.invocation,
+      item.contentHash ?? item.description ?? '',
+    ].join('\u0000');
+    const where =
+      item.profileKey ?? (item.scope === 'project' ? null : item.path);
+    const row = rows.get(key);
+    if (!row) {
+      rows.set(key, { skill: item, profiles: where ? [where] : [] });
+    } else if (where && !row.profiles.includes(where)) {
+      row.profiles.push(where);
+    }
+  }
+  return [...rows.values()];
+}
+
+/** "in 5 profiles"; empty for a skill that lives in the project. */
+export function profilesLabel(profiles: readonly string[]): string {
+  if (profiles.length === 0) return '';
+  return profiles.length === 1
+    ? `profile ${profiles[0]}`
+    : `in ${profiles.length} profiles`;
+}
+
 /** Where a skill came from: `owner/repo@abc1234`, the plugin version, or a dash. */
 export function provenanceLabel(item: InstalledSkillView): string {
   if (item.source) {
