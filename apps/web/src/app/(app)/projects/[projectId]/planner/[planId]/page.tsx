@@ -150,7 +150,7 @@ function PlanView({
 
   // On a phone the panel stacks below the cards: bring it into view.
   useEffect(() => {
-    if (selectedKey && window.matchMedia('(max-width: 1279px)').matches) {
+    if (selectedKey && window.matchMedia('(max-width: 1023px)').matches) {
       panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }, [selectedKey]);
@@ -184,6 +184,7 @@ function PlanView({
         canWrite={canWrite && elsewhere === null}
         writeReason={block ?? elsewhere ?? undefined}
         busy={turnBusy}
+        chat={taskKey !== null || plan.tasks.length === 0}
         onAnswers={(answers) =>
           taskKey
             ? actions.taskTurn(taskKey, { answers })
@@ -266,16 +267,25 @@ function PlanView({
               {conversationFor(null)}
             </section>
           ) : null}
+          {/*
+           * Tasks | graph, and the panel on the right once a task is open.
+           * Three columns only fit at 2xl: below it a graph squeezed beside
+           * the panel is drawn too small to read, so with a task open the
+           * graph takes a full row above the tasks and the panel. On a phone
+           * everything stacks, graph first.
+           */}
           <div
-            className={`grid min-w-0 gap-6 ${
+            className={`grid min-w-0 gap-6 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)] ${
               selected
-                ? 'lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)] xl:grid-cols-[minmax(0,300px)_minmax(0,1fr)_minmax(0,420px)]'
-                : 'lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]'
+                ? '2xl:grid-cols-[minmax(0,300px)_minmax(0,1fr)_minmax(0,440px)]'
+                : ''
             }`}
           >
             <section
               aria-labelledby="plan-tasks"
-              className="flex min-w-0 flex-col gap-3 lg:order-1"
+              className={`flex min-w-0 flex-col gap-3 ${
+                selected ? 'lg:order-2 2xl:order-1' : 'lg:order-1'
+              }`}
             >
               <h2 id="plan-tasks" className="text-sm font-semibold">
                 Tasks{' '}
@@ -299,7 +309,11 @@ function PlanView({
             </section>
             <section
               aria-labelledby="plan-graph"
-              className="order-first flex min-w-0 flex-col gap-3 lg:order-2"
+              className={`order-first flex min-w-0 flex-col gap-3 ${
+                selected
+                  ? 'lg:order-1 lg:col-span-2 2xl:order-2 2xl:col-span-1'
+                  : 'lg:order-2'
+              }`}
             >
               <h2 id="plan-graph" className="text-sm font-semibold">
                 Dependencies
@@ -311,10 +325,7 @@ function PlanView({
               />
             </section>
             {selected ? (
-              <div
-                ref={panelRef}
-                className="min-w-0 scroll-mt-4 lg:order-3 lg:col-span-2 xl:col-span-1"
-              >
+              <div ref={panelRef} className="min-w-0 scroll-mt-4 lg:order-3">
                 <TaskPanel
                   key={selected.key}
                   task={selected}

@@ -27,6 +27,7 @@ export function Conversation({
   canWrite,
   writeReason,
   busy,
+  chat = true,
   onAnswers,
   onMessage,
   onCancel,
@@ -44,6 +45,12 @@ export function Conversation({
   /** Why a write is off: a turn elsewhere in the plan, a closed plan, a viewer. */
   writeReason?: string;
   busy: 'cancel' | 'retry' | null;
+  /**
+   * The chat composer. Off for the plan once it has tasks: from then on the
+   * plan speaks through reviews and Revise plan, and only its turn in flight
+   * or the one that failed is shown here.
+   */
+  chat?: boolean;
   onAnswers: (answers: PlanAnswer[]) => Promise<void>;
   onMessage: (message: string) => Promise<void>;
   onCancel: () => void;
@@ -120,21 +127,23 @@ export function Conversation({
         />
       ) : null}
 
-      <PromptInput
-        aria-label={label}
-        placeholder="Tell the planner something…"
-        multiline
-        value={draft}
-        onValueChange={setDraft}
-        onSubmit={(text) => void send(text)}
-        disabled={!canWrite || active !== null}
-        disabledReason={
-          active
-            ? 'Wait for the planner to answer.'
-            : (writeReason ?? undefined)
-        }
-        sendLabel="Send"
-      />
+      {chat ? (
+        <PromptInput
+          aria-label={label}
+          placeholder="Tell the planner something…"
+          multiline
+          value={draft}
+          onValueChange={setDraft}
+          onSubmit={(text) => void send(text)}
+          disabled={!canWrite || active !== null}
+          disabledReason={
+            active
+              ? 'Wait for the planner to answer.'
+              : (writeReason ?? undefined)
+          }
+          sendLabel="Send"
+        />
+      ) : null}
     </div>
   );
 }
