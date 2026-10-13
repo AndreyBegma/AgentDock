@@ -81,14 +81,14 @@ export function TelegramCard({ link }: { link: Link }) {
                 href={pending.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="underline"
+                className="text-accent-ink underline"
               >
                 open the link
               </a>{' '}
               (valid until {formatDate(pending.expiresAt, 'time')}), then{' '}
               <button
                 type="button"
-                className="underline"
+                className="text-accent-ink underline"
                 onClick={() => void reload()}
               >
                 check again

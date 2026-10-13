@@ -218,7 +218,7 @@ export default function AdminBudgetsPage() {
             after{' '}
             <Link
               href="/admin/prices"
-              className="text-ink underline underline-offset-2"
+              className="text-accent-ink underline underline-offset-2"
             >
               re-pricing requests
             </Link>

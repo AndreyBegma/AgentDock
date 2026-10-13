@@ -276,7 +276,7 @@ function AppDetails({
               href={app.htmlUrl}
               target="_blank"
               rel="noreferrer"
-              className="underline"
+              className="text-accent-ink underline"
             >
               {app.slug}
             </a>{' '}

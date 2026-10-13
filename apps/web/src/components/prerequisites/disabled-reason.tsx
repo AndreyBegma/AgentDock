@@ -26,7 +26,10 @@ export function DisabledReason({
       {href && cta ? (
         <>
           {' '}
-          <Link href={href} className="text-ink underline underline-offset-2">
+          <Link
+            href={href}
+            className="text-accent-ink underline underline-offset-2"
+          >
             {cta}
           </Link>
         </>

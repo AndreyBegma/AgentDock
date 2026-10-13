@@ -42,7 +42,7 @@ export function GitHubAppRow({ projectId }: { projectId: string }) {
         />
         <Link
           href="/admin/integrations"
-          className="ml-auto text-sm underline underline-offset-2"
+          className="ml-auto text-sm text-accent-ink underline underline-offset-2"
         >
           Manage in Integrations
         </Link>

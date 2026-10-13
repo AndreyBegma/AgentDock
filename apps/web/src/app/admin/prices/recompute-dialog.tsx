@@ -202,7 +202,7 @@ export function RecomputeDialog({
               Costs are updated. Budgets still count the old costs until you run{' '}
               <Link
                 href="/admin/budgets"
-                className="text-ink underline underline-offset-2"
+                className="text-accent-ink underline underline-offset-2"
               >
                 Recompute budget totals
               </Link>

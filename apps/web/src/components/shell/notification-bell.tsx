@@ -78,7 +78,7 @@ export function NotificationBell() {
             Could not load notifications.{' '}
             <button
               type="button"
-              className="underline"
+              className="text-accent-ink underline"
               onClick={() => void feed.reload()}
             >
               Try again

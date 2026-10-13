@@ -129,7 +129,7 @@ function Choice<T extends string>({
             type="button"
             aria-pressed={value === option}
             onClick={() => onChange(option)}
-            className={`relative w-full px-4 py-1.5 text-sm ${value === option ? 'text-ink' : 'text-ink-2 hover:text-ink'}`}
+            className={`relative w-full px-4 py-1.5 text-sm ${value === option ? '' : 'text-ink-2 hover:text-ink'}`}
           >
             {render(option)}
           </button>
@@ -158,7 +158,7 @@ function Step({
       <div className="flex flex-col items-center">
         <span
           aria-hidden="true"
-          className="flex size-8 shrink-0 items-center justify-center rounded-full bg-ink text-sm font-semibold tabular-nums text-ground"
+          className="flex size-8 shrink-0 items-center justify-center rounded-full border border-line-strong bg-raised text-sm font-semibold tabular-nums text-ink"
         >
           {n}
         </span>

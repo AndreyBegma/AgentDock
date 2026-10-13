@@ -212,7 +212,7 @@ export default function HistoryPage() {
         title="Project not found"
         description="It does not exist, or you are not a member of it."
         action={
-          <Link href="/projects" className="text-sm underline">
+          <Link href="/projects" className="text-sm text-accent-ink underline">
             Open Projects
           </Link>
         }
@@ -341,7 +341,7 @@ export default function HistoryPage() {
               action={
                 <Link
                   href={`/projects/${projectId}/fleet`}
-                  className="text-sm underline"
+                  className="text-sm text-accent-ink underline"
                 >
                   Open Fleet
                 </Link>

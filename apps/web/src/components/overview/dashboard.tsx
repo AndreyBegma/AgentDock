@@ -244,7 +244,7 @@ function NeedsYou({ items }: { items: NeedsYouItem[] }) {
         <li key={item.key}>
           <Link
             href={item.href}
-            className="flex items-start gap-3 rounded-md px-2 py-2 hover:bg-hover focus-visible:outline-2 focus-visible:outline-ink"
+            className="flex items-start gap-3 rounded-md px-2 py-2 hover:bg-hover"
           >
             <span className="mt-0.5 shrink-0">{NEEDS_ICON[item.kind]}</span>
             <span className="flex min-w-0 flex-1 flex-col">
@@ -310,10 +310,7 @@ function RecentActivity({
         return (
           <li key={item.id}>
             {item.link ? (
-              <Link
-                href={item.link}
-                className={`${row} hover:bg-hover focus-visible:outline-2 focus-visible:outline-ink`}
-              >
+              <Link href={item.link} className={`${row} hover:bg-hover`}>
                 {body}
               </Link>
             ) : (

@@ -125,7 +125,7 @@ export default function QueuePage() {
         title="Project not found"
         description="It was removed, or you are not a member of it."
         action={
-          <Link href="/projects" className="text-sm underline">
+          <Link href="/projects" className="text-sm text-accent-ink underline">
             Open Projects
           </Link>
         }

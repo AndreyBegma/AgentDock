@@ -710,7 +710,7 @@ export default function UsagePage() {
                     Add the model under{' '}
                     <Link
                       href="/admin/prices"
-                      className="text-ink underline underline-offset-2"
+                      className="text-accent-ink underline underline-offset-2"
                     >
                       Admin › Prices
                     </Link>

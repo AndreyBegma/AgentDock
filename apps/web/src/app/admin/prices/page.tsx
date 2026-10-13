@@ -221,7 +221,7 @@ export default function AdminPricesPage() {
         separately: after re-pricing, run{' '}
         <Link
           href="/admin/budgets"
-          className="text-ink underline underline-offset-2"
+          className="text-accent-ink underline underline-offset-2"
         >
           Recompute budget totals under Budgets
         </Link>

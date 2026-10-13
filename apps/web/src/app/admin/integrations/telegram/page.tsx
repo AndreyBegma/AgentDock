@@ -167,7 +167,7 @@ export default function TelegramIntegrationPage() {
                     The test goes to your own chat.{' '}
                     <Link
                       href={TELEGRAM_LINK_PAGE}
-                      className="text-ink underline underline-offset-2"
+                      className="text-accent-ink underline underline-offset-2"
                     >
                       Link your Telegram
                     </Link>{' '}
