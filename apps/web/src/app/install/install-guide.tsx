@@ -235,226 +235,239 @@ export function InstallGuide() {
     guide.keepOnline[method === 'Homebrew' ? 0 : 1] ?? guide.keepOnline[0];
 
   return (
-    <main
-      id="main-content"
-      className="relative isolate mx-auto flex w-full max-w-3xl flex-col gap-12 px-4 pb-16 pt-6 sm:px-6 sm:pt-8"
-    >
+    // The glow spans the window; the column is the main.
+    <div className="relative isolate">
       <HeroGlow />
-      <nav
-        aria-label="AgentDock"
-        className="flex items-center justify-between gap-3"
+      <main
+        id="main-content"
+        className="mx-auto flex w-full max-w-3xl flex-col gap-12 px-4 pb-16 pt-6 sm:px-6 sm:pt-8"
       >
-        <Link
-          href={viewer === 'signed-out' ? '/login' : '/'}
+        <nav
           aria-label="AgentDock"
+          className="flex items-center justify-between gap-3"
         >
-          <Wordmark size="md" />
-        </Link>
-        {viewer === 'signed-out' ? (
           <Link
-            href="/login"
-            className={buttonClassName({ variant: 'glass', size: 'sm' })}
+            href={viewer === 'signed-out' ? '/login' : '/'}
+            aria-label="AgentDock"
           >
-            Sign in
+            <Wordmark size="md" />
           </Link>
-        ) : null}
-        {viewer === 'member' || viewer === 'admin' ? (
-          <Link
-            href="/"
-            className={buttonClassName({ variant: 'glass', size: 'sm' })}
-          >
-            Back to AgentDock
-          </Link>
-        ) : null}
-      </nav>
+          {viewer === 'signed-out' ? (
+            <Link
+              href="/login"
+              className={buttonClassName({ variant: 'glass', size: 'sm' })}
+            >
+              Sign in
+            </Link>
+          ) : null}
+          {viewer === 'member' || viewer === 'admin' ? (
+            <Link
+              href="/"
+              className={buttonClassName({ variant: 'glass', size: 'sm' })}
+            >
+              Back to AgentDock
+            </Link>
+          ) : null}
+        </nav>
 
-      <header className="flex flex-col items-start gap-5 sm:pt-6">
-        <p className="text-sm font-medium text-ink-3">The AgentDock runner</p>
-        <h1 className="text-[34px] leading-[1.1] font-semibold tracking-tight text-ink sm:text-[44px]">
-          Run your agents on your own machine.
-        </h1>
-        <p className="max-w-2xl text-base leading-relaxed text-ink-2 sm:text-lg">
-          The runner is a small daemon for the machine that holds your
-          repositories. It starts Claude Code and Codex agents there, and
-          reports to this server. Three steps: install it, pair it, keep it
-          running.
-        </p>
-        <ul className="grid w-full gap-3 pt-2 sm:grid-cols-3">
-          {VALUE.map(({ icon: Icon, title, text }) => (
-            <li key={title} className="flex flex-col gap-1.5">
-              <Icon size={18} aria-hidden="true" className="text-ink" />
-              <span className="text-[15px] font-medium text-ink">{title}</span>
-              <span className="text-sm leading-relaxed text-ink-2">{text}</span>
-            </li>
-          ))}
-        </ul>
-      </header>
-
-      <section aria-labelledby="setup" className="flex flex-col gap-8">
-        <div className="flex flex-col gap-4">
-          <h2 id="setup" className="text-2xl font-semibold tracking-tight">
-            Set it up
-          </h2>
-          <Choice
-            label="Your system"
-            layoutId="install-os"
-            options={['macos', 'linux'] as const}
-            value={os}
-            onChange={chooseOs}
-            render={(option) => (
-              <span className="flex flex-col items-center leading-tight sm:flex-row sm:gap-2">
-                <span className="font-medium">{SYSTEMS[option].label}</span>
-                <span className="text-xs text-ink-3">
-                  {SYSTEMS[option].arch}
-                </span>
-              </span>
-            )}
-          />
-        </div>
-
-        <ol className="flex flex-col">
-          <Step n={1} id="install" title="Install">
-            <p>It needs these on the machine:</p>
-            <ul className="flex list-disc flex-col gap-1 pl-5">
-              {RUNNER_REQUIREMENTS.map((item) => (
-                <li key={item.tool}>
-                  <span className="text-ink">{item.tool}</span> — {item.why}
-                </li>
-              ))}
-            </ul>
-            <p>Then install the runner with:</p>
-            <Choice
-              label="Install with"
-              layoutId="install-method"
-              options={METHODS}
-              value={method}
-              onChange={setMethod}
-              render={(option) => option}
-            />
-            {install ? (
-              <Command code={install.command} language={install.label} />
-            ) : null}
-            {os === 'macos' && method !== 'Homebrew' ? (
-              <p className="text-sm">
-                On macOS, Homebrew is the supported way: macOS can refuse a
-                binary installed any other way.
-              </p>
-            ) : null}
-            <p>Check that it is on your path:</p>
-            <Command code={guide.version} />
-            <p className="text-sm">
-              No prebuilt binary for your machine?{' '}
-              <a
-                href={RUNNER_README_URL}
-                target="_blank"
-                rel="noreferrer"
-                className={linkClass}
-              >
-                Build it from source
-              </a>
-              .
-            </p>
-          </Step>
-
-          <Step n={2} id="pair" title="Pair it with this server">
-            <p>
-              An administrator creates a pairing code in Admin → Runners → Add
-              runner. The code works once and is valid for {TTL}. On the
-              runner&apos;s machine, run this with that code:
-            </p>
-            {origin ? (
-              <>
-                <Command code={guide.pair} />
-                <p className="text-sm">
-                  The machine must reach <Mono>{guide.server}</Mono>.
-                </p>
-              </>
-            ) : (
-              <p aria-live="polite">Reading this server&apos;s address…</p>
-            )}
-            {viewer === 'admin' ? (
-              <div>
-                <Link
-                  href={ADD_RUNNER_PATH}
-                  className={buttonClassName({ variant: 'solid', size: 'sm' })}
-                >
-                  Add runner
-                </Link>
-              </div>
-            ) : null}
-          </Step>
-
-          <Step n={3} id="keep-online" title="Keep it running" last>
-            <p>
-              Run it as a service, so it survives logouts and reboots
-              {method === 'Homebrew'
-                ? ' (a Homebrew service):'
-                : ' (a systemd user unit on Linux, a launchd agent on macOS):'}
-            </p>
-            <Command code={keepOnline.command} language={keepOnline.label} />
-            <p>To run it in the foreground instead:</p>
-            <Command code={guide.run} />
-          </Step>
-        </ol>
-      </section>
-
-      <div className="flex flex-col gap-4">
-        <Section id="profiles" title="Profiles">
-          <p>
-            A runtime profile is how to launch a runtime on a runner: binary,
-            environment (<Mono>CLAUDE_CONFIG_DIR</Mono>, <Mono>CODEX_HOME</Mono>
-            ), extra args. Pairing detects them when the runner has none; to
-            detect and store them again:
+        <header className="flex flex-col items-start gap-5 sm:pt-6">
+          <p className="text-sm font-medium text-ink-3">The AgentDock runner</p>
+          <h1 className="text-[34px] leading-[1.1] font-semibold tracking-tight text-ink sm:text-[44px]">
+            Run your agents on your own machine.
+          </h1>
+          <p className="max-w-2xl text-base leading-relaxed text-ink-2 sm:text-lg">
+            The runner is a small daemon for the machine that holds your
+            repositories. It starts Claude Code and Codex agents there, and
+            reports to this server. Three steps: install it, pair it, keep it
+            running.
           </p>
-          <Command code={guide.profiles} />
-        </Section>
-
-        <Section id="troubleshooting" title="Troubleshooting">
-          <dl className="flex flex-col gap-4">
-            <div>
-              <dt className="font-medium text-ink">The runner shows offline</dt>
-              <dd>
-                It is paired but not running. Start it on its machine, as in
-                Keep it running.
-              </dd>
-            </div>
-            <div>
-              <dt className="font-medium text-ink">The pairing code expired</dt>
-              <dd>
-                Codes last {TTL}. An administrator generates a new one from the
-                runner in Admin → Runners.
-              </dd>
-            </div>
-            <div>
-              <dt className="font-medium text-ink">
-                <Mono>command not found</Mono>
-              </dt>
-              <dd>
-                The install directory is not on your <Mono>PATH</Mono>. With
-                npm, add the global bin (<Mono>{guide.npmPrefix}</Mono>, then
-                its <Mono>bin</Mono>) to <Mono>PATH</Mono>.
-              </dd>
-            </div>
-            <div>
-              <dt className="font-medium text-ink">macOS refuses the binary</dt>
-              <dd>
-                Install it with Homebrew: that is the supported way on macOS.
-              </dd>
-            </div>
-            <div>
-              <dt className="font-medium text-ink">
-                The server is not reachable from the machine
-              </dt>
-              <dd className="flex flex-col gap-2">
-                <span>
-                  Check that this answers from the runner&apos;s machine:
+          <ul className="grid w-full gap-3 pt-2 sm:grid-cols-3">
+            {VALUE.map(({ icon: Icon, title, text }) => (
+              <li key={title} className="flex flex-col gap-1.5">
+                <Icon size={18} aria-hidden="true" className="text-ink" />
+                <span className="text-[15px] font-medium text-ink">
+                  {title}
                 </span>
-                {origin ? <Command code={guide.healthCheck} /> : null}
-              </dd>
-            </div>
-          </dl>
-        </Section>
-      </div>
-    </main>
+                <span className="text-sm leading-relaxed text-ink-2">
+                  {text}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </header>
+
+        <section aria-labelledby="setup" className="flex flex-col gap-8">
+          <div className="flex flex-col gap-4">
+            <h2 id="setup" className="text-2xl font-semibold tracking-tight">
+              Set it up
+            </h2>
+            <Choice
+              label="Your system"
+              layoutId="install-os"
+              options={['macos', 'linux'] as const}
+              value={os}
+              onChange={chooseOs}
+              render={(option) => SYSTEMS[option].label}
+            />
+            <p className="text-sm text-ink-3">
+              Prebuilt for {SYSTEMS[os].label} on {SYSTEMS[os].arch}.
+            </p>
+          </div>
+
+          <ol className="flex flex-col">
+            <Step n={1} id="install" title="Install">
+              <p>It needs these on the machine:</p>
+              <ul className="flex list-disc flex-col gap-1 pl-5">
+                {RUNNER_REQUIREMENTS.map((item) => (
+                  <li key={item.tool}>
+                    <span className="text-ink">{item.tool}</span> — {item.why}
+                  </li>
+                ))}
+              </ul>
+              <p>Then install the runner with:</p>
+              <Choice
+                label="Install with"
+                layoutId="install-method"
+                options={METHODS}
+                value={method}
+                onChange={setMethod}
+                render={(option) => option}
+              />
+              {install ? (
+                <Command code={install.command} language={install.label} />
+              ) : null}
+              {os === 'macos' && method !== 'Homebrew' ? (
+                <p className="text-sm">
+                  On macOS, Homebrew is the supported way: macOS can refuse a
+                  binary installed any other way.
+                </p>
+              ) : null}
+              <p>Check that it is on your path:</p>
+              <Command code={guide.version} />
+              <p className="text-sm">
+                No prebuilt binary for your machine?{' '}
+                <a
+                  href={RUNNER_README_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={linkClass}
+                >
+                  Build it from source
+                </a>
+                .
+              </p>
+            </Step>
+
+            <Step n={2} id="pair" title="Pair it with this server">
+              <p>
+                An administrator creates a pairing code in Admin → Runners → Add
+                runner. The code works once and is valid for {TTL}. On the
+                runner&apos;s machine, run this with that code:
+              </p>
+              {origin ? (
+                <>
+                  <Command code={guide.pair} />
+                  <p className="text-sm">
+                    The machine must reach <Mono>{guide.server}</Mono>.
+                  </p>
+                </>
+              ) : (
+                <p aria-live="polite">Reading this server&apos;s address…</p>
+              )}
+              {viewer === 'admin' ? (
+                <div>
+                  <Link
+                    href={ADD_RUNNER_PATH}
+                    className={buttonClassName({
+                      variant: 'solid',
+                      size: 'sm',
+                    })}
+                  >
+                    Add runner
+                  </Link>
+                </div>
+              ) : null}
+            </Step>
+
+            <Step n={3} id="keep-online" title="Keep it running" last>
+              <p>
+                Run it as a service, so it survives logouts and reboots
+                {method === 'Homebrew'
+                  ? ' (a Homebrew service):'
+                  : ' (a systemd user unit on Linux, a launchd agent on macOS):'}
+              </p>
+              <Command code={keepOnline.command} language={keepOnline.label} />
+              <p>To run it in the foreground instead:</p>
+              <Command code={guide.run} />
+            </Step>
+          </ol>
+        </section>
+
+        <div className="flex flex-col gap-4">
+          <Section id="profiles" title="Profiles">
+            <p>
+              A runtime profile is how to launch a runtime on a runner: binary,
+              environment (<Mono>CLAUDE_CONFIG_DIR</Mono>,{' '}
+              <Mono>CODEX_HOME</Mono>
+              ), extra args. Pairing detects them when the runner has none; to
+              detect and store them again:
+            </p>
+            <Command code={guide.profiles} />
+          </Section>
+
+          <Section id="troubleshooting" title="Troubleshooting">
+            <dl className="flex flex-col gap-4">
+              <div>
+                <dt className="font-medium text-ink">
+                  The runner shows offline
+                </dt>
+                <dd>
+                  It is paired but not running. Start it on its machine, as in
+                  Keep it running.
+                </dd>
+              </div>
+              <div>
+                <dt className="font-medium text-ink">
+                  The pairing code expired
+                </dt>
+                <dd>
+                  Codes last {TTL}. An administrator generates a new one from
+                  the runner in Admin → Runners.
+                </dd>
+              </div>
+              <div>
+                <dt className="font-medium text-ink">
+                  <Mono>command not found</Mono>
+                </dt>
+                <dd>
+                  The install directory is not on your <Mono>PATH</Mono>. With
+                  npm, add the global bin (<Mono>{guide.npmPrefix}</Mono>, then
+                  its <Mono>bin</Mono>) to <Mono>PATH</Mono>.
+                </dd>
+              </div>
+              <div>
+                <dt className="font-medium text-ink">
+                  macOS refuses the binary
+                </dt>
+                <dd>
+                  Install it with Homebrew: that is the supported way on macOS.
+                </dd>
+              </div>
+              <div>
+                <dt className="font-medium text-ink">
+                  The server is not reachable from the machine
+                </dt>
+                <dd className="flex flex-col gap-2">
+                  <span>
+                    Check that this answers from the runner&apos;s machine:
+                  </span>
+                  {origin ? <Command code={guide.healthCheck} /> : null}
+                </dd>
+              </div>
+            </dl>
+          </Section>
+        </div>
+      </main>
+    </div>
   );
 }

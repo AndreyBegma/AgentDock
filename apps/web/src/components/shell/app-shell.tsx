@@ -34,6 +34,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
 } from 'react';
@@ -145,6 +146,36 @@ function useRecent(open: boolean, projectId: string | null): RecentEntities {
   return recent;
 }
 
+/** The root layout's `title.default`: what a page without metadata gets. */
+const DEFAULT_TITLE = 'AgentDock';
+
+/**
+ * Client pages have no metadata of their own, so the trail names the tab.
+ * Next writes the metadata title after this effect (it streams), so the
+ * default is replaced whenever it appears, and so is the title this hook set
+ * for the previous page; a page that set its own `metadata.title` keeps it.
+ */
+function useDocumentTitle(title: string) {
+  const ours = useRef<string | null>(null);
+  useEffect(() => {
+    const apply = () => {
+      const current = document.title;
+      if (current === title) return;
+      if (current !== DEFAULT_TITLE && current !== ours.current) return;
+      document.title = title;
+      ours.current = title;
+    };
+    apply();
+    const observer = new MutationObserver(apply);
+    observer.observe(document.head, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+    return () => observer.disconnect();
+  }, [title]);
+}
+
 function ConnectionDot({ status, paused }: ReturnType<typeof useLivePaused>) {
   const label = liveDotLabel(status, paused);
   const tone = status === 'connected' ? 'ok' : 'warn';
@@ -194,10 +225,7 @@ export function AppShell({
 
   const crumbs = useMemo(() => crumbsFor(pathname, names), [pathname, names]);
   const pageTitle = pageTitleOf(crumbs);
-  // Client pages have no metadata of their own: the trail names the tab.
-  useEffect(() => {
-    document.title = `${pageTitle} · AgentDock`;
-  }, [pageTitle]);
+  useDocumentTitle(`${pageTitle} · AgentDock`);
   const parent = crumbs.length > 1 ? crumbs.at(-2) : undefined;
 
   // glass-ui's NavRailItem has no badge prop yet, so the count rides the label.
@@ -246,8 +274,12 @@ export function AppShell({
       >
         Skip to content
       </a>
-      <div className="flex min-h-screen gap-3 p-3">
-        <aside className="sticky top-3 h-[calc(100vh-1.5rem)] shrink-0">
+      <div
+        className={`flex min-h-screen ${narrow ? 'gap-2 p-2' : 'gap-3 p-3'}`}
+      >
+        <aside
+          className={`sticky shrink-0 ${narrow ? 'top-2 h-[calc(100vh-1rem)]' : 'top-3 h-[calc(100vh-1.5rem)]'}`}
+        >
           <Rail
             sections={sections}
             activeId={activeId}
@@ -259,7 +291,9 @@ export function AppShell({
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col gap-3">
-          <header className="glass rounded-surface flex min-h-12 items-center gap-3 px-4 py-2">
+          <header
+            className={`glass rounded-surface flex min-h-12 items-center py-2 ${narrow ? 'gap-0.5 px-2' : 'gap-3 px-4'}`}
+          >
             {narrow ? (
               // A phone has no room for the trail: the page, and a way up.
               <div className="flex min-w-0 flex-1 items-center gap-1">
@@ -267,7 +301,7 @@ export function AppShell({
                   <Link
                     href={parent.href}
                     aria-label={`Back to ${parent.label}`}
-                    className="-ml-2 flex size-8 shrink-0 items-center justify-center rounded-control text-ink-2 hover:bg-hover hover:text-ink"
+                    className="flex size-8 shrink-0 items-center justify-center rounded-control text-ink-2 hover:bg-hover hover:text-ink"
                   >
                     <ArrowLeft size={16} aria-hidden="true" />
                   </Link>
@@ -289,10 +323,13 @@ export function AppShell({
                 )}
               />
             )}
-            <ConnectionDot {...live} />
+            <span className={narrow ? 'px-1.5' : undefined}>
+              <ConnectionDot {...live} />
+            </span>
             <Button
               variant="ghost"
               size="sm"
+              icon={narrow}
               onClick={() => setPaletteOpen(true)}
               aria-label="Open command palette"
             >
