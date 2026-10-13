@@ -8,6 +8,7 @@ import { ApiError } from '../api';
 import {
   allowedToolsOf,
   COMMAND_UNAVAILABLE_TEXT,
+  defaultProfileOptionLabel,
   describeSkillsError,
   EMPTY_RUN_FORM,
   formatBytes,
@@ -20,7 +21,9 @@ import {
   profileOptionLabel,
   provenanceLabel,
   runFormProblem,
+  runProfileReason,
   skillRunProfiles,
+  skillRunsHref,
   toRunRequest,
 } from './format';
 
@@ -236,6 +239,38 @@ describe('errors', () => {
     expect(describeSkillsError(new ApiError(404, undefined, 'x'))).toContain(
       'member',
     );
+  });
+
+  test('skillRunsHref filters History to skill runs', () => {
+    expect(skillRunsHref('p1')).toBe('/projects/p1/history?kind=skill');
+  });
+
+  describe('runProfileReason', () => {
+    const profile = (key: string, isDefault: boolean) =>
+      ({ key, isDefault }) as ProjectRuntimeProfile;
+
+    test('a picked profile is always fine', () => {
+      expect(runProfileReason('work', [], 'p1')).toBeNull();
+    });
+
+    test('no pick and a default exists: fine, and the option says "Project default"', () => {
+      const profiles = [profile('work', true)];
+      expect(runProfileReason('', profiles, 'p1')).toBeNull();
+      expect(defaultProfileOptionLabel(profiles)).toBe('Project default');
+    });
+
+    test('no pick and no default: a reason that links to the settings', () => {
+      const profiles = [profile('work', false)];
+      const reason = runProfileReason('', profiles, 'p1');
+      expect(reason?.href).toBe('/projects/p1/settings?tab=orchestrator');
+      expect(defaultProfileOptionLabel(profiles)).toBe('(none set)');
+    });
+
+    test('profiles that failed to load are not read as "no default"', () => {
+      const reason = runProfileReason('', [], 'p1', true);
+      expect(reason?.text).toContain('could not be loaded');
+      expect(reason?.href).toBeUndefined();
+    });
   });
 
   test('an old runner is named and told to update, with no "yet"', () => {

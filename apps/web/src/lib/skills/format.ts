@@ -98,6 +98,49 @@ export function profileOptionLabel(profile: ProjectRuntimeProfile): string {
   return profile.isDefault ? `${profile.key} (project default)` : profile.key;
 }
 
+/** The option for "no explicit profile": the project's default, or honestly nothing. */
+export const defaultProfileOptionLabel = (
+  profiles: readonly ProjectRuntimeProfile[],
+): string =>
+  profiles.some((profile) => profile.isDefault)
+    ? 'Project default'
+    : '(none set)';
+
+export interface RunProfileReason {
+  text: string;
+  href?: string;
+  cta?: string;
+}
+
+/**
+ * Why Run is off before the form is even sent (rule R1): no profile is picked
+ * and the project has no default one, or the runner's profiles did not load.
+ * Null when a profile will be used.
+ */
+export function runProfileReason(
+  profileKey: string,
+  profiles: readonly ProjectRuntimeProfile[],
+  projectId: string,
+  profilesFailed = false,
+): RunProfileReason | null {
+  if (profileKey !== '') return null;
+  if (profilesFailed) {
+    return {
+      text: 'The runner’s runtime profiles could not be loaded, so Run cannot pick one. Close this dialog and reload the page.',
+    };
+  }
+  if (profiles.some((profile) => profile.isDefault)) return null;
+  return {
+    text: 'This project has no default runtime profile. Pick one here, or set a default.',
+    href: `/projects/${projectId}/settings?tab=orchestrator`,
+    cta: 'Set a default profile',
+  };
+}
+
+/** Where the runs of skills are listed. */
+export const skillRunsHref = (projectId: string): string =>
+  `/projects/${projectId}/history?kind=skill`;
+
 export const SKILL_MODELS = ['opus', 'sonnet', 'haiku', 'fable'] as const;
 
 export const SKILL_OUTPUT_LABEL = {
