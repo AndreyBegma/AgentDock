@@ -14,6 +14,7 @@ import { CodeBlock } from 'glass-ui/code-block';
 import { DialogContent, DialogRoot } from 'glass-ui/dialog';
 import { EmptyState } from 'glass-ui/empty-state';
 import { Field, Textarea } from 'glass-ui/field';
+import { SectionUnavailable } from 'glass-ui/section-unavailable';
 import { SheetContent, SheetRoot } from 'glass-ui/sheet';
 import { Skeleton } from 'glass-ui/skeleton';
 import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
@@ -22,6 +23,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../../../lib/api';
 import { formatAgo } from '../../../../lib/fleet/format';
 import { useLive } from '../../../../lib/live/use-live';
+import { triggerUrl } from '../../../../lib/webhooks/events';
 import {
   actionSummary,
   deliveryReasonLabel,
@@ -59,6 +61,7 @@ export function TriggerSheet({
   const [busy, setBusy] = useState(false);
   const [payload, setPayload] = useState('{\n  \n}');
   const [verdict, setVerdict] = useState<InboundDryRunResult | string>();
+  const [loadError, setLoadError] = useState<string>();
 
   const load = useCallback(async () => {
     if (!triggerId) return;
@@ -66,8 +69,10 @@ export function TriggerSheet({
       setDetail(
         await api<InboundTriggerDetail>(`/admin/triggers/${triggerId}`),
       );
+      setLoadError(undefined);
     } catch (err) {
-      toast.error(describeWebhooksError(err));
+      // Rule R2: what is on screen stays; the failure is said above it.
+      setLoadError(describeWebhooksError(err));
     }
   }, [triggerId]);
 
@@ -75,6 +80,7 @@ export function TriggerSheet({
     setDetail(undefined);
     setVerdict(undefined);
     setConfirm(undefined);
+    setLoadError(undefined);
     if (!triggerId) return;
     void load();
     const timer = setInterval(load, POLL_MS);
@@ -169,11 +175,31 @@ export function TriggerSheet({
                 : undefined
             }
           >
-            {!detail ? (
-              <div className="flex flex-col gap-3" aria-busy="true">
-                <Skeleton className="h-6 w-40" />
-                <Skeleton className="h-32 w-full" />
+            {loadError ? (
+              <div className="mb-4">
+                <SectionUnavailable
+                  title="This trigger is not answering"
+                  stillWorks={
+                    detail
+                      ? 'What is shown below may be out of date.'
+                      : 'Signed requests to it are still accepted.'
+                  }
+                  detail={loadError}
+                  action={
+                    <Button variant="glass" size="sm" onClick={load}>
+                      Try again
+                    </Button>
+                  }
+                />
               </div>
+            ) : null}
+            {!detail ? (
+              loadError ? null : (
+                <div className="flex flex-col gap-3" aria-busy="true">
+                  <Skeleton className="h-6 w-40" />
+                  <Skeleton className="h-32 w-full" />
+                </div>
+              )
             ) : (
               <div className="flex flex-col gap-6">
                 <div className="flex flex-wrap items-center gap-2">
@@ -236,11 +262,14 @@ export function TriggerSheet({
                   <h3 id="trigger-url" className="text-sm font-semibold">
                     Endpoint
                   </h3>
-                  <CodeBlock code={`POST ${detail.path}`} copy={false} />
+                  <CodeBlock
+                    code={triggerUrl(window.location.origin, detail.path)}
+                  />
                   <p className="text-xs text-ink-3">
-                    The path is relative to the API’s public URL. Sign every
-                    request with the trigger’s secret; the secret itself is
-                    never shown again.
+                    Send a signed POST to this URL. The caller must be able to
+                    reach this address. Sign every request with the trigger’s
+                    secret; the secret itself is never shown again — Rotate
+                    secret issues a new one.
                   </p>
                 </section>
 
@@ -279,7 +308,7 @@ export function TriggerSheet({
                   ) : verdict?.ok ? (
                     <Banner tone="ok" title="Would fire">
                       {verdict.args === null ? (
-                        'No args (orchestrator next).'
+                        'No args: it starts the next orchestrator round.'
                       ) : (
                         <code className="break-all font-mono text-xs">
                           {verdict.args}
@@ -380,6 +409,7 @@ export function TriggerSheet({
                 Cancel
               </Button>
               <Button
+                variant={confirm === 'delete' ? 'danger' : 'solid'}
                 disabled={busy}
                 onClick={confirm === 'rotate' ? rotate : remove}
               >

@@ -12,13 +12,16 @@ import { EmptyState } from 'glass-ui/empty-state';
 import { Skeleton } from 'glass-ui/skeleton';
 import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
 import { toast } from 'glass-ui/toast';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { AsyncSection } from '../../../../components/prerequisites/async-section';
 import { api } from '../../../../lib/api';
 import { formatAgo } from '../../../../lib/fleet/format';
+import { useSection } from '../../../../lib/section/use-section';
+import { triggerUrl } from '../../../../lib/webhooks/events';
 import {
   actionSummary,
   curlExample,
-  describeWebhooksError,
+  deliveryReasonLabel,
   INBOUND_STATUS_LABEL,
   INBOUND_STATUS_TONE,
   projectLabel,
@@ -32,9 +35,8 @@ import { TriggerSheet } from './trigger-sheet';
 
 const POLL_MS = 15_000;
 
-/** The caller-facing URL: the API is reached through the web app's `/api` rewrite. */
 const hookUrl = (path: string): string =>
-  `${window.location.origin}/api${path}`;
+  triggerUrl(window.location.origin, path);
 
 function revealTrigger(
   title: string,
@@ -64,33 +66,23 @@ function revealTrigger(
 }
 
 export default function AdminTriggersPage() {
-  const [triggers, setTriggers] = useState<InboundTriggerView[]>();
-  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const triggers = useSection(
+    () => api<InboundTriggerView[]>('/admin/triggers'),
+    [],
+  );
+  const projects = useSection(() => api<ProjectSummary[]>('/projects'), []);
   const [editing, setEditing] = useState<InboundTriggerView | 'new'>();
   const [selected, setSelected] = useState<string>();
   const [revealed, setRevealed] = useState<RevealedSecret | null>(null);
-
-  const load = useCallback(async () => {
-    try {
-      setTriggers(await api<InboundTriggerView[]>('/admin/triggers'));
-    } catch (err) {
-      toast.error(describeWebhooksError(err));
-    }
-  }, []);
+  const reload = triggers.retry;
+  const projectList = projects.data ?? [];
 
   useEffect(() => {
-    void load();
-    const timer = setInterval(load, POLL_MS);
+    const timer = setInterval(reload, POLL_MS);
     return () => clearInterval(timer);
-  }, [load]);
+  }, [reload]);
 
-  useEffect(() => {
-    api<ProjectSummary[]>('/projects')
-      .then(setProjects)
-      .catch(() => undefined);
-  }, []);
-
-  const selectedTrigger = triggers?.find((t) => t.id === selected);
+  const selectedTrigger = triggers.data?.find((t) => t.id === selected);
 
   return (
     <div className="flex flex-col gap-6">
@@ -100,88 +92,107 @@ export default function AdminTriggersPage() {
           <p className="max-w-prose text-sm text-ink-2">
             Inbound webhooks. A signed{' '}
             <code className="font-mono">POST /hooks/&lt;id&gt;</code> starts a
-            skill run or <code className="font-mono">orchestrator next</code> on
-            one project. Payload values only fill the placeholders you allow,
-            and never reach a shell.
+            skill run or the next orchestrator round on one project. Payload
+            values only fill the placeholders you allow, and never reach a
+            shell.
           </p>
         </div>
         <Button onClick={() => setEditing('new')}>New trigger</Button>
       </div>
 
-      {!triggers ? (
-        <Skeleton className="h-48 w-full" />
-      ) : triggers.length === 0 ? (
-        <EmptyState
-          title="No triggers"
-          description="Create one to let CI, a deploy hook or another system start work."
-        />
-      ) : (
-        <Table scroll>
-          <TableHead>
-            <TableRow>
-              <TableCell head>Name</TableCell>
-              <TableCell head>Project</TableCell>
-              <TableCell head>Action</TableCell>
-              <TableCell head>State</TableCell>
-              <TableCell head>Last delivery</TableCell>
-              <TableCell head>
-                <span className="sr-only">Actions</span>
-              </TableCell>
-            </TableRow>
-          </TableHead>
-          <tbody>
-            {triggers.map((trigger) => (
-              <TableRow key={trigger.id}>
-                <TableCell>
-                  <span className="font-medium">{trigger.name}</span>
-                </TableCell>
-                <TableCell>
-                  {projectLabel(trigger.projectId, projects)}
-                </TableCell>
-                <TableCell>
-                  <span className="font-mono text-sm">
-                    {actionSummary(trigger.action)}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    tone={trigger.enabled ? 'ok' : 'neutral'}
-                    label={trigger.enabled ? 'enabled' : 'disabled'}
-                  />
-                </TableCell>
-                <TableCell>
-                  {trigger.lastDelivery ? (
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        tone={INBOUND_STATUS_TONE[trigger.lastDelivery.status]}
-                        label={
-                          INBOUND_STATUS_LABEL[trigger.lastDelivery.status]
-                        }
-                      />
-                      <span className="text-xs text-ink-3">
-                        {formatAgo(trigger.lastDelivery.receivedAt)}
-                      </span>
-                    </div>
-                  ) : (
-                    '—'
-                  )}
-                </TableCell>
-                <TableCell>
-                  <div className="flex justify-end">
-                    <Button
-                      variant="glass"
-                      size="sm"
-                      onClick={() => setSelected(trigger.id)}
-                    >
-                      Open
-                    </Button>
-                  </div>
+      <AsyncSection
+        section={triggers}
+        unavailable={{
+          title: 'Triggers are not answering',
+          stillWorks:
+            'Signed requests to existing triggers are still accepted; only this list is missing.',
+        }}
+        skeleton={<Skeleton className="h-48 w-full" />}
+        empty={
+          <EmptyState
+            title="URLs that start work from outside"
+            description="Create a trigger to let CI, a deploy hook or another system start a skill run or the next orchestrator round on a project."
+            action={
+              <Button onClick={() => setEditing('new')}>New trigger</Button>
+            }
+          />
+        }
+      >
+        {(list) => (
+          <Table scroll>
+            <TableHead>
+              <TableRow>
+                <TableCell head>Name</TableCell>
+                <TableCell head>Project</TableCell>
+                <TableCell head>Action</TableCell>
+                <TableCell head>State</TableCell>
+                <TableCell head>Last delivery</TableCell>
+                <TableCell head>
+                  <span className="sr-only">Actions</span>
                 </TableCell>
               </TableRow>
-            ))}
-          </tbody>
-        </Table>
-      )}
+            </TableHead>
+            <tbody>
+              {list.map((trigger) => (
+                <TableRow key={trigger.id}>
+                  <TableCell>
+                    <span className="font-medium">{trigger.name}</span>
+                  </TableCell>
+                  <TableCell>
+                    {projectLabel(trigger.projectId, projectList)}
+                  </TableCell>
+                  <TableCell>
+                    <span className="font-mono text-sm">
+                      {actionSummary(trigger.action)}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      tone={trigger.enabled ? 'ok' : 'neutral'}
+                      label={trigger.enabled ? 'enabled' : 'disabled'}
+                    />
+                    {!trigger.enabled && trigger.disabledReason ? (
+                      <div className="text-xs text-ink-3">
+                        {deliveryReasonLabel(trigger.disabledReason)}
+                      </div>
+                    ) : null}
+                  </TableCell>
+                  <TableCell>
+                    {trigger.lastDelivery ? (
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          tone={
+                            INBOUND_STATUS_TONE[trigger.lastDelivery.status]
+                          }
+                          label={
+                            INBOUND_STATUS_LABEL[trigger.lastDelivery.status]
+                          }
+                        />
+                        <span className="text-xs text-ink-3">
+                          {formatAgo(trigger.lastDelivery.receivedAt)}
+                        </span>
+                      </div>
+                    ) : (
+                      '—'
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex justify-end">
+                      <Button
+                        variant="glass"
+                        size="sm"
+                        onClick={() => setSelected(trigger.id)}
+                      >
+                        Open
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </tbody>
+          </Table>
+        )}
+      </AsyncSection>
 
       <TriggerDialog
         open={editing !== undefined}
@@ -191,12 +202,12 @@ export default function AdminTriggersPage() {
         onCreated={(created) => {
           setEditing(undefined);
           setRevealed(revealTrigger('Trigger created', created));
-          void load();
+          reload();
         }}
         onSaved={() => {
           setEditing(undefined);
           toast.success('Trigger saved');
-          void load();
+          reload();
         }}
       />
 
@@ -204,7 +215,7 @@ export default function AdminTriggersPage() {
         triggerId={selected}
         projectName={
           selectedTrigger
-            ? projectLabel(selectedTrigger.projectId, projects)
+            ? projectLabel(selectedTrigger.projectId, projectList)
             : ''
         }
         onClose={() => setSelected(undefined)}
@@ -212,7 +223,7 @@ export default function AdminTriggersPage() {
         onRotated={(rotated) =>
           setRevealed(revealTrigger('Secret rotated', rotated))
         }
-        onChanged={() => void load()}
+        onChanged={reload}
       />
 
       <SecretDialog revealed={revealed} onClose={() => setRevealed(null)} />

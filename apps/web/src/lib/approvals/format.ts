@@ -7,6 +7,7 @@ import {
 } from '@agentdock/shared';
 import { APPROVAL_NOTE_MAX_BYTES } from '@agentdock/shared/protocol';
 import { ApiError, describeError } from '../api';
+import { updateRunnerText } from '../control/format';
 
 type Tone = 'ok' | 'warn' | 'danger' | 'neutral';
 
@@ -30,13 +31,13 @@ export const STATUS_TONE: Record<ApprovalStatus, Tone> = {
 
 export const SOURCE_LABEL: Record<ApprovalSource, string> = {
   orchestrator: 'orchestrator',
-  derived: 'derived',
+  derived: 'inferred',
 };
 
 export const SOURCE_TOOLTIP: Record<ApprovalSource, string> = {
   orchestrator: 'The orchestrator announced that this pull request waits.',
   derived:
-    'No plugin events: AgentDock derived this from a green, mergeable slot with an open pull request.',
+    'The orchestrator did not announce it: AgentDock inferred it from a slot with green checks and an open, mergeable pull request.',
 };
 
 /** The sidebar label: `Approvals`, or `Approvals · 3` while PRs wait. */
@@ -79,6 +80,45 @@ export function mismatchSentence(
   return 'The project config asks the orchestrator to wait for approval, but AgentDock’s merge approval is off. Turn it on in the project settings so the queue is not forgotten.';
 }
 
+/** Where merge approval is switched on and off. */
+export const approvalSettingsHref = (projectId: string): string =>
+  `/projects/${projectId}/settings?tab=general`;
+
+/** The empty list, said honestly: with approval off nothing is ever expected here. */
+export function emptyWaitingCopy(mergeApproval: boolean): {
+  title: string;
+  description: string;
+} {
+  return mergeApproval
+    ? {
+        title: 'Nothing is waiting',
+        description:
+          'No pull request waits for approval right now. New ones appear here by themselves.',
+      }
+    : {
+        title: 'Merge approval is off',
+        description:
+          'The orchestrator merges green pull requests without asking, so nothing waits here. Turn merge approval on in the project settings to review each one first.',
+      };
+}
+
+/**
+ * Why Approve and Request changes are off, in plain words; null when they work.
+ * A decision binds to the head commit the runner reports, so no inspection
+ * means no decision.
+ */
+export function decisionDisabledReason(
+  inspection: { state: string } | null,
+  runnerName?: string | null,
+): string | null {
+  if (inspection === null) {
+    return `AgentDock has not seen this pull request’s latest commit yet. A decision applies to exactly the commit you reviewed, so it waits until the runner${runnerName ? ` on ${runnerName}` : ''} reports it. If this stays, check that the runner is online.`;
+  }
+  return inspection.state === 'open'
+    ? null
+    : 'The pull request is no longer open on GitHub.';
+}
+
 export const isNotFound = (error: unknown): boolean =>
   error instanceof ApiError && error.status === 404;
 
@@ -95,11 +135,16 @@ export function movedHead(error: unknown): string | undefined {
 export const isCommandUnavailable = (error: unknown): boolean =>
   errorCode(error) === APPROVALS_ERROR.commandUnavailable;
 
-export const COMMAND_UNAVAILABLE_TEXT =
-  'The runner does not handle approvals yet, so nothing was sent. Nothing was decided.';
+export const commandUnavailableText = (runnerName?: string | null): string =>
+  `This runner is too old to carry out approvals, so nothing was sent and nothing was decided. ${updateRunnerText(runnerName)}`;
+
+export const COMMAND_UNAVAILABLE_TEXT = commandUnavailableText();
 
 /** Every approvals error as a sentence for the person. */
-export function describeApprovalError(error: unknown): string {
+export function describeApprovalError(
+  error: unknown,
+  runnerName?: string | null,
+): string {
   switch (errorCode(error)) {
     case APPROVALS_ERROR.headMoved:
       return 'The pull request has a newer commit than the one you reviewed. Nothing was sent; review the new head and decide again.';
@@ -114,7 +159,7 @@ export function describeApprovalError(error: unknown): string {
     case APPROVALS_ERROR.noteTooLong:
       return `The note is over ${APPROVAL_NOTE_MAX_BYTES / 1024} KB.`;
     case APPROVALS_ERROR.commandUnavailable:
-      return COMMAND_UNAVAILABLE_TEXT;
+      return commandUnavailableText(runnerName);
     case APPROVALS_ERROR.commandFailed:
       return `The runner could not complete the request: ${error instanceof ApiError ? error.message : 'unknown error'}`;
     default:

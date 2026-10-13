@@ -54,6 +54,11 @@ export class GitHubAppStore {
     return app;
   }
 
+  /** `APP_ENCRYPTION_KEY` is set and usable: secrets can be sealed (D3). */
+  get encryptionAvailable(): boolean {
+    return this.cipher.available;
+  }
+
   /** 409 `encryption_key_missing` without a usable key (D3). */
   requireCipher(): void {
     if (!this.cipher.available)

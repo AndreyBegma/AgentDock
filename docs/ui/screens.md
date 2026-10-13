@@ -7,22 +7,30 @@ UI WebSocket.
 | Screen | Content | Milestone |
 |---|---|---|
 | **Overview** | for an admin, the Getting started checklist until setup is done (see "First run"); your projects with their runner's status; later: running slots, blocked on a person, merged today, cost today/7d (StatTiles) | M1 |
-| **Project → Fleet** | orchestrator status + controls; slots table (slot, issue, runtime/model, checkpoint, PR + checks, age); slot detail: brief, fence, checkpoints, live pane, sessions, cost | M1 / M2 |
-| **Project → Queue** | ready issues with computed state and reason; held-for-lead; Board view; create issue | M2 |
-| **Project → Approvals** | green PRs awaiting a person when merge approval is on | M2 |
-| **Project → History** | rounds, slots, runs with outcome, duration, PR, cost | M2 |
-| **Project → Skills** | installed skills, run a skill (profile, model, args, report/PR), runs | M3 |
-| **Project → Schedules** | cron rules, next runs, last results | M3 |
+| **Project → Fleet** | the project's runner banner when it is offline; orchestrator status + controls (Start and Stop say why they are off and link to the fix: runner offline, no runtime profile, already running, not running); slots table (slot, issue, runtime/model, checkpoint, PR + checks, age); an empty fleet explains slots and rounds; slot detail: brief, fence, checkpoints, live pane, sessions, cost, with a hint under each term | M1 / M2 |
+| **Project → Queue** | runner banner; ready issues with computed state and reason; an unreadable queue is a banner naming the cause; an empty queue says how an issue gets in; held-for-lead and the round footer are explained; Board view; create issue | M2 |
+| **Project → Approvals** | runner banner; green PRs awaiting a person when merge approval is on; with approval off the empty state says so and links to Settings; the mismatch banner links to Settings; a decision that cannot be taken says why | M2 |
+| **Project → History** | runner banner; rounds, slots, runs with outcome, duration, PR, cost; filtered by kind (`?kind=skill`), status and dates, with unapplied changes shown; "no matches" and "nothing yet" are different | M2 |
+| **Project → Skills** | runner banner; installed skills, run a skill (profile, model, args, report/PR); Run says why it is off when the project has no default profile; Rescan on the empty state; Recent runs link; runs | M3 |
+| **Project → Schedules** | runner banner; cron rules, next runs, last results; a disabled schedule says why in a sentence; the empty state carries New schedule | M3 |
 | **Project → Settings** | docs source, base, ready label, default profile, merge approval, runtime policy, budget, members | M1+ |
-| **Sessions** | all sessions (filtered by access): runtime, model, project/slot, tokens, cost; session detail with TraceTree | M1 |
-| **Activity** | global feed with filters (project, type, actor) | M2 |
-| **Usage** | cost/tokens by project, model, runtime, user, day; price table (admin) | M1 / M3 |
-| **Skills catalog** | skills.sh search, details, install | M3 |
+| **Sessions** | all sessions (filtered by access): runtime, model, project/slot, tokens, cost; session detail with TraceTree. A failed load is "Sessions are not answering" with Try again, never an empty list; no matches offers Clear filters, nothing yet points to Runners (admin) or Projects; unapplied filter changes are flagged; "not yet read" explains an unparsed transcript | M1 |
+| **Activity** | global feed with filters (project, type, actor); same load-failure, no-matches and nothing-yet states as Sessions | M2 |
+| **Usage** | cost/tokens by project, model, runtime, user, day; price table (admin). Unpriced requests say an administrator fixes them under Admin › Prices; an empty range for one project offers "Show all projects" | M1 / M3 |
+| **Skills catalog** | skills.sh search, details, install. With no project an admin sees "Connect a project first"; project options show the runner's state and an offline runner gets the shared banner | M3 |
+| **Account** | profile, password, signed-in devices | M1 |
 | **Runners** (admin) | pair (numbered install / pair / keep-online steps), status with the next step for a runner that is not online, capabilities, profiles, revoke | M1 |
-| **Users** (admin) | pending approvals, roles, disable, registration toggle | M1 |
-| **Integrations** (admin) | GitHub App, Telegram bot, webhooks + delivery log, inbound triggers | M2 / M3 |
-| **Audit** (admin) | filterable log, chain verification status | M1 |
-| **Notifications** | in-app centre; Telegram link | M2 |
+| **Users** (admin) | pending approvals, roles with a one-line hint each, disable, delete (says what goes with the account); a change to or from admin is confirmed; your own row cannot be disabled or deleted; an empty Pending tab says when registration is closed and links to Settings | M1 |
+| **Settings** (admin) | registration toggle | M1 |
+| **Integrations** (admin) | overview of the four integrations with their status (a failed one reads "Status unavailable"); GitHub App, Telegram bot, webhooks + delivery log, inbound triggers | M2 / M3 |
+| **GitHub App** (admin) | without `APP_ENCRYPTION_KEY` a banner, and both register paths off with a reason; the manual card lists permissions, events, the absolute webhook URL and where GitHub shows the App ID and key; an inactive or failing webhook links to the App's Recent deliveries | M2 |
+| **Telegram** (admin) | bot status with what "Polling" means; Remove bot is confirmed with who stops getting notifications; the test message links to Account › Notifications for linking | M2 |
+| **Webhooks / Triggers** (admin) | Save always shows why it is off; "Delivery paused (receiver failing)" and Resume deliveries; event descriptions; the trigger's absolute URL with copy | M3 |
+| **Budgets** (admin) | every budget; "Recompute budget totals", linked to Prices' "Re-price requests" | M3 |
+| **Prices** (admin) | price versions, model table, test calculator, "Re-price requests"; with no version, the seed command | M3 |
+| **Schedules** (admin) | every project's schedules (created on the project) and the API's system jobs, in UTC | M3 |
+| **Audit** (admin) | filterable log with labelled actions; chain verification status — a broken chain says what it means and what to do | M1 |
+| **Notifications** | in-app centre; Telegram link; rules (the Telegram column links to the link card until a chat is linked); muted projects (Mute states why it is off). Each card shows its own load failure with Try again | M2 |
 
 ## States every screen follows
 

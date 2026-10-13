@@ -11,7 +11,9 @@ import { Button } from 'glass-ui/button';
 import { DialogContent, DialogRoot } from 'glass-ui/dialog';
 import { Field, Input, Select, Textarea } from 'glass-ui/field';
 import { useEffect, useState } from 'react';
+import { DisabledReason } from '../../../../components/prerequisites/disabled-reason';
 import { api } from '../../../../lib/api';
+import type { Section } from '../../../../lib/section/use-section';
 import {
   describeWebhooksError,
   emptyTriggerForm,
@@ -21,6 +23,7 @@ import {
   toTriggerUpdateRequest,
   triggerFormProblem,
 } from '../../../../lib/webhooks/format';
+import { ProjectsNote } from '../projects-note';
 
 /**
  * Creates or edits an inbound trigger (spec 26 UI). On create the response
@@ -37,7 +40,7 @@ export function TriggerDialog({
   open: boolean;
   /** Set to edit; unset to create. */
   trigger?: InboundTriggerView;
-  projects: ProjectSummary[];
+  projects: Section<ProjectSummary[]>;
   onClose: () => void;
   onCreated: (created: InboundTriggerWithSecret) => void;
   onSaved: () => void;
@@ -94,16 +97,27 @@ export function TriggerDialog({
     <DialogRoot open={open} onOpenChange={(next) => !next && close()}>
       <DialogContent
         title={trigger ? 'Edit trigger' : 'New trigger'}
-        description="A signed POST starts one skill run, or orchestrator next, on a project. The payload only fills the placeholders you allow."
+        description="A signed POST starts one skill run, or the next orchestrator round, on a project. The payload only fills the placeholders you allow."
         footer={
-          <>
-            <Button variant="glass" disabled={busy} onClick={close}>
-              Cancel
-            </Button>
-            <Button disabled={busy || problem !== null} onClick={submit}>
-              {busy ? 'Saving…' : 'Save'}
-            </Button>
-          </>
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex gap-2">
+              <Button variant="glass" disabled={busy} onClick={close}>
+                Cancel
+              </Button>
+              <Button
+                disabled={busy || problem !== null}
+                aria-describedby={problem ? 'trigger-save-reason' : undefined}
+                onClick={submit}
+              >
+                {busy ? 'Saving…' : 'Save'}
+              </Button>
+            </div>
+            {problem ? (
+              <DisabledReason id="trigger-save-reason">
+                {problem}
+              </DisabledReason>
+            ) : null}
+          </div>
         }
       >
         <form
@@ -135,13 +149,14 @@ export function TriggerDialog({
               onChange={(e) => set('projectId', e.target.value)}
             >
               <option value="">Pick a project…</option>
-              {projects.map((p) => (
+              {(projects.data ?? []).map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.displayName}
                 </option>
               ))}
             </Select>
           </Field>
+          {creating ? <ProjectsNote projects={projects} /> : null}
           <Field label="Action" htmlFor="trigger-kind">
             <Select
               id="trigger-kind"
@@ -154,7 +169,9 @@ export function TriggerDialog({
               }
             >
               <option value="skill">Run a skill</option>
-              <option value="orchestrator">Orchestrator next</option>
+              <option value="orchestrator">
+                Start the next orchestrator round
+              </option>
             </Select>
           </Field>
 
@@ -245,11 +262,6 @@ export function TriggerDialog({
               onChange={(e) => set('valuePattern', e.target.value)}
             />
           </Field>
-          {problem && form.name.trim() !== '' ? (
-            <p className="text-xs text-ink-3" role="status">
-              {problem}
-            </p>
-          ) : null}
         </form>
       </DialogContent>
     </DialogRoot>

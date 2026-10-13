@@ -32,8 +32,10 @@ runner through Homebrew and npm (issue #131).
    creates a GitHub Release on `AndreyBegma/AgentDock` with one
    `agentdock-runner-<version>-<os>-<arch>.tar.gz` per target and a
    `SHA256SUMS`. It then publishes to npm and pushes the formula to the tap. A
-   manual run with `RUNNER_RELEASE=1` is a dry run that builds everything and
-   stops before every publish step. `RUNNER_RELEASE_DRY_RUN=1` also stops a tag
+   manual run whose message contains `[runner-release]` is a dry run that
+   builds everything and stops before every publish step. The gate is a
+   message marker because Woodpecker 3.x passes a manual run's variables to
+   the steps only, never to a workflow's `when` (issue #135). `RUNNER_RELEASE_DRY_RUN=1` also stops a tag
    run before it publishes. Pull requests never run the workflow, and its
    secrets are restricted to the `tag` and `manual` events.
 4. **npm, esbuild-style.** The wrapper package `agentdock-runner` holds a small

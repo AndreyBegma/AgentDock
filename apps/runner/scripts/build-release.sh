@@ -23,6 +23,10 @@ if [ -n "${RUNNER_TAG:-}" ] && [ "$RUNNER_TAG" != "runner-v$version" ]; then
   exit 1
 fi
 
+# The runner imports @agentdock/shared's built output, so build it first; on a
+# clean checkout nothing else has.
+(cd "$runner/../.." && bunx turbo run build --filter=@agentdock/shared)
+
 targets="darwin-arm64 darwin-x64 linux-x64 linux-arm64"
 out="$runner/release"
 rm -rf "$out"

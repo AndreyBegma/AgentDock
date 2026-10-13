@@ -12,8 +12,11 @@ import { DateInput } from 'glass-ui/date-input';
 import { DialogContent, DialogRoot } from 'glass-ui/dialog';
 import { Field, Select } from 'glass-ui/field';
 import { Progress } from 'glass-ui/progress';
+import Link from 'next/link';
 import { type FormEvent, useEffect, useState } from 'react';
+import { DisabledReason } from '../../../components/prerequisites/disabled-reason';
 import { api } from '../../../lib/api';
+import { REPRICE_STATUS_LABEL, SOURCE_LABEL } from '../../../lib/prices/format';
 import {
   customRange,
   describeUsageError,
@@ -103,8 +106,8 @@ export function RecomputeDialog({
   return (
     <DialogRoot open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent
-        title="Recompute costs"
-        description="Re-prices every request in the range with the chosen version and rebuilds the rollups for those hours. Earlier versions are not touched."
+        title="Re-price requests"
+        description="Re-prices every request in the range with the chosen version and rebuilds the usage totals for those hours. Earlier versions are not touched. Budgets are not: run Recompute budget totals under Budgets afterwards."
       >
         <form onSubmit={submit} className="flex flex-col gap-3">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -136,7 +139,8 @@ export function RecomputeDialog({
             >
               {versions.map((v) => (
                 <option key={v.id} value={v.id}>
-                  v{v.number} · {v.source} · {formatTime(v.createdAt)}
+                  v{v.number} · {SOURCE_LABEL[v.source]} ·{' '}
+                  {formatTime(v.createdAt)}
                   {v.id === currentId ? ' (current)' : ''}
                 </option>
               ))}
@@ -144,13 +148,13 @@ export function RecomputeDialog({
           </Field>
 
           {conflict ? (
-            <Banner tone="warn" title="A recompute is already running">
+            <Banner tone="warn" title="A re-price is already running">
               Only one runs at a time. Wait for it to finish, then start this
               one.
             </Banner>
           ) : null}
           {error ? (
-            <Banner tone="danger" title="Recompute failed to start">
+            <Banner tone="danger" title="Re-price failed to start">
               {error}
             </Banner>
           ) : null}
@@ -166,7 +170,7 @@ export function RecomputeDialog({
                         ? 'danger'
                         : 'neutral'
                   }
-                  label={job.status}
+                  label={REPRICE_STATUS_LABEL[job.status]}
                 />
                 <span className="text-ink-2">
                   v{job.versionNumber} · {job.processed.toLocaleString()} of{' '}
@@ -193,17 +197,40 @@ export function RecomputeDialog({
             </div>
           ) : null}
 
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" type="button" onClick={onClose}>
-              {job && jobDone ? 'Close' : 'Cancel'}
-            </Button>
-            <Button
-              variant="solid"
-              type="submit"
-              disabled={busy || running || !range || !versionId}
-            >
-              {busy ? 'Starting…' : 'Recompute'}
-            </Button>
+          {job?.status === 'done' ? (
+            <p className="text-sm text-ink-2">
+              Costs are updated. Budgets still count the old costs until you run{' '}
+              <Link
+                href="/admin/budgets"
+                className="text-ink underline underline-offset-2"
+              >
+                Recompute budget totals
+              </Link>
+              .
+            </p>
+          ) : null}
+
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" type="button" onClick={onClose}>
+                {job && jobDone ? 'Close' : 'Cancel'}
+              </Button>
+              <Button
+                variant="solid"
+                type="submit"
+                disabled={busy || running || !range || !versionId}
+                aria-describedby={
+                  !running && !range ? 'reprice-reason' : undefined
+                }
+              >
+                {busy ? 'Starting…' : 'Re-price'}
+              </Button>
+            </div>
+            {!running && !range ? (
+              <DisabledReason id="reprice-reason">
+                Pick the first and the last day to re-price.
+              </DisabledReason>
+            ) : null}
           </div>
         </form>
       </DialogContent>

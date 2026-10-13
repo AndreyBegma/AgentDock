@@ -8,8 +8,10 @@ import type {
   OrchestratorMode,
   OrchestratorPermissionMode,
 } from '@agentdock/shared/protocol';
-import { ApiError, describeError } from '../api';
+import { ApiError, describeError, type ErrorHint } from '../api';
 import { describeBudgetExceededError } from '../budgets/format';
+import { RUNNERS_PAGE } from '../prerequisites/copy';
+import { orchestratorSettingsHref } from './reasons';
 
 /** Spec 17 D7: the text of a message to a worker, counted in UTF-8 bytes. */
 export const MESSAGE_MAX_BYTES = 16 * 1024;
@@ -55,9 +57,16 @@ export const permissionModesFor = (
 ): readonly OrchestratorPermissionMode[] =>
   PERMISSION_MODES.filter((mode) => isAdmin || mode !== 'bypassPermissions');
 
+/** What each command does, short enough for a table cell. */
+export const MODE_SHORT: Record<OrchestratorMode, string> = {
+  start: 'new round',
+  next: 'next queued issue',
+};
+
+/** One meaning for both words, in the Start dialog and in schedules. */
 export const MODE_LABEL: Record<OrchestratorMode, string> = {
-  start: 'start — begin a round',
-  next: 'next — resume from the board',
+  start: 'Start — begin a new round',
+  next: 'Next — pick up the next queued issue',
 };
 
 /** One sentence per error code of the control routes (#59). */
@@ -97,19 +106,67 @@ export function commandRunIdOf(error: unknown): string | undefined {
   return typeof id === 'string' && id !== '' ? id : undefined;
 }
 
-/** A sentence for a failed control request. */
-export function describeControlError(error: unknown): string {
-  if (!(error instanceof ApiError)) return describeError(error);
-  const budget = describeBudgetExceededError(error);
-  if (budget) return budget;
-  const code = error.code as string | undefined;
-  if (isControlErrorCode(code)) return CONTROL_ERROR_SENTENCE[code];
-  if (error.status === 403) return CONTROL_ERROR_SENTENCE.forbidden;
-  if (error.status === 404) return CONTROL_ERROR_SENTENCE.not_found;
-  if (error.status === 504) return CONTROL_ERROR_SENTENCE.runner_timeout;
-  if (error.status === 502) return CONTROL_ERROR_SENTENCE.runner_error;
-  return describeError(error);
+/**
+ * The remedy for a runner too old for a command (rule R5): name the machine,
+ * never "not deployed yet".
+ */
+export const updateRunnerText = (runnerName?: string | null): string =>
+  `Update the AgentDock runner on ${runnerName || 'the project’s machine'} and try again.`;
+
+/** Where a failed control request is fixed, when the viewer can open that page. */
+export interface ControlErrorContext {
+  projectId?: string;
+  isAdmin?: boolean;
 }
+
+/** A failed control request as a sentence, with the page that fixes it when there is one. */
+export function describeControlErrorHint(
+  error: unknown,
+  { projectId, isAdmin = false }: ControlErrorContext = {},
+): ErrorHint {
+  if (!(error instanceof ApiError)) return { text: describeError(error) };
+  const budget = describeBudgetExceededError(error);
+  if (budget) return { text: budget };
+  const code = error.code as string | undefined;
+  if (code === CONTROL_ERROR.runnerOffline) {
+    return {
+      text: `${CONTROL_ERROR_SENTENCE.runner_offline} Start it with \`agentdock-runner run\` on that machine.`,
+      ...(isAdmin ? { href: RUNNERS_PAGE, cta: 'Open Runners' } : {}),
+    };
+  }
+  if (
+    code === CONTROL_ERROR.noProfile ||
+    code === CONTROL_ERROR.unknownProfile
+  ) {
+    return {
+      text: CONTROL_ERROR_SENTENCE[code],
+      ...(projectId
+        ? { href: orchestratorSettingsHref(projectId), cta: 'Open settings' }
+        : {}),
+    };
+  }
+  if (code === CONTROL_ERROR.runnerError) {
+    const detail = error.message.trim();
+    return {
+      text: detail
+        ? `${CONTROL_ERROR_SENTENCE.runner_error} It said: ${detail}`
+        : CONTROL_ERROR_SENTENCE.runner_error,
+    };
+  }
+  if (isControlErrorCode(code)) return { text: CONTROL_ERROR_SENTENCE[code] };
+  if (error.status === 403) return { text: CONTROL_ERROR_SENTENCE.forbidden };
+  if (error.status === 404) return { text: CONTROL_ERROR_SENTENCE.not_found };
+  if (error.status === 504) {
+    return { text: CONTROL_ERROR_SENTENCE.runner_timeout };
+  }
+  if (error.status === 502)
+    return { text: CONTROL_ERROR_SENTENCE.runner_error };
+  return { text: describeError(error) };
+}
+
+/** A sentence for a failed control request. */
+export const describeControlError = (error: unknown): string =>
+  describeControlErrorHint(error).text;
 
 type Run = Pick<CommandRunLiveEvent, 'command' | 'slot' | 'status' | 'error'> &
   Partial<Pick<CommandRunView, 'result'>>;

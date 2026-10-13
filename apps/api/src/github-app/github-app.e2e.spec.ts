@@ -200,7 +200,11 @@ describe('GitHub App (e2e, spec 27)', () => {
 
       const view = await admin.get(ADMIN_ROUTE);
       expect(view.status).toBe(200);
-      expect(view.body).toMatchObject({ registered: true, slug: SLUG });
+      expect(view.body).toMatchObject({
+        registered: true,
+        slug: SLUG,
+        encryptionAvailable: true,
+      });
       expectNoSecret(view.text);
       const audit = await auditOf('github_app.register');
       expect(audit).toHaveLength(1);
@@ -271,6 +275,12 @@ describe('GitHub App (e2e, spec 27)', () => {
         await resetGitHub(bare.prisma);
         await createUser(bare.prisma, 'eve@example.com', 'admin');
         const eve = await login(bare, 'eve@example.com');
+        // The admin page learns it up front, before trying to register.
+        expect((await eve.get(ADMIN_ROUTE)).body).toEqual({
+          registered: false,
+          publicUrl: 'https://dock.example',
+          encryptionAvailable: false,
+        });
         const res = await eve.send('post', `${ADMIN_ROUTE}/manifest`, {});
         expect(res.status).toBe(409);
         expect(res.body.error).toBe('encryption_key_missing');
@@ -289,6 +299,7 @@ describe('GitHub App (e2e, spec 27)', () => {
       expect((await admin.get(ADMIN_ROUTE)).body).toEqual({
         registered: false,
         publicUrl: 'https://dock.example',
+        encryptionAvailable: true,
       });
     });
   });
