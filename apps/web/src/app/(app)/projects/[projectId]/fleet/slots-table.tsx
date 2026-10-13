@@ -20,6 +20,7 @@ import {
   safeHttpsUrl,
 } from '../../../../../lib/fleet/format';
 import { Time } from '../../../../../lib/format/time';
+import { READABLE_BADGE } from '../../../../../lib/history/format';
 
 function IssueCell({ slot }: { slot: SlotSummary }) {
   if (slot.issue === null) return <>—</>;
@@ -139,6 +140,7 @@ export function SlotsTable({
               </TableCell>
               <TableCell>
                 <Badge
+                  className={READABLE_BADGE}
                   tone={SLOT_STATUS_TONE[slot.status]}
                   label={SLOT_STATUS_LABEL[slot.status]}
                 />

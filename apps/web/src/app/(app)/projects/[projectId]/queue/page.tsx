@@ -238,7 +238,7 @@ export default function QueuePage() {
               />
 
               {view === 'list' ? (
-                <fieldset className="m-0 grid min-w-0 grid-cols-2 gap-2 border-0 p-0 sm:grid-cols-3 lg:grid-cols-6">
+                <fieldset className="m-0 flex min-w-0 flex-wrap gap-2 border-0 p-0">
                   <legend className="sr-only">Filter by state</legend>
                   <ChipButton
                     selected={filter === 'all'}
