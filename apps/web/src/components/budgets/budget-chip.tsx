@@ -40,7 +40,7 @@ export function BudgetChip({
   const text = `${name} · ${formatPercent(budget.current.percent)} of ${formatLimit(budget.limitUsd)} ${PERIOD_LABEL[budget.period].toLowerCase()} · ${budget.current.state}`;
   const badge = <Badge tone={budgetTone(budget.current.state)} label={text} />;
   return href ? (
-    <Link href={href} className="rounded-full focus-visible:outline-2">
+    <Link href={href} className="rounded-full">
       {badge}
     </Link>
   ) : (

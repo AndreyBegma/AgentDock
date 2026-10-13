@@ -184,7 +184,7 @@ export default function ProjectSkillsPage() {
         title="Project not found"
         description="It was removed, or you are not a member of it."
         action={
-          <Link href="/projects" className="text-sm underline">
+          <Link href="/projects" className="text-sm text-accent-ink underline">
             Open Projects
           </Link>
         }
@@ -215,7 +215,7 @@ export default function ProjectSkillsPage() {
               ) : null}{' '}
               <Link
                 href={skillRunsHref(projectId)}
-                className="underline underline-offset-2"
+                className="text-accent-ink underline underline-offset-2"
               >
                 Recent runs
               </Link>

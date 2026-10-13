@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { ApiError } from '../api';
 import {
   approvalSettingsHref,
+  approvalsBadge,
   COMMAND_UNAVAILABLE_TEXT,
   decisionDisabledReason,
   describeApprovalError,
@@ -10,7 +11,6 @@ import {
   isCommandUnavailable,
   mismatchSentence,
   movedHead,
-  navLabel,
   noteBytes,
   noteError,
   SOURCE_LABEL,
@@ -28,10 +28,18 @@ const apiError = (
     ...body,
   });
 
-describe('navLabel', () => {
-  test('shows the count only while PRs wait', () => {
-    expect(navLabel('Approvals', 0)).toBe('Approvals');
-    expect(navLabel('Approvals', 3)).toBe('Approvals · 3');
+describe('approvalsBadge', () => {
+  test('draws nothing while no PR waits', () => {
+    expect(approvalsBadge(0)).toBeUndefined();
+  });
+
+  test('counts the waiting PRs and says what the number is', () => {
+    expect(approvalsBadge(1)).toEqual({
+      count: 1,
+      tone: 'warn',
+      label: '1 waiting approval',
+    });
+    expect(approvalsBadge(3)?.label).toBe('3 waiting approvals');
   });
 });
 

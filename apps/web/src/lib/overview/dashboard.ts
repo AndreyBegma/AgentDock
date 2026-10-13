@@ -190,16 +190,6 @@ export const ORCHESTRATOR_LABEL: Record<OrchestratorStatus, string> = {
   unknown: 'Orchestrator not seen yet',
 };
 
-export const ORCHESTRATOR_TONE: Record<
-  OrchestratorStatus,
-  'ok' | 'neutral' | 'warn'
-> = {
-  running: 'ok',
-  idle: 'neutral',
-  absent: 'neutral',
-  unknown: 'neutral',
-};
-
 /** "Round Oct 13, 14:05 · 3 of 5 slots" — a round's start and occupancy. */
 export function roundLabel(
   round: FleetView['latestRound'],

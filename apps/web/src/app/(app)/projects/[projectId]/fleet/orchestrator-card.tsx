@@ -10,6 +10,7 @@ import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { Disclosure } from '@andrewbehma/glass-ui/disclosure';
+import { StatusDot } from '@andrewbehma/glass-ui/status-pill';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import { type ReactNode, useState } from 'react';
@@ -25,10 +26,10 @@ import {
   formatRoundHeader,
   ORCHESTRATOR_STATUS_HINT,
   ORCHESTRATOR_STATUS_LABEL,
-  ORCHESTRATOR_TONE,
   showStopControl,
 } from '../../../../../lib/fleet/format';
 import type { Section } from '../../../../../lib/section/use-section';
+import { ORCHESTRATOR_PILL_STATUS } from '../../../../../lib/status/pill';
 import { OrchestratorControls } from './orchestrator-controls';
 import type { ControlReasons } from './use-control-reasons';
 
@@ -92,7 +93,7 @@ export function OrchestratorCard({
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="text-base font-semibold">Orchestrator</h2>
         <span className="inline-flex items-center gap-2 text-sm">
-          <Badge dot tone={ORCHESTRATOR_TONE[status]} aria-hidden="true" />
+          <StatusDot status={ORCHESTRATOR_PILL_STATUS[status]} />
           <Tooltip content={ORCHESTRATOR_STATUS_HINT[status]}>
             <button type="button" className="cursor-help">
               {ORCHESTRATOR_STATUS_LABEL[status]}

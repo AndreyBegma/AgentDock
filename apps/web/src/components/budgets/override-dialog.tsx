@@ -2,8 +2,9 @@
 
 import { BUDGET_OVERRIDE_REASON_MAX, type BudgetView } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
+import { DateInput } from '@andrewbehma/glass-ui/date-input';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
-import { Field, Input, Textarea } from '@andrewbehma/glass-ui/field';
+import { Field, Textarea } from '@andrewbehma/glass-ui/field';
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import {
@@ -112,7 +113,7 @@ export function OverrideDialog({
             label="Until (your local time)"
             htmlFor="budget-override-until"
           >
-            <Input
+            <DateInput
               id="budget-override-until"
               type="datetime-local"
               value={form.until}

@@ -5,6 +5,7 @@ import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Tabs, TabsItem } from '@andrewbehma/glass-ui/tabs';
 import { type ReactNode, useEffect, useState } from 'react';
 import { api } from '../../../../../lib/api';
@@ -18,10 +19,10 @@ import {
   formatAheadBehind,
   formatRound,
   SLOT_STATUS_LABEL,
-  SLOT_STATUS_TONE,
   SLOT_TERM_HINT,
   safeHttpsUrl,
 } from '../../../../../lib/fleet/format';
+import { SLOT_PILL_STATUS } from '../../../../../lib/status/pill';
 import { PanePanel } from './pane-panel';
 import { SlotControls } from './slot-controls';
 
@@ -68,8 +69,9 @@ function Detail({ slot }: { slot: SlotDetail }) {
   return (
     <dl className="flex flex-col gap-4">
       <Row label="Status">
-        <Badge
-          tone={SLOT_STATUS_TONE[slot.status]}
+        <StatusPill
+          size="md"
+          status={SLOT_PILL_STATUS[slot.status]}
           label={SLOT_STATUS_LABEL[slot.status]}
         />
       </Row>

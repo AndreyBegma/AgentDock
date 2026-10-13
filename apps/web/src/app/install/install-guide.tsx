@@ -19,7 +19,6 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { type ReactNode, useEffect, useState } from 'react';
-import { HeroGlow } from '../../components/auth-card';
 import { SiteLink, Wordmark } from '../../components/brand';
 import { api } from '../../lib/api';
 import {
@@ -130,7 +129,7 @@ function Choice<T extends string>({
             type="button"
             aria-pressed={value === option}
             onClick={() => onChange(option)}
-            className={`relative w-full px-4 py-1.5 text-sm ${value === option ? 'text-ink' : 'text-ink-2 hover:text-ink'}`}
+            className={`relative w-full px-4 py-1.5 text-sm ${value === option ? '' : 'text-ink-2 hover:text-ink'}`}
           >
             {render(option)}
           </button>
@@ -159,7 +158,7 @@ function Step({
       <div className="flex flex-col items-center">
         <span
           aria-hidden="true"
-          className="flex size-8 shrink-0 items-center justify-center rounded-full bg-ink text-sm font-semibold tabular-nums text-ground"
+          className="flex size-8 shrink-0 items-center justify-center rounded-full border border-line-strong bg-raised text-sm font-semibold tabular-nums text-ink"
         >
           {n}
         </span>
@@ -235,9 +234,8 @@ export function InstallGuide() {
     guide.keepOnline[method === 'Homebrew' ? 0 : 1] ?? guide.keepOnline[0];
 
   return (
-    // The glow spans the window; the column is the main.
-    <div className="relative isolate">
-      <HeroGlow />
+    // The canvas behind the page is the root layout's; the column is the main.
+    <div>
       <main
         id="main-content"
         className="mx-auto flex w-full max-w-3xl flex-col gap-12 px-4 pb-16 pt-6 sm:px-6 sm:pt-8"

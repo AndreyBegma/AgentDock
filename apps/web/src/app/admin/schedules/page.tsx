@@ -142,7 +142,7 @@ export default function AdminSchedulesPage() {
             Schedules page, under{' '}
             <Link
               href="/projects"
-              className="text-ink underline underline-offset-2"
+              className="text-accent-ink underline underline-offset-2"
             >
               Projects
             </Link>

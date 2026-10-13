@@ -7,6 +7,7 @@ import {
   type RunPage,
   type SessionListResponse,
 } from '@agentdock/shared';
+import { ActionList } from '@andrewbehma/glass-ui/action-list';
 import { Avatar } from '@andrewbehma/glass-ui/avatar';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
@@ -24,6 +25,7 @@ import {
   MenuSeparator,
   MenuTrigger,
 } from '@andrewbehma/glass-ui/menu';
+import { TabBar, type TabBarProps } from '@andrewbehma/glass-ui/tab-bar';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { useCommandPaletteShortcut } from '@andrewbehma/glass-ui/use-command-palette-shortcut';
 import { ArrowLeft, LogOut, Search, User } from 'lucide-react';
@@ -42,9 +44,10 @@ import { api, describeError } from '../../lib/api';
 import { useLiveStatus } from '../../lib/live/use-live';
 import { crumbsFor, pageTitleOf } from './crumbs';
 import { liveDotLabel, useLivePaused } from './live-status';
-import { activeEntryId, projectIdOf, visibleNav } from './nav';
+import { activeEntryId, projectIdOf, tabBarSplit, visibleNav } from './nav';
 import { NotificationBell } from './notification-bell';
 import { paletteGroups, type RecentEntities } from './palette';
+import { ProjectSwitcher } from './project-switcher';
 import { Rail } from './rail';
 import {
   applyTheme,
@@ -56,6 +59,7 @@ import {
   type ThemeMode,
 } from './theme';
 import { useCrumbNames } from './use-crumb-names';
+import { useSlotsNeedingAttention } from './use-slots-needing-attention';
 import { useWaitingApprovals } from './use-waiting-approvals';
 import { UserProvider } from './user-context';
 
@@ -65,6 +69,18 @@ const COLLAPSE_QUERY = '(max-width: 1023px)';
 const RECENT_LIMIT = 5;
 
 const NO_RECENT: RecentEntities = { sessions: [], runs: [] };
+
+/** The tab bar's and More's anchors are Next links. */
+const renderLink: NonNullable<TabBarProps['link']> = ({
+  href,
+  className,
+  children: content,
+  ...rest
+}) => (
+  <Link href={href} className={className} {...rest}>
+    {content}
+  </Link>
+);
 
 function useNarrow(): boolean {
   return useSyncExternalStore(
@@ -228,8 +244,18 @@ export function AppShell({
   useDocumentTitle(`${pageTitle} · AgentDock`);
   const parent = crumbs.length > 1 ? crumbs.at(-2) : undefined;
 
-  // glass-ui's NavRailItem has no badge prop yet, so the count rides the label.
+  // The rail's badges on Approvals and Fleet.
   const waitingApprovals = useWaitingApprovals(projectId);
+  const slotsNeedingAttention = useSlotsNeedingAttention(projectId);
+
+  // Below `lg`: five tabs, the rest in More's sheet, which a navigation closes.
+  const { tabs, more } = useMemo(() => tabBarSplit(sections), [sections]);
+  const [moreOpen, setMoreOpen] = useState(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: pathname is the trigger
+  useEffect(() => setMoreOpen(false), [pathname]);
+  const projectName = projects.find(
+    (project) => project.id === projectId,
+  )?.displayName;
 
   const logout = useCallback(async () => {
     try {
@@ -277,18 +303,18 @@ export function AppShell({
       <div
         className={`flex min-h-screen ${narrow ? 'gap-2 p-2' : 'gap-3 p-3'}`}
       >
-        <aside
-          className={`sticky shrink-0 ${narrow ? 'top-2 h-[calc(100vh-1rem)]' : 'top-3 h-[calc(100vh-1.5rem)]'}`}
-        >
-          <Rail
-            sections={sections}
-            activeId={activeId}
-            narrow={narrow}
-            projects={projects}
-            projectId={projectId}
-            waitingApprovals={waitingApprovals}
-          />
-        </aside>
+        {narrow ? null : (
+          <aside className="sticky top-3 h-[calc(100vh-1.5rem)] shrink-0">
+            <Rail
+              sections={sections}
+              activeId={activeId}
+              projects={projects}
+              projectId={projectId}
+              waitingApprovals={waitingApprovals}
+              slotsNeedingAttention={slotsNeedingAttention}
+            />
+          </aside>
+        )}
 
         <div className="flex min-w-0 flex-1 flex-col gap-3">
           <header
@@ -306,7 +332,7 @@ export function AppShell({
                     <ArrowLeft size={16} aria-hidden="true" />
                   </Link>
                 ) : null}
-                <span className="truncate text-sm font-semibold text-ink">
+                <span className="truncate text-section text-ink">
                   {crumbs.at(-1)?.label}
                 </span>
               </div>
@@ -403,6 +429,58 @@ export function AppShell({
           >
             {children}
           </main>
+
+          {narrow ? (
+            // Below `lg` the tab bar replaces the rail; its spacer keeps the
+            // page's end clear of it.
+            <TabBar
+              aria-label="Main"
+              items={tabs.map((entry) => ({
+                id: entry.id,
+                label: entry.label,
+                icon: entry.icon,
+                href: entry.resolvedHref,
+                active: entry.id === activeId,
+              }))}
+              link={renderLink}
+              more={
+                more.length > 0
+                  ? {
+                      label: 'More',
+                      title: 'More pages',
+                      open: moreOpen,
+                      onOpenChange: setMoreOpen,
+                      children: (
+                        <div className="flex flex-col gap-4">
+                          <ProjectSwitcher
+                            projects={projects}
+                            projectId={projectId}
+                          />
+                          {more.map((section) => (
+                            <ActionList
+                              key={section.id}
+                              surface="content"
+                              heading={
+                                section.id === 'project' && projectName
+                                  ? projectName
+                                  : section.title
+                              }
+                              link={renderLink}
+                              items={section.entries.map((entry) => ({
+                                id: entry.id,
+                                label: entry.label,
+                                icon: entry.icon,
+                                href: entry.resolvedHref,
+                              }))}
+                            />
+                          ))}
+                        </div>
+                      ),
+                    }
+                  : undefined
+              }
+            />
+          ) : null}
         </div>
       </div>
 

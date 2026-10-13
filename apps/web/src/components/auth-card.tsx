@@ -7,22 +7,10 @@ export const TAGLINE =
   'The control plane for your Claude Code and Codex agent fleet.';
 
 /**
- * The accent glow behind a public page's hero. Token colours only; it is
- * decoration, so it is hidden from readers and from the pointer.
- */
-export function HeroGlow() {
-  return (
-    <div
-      aria-hidden="true"
-      className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px] bg-[radial-gradient(ellipse_60%_50%_at_50%_0%,color-mix(in_oklab,var(--color-accent)_16%,transparent),transparent)]"
-    />
-  );
-}
-
-/**
  * The centred, branded page shared by the unauthenticated pages (sign in,
  * register, pending), which have no shell (#159): the wordmark and the tagline
- * above the card, the card's own title as the page's h1.
+ * above the card, the card's own title as the page's h1. The aurora behind it
+ * is the root layout's `Canvas` (#163).
  */
 export function AuthCard({
   title,
@@ -36,9 +24,8 @@ export function AuthCard({
   return (
     <main
       id="main-content"
-      className="relative isolate flex min-h-screen w-full flex-col items-center px-4 py-10 sm:justify-center sm:py-16"
+      className="flex min-h-screen w-full flex-col items-center px-4 py-10 sm:justify-center sm:py-16"
     >
-      <HeroGlow />
       <div className="flex w-full max-w-sm flex-col gap-8">
         <div className="flex flex-col items-center gap-3 text-center">
           <Wordmark size="lg" />

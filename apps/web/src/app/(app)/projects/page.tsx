@@ -6,6 +6,7 @@ import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { type Column, DataTable } from '@andrewbehma/glass-ui/data-table';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Sparkline } from '@andrewbehma/glass-ui/sparkline';
+import { StatusDot } from '@andrewbehma/glass-ui/status-pill';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -15,12 +16,10 @@ import { AsyncSection } from '../../../components/prerequisites/async-section';
 import { ScrollX } from '../../../components/scroll-x/scroll-x';
 import { useCurrentUser } from '../../../components/shell/user-context';
 import { api } from '../../../lib/api';
-import {
-  ORCHESTRATOR_STATUS_LABEL,
-  ORCHESTRATOR_TONE,
-} from '../../../lib/fleet/format';
+import { ORCHESTRATOR_STATUS_LABEL } from '../../../lib/fleet/format';
 import { formatCost, formatNumber } from '../../../lib/format';
 import { Time } from '../../../lib/format/time';
+import { projectHue } from '../../../lib/hue';
 import { RUNNERS_PAGE } from '../../../lib/prerequisites/copy';
 import { usePrerequisites } from '../../../lib/prerequisites/use-prerequisites';
 import {
@@ -32,6 +31,7 @@ import {
 } from '../../../lib/projects/overview';
 import { RUNNER_STATUS_LABEL, STATUS_TONE } from '../../../lib/runners/format';
 import { useSection } from '../../../lib/section/use-section';
+import { ORCHESTRATOR_PILL_STATUS } from '../../../lib/status/pill';
 import { ConnectDialog } from './connect-dialog';
 import { useProjectFacts } from './use-project-facts';
 
@@ -54,15 +54,24 @@ function ProjectsTable({ projects }: { projects: ProjectSummary[] }) {
         id: 'name',
         header: 'Project',
         cell: (project) => (
-          <>
-            <Link
-              href={`/projects/${project.id}`}
-              className="font-medium underline-offset-4 hover:underline"
-            >
-              {project.displayName}
-            </Link>
-            <span className="block text-xs text-ink-3">{project.repo}</span>
-          </>
+          <span className="flex items-start gap-2">
+            {/* The project's identity hue, as on its Overview card (#163). */}
+            <Badge
+              dot
+              hue={projectHue(project.id)}
+              aria-hidden="true"
+              className="mt-1.5"
+            />
+            <span className="min-w-0">
+              <Link
+                href={`/projects/${project.id}`}
+                className="font-medium underline-offset-4 hover:underline"
+              >
+                {project.displayName}
+              </Link>
+              <span className="block text-xs text-ink-3">{project.repo}</span>
+            </span>
+          </span>
         ),
       },
       {
@@ -91,7 +100,7 @@ function ProjectsTable({ projects }: { projects: ProjectSummary[] }) {
           const status = fleet.orchestrator.status;
           return (
             <span className="inline-flex items-center gap-2">
-              <Badge dot tone={ORCHESTRATOR_TONE[status]} aria-hidden="true" />
+              <StatusDot status={ORCHESTRATOR_PILL_STATUS[status]} />
               {ORCHESTRATOR_STATUS_LABEL[status]}
             </span>
           );

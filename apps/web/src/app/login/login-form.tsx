@@ -82,14 +82,14 @@ export function LoginForm() {
         {registrationOpen ? (
           <p>
             No account?{' '}
-            <Link href="/register" className="text-ink underline">
+            <Link href="/register" className="text-accent-ink underline">
               Register
             </Link>
           </p>
         ) : null}
         <p>
           New machine?{' '}
-          <Link href={INSTALL_PATH} className="text-ink underline">
+          <Link href={INSTALL_PATH} className="text-accent-ink underline">
             Install the runner
           </Link>
         </p>

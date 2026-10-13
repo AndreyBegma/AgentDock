@@ -12,6 +12,7 @@ import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { Sparkline } from '@andrewbehma/glass-ui/sparkline';
 import { StatTile } from '@andrewbehma/glass-ui/stat-tile';
+import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import {
   ChevronRight,
   CircleCheck,
@@ -23,6 +24,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { formatCost, formatDate, pluralize } from '../../lib/format';
 import { Time } from '../../lib/format/time';
+import { projectHue } from '../../lib/hue';
 import {
   costByProject,
   isAlive,
@@ -30,13 +32,13 @@ import {
   type NeedsYouItem,
   needsYou,
   ORCHESTRATOR_LABEL,
-  ORCHESTRATOR_TONE,
   roundLabel,
   runningSlots,
   waitingApprovals,
 } from '../../lib/overview/dashboard';
 import { RUNNER_STATUS_LABEL, STATUS_TONE } from '../../lib/runners/format';
 import type { Section } from '../../lib/section/use-section';
+import { ORCHESTRATOR_PILL_STATUS } from '../../lib/status/pill';
 import { costOrBlank, sparkValues } from '../../lib/usage/format';
 import type { ProjectFacts } from './use-dashboard';
 import { useDashboard } from './use-dashboard';
@@ -94,13 +96,17 @@ function Stats({
 
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {/* Each tile keeps one hue, echoing the status it counts (#163):
+          running teal, cost amber, merged green, waiting blue. */}
       <StatTile
+        hue={2}
         label="Running slots"
         loading={facts.loading && !facts.data}
         value={running.value}
         hint={factsHint('Agent sessions alive now')}
       />
       <StatTile
+        hue={4}
         label="Cost today"
         loading={costToday.loading && !costToday.data}
         value={cost.value}
@@ -112,6 +118,7 @@ function Stats({
         href="/usage"
       />
       <StatTile
+        hue={3}
         label="PRs merged today"
         loading={merged.loading && !merged.data}
         value={mergedToday.value}
@@ -121,6 +128,7 @@ function Stats({
         href="/activity"
       />
       <StatTile
+        hue={1}
         label="Approvals waiting"
         loading={facts.loading && !facts.data}
         value={approvals.value}
@@ -151,17 +159,19 @@ function ProjectCard({
   return (
     <Link
       href={`/projects/${project.id}`}
-      className="group block rounded-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+      className="group block rounded-surface"
     >
+      {/* The project's identity hue, the same on every screen (#163). */}
       <Card
-        variant="raised"
         pad="md"
+        hue={projectHue(project.id)}
         className="flex h-full flex-col gap-3 transition-colors group-hover:bg-hover"
       >
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 flex-col gap-0.5">
-            <span className="truncate font-semibold tracking-tight">
-              {project.displayName}
+            <span className="flex min-w-0 items-center gap-2 font-semibold tracking-tight">
+              <Badge dot hue={projectHue(project.id)} aria-hidden="true" />
+              <span className="truncate">{project.displayName}</span>
             </span>
             <span className="inline-flex items-center gap-1.5 text-xs text-ink-3">
               <Badge
@@ -181,8 +191,8 @@ function ProjectCard({
         <div className="flex flex-wrap items-center gap-2 text-sm">
           {fleet ? (
             <>
-              <Badge
-                tone={ORCHESTRATOR_TONE[fleet.orchestrator.status]}
+              <StatusPill
+                status={ORCHESTRATOR_PILL_STATUS[fleet.orchestrator.status]}
                 label={ORCHESTRATOR_LABEL[fleet.orchestrator.status]}
               />
               <span className="num text-ink-2">
@@ -244,7 +254,7 @@ function NeedsYou({ items }: { items: NeedsYouItem[] }) {
         <li key={item.key}>
           <Link
             href={item.href}
-            className="flex items-start gap-3 rounded-md px-2 py-2 hover:bg-hover focus-visible:outline-2 focus-visible:outline-ink"
+            className="flex items-start gap-3 rounded-md px-2 py-2 hover:bg-hover"
           >
             <span className="mt-0.5 shrink-0">{NEEDS_ICON[item.kind]}</span>
             <span className="flex min-w-0 flex-1 flex-col">
@@ -310,10 +320,7 @@ function RecentActivity({
         return (
           <li key={item.id}>
             {item.link ? (
-              <Link
-                href={item.link}
-                className={`${row} hover:bg-hover focus-visible:outline-2 focus-visible:outline-ink`}
-              >
+              <Link href={item.link} className={`${row} hover:bg-hover`}>
                 {body}
               </Link>
             ) : (

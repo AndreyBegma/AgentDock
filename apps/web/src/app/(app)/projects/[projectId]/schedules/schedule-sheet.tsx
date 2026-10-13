@@ -109,7 +109,7 @@ function Detail({ detail }: { detail: ScheduleDetail }) {
                   {firing.runId ? (
                     <Link
                       href={`/projects/${detail.projectId}/history/${firing.runId}`}
-                      className="text-xs underline underline-offset-2"
+                      className="text-xs text-accent-ink underline underline-offset-2"
                     >
                       Open the run
                     </Link>

@@ -208,7 +208,7 @@ export function ManualCard({
             href="https://github.com/settings/apps/new"
             target="_blank"
             rel="noreferrer"
-            className="text-ink underline underline-offset-2"
+            className="text-accent-ink underline underline-offset-2"
           >
             Settings › Developer settings › GitHub Apps › New GitHub App
           </a>{' '}

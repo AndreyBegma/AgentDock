@@ -7,8 +7,8 @@ export const contentType = 'image/png';
 /**
  * The home-screen icon, generated from the logomark at build time — no binary
  * in git. iOS fills transparency with black, so the tile sits on the dark
- * ground with its own padding; the colours are the dark theme's ink, ground
- * and desk accent (an image cannot read CSS variables).
+ * ground with its own padding; the colours are the dark theme's ink, the navy
+ * ground and the accent (an image cannot read CSS variables).
  */
 export default function AppleIcon() {
   return new ImageResponse(
@@ -19,12 +19,12 @@ export default function AppleIcon() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: '#09090c',
+        background: '#0a1022',
       }}
     >
       <svg width="118" height="118" viewBox="0 0 32 32" aria-hidden="true">
         <path fill="#f2f2f6" fillRule="evenodd" d={LOGOMARK_PATH} />
-        <circle cx="21.25" cy="21.25" r="2.75" fill="#806ffc" />
+        <circle cx="21.25" cy="21.25" r="2.75" fill="#5b5bf6" />
       </svg>
     </div>,
     size,

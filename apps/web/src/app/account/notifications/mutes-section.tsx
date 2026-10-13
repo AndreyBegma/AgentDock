@@ -151,7 +151,10 @@ export function MutesSection() {
       ) : mutes === undefined || mutes.length === 0 ? (
         <p className="text-ink-2 text-sm">
           No project is muted. Mute a noisy one above;{' '}
-          <Link href="/projects" className="underline underline-offset-2">
+          <Link
+            href="/projects"
+            className="text-accent-ink underline underline-offset-2"
+          >
             all projects
           </Link>{' '}
           are listed on Projects.

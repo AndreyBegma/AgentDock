@@ -157,7 +157,7 @@ export default function FleetPage() {
         title="Project not found"
         description="It was removed, or you are not a member of it."
         action={
-          <Link href="/projects" className="text-sm underline">
+          <Link href="/projects" className="text-sm text-accent-ink underline">
             Open Projects
           </Link>
         }
@@ -177,7 +177,7 @@ export default function FleetPage() {
         ) : (
           <Link
             href={`/projects/${projectId}/queue`}
-            className="text-sm underline"
+            className="text-sm text-accent-ink underline"
           >
             Open Queue
           </Link>
@@ -312,7 +312,7 @@ export default function FleetPage() {
                         action={
                           <Link
                             href={`/projects/${projectId}/queue`}
-                            className="text-sm underline"
+                            className="text-sm text-accent-ink underline"
                           >
                             Open Queue
                           </Link>

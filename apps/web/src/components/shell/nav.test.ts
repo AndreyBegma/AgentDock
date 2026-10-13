@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'bun:test';
-import { activeEntryId, isActive, projectIdOf, visibleNav } from './nav';
+import {
+  activeEntryId,
+  isActive,
+  projectIdOf,
+  tabBarSplit,
+  visibleNav,
+} from './nav';
 
 const labels = (role: 'admin' | 'viewer', path: string) =>
   visibleNav(role, path).flatMap((section) =>
@@ -137,6 +143,51 @@ describe('activeEntryId: one active item', () => {
       .flatMap((section) => section.entries)
       .filter((entry) => entry.id === id);
     expect(marked).toHaveLength(1);
+  });
+});
+
+describe('tabBarSplit', () => {
+  const split = (role: 'admin' | 'viewer', path: string) => {
+    const { tabs, more } = tabBarSplit(visibleNav(role, path));
+    return {
+      tabs: tabs.map((entry) => entry.label),
+      more: more.map(
+        (section) =>
+          `${section.id}: ${section.entries.map((e) => e.label).join(', ')}`,
+      ),
+    };
+  };
+
+  test('outside a project: the workspace five, the rest behind More', () => {
+    expect(split('admin', '/')).toEqual({
+      tabs: ['Overview', 'Projects', 'Activity', 'Sessions', 'Usage'],
+      more: [
+        'workspace: Skills',
+        'admin: Runners, Users, Schedules, Budgets, Audit, Prices, Integrations, Settings',
+      ],
+    });
+  });
+
+  test('inside a project: its working pages, then its others first in More', () => {
+    expect(split('admin', '/projects/p1/queue')).toEqual({
+      tabs: ['Fleet', 'Queue', 'Approvals', 'Activity', 'History'],
+      more: [
+        'project: Skills, Schedules, Settings',
+        'workspace: Overview, Projects, Activity, Sessions, Usage, Skills',
+        'admin: Runners, Users, Schedules, Budgets, Audit, Prices, Integrations, Settings',
+      ],
+    });
+  });
+
+  test('a viewer gets five tabs and no Admin, and More may be empty', () => {
+    const { tabs, more } = split('viewer', '/');
+    expect(tabs).toHaveLength(5);
+    expect(more).toEqual([]);
+  });
+
+  test('tabs resolve the project id', () => {
+    const { tabs } = tabBarSplit(visibleNav('viewer', '/projects/p1'));
+    expect(tabs[0]?.resolvedHref).toBe('/projects/p1/fleet');
   });
 });
 

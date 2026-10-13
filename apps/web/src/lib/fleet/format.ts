@@ -5,19 +5,10 @@ import {
   type SlotStatus,
 } from '@agentdock/shared';
 import type { CheckpointKind, PrChecks } from '@agentdock/shared/protocol';
+import type { RailBadge } from '@andrewbehma/glass-ui/nav-rail';
 import { ApiError, describeError, type ErrorHint } from '../api';
 
 type Tone = 'ok' | 'warn' | 'danger' | 'neutral';
-
-export const SLOT_STATUS_TONE: Record<SlotStatus, Tone> = {
-  dispatched: 'neutral',
-  running: 'ok',
-  idle: 'neutral',
-  prompt: 'warn',
-  quota: 'danger',
-  stale: 'danger',
-  ended: 'neutral',
-};
 
 export const SLOT_STATUS_LABEL: Record<SlotStatus, string> = {
   dispatched: 'dispatched',
@@ -29,12 +20,31 @@ export const SLOT_STATUS_LABEL: Record<SlotStatus, string> = {
   ended: 'ended',
 };
 
-export const ORCHESTRATOR_TONE: Record<OrchestratorStatus, Tone> = {
-  running: 'ok',
-  idle: 'neutral',
-  absent: 'warn',
-  unknown: 'neutral',
-};
+/**
+ * A slot that waits on a person: stuck on a launch prompt, out of quota, or
+ * dead with its PR unmerged. The rail counts these on Fleet (#163).
+ */
+const ATTENTION: ReadonlySet<SlotStatus> = new Set([
+  'prompt',
+  'quota',
+  'stale',
+]);
+
+export const needsAttention = (slot: { status: SlotStatus }): boolean =>
+  ATTENTION.has(slot.status);
+
+/** The rail's mark on Fleet while slots need someone; nothing at zero. */
+export const attentionBadge = (count: number): RailBadge | undefined =>
+  count > 0
+    ? {
+        count,
+        tone: 'warn',
+        label:
+          count === 1
+            ? '1 slot needs attention'
+            : `${count} slots need attention`,
+      }
+    : undefined;
 
 export const CHANNEL_TONE: Record<FleetChannel, Tone> = {
   events: 'ok',

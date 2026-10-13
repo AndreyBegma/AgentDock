@@ -20,7 +20,7 @@ import { useErrorToast } from '../../../lib/section/use-error-toast';
 import { useSection } from '../../../lib/section/use-section';
 
 const LINK_TELEGRAM = (
-  <a href="#telegram" className="text-ink underline underline-offset-2">
+  <a href="#telegram" className="text-accent-ink underline underline-offset-2">
     Link Telegram
   </a>
 );

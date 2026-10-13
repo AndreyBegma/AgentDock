@@ -53,7 +53,7 @@ const COMPONENTS: Components = {
     return (
       <a
         href={target}
-        className="text-ink underline decoration-line-strong underline-offset-2 hover:decoration-ink"
+        className="text-accent-ink underline underline-offset-2"
         {...(external ? { target: '_blank', rel: 'noreferrer noopener' } : {})}
       >
         {children}

@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { SLOT_STATUSES } from '@agentdock/shared';
 import { ApiError } from '../api';
 import {
+  attentionBadge,
   boardErrorHint,
   boardErrorView,
   CHANNEL_EXPLANATION,
@@ -15,6 +16,7 @@ import {
   formatRound,
   isNotFound,
   issueUrl,
+  needsAttention,
   ORCHESTRATOR_STATUS_HINT,
   ORCHESTRATOR_STATUS_LABEL,
   parseIssueFilter,
@@ -26,6 +28,30 @@ import {
 
 const NOW = Date.parse('2026-10-08T12:00:00Z');
 const ago = (seconds: number) => new Date(NOW - seconds * 1000).toISOString();
+
+describe('needsAttention', () => {
+  test('only the statuses that wait on a person', () => {
+    const flagged = SLOT_STATUSES.filter((status) =>
+      needsAttention({ status }),
+    );
+    expect(flagged).toEqual(['prompt', 'quota', 'stale']);
+  });
+});
+
+describe('attentionBadge', () => {
+  test('draws nothing at zero', () => {
+    expect(attentionBadge(0)).toBeUndefined();
+  });
+
+  test('counts the slots in the warn tone, with a sentence for a reader', () => {
+    expect(attentionBadge(1)).toEqual({
+      count: 1,
+      tone: 'warn',
+      label: '1 slot needs attention',
+    });
+    expect(attentionBadge(2)?.label).toBe('2 slots need attention');
+  });
+});
 
 describe('formatAge', () => {
   test('picks the coarsest honest unit', () => {
