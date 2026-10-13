@@ -9,6 +9,7 @@ import {
   type PrerequisiteCopy,
   runnerOfflineCopy,
 } from '../../lib/prerequisites/copy';
+import { InstallGuideLink } from '../onboarding/runner-commands';
 import { useCurrentUser } from '../shell/user-context';
 
 /**
@@ -50,5 +51,16 @@ export function RunnerOfflineBanner({
 }) {
   const isAdmin = useCurrentUser().role === 'admin';
   const copy = runnerOfflineCopy(project, isAdmin);
-  return copy ? <PrerequisiteBanner {...copy} /> : null;
+  if (!copy) return null;
+  return (
+    <PrerequisiteBanner
+      {...copy}
+      body={
+        <>
+          {copy.body}
+          <InstallGuideLink>How to start the runner</InstallGuideLink>
+        </>
+      }
+    />
+  );
 }

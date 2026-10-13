@@ -7,7 +7,11 @@ import { Check, Circle } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import type { RunnersFact } from '../../lib/prerequisites/facts';
-import { InstallCommands, KeepOnlineCommands } from './runner-commands';
+import {
+  InstallCommands,
+  InstallGuideLink,
+  KeepOnlineCommands,
+} from './runner-commands';
 import { currentStep, type GettingStarted as State, type Step } from './steps';
 
 /** What to do for the step the checklist is on. */
@@ -21,6 +25,7 @@ function StepBody({ step, runners }: { step: Step; runners: RunnersFact }) {
             repositories on its machine. Install it with one of:
           </p>
           <InstallCommands />
+          <InstallGuideLink />
         </>
       );
     case 'pair':
@@ -40,6 +45,7 @@ function StepBody({ step, runners }: { step: Step; runners: RunnersFact }) {
               : 'Start the runner on its machine:'}
           </p>
           <KeepOnlineCommands />
+          <InstallGuideLink />
         </>
       );
     }

@@ -1,11 +1,49 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  BUN_INSTALL_COMMAND,
   INSTALL_COMMANDS,
+  installGuide,
   isLocalUrl,
   KEEP_ONLINE_COMMANDS,
+  PROFILES_DETECT_COMMAND,
   pairingServers,
+  RUN_COMMAND,
   serverOfCommand,
+  VERSION_COMMAND,
 } from './install';
+
+describe('the /install guide', () => {
+  const guide = installGuide('https://dock.example.com');
+
+  test('install and keep-online commands are the shared constants', () => {
+    expect(guide.install).toEqual([
+      ...INSTALL_COMMANDS,
+      { label: 'Bun', command: BUN_INSTALL_COMMAND },
+    ]);
+    expect(guide.keepOnline).toBe(KEEP_ONLINE_COMMANDS);
+    expect(guide.run).toBe(RUN_COMMAND);
+    expect(guide.version).toBe(VERSION_COMMAND);
+    expect(guide.profiles).toBe(PROFILES_DETECT_COMMAND);
+  });
+
+  test("pairs with the page's origin plus /api", () => {
+    expect(guide.pair).toBe(
+      'agentdock-runner pair --server https://dock.example.com/api --code XXXX-XXXX',
+    );
+    expect(guide.health).toBe('https://dock.example.com/api/health');
+    expect(guide.healthCheck).toBe('curl https://dock.example.com/api/health');
+    expect(installGuide('https://dock.example.com/').server).toBe(
+      'https://dock.example.com/api',
+    );
+  });
+
+  test('never shows localhost unless the page is on localhost', () => {
+    expect(JSON.stringify(guide)).not.toContain('localhost');
+    expect(installGuide('http://localhost:3517').pair).toContain(
+      'http://localhost:3517/api',
+    );
+  });
+});
 
 describe('install and keep-online commands', () => {
   test('one keep-online command per install method, in the same order', () => {

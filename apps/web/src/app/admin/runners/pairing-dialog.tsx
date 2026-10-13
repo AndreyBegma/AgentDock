@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { type ReactNode, useEffect, useState } from 'react';
 import {
   InstallCommands,
+  InstallGuideLink,
   KeepOnlineCommands,
 } from '../../../components/onboarding/runner-commands';
 import { isRunnerOnline } from '../../../lib/prerequisites/facts';
@@ -155,6 +156,7 @@ export function PairingDialog({
               <Step number={1} title="Install the runner">
                 <p>Skip this if it is already installed.</p>
                 <InstallCommands />
+                <InstallGuideLink />
               </Step>
 
               <Step number={2} title="Pair it">

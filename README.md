@@ -16,6 +16,11 @@ bun run start:dev    # api → http://localhost:8180  ·  web → http://localho
 
 Health check: `curl http://localhost:8180/health`
 
+Then put a runner on the machine that holds your repositories: the server's
+public `/install` page (http://localhost:3517/install) shows how to install,
+pair and keep it online. The runner itself is documented in
+[apps/runner/README.md](apps/runner/README.md).
+
 ## Workspaces
 
 | Path | Package | Stack |

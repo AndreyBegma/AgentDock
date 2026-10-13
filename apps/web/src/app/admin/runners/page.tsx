@@ -2,12 +2,14 @@
 
 import type { AdminRunner, PairingCodeResponse } from '@agentdock/shared';
 import { Badge } from 'glass-ui/badge';
-import { Button } from 'glass-ui/button';
+import { Button, buttonClassName } from 'glass-ui/button';
 import { DialogContent, DialogRoot } from 'glass-ui/dialog';
 import { EmptyState } from 'glass-ui/empty-state';
 import { Field, Input } from 'glass-ui/field';
 import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
 import { toast } from 'glass-ui/toast';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
 import { type FormEvent, useEffect, useState } from 'react';
 import { AsyncSection } from '../../../components/prerequisites/async-section';
 import { api } from '../../../lib/api';
@@ -18,6 +20,7 @@ import {
   STATUS_TONE,
   statusLabel,
 } from '../../../lib/runners/format';
+import { ADD_RUNNER_PARAM, INSTALL_PATH } from '../../../lib/runners/install';
 import { useSection } from '../../../lib/section/use-section';
 import { PairingDialog } from './pairing-dialog';
 import { RunnerSheet } from './runner-sheet';
@@ -181,12 +184,23 @@ function RunnersTable() {
   const [adding, setAdding] = useState(false);
   const [pairing, setPairing] = useState<PairingCodeResponse | null>(null);
   const [selected, setSelected] = useState<string>();
+  const router = useRouter();
+  const pathname = usePathname();
 
   const load = section.retry;
   useEffect(() => {
     const timer = setInterval(load, POLL_MS);
     return () => clearInterval(timer);
   }, [load]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get(ADD_RUNNER_PARAM) === null) return;
+    setAdding(true);
+    params.delete(ADD_RUNNER_PARAM);
+    const rest = params.toString();
+    router.replace(rest ? `${pathname}?${rest}` : pathname);
+  }, [pathname, router]);
 
   // The pairing dialog follows its runner through this page's poll.
   const pairingRunner = pairing
@@ -235,9 +249,21 @@ function RunnersTable() {
             title="Pair your first runner"
             description="A runner is the AgentDock daemon on the machine that holds your repositories: it runs the agents and reads the code, and it dials out to AgentDock, so the machine needs no open port. Add one to get a pairing command to run there."
             action={
-              <Button variant="solid" size="sm" onClick={() => setAdding(true)}>
-                Add runner
-              </Button>
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button
+                  variant="solid"
+                  size="sm"
+                  onClick={() => setAdding(true)}
+                >
+                  Add runner
+                </Button>
+                <Link
+                  href={INSTALL_PATH}
+                  className={buttonClassName({ variant: 'glass', size: 'sm' })}
+                >
+                  How to install the runner
+                </Link>
+              </div>
             }
           />
         }
