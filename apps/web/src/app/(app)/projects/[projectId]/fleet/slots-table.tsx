@@ -42,7 +42,7 @@ function ModelCell({ slot }: { slot: SlotSummary }) {
       </button>
     </Tooltip>
   ) : (
-    <>{text}</>
+    text
   );
 }
 

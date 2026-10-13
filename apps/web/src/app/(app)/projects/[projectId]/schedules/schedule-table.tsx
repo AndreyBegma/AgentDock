@@ -7,6 +7,7 @@ import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
 import { Toggle } from 'glass-ui/toggle';
 import Link from 'next/link';
 import {
+  DISABLED_REASON_LABEL,
   describeTarget,
   FIRING_STATUS_LABEL,
   FIRING_STATUS_TONE,
@@ -72,7 +73,7 @@ export function ScheduleTable({
                 </button>
                 {schedule.disabledReason && !schedule.enabled ? (
                   <div className="text-xs text-warn">
-                    disabled: {schedule.disabledReason.replaceAll('_', ' ')}
+                    {DISABLED_REASON_LABEL[schedule.disabledReason]}
                   </div>
                 ) : null}
               </TableCell>

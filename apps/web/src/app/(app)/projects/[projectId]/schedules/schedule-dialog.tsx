@@ -13,6 +13,7 @@ import {
 import { Toggle } from 'glass-ui/toggle';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../../../../lib/api';
+import { MODE_LABEL } from '../../../../../lib/control/format';
 import {
   browserTimezone,
   describeSchedulesError,
@@ -299,8 +300,8 @@ export function ScheduleDialog({
                   set('mode', e.target.value === 'start' ? 'start' : 'next')
                 }
               >
-                <option value="next">next — take the next queued issue</option>
-                <option value="start">start — start the orchestrator</option>
+                <option value="next">{MODE_LABEL.next}</option>
+                <option value="start">{MODE_LABEL.start}</option>
               </Select>
             </Field>
           )}

@@ -57,6 +57,12 @@ export const permissionModesFor = (
 ): readonly OrchestratorPermissionMode[] =>
   PERMISSION_MODES.filter((mode) => isAdmin || mode !== 'bypassPermissions');
 
+/** What each command does, short enough for a table cell. */
+export const MODE_SHORT: Record<OrchestratorMode, string> = {
+  start: 'new round',
+  next: 'next queued issue',
+};
+
 /** One meaning for both words, in the Start dialog and in schedules. */
 export const MODE_LABEL: Record<OrchestratorMode, string> = {
   start: 'Start — begin a new round',
