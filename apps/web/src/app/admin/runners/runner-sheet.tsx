@@ -8,6 +8,7 @@ import type {
 } from '@agentdock/shared';
 import { Badge } from 'glass-ui/badge';
 import { Button } from 'glass-ui/button';
+import { CodeBlock } from 'glass-ui/code-block';
 import { DialogContent, DialogRoot } from 'glass-ui/dialog';
 import { EmptyState } from 'glass-ui/empty-state';
 import { Field, Input } from 'glass-ui/field';
@@ -16,14 +17,17 @@ import { Skeleton } from 'glass-ui/skeleton';
 import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
 import { toast } from 'glass-ui/toast';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
+import { DisabledReason } from '../../../components/prerequisites/disabled-reason';
 import { api } from '../../../lib/api';
 import {
   capabilityRows,
   describeRunnerError,
   formatLastSeen,
+  runnerRemedy,
   STATUS_TONE,
   statusLabel,
 } from '../../../lib/runners/format';
+import { PROFILES_DETECT_COMMAND } from '../../../lib/runners/install';
 
 const POLL_MS = 10_000;
 
@@ -146,6 +150,7 @@ export function RunnerSheet({
   };
 
   const isRevoked = detail?.status === 'revoked';
+  const remedy = detail ? runnerRemedy(detail) : null;
 
   return (
     <>
@@ -181,12 +186,26 @@ export function RunnerSheet({
                     aria-hidden="true"
                   />
                   <span className="text-sm font-medium">
-                    {statusLabel(detail.status, detail.pairedAt)}
+                    {statusLabel(
+                      detail.status,
+                      detail.pairedAt,
+                      detail.lastSeenAt,
+                    )}
                   </span>
                   <span className="text-xs text-ink-3">
                     last seen {formatLastSeen(detail.lastSeenAt)}
                   </span>
                 </div>
+                {remedy && !isRevoked ? (
+                  <p className="text-sm text-ink-2">
+                    {remedy.text}
+                    {remedy.command ? (
+                      <code className="ml-1 font-mono text-ink">
+                        {remedy.command}
+                      </code>
+                    ) : null}
+                  </p>
+                ) : null}
 
                 <div className="flex flex-wrap gap-2">
                   <Button
@@ -225,6 +244,13 @@ export function RunnerSheet({
                     Revoke
                   </Button>
                 </div>
+                {isRevoked ? (
+                  <DisabledReason>
+                    This runner is revoked: it cannot reconnect, so it cannot be
+                    pinged, re-paired or revoked again. To use the machine
+                    again, add a new runner.
+                  </DisabledReason>
+                ) : null}
 
                 <section aria-labelledby="runner-about">
                   <h3 id="runner-about" className="mb-2 text-sm font-semibold">
@@ -282,7 +308,15 @@ export function RunnerSheet({
                     Runtime profiles
                   </h3>
                   {detail.profiles.length === 0 ? (
-                    <p className="text-sm text-ink-3">No profiles reported.</p>
+                    <div className="flex flex-col gap-2 text-sm text-ink-2">
+                      <p>
+                        No profiles reported. A profile is a Claude Code or
+                        Codex sign-in the runner can start agents with. Detect
+                        and save them on the runner&apos;s machine, then restart
+                        the runner:
+                      </p>
+                      <CodeBlock code={PROFILES_DETECT_COMMAND} />
+                    </div>
                   ) : (
                     <Table scroll>
                       <TableHead>
