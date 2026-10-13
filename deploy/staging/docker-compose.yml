@@ -81,6 +81,10 @@ services:
     image: agentdock-web:staging
     container_name: agentdock-staging-web
     restart: unless-stopped
+    # Read at runtime by server components (current-user.ts), not only by the
+    # build-time /api rewrite: without it they call localhost:8180.
+    environment:
+      API_URL: http://api:8180
     depends_on:
       api: { condition: service_healthy }
     mem_limit: 512m
