@@ -3,43 +3,56 @@
 import type { GitHubAppView, GitHubResyncResult } from '@agentdock/shared';
 import { Badge } from 'glass-ui/badge';
 import { Banner } from 'glass-ui/banner';
-import { Button } from 'glass-ui/button';
+import { Button, buttonClassName } from 'glass-ui/button';
 import { Card } from 'glass-ui/card';
 import { DialogContent, DialogRoot } from 'glass-ui/dialog';
 import { EmptyState } from 'glass-ui/empty-state';
 import { Skeleton } from 'glass-ui/skeleton';
 import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
 import { toast } from 'glass-ui/toast';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { AsyncSection } from '../../../../components/prerequisites/async-section';
+import { PrerequisiteBanner } from '../../../../components/prerequisites/prerequisite-banner';
 import { api } from '../../../../lib/api';
 import { formatAgo } from '../../../../lib/fleet/format';
 import {
   describeCallbackError,
   describeGitHubAppError,
+  githubAppDeliveriesUrl,
 } from '../../../../lib/github-app/format';
+import {
+  ENCRYPTION_KEY_REMEDY,
+  PUBLIC_URL_REMEDY,
+} from '../../../../lib/prerequisites/copy';
+import { useSection } from '../../../../lib/section/use-section';
 import { ManualCard, RegisterCard } from './register-cards';
 
 type Registered = Extract<GitHubAppView, { registered: true }>;
 
 const when = (iso: string | null): string => (iso ? formatAgo(iso) : '—');
 
+/** Rule R4: without a key nothing can be stored, or a stored App opened. */
+function NoKeyBanner({ registered }: { registered: boolean }) {
+  return (
+    <PrerequisiteBanner
+      tone={registered ? 'danger' : 'warn'}
+      title="No APP_ENCRYPTION_KEY on the server"
+      body={
+        registered
+          ? `The App’s stored secrets cannot be opened, so deliveries fail their signature check and AgentDock cannot call GitHub. ${ENCRYPTION_KEY_REMEDY} Use the key the App was registered with.`
+          : `Both ways to register below stay off: the App’s secrets are stored encrypted. ${ENCRYPTION_KEY_REMEDY}`
+      }
+    />
+  );
+}
+
 export default function GitHubAppPage() {
-  const [view, setView] = useState<GitHubAppView>();
+  const section = useSection(() => api<GitHubAppView>('/admin/github-app'), []);
+  const view = section.data;
+  const load = section.retry;
   const [callbackError, setCallbackError] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-
-  const load = useCallback(async () => {
-    try {
-      setView(await api<GitHubAppView>('/admin/github-app'));
-    } catch (err) {
-      toast.error(describeGitHubAppError(err));
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
 
   // The API’s callback redirects here with `?registered=1` or `?error=<code>`.
   useEffect(() => {
@@ -61,7 +74,7 @@ export default function GitHubAppPage() {
       toast.success(
         `Synced ${result.installations} installation(s), ${result.repos} repo(s).`,
       );
-      await load();
+      load();
     } catch (err) {
       toast.error(describeGitHubAppError(err));
     } finally {
@@ -75,7 +88,7 @@ export default function GitHubAppPage() {
       await api('/admin/github-app', { method: 'DELETE' });
       setConfirmDelete(false);
       toast.success('GitHub App removed.');
-      await load();
+      load();
     } catch (err) {
       toast.error(describeGitHubAppError(err));
     } finally {
@@ -100,21 +113,36 @@ export default function GitHubAppPage() {
         </Banner>
       ) : null}
 
-      {!view ? (
-        <Skeleton className="h-48 w-full" />
-      ) : view.registered ? (
-        <AppDetails
-          app={view}
-          busy={busy}
-          onResync={() => void resync()}
-          onDelete={() => setConfirmDelete(true)}
-        />
-      ) : (
-        <>
-          <RegisterCard view={view} />
-          <ManualCard onSaved={() => void load()} />
-        </>
-      )}
+      {view && !view.encryptionAvailable ? (
+        <NoKeyBanner registered={view.registered} />
+      ) : null}
+
+      <AsyncSection
+        section={section}
+        unavailable={{
+          title: 'The GitHub App settings are not answering',
+          stillWorks: 'Runners keep polling GitHub every 60 s meanwhile.',
+        }}
+        isEmpty={() => false}
+        empty={null}
+        skeleton={<Skeleton className="h-48 w-full" />}
+      >
+        {(loaded) =>
+          loaded.registered ? (
+            <AppDetails
+              app={loaded}
+              busy={busy}
+              onResync={() => void resync()}
+              onDelete={() => setConfirmDelete(true)}
+            />
+          ) : (
+            <>
+              <RegisterCard view={loaded} />
+              <ManualCard view={loaded} onSaved={load} />
+            </>
+          )
+        }
+      </AsyncSection>
 
       <DialogRoot
         open={confirmDelete}
@@ -147,6 +175,20 @@ export default function GitHubAppPage() {
   );
 }
 
+/** GitHub's Recent deliveries list for this App: why each delivery failed. */
+function DeliveriesLink({ app }: { app: Registered }) {
+  return (
+    <a
+      href={githubAppDeliveriesUrl(app)}
+      target="_blank"
+      rel="noreferrer"
+      className={buttonClassName({ variant: 'glass', size: 'sm' })}
+    >
+      Recent deliveries on GitHub
+    </a>
+  );
+}
+
 function AppDetails({
   app,
   busy,
@@ -160,21 +202,43 @@ function AppDetails({
 }) {
   return (
     <>
-      {app.hookActive ? null : (
+      {app.hookActive ? null : app.publicUrl ? (
+        <Banner
+          tone="warn"
+          title="Webhook inactive"
+          action={<DeliveriesLink app={app} />}
+        >
+          The App was registered before PUBLIC_URL was set, so its webhook on
+          GitHub is off. Remove the App here and register it again to turn it
+          on. Runners keep polling every 60 s meanwhile.
+        </Banner>
+      ) : (
         <Banner tone="warn" title="Webhook inactive">
-          {app.publicUrl
-            ? 'GitHub is not delivering to this server.'
-            : 'No PUBLIC_URL is configured, so GitHub cannot reach this server.'}{' '}
-          Runners keep polling every 60 s.
+          No PUBLIC_URL is configured, so GitHub cannot reach this server.
+          Runners keep polling every 60 s. {PUBLIC_URL_REMEDY} Then remove the
+          App here and register it again.
         </Banner>
       )}
+      {app.hookActive && app.hookCheckOk === false ? (
+        <Banner
+          tone="warn"
+          title="GitHub cannot deliver to this server"
+          action={<DeliveriesLink app={app} />}
+        >
+          The last resync found failed deliveries. GitHub’s Recent deliveries
+          list shows why each one failed — usually PUBLIC_URL is not reachable
+          from the internet. Runners keep polling every 60 s meanwhile.
+        </Banner>
+      ) : null}
       {app.signatureFailures > 0 ? (
         <Banner tone="warn" title="Signature failures">
           {app.signatureFailures} delivery(ies) failed the signature check
           {app.lastSignatureFailureAt
             ? `, the last ${formatAgo(app.lastSignatureFailureAt)}`
             : ''}
-          . The webhook secret here and on GitHub may differ.
+          . The webhook secret here and on GitHub may differ: set a new secret
+          on GitHub, then remove the App here and enter its credentials by hand
+          with that secret.
         </Banner>
       ) : null}
 
@@ -250,6 +314,16 @@ function AppDetails({
         <EmptyState
           title="Not installed anywhere"
           description="Install the App on the account that owns your repositories, then resync."
+          action={
+            <a
+              href={app.installUrl}
+              target="_blank"
+              rel="noreferrer"
+              className={buttonClassName({ variant: 'solid', size: 'sm' })}
+            >
+              Install on GitHub
+            </a>
+          }
         />
       ) : (
         <Table scroll>

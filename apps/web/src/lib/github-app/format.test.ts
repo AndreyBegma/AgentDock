@@ -1,13 +1,22 @@
 import { describe, expect, test } from 'bun:test';
-import { GITHUB_HEALTH_REASONS } from '@agentdock/shared';
+import {
+  GITHUB_APP_EVENTS,
+  GITHUB_APP_PERMISSIONS,
+  GITHUB_HEALTH_REASONS,
+} from '@agentdock/shared';
 import { ApiError } from '../api';
 import {
   apiCallbackUrl,
+  credentialsErrorField,
   credentialsProblem,
   describeCallbackError,
   describeGitHubAppError,
+  EVENT_LABEL,
   emptyCredentialsForm,
+  githubAppDeliveriesUrl,
+  githubWebhookUrl,
   HEALTH_REASON_LABEL,
+  PERMISSION_LABEL,
   parseOwner,
   toCredentialsRequest,
 } from './format';
@@ -51,14 +60,91 @@ describe('credentials form', () => {
     expect(toCredentialsRequest(valid).appId).toBe(123);
   });
 
-  test('each field is checked', () => {
-    expect(credentialsProblem(emptyCredentialsForm())).toContain('App ID');
-    expect(credentialsProblem({ ...valid, slug: '' })).toContain('slug');
-    expect(credentialsProblem({ ...valid, privateKey: 'x' })).toContain('PEM');
-    expect(credentialsProblem({ ...valid, webhookSecret: ' ' })).toContain(
-      'secret',
+  test('each problem names the field it belongs under', () => {
+    expect(credentialsProblem(emptyCredentialsForm())).toMatchObject({
+      field: 'appId',
+      text: expect.stringContaining('App ID'),
+    });
+    expect(credentialsProblem({ ...valid, slug: '' })?.field).toBe('slug');
+    expect(credentialsProblem({ ...valid, privateKey: 'x' })).toMatchObject({
+      field: 'privateKey',
+      text: expect.stringContaining('PEM'),
+    });
+    expect(credentialsProblem({ ...valid, webhookSecret: ' ' })?.field).toBe(
+      'webhookSecret',
     );
   });
+
+  test('GitHub refusing the credentials points at the key; other errors at the form', () => {
+    expect(
+      credentialsErrorField(
+        new ApiError(400, 'invalid_credentials' as never, 'x'),
+      ),
+    ).toBe('privateKey');
+    expect(
+      credentialsErrorField(
+        new ApiError(409, 'encryption_key_missing' as never, 'x'),
+      ),
+    ).toBeNull();
+    expect(credentialsErrorField(new Error('offline'))).toBeNull();
+  });
+});
+
+describe('webhook and deliveries URLs', () => {
+  test('the webhook URL is absolute under PUBLIC_URL, or null without it', () => {
+    expect(githubWebhookUrl('https://dock.example/')).toBe(
+      'https://dock.example/hooks/github',
+    );
+    expect(githubWebhookUrl(null)).toBeNull();
+  });
+
+  const app = (accountType: string, accountLogin = 'acme') => ({
+    slug: 'agentdock-x',
+    ownerLogin: 'Acme',
+    installations: [
+      {
+        id: 1,
+        accountLogin,
+        accountType,
+        suspended: false,
+        syncedAt: '',
+        repos: [],
+      },
+    ],
+  });
+
+  test('an App owned by an organization is under the organization’s settings', () => {
+    expect(githubAppDeliveriesUrl(app('Organization'))).toBe(
+      'https://github.com/organizations/Acme/settings/apps/agentdock-x/advanced',
+    );
+  });
+
+  test('a personal App, or one with no installation on its owner, is under the user’s settings', () => {
+    expect(githubAppDeliveriesUrl(app('User'))).toBe(
+      'https://github.com/settings/apps/agentdock-x/advanced',
+    );
+    expect(githubAppDeliveriesUrl(app('Organization', 'other'))).toBe(
+      'https://github.com/settings/apps/agentdock-x/advanced',
+    );
+  });
+});
+
+test('every permission and event the App asks for has a label', () => {
+  for (const key of Object.keys(GITHUB_APP_PERMISSIONS)) {
+    expect(PERMISSION_LABEL[key as keyof typeof PERMISSION_LABEL]).toBeTruthy();
+  }
+  for (const event of GITHUB_APP_EVENTS) {
+    expect(EVENT_LABEL[event]).toBeTruthy();
+  }
+});
+
+test('the missing-key error says how to set the key (R4)', () => {
+  const text = describeGitHubAppError(
+    new ApiError(409, 'encryption_key_missing' as never, 'x'),
+  );
+  expect(text).toContain('APP_ENCRYPTION_KEY=');
+  expect(text).toContain('openssl rand -base64 32');
+  expect(text).toContain('restart the API');
 });
 
 describe('errors', () => {
