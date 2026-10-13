@@ -8,10 +8,11 @@ import { INSTALL_PATH } from './lib/runners/install';
 const PUBLIC_PATHS = ['/login', '/register', '/pending', INSTALL_PATH];
 
 /**
- * The app icons (`app/icon.svg`, `app/apple-icon.png`) are fetched by the
- * browser on the sign-in page too; redirected, the tab shows no icon there.
+ * The app icons (`app/icon.svg`, and `app/apple-icon.tsx`, served at
+ * `/apple-icon`) are fetched by the browser on the sign-in page too;
+ * redirected, the tab shows no icon there.
  */
-export const PUBLIC_FILES = ['/favicon.ico', '/icon.svg', '/apple-icon.png'];
+export const PUBLIC_FILES = ['/favicon.ico', '/icon.svg', '/apple-icon'];
 
 /**
  * Route protection (spec D13). Next 16 renamed `middleware` to `proxy`; this is
@@ -33,7 +34,5 @@ export function proxy(request: NextRequest) {
 export const config = {
   // Everything except the API rewrite, Next internals and the app icons
   // (`PUBLIC_FILES`, kept in step with this list).
-  matcher: [
-    '/((?!api/|_next/|favicon\\.ico$|icon\\.svg$|apple-icon\\.png$).*)',
-  ],
+  matcher: ['/((?!api/|_next/|favicon\\.ico$|icon\\.svg$|apple-icon$).*)'],
 };

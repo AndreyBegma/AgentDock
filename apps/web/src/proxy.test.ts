@@ -44,7 +44,7 @@ describe('proxy', () => {
   });
 
   test('the app icons load signed out (the login tab has its favicon)', () => {
-    for (const path of ['/icon.svg', '/apple-icon.png', '/favicon.ico']) {
+    for (const path of ['/icon.svg', '/apple-icon', '/favicon.ico']) {
       expect(redirectOf(visit(path))).toBeNull();
     }
     expect(redirectOf(visit('/icon.svg?f0e1d2c3'))).toBeNull();
@@ -54,7 +54,7 @@ describe('proxy', () => {
     const matches = (path: string) =>
       config.matcher.some((pattern) => new RegExp(`^${pattern}$`).test(path));
     for (const path of PUBLIC_FILES) expect(matches(path)).toBe(false);
-    for (const path of ['/', '/icon.svg/x', '/icons', '/admin/runners']) {
+    for (const path of ['/', '/icon.svg/x', '/apple-icons', '/admin/runners']) {
       expect(matches(path)).toBe(true);
     }
   });
