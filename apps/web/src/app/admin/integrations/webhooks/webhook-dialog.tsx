@@ -6,12 +6,12 @@ import {
   type WebhookView,
   type WebhookWithSecret,
 } from '@agentdock/shared';
-import { Banner } from 'glass-ui/banner';
-import { Button } from 'glass-ui/button';
-import { Checkbox } from 'glass-ui/checkbox';
-import { Combobox } from 'glass-ui/combobox';
-import { DialogContent, DialogRoot } from 'glass-ui/dialog';
-import { Field, Input } from 'glass-ui/field';
+import { Banner } from '@andrewbehma/glass-ui/banner';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { Checkbox } from '@andrewbehma/glass-ui/checkbox';
+import { Combobox } from '@andrewbehma/glass-ui/combobox';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { Field, Input } from '@andrewbehma/glass-ui/field';
 import { useEffect, useMemo, useState } from 'react';
 import { DisabledReason } from '../../../../components/prerequisites/disabled-reason';
 import { api } from '../../../../lib/api';

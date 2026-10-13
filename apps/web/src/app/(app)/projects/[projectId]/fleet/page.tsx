@@ -10,11 +10,11 @@ import {
   type SlotStatus,
   type SlotSummary,
 } from '@agentdock/shared';
-import { Button } from 'glass-ui/button';
-import { EmptyState } from 'glass-ui/empty-state';
-import { Field, Input, Select } from 'glass-ui/field';
-import { Skeleton } from 'glass-ui/skeleton';
-import { Toggle } from 'glass-ui/toggle';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import { Toggle } from '@andrewbehma/glass-ui/toggle';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';

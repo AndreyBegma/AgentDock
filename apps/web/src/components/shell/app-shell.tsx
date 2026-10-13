@@ -5,16 +5,19 @@ import {
   type ProjectSummary,
   type PublicUser,
 } from '@agentdock/shared';
-import { Avatar } from 'glass-ui/avatar';
-import { Badge } from 'glass-ui/badge';
-import { Banner } from 'glass-ui/banner';
-import { Breadcrumb, type BreadcrumbItem } from 'glass-ui/breadcrumb';
-import { Button } from 'glass-ui/button';
+import { Avatar } from '@andrewbehma/glass-ui/avatar';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Banner } from '@andrewbehma/glass-ui/banner';
+import {
+  Breadcrumb,
+  type BreadcrumbItem,
+} from '@andrewbehma/glass-ui/breadcrumb';
+import { Button } from '@andrewbehma/glass-ui/button';
 import {
   CommandPalette,
   type CommandPaletteGroup,
-} from 'glass-ui/command-palette';
-import { KeyHint } from 'glass-ui/key-hint';
+} from '@andrewbehma/glass-ui/command-palette';
+import { KeyHint } from '@andrewbehma/glass-ui/key-hint';
 import {
   MenuContent,
   MenuItem,
@@ -24,10 +27,10 @@ import {
   MenuRoot,
   MenuSeparator,
   MenuTrigger,
-} from 'glass-ui/menu';
-import { NavRail, type NavRailGroup } from 'glass-ui/nav-rail';
-import { toast } from 'glass-ui/toast';
-import { useCommandPaletteShortcut } from 'glass-ui/use-command-palette-shortcut';
+} from '@andrewbehma/glass-ui/menu';
+import { NavRail, type NavRailGroup } from '@andrewbehma/glass-ui/nav-rail';
+import { toast } from '@andrewbehma/glass-ui/toast';
+import { useCommandPaletteShortcut } from '@andrewbehma/glass-ui/use-command-palette-shortcut';
 import { FolderGit2, LogOut, Palette, Search, User } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';

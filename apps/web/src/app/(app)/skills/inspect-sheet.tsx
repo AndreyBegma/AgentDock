@@ -7,14 +7,19 @@ import {
   type SkillPreviewView,
   type SkillProfileInstallView,
 } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Banner } from 'glass-ui/banner';
-import { Button } from 'glass-ui/button';
-import { Chip } from 'glass-ui/chip';
-import { Field, Select } from 'glass-ui/field';
-import { KeyValueList } from 'glass-ui/key-value-list';
-import { SheetContent, SheetRoot } from 'glass-ui/sheet';
-import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Banner } from '@andrewbehma/glass-ui/banner';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { Chip } from '@andrewbehma/glass-ui/chip';
+import { Field, Select } from '@andrewbehma/glass-ui/field';
+import { KeyValueList } from '@andrewbehma/glass-ui/key-value-list';
+import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
+import {
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+} from '@andrewbehma/glass-ui/table';
 import { useState } from 'react';
 import { api } from '../../../lib/api';
 import { parseRunEvent } from '../../../lib/control/pending';

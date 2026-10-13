@@ -1,11 +1,11 @@
 'use client';
 
 import type { ProjectDetail } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { EmptyState } from 'glass-ui/empty-state';
-import { Skeleton } from 'glass-ui/skeleton';
-import { Tabs, TabsItem } from 'glass-ui/tabs';
-import { toast } from 'glass-ui/toast';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import { Tabs, TabsItem } from '@andrewbehma/glass-ui/tabs';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { ApiError, api } from '../../../../../lib/api';

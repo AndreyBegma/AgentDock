@@ -2,12 +2,12 @@
 
 import type { ProjectDetail } from '@agentdock/shared';
 import type { DocsSourceKind } from '@agentdock/shared/protocol';
-import { Button } from 'glass-ui/button';
-import { Card } from 'glass-ui/card';
-import { DialogContent, DialogRoot } from 'glass-ui/dialog';
-import { EmptyState } from 'glass-ui/empty-state';
-import { Field, Input, Select } from 'glass-ui/field';
-import { toast } from 'glass-ui/toast';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { Card } from '@andrewbehma/glass-ui/card';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import { useEffect, useState } from 'react';
 import { api } from '../../../../../lib/api';
 import {

@@ -1,9 +1,9 @@
 'use client';
 
 import type { ModelPriceInput } from '@agentdock/shared';
-import { Button } from 'glass-ui/button';
-import { DialogContent, DialogRoot } from 'glass-ui/dialog';
-import { Field, Input } from 'glass-ui/field';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { Field, Input } from '@andrewbehma/glass-ui/field';
 import { type FormEvent, useEffect, useState } from 'react';
 import {
   compilePattern,

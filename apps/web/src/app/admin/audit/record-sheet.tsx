@@ -1,8 +1,8 @@
 'use client';
 
 import type { AuditRecordView } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { SheetContent, SheetRoot } from 'glass-ui/sheet';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import type { ReactNode } from 'react';
 import { actionLabel, RESULT_LABEL } from '../../../lib/audit/actions';
 import {

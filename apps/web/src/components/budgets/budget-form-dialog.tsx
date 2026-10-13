@@ -7,11 +7,11 @@ import {
   type BudgetScope,
   type BudgetView,
 } from '@agentdock/shared';
-import { Button } from 'glass-ui/button';
-import { Combobox } from 'glass-ui/combobox';
-import { DialogContent, DialogRoot } from 'glass-ui/dialog';
-import { Field, Input, Select } from 'glass-ui/field';
-import { Toggle } from 'glass-ui/toggle';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { Combobox } from '@andrewbehma/glass-ui/combobox';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
+import { Toggle } from '@andrewbehma/glass-ui/toggle';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api';
 import {

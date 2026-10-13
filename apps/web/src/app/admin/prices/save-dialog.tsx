@@ -4,10 +4,10 @@ import type {
   CreatePriceVersionRequest,
   ModelPriceInput,
 } from '@agentdock/shared';
-import { Button } from 'glass-ui/button';
-import { DialogContent, DialogRoot } from 'glass-ui/dialog';
-import { Field, Input } from 'glass-ui/field';
-import { toast } from 'glass-ui/toast';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { Field, Input } from '@andrewbehma/glass-ui/field';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import { type FormEvent, useEffect, useState } from 'react';
 import { api } from '../../../lib/api';
 import { describeUsageError } from '../../../lib/usage/format';

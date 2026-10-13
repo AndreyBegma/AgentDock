@@ -1,6 +1,6 @@
 'use client';
 
-import { Badge } from 'glass-ui/badge';
+import { Badge } from '@andrewbehma/glass-ui/badge';
 import { liveStatusLabel, useLivePaused } from './live-status';
 
 /**

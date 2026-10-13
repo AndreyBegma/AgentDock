@@ -8,13 +8,18 @@ import {
   type Role,
   type UpdateProjectMemberRequest,
 } from '@agentdock/shared';
-import { Button } from 'glass-ui/button';
-import { Card } from 'glass-ui/card';
-import { DialogContent, DialogRoot } from 'glass-ui/dialog';
-import { EmptyState } from 'glass-ui/empty-state';
-import { Field, Select } from 'glass-ui/field';
-import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
-import { toast } from 'glass-ui/toast';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { Card } from '@andrewbehma/glass-ui/card';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { Field, Select } from '@andrewbehma/glass-ui/field';
+import {
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+} from '@andrewbehma/glass-ui/table';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../../../../lib/api';
 import { describeProjectError } from '../../../../../lib/projects/format';

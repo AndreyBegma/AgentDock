@@ -5,7 +5,7 @@ import {
   type CommandRunView,
   type OrchestratorStartRequest,
 } from '@agentdock/shared';
-import { toast } from 'glass-ui/toast';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import { useRouter } from 'next/navigation';
 import { useCallback, useRef, useState } from 'react';
 import { api, errorText, errorToastOptions } from '../api';

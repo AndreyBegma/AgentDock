@@ -1,8 +1,12 @@
 'use client';
 
-import { Badge } from 'glass-ui/badge';
-import { Button } from 'glass-ui/button';
-import { PopoverContent, PopoverRoot, PopoverTrigger } from 'glass-ui/popover';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Button } from '@andrewbehma/glass-ui/button';
+import {
+  PopoverContent,
+  PopoverRoot,
+  PopoverTrigger,
+} from '@andrewbehma/glass-ui/popover';
 import { Bell } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';

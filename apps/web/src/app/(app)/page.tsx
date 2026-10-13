@@ -1,12 +1,12 @@
 'use client';
 
 import type { ProjectSummary } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Button, buttonClassName } from 'glass-ui/button';
-import { Card } from 'glass-ui/card';
-import { EmptyState } from 'glass-ui/empty-state';
-import { SectionUnavailable } from 'glass-ui/section-unavailable';
-import { Skeleton } from 'glass-ui/skeleton';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
+import { Card } from '@andrewbehma/glass-ui/card';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import Link from 'next/link';
 import { useEffect } from 'react';
 import { GettingStarted } from '../../components/onboarding/getting-started';

@@ -1,6 +1,6 @@
 'use client';
 
-import { toast } from 'glass-ui/toast';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import { useRouter } from 'next/navigation';
 import { useCallback } from 'react';
 import { type Described, errorText, errorToastOptions } from '../api';

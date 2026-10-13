@@ -8,19 +8,23 @@ import type {
   UsageSummaryResponse,
   UsageTimeseriesResponse,
 } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Button, buttonClassName } from 'glass-ui/button';
-import { DataTable, type DataTableSort, sortRows } from 'glass-ui/data-table';
-import { DateInput } from 'glass-ui/date-input';
-import { EmptyState } from 'glass-ui/empty-state';
-import { Field, Select } from 'glass-ui/field';
-import { SectionUnavailable } from 'glass-ui/section-unavailable';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
+import {
+  DataTable,
+  type DataTableSort,
+  sortRows,
+} from '@andrewbehma/glass-ui/data-table';
+import { DateInput } from '@andrewbehma/glass-ui/date-input';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { Field, Select } from '@andrewbehma/glass-ui/field';
+import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
 import {
   SegmentedControl,
   SegmentedControlItem,
-} from 'glass-ui/segmented-control';
-import { Sparkline } from 'glass-ui/sparkline';
-import { StatTile } from 'glass-ui/stat-tile';
+} from '@andrewbehma/glass-ui/segmented-control';
+import { Sparkline } from '@andrewbehma/glass-ui/sparkline';
+import { StatTile } from '@andrewbehma/glass-ui/stat-tile';
 import Link from 'next/link';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { BudgetStrip } from '../../../components/budgets/budget-chip';

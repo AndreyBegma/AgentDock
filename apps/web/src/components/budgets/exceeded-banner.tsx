@@ -1,6 +1,6 @@
 'use client';
 
-import { Banner } from 'glass-ui/banner';
+import { Banner } from '@andrewbehma/glass-ui/banner';
 import Link from 'next/link';
 import { formatMoment, refusingBudget } from '../../lib/budgets/format';
 import { useProjectBudgets } from '../../lib/budgets/use-budgets';

@@ -1,6 +1,11 @@
 import type { QueueItemView } from '@agentdock/shared';
-import { Button } from 'glass-ui/button';
-import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
+import { Button } from '@andrewbehma/glass-ui/button';
+import {
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+} from '@andrewbehma/glass-ui/table';
 import { blockerLabel, priorityLabel } from '../../../../../lib/queue/format';
 import { ComputedNote, IssueLink, SourceDot, StateBadge } from './state-cells';
 

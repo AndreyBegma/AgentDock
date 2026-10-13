@@ -10,14 +10,19 @@ import {
   type BudgetView,
   type ProjectSummary,
 } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Button } from 'glass-ui/button';
-import { DialogContent, DialogRoot } from 'glass-ui/dialog';
-import { EmptyState } from 'glass-ui/empty-state';
-import { Field, Select } from 'glass-ui/field';
-import { Skeleton } from 'glass-ui/skeleton';
-import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
-import { toast } from 'glass-ui/toast';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { Field, Select } from '@andrewbehma/glass-ui/field';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import {
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+} from '@andrewbehma/glass-ui/table';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { BudgetFormDialog } from '../../../components/budgets/budget-form-dialog';

@@ -1,4 +1,4 @@
 @import "tailwindcss";
-@import "glass-ui/tokens.css";
-@import "glass-ui/material.css";
-@import "glass-ui/base.css";
+@import "@andrewbehma/glass-ui/tokens.css";
+@import "@andrewbehma/glass-ui/material.css";
+@import "@andrewbehma/glass-ui/base.css";

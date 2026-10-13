@@ -1,6 +1,6 @@
 import type { QueueItemView } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Tooltip } from 'glass-ui/tooltip';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import {
   computedNote,
   STATE_TONE,

@@ -7,10 +7,10 @@ import type {
   ProjectDetail,
 } from '@agentdock/shared';
 import type { ProjectInspection } from '@agentdock/shared/protocol';
-import { Button } from 'glass-ui/button';
-import { DialogContent, DialogRoot } from 'glass-ui/dialog';
-import { Field, Input, Select } from 'glass-ui/field';
-import { toast } from 'glass-ui/toast';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import { type FormEvent, useEffect, useState } from 'react';
 import { InstallGuideLink } from '../../../components/onboarding/runner-commands';
 import { DisabledReason } from '../../../components/prerequisites/disabled-reason';

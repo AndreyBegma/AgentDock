@@ -1,8 +1,8 @@
 'use client';
 
-import { buttonClassName } from 'glass-ui/button';
-import { Card } from 'glass-ui/card';
-import { Progress } from 'glass-ui/progress';
+import { buttonClassName } from '@andrewbehma/glass-ui/button';
+import { Card } from '@andrewbehma/glass-ui/card';
+import { Progress } from '@andrewbehma/glass-ui/progress';
 import { Check, Circle } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';

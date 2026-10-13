@@ -7,15 +7,15 @@ import {
   type QueueRefreshResult,
   type QueueView,
 } from '@agentdock/shared';
-import { Button } from 'glass-ui/button';
-import { ChipButton } from 'glass-ui/chip';
-import { EmptyState } from 'glass-ui/empty-state';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { ChipButton } from '@andrewbehma/glass-ui/chip';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import {
   SegmentedControl,
   SegmentedControlItem,
-} from 'glass-ui/segmented-control';
-import { toast } from 'glass-ui/toast';
-import { Toolbar } from 'glass-ui/toolbar';
+} from '@andrewbehma/glass-ui/segmented-control';
+import { toast } from '@andrewbehma/glass-ui/toast';
+import { Toolbar } from '@andrewbehma/glass-ui/toolbar';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';

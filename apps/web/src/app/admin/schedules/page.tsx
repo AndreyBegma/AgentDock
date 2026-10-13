@@ -5,12 +5,17 @@ import type {
   ScheduleView,
   SystemJobView,
 } from '@agentdock/shared';
-import { Badge } from 'glass-ui/badge';
-import { Button, buttonClassName } from 'glass-ui/button';
-import { EmptyState } from 'glass-ui/empty-state';
-import { Field, Select } from 'glass-ui/field';
-import { Skeleton } from 'glass-ui/skeleton';
-import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { Field, Select } from '@andrewbehma/glass-ui/field';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import {
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+} from '@andrewbehma/glass-ui/table';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { AsyncSection } from '../../../components/prerequisites/async-section';

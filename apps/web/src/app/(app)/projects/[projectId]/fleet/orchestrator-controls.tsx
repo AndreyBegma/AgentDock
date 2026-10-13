@@ -9,9 +9,9 @@ import type {
   OrchestratorMode,
   OrchestratorPermissionMode,
 } from '@agentdock/shared/protocol';
-import { Button } from 'glass-ui/button';
-import { DialogContent, DialogRoot } from 'glass-ui/dialog';
-import { Field, Input, Select } from 'glass-ui/field';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
 import { useState } from 'react';
 import { DisabledReason } from '../../../../../components/prerequisites/disabled-reason';
 import { api } from '../../../../../lib/api';

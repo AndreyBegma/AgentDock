@@ -1,8 +1,8 @@
 'use client';
 
 import type { ProjectSummary } from '@agentdock/shared';
-import { Banner } from 'glass-ui/banner';
-import { buttonClassName } from 'glass-ui/button';
+import { Banner } from '@andrewbehma/glass-ui/banner';
+import { buttonClassName } from '@andrewbehma/glass-ui/button';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import {

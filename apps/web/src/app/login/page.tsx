@@ -6,8 +6,8 @@ import {
   type PublicUser,
   type RegistrationState,
 } from '@agentdock/shared';
-import { Button } from 'glass-ui/button';
-import { Field, Input } from 'glass-ui/field';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { Field, Input } from '@andrewbehma/glass-ui/field';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useEffect, useState } from 'react';

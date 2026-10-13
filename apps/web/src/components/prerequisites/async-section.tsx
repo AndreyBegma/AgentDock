@@ -1,8 +1,8 @@
 'use client';
 
-import { Button } from 'glass-ui/button';
-import { SectionUnavailable } from 'glass-ui/section-unavailable';
-import { Skeleton } from 'glass-ui/skeleton';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import type { ReactNode } from 'react';
 import { sectionView } from '../../lib/section/state';
 import type { Section } from '../../lib/section/use-section';
