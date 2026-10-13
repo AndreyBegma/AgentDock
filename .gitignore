@@ -8,6 +8,9 @@ dist/
 .next/
 out/
 
+# Runner release assets (apps/runner/scripts/build-release.sh)
+apps/runner/release/
+
 # Turbo
 .turbo/
 
