@@ -1,3 +1,4 @@
+import { Canvas } from '@andrewbehma/glass-ui/canvas';
 import { Toaster } from '@andrewbehma/glass-ui/toast';
 import type { Metadata, Viewport } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
@@ -25,9 +26,11 @@ export const metadata: Metadata = {
   applicationName: 'AgentDock',
 };
 
+// The browser chrome takes the navy palette's ground (glass-ui#109): a meta
+// tag cannot read a CSS variable, so these mirror `--color-ground`.
 export const viewport: Viewport = {
   themeColor: [
-    { media: '(prefers-color-scheme: dark)', color: '#09090c' },
+    { media: '(prefers-color-scheme: dark)', color: '#0a1022' },
     { media: '(prefers-color-scheme: light)', color: '#ffffff' },
   ],
 };
@@ -43,6 +46,7 @@ export default function RootLayout({
     <html
       lang="en"
       data-scale="desk"
+      data-palette="navy"
       className={`${inter.variable} ${mono.variable}`}
       suppressHydrationWarning
     >
@@ -50,7 +54,11 @@ export default function RootLayout({
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: constant script, no user input */}
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }} />
       </head>
-      <body className="min-h-screen bg-ground font-sans text-ink antialiased">
+      {/* No background on body: `html` paints the ground under the canvas. */}
+      <body className="min-h-screen font-sans text-ink antialiased">
+        {/* The aurora behind every page, once, outside each `#main-content`:
+            the depth effect transforms that element (glass-ui#93). */}
+        <Canvas />
         {children}
         <Toaster />
       </body>

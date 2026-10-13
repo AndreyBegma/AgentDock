@@ -19,7 +19,6 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { type ReactNode, useEffect, useState } from 'react';
-import { HeroGlow } from '../../components/auth-card';
 import { SiteLink, Wordmark } from '../../components/brand';
 import { api } from '../../lib/api';
 import {
@@ -235,9 +234,8 @@ export function InstallGuide() {
     guide.keepOnline[method === 'Homebrew' ? 0 : 1] ?? guide.keepOnline[0];
 
   return (
-    // The glow spans the window; the column is the main.
-    <div className="relative isolate">
-      <HeroGlow />
+    // The canvas behind the page is the root layout's; the column is the main.
+    <div>
       <main
         id="main-content"
         className="mx-auto flex w-full max-w-3xl flex-col gap-12 px-4 pb-16 pt-6 sm:px-6 sm:pt-8"
