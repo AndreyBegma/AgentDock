@@ -9,7 +9,7 @@ import {
 } from '@agentdock/shared';
 import type { Runtime } from '@agentdock/shared/protocol';
 import type { TreeItem } from 'glass-ui/tree';
-import { ApiError, describeError } from '../api';
+import { ApiError, describeError, type ErrorHint } from '../api';
 
 /** `1234` → `1.2k`, `2_500_000` → `2.5M`. */
 export function formatTokens(n: number): string {
@@ -264,6 +264,27 @@ export function barGeometry(
   );
   return { left, width };
 }
+
+/** The sentence, plus the page that fixes it when there is one. */
+export function describeSessionHint(error: unknown): ErrorHint {
+  const text = describeSessionError(error);
+  const code: string | undefined =
+    error instanceof ApiError ? error.code : undefined;
+  if (code === SESSION_ERROR.forbidden) {
+    return { text, href: '/sessions', cta: 'Show my sessions' };
+  }
+  return { text };
+}
+
+/** Whether a query narrows the list at all (none: "nothing yet", some: "no matches"). */
+export const hasSessionFilters = (query: SessionListQuery): boolean =>
+  Object.values(query).some((value) => value !== undefined && value !== '');
+
+/** Whether the form holds filters that were not applied yet. */
+export const sessionFormChanged = (
+  form: SessionFilterForm,
+  applied: SessionListQuery,
+): boolean => queryString(toQuery(form)) !== queryString(applied);
 
 export function describeSessionError(error: unknown): string {
   if (error instanceof ApiError) {

@@ -9,13 +9,14 @@ import {
   type LiveTopic,
   type ProjectSummary,
 } from '@agentdock/shared';
-import { Button } from 'glass-ui/button';
+import { Button, buttonClassName } from 'glass-ui/button';
 import { DateInput } from 'glass-ui/date-input';
 import { EmptyState } from 'glass-ui/empty-state';
 import { Field, Input, Select } from 'glass-ui/field';
+import { SectionUnavailable } from 'glass-ui/section-unavailable';
 import { Skeleton } from 'glass-ui/skeleton';
 import { Timeline } from 'glass-ui/timeline';
-import { toast } from 'glass-ui/toast';
+import Link from 'next/link';
 import {
   type FormEvent,
   useCallback,
@@ -26,8 +27,10 @@ import {
 } from 'react';
 import {
   type ActivityFilterForm,
+  activityFormChanged,
   CATEGORY_LABEL,
   EMPTY_ACTIVITY_FILTERS,
+  hasActivityFilters,
   isNotFound,
   matchesQuery,
   mergeItems,
@@ -40,8 +43,9 @@ import {
   toActivityQuery,
   toTimelineItem,
 } from '../../../lib/activity/format';
-import { api, describeError } from '../../../lib/api';
+import { api, describeError, describeErrorHint } from '../../../lib/api';
 import { useLive } from '../../../lib/live/use-live';
+import { useErrorToast } from '../../../lib/section/use-error-toast';
 
 /** `useLive` takes one topic; a feed may follow several, so one invisible subscriber each. */
 function TopicListener({
@@ -63,6 +67,7 @@ function Filters({
   form,
   projects,
   showProject,
+  changed,
   onChange,
   onApply,
   onReset,
@@ -70,6 +75,8 @@ function Filters({
   form: ActivityFilterForm;
   projects: ProjectSummary[];
   showProject: boolean;
+  /** The form holds filters that were not applied yet. */
+  changed: boolean;
   onChange: (patch: Partial<ActivityFilterForm>) => void;
   onApply: () => void;
   onReset: () => void;
@@ -113,7 +120,11 @@ function Filters({
           ))}
         </Select>
       </Field>
-      <Field label="Type" htmlFor="activity-type">
+      <Field
+        label="Type"
+        htmlFor="activity-type"
+        hint="The event code shown on an item, e.g. pr.merged."
+      >
         <Input
           id="activity-type"
           value={form.type}
@@ -122,7 +133,11 @@ function Filters({
           onChange={(e) => onChange({ type: e.target.value })}
         />
       </Field>
-      <Field label="Actor" htmlFor="activity-actor">
+      <Field
+        label="Actor"
+        htmlFor="activity-actor"
+        hint="Who caused it: a user's id, a runner's id, or “orchestrator”."
+      >
         <Input
           id="activity-actor"
           value={form.actor}
@@ -131,7 +146,11 @@ function Filters({
           onChange={(e) => onChange({ actor: e.target.value })}
         />
       </Field>
-      <Field label="Slot" htmlFor="activity-slot">
+      <Field
+        label="Slot"
+        htmlFor="activity-slot"
+        hint="The name of an orchestrator slot."
+      >
         <Input
           id="activity-slot"
           value={form.slot}
@@ -156,13 +175,18 @@ function Filters({
           onChange={(e) => onChange({ toDate: e.target.value })}
         />
       </Field>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-4">
         <Button variant="solid" type="submit">
           Apply
         </Button>
         <Button variant="ghost" type="button" onClick={onReset}>
           Reset
         </Button>
+        {changed ? (
+          <p className="text-xs text-ink-2" role="status">
+            Filters changed. Press Apply to update the feed.
+          </p>
+        ) : null}
       </div>
     </form>
   );
@@ -189,6 +213,9 @@ export function ActivityFeed({
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [missing, setMissing] = useState(false);
+  // A failed load is never "no activity": keep what is on screen and say so.
+  const [failure, setFailure] = useState<unknown>(null);
+  const showError = useErrorToast();
   const generation = useRef(0);
   const topRef = useRef<HTMLDivElement>(null);
   const itemsRef = useRef<ActivityItem[] | undefined>(undefined);
@@ -228,6 +255,7 @@ export function ActivityFeed({
         );
         if (mine !== generation.current) return;
         setMissing(false);
+        setFailure(null);
         if (reset) {
           setItems(page.items);
           setPending([]);
@@ -238,8 +266,7 @@ export function ActivityFeed({
       } catch (err) {
         if (mine !== generation.current) return;
         if (isNotFound(err)) setMissing(true);
-        else toast.error(describeError(err));
-        setItems((current) => current ?? []);
+        else setFailure(err);
       }
     },
     [base, receive],
@@ -253,6 +280,7 @@ export function ActivityFeed({
 
   useEffect(() => {
     setItems(undefined);
+    setFailure(null);
     loadFirst(applied, true);
   }, [applied, loadFirst]);
 
@@ -293,7 +321,7 @@ export function ActivityFeed({
       setItems((current) => mergeItems(current ?? [], page.items));
       setNextCursor(page.nextCursor);
     } catch (err) {
-      toast.error(describeError(err));
+      showError(describeErrorHint(err));
     } finally {
       setLoadingMore(false);
     }
@@ -333,6 +361,7 @@ export function ActivityFeed({
           form={form}
           projects={projects}
           showProject={!fixed}
+          changed={activityFormChanged(form, applied)}
           onChange={(patch) => setForm((c) => ({ ...c, ...patch }))}
           onApply={() => setApplied(toActivityQuery(form))}
           onReset={reset}
@@ -340,11 +369,30 @@ export function ActivityFeed({
       </div>
 
       <div ref={topRef} />
-      {items === undefined ? (
-        <div className="flex flex-col gap-3" aria-busy="true">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-40 w-full" />
+      {failure !== null ? (
+        <div className="mb-4">
+          <SectionUnavailable
+            title="Activity is not answering"
+            stillWorks={`${describeError(failure)} The filters above still work.`}
+            action={
+              <Button
+                variant="glass"
+                size="sm"
+                onClick={() => loadFirst(applied, items === undefined)}
+              >
+                Try again
+              </Button>
+            }
+          />
         </div>
+      ) : null}
+      {items === undefined ? (
+        failure !== null ? null : (
+          <div className="flex flex-col gap-3" aria-busy="true">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-40 w-full" />
+          </div>
+        )
       ) : (
         <Timeline
           items={timelineItems}
@@ -355,10 +403,40 @@ export function ActivityFeed({
           onShowNew={showNew}
           dayHeadingLevel={2}
           empty={
-            <EmptyState
-              title="No activity"
-              description="Nothing matches these filters, or nothing has happened yet."
-            />
+            hasActivityFilters(applied) ? (
+              <EmptyState
+                title="No activity matches these filters"
+                description="Widen the date range or clear a filter to see more."
+                action={
+                  <Button variant="glass" onClick={reset}>
+                    Clear filters
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState
+                title="No activity yet"
+                description="Events appear here as the orchestrator opens pull requests, hits blockers and finishes work."
+                action={
+                  <Link
+                    href={
+                      fixed
+                        ? `/projects/${projectId}/fleet`
+                        : isAdmin
+                          ? '/admin/runners'
+                          : '/projects'
+                    }
+                    className={buttonClassName({ variant: 'glass' })}
+                  >
+                    {fixed
+                      ? 'Open Fleet'
+                      : isAdmin
+                        ? 'Open Runners'
+                        : 'Open Projects'}
+                  </Link>
+                }
+              />
+            )
           }
         />
       )}

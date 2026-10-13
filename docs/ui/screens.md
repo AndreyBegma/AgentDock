@@ -14,15 +14,16 @@ UI WebSocket.
 | **Project → Skills** | installed skills, run a skill (profile, model, args, report/PR), runs | M3 |
 | **Project → Schedules** | cron rules, next runs, last results | M3 |
 | **Project → Settings** | docs source, base, ready label, default profile, merge approval, runtime policy, budget, members | M1+ |
-| **Sessions** | all sessions (filtered by access): runtime, model, project/slot, tokens, cost; session detail with TraceTree | M1 |
-| **Activity** | global feed with filters (project, type, actor) | M2 |
-| **Usage** | cost/tokens by project, model, runtime, user, day; price table (admin) | M1 / M3 |
-| **Skills catalog** | skills.sh search, details, install | M3 |
+| **Sessions** | all sessions (filtered by access): runtime, model, project/slot, tokens, cost; session detail with TraceTree. A failed load is "Sessions are not answering" with Try again, never an empty list; no matches offers Clear filters, nothing yet points to Runners (admin) or Projects; unapplied filter changes are flagged; "not yet read" explains an unparsed transcript | M1 |
+| **Activity** | global feed with filters (project, type, actor); same load-failure, no-matches and nothing-yet states as Sessions | M2 |
+| **Usage** | cost/tokens by project, model, runtime, user, day; price table (admin). Unpriced requests say an administrator fixes them under Admin › Prices; an empty range for one project offers "Show all projects" | M1 / M3 |
+| **Skills catalog** | skills.sh search, details, install. With no project an admin sees "Connect a project first"; project options show the runner's state and an offline runner gets the shared banner | M3 |
+| **Account** | profile, password, signed-in devices | M1 |
 | **Runners** (admin) | pair (numbered install / pair / keep-online steps), status with the next step for a runner that is not online, capabilities, profiles, revoke | M1 |
 | **Users** (admin) | pending approvals, roles, disable, registration toggle | M1 |
 | **Integrations** (admin) | GitHub App, Telegram bot, webhooks + delivery log, inbound triggers | M2 / M3 |
 | **Audit** (admin) | filterable log, chain verification status | M1 |
-| **Notifications** | in-app centre; Telegram link | M2 |
+| **Notifications** | in-app centre; Telegram link; rules (the Telegram column links to the link card until a chat is linked); muted projects (Mute states why it is off). Each card shows its own load failure with Try again | M2 |
 
 ## States every screen follows
 

@@ -11,12 +11,16 @@ import { Badge } from 'glass-ui/badge';
 import { Button } from 'glass-ui/button';
 import { Card } from 'glass-ui/card';
 import { Field, Input } from 'glass-ui/field';
+import { SectionUnavailable } from 'glass-ui/section-unavailable';
+import { Skeleton } from 'glass-ui/skeleton';
 import { Table, TableCell, TableHead, TableRow } from 'glass-ui/table';
 import { toast } from 'glass-ui/toast';
 import { useRouter } from 'next/navigation';
-import { type FormEvent, useCallback, useEffect, useState } from 'react';
+import { type FormEvent, useState } from 'react';
 import { useCurrentUser } from '../../components/shell/user-context';
-import { api, describeError } from '../../lib/api';
+import { api, describeError, describeErrorHint } from '../../lib/api';
+import { useErrorToast } from '../../lib/section/use-error-toast';
+import { useSection } from '../../lib/section/use-section';
 
 const formatTime = (iso: string) => new Date(iso).toLocaleString();
 
@@ -86,68 +90,78 @@ function PasswordCard() {
 
 function SessionsCard() {
   const router = useRouter();
-  const [sessions, setSessions] = useState<SessionInfo[]>([]);
-
-  const load = useCallback(async () => {
-    try {
-      setSessions(await api<SessionInfo[]>('/auth/sessions'));
-    } catch (err) {
-      toast.error(describeError(err));
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const showError = useErrorToast();
+  const devices = useSection(() => api<SessionInfo[]>('/auth/sessions'), []);
+  const sessions = devices.data ?? [];
 
   const revoke = async (session: SessionInfo) => {
     try {
       await api(`/auth/sessions/${session.id}`, { method: 'DELETE' });
       if (session.current) router.replace('/login');
-      else await load();
+      else devices.retry();
     } catch (err) {
-      toast.error(describeError(err));
+      showError(describeErrorHint(err));
     }
   };
 
   return (
     <Card pad="lg">
-      <h2 className="mb-4 text-lg font-bold">Sessions</h2>
-      <Table scroll>
-        <TableHead>
-          <TableRow>
-            <TableCell head>Device</TableCell>
-            <TableCell head>IP</TableCell>
-            <TableCell head>Signed in</TableCell>
-            <TableCell head>Last active</TableCell>
-            <TableCell head>
-              <span className="sr-only">Actions</span>
-            </TableCell>
-          </TableRow>
-        </TableHead>
-        <tbody>
-          {sessions.map((session) => (
-            <TableRow key={session.id}>
-              <TableCell>
-                <span className="mr-2">{session.userAgent ?? 'Unknown'}</span>
-                {session.current ? <Badge tone="ok" label="current" /> : null}
-              </TableCell>
-              <TableCell>{session.ip ?? '—'}</TableCell>
-              <TableCell>{formatTime(session.createdAt)}</TableCell>
-              <TableCell>{formatTime(session.lastSeenAt)}</TableCell>
-              <TableCell>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={() => revoke(session)}
-                >
-                  {session.current ? 'Sign out' : 'Revoke'}
-                </Button>
+      <h2 className="mb-1 text-lg font-bold">Signed-in devices</h2>
+      <p className="mb-4 text-sm text-ink-2">
+        Browsers and devices that are signed in to your account. Revoke one you
+        do not recognise.
+      </p>
+      {devices.data === undefined ? (
+        devices.error !== null && !devices.loading ? (
+          <SectionUnavailable
+            title="Your devices could not be loaded"
+            stillWorks={`${describeError(devices.error)} The rest of your account is unaffected.`}
+            action={
+              <Button variant="glass" size="sm" onClick={devices.retry}>
+                Try again
+              </Button>
+            }
+          />
+        ) : (
+          <Skeleton className="h-24 w-full" />
+        )
+      ) : (
+        <Table scroll>
+          <TableHead>
+            <TableRow>
+              <TableCell head>Device</TableCell>
+              <TableCell head>IP</TableCell>
+              <TableCell head>Signed in</TableCell>
+              <TableCell head>Last active</TableCell>
+              <TableCell head>
+                <span className="sr-only">Actions</span>
               </TableCell>
             </TableRow>
-          ))}
-        </tbody>
-      </Table>
+          </TableHead>
+          <tbody>
+            {sessions.map((session) => (
+              <TableRow key={session.id}>
+                <TableCell>
+                  <span className="mr-2">{session.userAgent ?? 'Unknown'}</span>
+                  {session.current ? <Badge tone="ok" label="current" /> : null}
+                </TableCell>
+                <TableCell>{session.ip ?? '—'}</TableCell>
+                <TableCell>{formatTime(session.createdAt)}</TableCell>
+                <TableCell>{formatTime(session.lastSeenAt)}</TableCell>
+                <TableCell>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => revoke(session)}
+                  >
+                    {session.current ? 'Sign out' : 'Revoke'}
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </tbody>
+        </Table>
+      )}
     </Card>
   );
 }
@@ -172,6 +186,12 @@ export default function AccountPage() {
   const user = useCurrentUser();
   return (
     <div className="flex flex-col gap-6">
+      <div>
+        <h1 className="text-xl font-semibold">Account</h1>
+        <p className="text-sm text-ink-2">
+          Your profile, password and the devices signed in as you.
+        </p>
+      </div>
       <Profile user={user} />
       <PasswordCard />
       <SessionsCard />

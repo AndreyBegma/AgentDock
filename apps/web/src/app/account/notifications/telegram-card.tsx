@@ -20,7 +20,7 @@ export function TelegramCard({ link }: { link: Link }) {
   };
 
   return (
-    <Card pad="lg">
+    <Card pad="lg" id="telegram">
       <h2 className="mb-1 text-lg font-bold">Telegram</h2>
       <p className="text-ink-2 mb-4 text-sm">
         Get the notifications you pick below in a private chat with the bot.
@@ -30,6 +30,7 @@ export function TelegramCard({ link }: { link: Link }) {
       ) : view.status === 'error' ? (
         <Banner
           tone="warn"
+          title="Telegram is not answering"
           action={
             <Button size="sm" onClick={() => void reload()}>
               Try again
@@ -58,7 +59,8 @@ export function TelegramCard({ link }: { link: Link }) {
         </div>
       ) : !view.state.botConfigured ? (
         <Banner tone="info">
-          An administrator has not set up the Telegram bot yet.
+          An administrator has not set up the Telegram bot yet. Until they do,
+          notifications stay in the app.
         </Banner>
       ) : (
         <div className="flex flex-col gap-3">
