@@ -13,7 +13,10 @@ import { Combobox } from 'glass-ui/combobox';
 import { DialogContent, DialogRoot } from 'glass-ui/dialog';
 import { Field, Input } from 'glass-ui/field';
 import { useEffect, useMemo, useState } from 'react';
+import { DisabledReason } from '../../../../components/prerequisites/disabled-reason';
 import { api } from '../../../../lib/api';
+import type { Section } from '../../../../lib/section/use-section';
+import { EVENT_DESCRIPTION } from '../../../../lib/webhooks/events';
 import {
   describeWebhooksError,
   emptyWebhookForm,
@@ -24,6 +27,7 @@ import {
   type WebhookForm,
   webhookFormProblem,
 } from '../../../../lib/webhooks/format';
+import { ProjectsNote } from '../projects-note';
 
 /**
  * Creates or edits an outbound webhook (spec 26 UI). On create the response
@@ -39,7 +43,7 @@ export function WebhookDialog({
 }: {
   open: boolean;
   webhook?: WebhookView;
-  projects: ProjectSummary[];
+  projects: Section<ProjectSummary[]>;
   onClose: () => void;
   onCreated: (created: WebhookWithSecret) => void;
   onSaved: () => void;
@@ -56,8 +60,9 @@ export function WebhookDialog({
 
   const problem = webhookFormProblem(form);
   const projectOptions = useMemo(
-    () => projects.map((p) => ({ value: p.id, label: p.displayName })),
-    [projects],
+    () =>
+      (projects.data ?? []).map((p) => ({ value: p.id, label: p.displayName })),
+    [projects.data],
   );
 
   const toggleEvent = (type: (typeof WEBHOOK_EVENT_TYPES)[number]) =>
@@ -109,14 +114,25 @@ export function WebhookDialog({
         title={webhook ? 'Edit webhook' : 'New webhook'}
         description="AgentDock POSTs the chosen events to this URL, signed with the webhook’s secret."
         footer={
-          <>
-            <Button variant="glass" disabled={busy} onClick={close}>
-              Cancel
-            </Button>
-            <Button disabled={busy || problem !== null} onClick={submit}>
-              {busy ? 'Saving…' : 'Save'}
-            </Button>
-          </>
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex gap-2">
+              <Button variant="glass" disabled={busy} onClick={close}>
+                Cancel
+              </Button>
+              <Button
+                disabled={busy || problem !== null}
+                aria-describedby={problem ? 'webhook-save-reason' : undefined}
+                onClick={submit}
+              >
+                {busy ? 'Saving…' : 'Save'}
+              </Button>
+            </div>
+            {problem ? (
+              <DisabledReason id="webhook-save-reason">
+                {problem}
+              </DisabledReason>
+            ) : null}
+          </div>
         }
       >
         <form
@@ -139,7 +155,7 @@ export function WebhookDialog({
             label="URL"
             htmlFor="webhook-url"
             required
-            hint="https:// only, unless the host is on the private-target allowlist."
+            hint="https:// only, unless the host is on the private-target allowlist at the bottom of the Webhooks page."
           >
             <Input
               id="webhook-url"
@@ -151,12 +167,17 @@ export function WebhookDialog({
           <fieldset className="flex flex-col gap-2">
             <legend className="mb-1 text-xs font-medium text-ink-2">
               Events
+              <span className="ml-0.5 text-danger" aria-hidden="true">
+                *
+              </span>
+              <span className="ml-1 font-normal text-ink-3">at least one</span>
             </legend>
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2">
               {WEBHOOK_EVENT_TYPES.map((type) => (
                 <Checkbox
                   key={type}
                   label={type}
+                  hint={EVENT_DESCRIPTION[type]}
                   checked={form.events.includes(type)}
                   onChange={() => toggleEvent(type)}
                 />
@@ -173,11 +194,7 @@ export function WebhookDialog({
               onValueChange={(projectIds) => setForm({ ...form, projectIds })}
             />
           </Field>
-          {problem && form.name.trim() !== '' ? (
-            <p className="text-xs text-ink-3" role="status">
-              {problem}
-            </p>
-          ) : null}
+          <ProjectsNote projects={projects} />
         </form>
       </DialogContent>
     </DialogRoot>
