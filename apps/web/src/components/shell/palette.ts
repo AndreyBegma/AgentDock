@@ -79,19 +79,22 @@ export function paletteGroups(input: PaletteInput): CommandPaletteGroup[] {
   const matches = matcher(input.query);
   const searching = input.query.trim() !== '';
 
-  const pages: Item[] = input.sections
-    .filter((section) => section.id !== 'project')
-    .flatMap((section) =>
-      section.entries
-        .filter((entry) => matches(`${section.title} ${entry.label}`))
-        .map((entry) => ({
-          id: `go:${entry.resolvedHref}`,
-          label: entry.label,
-          // The Admin pages share names with project pages (Settings, Schedules).
-          hint: section.id === 'admin' ? 'Admin' : undefined,
-          icon: entry.icon,
-        })),
-    );
+  // The Admin pages share names with project pages (Settings, Schedules):
+  // their own group tells them apart, once, instead of a hint on every row.
+  const sectionPages = (id: VisibleSection['id']): Item[] =>
+    input.sections
+      .filter((section) => section.id === id)
+      .flatMap((section) =>
+        section.entries
+          .filter((entry) => matches(`${section.title} ${entry.label}`))
+          .map((entry) => ({
+            id: `go:${entry.resolvedHref}`,
+            label: entry.label,
+            icon: entry.icon,
+          })),
+      );
+  const pages = sectionPages('workspace');
+  const admin = sectionPages('admin');
   if (matches('account')) {
     pages.push({ id: 'go:/account', label: 'Account', icon: User });
   }
@@ -153,6 +156,7 @@ export function paletteGroups(input: PaletteInput): CommandPaletteGroup[] {
     ...group('project-pages', 'Project pages', subPages),
     ...group('projects', 'Projects', projects),
     ...group('recent', 'Recent', recent),
+    ...group('admin', 'Admin', admin),
     ...group('actions', 'Actions', actions),
   ];
 }

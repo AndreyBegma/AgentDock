@@ -87,11 +87,20 @@ describe('paletteGroups', () => {
     ]);
   });
 
-  test('the admin Settings is told apart from the project Settings', () => {
+  test('the admin Settings is told apart from the project Settings by its group', () => {
     const groups = paletteGroups(input({ query: 'settings', projectId: 'p1' }));
-    const admin = groups
-      .find((group) => group.id === 'pages')
-      ?.items.find((item) => item.id === 'go:/admin/settings');
-    expect(admin?.hint).toBe('Admin');
+    expect(labelsIn(groups, 'admin')).toEqual(['Settings']);
+    expect(labelsIn(groups, 'project-pages')).toEqual([
+      'AgentDock › Settings',
+      'Glass › Settings',
+    ]);
+    expect(labelsIn(groups, 'pages')).not.toContain('Settings');
+  });
+
+  test('no hint repeats down a group', () => {
+    for (const group of paletteGroups(input({ projectId: 'p1' }))) {
+      const hints = group.items.map((item) => item.hint).filter(Boolean);
+      if (hints.length > 1) expect(new Set(hints).size).toBeGreaterThan(1);
+    }
   });
 });
