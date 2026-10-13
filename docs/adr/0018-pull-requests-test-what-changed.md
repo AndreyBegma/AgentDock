@@ -70,3 +70,5 @@ then `develop` (or whatever feeds production) tests in full after every merge
 again. They are also reverted earlier if a regression reaches `develop` while
 its pull request was green, because the affected set missed it. Point 6
 stays: CI data is throwaway in either case.
+
+<!-- Throwaway (#140 measurement e): a docs-only change. Never merged. -->
