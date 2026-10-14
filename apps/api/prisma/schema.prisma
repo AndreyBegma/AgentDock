@@ -37,7 +37,11 @@ model User {
   approvedUsers               User[]                        @relation("UserApprovals")
   sessions                    UserSession[]
   settingsUpdated             Setting[]
-  runnersCreated              Runner[]
+  runnersCreated              Runner[]                      @relation("RunnerCreatedBy")
+  runnersLocal                Runner[]                      @relation("RunnerLocalUser")
+  sessionsOwned               AgentSession[]                @relation("SessionOwner")
+  actionRequestsRequested     ActionRequest[]               @relation("ActionRequestRequestedBy")
+  actionRequestsDecided       ActionRequest[]               @relation("ActionRequestDecidedBy")
   projectsCreated             Project[]
   memberships                 ProjectMember[]               @relation("ProjectMembership")
   membersAdded                ProjectMember[]               @relation("ProjectMemberAddedBy")
@@ -124,10 +128,16 @@ model Runner {
   revokedAt       DateTime?
   /// Nullable so deleting the admin who created it keeps the runner.
   createdById     String?
+  /// The user a local request (hook or MCP) acts as (spec 201 D8); backfilled
+  /// from `createdById`. Null: every local request is `forbidden`.
+  localUserId     String?
+  /// Away mode: permission prompts go to the web app and Telegram (spec 201 D17).
+  awayMode        Boolean   @default(false)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  createdBy            User?                 @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy            User?                 @relation("RunnerCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  localUser            User?                 @relation("RunnerLocalUser", fields: [localUserId], references: [id], onDelete: SetNull)
   pairingCodes         RunnerPairingCode[]
   profiles             RuntimeProfile[]
   events               Event[]
@@ -138,6 +148,7 @@ model Runner {
   incidents            RunnerIncident[]
   installedSkills      InstalledSkill[]
   skillInstallPreviews SkillInstallPreview[]
+  actionRequests       ActionRequest[]
 
   @@map("runners")
 }
@@ -297,29 +308,33 @@ enum DocsRule {
 /// A git repository on a runner (docs/specs/10). `rootPath` is its main
 /// checkout; the same `owner/name` on two runners is two projects (D14).
 model Project {
-  id                 String     @id @default(cuid())
-  runnerId           String
-  rootPath           String
+  id                          String     @id @default(cuid())
+  runnerId                    String
+  rootPath                    String
   /// `owner/name` on GitHub — the only forge a project connects on (ADR-0004).
-  repo               String
-  displayName        String
-  baseBranch         String
-  baseSource         BaseSource
-  baseOverride       String?
-  readyLabelOverride String?
+  repo                        String
+  displayName                 String
+  baseBranch                  String
+  baseSource                  BaseSource
+  baseOverride                String?
+  readyLabelOverride          String?
   /// Must belong to `runnerId`; checked by the API.
-  defaultProfileId   String?
+  defaultProfileId            String?
   /// Stored for M2.5; nothing reads it yet.
-  mergeApproval      Boolean    @default(false)
+  mergeApproval               Boolean    @default(false)
+  /// Store redacted session content from hooks (ADR-0021). Off by default.
+  shipSessionContent          Boolean    @default(false)
+  /// 1–365, validated by the DTO.
+  sessionContentRetentionDays Int        @default(30)
   /// The `orchestrator` block of `.code-analyzer-config.json` and/or its parse error.
-  codeSentinelConfig Json?
-  hasClaudeMd        Boolean
-  hasAgentsMd        Boolean
-  lastInspectedAt    DateTime
+  codeSentinelConfig          Json?
+  hasClaudeMd                 Boolean
+  hasAgentsMd                 Boolean
+  lastInspectedAt             DateTime
   /// Nullable so deleting the admin who connected it keeps the project.
-  createdById        String?
-  createdAt          DateTime   @default(now())
-  updatedAt          DateTime   @updatedAt
+  createdById                 String?
+  createdAt                   DateTime   @default(now())
+  updatedAt                   DateTime   @updatedAt
 
   runner               Runner                       @relation(fields: [runnerId], references: [id], onDelete: Restrict)
   defaultProfile       RuntimeProfile?              @relation(fields: [defaultProfileId], references: [id], onDelete: SetNull)
@@ -350,6 +365,8 @@ model Project {
   plannerInstructions  PlannerInstructions[]
   plannerSettings      PlannerSettings?
   plans                Plan[]
+  sessionContents      SessionContent[]
+  actionRequests       ActionRequest[]
 
   @@unique([runnerId, rootPath])
   @@map("projects")
@@ -584,11 +601,13 @@ enum CostSource {
 }
 
 /// An agent session found in a runtime's transcripts (docs/specs/12). Built from
-/// `session.observed`, `turn.*`, `llm.request` and `tool.call` events. No prompt,
-/// response or tool-argument text is stored (D9). A row created by an event that
-/// arrived before its `session.observed` has `cwd = ''` until that event comes.
+/// `session.observed`, `turn.*`, `llm.request` and `tool.call` events, and from
+/// `hook.*` events (spec 201 D14). No prompt, response or tool-argument text is
+/// stored here (D9); hook content lives in `session_contents`, only for projects
+/// that opted in (ADR-0021). A row created by an event that arrived before its
+/// `session.observed` has `cwd = ''` until that event comes.
 model AgentSession {
-  id              String    @id @default(cuid())
+  id              String            @id @default(cuid())
   runnerId        String
   runtime         Runtime
   profileKey      String?
@@ -601,33 +620,47 @@ model AgentSession {
   gitBranch       String?
   title           String?
   /// Distinct models used, in order of first use.
-  models          Json      @default("[]")
+  models          Json              @default("[]")
   /// The session this subagent session belongs to.
   parentSessionId String?
-  parsed          Boolean   @default(true)
+  parsed          Boolean           @default(true)
   startedAt       DateTime
   lastEventAt     DateTime
   endedAt         DateTime?
   /// A subagent's type (Claude's `agentType`, e.g. `Explore`), from its
   /// requests' `agentName`; written by the workflows sink (#161).
   agentType       String?
+  /// worker (slot) / run / manual (hooks seen) / unknown (spec 201 D14).
+  origin          SessionOrigin     @default(unknown)
+  /// The slot's issue, or the number in a `<kind>/<n>-…` branch.
+  issue           Int?
+  /// For a manual session: the runner's local user.
+  ownerId         String?
+  /// Live state from hooks; null for sessions no hook has reported.
+  liveState       SessionLiveState?
+  /// `agentdock-manual-*` tmux session from `agentdock-runner claude` (D23).
+  tmuxSession     String?
 
-  runner        Runner               @relation(fields: [runnerId], references: [id], onDelete: Cascade)
-  project       Project?             @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  parent        AgentSession?        @relation("SessionParent", fields: [parentSessionId], references: [id], onDelete: SetNull)
-  children      AgentSession[]       @relation("SessionParent")
-  turns         Turn[]
-  llmRequests   LlmRequest[]
-  toolCalls     ToolCall[]
-  spawnedBy     ToolCall[]           @relation("ToolCallChild")
-  compactions   SessionCompaction[]
-  errors        SessionError[]
-  workflow      SessionWorkflow?
-  workflowMark  SessionWorkflowMark?
+  runner         Runner               @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+  owner          User?                @relation("SessionOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  project        Project?             @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  parent         AgentSession?        @relation("SessionParent", fields: [parentSessionId], references: [id], onDelete: SetNull)
+  children       AgentSession[]       @relation("SessionParent")
+  turns          Turn[]
+  llmRequests    LlmRequest[]
+  toolCalls      ToolCall[]
+  spawnedBy      ToolCall[]           @relation("ToolCallChild")
+  compactions    SessionCompaction[]
+  errors         SessionError[]
+  workflow       SessionWorkflow?
+  workflowMark   SessionWorkflowMark?
+  contents       SessionContent[]
+  actionRequests ActionRequest[]
 
   @@unique([runnerId, runtime, externalId])
   @@index([projectId, startedAt])
   @@index([parentSessionId])
+  @@index([projectId, origin, lastEventAt])
   @@map("sessions")
 }
 
@@ -807,6 +840,100 @@ model SessionToolTransition {
 
   @@id([sessionId, from, to])
   @@map("session_tool_transitions")
+}
+
+// ─── Claude Code integration (docs/specs/201) ───────────────────────────────
+
+enum SessionOrigin {
+  unknown
+  worker
+  run
+  manual
+}
+
+enum SessionLiveState {
+  idle
+  working
+  waiting
+  ended
+}
+
+enum SessionContentKind {
+  prompt
+  response
+  tool_input
+  tool_output
+}
+
+enum ActionRequestKind {
+  tool_use
+  orchestrator_start
+  orchestrator_stop
+  pr_approve
+}
+
+enum ActionRequestStatus {
+  pending
+  approved
+  denied
+  expired
+  executed
+  failed
+}
+
+/// Redacted session text from hooks (ADR-0021): written only while the
+/// project's `shipSessionContent` is on, deleted after its retention.
+model SessionContent {
+  id        BigInt             @id @default(autoincrement())
+  sessionId String
+  projectId String
+  kind      SessionContentKind
+  toolUseId String?
+  toolName  String?
+  at        DateTime
+  text      String
+  truncated Boolean            @default(false)
+  createdAt DateTime           @default(now())
+
+  session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  project Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, at])
+  @@index([projectId, createdAt])
+  @@map("session_contents")
+}
+
+/// An action a local session asked for and a person decides (spec 201 D18).
+/// `tool_use` only returns the decision; the other kinds are executed as the
+/// approver.
+model ActionRequest {
+  id            String              @id @default(cuid())
+  projectId     String
+  runnerId      String
+  sessionId     String?
+  /// The runner's local user. Nullable so deleting the user keeps the row.
+  requestedById String?
+  kind          ActionRequestKind
+  summary       String
+  args          Json
+  status        ActionRequestStatus @default(pending)
+  /// Nullable so deleting the user keeps the decision.
+  decidedById   String?
+  decidedAt     DateTime?
+  note          String?
+  result        Json?
+  expiresAt     DateTime
+  createdAt     DateTime            @default(now())
+
+  project     Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  runner      Runner        @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+  session     AgentSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  requestedBy User?         @relation("ActionRequestRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+  decidedBy   User?         @relation("ActionRequestDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+
+  @@index([projectId, status, createdAt])
+  @@index([status, expiresAt])
+  @@map("action_requests")
 }
 
 // ─── Tokens and API-equivalent cost (docs/specs/13) ─────────────────────────
