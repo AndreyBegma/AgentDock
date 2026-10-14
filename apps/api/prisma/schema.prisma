@@ -1970,9 +1970,10 @@ model PlannerInstructions {
   authorId  String?
   createdAt DateTime @default(now())
 
-  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  author  User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
-  plans   Plan[]
+  project    Project?          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author     User?             @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  plans      Plan[]
+  overrideOf PlannerSettings[]
 
   @@unique([projectId, version])
   @@map("planner_instructions")
@@ -1981,14 +1982,18 @@ model PlannerInstructions {
 /// A project's planner settings (D10). No row: `docs_pr` when the project has
 /// a `specDir`, `issue_body` otherwise.
 model PlannerSettings {
-  projectId   String            @id
-  specOutput  PlannerSpecOutput
+  projectId              String            @id
+  specOutput             PlannerSpecOutput
+  /// The project's instructions override, a project version; null: the latest
+  /// global version applies. Clearing sets null and keeps every version (D11).
+  overrideInstructionsId String?
   /// Nullable so deleting the admin keeps the settings.
-  updatedById String?
-  updatedAt   DateTime          @updatedAt
+  updatedById            String?
+  updatedAt              DateTime          @updatedAt
 
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  updatedBy User?   @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+  project              Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  overrideInstructions PlannerInstructions? @relation(fields: [overrideInstructionsId], references: [id], onDelete: SetNull)
+  updatedBy            User?                @relation(fields: [updatedById], references: [id], onDelete: SetNull)
 
   @@map("planner_settings")
 }
