@@ -7,3 +7,4 @@ export {
 export { BudgetClock } from './budget-options';
 export { BudgetSweep } from './budget-sweep';
 export { BudgetsModule } from './budgets.module';
+export { type BudgetRemaining, BudgetsService } from './budgets.service';

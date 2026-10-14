@@ -7,21 +7,29 @@ UI WebSocket.
 **The shell** (`components/shell/`). A skip link comes first. The rail has three
 sections: Workspace (Overview, Projects, Activity, Tasks, Sessions, Usage,
 Workflows, Skills), then the open project's pages under its name (Planner among them),
-then Admin (its Planner entry opens the instructions editor), folded into one
+then Admin (its "Planner instructions" entry opens the instructions editor), folded into one
 group. That group unfolds by itself on an admin page and remembers its state
 per browser. Exactly one item is active: the longest matching href wins, and
 `/` and `/projects` match only exactly. Integrations goes to the hub,
 `/admin/integrations`. The active item is scrolled into view, and the rail
 fades at whichever edge has more. The project switcher is a button with the
 project's name, its runner's status and a chevron. Breadcrumbs come from data
-(`crumbsFor`): the project's name, `#155 · i155` for a run, the session's
-title. An unknown id is never title-cased. Client pages take the tab title
-from the last crumb. Below 1024 px the rail keeps its tooltips, and the top
-bar shows the page title with a back link. The palette (⌘K) lists the
-project's pages as "Project › Page", Recent sessions and runs, and Admin as a
-group of its own, so no group label repeats on its rows. Gaps waiting on
-glass-ui: NavRail has no collapsible group, no scroll fade and no badge, so
-those are stop-gaps here.
+(`crumbsFor`): the project's name, `#155 · i155` for a run, the plan's title,
+the session's title. An unknown id is never title-cased; it reads as its kind
+("Run", "Plan"). Tab titles are `"<Page> · AgentDock"`, and inside a project
+`"<Page> · <Project>"` (`pageTitleOf`); client pages take the page from the
+last crumb. Below 1024 px the rail gives way to the TabBar — outside a project
+Overview, Projects, Activity, Sessions, Usage; inside one Fleet, Planner,
+Queue, Approvals, History, with the project's Activity behind More — carrying
+the rail's badges (waiting approvals, slots that need a person); the top bar
+shows the page title with a back link, and the page sits on a 16 px gutter.
+The main column is `max-w-5xl`, and `max-w-7xl` on the data pages the nav
+registry marks `wide` (and every page below them). A route that is loading
+shows a page-shaped skeleton (`app/(app)/loading.tsx`); one that throws shows
+"This page could not be shown" with Try again inside the shell
+(`app/(app)/error.tsx`). The palette (⌘K) lists the project's pages as
+"Project › Page", the project's Plans (newest five), Recent sessions and runs,
+and Admin as a group of its own, so no group label repeats on its rows.
 
 | Screen | Content | Milestone |
 |---|---|---|

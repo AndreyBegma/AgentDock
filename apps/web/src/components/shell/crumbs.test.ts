@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'bun:test';
-import { crumbsFor, pageTitleOf, runLabel, sessionLabel } from './crumbs';
+import {
+  crumbsFor,
+  pageTitleOf,
+  planLabel,
+  runLabel,
+  sessionLabel,
+} from './crumbs';
 
 const PROJECT = 'cmg7x2p0q0000abcdxyz12345';
 const RUN = 'cmg8a1b2c0003efghijk67890';
@@ -78,17 +84,64 @@ describe('crumbsFor', () => {
   });
 });
 
-describe('pageTitleOf', () => {
-  test('a project page carries the project name', () => {
-    const names = new Map([[PROJECT, 'AgentDock']]);
-    expect(pageTitleOf(crumbsFor(`/projects/${PROJECT}/fleet`, names))).toBe(
-      'Fleet · AgentDock',
+describe('a plan in the trail', () => {
+  const PLAN = 'cmv83980d001j01mn49svna0w';
+
+  test('an unnamed plan reads as its kind, never "Details"', () => {
+    expect(labels(`/projects/${PROJECT}/planner/${PLAN}`)).toEqual([
+      'Projects',
+      'Project',
+      'Planner',
+      'Plan',
+    ]);
+  });
+
+  test('a named plan reads as its title', () => {
+    const names = new Map([[PLAN, 'Ship the shell']]);
+    expect(labels(`/projects/${PROJECT}/planner/${PLAN}`, names).at(-1)).toBe(
+      'Ship the shell',
     );
   });
 
-  test('anywhere else it is the page', () => {
-    expect(pageTitleOf(crumbsFor('/admin/runners'))).toBe('Runners');
-    expect(pageTitleOf(crumbsFor('/projects'))).toBe('Projects');
+  test('planLabel falls back to the kind for a blank title', () => {
+    expect(planLabel({ title: '  ' })).toBe('Plan');
+    expect(planLabel({ title: 'Ship it' })).toBe('Ship it');
+  });
+});
+
+describe('pageTitleOf', () => {
+  test('a project page is "<Page> · <Project>", once, even for a project named AgentDock', () => {
+    const names = new Map([[PROJECT, 'AgentDock']]);
+    const crumbs = crumbsFor(`/projects/${PROJECT}/fleet`, names);
+    expect(pageTitleOf(crumbs, 'AgentDock')).toBe('Fleet · AgentDock');
+    expect(pageTitleOf(crumbs, 'Widget')).toBe('Fleet · Widget');
+  });
+
+  test('a plan page is titled by the plan and its project', () => {
+    const names = new Map([['plan1', 'Ship the shell']]);
+    expect(
+      pageTitleOf(
+        crumbsFor(`/projects/${PROJECT}/planner/plan1`, names),
+        'AgentDock',
+      ),
+    ).toBe('Ship the shell · AgentDock');
+  });
+
+  test('before the project is known its half is the product, not its kind', () => {
+    expect(pageTitleOf(crumbsFor(`/projects/${PROJECT}/queue`))).toBe(
+      'Queue · AgentDock',
+    );
+  });
+
+  test('anywhere else it is "<Page> · AgentDock"', () => {
+    expect(pageTitleOf(crumbsFor('/admin/runners'))).toBe(
+      'Runners · AgentDock',
+    );
+    expect(pageTitleOf(crumbsFor('/projects'))).toBe('Projects · AgentDock');
+    expect(pageTitleOf(crumbsFor('/'))).toBe('Overview · AgentDock');
+    expect(pageTitleOf(crumbsFor('/admin/planner'))).toBe(
+      'Planner instructions · AgentDock',
+    );
   });
 });
 

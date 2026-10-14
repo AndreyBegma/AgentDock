@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { BotTokenStore, TelegramDeliveryLedger } from '../notifications';
 import { formatDigest, formatMessage } from './markdown-v2';
+import { TelegramActionRequestService } from './telegram-action-request.service';
 import { TelegramApprovalService } from './telegram-approval.service';
 import { TelegramApiError, TelegramClient } from './telegram-client';
 import { TELEGRAM_OPTIONS, type TelegramOptions } from './telegram-options';
@@ -50,6 +51,7 @@ export class TelegramDeliveryService {
     private readonly tokens: BotTokenStore,
     private readonly client: TelegramClient,
     private readonly approvals: TelegramApprovalService,
+    private readonly actionRequests: TelegramActionRequestService,
     @Inject(TELEGRAM_OPTIONS) private readonly options: TelegramOptions,
   ) {}
 
@@ -70,6 +72,13 @@ export class TelegramDeliveryService {
         message.content.kind === 'pr.awaiting_approval'
           ? await this.approvals.offer(message.notificationId)
           : null;
+      // Spec 201 D18: an action request goes out with Approve / Deny while pending.
+      const actionMarkup =
+        message.content.kind === 'action.requested'
+          ? await this.actionRequests
+              .offer(message.notificationId)
+              .catch(() => null)
+          : null;
       try {
         await this.client.sendMessage(
           bot.token,
@@ -80,7 +89,7 @@ export class TelegramDeliveryService {
             offer?.headSha ?? null,
           ),
           false,
-          offer?.replyMarkup,
+          offer?.replyMarkup ?? actionMarkup ?? undefined,
         );
         await this.ledger.markSent(message.id, now);
         pass.sent += 1;

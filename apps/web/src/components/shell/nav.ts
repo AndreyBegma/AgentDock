@@ -41,6 +41,11 @@ export interface NavEntry {
    * list, and inside a project the project's own entry is the active one.
    */
   exact?: boolean;
+  /**
+   * A data page (#213): the shell gives it the wide column (max-w-7xl), and
+   * so every page below it (a run under History, a session under Sessions).
+   */
+  wide?: boolean;
 }
 
 export interface NavSection {
@@ -79,6 +84,7 @@ export const NAV: NavSection[] = [
       },
       {
         id: 'activity',
+        wide: true,
         href: '/activity',
         label: 'Activity',
         icon: Radio,
@@ -87,6 +93,7 @@ export const NAV: NavSection[] = [
       },
       {
         id: 'tasks',
+        wide: true,
         href: '/tasks',
         label: 'Tasks',
         icon: ListTodo,
@@ -95,6 +102,7 @@ export const NAV: NavSection[] = [
       },
       {
         id: 'sessions',
+        wide: true,
         href: '/sessions',
         label: 'Sessions',
         icon: Activity,
@@ -103,6 +111,7 @@ export const NAV: NavSection[] = [
       },
       {
         id: 'usage',
+        wide: true,
         href: '/usage',
         label: 'Usage',
         icon: BarChart3,
@@ -111,6 +120,7 @@ export const NAV: NavSection[] = [
       },
       {
         id: 'workflows',
+        wide: true,
         href: '/workflows',
         label: 'Workflows',
         icon: Waypoints,
@@ -134,6 +144,7 @@ export const NAV: NavSection[] = [
     entries: [
       {
         id: 'fleet',
+        wide: true,
         href: '/projects/:projectId/fleet',
         label: 'Fleet',
         icon: Workflow,
@@ -150,6 +161,7 @@ export const NAV: NavSection[] = [
       },
       {
         id: 'queue',
+        wide: true,
         href: '/projects/:projectId/queue',
         label: 'Queue',
         icon: ListChecks,
@@ -158,6 +170,7 @@ export const NAV: NavSection[] = [
       },
       {
         id: 'approvals',
+        wide: true,
         href: '/projects/:projectId/approvals',
         label: 'Approvals',
         icon: GitMerge,
@@ -166,6 +179,7 @@ export const NAV: NavSection[] = [
       },
       {
         id: 'project-activity',
+        wide: true,
         href: '/projects/:projectId/activity',
         label: 'Activity',
         icon: Radio,
@@ -174,6 +188,7 @@ export const NAV: NavSection[] = [
       },
       {
         id: 'history',
+        wide: true,
         href: '/projects/:projectId/history',
         label: 'History',
         icon: History,
@@ -182,6 +197,7 @@ export const NAV: NavSection[] = [
       },
       {
         id: 'project-skills',
+        wide: true,
         href: '/projects/:projectId/skills',
         label: 'Skills',
         icon: Wand2,
@@ -190,6 +206,7 @@ export const NAV: NavSection[] = [
       },
       {
         id: 'project-schedules',
+        wide: true,
         href: '/projects/:projectId/schedules',
         label: 'Schedules',
         icon: CalendarClock,
@@ -213,6 +230,7 @@ export const NAV: NavSection[] = [
     entries: [
       {
         id: 'runners',
+        wide: true,
         href: '/admin/runners',
         label: 'Runners',
         icon: Server,
@@ -221,6 +239,7 @@ export const NAV: NavSection[] = [
       },
       {
         id: 'users',
+        wide: true,
         href: '/admin/users',
         label: 'Users',
         icon: Users,
@@ -229,6 +248,7 @@ export const NAV: NavSection[] = [
       },
       {
         id: 'admin-schedules',
+        wide: true,
         href: '/admin/schedules',
         label: 'Schedules',
         icon: CalendarClock,
@@ -237,6 +257,7 @@ export const NAV: NavSection[] = [
       },
       {
         id: 'admin-budgets',
+        wide: true,
         href: '/admin/budgets',
         label: 'Budgets',
         icon: Wallet,
@@ -246,13 +267,14 @@ export const NAV: NavSection[] = [
       {
         id: 'admin-planner',
         href: '/admin/planner',
-        label: 'Planner',
+        label: 'Planner instructions',
         icon: Lightbulb,
         minRole: 'admin',
         enabled: true,
       },
       {
         id: 'audit',
+        wide: true,
         href: '/admin/audit',
         label: 'Audit',
         icon: ScrollText,
@@ -261,6 +283,7 @@ export const NAV: NavSection[] = [
       },
       {
         id: 'prices',
+        wide: true,
         href: '/admin/prices',
         label: 'Prices',
         icon: Tag,
@@ -328,11 +351,12 @@ export function visibleNav(role: Role, pathname: string): VisibleSection[] {
 
 /**
  * The phone's tab bar (#163): five places, the rest behind More. Outside a
- * project the workspace's five; inside one, the project's working pages.
+ * project the workspace's five; inside one, the project's working pages —
+ * Planner among them, the project's Activity behind More (#213).
  */
 const TAB_IDS = {
   workspace: ['overview', 'projects', 'activity', 'sessions', 'usage'],
-  project: ['fleet', 'queue', 'approvals', 'project-activity', 'history'],
+  project: ['fleet', 'planner', 'queue', 'approvals', 'history'],
 } as const;
 
 export interface TabBarSplit {
@@ -385,4 +409,15 @@ export function activeEntryId(
     }
   }
   return best?.id ?? null;
+}
+
+/** Whether the page at the active entry takes the wide column; false off the nav. */
+export function isWideEntry(
+  sections: readonly VisibleSection[],
+  activeId: string | null,
+): boolean {
+  if (!activeId) return false;
+  return sections.some((section) =>
+    section.entries.some((entry) => entry.id === activeId && entry.wide),
+  );
 }
