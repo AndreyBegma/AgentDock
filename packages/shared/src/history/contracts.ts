@@ -17,6 +17,7 @@ export const RUN_KINDS = [
   'schedule',
   /** A Planner turn (docs/specs/172-planner.md D14). */
   'plan',
+  'ui_profile',
 ] as const;
 export type RunKind = (typeof RUN_KINDS)[number];
 

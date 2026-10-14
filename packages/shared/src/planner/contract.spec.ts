@@ -3,11 +3,14 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   extractPlannerBlocks,
+  PLAN_TURN_ACTIONS,
+  PLANNER_DESIGN_CONTRACT,
   PLANNER_MAX_QUESTIONS,
   PLANNER_MAX_TASKS,
   PLANNER_OUTPUT_CONTRACT,
   type PlannerViolationReason,
   parsePlannerOutput,
+  plannerOutputContract,
 } from '../index';
 
 const fence = (json: unknown, tag = 'agentdock-plan'): string =>
@@ -28,6 +31,9 @@ const question = (id: string, blocking = false) => ({
   blocking,
 });
 
+const suggestion = { needed: false, why: 'No screen changes.', variants: 1 };
+
+/** A v2 task (the current contract); `taskV1` drops the design suggestion. */
 const task = (key: string, dependsOn: string[] = [], kind = 'feature') => ({
   key,
   kind,
@@ -35,7 +41,13 @@ const task = (key: string, dependsOn: string[] = [], kind = 'feature') => ({
   summary: 'What changes, for whom, and where.',
   dependsOn,
   questions: [],
+  design: suggestion,
 });
+
+const taskV1 = (key: string, dependsOn: string[] = []) => {
+  const { design: _design, ...rest } = task(key, dependsOn);
+  return rest;
+};
 
 const fixtures = {
   clarify: {
@@ -406,6 +418,183 @@ describe('parsePlannerOutput — rejections', () => {
   });
 });
 
+describe('parsePlannerOutput — contract versions', () => {
+  const v1Decompose = {
+    action: 'decompose',
+    title: 'Facts',
+    tasks: [taskV1('t1'), taskV1('t2', ['t1'])],
+  };
+
+  it('a v1 plan keeps running under v1: tasks without a design suggestion', () => {
+    const r = parsePlannerOutput(message(v1Decompose), 'decompose', {
+      contractVersion: 1,
+    });
+    expect(r.ok).toBe(true);
+    const revise = parsePlannerOutput(
+      message({ action: 'revise', tasks: [{ key: 't1' }, taskV1('t2')] }),
+      'revise',
+      { contractVersion: 1, frozenKeys: ['t1'] },
+    );
+    expect(revise.ok).toBe(true);
+  });
+
+  it('v1 refuses a design suggestion, as any unknown key', () => {
+    expectViolation(
+      parsePlannerOutput(message(fixtures.decompose), 'decompose', {
+        contractVersion: 1,
+      }),
+      'unknown_key',
+    );
+    expectViolation(
+      parsePlannerOutput(
+        message({ ...fixtures.grill, design: suggestion }),
+        'grill',
+        { contractVersion: 1, taskKey: 't2' },
+      ),
+      'unknown_key',
+    );
+  });
+
+  it('v2 — the default — needs a suggestion on every task written in full', () => {
+    expectViolation(
+      parsePlannerOutput(message(v1Decompose), 'decompose'),
+      'invalid_shape',
+    );
+    // In a revise the task is a union with `{ key }`, whose branch reports the
+    // task's other fields as unknown keys — the v1 behaviour for any bad task.
+    const revise = parsePlannerOutput(
+      message({ action: 'revise', tasks: [{ key: 't1' }, taskV1('t2')] }),
+      'revise',
+      { frozenKeys: ['t1'] },
+    );
+    expect(revise.ok).toBe(false);
+  });
+
+  it('v2 suggestions: 1–3 variants, and a grill may update one', () => {
+    const r = parsePlannerOutput(
+      message({
+        ...fixtures.grill,
+        design: { needed: true, why: 'A new screen.', variants: 3 },
+      }),
+      'grill',
+      { taskKey: 't2' },
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.output.design?.variants).toBe(3);
+    const tasks = [{ ...task('t1'), design: { ...suggestion, variants: 4 } }];
+    expectViolation(
+      parsePlannerOutput(
+        message({ ...fixtures.decompose, tasks }),
+        'decompose',
+      ),
+      'invalid_shape',
+    );
+  });
+});
+
+describe('parsePlannerOutput — design', () => {
+  const html =
+    '<!doctype html><html data-theme="light"><head><script src="https://cdn.tailwindcss.com/3.4.16"></script></head><body><main>Facts</main></body></html>';
+  const design = {
+    action: 'design',
+    taskKey: 't2',
+    variant: 2,
+    title: 'Table first',
+    rationale: 'The list is the screen; filters sit above it.',
+    addressed: ['c1'],
+  };
+  const designMessage = (plan: unknown, body = html) =>
+    `Variant 2.\n\n${fence(plan)}\n\n\`\`\`\`agentdock-design\n${body}\n\`\`\`\`\n`;
+  const ctx = { taskKey: 't2', variant: 2, openCommentIds: ['c1', 'c2'] };
+
+  it('returns the validated output and the HTML beside it', () => {
+    const r = parsePlannerOutput(designMessage(design), 'design', ctx);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.html).toBe(html);
+      expect(r.output).toEqual(design as never);
+      expect('html' in r.output).toBe(false);
+    }
+  });
+
+  it('a design turn runs under v1 too: the toggle works on a v1 plan', () => {
+    const r = parsePlannerOutput(designMessage(design), 'design', {
+      ...ctx,
+      contractVersion: 1,
+    });
+    expect(r.ok).toBe(true);
+  });
+
+  it('keeps a ``` line inside the four-backtick design block', () => {
+    const body = html.replace('Facts', 'Facts\n```\nnot a fence\n```');
+    const r = parsePlannerOutput(designMessage(design, body), 'design', ctx);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.html).toContain('not a fence');
+  });
+
+  it.each([
+    ['no design block', `${fence(design)}`, 'no_design_block'],
+    [
+      'a design block never closed',
+      `${fence(design)}\n\`\`\`\`agentdock-design\n${html}`,
+      'no_design_block',
+    ],
+    [
+      'two design blocks',
+      `${designMessage(design)}\n\`\`\`\`agentdock-design\n${html}\n\`\`\`\``,
+      'multiple_design_blocks',
+    ],
+    [
+      'another variant',
+      designMessage({ ...design, variant: 1 }),
+      'variant_mismatch',
+    ],
+    [
+      'a variant out of range',
+      designMessage({ ...design, variant: 4 }),
+      'invalid_shape',
+    ],
+    [
+      'another task',
+      designMessage({ ...design, taskKey: 't1' }),
+      'task_mismatch',
+    ],
+    [
+      'an addressed comment that is not open',
+      designMessage({ ...design, addressed: ['c9'] }),
+      'unknown_comment',
+    ],
+    [
+      'a script from another host',
+      designMessage(
+        design,
+        '<script src="https://evil.example/x.js"></script>',
+      ),
+      'design_host_not_allowed',
+    ],
+    [
+      'an unpinned package',
+      designMessage(
+        design,
+        '<script src="https://unpkg.com/react@18/umd/react.js"></script>',
+      ),
+      'design_unpinned_version',
+    ],
+    [
+      'a network call',
+      designMessage(design, '<script>fetch("/api/auth/me")</script>'),
+      'design_forbidden_feature',
+    ],
+    [
+      'HTML over 160 KiB',
+      designMessage(design, `<p>${'x'.repeat(160 * 1024)}</p>`),
+      'design_too_large',
+    ],
+  ] as const)('refuses %s', (_, text, reason) => {
+    expectViolation(parsePlannerOutput(text, 'design', ctx), reason);
+  });
+});
+
 describe('extractPlannerBlocks', () => {
   it('skips a tag quoted inside another fence', () => {
     const text = '````md\n```agentdock-plan\n{}\n```\n````';
@@ -415,10 +604,23 @@ describe('extractPlannerBlocks', () => {
 
 describe('the fixed contract and the default instructions', () => {
   it('the contract text names every action and the block tag', () => {
-    for (const action of ['clarify', 'decompose', 'grill', 'write', 'revise']) {
+    for (const action of PLAN_TURN_ACTIONS) {
       expect(PLANNER_OUTPUT_CONTRACT).toContain(`"action": "${action}"`);
     }
     expect(PLANNER_OUTPUT_CONTRACT).toContain('agentdock-plan');
+    expect(PLANNER_OUTPUT_CONTRACT).toContain('# Output contract (v2)');
+    expect(PLANNER_OUTPUT_CONTRACT).toContain(PLANNER_DESIGN_CONTRACT);
+    for (const host of ['cdnjs.cloudflare.com', 'cdn.jsdelivr.net/npm/']) {
+      expect(PLANNER_DESIGN_CONTRACT).toContain(host);
+    }
+  });
+
+  it('a v1 plan keeps the v1 text: no design anywhere', () => {
+    const v1 = plannerOutputContract(1);
+    expect(v1).toContain('# Output contract (v1)');
+    expect(v1).not.toContain('design');
+    expect(v1).not.toContain('agentdock-design');
+    expect(v1.endsWith('newlines are `\\n`.\n')).toBe(true);
   });
 
   it('default-instructions.md exists and carries the cs-spec rules', () => {

@@ -270,5 +270,6 @@ export const task = (
   summary: `Summary of ${key}`,
   dependsOn: [],
   questions: [],
+  design: { needed: false, why: 'No screen changes.', variants: 1 },
   ...over,
 });

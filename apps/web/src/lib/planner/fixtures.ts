@@ -36,6 +36,7 @@ export const task = (over: Partial<PlanTaskView> = {}): PlanTaskView => ({
   frozen: false,
   issue: null,
   queuedAt: null,
+  design: null,
   ...over,
 });
 
