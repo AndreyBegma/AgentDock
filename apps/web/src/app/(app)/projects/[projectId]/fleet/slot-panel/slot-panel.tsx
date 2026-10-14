@@ -1,6 +1,6 @@
 'use client';
 
-import { projectRoleAtLeast, type SlotDetail } from '@agentdock/shared';
+import { projectRoleAtLeast } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
@@ -11,6 +11,7 @@ import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Tabs, TabsItem } from '@andrewbehma/glass-ui/tabs';
 import { X } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
+import { ScrollX } from '../../../../../../components/scroll-x/scroll-x';
 import { TerminalSheet } from '../../../../../../components/terminal/terminal-sheet';
 import type { useControl } from '../../../../../../lib/control/use-control';
 import {
@@ -96,13 +97,7 @@ export function SlotPanel(props: SlotPanelProps) {
         if (!open) props.onClose();
       }}
     >
-      <SheetContent
-        side="bottom"
-        title={props.slot}
-        hideTitle
-        description="Agent panel"
-        pad="none"
-      >
+      <SheetContent side="bottom" title={props.slot} hideTitle pad="none">
         {body}
       </SheetContent>
     </SheetRoot>
@@ -111,20 +106,19 @@ export function SlotPanel(props: SlotPanelProps) {
 
 function Header({
   slot,
-  detail,
+  issue,
   pill,
   issueTitle,
   actions,
   onClose,
 }: {
   slot: string;
-  detail: SlotDetail | undefined;
+  issue: number | null;
   pill: ReactNode;
   issueTitle: string | null;
   actions: ReactNode;
   onClose: () => void;
 }) {
-  const issue = detail?.issue ?? null;
   return (
     <header className="flex flex-col gap-2 border-b border-line px-4 pt-4 pb-3">
       <div className="flex items-center gap-2">
@@ -143,14 +137,14 @@ function Header({
           <X aria-hidden="true" className="size-4" />
         </Button>
       </div>
-      {issue !== null || issueTitle ? (
-        <p className="truncate text-sm text-ink-2">
+      <div className="flex min-h-8 items-center gap-2">
+        <p className="min-w-0 flex-1 truncate text-sm text-ink-2">
           {issue !== null ? `#${issue}` : ''}
           {issue !== null && issueTitle ? ' · ' : ''}
           {issueTitle ?? ''}
         </p>
-      ) : null}
-      {actions}
+        {actions}
+      </div>
     </header>
   );
 }
@@ -234,20 +228,28 @@ function SlotPanelBody({
   } else {
     content = (
       <div className="flex flex-col gap-5">
-        <Tabs aria-label="Agent sections" className="overflow-x-auto">
-          {SLOT_PANEL_TABS.map(({ id, label }) => (
-            <TabsItem key={id} current={tab === id} layoutId="slot-panel-tab">
-              <button
-                type="button"
-                onClick={() => setTab(id)}
-                aria-pressed={tab === id}
-                className="relative flex w-full items-center justify-center whitespace-nowrap px-2.5 py-2 text-sm font-medium"
+        {/* Seven tabs outgrow a narrow column: they keep their width and scroll. */}
+        <ScrollX edgeClassName="from-surface">
+          <Tabs aria-label="Agent sections" className="w-max min-w-full">
+            {SLOT_PANEL_TABS.map(({ id, label }) => (
+              <TabsItem
+                key={id}
+                current={tab === id}
+                layoutId="slot-panel-tab"
+                className="flex-none"
               >
-                {label}
-              </button>
-            </TabsItem>
-          ))}
-        </Tabs>
+                <button
+                  type="button"
+                  onClick={() => setTab(id)}
+                  aria-pressed={tab === id}
+                  className="relative flex w-full items-center justify-center whitespace-nowrap px-3 py-2 text-sm font-medium"
+                >
+                  {label}
+                </button>
+              </TabsItem>
+            ))}
+          </Tabs>
+        </ScrollX>
         {tab === 'chat' ? (
           <ChatTab
             slot={slot}
@@ -282,15 +284,13 @@ function SlotPanelBody({
     <div className="flex h-full min-h-0 flex-col">
       <Header
         slot={slot}
-        detail={run}
+        issue={run?.issue ?? node?.issue ?? null}
         pill={pill}
         issueTitle={node?.issueTitle ?? null}
         onClose={onClose}
         actions={
           canOperate && run && !ended ? (
-            <div className="flex justify-end">
-              <StopSlot slot={slot} control={control} />
-            </div>
+            <StopSlot slot={slot} control={control} />
           ) : null
         }
       />

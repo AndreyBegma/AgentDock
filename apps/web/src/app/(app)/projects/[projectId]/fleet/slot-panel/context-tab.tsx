@@ -1,24 +1,38 @@
 'use client';
 
 import type { SlotDetail } from '@agentdock/shared';
-import { KeyValueList } from '@andrewbehma/glass-ui/key-value-list';
 import type { ReactNode } from 'react';
 import {
+  formatAheadBehind,
   formatRound,
   SLOT_TERM_HINT,
 } from '../../../../../../lib/fleet/format';
 
-function Term({ label, hint }: { label: string; hint: string }) {
+/**
+ * Label over value, not side by side: the fence's globs and the model's
+ * reason are long, and a two-column list clips them in a narrow column.
+ */
+function Row({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  /** One line that says what the term means. */
+  hint?: string;
+  children: ReactNode;
+}) {
   return (
-    <span className="flex flex-col gap-0.5">
-      <span>{label}</span>
-      <span className="text-xs font-normal text-ink-3">{hint}</span>
-    </span>
+    <div className="flex flex-col gap-1">
+      <dt className="text-xs font-medium text-ink-2">{label}</dt>
+      {hint ? <p className="text-xs text-ink-3">{hint}</p> : null}
+      <dd className="break-words text-sm">{children}</dd>
+    </div>
   );
 }
 
-function Globs({ globs }: { globs: string[] }): ReactNode {
-  if (globs.length === 0) return '—';
+function Globs({ globs }: { globs: string[] }) {
+  if (globs.length === 0) return <>—</>;
   return (
     <ul className="flex flex-col gap-1">
       {globs.map((glob) => (
@@ -33,58 +47,37 @@ function Globs({ globs }: { globs: string[] }): ReactNode {
 /** The brief the orchestrator dispatched the slot with: model, reason, fence. */
 export function ContextTab({ slot }: { slot: SlotDetail }) {
   return (
-    <KeyValueList
-      items={[
-        {
-          key: 'brief',
-          label: <Term label="Brief" hint={SLOT_TERM_HINT.brief} />,
-          value: slot.round ? formatRound(slot.round) : '—',
-        },
-        {
-          key: 'issue',
-          label: 'Issue',
-          value: slot.issue === null ? '—' : `#${slot.issue}`,
-        },
-        {
-          key: 'model',
-          label: 'Model',
-          value: (
-            <span className="flex flex-col gap-0.5">
-              <span>
-                {slot.model ?? 'model unknown'} · {slot.runtime}
-              </span>
-              {slot.modelWhy ? (
-                <span className="text-ink-2">{slot.modelWhy}</span>
-              ) : null}
-            </span>
-          ),
-        },
-        ...(slot.lead
-          ? [
-              {
-                key: 'lead',
-                label: <Term label="Lead" hint={SLOT_TERM_HINT.lead} />,
-                value: 'yes',
-              },
-            ]
-          : []),
-        {
-          key: 'branch',
-          label: 'Branch',
-          value: slot.branch ?? '—',
-          copyValue: slot.branch ?? undefined,
-        },
-        {
-          key: 'owns',
-          label: <Term label="Owns" hint={SLOT_TERM_HINT.owns} />,
-          value: <Globs globs={slot.owns} />,
-        },
-        {
-          key: 'never',
-          label: <Term label="Never" hint={SLOT_TERM_HINT.never} />,
-          value: <Globs globs={slot.never} />,
-        },
-      ]}
-    />
+    <dl className="flex flex-col gap-4">
+      <Row label="Brief" hint={SLOT_TERM_HINT.brief}>
+        {slot.round ? formatRound(slot.round) : '—'}
+        {slot.issue !== null ? ` · issue #${slot.issue}` : ''}
+      </Row>
+      <Row label="Model">
+        {slot.model ?? 'model unknown'} · {slot.runtime}
+        {slot.modelWhy ? (
+          <span className="block text-ink-2">{slot.modelWhy}</span>
+        ) : null}
+      </Row>
+      {slot.lead ? (
+        <Row label="Lead" hint={SLOT_TERM_HINT.lead}>
+          yes
+        </Row>
+      ) : null}
+      <Row label="Branch">{slot.branch ?? '—'}</Row>
+      <Row label="Worktree">
+        <span className="break-all">{slot.worktree}</span>
+        <span className="block text-xs text-ink-3">
+          {slot.worktreeExists ? 'exists' : 'gone'}
+          {slot.dirty ? ' · uncommitted changes' : ''} ·{' '}
+          {formatAheadBehind(slot.ahead, slot.behind)}
+        </span>
+      </Row>
+      <Row label="Owns" hint={SLOT_TERM_HINT.owns}>
+        <Globs globs={slot.owns} />
+      </Row>
+      <Row label="Never" hint={SLOT_TERM_HINT.never}>
+        <Globs globs={slot.never} />
+      </Row>
+    </dl>
   );
 }
