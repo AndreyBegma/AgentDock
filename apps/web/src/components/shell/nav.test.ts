@@ -36,6 +36,7 @@ describe('visibleNav', () => {
       'workspace/Tasks',
       'workspace/Sessions',
       'workspace/Usage',
+      'workspace/Workflows',
       'workspace/Skills',
       'admin/Runners',
       'admin/Users',
@@ -69,6 +70,7 @@ describe('visibleNav', () => {
       'workspace/Tasks',
       'workspace/Sessions',
       'workspace/Usage',
+      'workspace/Workflows',
     ]);
     const inProject = labels('viewer', '/projects/p1/settings');
     for (const page of [
@@ -141,6 +143,10 @@ describe('activeEntryId: one active item', () => {
     expect(activeAt('admin', '/admin/planner')).toBe('admin-planner');
   });
 
+  test('Workflows lights its own entry, never Usage', () => {
+    expect(activeAt('viewer', '/workflows')).toBe('workflows');
+  });
+
   test('a session detail lights Sessions; a page outside the rail lights nothing', () => {
     expect(activeAt('viewer', '/sessions/s1')).toBe('sessions');
     expect(activeAt('viewer', '/account')).toBeNull();
@@ -173,7 +179,7 @@ describe('tabBarSplit', () => {
     expect(split('admin', '/')).toEqual({
       tabs: ['Overview', 'Projects', 'Activity', 'Sessions', 'Usage'],
       more: [
-        'workspace: Tasks, Skills',
+        'workspace: Tasks, Workflows, Skills',
         'admin: Runners, Users, Schedules, Budgets, Planner, Audit, Prices, Integrations, Settings',
       ],
     });
@@ -184,16 +190,16 @@ describe('tabBarSplit', () => {
       tabs: ['Fleet', 'Queue', 'Approvals', 'Activity', 'History'],
       more: [
         'project: Planner, Skills, Schedules, Settings',
-        'workspace: Overview, Projects, Activity, Tasks, Sessions, Usage, Skills',
+        'workspace: Overview, Projects, Activity, Tasks, Sessions, Usage, Workflows, Skills',
         'admin: Runners, Users, Schedules, Budgets, Planner, Audit, Prices, Integrations, Settings',
       ],
     });
   });
 
-  test('a viewer gets five tabs and no Admin; Tasks waits behind More', () => {
+  test('a viewer gets five tabs and no Admin; Tasks and Workflows wait behind More', () => {
     const { tabs, more } = split('viewer', '/');
     expect(tabs).toHaveLength(5);
-    expect(more).toEqual(['workspace: Tasks']);
+    expect(more).toEqual(['workspace: Tasks, Workflows']);
   });
 
   test('tabs resolve the project id', () => {
