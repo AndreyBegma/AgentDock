@@ -1,8 +1,10 @@
 import {
+  type BoardCardView,
   DESIGN_ERROR,
   type DesignErrorCode,
   type PlanTaskView,
   type TaskDesignStatus,
+  type TaskDesignSummary,
   type UiProfileStatus,
 } from '@agentdock/shared';
 import type { Status } from '@andrewbehma/glass-ui/status-pill';
@@ -81,6 +83,64 @@ export const DESIGN_CHIP_LABEL: Record<DesignChipState, string> = {
 };
 
 /**
+ * The Design chip on a board card (#243): off, on and not drawn, being drawn,
+ * waiting for the person, approved. A card has no planner suggestion.
+ */
+export type CardDesignChipState =
+  | 'off'
+  | 'on'
+  | 'generating'
+  | 'reviewing'
+  | 'approved';
+
+export function cardDesignChipState(
+  design: TaskDesignSummary | null,
+): CardDesignChipState {
+  if (!design?.needed) return 'off';
+  switch (design.status) {
+    case 'approved':
+      return 'approved';
+    case 'generating':
+    case 'revising':
+      return 'generating';
+    case 'reviewing':
+      return 'reviewing';
+    case 'idle':
+      return 'on';
+  }
+}
+
+export const CARD_DESIGN_CHIP_LABEL: Record<CardDesignChipState, string> = {
+  off: 'Design off',
+  on: 'Design on',
+  generating: 'Drawing design',
+  reviewing: 'Design in review',
+  approved: 'Design approved',
+};
+
+/**
+ * Whether the card's design can still be switched or the continue switch
+ * changed (#243 D5, "designs freeze once a round exists"): no round yet, the
+ * design not approved, no turn running.
+ */
+export const canToggleCardDesign = (
+  card: Pick<BoardCardView, 'round' | 'design'>,
+): boolean =>
+  card.round === null &&
+  card.design?.status !== 'approved' &&
+  card.design?.status !== 'generating' &&
+  card.design?.status !== 'revising';
+
+/** Whether "Continue after design" can still change: until the design is approved. */
+export const canChangeContinue = (
+  card: Pick<BoardCardView, 'round' | 'design'>,
+): boolean => card.round === null && card.design?.status !== 'approved';
+
+/** Whether the chip offers Open design: the design is on, or was approved. */
+export const opensCardDesign = (design: TaskDesignSummary | null): boolean =>
+  design?.needed === true || design?.status === 'approved';
+
+/**
  * D3: where the toggle sits. A project whose profile says it has no UI hides
  * it behind "Design anyway", unless the design is already on; with no
  * profile yet (`hasUi` null) it is shown.
@@ -118,7 +178,7 @@ const ERROR_TEXT: Record<DesignErrorCode, string> = {
   no_open_comments: 'Leave a comment first: Revise sends the open comments.',
   design_approved: 'This design is approved and takes no more changes.',
   task_frozen:
-    'This task is approved or sent; its design can no longer change.',
+    'This task is approved or sent, or this card has started a round; its design can no longer change.',
   profile_build_failed:
     'The UI profile could not be built. See the build run in the Design settings.',
   contract_violation:

@@ -24,6 +24,20 @@ export const designApi = (
 ): string =>
   `${planApi(projectId, planId)}/tasks/${encodeURIComponent(taskKey)}/design`;
 
+/**
+ * A board card's design (#243, ADR-0025): the same routes as a task's, under
+ * the card's per-project number.
+ */
+export const cardDesignApi = (projectId: string, number: number): string =>
+  `/projects/${projectId}/board/cards/${number}/design`;
+
+/** The card's design viewer, with its URL state when given (`viewerSearch`). */
+export const cardDesignHref = (
+  projectId: string,
+  number: number,
+  search = '',
+): string => `/projects/${projectId}/board/cards/${number}/design${search}`;
+
 /** The project's UI profile: GET / PUT, and `/versions`, `/rebuild`. */
 export const uiProfileApi = (projectId: string): string =>
   `/projects/${projectId}/ui-profile`;

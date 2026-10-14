@@ -35,6 +35,7 @@ import { formatCost } from '../../lib/format';
 import { Time } from '../../lib/format/time';
 import { safeHttpsUrl } from '../../lib/queue/format';
 import { Markdown } from '../markdown/markdown';
+import { CardDesignSection } from './card-design';
 import { CardOptionToggles } from './card-options';
 import type { CardActions } from './use-card-actions';
 
@@ -295,6 +296,13 @@ function CardDetailBody({
           </div>
         </Field>
       ) : null}
+
+      <CardDesignSection
+        projectId={projectId}
+        card={card}
+        canOperate={canOperate}
+        onChanged={onSaved}
+      />
 
       <section aria-label="Rounds" className="flex flex-col gap-2">
         <h3 className="text-sm font-medium">Rounds</h3>
