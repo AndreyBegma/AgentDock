@@ -6,6 +6,7 @@ import {
   COMMAND_UNAVAILABLE_TEXT,
   decisionDisabledReason,
   describeApprovalError,
+  describeApprovalHint,
   emptyWaitingCopy,
   formatDiffStat,
   isCommandUnavailable,
@@ -137,6 +138,15 @@ describe('error mapping', () => {
     const error = apiError(503, 'command_unavailable');
     expect(isCommandUnavailable(error)).toBe(true);
     expect(describeApprovalError(error)).toBe(COMMAND_UNAVAILABLE_TEXT);
+  });
+
+  test('a too-old runner points at Runners; other errors carry no link', () => {
+    expect(
+      describeApprovalHint(apiError(503, 'command_unavailable'), 'build-box'),
+    ).toMatchObject({ href: '/admin/runners', cta: 'Open Runners' });
+    expect(describeApprovalHint(apiError(409, 'not_waiting'))).toEqual({
+      text: describeApprovalError(apiError(409, 'not_waiting')),
+    });
   });
 
   test('an old runner is named and told to update, with no "yet"', () => {

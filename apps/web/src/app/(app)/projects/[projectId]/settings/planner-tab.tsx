@@ -14,6 +14,7 @@ import { toast } from '@andrewbehma/glass-ui/toast';
 import { useState } from 'react';
 import { AsyncSection } from '../../../../../components/prerequisites/async-section';
 import { api } from '../../../../../lib/api';
+import { useErrorToast } from '../../../../../lib/section/use-error-toast';
 import { useSection } from '../../../../../lib/section/use-section';
 import {
   describePlannerError,
@@ -40,6 +41,7 @@ export function PlannerTab({
   );
   const { retry } = settings;
   const [busy, setBusy] = useState(false);
+  const showError = useErrorToast();
 
   const put = (body: PlannerSettingsUpdateRequest) =>
     api<PlannerSettingsView>(`/projects/${projectId}/planner/settings`, {
@@ -54,7 +56,7 @@ export function PlannerTab({
       toast.success('Specification output saved');
       retry();
     } catch (err) {
-      toast.error(describePlannerError(err));
+      showError(describePlannerError(err));
     } finally {
       setBusy(false);
     }

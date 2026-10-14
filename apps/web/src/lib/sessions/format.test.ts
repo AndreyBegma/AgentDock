@@ -6,7 +6,6 @@ import type {
   SessionTreeNode,
 } from '@agentdock/shared';
 import {
-  appliedFilterCount,
   buildTrace,
   describeSessionHint,
   EMPTY_FILTERS,
@@ -17,7 +16,6 @@ import {
   liveTopicFor,
   originOf,
   queryString,
-  sessionFormChanged,
   sumTotals,
   tokenSum,
   toQuery,
@@ -99,7 +97,6 @@ describe('query', () => {
   test('the origin filter is sent as `origin`', () => {
     const q = toQuery({ ...EMPTY_FILTERS, origin: 'manual' });
     expect(queryString(q)).toBe('?origin=manual');
-    expect(appliedFilterCount(q)).toBe(1);
   });
   test('an absent origin reads as unknown', () => {
     expect(originOf({})).toBe('unknown');
@@ -279,32 +276,10 @@ describe('sumTotals', () => {
   });
 });
 
-describe('appliedFilterCount', () => {
-  test('a date range counts once; empty values do not count', () => {
-    expect(appliedFilterCount({})).toBe(0);
-    expect(
-      appliedFilterCount({ from: 'a', to: 'b', runtime: 'claude', model: '' }),
-    ).toBe(2);
-    expect(appliedFilterCount({ to: 'b', unassigned: true, slot: 'i4' })).toBe(
-      3,
-    );
-  });
-});
-
 describe('filters and hints', () => {
   test('a query with no value is not a filter', () => {
     expect(hasSessionFilters({})).toBe(false);
     expect(hasSessionFilters({ model: 'x' })).toBe(true);
-  });
-
-  test('a form differing from what was applied is changed', () => {
-    expect(sessionFormChanged(EMPTY_FILTERS, {})).toBe(false);
-    expect(sessionFormChanged({ ...EMPTY_FILTERS, slot: ' i42 ' }, {})).toBe(
-      true,
-    );
-    expect(
-      sessionFormChanged({ ...EMPTY_FILTERS, slot: 'i42' }, { slot: 'i42' }),
-    ).toBe(false);
   });
 
   test('a failure without a fix is just text', () => {

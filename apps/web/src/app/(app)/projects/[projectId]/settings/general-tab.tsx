@@ -11,7 +11,7 @@ import {
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
-import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
@@ -24,6 +24,7 @@ import {
   describeProjectError,
 } from '../../../../../lib/projects/format';
 import { formatLastSeen } from '../../../../../lib/runners/format';
+import { useErrorToast } from '../../../../../lib/section/use-error-toast';
 
 const orNull = (value: string): string | null => value.trim() || null;
 
@@ -37,6 +38,7 @@ export function GeneralTab({
   onChanged: () => void;
 }) {
   const router = useRouter();
+  const showError = useErrorToast();
   // D1: judged on what is saved, not on the unsaved toggle.
   const mergeApprovalNote = mismatchSentence(
     {
@@ -69,8 +71,8 @@ export function GeneralTab({
     if (!isAdmin) return;
     api<AdminRunnerDetail>(`/admin/runners/${project.runnerId}`)
       .then((runner) => setProfiles(runner.profiles.filter((p) => !p.missing)))
-      .catch((err) => toast.error(describeProjectError(err)));
-  }, [isAdmin, project.runnerId]);
+      .catch((err) => showError(describeProjectError(err)));
+  }, [isAdmin, project.runnerId, showError]);
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
@@ -89,7 +91,7 @@ export function GeneralTab({
       toast.success('Settings saved.');
       onChanged();
     } catch (err) {
-      toast.error(describeProjectError(err));
+      showError(describeProjectError(err));
     } finally {
       setBusy(false);
     }
@@ -102,7 +104,7 @@ export function GeneralTab({
       toast.success(`${project.displayName} removed. Nothing on disk changed.`);
       router.push('/projects');
     } catch (err) {
-      toast.error(describeProjectError(err));
+      showError(describeProjectError(err));
       setBusy(false);
       setDeleting(false);
     }
@@ -261,24 +263,24 @@ export function GeneralTab({
         </Card>
       ) : null}
 
-      <DialogRoot open={deleting} onOpenChange={setDeleting}>
-        <DialogContent
-          title={`Remove ${project.displayName}?`}
-          description="The project, its members and its docs source are removed and the runner stops watching it. Files on disk are not touched."
-          footer={
-            <>
-              <Button variant="ghost" onClick={() => setDeleting(false)}>
-                Cancel
-              </Button>
-              <Button variant="danger" onClick={remove} disabled={busy}>
-                Remove project
-              </Button>
-            </>
-          }
-        >
-          <p className="font-mono text-sm break-all">{project.rootPath}</p>
-        </DialogContent>
-      </DialogRoot>
+      <ConfirmDialog
+        open={deleting}
+        onOpenChange={setDeleting}
+        title={`Remove ${project.displayName}?`}
+        consequence={
+          <>
+            The project, its members and its docs source are removed and the
+            runner stops watching it. Files on disk are not touched.
+            <span className="mt-2 block font-mono text-sm break-all">
+              {project.rootPath}
+            </span>
+          </>
+        }
+        verb="Remove"
+        tone="danger"
+        busy={busy}
+        onConfirm={() => void remove()}
+      />
     </>
   );
 }

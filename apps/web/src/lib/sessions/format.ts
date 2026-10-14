@@ -366,23 +366,6 @@ export function describeSessionHint(error: unknown): ErrorHint {
 export const hasSessionFilters = (query: SessionListQuery): boolean =>
   Object.values(query).some((value) => value !== undefined && value !== '');
 
-/** How many filters narrow the list — the count on the phone's "Filters" button. */
-export const appliedFilterCount = (query: SessionListQuery): number => {
-  const { from, to, ...rest } = query;
-  const dates = from !== undefined || to !== undefined ? 1 : 0;
-  return (
-    dates +
-    Object.values(rest).filter((value) => value !== undefined && value !== '')
-      .length
-  );
-};
-
-/** Whether the form holds filters that were not applied yet. */
-export const sessionFormChanged = (
-  form: SessionFilterForm,
-  applied: SessionListQuery,
-): boolean => queryString(toQuery(form)) !== queryString(applied);
-
 export function describeSessionError(error: unknown): string {
   if (error instanceof ApiError) {
     // `ApiError.code` is typed for auth errors; sessions add their own codes.

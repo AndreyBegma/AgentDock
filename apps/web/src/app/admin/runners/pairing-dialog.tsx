@@ -20,13 +20,18 @@ import {
 import { isRunnerOnline } from '../../../lib/prerequisites/facts';
 import { formatCountdown } from '../../../lib/runners/format';
 import { pairingServers } from '../../../lib/runners/install';
+import { useErrorToast } from '../../../lib/section/use-error-toast';
 
-async function copy(text: string, what: string) {
+async function copy(
+  text: string,
+  what: string,
+  showError: (described: string) => void,
+) {
   try {
     await navigator.clipboard.writeText(text);
     toast.success(`${what} copied.`);
   } catch {
-    toast.error('Could not copy — select the text and copy it by hand.');
+    showError('Could not copy — select the text and copy it by hand.');
   }
 }
 
@@ -76,6 +81,7 @@ export function PairingDialog({
   onNewCode: (runnerId: string) => void;
 }) {
   const [now, setNow] = useState(() => Date.now());
+  const showError = useErrorToast();
   const origin = useOrigin();
 
   useEffect(() => {
@@ -184,14 +190,14 @@ export function PairingDialog({
                   <Button
                     variant="glass"
                     size="sm"
-                    onClick={() => copy(result.pairingCode, 'Code')}
+                    onClick={() => copy(result.pairingCode, 'Code', showError)}
                   >
                     Copy code
                   </Button>
                   <Button
                     variant="glass"
                     size="sm"
-                    onClick={() => copy(command, 'Command')}
+                    onClick={() => copy(command, 'Command', showError)}
                   >
                     Copy command
                   </Button>

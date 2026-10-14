@@ -20,6 +20,7 @@ import {
   PERMISSION_MODE_LABEL,
   permissionModesFor,
 } from '../../../../../lib/control/format';
+import { useErrorToast } from '../../../../../lib/section/use-error-toast';
 
 /** Orchestrator defaults of the project (spec 17 D3). */
 export function OrchestratorTab({
@@ -38,6 +39,7 @@ export function OrchestratorTab({
   const [permissionMode, setPermissionMode] =
     useState<OrchestratorPermissionMode>('auto');
   const [busy, setBusy] = useState(false);
+  const showError = useErrorToast();
 
   const load = useCallback(async () => {
     try {
@@ -49,9 +51,9 @@ export function OrchestratorTab({
       setModel(view.model);
       setPermissionMode(view.permissionMode);
     } catch (err) {
-      toast.error(describeControlError(err));
+      showError(describeControlError(err));
     }
-  }, [project.id]);
+  }, [project.id, showError]);
 
   useEffect(() => {
     void load();
@@ -67,8 +69,8 @@ export function OrchestratorTab({
           runner.profiles.filter((p) => !p.missing && p.runtime !== 'codex'),
         ),
       )
-      .catch((err) => toast.error(describeControlError(err)));
-  }, [isAdmin, project.runnerId]);
+      .catch((err) => showError(describeControlError(err)));
+  }, [isAdmin, project.runnerId, showError]);
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
@@ -93,7 +95,7 @@ export function OrchestratorTab({
       toast.success('Orchestrator settings saved.');
       await load();
     } catch (err) {
-      toast.error(describeControlError(err));
+      showError(describeControlError(err));
     } finally {
       setBusy(false);
     }
