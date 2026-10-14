@@ -269,6 +269,13 @@ describe.skipIf(!tmuxInstalled)('skill runs (real tmux)', () => {
     expect(launch.env.OTEL_RESOURCE_ATTRIBUTES).toBe(
       'agentdock.project=prj_widget,agentdock.run=run_1',
     );
+    // A skill run feeds nothing on stdin: its spec carries no `stdin` key (spec 172 D16).
+    expect(Object.keys(launch).sort()).toEqual([
+      'args',
+      'binary',
+      'cwd',
+      'env',
+    ]);
   });
 
   it('turns a pr run into a commit, a push and a PR, and keeps the worktree until the PR closes', async () => {

@@ -16,6 +16,7 @@ import { HistoryModule } from './history';
 import { LiveModule } from './live/live.module';
 import { NotificationsModule } from './notifications';
 import { PaneModule } from './pane';
+import { PlannerModule } from './planner';
 import { PricesModule } from './prices/prices.module';
 import { ProjectsModule } from './projects/projects.module';
 import { QueueModule } from './queue';
@@ -56,6 +57,7 @@ import { WebhooksModule } from './webhooks';
     TelegramModule,
     TerminalModule,
     SkillsModule,
+    PlannerModule,
     SchedulesModule,
     BudgetsModule,
     // Before WebhooksModule: its `POST /hooks/:publicId` would otherwise

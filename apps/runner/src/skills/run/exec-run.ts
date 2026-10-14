@@ -17,7 +17,8 @@ export interface ExecRunIo {
 /**
  * `agentdock-runner exec-run <runDir>` (D7) — what a run's tmux session
  * executes. Reads `run.json`, spawns the profile binary as an argv (never a
- * shell string) in the run worktree, sends its stdout to `stream.jsonl` and
+ * shell string) in the run worktree, feeds it the spec's `stdin` file when
+ * there is one (a plan turn's prompt, spec 172 D16), sends its stdout to `stream.jsonl` and
  * its stderr to `stderr.log`, and records the exit in `exit.json`. Returns
  * the binary's exit code.
  */
@@ -62,7 +63,7 @@ export const execRun = async (
   const child = Bun.spawn([binary, ...spec.args], {
     cwd: spec.cwd,
     env,
-    stdin: 'ignore',
+    stdin: spec.stdin ? Bun.file(spec.stdin) : 'ignore',
     stdout: Bun.file(join(runDir, RUN_FILES.stream)),
     stderr: Bun.file(join(runDir, RUN_FILES.stderr)),
   });

@@ -76,7 +76,8 @@ export interface PlanTurnView {
 export interface PlanTaskIssueView {
   number: number;
   url: string;
-  liveStatus: PlanTaskLiveStatus;
+  /** Null: issued but not queued yet — a feature waiting for its docs pull request (D10). */
+  liveStatus: PlanTaskLiveStatus | null;
   prNumber: number | null;
   prUrl: string | null;
 }
@@ -242,6 +243,8 @@ export const PLANNER_ERROR = {
   invalidArgs: 'invalid_args',
   /** A turn of this plan is queued or running. */
   turnInProgress: 'turn_in_progress',
+  /** Retry of a turn that did not fail. */
+  turnNotFailed: 'turn_not_failed',
   /** `approve` while a blocking question is open (D6). */
   needsTalk: 'needs_talk',
   /** Send found a cycle in `dependsOn`; the message names the tasks (D8). */

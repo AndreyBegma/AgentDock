@@ -65,6 +65,62 @@ describe('exec-run', () => {
     });
   });
 
+  const catBinary = (dir: string): string => {
+    const binary = join(dir, 'cat-stdin');
+    writeFileSync(binary, '#!/bin/sh\nprintf "stdin:"\ncat\n');
+    chmodSync(binary, 0o755);
+    return binary;
+  };
+
+  it('feeds the stdin file to the binary when the spec names one', async () => {
+    const dir = runDir();
+    const prompt = join(dir, 'prompt.md');
+    writeFileSync(prompt, '# Plan\n$(not a shell) `x`\n');
+    writeFileSync(
+      join(dir, 'run.json'),
+      JSON.stringify({
+        binary: catBinary(dir),
+        args: [],
+        env: {},
+        cwd: dir,
+        stdin: prompt,
+      }),
+    );
+    const { io: ioDeps } = io();
+    expect(await execRun([dir], ioDeps)).toBe(0);
+    expect(readFileSync(join(dir, 'stream.jsonl'), 'utf8')).toBe(
+      'stdin:# Plan\n$(not a shell) `x`\n',
+    );
+  });
+
+  it('gives the binary no stdin when the spec names none', async () => {
+    const dir = runDir();
+    writeFileSync(
+      join(dir, 'run.json'),
+      JSON.stringify({ binary: catBinary(dir), args: [], env: {}, cwd: dir }),
+    );
+    const { io: ioDeps } = io();
+    expect(await execRun([dir], ioDeps)).toBe(0);
+    expect(readFileSync(join(dir, 'stream.jsonl'), 'utf8')).toBe('stdin:');
+  });
+
+  it('refuses a relative stdin path', async () => {
+    const dir = runDir();
+    writeFileSync(
+      join(dir, 'run.json'),
+      JSON.stringify({
+        binary: catBinary(dir),
+        args: [],
+        env: {},
+        cwd: dir,
+        stdin: 'prompt.md',
+      }),
+    );
+    const { io: ioDeps, err } = io();
+    expect(await execRun([dir], ioDeps)).toBe(1);
+    expect(err.join('')).toContain('missing or invalid');
+  });
+
   it('records 127 when the binary is not on PATH', async () => {
     const dir = runDir();
     writeFileSync(
