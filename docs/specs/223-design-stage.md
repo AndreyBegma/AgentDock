@@ -161,23 +161,31 @@ New violation reasons: `no_design_block`, `multiple_design_blocks`,
 
 ## API
 
+Every route but the mockup sits under `/projects/:projectId`, as the
+Planner's do (#172), so the project guard resolves the caller's role first.
+
 | Method | Path | Role | What |
 |---|---|---|---|
-| GET | `/projects/:id/ui-profile` | viewer | the current profile and its status (`none`, `fresh`, `stale`, `building`) |
-| GET | `/projects/:id/ui-profile/versions` | viewer | the version list; `?version=` reads one |
-| PUT | `/projects/:id/ui-profile` | project admin | a manual version (D14) |
-| POST | `/projects/:id/ui-profile/rebuild` | operator | runs `uiprofile.build` |
-| GET / PUT | `/projects/:id/design-settings` | viewer / project admin | viewports, default skills |
-| PATCH | `/plans/:planId/tasks/:key/design` | operator | `{ needed?, variantCount?, skills? }` |
-| POST | `/plans/:planId/tasks/:key/design/generate` | operator | the first revision of every variant; fingerprint check and profile build first |
-| POST | `/plans/:planId/tasks/:key/design/comments` | operator | a general, screen or pin comment |
-| POST | `/plans/:planId/tasks/:key/design/revise` | operator | D10 |
-| POST | `/plans/:planId/tasks/:key/design/approve` | operator | `{ revisionId }`; archives the other variants, chains the write turn |
-| GET | `/plans/:planId/tasks/:key/design` | plan reader | the design, revisions, comments |
-| GET | `/design-revisions/:id/html` | plan reader | the mockup, served for the iframe (below) |
+| GET | `/projects/:projectId/ui-profile` | viewer | the current profile and its status (`none`, `fresh`, `stale`, `building`) — `stale`: the newest build after the current version was started because the files changed, and failed |
+| GET | `/projects/:projectId/ui-profile/versions` | viewer | the version list, newest first; `?version=` reads one |
+| GET | `/projects/:projectId/ui-profile/preview` | viewer | the kit and every snippet of a version (`?version=`, default the current) on one page, served like the mockup (below); 404 without a profile or with no such version |
+| PUT | `/projects/:projectId/ui-profile` | project admin | a manual version (D14) |
+| POST | `/projects/:projectId/ui-profile/rebuild` | operator | runs `uiprofile.build`; 409 `design_busy` while one runs |
+| GET / PUT | `/projects/:projectId/design-settings` | viewer / project admin | viewports, default skills |
+| PATCH | `/projects/:projectId/plans/:planId/tasks/:key/design` | operator | `{ needed?, variantCount?, skills? }`; creates the design row when the task has none |
+| POST | `/projects/:projectId/plans/:planId/tasks/:key/design/generate` | operator | the first revision of every variant not drawn yet (409 when none is missing); fingerprint check and profile build first |
+| POST | `/projects/:projectId/plans/:planId/tasks/:key/design/comments` | operator | a general, screen or pin comment |
+| POST | `/projects/:projectId/plans/:planId/tasks/:key/design/revise` | operator | D10 |
+| POST | `/projects/:projectId/plans/:planId/tasks/:key/design/approve` | operator | `{ revisionId }`; archives the other variants, chains the write turn |
+| GET | `/projects/:projectId/plans/:planId/tasks/:key/design` | plan reader | the design, revisions, comments |
+| GET | `/design-revisions/:id/html` | plan reader | the mockup, served for the iframe (below); a revision's `htmlUrl` is `/api/design-revisions/:id/html`, through the web's rewrite |
 
-**The mockup endpoint** returns `text/html` with its own headers, overriding
-helmet's defaults for this route only:
+The design writes answer the design (`TaskDesignView`) as the caller now
+sees it.
+
+**The mockup endpoint** — and the profile preview, through the same code —
+returns `text/html` with its own headers, overriding helmet's defaults for
+that response only:
 
 - `Content-Security-Policy: sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline' <allowlist>; style-src 'unsafe-inline' <allowlist>; font-src <allowlist> data:; img-src <allowlist> data:; connect-src 'none'; form-action 'none'; frame-ancestors 'self'`;
 - `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`;

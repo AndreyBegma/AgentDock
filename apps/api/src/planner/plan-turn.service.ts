@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto';
 import {
   asPlannerContractVersion,
   PLANNER_ERROR,
-  type PlannerContractVersion,
   type PlanTurnAction,
   type PlanTurnInput,
   type Role,
@@ -21,20 +20,14 @@ import type { AuditContext } from '../audit/audit.types';
 import { SYSTEM_ACTOR, systemActorFor } from '../audit/audit.types';
 import { BudgetGate } from '../budgets/budget-gate';
 import { PrismaService } from '../database/prisma.service';
-import { type DesignTurnPlan, designTurnPlanOf } from '../design/design-rules';
-import {
-  loadApprovedDesign,
-  loadDesignPrompt,
-  profileHasUi,
-} from '../design/design-store';
+import type { DesignTurnPlan } from '../design/design-rules';
 import { TALKABLE_STATUSES } from './plan-apply';
 import { questionsOf } from './plan-mapper';
-import { assemblePrompt, type PromptInput } from './plan-prompt';
-import { designFilePath, ISSUE_PLACEHOLDER } from './plan-send';
-import { type PlanProject, PlanStore } from './plan-store';
+import { assemblePrompt } from './plan-prompt';
+import { PlanStore } from './plan-store';
+import { designPromptParts, retriedDesign } from './plan-turn-design';
 import { PlannerCommands, plannerOutput } from './planner-commands';
 import { PlannerFailure, plannerError } from './planner-error';
-import { specDirOf } from './planner-instructions.service';
 
 /** Who acts: a person on a route, or the system chaining a turn for its author. */
 export interface PlanCaller {
@@ -179,22 +172,10 @@ export class PlanTurnService {
     }
     const task = turn.task ? await this.store.task(plan, turn.task.key) : null;
     const input = (turn.input ?? {}) as PlanTurnInput;
-    let design: DesignTurnPlan | undefined;
-    if (turn.action === 'design') {
-      const run = await this.prisma.run.findUniqueOrThrow({
-        where: { id: turn.runId },
-        select: { args: true },
-      });
-      design = designTurnPlanOf(run.args) ?? undefined;
-      if (!design || !task) {
-        throw plannerError(
-          409,
-          PLANNER_ERROR.invalidArgs,
-          'The design turn cannot be retried; generate the design again',
-        );
-      }
-      await this.markDesign(plan.id, task.key, design.mode);
-    }
+    const design =
+      turn.action === 'design'
+        ? await retriedDesign(this.prisma, plan.id, turn.runId, task)
+        : undefined;
     return this.run(plan, { action: turn.action, task, input, design }, caller);
   }
 
@@ -247,18 +228,6 @@ export class PlanTurnService {
       );
       return false;
     }
-  }
-
-  /** A retried design turn puts its design back to drawing. */
-  private markDesign(
-    planId: string,
-    taskKey: string,
-    mode: DesignTurnPlan['mode'],
-  ) {
-    return this.prisma.taskDesign.updateMany({
-      where: { planId, taskKey },
-      data: { status: mode === 'generate' ? 'generating' : 'revising' },
-    });
   }
 
   /** Kills the turn's session; the runner reports `cancelled`. */
@@ -348,7 +317,7 @@ export class PlanTurnService {
       }),
       this.store.currentTasks(this.prisma, plan),
       this.session(plan, spec.task),
-      this.designParts(plan, project, spec, contractVersion),
+      designPromptParts(this.prisma, plan, project, spec, contractVersion),
     ]);
     const prompt = assemblePrompt({
       ...designParts,
@@ -493,68 +462,6 @@ export class PlanTurnService {
       }
       throw error;
     }
-  }
-
-  /**
-   * Spec 223: what the prompt carries of the design stage — whether the
-   * project has a UI (v2 suggesting turns, D3), a design turn's context (D8),
-   * and a write turn's approved design (D16).
-   */
-  private async designParts(
-    plan: Plan,
-    project: PlanProject,
-    spec: TurnSpec,
-    contractVersion: PlannerContractVersion,
-  ): Promise<Pick<PromptInput, 'hasUi' | 'design' | 'approvedDesign'>> {
-    if (spec.action === 'design') {
-      const design =
-        spec.task && spec.design
-          ? await this.prisma.taskDesign.findUnique({
-              where: {
-                planId_taskKey: { planId: plan.id, taskKey: spec.task.key },
-              },
-              select: { id: true, variantCount: true, skills: true },
-            })
-          : null;
-      if (!design || !spec.design) {
-        throw plannerError(
-          409,
-          PLANNER_ERROR.invalidArgs,
-          'A design turn needs the task design',
-        );
-      }
-      return {
-        design: await loadDesignPrompt(
-          this.prisma,
-          project,
-          design,
-          spec.design,
-        ),
-      };
-    }
-    if (spec.action === 'write' && spec.task) {
-      const approved = await loadApprovedDesign(
-        this.prisma,
-        plan.id,
-        spec.task.key,
-      );
-      if (!approved) return {};
-      return {
-        approvedDesign: {
-          ...approved,
-          path: designFilePath(
-            specDirOf(project.codeSentinelConfig),
-            ISSUE_PLACEHOLDER,
-            spec.task.title,
-            approved.variant,
-          ),
-        },
-      };
-    }
-    if (contractVersion >= 2 && spec.action !== 'clarify') {
-      return { hasUi: await profileHasUi(this.prisma, plan.projectId) };
-    }
-    return {};
   }
 
   /**

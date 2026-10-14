@@ -102,8 +102,8 @@ export class UiProfileService {
   private latestBuild(projectId: string) {
     return this.prisma.run.findFirst({
       where: { projectId, kind: 'ui_profile' },
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      select: { id: true, status: true, args: true, createdAt: true },
+      orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
+      select: { id: true, status: true, args: true, startedAt: true },
     });
   }
 

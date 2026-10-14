@@ -1,5 +1,4 @@
 import {
-  DEFAULT_VIEWPORTS,
   DESIGN_COMMENTS_PER_TURN_MAX,
   DESIGN_ERROR,
   type DesignCommentRequest,
@@ -19,13 +18,13 @@ import { plannerError } from '../planner/planner-error';
 import { settleDesign } from './design-apply';
 import { designError } from './design-error';
 import {
-  designInclude,
-  skillWarnings,
-  toDesignView,
-  viewportsOf,
-} from './design-mapper';
-import { batchOf, type DesignTurnPlan, withDesign } from './design-rules';
-import { defaultSkillsOf, installedOf } from './design-store';
+  batchOf,
+  commentAnchor,
+  type DesignTurnPlan,
+  withDesign,
+} from './design-rules';
+import { defaultSkillsOf } from './design-store';
+import { loadDesignView } from './design-view';
 import { UiProfileService } from './ui-profile.service';
 import type { WaitingDesign } from './ui-profile-mapper';
 
@@ -69,37 +68,8 @@ export class DesignService {
     key: string,
   ): Promise<TaskDesignView> {
     const plan = await this.store.readable(userId, projectId, planId);
-    const row = await this.prisma.taskDesign.findUnique({
-      where: { planId_taskKey: { planId: plan.id, taskKey: key } },
-      include: designInclude,
-    });
-    if (!row) {
-      throw designError(404, DESIGN_ERROR.notFound, 'Design not found');
-    }
     const project = await this.store.project(projectId);
-    const [installed, settings, active] = await Promise.all([
-      installedOf(this.prisma, project, row.skills),
-      this.prisma.designSettings.findUnique({
-        where: { projectId },
-        select: { viewports: true },
-      }),
-      this.prisma.planTurn.findFirst({
-        where: {
-          planId: plan.id,
-          action: 'design',
-          task: { key },
-          phase: { in: ['queued', 'running'] },
-        },
-        select: { id: true },
-      }),
-    ]);
-    return toDesignView(row, {
-      warnings: skillWarnings(row.skills, installed),
-      viewports: settings
-        ? viewportsOf(settings.viewports)
-        : [...DEFAULT_VIEWPORTS],
-      activeTurnId: active?.id ?? null,
-    });
+    return loadDesignView(this.prisma, project, plan.id, key);
   }
 
   /**
@@ -230,38 +200,17 @@ export class DesignService {
         'The revision is not a revision of this design',
       );
     }
-    const anchored = request.kind !== 'general';
-    if (anchored && (!request.viewport || !request.theme)) {
-      throw designError(
-        400,
-        DESIGN_ERROR.invalidArgs,
-        `A ${request.kind} comment names its viewport and theme`,
-      );
+    const anchor = commentAnchor(request);
+    if (typeof anchor === 'string') {
+      throw designError(400, DESIGN_ERROR.invalidArgs, anchor);
     }
-    if (
-      request.kind === 'pin' &&
-      (request.x === undefined ||
-        request.y === undefined ||
-        request.selector === undefined)
-    ) {
-      throw designError(
-        400,
-        DESIGN_ERROR.invalidArgs,
-        'A pin carries its point and the CSS path under it',
-      );
-    }
-    const pin = request.kind === 'pin';
     await this.prisma.designComment.create({
       data: {
         designId: design.id,
         revisionId: revision.id,
         authorId: actor.userId,
         kind: request.kind,
-        viewport: anchored ? (request.viewport ?? null) : null,
-        theme: anchored ? (request.theme ?? null) : null,
-        x: pin ? (request.x ?? null) : null,
-        y: pin ? (request.y ?? null) : null,
-        selector: pin ? (request.selector ?? null) : null,
+        ...anchor,
         body: request.body,
       },
     });

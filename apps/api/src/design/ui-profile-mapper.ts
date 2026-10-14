@@ -83,7 +83,7 @@ export interface BuildRunFacts {
   id: string;
   status: string;
   args: unknown;
-  createdAt: Date;
+  startedAt: Date;
 }
 
 /**
@@ -103,7 +103,7 @@ export const profileStatusOf = (
   if (!current) return { status: 'none', buildRunId: null };
   if (
     latestBuild &&
-    latestBuild.createdAt > current.createdAt &&
+    latestBuild.startedAt > current.createdAt &&
     latestBuild.status !== 'succeeded' &&
     buildArgsOf(latestBuild.args)?.reason === 'stale'
   ) {

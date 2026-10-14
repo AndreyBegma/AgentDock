@@ -1,6 +1,8 @@
 import {
+  CSRF_COOKIE,
   MOCKUP_PIN_HELPER_ATTRIBUTE,
   type PlanDetail,
+  SESSION_COOKIE,
   type TaskDesignView,
   type UiProfileView,
 } from '@agentdock/shared';
@@ -323,6 +325,20 @@ describe('design stage (e2e)', () => {
       expect(res.text).toContain(MOCKUP_PIN_HELPER_ATTRIBUTE);
     }
     expect(html.text).toContain('<button>Export</button>');
+    // The web's iframe may probe the preview with HEAD; nothing refuses it.
+    const head = await h.ctx
+      .http()
+      .head(`/projects/${h.projectId}/ui-profile/preview?version=1`)
+      .set(
+        'Cookie',
+        `${SESSION_COOKIE}=${h.viewer.token}; ${CSRF_COOKIE}=${h.viewer.csrf}`,
+      );
+    expect(head.status).toBe(200);
+    expect(String(head.headers['content-security-policy'])).toContain(
+      'sandbox allow-scripts',
+    );
+    // A task with no design row: 404, not an empty design.
+    expect((await h.author.get(h.designBase(plan.id, 't2'))).status).toBe(404);
     expect(preview.text).toContain('<div class="card">Card</div>');
     const stored = await h.ctx.prisma.designRevision.findUniqueOrThrow({
       where: { id: revision.id },
@@ -526,7 +542,8 @@ describe('design stage (e2e)', () => {
       `/projects/${h.projectId}/design-settings`,
       {
         viewports: [{ name: 'Desktop', width: 1440, height: 900 }],
-        defaultSkills: ['frontend-design', 'gone-skill'],
+        // Skills are keyed by their invocation (`InstalledSkillView.invocation`).
+        defaultSkills: ['design-kit:frontend-design', 'gone-skill'],
       },
     );
     expect(settings.status).toBe(200);
@@ -542,10 +559,10 @@ describe('design stage (e2e)', () => {
     await h.ctx.prisma.installedSkill.create({
       data: {
         runnerId: h.runnerId,
-        scope: 'profile',
+        scope: 'plugin',
         runtime: 'claude',
         name: 'frontend-design',
-        invocation: 'frontend-design',
+        invocation: 'design-kit:frontend-design',
         path: '/home/u/.claude/skills/frontend-design',
         seenAt: new Date(),
       },
@@ -560,7 +577,7 @@ describe('design stage (e2e)', () => {
 
     await h.author.send('patch', h.designBase(plan.id, 't1'), { needed: true });
     const view = await design(plan.id);
-    expect(view.skills).toEqual(['frontend-design', 'gone-skill']);
+    expect(view.skills).toEqual(['design-kit:frontend-design', 'gone-skill']);
     expect(view.viewports).toEqual([
       { name: 'Desktop', width: 1440, height: 900 },
     ]);
@@ -569,7 +586,7 @@ describe('design stage (e2e)', () => {
     ]);
     await generate(plan.id);
     const prompt = h.turnPrompts().at(-1) ?? '';
-    expect(prompt).toContain('`frontend-design`');
+    expect(prompt).toContain('`design-kit:frontend-design`');
     expect(prompt).not.toContain('gone-skill');
   });
 

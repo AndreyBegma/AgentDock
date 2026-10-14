@@ -56,6 +56,21 @@ describe('afterGrill', () => {
       chainWrite: false,
     });
   });
+
+  it('holds the write while the design is on and not approved (spec 223 D1)', () => {
+    const on = { needed: true, status: 'reviewing' as const };
+    expect(afterGrill({ questions: [], done: true }, on)).toEqual({
+      status: 'needs_design',
+      questions: [],
+      chainWrite: false,
+    });
+    expect(
+      afterGrill(
+        { questions: [], done: true },
+        { needed: true, status: 'approved' },
+      ),
+    ).toMatchObject({ status: 'ready', chainWrite: true });
+  });
 });
 
 describe('revisedTasks (D9)', () => {

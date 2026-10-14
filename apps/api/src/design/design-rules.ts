@@ -1,5 +1,7 @@
 import type {
+  DesignCommentKind,
   DesignSuggestion,
+  DesignTheme,
   PlanTaskStatus,
   TaskDesignStatus,
 } from '@agentdock/shared';
@@ -77,6 +79,51 @@ export const suggestionUpdate = (
     ? { variantCount: suggestion.variantCount }
     : {}),
 });
+
+/** A comment's anchor as stored (D9): a screen's and a pin's, nothing on a general one. */
+export interface CommentAnchor {
+  viewport: string | null;
+  theme: DesignTheme | null;
+  x: number | null;
+  y: number | null;
+  selector: string | null;
+}
+
+/**
+ * D9: a `screen` comment names its viewport and theme; a `pin` also its
+ * point and the CSS path under it; a `general` one carries none. The anchor
+ * to store, or why the request is refused.
+ */
+export const commentAnchor = (request: {
+  kind: DesignCommentKind;
+  viewport?: string;
+  theme?: DesignTheme;
+  x?: number;
+  y?: number;
+  selector?: string;
+}): CommentAnchor | string => {
+  const none: CommentAnchor = {
+    viewport: null,
+    theme: null,
+    x: null,
+    y: null,
+    selector: null,
+  };
+  if (request.kind === 'general') return none;
+  if (!request.viewport || !request.theme) {
+    return `A ${request.kind} comment names its viewport and theme`;
+  }
+  const screen = { ...none, viewport: request.viewport, theme: request.theme };
+  if (request.kind === 'screen') return screen;
+  if (
+    request.x === undefined ||
+    request.y === undefined ||
+    request.selector === undefined
+  ) {
+    return 'A pin carries its point and the CSS path under it';
+  }
+  return { ...screen, x: request.x, y: request.y, selector: request.selector };
+};
 
 /** A design's status once no turn of it runs: reviewing with a revision, else idle. */
 export const restingStatus = (drawn: boolean): TaskDesignStatus =>
