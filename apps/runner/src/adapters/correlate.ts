@@ -1,5 +1,6 @@
 import { basename, dirname } from 'node:path';
 import type { WatchedProject } from '@agentdock/shared/protocol';
+import { NON_SLOT_WORKTREE } from '../fleet/session-name';
 import type { Correlation } from './types';
 
 const trimSlash = (path: string): string =>
@@ -12,7 +13,9 @@ const isWithin = (path: string, root: string): boolean =>
  * The project and slot of a session from its `cwd` (D6). Path arithmetic
  * only, nothing is read from disk:
  * - inside `<parent of root>/.wt-<basename of root>-<slot>`, the worktree
- *   `dispatch.sh` creates for a slot: that project and that slot;
+ *   `dispatch.sh` creates for a slot: that project and that slot — unless it
+ *   is one the runner creates (`run-`, `skill-`, `card-`, `plan-`,
+ *   `uiprofile-`, #242 D14), which is that project without a slot;
  * - else the deepest watched root that is `cwd` or one of its ancestors;
  * - else nothing.
  * A longer repository name is tried first, so `.wt-app-web-i1` belongs to a
@@ -35,7 +38,11 @@ export const correlateCwd = (
     );
     if (!path.startsWith(prefix)) continue;
     const slot = path.slice(prefix.length).split('/')[0];
-    if (slot) return { projectId: id, slot };
+    if (!slot) continue;
+    // A runner worktree (#242 D14) is the project's, but no slot's.
+    return NON_SLOT_WORKTREE.test(slot)
+      ? { projectId: id }
+      : { projectId: id, slot };
   }
 
   let best: { id: string; root: string } | null = null;

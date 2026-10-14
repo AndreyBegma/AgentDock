@@ -104,6 +104,39 @@ describe('exec-run', () => {
     expect(readFileSync(join(dir, 'stream.jsonl'), 'utf8')).toBe('stdin:');
   });
 
+  it('interactive: the binary keeps the terminal, no stream files, exit still recorded (#242 D5)', async () => {
+    const dir = runDir();
+    const binary = join(dir, 'fake-interactive');
+    // Records its argv; whatever it prints goes to the inherited stdout.
+    writeFileSync(
+      binary,
+      '#!/bin/sh\nprintf "%s\\n" "$@" > "$RECORD"\necho on-the-pane\nexit 4\n',
+    );
+    chmodSync(binary, 0o755);
+    const record = join(dir, 'argv.txt');
+    writeFileSync(
+      join(dir, 'run.json'),
+      JSON.stringify({
+        binary,
+        args: ['--resume', 'abc', '--', '-p looks like a flag; $(x)'],
+        env: { RECORD: record },
+        cwd: dir,
+        interactive: true,
+      }),
+    );
+    const { io: ioDeps, out } = io();
+    expect(await execRun([dir], ioDeps)).toBe(4);
+    expect(readFileSync(record, 'utf8')).toBe(
+      '--resume\nabc\n--\n-p looks like a flag; $(x)\n',
+    );
+    expect(existsSync(join(dir, 'stream.jsonl'))).toBe(false);
+    expect(existsSync(join(dir, 'stderr.log'))).toBe(false);
+    expect(JSON.parse(readFileSync(join(dir, 'exit.json'), 'utf8')).code).toBe(
+      4,
+    );
+    expect(out.join('')).toContain('agentdock card');
+  });
+
   it('refuses a relative stdin path', async () => {
     const dir = runDir();
     writeFileSync(

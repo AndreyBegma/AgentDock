@@ -5,6 +5,7 @@ import type {
   TerminalAttachResult,
   WatchedProject,
 } from '@agentdock/shared/protocol';
+import type { CardHandlers } from '../cards';
 import { type Clock, isoNow } from '../clock';
 import type { ConfigProfile } from '../config';
 import {
@@ -64,7 +65,16 @@ export interface HandlerContext {
   planner?: PlannerHandlers;
   /** UI profiles (spec 223); absent means this runner does not build them. */
   uiprofile?: UiProfileHandlers;
+  /** Board card workers (#242); absent means this runner does not run them. */
+  cards?: CardHandlers;
 }
+
+const noCards = (): never => {
+  throw new CommandFailure(
+    'unsupported',
+    'this runner does not run board card workers',
+  );
+};
 
 const noSkills = (): never => {
   throw new CommandFailure('unsupported', 'this runner does not serve skills');
@@ -171,5 +181,10 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
         exec: context.exec,
         watchedProjects: context.watchedProjects,
       }),
+    'card.run': (args) => context.cards?.['card.run'](args) ?? noCards(),
+    'card.stop': (args) => context.cards?.['card.stop'](args) ?? noCards(),
+    'card.collect': (args) =>
+      context.cards?.['card.collect'](args) ?? noCards(),
+    'card.close': (args) => context.cards?.['card.close'](args) ?? noCards(),
   };
 };

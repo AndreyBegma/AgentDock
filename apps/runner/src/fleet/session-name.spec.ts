@@ -79,6 +79,17 @@ describe('worktree paths', () => {
       slotOfWorktree('/dev/AgentDock', '/dev/.wt-AgentDock-runner-i42'),
     ).toBe('runner-i42');
   });
+
+  it('does not treat card, plan and UI profile worktrees as slots (#242 D14)', () => {
+    for (const name of ['card-ab12cd34', 'plan-abc123', 'uiprofile-abc123']) {
+      expect(
+        slotOfWorktree('/dev/AgentDock', `/dev/.wt-AgentDock-${name}`),
+      ).toBeNull();
+    }
+    expect(
+      slotOfWorktree('/dev/AgentDock', '/dev/.wt-AgentDock-cards-i42'),
+    ).toBe('cards-i42');
+  });
 });
 
 describe('ownedSlot', () => {

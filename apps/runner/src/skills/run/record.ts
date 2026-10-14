@@ -71,6 +71,11 @@ export const launchSpecSchema = z.object({
     .string()
     .refine((p) => isAbsolute(p), { message: 'must be an absolute path' })
     .optional(),
+  /**
+   * A board card's worker (#242 D5): the binary inherits the tmux pane as its
+   * terminal instead of writing to `stream.jsonl` and `stderr.log`.
+   */
+  interactive: z.boolean().optional(),
 });
 export type LaunchSpec = z.infer<typeof launchSpecSchema>;
 

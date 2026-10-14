@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { capabilitiesSchema, hostSchema } from './capabilities';
 import { approvalCommands } from './commands/approvals';
+import { cardCommands } from './commands/cards';
 import { controlCommands } from './commands/control';
 import { githubCommands } from './commands/github';
 import { plannerCommands } from './commands/planner';
@@ -137,6 +138,7 @@ export const commands = {
   ...plannerCommands,
   ...uiprofileCommands,
   ...worktreeCommands,
+  ...cardCommands,
 } as const satisfies Record<string, CommandDefinition>;
 
 export type CommandName = keyof typeof commands;

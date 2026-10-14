@@ -3,6 +3,7 @@ import {
   actionRequestKindSchema,
 } from '@agentdock/shared';
 import {
+  LOCAL_CARD_SUMMARY_MAX,
   LOCAL_NOTE_MAX,
   type LocalMethodName,
 } from '@agentdock/shared/protocol';
@@ -122,6 +123,19 @@ export const MCP_TOOLS = [
     description: 'The state of an action request made with request_action.',
     method: 'action.status',
     input: { id: z.string().min(1).max(64) },
+  },
+  {
+    name: 'finish_card',
+    description:
+      'Only for the worker of an AgentDock board card: report the card done, with a summary of what changed. AgentDock then opens or updates the pull request. Any other session is refused (not_a_card_session).',
+    method: 'card.finish',
+    input: {
+      summary: z
+        .string()
+        .min(1)
+        .max(LOCAL_CARD_SUMMARY_MAX)
+        .describe('What was done on the card, for the pull request body.'),
+    },
   },
   {
     name: 'away',

@@ -9,6 +9,7 @@ import {
 import { adapters, SessionWatcher } from './adapters';
 import { resolveIngestSince } from './adapters/ingest-since';
 import { Backoff } from './backoff';
+import { CardExecutor, createCardHandlers } from './cards';
 import type { Clock } from './clock';
 import { CollectorRegistry, collectors } from './collectors';
 import { type CommandHandlers, createDispatcher } from './commands/dispatcher';
@@ -80,7 +81,9 @@ export interface DaemonOptions {
   plansDir?: string;
   /** UI profile builds (spec 223); `<state>/agentdock/uiprofile` beside the plans by default. */
   uiprofileDir?: string;
-  /** The argv that starts this runner; a skill run's or plan turn's session appends `exec-run <dir>`. */
+  /** Board card workers (#242); `<state>/agentdock/cards` beside the runs by default. */
+  cardsDir?: string;
+  /** The argv that starts this runner; a skill run's, plan turn's or card's session appends `exec-run <dir>`. */
   selfCommand?: readonly string[];
   /** The skills.sh catalog is fetched with it; the global `fetch` by default. */
   fetch?: typeof fetch;
@@ -208,6 +211,8 @@ export const runDaemon = async (
         runs.runSession(projectId, root, runId),
       // `hookSessions` is built below too; commands arrive after both exist.
       manualSession: (sessionId) => hookSessions.manualOf(sessionId),
+      cardSession: (projectId, root, cardId) =>
+        cards.cardSession(projectId, root, cardId),
       unsupported: async () => {
         const tmux = await exec('tmux', ['-V']);
         return terminalUnsupported(
@@ -260,6 +265,16 @@ export const runDaemon = async (
       log,
       otlpPort: () => otlp?.port ?? null,
     });
+    // Board card workers (#242): interactive, outside the shared run cap —
+    // the API limits running cards per project.
+    const cards = new CardExecutor({
+      deps: skillsDeps,
+      cardsDir: options.cardsDir ?? join(dirname(options.spoolDir), 'cards'),
+      selfCommand,
+      emit: (event) => connection?.emit(event),
+      log,
+      otlpPort: () => otlp?.port ?? null,
+    });
     const runLog = new RunLogStreamer({
       runs: runLogSources(runs, plans, uiProfiles),
       send: (message) => connection?.sendMessage(message) ?? false,
@@ -284,6 +299,7 @@ export const runDaemon = async (
       skills: createSkillHandlers(skillsDeps, runs),
       planner: createPlannerHandlers({ ...skillsDeps, log }, plans),
       uiprofile: createUiProfileHandlers(skillsDeps, uiProfiles),
+      cards: createCardHandlers(cards),
     });
     const dispatch = createDispatcher({
       handlers: builtHandlers,
@@ -424,6 +440,11 @@ export const runDaemon = async (
         error: errorMessage(error),
       });
     });
+    await cards.start().catch((error) => {
+      log.error('cards: cannot resume watching workers', {
+        error: errorMessage(error),
+      });
+    });
     // Not awaited: a first scan of a large profile must not delay connecting.
     sessions?.start(watchList.current).catch((error) => {
       log.error('sessions: cannot start', { error: errorMessage(error) });
@@ -438,6 +459,7 @@ export const runDaemon = async (
     runs.stop();
     plans.stop();
     uiProfiles.stop();
+    cards.stop();
     terminal.stop();
     await registry.stop();
     await sessions?.stop();
