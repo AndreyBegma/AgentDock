@@ -761,6 +761,44 @@ describe('planner (e2e)', () => {
     });
   });
 
+  describe('runner command advert (#233)', () => {
+    it('refuses a plan with runner_outdated when the runner does not serve plan.turn, writing and sending nothing', async () => {
+      h.advert = { commands: ['worktree.status'], disabled: [] };
+      const refused = await h.author.send('post', h.base(), {
+        brief: 'Plan it',
+        mode: 'batch',
+      });
+      expect(refused.status).toBe(409);
+      expect(refused.body).toMatchObject({ error: 'runner_outdated' });
+      expect(refused.body.message).toContain('plan.turn');
+      expect(await h.ctx.prisma.plan.count()).toBe(0);
+      expect(h.sent).toEqual([]);
+    });
+
+    it('refuses a turn of an existing plan once the runner stops serving plan.turn', async () => {
+      const plan = await threeTasks();
+      const before = h.sent.length;
+      h.advert = { commands: ['worktree.status'], disabled: [] };
+      const refused = await h.author.send(
+        'post',
+        `${h.base(plan.id)}/tasks/t2/turns`,
+        { message: 'Talk' },
+      );
+      expect(refused.status).toBe(409);
+      expect(refused.body).toMatchObject({ error: 'runner_outdated' });
+      expect(h.sent).toHaveLength(before);
+    });
+
+    it('leaves the runner to answer when it advertised nothing, or turned plan.turn off', async () => {
+      // `createPlan` throws on anything but 201.
+      await h.createPlan('batch');
+      h.advert = { commands: ['plan.turn'], disabled: ['plan.turn'] };
+      await h.createPlan('batch');
+      expect(await h.ctx.prisma.plan.count()).toBe(2);
+      expect(h.sentOf('plan.turn')).toHaveLength(2);
+    });
+  });
+
   describe('instructions and settings (D10, D11)', () => {
     it('versions the global instructions; a site admin only', async () => {
       const forbidden = await h.author.get('/admin/planner/instructions');

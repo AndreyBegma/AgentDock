@@ -13,6 +13,7 @@ import {
   docsSourceSchema,
   type ProjectInspection,
   projectInspectionSchema,
+  runnerCommandsOf,
 } from '@agentdock/shared/protocol';
 import type {
   DocsSource,
@@ -74,7 +75,12 @@ export const toDocsSourceView = (docs: DocsSource): DocsSourceView => ({
 });
 
 export type ProjectWithRelations = Project & {
-  runner: { id: string; name: string; revokedAt: Date | null };
+  runner: {
+    id: string;
+    name: string;
+    revokedAt: Date | null;
+    capabilities: Prisma.JsonValue;
+  };
   docsSource: DocsSource | null;
 };
 
@@ -121,8 +127,9 @@ export const toProjectDetail = (
   createdAt: project.createdAt.toISOString(),
   updatedAt: project.updatedAt.toISOString(),
   docsSource: project.docsSource ? toDocsSourceView(project.docsSource) : null,
-  // Read from the runner's capabilities by i233-api (#233); unknown until then.
-  runnerCommands: null,
+  // The latest hello's advert (#233): command names only, never the rest of
+  // the capabilities (profile env and binaries, paths).
+  runnerCommands: runnerCommandsOf(project.runner.capabilities),
 });
 
 export const toMemberView = (

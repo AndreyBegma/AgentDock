@@ -73,7 +73,6 @@ export class DesignHarness extends PlannerHarness {
       'uiprofile.fingerprint': () =>
         ok({ fingerprint: this.fingerprint, files: 3 }),
     };
-    jest.spyOn(this.designCommands, 'assertReady').mockImplementation(() => {});
     jest
       .spyOn(this.designCommands, 'send')
       .mockImplementation(async (_runner, name, args) => {

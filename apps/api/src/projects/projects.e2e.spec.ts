@@ -9,7 +9,9 @@ import { allowedLiveOrigin } from '../live/live-options';
 import { TestLiveSocket } from '../live/testing/live-e2e';
 import {
   adminSession,
+  capabilities,
   createRunnerE2eApp,
+  hello,
   pairedRunner,
   type RunnerE2eContext,
   TestRunnerSocket,
@@ -303,6 +305,51 @@ describe('projects (e2e)', () => {
       }
       // An unknown id answers exactly like an invisible one.
       expect((await viewer.session.get('/projects/prj_nope')).status).toBe(404);
+    });
+
+    it("shows a viewer the runner's advertised command names, and nothing else of its capabilities (#233)", async () => {
+      const a = await seedProject('/srv/a');
+      const viewer = await userSession('viewer@example.com', 'viewer');
+      await addMember(a.id, viewer.id);
+      const detail = async () => {
+        const response = await viewer.session.get(`/projects/${a.id}`);
+        expect(response.status).toBe(200);
+        return response;
+      };
+
+      // No hello yet, then a hello from a runner older than the advert.
+      expect((await detail()).body.runnerCommands).toBeNull();
+      const old = new TestRunnerSocket(ctx.origin, token);
+      sockets.push(old);
+      await old.connect(hello());
+      expect((await detail()).body.runnerCommands).toBeNull();
+      await old.close();
+
+      const current = new TestRunnerSocket(ctx.origin, token);
+      sockets.push(current);
+      await current.connect(
+        hello({
+          runnerVersion: '9.8.7',
+          capabilities: {
+            ...capabilities,
+            commands: ['plan.turn', 'worktree.status', 'future.command'],
+            disabledCommands: ['worktree.status'],
+          },
+        }),
+      );
+      const response = await detail();
+      expect((response.body as ProjectDetail).runnerCommands).toEqual({
+        commands: ['plan.turn', 'worktree.status', 'future.command'],
+        disabled: ['worktree.status'],
+      });
+      for (const leak of [
+        '9.8.7',
+        'runnerVersion',
+        'CLAUDE_CONFIG_DIR',
+        '~/',
+      ]) {
+        expect(response.text).not.toContain(leak);
+      }
     });
 
     it('lets an override lower a role but never raise it', async () => {

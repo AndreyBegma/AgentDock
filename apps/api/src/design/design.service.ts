@@ -6,6 +6,7 @@ import {
   type TaskDesignPatchRequest,
   type TaskDesignView,
 } from '@agentdock/shared';
+import { RUNNER_FEATURE_COMMANDS } from '@agentdock/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import type { Plan, PlanTask, TaskDesign } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
@@ -16,6 +17,7 @@ import { PlanStore } from '../planner/plan-store';
 import { type PlanCaller, PlanTurnService } from '../planner/plan-turn.service';
 import { plannerError } from '../planner/planner-error';
 import { settleDesign } from './design-apply';
+import { DesignCommands } from './design-commands';
 import { designError } from './design-error';
 import {
   batchOf,
@@ -58,6 +60,7 @@ export class DesignService {
     private readonly turns: PlanTurnService,
     private readonly profiles: UiProfileService,
     private readonly audit: AuditService,
+    private readonly commands: DesignCommands,
   ) {}
 
   /** `GET …/tasks/:key/design`: read through the plan's rule (D17). */
@@ -386,6 +389,12 @@ export class DesignService {
     }
     const caller: PlanCaller = callerOf(actor);
     const project = await this.store.project(plan.projectId);
+    // Every command the stage may need, before the profile check writes
+    // anything (a joined build, a first fingerprint, the busy status) (#233).
+    this.commands.assertServed(
+      project.runnerId,
+      RUNNER_FEATURE_COMMANDS.design,
+    );
     const readiness = await this.profiles.ensureFresh(project, caller, {
       designId: design.id,
       mode,

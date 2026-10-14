@@ -46,7 +46,11 @@ export class PlannerCommands {
     private readonly presence: RunnerPresence,
   ) {}
 
-  /** Throws 503 `command_unavailable` when `name` cannot be sent to `runnerId` now. */
+  /**
+   * Throws 503 `command_unavailable` when `name` cannot be sent to `runnerId`
+   * now, and 409 `runner_outdated` when the runner's hello says it does not
+   * serve it (#233).
+   */
   assertReady(
     runnerId: string,
     name: PlannerCommandName | 'issue.create',
@@ -64,6 +68,13 @@ export class PlannerCommands {
         503,
         PLANNER_ERROR.commandUnavailable,
         'The runner is not connected',
+      );
+    }
+    if (this.presence.missingCommand(runnerId, [wired])) {
+      throw new PlannerFailure(
+        409,
+        PLANNER_ERROR.runnerOutdated,
+        `The runner does not serve ${name}; update it`,
       );
     }
   }

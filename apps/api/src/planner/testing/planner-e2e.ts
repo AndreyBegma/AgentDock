@@ -1,12 +1,15 @@
 import { PLANNER_BLOCK_TAG, type PlanDetail } from '@agentdock/shared';
-import type {
-  IssueCreateArgs,
-  IssueCreateResult,
-  PlannerCommandName,
-  RunnerEvent,
+import {
+  commandSupport,
+  type IssueCreateArgs,
+  type IssueCreateResult,
+  type PlannerCommandName,
+  type RunnerCommands,
+  type RunnerEvent,
 } from '@agentdock/shared/protocol';
 import { seedProject } from '../../fleet/testing/fleet-e2e';
 import { RunnerEventSinks } from '../../runners/runner-event-sinks';
+import { RunnerPresence } from '../../runners/runner-presence';
 import {
   createE2eApp,
   createUser,
@@ -56,6 +59,9 @@ export class PlannerHarness {
   ctx!: E2eContext;
   sinks!: RunnerEventSinks;
   commands!: PlannerCommands;
+  presence!: RunnerPresence;
+  /** What the runner's hello advertised (#233); null = unknown. */
+  advert: RunnerCommands | null = null;
   runnerId!: string;
   projectId!: string;
   author!: Session;
@@ -74,6 +80,7 @@ export class PlannerHarness {
     this.ctx = await createE2eApp();
     this.sinks = this.ctx.app.get(RunnerEventSinks);
     this.commands = this.ctx.app.get(PlannerCommands);
+    this.presence = this.ctx.app.get(RunnerPresence);
   }
 
   async reset(): Promise<void> {
@@ -149,7 +156,13 @@ export class PlannerHarness {
       'plan.publish_specs': () =>
         ok({ prNumber: 7, prUrl: `https://github.com/${REPO}/pull/7` }),
     };
-    jest.spyOn(this.commands, 'assertReady').mockImplementation(() => {});
+    // The real `assertReady` runs against a stubbed presence: connected, and
+    // advertising `advert` (null = unknown, as from an older runner).
+    this.advert = null;
+    jest.spyOn(this.presence, 'isConnected').mockReturnValue(true);
+    jest
+      .spyOn(this.presence, 'commandSupport')
+      .mockImplementation((_runner, name) => commandSupport(this.advert, name));
     jest
       .spyOn(this.commands, 'send')
       .mockImplementation(async (_runner, name, args) => {

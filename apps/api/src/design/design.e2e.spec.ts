@@ -610,4 +610,55 @@ describe('design stage (e2e)', () => {
     expect(turn.body.error).toBe('budget_exceeded');
     expect((await design(plan.id)).status).toBe('idle');
   });
+
+  it('refuses a rebuild with runner_outdated when the runner does not serve uiprofile.build, creating no run (#233)', async () => {
+    await h.seedProfile();
+    h.advert = {
+      commands: ['plan.turn', 'uiprofile.fingerprint'],
+      disabled: [],
+    };
+    const refused = await h.author.send(
+      'post',
+      `/projects/${h.projectId}/ui-profile/rebuild`,
+    );
+    expect(refused.status).toBe(409);
+    expect(refused.body).toMatchObject({ error: 'runner_outdated' });
+    expect(refused.body.message).toContain('uiprofile.build');
+    expect(
+      await h.ctx.prisma.run.count({ where: { kind: 'ui_profile' } }),
+    ).toBe(0);
+    expect(h.designSent('uiprofile.build')).toHaveLength(0);
+  });
+
+  it('refuses Generate before the profile check when the runner lacks a design command, writing nothing (#233)', async () => {
+    await h.seedProfile({ fingerprint: '' });
+    const plan = await uiPlan();
+    const sent = h.sent.length;
+    h.advert = {
+      commands: ['uiprofile.fingerprint', 'uiprofile.build'],
+      disabled: [],
+    };
+    const refused = await generate(plan.id);
+    expect(refused.status).toBe(409);
+    expect(refused.body).toMatchObject({ error: 'runner_outdated' });
+    expect(refused.body.message).toContain('plan.turn');
+    expect(h.sent).toHaveLength(sent);
+    expect((await design(plan.id)).status).toBe('idle');
+    const profile = await h.ctx.prisma.uiProfile.findFirstOrThrow({
+      where: { projectId: h.projectId },
+    });
+    expect(profile.fingerprint).toBe('');
+    expect((await h.auditOf('design.generated')).length).toBe(0);
+  });
+
+  it('generates as before when every design command is advertised (#233)', async () => {
+    h.advert = {
+      commands: ['plan.turn', 'uiprofile.fingerprint', 'uiprofile.build'],
+      disabled: [],
+    };
+    await h.seedProfile();
+    const plan = await uiPlan();
+    expect((await generate(plan.id)).status).toBe(201);
+    expect((await design(plan.id)).status).toBe('generating');
+  });
 });
