@@ -28,7 +28,8 @@ export type TerminalTarget =
   | { kind: 'slot'; slot: string }
   | { kind: 'orchestrator' }
   | { kind: 'skill_run'; runId: string }
-  | { kind: 'manual'; sessionId: string };
+  | { kind: 'manual'; sessionId: string }
+  | { kind: 'card'; cardId: string };
 
 /** The ticket body the API accepts for a `manual` target (`sessionId`). */
 type TicketRequest = TerminalTicketRequest & { sessionId?: string };
@@ -66,6 +67,7 @@ export function TerminalView({
   const slot = target.kind === 'slot' ? target.slot : undefined;
   const runId = target.kind === 'skill_run' ? target.runId : undefined;
   const sessionId = target.kind === 'manual' ? target.sessionId : undefined;
+  const cardId = target.kind === 'card' ? target.cardId : undefined;
   const kind = target.kind;
 
   useEffect(() => {
@@ -134,6 +136,7 @@ export function TerminalView({
         ...(slot ? { slot } : {}),
         ...(runId ? { runId } : {}),
         ...(sessionId ? { sessionId } : {}),
+        ...(cardId ? { cardId } : {}),
       };
       let ticket: TerminalTicketResponse;
       try {
@@ -207,7 +210,7 @@ export function TerminalView({
       disposed = true;
       cleanup();
     };
-  }, [projectId, kind, slot, runId, sessionId, mode]);
+  }, [projectId, kind, slot, runId, sessionId, cardId, mode]);
 
   return (
     <div

@@ -58,7 +58,7 @@ process state.
 | page backdrop | `Canvas` (the aurora, root layout) |
 | app navigation | `NavRail` (groups, collapsible, badges, scroll fade), `TabBar` (below `lg`), `ActionList` (More's sheet), `Breadcrumb`, `CommandPalette` (⌘K) |
 | lists / tables | `Table*`, `DataTable`, `Toolbar`, `RowActions` |
-| queue board | `Board` (kanban) |
+| queue board, project Board | `Board` (kanban); the Board page is controlled and declines a move in `onMove` |
 | status | `StatusPill` / `StatusDot` (process state), `Badge` (tone, `dot`, `hue`), `Progress`, `Spinner`, `Skeleton`, `EmptyState`, `SectionUnavailable`, `Banner` |
 | dashboards | `StatTile` (`hue`), `Sparkline`, `Chart`, `KeyValueList` |
 | activity / agents | `Timeline`, `LogViewer`, `TraceTree`, `CodeBlock`, `Terminal`, `CronInput` |
@@ -109,4 +109,8 @@ Until then AgentDock does without it rather than drawing it here (ADR-0011).
 
 | Gap | Effect in AgentDock |
 |---|---|
-| — | Nothing is missing at the moment. |
+| `Board` has no `canDrop(card, column)` | The Board page checks `boardMoveRule` in `onMove` and declines there; a refused card snaps back, and the menu's "Move to" items still list every column. |
+| `Toggle` has no `disabled` | `components/board/card-options.tsx` makes a locked toggle inert and dimmed and drops its change handler. |
+
+`Board` was checked at 390 px for #242: its columns scroll sideways inside the
+board and the page does not, so it needs no release for the phone.
