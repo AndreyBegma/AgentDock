@@ -2,13 +2,14 @@
 
 import type { WorkflowsOrchestrationResponse } from '@agentdock/shared';
 import { Sankey, type SankeyNodeInfo } from '@andrewbehma/glass-ui/sankey';
+import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { type ReactNode, useMemo } from 'react';
 import { formatNumber } from '../../../lib/format';
 import {
   ORCHESTRATION_MAX_PER_COLUMN,
   orchestrationSankey,
-} from '../../../lib/workflows/format';
+} from '../../../lib/workflows/sankey';
 
 /**
  * 1. Sessions → main agent → subagent type → compactions → outcome. Every
@@ -38,15 +39,12 @@ export function OrchestrationCard({
   );
   return (
     <section className="mb-6" aria-labelledby="workflows-orchestration">
-      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3">
-        <h2 id="workflows-orchestration" className="text-sm font-medium">
-          1. Agent orchestration
-        </h2>
-        <p className="text-xs text-ink-3">
-          Width is sessions. Click a node to filter the page on it; the Sessions
-          node clears the graph filters.
-        </p>
-      </div>
+      <SectionHeader
+        className="mb-2"
+        headingId="workflows-orchestration"
+        title="1. Agent orchestration"
+        description="Width is sessions. Click a node to filter the page on it; the Sessions node clears the graph filters."
+      />
       {unavailable}
       {graph && data ? (
         data.sessions === 0 ? (

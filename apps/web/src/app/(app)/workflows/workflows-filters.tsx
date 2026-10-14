@@ -1,21 +1,22 @@
 'use client';
 
 import type { ProjectRuntimeProfile, ProjectSummary } from '@agentdock/shared';
-import { Button } from '@andrewbehma/glass-ui/button';
-import { ChipButton } from '@andrewbehma/glass-ui/chip';
 import { DateInput } from '@andrewbehma/glass-ui/date-input';
-import { Field, Select } from '@andrewbehma/glass-ui/field';
+import { Select } from '@andrewbehma/glass-ui/field';
 import { SegmentedControl } from '@andrewbehma/glass-ui/segmented-control';
-import { X } from 'lucide-react';
+import { Toolbar } from '@andrewbehma/glass-ui/toolbar';
+import { useMemo } from 'react';
+import { ScrollX } from '../../../components/scroll-x/scroll-x';
+import {
+  type UrlFilters,
+  useFilterChips,
+} from '../../../lib/filters/use-url-filters';
 import { RANGE_PRESETS, type RangePreset } from '../../../lib/usage/format';
 import {
-  clearNodeFilter,
-  clearNodeFilters,
   type WorkflowsFilters as Filters,
-  nodeFilterChips,
+  workflowsChipDefs,
 } from '../../../lib/workflows/format';
 import { Segment } from './segment';
-import { StatusSegment } from './workflows-header';
 
 const PRESET_LABEL: Record<RangePreset, string> = {
   '24h': '24 h',
@@ -24,14 +25,17 @@ const PRESET_LABEL: Record<RangePreset, string> = {
   custom: 'Custom',
 };
 
+/**
+ * The canonical filter bar (#213): the range as a view, project and runtime
+ * profile as instant selects, custom days when the range is Custom, and
+ * every filter in force — the graph's included — as a removable chip.
+ */
 export function WorkflowsFilters({
-  filters,
-  onChange,
+  url,
   projects,
   profiles,
 }: {
-  filters: Filters;
-  onChange: (next: Filters) => void;
+  url: UrlFilters<Filters>;
   projects: ProjectSummary[];
   /**
    * The chosen project's runtime profiles; null when the select is not
@@ -39,177 +43,109 @@ export function WorkflowsFilters({
    */
   profiles: ProjectRuntimeProfile[] | null;
 }) {
+  const { filters, set } = url;
+  const defs = useMemo(() => {
+    const projectNames = new Map(projects.map((p) => [p.id, p.displayName]));
+    const profileNames = new Map((profiles ?? []).map((p) => [p.key, p.label]));
+    return workflowsChipDefs({
+      project: (id) => projectNames.get(id) ?? id,
+      profile: (key) => profileNames.get(key) ?? key,
+    });
+  }, [projects, profiles]);
+  const chips = useFilterChips(url, defs);
+
+  const range = (size: 'sm' | 'md') => (
+    <SegmentedControl size={size} aria-label="Time range">
+      {RANGE_PRESETS.map((p) => (
+        <Segment
+          key={p}
+          layoutId={`workflows-range-${size}`}
+          size={size}
+          active={filters.range === p}
+          onSelect={() => set({ range: p })}
+        >
+          {PRESET_LABEL[p]}
+        </Segment>
+      ))}
+    </SegmentedControl>
+  );
+
   return (
-    <div className="flex flex-wrap items-end gap-3 [&>*]:min-w-0 [&>*:not(:first-child)]:flex-[1_1_12rem]">
-      {/* One first child, so the segments keep their size and the
-          selects after them share the rest of the row. */}
-      <div className="flex flex-wrap items-end gap-3">
-        {/* Below md the status segment lives here; the header holds it above. */}
-        <div className="md:hidden">
-          <Field label="Sessions">
-            <StatusSegment
-              status={filters.status}
-              onStatus={(status) => onChange({ ...filters, status })}
-              layoutId="workflows-status-filters"
-            />
-          </Field>
-        </div>
-        <Field label="Range">
-          <SegmentedControl aria-label="Time range">
-            {RANGE_PRESETS.map((p) => (
-              <Segment
-                key={p}
-                layoutId="workflows-range"
-                active={filters.range === p}
-                onSelect={() => onChange({ ...filters, range: p })}
-              >
-                {PRESET_LABEL[p]}
-              </Segment>
-            ))}
-          </SegmentedControl>
-        </Field>
+    <>
+      {/* A phone gives the ranges a row of their own, tap-sized, as Usage. */}
+      <div className="mb-3 sm:hidden">
+        <ScrollX>{range('md')}</ScrollX>
       </div>
-      <Field label="Project" htmlFor="workflows-project">
-        <Select
-          id="workflows-project"
-          value={filters.projectId}
-          // A profile key belongs to one project's runner: a new project drops it.
-          onChange={(e) =>
-            onChange({ ...filters, projectId: e.target.value, profileKey: '' })
-          }
-        >
-          <option value="">All my projects</option>
-          {filters.projectId &&
-          !projects.some((p) => p.id === filters.projectId) ? (
-            <option value={filters.projectId}>{filters.projectId}</option>
-          ) : null}
-          {projects.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.displayName}
-            </option>
-          ))}
-        </Select>
-      </Field>
-      {profiles ? (
-        <Field label="Runtime profile" htmlFor="workflows-profile">
-          <Select
-            id="workflows-profile"
-            value={filters.profileKey}
-            onChange={(e) =>
-              onChange({ ...filters, profileKey: e.target.value })
-            }
-          >
-            <option value="">Every profile</option>
-            {filters.profileKey &&
-            !profiles.some((p) => p.key === filters.profileKey) ? (
-              <option value={filters.profileKey}>{filters.profileKey}</option>
-            ) : null}
-            {profiles.map((profile) => (
-              <option key={profile.key} value={profile.key}>
-                {profile.label}
-              </option>
-            ))}
-          </Select>
-        </Field>
-      ) : null}
-      {filters.range === 'custom' ? (
-        <>
-          <Field label="From" htmlFor="workflows-from">
-            <DateInput
-              id="workflows-from"
-              value={filters.fromDate}
-              max={filters.toDate || undefined}
+      <Toolbar
+        aria-label="Filter workflows"
+        collapseBelow="sm"
+        activeFilters={chips.activeFilters}
+        onClearAll={chips.onClearAll}
+        views={<div className="hidden sm:block">{range('sm')}</div>}
+        filters={
+          <>
+            <Select
+              aria-label="Project"
+              value={filters.projectId}
+              className="w-full sm:w-48"
+              // A profile key belongs to one project's runner: a new project drops it.
               onChange={(e) =>
-                onChange({ ...filters, fromDate: e.target.value })
+                set({ projectId: e.target.value, profileKey: '' })
               }
-            />
-          </Field>
-          <Field label="To (inclusive)" htmlFor="workflows-to">
-            <DateInput
-              id="workflows-to"
-              value={filters.toDate}
-              min={filters.fromDate || undefined}
-              onChange={(e) => onChange({ ...filters, toDate: e.target.value })}
-            />
-          </Field>
-        </>
-      ) : null}
-    </div>
-  );
-}
-
-/**
- * What the graph clicks filter on, each removable. A profile that came in on
- * the URL while no select is offered shows here too: a filter that applies
- * is never invisible.
- */
-export function NodeFilterChips({
-  filters,
-  onChange,
-  showProfile,
-}: {
-  filters: Filters;
-  onChange: (next: Filters) => void;
-  showProfile: boolean;
-}) {
-  const chips = nodeFilterChips(filters);
-  if (chips.length === 0 && !showProfile) return null;
-  return (
-    <div className="mb-4 flex flex-wrap items-center gap-2">
-      <span className="text-xs text-ink-3" id="workflows-chips-label">
-        Filtered on
-      </span>
-      <ul
-        aria-labelledby="workflows-chips-label"
-        className="flex flex-wrap items-center gap-2"
-      >
-        {showProfile ? (
-          <li>
-            <RemoveChip
-              label={`Runtime profile: ${filters.profileKey}`}
-              onRemove={() => onChange({ ...filters, profileKey: '' })}
-            />
-          </li>
-        ) : null}
-        {chips.map((chip) => (
-          <li key={chip.key}>
-            <RemoveChip
-              label={chip.label}
-              onRemove={() => onChange(clearNodeFilter(filters, chip.key))}
-            />
-          </li>
-        ))}
-      </ul>
-      {chips.length > 1 ? (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onChange(clearNodeFilters(filters))}
-        >
-          Clear graph filters
-        </Button>
-      ) : null}
-    </div>
-  );
-}
-
-/** A filter that is on: the whole chip removes it. */
-function RemoveChip({
-  label,
-  onRemove,
-}: {
-  label: string;
-  onRemove: () => void;
-}) {
-  return (
-    <ChipButton
-      selected
-      aria-label={`Remove ${label}`}
-      onClick={onRemove}
-      className="gap-1.5"
-    >
-      {label}
-      <X aria-hidden="true" className="size-3" />
-    </ChipButton>
+            >
+              <option value="">All my projects</option>
+              {filters.projectId &&
+              !projects.some((p) => p.id === filters.projectId) ? (
+                <option value={filters.projectId}>{filters.projectId}</option>
+              ) : null}
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.displayName}
+                </option>
+              ))}
+            </Select>
+            {profiles ? (
+              <Select
+                aria-label="Runtime profile"
+                value={filters.profileKey}
+                className="w-full sm:w-44"
+                onChange={(e) => set({ profileKey: e.target.value })}
+              >
+                <option value="">Every profile</option>
+                {filters.profileKey &&
+                !profiles.some((p) => p.key === filters.profileKey) ? (
+                  <option value={filters.profileKey}>
+                    {filters.profileKey}
+                  </option>
+                ) : null}
+                {profiles.map((profile) => (
+                  <option key={profile.key} value={profile.key}>
+                    {profile.label}
+                  </option>
+                ))}
+              </Select>
+            ) : null}
+            {filters.range === 'custom' ? (
+              <>
+                <DateInput
+                  aria-label="From"
+                  value={filters.fromDate}
+                  max={filters.toDate || undefined}
+                  className="w-full sm:w-40"
+                  onChange={(e) => set({ fromDate: e.target.value })}
+                />
+                <DateInput
+                  aria-label="To (inclusive)"
+                  value={filters.toDate}
+                  min={filters.fromDate || undefined}
+                  className="w-full sm:w-40"
+                  onChange={(e) => set({ toDate: e.target.value })}
+                />
+              </>
+            ) : null}
+          </>
+        }
+      />
+    </>
   );
 }

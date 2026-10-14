@@ -9,34 +9,51 @@ import {
   type WorkflowsSummaryResponse,
   type WorkflowsToolsResponse,
 } from '@agentdock/shared';
-import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
+import { Button } from '@andrewbehma/glass-ui/button';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import {
+  type ComponentProps,
+  Suspense,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { canSee } from '../../../components/shell/nav';
 import { useCurrentUser } from '../../../components/shell/user-context';
 import { api } from '../../../lib/api';
+import { useUrlFilters } from '../../../lib/filters/use-url-filters';
 import { type Section, useSection } from '../../../lib/section/use-section';
 import {
   applyNodeFilter,
   clearNodeFilters,
   describeWorkflowsError,
   type WorkflowsFilters as Filters,
-  filtersFromSearch,
-  filtersSearch,
   hasNodeFilters,
   isWorkflowsNotFound,
   rangeOf,
+  WORKFLOWS_FILTER_CODEC,
   workflowsQuery,
 } from '../../../lib/workflows/format';
 import { OrchestrationCard } from './orchestration-card';
 import { ToolFlowCard } from './tool-flow-card';
 import { WorkflowTiles } from './workflow-tiles';
-import { NodeFilterChips, WorkflowsFilters } from './workflows-filters';
+import { WorkflowsFilters } from './workflows-filters';
 import { WorkflowsHeader } from './workflows-header';
+
+/** The empty state's action keeps client-side navigation. */
+const NextLink: NonNullable<ComponentProps<typeof EmptyState>['link']> = ({
+  href,
+  className,
+  children,
+  ...rest
+}) => (
+  <Link href={href} className={className} {...rest}>
+    {children}
+  </Link>
+);
 
 /**
  * A preset range moves with the clock, and the API's figures are at most
@@ -95,14 +112,10 @@ function WorkflowsEmpty({
       <EmptyState
         title="No sessions match the graph filters"
         description="Nothing in this range took that path."
-        action={
-          <Button
-            variant="glass"
-            onClick={() => onChange(clearNodeFilters(filters))}
-          >
-            Clear graph filters
-          </Button>
-        }
+        action={{
+          label: 'Clear graph filters',
+          onClick: () => onChange(clearNodeFilters(filters)),
+        }}
       />
     );
   }
@@ -111,16 +124,11 @@ function WorkflowsEmpty({
       <EmptyState
         title="No sessions for this project in this range"
         description="Try a longer range, or look at all your projects."
-        action={
-          <Button
-            variant="glass"
-            onClick={() =>
-              onChange({ ...filters, projectId: '', profileKey: '' })
-            }
-          >
-            Show all projects
-          </Button>
-        }
+        action={{
+          label: 'Show all projects',
+          onClick: () =>
+            onChange({ ...filters, projectId: '', profileKey: '' }),
+        }}
       />
     );
   }
@@ -133,14 +141,10 @@ function WorkflowsEmpty({
             : 'No session has ended in this range'
         }
         description="A session is active while it had an event in the last 30 minutes."
-        action={
-          <Button
-            variant="glass"
-            onClick={() => onChange({ ...filters, status: 'all' })}
-          >
-            Show all sessions
-          </Button>
-        }
+        action={{
+          label: 'Show all sessions',
+          onClick: () => onChange({ ...filters, status: 'all' }),
+        }}
       />
     );
   }
@@ -148,30 +152,18 @@ function WorkflowsEmpty({
     <EmptyState
       title="No sessions in this range"
       description="A session appears here once an agent runs on a paired runner. Try a longer range."
-      action={
-        <Link
-          href="/sessions"
-          className={buttonClassName({ variant: 'glass' })}
-        >
-          Open Sessions
-        </Link>
-      }
+      link={NextLink}
+      action={{ label: 'Open Sessions', href: '/sessions' }}
     />
   );
 }
 
 function WorkflowsView() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const params = useSearchParams();
   const user = useCurrentUser();
   // The URL holds the filters: reload, back and a shared link all keep them.
-  const filters = useMemo(
-    () => filtersFromSearch(new URLSearchParams(params.toString())),
-    [params],
-  );
-  const apply = (next: Filters) =>
-    router.replace(`${pathname}${filtersSearch(next)}`, { scroll: false });
+  const url = useUrlFilters(WORKFLOWS_FILTER_CODEC);
+  const { filters } = url;
+  const apply = url.replace;
 
   const [tick, refresh] = usePollTick();
   // biome-ignore lint/correctness/useExhaustiveDependencies: `tick` moves a preset range with the clock
@@ -267,25 +259,14 @@ function WorkflowsView() {
         data={data}
         range={range}
         query={query}
-        live={range !== null && !failed && data.summary !== undefined}
+        stale={range !== null && failed && !loading}
         refreshing={loading}
         onRefresh={refresh}
       />
 
-      <div className="mb-4">
-        <WorkflowsFilters
-          filters={filters}
-          onChange={apply}
-          projects={projects}
-          profiles={profiles}
-        />
+      <div className="mb-6">
+        <WorkflowsFilters url={url} projects={projects} profiles={profiles} />
       </div>
-
-      <NodeFilterChips
-        filters={filters}
-        onChange={apply}
-        showProfile={filters.profileKey !== '' && profiles === null}
-      />
 
       {!range ? (
         <EmptyState
@@ -296,16 +277,10 @@ function WorkflowsView() {
         <EmptyState
           title="Project not found"
           description="It does not exist, or you are not a member of it."
-          action={
-            <Button
-              variant="glass"
-              onClick={() =>
-                apply({ ...filters, projectId: '', profileKey: '' })
-              }
-            >
-              Show all projects
-            </Button>
-          }
+          action={{
+            label: 'Show all projects',
+            onClick: () => apply({ ...filters, projectId: '', profileKey: '' }),
+          }}
         />
       ) : (
         <>

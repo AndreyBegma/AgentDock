@@ -3,77 +3,65 @@
 import type { ProjectSummary, TaskPage } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
-import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import {
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { type ComponentProps, Suspense, useEffect, useState } from 'react';
 import { PageHeader } from '../../../components/page-header/page-header';
+import { AsyncSection } from '../../../components/prerequisites/async-section';
 import { api } from '../../../lib/api';
+import { useUrlFilters } from '../../../lib/filters/use-url-filters';
 import { useErrorToast } from '../../../lib/section/use-error-toast';
+import { useSection } from '../../../lib/section/use-section';
 import {
   describePlannerError,
-  EMPTY_TASK_FILTERS,
-  filtersFromSearch,
-  filtersSearch,
   hasTaskFilters,
   mergeTaskRows,
-  type TaskFilters,
+  plannerTarget,
+  TASK_FILTER_CODEC,
   tasksQuery,
 } from '../../../lib/tasks/format';
 import { TasksFilters } from './tasks-filters';
 import { TasksTable } from './tasks-table';
 
+/** The empty state's action keeps client-side navigation. */
+const NextLink: NonNullable<ComponentProps<typeof EmptyState>['link']> = ({
+  href,
+  className,
+  children,
+  ...rest
+}) => (
+  <Link href={href} className={className} {...rest}>
+    {children}
+  </Link>
+);
+
 /** Tasks span projects, so there is no single live topic to follow: poll. */
 const POLL_MS = 15_000;
 
-function TasksView() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const params = useSearchParams();
-  // The URL holds the filters: reload, back and a shared link all keep them.
-  const filters = useMemo(
-    () => filtersFromSearch(new URLSearchParams(params.toString())),
-    [params],
-  );
-  const [projects, setProjects] = useState<ProjectSummary[]>([]);
-  const [rows, setRows] = useState<TaskPage['items']>();
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
-  // A failed load is never "no tasks": keep what is on screen and say so.
-  const [failure, setFailure] = useState<unknown>(null);
-  const showError = useErrorToast();
-  // Only the newest request may write: a slow older one must not overwrite.
-  const generation = useRef(0);
-
-  const loadFirst = useCallback(async (applied: TaskFilters) => {
-    const mine = ++generation.current;
-    try {
-      const page = await api<TaskPage>(`/tasks${tasksQuery(applied)}`);
-      if (mine !== generation.current) return;
-      setRows(page.items);
-      setNextCursor(page.nextCursor);
-      setFailure(null);
-    } catch (err) {
-      if (mine !== generation.current) return;
-      setFailure(err);
-    }
-  }, []);
-
+function usePoll(ms: number): number {
+  const [tick, setTick] = useState(0);
   useEffect(() => {
-    setRows(undefined);
-    setFailure(null);
-    void loadFirst(filters);
-    const timer = setInterval(() => void loadFirst(filters), POLL_MS);
+    const timer = setInterval(() => setTick((n) => n + 1), ms);
     return () => clearInterval(timer);
-  }, [filters, loadFirst]);
+  }, [ms]);
+  return tick;
+}
+
+function TasksView() {
+  // The URL holds the filters: reload, back and a shared link all keep them.
+  const url = useUrlFilters(TASK_FILTER_CODEC);
+  const { filters, set } = url;
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const showError = useErrorToast();
+  const tick = usePoll(POLL_MS);
+  const query = tasksQuery(filters);
+
+  // `tick` reloads the first page.
+  const section = useSection(
+    () => api<TaskPage>(`/tasks${query}`),
+    [query, tick],
+  );
 
   useEffect(() => {
     api<ProjectSummary[]>('/projects')
@@ -85,9 +73,7 @@ function TasksView() {
       });
   }, []);
 
-  const apply = (next: TaskFilters) =>
-    router.replace(`${pathname}${filtersSearch(next)}`, { scroll: false });
-
+  const nextCursor = section.data?.nextCursor ?? null;
   const loadMore = async () => {
     if (!nextCursor) return;
     setLoadingMore(true);
@@ -95,8 +81,10 @@ function TasksView() {
       const page = await api<TaskPage>(
         `/tasks${tasksQuery(filters, nextCursor)}`,
       );
-      setRows((current) => mergeTaskRows(current ?? [], page.items));
-      setNextCursor(page.nextCursor);
+      section.setData((current) => ({
+        items: mergeTaskRows(current?.items ?? [], page.items),
+        nextCursor: page.nextCursor,
+      }));
     } catch (err) {
       showError(describePlannerError(err));
     } finally {
@@ -104,22 +92,10 @@ function TasksView() {
     }
   };
 
-  const unavailable =
-    failure !== null ? (
-      <SectionUnavailable
-        title="Tasks are not answering"
-        stillWorks={`${describePlannerError(failure)} The filters above still work.`}
-        action={
-          <Button
-            variant="glass"
-            size="sm"
-            onClick={() => void loadFirst(filters)}
-          >
-            Try again
-          </Button>
-        }
-      />
-    ) : null;
+  const planner = plannerTarget(
+    filters,
+    projects.map((p) => p.id),
+  );
 
   return (
     <>
@@ -129,65 +105,73 @@ function TasksView() {
       />
 
       <div className="mb-6">
-        <TasksFilters
-          filters={filters}
-          projects={projects}
-          onChange={(patch) => apply({ ...filters, ...patch })}
-          onReset={() => apply(EMPTY_TASK_FILTERS)}
-        />
+        <TasksFilters url={url} projects={projects} />
       </div>
 
-      {rows === undefined ? (
-        (unavailable ?? (
+      <AsyncSection
+        section={section}
+        isEmpty={(page) => page.items.length === 0}
+        unavailable={{
+          title: 'Tasks are not answering',
+          stillWorks: `${describePlannerError(section.error)} The filters above still work.`,
+        }}
+        skeleton={
           <div className="flex flex-col gap-3" aria-busy="true">
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-40 w-full" />
           </div>
-        ))
-      ) : rows.length === 0 ? (
-        <>
-          {unavailable}
-          {hasTaskFilters(filters) ? (
+        }
+        empty={
+          hasTaskFilters(filters) ? (
             <EmptyState
               title="No tasks match these filters"
               description="Clear a filter to see more."
-              action={
-                <Button
-                  variant="glass"
-                  onClick={() => apply(EMPTY_TASK_FILTERS)}
-                >
-                  Clear filters
-                </Button>
-              }
+              action={{
+                label: 'Clear filters',
+                onClick: () =>
+                  set({
+                    projectId: '',
+                    kind: '',
+                    status: '',
+                    planId: '',
+                    q: '',
+                  }),
+              }}
             />
           ) : (
             <EmptyState
               title="No tasks yet"
               description="A task appears here when the planner splits a brief into tasks. Start with a brief in a project's Planner."
+              link={NextLink}
               action={
-                <Link
-                  href="/projects"
-                  className="text-sm text-accent-ink underline"
-                >
-                  Open Projects
-                </Link>
+                planner
+                  ? {
+                      label: 'Open Planner',
+                      href: `/projects/${encodeURIComponent(planner)}/planner`,
+                    }
+                  : { label: 'Open Projects', href: '/projects' }
               }
             />
-          )}
-        </>
-      ) : (
-        <>
-          {unavailable}
-          <TasksTable rows={rows} />
-          {nextCursor ? (
-            <div className="mt-4 flex justify-center">
-              <Button variant="glass" disabled={loadingMore} onClick={loadMore}>
-                {loadingMore ? 'Loading…' : 'Load more'}
-              </Button>
-            </div>
-          ) : null}
-        </>
-      )}
+          )
+        }
+      >
+        {(page) => (
+          <>
+            <TasksTable rows={page.items} />
+            {page.nextCursor ? (
+              <div className="mt-4 flex justify-center">
+                <Button
+                  variant="glass"
+                  disabled={loadingMore}
+                  onClick={loadMore}
+                >
+                  {loadingMore ? 'Loading…' : 'Load more'}
+                </Button>
+              </div>
+            ) : null}
+          </>
+        )}
+      </AsyncSection>
     </>
   );
 }

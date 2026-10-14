@@ -10,6 +10,8 @@ import {
 } from '@agentdock/shared';
 import type { TimelineItem } from '@andrewbehma/glass-ui/timeline';
 import { ApiError } from '../api';
+import type { ChipDef, FilterCodec } from '../filters/url-filters';
+import { isSlotName } from '../fleet/workspace-url';
 
 /** Projects the global feed follows live; past it the page polls (the socket is shared, cap 50). */
 export const LIVE_PROJECT_BUDGET = 10;
@@ -370,13 +372,111 @@ export function itemMeta(
   }
   if (item.slot) parts.push(`slot ${item.slot}`);
   if (item.issue !== null) parts.push(`#${item.issue}`);
-  if (item.prNumber !== null) parts.push(`PR #${item.prNumber}`);
+  const { prNumber } = itemTitle(item);
+  if (prNumber !== null) parts.push(`PR #${prNumber}`);
   return parts.join(' · ');
 }
 
 /** An in-app link only: the API sends paths, but the page does not trust it. */
 export const safeLink = (link: string | null): string | undefined =>
   link?.startsWith('/') && !link.startsWith('//') ? link : undefined;
+
+/**
+ * Where a row opens (#213). An item about a slot whose link is its project's
+ * Fleet opens that slot's panel in front (`?open=<slot>&focus=<slot>`, the
+ * workspace URL of #160); any other link is the API's, as it is.
+ */
+export function activityHref(
+  item: Pick<ActivityItem, 'link' | 'projectId' | 'slot'>,
+): string | undefined {
+  const link = safeLink(item.link);
+  if (!link || !item.projectId || !item.slot || !isSlotName(item.slot)) {
+    return link;
+  }
+  if (link !== `/projects/${item.projectId}/fleet`) return link;
+  const slot = encodeURIComponent(item.slot);
+  return `${link}?open=${slot}&focus=${slot}`;
+}
+
+/** A GitHub pull request URL at the end of a title, with what leads into it. */
+const TRAILING_PR_URL = /\s*(?:[—–:-]\s*)?https?:\/\/\S+?\/pull\/(\d+)\S*\s*$/;
+
+/**
+ * The title without a raw pull request URL, and the PR's number for a
+ * `#205` chip (#213). A checkpoint heading such as "pull request open —
+ * https://github.com/o/r/pull/205" reads "pull request open"; the number
+ * comes from the item, else from the URL.
+ */
+export function itemTitle(item: Pick<ActivityItem, 'title' | 'prNumber'>): {
+  title: string;
+  prNumber: number | null;
+} {
+  const match = TRAILING_PR_URL.exec(item.title);
+  const fromUrl = match ? Number(match[1]) : null;
+  const title = match ? item.title.slice(0, match.index).trim() : item.title;
+  return {
+    title: title || item.title,
+    prNumber: item.prNumber ?? fromUrl,
+  };
+}
+
+/** `/activity`'s filters in the URL (`useUrlFilters`). */
+export const ACTIVITY_FILTER_CODEC: FilterCodec<ActivityFilterForm> = {
+  keys: Object.values(FORM_KEYS),
+  parse: formFromSearch,
+  search: formSearch,
+};
+
+/** A project's feed: the project is the page's, never a filter in its URL. */
+export const PROJECT_ACTIVITY_FILTER_CODEC: FilterCodec<ActivityFilterForm> = {
+  keys: Object.values(FORM_KEYS).filter((key) => key !== FORM_KEYS.projectId),
+  parse: (params) => ({ ...formFromSearch(params), projectId: '' }),
+  search: (form) => formSearch({ ...form, projectId: '' }),
+};
+
+/** The filters in force as removable chips, named the way the selects name them. */
+export const activityChipDefs = (names: {
+  project: (id: string) => string;
+  actor: (id: string) => string;
+}): ChipDef<ActivityFilterForm>[] => [
+  {
+    key: 'project',
+    label: (f) =>
+      f.projectId ? `Project: ${names.project(f.projectId)}` : null,
+    clear: { projectId: '' },
+  },
+  {
+    key: 'category',
+    label: (f) =>
+      isCategory(f.category) ? `Category: ${CATEGORY_LABEL[f.category]}` : null,
+    clear: { category: '' },
+  },
+  {
+    key: 'type',
+    label: (f) => (f.type.trim() ? `Type: ${typeLabel(f.type.trim())}` : null),
+    clear: { type: '' },
+  },
+  {
+    key: 'actor',
+    label: (f) => (f.actor.trim() ? `Actor: ${names.actor(f.actor)}` : null),
+    clear: { actor: '' },
+  },
+  {
+    key: 'slot',
+    label: (f) => (f.slot.trim() ? `Slot: ${f.slot.trim()}` : null),
+    clear: { slot: '' },
+  },
+  {
+    key: 'from',
+    label: (f) => (f.fromDate ? `From ${f.fromDate}` : null),
+    clear: { fromDate: '' },
+  },
+  {
+    key: 'to',
+    label: (f) => (f.toDate ? `To ${f.toDate}` : null),
+    clear: { toDate: '' },
+  },
+];
 
 export function toTimelineItem(
   item: ActivityItem,
@@ -389,9 +489,9 @@ export function toTimelineItem(
     at: item.ts,
     tone: severityTone(item.severity),
     actor: name ? { name } : undefined,
-    title: item.title,
+    title: itemTitle(item).title,
     meta: itemMeta(item, projectNames),
-    href: safeLink(item.link),
+    href: activityHref(item),
   };
 }
 
