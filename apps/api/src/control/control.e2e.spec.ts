@@ -47,6 +47,7 @@ const options: ControlOptions = {
     'orchestrator.start': TIMEOUT_MS,
     'orchestrator.stop': TIMEOUT_MS,
     'orchestrator.status': TIMEOUT_MS,
+    'orchestrator.message': TIMEOUT_MS,
     'slot.stop': TIMEOUT_MS,
     'slot.message': TIMEOUT_MS,
   },
@@ -92,6 +93,8 @@ const defaultAnswer = ({ name, args }: Received): Answer => {
       };
     case 'slot.message':
       return { ok: true, output: { written: true, delivered: true } };
+    case 'orchestrator.message':
+      return { ok: true, output: { delivered: true } };
     default:
       return { ok: false, code: 'unknown_command' };
   }
@@ -293,6 +296,7 @@ describe('orchestrator and slot control (e2e)', () => {
       [
         ['post', `/projects/${projectId}/orchestrator/start`],
         ['post', `/projects/${projectId}/orchestrator/stop`],
+        ['post', `/projects/${projectId}/orchestrator/message`],
         ['get', `/projects/${projectId}/orchestrator/status`],
         ['get', `/projects/${projectId}/orchestrator/settings`],
         ['put', `/projects/${projectId}/orchestrator/settings`],
@@ -300,7 +304,7 @@ describe('orchestrator and slot control (e2e)', () => {
         ['post', `/projects/${projectId}/slots/i42/message`],
         ['get', `/projects/${projectId}/command-runs`],
       ] as const;
-    const body = { mode: 'start', text: 'hello' };
+    const body = { mode: 'start', text: 'hello', body: 'hello' };
     const call = (
       session: Session,
       method: 'get' | 'post' | 'put',
@@ -733,6 +737,87 @@ describe('orchestrator and slot control (e2e)', () => {
     it('answers 400 to a blank message, with nothing recorded', async () => {
       const response = await message('   \n ');
       expect(response.status).toBe(400);
+      expect(runner.control()).toEqual([]);
+      expect(await runs()).toEqual([]);
+    });
+  });
+
+  describe('POST orchestrator/message (#189)', () => {
+    const message = (body: unknown = SECRET_TEXT, extra: object = {}) =>
+      operatorOfA.send('post', `/projects/${a}/orchestrator/message`, {
+        body,
+        ...extra,
+      });
+
+    it('sends the body with the user’s email and the project’s root, and keeps the body in the run only', async () => {
+      const response = await message();
+      expect(response.status).toBe(201);
+      expect(response.body as CommandRunView).toMatchObject({
+        command: 'orchestrator.message',
+        status: 'ok',
+        slot: null,
+        args: { body: SECRET_TEXT },
+        result: { delivered: true },
+      });
+      // No session and no argv: the runner resolves the session itself.
+      expect(runner.control()).toEqual([
+        {
+          name: 'orchestrator.message',
+          args: {
+            projectId: a,
+            root: ROOT_A,
+            body: SECRET_TEXT,
+            from: 'operator-a@example.com',
+          },
+        },
+      ]);
+
+      const [audit] = await audits('orchestrator.message');
+      expect(audit.result).toBe('ok');
+      const hashed = (audit.after as { args: { body: string } }).args.body;
+      expect(hashed).toMatch(/^sha256:[0-9a-f]{64}$/);
+      const [command] = await audits('runner.command');
+      expect((command.after as { args: { body: string } }).args.body).toBe(
+        hashed,
+      );
+      expect(await auditLog()).not.toContain('tangerine-42');
+    });
+
+    it('records an undelivered message as an ok run with the reason', async () => {
+      runner.answer = () => ({
+        ok: true,
+        output: { delivered: false, reason: 'prompt' },
+      });
+      const response = await message();
+      expect(response.status).toBe(201);
+      expect(response.body).toMatchObject({
+        status: 'ok',
+        result: { delivered: false, reason: 'prompt' },
+      });
+      expect((await audits('orchestrator.message'))[0].result).toBe('ok');
+    });
+
+    it('answers 403 to a viewer; nothing is sent or recorded', async () => {
+      const response = await viewerOfA.send(
+        'post',
+        `/projects/${a}/orchestrator/message`,
+        { body: 'hello' },
+      );
+      expect(response.status).toBe(403);
+      expect(runner.control()).toEqual([]);
+      expect(await runs()).toEqual([]);
+    });
+
+    it('answers 400 to a blank body, an oversize body, or a session/from field, with nothing recorded', async () => {
+      for (const bad of [
+        message('   \n '),
+        message('é'.repeat(8 * 1024 + 1)),
+        message('hello', { session: 'cs-i42' }),
+        message('hello', { from: 'someone-else@example.com' }),
+        message(42),
+      ]) {
+        expect((await bad).status).toBe(400);
+      }
       expect(runner.control()).toEqual([]);
       expect(await runs()).toEqual([]);
     });

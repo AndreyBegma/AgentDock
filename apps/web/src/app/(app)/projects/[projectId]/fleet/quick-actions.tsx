@@ -19,10 +19,10 @@ import {
 import { useState } from 'react';
 import type { useControl } from '../../../../../lib/control/use-control';
 import { showStopControl } from '../../../../../lib/fleet/format';
-import { ORCHESTRATOR_MESSAGE_REASON } from './agent-node';
+import { MessagePrompt } from './agent-node';
 import type { ControlReasons } from './use-control-reasons';
 
-type Confirm = 'pause' | 'stop-all';
+type Confirm = 'pause' | 'stop-all' | 'message';
 
 /**
  * Quick actions (#160). AgentDock does not create agents (ADR-0005): "New
@@ -34,6 +34,7 @@ export function QuickActions({
   canOperate,
   orchestrator,
   reasons,
+  orchestratorMessageReason,
   liveSlots,
   focusedSlot,
   hasOpen,
@@ -46,6 +47,8 @@ export function QuickActions({
   canOperate: boolean;
   orchestrator: OrchestratorStatus;
   reasons: ControlReasons;
+  /** Why the orchestrator cannot be messaged now; null when it can (#189). */
+  orchestratorMessageReason: string | null;
   /** The slots Stop all would stop. */
   liveSlots: readonly string[];
   /** The slot in front, the one "Open worktree in terminal" attaches to. */
@@ -87,14 +90,12 @@ export function QuickActions({
   items.push({
     id: 'message-orchestrator',
     label: 'Message orchestrator',
-    description: !onAttach
-      ? ORCHESTRATOR_MESSAGE_REASON
-      : orchestrator === 'absent'
-        ? 'The orchestrator is not running.'
-        : 'Opens the orchestrator’s terminal.',
+    description:
+      orchestratorMessageReason ??
+      'Writes into the orchestrator’s session, as if typed at its prompt.',
     icon: MessageSquare,
-    disabled: !onAttach || orchestrator === 'absent',
-    ...(onAttach ? { onSelect: () => onAttach('orchestrator') } : {}),
+    disabled: orchestratorMessageReason !== null,
+    onSelect: () => setConfirm('message'),
   });
   items.push({
     id: 'attach',
@@ -152,6 +153,25 @@ export function QuickActions({
   return (
     <>
       <ActionList heading="Quick actions" surface="content" items={items} />
+
+      <DialogRoot
+        open={confirm === 'message'}
+        onOpenChange={(open) => setConfirm(open ? 'message' : null)}
+      >
+        <DialogContent
+          title="Message the orchestrator"
+          description="It reads your message in its own session and answers there. Workers are messaged from their cards."
+        >
+          <MessagePrompt
+            target={{ kind: 'orchestrator' }}
+            control={control}
+            disabledReason={orchestratorMessageReason}
+            multiline
+            autoFocus
+            onSent={() => setConfirm(null)}
+          />
+        </DialogContent>
+      </DialogRoot>
 
       <DialogRoot
         open={confirm === 'pause'}

@@ -62,6 +62,23 @@ export function startDisabledReason(facts: ControlFacts): ControlReason | null {
   return null;
 }
 
+/**
+ * Why messaging the orchestrator is off (#189); null when it can be used.
+ * While its status is unknown the message is allowed: the runner answers
+ * "not running" itself.
+ */
+export function messageDisabledReason(
+  facts: ControlFacts,
+): ControlReason | null {
+  if (facts.runnerOnline === false) return runnerReason(facts);
+  if (facts.orchestrator === 'absent') {
+    return {
+      text: 'The orchestrator is not running, so there is nobody to message. Start it first.',
+    };
+  }
+  return null;
+}
+
 /** Why Stop is disabled; null when it can be used. */
 export function stopDisabledReason(facts: ControlFacts): ControlReason | null {
   if (facts.runnerOnline === false) return runnerReason(facts);

@@ -27,47 +27,70 @@ import {
   progressBar,
 } from '../../../../../lib/fleet/graph';
 
-/** Said in place of the orchestrator's prompt until #189 gives it a command. */
-export const ORCHESTRATOR_MESSAGE_REASON =
-  'Messaging the orchestrator needs a control command AgentDock does not have yet (#189).';
+/** Who a message box sends to: a worker's slot, or the orchestrator (#189). */
+export type MessageTarget =
+  | { kind: 'slot'; slot: string }
+  | { kind: 'orchestrator' };
 
 /**
- * The one-line "message worker" box in a card's footer. Controlled, so a send
- * that failed keeps its text; the `nodrag nopan nowheel` classes keep the
- * canvas from taking the clicks and keys typed into it.
+ * A message box: one line in a card's footer, or multiline in a dialog.
+ * Controlled, so a send that failed — or reached no orchestrator — keeps its
+ * text; the `nodrag nopan nowheel` classes keep the canvas from taking the
+ * clicks and keys typed into it.
  */
-function WorkerPrompt({
-  slot,
+export function MessagePrompt({
+  target,
   control,
   disabledReason,
+  multiline = false,
+  autoFocus = false,
+  onSent,
 }: {
-  slot: string;
+  target: MessageTarget;
   control: ReturnType<typeof useControl>;
   disabledReason: string | null;
+  multiline?: boolean;
+  autoFocus?: boolean;
+  /** Called once the message was delivered or, for a worker, saved. */
+  onSent?: () => void;
 }) {
   const [text, setText] = useState('');
-  const sending = control.busy('slot.message', slot);
+  const toSlot = target.kind === 'slot' ? target.slot : null;
+  const sending = toSlot
+    ? control.busy('slot.message', toSlot)
+    : control.busy('orchestrator.message');
   const tooLong = messageProblem(text) === 'too_long';
 
   const send = async (value: string) => {
     if (messageProblem(value) !== null) return;
-    const run = await control.message(slot, value);
-    if (run) setText('');
+    if (toSlot) {
+      // A worker's message is saved in its worktree even when not delivered.
+      if (!(await control.message(toSlot, value))) return;
+    } else {
+      const run = await control.messageOrchestrator(value);
+      if (run?.result?.delivered !== true) return;
+    }
+    setText('');
+    onSent?.();
   };
 
   const reason = disabledReason ?? (sending ? 'Sending…' : null);
+  const name = toSlot ?? 'the orchestrator';
 
   return (
     <div className="nodrag nopan nowheel flex flex-col gap-1">
       <PromptInput
-        size="sm"
-        multiline={false}
+        size={multiline ? 'md' : 'sm'}
+        multiline={multiline}
         value={text}
         onValueChange={setText}
         onSubmit={send}
-        placeholder={`Message ${slot}…`}
-        aria-label={`Message worker ${slot}`}
-        sendLabel={`Send to ${slot}`}
+        placeholder={`Message ${name}…`}
+        aria-label={
+          toSlot ? `Message worker ${toSlot}` : 'Message the orchestrator'
+        }
+        sendLabel={`Send to ${name}`}
+        autoFocus={autoFocus}
         disabled={reason !== null}
         {...(reason !== null ? { disabledReason: reason } : {})}
       />
@@ -90,6 +113,7 @@ export function AgentNode({
   selected,
   control,
   canOperate,
+  orchestratorMessageReason,
   onOpen,
   onAttach,
   size = 'compact',
@@ -98,6 +122,8 @@ export function AgentNode({
   selected: boolean;
   control: ReturnType<typeof useControl>;
   canOperate: boolean;
+  /** Why the orchestrator cannot be messaged now; null when it can (#189). */
+  orchestratorMessageReason: string | null;
   onOpen: () => void;
   /** Admins on a runner that can attach; absent hides the action. */
   onAttach?: () => void;
@@ -121,20 +147,16 @@ export function AgentNode({
   let footer = null;
   if (node.kind === 'orchestrator') {
     footer = (
-      <PromptInput
-        className="nodrag nopan nowheel"
-        size="sm"
-        multiline={false}
-        onSubmit={() => {}}
-        aria-label="Message the orchestrator"
-        disabled
-        disabledReason={ORCHESTRATOR_MESSAGE_REASON}
+      <MessagePrompt
+        target={{ kind: 'orchestrator' }}
+        control={control}
+        disabledReason={orchestratorMessageReason}
       />
     );
   } else if (node.kind === 'slot') {
     footer = (
-      <WorkerPrompt
-        slot={node.slot}
+      <MessagePrompt
+        target={{ kind: 'slot', slot: node.slot }}
         control={control}
         disabledReason={
           !canOperate

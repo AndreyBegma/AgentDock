@@ -1,11 +1,13 @@
 import {
   COMMAND_RUN_LIST_MAX_LIMIT,
   type CommandRunListQuery,
+  type OrchestratorMessageRequest,
   type OrchestratorSettingsRequest,
   type OrchestratorStartRequest,
   type SlotMessageRequest,
 } from '@agentdock/shared';
 import {
+  ORCHESTRATOR_MESSAGE_MAX_BYTES,
   type OrchestratorMode,
   type OrchestratorPermissionMode,
   orchestratorModeSchema,
@@ -83,6 +85,17 @@ export class SlotMessageDto implements SlotMessageRequest {
   @IsNotEmpty()
   @MaxLength(SLOT_MESSAGE_MAX_BYTES)
   text!: string;
+}
+
+/**
+ * `POST /projects/:projectId/orchestrator/message` (#189). The byte limit and
+ * the blank check are the command schema's, applied by the service.
+ */
+export class OrchestratorMessageDto implements OrchestratorMessageRequest {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(ORCHESTRATOR_MESSAGE_MAX_BYTES)
+  body!: string;
 }
 
 export class CommandRunListQueryDto implements CommandRunListQuery {

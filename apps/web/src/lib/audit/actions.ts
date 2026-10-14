@@ -36,6 +36,7 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   'orchestrator.start': 'Started the orchestrator',
   'orchestrator.stop': 'Stopped the orchestrator',
   'orchestrator.settings': 'Changed orchestrator settings',
+  'orchestrator.message': 'Messaged the orchestrator',
   'slot.stop': 'Stopped a worker',
   'slot.message': 'Messaged a worker',
   'approval.approve': 'Approved a merge',

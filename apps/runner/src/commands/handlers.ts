@@ -8,6 +8,7 @@ import type {
 import { type Clock, isoNow } from '../clock';
 import type { ConfigProfile } from '../config';
 import {
+  messageOrchestrator,
   orchestratorStatus,
   startOrchestrator,
   stopOrchestrator,
@@ -102,6 +103,7 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
     'orchestrator.start': (args) => startOrchestrator(args, control),
     'orchestrator.stop': (args) => stopOrchestrator(args, control),
     'orchestrator.status': (args) => orchestratorStatus(args, control),
+    'orchestrator.message': (args) => messageOrchestrator(args, control),
     'slot.stop': (args) => stopSlot(args, control),
     'slot.message': (args) => messageSlot(args, control),
     'issue.create': (args) =>

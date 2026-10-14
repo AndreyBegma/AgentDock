@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
   type ControlFacts,
+  messageDisabledReason,
   startDisabledReason,
   stopDisabledReason,
 } from './reasons';
@@ -58,6 +59,26 @@ describe('startDisabledReason', () => {
 
   test('nothing is claimed before the runner is known', () => {
     expect(startDisabledReason(facts({ runnerOnline: null }))).toBeNull();
+  });
+});
+
+describe('messageDisabledReason', () => {
+  test('a live or not-yet-known orchestrator can be messaged', () => {
+    for (const orchestrator of ['running', 'idle', 'unknown'] as const) {
+      expect(messageDisabledReason(facts({ orchestrator }))).toBeNull();
+    }
+  });
+
+  test('an absent orchestrator says to start it first', () => {
+    expect(messageDisabledReason(facts())?.text).toContain('not running');
+  });
+
+  test('an offline runner comes first, with the Runners link for admins', () => {
+    const reason = messageDisabledReason(
+      facts({ runnerOnline: false, orchestrator: 'running' }),
+    );
+    expect(reason?.text).toContain('laptop is offline');
+    expect(reason?.href).toBe('/admin/runners');
   });
 });
 

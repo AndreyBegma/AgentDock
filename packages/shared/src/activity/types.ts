@@ -398,6 +398,7 @@ const AUDIT_TITLES: Record<string, string> = {
   'orchestrator.start': 'Orchestrator start requested',
   'orchestrator.stop': 'Orchestrator stop requested',
   'orchestrator.settings': 'Orchestrator settings changed',
+  'orchestrator.message': 'Message sent to the orchestrator',
   'slot.stop': 'Slot stop requested',
   'slot.message': 'Message sent to a slot',
 };

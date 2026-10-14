@@ -1,12 +1,24 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from 'bun:test';
-import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import type { ConfigProfile } from '../config';
 import { createExec, type Exec } from '../detect/exec';
 import { FakeClock } from '../testing/fake-clock';
 import { REAL_PROCESS_TIMEOUT_MS, workspace } from '../testing/projects';
 import type { ControlDeps } from './deps';
-import { startOrchestrator, stopOrchestrator } from './orchestrator';
+import {
+  messageOrchestrator,
+  ORCHESTRATOR_MESSAGE_DIR,
+  orchestratorMessagePrompt,
+  startOrchestrator,
+  stopOrchestrator,
+} from './orchestrator';
 import { MESSAGE_FILE, messageSlot, stopSlot } from './slot';
 
 setDefaultTimeout(REAL_PROCESS_TIMEOUT_MS);
@@ -186,5 +198,52 @@ describe.skipIf(!tmuxInstalled)('control commands on a real tmux', () => {
     expect(
       readFileSync(join(f.ws, '.wt-widget-i7', MESSAGE_FILE), 'utf8'),
     ).toStartWith('From: dev@example.com via AgentDock\n');
+  });
+
+  it('messages the orchestrator: file in the git dir, prompt typed, then submitted', async () => {
+    const f = await fixture();
+    // A stand-in orchestrator: `cat` writes a line to its file only once the
+    // line is submitted, so the file proves the C-m reached the pane.
+    const typed = join(f.ws, 'typed');
+    const created = await f.deps.exec('tmux', [
+      ...(f.deps.tmuxServer ?? []),
+      'new-session',
+      '-d',
+      '-s',
+      SESSION,
+      '-c',
+      f.root,
+      'sh',
+      '-c',
+      `cat > '${typed}'`,
+    ]);
+    expect(created?.code).toBe(0);
+
+    expect(
+      await messageOrchestrator(
+        {
+          projectId: 'prj_1',
+          root: f.root,
+          body: 'Hold i43.',
+          from: 'dev@example.com',
+        },
+        f.deps,
+      ),
+    ).toEqual({ delivered: true });
+
+    const dir = join(f.root, '.git', ORCHESTRATOR_MESSAGE_DIR);
+    const [name] = readdirSync(dir);
+    const file = join(dir, name ?? '');
+    expect(readFileSync(file, 'utf8')).toEndWith('\n\nHold i43.\n');
+    expect(
+      await eventually(
+        () =>
+          existsSync(typed) &&
+          readFileSync(typed, 'utf8') ===
+            `${orchestratorMessagePrompt(file)}\n`,
+      ),
+    ).toBe(true);
+    // Inside .git: the checkout stays clean.
+    expect(await f.run(f.root, 'status', '--porcelain')).toBe('');
   });
 });

@@ -191,6 +191,23 @@ describe('describeOutcome', () => {
     ).toContain('Workers keep running');
   });
 
+  test('an orchestrator message says delivered, or why it was not sent', () => {
+    const orchestrator = (result: Record<string, unknown>) =>
+      describeOutcome(
+        run({ command: 'orchestrator.message', slot: null, result }),
+      );
+    expect(orchestrator({ delivered: true })).toEqual({
+      tone: 'success',
+      text: 'Message to the orchestrator delivered.',
+    });
+    const absent = orchestrator({ delivered: false, reason: 'absent' });
+    expect(absent?.tone).toBe('info');
+    expect(absent?.text).toContain('not running');
+    const prompt = orchestrator({ delivered: false, reason: 'prompt' });
+    expect(prompt?.tone).toBe('info');
+    expect(prompt?.text).toContain('waiting on a prompt');
+  });
+
   test('a stop of nothing is informational', () => {
     expect(
       describeOutcome(run({ command: 'slot.stop', result: { stopped: false } }))

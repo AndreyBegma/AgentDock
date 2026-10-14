@@ -174,6 +174,7 @@ type Run = Pick<CommandRunLiveEvent, 'command' | 'slot' | 'status' | 'error'> &
 const SUBJECT: Record<Run['command'], (slot: string | null) => string> = {
   'orchestrator.start': () => 'Orchestrator start',
   'orchestrator.stop': () => 'Orchestrator stop',
+  'orchestrator.message': () => 'Message to the orchestrator',
   'slot.stop': (slot) => `Stopping slot ${slot ?? ''}`.trim(),
   'slot.message': (slot) => `Message to ${slot ?? 'the worker'}`,
   'skill.install': () => 'Skill install',
@@ -182,6 +183,7 @@ const SUBJECT: Record<Run['command'], (slot: string | null) => string> = {
 export const COMMAND_PENDING_LABEL: Record<Run['command'], string> = {
   'orchestrator.start': 'Starting the orchestrator…',
   'orchestrator.stop': 'Stopping the orchestrator…',
+  'orchestrator.message': 'Sending the message…',
   'slot.stop': 'Stopping the slot…',
   'slot.message': 'Sending the message…',
   'skill.install': 'Installing the skill…',
@@ -232,6 +234,20 @@ function okOutcome(run: Run, subject: string): Outcome {
             tone: 'success',
             text: 'Orchestrator stopped. Workers keep running.',
           };
+    case 'orchestrator.message':
+      if (result.reason === 'absent') {
+        return {
+          tone: 'info',
+          text: `${subject} not sent: the orchestrator is not running.`,
+        };
+      }
+      if (result.reason === 'prompt') {
+        return {
+          tone: 'info',
+          text: `${subject} not sent: the orchestrator is waiting on a prompt in its terminal. Answer it there, then send again.`,
+        };
+      }
+      return { tone: 'success', text: `${subject} delivered.` };
     case 'slot.stop':
       return result.stopped === false
         ? { tone: 'info', text: `Slot ${run.slot} had no live session.` }

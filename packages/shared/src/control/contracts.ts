@@ -78,6 +78,11 @@ export interface SlotMessageRequest {
   text: string;
 }
 
+/** `POST /projects/:id/orchestrator/message` (#189). */
+export interface OrchestratorMessageRequest {
+  body: string;
+}
+
 /** A profile as the settings tab lists it. */
 export interface OrchestratorProfileRef {
   id: string;
