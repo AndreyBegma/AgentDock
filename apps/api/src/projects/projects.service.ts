@@ -254,6 +254,8 @@ export class ProjectsService {
       'readyLabelOverride',
       'defaultProfileId',
       'mergeApproval',
+      'shipSessionContent',
+      'sessionContentRetentionDays',
     ] as const;
     const before: Record<string, unknown> = {};
     const after: Record<string, unknown> = {};
@@ -281,6 +283,10 @@ export class ProjectsService {
       after,
       result: 'ok',
     });
+    // ADR-0021: the runner attaches content only for projects that ship it.
+    if ('shipSessionContent' in after) {
+      await this.watchList.push(project.runnerId);
+    }
     return this.toDetail(updated, 'admin');
   }
 
