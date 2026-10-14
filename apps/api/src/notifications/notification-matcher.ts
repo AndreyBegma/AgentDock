@@ -227,12 +227,16 @@ export class NotificationMatcher
       issue: draft.issue,
       title: draft.title,
       body: draft.body,
-      link: projectLink(projectId, draft.page),
+      link: projectLink(projectId, draft.page, draft.card),
       eventId: event.id,
       at: event.ts,
       // One item per disable: a second disable after a re-enable is news, not
-      // a repeat of the first (spec 25 D10).
-      fold: draft.kind !== 'schedule.disabled',
+      // a repeat of the first (spec 25 D10). A card's item is per card and
+      // round; folding by slot would merge different cards (issue #242).
+      fold:
+        draft.kind !== 'schedule.disabled' &&
+        draft.kind !== 'card.finished' &&
+        draft.kind !== 'card.waiting',
     };
   }
 

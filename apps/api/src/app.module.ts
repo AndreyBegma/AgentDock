@@ -5,6 +5,7 @@ import { AdminModule } from './admin/admin.module';
 import { ApprovalsModule } from './approvals';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
+import { BoardModule } from './board';
 import { BudgetsModule } from './budgets';
 import { BullmqModule } from './bullmq';
 import { ControlModule } from './control';
@@ -66,6 +67,8 @@ import { WorkflowsModule } from './workflows';
     PlannerModule,
     // Spec 223: the design stage, on top of the Planner.
     DesignModule,
+    // Issue #242: the project Board and its card workers.
+    BoardModule,
     SchedulesModule,
     BudgetsModule,
     // Before WebhooksModule: its `POST /hooks/:publicId` would otherwise

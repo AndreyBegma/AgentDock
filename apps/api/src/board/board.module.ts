@@ -1,0 +1,29 @@
+import { Module } from '@nestjs/common';
+import { LiveModule } from '../live/live.module';
+import { ProjectsModule } from '../projects';
+import { RunnersModule } from '../runners/runners.module';
+import { BoardController } from './board.controller';
+import { BoardService } from './board.service';
+import { BoardCommands } from './board-commands';
+import { BoardRoundsService } from './board-rounds.service';
+import { BoardSink } from './board-sink';
+import { BoardWork } from './board-work';
+
+/**
+ * The project Board (issue #242, ADR-0024): cards AgentDock owns, each worked
+ * by a dedicated interactive Claude Code worker outside the orchestrator.
+ * `BoardService` is exported for the local `card.finish` method (D6).
+ */
+@Module({
+  imports: [LiveModule, ProjectsModule, RunnersModule],
+  controllers: [BoardController],
+  providers: [
+    BoardCommands,
+    BoardRoundsService,
+    BoardService,
+    BoardSink,
+    BoardWork,
+  ],
+  exports: [BoardService],
+})
+export class BoardModule {}

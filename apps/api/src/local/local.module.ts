@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ApprovalsModule } from '../approvals';
+import { BoardModule } from '../board';
 import { ControlModule } from '../control';
 import { LiveModule } from '../live/live.module';
 import { NotificationsModule } from '../notifications';
@@ -32,6 +33,8 @@ import { LocalRequestRouter } from './local-request-router';
     NotificationsModule,
     QueueModule,
     ControlModule,
+    // Issue #242: `card.finish`, the card worker's `finish_card`.
+    BoardModule,
   ],
   controllers: [ActionRequestsController],
   providers: [
