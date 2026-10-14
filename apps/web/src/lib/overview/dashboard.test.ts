@@ -78,6 +78,7 @@ const run = (over: Partial<RunSummary>): RunSummary => ({
   prNumber: null,
   prUrl: null,
   prChecks: null,
+  planId: null,
   triggeredByType: 'orchestrator',
   triggeredById: null,
   startedAt: '2026-10-14T05:00:00.000Z',
