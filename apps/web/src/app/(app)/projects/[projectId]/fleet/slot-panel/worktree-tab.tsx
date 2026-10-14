@@ -13,6 +13,10 @@ import {
   formatAheadBehind,
 } from '../../../../../../lib/fleet/format';
 import { formatDate, pluralize } from '../../../../../../lib/format';
+import {
+  type RunnerGate,
+  runnerGateCopy,
+} from '../../../../../../lib/planner/runner-support';
 import type { Section } from '../../../../../../lib/section/use-section';
 import {
   describeWorktreeError,
@@ -31,15 +35,19 @@ const CHANGE_BRANCH_REASON =
  * The runner's answer for the slot's worktree, with Refresh and the time it
  * was read. A failure says why in a sentence, never as an empty list; the
  * last answer stays under it. An ended slot's worktree is gone, so the runner
- * is not asked (#213); a runner too old to answer says to update it.
+ * is not asked (#213); a runner too old to answer says to update it — from
+ * its advert before asking (#233), or from its refusal when it advertises
+ * nothing.
  */
 function WorktreeSection({
   worktree,
   ended,
+  runnerGate,
   children,
 }: {
   worktree: Section<SlotWorktreeView | undefined>;
   ended: boolean;
+  runnerGate: RunnerGate | null;
   children: (view: SlotWorktreeView) => ReactNode;
 }) {
   const { data, error, loading, retry } = worktree;
@@ -48,6 +56,27 @@ function WorktreeSection({
       <EmptyState
         title="Worktree removed"
         description="This slot has ended, and the orchestrator removes an ended slot’s worktree. Its branch and commits are on the pull request, if it opened one."
+      />
+    );
+  }
+  if (runnerGate !== null) {
+    const copy = runnerGateCopy('worktree', runnerGate);
+    // The project is re-read every 30 s: the tab asks on its own once the
+    // runner reconnects advertising `worktree.status`.
+    return (
+      <EmptyState
+        title={copy.title}
+        description={copy.body}
+        action={
+          copy.href && copy.cta ? (
+            <Link
+              href={copy.href}
+              className={buttonClassName({ variant: 'glass', size: 'sm' })}
+            >
+              How to update
+            </Link>
+          ) : undefined
+        }
       />
     );
   }
@@ -109,12 +138,14 @@ function WorktreeSection({
 export function WorktreeTab({
   worktree,
   ended,
+  runnerGate,
 }: {
   worktree: Section<SlotWorktreeView | undefined>;
   ended: boolean;
+  runnerGate: RunnerGate | null;
 }) {
   return (
-    <WorktreeSection worktree={worktree} ended={ended}>
+    <WorktreeSection worktree={worktree} ended={ended} runnerGate={runnerGate}>
       {(view) => (
         <>
           <KeyValueList
@@ -195,13 +226,15 @@ export function WorktreeTab({
 export function FilesTab({
   files,
   ended,
+  runnerGate,
 }: {
   /** Its own request and state, not the Worktree tab's (#213). */
   files: Section<SlotWorktreeView | undefined>;
   ended: boolean;
+  runnerGate: RunnerGate | null;
 }) {
   return (
-    <WorktreeSection worktree={files} ended={ended}>
+    <WorktreeSection worktree={files} ended={ended} runnerGate={runnerGate}>
       {(view) =>
         view.files.length === 0 ? (
           <p className="text-sm text-ink-2">

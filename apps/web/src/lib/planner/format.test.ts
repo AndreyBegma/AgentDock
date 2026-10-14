@@ -17,6 +17,7 @@ import {
   describePlannerError,
   failedTurn,
   isContractViolation,
+  isRunnerTooOldError,
   LIVE_STATUS_PILL,
   PLAN_STATUS_PILL,
   planAttentionReason,
@@ -317,6 +318,20 @@ describe('describePlannerError', () => {
         ),
       ),
     ).toBe(RUNNER_TOO_OLD_TEXT);
+  });
+
+  test('the API’s runner_outdated is too old, whatever its message (#233)', () => {
+    const outdated = err(
+      409,
+      'runner_outdated',
+      'The runner does not serve plan.turn',
+    );
+    expect(describePlannerError(outdated)).toBe(RUNNER_TOO_OLD_TEXT);
+    expect(isRunnerTooOldError(outdated)).toBe(true);
+    expect(
+      isRunnerTooOldError(err(502, 'command_failed', 'unknown_command')),
+    ).toBe(true);
+    expect(isRunnerTooOldError(err(409, 'turn_in_progress'))).toBe(false);
   });
 
   test('an offline runner is not called too old', () => {

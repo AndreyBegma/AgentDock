@@ -25,6 +25,7 @@ import {
   NODE_PILL_STATUS,
   parseSlotTab,
   SLOT_PANEL_TABS,
+  worktreeRunnerGate,
 } from '../../../../../../lib/slot/format';
 import { nodeOf } from '../../../../../../lib/slot/relations';
 import {
@@ -191,16 +192,19 @@ function SlotPanelBody({
   // An ended slot's worktree is gone: neither tab asks the runner (#213).
   // Each tab has its own request, so Files never shows Worktree's state.
   const live = run !== undefined && !ended;
+  // #233: a runner that advertised it cannot read worktrees is not asked.
+  const runnerGate = worktreeRunnerGate(project);
+  const asks = live && runnerGate === null;
   const worktree = useSlotWorktree(
     projectId,
     slot,
-    live && tab === 'worktree',
+    asks && tab === 'worktree',
     detailVersion,
   );
   const files = useSlotWorktree(
     projectId,
     slot,
-    live && tab === 'files',
+    asks && tab === 'files',
     detailVersion,
   );
 
@@ -283,10 +287,14 @@ function SlotPanelBody({
               <ContextTab slot={run} />
             </TabPanel>
             <TabPanel value="worktree" className="pt-5">
-              <WorktreeTab worktree={worktree} ended={ended} />
+              <WorktreeTab
+                worktree={worktree}
+                ended={ended}
+                runnerGate={runnerGate}
+              />
             </TabPanel>
             <TabPanel value="files" className="pt-5">
-              <FilesTab files={files} ended={ended} />
+              <FilesTab files={files} ended={ended} runnerGate={runnerGate} />
             </TabPanel>
             <TabPanel value="tests" className="pt-5">
               <TestsTab slot={run} conversation={conversation.data} />

@@ -1,6 +1,7 @@
 'use client';
 
 import type {
+  ProjectDetail,
   UiProfileRebuildResult,
   UiProfileVersionsView,
   UiProfileVersionView,
@@ -21,15 +22,18 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Markdown } from '../../../../../../components/markdown/markdown';
 import { AsyncSection } from '../../../../../../components/prerequisites/async-section';
+import { DisabledReason } from '../../../../../../components/prerequisites/disabled-reason';
 import { api } from '../../../../../../lib/api';
 import {
   describeDesignError,
   PROFILE_STATUS_HINT,
   PROFILE_STATUS_LABEL,
   PROFILE_STATUS_PILL,
+  rebuildRunnerGate,
 } from '../../../../../../lib/design/format';
 import { runHref, uiProfileApi } from '../../../../../../lib/design/href';
 import { Time } from '../../../../../../lib/format/time';
+import { runnerGateCopy } from '../../../../../../lib/planner/runner-support';
 import { useErrorToast } from '../../../../../../lib/section/use-error-toast';
 import { useSection } from '../../../../../../lib/section/use-section';
 import { ProfileEditor } from './profile-editor';
@@ -79,6 +83,15 @@ export function ProfileSection({
     [projectId, picked, current?.version],
   );
   const shown = older.data ?? current;
+
+  // #233: a runner that advertised its commands without `uiprofile.build`
+  // turns Build off before it is tried.
+  const project = useSection(
+    () => api<ProjectDetail>(`/projects/${projectId}`),
+    [projectId],
+  );
+  const gate = rebuildRunnerGate(project.data);
+  const runnerCopy = gate ? runnerGateCopy('uiProfileBuild', gate) : null;
 
   const { retry } = profile;
   const building = profile.data?.status === 'building';
@@ -136,8 +149,13 @@ export function ProfileSection({
                     <Button
                       size="sm"
                       variant="glass"
-                      disabled={building || rebuilding || editing}
+                      disabled={
+                        building || rebuilding || editing || runnerCopy !== null
+                      }
                       title={building ? 'A build is running.' : undefined}
+                      aria-describedby={
+                        runnerCopy ? 'ui-profile-runner-reason' : undefined
+                      }
                       onClick={() => setConfirming(true)}
                     >
                       {data.current ? 'Rebuild' : 'Build'}
@@ -156,6 +174,15 @@ export function ProfileSection({
                 </div>
               }
             />
+            {canOperate && runnerCopy ? (
+              <DisabledReason
+                id="ui-profile-runner-reason"
+                href={runnerCopy.href}
+                cta={runnerCopy.cta}
+              >
+                {runnerCopy.reason}
+              </DisabledReason>
+            ) : null}
             {data.buildRunId ? (
               <Link
                 href={runHref(projectId, data.buildRunId)}

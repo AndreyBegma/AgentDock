@@ -13,6 +13,11 @@ import { ApiError, describeError } from '../api';
 import { describeOutcome } from '../control/format';
 import { CHECKPOINT_LABEL } from '../fleet/format';
 import { formatDate } from '../format';
+import {
+  type RunnerFacts,
+  type RunnerGate,
+  runnerGate,
+} from '../planner/runner-support';
 import type { OutboxEntry } from './outbox';
 
 /** The agent panel's tabs (#160), in order. */
@@ -82,18 +87,33 @@ export function formatLineCounts(
   return `+${additions ?? 0} −${deletions ?? 0}`;
 }
 
-/** Where "Update the runner" sends a person: the install page has the upgrade. */
-export const RUNNER_UPDATE_HREF = '/install';
+export { RUNNER_UPDATE_HREF } from '../planner/runner-support';
 
 /**
- * The runner answered `/worktree` with `unknown_command`: it predates
- * `worktree.status`. The API passes the runner's code as the message's prefix
+ * #233: what stops the Worktree and Files tabs before they ask the runner.
+ * With a gate the panel does not fetch `/worktree`; with none — an unknown
+ * advert among them — it asks, and `isRunnerOutdated` reads the refusal.
+ */
+export const worktreeRunnerGate = (
+  project: RunnerFacts | undefined,
+): RunnerGate | null => runnerGate(project, 'worktree');
+
+/**
+ * `/worktree` says the runner predates `worktree.status`: the API's 409
+ * `runner_outdated` from the runner's advert (#233), or — from a runner that
+ * advertises nothing — the runner's own `unknown_command`, which the API
+ * passes as the message's prefix
  * (`unknown_command: unknown command: worktree.status`).
  */
-export const isRunnerOutdated = (error: unknown): boolean =>
-  error instanceof ApiError &&
-  (error.code as string | undefined) === FLEET_ERROR.worktreeUnavailable &&
-  error.message.startsWith('unknown_command');
+export const isRunnerOutdated = (error: unknown): boolean => {
+  if (!(error instanceof ApiError)) return false;
+  const code = error.code as string | undefined;
+  return (
+    code === FLEET_ERROR.runnerOutdated ||
+    (code === FLEET_ERROR.worktreeUnavailable &&
+      error.message.startsWith('unknown_command'))
+  );
+};
 
 /** Why `/worktree` gave no answer, as the panel says it. */
 export function describeWorktreeError(error: unknown): string {

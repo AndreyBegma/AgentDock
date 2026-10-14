@@ -49,6 +49,7 @@ export function Composer({
   initialBrief,
   profiles,
   disabledReason,
+  runnerReason = null,
   onCreate,
 }: {
   projectId: string;
@@ -61,6 +62,11 @@ export function Composer({
   profiles: readonly ProjectRuntimeProfile[] | 'failed' | undefined;
   /** Why the person cannot start a plan (a viewer); null when they can. */
   disabledReason: string | null;
+  /**
+   * The runner cannot plan (#233): Plan is off with this reason, and the
+   * brief stays editable so it is ready once the runner is fixed.
+   */
+  runnerReason?: { text: string; href?: string; cta?: string } | null;
   /** Rejects to keep the form as it is. */
   onCreate: (request: CreatePlanRequest) => Promise<void>;
 }) {
@@ -80,6 +86,7 @@ export function Composer({
   const off = busy || disabledReason !== null;
   const cannotPlan =
     off ||
+    runnerReason !== null ||
     profiles === undefined ||
     profileReason !== null ||
     brief.trim() === '';
@@ -200,7 +207,11 @@ export function Composer({
               className="justify-self-end"
               disabled={cannotPlan}
               aria-describedby={
-                profileReason ? 'planner-profile-reason' : undefined
+                runnerReason
+                  ? 'planner-runner-reason'
+                  : profileReason
+                    ? 'planner-profile-reason'
+                    : undefined
               }
             >
               {busy ? 'Starting…' : 'Plan'}
@@ -208,6 +219,14 @@ export function Composer({
           </div>
           {disabledReason ? (
             <DisabledReason>{disabledReason}</DisabledReason>
+          ) : runnerReason ? (
+            <DisabledReason
+              id="planner-runner-reason"
+              href={runnerReason.href}
+              cta={runnerReason.cta}
+            >
+              {runnerReason.text}
+            </DisabledReason>
           ) : profileReason ? (
             <DisabledReason
               id="planner-profile-reason"

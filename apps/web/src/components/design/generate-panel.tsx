@@ -5,6 +5,7 @@ import {
   DESIGN_VARIANTS_MAX,
   DESIGN_VARIANTS_MIN,
   type InstalledSkillsView,
+  type ProjectDetail,
   type TaskDesignPatchRequest,
   type TaskDesignView,
 } from '@agentdock/shared';
@@ -17,8 +18,11 @@ import {
 } from '@andrewbehma/glass-ui/segmented-control';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api';
+import { generateRunnerGate } from '../../lib/design/format';
 import { installedSkillsApi } from '../../lib/design/href';
+import { runnerGateCopy } from '../../lib/planner/runner-support';
 import { useSection } from '../../lib/section/use-section';
+import { DisabledReason } from '../prerequisites/disabled-reason';
 
 const VARIANT_COUNTS = Array.from(
   { length: DESIGN_VARIANTS_MAX - DESIGN_VARIANTS_MIN + 1 },
@@ -63,6 +67,15 @@ export function GeneratePanel({
     for (const s of skills) names.add(s);
     return [...names].sort().map((name) => ({ value: name, label: name }));
   }, [installed.data, skills]);
+
+  // #233: a runner that advertised its commands without the design ones is
+  // said before Generate, not after a refused turn.
+  const project = useSection(
+    () => api<ProjectDetail>(`/projects/${projectId}`),
+    [projectId],
+  );
+  const gate = generateRunnerGate(project.data);
+  const runnerCopy = gate ? runnerGateCopy('design', gate) : null;
 
   const changed =
     count !== design.variantCount ||
@@ -138,10 +151,23 @@ export function GeneratePanel({
         />
       </Field>
 
-      {writeBlock ? <p className="text-xs text-ink-3">{writeBlock}</p> : null}
+      {writeBlock ? (
+        <p className="text-xs text-ink-3">{writeBlock}</p>
+      ) : runnerCopy ? (
+        <DisabledReason
+          id="design-runner-reason"
+          href={runnerCopy.href}
+          cta={runnerCopy.cta}
+        >
+          {runnerCopy.reason}
+        </DisabledReason>
+      ) : null}
       <Button
         variant="solid"
-        disabled={writeBlock !== null || busy}
+        disabled={writeBlock !== null || runnerCopy !== null || busy}
+        aria-describedby={
+          writeBlock === null && runnerCopy ? 'design-runner-reason' : undefined
+        }
         onClick={() => void generate()}
       >
         {busy ? 'Starting…' : 'Generate'}

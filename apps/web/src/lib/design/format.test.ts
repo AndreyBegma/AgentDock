@@ -13,10 +13,48 @@ import {
   DESIGN_STATUS_PILL,
   describeDesignError,
   designChipState,
+  generateRunnerGate,
   opensDesign,
   PROFILE_STATUS_PILL,
+  rebuildRunnerGate,
   toggleBehindMenu,
 } from './format';
+
+describe('runner gates (#233)', () => {
+  const ALL = ['plan.turn', 'uiprofile.build', 'uiprofile.fingerprint'];
+  const online = (commands: string[], disabled: string[] = []) => ({
+    runnerStatus: 'online' as const,
+    runnerCommands: { commands, disabled },
+  });
+
+  test('Generate needs plan.turn and both UI profile commands', () => {
+    expect(generateRunnerGate(online(ALL))).toBeNull();
+    expect(generateRunnerGate(online(['plan.turn']))).toBe('outdated');
+    expect(generateRunnerGate(online(ALL, ['uiprofile.fingerprint']))).toBe(
+      'disabled',
+    );
+  });
+
+  test('Build / Rebuild needs only uiprofile.build', () => {
+    expect(rebuildRunnerGate(online(['uiprofile.build']))).toBeNull();
+    expect(rebuildRunnerGate(online(['plan.turn']))).toBe('outdated');
+    expect(rebuildRunnerGate(online(ALL, ['uiprofile.build']))).toBe(
+      'disabled',
+    );
+  });
+
+  test('unknown or offline: no gate, the runner’s answer decides', () => {
+    const unknown = { runnerStatus: 'online' as const, runnerCommands: null };
+    expect(generateRunnerGate(unknown)).toBeNull();
+    expect(rebuildRunnerGate(unknown)).toBeNull();
+    expect(
+      rebuildRunnerGate({
+        runnerStatus: 'offline',
+        runnerCommands: { commands: [], disabled: [] },
+      }),
+    ).toBeNull();
+  });
+});
 
 const summary = (over: Partial<TaskDesignSummary> = {}): TaskDesignSummary => ({
   needed: false,
@@ -97,6 +135,16 @@ describe('describeDesignError', () => {
       href: '/projects/p1/settings?tab=budget',
       cta: 'Open budget',
     });
+  });
+
+  test('an old runner links the update (#233)', () => {
+    for (const code of ['runner_outdated', 'command_unavailable']) {
+      expect(describeDesignError(refused(409, code), 'p1')).toEqual({
+        text: expect.any(String),
+        href: '/install',
+        cta: 'Update the runner',
+      });
+    }
   });
 
   test('status codes without a body, and the network', () => {
