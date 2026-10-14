@@ -1,5 +1,6 @@
 import {
   PLANNER_ERROR,
+  type PlanAttention,
   type PlanDetail,
   type PlannerErrorCode,
   type PlannerSpecOutput,
@@ -43,6 +44,74 @@ export const PLAN_STATUS_PILL: Record<PlanStatus, Status> = {
   sent: 'done',
   archived: 'idle',
 };
+
+/**
+ * #213: what a plan's pill says. A failed newest turn outranks the stored
+ * status — a stalled plan must not read "Drafting" with a running dot.
+ * `attention` is the API's (list rows); `turns` lets the plan view derive the
+ * same from the detail it already has.
+ */
+export function planPill(
+  plan: Pick<PlanSummary, 'status' | 'attention'> & {
+    turns?: readonly PlanTurnView[];
+  },
+): { status: Status; label: string } {
+  const kind = plan.attention?.kind ?? attentionFromTurns(plan);
+  if (kind === 'failed') return { status: 'error', label: 'Failed' };
+  if (kind === 'attention') {
+    return { status: 'blocked', label: 'Needs attention' };
+  }
+  return {
+    status: PLAN_STATUS_PILL[plan.status],
+    label: PLAN_STATUS_LABEL[plan.status],
+  };
+}
+
+/** The reason under a plan whose newest turn failed, or null. */
+export function planAttentionReason(
+  plan: Pick<PlanSummary, 'attention'>,
+): string | null {
+  const reason = plan.attention?.reason;
+  if (!reason) return null;
+  return isRunnerTooOld(reason) ? RUNNER_TOO_OLD_TEXT : reason;
+}
+
+/** The API's `planAttention` rule, read from a plan view's own turns. */
+function attentionFromTurns(
+  plan: Pick<PlanSummary, 'status'> & { turns?: readonly PlanTurnView[] },
+): PlanAttention['kind'] | null {
+  if (!plan.turns || !OPEN_STATUSES.includes(plan.status)) return null;
+  const newest = plan.turns.reduce<PlanTurnView | null>(
+    (latest, t) =>
+      latest === null || t.createdAt > latest.createdAt ? t : latest,
+    null,
+  );
+  if (newest?.phase !== 'failed') return null;
+  return plan.status === 'reviewing' ? 'attention' : 'failed';
+}
+
+const OPEN_STATUSES: readonly PlanStatus[] = [
+  'clarifying',
+  'drafting',
+  'reviewing',
+];
+
+export const RUNNER_TOO_OLD_TEXT =
+  'The project’s runner is too old to run the planner. Update the runner, then retry.';
+
+/**
+ * The runner answered `plan.turn` with `unknown_command`: it predates the
+ * planner. The API keeps the runner's code in the message
+ * (`plan.turn failed on the runner: unknown_command — …`), the same test
+ * `lib/slot/format.ts` makes for worktrees. Until the runner advertises its
+ * commands, this is how the planner learns it is too old.
+ */
+export const isRunnerTooOld = (text: string | null | undefined): boolean =>
+  /\bunknown_command\b/.test(text ?? '');
+
+/** A failed planner request that says the runner is too old. */
+export const isRunnerTooOldError = (error: unknown): boolean =>
+  error instanceof ApiError && isRunnerTooOld(error.message);
 
 export const TASK_STATUS_LABEL: Record<PlanTaskStatus, string> = {
   draft: 'Draft',
@@ -346,6 +415,14 @@ export function describePlannerError(error: unknown): string {
         : undefined;
     if (code === PLANNER_ERROR.dependencyCycle) {
       return `The tasks depend on each other in a cycle: ${error.message}`;
+    }
+    if (isRunnerTooOld(error.message)) return RUNNER_TOO_OLD_TEXT;
+    // 503 `command_unavailable` is also an offline runner, not only an old one.
+    if (
+      code === PLANNER_ERROR.commandUnavailable &&
+      /not connected/i.test(error.message)
+    ) {
+      return 'The project’s runner is offline. Start it, then try again.';
     }
     if (known) return known;
     if (error.status === 404) return ERROR_TEXT.not_found ?? error.message;

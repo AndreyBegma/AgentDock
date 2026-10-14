@@ -14,10 +14,11 @@ import {
 } from '@andrewbehma/glass-ui/segmented-control';
 import { useState } from 'react';
 import {
-  defaultProfileOptionLabel,
-  profileOptionLabel,
-  SKILL_MODELS,
-} from '../../lib/skills/format';
+  initialProfileKey,
+  planProfileReason,
+} from '../../lib/planner/profile';
+import { profileOptionLabel, SKILL_MODELS } from '../../lib/skills/format';
+import { DisabledReason } from '../prerequisites/disabled-reason';
 
 const MODES: { value: PlanMode; label: string; hint: string }[] = [
   {
@@ -38,18 +39,26 @@ const DEFAULT_MODEL = 'opus';
 /**
  * The brief composer (spec 172 UI): a large text box, the mode, and the
  * model and runtime profile every turn of the plan will use. **Plan** is the
- * page's primary action.
+ * page's one solid action. The profile starts on the project default or the
+ * only one (#213); with none to use, Plan says why and links to the fix
+ * instead of letting the API answer 422. Below `md` the model, the profile
+ * and Plan stick to the bottom of the screen while the brief scrolls.
  */
 export function Composer({
+  projectId,
   initialBrief,
   profiles,
   disabledReason,
   onCreate,
 }: {
+  projectId: string;
   /** `?brief=` from the Fleet canvas's "Plan this" (#160). */
   initialBrief: string;
-  /** Claude profiles of the project's runner; empty = the default only. */
-  profiles: readonly ProjectRuntimeProfile[];
+  /**
+   * The runner's Claude profiles; `undefined` while they load, `'failed'`
+   * when they could not be read.
+   */
+  profiles: readonly ProjectRuntimeProfile[] | 'failed' | undefined;
   /** Why the person cannot start a plan (a viewer); null when they can. */
   disabledReason: string | null;
   /** Rejects to keep the form as it is. */
@@ -58,20 +67,33 @@ export function Composer({
   const [brief, setBrief] = useState(initialBrief);
   const [mode, setMode] = useState<PlanMode>('batch');
   const [model, setModel] = useState(DEFAULT_MODEL);
-  const [profileKey, setProfileKey] = useState('');
+  // The person's pick; until then the preselection follows the loaded list.
+  const [picked, setPicked] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const list = Array.isArray(profiles) ? profiles : [];
+  const profileKey = picked ?? initialProfileKey(list);
+  const profileReason =
+    disabledReason === null && profiles !== undefined
+      ? planProfileReason(profileKey, profiles, projectId)
+      : null;
   const off = busy || disabledReason !== null;
+  const cannotPlan =
+    off ||
+    profiles === undefined ||
+    profileReason !== null ||
+    brief.trim() === '';
 
   const submit = async () => {
     const text = brief.trim();
-    if (!text || off) return;
+    if (!text || cannotPlan) return;
     setBusy(true);
     try {
       await onCreate({
         brief: text,
         mode,
         ...(model !== DEFAULT_MODEL ? { model } : {}),
-        ...(profileKey ? { profileKey } : {}),
+        profileKey,
       });
     } catch {
       // The caller said why; the brief stays.
@@ -102,35 +124,39 @@ export function Composer({
             onChange={(e) => setBrief(e.target.value)}
           />
         </Field>
-        <div className="flex flex-col gap-4 md:flex-row md:items-end">
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <span className="text-sm font-medium text-ink" id="planner-mode">
-              Mode
-            </span>
-            <SegmentedControl aria-label="Mode" variant="on-glass">
-              {MODES.map((m) => (
-                <SegmentedControlItem
-                  key={m.value}
-                  active={mode === m.value}
-                  layoutId="planner-mode"
+        <fieldset className="flex min-w-0 flex-col gap-1">
+          <legend className="mb-1 text-xs font-medium text-ink-2">Mode</legend>
+          <SegmentedControl
+            aria-label="Mode"
+            variant="on-glass"
+            className="self-start"
+          >
+            {MODES.map((m) => (
+              <SegmentedControlItem
+                key={m.value}
+                active={mode === m.value}
+                layoutId="planner-mode"
+              >
+                <button
+                  type="button"
+                  aria-pressed={mode === m.value}
+                  disabled={off}
+                  onClick={() => setMode(m.value)}
+                  className="relative w-full px-4 py-1.5 text-sm font-medium"
                 >
-                  <button
-                    type="button"
-                    aria-pressed={mode === m.value}
-                    disabled={off}
-                    onClick={() => setMode(m.value)}
-                    className="relative w-full px-4 py-1.5 text-sm font-medium"
-                  >
-                    {m.label}
-                  </button>
-                </SegmentedControlItem>
-              ))}
-            </SegmentedControl>
-            <span className="text-xs text-ink-3">
-              {MODES.find((m) => m.value === mode)?.hint}
-            </span>
-          </div>
-          <div className="grid min-w-0 flex-1 grid-cols-1 gap-4 sm:grid-cols-2">
+                  {m.label}
+                </button>
+              </SegmentedControlItem>
+            ))}
+          </SegmentedControl>
+          <span className="text-xs text-ink-3">
+            {MODES.find((m) => m.value === mode)?.hint}
+          </span>
+        </fieldset>
+        {/* The sticky footer below `md`: the TabBar floats over the last
+            6 rem of a phone screen, so it sits just above it. */}
+        <div className="sticky bottom-24 z-10 -mx-4 flex flex-col gap-3 border-t border-line bg-content px-4 py-3 md:static md:mx-0 md:border-0 md:bg-transparent md:p-0">
+          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-end gap-3 md:grid-cols-[minmax(0,12rem)_minmax(0,16rem)_1fr]">
             <Field label="Model" htmlFor="planner-model">
               <Select
                 id="planner-model"
@@ -149,30 +175,54 @@ export function Composer({
               <Select
                 id="planner-profile"
                 value={profileKey}
-                disabled={off}
-                onChange={(e) => setProfileKey(e.target.value)}
+                disabled={off || list.length === 0}
+                aria-describedby={
+                  profileReason ? 'planner-profile-reason' : undefined
+                }
+                onChange={(e) => setPicked(e.target.value)}
               >
-                <option value="">{defaultProfileOptionLabel(profiles)}</option>
-                {profiles.map((p) => (
+                {profiles === undefined ? (
+                  <option value="">Loading…</option>
+                ) : profileKey === '' ? (
+                  <option value="" disabled>
+                    {list.length === 0
+                      ? 'None on the runner'
+                      : 'Pick a profile'}
+                  </option>
+                ) : null}
+                {list.map((p) => (
                   <option key={p.key} value={p.key}>
                     {profileOptionLabel(p)}
                   </option>
                 ))}
               </Select>
             </Field>
+            <Button
+              type="submit"
+              className="justify-self-end"
+              disabled={cannotPlan}
+              aria-describedby={
+                profileReason ? 'planner-profile-reason' : undefined
+              }
+            >
+              {busy ? 'Starting…' : 'Plan'}
+            </Button>
           </div>
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-3">
           {disabledReason ? (
-            <p className="text-sm text-ink-3">{disabledReason}</p>
+            <DisabledReason>{disabledReason}</DisabledReason>
+          ) : profileReason ? (
+            <DisabledReason
+              id="planner-profile-reason"
+              href={profileReason.href}
+              cta={profileReason.cta}
+            >
+              {profileReason.text}
+            </DisabledReason>
           ) : (
             <p className="text-xs text-ink-3">
               A new plan is private to you until you share or send it.
             </p>
           )}
-          <Button type="submit" disabled={off || brief.trim() === ''}>
-            {busy ? 'Starting…' : 'Plan'}
-          </Button>
         </div>
       </form>
     </Card>

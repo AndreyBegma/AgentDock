@@ -9,20 +9,30 @@ import {
   projectRoleAtLeast,
 } from '@agentdock/shared';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
-import { toast } from '@andrewbehma/glass-ui/toast';
+import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { PageHeader } from '../../../../../components/page-header/page-header';
 import { Composer } from '../../../../../components/planner/composer';
 import { PlanList } from '../../../../../components/planner/plan-list';
 import { AsyncSection } from '../../../../../components/prerequisites/async-section';
-import { RunnerOfflineBanner } from '../../../../../components/prerequisites/prerequisite-banner';
+import {
+  PrerequisiteBanner,
+  RunnerOfflineBanner,
+} from '../../../../../components/prerequisites/prerequisite-banner';
 import { api } from '../../../../../lib/api';
 import { useLive } from '../../../../../lib/live/use-live';
-import { describePlannerError } from '../../../../../lib/planner/format';
+import {
+  describePlannerError,
+  isRunnerTooOld,
+  isRunnerTooOldError,
+  RUNNER_TOO_OLD_TEXT,
+} from '../../../../../lib/planner/format';
 import { planHref } from '../../../../../lib/planner/href';
+import { useErrorToast } from '../../../../../lib/section/use-error-toast';
 import { useSection } from '../../../../../lib/section/use-section';
 import { skillRunProfiles } from '../../../../../lib/skills/format';
+import { RUNNER_UPDATE_HREF } from '../../../../../lib/slot/format';
 import { useProjectDetail } from '../use-project-detail';
 
 /** One refetch for a burst of pushes. */
@@ -68,6 +78,14 @@ export default function PlannerPage() {
     [canOperate, projectId],
   );
 
+  const showError = useErrorToast();
+  const [createdTooOld, setCreatedTooOld] = useState(false);
+  // #213: until the runner advertises its commands, the planner learns it is
+  // too old from a turn it refused — the newest plan's, or the one just tried.
+  const newest = plans.data?.items[0];
+  const runnerTooOld =
+    createdTooOld || isRunnerTooOld(newest?.attention?.reason);
+
   const create = async (request: CreatePlanRequest) => {
     try {
       const plan = await api<PlanSummary>(`/projects/${projectId}/plans`, {
@@ -76,7 +94,8 @@ export default function PlannerPage() {
       });
       router.push(planHref(projectId, plan.id));
     } catch (error) {
-      toast.error(describePlannerError(error));
+      setCreatedTooOld(isRunnerTooOldError(error));
+      showError(describePlannerError(error));
       throw error;
     }
   };
@@ -90,11 +109,21 @@ export default function PlannerPage() {
           description="Turn a brief into reviewed bugs and features, talk each one through, and send them to the fleet as issues."
         />
         {project ? <RunnerOfflineBanner project={project} /> : null}
+        {runnerTooOld && project?.runnerStatus !== 'offline' ? (
+          <PrerequisiteBanner
+            tone="warn"
+            title="The runner is too old to plan"
+            body={RUNNER_TOO_OLD_TEXT}
+            href={RUNNER_UPDATE_HREF}
+            cta="Update the runner"
+          />
+        ) : null}
       </div>
 
       <Composer
+        projectId={projectId}
         initialBrief={brief}
-        profiles={profiles.data ?? []}
+        profiles={profiles.error ? 'failed' : profiles.data}
         disabledReason={
           project === undefined
             ? 'Loading the project…'
@@ -106,9 +135,7 @@ export default function PlannerPage() {
       />
 
       <section aria-labelledby="plans" className="flex flex-col gap-3">
-        <h2 id="plans" className="text-sm font-semibold">
-          Plans
-        </h2>
+        <SectionHeader title="Plans" headingId="plans" />
         <AsyncSection
           section={plans}
           unavailable={{

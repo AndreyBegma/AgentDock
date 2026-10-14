@@ -1,59 +1,112 @@
+'use client';
+
 import type { PlanSummary } from '@agentdock/shared';
-import { Card } from '@andrewbehma/glass-ui/card';
+import { type Column, DataTable } from '@andrewbehma/glass-ui/data-table';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Time } from '../../lib/format/time';
 import {
-  PLAN_STATUS_LABEL,
-  PLAN_STATUS_PILL,
+  planAttentionReason,
+  planPill,
   taskCountsText,
 } from '../../lib/planner/format';
 import { planHref } from '../../lib/planner/href';
+import { ScrollX } from '../scroll-x/scroll-x';
 import { VisibilityChip } from './plan-header';
 
+const columns: Column<PlanSummary>[] = [
+  {
+    id: 'plan',
+    header: 'Plan',
+    width: '40%',
+    cell: (plan) => {
+      const reason = planAttentionReason(plan);
+      return (
+        <span className="flex min-w-64 flex-col gap-0.5 py-1">
+          <span className="flex min-w-0 items-center gap-2">
+            <Link
+              href={planHref(plan.projectId, plan.id)}
+              className="min-w-0 truncate font-medium text-ink underline-offset-2 hover:underline"
+              title={plan.title}
+            >
+              {plan.title}
+            </Link>
+            <VisibilityChip plan={plan} />
+          </span>
+          {reason ? (
+            <span
+              className="line-clamp-1 text-xs break-all text-status-error-ink"
+              title={reason}
+            >
+              {reason}
+            </span>
+          ) : null}
+        </span>
+      );
+    },
+  },
+  {
+    id: 'status',
+    header: 'Status',
+    cell: (plan) => {
+      const pill = planPill(plan);
+      return <StatusPill size="sm" status={pill.status} label={pill.label} />;
+    },
+  },
+  {
+    id: 'tasks',
+    header: 'Tasks',
+    cell: (plan) => (
+      <span className="whitespace-nowrap text-ink-2">
+        {taskCountsText(plan.taskCounts) ?? 'No tasks yet'}
+      </span>
+    ),
+  },
+  {
+    id: 'mode',
+    header: 'Mode',
+    cell: (plan) => (
+      <span className="whitespace-nowrap text-ink-2">
+        {plan.mode === 'dialogue' ? 'Dialogue' : 'Batch'} · v{plan.version}
+      </span>
+    ),
+  },
+  {
+    id: 'author',
+    header: 'Author',
+    cell: (plan) => (
+      <span className="whitespace-nowrap text-ink-2">{plan.author.name}</span>
+    ),
+  },
+  {
+    id: 'updated',
+    header: 'Updated',
+    cell: (plan) => (
+      <span className="whitespace-nowrap text-ink-2">
+        <Time value={plan.updatedAt} />
+      </span>
+    ),
+  },
+];
+
 /**
- * The plans the person may read (spec 172 UI): title, author, visibility
- * (a lock for a private one), status, task counts and when it last moved.
- * A list of cards rather than a table, so nothing scrolls at 390 px.
+ * The plans the person may read (spec 172 UI), a `DataTable` (#213): title
+ * with its visibility (a lock for a private one) and, when the newest turn
+ * failed, the reason; status; task counts; mode and version; author; when it
+ * last moved. Below `md` the table scrolls in its own box.
  */
 export function PlanList({ plans }: { plans: readonly PlanSummary[] }) {
+  const router = useRouter();
   return (
-    <ul className="flex flex-col gap-2">
-      {plans.map((plan) => (
-        <li key={plan.id}>
-          <Card
-            variant="content"
-            pad="sm"
-            className="relative flex min-w-0 flex-col gap-1.5 transition-colors focus-within:bg-hover hover:bg-hover"
-          >
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <Link
-                href={planHref(plan.projectId, plan.id)}
-                className="min-w-0 flex-1 font-medium break-words text-ink after:absolute after:inset-0 after:content-['']"
-              >
-                {plan.title}
-              </Link>
-              <VisibilityChip plan={plan} />
-              <StatusPill
-                size="sm"
-                status={PLAN_STATUS_PILL[plan.status]}
-                label={PLAN_STATUS_LABEL[plan.status]}
-              />
-            </div>
-            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-3">
-              <span>{plan.author.name}</span>
-              <span>
-                {plan.mode === 'dialogue' ? 'Dialogue' : 'Batch'} · v
-                {plan.version}
-              </span>
-              <span>{taskCountsText(plan.taskCounts) ?? 'No tasks yet'}</span>
-              <span>
-                updated <Time value={plan.updatedAt} />
-              </span>
-            </div>
-          </Card>
-        </li>
-      ))}
-    </ul>
+    <ScrollX label="Plans">
+      <DataTable
+        rows={[...plans]}
+        getRowId={(plan) => plan.id}
+        columns={columns}
+        stickyHeader={false}
+        onRowActivate={(plan) => router.push(planHref(plan.projectId, plan.id))}
+      />
+    </ScrollX>
   );
 }
