@@ -9,6 +9,8 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { Client } from 'pg';
 import { PrismaService } from '../database/prisma.service';
 import { BotTokenStore } from '../notifications';
+import { isActionRequestCallback } from './action-request-actions';
+import { TelegramActionRequestService } from './telegram-action-request.service';
 import {
   type ApprovalAnswer,
   TelegramApprovalService,
@@ -114,6 +116,7 @@ export class TelegramPoller implements OnApplicationBootstrap, OnModuleDestroy {
     private readonly client: TelegramClient,
     private readonly linking: TelegramLinkingService,
     private readonly approvals: TelegramApprovalService,
+    private readonly actionRequests: TelegramActionRequestService,
     private readonly delivery: TelegramDeliveryService,
     private readonly scheduler: SchedulerRegistry,
     @Inject(TELEGRAM_OPTIONS) private readonly options: TelegramOptions,
@@ -244,7 +247,10 @@ export class TelegramPoller implements OnApplicationBootstrap, OnModuleDestroy {
       this.logger.warn(`Telegram reply failed: ${safeMessage(error, token)}`);
     };
     if (update.callback_query) {
-      const answer = await this.approvals.handleCallback(update.callback_query);
+      // Spec 201 D18: `x:`/`y:` are the action-request buttons.
+      const answer = isActionRequestCallback(update.callback_query.data)
+        ? await this.actionRequests.handleCallback(update.callback_query)
+        : await this.approvals.handleCallback(update.callback_query);
       await this.sendApprovalAnswer(token, answer).catch(warn);
       return;
     }

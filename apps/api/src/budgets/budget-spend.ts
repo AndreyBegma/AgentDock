@@ -29,10 +29,16 @@ const utc = (at: Date) =>
  *   that window, the latest one before the session owns it — and when that
  *   start was a schedule firing (#25: its `schedule_firings.commandRunId`),
  *   the session is nobody's, though the run carries the creator's id.
+ * - a manual session the user owns (spec 201 D15): `ownerId`, set from the
+ *   runner's local user when its hooks report it.
  * Fleet workers (sessions with a slot) are never a user's.
  */
 const userSessions = (userId: string, matchMs: number) => Prisma.sql`
   WITH RECURSIVE roots(id) AS (
+    SELECT s.id
+    FROM sessions s
+    WHERE s."ownerId" = ${userId}
+    UNION
     SELECT s.id
     FROM runs ru
     JOIN skill_runs sr ON sr."runId" = ru.id AND sr.worktree IS NOT NULL

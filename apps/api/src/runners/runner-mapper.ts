@@ -6,13 +6,14 @@ import type {
 } from '@agentdock/shared';
 import type { EventSource } from '@agentdock/shared/protocol';
 import type { Event, Runner, RuntimeProfile } from '@prisma/client';
+import type { RunnerLocalSettings } from './runner-settings.service';
 
 // Explicit field lists: tokenHash / tokenPrefix never leak by default.
 export const toAdminRunner = (
   runner: Runner,
   status: RunnerStatus,
   profilesCount: number,
-): AdminRunner => ({
+): AdminRunner & RunnerLocalSettings => ({
   id: runner.id,
   name: runner.name,
   status,
@@ -26,6 +27,9 @@ export const toAdminRunner = (
   lastSeenAt: runner.lastSeenAt?.toISOString() ?? null,
   revokedAt: runner.revokedAt?.toISOString() ?? null,
   createdAt: runner.createdAt.toISOString(),
+  // Spec 201 D8, D17 — not yet in the shared `AdminRunner`.
+  localUserId: runner.localUserId,
+  awayMode: runner.awayMode,
 });
 
 export const toAdminProfile = (
