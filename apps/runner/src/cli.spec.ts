@@ -533,4 +533,87 @@ describe('agentdock-runner CLI', () => {
       expect(await exit).toBe(EXIT.terminalClose);
     });
   });
+
+  describe('Claude Code integration subcommands (spec 201)', () => {
+    it('hook exits 0 for an unknown hook and when the daemon is down', async () => {
+      expect(
+        await runCli(
+          ['hook', 'pre-compact'],
+          deps({
+            stdin: () => new Response('{}').body as ReadableStream<Uint8Array>,
+          }),
+        ),
+      ).toBe(EXIT.ok);
+      const started = Date.now();
+      expect(
+        await runCli(
+          ['hook', 'stop'],
+          deps({
+            stdin: () =>
+              new Response('{"session_id":"s","cwd":"/x"}')
+                .body as ReadableStream<Uint8Array>,
+          }),
+        ),
+      ).toBe(EXIT.ok);
+      expect(Date.now() - started).toBeLessThan(1_000);
+      expect(stdout).toEqual([]);
+    });
+
+    it('mcp and claude are stubs that say they are not implemented', async () => {
+      expect(await runCli(['mcp'], deps())).toBe(EXIT.failure);
+      expect(await runCli(['claude', '--', '-p', 'hi'], deps())).toBe(
+        EXIT.failure,
+      );
+      expect(stderr.join('')).toContain('mcp is not implemented yet');
+      expect(stderr.join('')).toContain('claude is not implemented yet');
+    });
+
+    it('away needs on or off, and fails when the daemon is down', async () => {
+      expect(await runCli(['away', 'maybe'], deps())).toBe(EXIT.usage);
+      expect(await runCli(['away', 'on'], deps())).toBe(EXIT.failure);
+      expect(stderr.join('')).toContain('daemon_unavailable');
+    });
+
+    it('setup needs the claude target and accepts its flags', async () => {
+      expect(await runCli(['setup'], deps())).toBe(EXIT.usage);
+      expect(await runCli(['setup', 'codex'], deps())).toBe(EXIT.usage);
+      expect(await runCli(['setup', 'claude', 'extra'], deps())).toBe(
+        EXIT.usage,
+      );
+      saveConfig(paths().configFile, {
+        profiles: [
+          {
+            id: 'claude-main',
+            runtime: 'claude',
+            env: { CLAUDE_CONFIG_DIR: '~/.claude-main' },
+            args: [],
+          },
+        ],
+      });
+      expect(
+        await runCli(
+          ['setup', 'claude', '--dry-run', '--profile', 'claude-main'],
+          deps(),
+        ),
+      ).toBe(EXIT.ok);
+      expect(stdout.join('')).toContain(
+        'claude plugin install agentdock@agentdock --scope user',
+      );
+      expect(stdout.join('')).toContain('Dry run');
+    });
+
+    it('lists the new commands in the usage', async () => {
+      await runCli(['help'], deps());
+      const text = stdout.join('');
+      for (const command of [
+        'setup claude',
+        'away on|off',
+        'hook <name>',
+        'mcp',
+        'claude [-- <args>]',
+      ]) {
+        expect(text).toContain(command);
+      }
+    });
+  });
 });
