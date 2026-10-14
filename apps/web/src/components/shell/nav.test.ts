@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   activeEntryId,
   isActive,
+  isWideEntry,
   projectIdOf,
   tabBarSplit,
   visibleNav,
@@ -42,7 +43,7 @@ describe('visibleNav', () => {
       'admin/Users',
       'admin/Schedules',
       'admin/Budgets',
-      'admin/Planner',
+      'admin/Planner instructions',
       'admin/Audit',
       'admin/Prices',
       'admin/Integrations',
@@ -180,18 +181,18 @@ describe('tabBarSplit', () => {
       tabs: ['Overview', 'Projects', 'Activity', 'Sessions', 'Usage'],
       more: [
         'workspace: Tasks, Workflows, Skills',
-        'admin: Runners, Users, Schedules, Budgets, Planner, Audit, Prices, Integrations, Settings',
+        'admin: Runners, Users, Schedules, Budgets, Planner instructions, Audit, Prices, Integrations, Settings',
       ],
     });
   });
 
-  test('inside a project: its working pages, then its others first in More', () => {
+  test('inside a project: its working pages with Planner, Activity first in More', () => {
     expect(split('admin', '/projects/p1/queue')).toEqual({
-      tabs: ['Fleet', 'Queue', 'Approvals', 'Activity', 'History'],
+      tabs: ['Fleet', 'Planner', 'Queue', 'Approvals', 'History'],
       more: [
-        'project: Planner, Skills, Schedules, Settings',
+        'project: Activity, Skills, Schedules, Settings',
         'workspace: Overview, Projects, Activity, Tasks, Sessions, Usage, Workflows, Skills',
-        'admin: Runners, Users, Schedules, Budgets, Planner, Audit, Prices, Integrations, Settings',
+        'admin: Runners, Users, Schedules, Budgets, Planner instructions, Audit, Prices, Integrations, Settings',
       ],
     });
   });
@@ -205,6 +206,27 @@ describe('tabBarSplit', () => {
   test('tabs resolve the project id', () => {
     const { tabs } = tabBarSplit(visibleNav('viewer', '/projects/p1'));
     expect(tabs[0]?.resolvedHref).toBe('/projects/p1/fleet');
+  });
+});
+
+describe('isWideEntry', () => {
+  const wideAt = (path: string) => {
+    const sections = visibleNav('admin', path);
+    return isWideEntry(sections, activeEntryId(sections, path));
+  };
+
+  test('data pages and the pages below them take the wide column', () => {
+    expect(wideAt('/sessions')).toBe(true);
+    expect(wideAt('/projects/p1/history')).toBe(true);
+    expect(wideAt('/projects/p1/history/r1')).toBe(true);
+    expect(wideAt('/admin/audit')).toBe(true);
+  });
+
+  test('dashboards, forms and pages off the nav keep the reading column', () => {
+    expect(wideAt('/')).toBe(false);
+    expect(wideAt('/projects/p1/planner')).toBe(false);
+    expect(wideAt('/projects/p1/settings')).toBe(false);
+    expect(wideAt('/account')).toBe(false);
   });
 });
 

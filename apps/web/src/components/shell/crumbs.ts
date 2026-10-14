@@ -3,7 +3,7 @@ import { NAV } from './nav';
 
 /**
  * Names the shell has resolved for the ids in the path: projects from the
- * project list, the run or session of a detail page from its own GET. An id
+ * project list, the run, plan or session of a detail page from its own GET. An id
  * missing here reads as its kind ("Run"), never as the id itself (#159 R2).
  */
 export type CrumbNames = ReadonlyMap<string, string>;
@@ -52,6 +52,7 @@ function kindOf(segments: readonly string[], index: number): string {
   if (parent === 'sessions') return 'Session';
   if (parent === 'runs' && segments[index - 2] === 'skills') return 'Skill run';
   if (parent === 'history') return 'Run';
+  if (parent === 'planner') return 'Plan';
   return 'Details';
 }
 
@@ -96,18 +97,24 @@ export function crumbsFor(
   });
 }
 
+/** The product, the second half of every tab title outside a project. */
+export const APP_NAME = 'AgentDock';
+
 /**
- * The tab title for the trail, before the root template adds "· AgentDock":
- * the page, and inside a project the project too, so two tabs on Fleet of
- * two projects can be told apart.
+ * The tab title for the trail (#213): `"<Page> · AgentDock"`, and inside a
+ * project `"<Page> · <Project>"`, so two tabs on Fleet of two projects can be
+ * told apart and a project named AgentDock does not read "AgentDock ·
+ * AgentDock". `projectName` is the project's real name: until it is known the
+ * project half falls back to the product rather than to the crumb's kind.
  */
-export function pageTitleOf(crumbs: readonly BreadcrumbItem[]): string {
-  const page = crumbs.at(-1)?.label ?? 'AgentDock';
-  const project = crumbs[0]?.id === '/projects' ? crumbs[1] : undefined;
-  if (project && project !== crumbs.at(-1)) {
-    return `${page} · ${project.label}`;
-  }
-  return page;
+export function pageTitleOf(
+  crumbs: readonly BreadcrumbItem[],
+  projectName?: string,
+): string {
+  const page = crumbs.at(-1)?.label;
+  if (!page) return APP_NAME;
+  const inProject = crumbs[0]?.id === '/projects' && crumbs.length > 2;
+  return `${page} · ${inProject && projectName ? projectName : APP_NAME}`;
 }
 
 const MAX_LABEL = 48;
@@ -125,6 +132,11 @@ export function runLabel(run: {
   if (run.issue !== null) return `#${run.issue}`;
   if (run.title) return clip(run.title);
   return run.slot ?? 'Run';
+}
+
+/** A plan in the trail and the palette: its title, else its kind. */
+export function planLabel(plan: { title: string }): string {
+  return plan.title.trim() ? clip(plan.title.trim()) : 'Plan';
 }
 
 /** A session in the trail: its title, else its slot. */

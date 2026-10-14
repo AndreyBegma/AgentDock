@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type {
+  PlanSummary,
   ProjectSummary,
   RunSummary,
   SessionSummary,
@@ -21,6 +22,7 @@ function input(overrides: Partial<PaletteInput> = {}): PaletteInput {
     projects: PROJECTS,
     projectId: null,
     recent: { sessions: [], runs: [] },
+    plans: [],
     themeLabel: 'System',
     ...overrides,
   };
@@ -31,6 +33,50 @@ const titles = (groups: ReturnType<typeof paletteGroups>) =>
 const labelsIn = (groups: ReturnType<typeof paletteGroups>, id: string) =>
   groups.find((group) => group.id === id)?.items.map((item) => item.label) ??
   [];
+
+const plan = (id: string, title: string, updatedAt: string) =>
+  ({ id, projectId: 'p1', title, updatedAt }) as PlanSummary;
+
+describe('paletteGroups: Plans', () => {
+  const plans = [
+    plan('a', 'Old plan', '2026-10-01T00:00:00Z'),
+    plan('b', 'Ship the shell', '2026-10-14T00:00:00Z'),
+  ];
+
+  test('the project plans are a group, newest first, opening the plan', () => {
+    const groups = paletteGroups(input({ projectId: 'p1', plans }));
+    expect(labelsIn(groups, 'plans')).toEqual(['Ship the shell', 'Old plan']);
+    const first = groups.find((group) => group.id === 'plans')?.items[0];
+    expect(first?.id).toBe('go:/projects/p1/planner/b');
+  });
+
+  test('a query narrows the plans, and "plan" finds them all', () => {
+    expect(
+      labelsIn(
+        paletteGroups(input({ projectId: 'p1', plans, query: 'shell' })),
+        'plans',
+      ),
+    ).toEqual(['Ship the shell']);
+    expect(
+      labelsIn(
+        paletteGroups(input({ projectId: 'p1', plans, query: 'plan' })),
+        'plans',
+      ),
+    ).toHaveLength(2);
+  });
+
+  test('no plans, no group', () => {
+    expect(titles(paletteGroups(input({ projectId: 'p1' })))).not.toContain(
+      'Plans',
+    );
+  });
+
+  test('the admin page reads "Planner instructions"', () => {
+    expect(labelsIn(paletteGroups(input()), 'admin')).toContain(
+      'Planner instructions',
+    );
+  });
+});
 
 describe('paletteGroups', () => {
   test('group titles are unique and no row repeats its group title', () => {

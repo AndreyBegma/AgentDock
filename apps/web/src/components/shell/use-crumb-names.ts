@@ -1,6 +1,7 @@
 'use client';
 
 import type {
+  PlanDetail,
   ProjectSummary,
   RunDetail,
   SessionDetail,
@@ -8,7 +9,7 @@ import type {
 } from '@agentdock/shared';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api';
-import { type CrumbNames, runLabel, sessionLabel } from './crumbs';
+import { type CrumbNames, planLabel, runLabel, sessionLabel } from './crumbs';
 
 /** The detail page at `pathname`, if it is one whose name needs a GET. */
 function detailOf(pathname: string): { id: string; path: string } | null {
@@ -19,6 +20,13 @@ function detailOf(pathname: string): { id: string; path: string } | null {
     return {
       id: skillRun[2] ?? '',
       path: `/projects/${skillRun[1]}/skill-runs/${skillRun[2]}`,
+    };
+  }
+  const plan = /^\/projects\/([^/]+)\/planner\/([^/]+)$/.exec(pathname);
+  if (plan) {
+    return {
+      id: plan[2] ?? '',
+      path: `/projects/${plan[1]}/plans/${plan[2]}`,
     };
   }
   const run = /^\/projects\/([^/]+)\/history\/([^/]+)$/.exec(pathname);
@@ -33,17 +41,18 @@ function detailOf(pathname: string): { id: string; path: string } | null {
   return null;
 }
 
-type Detail = RunDetail | SessionDetail | SkillRunDetail;
+type Detail = RunDetail | SessionDetail | SkillRunDetail | PlanDetail;
 
 function labelOf(detail: Detail): string {
   if ('session' in detail) return sessionLabel(detail.session);
   if ('skill' in detail) return detail.skill;
+  if ('brief' in detail) return planLabel(detail);
   return runLabel(detail);
 }
 
 /**
  * Names for the ids in the breadcrumb (#159): projects from the list the shell
- * already holds, and the run, skill run or session of a detail page from its
+ * already holds, and the run, skill run, plan or session of a detail page from its
  * own GET. A failed GET leaves the id unnamed, and the trail shows its kind.
  */
 export function useCrumbNames(
