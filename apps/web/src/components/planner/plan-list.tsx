@@ -34,6 +34,10 @@ const columns: Column<PlanSummary>[] = [
             </Link>
             <VisibilityChip plan={plan} />
           </span>
+          <span className="text-xs text-ink-3">
+            {plan.author.name} ·{' '}
+            {plan.mode === 'dialogue' ? 'Dialogue' : 'Batch'} · v{plan.version}
+          </span>
           {reason ? (
             <span
               className="line-clamp-1 text-xs break-all text-status-error-ink"
@@ -64,22 +68,6 @@ const columns: Column<PlanSummary>[] = [
     ),
   },
   {
-    id: 'mode',
-    header: 'Mode',
-    cell: (plan) => (
-      <span className="whitespace-nowrap text-ink-2">
-        {plan.mode === 'dialogue' ? 'Dialogue' : 'Batch'} · v{plan.version}
-      </span>
-    ),
-  },
-  {
-    id: 'author',
-    header: 'Author',
-    cell: (plan) => (
-      <span className="whitespace-nowrap text-ink-2">{plan.author.name}</span>
-    ),
-  },
-  {
     id: 'updated',
     header: 'Updated',
     cell: (plan) => (
@@ -92,9 +80,10 @@ const columns: Column<PlanSummary>[] = [
 
 /**
  * The plans the person may read (spec 172 UI), a `DataTable` (#213): title
- * with its visibility (a lock for a private one) and, when the newest turn
- * failed, the reason; status; task counts; mode and version; author; when it
- * last moved. Below `md` the table scrolls in its own box.
+ * with its visibility (a lock for a private one), author, mode and version
+ * under it and, when the newest turn failed, the reason; status; task
+ * counts; when it last moved. Four columns, so it fits at 1440 beside the
+ * rail; below that the table scrolls in its own box.
  */
 export function PlanList({ plans }: { plans: readonly PlanSummary[] }) {
   const router = useRouter();

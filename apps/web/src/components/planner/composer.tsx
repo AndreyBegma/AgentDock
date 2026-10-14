@@ -185,9 +185,7 @@ export function Composer({
                   <option value="">Loading…</option>
                 ) : profileKey === '' ? (
                   <option value="" disabled>
-                    {list.length === 0
-                      ? 'None on the runner'
-                      : 'Pick a profile'}
+                    {list.length === 0 ? 'None on the runner' : 'Pick one'}
                   </option>
                 ) : null}
                 {list.map((p) => (

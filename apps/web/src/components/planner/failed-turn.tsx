@@ -43,27 +43,15 @@ export function FailedTurn({
             : 'The turn failed'
       }
       action={
-        tooOld || canRetry ? (
-          <span className="flex flex-wrap gap-2">
-            {tooOld ? (
-              <Link
-                href={RUNNER_UPDATE_HREF}
-                className={buttonClassName({ variant: 'glass', size: 'sm' })}
-              >
-                Update the runner
-              </Link>
-            ) : null}
-            {canRetry ? (
-              <Button
-                size="sm"
-                variant="glass"
-                disabled={retrying}
-                onClick={onRetry}
-              >
-                {retrying ? 'Retrying…' : 'Retry turn'}
-              </Button>
-            ) : null}
-          </span>
+        canRetry ? (
+          <Button
+            size="sm"
+            variant="glass"
+            disabled={retrying}
+            onClick={onRetry}
+          >
+            {retrying ? 'Retrying…' : 'Retry turn'}
+          </Button>
         ) : undefined
       }
     >
@@ -74,6 +62,14 @@ export function FailedTurn({
             ? RUNNER_TOO_OLD_TEXT
             : (turn.error ?? 'The runner gave no reason.')}
         </p>
+        {tooOld ? (
+          <Link
+            href={RUNNER_UPDATE_HREF}
+            className={`${buttonClassName({ variant: 'glass', size: 'sm' })} self-start`}
+          >
+            Update the runner
+          </Link>
+        ) : null}
         {violation && turn.resultText ? (
           <Disclosure
             open={open}
