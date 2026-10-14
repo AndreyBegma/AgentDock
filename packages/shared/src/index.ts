@@ -5,6 +5,7 @@ export * from './audit';
 export * from './auth';
 export * from './budgets';
 export * from './control';
+export * from './design';
 export * from './fleet';
 export * from './github-app';
 export * from './history';
