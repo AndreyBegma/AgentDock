@@ -173,6 +173,10 @@ export function describeBoardError(
       return 'This project has no spec directory, so a spec cannot be written. Turn the spec off, or set the docs source in the project settings.';
     case BOARD_ERROR.unsupportedRuntime:
       return 'Card workers run on Claude profiles only; this project’s profile is Codex.';
+    case BOARD_ERROR.designNotApproved:
+      return 'This card’s design is on and not approved yet. Open the design and approve it, or approve and run from there.';
+    case BOARD_ERROR.designApproved:
+      return 'The design is approved, so “Continue after design” can no longer change.';
     case BOARD_ERROR.commandUnavailable:
       return `The runner${runnerName ? ` ${runnerName}` : ''} is offline or too old to run card workers.`;
     default:

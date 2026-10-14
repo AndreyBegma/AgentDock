@@ -5,6 +5,7 @@ import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import { hooksHint, roundPill } from '../../lib/board/format';
 import { formatCost } from '../../lib/format';
 import { safeHttpsUrl } from '../../lib/queue/format';
+import { CardFaceDesign } from './card-design';
 
 /** What a card shows on the board: label, title, kind, round state, PR and issue, cost. */
 export function CardFace({
@@ -36,6 +37,7 @@ export function CardFace({
       >
         {card.title}
       </button>
+      <CardFaceDesign card={card} />
       {pill || card.round?.hooksMissing ? (
         <div className="flex flex-wrap items-center gap-1.5">
           {pill ? (
