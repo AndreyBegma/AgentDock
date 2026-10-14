@@ -1,4 +1,5 @@
 import type { RunnerEvent } from '@agentdock/shared/protocol';
+import { RunsProjector } from '../history/runs-projector.service';
 import { createE2eApp, type E2eContext, resetDatabase } from '../test/e2e-app';
 import { FleetProjector } from './fleet-projector.service';
 import { EventStream, fleetRows, ROOT, seedProject } from './testing/fleet-e2e';
@@ -233,7 +234,11 @@ describe('fleet projector (e2e)', () => {
     );
 
     const row = await slot();
-    expect(row).toMatchObject({ lastCheckpoint: 'pr_open', prUrl: PR_URL });
+    expect(row).toMatchObject({
+      lastCheckpoint: 'pr_open',
+      prUrl: PR_URL,
+      prNumber: 7,
+    });
     const checkpoints = await ctx.prisma.slotCheckpoint.findMany({
       where: { slotId: row.id },
       orderBy: { position: 'asc' },
@@ -243,6 +248,67 @@ describe('fleet projector (e2e)', () => {
       [1, 'pr_open'],
     ]);
     expect(checkpoints[0].at < checkpoints[1].at).toBe(true);
+  });
+
+  it('takes the PR number from a pr_open URL when gh reports nothing, and the run keeps it after the session ends', async () => {
+    // #213 (i185): the runner's gh poll was unavailable, so the reply file's
+    // `pull request open — <url>` was the only word of the PR.
+    await project(appeared());
+    await project(
+      stream.next(
+        'slot.checkpoint',
+        {
+          checkpoint: 'pr_open',
+          heading: `pull request open — ${PR_URL}`,
+          summary: 'What changed',
+          position: 0,
+          prUrl: PR_URL,
+        },
+        { slot: 'i42', source: 'scraped' },
+      ),
+    );
+    expect(await slot()).toMatchObject({ prNumber: 7, prUrl: PR_URL });
+
+    await project(vanished());
+    const row = await slot();
+    expect(row.status).toBe('stale');
+    await ctx.app.get(RunsProjector).tick();
+    expect(
+      await ctx.prisma.run.findUniqueOrThrow({ where: { slotId: row.id } }),
+    ).toMatchObject({
+      status: 'waiting_person',
+      output: 'pr',
+      prNumber: 7,
+      prUrl: PR_URL,
+    });
+  });
+
+  it('keeps a number the plugin reported over the one in the URL', async () => {
+    await project(appeared());
+    await project(
+      stream.next(
+        'slot.checkpoint',
+        { checkpoint: 'pr_open', prUrl: PR_URL, prNumber: 8 },
+        { slot: 'i42', source: 'code-sentinel' },
+      ),
+    );
+    expect((await slot()).prNumber).toBe(8);
+  });
+
+  it('takes no number from a pr_open URL that is not a pull request', async () => {
+    await project(appeared());
+    await project(
+      stream.next(
+        'slot.checkpoint',
+        {
+          checkpoint: 'pr_open',
+          position: 0,
+          prUrl: 'https://github.com/acme/widget/issues/7',
+        },
+        { slot: 'i42', source: 'scraped' },
+      ),
+    );
+    expect((await slot()).prNumber).toBeNull();
   });
 
   it('flips prChecks from pending to green, and to red on one failure', async () => {
