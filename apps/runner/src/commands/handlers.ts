@@ -33,6 +33,7 @@ import {
   type SessionBackfillContext,
   sessionBackfill,
 } from './session-backfill';
+import { worktreeStatus } from './worktree/status';
 
 export interface HandlerContext {
   clock: Clock;
@@ -149,5 +150,10 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
       context.planner?.['plan.publish_specs'](args) ?? noPlanner(),
     'plan.queue_issues': (args) =>
       context.planner?.['plan.queue_issues'](args) ?? noPlanner(),
+    'worktree.status': (args) =>
+      worktreeStatus(args, {
+        exec: context.exec,
+        watchedProjects: context.watchedProjects,
+      }),
   };
 };
