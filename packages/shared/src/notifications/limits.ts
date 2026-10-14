@@ -15,5 +15,11 @@ export const TELEGRAM_RATE_WINDOW_MS = 10 * MINUTE_MS;
 /** D1: at most one `queue.dry` per project in this long. */
 export const QUEUE_DRY_INTERVAL_MS = 6 * 60 * MINUTE_MS;
 
+/**
+ * Note 23: a blocked checkpoint notifies only if it is still the slot's latest
+ * this long after it arrived.
+ */
+export const BLOCKED_CHECKPOINT_DELAY_MS = 15 * MINUTE_MS;
+
 /** D5: a runner away this long opens an incident. */
 export const RUNNER_OFFLINE_AFTER_MS = 5 * MINUTE_MS;

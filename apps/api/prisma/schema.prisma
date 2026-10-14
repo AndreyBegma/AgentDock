@@ -569,7 +569,8 @@ model SlotCheckpoint {
   position Int
   at       DateTime
 
-  slot Slot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  slot   Slot                     @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  notice BlockedCheckpointNotice?
 
   @@unique([slotId, position])
   @@map("slot_checkpoints")
@@ -1391,6 +1392,20 @@ model RunnerIncident {
 
   @@index([runnerId, resolvedAt])
   @@map("runner_incidents")
+}
+
+/// The blocked-checkpoint sweep's memory of one blocked checkpoint (spec 22
+/// note 23): which heading it is about, since when that heading stands, and
+/// whether it notified. A new heading at the same position starts it over.
+model BlockedCheckpointNotice {
+  checkpointId String    @id
+  heading      String
+  since        DateTime
+  notifiedAt   DateTime?
+
+  checkpoint SlotCheckpoint @relation(fields: [checkpointId], references: [id], onDelete: Cascade)
+
+  @@map("blocked_checkpoint_notices")
 }
 
 // ─── Activity feed and execution history (docs/specs/21) ────────────────────

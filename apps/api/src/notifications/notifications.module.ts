@@ -4,6 +4,7 @@ import { LiveModule } from '../live/live.module';
 import { ProjectsModule } from '../projects';
 import { RunnersModule } from '../runners/runners.module';
 import { SettingsModule } from '../settings/settings.module';
+import { BlockedCheckpointSweep } from './blocked-checkpoint-sweep';
 import { BotTokenStore } from './bot-token.store';
 import { NotificationMatcher } from './notification-matcher';
 import {
@@ -19,6 +20,7 @@ import { TelegramDeliveryLedger } from './telegram-delivery-ledger';
 
 /**
  * Notifications (docs/specs/22): the event matcher, the runner watcher, the
+ * blocked-checkpoint sweep, the
  * in-app centre with its rules and mutes, and the bookkeeping the Telegram
  * module sends from. Exports what `apps/api/src/telegram/**` builds on, and
  * the writer budgets notify through (spec 28 D6).
@@ -46,6 +48,7 @@ import { TelegramDeliveryLedger } from './telegram-delivery-ledger';
     NotificationRulesService,
     NotificationMatcher,
     RunnerWatcher,
+    BlockedCheckpointSweep,
     TelegramDeliveryLedger,
     BotTokenStore,
   ],

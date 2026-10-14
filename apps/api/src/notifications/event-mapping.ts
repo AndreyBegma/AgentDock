@@ -174,19 +174,8 @@ export const draftFor = (event: MatchableEvent): NotificationDraft | null => {
         page: 'fleet',
       };
     }
-    case 'slot.checkpoint': {
-      const parsed = parseFleetEvent(toRunnerEvent(event));
-      if (!parsed?.ok || parsed.event.type !== 'slot.checkpoint') return null;
-      if (parsed.event.data.checkpoint !== 'blocked') return null;
-      return {
-        kind: 'slot.blocked',
-        slot,
-        issue,
-        title: `${who(slot, issue)} is blocked`,
-        body: 'The worker reported a blocked checkpoint.',
-        page: 'fleet',
-      };
-    }
+    // A blocked checkpoint notifies from the sweep, once per checkpoint and
+    // only when it still stands after the delay (spec 22 note 23), never here.
     case 'issue.blocked': {
       if (data.kind !== 'person') return null;
       return {
@@ -250,6 +239,33 @@ export const draftFor = (event: MatchableEvent): NotificationDraft | null => {
     default:
       return null;
   }
+};
+
+/** A heading that says nothing beyond its kind: "blocked", "Blocked:". */
+const BARE_BLOCKED = /^blocked\W*$/i;
+
+/**
+ * The `slot.blocked` draft of a scraped or plugin checkpoint that is still
+ * standing (spec 22 note 23). The heading is the reason; the summary is never
+ * copied (D10).
+ */
+export const blockedCheckpointDraft = (
+  slot: string,
+  issue: number | null,
+  heading: string,
+): NotificationDraft => {
+  const line = oneLine(heading);
+  return {
+    kind: 'slot.blocked',
+    slot,
+    issue,
+    title: `${who(slot, issue)} is blocked`,
+    body:
+      line && !BARE_BLOCKED.test(line)
+        ? line
+        : 'The worker reported a blocked checkpoint.',
+    page: 'fleet',
+  };
 };
 
 /** The web path a project notification opens. */
