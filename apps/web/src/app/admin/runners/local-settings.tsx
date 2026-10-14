@@ -36,7 +36,7 @@ export function LocalSettings({
 
   useEffect(() => {
     let cancelled = false;
-    api<AdminUser[]>('/admin/users?status=approved')
+    api<AdminUser[]>('/admin/users?status=active')
       .then((list) => {
         if (!cancelled) setUsers(list);
       })

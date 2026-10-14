@@ -9,6 +9,7 @@ import { toast } from '@andrewbehma/glass-ui/toast';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { PageHeader } from '../../../../../components/page-header/page-header';
+import { ScrollX } from '../../../../../components/scroll-x/scroll-x';
 import { ApiError, api } from '../../../../../lib/api';
 import { useLive } from '../../../../../lib/live/use-live';
 import { describeProjectError } from '../../../../../lib/projects/format';
@@ -98,13 +99,16 @@ export default function ProjectSettingsPage() {
       />
 
       <TabGroup value={tab} onValueChange={(next) => setTab(next as TabId)}>
-        <TabList aria-label="Project settings">
-          {TABS.map(({ id, label }) => (
-            <Tab key={id} value={id}>
-              {label}
-            </Tab>
-          ))}
-        </TabList>
+        {/* Seven tabs do not fit a phone: the strip scrolls inside its box. */}
+        <ScrollX>
+          <TabList aria-label="Project settings" className="min-w-max">
+            {TABS.map(({ id, label }) => (
+              <Tab key={id} value={id} className="whitespace-nowrap">
+                {label}
+              </Tab>
+            ))}
+          </TabList>
+        </ScrollX>
 
         <TabPanel value="general" className="pt-4">
           <div className="flex flex-col gap-4">

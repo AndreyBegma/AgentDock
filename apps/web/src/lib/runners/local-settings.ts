@@ -6,7 +6,7 @@ export const userOptionLabel = (
 ): string => (user.name ? `${user.name} (${user.email})` : user.email);
 
 /**
- * The options of the local-user selector: every approved user, plus the saved
+ * The options of the local-user selector: every active user, plus the saved
  * one when it is not among them (a user since rejected still has to show, or
  * the Select would silently display a different person).
  */
