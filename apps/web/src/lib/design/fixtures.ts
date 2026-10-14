@@ -45,6 +45,7 @@ export const comment = (
 
 export const design = (over: Partial<TaskDesignView> = {}): TaskDesignView => ({
   id: 'design-1',
+  owner: { kind: 'task', planId: 'plan-1', taskKey: 't1' },
   planId: 'plan-1',
   taskKey: 't1',
   needed: true,

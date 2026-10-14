@@ -307,18 +307,20 @@ export class DesignService {
         include: { plan: true },
       });
       if (!design || !isBusy(design)) continue;
-      const { plan } = design;
+      const { plan, taskKey } = design;
+      // ADR-0025: only a plan task's design waits here until #243 iB-api.
+      if (plan === null || taskKey === null) continue;
       const started =
         profileId !== undefined &&
-        (await this.startWaiting(plan, design, w, profileId));
-      if (!started) await settleDesign(this.prisma, plan.id, design.taskKey);
-      this.store.publishDesign(plan.projectId, plan.id, design.taskKey);
+        (await this.startWaiting(plan, { ...design, taskKey }, w, profileId));
+      if (!started) await settleDesign(this.prisma, plan.id, taskKey);
+      this.store.publishDesign(plan.projectId, plan.id, taskKey);
     }
   }
 
   private async startWaiting(
     plan: Plan,
-    design: TaskDesign,
+    design: TaskDesign & { taskKey: string },
     w: WaitingDesign,
     profileId: string | null,
   ): Promise<boolean> {

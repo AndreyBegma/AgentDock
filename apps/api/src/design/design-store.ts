@@ -104,7 +104,9 @@ export const designGates = async (
     where: { planId },
     select: { taskKey: true, needed: true, status: true },
   });
-  return new Map(rows.map((r) => [r.taskKey, r]));
+  return new Map(
+    rows.flatMap((r) => (r.taskKey === null ? [] : [[r.taskKey, r] as const])),
+  );
 };
 
 /** Every design of a plan, by task key, as a task card shows it. */
@@ -124,7 +126,11 @@ export const designSummaries = async (
       approvedRevisionId: true,
     },
   });
-  return new Map(rows.map(({ taskKey, ...summary }) => [taskKey, summary]));
+  return new Map(
+    rows.flatMap(({ taskKey, ...summary }) =>
+      taskKey === null ? [] : [[taskKey, summary] as const],
+    ),
+  );
 };
 
 /**

@@ -1,6 +1,7 @@
 import {
   DEFAULT_VIEWPORTS,
   type DesignCommentView,
+  type DesignOwnerView,
   type DesignRevisionView,
   type DesignSkillWarning,
   type TaskDesignView,
@@ -100,6 +101,17 @@ export const skillWarnings = (
       message: `${skill} is not installed for this project; design turns skip it`,
     }));
 
+/**
+ * ADR-0025: the task owner of a design row. A card's design is not read
+ * through this mapper yet (#243 iB-api); one reaching it is a bug, not a view.
+ */
+const taskOwnerOf = (row: DesignRow): DesignOwnerView => {
+  if (row.planId === null || row.taskKey === null) {
+    throw new Error(`design ${row.id} has no plan task owner`);
+  }
+  return { kind: 'task', planId: row.planId, taskKey: row.taskKey };
+};
+
 export const toDesignView = (
   row: DesignRow,
   extra: {
@@ -109,6 +121,7 @@ export const toDesignView = (
   },
 ): TaskDesignView => ({
   id: row.id,
+  owner: taskOwnerOf(row),
   planId: row.planId,
   taskKey: row.taskKey,
   needed: row.needed,

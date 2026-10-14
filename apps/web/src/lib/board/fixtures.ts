@@ -39,6 +39,8 @@ export const card = (
   prNumber: null,
   prUrl: null,
   round: null,
+  design: null,
+  continueAfterDesign: false,
   costUsd: null,
   movedAt: '2026-10-14T10:00:00.000Z',
   completedAt: null,

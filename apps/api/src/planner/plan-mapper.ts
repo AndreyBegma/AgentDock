@@ -107,9 +107,15 @@ export const turnInclude = {
 
 type TurnRow = Prisma.PlanTurnGetPayload<{ include: typeof turnInclude }>;
 
+/** ADR-0025: plan turns are read per plan, so a card's design turn never reaches here. */
+const turnPlanId = (row: TurnRow): string => {
+  if (row.planId === null) throw new Error(`turn ${row.id} has no plan`);
+  return row.planId;
+};
+
 export const toTurnView = (row: TurnRow): PlanTurnView => ({
   id: row.id,
-  planId: row.planId,
+  planId: turnPlanId(row),
   taskKey: row.task?.key ?? null,
   runId: row.runId,
   action: row.action,
