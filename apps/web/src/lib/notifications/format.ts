@@ -26,6 +26,8 @@ export const KIND_LABEL: Record<NotificationKind, string> = {
   'budget.threshold': 'Budget threshold reached',
   'schedule.disabled': 'Schedule disabled',
   'action.requested': 'Action requested',
+  'card.finished': 'Board card finished',
+  'card.waiting': 'Card worker is waiting for you',
 };
 
 /** What a notification of the kind reads like, under the rule's name. */
@@ -42,6 +44,8 @@ export const KIND_EXAMPLE: Record<NotificationKind, string> = {
   'budget.threshold': 'luna-watch reached 80 % of its monthly budget',
   'schedule.disabled': 'The nightly review schedule was turned off',
   'action.requested': 'A session asks to start the orchestrator',
+  'card.finished': 'Card C-12 · luna-watch is finished, PR #160 opened',
+  'card.waiting': 'The worker of card C-12 waits for your answer',
 };
 
 export type RuleGroup = 'fleet' | 'runners' | 'budgets' | 'schedules';
@@ -66,6 +70,8 @@ const KIND_GROUP: Record<NotificationKind, RuleGroup> = {
   'budget.threshold': 'budgets',
   'schedule.disabled': 'schedules',
   'action.requested': 'fleet',
+  'card.finished': 'fleet',
+  'card.waiting': 'fleet',
 };
 
 export type KindTone = 'ok' | 'warn' | 'danger' | 'neutral';
@@ -83,6 +89,8 @@ export const KIND_TONE: Record<NotificationKind, KindTone> = {
   'budget.threshold': 'warn',
   'schedule.disabled': 'danger',
   'action.requested': 'warn',
+  'card.finished': 'ok',
+  'card.waiting': 'warn',
 };
 
 export interface FeedState {

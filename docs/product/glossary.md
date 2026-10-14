@@ -19,6 +19,9 @@
 | **Fence** | a slot's `owns:` / `never:` globs, enforced by `fence.py` for Claude workers |
 | **Ready label** | `cs:ready` (configurable); marks an issue dispatchable |
 | **Skill run** | a headless session running one skill on one project |
+| **Board** | a project's own work board (`/projects/<id>/board`): To Do → In progress → Finished → Completed. Not the Queue's board view, which shows GitHub issues for the fleet (ADR-0024) |
+| **Card** | a work item on the Board, numbered `C-<n>` per project and stored by AgentDock, not GitHub. Run starts a dedicated interactive worker for it, outside the orchestrator |
+| **Card round** | one Run or one feedback of a card: a resumed turn of the card's Claude session with its own `runs` row. Not an orchestrator **Round** |
 | **Schedule** | a cron rule that creates skill runs or orchestrator commands |
 | **API-equivalent cost** | what the recorded tokens would cost at public API prices, regardless of subscription |
 | **Budget** | spend limit per project or user per period; alert or hard stop |

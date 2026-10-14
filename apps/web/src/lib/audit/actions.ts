@@ -104,6 +104,16 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   'action_request.decided': 'Decided an action request',
   'action_request.executed': 'Executed a requested action',
   'session_content.purged': 'Purged session content',
+  'card.created': 'Created a board card',
+  'card.updated': 'Edited a board card',
+  'card.deleted': 'Deleted a board card',
+  'card.moved': 'Moved a board card',
+  'card.run_started': 'Started a card worker',
+  'card.feedback': 'Sent feedback on a card',
+  'card.finished': 'Finished a card round',
+  'card.accepted': 'Accepted a board card',
+  'card.stopped': 'Stopped a card worker',
+  'board.settings_updated': 'Changed board settings',
 };
 
 /** The action filter's groups: the prefix before the dot. */

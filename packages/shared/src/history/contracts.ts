@@ -18,6 +18,8 @@ export const RUN_KINDS = [
   /** A Planner turn (docs/specs/172-planner.md D14). */
   'plan',
   'ui_profile',
+  /** A board card round (issue #242 D4). */
+  'card',
 ] as const;
 export type RunKind = (typeof RUN_KINDS)[number];
 

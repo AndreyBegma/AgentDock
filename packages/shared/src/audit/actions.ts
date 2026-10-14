@@ -105,6 +105,16 @@ export const AUDIT_ACTIONS = [
   'action_request.decided',
   'action_request.executed',
   'session_content.purged',
+  'card.created',
+  'card.updated',
+  'card.deleted',
+  'card.moved',
+  'card.run_started',
+  'card.feedback',
+  'card.finished',
+  'card.accepted',
+  'card.stopped',
+  'board.settings_updated',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 

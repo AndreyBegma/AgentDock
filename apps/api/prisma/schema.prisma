@@ -73,6 +73,11 @@ model User {
   designSettingsUpdated       DesignSettings[]
   taskDesignsApproved         TaskDesign[]
   designComments              DesignComment[]
+  boardCardsCreated           BoardCard[]                   @relation("BoardCardCreatedBy")
+  boardCardsMoved             BoardCard[]                   @relation("BoardCardMovedBy")
+  boardCardsCompleted         BoardCard[]                   @relation("BoardCardCompletedBy")
+  boardCardRounds             BoardCardRound[]
+  boardSettingsUpdated        BoardSettings[]
 
   @@map("users")
 }
@@ -373,6 +378,8 @@ model Project {
   actionRequests       ActionRequest[]
   uiProfiles           UiProfile[]
   designSettings       DesignSettings?
+  boardCards           BoardCard[]
+  boardSettings        BoardSettings?
 
   @@unique([runnerId, rootPath])
   @@map("projects")
@@ -1491,6 +1498,8 @@ enum RunKind {
   plan
   /// A UI profile build (docs/specs/223 D13).
   ui_profile
+  /// A board card round (issue #242 D4).
+  card
 }
 
 enum RunStatus {
@@ -1551,6 +1560,7 @@ model Run {
   planTurn          PlanTurn?
   uiProfiles        UiProfile[]
   firings           ScheduleFiring[]
+  cardRound         BoardCardRound?
   inboundDeliveries InboundDelivery[]
 
   @@index([projectId, startedAt])
@@ -2538,4 +2548,152 @@ model DesignComment {
   @@index([designId, createdAt])
   @@index([revisionId])
   @@map("design_comments")
+}
+
+// ─── Board (issue #242, ADR-0024) ───────────────────────────────────────────
+
+/// Shared `BOARD_COLUMNS` (D3). `inbox` arrives with #244.
+enum BoardColumn {
+  todo
+  in_progress
+  finished
+  completed
+}
+
+/// Shared `BOARD_CARD_KINDS`: the branch prefix and the issue label.
+enum BoardCardKind {
+  feature
+  bug
+}
+
+/// Shared `BOARD_CARD_SOURCES`.
+enum BoardCardSource {
+  manual
+}
+
+/// Shared `CARD_ROUND_TRIGGERS` (D4).
+enum CardRoundTrigger {
+  run
+  feedback
+}
+
+/// Shared `CARD_ROUND_PHASES` (D4, D6).
+enum CardRoundPhase {
+  queued
+  starting
+  running
+  waiting
+  finished
+  ended
+  failed
+  cancelled
+}
+
+/// Shared `CARD_FINISHED_BY` (D6).
+enum CardFinishedBy {
+  worker
+  session_end
+  person
+}
+
+/// A work item AgentDock owns (ADR-0024), not a GitHub issue. Each Run or
+/// feedback is a round with its own `runs` row (D4).
+model BoardCard {
+  id            String          @id @default(cuid())
+  projectId     String
+  /// Per project, `C-<number>`: max + 1 under `pg_advisory_xact_lock` (D1).
+  number        Int
+  /// `^[a-z0-9]{8}$`: the worktree, tmux session and runner record (D5).
+  shortId       String          @unique
+  /// At most 200 characters, checked by the DTO.
+  title         String
+  /// Markdown, at most 20 000 characters.
+  body          String          @default("")
+  kind          BoardCardKind   @default(feature)
+  column        BoardColumn     @default(todo)
+  /// Fractional index inside the column (D3).
+  position      Float
+  source        BoardCardSource @default(manual)
+  issueOnRun    Boolean
+  specOnRun     Boolean
+  /// Overrides the project's model from the next round (D12).
+  model         String?
+  /// The Claude session, fixed at the first Run (D6).
+  sessionId     String?         @db.Uuid
+  branch        String?
+  /// Display only: the runner owns the path.
+  worktree      String?
+  issueNumber   Int?
+  issueUrl      String?
+  specPath      String?
+  prNumber      Int?
+  prUrl         String?
+  /// Nullable so deleting a user keeps the card.
+  createdById   String?
+  movedById     String?
+  completedById String?
+  movedAt       DateTime
+  completedAt   DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy   User?            @relation("BoardCardCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  movedBy     User?            @relation("BoardCardMovedBy", fields: [movedById], references: [id], onDelete: SetNull)
+  completedBy User?            @relation("BoardCardCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+  rounds      BoardCardRound[]
+
+  @@unique([projectId, number])
+  @@index([projectId, column, position])
+  @@index([sessionId])
+  @@map("board_cards")
+}
+
+/// One Run or feedback of a card (D4), with its `runs` row of kind `card`.
+model BoardCardRound {
+  id          String           @id @default(cuid())
+  cardId      String
+  round       Int
+  runId       String           @unique
+  trigger     CardRoundTrigger
+  /// The person's feedback (D9), at most 8 000 characters.
+  feedback    String?
+  /// Nullable so deleting the author keeps the round.
+  authorId    String?
+  phase       CardRoundPhase   @default(queued)
+  /// `agentdock-card-<shortId>`.
+  tmuxSession String?
+  finishedBy  CardFinishedBy?
+  /// From `finish_card` (D6), at most 4 000 characters.
+  summary     String?
+  exitCode    Int?
+  error       String?
+  startedAt   DateTime         @default(now())
+  waitingAt   DateTime?
+  finishedAt  DateTime?
+  endedAt     DateTime?
+
+  card   BoardCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  run    Run       @relation(fields: [runId], references: [id], onDelete: Cascade)
+  author User?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@unique([cardId, round])
+  @@index([phase])
+  @@map("board_card_rounds")
+}
+
+/// A project's board settings (D2, D13). No row: the defaults.
+model BoardSettings {
+  projectId   String   @id
+  issueOnRun  Boolean  @default(false)
+  specOnRun   Boolean  @default(false)
+  /// 1–10, checked by the DTO.
+  maxRunning  Int      @default(3)
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  updatedBy User?   @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@map("board_settings")
 }

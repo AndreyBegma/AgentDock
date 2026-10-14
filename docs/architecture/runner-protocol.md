@@ -733,6 +733,7 @@ daemon relays their request. Schemas are in `local.ts`.
 | `handoff.create` | operator | `title, body, branch` | an issue queued for the fleet, plus `manual.handoff` |
 | `action.request` | operator | `kind, args, summary` | a pending action request (spec 201 D18) |
 | `away.set` | operator | `on` | the runner's away mode; needs no project |
+| `card.finish` | operator | `summary` (≤ 4 000) | `{ number, finished: true }`; the card is the one whose session uuid is the request's `session.id`, else `not_a_card_session` (issue #242 D6) |
 
 ```json
 {
@@ -791,7 +792,7 @@ handler.
 | `skill.run` | `runId, projectId, root, base, skill, args, profileKey, model, permissionMode, output: report\|pr, timeoutSec` | operator | defined, not in the map yet: → `{ phase: queued\|preparing, tmuxSession? }`, timeout 30 s |
 | `skill.cancel` | `runId, projectId` | operator | defined, not in the map yet: → `{ cancelled }`, timeout 15 s |
 | `session.backfill` | `projectId?, since` | admin | implemented: → `{ files, events }`, timeout 600 s |
-| `terminal.attach` | `id, target: { kind: slot\|orchestrator\|skill_run, projectId, root, slot?\|runId? }, mode: read\|write, cols, rows` | admin | implemented: → `{ attached: true, session }`, timeout 10 s; `skill_run` answers `unsupported` until #24's runner lands |
+| `terminal.attach` | `id, target: { kind: slot\|orchestrator\|skill_run\|manual\|card, projectId, root, slot?\|runId?\|sessionId?\|cardId? }, mode: read\|write, cols, rows` | admin | implemented: → `{ attached: true, session }`, timeout 10 s; `skill_run` answers `unsupported` until #24's runner lands |
 | `worktree.status` | `projectId, root, slot, base?` | viewer | implemented (`commands/worktree.ts`): → `{ slot, branch, head, base, ahead, behind, changed, untracked, files (≤ 200), filesTruncated, commits (≤ 5) }`, timeout 10 s |
 
 Arguments are validated by schema on both sides (`parseCommand`). Commands
@@ -1053,6 +1054,51 @@ How the runner serves them:
   then tails `stream.jsonl` every 500 ms. Lines are redacted like pane
   frames, and so is `reportText`.
 
+### Board cards
+
+Schemas in `commands/cards.ts` (`cardCommands`) and `events/cards.ts`; the
+rules are issue [#242](https://github.com/AndreyBegma/AgentDock/issues/242)
+and [ADR-0024](../adr/0024-board-cards-and-dedicated-card-workers.md).
+`cardCommands` is defined but enters the `commands` map only together with
+its runner handlers (`apps/runner/src/cards/`).
+
+A card's worker is an interactive Claude Code session in its own worktree
+`<parent>/.wt-<repo>-card-<shortId>` and tmux session
+`agentdock-card-<shortId>` (`cardSessionName`), outside the orchestrator.
+Every command needs an operator.
+
+| Command | Args | Result |
+|---|---|---|
+| `card.run` | `cardId, runId, projectId, root, base, shortId (^[a-z0-9]{8}$), branch, session { id (uuid), resume }, prompt (≤ 64 KiB, no NUL), files? ([{ path, content }] ≤ 4, repository-relative, each ≤ 192 KiB), profileKey, model, permissionMode` | `{ phase: starting\|running, tmuxSession }`, timeout 60 s |
+| `card.stop` | `cardId, projectId` | `{ stopped }`, timeout 15 s |
+| `card.collect` | `cardId, projectId, root, base, branch, number, title (one line), body (≤ 16 KiB)` | `{ ahead, pushed, prNumber?, prUrl? }`, timeout 180 s |
+| `card.close` | `cardId, projectId, removeWorktree` | `{ stopped, worktreeRemoved, branchDeleted }`, timeout 30 s |
+
+- **Run.** Round 1 (`session.resume: false`) creates the worktree from
+  `origin/<base>` on `branch`, or checks out `origin/<branch>` when it exists,
+  commits `files` as the branch's first commit, writes `launch.json` with
+  `interactive: true` and starts tmux running `agentdock-runner exec-run`.
+  `exec-run` launches `claude --session-id <id>` (later rounds
+  `claude --resume <id>`) with `--model` and `--permission-mode`; the prompt is
+  one argv element, never a shell string. An interactive `exec-run` inherits
+  stdio (the tmux pane is the terminal) and still writes `exit.json`.
+- **Collect.** Commits leftovers as `chore: card C-<number> work in progress`,
+  pushes, and opens a PR into `base` when none is open for `branch` (else
+  pushes only). `ahead: 0` is "No changes".
+- **Close.** Kills tmux; with `removeWorktree`, removes the worktree and
+  deletes the local branch only when it is pushed. Never merges.
+- A card of another project is `not_found`.
+
+A round outlives `card.run`. Its progress is one event type (`source: "runner"`):
+
+| Type | `data` | Sent |
+|---|---|---|
+| `card_run.phase_changed` | `cardId, runId, projectId, phase: starting\|running\|ended\|failed, at, tmuxSession?, worktree?, exitCode?, error?` | on every transition; `ended` when the tmux session is gone (polled every 10 s) |
+
+What Claude does inside the session arrives as `hook.*` events whose
+`session.id` is the card's session uuid; the worker's `finish_card` MCP tool
+is the `card.finish` local method.
+
 ### Terminal
 
 Schemas in `commands/terminal.ts`; the rules are [spec 29](../specs/29-terminal-attach.md)
@@ -1070,6 +1116,9 @@ D1–D7 and D10. It is exported as `terminalCommands` and spread into the
   - `skill_run { projectId, root, runId }` → `agentdock-run-<shortid>` of a
     live run of that project. Until #24's runner lands this answers
     `unsupported`.
+  - `card { projectId, root, cardId }` → `agentdock-card-<shortid>` of that
+    project's board card (issue #242). Until the card executor lands this
+    answers `unsupported`.
 - A target that does not resolve, or resolves into another project, is
   `not_found`. When both `cs-<slot>` and `cs-<prefix>--<slot>` are live, the
   runner attaches to the one that sorts first.

@@ -126,5 +126,11 @@ const resolve = async (
       }
       return name.data;
     }
+    case 'card':
+      // Issue #242: resolved once the card executor lands.
+      throw new CommandFailure(
+        'unsupported',
+        'attaching to a board card is not supported by this runner',
+      );
   }
 };

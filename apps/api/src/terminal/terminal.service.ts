@@ -53,6 +53,9 @@ const targetOf = (
       return { kind: 'orchestrator', ...base };
     case 'skill_run':
       return { kind: 'skill_run', ...base, runId: dto.runId ?? '' };
+    case 'card':
+      // Issue #242: the ticket DTO does not accept `card` until the board lands.
+      throw new BadRequestException('kind card is not supported yet');
   }
 };
 

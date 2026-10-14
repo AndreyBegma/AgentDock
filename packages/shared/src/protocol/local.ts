@@ -47,6 +47,8 @@ export const localErrorCodeSchema = z.enum([
   'not_found',
   /** The domain service failed; `message` carries no stack trace. */
   'internal',
+  /** `card.finish` from a session that is not a board card's worker (issue #242). */
+  'not_a_card_session',
 ]);
 export type LocalErrorCode = z.infer<typeof localErrorCodeSchema>;
 
@@ -193,6 +195,24 @@ export const localActionStatusArgsSchema = z.strictObject({
 
 export const localAwaySetArgsSchema = z.strictObject({ on: z.boolean() });
 
+/** The `finish_card` summary; `CARD_SUMMARY_MAX` in the board module. */
+export const LOCAL_CARD_SUMMARY_MAX = 4_000;
+
+/**
+ * `card.finish` (issue #242 D6): the card worker's `finish_card` tool. The
+ * card is resolved from the request's `session.id` — the uuid the API gave
+ * the card — never from an argument; any other session is answered
+ * `not_a_card_session`.
+ */
+export const localCardFinishArgsSchema = z.strictObject({
+  summary: z.string().trim().min(1).max(LOCAL_CARD_SUMMARY_MAX),
+});
+export const localCardFinishResultSchema = z.object({
+  /** The card's per-project number (`C-<number>`). */
+  number: z.number().int().positive(),
+  finished: z.literal(true),
+});
+
 /**
  * The local method allowlist (D7). Each later change adds its method here and
  * its handler to the API's router in the same change.
@@ -267,6 +287,12 @@ export const localMethods = {
   'action.request': {
     args: localActionRequestArgsSchema,
     result: actionRequestSummarySchema,
+    minRole: 'operator',
+    needsProject: true,
+  },
+  'card.finish': {
+    args: localCardFinishArgsSchema,
+    result: localCardFinishResultSchema,
     minRole: 'operator',
     needsProject: true,
   },

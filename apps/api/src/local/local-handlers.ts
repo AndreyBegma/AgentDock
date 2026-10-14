@@ -22,6 +22,7 @@ import {
   type LocalProject,
   projectOf,
 } from './local-call';
+import { LocalError } from './local-error';
 
 const strings = (value: unknown): string[] =>
   Array.isArray(value)
@@ -93,6 +94,10 @@ export class LocalHandlers {
     'handoff.create': (args, call) => this.handoff(args, call),
     'action.request': (args, call) => this.actionRequest(args, call),
     'away.set': (args, call) => this.awaySet(args.on, call),
+    // Issue #242: no session is a card's until the board module handles it.
+    'card.finish': async () => {
+      throw new LocalError('not_a_card_session', 'not a board card session');
+    },
   };
 
   /** D16: plain text for the `SessionStart` hook, at most 2 000 characters. */
