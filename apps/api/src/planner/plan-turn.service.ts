@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import {
+  asPlannerContractVersion,
   PLANNER_ERROR,
   type PlanTurnAction,
   type PlanTurnInput,
@@ -19,10 +20,12 @@ import type { AuditContext } from '../audit/audit.types';
 import { SYSTEM_ACTOR, systemActorFor } from '../audit/audit.types';
 import { BudgetGate } from '../budgets/budget-gate';
 import { PrismaService } from '../database/prisma.service';
+import type { DesignTurnPlan } from '../design/design-rules';
 import { TALKABLE_STATUSES } from './plan-apply';
 import { questionsOf } from './plan-mapper';
 import { assemblePrompt } from './plan-prompt';
 import { PlanStore } from './plan-store';
+import { designPromptParts, retriedDesign } from './plan-turn-design';
 import { PlannerCommands, plannerOutput } from './planner-commands';
 import { PlannerFailure, plannerError } from './planner-error';
 
@@ -38,6 +41,8 @@ interface TurnSpec {
   action: PlanTurnAction;
   task: PlanTask | null;
   input: PlanTurnInput;
+  /** Spec 223: what a design turn draws; kept in `runs.args.design`. */
+  design?: DesignTurnPlan;
 }
 
 const turnInProgress = () =>
@@ -167,7 +172,62 @@ export class PlanTurnService {
     }
     const task = turn.task ? await this.store.task(plan, turn.task.key) : null;
     const input = (turn.input ?? {}) as PlanTurnInput;
-    return this.run(plan, { action: turn.action, task, input }, caller);
+    const design =
+      turn.action === 'design'
+        ? await retriedDesign(this.prisma, plan.id, turn.runId, task)
+        : undefined;
+    return this.run(plan, { action: turn.action, task, input, design }, caller);
+  }
+
+  /**
+   * Spec 223 D4, D10: one design turn — one variant of one task, in the
+   * task's fork session (D8). The variants of a batch run one after another:
+   * `PlanTurnProjector` starts the next when one is drawn.
+   */
+  designTurn(
+    plan: Plan,
+    task: PlanTask,
+    design: DesignTurnPlan,
+    caller: PlanCaller,
+  ): Promise<string> {
+    this.store.assertOpen(plan);
+    return this.run(
+      plan,
+      { action: 'design', task, input: {}, design },
+      caller,
+    );
+  }
+
+  /**
+   * The next design turn of a batch, or the first after a profile build
+   * (D13), for the person who asked for it. False when it did not start —
+   * the caller settles the design.
+   */
+  async chainDesign(
+    planId: string,
+    taskId: string,
+    design: DesignTurnPlan,
+    authorId: string | null,
+  ): Promise<boolean> {
+    try {
+      const plan = await this.prisma.plan.findUniqueOrThrow({
+        where: { id: planId },
+      });
+      const task = await this.prisma.planTask.findUniqueOrThrow({
+        where: { id: taskId },
+      });
+      await this.designTurn(plan, task, design, {
+        userId: authorId,
+        role: 'operator',
+        ctx: { actor: authorId ? systemActorFor(authorId) : SYSTEM_ACTOR },
+      });
+      return true;
+    } catch (error) {
+      this.logger.warn(
+        `plan ${planId}: design turn of variant ${design.variant} not started: ${(error as Error).message}`,
+      );
+      return false;
+    }
   }
 
   /** Kills the turn's session; the runner reports `cancelled`. */
@@ -249,15 +309,19 @@ export class PlanTurnService {
       userId: caller.userId,
     });
 
-    const [instructions, tasks, session] = await Promise.all([
+    const contractVersion = asPlannerContractVersion(plan.contractVersion);
+    const [instructions, tasks, session, designParts] = await Promise.all([
       this.prisma.plannerInstructions.findUniqueOrThrow({
         where: { id: plan.instructionsId },
         select: { body: true },
       }),
       this.store.currentTasks(this.prisma, plan),
       this.session(plan, spec.task),
+      designPromptParts(this.prisma, plan, project, spec, contractVersion),
     ]);
     const prompt = assemblePrompt({
+      ...designParts,
+      contractVersion,
       instructions: instructions.body,
       action: spec.action,
       brief: plan.brief,
@@ -334,7 +398,7 @@ export class PlanTurnService {
           kind: 'plan',
           projectId: plan.projectId,
           title: spec.task
-            ? `Plan ${spec.action}: ${spec.task.key}`
+            ? `Plan ${spec.action}: ${spec.task.key}${spec.design ? ` v${spec.design.variant}` : ''}`
             : `Plan ${spec.action}`,
           runtime: profile.runtime,
           model: plan.model,
@@ -343,6 +407,7 @@ export class PlanTurnService {
             planId: plan.id,
             action: spec.action,
             ...(spec.task ? { taskKey: spec.task.key } : {}),
+            ...(spec.design ? { design: spec.design } : {}),
           },
           status: 'running',
           triggeredByType: 'user',

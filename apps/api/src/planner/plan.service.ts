@@ -17,6 +17,8 @@ import { AuditService } from '../audit/audit.service';
 import type { AuditContext } from '../audit/audit.types';
 import { BudgetGate } from '../budgets/budget-gate';
 import { PrismaService } from '../database/prisma.service';
+import { designBlocks } from '../design/design-rules';
+import { designSummaries } from '../design/design-store';
 import { readablePlanWhere } from './plan-access';
 import {
   blockingOpen,
@@ -149,10 +151,28 @@ export class PlanService {
       include: planInclude,
       orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
     });
-    const tasks = await this.prisma.planTask.findMany({
-      where: { planId: { in: plans.map((p) => p.id) } },
-      select: { planId: true, planVersion: true, status: true },
-    });
+    const planIds = plans.map((p) => p.id);
+    const [tasks, latest] = await Promise.all([
+      this.prisma.planTask.findMany({
+        where: { planId: { in: planIds } },
+        select: { planId: true, planVersion: true, status: true },
+      }),
+      // #213: each plan's newest turn, any scope — the first of its plan in this order.
+      this.prisma.planTurn.findMany({
+        where: { planId: { in: planIds } },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        distinct: ['planId'],
+        select: {
+          id: true,
+          planId: true,
+          phase: true,
+          error: true,
+          createdAt: true,
+          finishedAt: true,
+        },
+      }),
+    ]);
+    const latestOf = new Map(latest.map((t) => [t.planId, t]));
     return {
       items: plans.map((plan) =>
         toSummary(
@@ -160,6 +180,7 @@ export class PlanService {
           tasks.filter(
             (t) => t.planId === plan.id && t.planVersion === plan.version,
           ),
+          latestOf.get(plan.id) ?? null,
         ),
       ),
     };
@@ -186,11 +207,18 @@ export class PlanService {
         ? this.store.planRound(planId)
         : Promise.resolve([]),
     ]);
-    const issueOf = await loadIssueViews(this.prisma, projectId, tasks);
+    const [issueOf, designs] = await Promise.all([
+      loadIssueViews(this.prisma, projectId, tasks),
+      designSummaries(this.prisma, planId),
+    ]);
     return toDetail({
       plan,
-      tasks: tasks.map((t) => toTaskView(t, issueOf(t))),
+      tasks: tasks.map((t) =>
+        toTaskView(t, issueOf(t), designs.get(t.key) ?? null),
+      ),
       turns: turns.map(toTurnView),
+      // Oldest first: the last is the newest (#213).
+      latestTurn: turns.at(-1) ?? null,
       questions,
     });
   }
@@ -311,6 +339,20 @@ export class PlanService {
         PLANNER_ERROR.needsTalk,
         `Task ${key} has a blocking question open`,
       );
+    }
+    if (decision === 'approve') {
+      const design = await this.prisma.taskDesign.findUnique({
+        where: { planId_taskKey: { planId: plan.id, taskKey: key } },
+        select: { needed: true, status: true },
+      });
+      if (designBlocks(design)) {
+        await record('denied', { reason: PLANNER_ERROR.designNotApproved });
+        throw plannerError(
+          409,
+          PLANNER_ERROR.designNotApproved,
+          `Task ${key} needs its design approved first`,
+        );
+      }
     }
     const text = comment?.trim() ?? '';
     if (decision === 'rewrite' && text === '') {

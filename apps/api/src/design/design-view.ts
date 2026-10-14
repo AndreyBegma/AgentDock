@@ -1,0 +1,57 @@
+import {
+  DEFAULT_VIEWPORTS,
+  DESIGN_ERROR,
+  type TaskDesignView,
+} from '@agentdock/shared';
+import type { PrismaService } from '../database/prisma.service';
+import { designError } from './design-error';
+import {
+  designInclude,
+  skillWarnings,
+  toDesignView,
+  viewportsOf,
+} from './design-mapper';
+import { installedOf } from './design-store';
+
+/**
+ * `GET …/tasks/:key/design` once the plan is known readable (D17): the
+ * design with its revisions and comments, the skills no longer installed
+ * (D15), the viewer's viewports (D11) and the design turn under way.
+ */
+export const loadDesignView = async (
+  prisma: PrismaService,
+  project: { id: string; runnerId: string },
+  planId: string,
+  key: string,
+): Promise<TaskDesignView> => {
+  const row = await prisma.taskDesign.findUnique({
+    where: { planId_taskKey: { planId, taskKey: key } },
+    include: designInclude,
+  });
+  if (!row) {
+    throw designError(404, DESIGN_ERROR.notFound, 'Design not found');
+  }
+  const [installed, settings, active] = await Promise.all([
+    installedOf(prisma, project, row.skills),
+    prisma.designSettings.findUnique({
+      where: { projectId: project.id },
+      select: { viewports: true },
+    }),
+    prisma.planTurn.findFirst({
+      where: {
+        planId,
+        action: 'design',
+        task: { key },
+        phase: { in: ['queued', 'running'] },
+      },
+      select: { id: true },
+    }),
+  ]);
+  return toDesignView(row, {
+    warnings: skillWarnings(row.skills, installed),
+    viewports: settings
+      ? viewportsOf(settings.viewports)
+      : [...DEFAULT_VIEWPORTS],
+    activeTurnId: active?.id ?? null,
+  });
+};

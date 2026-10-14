@@ -123,6 +123,44 @@ export const specFilePath = (
   title: string,
 ): string => `${specDir}/${issue}-${slugOf(title)}.md`;
 
+/** Spec 223 "Open questions": where a project without a `specDir` keeps designs. */
+export const DESIGN_FALLBACK_DIR = 'docs';
+
+/** What a write turn is told before the issue exists; send fills it in. */
+export const ISSUE_PLACEHOLDER = '<issue>';
+
+/** How an issue body names a path holding its own number, which it cannot know (Q3). */
+export const THIS_ISSUE = '<this issue>';
+
+/**
+ * Spec 223 D16: `<specDir>/<issue>-<slug>/design/<variant>.html`, or
+ * `docs/design/<issue>-<slug>/<variant>.html` without a `specDir`.
+ */
+export const designFilePath = (
+  specDir: string | null,
+  issue: number | typeof ISSUE_PLACEHOLDER | typeof THIS_ISSUE,
+  title: string,
+  variant: number,
+): string =>
+  specDir
+    ? `${specDir}/${issue}-${slugOf(title)}/design/${variant}.html`
+    : `${DESIGN_FALLBACK_DIR}/design/${issue}-${slugOf(title)}/${variant}.html`;
+
+/**
+ * Spec 223 D16: the document names its design file with the real issue
+ * number. The write turn wrote the path with `<issue>`; a document that does
+ * not name the file at all gets a `## Design` section that does.
+ */
+export const withDesignPath = (
+  document: string,
+  template: string,
+  path: string,
+): string => {
+  const filled = document.split(template).join(path);
+  if (filled.includes(path)) return filled;
+  return `${filled.trimEnd()}\n\n## Design\n\nThe approved mockup is \`${path}\`. It fixes the layout, the states and the copy; it is not code to copy — build it with the project's real components.\n`;
+};
+
 /**
  * The document of a task that was approved as it is, without a written one
  * (D6, Q6): its summary and, under `## Open questions`, the defaults taken.
@@ -155,6 +193,7 @@ export const docsPrIssueBody = (
   task: SendTask,
   specDir: string,
   branch: string,
+  designVariant: number | null = null,
 ): string =>
   [
     '## Summary',
@@ -163,6 +202,12 @@ export const docsPrIssueBody = (
     '',
     '## Specification',
     '',
-    `The full specification is \`${specDir}/<this issue>-${slugOf(task.title)}.md\`, added by this plan's docs pull request (branch \`${branch}\`).`,
+    `The full specification is \`${specDir}/${THIS_ISSUE}-${slugOf(task.title)}.md\`, added by this plan's docs pull request (branch \`${branch}\`).`,
+    ...(designVariant !== null
+      ? [
+          '',
+          `Its approved design is \`${designFilePath(specDir, THIS_ISSUE, task.title, designVariant)}\`, in the same pull request.`,
+        ]
+      : []),
     '',
   ].join('\n');

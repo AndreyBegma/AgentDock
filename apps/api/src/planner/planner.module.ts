@@ -37,5 +37,7 @@ import { TasksQueryService } from './tasks-query.service';
     PlannerInstructionsService,
     TasksQueryService,
   ],
+  // The design stage (spec 223) runs its turns through the planner's.
+  exports: [PlanStore, PlanTurnService],
 })
 export class PlannerModule {}

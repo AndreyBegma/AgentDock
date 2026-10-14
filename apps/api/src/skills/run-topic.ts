@@ -22,9 +22,10 @@ export const parseRunTopic = (topic: LiveTopic): RunTarget =>
 /**
  * Who may read `run:<projectId>:<runId>` (spec 24 D13): anyone who can see
  * the project, viewer and up — and for a plan turn (#183), only a reader of
- * its plan (`readablePlanWhere`, spec 172 D13). A project the caller cannot
- * see is `forbidden` whether or not it exists; a run that is not a skill run
- * or a plan turn of that project, or a turn of a plan the caller cannot read,
+ * its plan (`readablePlanWhere`, spec 172 D13); a UI profile build (spec 223
+ * D17) is any member's. A project the caller cannot see is `forbidden`
+ * whether or not it exists; a run that is not a skill run, a plan turn or a
+ * profile build of that project, or a turn of a plan the caller cannot read,
  * is `not_found`, as the planner answers a hidden plan. Re-validation runs
  * this again, so a plan taken back to private drops its other watchers.
  */
@@ -47,6 +48,8 @@ export const authorizeRun = async (
           kind: 'plan',
           planTurn: { is: { plan: readablePlanWhere(user.id) } },
         },
+        // Spec 223 D17: a profile build is project-wide; every member reads it.
+        { kind: 'ui_profile' },
       ],
     },
     select: { id: true },

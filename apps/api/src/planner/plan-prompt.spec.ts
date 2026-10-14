@@ -39,6 +39,7 @@ const base: PromptInput = {
   tasks: [],
   round: [],
   input: {},
+  contractVersion: 2,
 };
 
 describe('assemblePrompt', () => {

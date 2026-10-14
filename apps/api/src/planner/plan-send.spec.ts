@@ -1,13 +1,42 @@
 import {
   dependencyOrder,
+  designFilePath,
   docsPrIssueBody,
   fallbackDocument,
   findCycle,
+  ISSUE_PLACEHOLDER,
   rewriteDependsOn,
   type SendTask,
   slugOf,
   specFilePath,
+  withDesignPath,
 } from './plan-send';
+
+describe('design files (spec 223 D16)', () => {
+  it('sit under the spec directory, or docs/design without one', () => {
+    expect(designFilePath('docs/specs', 12, 'Export CSV', 2)).toBe(
+      'docs/specs/12-export-csv/design/2.html',
+    );
+    expect(designFilePath(null, 12, 'Export CSV', 1)).toBe(
+      'docs/design/12-export-csv/1.html',
+    );
+  });
+
+  it('fills the issue number into the path the write turn named, or adds a Design section', () => {
+    const template = designFilePath('docs/specs', ISSUE_PLACEHOLDER, 'X', 1);
+    const path = designFilePath('docs/specs', 7, 'X', 1);
+    expect(
+      withDesignPath(`## Design\n\nSee \`${template}\`.\n`, template, path),
+    ).toBe(`## Design\n\nSee \`${path}\`.\n`);
+    const added = withDesignPath(
+      '## Summary\n\nNo design named.\n',
+      template,
+      path,
+    );
+    expect(added).toContain('## Design');
+    expect(added).toContain(`\`${path}\``);
+  });
+});
 
 const task = (key: string, dependsOn: string[] = []): SendTask => ({
   key,

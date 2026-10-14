@@ -1,13 +1,24 @@
 import {
+  designBytes,
   PLANNER_BLOCK_TAG,
-  PLANNER_OUTPUT_CONTRACT,
+  PLANNER_DESIGN_CONTRACT,
   type PlanMode,
+  type PlannerContractVersion,
   type PlanQuestion,
   type PlanTaskKind,
   type PlanTaskStatus,
   type PlanTurnAction,
   type PlanTurnInput,
+  plannerOutputContract,
 } from '@agentdock/shared';
+import { PLAN_TURN_PROMPT_MAX_BYTES } from '@agentdock/shared/protocol';
+import {
+  type ApprovedDesignContext,
+  approvedDesignSections,
+  type DesignPromptContext,
+  designSections,
+  designWhat,
+} from '../design/design-prompt';
 
 /** A task as the planner sees it in the plan state. */
 export interface PromptTask {
@@ -35,7 +46,21 @@ export interface PromptInput {
   /** The round the input answers: the plan's for clarify, the task's for grill. */
   round: PlanQuestion[];
   input: PlanTurnInput;
+  /** The plan's contract version (D11): its turns run under it. */
+  contractVersion: PlannerContractVersion;
+  /**
+   * Spec 223 D3: whether the project's UI profile reports a UI — null with no
+   * profile. Told to v2 turns that suggest designs.
+   */
+  hasUi?: boolean | null;
+  /** Spec 223 D8: a design turn's context. */
+  design?: DesignPromptContext;
+  /** Spec 223 D16: a write turn of a task whose design is approved. */
+  approvedDesign?: ApprovedDesignContext;
 }
+
+/** Actions whose output carries design suggestions under contract v2. */
+const SUGGESTING: readonly PlanTurnAction[] = ['decompose', 'grill', 'revise'];
 
 const WHAT: Record<PlanTurnAction, (input: PromptInput) => string> = {
   clarify: () =>
@@ -48,9 +73,18 @@ const WHAT: Record<PlanTurnAction, (input: PromptInput) => string> = {
     `Write the document of task \`${i.taskKey}\`. Use the answers given so far; record every default you took under \`## Open questions\`.`,
   revise: () =>
     'Revise the plan. Apply every rewrite comment. Pass every frozen (approved) task through as `{ "key": "<key>" }` only, drop rejected tasks, and return every other task in full.',
-  // Placeholder until the design flow lands (spec 223, slot i223-api).
-  design: (i) => `Draw the mockup of task \`${i.taskKey}\`.`,
+  design: (i) =>
+    i.design
+      ? designWhat(i.taskKey ?? '', i.design)
+      : `Draw the mockup of task \`${i.taskKey}\`.`,
 };
+
+const UI_LINE = {
+  true: 'The project has a user interface (its UI profile says so).',
+  false:
+    'The project has no user interface (its UI profile says so): every `design.needed` is `false`.',
+  none: 'The project has no UI profile yet; judge from the brief and the repository.',
+} as const;
 
 const fence = (lang: string, body: string): string => {
   // A fence longer than any backtick run inside, so the body cannot close it.
@@ -88,6 +122,23 @@ const answersText = (
  * string. Free text from the person is fenced, so it reads as data.
  */
 export const assemblePrompt = (input: PromptInput): string => {
+  const design = input.design;
+  if (!design) return assembleWith(input, []);
+  // Spec 223: a large style kit's snippets are trimmed from the end until
+  // the prompt fits its cap; the prompt says which were left out.
+  const count = design.profile?.snippets.length ?? 0;
+  let prompt = assembleWith(input, designSections(design));
+  for (
+    let keep = count - 1;
+    keep >= 0 && designBytes(prompt) > PLAN_TURN_PROMPT_MAX_BYTES;
+    keep -= 1
+  ) {
+    prompt = assembleWith(input, designSections(design, keep));
+  }
+  return prompt;
+};
+
+const assembleWith = (input: PromptInput, design: string[]): string => {
   const state = {
     title: input.plan.title,
     mode: input.plan.mode,
@@ -107,9 +158,15 @@ export const assemblePrompt = (input: PromptInput): string => {
         : {}),
     })),
   };
+  const v2 = input.contractVersion >= 2;
   const sections = [
     input.instructions.trim(),
-    PLANNER_OUTPUT_CONTRACT.trim(),
+    plannerOutputContract(input.contractVersion).trim(),
+    // Spec 223: a v1 plan's design is switched on by hand; its contract text
+    // does not carry the design action, so a design turn gets it here.
+    ...(input.action === 'design' && !v2
+      ? [PLANNER_DESIGN_CONTRACT.trim()]
+      : []),
     '# This turn',
     `Action: \`${input.action}\`. ${WHAT[input.action](input)}`,
     `Answer with exactly one \`${PLANNER_BLOCK_TAG}\` block whose \`action\` is \`${input.action}\`${input.taskKey ? ` and whose \`taskKey\` is \`${input.taskKey}\`` : ''}.`,
@@ -118,6 +175,16 @@ export const assemblePrompt = (input: PromptInput): string => {
     '## Plan state',
     fence('json', JSON.stringify(state, null, 2)),
   ];
+  if (v2 && SUGGESTING.includes(input.action) && input.hasUi !== undefined) {
+    sections.push(
+      '## User interface',
+      UI_LINE[input.hasUi === null ? 'none' : input.hasUi ? 'true' : 'false'],
+    );
+  }
+  sections.push(...design);
+  if (input.approvedDesign) {
+    sections.push(...approvedDesignSections(input.approvedDesign));
+  }
   if (input.action === 'revise') {
     const frozen = input.tasks.filter((t) => t.status === 'approved');
     sections.push(

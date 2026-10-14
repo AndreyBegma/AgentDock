@@ -18,8 +18,10 @@ import {
   plannerOutputSchemas,
   planQuestionRoundSchema,
   planTurnInputSchema,
+  type TaskDesignSummary,
 } from '@agentdock/shared';
 import type { Prisma } from '@prisma/client';
+import { type PlanStatusTurn, planAttention } from './plan-status';
 
 export const userSelect = {
   select: { id: true, name: true, email: true },
@@ -126,6 +128,7 @@ type TaskRow = Prisma.PlanTaskGetPayload<object>;
 export const toTaskView = (
   row: TaskRow,
   issue: PlanTaskIssueView | null,
+  design: TaskDesignSummary | null = null,
 ): PlanTaskView => {
   const questions = questionsOf(row.questions);
   return {
@@ -144,8 +147,7 @@ export const toTaskView = (
     frozen: row.frozen,
     issue,
     queuedAt: row.queuedAt?.toISOString() ?? null,
-    // Filled from `task_designs` by the design flow (spec 223, slot i223-api).
-    design: null,
+    design,
   };
 };
 
@@ -161,9 +163,14 @@ export const planInclude = { author: userSelect } as const;
 
 type PlanRow = Prisma.PlanGetPayload<{ include: typeof planInclude }>;
 
+/**
+ * `latestTurn`: the plan's newest turn of any scope (#213) — a failed one
+ * that nothing replaced marks the plan for attention.
+ */
 export const toSummary = (
   row: PlanRow,
   tasks: readonly { status: PlanTaskStatus }[],
+  latestTurn: PlanStatusTurn | null,
 ): PlanSummary => ({
   id: row.id,
   projectId: row.projectId,
@@ -177,6 +184,7 @@ export const toSummary = (
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(),
   sentAt: row.sentAt?.toISOString() ?? null,
+  attention: planAttention(row.status, latestTurn),
 });
 
 /** Tasks as nodes, `dependsOn` as edges from the dependency to its dependant. */
@@ -198,6 +206,8 @@ export interface DetailParts {
   plan: PlanRow & { instructions: { version: number } };
   tasks: PlanTaskView[];
   turns: PlanTurnView[];
+  /** The plan's newest turn row, for its attention (#213). */
+  latestTurn: PlanStatusTurn | null;
   /** The current plan-level round (dialogue mode, before decomposition). */
   questions: PlanQuestion[];
 }
@@ -206,9 +216,10 @@ export const toDetail = ({
   plan,
   tasks,
   turns,
+  latestTurn,
   questions,
 }: DetailParts): PlanDetail => ({
-  ...toSummary(plan, tasks),
+  ...toSummary(plan, tasks, latestTurn),
   brief: plan.brief,
   questions,
   instructionsVersion: plan.instructions.version,

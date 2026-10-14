@@ -6,6 +6,11 @@ import {
   type PlanTaskStatus,
   type ReviseOutput,
 } from '@agentdock/shared';
+import {
+  type DesignGate,
+  designBlocks,
+  withDesign,
+} from '../design/design-rules';
 
 /** D6: a blocking question keeps a task in `needs_talk`; otherwise it can be approved. */
 export const statusOfRound = (
@@ -17,6 +22,7 @@ export const statusOfRound = (
 export const TALKABLE_STATUSES: readonly PlanTaskStatus[] = [
   'draft',
   'needs_talk',
+  'needs_design',
   'ready',
   'rewrite_requested',
 ];
@@ -52,19 +58,30 @@ export const draftOf = (
   sessionId,
 });
 
-/** The grill result for a task: the next round, or done (`write` follows). */
-export const afterGrill = (output: {
-  questions: PlanQuestion[];
-  done: boolean;
-}): {
+/**
+ * The grill result for a task: the next round, or done — `write` follows,
+ * unless the task's design holds it (spec 223 D1): then approving the design
+ * chains the write instead.
+ */
+export const afterGrill = (
+  output: {
+    questions: PlanQuestion[];
+    done: boolean;
+  },
+  design: DesignGate | null = null,
+): {
   status: PlanTaskStatus;
   questions: PlanQuestion[];
   chainWrite: boolean;
 } =>
   output.done
-    ? { status: 'ready', questions: [], chainWrite: true }
+    ? {
+        status: withDesign('ready', design),
+        questions: [],
+        chainWrite: !designBlocks(design),
+      }
     : {
-        status: statusOfRound(output.questions),
+        status: withDesign(statusOfRound(output.questions), design),
         questions: output.questions,
         chainWrite: false,
       };

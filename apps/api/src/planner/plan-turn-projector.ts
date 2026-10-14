@@ -1,8 +1,10 @@
 import {
+  asPlannerContractVersion,
   type ClarifyOutput,
   type DecomposeOutput,
   type DesignOutput,
   type GrillOutput,
+  isPlannedTask,
   type PlannerParseResult,
   type PlanTurnAction,
   parsePlannerOutput,
@@ -19,6 +21,14 @@ import {
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import type { Plan, PlanTask, Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
+import { applyDesignOutput, settleDesign } from '../design/design-apply';
+import {
+  type DesignGate,
+  type DesignTurnPlan,
+  designTurnPlanOf,
+  withDesign,
+} from '../design/design-rules';
+import { applySuggestions, designGates } from '../design/design-store';
 import {
   type RunnerEventSink,
   RunnerEventSinks,
@@ -36,11 +46,10 @@ import { PlanTurnService } from './plan-turn.service';
 
 type Tx = Prisma.TransactionClient;
 
-/** A turn the API starts once this one is applied (D7). */
-interface Chain {
-  action: 'write' | 'decompose';
-  taskId: string | null;
-}
+/** A turn the API starts once this one is applied (D7; spec 223 D4). */
+type Chain =
+  | { action: 'write' | 'decompose'; taskId: string | null }
+  | { action: 'design'; taskId: string; design: DesignTurnPlan };
 
 const taskData = (planId: string, version: number, draft: TaskDraft) => ({
   planId,
@@ -55,6 +64,15 @@ const taskData = (planId: string, version: number, draft: TaskDraft) => ({
   document: draft.document,
   frozen: draft.frozen,
   sessionId: draft.sessionId,
+});
+
+/** Spec 223 D1: a draft whose design holds it is `needs_design`. */
+const gated = (
+  draft: TaskDraft,
+  design: DesignGate | undefined,
+): TaskDraft => ({
+  ...draft,
+  status: withDesign(draft.status, design),
 });
 
 const asCurrent = (row: PlanTask): CurrentTask => ({
@@ -162,9 +180,27 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
     const resultText = data.resultText ?? null;
     let chain: Chain | null = null;
 
+    const designPlan =
+      turn.action === 'design'
+        ? designTurnPlanOf(
+            (
+              await this.prisma.run.findUnique({
+                where: { id: turn.runId },
+                select: { args: true },
+              })
+            )?.args,
+          )
+        : null;
+    // Spec 223: a design turn that draws nothing puts its design back to rest.
+    const unsettle = async (tx: Tx) => {
+      if (turn.action === 'design' && turn.task) {
+        await settleDesign(tx, turn.planId, turn.task.key);
+      }
+    };
+
     const applied = await this.prisma.$transaction(async (tx) => {
       if (data.phase !== 'succeeded') {
-        return this.store.settleTurn(
+        const settled = await this.store.settleTurn(
           turn.id,
           {
             phase: data.phase,
@@ -174,15 +210,24 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
           },
           tx,
         );
+        if (settled) await unsettle(tx);
+        return settled;
       }
       const parsed = data.resultTruncated
         ? null
-        : await this.parse(tx, turn.plan, turn.task, turn.action, resultText);
+        : await this.parse(
+            tx,
+            turn.plan,
+            turn.task,
+            turn.action,
+            resultText,
+            designPlan,
+          );
       if (!parsed?.ok) {
         const why = parsed
           ? `${parsed.error.reason}: ${parsed.error.message}`
           : 'result_truncated: the result was cut at the event size limit';
-        return this.store.settleTurn(
+        const settled = await this.store.settleTurn(
           turn.id,
           {
             phase: 'failed',
@@ -192,6 +237,38 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
           },
           tx,
         );
+        if (settled) await unsettle(tx);
+        return settled;
+      }
+      if (
+        parsed.output.action === 'design' &&
+        'html' in parsed &&
+        typeof parsed.html === 'string' &&
+        turn.task &&
+        designPlan
+      ) {
+        const settled = await this.store.settleTurn(
+          turn.id,
+          {
+            phase: 'succeeded',
+            resultText,
+            output: parsed.output as Prisma.InputJsonValue,
+            at,
+          },
+          tx,
+        );
+        if (!settled) return false;
+        const next = await applyDesignOutput(
+          tx,
+          { id: turn.id, planId: turn.planId, taskKey: turn.task.key },
+          designPlan,
+          parsed.output,
+          parsed.html,
+        );
+        chain = next
+          ? { action: 'design', taskId: turn.task.id, design: next }
+          : null;
+        return true;
       }
       const settled = await this.store.settleTurn(
         turn.id,
@@ -209,8 +286,30 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
     });
     if (!applied) return;
     await this.publish(turn.plan, turn.runId);
+    if (turn.action === 'design') {
+      this.store.publishDesign(
+        turn.plan.projectId,
+        turn.planId,
+        turn.task?.key ?? null,
+      );
+    }
     const next = chain as Chain | null;
-    if (next) {
+    if (next?.action === 'design') {
+      const started = await this.turns.chainDesign(
+        turn.planId,
+        next.taskId,
+        next.design,
+        turn.authorId,
+      );
+      if (!started && turn.task) {
+        await settleDesign(this.prisma, turn.planId, turn.task.key);
+        this.store.publishDesign(
+          turn.plan.projectId,
+          turn.planId,
+          turn.task.key,
+        );
+      }
+    } else if (next) {
       await this.turns.chain(
         turn.planId,
         next.action,
@@ -227,26 +326,40 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
     task: PlanTask | null,
     action: PlanTurnAction,
     text: string | null,
+    designPlan: DesignTurnPlan | null,
   ): Promise<PlannerParseResult<PlanTurnAction>> {
     const body = text ?? '';
+    // D11: a plan's turns are validated against the version it was created with.
+    const contractVersion = asPlannerContractVersion(plan.contractVersion);
     switch (action) {
-      // Placeholder until the design flow lands (spec 223, slot i223-api).
       case 'design':
-        return {
-          ok: false,
-          error: {
-            code: 'contract_violation',
-            reason: 'action_mismatch',
-            message: 'design turns are not handled yet',
-          },
-        };
+        if (!designPlan || !task) {
+          return {
+            ok: false,
+            error: {
+              code: 'contract_violation',
+              reason: 'invalid_shape',
+              message: 'the design turn lost its variant; generate it again',
+            },
+          };
+        }
+        return parsePlannerOutput(body, 'design', {
+          contractVersion,
+          taskKey: task.key,
+          variant: designPlan.variant,
+          openCommentIds: designPlan.comments,
+        });
       case 'clarify':
       case 'decompose':
-        return parsePlannerOutput(body, action);
+        return parsePlannerOutput(body, action, { contractVersion });
       case 'grill':
-        return parsePlannerOutput(body, 'grill', { taskKey: task?.key ?? '' });
+        return parsePlannerOutput(body, 'grill', {
+          contractVersion,
+          taskKey: task?.key ?? '',
+        });
       case 'write':
         return parsePlannerOutput(body, 'write', {
+          contractVersion,
           taskKey: task?.key ?? '',
           taskKind: task?.kind ?? 'feature',
         });
@@ -260,6 +373,7 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
           select: { key: true },
         });
         return parsePlannerOutput(body, 'revise', {
+          contractVersion,
           frozenKeys: approved.map((t) => t.key),
         });
       }
@@ -279,8 +393,7 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
       | ReviseOutput
       | DesignOutput,
   ): Promise<Chain | null> {
-    // Placeholder until the design flow lands (spec 223, slot i223-api):
-    // `parse` refuses design turns, so none reaches here.
+    // A design turn is applied by `applyDesignOutput` before this is reached.
     if (output.action === 'design') return null;
     // The turn may have been started on an older row; read the plan now.
     const plan = await tx.plan.findUniqueOrThrow({ where: { id: planRow.id } });
@@ -288,12 +401,19 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
       case 'clarify':
         return output.done ? { action: 'decompose', taskId: null } : null;
       case 'decompose': {
+        // Spec 223 D2: the suggestions first, so the statuses can read them.
+        await applySuggestions(tx, plan, output.tasks);
+        const designs = await designGates(tx, plan.id);
         await tx.planTask.deleteMany({
           where: { planId: plan.id, planVersion: plan.version },
         });
         await tx.planTask.createMany({
           data: output.tasks.map((t) =>
-            taskData(plan.id, plan.version, draftOf(t)),
+            taskData(
+              plan.id,
+              plan.version,
+              gated(draftOf(t), designs.get(t.key)),
+            ),
           ),
         });
         await tx.plan.update({
@@ -304,7 +424,11 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
       }
       case 'grill': {
         if (!task) return null;
-        const next = afterGrill(output);
+        await applySuggestions(tx, plan, [
+          { key: task.key, design: output.design },
+        ]);
+        const designs = await designGates(tx, plan.id);
+        const next = afterGrill(output, designs.get(task.key));
         await tx.planTask.update({
           where: { id: task.id },
           data: {
@@ -326,9 +450,11 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
           where: { planId: plan.id, planVersion: plan.version },
         });
         const version = plan.version + 1;
+        await applySuggestions(tx, plan, output.tasks.filter(isPlannedTask));
+        const designs = await designGates(tx, plan.id);
         await tx.planTask.createMany({
           data: revisedTasks(current.map(asCurrent), output).map((d) =>
-            taskData(plan.id, version, d),
+            taskData(plan.id, version, gated(d, designs.get(d.key))),
           ),
         });
         await tx.plan.update({ where: { id: plan.id }, data: { version } });

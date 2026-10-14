@@ -1,5 +1,6 @@
 import type {
   PlanDetail,
+  PlanListView,
   PlannerInstructionsView,
   PlannerSettingsView,
   PlanTaskVersionsView,
@@ -558,6 +559,19 @@ describe('planner (e2e)', () => {
         where: { id: failed.runId },
       });
       expect(run).toMatchObject({ kind: 'plan', status: 'failed' });
+      // #213: the failed plan is not "drafting" — the list and the detail say so.
+      expect(detail.attention).toMatchObject({
+        kind: 'failed',
+        turnId: failed.id,
+      });
+      const listed = (await h.author.get(h.base())).body as PlanListView;
+      expect(listed.items[0].attention).toMatchObject({
+        kind: 'failed',
+        turnId: failed.id,
+        reason: expect.stringMatching(
+          /^contract_violation: no_block/,
+        ) as string,
+      });
 
       const retry = await h.author.send(
         'post',
@@ -577,6 +591,7 @@ describe('planner (e2e)', () => {
       );
       detail = await h.detail(plan.id);
       expect(detail.tasks.map((t) => t.key)).toEqual(['t1']);
+      expect(detail.attention).toBeNull();
       const succeeded = detail.turns[1];
       expect(succeeded).toMatchObject({
         action: 'decompose',
