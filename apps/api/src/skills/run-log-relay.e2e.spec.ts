@@ -197,6 +197,34 @@ describe('skill run live log (e2e)', () => {
     await expect(desk.next('subscribe', 300)).rejects.toThrow(/no .* within/);
   });
 
+  it('relays a running UI profile build to any member of the project (spec 223 D17)', async () => {
+    const desk = await runner();
+    const now = new Date();
+    const { id: runId } = await ctx.prisma.run.create({
+      data: {
+        kind: 'ui_profile',
+        projectId,
+        status: 'running',
+        triggeredByType: 'user',
+        startedAt: now,
+        updatedAt: now,
+        args: { projectId, reason: 'first', obligations: null, waiting: [] },
+      },
+    });
+    const topic = runTopic(projectId, runId);
+    const page = await browser(viewer);
+
+    expect(await page.subscribe(topic)).toEqual({ type: 'subscribed', topic });
+    const subscribe = await desk.next('subscribe');
+    expect(subscribe).toMatchObject({ kind: 'run_log', projectId, runId });
+    desk.send({ type: 'run_log', id: subscribe.id, frame: lines(MARKER) });
+    expect(await page.next('event')).toMatchObject({
+      topic,
+      event: RUN_LOG_LIVE_EVENTS.lines,
+      data: lines(MARKER),
+    });
+  });
+
   describe('a plan turn (#183)', () => {
     let author: Session;
     let other: Session;

@@ -142,15 +142,24 @@ export class RunLogRelay implements LiveTopicHooks, RunnerStreamListener {
   private async open(topic: LiveTopic): Promise<RunWatch | null> {
     const { projectId, runId } = parseRunTopic(topic);
     const run = await this.prisma.run.findFirst({
-      where: { id: runId, projectId, kind: { in: ['skill', 'plan'] } },
+      where: {
+        id: runId,
+        projectId,
+        kind: { in: ['skill', 'plan', 'ui_profile'] },
+      },
       select: {
+        status: true,
         skillRun: { select: { phase: true } },
         planTurn: { select: { phase: true } },
         project: { select: { runnerId: true } },
       },
     });
-    // A plan turn's phases are a subset of a skill run's.
-    const phase = run?.skillRun?.phase ?? run?.planTurn?.phase;
+    // A plan turn's phases are a subset of a skill run's; a profile build
+    // (spec 223) has only its run's status.
+    const phase =
+      run?.skillRun?.phase ??
+      run?.planTurn?.phase ??
+      (run?.status === 'running' ? 'running' : run ? 'succeeded' : undefined);
     if (!run || !phase || isTerminalSkillRunPhase(phase)) return null;
     return {
       topic,
