@@ -9,6 +9,7 @@ import {
   PROJECT_PATH_MAX_LENGTH,
   ROLES,
   type Role,
+  SESSION_CONTENT_RETENTION_DAYS,
   type UpdateProjectMemberRequest,
   type UpdateProjectRequest,
 } from '@agentdock/shared';
@@ -20,11 +21,14 @@ import { Transform } from 'class-transformer';
 import {
   IsBoolean,
   IsIn,
+  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
   Matches,
+  Max,
   MaxLength,
+  Min,
   ValidateIf,
 } from 'class-validator';
 
@@ -93,6 +97,17 @@ export class UpdateProjectDto implements UpdateProjectRequest {
   @IsOptional()
   @IsBoolean()
   mergeApproval?: boolean;
+
+  /** ADR-0021: keep hook content of the project's sessions. */
+  @IsOptional()
+  @IsBoolean()
+  shipSessionContent?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(SESSION_CONTENT_RETENTION_DAYS.min)
+  @Max(SESSION_CONTENT_RETENTION_DAYS.max)
+  sessionContentRetentionDays?: number;
 }
 
 /** Which fields a kind takes is checked by the service (`invalid_docs_source`). */
