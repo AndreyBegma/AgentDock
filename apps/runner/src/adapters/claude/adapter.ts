@@ -77,7 +77,7 @@ const projectsDir = (profile: ConfigProfile, home: string): string =>
  */
 export const claudeAdapter: RuntimeAdapter = {
   runtime: 'claude',
-  version: '1',
+  version: '2',
 
   roots: (profile, home) => [projectsDir(profile, home)],
 

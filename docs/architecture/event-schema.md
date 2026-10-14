@@ -71,6 +71,8 @@ are in [runner-protocol.md](runner-protocol.md#session-events). The envelope's
 | `llm.request` | `requestId, model, tokens: { input, output, cacheRead, cacheWrite5m, cacheWrite1h, reasoning }, querySource: main\|subagent\|auxiliary, promptId?, durationMs?, durationApprox?, ttftMs?, stopReason?, agentName?, reportedCostUsd?, cacheWriteTtlUnknown?, source?: transcript\|otel, run?` |
 | `tool.call` | `toolUseId, tool, startedAt, promptId?, endedAt?, ok?, durationMs?, decision?, childSessionId?` |
 | `turn.started` / `turn.finished` | `promptId` |
+| `session.compacted` | `compactionId, trigger: auto\|manual, preTokens?` |
+| `session.error` | `errorId, kind (an error code, [a-z_] only), status?, promptId?` |
 | `skill.activated` | `skill` |
 
 None of these carries prompt, response, thinking or tool-argument text
