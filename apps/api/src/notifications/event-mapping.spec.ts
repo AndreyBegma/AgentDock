@@ -1,4 +1,5 @@
 import {
+  blockedCheckpointDraft,
   draftFor,
   type MatchableEvent,
   oneLine,
@@ -68,20 +69,39 @@ describe('draftFor (spec 22 D1)', () => {
     });
   });
 
-  it('maps only a blocked checkpoint to slot.blocked, without its summary', () => {
-    const blocked = draftFor(
-      event({
-        type: 'slot.checkpoint',
-        data: { checkpoint: 'blocked', summary: 'secret stack trace' },
-      }),
-    );
-    expect(blocked?.kind).toBe('slot.blocked');
-    expect(JSON.stringify(blocked)).not.toContain('secret stack trace');
+  it('never drafts from a checkpoint event: the sweep decides (note 23)', () => {
+    const checkpoint = (data: object) =>
+      draftFor(event({ type: 'slot.checkpoint', source: 'scraped', data }));
     expect(
-      draftFor(
-        event({ type: 'slot.checkpoint', data: { checkpoint: 'pr_open' } }),
-      ),
+      checkpoint({ checkpoint: 'blocked', heading: 'blocked', position: 1 }),
     ).toBeNull();
+    expect(checkpoint({ checkpoint: 'pr_open' })).toBeNull();
+  });
+
+  it('puts the blocked heading in the body, never the summary', () => {
+    expect(
+      blockedCheckpointDraft(
+        'i42-api',
+        42,
+        'blocked — the docs question only\nsecond line',
+      ),
+    ).toEqual({
+      kind: 'slot.blocked',
+      slot: 'i42-api',
+      issue: 42,
+      title: 'i42-api (#42) is blocked',
+      body: 'blocked — the docs question only',
+      page: 'fleet',
+    });
+  });
+
+  it('falls back to the fixed body when the heading is just "blocked"', () => {
+    for (const heading of ['blocked', 'Blocked:', '  BLOCKED  ']) {
+      expect(blockedCheckpointDraft('719', 719, heading)).toMatchObject({
+        title: 'Issue #719 is blocked',
+        body: 'The worker reported a blocked checkpoint.',
+      });
+    }
   });
 
   it('names the issue when a blocked title has no slot name', () => {
