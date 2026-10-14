@@ -381,7 +381,13 @@ describe('terminal attach (e2e)', () => {
       expect(response.body).toEqual([
         expect.objectContaining({
           mode: 'read',
-          target: { kind: 'slot', projectId, slot: 'i42', runId: null },
+          target: {
+            kind: 'slot',
+            projectId,
+            slot: 'i42',
+            runId: null,
+            cardId: null,
+          },
           user: { id: adminId, email: 'admin@example.com' },
         }),
       ]);
