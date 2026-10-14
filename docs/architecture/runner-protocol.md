@@ -271,10 +271,35 @@ does not fit is stored but projects nothing; it never fails the batch.
       "source": "runner",
       "project": { "repo": "AndreyBegma/AgentDock", "root": "/home/archi/dev/AgentDock" },
       "data": { "target": "orchestrator", "polls": 3 }
+    },
+    {
+      "v": 1,
+      "seq": 18243,
+      "ts": "2026-10-08T14:32:00.000Z",
+      "type": "slot.message_seen",
+      "source": "scraped",
+      "project": { "repo": "AndreyBegma/AgentDock", "root": "/home/archi/dev/AgentDock" },
+      "slot": "i11-api",
+      "issue": 11,
+      "data": {
+        "body": "## From the orchestrator (agentdock-fd): plan approved\n\nGo ahead.",
+        "sender": "the orchestrator (agentdock-fd)",
+        "mode": "appended",
+        "fileHash": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+      }
     }
   ]
 }
 ```
+
+`slot.message_seen` (#160, [spec 160](../specs/160-agent-workspace.md)) is the
+orchestrator's side of a slot's conversation: each change of the worktree's
+`.orchestrator-msg.md` is one event. A file that grew by appending yields the
+appended suffix (`mode: appended`), any other change the whole file
+(`replaced`); `body` is at most 16 KB. `fileHash` is the sha256 of the whole
+file after the change: the runner keeps what it read in memory only, so after
+a restart it sends the unchanged file once more and the API keeps the first
+entry per `fileHash` in a slot's run.
 
 ### Session events
 
@@ -668,6 +693,7 @@ handler.
 | `skill.cancel` | `runId, projectId` | operator | defined, not in the map yet: → `{ cancelled }`, timeout 15 s |
 | `session.backfill` | `projectId?, since` | admin | implemented: → `{ files, events }`, timeout 600 s |
 | `terminal.attach` | `id, target: { kind: slot\|orchestrator\|skill_run, projectId, root, slot?\|runId? }, mode: read\|write, cols, rows` | admin | implemented: → `{ attached: true, session }`, timeout 10 s; `skill_run` answers `unsupported` until #24's runner lands |
+| `worktree.status` | `projectId, root, slot, base?` | viewer | implemented (`commands/worktree.ts`): → `{ slot, branch, head, base, ahead, behind, changed, untracked, files (≤ 200), filesTruncated, commits (≤ 5) }`, timeout 10 s |
 
 Arguments are validated by schema on both sides (`parseCommand`). Commands
 without arguments take `{}` and reject any field. Paths are resolved and must
@@ -979,6 +1005,71 @@ D1–D7 and D10. It is exported as `terminalCommands` and spread into the
   "id": "cmd_31",
   "ok": true,
   "output": { "attached": true, "session": "cs-i42" }
+}
+```
+
+### Worktree
+
+Schemas in `commands/worktree.ts` (`worktreeCommands`); the rules are
+[spec 160](../specs/160-agent-workspace.md). The runner serves it from
+`apps/runner/src/commands/worktree/`.
+
+- `worktree.status { projectId, root, slot, base? }` is a read for any member
+  (`viewer`). `projectId` and `root` must be an entry of the watch list; the
+  worktree is the `.wt-<repo>-<slot>` one git lists for that root, else
+  `path_not_allowed`. No argument names a path, a ref range or a git flag.
+- `base` is a ref name (`gitRefSchema`). The runner tries `origin/<base>`,
+  then `<base>`, then the project's default branch, each with
+  `rev-parse --verify`; `base` in the result is the one that resolved, or null.
+- `files` are the paths that differ from the merge base with the base —
+  committed, staged and unstaged, with `--numstat` line counts (null for a
+  binary file) — then the untracked ones; at most 200, the rest counted in
+  `filesTruncated`. `commits` are the last 5 of HEAD. `changed` and
+  `untracked` count the working tree's uncommitted paths.
+- Every git call is a fixed argv (`worktree list`, `status --porcelain=v2`,
+  `rev-parse`, `rev-list`, `merge-base`, `diff`, `log`); nothing is written.
+
+```json
+{
+  "type": "command",
+  "id": "cmd_44",
+  "name": "worktree.status",
+  "args": {
+    "projectId": "prj_agentdock",
+    "root": "/home/dev/agentdock",
+    "slot": "i42",
+    "base": "develop"
+  }
+}
+```
+
+```json
+{
+  "type": "command.result",
+  "id": "cmd_44",
+  "ok": true,
+  "output": {
+    "slot": "i42",
+    "branch": "feat/42-api",
+    "head": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+    "base": "origin/develop",
+    "ahead": 3,
+    "behind": 0,
+    "changed": 1,
+    "untracked": 0,
+    "files": [
+      { "path": "apps/api/src/fleet/graph.ts", "status": "added", "additions": 120, "deletions": 0 }
+    ],
+    "filesTruncated": 0,
+    "commits": [
+      {
+        "sha": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+        "subject": "feat(api): fleet graph",
+        "author": "Archi",
+        "at": "2026-10-14T09:12:00+02:00"
+      }
+    ]
+  }
 }
 ```
 

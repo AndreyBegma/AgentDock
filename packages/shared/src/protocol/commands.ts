@@ -7,6 +7,7 @@ import { plannerCommands } from './commands/planner';
 import { queueCommands } from './commands/queue';
 import { skillCommands } from './commands/skills';
 import { terminalCommands } from './commands/terminal';
+import { worktreeCommands } from './commands/worktree';
 import {
   SESSION_BACKFILL_TIMEOUT_MS,
   sessionBackfillArgsSchema,
@@ -133,6 +134,7 @@ export const commands = {
   ...terminalCommands,
   ...skillCommands,
   ...plannerCommands,
+  ...worktreeCommands,
 } as const satisfies Record<string, CommandDefinition>;
 
 export type CommandName = keyof typeof commands;
