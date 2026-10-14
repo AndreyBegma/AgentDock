@@ -25,3 +25,4 @@ Numbered, never rewritten. A changed decision gets a new ADR that supersedes the
 | [0019](0019-planner-instructions-live-in-agentdock.md) | The Planner's instructions live in AgentDock, editable, behind a fixed output contract (scopes ADR-0005) |
 | [0020](0020-claude-code-integration-through-the-runner.md) | Claude Code integration — hooks observe, MCP acts, both through the runner (amends ADR-0010) |
 | [0021](0021-session-content-is-opt-in-per-project.md) | Session content is opt-in per project (amends spec 12 D9) |
+| [0022](0022-design-stage-html-mockups-from-a-ui-profile.md) | The design stage draws HTML mockups from a cached UI profile — no external design tool, no dev server |
