@@ -50,6 +50,7 @@ export const turn = (over: Partial<PlanTurnView> = {}): PlanTurnView => ({
   phase: 'succeeded',
   error: null,
   resultText: null,
+  rounds: [],
   createdAt: '2026-10-13T10:00:00.000Z',
   finishedAt: '2026-10-13T10:02:00.000Z',
   ...over,

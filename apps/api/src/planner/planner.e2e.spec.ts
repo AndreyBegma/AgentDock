@@ -329,6 +329,65 @@ describe('planner (e2e)', () => {
     });
   });
 
+  describe('past rounds on turns (#184)', () => {
+    it("carries each round on the turn that opened it: a task's first from decompose, the next from grill", async () => {
+      const created = await threeTasks();
+      const grillT2 = async (answer: string, questions: object[]) => {
+        const turn = await h.author.send(
+          'post',
+          `${h.base(created.id)}/tasks/t2/turns`,
+          { answers: [{ questionId: answer, optionId: 'yes' }] },
+        );
+        expect(turn.status).toBe(201);
+        await h.finish(
+          created.id,
+          block({ action: 'grill', taskKey: 't2', questions, done: false }),
+        );
+      };
+      await grillT2('q1', [question('q3', true)]);
+      await grillT2('q3', [question('q4', false)]);
+
+      const plan = await h.detail(created.id);
+      expect(
+        plan.turns.map((t) => [
+          t.action,
+          t.taskKey,
+          t.input.answers?.map((a) => a.questionId) ?? [],
+          t.rounds.map((r) => [r.taskKey, r.questions.map((q) => q.id)]),
+        ]),
+      ).toEqual([
+        [
+          'decompose',
+          null,
+          [],
+          [
+            ['t2', ['q1']],
+            ['t3', ['q2']],
+          ],
+        ],
+        ['grill', 't2', ['q1'], [['t2', ['q3']]]],
+        ['grill', 't2', ['q3'], [['t2', ['q4']]]],
+      ]);
+      expect(plan.turns[0].rounds[0].questions[0]).toEqual(
+        question('q1', true),
+      );
+      // The open round is still the task's own.
+      const t2 = plan.tasks.find((t) => t.key === 't2');
+      expect(t2?.questions.map((q) => q.id)).toEqual(['q4']);
+    });
+
+    it('opens no round for a grill that is done, nor for a write', async () => {
+      const created = await threeTasks();
+      await talkThroughT2(created.id);
+      const plan = await h.detail(created.id);
+      expect(plan.turns.map((t) => [t.action, t.rounds.length])).toEqual([
+        ['decompose', 2],
+        ['grill', 0],
+        ['write', 0],
+      ]);
+    });
+  });
+
   describe('revise (D9)', () => {
     it('passes frozen tasks through, drops rejected ones and bumps the version', async () => {
       const plan = await threeTasks();

@@ -34,6 +34,7 @@ import {
   writeBlock,
 } from '../../../../../../lib/planner/format';
 import { planHref, plannerHref } from '../../../../../../lib/planner/href';
+import { pastRounds } from '../../../../../../lib/planner/rounds';
 import { usePlan } from '../../../../../../lib/planner/use-plan';
 import { useSection } from '../../../../../../lib/section/use-section';
 import { useProjectDetail } from '../../use-project-detail';
@@ -178,6 +179,7 @@ function PlanView({
             : 'Message the planner'
         }
         turns={turns}
+        rounds={pastRounds(plan.turns, taskKey)}
         questions={taskKey ? (task?.questions ?? []) : plan.questions}
         active={scopedActive}
         failed={scopedActive ? null : failed}
