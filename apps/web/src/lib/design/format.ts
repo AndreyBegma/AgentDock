@@ -124,6 +124,7 @@ const ERROR_TEXT: Record<DesignErrorCode, string> = {
     'The runner does not know this command yet. Update the runner.',
   command_failed: 'The runner could not run it. Try again.',
   runner_timeout: 'The runner did not answer in time. Try again.',
+  runner_outdated: 'The runner is too old for this. Update the runner.',
 };
 
 /** A sentence for the person, and where the fix is when it is elsewhere. */
