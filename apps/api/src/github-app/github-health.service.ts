@@ -9,6 +9,7 @@ import {
   type OnApplicationBootstrap,
   type OnApplicationShutdown,
 } from '@nestjs/common';
+import { SchedulerRegistry } from '@nestjs/schedule';
 import { PrismaService } from '../database/prisma.service';
 import { RunnerWatchList } from '../runners/runner-watch-list';
 import {
@@ -20,6 +21,7 @@ import { computeProjectHealth, type HealthInstallation } from './github-health';
 
 /** Deliveries ask for a recompute; requests within this window share one. */
 const RECOMPUTE_COALESCE_MS = 1_000;
+const JOB_NAME = 'github-health';
 
 /**
  * D10–D12: each project's App health, stored in `github_project_health`,
@@ -41,6 +43,7 @@ export class GitHubHealthService
     private readonly prisma: PrismaService,
     private readonly store: GitHubAppStore,
     private readonly watchList: RunnerWatchList,
+    private readonly scheduler: SchedulerRegistry,
     @Inject(GITHUB_APP_OPTIONS) private readonly options: GitHubAppOptions,
   ) {}
 
@@ -51,11 +54,15 @@ export class GitHubHealthService
       this.options.healthIntervalMs,
     );
     this.interval.unref();
+    this.scheduler.addInterval(JOB_NAME, this.interval);
     void this.recompute().catch((error: unknown) => this.fail(error));
   }
 
   onApplicationShutdown(): void {
     if (this.interval) clearInterval(this.interval);
+    if (this.scheduler.doesExist('interval', JOB_NAME)) {
+      this.scheduler.deleteInterval(JOB_NAME);
+    }
     if (this.soon) clearTimeout(this.soon);
   }
 

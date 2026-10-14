@@ -6,6 +6,7 @@ import {
   type OnApplicationBootstrap,
   type OnModuleDestroy,
 } from '@nestjs/common';
+import { SchedulerRegistry } from '@nestjs/schedule';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { erroredOf, primaryAgentType } from './workflow-metrics';
@@ -15,6 +16,7 @@ import { WORKFLOWS_OPTIONS, type WorkflowsOptions } from './workflows-options';
 export const WORKFLOWS_BATCH = 500;
 /** Batches one tick runs at most, so a backlog never starves the event loop. */
 const MAX_BATCHES_PER_TICK = 50;
+const JOB_NAME = 'workflows-projector';
 const TRANSACTION_TIMEOUT_MS = 60_000;
 /** Subagent nesting followed before a tree is cut: far beyond any real one. */
 const MAX_DEPTH = 64;
@@ -64,6 +66,7 @@ export class WorkflowsProjector
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly scheduler: SchedulerRegistry,
     @Inject(WORKFLOWS_OPTIONS) private readonly options: WorkflowsOptions,
   ) {}
 
@@ -84,10 +87,14 @@ export class WorkflowsProjector
       );
     }, this.options.pollMs);
     this.timer.unref();
+    this.scheduler.addInterval(JOB_NAME, this.timer);
   }
 
   onModuleDestroy(): void {
     if (this.timer) clearInterval(this.timer);
+    if (this.scheduler.doesExist('interval', JOB_NAME)) {
+      this.scheduler.deleteInterval(JOB_NAME);
+    }
   }
 
   /** Marks every root session that has no row yet; returns how many. */

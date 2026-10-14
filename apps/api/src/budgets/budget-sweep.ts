@@ -6,6 +6,7 @@ import {
   type OnApplicationBootstrap,
   type OnModuleDestroy,
 } from '@nestjs/common';
+import { SchedulerRegistry } from '@nestjs/schedule';
 import { PrismaService } from '../database/prisma.service';
 import { BudgetEvaluator } from './budget-evaluator';
 import {
@@ -15,6 +16,7 @@ import {
 } from './budget-options';
 
 const HOUR_MS = 3_600_000;
+const JOB_NAME = 'budget-sweep';
 
 /**
  * When budgets are evaluated (D5): the fast path after a rollup rebuild —
@@ -34,6 +36,7 @@ export class BudgetSweep implements OnApplicationBootstrap, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly evaluator: BudgetEvaluator,
     private readonly clock: BudgetClock,
+    private readonly scheduler: SchedulerRegistry,
     @Inject(BUDGET_OPTIONS) private readonly options: BudgetOptions,
   ) {}
 
@@ -43,11 +46,15 @@ export class BudgetSweep implements OnApplicationBootstrap, OnModuleDestroy {
       void this.sweep().catch((error: unknown) => this.failed('sweep', error));
     }, this.options.sweepMs);
     this.sweepTimer.unref();
+    this.scheduler.addInterval(JOB_NAME, this.sweepTimer);
   }
 
   onModuleDestroy(): void {
     clearInterval(this.sweepTimer);
     clearTimeout(this.debounce);
+    if (this.scheduler.doesExist('interval', JOB_NAME)) {
+      this.scheduler.deleteInterval(JOB_NAME);
+    }
   }
 
   /**

@@ -13,6 +13,7 @@ import {
   type OnApplicationBootstrap,
   type OnModuleDestroy,
 } from '@nestjs/common';
+import { SchedulerRegistry } from '@nestjs/schedule';
 import type { Prisma } from '@prisma/client';
 import { EventFrontier } from '../../activity/event-frontier';
 import { PrismaService } from '../../database/prisma.service';
@@ -20,6 +21,7 @@ import { WEBHOOKS_OPTIONS, type WebhooksOptions } from '../common';
 
 type Tx = Prisma.TransactionClient;
 
+const JOB_NAME = 'webhook-dispatcher';
 const STATE_ID = 'webhooks';
 const LOCK_KEY = 'webhooks:dispatcher';
 /** Events read per pass. */
@@ -84,6 +86,7 @@ export class WebhookDispatcher
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly scheduler: SchedulerRegistry,
     @Inject(WEBHOOKS_OPTIONS) private readonly options: WebhooksOptions,
   ) {}
 
@@ -96,10 +99,14 @@ export class WebhookDispatcher
       });
     }, WEBHOOK_DISPATCH_INTERVAL_MS);
     this.timer.unref();
+    this.scheduler.addInterval(JOB_NAME, this.timer);
   }
 
   onModuleDestroy(): void {
     clearInterval(this.timer);
+    if (this.scheduler.doesExist('interval', JOB_NAME)) {
+      this.scheduler.deleteInterval(JOB_NAME);
+    }
   }
 
   /**

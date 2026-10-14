@@ -6,6 +6,7 @@ import {
   type OnApplicationBootstrap,
   type OnModuleDestroy,
 } from '@nestjs/common';
+import { SchedulerRegistry } from '@nestjs/schedule';
 import { ACTIVITY_OPTIONS, type ActivityOptions } from '../activity';
 import { PrismaService } from '../database/prisma.service';
 import { LiveService } from '../live/live.service';
@@ -14,6 +15,7 @@ import { runOfSlot } from './run-projection';
 /** Slots rebuilt per transaction. */
 export const RUNS_BATCH = 500;
 const MAX_BATCHES_PER_TICK = 50;
+const JOB_NAME = 'runs-projector';
 const TRANSACTION_TIMEOUT_MS = 60_000;
 
 /**
@@ -33,6 +35,7 @@ export class RunsProjector implements OnApplicationBootstrap, OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     private readonly live: LiveService,
+    private readonly scheduler: SchedulerRegistry,
     @Inject(ACTIVITY_OPTIONS) private readonly options: ActivityOptions,
   ) {}
 
@@ -44,10 +47,14 @@ export class RunsProjector implements OnApplicationBootstrap, OnModuleDestroy {
       );
     }, this.options.pollMs);
     this.timer.unref();
+    this.scheduler.addInterval(JOB_NAME, this.timer);
   }
 
   onModuleDestroy(): void {
     if (this.timer) clearInterval(this.timer);
+    if (this.scheduler.doesExist('interval', JOB_NAME)) {
+      this.scheduler.deleteInterval(JOB_NAME);
+    }
   }
 
   /** Rebuilds every stale run; returns how many it wrote. */

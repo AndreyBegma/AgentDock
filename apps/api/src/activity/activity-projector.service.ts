@@ -13,7 +13,9 @@ import {
   Logger,
   type OnApplicationBootstrap,
   type OnModuleDestroy,
+  Optional,
 } from '@nestjs/common';
+import { SchedulerRegistry } from '@nestjs/schedule';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { LiveService } from '../live/live.service';
@@ -26,6 +28,7 @@ export const ACTIVITY_BATCH = 1000;
 /** Batches one tick runs at most, so a backlog never starves the event loop. */
 const MAX_BATCHES_PER_TICK = 50;
 const STATE_ID = 'activity';
+const JOB_NAME = 'activity-projector';
 /** The plugin channel is live when it sent an event in this window (spec 16 D8). */
 const PLUGIN_CHANNEL_WINDOW_MS = 24 * 60 * 60 * 1000;
 const TRANSACTION_TIMEOUT_MS = 60_000;
@@ -68,6 +71,7 @@ export class ActivityProjector
     private readonly prisma: PrismaService,
     private readonly live: LiveService,
     @Inject(ACTIVITY_OPTIONS) private readonly options: ActivityOptions,
+    @Optional() private readonly scheduler?: SchedulerRegistry,
   ) {
     this.frontier = new EventFrontier(options.gapGraceMs);
   }
@@ -82,10 +86,14 @@ export class ActivityProjector
       );
     }, this.options.pollMs);
     this.timer.unref();
+    this.scheduler?.addInterval(JOB_NAME, this.timer);
   }
 
   onModuleDestroy(): void {
     if (this.timer) clearInterval(this.timer);
+    if (this.scheduler?.doesExist('interval', JOB_NAME)) {
+      this.scheduler.deleteInterval(JOB_NAME);
+    }
   }
 
   /**
