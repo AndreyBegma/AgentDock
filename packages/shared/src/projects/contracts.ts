@@ -126,6 +126,9 @@ export interface ProjectDetail extends ProjectSummary {
   createdAt: string;
   updatedAt: string;
   docsSource: DocsSourceView | null;
+  /** ADR-0021; optional until the API returns them (spec 201). */
+  shipSessionContent?: boolean;
+  sessionContentRetentionDays?: number;
 }
 
 /** A row of `GET /projects/:id/members`. */
@@ -176,6 +179,10 @@ export interface UpdateProjectRequest {
   readyLabelOverride?: string | null;
   defaultProfileId?: string | null;
   mergeApproval?: boolean;
+  /** ADR-0021. */
+  shipSessionContent?: boolean;
+  /** 1–365 (`SESSION_CONTENT_RETENTION_DAYS`). */
+  sessionContentRetentionDays?: number;
 }
 
 /**
