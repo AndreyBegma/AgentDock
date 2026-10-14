@@ -53,7 +53,10 @@ describe('agentdock-runner CLI', () => {
   it('version prints the package version and the target', async () => {
     expect(await runCli(['version'], deps())).toBe(EXIT.ok);
     expect(stdout.join('')).toBe(`${RUNNER_VERSION} linux-x64\n`);
-    expect(RUNNER_VERSION).toBe('0.1.0');
+    const pkg = JSON.parse(
+      readFileSync(join(import.meta.dir, '../package.json'), 'utf8'),
+    ) as { version: string };
+    expect(RUNNER_VERSION).toBe(pkg.version);
   });
 
   it('an unknown or missing command is a usage error', async () => {
@@ -77,7 +80,7 @@ describe('agentdock-runner CLI', () => {
         {
           code: 'ABCD-EFGH',
           hostname: 'test-host',
-          version: '0.1.0',
+          version: RUNNER_VERSION,
           protocolVersion: 1,
         },
       ]);
@@ -362,7 +365,7 @@ describe('agentdock-runner CLI', () => {
       const { clock, controller, exit, live } = start();
       const [hello] = (await server.waitFor('hello')) as HelloMessage[];
       expect(hello).toMatchObject({
-        runnerVersion: '0.1.0',
+        runnerVersion: RUNNER_VERSION,
         protocolVersion: 1,
         hostname: 'test-host',
         os: 'linux',
