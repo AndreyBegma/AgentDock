@@ -18,6 +18,7 @@ import {
   type FeedRow,
   itemTitle,
   parseLiveItem,
+  prLink,
   severityTone,
   typeLabel,
 } from '../../../lib/activity/format';
@@ -54,10 +55,36 @@ export function TopicListener({
 }
 
 /**
+ * A pull request as a `#205` chip (#213). With a URL it is a real link, and
+ * rides in `TimelineItem.actions` beside the row — outside its anchor, so no
+ * link nests in a link; tab order is the row, then the PR.
+ */
+function PrChip({ prNumber, href }: { prNumber: number; href?: string }) {
+  const chip = (
+    <Chip size="sm" className="gap-1 text-[11px]">
+      <GitPullRequest aria-hidden="true" className="size-3" />
+      <span className="sr-only">Pull request </span>#{prNumber}
+    </Chip>
+  );
+  if (!href) return chip;
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer">
+      {chip}
+    </a>
+  );
+}
+
+function prActions(item: ActivityItem): ReactNode {
+  const { prNumber } = itemTitle(item);
+  const href = prLink(item);
+  if (prNumber === null || !href) return undefined;
+  return <PrChip prNumber={prNumber} href={href} />;
+}
+
+/**
  * What an item is about, as tinted chips; the event code only in the
- * tooltip (R2). A pull request is a `#205` chip, never a raw URL (#213). The
- * row itself is the link, so the chip is not one: a link inside a link is
- * not valid HTML, and glass-ui's `TimelineItem` has no secondary action yet.
+ * tooltip (R2). A pull request is a `#205` chip, never a raw URL (#213); one
+ * with a URL is shown by `prActions` instead, so it appears once.
  */
 function ItemMeta({
   item,
@@ -88,11 +115,8 @@ function ItemMeta({
           #{item.issue}
         </Chip>
       ) : null}
-      {prNumber !== null ? (
-        <Chip size="sm" className="gap-1 text-[11px]">
-          <GitPullRequest aria-hidden="true" className="size-3" />
-          <span className="sr-only">Pull request </span>#{prNumber}
-        </Chip>
+      {prNumber !== null && !prLink(item) ? (
+        <PrChip prNumber={prNumber} />
       ) : null}
       {extra}
     </span>
@@ -128,6 +152,7 @@ function toEntry(item: ActivityItem, names: Names, fixed: boolean) {
       <ItemMeta item={item} projectName={projectNameOf(item, names, fixed)} />
     ),
     href: activityHref(item),
+    actions: prActions(item),
   } satisfies TimelineItem;
 }
 
@@ -186,6 +211,7 @@ export function toEntries(
           }
         />
       ),
+      actions: prActions(newest),
       onSelect: () => toggle(row.id),
     });
   }

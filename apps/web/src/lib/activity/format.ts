@@ -420,6 +420,29 @@ export function itemTitle(item: Pick<ActivityItem, 'title' | 'prNumber'>): {
   };
 }
 
+/**
+ * Where an item's pull request lives: the `prUrl` the checkpoint carried, else
+ * the URL at the end of the title. https only — the data is not trusted.
+ */
+export function prLink(
+  item: Pick<ActivityItem, 'title' | 'data'>,
+): string | undefined {
+  const fromData = item.data?.prUrl;
+  const candidate =
+    typeof fromData === 'string'
+      ? fromData
+      : TRAILING_PR_URL.exec(item.title)?.[0]
+          .trim()
+          .replace(/^[—–:-]\s*/, '');
+  if (!candidate) return undefined;
+  try {
+    const url = new URL(candidate);
+    return url.protocol === 'https:' ? url.href : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** `/activity`'s filters in the URL (`useUrlFilters`). */
 export const ACTIVITY_FILTER_CODEC: FilterCodec<ActivityFilterForm> = {
   keys: Object.values(FORM_KEYS),
