@@ -66,7 +66,7 @@ import { DependenciesPanel } from './dependencies-panel';
 import { FleetHeader } from './fleet-header';
 import { OrchestratorCard } from './orchestrator-card';
 import { QuickActions } from './quick-actions';
-import { SlotSheet } from './slot-sheet';
+import { SlotPanel } from './slot-panel';
 import { SlotsView } from './slots-view';
 import { useControlReasons } from './use-control-reasons';
 
@@ -422,16 +422,16 @@ function FleetWorkspace() {
           ) : null}
         </div>
 
-        {/* The focused slot's panel. Today's sheet until i160-panel's SlotPanel lands. */}
-        <SlotSheet
-          projectId={projectId}
-          name={focusedSlot ?? undefined}
-          version={version}
-          control={control}
-          canOperate={canOperate}
-          onClose={() => update(blur)}
-          {...(onAttach ? { onAttach } : {})}
-        />
+        {/* The focused slot's panel: a column from `lg`, its own sheet below. */}
+        {focusedSlot ? (
+          <SlotPanel
+            projectId={projectId}
+            slot={focusedSlot}
+            control={control}
+            onClose={() => update(blur)}
+            onOpenSlot={open}
+          />
+        ) : null}
       </div>
 
       <SheetRoot

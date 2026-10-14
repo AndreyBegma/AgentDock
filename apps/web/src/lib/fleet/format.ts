@@ -260,7 +260,7 @@ export const CHANNEL_LABEL: Record<FleetChannel, string> = {
   both: 'events + scraped',
 };
 
-/** One line under each slot-sheet term. */
+/** One line that explains each slot term. */
 export const SLOT_TERM_HINT = {
   brief: 'The task the orchestrator gave this worker.',
   owns: 'Files and folders this worker may change.',
