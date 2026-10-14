@@ -2,6 +2,7 @@ import {
   type CreateRunnerRequest,
   type RenameRunnerRequest,
   RUNNER_NAME_MAX_LENGTH,
+  type UpdateRunnerSettingsRequest,
 } from '@agentdock/shared';
 import type { PairingRequest } from '@agentdock/shared/protocol';
 import { Transform } from 'class-transformer';
@@ -31,7 +32,9 @@ export class CreateRunnerDto implements CreateRunnerRequest {
  * `PATCH /admin/runners/:id`: the name, and spec 201's local user and away
  * mode. Only the fields sent change.
  */
-export class UpdateRunnerDto implements Partial<RenameRunnerRequest> {
+export class UpdateRunnerDto
+  implements Partial<RenameRunnerRequest>, UpdateRunnerSettingsRequest
+{
   @IsOptional()
   @Transform(trim)
   @IsString()
@@ -55,7 +58,7 @@ export class UpdateRunnerDto implements Partial<RenameRunnerRequest> {
  * `PATCH /runners/:id` (spec 201 "API"): `localUserId` is an admin's, away
  * mode the admin's or the runner's local user's own.
  */
-export class RunnerSettingsDto {
+export class RunnerSettingsDto implements UpdateRunnerSettingsRequest {
   @ValidateIf((_, value) => value !== null && value !== undefined)
   @IsString()
   @IsNotEmpty()
