@@ -235,8 +235,8 @@ const TURN_PHASE_WORD: Record<PlanTurnPhase, string> = {
 
 /**
  * An earlier turn as a chat entry: what the person sent — the message, and
- * each answer as `id: option — words` (the questions themselves are not on
- * the turn) — then what became of it.
+ * each answer as `id: option — words` (the past round's cards show the
+ * questions, #184) — then what became of it.
  */
 export function turnBody(
   turn: Pick<PlanTurnView, 'action' | 'input' | 'phase'>,

@@ -8,19 +8,23 @@ import { useState } from 'react';
 import { formatDate, pluralize } from '../../lib/format';
 import { roundKey } from '../../lib/planner/answers';
 import { isActiveTurn, turnBody } from '../../lib/planner/format';
+import type { PastRound as PastRoundData } from '../../lib/planner/rounds';
 import { FailedTurn } from './failed-turn';
+import { PastRound } from './past-round';
 import { QuestionRound } from './question-round';
 import { RunningTurn } from './running-turn';
 
 /**
  * A conversation with the planner — the plan's (dialogue mode) or one
- * task's (the grill): earlier rounds collapsed into chat entries, the turn
- * in flight or the one that failed, the current round's question cards, and
- * a chat composer below. Every round and every message is one turn.
+ * task's (the grill): earlier turns collapsed into chat entries, earlier
+ * rounds as read-only cards with their answers, the turn in flight or the one
+ * that failed, the open round's question cards, and a chat composer below.
+ * Every round and every message is one turn.
  */
 export function Conversation({
   label,
   turns,
+  rounds,
   questions,
   active,
   failed,
@@ -37,6 +41,9 @@ export function Conversation({
   label: string;
   /** This scope's turns, oldest first. */
   turns: readonly PlanTurnView[];
+  /** Earlier rounds, read-only, oldest first (#184). */
+  rounds: readonly PastRoundData[];
+  /** The open round, interactive. */
   questions: readonly PlanQuestion[];
   /** The plan's turn in flight, if it belongs to this scope. */
   active: PlanTurnView | null;
@@ -77,7 +84,7 @@ export function Conversation({
         <Disclosure
           open={open}
           onOpenChange={setOpen}
-          trigger={`${open ? 'Hide' : 'Show'} earlier rounds (${pluralize(earlier.length, 'turn')})`}
+          trigger={`${open ? 'Hide' : 'Show'} earlier turns (${pluralize(earlier.length, 'turn')})`}
           triggerClassName="text-sm text-accent-ink underline underline-offset-2"
         >
           <ChatThread
@@ -99,6 +106,11 @@ export function Conversation({
         </Disclosure>
       ) : null}
 
+      {/* A turn opens at most one round per scope, so it keys the round. */}
+      {rounds.map((round, i) => (
+        <PastRound key={round.openedBy.id} round={round} number={i + 1} />
+      ))}
+
       {active ? (
         <RunningTurn
           turn={active}
@@ -115,6 +127,11 @@ export function Conversation({
         />
       ) : null}
 
+      {questions.length > 0 && rounds.length > 0 ? (
+        <h3 className="text-sm font-semibold text-ink">
+          Round {rounds.length + 1}
+        </h3>
+      ) : null}
       {questions.length > 0 ? (
         <QuestionRound
           key={roundKey(questions)}

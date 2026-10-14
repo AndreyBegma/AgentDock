@@ -53,6 +53,13 @@ export interface PlanUserRef {
   name: string;
 }
 
+/** A round of questions a turn opened, in the scope it was asked in. */
+export interface PlanTurnRound {
+  /** The task the round belongs to; null for a plan-level round (clarify). */
+  taskKey: string | null;
+  questions: PlanQuestion[];
+}
+
 /** A turn (`plan_turns` row). `resultText` is kept for a `contract_violation` (D17). */
 export interface PlanTurnView {
   id: string;
@@ -68,6 +75,14 @@ export interface PlanTurnView {
   error: string | null;
   /** Kept for a `contract_violation`, shown raw in a `Disclosure`. */
   resultText: string | null;
+  /**
+   * The rounds this turn opened, from its stored output: a clarify opens the
+   * plan-level round, a grill its task's next round, a decompose or revise
+   * the first round of each new or changed task. Empty when the output says
+   * `done`, when the turn has no output (failed, running, older), or when the
+   * stored output no longer parses.
+   */
+  rounds: PlanTurnRound[];
   createdAt: string;
   finishedAt: string | null;
 }

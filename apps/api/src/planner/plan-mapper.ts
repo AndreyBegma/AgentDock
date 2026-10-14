@@ -1,15 +1,21 @@
 import {
+  type FrozenTaskRef,
+  isPlannedTask,
   type PlanDetail,
   type PlanGraphView,
+  type PlannedTask,
   type PlannerInstructionsVersion,
   type PlanQuestion,
   type PlanSummary,
   type PlanTaskIssueView,
   type PlanTaskStatus,
   type PlanTaskView,
+  type PlanTurnAction,
   type PlanTurnInput,
+  type PlanTurnRound,
   type PlanTurnView,
   type PlanUserRef,
+  plannerOutputSchemas,
   planQuestionRoundSchema,
   planTurnInputSchema,
 } from '@agentdock/shared';
@@ -58,6 +64,39 @@ export const inputOf = (value: Prisma.JsonValue): PlanTurnInput => {
 export const blockingOpen = (questions: readonly PlanQuestion[]): number =>
   questions.filter((q) => q.blocking).length;
 
+/**
+ * The rounds a turn opened, read back from its stored output with the
+ * action's contract schema. An output that no longer parses reads as no
+ * rounds, like `questionsOf`; a frozen revise pass-through opens none.
+ */
+export const roundsOf = (
+  action: PlanTurnAction,
+  output: Prisma.JsonValue,
+  taskKey: string | null,
+): PlanTurnRound[] => {
+  if (output === null) return [];
+  const parsed = plannerOutputSchemas[action].safeParse(output);
+  if (!parsed.success) return [];
+  const out = parsed.data;
+  switch (out.action) {
+    case 'clarify':
+      return out.done ? [] : [{ taskKey: null, questions: out.questions }];
+    case 'grill':
+      return out.done
+        ? []
+        : [{ taskKey: taskKey ?? out.taskKey, questions: out.questions }];
+    case 'decompose':
+    case 'revise':
+      return out.tasks.flatMap((t: PlannedTask | FrozenTaskRef) =>
+        isPlannedTask(t) && t.questions.length > 0
+          ? [{ taskKey: t.key, questions: t.questions }]
+          : [],
+      );
+    case 'write':
+      return [];
+  }
+};
+
 export const turnInclude = {
   author: userSelect,
   task: { select: { key: true } },
@@ -76,6 +115,7 @@ export const toTurnView = (row: TurnRow): PlanTurnView => ({
   phase: row.phase,
   error: row.error,
   resultText: row.resultText,
+  rounds: roundsOf(row.action, row.output, row.task?.key ?? null),
   createdAt: row.createdAt.toISOString(),
   finishedAt: row.finishedAt?.toISOString() ?? null,
 });

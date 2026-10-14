@@ -186,6 +186,14 @@ A turn over the cap waits as `queued`.
 | GET / PUT | `/admin/planner/instructions` | site admin | global instructions; PUT writes a new version |
 | GET / PUT | `/projects/:projectId/planner/settings` | GET: viewer; PUT: project admin | `{ specOutput, instructionsOverride? }`; a non-empty override writes a new project version, an empty one clears it |
 
+**Past rounds (#184):** each turn in the plan detail carries `rounds` — the
+rounds of questions its stored output opened, each with its `taskKey`
+(`null` for the plan level). A clarify opens the plan-level round, a grill its
+task's next round, and a decompose or revise the first round of each new or
+changed task; an output that says `done`, or a turn with no output, opens none.
+The client pairs each round with the answers of the next succeeded turn of
+its scope, so earlier rounds re-render as read-only cards.
+
 **Live:** every turn phase change, review, revise and send publishes
 `{ kind: "planner", projectId, planId }` on `project:<id>`. The message carries
 ids only, so a client refetches, and the refetch is authorized.
@@ -211,8 +219,10 @@ All of it is glass-ui (ADR-0011) and dark-first, following #163's look.
     - **Right panel** (opened by clicking a task):
       - **Conversation:** question cards for the current round. Each card has
         a recommendation badge, option radios, a free-text answer, and
-        **Accept all recommendations**. Earlier rounds collapse. A chat
-        composer sits below.
+        **Accept all recommendations**. Earlier rounds stay above it as
+        read-only cards with the answer given — or "left to the default",
+        or "not answered" when a later round replaced it (#184). Earlier chat
+        messages collapse. A chat composer sits below.
       - **Document:** the task's markdown through the shared `<Markdown>`.
       - **History:** the plan versions this task appeared in.
     - **Header:** plan title, version, visibility with **Share with project**,
