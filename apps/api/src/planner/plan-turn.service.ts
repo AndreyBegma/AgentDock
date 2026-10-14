@@ -24,7 +24,7 @@ import { questionsOf } from './plan-mapper';
 import { assemblePrompt } from './plan-prompt';
 import { PlanStore } from './plan-store';
 import { PlannerCommands, plannerOutput } from './planner-commands';
-import { PlannerFailure, plannerError, TURN_NOT_FAILED } from './planner-error';
+import { PlannerFailure, plannerError } from './planner-error';
 
 /** Who acts: a person on a route, or the system chaining a turn for its author. */
 export interface PlanCaller {
@@ -161,7 +161,7 @@ export class PlanTurnService {
     if (turn.phase !== 'failed') {
       throw plannerError(
         409,
-        TURN_NOT_FAILED,
+        PLANNER_ERROR.turnNotFailed,
         `The turn is ${turn.phase}; only a failed turn is retried`,
       );
     }
