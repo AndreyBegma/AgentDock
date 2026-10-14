@@ -9,6 +9,7 @@ import { errorMessage, type Logger } from '../log';
 import { ProjectDirectory } from './projects';
 import { DEFAULT_OTLP_HTTP_PORT, OTLP_HOST, OtlpReceiver } from './receiver';
 
+export { ProjectDirectory } from './projects';
 export { OtlpReceiver } from './receiver';
 
 /** The receiver settings from the runner config's `otlp` key (spec 13). */
@@ -29,6 +30,10 @@ export interface StartOtlpOptions {
   settings: OtlpSettings;
   emit: (event: UnsequencedEvent) => void;
   projects: () => readonly WatchedProject[];
+  /** The hook session map's project of a session (spec 201 D22). */
+  sessionProject?: (sessionId: string) => string | undefined;
+  /** Shared with other envelope builders; one is made when absent. */
+  directory?: ProjectDirectory;
   exec: Exec;
   clock: Clock;
   log: Logger;
@@ -43,15 +48,15 @@ export const startOtlpReceiver = (
 ): OtlpReceiver | null => {
   const { settings, log } = options;
   if (!settings.enabled) return null;
-  const directory = new ProjectDirectory({
-    projects: options.projects,
-    exec: options.exec,
-  });
+  const directory =
+    options.directory ??
+    new ProjectDirectory({ projects: options.projects, exec: options.exec });
   const receiver = new OtlpReceiver({
     port: settings.httpPort,
     emit: options.emit,
     projects: (ids) => directory.resolve(ids),
     codexExperimental: settings.codexExperimental,
+    sessionProject: options.sessionProject,
     now: () => new Date(options.clock.now()).toISOString(),
     log,
   });

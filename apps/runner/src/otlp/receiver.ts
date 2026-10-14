@@ -10,7 +10,7 @@ import {
   OtlpDecodeError,
   type OtlpLogRecord,
 } from './decode';
-import { type EnvelopeProject, mapLogRecords } from './map';
+import { type EnvelopeProject, mapLogRecords, recordProjectId } from './map';
 
 /** D16: a request body larger than this is refused, compressed or inflated. */
 export const MAX_BODY_BYTES = 4 * 1024 * 1024;
@@ -26,6 +26,8 @@ export interface ReceiverDeps {
   /** Envelope projects for the `agentdock.project` ids of one request (D14). */
   projects: (ids: Iterable<string>) => Promise<Map<string, EnvelopeProject>>;
   codexExperimental: boolean;
+  /** A hook-reported session's project, for records without `agentdock.project` (spec 201 D22). */
+  sessionProject?: (sessionId: string) => string | undefined;
   now: () => string;
   log: Logger;
 }
@@ -113,13 +115,14 @@ const inflate = (body: Uint8Array, encoding: string | null): Uint8Array => {
   }
 };
 
-const projectIds = (records: readonly OtlpLogRecord[]): Set<string> => {
+const projectIds = (
+  records: readonly OtlpLogRecord[],
+  deps: Pick<ReceiverDeps, 'sessionProject'>,
+): Set<string> => {
   const ids = new Set<string>();
   for (const record of records) {
-    const id =
-      record.attributes['agentdock.project'] ??
-      record.resource['agentdock.project'];
-    if (typeof id === 'string' && id.length > 0) ids.add(id);
+    const id = recordProjectId(record, deps);
+    if (id) ids.add(id);
   }
   return ids;
 };
@@ -173,9 +176,10 @@ export const handleOtlpRequest = async (
     throw error;
   }
 
-  const projects = await deps.projects(projectIds(records));
+  const projects = await deps.projects(projectIds(records, deps));
   const { events, dropped } = mapLogRecords(records, {
     project: (id) => projects.get(id),
+    sessionProject: deps.sessionProject,
     codexExperimental: deps.codexExperimental,
     now: deps.now,
   });

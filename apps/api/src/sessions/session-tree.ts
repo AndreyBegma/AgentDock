@@ -1,4 +1,6 @@
 import type {
+  SessionLiveState,
+  SessionOrigin,
   SessionRequestNode,
   SessionSummary,
   SessionToolNode,
@@ -27,6 +29,13 @@ export interface SessionRow {
   startedAt: Date;
   lastEventAt: Date;
   endedAt: Date | null;
+  origin?: SessionOrigin;
+  issue?: number | null;
+  ownerId?: string | null;
+  liveState?: SessionLiveState | null;
+  tmuxSession?: string | null;
+  /** Content rows exist and the caller may read them (ADR-0021). */
+  hasContent?: boolean;
 }
 
 export interface TurnRow {
@@ -182,6 +191,12 @@ export const summaryOf = (
   ),
   ...counts,
   totals: sessionTotals,
+  origin: row.origin ?? 'unknown',
+  issue: row.issue ?? null,
+  ownerId: row.ownerId ?? null,
+  liveState: row.liveState ?? null,
+  tmuxSession: row.tmuxSession ?? null,
+  hasContent: row.hasContent ?? false,
 });
 
 /**

@@ -1,0 +1,12 @@
+{
+  "session_id": "0c9e2f4a-5b1d-4e8a-9c3f-2a7b6d1e8f90",
+  "transcript_path": "/home/person/.claude/projects/x/0c9e2f4a.jsonl",
+  "cwd": "/home/person/dev/app",
+  "permission_mode": "default",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Write",
+  "tool_input": { "file_path": "/path/to/file.txt", "content": "file content" },
+  "tool_response": { "filePath": "/path/to/file.txt", "type": "create" },
+  "tool_use_id": "toolu_01ABC123",
+  "duration_ms": 12
+}

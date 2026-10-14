@@ -1,0 +1,15 @@
+{
+  "source": "https://code.claude.com/docs/en/hooks — PermissionRequest decision control (read 2026-10-14)",
+  "allow": {
+    "hookSpecificOutput": {
+      "hookEventName": "PermissionRequest",
+      "decision": { "behavior": "allow" }
+    }
+  },
+  "deny": {
+    "hookSpecificOutput": {
+      "hookEventName": "PermissionRequest",
+      "decision": { "behavior": "deny", "message": "Not on prod, please." }
+    }
+  }
+}
