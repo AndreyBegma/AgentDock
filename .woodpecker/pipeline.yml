@@ -96,6 +96,20 @@ steps:
     commands:
       - bun run check
 
+  # `next build` skips test files and `bun test` does not type-check, so a
+  # stale fixture only shows up here. Turbo builds `shared` first.
+  - name: typecheck
+    image: *ci_image
+    depends_on: [install]
+    when:
+      - event: pull_request
+        path: *docs_only
+      - event: [push, manual]
+    volumes: *caches
+    environment: *cache_env
+    commands:
+      - bun run typecheck --filter=@agentdock/web
+
   - name: build
     image: *ci_image
     depends_on: [install]
@@ -158,7 +172,7 @@ steps:
   # dropped. On a manual run, the deploy waits for the full suite.
   - name: build-staging
     image: *docker_image
-    depends_on: [check, build, { name: test, optional: true }]
+    depends_on: [check, typecheck, build, { name: test, optional: true }]
     when:
       - event: push
         branch: develop
