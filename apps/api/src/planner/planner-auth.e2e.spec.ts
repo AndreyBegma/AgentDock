@@ -1,4 +1,9 @@
-import type { PlanDetail, PlanListView, TaskPage } from '@agentdock/shared';
+import type {
+  PlanDetail,
+  PlanListView,
+  PlanTaskVersionsView,
+  TaskPage,
+} from '@agentdock/shared';
 import type { Session } from '../test/e2e-app';
 import { decomposed, PlannerHarness, task } from './testing/planner-e2e';
 
@@ -10,6 +15,7 @@ const planRoutes = (
   turnId: string,
 ): [Method, string, object][] => [
   ['get', base, {}],
+  ['get', `${base}/tasks/t1/versions`, {}],
   ['post', `${base}/turns`, { message: 'hi' }],
   ['post', `${base}/tasks/t1/turns`, { message: 'hi' }],
   ['post', `${base}/tasks/t1/review`, { decision: 'approve' }],
@@ -71,6 +77,8 @@ describe('planner authorization (e2e)', () => {
 
   it('hides a private plan from a site admin too (spec open question, default)', async () => {
     expect((await h.admin.get(h.base(plan.id))).status).toBe(404);
+    const versions = `${h.base(plan.id)}/tasks/t1/versions`;
+    expect((await h.admin.get(versions)).status).toBe(404);
     expect(await items(h.admin, h.base())).toEqual([]);
     expect(await items(h.admin, '/tasks')).toEqual([]);
   });
@@ -81,6 +89,9 @@ describe('planner authorization (e2e)', () => {
     expect(audit.after).toEqual({ visibility: 'project' });
 
     expect((await h.other.get(h.base(plan.id))).status).toBe(200);
+    const versions = await h.other.get(`${h.base(plan.id)}/tasks/t1/versions`);
+    expect(versions.status).toBe(200);
+    expect((versions.body as PlanTaskVersionsView).versions).toHaveLength(1);
     expect(await items(h.other, h.base())).toHaveLength(1);
     expect(await items(h.other, '/tasks')).toHaveLength(2);
     const reviewed = await h.other.send(
@@ -119,6 +130,8 @@ describe('planner authorization (e2e)', () => {
     expect((await h.viewer.get(h.base(plan.id))).status).toBe(404);
     await share();
     expect((await h.viewer.get(h.base(plan.id))).status).toBe(200);
+    const versions = `${h.base(plan.id)}/tasks/t1/versions`;
+    expect((await h.viewer.get(versions)).status).toBe(200);
     expect(await items(h.viewer, '/tasks')).toHaveLength(2);
     const sentBefore = h.sent.length;
     for (const route of planRoutes(h.base(plan.id), turnId)) {

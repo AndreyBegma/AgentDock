@@ -331,6 +331,8 @@ function PlanView({
               <div ref={panelRef} className="min-w-0 scroll-mt-4 lg:order-3">
                 <TaskPanel
                   key={selected.key}
+                  projectId={projectId}
+                  planId={plan.id}
                   task={selected}
                   turns={turnsOf(plan.turns, selected.key)}
                   conversation={conversationFor(selected.key)}

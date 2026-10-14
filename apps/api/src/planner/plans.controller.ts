@@ -3,6 +3,7 @@ import {
   type PlanDetail,
   type PlanListView,
   type PlannerSettingsView,
+  type PlanTaskVersionsView,
   type PlanTurnInput,
   planTurnInputSchema,
 } from '@agentdock/shared';
@@ -121,6 +122,16 @@ export class PlansController {
     @Param('planId') planId: string,
   ): Promise<PlanDetail> {
     return this.plans.detail(access.projectId, user.id, planId);
+  }
+
+  @Get('plans/:planId/tasks/:key/versions')
+  taskVersions(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @Param('planId') planId: string,
+    @Param('key') key: string,
+  ): Promise<PlanTaskVersionsView> {
+    return this.plans.taskVersions(access.projectId, user.id, planId, key);
   }
 
   @Post('plans/:planId/turns')

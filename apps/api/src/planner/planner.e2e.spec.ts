@@ -2,6 +2,7 @@ import type {
   PlanDetail,
   PlannerInstructionsView,
   PlannerSettingsView,
+  PlanTaskVersionsView,
   RunPage,
   TaskPage,
 } from '@agentdock/shared';
@@ -438,6 +439,103 @@ describe('planner (e2e)', () => {
       ).toBe(3);
       const [revised] = await h.auditOf('plan.revised');
       expect(revised.after).toMatchObject({ fromVersion: 1, rewrites: ['t3'] });
+    });
+
+    it('keeps every version a task appeared in readable, each with the turn that produced it (#185)', async () => {
+      const plan = await threeTasks();
+      await talkThroughT2(plan.id);
+      await review(plan.id, 't2', 'approve');
+      await review(plan.id, 't3', 'reject');
+      await review(plan.id, 't1', 'rewrite', 'Narrow it');
+      await h.author.send('post', `${h.base(plan.id)}/revise`);
+      await h.finish(
+        plan.id,
+        block({
+          action: 'revise',
+          tasks: [{ key: 't2' }, task('t1', { title: 'Narrower t1' })],
+        }),
+      );
+      await review(plan.id, 't1', 'rewrite', 'Narrower still');
+      await h.author.send('post', `${h.base(plan.id)}/revise`);
+      // A revise that fails changes no version; its retry produces the next.
+      await h.finish(plan.id, 'No block this time.');
+      const failed = (await h.detail(plan.id)).turns.at(-1);
+      expect(failed).toMatchObject({ action: 'revise', phase: 'failed' });
+      await h.author.send(
+        'post',
+        `${h.base(plan.id)}/turns/${failed?.id}/retry`,
+      );
+      await h.finish(
+        plan.id,
+        block({
+          action: 'revise',
+          tasks: [{ key: 't2' }, task('t1', { title: 'Narrowest t1' })],
+        }),
+      );
+
+      const detail = await h.detail(plan.id);
+      expect(detail.version).toBe(3);
+      const producers = [
+        detail.turns.find((t) => t.action === 'decompose')?.id,
+        ...detail.turns
+          .filter((t) => t.action === 'revise' && t.phase === 'succeeded')
+          .map((t) => t.id),
+      ];
+      expect(producers).toHaveLength(3);
+
+      const versionsOf = async (key: string) => {
+        const res = await h.author.get(
+          `${h.base(plan.id)}/tasks/${key}/versions`,
+        );
+        expect(res.status).toBe(200);
+        return res.body as PlanTaskVersionsView;
+      };
+
+      const t2 = await versionsOf('t2');
+      expect(t2).toMatchObject({ key: 't2', currentVersion: 3 });
+      expect(
+        t2.versions.map((v) => [
+          v.version,
+          v.status,
+          v.frozen,
+          v.document,
+          v.turn?.id,
+        ]),
+      ).toEqual([
+        [1, 'approved', false, BUG_DOC, producers[0]],
+        [2, 'approved', true, BUG_DOC, producers[1]],
+        [3, 'approved', true, BUG_DOC, producers[2]],
+      ]);
+      expect(t2.versions.map((v) => v.turn?.action)).toEqual([
+        'decompose',
+        'revise',
+        'revise',
+      ]);
+
+      const t1 = await versionsOf('t1');
+      expect(
+        t1.versions.map((v) => [
+          v.version,
+          v.status,
+          v.title,
+          v.rewriteComment,
+        ]),
+      ).toEqual([
+        [1, 'rewrite_requested', 'Task t1', 'Narrow it'],
+        [2, 'rewrite_requested', 'Narrower t1', 'Narrower still'],
+        [3, 'ready', 'Narrowest t1', null],
+      ]);
+
+      // A rejected task is dropped by the next revise: its history ends there.
+      const t3 = await versionsOf('t3');
+      expect(t3.versions.map((v) => [v.version, v.status])).toEqual([
+        [1, 'rejected'],
+      ]);
+
+      const missing = await h.author.get(
+        `${h.base(plan.id)}/tasks/t9/versions`,
+      );
+      expect(missing.status).toBe(404);
     });
   });
 

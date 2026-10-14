@@ -118,6 +118,38 @@ export interface PlanTaskView {
   queuedAt: string | null;
 }
 
+/** The turn that produced a plan version: the decompose for 1, a revise after. */
+export interface PlanVersionTurnView {
+  id: string;
+  action: Extract<PlanTurnAction, 'decompose' | 'revise'>;
+  author: PlanUserRef;
+  finishedAt: string | null;
+}
+
+/** A task as it was in one plan version (D9: earlier versions stay readable). */
+export interface PlanTaskVersionView {
+  version: number;
+  status: PlanTaskStatus;
+  frozen: boolean;
+  title: string;
+  summary: string;
+  document: string | null;
+  rewriteComment: string | null;
+  /** When the version's row was written. */
+  createdAt: string;
+  /** Null when the producing turn cannot be told (an older or edited plan). */
+  turn: PlanVersionTurnView | null;
+}
+
+/** `GET /projects/:projectId/plans/:planId/tasks/:key/versions`. */
+export interface PlanTaskVersionsView {
+  key: string;
+  /** The plan's current version; the task may have left the plan before it. */
+  currentVersion: number;
+  /** The versions the task appeared in, oldest first. */
+  versions: PlanTaskVersionView[];
+}
+
 /** One row of a plan list. */
 export interface PlanSummary {
   id: string;
