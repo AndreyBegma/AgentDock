@@ -1,37 +1,19 @@
 'use client';
 
-import {
-  ACTIVITY_CATEGORIES,
-  ACTIVITY_ITEM_LIVE_EVENT,
-  type ActivityCategory,
-  type ActivityItem,
-  type ActivityPage,
-  type ActivityQuery,
-  type ActivitySeverity,
-  type LiveTopic,
-  type ProjectSummary,
+import type {
+  ActivityItem,
+  ActivityPage,
+  ActivityQuery,
+  ProjectSummary,
 } from '@agentdock/shared';
-import { Badge } from '@andrewbehma/glass-ui/badge';
-import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
-import { Chip } from '@andrewbehma/glass-ui/chip';
-import { DateInput } from '@andrewbehma/glass-ui/date-input';
+import { Button } from '@andrewbehma/glass-ui/button';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
-import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
-import {
-  PopoverContent,
-  PopoverRoot,
-  PopoverTrigger,
-} from '@andrewbehma/glass-ui/popover';
 import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
-import { Timeline, type TimelineItem } from '@andrewbehma/glass-ui/timeline';
-import { Toolbar } from '@andrewbehma/glass-ui/toolbar';
-import { Bot, ListFilter, Server, ShieldCheck } from 'lucide-react';
+import { Timeline } from '@andrewbehma/glass-ui/timeline';
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
-  type FormEvent,
-  type ReactNode,
+  type ComponentProps,
   Suspense,
   useCallback,
   useEffect,
@@ -40,415 +22,38 @@ import {
   useState,
 } from 'react';
 import {
-  type ActivityFilterForm,
-  actorName,
-  CATEGORY_LABEL,
+  ACTIVITY_FILTER_CODEC,
   EMPTY_ACTIVITY_FILTERS,
-  type FeedRow,
-  formFromSearch,
-  formSearch,
   groupRows,
   hasActivityFilters,
   isNotFound,
   matchesQuery,
   mergeItems,
-  moreFilterCount,
   PAGE_SIZE,
   POLL_MS,
-  parseLiveItem,
+  PROJECT_ACTIVITY_FILTER_CODEC,
   planLive,
   queryString,
   SCROLLED_PX,
-  safeLink,
-  severityTone,
-  TYPE_OPTIONS,
   toActivityQuery,
-  typeLabel,
 } from '../../../lib/activity/format';
 import { api, describeError, describeErrorHint } from '../../../lib/api';
-import { pluralize } from '../../../lib/format';
-import { useLive } from '../../../lib/live/use-live';
+import { useUrlFilters } from '../../../lib/filters/use-url-filters';
 import { useErrorToast } from '../../../lib/section/use-error-toast';
+import { type Names, TopicListener, toEntries } from './feed-entries';
+import { FeedToolbar } from './feed-toolbar';
 
-const CATEGORY_ICON: Record<ActivityCategory, ReactNode> = {
-  fleet: <Bot size={14} strokeWidth={2} />,
-  runner: <Server size={14} strokeWidth={2} />,
-  audit: <ShieldCheck size={14} strokeWidth={2} />,
-};
-
-const SEVERITY_RANK: Record<ActivitySeverity, number> = {
-  info: 0,
-  ok: 1,
-  warn: 2,
-  danger: 3,
-};
-
-/** `useLive` takes one topic; a feed may follow several, so one invisible subscriber each. */
-function TopicListener({
-  topic,
-  onItem,
-}: {
-  topic: LiveTopic;
-  onItem: (item: ActivityItem) => void;
-}) {
-  useLive(topic, (message) => {
-    if (message.event !== ACTIVITY_ITEM_LIVE_EVENT) return;
-    const item = parseLiveItem(message.data);
-    if (item) onItem(item);
-  });
-  return null;
-}
-
-/** What an item is about, as tinted chips; the event code only in the tooltip (R2). */
-function ItemMeta({
-  item,
-  projectName,
-  extra,
-}: {
-  item: ActivityItem;
-  projectName: string | null;
-  extra?: ReactNode;
-}) {
-  return (
-    <span
-      className="mt-0.5 flex flex-wrap items-center gap-1.5"
-      title={item.type}
-    >
-      <span>{CATEGORY_LABEL[item.category] ?? typeLabel(item.category)}</span>
-      {projectName ? (
-        <span className="max-w-48 truncate">· {projectName}</span>
-      ) : null}
-      {item.slot ? (
-        <Chip size="sm" className="text-[11px]">
-          {item.slot}
-        </Chip>
-      ) : null}
-      {item.issue !== null ? (
-        <Chip size="sm" className="text-[11px]">
-          #{item.issue}
-        </Chip>
-      ) : null}
-      {item.prNumber !== null ? (
-        <Chip size="sm" className="text-[11px]">
-          PR #{item.prNumber}
-        </Chip>
-      ) : null}
-      {extra}
-    </span>
-  );
-}
-
-/** A title that wraps anywhere: a checkpoint heading may carry a long URL (R4). */
-const Title = ({ text }: { text: string }) => (
-  <span className="[overflow-wrap:anywhere]">{text}</span>
+/** The empty state's action keeps client-side navigation. */
+const NextLink: NonNullable<ComponentProps<typeof EmptyState>['link']> = ({
+  href,
+  className,
+  children,
+  ...rest
+}) => (
+  <Link href={href} className={className} {...rest}>
+    {children}
+  </Link>
 );
-
-interface Names {
-  projects: ReadonlyMap<string, string>;
-  runners: ReadonlyMap<string, string>;
-}
-
-function projectNameOf(item: ActivityItem, names: Names, fixed: boolean) {
-  if (fixed) return null;
-  if (!item.projectId) return 'no project';
-  return names.projects.get(item.projectId) ?? null;
-}
-
-function toEntry(item: ActivityItem, names: Names, fixed: boolean) {
-  const name = actorName(item, names.runners);
-  return {
-    id: item.id,
-    at: item.ts,
-    tone: severityTone(item.severity),
-    icon: CATEGORY_ICON[item.category],
-    actor: name ? { name } : undefined,
-    title: <Title text={item.title} />,
-    meta: (
-      <ItemMeta item={item} projectName={projectNameOf(item, names, fixed)} />
-    ),
-    href: safeLink(item.link),
-  } satisfies TimelineItem;
-}
-
-/**
- * Feed rows as Timeline items. A collapsed group is its newest item with
- * "N earlier" and opens in place; an open group is a header that closes it,
- * then every item.
- */
-function toEntries(
-  rows: FeedRow[],
-  open: ReadonlySet<string>,
-  toggle: (id: string) => void,
-  names: Names,
-  fixed: boolean,
-): TimelineItem[] {
-  const entries: TimelineItem[] = [];
-  for (const row of rows) {
-    if (row.kind === 'item') {
-      entries.push(toEntry(row.item, names, fixed));
-      continue;
-    }
-    const [newest] = row.items;
-    const worst = row.items.reduce((a, b) =>
-      SEVERITY_RANK[b.severity] > SEVERITY_RANK[a.severity] ? b : a,
-    );
-    if (open.has(row.id)) {
-      entries.push({
-        id: row.id,
-        at: newest.ts,
-        tone: severityTone(worst.severity),
-        icon: CATEGORY_ICON[newest.category],
-        title: `${row.label}: ${pluralize(row.items.length, 'update')}`,
-        meta: 'Hide the updates',
-        onSelect: () => toggle(row.id),
-      });
-      for (const item of row.items) entries.push(toEntry(item, names, fixed));
-      continue;
-    }
-    const earlier = row.items.length - 1;
-    const name = actorName(newest, names.runners);
-    entries.push({
-      id: row.id,
-      at: newest.ts,
-      tone: severityTone(worst.severity),
-      icon: CATEGORY_ICON[newest.category],
-      actor: name ? { name } : undefined,
-      title: <Title text={newest.title} />,
-      meta: (
-        <ItemMeta
-          item={newest}
-          projectName={projectNameOf(newest, names, fixed)}
-          extra={
-            <span className="font-medium text-ink-2">
-              · {pluralize(earlier, 'earlier update')}, show
-            </span>
-          }
-        />
-      ),
-      onSelect: () => toggle(row.id),
-    });
-  }
-  return entries;
-}
-
-function MoreFilters({
-  form,
-  actors,
-  categoryHere,
-  onApply,
-}: {
-  form: ActivityFilterForm;
-  /** Who caused the items loaded so far, by id → name. */
-  actors: ReadonlyMap<string, string>;
-  /** Phones: Category moves in here, beside the project select it crowds (R4). */
-  categoryHere: boolean;
-  onApply: (patch: Partial<ActivityFilterForm>) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState(form);
-  const count = moreFilterCount(form);
-
-  useEffect(() => {
-    if (open) setDraft(form);
-  }, [open, form]);
-
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    onApply({
-      category: draft.category,
-      type: draft.type,
-      actor: draft.actor,
-      slot: draft.slot.trim(),
-      fromDate: draft.fromDate,
-      toDate: draft.toDate,
-    });
-    setOpen(false);
-  };
-  const clear = () => {
-    onApply({ type: '', actor: '', slot: '', fromDate: '', toDate: '' });
-    setOpen(false);
-  };
-  const set = (patch: Partial<ActivityFilterForm>) =>
-    setDraft((current) => ({ ...current, ...patch }));
-
-  return (
-    <PopoverRoot open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="glass" size="sm">
-          <ListFilter size={14} aria-hidden="true" />
-          More filters
-          {count > 0 ? <Badge tone="ink" count={count} /> : null}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent title="More filters" align="end" className="w-80">
-        <form onSubmit={submit} className="flex flex-col gap-3">
-          {categoryHere ? (
-            <div className="sm:hidden">
-              <Field label="Category" htmlFor="activity-category">
-                <Select
-                  id="activity-category"
-                  value={draft.category}
-                  onChange={(e) => set({ category: e.target.value })}
-                >
-                  <option value="">Any category</option>
-                  {ACTIVITY_CATEGORIES.map((category) => (
-                    <option key={category} value={category}>
-                      {CATEGORY_LABEL[category]}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-            </div>
-          ) : null}
-          <Field label="Type" htmlFor="activity-type">
-            <Select
-              id="activity-type"
-              value={draft.type}
-              onChange={(e) => set({ type: e.target.value })}
-            >
-              <option value="">Any type</option>
-              {TYPE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field
-            label="Actor"
-            htmlFor="activity-actor"
-            hint="People and runners seen in the feed so far."
-          >
-            <Select
-              id="activity-actor"
-              value={draft.actor}
-              onChange={(e) => set({ actor: e.target.value })}
-            >
-              <option value="">Anyone</option>
-              {[...actors].map(([id, name]) => (
-                <option key={id} value={id}>
-                  {name}
-                </option>
-              ))}
-              {draft.actor && !actors.has(draft.actor) ? (
-                <option value={draft.actor}>The chosen actor</option>
-              ) : null}
-            </Select>
-          </Field>
-          <Field
-            label="Slot"
-            htmlFor="activity-slot"
-            hint="An orchestrator slot's name."
-          >
-            <Input
-              id="activity-slot"
-              value={draft.slot}
-              maxLength={200}
-              placeholder="e.g. i42"
-              onChange={(e) => set({ slot: e.target.value })}
-            />
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="From" htmlFor="activity-from">
-              <DateInput
-                id="activity-from"
-                value={draft.fromDate}
-                max={draft.toDate || undefined}
-                onChange={(e) => set({ fromDate: e.target.value })}
-              />
-            </Field>
-            <Field label="To" htmlFor="activity-to">
-              <DateInput
-                id="activity-to"
-                value={draft.toDate}
-                min={draft.fromDate || undefined}
-                onChange={(e) => set({ toDate: e.target.value })}
-              />
-            </Field>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" size="sm" type="button" onClick={clear}>
-              Clear
-            </Button>
-            <Button variant="solid" size="sm" type="submit">
-              Apply
-            </Button>
-          </div>
-        </form>
-      </PopoverContent>
-    </PopoverRoot>
-  );
-}
-
-function FeedToolbar({
-  form,
-  projects,
-  showProject,
-  actors,
-  onChange,
-  onReset,
-}: {
-  form: ActivityFilterForm;
-  projects: ProjectSummary[];
-  showProject: boolean;
-  actors: ReadonlyMap<string, string>;
-  onChange: (patch: Partial<ActivityFilterForm>) => void;
-  onReset: () => void;
-}) {
-  const filtered = hasActivityFilters(toActivityQuery(form));
-  return (
-    <Toolbar
-      aria-label="Filter activity"
-      filters={
-        <div className="flex items-center gap-2">
-          {showProject ? (
-            <Select
-              aria-label="Project"
-              value={form.projectId}
-              onChange={(e) => onChange({ projectId: e.target.value })}
-              className="w-36 sm:w-44"
-            >
-              <option value="">All my projects</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.displayName}
-                </option>
-              ))}
-            </Select>
-          ) : null}
-          <Select
-            aria-label="Category"
-            value={form.category}
-            onChange={(e) => onChange({ category: e.target.value })}
-            className={showProject ? 'hidden w-36 sm:flex' : 'w-36'}
-          >
-            <option value="">Any category</option>
-            {ACTIVITY_CATEGORIES.map((category) => (
-              <option key={category} value={category}>
-                {CATEGORY_LABEL[category]}
-              </option>
-            ))}
-          </Select>
-        </div>
-      }
-      actions={
-        <div className="flex items-center gap-1">
-          <MoreFilters
-            form={form}
-            actors={actors}
-            categoryHere={showProject}
-            onApply={onChange}
-          />
-          {filtered ? (
-            <Button variant="ghost" size="sm" onClick={onReset}>
-              Reset
-            </Button>
-          ) : null}
-        </div>
-      }
-    />
-  );
-}
 
 type FeedProps = {
   projectId?: string;
@@ -480,14 +85,10 @@ function FeedSkeleton() {
 
 function Feed({ projectId, isAdmin }: FeedProps) {
   const fixed = projectId !== undefined;
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const search = searchParams.toString();
-  const form = useMemo(() => {
-    const read = formFromSearch(new URLSearchParams(search));
-    return fixed ? { ...read, projectId: '' } : read;
-  }, [search, fixed]);
+  const url = useUrlFilters(
+    fixed ? PROJECT_ACTIVITY_FILTER_CODEC : ACTIVITY_FILTER_CODEC,
+  );
+  const form = url.filters;
   const applied = useMemo(() => toActivityQuery(form), [form]);
 
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
@@ -511,12 +112,7 @@ function Feed({ projectId, isAdmin }: FeedProps) {
   appliedRef.current = applied;
 
   const base = fixed ? `/projects/${projectId}/activity` : '/activity';
-
-  const navigate = (next: ActivityFilterForm) =>
-    router.replace(`${pathname}${formSearch(next)}`, { scroll: false });
-  const change = (patch: Partial<ActivityFilterForm>) =>
-    navigate({ ...form, ...patch });
-  const reset = () => navigate(EMPTY_ACTIVITY_FILTERS);
+  const reset = () => url.replace(EMPTY_ACTIVITY_FILTERS);
 
   /** Reads refs only, so it is stable and never sees stale filters. */
   const receive = useCallback((incoming: ActivityItem[]) => {
@@ -665,12 +261,10 @@ function Feed({ projectId, isAdmin }: FeedProps) {
 
       <div className="mb-4">
         <FeedToolbar
-          form={form}
+          url={url}
           projects={projects}
           showProject={!fixed}
           actors={actors}
-          onChange={change}
-          onReset={reset}
         />
       </div>
 
@@ -711,33 +305,22 @@ function Feed({ projectId, isAdmin }: FeedProps) {
               <EmptyState
                 title="No activity matches these filters"
                 description="Widen the date range or clear a filter to see more."
-                action={
-                  <Button variant="glass" onClick={reset}>
-                    Clear filters
-                  </Button>
-                }
+                action={{ label: 'Clear filters', onClick: reset }}
               />
             ) : (
               <EmptyState
                 title="No activity yet"
                 description="Events appear here as the orchestrator opens pull requests, hits blockers and finishes work."
+                link={NextLink}
                 action={
-                  <Link
-                    href={
-                      fixed
-                        ? `/projects/${projectId}/fleet`
-                        : isAdmin
-                          ? '/admin/runners'
-                          : '/projects'
-                    }
-                    className={buttonClassName({ variant: 'glass' })}
-                  >
-                    {fixed
-                      ? 'Open Fleet'
-                      : isAdmin
-                        ? 'Open Runners'
-                        : 'Open Projects'}
-                  </Link>
+                  fixed
+                    ? {
+                        label: 'Open Fleet',
+                        href: `/projects/${projectId}/fleet`,
+                      }
+                    : isAdmin
+                      ? { label: 'Open Runners', href: '/admin/runners' }
+                      : { label: 'Open Projects', href: '/projects' }
                 }
               />
             )
