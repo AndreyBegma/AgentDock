@@ -5,6 +5,7 @@ import {
   type PlannerSettingsView,
   type PlanTaskView,
   projectRoleAtLeast,
+  type UiProfileView,
 } from '@agentdock/shared';
 import { buttonClassName } from '@andrewbehma/glass-ui/button';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
@@ -26,6 +27,7 @@ import { TaskPanel } from '../../../../../../components/planner/task-panel';
 import { AsyncSection } from '../../../../../../components/prerequisites/async-section';
 import { useCurrentUser } from '../../../../../../components/shell/user-context';
 import { api } from '../../../../../../lib/api';
+import { uiProfileApi } from '../../../../../../lib/design/href';
 import {
   activeTurn,
   describePlannerError,
@@ -67,6 +69,12 @@ export default function PlanPage() {
     () => api<PlannerSettingsView>(`/projects/${projectId}/planner/settings`),
     [projectId],
   );
+  // D3: a project whose profile says it has no UI hides the design toggle.
+  // A profile that does not load is treated as none: the toggle shows.
+  const profile = useSection(
+    () => api<UiProfileView>(uiProfileApi(projectId)),
+    [projectId],
+  );
 
   if (section.data === undefined && isNotFound(section.error)) {
     return (
@@ -106,6 +114,8 @@ export default function PlanPage() {
           specOutput={settings.data?.specOutput}
           busy={section.busy}
           actions={section.actions}
+          hasUi={profile.data?.current?.hasUi ?? null}
+          onRefresh={section.retry}
           onArchived={() => router.push(plannerHref(projectId))}
         />
       )}
@@ -126,6 +136,8 @@ function PlanView({
   specOutput,
   busy,
   actions,
+  hasUi,
+  onRefresh,
   onArchived,
 }: {
   plan: PlanDetail;
@@ -138,6 +150,9 @@ function PlanView({
   specOutput: PlannerSettingsView['specOutput'] | undefined;
   busy: Plan['busy'];
   actions: Plan['actions'];
+  /** The UI profile's `hasUi`; null with no profile (spec 223 D3). */
+  hasUi: boolean | null;
+  onRefresh: () => void;
   onArchived: () => void;
 }) {
   const [rewriting, setRewriting] = useState<PlanTaskView | null>(null);
@@ -314,14 +329,19 @@ function PlanView({
               {plan.tasks.map((task) => (
                 <TaskCard
                   key={task.key}
+                  projectId={projectId}
+                  planId={plan.id}
                   task={task}
                   selected={task.key === selectedKey}
                   canReview={canWrite && active === null}
+                  canDesign={canWrite}
+                  hasUi={hasUi}
                   busy={busy !== null}
                   onSelect={() =>
                     onSelect(task.key === selectedKey ? null : task.key)
                   }
                   onReview={(d) => review(task, d)}
+                  onDesignChanged={onRefresh}
                 />
               ))}
             </section>
