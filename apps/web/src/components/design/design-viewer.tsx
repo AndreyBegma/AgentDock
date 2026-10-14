@@ -169,6 +169,14 @@ export function DesignViewer({
                 if (!on) setDraft(null);
               }}
             />
+            {/* Below `lg` the panel is a sheet; its way in sits above the frame. */}
+            <Button
+              variant="glass"
+              className="shrink-0 self-start lg:hidden"
+              onClick={() => setSheetOpen(true)}
+            >
+              Comments and review ({openCount} open)
+            </Button>
             <FrameBox
               width={state.width}
               height={state.viewport.height}
@@ -188,13 +196,6 @@ export function DesignViewer({
                 }}
               />
             </FrameBox>
-            <Button
-              variant="glass"
-              className="self-start lg:hidden"
-              onClick={() => setSheetOpen(true)}
-            >
-              Comments ({openCount})
-            </Button>
           </>
         ) : (
           <GeneratePanel

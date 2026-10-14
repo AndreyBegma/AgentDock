@@ -179,7 +179,8 @@ function SettingsForm({
               <div className="flex flex-wrap items-center gap-2">
                 <Input
                   aria-label={`Preset ${i + 1} name`}
-                  className="w-36"
+                  // A row of its own on a phone; the sizes wrap under it.
+                  className="w-full sm:w-36"
                   value={row.name}
                   disabled={!isAdmin}
                   aria-invalid={errors[row.key] ? true : undefined}
@@ -310,7 +311,7 @@ function SettingsForm({
           options={options}
           value={skills}
           disabled={!isAdmin}
-          placeholder="No default skills"
+          placeholder="Add a skill"
           onValueChange={(next) => setSkills(next.slice(0, DESIGN_SKILLS_MAX))}
         />
         {installed.error ? (

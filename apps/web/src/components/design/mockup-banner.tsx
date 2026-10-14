@@ -14,7 +14,7 @@ export function MockupBanner({ design }: { design: TaskDesignView }) {
     design.status === 'generating' ||
     design.status === 'revising';
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex shrink-0 flex-col gap-2">
       <Banner tone="info">
         Mockup — the implementation uses the project’s real components.
       </Banner>

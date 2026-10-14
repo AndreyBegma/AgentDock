@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { DesignViewer } from '../../../../../../../../../components/design/design-viewer';
+import { FullScreenLayer } from '../../../../../../../../../components/design/full-screen-layer';
 import { AsyncSection } from '../../../../../../../../../components/prerequisites/async-section';
 import { api } from '../../../../../../../../../lib/api';
 import {
@@ -55,7 +56,7 @@ export default function DesignViewerPage() {
   const back = planHref(projectId, planId, taskKey);
 
   return (
-    <div className="fixed inset-0 z-[calc(var(--z-index-chrome)+1)] flex flex-col bg-ground">
+    <FullScreenLayer label="Design viewer">
       <header className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-3">
         <Link
           href={back}
@@ -90,37 +91,41 @@ export default function DesignViewerPage() {
           onTurnedOn={section.retry}
         />
       ) : (
-        <AsyncSection
-          section={section}
-          unavailable={{
-            title: 'The design could not be loaded',
-            stillWorks: 'The plan and its other tasks are still available.',
-          }}
-          empty={null}
-        >
-          {(design) => (
-            <DesignViewer
-              projectId={projectId}
-              design={design}
-              state={resolveViewerState(
-                search,
-                design.revisions,
-                design.viewports,
-              )}
-              canOperate={canOperate}
-              busy={section.busy}
-              actions={section.actions}
-              onChange={(change) =>
-                router.replace(
-                  `${window.location.pathname}${applyViewerChange(search, change)}`,
-                  { scroll: false },
-                )
-              }
-            />
-          )}
-        </AsyncSection>
+        // AsyncSection wraps its states in a div of its own: it takes the
+        // height left under the header, so the stage scrolls, not the overlay.
+        <div className="flex min-h-0 flex-1 flex-col *:min-h-0 *:flex-1">
+          <AsyncSection
+            section={section}
+            unavailable={{
+              title: 'The design could not be loaded',
+              stillWorks: 'The plan and its other tasks are still available.',
+            }}
+            empty={null}
+          >
+            {(design) => (
+              <DesignViewer
+                projectId={projectId}
+                design={design}
+                state={resolveViewerState(
+                  search,
+                  design.revisions,
+                  design.viewports,
+                )}
+                canOperate={canOperate}
+                busy={section.busy}
+                actions={section.actions}
+                onChange={(change) =>
+                  router.replace(
+                    `${window.location.pathname}${applyViewerChange(search, change)}`,
+                    { scroll: false },
+                  )
+                }
+              />
+            )}
+          </AsyncSection>
+        </div>
       )}
-    </div>
+    </FullScreenLayer>
   );
 }
 

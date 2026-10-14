@@ -38,7 +38,8 @@ export function FrameBox({
 }: FrameBoxProps) {
   const clamped = Math.min(max, Math.max(min, width));
   return (
-    <div className={`w-full overflow-x-auto ${className ?? ''}`}>
+    // `shrink-0`: in a scrolling column the box keeps the frame's height.
+    <div className={`w-full shrink-0 overflow-x-auto ${className ?? ''}`}>
       <div
         className="mx-auto overflow-hidden rounded-md border border-line bg-content"
         style={{ width: clamped, height: height ?? '100%' }}

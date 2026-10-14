@@ -67,7 +67,7 @@ export function ViewerToolbar({
     <div
       role="toolbar"
       aria-label="Mockup view"
-      className="flex flex-wrap items-center gap-2"
+      className="flex shrink-0 flex-wrap items-center gap-2"
     >
       <SegmentedControl size="sm" role="group" aria-label="Viewport">
         {viewports.map((vp) => {
@@ -166,7 +166,10 @@ export function ViewerToolbar({
         size="sm"
         // Glass either way: the screen's one solid is Approve.
         variant="glass"
-        className={pinMode ? 'ring-2 ring-accent' : undefined}
+        // An outline, not a ring: glass draws its own box-shadow.
+        className={
+          pinMode ? 'outline-2 outline-offset-1 outline-accent' : undefined
+        }
         aria-pressed={pinMode}
         disabled={!canPin}
         title={

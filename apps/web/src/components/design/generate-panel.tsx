@@ -133,7 +133,7 @@ export function GeneratePanel({
           options={options}
           value={skills}
           disabled={writeBlock !== null}
-          placeholder="No skills"
+          placeholder="Add a skill"
           onValueChange={(next) => setSkills(next.slice(0, DESIGN_SKILLS_MAX))}
         />
       </Field>
