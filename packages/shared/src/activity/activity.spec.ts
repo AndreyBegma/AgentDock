@@ -52,12 +52,16 @@ const SAMPLE: Record<string, unknown> = {
 };
 
 /** Types the API records itself (ADR-0014): only `source` `api` shows them. */
-const API_ONLY = new Set(SCHEDULE_EVENT_TYPES);
+const API_ONLY = new Set<string>([
+  ...SCHEDULE_EVENT_TYPES,
+  'manual.note',
+  'manual.handoff',
+]);
 
 describe('the curated event map (spec 21 D3)', () => {
   it('maps every curated type to an item', () => {
     for (const type of ACTIVITY_EVENT_TYPES) {
-      const source = API_ONLY.has(type as never) ? API_EVENT_SOURCE : 'runner';
+      const source = API_ONLY.has(type) ? API_EVENT_SOURCE : 'runner';
       const item = activityFromEvent(
         event(type, SAMPLE[type] ?? {}, { source }),
         'p1',
@@ -95,6 +99,8 @@ describe('the curated event map (spec 21 D3)', () => {
         'schedule.skipped',
         'schedule.failed',
         'schedule.disabled',
+        'manual.note',
+        'manual.handoff',
       ].sort(),
     );
   });

@@ -17,6 +17,8 @@ export const eventSourceSchema = z.enum([
   'github',
   /** Parsed from Code Sentinel's markdown, the ADR-0002 fallback (spec 11). */
   'scraped',
+  /** The `agentdock` Claude Code plugin's hooks (ADR-0020). */
+  'hook',
 ]);
 export type EventSource = z.infer<typeof eventSourceSchema>;
 

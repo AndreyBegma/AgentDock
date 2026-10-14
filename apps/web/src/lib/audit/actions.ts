@@ -18,6 +18,8 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   'runner.pair': 'Paired a runner',
   'runner.rename': 'Renamed a runner',
   'runner.revoke': 'Revoked a runner',
+  'runner.update': "Changed a runner's settings",
+  'local.request': 'A Claude Code session asked the server',
   'runner.command': 'Sent a command to a runner',
   'runner.command.result': 'Runner answered a command',
   'project.connect': 'Connected a project',
@@ -91,6 +93,10 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   'plan.task_reviewed': 'Reviewed a planned task',
   'planner.instructions_updated': 'Changed the planner instructions',
   'planner.settings_updated': 'Changed the planner settings',
+  'action_request.created': 'Requested an action from a session',
+  'action_request.decided': 'Decided an action request',
+  'action_request.executed': 'Executed a requested action',
+  'session_content.purged': 'Purged session content',
 };
 
 /** The action filter's groups: the prefix before the dot. */

@@ -25,6 +25,7 @@ export const KIND_LABEL: Record<NotificationKind, string> = {
   'budget.exceeded': 'Budget exceeded',
   'budget.threshold': 'Budget threshold reached',
   'schedule.disabled': 'Schedule disabled',
+  'action.requested': 'Action requested',
 };
 
 /** What a notification of the kind reads like, under the rule's name. */
@@ -40,6 +41,7 @@ export const KIND_EXAMPLE: Record<NotificationKind, string> = {
   'budget.exceeded': 'luna-watch spent its whole monthly budget',
   'budget.threshold': 'luna-watch reached 80 % of its monthly budget',
   'schedule.disabled': 'The nightly review schedule was turned off',
+  'action.requested': 'A session asks to start the orchestrator',
 };
 
 export type RuleGroup = 'fleet' | 'runners' | 'budgets' | 'schedules';
@@ -63,6 +65,7 @@ const KIND_GROUP: Record<NotificationKind, RuleGroup> = {
   'budget.exceeded': 'budgets',
   'budget.threshold': 'budgets',
   'schedule.disabled': 'schedules',
+  'action.requested': 'fleet',
 };
 
 export type KindTone = 'ok' | 'warn' | 'danger' | 'neutral';
@@ -79,6 +82,7 @@ export const KIND_TONE: Record<NotificationKind, KindTone> = {
   'budget.exceeded': 'danger',
   'budget.threshold': 'warn',
   'schedule.disabled': 'danger',
+  'action.requested': 'warn',
 };
 
 export interface FeedState {

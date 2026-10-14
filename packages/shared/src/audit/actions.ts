@@ -19,6 +19,8 @@ export const AUDIT_ACTIONS = [
   'runner.pair',
   'runner.rename',
   'runner.revoke',
+  'runner.update',
+  'local.request',
   'runner.command',
   'runner.command.result',
   'project.connect',
@@ -92,6 +94,10 @@ export const AUDIT_ACTIONS = [
   'plan.task_reviewed',
   'planner.instructions_updated',
   'planner.settings_updated',
+  'action_request.created',
+  'action_request.decided',
+  'action_request.executed',
+  'session_content.purged',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
