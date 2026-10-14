@@ -22,6 +22,7 @@ import {
   Users,
   Wallet,
   Wand2,
+  Waypoints,
   Workflow,
 } from 'lucide-react';
 
@@ -105,6 +106,14 @@ export const NAV: NavSection[] = [
         href: '/usage',
         label: 'Usage',
         icon: BarChart3,
+        minRole: 'viewer',
+        enabled: true,
+      },
+      {
+        id: 'workflows',
+        href: '/workflows',
+        label: 'Workflows',
+        icon: Waypoints,
         minRole: 'viewer',
         enabled: true,
       },
