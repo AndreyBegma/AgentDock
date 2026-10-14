@@ -197,6 +197,138 @@ describe('skill run live log (e2e)', () => {
     await expect(desk.next('subscribe', 300)).rejects.toThrow(/no .* within/);
   });
 
+  describe('a plan turn (#183)', () => {
+    let author: Session;
+    let other: Session;
+
+    const member = async (email: string) => {
+      const user = await createUser(ctx.prisma, email, 'operator');
+      await ctx.prisma.projectMember.create({
+        data: { projectId, userId: user.id },
+      });
+      return user;
+    };
+
+    /** A running turn of a private plan by `author@example.com`. */
+    const seedTurn = async (phase: 'running' | 'succeeded' = 'running') => {
+      const authorId = (
+        await ctx.prisma.user.findUniqueOrThrow({
+          where: { email: 'author@example.com' },
+        })
+      ).id;
+      const instructions = await ctx.prisma.plannerInstructions.create({
+        data: { projectId: null, version: 1, body: 'INSTRUCTIONS' },
+      });
+      const plan = await ctx.prisma.plan.create({
+        data: {
+          projectId,
+          authorId,
+          title: 'Exporter',
+          brief: 'Build an exporter',
+          mode: 'batch',
+          status: 'drafting',
+          sessionId: '11111111-1111-4111-8111-111111111111',
+          instructionsId: instructions.id,
+          contractVersion: 1,
+          profileKey: 'claude-main',
+          model: 'opus',
+        },
+      });
+      const now = new Date();
+      const run = await ctx.prisma.run.create({
+        data: {
+          kind: 'plan',
+          projectId,
+          status: phase,
+          triggeredByType: 'user',
+          triggeredById: authorId,
+          startedAt: now,
+          updatedAt: now,
+          planTurn: {
+            create: {
+              planId: plan.id,
+              action: 'decompose',
+              authorId,
+              input: {},
+              phase,
+            },
+          },
+        },
+      });
+      return { planId: plan.id, runId: run.id };
+    };
+
+    beforeEach(async () => {
+      await member('author@example.com');
+      await member('other@example.com');
+      author = await login(ctx, 'author@example.com');
+      other = await login(ctx, 'other@example.com');
+    });
+
+    it('relays the live line to a reader of the plan', async () => {
+      const desk = await runner();
+      const { runId } = await seedTurn();
+      const topic = runTopic(projectId, runId);
+      const page = await browser(author);
+
+      expect(await page.subscribe(topic)).toEqual({
+        type: 'subscribed',
+        topic,
+      });
+      const subscribe = await desk.next('subscribe');
+      expect(subscribe).toMatchObject({ kind: 'run_log', projectId, runId });
+      desk.send({ type: 'run_log', id: subscribe.id, frame: lines(MARKER) });
+      expect(await page.next('event')).toMatchObject({
+        topic,
+        event: RUN_LOG_LIVE_EVENTS.lines,
+        data: lines(MARKER),
+      });
+    });
+
+    it('gives another operator nothing on a private plan’s topic, and opens it once shared', async () => {
+      const desk = await runner();
+      const { planId, runId } = await seedTurn();
+      const topic = runTopic(projectId, runId);
+      const page = await browser(other);
+
+      expect(await page.subscribe(topic)).toMatchObject({
+        type: 'error',
+        topic,
+        code: 'not_found',
+      });
+      await relay.settled();
+      await expect(desk.next('subscribe', 300)).rejects.toThrow(/no .* within/);
+
+      // A reader's line on the same run never reaches them.
+      const reader = await browser(author);
+      await reader.subscribe(topic);
+      const subscribe = await desk.next('subscribe');
+      desk.send({ type: 'run_log', id: subscribe.id, frame: lines(MARKER) });
+      await reader.next('event');
+      await expect(page.next('event', 300)).rejects.toThrow(/no .* within/);
+
+      await ctx.prisma.plan.update({
+        where: { id: planId },
+        data: { visibility: 'project' },
+      });
+      expect(await page.subscribe(topic)).toEqual({
+        type: 'subscribed',
+        topic,
+      });
+    });
+
+    it('does not subscribe for a turn that already ended', async () => {
+      const desk = await runner();
+      const { runId } = await seedTurn('succeeded');
+      const page = await browser(author);
+      expect(await page.subscribe(runTopic(projectId, runId))).toMatchObject({
+        type: 'subscribed',
+      });
+      await relay.settled();
+      await expect(desk.next('subscribe', 300)).rejects.toThrow(/no .* within/);
+    });
+  });
+
   it('drops a run_log frame for a subscription it did not open', async () => {
     const desk = await runner();
     const runId = await seedRun();

@@ -90,6 +90,11 @@ export class PlanTurnExecutor {
   private readonly preparing = new Set<string>();
   /** Plans being closed: a turn still preparing must not recreate the worktree. */
   private readonly closing = new Set<string>();
+  /** `runId` → the turn it names, for turns the run log looked up on disk. */
+  private readonly byRun = new Map<
+    string,
+    { planId: string; turnId: string }
+  >();
   private ticking = false;
   private cancelTick: Cancel = () => {};
   private cancelCleanup: Cancel = () => {};
@@ -145,6 +150,34 @@ export class PlanTurnExecutor {
       this.active.get(turnKey(planId, turnId)) ??
       this.store.loadTurn(planId, turnId)
     );
+  }
+
+  /**
+   * A turn by its `runs` row, for the run log (#183): a live turn, else one
+   * on disk. The index keeps a finished turn's last polls off a full scan.
+   */
+  record(runId: string): TurnRecord | null {
+    for (const turn of this.active.values()) {
+      if (turn.runId === runId) return turn;
+    }
+    const known = this.byRun.get(runId);
+    if (known) {
+      const turn = this.store.loadTurn(known.planId, known.turnId);
+      if (turn) return turn;
+      this.byRun.delete(runId);
+    }
+    let found: TurnRecord | null = null;
+    for (const turn of this.store.turns()) {
+      this.byRun.set(turn.runId, { planId: turn.planId, turnId: turn.turnId });
+      if (turn.runId === runId) found = turn;
+    }
+    return found;
+  }
+
+  /** The turn's `stream.jsonl`; an unknown run opens nothing. */
+  streamFile(runId: string): string {
+    const turn = this.record(runId);
+    return turn ? this.store.file(turn, 'stream') : '';
   }
 
   /** `plan.turn` (D3, D15, D16). Answers once the turn is queued or running. */

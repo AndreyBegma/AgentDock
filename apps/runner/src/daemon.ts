@@ -43,6 +43,7 @@ import {
   RunLogStreamer,
   SkillRunExecutor,
 } from './skills';
+import { runLogSources } from './skills/run/log';
 import { Spool } from './spool';
 import { bunSpawnPty, type SpawnPty, TerminalManager } from './terminal';
 import { RUNNER_VERSION } from './version';
@@ -224,7 +225,7 @@ export const runDaemon = async (
       otlpPort: () => otlp?.port ?? null,
     });
     const runLog = new RunLogStreamer({
-      runs,
+      runs: runLogSources(runs, plans),
       send: (message) => connection?.sendMessage(message) ?? false,
       clock,
       log,

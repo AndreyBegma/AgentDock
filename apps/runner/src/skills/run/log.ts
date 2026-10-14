@@ -7,11 +7,11 @@ import {
   type RunLogLine,
   type RunLogMessage,
   type RunLogSubscribeMessage,
+  type SkillRunPhase,
   type SubscribeErrorMessage,
 } from '@agentdock/shared/protocol';
 import type { Cancel, Clock } from '../../clock';
 import { errorMessage, type Logger } from '../../log';
-import type { RunRecord } from './record';
 import { renderStreamLine } from './stream';
 
 /** How often subscribed run logs are tailed. */
@@ -21,10 +21,41 @@ const READ_CHUNK_BYTES = 1024 * 1024;
 
 export type RunLogOutbound = RunLogMessage | SubscribeErrorMessage;
 
+/**
+ * What the log needs of a run: whose it is and whether it is over. A plan
+ * turn's phases are a subset of a skill run's (#183).
+ */
+export interface RunLogRecord {
+  projectId: string;
+  phase: SkillRunPhase;
+}
+
 export interface RunLogSource {
-  record(runId: string): RunRecord | null;
+  record(runId: string): RunLogRecord | null;
   streamFile(runId: string): string;
 }
+
+/**
+ * Skill runs and plan turns as one source (#183): a `runId` is a `runs` row,
+ * so at most one of them knows it.
+ */
+export const runLogSources = (
+  ...sources: readonly RunLogSource[]
+): RunLogSource => {
+  const owner = (runId: string): RunLogSource | undefined =>
+    sources.find((source) => source.record(runId) !== null);
+  return {
+    record: (runId) => {
+      for (const source of sources) {
+        const record = source.record(runId);
+        if (record) return record;
+      }
+      return null;
+    },
+    // Only asked of a run `record` found; an unknown one opens nothing.
+    streamFile: (runId) => owner(runId)?.streamFile(runId) ?? '',
+  };
+};
 
 export interface RunLogOptions {
   runs: RunLogSource;
@@ -76,7 +107,7 @@ export const runLogFrames = (
 };
 
 /**
- * The live log of skill runs (D13). While the server holds a `run_log`
+ * The live log of skill runs (D13) and plan turns (#183). While the server holds a `run_log`
  * subscription, the runner tails the run's `stream.jsonl` and sends rendered
  * lines — the newest backlog first, then live lines — and an `ended` frame
  * at the run's terminal phase. The stream itself never leaves the runner.
@@ -215,7 +246,7 @@ export class RunLogStreamer {
     }
   }
 
-  private ended(id: string, record: RunRecord): void {
+  private ended(id: string, record: RunLogRecord): void {
     if (!isTerminalSkillRunPhase(record.phase)) return;
     this.options.send({
       type: 'run_log',

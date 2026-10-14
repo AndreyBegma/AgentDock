@@ -173,6 +173,7 @@ function PlanView({
     return (
       <Conversation
         key={taskKey ?? 'plan'}
+        projectId={projectId}
         label={
           taskKey
             ? `Message the planner about ${taskKey}`

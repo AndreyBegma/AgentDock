@@ -22,6 +22,7 @@ import { RunningTurn } from './running-turn';
  * Every round and every message is one turn.
  */
 export function Conversation({
+  projectId,
   label,
   turns,
   rounds,
@@ -37,6 +38,8 @@ export function Conversation({
   onCancel,
   onRetry,
 }: {
+  /** The plan's project: the running turn's log topic is keyed by it. */
+  projectId: string;
   /** Names the composer: "Message the planner about t3". */
   label: string;
   /** This scope's turns, oldest first. */
@@ -113,6 +116,7 @@ export function Conversation({
 
       {active ? (
         <RunningTurn
+          projectId={projectId}
           turn={active}
           canCancel={canWrite}
           cancelling={busy === 'cancel'}
