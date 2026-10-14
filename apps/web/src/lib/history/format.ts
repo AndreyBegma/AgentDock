@@ -42,6 +42,7 @@ export const RUN_KIND_LABEL: Record<RunKind, string> = {
   skill: 'Skill run',
   schedule: 'Scheduled start',
   plan: 'Planner turn',
+  ui_profile: 'UI profile build',
 };
 
 export const isRunKind = (value: string): value is RunKind =>

@@ -47,6 +47,7 @@ export const PLAN_STATUS_PILL: Record<PlanStatus, Status> = {
 export const TASK_STATUS_LABEL: Record<PlanTaskStatus, string> = {
   draft: 'Draft',
   needs_talk: 'Needs talk',
+  needs_design: 'Needs design',
   ready: 'Ready',
   approved: 'Approved',
   rejected: 'Rejected',
@@ -58,6 +59,8 @@ export const TASK_STATUS_PILL: Record<PlanTaskStatus, Status> = {
   draft: 'idle',
   // A blocking question has no safe default (D6): it waits on a person.
   needs_talk: 'blocked',
+  // Spec 223 D1: waits on the person's design approval.
+  needs_design: 'waiting',
   ready: 'waiting',
   approved: 'done',
   rejected: 'idle',
@@ -172,6 +175,7 @@ export function turnActionText(
     grill: `Thinking about ${task}…`,
     write: `Writing ${task}’s document…`,
     revise: 'Revising the plan…',
+    design: `Drawing ${task}’s mockup…`,
   };
   return sentence[turn.action];
 }
@@ -223,6 +227,7 @@ export const TURN_ACTION_LABEL: Record<PlanTurnAction, string> = {
   grill: 'Talk it through',
   write: 'Write the document',
   revise: 'Revise the plan',
+  design: 'Draw the mockup',
 };
 
 const TURN_PHASE_WORD: Record<PlanTurnPhase, string> = {

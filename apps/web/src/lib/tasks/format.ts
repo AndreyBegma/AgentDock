@@ -26,6 +26,7 @@ export const TASK_STATUSES: readonly TaskStatus[] = [
 export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
   draft: 'Draft',
   needs_talk: 'Needs talk',
+  needs_design: 'Needs design',
   ready: 'Ready',
   approved: 'Approved',
   rejected: 'Rejected',
@@ -42,6 +43,7 @@ export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
 export const TASK_PILL_STATUS: Record<TaskStatus, Status> = {
   draft: 'idle',
   needs_talk: 'blocked',
+  needs_design: 'waiting',
   ready: 'waiting',
   approved: 'done',
   rejected: 'idle',

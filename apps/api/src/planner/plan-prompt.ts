@@ -48,6 +48,8 @@ const WHAT: Record<PlanTurnAction, (input: PromptInput) => string> = {
     `Write the document of task \`${i.taskKey}\`. Use the answers given so far; record every default you took under \`## Open questions\`.`,
   revise: () =>
     'Revise the plan. Apply every rewrite comment. Pass every frozen (approved) task through as `{ "key": "<key>" }` only, drop rejected tasks, and return every other task in full.',
+  // Placeholder until the design flow lands (spec 223, slot i223-api).
+  design: (i) => `Draw the mockup of task \`${i.taskKey}\`.`,
 };
 
 const fence = (lang: string, body: string): string => {
