@@ -57,6 +57,7 @@ export function DesignViewer({
   canOperate,
   busy,
   actions,
+  approval,
   onChange,
 }: {
   projectId: string;
@@ -65,6 +66,11 @@ export function DesignViewer({
   canOperate: boolean;
   busy: DesignBusy | null;
   actions: DesignViewerActions;
+  /** A card's design (#243 D6): what approving does, and **Approve & run** when it starts nothing. */
+  approval?: {
+    consequence: string;
+    onApproveAndRun?: (revisionId: string) => Promise<unknown>;
+  };
   onChange: (change: ViewerChange) => void;
 }) {
   const [pinMode, setPinMode] = useState(false);
@@ -270,6 +276,17 @@ export function DesignViewer({
         candidates={candidates}
         inView={state.revision}
         busy={busy === 'approve'}
+        consequence={approval?.consequence}
+        onApproveAndRun={
+          approval?.onApproveAndRun
+            ? (id) => {
+                void approval
+                  .onApproveAndRun?.(id)
+                  .then(() => setApproveOpen(false))
+                  .catch(() => {});
+              }
+            : undefined
+        }
         onApprove={(id) => {
           void actions
             .approve({ revisionId: id })

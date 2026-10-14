@@ -7,18 +7,84 @@ import {
 } from '@agentdock/shared';
 import { STATUSES } from '@andrewbehma/glass-ui/status-pill';
 import { ApiError } from '../api';
+import { card, round } from '../board/fixtures';
 import { task } from '../planner/fixtures';
 import {
+  canChangeContinue,
+  canToggleCardDesign,
   canToggleDesign,
+  cardDesignChipState,
   DESIGN_STATUS_PILL,
   describeDesignError,
   designChipState,
   generateRunnerGate,
+  opensCardDesign,
   opensDesign,
   PROFILE_STATUS_PILL,
   rebuildRunnerGate,
   toggleBehindMenu,
 } from './format';
+
+describe('the Design chip on a board card (#243)', () => {
+  const summary = (over: Partial<TaskDesignSummary>): TaskDesignSummary => ({
+    needed: true,
+    suggested: false,
+    suggestionWhy: null,
+    variantCount: 2,
+    status: 'idle',
+    approvedRevisionId: null,
+    ...over,
+  });
+
+  test('every status has a state, and off is a card without a design', () => {
+    expect(cardDesignChipState(null)).toBe('off');
+    expect(cardDesignChipState(summary({ needed: false }))).toBe('off');
+    expect(cardDesignChipState(summary({ status: 'idle' }))).toBe('on');
+    expect(cardDesignChipState(summary({ status: 'generating' }))).toBe(
+      'generating',
+    );
+    expect(cardDesignChipState(summary({ status: 'revising' }))).toBe(
+      'generating',
+    );
+    expect(cardDesignChipState(summary({ status: 'reviewing' }))).toBe(
+      'reviewing',
+    );
+    expect(cardDesignChipState(summary({ status: 'approved' }))).toBe(
+      'approved',
+    );
+  });
+
+  test('the design and the switch freeze with the first round', () => {
+    const open = card(1, 'todo');
+    expect(canToggleCardDesign(open)).toBe(true);
+    expect(canChangeContinue(open)).toBe(true);
+    const running = card(1, 'in_progress', { round: round('running') });
+    expect(canToggleCardDesign(running)).toBe(false);
+    expect(canChangeContinue(running)).toBe(false);
+  });
+
+  test('approval freezes the design; a running turn freezes only the toggle', () => {
+    const approved = card(1, 'todo', {
+      design: summary({ status: 'approved' }),
+    });
+    expect(canToggleCardDesign(approved)).toBe(false);
+    expect(canChangeContinue(approved)).toBe(false);
+    const drawing = card(1, 'todo', {
+      design: summary({ status: 'generating' }),
+    });
+    expect(canToggleCardDesign(drawing)).toBe(false);
+    expect(canChangeContinue(drawing)).toBe(true);
+  });
+
+  test('Open design once the design is on or approved', () => {
+    expect(opensCardDesign(null)).toBe(false);
+    expect(opensCardDesign(summary({ needed: false }))).toBe(false);
+    expect(opensCardDesign(summary({}))).toBe(true);
+    expect(
+      opensCardDesign(summary({ needed: false, status: 'approved' })),
+    ).toBe(true);
+  });
+});
 
 describe('runner gates (#233)', () => {
   const ALL = ['plan.turn', 'uiprofile.build', 'uiprofile.fingerprint'];

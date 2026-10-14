@@ -1,6 +1,6 @@
 # Changes AgentDock needs in code-sentinel
 
-Repository: [AndreyBegma/claude-code-plugin](https://github.com/AndreyBegma/claude-code-plugin).
+Repository: [AndreyBegma/code-sentinel-skills](https://github.com/AndreyBegma/code-sentinel-skills).
 Each item is tracked as an issue there (base branch `develop`; releases to `main` are a separate step); AgentDock must keep working without
 them (markdown fallback) until they land.
 

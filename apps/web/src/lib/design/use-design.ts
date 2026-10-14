@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  BOARD_CHANGED_EVENT,
   DESIGN_LIVE_EVENT,
   type DesignApproveRequest,
   type DesignCommentRequest,
@@ -15,7 +16,7 @@ import { useLive } from '../live/use-live';
 import { useErrorToast } from '../section/use-error-toast';
 import { useSection } from '../section/use-section';
 import { describeDesignError } from './format';
-import { designApi } from './href';
+import { cardDesignApi, designApi } from './href';
 
 /** Pushes come in bursts (a phase change, then the result); one refetch covers them. */
 const REFETCH_DEBOUNCE_MS = 250;
@@ -51,18 +52,61 @@ export function isDesignChange(
 }
 
 /**
- * One task's design, kept current like `usePlan`: loaded once, refetched on
- * every push that concerns it (the push carries ids only), and after each of
- * the person's own actions.
+ * Whether a push concerns a card's design (#243): a `design` push or a
+ * `board.changed` one, both carrying the card's id. Until the design has
+ * loaded the id is not known, so any card's push counts.
  */
+export function isCardDesignChange(
+  event: string,
+  data: unknown,
+  cardId: string | undefined,
+): boolean {
+  if (event !== DESIGN_LIVE_EVENT && event !== BOARD_CHANGED_EVENT) {
+    return false;
+  }
+  if (typeof data !== 'object' || data === null) return false;
+  const change = data as { cardId?: unknown };
+  if (typeof change.cardId !== 'string') return false;
+  return cardId === undefined || change.cardId === cardId;
+}
+
+/** One task's design, kept current like `usePlan`. */
 export function useDesign(projectId: string, planId: string, taskKey: string) {
+  return useDesignAt(
+    projectId,
+    designApi(projectId, planId, taskKey),
+    (event, data) => isDesignChange(event, data, planId, taskKey),
+  );
+}
+
+/** One board card's design (#243): the same viewer, at the card's base. */
+export function useCardDesign(projectId: string, number: number) {
+  const cardId = useRef<string | undefined>(undefined);
+  const design = useDesignAt(
+    projectId,
+    cardDesignApi(projectId, number),
+    (event, data) => isCardDesignChange(event, data, cardId.current),
+  );
+  const owner = design.data?.owner;
+  cardId.current = owner?.kind === 'card' ? owner.cardId : undefined;
+  return design;
+}
+
+/**
+ * A design at `base`: loaded once, refetched on every push `concerns` accepts
+ * (the push carries ids only), and after each of the person's own actions.
+ */
+export function useDesignAt(
+  projectId: string,
+  base: string,
+  concerns: (event: string, data: unknown) => boolean,
+) {
   const [version, setVersion] = useState(0);
-  const base = designApi(projectId, planId, taskKey);
   const section = useSection(() => api<TaskDesignView>(base), [base, version]);
 
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useLive(`project:${projectId}`, (message) => {
-    if (!isDesignChange(message.event, message.data, planId, taskKey)) return;
+    if (!concerns(message.event, message.data)) return;
     clearTimeout(timer.current);
     timer.current = setTimeout(
       () => setVersion((v) => v + 1),
