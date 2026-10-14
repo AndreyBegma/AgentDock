@@ -1,8 +1,10 @@
 import type {
   OrchestratorStatus,
+  QueueState,
   RunStatus,
   SlotStatus,
 } from '@agentdock/shared';
+import type { SkillRunPhase } from '@agentdock/shared/protocol';
 import type { Status } from '@andrewbehma/glass-ui/status-pill';
 
 /**
@@ -39,4 +41,27 @@ export const ORCHESTRATOR_PILL_STATUS: Record<OrchestratorStatus, Status> = {
   idle: 'idle',
   absent: 'paused',
   unknown: 'idle',
+};
+
+/** Where an issue stands in the queue (spec 19), as process state (#213). */
+export const QUEUE_PILL_STATUS: Record<QueueState, Status> = {
+  in_flight: 'running',
+  // Ready to dispatch: it waits for a slot.
+  ready: 'waiting',
+  // It resumes by itself once the work it depends on lands.
+  blocked_work: 'paused',
+  blocked_person: 'blocked',
+  no_spec: 'idle',
+};
+
+/** A skill run's phase (spec D12). */
+export const SKILL_PILL_STATUS: Record<SkillRunPhase, Status> = {
+  queued: 'waiting',
+  preparing: 'running',
+  running: 'running',
+  collecting: 'running',
+  succeeded: 'done',
+  failed: 'error',
+  timed_out: 'error',
+  cancelled: 'idle',
 };

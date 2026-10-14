@@ -134,6 +134,28 @@ export function paletteGroups(input: PaletteInput): CommandPaletteGroup[] {
   const projectName = new Map(
     input.projects.map((project) => [project.id, project.displayName]),
   );
+  const planTitle = new Map(input.plans.map((plan) => [plan.id, plan]));
+  // A planner run is a turn of a plan: it shows as the plan it serves, once
+  // however many turns it took (#213).
+  const runItem = (run: RunSummary): Item => {
+    const where = projectName.get(run.projectId);
+    if (run.planId) {
+      const plan = planTitle.get(run.planId);
+      return {
+        id: `go:${planHref(run.projectId, run.planId)}`,
+        label: plan ? planLabel(plan) : runLabel(run),
+        hint: ['Plan', where].filter(Boolean).join(' · '),
+        icon: Lightbulb,
+      };
+    }
+    return {
+      id: `go:/projects/${run.projectId}/history/${run.id}`,
+      label: runLabel(run),
+      hint: ['Run', where].filter(Boolean).join(' · '),
+      icon: Play,
+    };
+  };
+  const seen = new Set<string>();
   const recent: Item[] = [
     ...input.recent.sessions.map((session) => ({
       id: `go:/sessions/${session.id}`,
@@ -141,13 +163,10 @@ export function paletteGroups(input: PaletteInput): CommandPaletteGroup[] {
       hint: ['Session', session.projectName].filter(Boolean).join(' · '),
       icon: SquareTerminal,
     })),
-    ...input.recent.runs.map((run) => ({
-      id: `go:/projects/${run.projectId}/history/${run.id}`,
-      label: runLabel(run),
-      hint: ['Run', projectName.get(run.projectId)].filter(Boolean).join(' · '),
-      icon: Play,
-    })),
-  ].filter((item) => matches(`${item.label} ${item.hint}`));
+    ...input.recent.runs.map(runItem),
+  ]
+    .filter((item) => !seen.has(item.id) && seen.add(item.id))
+    .filter((item) => matches(`${item.label} ${item.hint}`));
 
   const plans: Item[] = [...input.plans]
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))

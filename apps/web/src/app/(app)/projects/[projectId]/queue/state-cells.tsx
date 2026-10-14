@@ -1,16 +1,23 @@
 import type { QueueItemView } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
+import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import {
   computedNote,
-  STATE_TONE,
+  STATE_CHIP_LABEL,
   safeHttpsUrl,
   sourceLabel,
-  stateLabel,
 } from '../../../../../lib/queue/format';
+import { QUEUE_PILL_STATUS } from '../../../../../lib/status/pill';
 
+/** Where the issue stands: process state, so a pill (#213). */
 export function StateBadge({ item }: { item: QueueItemView }) {
-  return <Badge tone={STATE_TONE[item.state]} label={stateLabel(item.state)} />;
+  return (
+    <StatusPill
+      status={QUEUE_PILL_STATUS[item.state]}
+      label={STATE_CHIP_LABEL[item.state]}
+    />
+  );
 }
 
 /** The dot that says whose verdict the state is (D4). */

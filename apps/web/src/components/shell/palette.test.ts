@@ -133,6 +133,37 @@ describe('paletteGroups', () => {
     ]);
   });
 
+  test('a planner run shows as its plan, once for all its turns (#213)', () => {
+    const turn = (id: string) =>
+      ({
+        id,
+        kind: 'plan',
+        projectId: 'p1',
+        issue: null,
+        slot: null,
+        title: 'Plan decompose',
+        planId: 'pl1',
+      }) as RunSummary;
+    const groups = paletteGroups(
+      input({
+        projectId: 'p1',
+        plans: [
+          {
+            id: 'pl1',
+            projectId: 'p1',
+            title: 'CSV exporter',
+            updatedAt: '2026-10-14T10:00:00.000Z',
+          } as PlanSummary,
+        ],
+        recent: { sessions: [], runs: [turn('r2'), turn('r1')] },
+      }),
+    );
+    const recent = groups.find((group) => group.id === 'recent');
+    expect(recent?.items.map((item) => [item.id, item.label])).toEqual([
+      ['go:/projects/p1/planner/pl1', 'CSV exporter'],
+    ]);
+  });
+
   test('the admin Settings is told apart from the project Settings by its group', () => {
     const groups = paletteGroups(input({ query: 'settings', projectId: 'p1' }));
     expect(labelsIn(groups, 'admin')).toEqual(['Settings']);

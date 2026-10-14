@@ -42,7 +42,8 @@ export function QueueList({
               <TableCell>
                 <IssueLink item={item} />
               </TableCell>
-              <TableCell>
+              {/* Minimum widths: at 390 the table scrolls in ScrollX, not crushes. */}
+              <TableCell className="min-w-56">
                 <button
                   type="button"
                   className="text-start font-medium underline-offset-2 hover:underline"
@@ -62,7 +63,7 @@ export function QueueList({
                   </span>
                 ) : null}
               </TableCell>
-              <TableCell>
+              <TableCell className="whitespace-nowrap">
                 <span className="flex flex-col items-start gap-1">
                   <span className="inline-flex items-center gap-2">
                     <StateBadge item={item} />
@@ -71,7 +72,7 @@ export function QueueList({
                   <ComputedNote item={item} />
                 </span>
               </TableCell>
-              <TableCell>
+              <TableCell className="min-w-64">
                 <span className="block">{item.why || '—'}</span>
                 {item.clears ? (
                   <span className="block text-xs text-ink-2">

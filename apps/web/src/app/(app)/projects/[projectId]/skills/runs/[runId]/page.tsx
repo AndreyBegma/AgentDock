@@ -5,7 +5,6 @@ import {
   RUN_UPDATED_LIVE_EVENT,
   type SkillRunDetail,
 } from '@agentdock/shared';
-import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
@@ -13,7 +12,7 @@ import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { KeyValueList } from '@andrewbehma/glass-ui/key-value-list';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
-import { Spinner } from '@andrewbehma/glass-ui/spinner';
+import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import {
   Table,
   TableCell,
@@ -24,6 +23,7 @@ import { toast } from '@andrewbehma/glass-ui/toast';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { PageHeader } from '../../../../../../../components/page-header/page-header';
 import { TerminalSheet } from '../../../../../../../components/terminal/terminal-sheet';
 import { api } from '../../../../../../../lib/api';
 import { safeHttpsUrl } from '../../../../../../../lib/fleet/format';
@@ -39,13 +39,17 @@ import {
   isNotFound,
   SKILL_OUTPUT_LABEL,
   SKILL_PHASE_LABEL,
-  SKILL_PHASE_TONE,
 } from '../../../../../../../lib/skills/format';
+import { SKILL_PILL_STATUS } from '../../../../../../../lib/status/pill';
 import { useTerminalAvailable } from '../../../../../../../lib/terminal/use-terminal-available';
 import { ProjectRunnerBanner } from '../../../project-runner-banner';
 import { RunLogPanel } from './log-panel';
 
 const REFETCH_DEBOUNCE_MS = 300;
+
+/** "timed out" → "Timed out": a pill label is sentence case (#213). */
+const sentenceCase = (text: string): string =>
+  text.charAt(0).toUpperCase() + text.slice(1);
 
 const FILE_STATUS_LABEL = (status: string): string => {
   const code = status.trim();
@@ -151,39 +155,33 @@ export default function SkillRunPage() {
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <div className="mb-1 text-sm text-ink-3">
-          <Link
-            href={`/projects/${projectId}/skills`}
-            className="underline-offset-2 hover:underline"
-          >
-            Skills
-          </Link>
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="flex items-center gap-3 text-xl font-semibold">
-            <span className="font-mono">/{run.skill}</span>
-            <Badge
-              tone={SKILL_PHASE_TONE[run.phase]}
-              label={SKILL_PHASE_LABEL[run.phase]}
+        <PageHeader
+          className="mb-0"
+          eyebrow="Skill run"
+          title={<span className="font-mono">/{run.skill}</span>}
+          status={
+            <StatusPill
+              size="md"
+              status={SKILL_PILL_STATUS[run.phase]}
+              label={sentenceCase(SKILL_PHASE_LABEL[run.phase])}
             />
-            {active ? (
-              <Spinner size="sm" label={SKILL_PHASE_LABEL[run.phase]} />
-            ) : null}
-          </h1>
-          <div className="flex flex-wrap items-center gap-2">
-            {/* The runner resolves a run's session only while it is running. */}
-            {run.phase === 'running' && canAttach ? (
-              <Button variant="glass" onClick={() => setAttaching(true)}>
-                Attach
-              </Button>
-            ) : null}
-            {active && canOperate ? (
-              <Button variant="glass" onClick={() => setConfirming(true)}>
-                Cancel run
-              </Button>
-            ) : null}
-          </div>
-        </div>
+          }
+          actions={
+            <>
+              {/* The runner resolves a run's session only while it is running. */}
+              {run.phase === 'running' && canAttach ? (
+                <Button variant="glass" onClick={() => setAttaching(true)}>
+                  Attach
+                </Button>
+              ) : null}
+              {active && canOperate ? (
+                <Button variant="glass" onClick={() => setConfirming(true)}>
+                  Cancel run
+                </Button>
+              ) : null}
+            </>
+          }
+        />
         <div className="mt-3">
           <ProjectRunnerBanner projectId={projectId} />
         </div>
