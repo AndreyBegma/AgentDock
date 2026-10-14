@@ -366,6 +366,35 @@ export const commitTrailerFoundDataSchema = z.object({
   sha: z.string().regex(/^[0-9a-f]{7,64}$/),
 });
 
+/** Largest `body` of a `slot.message_seen`, in bytes — a message's own bound (spec 17 D7). */
+export const SLOT_MESSAGE_SEEN_MAX_BYTES = 16 * 1024;
+
+const sha256Hex = z.string().regex(/^[0-9a-f]{64}$/);
+
+/**
+ * A new message to the worker in its `.orchestrator-msg.md`
+ * (docs/specs/160-agent-workspace.md). The file is either replaced (the
+ * skill's Phase 6.5, AgentDock's `slot.message`) or grown by appending a
+ * section: an append is the new suffix, anything else the whole file.
+ */
+export const slotMessageSeenDataSchema = z.object({
+  /** The message, trimmed and cut to `SLOT_MESSAGE_SEEN_MAX_BYTES`. */
+  body: z.string().min(1),
+  /** `From:` of the message header, when it has one. */
+  sender: z.string().min(1).max(320).optional(),
+  /** `Date:` of the message header, when it parses as a date. */
+  sentAt: z.iso.datetime({ offset: true }).optional(),
+  /** `appended`: a suffix of the file; `replaced`: the whole file. */
+  mode: z.enum(['appended', 'replaced']),
+  /**
+   * sha256 of the whole file after this change. A runner restart re-reads an
+   * unchanged file and sends it again under the same hash; the API keeps the
+   * first entry per hash in a slot's run.
+   */
+  fileHash: sha256Hex,
+});
+export type SlotMessageSeenData = z.infer<typeof slotMessageSeenDataSchema>;
+
 /** `data` schema of every fleet event type. */
 export const fleetEventDataSchemas = {
   'session.appeared': sessionPresenceDataSchema,
@@ -380,6 +409,7 @@ export const fleetEventDataSchemas = {
   'board.unparsed': boardUnparsedDataSchema,
   'slot.dispatched': slotDispatchedDataSchema,
   'slot.checkpoint': slotCheckpointDataSchema,
+  'slot.message_seen': slotMessageSeenDataSchema,
   'pr.opened': prOpenedDataSchema,
   'pr.checks_changed': prChecksChangedDataSchema,
   'pr.closed': prClosedDataSchema,
@@ -404,6 +434,7 @@ export const SLOT_SCOPED_FLEET_EVENTS: readonly FleetEventType[] = [
   'worktree.changed',
   'slot.dispatched',
   'slot.checkpoint',
+  'slot.message_seen',
   'slot.redispatched',
   'commit.trailer_found',
 ];

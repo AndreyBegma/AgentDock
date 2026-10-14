@@ -7,6 +7,7 @@ export * from './commands/planner';
 export * from './commands/queue';
 export * from './commands/skills';
 export * from './commands/terminal';
+export * from './commands/worktree';
 export * from './envelope';
 export * from './events/fleet';
 export * from './events/planner';
