@@ -53,7 +53,33 @@ first, so it works on a clean checkout. Releasing is in
 | `status` | config, spool and whether the server answers |
 | `profiles [--detect [--write]]` | configured profiles; `--detect` proposes them, `--write` stores the proposal |
 | `install-service` | writes the systemd user unit (Linux) or the launchd agent (macOS) and prints how to start it |
+| `mcp` | the `agentdock` MCP server over stdio, for the Claude Code plugin ([spec 201](../../docs/specs/201-claude-code-integration.md) D20); see below |
 | `version` | prints the version and the target, e.g. `0.1.0 darwin-arm64` |
+
+### `mcp`
+
+Twelve tools, each one local method of the daemon's socket (spec 201 D7). Claude
+shows them as `mcp__plugin_agentdock_agentdock__<tool>`:
+
+| Tool | Local method | Role |
+|---|---|---|
+| `status` | `fleet.status` | viewer |
+| `queue` `{limit?}` | `queue.list` | viewer |
+| `budget` | `budget.remaining` | viewer |
+| `approvals` | `approvals.list` | viewer |
+| `activity` `{limit?}` | `activity.recent` | viewer |
+| `sessions` `{limit?}` | `sessions.recent` | viewer |
+| `create_issue` `{title, body, labels?, queue}` | `issue.create` | operator |
+| `note` `{text}` | `activity.note` | operator |
+| `handoff` `{title, body, branch}` | `handoff.create` | operator |
+| `request_action` `{kind, args, summary}` | `action.request` | operator |
+| `action_status` `{id}` | `action.status` | viewer |
+| `away` `{on}` | `away.set` | operator |
+
+The project comes from `CLAUDE_PROJECT_DIR` (else the working directory), the
+session from the parent pid. A failure is an MCP tool error whose text starts
+with the local error code (`runner_offline`, `no_project`, `daemon_unavailable`,
+`forbidden`, …) and whose `structuredContent.error.code` carries it.
 
 `<api-origin>` is the API, not the web app: pairing is `POST <api-origin>/runners/pair`,
 the socket `<api-origin>/runner`.
