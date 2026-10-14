@@ -2,22 +2,24 @@
 
 import {
   RUN_KINDS,
-  RUN_STATUSES,
   RUN_UPDATED_LIVE_EVENT,
-  type RunListQuery,
   type RunPage,
+  type RunStatus,
   type RunSummary,
 } from '@agentdock/shared';
+import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
+import { ChipButton } from '@andrewbehma/glass-ui/chip';
 import { type Column, DataTable } from '@andrewbehma/glass-ui/data-table';
 import { DateInput } from '@andrewbehma/glass-ui/date-input';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
-import { Field, Select } from '@andrewbehma/glass-ui/field';
+import { Select } from '@andrewbehma/glass-ui/field';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
-import { toast } from '@andrewbehma/glass-ui/toast';
-import Link from 'next/link';
+import { Toolbar } from '@andrewbehma/glass-ui/toolbar';
+import NextLink from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { PageHeader } from '../../../../../components/page-header/page-header';
 import { AsyncSection } from '../../../../../components/prerequisites/async-section';
 import { ScrollX } from '../../../../../components/scroll-x/scroll-x';
@@ -26,28 +28,36 @@ import {
   PAGE_SIZE,
   queryString,
 } from '../../../../../lib/activity/format';
-import { api, describeError } from '../../../../../lib/api';
-import { formatDate } from '../../../../../lib/format';
+import { api, describeErrorHint } from '../../../../../lib/api';
+import {
+  type UrlFilters,
+  useFilterChips,
+  useUrlFilters,
+} from '../../../../../lib/filters/use-url-filters';
+import { formatNumber } from '../../../../../lib/format';
 import { Time } from '../../../../../lib/format/time';
 import {
   abandonedHiddenLabel,
   costLabel,
-  EMPTY_RUN_FILTERS,
   hasRunFilters,
+  NO_RUN_FILTERS,
   parseRunUpdate,
   prLabel,
+  RUN_CHIP_DEFS,
+  RUN_FILTER_CODEC,
   RUN_KIND_LABEL,
+  RUN_STATUS_CHIPS,
   RUN_STATUS_LABEL,
-  type RunFilterForm,
-  runFiltersDirty,
-  runFiltersFromKind,
+  type RunFilters,
   runTitle,
   runtimeLabel,
   splitAbandoned,
   tokensLabel,
   toRunQuery,
+  totalRuns,
 } from '../../../../../lib/history/format';
 import { useLive } from '../../../../../lib/live/use-live';
+import { useErrorToast } from '../../../../../lib/section/use-error-toast';
 import { useSection } from '../../../../../lib/section/use-section';
 import { formatDuration } from '../../../../../lib/sessions/format';
 import { RUN_PILL_STATUS } from '../../../../../lib/status/pill';
@@ -56,32 +66,120 @@ import { ProjectRunnerBanner } from '../project-runner-banner';
 /** Pushes arrive in bursts; one refetch covers them. */
 const REFETCH_DEBOUNCE_MS = 300;
 
-export default function HistoryPage() {
+/** A selected filter chip wears the accent, not solid ink (#213). */
+const SELECTED_CHIP = 'bg-accent-soft text-accent-ink';
+
+/** Kind and dates: the canonical bar (#213), instant, in the URL. */
+function HistoryFilters({ url }: { url: UrlFilters<RunFilters> }) {
+  const { filters, set } = url;
+  const chips = useFilterChips(url, RUN_CHIP_DEFS);
+  return (
+    <Toolbar
+      aria-label="Filter runs"
+      collapseBelow="sm"
+      activeFilters={chips.activeFilters}
+      onClearAll={chips.onClearAll}
+      filters={
+        <>
+          <Select
+            aria-label="Kind"
+            value={filters.kind}
+            className="w-full sm:w-44"
+            onChange={(e) =>
+              set({ kind: e.target.value as RunFilters['kind'] })
+            }
+          >
+            <option value="">Any kind</option>
+            {RUN_KINDS.map((kind) => (
+              <option key={kind} value={kind}>
+                {RUN_KIND_LABEL[kind]}
+              </option>
+            ))}
+          </Select>
+          <DateInput
+            aria-label="Started from"
+            value={filters.from}
+            max={filters.to || undefined}
+            className="w-full sm:w-40"
+            onChange={(e) => set({ from: e.target.value })}
+          />
+          <DateInput
+            aria-label="Started up to"
+            value={filters.to}
+            min={filters.from || undefined}
+            className="w-full sm:w-40"
+            onChange={(e) => set({ to: e.target.value })}
+          />
+        </>
+      }
+    />
+  );
+}
+
+/** One dimension's counts — the status — as chips; a chip is a filter (#213). */
+function StatusChips({
+  counts,
+  status,
+  onChange,
+}: {
+  counts: Record<RunStatus, number>;
+  status: RunFilters['status'];
+  onChange: (status: RunFilters['status']) => void;
+}) {
+  const chip = (
+    key: string,
+    label: string,
+    count: number,
+    selected: boolean,
+    value: RunFilters['status'],
+  ) => (
+    <ChipButton
+      key={key}
+      selected={selected}
+      className={`shrink-0 ${selected ? SELECTED_CHIP : ''}`}
+      onClick={() => onChange(value)}
+    >
+      {label} <Badge count={count} className="ml-1" />
+    </ChipButton>
+  );
+  return (
+    <fieldset className="m-0 mb-4 min-w-0 border-0 p-0">
+      <legend className="sr-only">Filter by status</legend>
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
+        {chip('all', 'All', totalRuns(counts), status === '', '')}
+        {RUN_STATUS_CHIPS.map((s) =>
+          chip(
+            s,
+            RUN_STATUS_LABEL[s],
+            counts[s],
+            status === s,
+            status === s ? '' : s,
+          ),
+        )}
+      </div>
+    </fieldset>
+  );
+}
+
+function HistoryView() {
   const { projectId } = useParams<{ projectId: string }>();
   const router = useRouter();
-  const [form, setForm] = useState<RunFilterForm>(EMPTY_RUN_FILTERS);
-  const [applied, setApplied] = useState<RunListQuery>({});
+  const url = useUrlFilters(RUN_FILTER_CODEC);
+  const { filters, set } = url;
+  const applied = useMemo(() => toRunQuery(filters), [filters]);
   /** Bumped by a live push; the list reloads. */
   const [version, setVersion] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
   const [showAbandoned, setShowAbandoned] = useState(false);
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const showError = useErrorToast();
 
   const base = `/projects/${projectId}/runs`;
-
-  // A link may carry the kind (`?kind=skill`, from the Skills page).
-  useEffect(() => {
-    const kind = new URLSearchParams(window.location.search).get('kind');
-    if (kind === null) return;
-    const next = runFiltersFromKind(kind);
-    setForm(next);
-    setApplied(toRunQuery(next));
-  }, []);
+  const query = queryString(applied, { limit: PAGE_SIZE });
 
   const runs = useSection(
-    () => api<RunPage>(`${base}${queryString(applied, { limit: PAGE_SIZE })}`),
-    [base, applied, version],
+    () => api<RunPage>(`${base}${query}`),
+    [base, query, version],
   );
 
   useLive(`project:${projectId}`, (message) => {
@@ -107,6 +205,7 @@ export default function HistoryPage() {
         if (!current) return current;
         const seen = new Set(current.items.map((r) => r.id));
         return {
+          ...current,
           items: [
             ...current.items,
             ...page.items.filter((r) => !seen.has(r.id)),
@@ -115,35 +214,33 @@ export default function HistoryPage() {
         };
       });
     } catch (err) {
-      toast.error(describeError(err));
+      showError(describeErrorHint(err));
     } finally {
       setLoadingMore(false);
     }
   };
 
+  // Runtime and model ride under the title, and Kind is the eyebrow of the
+  // run page, so the table fits the desk width without a clipped column.
   const columns = useMemo<Column<RunSummary>[]>(
     () => [
       {
         id: 'run',
         header: 'Run',
         cell: (run) => (
-          <Link
-            href={`/projects/${projectId}/history/${run.id}`}
-            className="underline-offset-2 hover:underline"
-          >
-            {runTitle(run)}
-          </Link>
+          <span className="flex min-w-48 flex-col">
+            <NextLink
+              href={`/projects/${projectId}/history/${run.id}`}
+              className="underline-offset-2 hover:underline"
+            >
+              {runTitle(run)}
+            </NextLink>
+            <span className="text-xs text-ink-3">
+              {RUN_KIND_LABEL[run.kind]}
+              {runtimeLabel(run) !== '—' ? ` · ${runtimeLabel(run)}` : ''}
+            </span>
+          </span>
         ),
-      },
-      {
-        id: 'kind',
-        header: 'Kind',
-        cell: (run) => RUN_KIND_LABEL[run.kind],
-      },
-      {
-        id: 'runtime',
-        header: 'Runtime / model',
-        cell: (run) => runtimeLabel(run),
       },
       {
         id: 'status',
@@ -156,13 +253,21 @@ export default function HistoryPage() {
           />
         ),
       },
-      { id: 'pr', header: 'PR', cell: (run) => prLabel(run) },
+      {
+        id: 'pr',
+        header: 'PR',
+        cell: (run) => (
+          <span className="whitespace-nowrap">{prLabel(run)}</span>
+        ),
+      },
       {
         id: 'duration',
         header: 'Duration',
         align: 'end',
         cell: (run) => (
-          <span className="num">{formatDuration(run.durationMs)}</span>
+          <span className="num whitespace-nowrap">
+            {formatDuration(run.durationMs)}
+          </span>
         ),
       },
       {
@@ -175,46 +280,34 @@ export default function HistoryPage() {
         id: 'cost',
         header: 'Cost',
         align: 'end',
-        cell: (run) => <span className="num">{costLabel(run.usage)}</span>,
+        cell: (run) => (
+          <span className="num whitespace-nowrap">{costLabel(run.usage)}</span>
+        ),
       },
       {
         id: 'started',
         header: 'Started',
-        cell: (run) => <Time value={run.startedAt} />,
+        cell: (run) => (
+          <span className="whitespace-nowrap">
+            <Time value={run.startedAt} />
+          </span>
+        ),
       },
     ],
     [projectId],
   );
 
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    setApplied(toRunQuery(form));
-  };
-
-  const reset = () => {
-    setForm(EMPTY_RUN_FILTERS);
-    setApplied({});
-  };
-
-  const dirty = runFiltersDirty(form, applied);
-  const filtered = Object.keys(applied).length > 0;
+  const filtered = hasRunFilters(filters);
   // Filtering for abandoned runs is asking to see them.
-  const revealAbandoned = showAbandoned || applied.status === 'abandoned';
-  const range =
-    applied.from || applied.to
-      ? `${applied.from ? formatDate(applied.from, 'date') : 'the start'} – ${applied.to ? formatDate(new Date(Date.parse(applied.to) - 1), 'date') : 'now'}`
-      : null;
+  const revealAbandoned = showAbandoned || filters.status === 'abandoned';
 
   if (runs.data === undefined && isNotFound(runs.error)) {
     return (
       <EmptyState
         title="Project not found"
         description="It does not exist, or you are not a member of it."
-        action={
-          <Link href="/projects" className="text-sm text-accent-ink underline">
-            Open Projects
-          </Link>
-        }
+        link={NextLink}
+        action={{ label: 'Open Projects', href: '/projects' }}
       />
     );
   }
@@ -230,90 +323,17 @@ export default function HistoryPage() {
         <ProjectRunnerBanner projectId={projectId} />
       </div>
 
-      <div className="mb-3 sm:hidden">
-        <Button
-          variant="glass"
-          type="button"
-          aria-expanded={filtersOpen}
-          aria-controls="history-filters"
-          onClick={() => setFiltersOpen((open) => !open)}
-        >
-          {filtersOpen ? 'Hide filters' : filtered ? 'Filters (on)' : 'Filters'}
-        </Button>
+      <div className="mb-4">
+        <HistoryFilters url={url} />
       </div>
 
-      <form
-        id="history-filters"
-        onSubmit={submit}
-        className={`${filtersOpen ? 'grid' : 'hidden'} mb-6 grid-cols-1 items-end gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-5`}
-      >
-        <Field label="Kind" htmlFor="history-kind">
-          <Select
-            id="history-kind"
-            value={form.kind}
-            onChange={(e) => setForm((c) => ({ ...c, kind: e.target.value }))}
-          >
-            <option value="">Any kind</option>
-            {RUN_KINDS.map((kind) => (
-              <option key={kind} value={kind}>
-                {RUN_KIND_LABEL[kind]}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Status" htmlFor="history-status">
-          <Select
-            id="history-status"
-            value={form.status}
-            onChange={(e) => setForm((c) => ({ ...c, status: e.target.value }))}
-          >
-            <option value="">Any status</option>
-            {RUN_STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {RUN_STATUS_LABEL[status]}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="From" htmlFor="history-from">
-          <DateInput
-            id="history-from"
-            value={form.fromDate}
-            max={form.toDate || undefined}
-            onChange={(e) =>
-              setForm((c) => ({ ...c, fromDate: e.target.value }))
-            }
-          />
-        </Field>
-        <Field label="To" htmlFor="history-to">
-          <DateInput
-            id="history-to"
-            value={form.toDate}
-            min={form.fromDate || undefined}
-            onChange={(e) => setForm((c) => ({ ...c, toDate: e.target.value }))}
-          />
-        </Field>
-        <div className="flex flex-col gap-1">
-          <div className="flex gap-2">
-            <Button variant="solid" type="submit">
-              Apply
-            </Button>
-            <Button
-              variant="ghost"
-              type="button"
-              disabled={!hasRunFilters(form) && !filtered}
-              onClick={reset}
-            >
-              Reset
-            </Button>
-          </div>
-          {dirty ? (
-            <p role="status" className="text-xs text-warn">
-              Filters changed. Apply to update the list.
-            </p>
-          ) : null}
-        </div>
-      </form>
+      {runs.data ? (
+        <StatusChips
+          counts={runs.data.counts}
+          status={filters.status}
+          onChange={(status) => set({ status })}
+        />
+      ) : null}
 
       <AsyncSection
         section={runs}
@@ -327,24 +347,20 @@ export default function HistoryPage() {
             <EmptyState
               title="No matching runs"
               description="No run matches these filters."
-              action={
-                <Button variant="glass" onClick={reset}>
-                  Clear filters
-                </Button>
-              }
+              action={{
+                label: 'Clear filters',
+                onClick: () => url.replace(NO_RUN_FILTERS),
+              }}
             />
           ) : (
             <EmptyState
               title="No runs yet"
               description="A run is recorded when a worker slot, a skill or a schedule starts work. Start the orchestrator from Fleet to get the first one."
-              action={
-                <Link
-                  href={`/projects/${projectId}/fleet`}
-                  className="text-sm text-accent-ink underline"
-                >
-                  Open Fleet
-                </Link>
-              }
+              link={NextLink}
+              action={{
+                label: 'Open Fleet',
+                href: `/projects/${projectId}/fleet`,
+              }}
             />
           )
         }
@@ -364,10 +380,7 @@ export default function HistoryPage() {
           );
           return (
             <>
-              {range ? (
-                <p className="mb-2 text-sm text-ink-2">Started {range}</p>
-              ) : null}
-              {hidden > 0 || (showAbandoned && !applied.status) ? (
+              {hidden > 0 || (showAbandoned && !filters.status) ? (
                 <div className="mb-3 flex flex-wrap items-center gap-2 text-sm text-ink-2">
                   {hidden > 0
                     ? abandonedHiddenLabel(hidden)
@@ -400,7 +413,7 @@ export default function HistoryPage() {
                 </ScrollX>
               )}
               {page.nextCursor ? (
-                <div className="mt-4 flex justify-center">
+                <div className="mt-4 flex flex-col items-center gap-1">
                   <Button
                     variant="glass"
                     disabled={loadingMore}
@@ -408,6 +421,14 @@ export default function HistoryPage() {
                   >
                     {loadingMore ? 'Loading…' : 'Load more'}
                   </Button>
+                  <span className="text-xs text-ink-3">
+                    {formatNumber(page.items.length)} of{' '}
+                    {formatNumber(
+                      filters.status
+                        ? page.counts[filters.status]
+                        : totalRuns(page.counts),
+                    )}
+                  </span>
                 </div>
               ) : null}
             </>
@@ -415,5 +436,14 @@ export default function HistoryPage() {
         }}
       </AsyncSection>
     </>
+  );
+}
+
+export default function HistoryPage() {
+  // `useSearchParams` needs a boundary for the static shell.
+  return (
+    <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+      <HistoryView />
+    </Suspense>
   );
 }

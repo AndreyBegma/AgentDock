@@ -1,8 +1,10 @@
 import {
   RUN_DETAIL_ACTIVITY_MAX,
   RUN_PAGE_DEFAULT,
+  RUN_STATUSES,
   type RunDetail,
   type RunPage,
+  type RunStatus,
   type RunSummary,
   type RunUsage,
 } from '@agentdock/shared';
@@ -21,6 +23,7 @@ import { EMPTY_USAGE, usageByRun, usageBySession } from './run-usage';
 
 const runInclude = {
   slot: { select: { name: true, prChecks: true } },
+  planTurn: { select: { planId: true } },
 } as const satisfies Prisma.RunInclude;
 
 type RunRow = Prisma.RunGetPayload<{ include: typeof runInclude }>;
@@ -42,6 +45,7 @@ const toSummary = (row: RunRow, usage: RunUsage): RunSummary => ({
   prNumber: row.prNumber,
   prUrl: row.prUrl,
   prChecks: row.prNumber !== null ? (row.slot?.prChecks ?? null) : null,
+  planId: row.planTurn?.planId ?? null,
   triggeredByType: row.triggeredByType,
   triggeredById: row.triggeredById,
   startedAt: row.startedAt.toISOString(),
@@ -64,12 +68,13 @@ export class RunsQueryService {
   /** Runs of a project, newest first, with tokens and cost (D8). */
   async list(projectId: string, query: RunListQueryDto): Promise<RunPage> {
     const limit = query.limit ?? RUN_PAGE_DEFAULT;
-    const and: Prisma.RunWhereInput[] = [{ projectId }];
-    if (query.kind) and.push({ kind: query.kind });
+    const scope: Prisma.RunWhereInput[] = [{ projectId }];
+    if (query.kind) scope.push({ kind: query.kind });
+    if (query.issue) scope.push({ issue: query.issue });
+    if (query.from) scope.push({ startedAt: { gte: new Date(query.from) } });
+    if (query.to) scope.push({ startedAt: { lt: new Date(query.to) } });
+    const and = [...scope];
     if (query.status) and.push({ status: query.status });
-    if (query.issue) and.push({ issue: query.issue });
-    if (query.from) and.push({ startedAt: { gte: new Date(query.from) } });
-    if (query.to) and.push({ startedAt: { lt: new Date(query.to) } });
     if (query.cursor) {
       const key = decodeKeyset(query.cursor);
       if (!key) throw badCursor();
@@ -80,12 +85,23 @@ export class RunsQueryService {
         ],
       });
     }
-    const rows = await this.prisma.run.findMany({
-      where: { AND: and },
-      include: runInclude,
-      orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
-      take: limit + 1,
-    });
+    const [rows, byStatus] = await Promise.all([
+      this.prisma.run.findMany({
+        where: { AND: and },
+        include: runInclude,
+        orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
+        take: limit + 1,
+      }),
+      this.prisma.run.groupBy({
+        by: ['status'],
+        where: { AND: scope },
+        _count: { _all: true },
+      }),
+    ]);
+    const counts = Object.fromEntries(
+      RUN_STATUSES.map((status) => [status, 0]),
+    ) as Record<RunStatus, number>;
+    for (const group of byStatus) counts[group.status] = group._count._all;
     const page = rows.slice(0, limit);
     const usage = await usageByRun(
       this.prisma,
@@ -100,6 +116,7 @@ export class RunsQueryService {
         rows.length > limit && last
           ? encodeKeyset({ at: last.startedAt, id: last.id })
           : null,
+      counts,
     };
   }
 

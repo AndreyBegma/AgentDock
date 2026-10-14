@@ -1,13 +1,17 @@
 import { describe, expect, test } from 'bun:test';
 import {
   ORCHESTRATOR_STATUSES,
+  QUEUE_STATES,
   RUN_STATUSES,
   SLOT_STATUSES,
 } from '@agentdock/shared';
+import { skillRunPhaseSchema } from '@agentdock/shared/protocol';
 import { STATUSES } from '@andrewbehma/glass-ui/status-pill';
 import {
   ORCHESTRATOR_PILL_STATUS,
+  QUEUE_PILL_STATUS,
   RUN_PILL_STATUS,
+  SKILL_PILL_STATUS,
   SLOT_PILL_STATUS,
 } from './pill';
 
@@ -38,5 +42,25 @@ describe('pill status maps', () => {
   test('a blocked run and a failed one are told apart', () => {
     expect(RUN_PILL_STATUS.blocked).toBe('blocked');
     expect(RUN_PILL_STATUS.failed).toBe('error');
+  });
+
+  test('every queue state and skill phase maps onto glass-ui’s scale', () => {
+    for (const s of QUEUE_STATES) {
+      expect(STATUSES).toContain(QUEUE_PILL_STATUS[s]);
+    }
+    for (const s of skillRunPhaseSchema.options) {
+      expect(STATUSES).toContain(SKILL_PILL_STATUS[s]);
+    }
+  });
+
+  test('ready and in flight read as different states (#213)', () => {
+    expect(QUEUE_PILL_STATUS.ready).toBe('waiting');
+    expect(QUEUE_PILL_STATUS.in_flight).toBe('running');
+    expect(QUEUE_PILL_STATUS.blocked_person).toBe('blocked');
+  });
+
+  test('a skill run that timed out is an error, a cancelled one is not', () => {
+    expect(SKILL_PILL_STATUS.timed_out).toBe('error');
+    expect(SKILL_PILL_STATUS.cancelled).toBe('idle');
   });
 });

@@ -13,6 +13,7 @@ import {
 } from '@agentdock/shared';
 import { ApiError, describeError } from '../api';
 import { updateRunnerText } from '../control/format';
+import type { FilterCodec } from '../filters/url-filters';
 
 type Tone = 'ok' | 'warn' | 'danger' | 'neutral';
 
@@ -162,12 +163,47 @@ export function queueUnavailableCopy(
   const where = runnerName
     ? `The runner ${runnerName}`
     : 'The project’s runner';
+  const machine = runnerName ? `on ${runnerName}` : 'on the runner';
+  // The usual cause is the GitHub CLI on the runner's machine, and the fix is
+  // there, not on the Runners page (#213).
+  if (GH_REASON.test(unavailable.reason)) {
+    return {
+      title: 'The queue could not be refreshed',
+      body: `${where} could not read this project’s issues: ${unavailable.reason}. The list below is the last snapshot. Install the GitHub CLI ${machine} and sign it in with gh auth login, then press Refresh.`,
+      href: '/install#troubleshooting',
+      cta: `Set up gh ${machine}`,
+    };
+  }
   return {
     title: 'The queue could not be refreshed',
     body: `${where} could not read this project’s issues: ${unavailable.reason}. The list below is the last snapshot. Fix the cause on that machine, then press Refresh.`,
     ...(isAdmin ? { href: '/admin/runners', cta: 'Open Runners' } : {}),
   };
 }
+
+/** A reason that names the GitHub CLI ("gh is not available or timed out"). */
+const GH_REASON = /\bgh\b/i;
+
+/** The Queue's filters in the URL (#213): one state chip, and the view. */
+export interface QueueFilters {
+  state: StateFilter;
+  view: 'list' | 'board';
+}
+
+export const QUEUE_FILTER_CODEC: FilterCodec<QueueFilters> = {
+  keys: ['state', 'view'],
+  parse: (params) => ({
+    state: parseStateFilter(params.get('state') ?? ''),
+    view: params.get('view') === 'board' ? 'board' : 'list',
+  }),
+  search: ({ state, view }) => {
+    const params = new URLSearchParams();
+    if (state !== 'all') params.set('state', state);
+    if (view === 'board') params.set('view', view);
+    const text = params.toString();
+    return text ? `?${text}` : '';
+  },
+};
 
 /** Only `https:` links become anchors; the URL came from a GitHub payload. */
 export function safeHttpsUrl(url: string | null): string | null {

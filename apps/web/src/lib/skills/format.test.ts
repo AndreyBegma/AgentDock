@@ -26,6 +26,7 @@ import {
   runProfileReason,
   skillRunProfiles,
   skillRunsHref,
+  skillToRun,
   toRunRequest,
 } from './format';
 
@@ -61,6 +62,29 @@ describe('groupBySkillScope', () => {
     ]);
     expect(groups.map((g) => g.scope)).toEqual(['project', 'plugin']);
     expect(groups[0]?.items.map((i) => i.invocation)).toEqual(['a', 'b']);
+  });
+});
+
+describe('skillToRun', () => {
+  const items = [
+    skill({ id: 'a', invocation: 'cs-review', runnable: true }),
+    skill({ id: 'b', invocation: 'cs-orchestrator', runnable: false }),
+    skill({
+      id: 'c',
+      invocation: 'cs-codex',
+      runtime: 'codex',
+      runnable: true,
+    }),
+  ];
+  test('a ?run= link opens the named runnable Claude skill, slash or not', () => {
+    expect(skillToRun(items, 'cs-review')?.id).toBe('a');
+    expect(skillToRun(items, '/cs-review')?.id).toBe('a');
+  });
+  test('nothing to open for no name, an unknown, unrunnable or Codex skill', () => {
+    expect(skillToRun(items, null)).toBeNull();
+    expect(skillToRun(items, 'nope')).toBeNull();
+    expect(skillToRun(items, 'cs-orchestrator')).toBeNull();
+    expect(skillToRun(items, 'cs-codex')).toBeNull();
   });
 });
 

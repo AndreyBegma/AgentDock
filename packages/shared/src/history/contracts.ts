@@ -94,6 +94,8 @@ export interface RunSummary {
   prUrl: string | null;
   /** The slot's current PR checks, when it has a PR. */
   prChecks: PrChecks | null;
+  /** The plan a `plan` run is a turn of; null for every other kind. */
+  planId: string | null;
   triggeredByType: RunTrigger;
   triggeredById: string | null;
   startedAt: string;
@@ -107,6 +109,11 @@ export interface RunPage {
   items: RunSummary[];
   /** Pass as `cursor` for the next (older) page; null on the last page. */
   nextCursor: string | null;
+  /**
+   * Runs per status under every filter of the query except `status` and the
+   * cursor — the History status chips (#213).
+   */
+  counts: Record<RunStatus, number>;
 }
 
 /** `GET /projects/:projectId/runs`. `from`/`to` bound `startedAt` (ISO, `to` exclusive). */

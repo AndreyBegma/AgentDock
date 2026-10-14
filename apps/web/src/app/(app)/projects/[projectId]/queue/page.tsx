@@ -15,21 +15,24 @@ import {
   SegmentedControl,
   SegmentedControlItem,
 } from '@andrewbehma/glass-ui/segmented-control';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { Toolbar } from '@andrewbehma/glass-ui/toolbar';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import { RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { PageHeader } from '../../../../../components/page-header/page-header';
 import { AsyncSection } from '../../../../../components/prerequisites/async-section';
 import {
   PrerequisiteBanner,
   RunnerOfflineBanner,
 } from '../../../../../components/prerequisites/prerequisite-banner';
+import { useLivePaused } from '../../../../../components/shell/live-status';
 import { LiveStatusBadge } from '../../../../../components/shell/live-status-badge';
 import { api } from '../../../../../lib/api';
+import { useUrlFilters } from '../../../../../lib/filters/use-url-filters';
 import { Time } from '../../../../../lib/format/time';
 import { useLive } from '../../../../../lib/live/use-live';
 import {
@@ -38,6 +41,8 @@ import {
   describeQueueError,
   filterItems,
   isNotFound,
+  QUEUE_FILTER_CODEC,
+  type QueueFilters,
   queueEmptyDescription,
   queueUnavailableCopy,
   roundFooter,
@@ -57,17 +62,31 @@ const REFETCH_DEBOUNCE_MS = 300;
 /** "Snapshot 3 min ago" is relative to now. */
 const AGE_TICK_MS = 30_000;
 
-type View = 'list' | 'board';
+/** A selected filter chip wears the accent, not solid ink (#213). */
+const SELECTED_CHIP = 'bg-accent-soft text-accent-ink';
 
 export default function QueuePage() {
+  // `useSearchParams` needs a boundary for the static shell.
+  return (
+    <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+      <QueueScreen />
+    </Suspense>
+  );
+}
+
+function QueueScreen() {
   const { projectId } = useParams<{ projectId: string }>();
   /** Bumped by a live push; the queue and the issue sheet depend on it. */
   const [version, setVersion] = useState(0);
   const [, setNow] = useState(0);
 
-  const [view, setView] = useState<View>('list');
-  const [filter, setFilter] = useState<StateFilter>('all');
+  // The state chip and the view live in the URL: reload and a link keep them.
+  const { filters, set } = useUrlFilters(QUEUE_FILTER_CODEC);
+  const { view, state: filter } = filters;
+  const setView = (next: QueueFilters['view']) => set({ view: next });
+  const setFilter = (next: StateFilter) => set({ state: next });
   const [selected, setSelected] = useState<QueueItemView>();
+  const live = useLivePaused();
   const [creating, setCreating] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -154,7 +173,17 @@ export default function QueuePage() {
               </>
             ) : undefined
           }
-          actions={<LiveStatusBadge />}
+          actions={
+            <>
+              {/* The top bar's dot says "live"; the page speaks only when it is not. */}
+              {live.status !== 'connected' ? <LiveStatusBadge /> : null}
+              {canOperate ? (
+                <Button variant="solid" onClick={() => setCreating(true)}>
+                  New issue
+                </Button>
+              ) : null}
+            </>
+          }
         />
         {project ? <RunnerOfflineBanner project={project} /> : null}
       </div>
@@ -208,56 +237,56 @@ export default function QueuePage() {
                 }
                 actions={
                   canOperate ? (
-                    <>
-                      <Tooltip
-                        content={
-                          refreshing
-                            ? 'Refreshing…'
-                            : 'Refresh: ask the runner to poll GitHub'
-                        }
+                    <Tooltip
+                      content={
+                        refreshing
+                          ? 'Refreshing…'
+                          : 'Refresh: ask the runner to poll GitHub'
+                      }
+                    >
+                      <Button
+                        variant="ghost"
+                        icon
+                        aria-label="Refresh the queue"
+                        disabled={refreshing}
+                        onClick={refresh}
                       >
-                        <Button
-                          variant="ghost"
-                          icon
-                          aria-label="Refresh the queue"
-                          disabled={refreshing}
-                          onClick={refresh}
-                        >
-                          <RefreshCw
-                            aria-hidden="true"
-                            className={`size-4 ${refreshing ? 'animate-spin' : ''}`}
-                          />
-                        </Button>
-                      </Tooltip>
-                      <Button variant="solid" onClick={() => setCreating(true)}>
-                        New issue
+                        <RefreshCw
+                          aria-hidden="true"
+                          className={`size-4 ${refreshing ? 'animate-spin' : ''}`}
+                        />
                       </Button>
-                    </>
+                    </Tooltip>
                   ) : undefined
                 }
               />
 
               {view === 'list' ? (
-                <fieldset className="m-0 flex min-w-0 flex-wrap gap-2 border-0 p-0">
+                <fieldset className="m-0 min-w-0 border-0 p-0">
                   <legend className="sr-only">Filter by state</legend>
-                  <ChipButton
-                    selected={filter === 'all'}
-                    onClick={() => setFilter('all')}
-                  >
-                    All <Badge count={data.items.length} className="ml-1" />
-                  </ChipButton>
-                  {QUEUE_STATES.map((state) => (
+                  {/* One row that scrolls on a phone instead of wrapping into three. */}
+                  <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
                     <ChipButton
-                      key={state}
-                      selected={filter === state}
-                      onClick={() =>
-                        setFilter(filter === state ? 'all' : state)
-                      }
+                      selected={filter === 'all'}
+                      className={`shrink-0 ${filter === 'all' ? SELECTED_CHIP : ''}`}
+                      onClick={() => setFilter('all')}
                     >
-                      {STATE_CHIP_LABEL[state]}{' '}
-                      <Badge count={counts[state]} className="ml-1" />
+                      All <Badge count={data.items.length} className="ml-1" />
                     </ChipButton>
-                  ))}
+                    {QUEUE_STATES.map((state) => (
+                      <ChipButton
+                        key={state}
+                        selected={filter === state}
+                        className={`shrink-0 ${filter === state ? SELECTED_CHIP : ''}`}
+                        onClick={() =>
+                          setFilter(filter === state ? 'all' : state)
+                        }
+                      >
+                        {STATE_CHIP_LABEL[state]}{' '}
+                        <Badge count={counts[state]} className="ml-1" />
+                      </ChipButton>
+                    ))}
+                  </div>
                 </fieldset>
               ) : null}
 
@@ -270,7 +299,7 @@ export default function QueuePage() {
                   )}
                   action={
                     canOperate ? (
-                      <Button variant="solid" onClick={() => setCreating(true)}>
+                      <Button variant="glass" onClick={() => setCreating(true)}>
                         New issue
                       </Button>
                     ) : undefined

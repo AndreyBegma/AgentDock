@@ -109,6 +109,27 @@ export function dedupeSkills(items: InstalledSkillView[]): SkillRow[] {
   return [...rows.values()];
 }
 
+/**
+ * The skill a `?run=<invocation>` link opens the run dialog for — History's
+ * Retry on a failed skill run (#213). Only a runnable Claude skill; null when
+ * the link names none, so the page simply shows the list.
+ */
+export function skillToRun(
+  items: readonly InstalledSkillView[],
+  invocation: string | null,
+): InstalledSkillView | null {
+  if (!invocation) return null;
+  const wanted = invocation.replace(/^\//, '');
+  return (
+    items.find(
+      (item) =>
+        item.invocation === wanted &&
+        item.runnable &&
+        item.runtime === 'claude',
+    ) ?? null
+  );
+}
+
 /** "in 5 profiles"; empty for a skill that lives in the project. */
 export function profilesLabel(profiles: readonly string[]): string {
   if (profiles.length === 0) return '';

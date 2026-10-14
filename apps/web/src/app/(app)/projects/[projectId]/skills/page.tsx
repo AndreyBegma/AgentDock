@@ -7,20 +7,16 @@ import type {
 } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
-import { Button } from '@andrewbehma/glass-ui/button';
+import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
+import { type Column, DataTable } from '@andrewbehma/glass-ui/data-table';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
-import {
-  Table,
-  TableCell,
-  TableHead,
-  TableRow,
-} from '@andrewbehma/glass-ui/table';
+import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import { Play } from 'lucide-react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '../../../../../components/page-header/page-header';
 import { AsyncSection } from '../../../../../components/prerequisites/async-section';
 import { RunnerOfflineBanner } from '../../../../../components/prerequisites/prerequisite-banner';
@@ -38,12 +34,15 @@ import {
   profilesLabel,
   provenanceLabel,
   SCOPE_LABEL,
+  type SkillRow,
   skillRunProfiles,
   skillRunsHref,
+  skillToRun,
 } from '../../../../../lib/skills/format';
 import { useProjectDetail } from '../use-project-detail';
 import { RunDialog } from './run-dialog';
 
+/** One scope's skills: a `DataTable` that scrolls inside its own frame (#213). */
 function SkillRows({
   items,
   canOperate,
@@ -54,81 +53,99 @@ function SkillRows({
   onRun: (skill: InstalledSkillView) => void;
 }) {
   const rows = dedupeSkills(items);
+  const columns: Column<SkillRow>[] = [
+    {
+      id: 'skill',
+      header: 'Skill',
+      cell: ({ skill: item, profiles }) => (
+        <span className="flex flex-col">
+          <span className="font-mono text-sm">{item.invocation}</span>
+          {profiles.length > 0 ? (
+            <span className="text-xs text-ink-3">
+              <Tooltip content={profiles.join(', ')}>
+                <button type="button" className="cursor-help">
+                  {profilesLabel(profiles)}
+                </button>
+              </Tooltip>
+            </span>
+          ) : null}
+        </span>
+      ),
+    },
+    {
+      id: 'runtime',
+      header: 'Runtime',
+      cell: ({ skill: item }) => <Badge tone="neutral" label={item.runtime} />,
+    },
+    {
+      id: 'source',
+      header: 'Source',
+      cell: ({ skill: item }) => provenanceLabel(item),
+    },
+    {
+      id: 'description',
+      header: 'Description',
+      cell: ({ skill: item }) => (
+        <span
+          className="block max-w-56 truncate text-sm text-ink-2 sm:max-w-md"
+          title={item.description ?? undefined}
+        >
+          {item.description ?? '—'}
+        </span>
+      ),
+    },
+    ...(canOperate
+      ? [
+          {
+            id: 'run',
+            header: <span className="sr-only">Run</span>,
+            align: 'end' as const,
+            cell: ({ skill: item }: SkillRow) =>
+              item.runnable && item.runtime === 'claude' ? (
+                <Tooltip content={`Run ${item.invocation}`}>
+                  <Button
+                    size="sm"
+                    icon
+                    variant="ghost"
+                    aria-label={`Run ${item.invocation}`}
+                    onClick={() => onRun(item)}
+                  >
+                    <Play aria-hidden="true" className="size-4" />
+                  </Button>
+                </Tooltip>
+              ) : (
+                <span className="text-xs text-ink-3">
+                  {item.runnable ? 'Claude only' : 'Not runnable'}
+                </span>
+              ),
+          },
+        ]
+      : []),
+  ];
   return (
     <ScrollX label="Skills" edgeClassName="from-surface">
-      <Table>
-        <TableHead>
-          <TableRow>
-            <TableCell head>Skill</TableCell>
-            <TableCell head>Runtime</TableCell>
-            <TableCell head>Source</TableCell>
-            <TableCell head>Description</TableCell>
-            {canOperate ? (
-              <TableCell head>
-                <span className="sr-only">Run</span>
-              </TableCell>
-            ) : null}
-          </TableRow>
-        </TableHead>
-        <tbody>
-          {rows.map(({ skill: item, profiles }) => (
-            <TableRow key={item.id} className="group">
-              <TableCell>
-                <span className="font-mono text-sm break-normal whitespace-nowrap">
-                  {item.invocation}
-                </span>
-                {profiles.length > 0 ? (
-                  <div className="text-xs text-ink-3">
-                    <Tooltip content={profiles.join(', ')}>
-                      <button type="button" className="cursor-help">
-                        {profilesLabel(profiles)}
-                      </button>
-                    </Tooltip>
-                  </div>
-                ) : null}
-              </TableCell>
-              <TableCell>
-                <Badge tone="neutral" label={item.runtime} />
-              </TableCell>
-              <TableCell className="whitespace-nowrap">
-                {provenanceLabel(item)}
-              </TableCell>
-              <TableCell>
-                <span className="line-clamp-2 min-w-48 text-sm text-ink-2">
-                  {item.description ?? '—'}
-                </span>
-              </TableCell>
-              {canOperate ? (
-                <TableCell className="text-end">
-                  {item.runnable && item.runtime === 'claude' ? (
-                    <Tooltip content={`Run ${item.invocation}`}>
-                      <Button
-                        size="sm"
-                        icon
-                        aria-label={`Run ${item.invocation}`}
-                        className="opacity-100 transition-opacity focus-visible:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-focus-within:opacity-100 [@media(hover:hover)]:group-hover:opacity-100"
-                        onClick={() => onRun(item)}
-                      >
-                        <Play aria-hidden="true" className="size-4" />
-                      </Button>
-                    </Tooltip>
-                  ) : (
-                    <span className="text-xs text-ink-3">
-                      {item.runnable ? 'Claude only' : 'Not runnable'}
-                    </span>
-                  )}
-                </TableCell>
-              ) : null}
-            </TableRow>
-          ))}
-        </tbody>
-      </Table>
+      <DataTable
+        rows={rows}
+        getRowId={(row) => row.skill.id}
+        columns={columns}
+        stickyHeader={false}
+      />
     </ScrollX>
   );
 }
 
 export default function ProjectSkillsPage() {
+  // `useSearchParams` needs a boundary for the static shell.
+  return (
+    <Suspense fallback={null}>
+      <SkillsView />
+    </Suspense>
+  );
+}
+
+function SkillsView() {
   const { projectId } = useParams<{ projectId: string }>();
+  const runParam = useSearchParams().get('run');
   const detail = useProjectDetail(projectId);
   const project = detail.data;
   const skills = useSection(
@@ -177,6 +194,15 @@ export default function ProjectSkillsPage() {
   // A rescan's answer is newer than the load before it.
   const view = scanned ?? skills.data;
   const groups = useMemo(() => groupBySkillScope(view?.items ?? []), [view]);
+
+  // History's Retry links here with `?run=<invocation>`: open its dialog once.
+  const [opened, setOpened] = useState(false);
+  useEffect(() => {
+    if (opened || !canRun || !skills.data) return;
+    setOpened(true);
+    const target = skillToRun(skills.data.items, runParam);
+    if (target) setRunning(target);
+  }, [opened, canRun, skills.data, runParam]);
 
   if (skills.data === undefined && isNotFound(skills.error)) {
     return (
@@ -227,8 +253,11 @@ export default function ProjectSkillsPage() {
                 <Button variant="glass" disabled={refreshing} onClick={refresh}>
                   {refreshing ? 'Scanning…' : 'Rescan'}
                 </Button>
-                <Link href="/skills">
-                  <Button>Find skills</Button>
+                <Link
+                  href="/skills"
+                  className={buttonClassName({ variant: 'solid' })}
+                >
+                  Find skills
                 </Link>
               </>
             ) : undefined
@@ -272,15 +301,18 @@ export default function ProjectSkillsPage() {
         {() =>
           groups.map((group) => (
             <section key={group.scope} aria-labelledby={`scope-${group.scope}`}>
-              <h2
-                id={`scope-${group.scope}`}
-                className="mb-2 text-sm font-semibold"
-              >
-                {SCOPE_LABEL[group.scope]}{' '}
-                <span className="font-normal text-ink-3">
-                  ({dedupeSkills(group.items).length})
-                </span>
-              </h2>
+              <SectionHeader
+                headingId={`scope-${group.scope}`}
+                className="mb-2"
+                title={
+                  <>
+                    {SCOPE_LABEL[group.scope]}{' '}
+                    <span className="font-normal text-ink-3">
+                      ({dedupeSkills(group.items).length})
+                    </span>
+                  </>
+                }
+              />
               <SkillRows
                 items={group.items}
                 canOperate={canOperate}

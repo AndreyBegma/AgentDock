@@ -3,14 +3,10 @@
 import type { AdminScheduleView, ScheduleView } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
-import {
-  Table,
-  TableCell,
-  TableHead,
-  TableRow,
-} from '@andrewbehma/glass-ui/table';
+import { type Column, DataTable } from '@andrewbehma/glass-ui/data-table';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
 import Link from 'next/link';
+import { ScrollX } from '../../../../../components/scroll-x/scroll-x';
 import {
   DISABLED_REASON_LABEL,
   describeTarget,
@@ -44,129 +40,150 @@ export function ScheduleTable({
   busyId?: string | null;
   onOpen: (schedule: ScheduleView) => void;
 }) {
-  return (
-    <Table scroll>
-      <TableHead>
-        <TableRow>
-          <TableCell head>Name</TableCell>
-          {showProject ? <TableCell head>Project</TableCell> : null}
-          <TableCell head>Runs</TableCell>
-          <TableCell head>Cron</TableCell>
-          <TableCell head>Next run</TableCell>
-          <TableCell head>Last firing</TableCell>
-          <TableCell head>Enabled</TableCell>
-          {actions ? (
-            <TableCell head>
-              <span className="sr-only">Actions</span>
-            </TableCell>
+  type Row = ScheduleView | AdminScheduleView;
+  const columns: Column<Row>[] = [
+    {
+      id: 'name',
+      header: 'Name',
+      cell: (schedule) => (
+        <span className="flex flex-col">
+          <button
+            type="button"
+            className="text-left font-medium underline-offset-2 hover:underline"
+            onClick={() => onOpen(schedule)}
+          >
+            {schedule.name}
+          </button>
+          {schedule.disabledReason && !schedule.enabled ? (
+            <span className="text-xs text-warn">
+              {DISABLED_REASON_LABEL[schedule.disabledReason]}
+            </span>
           ) : null}
-        </TableRow>
-      </TableHead>
-      <tbody>
-        {schedules.map((schedule) => {
-          const last = schedule.lastFiring;
-          const busy = busyId === schedule.id;
-          return (
-            <TableRow key={schedule.id}>
-              <TableCell>
-                <button
-                  type="button"
-                  className="text-left font-medium underline-offset-2 hover:underline"
-                  onClick={() => onOpen(schedule)}
-                >
-                  {schedule.name}
-                </button>
-                {schedule.disabledReason && !schedule.enabled ? (
-                  <div className="text-xs text-warn">
-                    {DISABLED_REASON_LABEL[schedule.disabledReason]}
-                  </div>
-                ) : null}
-              </TableCell>
-              {showProject ? (
-                <TableCell>
-                  <Link
-                    href={`/projects/${schedule.projectId}/schedules`}
-                    className="underline-offset-2 hover:underline"
+        </span>
+      ),
+    },
+    ...(showProject
+      ? [
+          {
+            id: 'project',
+            header: 'Project',
+            cell: (schedule: Row) => (
+              <Link
+                href={`/projects/${schedule.projectId}/schedules`}
+                className="underline-offset-2 hover:underline"
+              >
+                {'projectName' in schedule
+                  ? schedule.projectName
+                  : schedule.projectId}
+              </Link>
+            ),
+          },
+        ]
+      : []),
+    {
+      id: 'runs',
+      header: 'Runs',
+      cell: (schedule) => (
+        <span className="font-mono text-sm">
+          {describeTarget(schedule.target)}
+        </span>
+      ),
+    },
+    {
+      id: 'cron',
+      header: 'Cron',
+      cell: (schedule) => (
+        <span className="flex flex-col">
+          <span className="font-mono text-sm">{schedule.cron}</span>
+          <span className="text-xs text-ink-3">{schedule.timezone}</span>
+        </span>
+      ),
+    },
+    { id: 'next', header: 'Next run', cell: (s) => nextRunLabel(s) },
+    {
+      id: 'last',
+      header: 'Last firing',
+      cell: ({ lastFiring: last }) =>
+        last ? (
+          <Badge
+            tone={FIRING_STATUS_TONE[last.status]}
+            label={FIRING_STATUS_LABEL[last.status]}
+          />
+        ) : (
+          <span className="text-ink-3">never</span>
+        ),
+    },
+    {
+      id: 'enabled',
+      header: 'Enabled',
+      cell: (schedule) =>
+        actions ? (
+          <>
+            <span id={`schedule-on-${schedule.id}`} className="sr-only">
+              Enable {schedule.name}
+            </span>
+            <Toggle
+              checked={schedule.enabled}
+              labelledBy={`schedule-on-${schedule.id}`}
+              onChange={(value) => actions.onToggle(schedule, value)}
+            />
+          </>
+        ) : (
+          <Badge
+            tone={schedule.enabled ? 'ok' : 'neutral'}
+            label={schedule.enabled ? 'on' : 'off'}
+          />
+        ),
+    },
+    ...(actions
+      ? [
+          {
+            id: 'actions',
+            header: <span className="sr-only">Actions</span>,
+            align: 'end' as const,
+            cell: (schedule: Row) => {
+              const busy = busyId === schedule.id;
+              return (
+                <span className="inline-flex justify-end gap-2">
+                  <Button
+                    variant="glass"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => actions.onEdit(schedule)}
                   >
-                    {'projectName' in schedule
-                      ? schedule.projectName
-                      : schedule.projectId}
-                  </Link>
-                </TableCell>
-              ) : null}
-              <TableCell>
-                <span className="font-mono text-sm">
-                  {describeTarget(schedule.target)}
+                    Edit
+                  </Button>
+                  <Button
+                    variant="glass"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => actions.onRunNow(schedule)}
+                  >
+                    Run now
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => actions.onDelete(schedule)}
+                  >
+                    Delete
+                  </Button>
                 </span>
-              </TableCell>
-              <TableCell>
-                <span className="font-mono text-sm">{schedule.cron}</span>
-                <div className="text-xs text-ink-3">{schedule.timezone}</div>
-              </TableCell>
-              <TableCell>{nextRunLabel(schedule)}</TableCell>
-              <TableCell>
-                {last ? (
-                  <Badge
-                    tone={FIRING_STATUS_TONE[last.status]}
-                    label={FIRING_STATUS_LABEL[last.status]}
-                  />
-                ) : (
-                  <span className="text-ink-3">never</span>
-                )}
-              </TableCell>
-              <TableCell>
-                {actions ? (
-                  <>
-                    <span id={`schedule-on-${schedule.id}`} className="sr-only">
-                      Enable {schedule.name}
-                    </span>
-                    <Toggle
-                      checked={schedule.enabled}
-                      labelledBy={`schedule-on-${schedule.id}`}
-                      onChange={(value) => actions.onToggle(schedule, value)}
-                    />
-                  </>
-                ) : (
-                  <Badge
-                    tone={schedule.enabled ? 'ok' : 'neutral'}
-                    label={schedule.enabled ? 'on' : 'off'}
-                  />
-                )}
-              </TableCell>
-              {actions ? (
-                <TableCell>
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="glass"
-                      size="sm"
-                      disabled={busy}
-                      onClick={() => actions.onEdit(schedule)}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      variant="glass"
-                      size="sm"
-                      disabled={busy}
-                      onClick={() => actions.onRunNow(schedule)}
-                    >
-                      Run now
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={busy}
-                      onClick={() => actions.onDelete(schedule)}
-                    >
-                      Delete
-                    </Button>
-                  </div>
-                </TableCell>
-              ) : null}
-            </TableRow>
-          );
-        })}
-      </tbody>
-    </Table>
+              );
+            },
+          },
+        ]
+      : []),
+  ];
+  return (
+    <ScrollX label="Schedules" edgeClassName="from-surface">
+      <DataTable
+        rows={schedules}
+        getRowId={(schedule) => schedule.id}
+        columns={columns}
+        stickyHeader={false}
+      />
+    </ScrollX>
   );
 }

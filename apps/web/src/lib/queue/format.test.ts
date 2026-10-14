@@ -16,6 +16,7 @@ import {
   gapSentence,
   heldForLeadSummary,
   parseStateFilter,
+  QUEUE_FILTER_CODEC,
   queueEmptyDescription,
   queueHint,
   queueUnavailableCopy,
@@ -269,6 +270,40 @@ describe('misc', () => {
     expect(
       queueUnavailableCopy({ reason: 'x' }, null, false).href,
     ).toBeUndefined();
+  });
+
+  test('a gh failure names gh on the runner, not the Runners page (#213)', () => {
+    const copy = queueUnavailableCopy(
+      { reason: 'gh is not available or timed out' },
+      'i185-screens',
+      true,
+    );
+    expect(copy.cta).toBe('Set up gh on i185-screens');
+    expect(copy.href).toBe('/install#troubleshooting');
+    expect(copy.body).toContain('gh auth login');
+    // A member who is not an admin gets the fix too: it is on the machine.
+    expect(
+      queueUnavailableCopy({ reason: 'gh timed out' }, null, false).cta,
+    ).toBe('Set up gh on the runner');
+    // A word that merely contains "gh" is not the GitHub CLI.
+    expect(queueUnavailableCopy({ reason: 'high load' }, null, true).cta).toBe(
+      'Open Runners',
+    );
+  });
+
+  test('the state chip and the view round-trip through the URL', () => {
+    const parse = (s: string) =>
+      QUEUE_FILTER_CODEC.parse(new URLSearchParams(s));
+    expect(parse('')).toEqual({ state: 'all', view: 'list' });
+    expect(parse('state=ready&view=board')).toEqual({
+      state: 'ready',
+      view: 'board',
+    });
+    expect(parse('state=bogus').state).toBe('all');
+    expect(QUEUE_FILTER_CODEC.search({ state: 'all', view: 'list' })).toBe('');
+    expect(
+      QUEUE_FILTER_CODEC.search({ state: 'blocked_person', view: 'list' }),
+    ).toBe('?state=blocked_person');
   });
 
   test('the round footer explains the dot', () => {

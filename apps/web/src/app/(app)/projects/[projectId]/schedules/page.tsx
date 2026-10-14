@@ -10,12 +10,13 @@ import {
   SCHEDULE_UPDATED_LIVE_EVENT,
 } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
-import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { PageHeader } from '../../../../../components/page-header/page-header';
 import { AsyncSection } from '../../../../../components/prerequisites/async-section';
 import { RunnerOfflineBanner } from '../../../../../components/prerequisites/prerequisite-banner';
 import { api } from '../../../../../lib/api';
@@ -45,27 +46,16 @@ function DeleteDialog({
   onConfirm: () => void;
 }) {
   return (
-    <DialogRoot
+    <ConfirmDialog
       open={schedule !== null}
       onOpenChange={(open) => !open && !busy && onCancel()}
-    >
-      <DialogContent
-        title={schedule ? `Delete ${schedule.name}?` : 'Delete schedule'}
-        description="The schedule and its firings are removed. Runs it already started stay in history."
-        footer={
-          <>
-            <Button variant="glass" disabled={busy} onClick={onCancel}>
-              Cancel
-            </Button>
-            <Button disabled={busy} onClick={onConfirm}>
-              {busy ? 'Deleting…' : 'Delete'}
-            </Button>
-          </>
-        }
-      >
-        <p className="text-sm text-ink-2">This cannot be undone.</p>
-      </DialogContent>
-    </DialogRoot>
+      title={schedule ? `Delete ${schedule.name}?` : 'Delete this schedule?'}
+      consequence="The schedule and its firings are removed; runs it already started stay in history. This cannot be undone."
+      verb="Delete"
+      tone="danger"
+      busy={busy}
+      onConfirm={onConfirm}
+    />
   );
 }
 
@@ -225,18 +215,18 @@ export default function ProjectSchedulesPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-semibold">Schedules</h1>
-            <p className="text-sm text-ink-2">
-              Skills and orchestrator commands that run on this project at fixed
-              times, with their creator’s authority.
-            </p>
-          </div>
-          {canOperate ? (
-            <Button onClick={() => setCreating(true)}>New schedule</Button>
-          ) : null}
-        </div>
+        <PageHeader
+          className="mb-0"
+          title="Schedules"
+          description="Skills and orchestrator commands that run on this project at fixed times, with their creator’s authority."
+          actions={
+            canOperate ? (
+              <Button variant="solid" onClick={() => setCreating(true)}>
+                New schedule
+              </Button>
+            ) : undefined
+          }
+        />
         {project ? <RunnerOfflineBanner project={project} /> : null}
       </div>
 
@@ -257,7 +247,9 @@ export default function ProjectSchedulesPage() {
             }
             action={
               canOperate ? (
-                <Button onClick={() => setCreating(true)}>New schedule</Button>
+                <Button variant="glass" onClick={() => setCreating(true)}>
+                  New schedule
+                </Button>
               ) : undefined
             }
           />

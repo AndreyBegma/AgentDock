@@ -1,22 +1,38 @@
 import { describe, expect, test } from 'bun:test';
-import { RUN_KINDS, type RunUsage } from '@agentdock/shared';
+import { RUN_KINDS, RUN_STATUSES, type RunUsage } from '@agentdock/shared';
 import {
   abandonedHiddenLabel,
   costLabel,
-  EMPTY_RUN_FILTERS,
   hasRunFilters,
+  latestSession,
+  NO_RUN_FILTERS,
   parseRunUpdate,
   prLabel,
+  RUN_CHIP_DEFS,
   RUN_KIND_LABEL,
-  runFiltersDirty,
-  runFiltersFromKind,
+  RUN_STATUS_CHIPS,
+  RUN_STATUS_LABEL,
+  retryHref,
+  runFailure,
+  runFiltersFromSearch,
+  runFiltersSearch,
   runLabel,
   runTitle,
   runtimeLabel,
   splitAbandoned,
   tokensLabel,
   toRunQuery,
+  totalRuns,
 } from './format';
+
+describe('RUN_STATUS_LABEL', () => {
+  test('is sentence case, as every pill label', () => {
+    for (const status of RUN_STATUSES) {
+      const label = RUN_STATUS_LABEL[status];
+      expect(label[0]).toBe(label[0].toUpperCase());
+    }
+  });
+});
 
 describe('runTitle', () => {
   const base = { issue: null, slot: null, title: null, kind: 'skill' } as const;
@@ -72,29 +88,139 @@ describe('run kinds and filters', () => {
     }
   });
 
+  const parse = (search: string) =>
+    runFiltersFromSearch(new URLSearchParams(search));
+
   test('a ?kind= link opens the filter; an unknown kind is ignored', () => {
-    expect(runFiltersFromKind('skill').kind).toBe('skill');
-    expect(runFiltersFromKind('nonsense').kind).toBe('');
-    expect(runFiltersFromKind(null)).toEqual(EMPTY_RUN_FILTERS);
+    expect(parse('kind=skill').kind).toBe('skill');
+    expect(parse('kind=nonsense').kind).toBe('');
+    expect(parse('')).toEqual(NO_RUN_FILTERS);
+  });
+
+  test('the URL round-trips, in a stable order, and drops a bad date', () => {
+    const filters = parse('to=2026-10-14&status=failed&from=2026-10-01');
+    expect(runFiltersSearch(filters)).toBe(
+      '?status=failed&from=2026-10-01&to=2026-10-14',
+    );
+    expect(parse('from=yesterday').from).toBe('');
+    expect(runFiltersSearch(NO_RUN_FILTERS)).toBe('');
   });
 
   test('the kind filter reaches the query', () => {
-    expect(toRunQuery({ ...EMPTY_RUN_FILTERS, kind: 'skill' }).kind).toBe(
-      'skill',
-    );
+    expect(toRunQuery({ ...NO_RUN_FILTERS, kind: 'skill' }).kind).toBe('skill');
   });
 
   test('no filter set is "nothing yet", any filter set is "no matches"', () => {
-    expect(hasRunFilters(EMPTY_RUN_FILTERS)).toBe(false);
-    expect(hasRunFilters({ ...EMPTY_RUN_FILTERS, status: 'failed' })).toBe(
-      true,
-    );
+    expect(hasRunFilters(NO_RUN_FILTERS)).toBe(false);
+    expect(hasRunFilters({ ...NO_RUN_FILTERS, status: 'failed' })).toBe(true);
   });
 
-  test('typed but unapplied filters are dirty', () => {
-    const form = { ...EMPTY_RUN_FILTERS, status: 'failed' };
-    expect(runFiltersDirty(form, {})).toBe(true);
-    expect(runFiltersDirty(form, { status: 'failed' })).toBe(false);
+  test('status has its own chips, so it is not a removable toolbar chip', () => {
+    expect(RUN_CHIP_DEFS.map((d) => d.key)).toEqual(['kind', 'from', 'to']);
+    expect(RUN_STATUS_CHIPS).toContain('failed');
+    expect([...RUN_STATUS_CHIPS].sort()).toEqual([...RUN_STATUSES].sort());
+  });
+
+  test('the All chip counts every status', () => {
+    expect(
+      totalRuns({
+        running: 2,
+        blocked: 1,
+        waiting_person: 0,
+        succeeded: 4,
+        failed: 3,
+        abandoned: 5,
+      }),
+    ).toBe(15);
+  });
+});
+
+describe('runFailure', () => {
+  const run = {
+    kind: 'plan',
+    status: 'failed',
+    outcome: null,
+    prNumber: null,
+  } as const;
+
+  test('a fine run has no banner', () => {
+    expect(runFailure({ ...run, status: 'running' })).toBeNull();
+    expect(runFailure({ ...run, status: 'succeeded' })).toBeNull();
+  });
+
+  test('a failed run leads with the runner’s words', () => {
+    expect(
+      runFailure({ ...run, outcome: 'plan.turn failed: timeout' }),
+    ).toMatchObject({
+      tone: 'danger',
+      cause: 'plan.turn failed: timeout',
+      updateRunner: false,
+    });
+    expect(runFailure(run)?.cause).toBe('The runner reported no reason.');
+  });
+
+  test('unknown_command asks for a runner update', () => {
+    expect(
+      runFailure({
+        ...run,
+        outcome:
+          'plan.turn failed on the runner: unknown_command — unknown command: plan.turn',
+      })?.updateRunner,
+    ).toBe(true);
+  });
+
+  test('a slot run fails on its closed PR', () => {
+    expect(
+      runFailure({ ...run, kind: 'orchestrator_slot', prNumber: 205 })?.cause,
+    ).toBe('Pull request #205 was closed without being merged.');
+  });
+
+  test('blocked carries the worker’s checkpoint', () => {
+    expect(
+      runFailure({
+        ...run,
+        kind: 'orchestrator_slot',
+        status: 'blocked',
+        outcome: 'needs a grant',
+      }),
+    ).toMatchObject({ tone: 'warn', cause: 'needs a grant' });
+  });
+});
+
+describe('retryHref', () => {
+  const base = { status: 'failed', planId: null, title: null } as const;
+  test('a planner run retries in its plan', () => {
+    expect(retryHref('p1', { ...base, kind: 'plan', planId: 'pl1' })).toBe(
+      '/projects/p1/planner/pl1',
+    );
+  });
+  test('a skill run reopens the skill’s run dialog', () => {
+    expect(
+      retryHref('p1', { ...base, kind: 'skill', title: '/cs-review' }),
+    ).toBe('/projects/p1/skills?run=cs-review');
+  });
+  test('a slot run and a running run have no retry', () => {
+    expect(retryHref('p1', { ...base, kind: 'orchestrator_slot' })).toBeNull();
+    expect(
+      retryHref('p1', {
+        ...base,
+        kind: 'plan',
+        planId: 'pl1',
+        status: 'running',
+      }),
+    ).toBeNull();
+  });
+});
+
+describe('latestSession', () => {
+  test('picks the newest start, none for none', () => {
+    expect(
+      latestSession([
+        { id: 'a', startedAt: '2026-10-14T10:00:00.000Z' },
+        { id: 'b', startedAt: '2026-10-14T11:00:00.000Z' },
+      ])?.id,
+    ).toBe('b');
+    expect(latestSession([])).toBeNull();
   });
 });
 
@@ -147,11 +273,13 @@ describe('labels', () => {
 });
 
 describe('toRunQuery / parseRunUpdate', () => {
-  test('keeps a known status only', () => {
-    expect(toRunQuery({ ...EMPTY_RUN_FILTERS, status: 'failed' })).toEqual({
+  test('a status reaches the query; a bad one never gets past the URL', () => {
+    expect(toRunQuery({ ...NO_RUN_FILTERS, status: 'failed' })).toEqual({
       status: 'failed',
     });
-    expect(toRunQuery({ ...EMPTY_RUN_FILTERS, status: 'nope' })).toEqual({});
+    expect(
+      toRunQuery(runFiltersFromSearch(new URLSearchParams('status=nope'))),
+    ).toEqual({});
   });
   test('run.updated payload', () => {
     expect(parseRunUpdate({ id: 'r1', status: 'running' })).toEqual({
