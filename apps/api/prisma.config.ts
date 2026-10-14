@@ -9,7 +9,9 @@ export default defineConfig({
   schema: './prisma/schema.prisma',
   migrations: {
     path: './prisma/migrations',
-    seed: 'ts-node prisma/seed.ts',
+    // --transpile-only: full type-checking the seed's import graph exhausts the
+    // heap of the memory-capped api container at boot.
+    seed: 'ts-node --transpile-only prisma/seed.ts',
   },
   datasource: {
     url: process.env.DATABASE_URL ?? PLACEHOLDER_URL,

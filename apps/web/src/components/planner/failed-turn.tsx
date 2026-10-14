@@ -2,10 +2,16 @@
 
 import type { PlanTurnView } from '@agentdock/shared';
 import { Banner } from '@andrewbehma/glass-ui/banner';
-import { Button } from '@andrewbehma/glass-ui/button';
+import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { Disclosure } from '@andrewbehma/glass-ui/disclosure';
+import Link from 'next/link';
 import { useState } from 'react';
-import { isContractViolation } from '../../lib/planner/format';
+import {
+  isContractViolation,
+  isRunnerTooOld,
+  RUNNER_TOO_OLD_TEXT,
+} from '../../lib/planner/format';
+import { RUNNER_UPDATE_HREF } from '../../lib/slot/format';
 
 /**
  * A failed turn: the error and **Retry turn**. For a `contract_violation`
@@ -25,13 +31,16 @@ export function FailedTurn({
 }) {
   const [open, setOpen] = useState(false);
   const violation = isContractViolation(turn);
+  const tooOld = isRunnerTooOld(turn.error);
   return (
     <Banner
       tone="danger"
       title={
         violation
           ? 'The planner’s answer did not follow the contract'
-          : 'The turn failed'
+          : tooOld
+            ? 'The runner is too old to plan'
+            : 'The turn failed'
       }
       action={
         canRetry ? (
@@ -49,8 +58,18 @@ export function FailedTurn({
       <div className="flex min-w-0 flex-col gap-2">
         <p className="break-words">
           {violation ? 'Nothing was changed. ' : null}
-          {turn.error ?? 'The runner gave no reason.'}
+          {tooOld
+            ? RUNNER_TOO_OLD_TEXT
+            : (turn.error ?? 'The runner gave no reason.')}
         </p>
+        {tooOld ? (
+          <Link
+            href={RUNNER_UPDATE_HREF}
+            className={`${buttonClassName({ variant: 'glass', size: 'sm' })} self-start`}
+          >
+            Update the runner
+          </Link>
+        ) : null}
         {violation && turn.resultText ? (
           <Disclosure
             open={open}

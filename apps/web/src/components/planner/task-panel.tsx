@@ -4,9 +4,10 @@ import type { PlanTaskView, PlanTurnView } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
-import { Tabs, TabsItem } from '@andrewbehma/glass-ui/tabs';
+import { Tab, TabGroup, TabList, TabPanel } from '@andrewbehma/glass-ui/tabs';
 import { X } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import type { ReactNode } from 'react';
 import { KIND_LABEL, taskStatusView } from '../../lib/planner/format';
 import { Markdown } from '../markdown/markdown';
 import { IssueLinks } from './issue-links';
@@ -18,6 +19,9 @@ const TABS = [
   { id: 'history', label: 'History' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
+
+const isTabId = (value: string | null): value is TabId =>
+  TABS.some((t) => t.id === value);
 
 /**
  * The right panel (spec 172 UI): the selected task's conversation, its
@@ -41,10 +45,22 @@ export function TaskPanel({
   conversation: ReactNode;
   onClose: () => void;
 }) {
-  // A task with open questions opens on them; a written one on its document.
-  const [tab, setTab] = useState<TabId>(
-    task.questions.length === 0 && task.document ? 'document' : 'conversation',
-  );
+  const router = useRouter();
+  const pathname = usePathname();
+  const search = useSearchParams();
+  const asked = search.get('tab');
+  // `?tab=` when it names one; else a task with open questions opens on
+  // them, a written one on its document.
+  const tab: TabId = isTabId(asked)
+    ? asked
+    : task.questions.length === 0 && task.document
+      ? 'document'
+      : 'conversation';
+  const setTab = (next: string) => {
+    const params = new URLSearchParams(search.toString());
+    params.set('tab', next);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
   const view = taskStatusView(task);
 
   return (
@@ -82,41 +98,37 @@ export function TaskPanel({
         </Button>
       </div>
 
-      <Tabs aria-label="Task sections">
-        {TABS.map(({ id, label }) => (
-          <TabsItem key={id} current={tab === id} layoutId="planner-task-tab">
-            <button
-              type="button"
-              onClick={() => setTab(id)}
-              aria-pressed={tab === id}
-              className="relative flex w-full items-center justify-center px-3 py-2 text-sm font-medium"
-            >
+      <TabGroup value={tab} onValueChange={setTab}>
+        <TabList aria-label="Task sections">
+          {TABS.map(({ id, label }) => (
+            <Tab key={id} value={id}>
               {label}
-            </button>
-          </TabsItem>
-        ))}
-      </Tabs>
-
-      {tab === 'conversation' ? (
-        conversation
-      ) : tab === 'document' ? (
-        task.document ? (
-          <Markdown>{task.document}</Markdown>
-        ) : (
-          <p className="text-sm text-ink-3">
-            {task.blockingOpen > 0
-              ? 'The planner writes the document once the blocking questions are answered.'
-              : 'No document yet. The planner writes it when the conversation is done.'}
-          </p>
-        )
-      ) : (
-        <TaskHistory
-          projectId={projectId}
-          planId={planId}
-          task={task}
-          turns={turns}
-        />
-      )}
+            </Tab>
+          ))}
+        </TabList>
+        <TabPanel value="conversation" className="pt-4">
+          {conversation}
+        </TabPanel>
+        <TabPanel value="document" className="pt-4">
+          {task.document ? (
+            <Markdown>{task.document}</Markdown>
+          ) : (
+            <p className="text-sm text-ink-3">
+              {task.blockingOpen > 0
+                ? 'The planner writes the document once the blocking questions are answered.'
+                : 'No document yet. The planner writes it when the conversation is done.'}
+            </p>
+          )}
+        </TabPanel>
+        <TabPanel value="history" className="pt-4">
+          <TaskHistory
+            projectId={projectId}
+            planId={planId}
+            task={task}
+            turns={turns}
+          />
+        </TabPanel>
+      </TabGroup>
     </Card>
   );
 }

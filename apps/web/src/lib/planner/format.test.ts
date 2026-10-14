@@ -18,6 +18,9 @@ import {
   isContractViolation,
   LIVE_STATUS_PILL,
   PLAN_STATUS_PILL,
+  planAttentionReason,
+  planPill,
+  RUNNER_TOO_OLD_TEXT,
   sendBlock,
   TASK_STATUS_PILL,
   TURN_PHASE_PILL,
@@ -201,6 +204,71 @@ describe('what the person may do', () => {
   });
 });
 
+describe('planPill (#213)', () => {
+  const failed = turn({
+    id: 'turn-2',
+    phase: 'failed',
+    error: 'boom',
+    createdAt: '2026-10-13T11:00:00.000Z',
+  });
+
+  test('a drafting plan whose newest turn failed is Failed, not Drafting', () => {
+    expect(planPill(plan({ status: 'drafting', turns: [failed] }))).toEqual({
+      status: 'error',
+      label: 'Failed',
+    });
+  });
+
+  test('a failed task turn on a plan under review needs attention', () => {
+    expect(
+      planPill(plan({ status: 'reviewing', turns: [turn(), failed] })).label,
+    ).toBe('Needs attention');
+  });
+
+  test('a retry newer than the failure clears it', () => {
+    const retry = turn({
+      id: 'turn-3',
+      phase: 'running',
+      createdAt: '2026-10-13T12:00:00.000Z',
+    });
+    expect(
+      planPill(plan({ status: 'drafting', turns: [failed, retry] })).label,
+    ).toBe('Drafting');
+  });
+
+  test('a sent plan stays Sent', () => {
+    expect(planPill(plan({ status: 'sent', turns: [failed] })).label).toBe(
+      'Sent',
+    );
+  });
+
+  test('a list row reads the API’s attention, and its absence as none', () => {
+    const row = { status: 'drafting' as const };
+    expect(planPill(row).label).toBe('Drafting');
+    expect(
+      planPill({
+        ...row,
+        attention: { kind: 'failed', reason: 'x', turnId: 't', at: 'a' },
+      }).label,
+    ).toBe('Failed');
+  });
+
+  test('the row reason names an old runner in words', () => {
+    expect(
+      planAttentionReason({
+        attention: {
+          kind: 'failed',
+          reason: 'plan.turn failed on the runner: unknown_command',
+          turnId: 't',
+          at: 'a',
+        },
+      }),
+    ).toBe(RUNNER_TOO_OLD_TEXT);
+    expect(planAttentionReason({ attention: null })).toBeNull();
+    expect(planAttentionReason({})).toBeNull();
+  });
+});
+
 describe('describePlannerError', () => {
   const err = (status: number, error: string, message = 'm') =>
     new ApiError(status, undefined, message, undefined, {
@@ -223,6 +291,26 @@ describe('describePlannerError', () => {
     expect(
       describePlannerError(new ApiError(404, undefined, 'Not Found')),
     ).toMatch(/private to its author/);
+  });
+
+  test('a runner that does not know plan.turn is said to be too old', () => {
+    expect(
+      describePlannerError(
+        err(
+          502,
+          'command_failed',
+          'plan.turn failed on the runner: unknown_command — unknown command: plan.turn',
+        ),
+      ),
+    ).toBe(RUNNER_TOO_OLD_TEXT);
+  });
+
+  test('an offline runner is not called too old', () => {
+    expect(
+      describePlannerError(
+        err(503, 'command_unavailable', 'The runner is not connected'),
+      ),
+    ).toMatch(/offline/);
   });
 
   test('a network failure is a sentence too', () => {

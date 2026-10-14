@@ -49,6 +49,7 @@ import {
 import { runLogSources } from './skills/run/log';
 import { Spool } from './spool';
 import { bunSpawnPty, type SpawnPty, TerminalManager } from './terminal';
+import { createUiProfileHandlers, UiProfileBuildExecutor } from './uiprofile';
 import { RUNNER_VERSION } from './version';
 
 export interface DaemonOptions {
@@ -76,6 +77,8 @@ export interface DaemonOptions {
   runsDir?: string;
   /** Plans' worktree records and turns (spec 172); `<state>/agentdock/plans` beside the runs by default. */
   plansDir?: string;
+  /** UI profile builds (spec 223); `<state>/agentdock/uiprofile` beside the plans by default. */
+  uiprofileDir?: string;
   /** The argv that starts this runner; a skill run's or plan turn's session appends `exec-run <dir>`. */
   selfCommand?: readonly string[];
   /** The skills.sh catalog is fetched with it; the global `fetch` by default. */
@@ -234,8 +237,18 @@ export const runDaemon = async (
       log,
       otlpPort: () => otlp?.port ?? null,
     });
+    const uiProfiles = new UiProfileBuildExecutor({
+      deps: skillsDeps,
+      buildsDir:
+        options.uiprofileDir ?? join(dirname(options.spoolDir), 'uiprofile'),
+      selfCommand,
+      slots,
+      emit: (event) => connection?.emit(event),
+      log,
+      otlpPort: () => otlp?.port ?? null,
+    });
     const runLog = new RunLogStreamer({
-      runs: runLogSources(runs, plans),
+      runs: runLogSources(runs, plans, uiProfiles),
       send: (message) => connection?.sendMessage(message) ?? false,
       clock,
       log,
@@ -258,6 +271,7 @@ export const runDaemon = async (
         terminal,
         skills: createSkillHandlers(skillsDeps, runs),
         planner: createPlannerHandlers({ ...skillsDeps, log }, plans),
+        uiprofile: createUiProfileHandlers(skillsDeps, uiProfiles),
       }),
       disabledCommands: config.disabledCommands,
       clock,
@@ -391,6 +405,11 @@ export const runDaemon = async (
         error: errorMessage(error),
       });
     });
+    await uiProfiles.start().catch((error) => {
+      log.error('uiprofile: cannot resume builds', {
+        error: errorMessage(error),
+      });
+    });
     // Not awaited: a first scan of a large profile must not delay connecting.
     sessions?.start(watchList.current).catch((error) => {
       log.error('sessions: cannot start', { error: errorMessage(error) });
@@ -404,6 +423,7 @@ export const runDaemon = async (
     // Sessions run on in tmux; the next start resumes watching them.
     runs.stop();
     plans.stop();
+    uiProfiles.stop();
     terminal.stop();
     await registry.stop();
     await sessions?.stop();

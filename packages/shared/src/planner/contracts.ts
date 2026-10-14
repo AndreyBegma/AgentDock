@@ -153,6 +153,21 @@ export interface PlanTaskVersionsView {
   versions: PlanTaskVersionView[];
 }
 
+/**
+ * Why a plan needs the person although its stored status says otherwise
+ * (#213): its newest turn failed and nothing replaced it. `failed` while the
+ * plan had made no progress (clarifying, drafting); `attention` once it has
+ * tasks to review. Derived on read, never stored.
+ */
+export interface PlanAttention {
+  kind: 'failed' | 'attention';
+  /** The failed turn's error, as the turn view carries it. */
+  reason: string;
+  turnId: string;
+  /** When the turn failed (its `finishedAt`, else `createdAt`). */
+  at: string;
+}
+
 /** One row of a plan list. */
 export interface PlanSummary {
   id: string;
@@ -162,6 +177,11 @@ export interface PlanSummary {
   mode: PlanMode;
   visibility: PlanVisibility;
   status: PlanStatus;
+  /**
+   * Null when the plan needs nothing beyond what `status` says. Optional
+   * until every route that answers a summary derives it; absent reads as null.
+   */
+  attention?: PlanAttention | null;
   version: number;
   /** Tasks of the current version, by status. */
   taskCounts: Partial<Record<PlanTaskStatus, number>>;
