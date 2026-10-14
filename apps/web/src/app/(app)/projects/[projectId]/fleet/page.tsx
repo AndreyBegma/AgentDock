@@ -8,7 +8,6 @@ import {
   projectRoleAtLeast,
   type QueueView,
 } from '@agentdock/shared';
-import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
@@ -37,7 +36,6 @@ import type { TerminalTarget } from '../../../../../components/terminal/terminal
 import { api } from '../../../../../lib/api';
 import { useControl } from '../../../../../lib/control/use-control';
 import {
-  boardErrorView,
   EMPTY_FLEET_DESCRIPTION,
   isNotFound,
 } from '../../../../../lib/fleet/format';
@@ -62,12 +60,15 @@ import { NewIssueDialog } from '../queue/new-issue-dialog';
 import { useProjectDetail } from '../use-project-detail';
 import { AgentCanvas, AgentList } from './agent-canvas';
 import { AgentDock } from './agent-dock';
+import { BoardErrorBanner } from './board-error-banner';
 import { DependenciesPanel } from './dependencies-panel';
+import { FirstProjectChecklist } from './first-project-checklist';
 import { FleetHeader } from './fleet-header';
 import { OrchestratorCard } from './orchestrator-card';
 import { QuickActions } from './quick-actions';
 import { SlotPanel } from './slot-panel';
 import { SlotsView } from './slots-view';
+import { StartOrchestratorDialog } from './start-dialog';
 import { useControlReasons } from './use-control-reasons';
 
 /** Pushes arrive in bursts (one per projected batch); one refetch covers them. */
@@ -224,11 +225,19 @@ function FleetWorkspace() {
     );
   }
 
-  const newIssueAction = canOperate ? (
-    <Button variant="solid" onClick={() => setCreating(true)}>
-      New issue
-    </Button>
-  ) : null;
+  /**
+   * Nothing on the board and no orchestrator at work: the first-project
+   * checklist stands in for the canvas, and its Start is the screen's one
+   * solid button (#213).
+   */
+  const emptyFleet =
+    (graph.data?.nodes.length ?? 0) <= 1 &&
+    (fleet.data?.slots.length ?? 0) === 0;
+  const showChecklist =
+    emptyFleet &&
+    orchestratorStatus !== undefined &&
+    orchestratorStatus !== 'running' &&
+    orchestratorStatus !== 'idle';
 
   const orchestratorCard = (view: FleetView) => (
     <OrchestratorCard
@@ -239,25 +248,24 @@ function FleetWorkspace() {
       isAdmin={isAdmin}
       settings={settings}
       reasons={reasons}
-      startOpen={startOpen}
-      onStartOpenChange={setStartOpen}
+      showStart={!showChecklist}
+      onStart={() => setStartOpen(true)}
       {...(onAttach ? { onAttach: () => onAttach(ORCHESTRATOR_KEY) } : {})}
     />
   );
 
-  /** The orchestrator is not running: say why nothing moves, and how to start it. */
+  /** Nothing runs here yet: what is left, in order, then the card's facts. */
   const notRunning = (view: FleetView) => (
     <div className="flex flex-col gap-4">
-      <EmptyState
-        title="The orchestrator is not running"
-        description="AgentDock does not create agents itself: the orchestrator reads the queue and dispatches a slot per issue. Start it to put the queue to work."
-        action={
-          canOperate && reasons.start === null ? (
-            <Button variant="solid" onClick={() => setStartOpen(true)}>
-              Start the orchestrator
-            </Button>
-          ) : null
-        }
+      <FirstProjectChecklist
+        projectId={projectId}
+        runnerId={project?.runnerId}
+        isAdmin={isAdmin}
+        canOperate={canOperate}
+        settings={settings}
+        startReason={reasons.start}
+        starting={control.busy('orchestrator.start')}
+        onStart={() => setStartOpen(true)}
       />
       {orchestratorCard(view)}
     </div>
@@ -270,7 +278,12 @@ function FleetWorkspace() {
       description={`${EMPTY_FLEET_DESCRIPTION} AgentDock does not create agents itself: queue an issue and the orchestrator dispatches it.`}
       action={
         <div className="flex flex-wrap items-center justify-center gap-3">
-          {newIssueAction}
+          {canOperate ? (
+            // Glass: New issue in the header is the screen's solid.
+            <Button variant="glass" onClick={() => setCreating(true)}>
+              New issue
+            </Button>
+          ) : null}
           <Link
             href={plannerBriefHref(projectId, NEXT_WAVE_BRIEF)}
             className="text-sm text-accent-ink underline"
@@ -282,9 +295,8 @@ function FleetWorkspace() {
     />
   );
 
-  const boardIssue = fleet.data?.boardError
-    ? boardErrorView(fleet.data.boardError)
-    : null;
+  const emptyView = (view: FleetView) =>
+    showChecklist ? notRunning(view) : queueEmpty;
 
   return (
     <div className="flex flex-col gap-4">
@@ -295,6 +307,7 @@ function FleetWorkspace() {
         counts={counts}
         view={workspace.view}
         canOperate={canOperate}
+        newIssuePrimary={!showChecklist}
         onNewIssue={() => setCreating(true)}
         {...(desktop &&
         workspace.view === 'canvas' &&
@@ -305,20 +318,8 @@ function FleetWorkspace() {
       />
       {project ? <RunnerOfflineBanner project={project} /> : null}
       <BudgetExceededBanner projectId={projectId} />
-      {boardIssue ? (
-        <Banner
-          tone="warn"
-          title={boardIssue.title}
-          action={
-            <Button
-              variant="glass"
-              size="sm"
-              onClick={() => open(ORCHESTRATOR_KEY)}
-            >
-              Show detail
-            </Button>
-          }
-        />
+      {fleet.data?.boardError ? (
+        <BoardErrorBanner error={fleet.data.boardError} />
       ) : null}
 
       {/* A row: the workspace, then the agent panel as its last child. */}
@@ -340,11 +341,7 @@ function FleetWorkspace() {
                   projectId={projectId}
                   active={view.slots}
                   version={version}
-                  nobodyYet={
-                    view.orchestrator.status === 'absent'
-                      ? notRunning(view)
-                      : queueEmpty
-                  }
+                  nobodyYet={emptyView(view)}
                   onSelect={open}
                 />
               ) : (
@@ -356,11 +353,7 @@ function FleetWorkspace() {
                       'The table view (View → All slots) still lists every slot.',
                   }}
                   isEmpty={(g) => g.nodes.length <= 1}
-                  empty={
-                    view.orchestrator.status === 'absent'
-                      ? notRunning(view)
-                      : queueEmpty
-                  }
+                  empty={emptyView(view)}
                   skeleton={<Skeleton className="h-96 w-full" />}
                 >
                   {(g) =>
@@ -450,6 +443,17 @@ function FleetWorkspace() {
           {fleet.data ? orchestratorCard(fleet.data) : null}
         </SheetContent>
       </SheetRoot>
+
+      {canOperate ? (
+        <StartOrchestratorDialog
+          control={control}
+          isAdmin={isAdmin}
+          settings={settings.data}
+          open={startOpen}
+          onOpenChange={setStartOpen}
+          onStarted={() => setVersion((v) => v + 1)}
+        />
+      ) : null}
 
       {canOperate ? (
         <NewIssueDialog

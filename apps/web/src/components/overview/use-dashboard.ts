@@ -4,7 +4,10 @@ import type {
   ActivityPage,
   ApprovalsView,
   FleetView,
+  OrchestratorSettingsView,
   ProjectSummary,
+  RunPage,
+  RunSummary,
   UsageSummaryResponse,
   UsageTimeseriesResponse,
 } from '@agentdock/shared';
@@ -23,41 +26,67 @@ const REFRESH_MS = 30_000;
 const RECENT_LIMIT = 8;
 /** Merges in one day across every project; more than this is not a glance. */
 const MERGED_LIMIT = 200;
+/** The newest failed runs per project; "Needs you" shows the last 24 h of them. */
+const FAILED_RUNS_LIMIT = 20;
 
 export interface ProjectFacts {
   fleets: Map<string, FleetView>;
   approvals: Map<string, ApprovalsView>;
-  /** Projects whose fleet or approvals did not answer — never shown as zero. */
+  /** Each project's latest failed runs; "Needs you" keeps the last 24 h. */
+  failedRuns: Map<string, RunSummary[]>;
+  /** Projects whose orchestrator has no profile, its own or the default. */
+  missingProfile: Set<string>;
+  /** Projects where any of these did not answer — never shown as zero. */
   failed: ProjectSummary[];
 }
 
 /**
- * Every project's fleet and approvals. One project failing does not fail the
- * rest: its id goes in `failed` and the page says so beside the figures.
+ * Every project's fleet, approvals, failed runs and orchestrator settings.
+ * One project failing does not fail the rest: its id goes in `failed` and the
+ * page says so beside the figures.
  */
 async function loadProjectFacts(
   projects: ProjectSummary[],
 ): Promise<ProjectFacts> {
   const results = await Promise.all(
     projects.map(async (project) => {
-      const [fleet, approvals] = await Promise.allSettled([
-        api<FleetView>(`/projects/${project.id}/fleet`),
-        api<ApprovalsView>(`/projects/${project.id}/approvals`),
+      const base = `/projects/${project.id}`;
+      const [fleet, approvals, runs, settings] = await Promise.allSettled([
+        api<FleetView>(`${base}/fleet`),
+        api<ApprovalsView>(`${base}/approvals`),
+        api<RunPage>(`${base}/runs?status=failed&limit=${FAILED_RUNS_LIMIT}`),
+        api<OrchestratorSettingsView>(`${base}/orchestrator/settings`),
       ]);
-      return { project, fleet, approvals };
+      return { project, fleet, approvals, runs, settings };
     }),
   );
   const facts: ProjectFacts = {
     fleets: new Map(),
     approvals: new Map(),
+    failedRuns: new Map(),
+    missingProfile: new Set(),
     failed: [],
   };
-  for (const { project, fleet, approvals } of results) {
+  for (const { project, fleet, approvals, runs, settings } of results) {
     if (fleet.status === 'fulfilled') facts.fleets.set(project.id, fleet.value);
     if (approvals.status === 'fulfilled') {
       facts.approvals.set(project.id, approvals.value);
     }
-    if (fleet.status === 'rejected' || approvals.status === 'rejected') {
+    if (runs.status === 'fulfilled') {
+      facts.failedRuns.set(project.id, runs.value.items);
+    }
+    if (
+      settings.status === 'fulfilled' &&
+      settings.value.effectiveProfile === null
+    ) {
+      facts.missingProfile.add(project.id);
+    }
+    if (
+      fleet.status === 'rejected' ||
+      approvals.status === 'rejected' ||
+      runs.status === 'rejected' ||
+      settings.status === 'rejected'
+    ) {
       facts.failed.push(project);
     }
   }

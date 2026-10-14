@@ -11,25 +11,32 @@ import {
   MenuTrigger,
 } from '@andrewbehma/glass-ui/menu';
 import { MetaBar } from '@andrewbehma/glass-ui/meta-bar';
+import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
-import { LayoutGrid, Maximize, Network, Settings } from 'lucide-react';
+import { LayoutGrid, Maximize, Settings } from 'lucide-react';
 import Link from 'next/link';
+import { PageHeader } from '../../../../../components/page-header/page-header';
+import { useLivePaused } from '../../../../../components/shell/live-status';
 import { LiveStatusBadge } from '../../../../../components/shell/live-status-badge';
 import { orchestratorSettingsHref } from '../../../../../lib/control/reasons';
+import { ORCHESTRATOR_STATUS_LABEL } from '../../../../../lib/fleet/format';
 import {
   type FleetCounts,
   fleetCounters,
-  ORCHESTRATOR_HEADER_STATUS,
-  ORCHESTRATOR_PILL_LABEL,
 } from '../../../../../lib/fleet/graph';
 import type { WorkspaceView } from '../../../../../lib/fleet/workspace-url';
+import { ORCHESTRATOR_PILL_STATUS } from '../../../../../lib/status/pill';
 
 const VIEW_LABEL: Record<WorkspaceView, string> = {
   canvas: 'Agent tree',
   list: 'All slots (table)',
 };
 
-/** The workspace's header (#160): who, how it is doing, and what to do next. */
+/**
+ * The workspace's header (#160, #213): the shared `PageHeader`, the
+ * orchestrator's state beside the title in the one vocabulary the card and
+ * the canvas use, and the fleet's counters in `meta`.
+ */
 export function FleetHeader({
   projectId,
   title,
@@ -37,6 +44,7 @@ export function FleetHeader({
   counts,
   view,
   canOperate,
+  newIssuePrimary,
   onNewIssue,
   onFit,
   onViewChange,
@@ -47,32 +55,45 @@ export function FleetHeader({
   counts: FleetCounts | undefined;
   view: WorkspaceView;
   canOperate: boolean;
+  /**
+   * New issue is the screen's one solid button, except on an empty fleet,
+   * where the first-project checklist's Start is (#213).
+   */
+  newIssuePrimary: boolean;
   onNewIssue: () => void;
   /** Absent while there is no canvas to fit. */
   onFit?: () => void;
   onViewChange: (view: WorkspaceView) => void;
 }) {
+  const live = useLivePaused();
+  // The top bar's dot says "live"; the page speaks up only when it is not.
+  const notLive = live.status !== 'connected' || live.paused;
   return (
-    <MetaBar
-      // MetaBar's title column is `flex-1` (basis 0), so on a phone the row
-      // never wraps and the title is squeezed instead; the actions take a row
-      // of their own until glass-ui gives the column a basis.
-      className="max-sm:[&>[data-meta-actions]]:basis-full"
+    <PageHeader
+      className="mb-0"
       title={title}
-      icon={Network}
       description="The orchestrator and the agents it runs on this project."
       {...(orchestrator
         ? {
-            status: ORCHESTRATOR_HEADER_STATUS[orchestrator],
-            statusLabel: ORCHESTRATOR_PILL_LABEL[orchestrator],
+            status: (
+              <StatusPill
+                status={ORCHESTRATOR_PILL_STATUS[orchestrator]}
+                label={ORCHESTRATOR_STATUS_LABEL[orchestrator]}
+              />
+            ),
           }
         : {})}
-      {...(counts ? { counters: fleetCounters(counts) } : {})}
+      {...(counts
+        ? { meta: <MetaBar counters={fleetCounters(counts)} /> }
+        : {})}
       actions={
         <div className="flex flex-wrap items-center gap-2">
-          <LiveStatusBadge />
+          {notLive ? <LiveStatusBadge /> : null}
           {canOperate ? (
-            <Button variant="solid" onClick={onNewIssue}>
+            <Button
+              variant={newIssuePrimary ? 'solid' : 'glass'}
+              onClick={onNewIssue}
+            >
               New issue
             </Button>
           ) : null}

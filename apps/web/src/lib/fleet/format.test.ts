@@ -79,9 +79,12 @@ describe('formatAheadBehind / formatOccupancy / formatRound', () => {
     expect(formatAheadBehind(3, null)).toBe('↑3 ↓0');
   });
 
-  test('occupancy', () => {
-    expect(formatOccupancy(null)).toBe('—');
-    expect(formatOccupancy({ occupied: 2, max: 4 })).toBe('2 / 4');
+  test('occupancy is the active slots out of the round’s max, not the board’s figure (#213)', () => {
+    expect(formatOccupancy(0, null)).toBe('0');
+    expect(formatOccupancy(2, { max: 4 })).toBe('2 / 4');
+    // The audit: a stale board said 5 of 5 while no slot was active.
+    const staleBoard = { occupied: 5, max: 5 };
+    expect(formatOccupancy(0, staleBoard)).toBe('0 / 5');
   });
 
   test('round label', () => {

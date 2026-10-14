@@ -5,7 +5,7 @@ import {
   ActionList,
   type ActionListItem,
 } from '@andrewbehma/glass-ui/action-list';
-import { Button } from '@andrewbehma/glass-ui/button';
+import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import {
   FilePlus2,
@@ -65,16 +65,29 @@ export function QuickActions({
   const canStopOrchestrator =
     showStopControl(orchestrator) && reasons.stop === null;
 
+  /** A confirmed stop is in flight; the dialog stays open until it returns. */
+  const [working, setWorking] = useState(false);
+
   const pause = async () => {
-    setConfirm(null);
-    await control.stop();
+    setWorking(true);
+    try {
+      await control.stop();
+    } finally {
+      setWorking(false);
+      setConfirm(null);
+    }
   };
 
   const stopAll = async () => {
-    setConfirm(null);
-    // The orchestrator first, so it does not dispatch into the slots stopping.
-    if (canStopOrchestrator) await control.stop();
-    await Promise.all(liveSlots.map((slot) => control.stopSlot(slot)));
+    setWorking(true);
+    try {
+      // The orchestrator first, so it does not dispatch into the slots stopping.
+      if (canStopOrchestrator) await control.stop();
+      await Promise.all(liveSlots.map((slot) => control.stopSlot(slot)));
+    } finally {
+      setWorking(false);
+      setConfirm(null);
+    }
   };
 
   const items: ActionListItem[] = [];
@@ -173,61 +186,40 @@ export function QuickActions({
         </DialogContent>
       </DialogRoot>
 
-      <DialogRoot
+      <ConfirmDialog
         open={confirm === 'pause'}
         onOpenChange={(open) => setConfirm(open ? 'pause' : null)}
-      >
-        <DialogContent
-          title="Pause all?"
-          description="Stops the orchestrator, so nothing new is dispatched. Workers keep running, and no worktree, branch or slot is touched. Start it again to resume."
-          footer={
-            <>
-              <Button variant="ghost" onClick={() => setConfirm(null)}>
-                Cancel
-              </Button>
-              <Button variant="solid" onClick={pause}>
-                Stop the orchestrator
-              </Button>
-            </>
-          }
-        >
-          <p className="text-sm text-ink-2">
-            Any prompt the orchestrator is in the middle of is lost.
-          </p>
-        </DialogContent>
-      </DialogRoot>
+        title="Pause all?"
+        consequence="Stops the orchestrator, so nothing new is dispatched, and any prompt it is in the middle of is lost. Workers keep running, and no worktree, branch or slot is touched. Start it again to resume."
+        verb="Pause"
+        busy={working}
+        onConfirm={pause}
+      />
 
-      <DialogRoot
+      <ConfirmDialog
         open={confirm === 'stop-all'}
         onOpenChange={(open) => setConfirm(open ? 'stop-all' : null)}
-      >
-        <DialogContent
-          title="Stop everything?"
-          description="Kills the sessions below. Worktrees and branches are kept; commits are not lost."
-          footer={
-            <>
-              <Button variant="ghost" onClick={() => setConfirm(null)}>
-                Cancel
-              </Button>
-              <Button variant="solid" onClick={stopAll}>
-                Stop all
-              </Button>
-            </>
-          }
-        >
-          <ul className="flex flex-col gap-1 text-sm">
-            {canStopOrchestrator ? <li>The orchestrator</li> : null}
-            {liveSlots.map((slot) => (
-              <li key={slot}>
-                Slot <span className="font-mono">{slot}</span>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-3 text-sm text-ink-2">
-            Unsaved work in each session is lost.
-          </p>
-        </DialogContent>
-      </DialogRoot>
+        title="Stop everything?"
+        consequence={
+          <div className="flex flex-col gap-3 text-sm">
+            <p className="text-ink-2">
+              Kills these sessions; unsaved work in each is lost. Worktrees and
+              branches are kept, and commits are not lost.
+            </p>
+            <ul className="flex flex-col gap-1">
+              {canStopOrchestrator ? <li>The orchestrator</li> : null}
+              {liveSlots.map((slot) => (
+                <li key={slot}>
+                  Slot <span className="font-mono">{slot}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        }
+        verb="Stop all"
+        busy={working}
+        onConfirm={stopAll}
+      />
     </>
   );
 }

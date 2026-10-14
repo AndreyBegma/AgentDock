@@ -8,6 +8,7 @@ import {
   openSlot,
   parseWorkspace,
   setView,
+  slotHref,
   toSearch,
   type WorkspaceState,
 } from './workspace-url';
@@ -137,5 +138,21 @@ describe('transitions', () => {
     expect(closeAll(copy)).toEqual({ open: [], focus: null, view: 'list' });
     expect(blur(copy)).toEqual({ ...copy, focus: null });
     expect(setView(copy, 'canvas').view).toBe('canvas');
+  });
+});
+
+describe('slotHref', () => {
+  test('opens the slot in front, and parses back to it', () => {
+    const href = slotHref('p1', 'i42');
+    expect(href).toBe('/projects/p1/fleet?open=i42&focus=i42');
+    expect(parse(href.split('?')[1] ?? '')).toEqual({
+      open: ['i42'],
+      focus: 'i42',
+      view: 'canvas',
+    });
+  });
+
+  test('a name that is not a slot opens the Fleet alone', () => {
+    expect(slotHref('p1', 'Not A Slot')).toBe('/projects/p1/fleet');
   });
 });

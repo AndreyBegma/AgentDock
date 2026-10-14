@@ -163,7 +163,9 @@ export function ChatTab({
             </p>
           ) : null}
           <ChatThread
-            className="h-[60vh] max-h-[40rem] min-h-80"
+            // The thread takes what the sticky panel leaves under its header
+            // and tabs, so the composer is on screen without scrolling (#213).
+            className="h-[calc(100dvh-22rem)] max-h-[48rem] min-h-72"
             messages={messages}
             renderBody={(m) => {
               const message = byId.get(m.id);

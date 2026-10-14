@@ -1,13 +1,13 @@
 'use client';
 
 import { Button } from '@andrewbehma/glass-ui/button';
-import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { useState } from 'react';
 import { COMMAND_PENDING_LABEL } from '../../../../../../lib/control/format';
 import type { useControl } from '../../../../../../lib/control/use-control';
 import { PendingLabel } from '../pending-label';
 
-/** Stop slot, with the confirmation the slot sheet had (spec 17 D8). */
+/** Stop slot, with the confirmation the slot sheet had (spec 17 D8, #213). */
 export function StopSlot({
   slot,
   control,
@@ -19,8 +19,8 @@ export function StopSlot({
   const busy = control.busy('slot.stop', slot);
 
   const stop = async () => {
-    setOpen(false);
     await control.stopSlot(slot);
+    setOpen(false);
   };
 
   return (
@@ -38,26 +38,15 @@ export function StopSlot({
           Stop slot
         </Button>
       </div>
-      <DialogRoot open={open} onOpenChange={setOpen}>
-        <DialogContent
-          title={`Stop slot ${slot}?`}
-          description="Only the worker’s session is killed. The worktree and branch are kept; the orchestrator will resume or clean up."
-          footer={
-            <>
-              <Button variant="ghost" onClick={() => setOpen(false)}>
-                Cancel
-              </Button>
-              <Button variant="solid" onClick={stop}>
-                Stop slot
-              </Button>
-            </>
-          }
-        >
-          <p className="text-sm text-ink-2">
-            Unsaved work in the session is lost; commits are not.
-          </p>
-        </DialogContent>
-      </DialogRoot>
+      <ConfirmDialog
+        open={open}
+        onOpenChange={setOpen}
+        title={`Stop slot ${slot}?`}
+        consequence="Only the worker’s session is killed, and unsaved work in it is lost. The worktree, the branch and the commits are kept; the orchestrator will resume or clean up."
+        verb="Stop"
+        busy={busy}
+        onConfirm={stop}
+      />
     </>
   );
 }

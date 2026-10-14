@@ -2,14 +2,17 @@ import { describe, expect, test } from 'bun:test';
 import { type ConversationEntry, FLEET_ERROR } from '@agentdock/shared';
 import { ApiError } from '../api';
 import {
+  briefRoundLabel,
   chatMessageOf,
   chatMessages,
   describeWorktreeError,
   formatLineCounts,
+  isRunnerOutdated,
   lastLocalChecks,
   messageOutcome,
   ORCHESTRATOR_AUTHOR,
   OUTBOX_AUTHOR,
+  parseSlotTab,
   SLOT_PANEL_TABS,
   shortSha,
   usesWorktree,
@@ -77,10 +80,29 @@ describe('describeWorktreeError', () => {
       describeWorktreeError(
         apiError(409, FLEET_ERROR.worktreeUnavailable, 'path_not_allowed'),
       ),
-    ).toContain('(path_not_allowed)');
+    ).toBe('The runner could not read this worktree. Refresh to try again.');
     expect(
       describeWorktreeError(apiError(404, FLEET_ERROR.slotNotFound)),
     ).toContain('no run yet');
+  });
+
+  test('unknown_command says "Update the runner", never the raw error (#213)', () => {
+    const outdated = apiError(
+      409,
+      FLEET_ERROR.worktreeUnavailable,
+      'unknown_command: unknown command: worktree.status',
+    );
+    expect(isRunnerOutdated(outdated)).toBe(true);
+    expect(describeWorktreeError(outdated)).toContain('Update the runner');
+    expect(describeWorktreeError(outdated)).not.toContain('unknown_command');
+    expect(
+      isRunnerOutdated(
+        apiError(409, FLEET_ERROR.worktreeUnavailable, 'path_not_allowed'),
+      ),
+    ).toBe(false);
+    expect(isRunnerOutdated(apiError(409, FLEET_ERROR.runnerOffline))).toBe(
+      false,
+    );
   });
 
   test('a network failure is the app-wide sentence', () => {
@@ -178,4 +200,17 @@ describe('messageOutcome', () => {
 
 test('shortSha', () => {
   expect(shortSha('0b6445a1234567890')).toBe('0b6445a');
+});
+
+test('the tab in the URL is one of the panel’s, else Chat (#213)', () => {
+  expect(parseSlotTab('files')).toBe('files');
+  expect(parseSlotTab('pane')).toBe('pane');
+  expect(parseSlotTab('nope')).toBe('chat');
+  expect(parseSlotTab(null)).toBe('chat');
+});
+
+test('the brief’s round is an id, not a timestamp (#213)', () => {
+  expect(briefRoundLabel('2026-10-14/1830')).toBe('Round 2026-10-14/1830');
+  expect(briefRoundLabel('2026-10-14/1830')).not.toContain('18:30');
+  expect(briefRoundLabel(null)).toBe('—');
 });
