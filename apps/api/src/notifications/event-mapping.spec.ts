@@ -200,6 +200,79 @@ describe('draftFor (spec 22 D1)', () => {
     ).toBeNull();
   });
 
+  describe('board cards (issue #242 D15)', () => {
+    const card = (type: string, data: object, source = 'api') =>
+      event({ type, source, slot: null, issue: null, data });
+
+    it('maps card.finished, naming the card and its PR, linking the card', () => {
+      const draft = draftFor(
+        card('card.finished', {
+          cardId: 'c1',
+          number: 12,
+          title: 'Add login',
+          round: 1,
+          finishedBy: 'worker',
+          prNumber: 77,
+          prUrl: 'https://github.com/acme/widget/pull/77',
+        }),
+      );
+      expect(draft).toEqual({
+        kind: 'card.finished',
+        slot: null,
+        issue: null,
+        title: 'C-12 "Add login" is finished',
+        body: 'PR #77 is ready for review.',
+        page: 'board',
+        card: 12,
+      });
+      expect(projectLink('p1', 'board', 12)).toBe('/projects/p1/board?card=12');
+    });
+
+    it('maps card.finished without a PR', () => {
+      expect(
+        draftFor(
+          card('card.finished', {
+            number: 3,
+            title: 'Fix it',
+            prNumber: null,
+          }),
+        ),
+      ).toMatchObject({
+        title: 'C-3 "Fix it" is finished',
+        body: 'Review it on the board: accept it, or send feedback.',
+      });
+    });
+
+    it('maps card.waiting', () => {
+      expect(
+        draftFor(card('card.waiting', { number: 4, title: 'Add login' })),
+      ).toMatchObject({
+        kind: 'card.waiting',
+        title: 'C-4 "Add login" is waiting for you',
+        page: 'board',
+        card: 4,
+      });
+    });
+
+    it('never copies more than the title, and only the first line of it', () => {
+      const draft = draftFor(
+        card('card.waiting', {
+          number: 4,
+          title: 'Add login\nsecret prompt text',
+          summary: 'secret summary',
+        }),
+      );
+      expect(JSON.stringify(draft)).not.toContain('secret');
+    });
+
+    it('does not let a runner forge a card event, and needs a number', () => {
+      for (const type of ['card.finished', 'card.waiting']) {
+        expect(draftFor(card(type, { number: 1 }, 'runner'))).toBeNull();
+        expect(draftFor(card(type, { title: 'x' }))).toBeNull();
+      }
+    });
+  });
+
   it.each([
     'events.duplicate',
     'events.unparsed',

@@ -33,7 +33,10 @@ export const EMPTY_USAGE: RunUsage = {
  * - a plan turn (spec 172 D14): the Claude session it ran in — the task's
  *   fork for a task turn, else the plan's — by its id on the project's
  *   runner. The plan worktree sits outside the project root, so the session
- *   has no `projectId` to match on.
+ *   has no `projectId` to match on;
+ * - a board card round (issue #242 D4): the card's Claude session, by its id
+ *   on the project's runner. Every round resumes the same session, so the
+ *   run's window is what splits its requests between rounds.
  * Skill runs record no session id, so they have no usage yet.
  */
 const RUN_SESSIONS = Prisma.sql`
@@ -49,7 +52,15 @@ const RUN_SESSIONS = Prisma.sql`
   JOIN projects pr ON pr.id = p."projectId"
   JOIN sessions se2 ON se2."runnerId" = pr."runnerId"
     AND se2.runtime = 'claude'
-    AND se2."externalId" = COALESCE(t."sessionId", p."sessionId")::text`;
+    AND se2."externalId" = COALESCE(t."sessionId", p."sessionId")::text
+  UNION ALL
+  SELECT cr."runId", se2.id
+  FROM board_card_rounds cr
+  JOIN board_cards c ON c.id = cr."cardId"
+  JOIN projects pr ON pr.id = c."projectId"
+  JOIN sessions se2 ON se2."runnerId" = pr."runnerId"
+    AND se2.runtime = 'claude'
+    AND se2."externalId" = c."sessionId"::text`;
 
 /**
  * The requests of a run (spec 21 D8): of its sessions, the `llm_requests`

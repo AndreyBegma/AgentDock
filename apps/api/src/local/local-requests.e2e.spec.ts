@@ -19,6 +19,8 @@ import { createUser, resetDatabase, type Session } from '../test/e2e-app';
 const ROOT = '/srv/dev/widget';
 const OTHER_ROOT = '/srv/dev/gadget';
 const ISSUE_URL = 'https://github.com/acme/widget/issues';
+/** A board card worker's Claude session (issue #242 D6). */
+const CARD_SESSION = '0b7e7c1e-5d0f-4c1a-9a51-2f3c4d5e6f70';
 
 /** The args each method is called with in the all-methods sweep. */
 const ARGS: Record<LocalMethodName, unknown> = {
@@ -72,6 +74,7 @@ describe('local requests over the runner socket (e2e)', () => {
     method: string,
     args: unknown,
     project: string | null = projectId,
+    sessionId = 'sess-manual-1',
   ): Promise<LocalResponseMessage> => {
     nextId += 1;
     const id = `lr_${nextId}`;
@@ -81,7 +84,7 @@ describe('local requests over the runner socket (e2e)', () => {
       method,
       args,
       ...(project ? { projectId: project } : {}),
-      session: { runtime: 'claude', id: 'sess-manual-1' },
+      session: { runtime: 'claude', id: sessionId },
       via: 'mcp',
     });
     for (;;) {
@@ -123,6 +126,39 @@ describe('local requests over the runner socket (e2e)', () => {
             },
       );
     }
+  };
+
+  /** Card C-1 of the project, its worker running in `CARD_SESSION`. */
+  const seedCardSession = async () => {
+    const now = new Date();
+    const run = await ctx.prisma.run.create({
+      data: {
+        kind: 'card',
+        projectId,
+        status: 'running',
+        triggeredByType: 'user',
+        startedAt: now,
+        updatedAt: now,
+      },
+    });
+    await ctx.prisma.boardCard.create({
+      data: {
+        projectId,
+        number: 1,
+        shortId: 'abcd1234',
+        title: 'Add login',
+        column: 'in_progress',
+        position: 0,
+        issueOnRun: false,
+        specOnRun: false,
+        sessionId: CARD_SESSION,
+        branch: 'card/c1-add-login',
+        movedAt: now,
+        rounds: {
+          create: { round: 1, runId: run.id, trigger: 'run', phase: 'running' },
+        },
+      },
+    });
   };
 
   beforeAll(async () => {
@@ -179,9 +215,10 @@ describe('local requests over the runner socket (e2e)', () => {
     });
     const responses = new Map<LocalMethodName, LocalResponseMessage>();
     let actionId = '';
+    // `card.finish` asks from the session of a board card's running worker.
+    await seedCardSession();
     // `action.request` first: `action.status` asks about the request it made.
-    // `card.finish` needs a card session; the board's own e2e covers it.
-    const swept = localMethodNames.filter((m) => m !== 'card.finish');
+    const swept = localMethodNames;
     const order = [
       'action.request',
       ...swept.filter((m) => m !== 'action.request'),
@@ -192,6 +229,7 @@ describe('local requests over the runner socket (e2e)', () => {
         method,
         args,
         localMethods[method].needsProject ? projectId : null,
+        method === 'card.finish' ? CARD_SESSION : undefined,
       );
       expect([method, response.ok, response.error]).toEqual([
         method,
@@ -226,6 +264,10 @@ describe('local requests over the runner socket (e2e)', () => {
       args: { mode: 'next' },
     });
     expect(responses.get('away.set')?.data).toEqual({ awayMode: true });
+    expect(responses.get('card.finish')?.data).toEqual({
+      number: 1,
+      finished: true,
+    });
 
     // The writes acted as the local user, through the runner.
     expect(commands.map((c) => [c.name, c.args.queue])).toEqual([
@@ -264,6 +306,7 @@ describe('local requests over the runner socket (e2e)', () => {
       ['issue.create', 'ok', localUserId, 'mcp'],
       ['activity.note', 'ok', localUserId, 'mcp'],
       ['handoff.create', 'ok', localUserId, 'mcp'],
+      ['card.finish', 'ok', localUserId, 'mcp'],
       ['away.set', 'ok', localUserId, 'mcp'],
     ]);
     const issueAudit = await ctx.prisma.auditRecord.findFirst({
@@ -271,6 +314,25 @@ describe('local requests over the runner socket (e2e)', () => {
       orderBy: { seq: 'asc' },
     });
     expect(issueAudit?.actorRunnerId).toBe(runnerId);
+  });
+
+  it('answers card.finish from a session that is not a card worker with not_a_card_session', async () => {
+    await seedCardSession();
+    const manual = await ask('card.finish', { summary: 'Done.' });
+    expect(manual.error?.code).toBe('not_a_card_session');
+    // The card's session, but asked about another project: not this card.
+    const elsewhere = await ask(
+      'card.finish',
+      { summary: 'Done.' },
+      otherRunnerProject,
+      CARD_SESSION,
+    );
+    expect(elsewhere.ok).toBe(false);
+    const card = await ctx.prisma.boardCard.findFirstOrThrow({
+      include: { rounds: true },
+    });
+    expect(card.column).toBe('in_progress');
+    expect(card.rounds[0].phase).toBe('running');
   });
 
   it('pushes away mode to the runner in `config`', async () => {

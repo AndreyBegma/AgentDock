@@ -1,4 +1,7 @@
 import {
+  CARD_FINISHED_EVENT,
+  CARD_WAITING_EVENT,
+  cardLabel,
   type NotificationKind,
   SCHEDULE_DISABLED_LIVE_EVENT,
 } from '@agentdock/shared';
@@ -36,7 +39,9 @@ export interface NotificationDraft {
   title: string;
   body: string;
   /** Which project page the link opens. */
-  page: 'fleet' | 'overview' | 'schedules';
+  page: 'fleet' | 'overview' | 'schedules' | 'board';
+  /** `board`: the card the link opens (`?card=<number>`). */
+  card?: number;
 }
 
 /**
@@ -236,6 +241,41 @@ export const draftFor = (event: MatchableEvent): NotificationDraft | null => {
         page: 'schedules',
       };
     }
+    // Issue #242 D15: only the API records these; they name the card and its
+    // PR, never prompt or summary text.
+    case CARD_FINISHED_EVENT:
+    case CARD_WAITING_EVENT: {
+      if (event.source !== API_EVENT_SOURCE) return null;
+      const number = positiveInt(data.number);
+      if (!number) return null;
+      const title = oneLine(data.title, 120);
+      const card = title
+        ? `${cardLabel(number)} "${title}"`
+        : `Card ${cardLabel(number)}`;
+      if (event.type === CARD_WAITING_EVENT) {
+        return {
+          kind: 'card.waiting',
+          slot: null,
+          issue: null,
+          title: `${card} is waiting for you`,
+          body: 'Its worker stopped and waits for a reply in its session.',
+          page: 'board',
+          card: number,
+        };
+      }
+      const pr = positiveInt(data.prNumber);
+      return {
+        kind: 'card.finished',
+        slot: null,
+        issue: null,
+        title: `${card} is finished`,
+        body: pr
+          ? `PR #${pr} is ready for review.`
+          : 'Review it on the board: accept it, or send feedback.',
+        page: 'board',
+        card: number,
+      };
+    }
     default:
       return null;
   }
@@ -272,7 +312,11 @@ export const blockedCheckpointDraft = (
 export const projectLink = (
   projectId: string,
   page: NotificationDraft['page'],
+  card?: number,
 ): string => {
+  if (page === 'board') {
+    return `/projects/${projectId}/board${card ? `?card=${card}` : ''}`;
+  }
   if (page === 'fleet') return `/projects/${projectId}/fleet`;
   if (page === 'schedules') return `/projects/${projectId}/schedules`;
   return `/projects/${projectId}`;

@@ -44,6 +44,9 @@ const targetOf = (
   if (dto.kind !== 'manual' && dto.sessionId !== undefined) {
     throw new BadRequestException(`sessionId is only allowed with kind manual`);
   }
+  if (dto.kind !== 'card' && dto.cardId !== undefined) {
+    throw new BadRequestException(`cardId is only allowed with kind card`);
+  }
   switch (dto.kind) {
     case 'manual':
       return { kind: 'manual', ...base, sessionId: sessionId ?? '' };
@@ -54,8 +57,7 @@ const targetOf = (
     case 'skill_run':
       return { kind: 'skill_run', ...base, runId: dto.runId ?? '' };
     case 'card':
-      // Issue #242: the ticket DTO does not accept `card` until the board lands.
-      throw new BadRequestException('kind card is not supported yet');
+      return { kind: 'card', ...base, cardId: dto.cardId ?? '' };
   }
 };
 
@@ -90,6 +92,7 @@ export class TerminalService {
       },
     });
     if (!project) throw projectNotFound();
+    await this.assertCard(dto);
     const target = targetOf(
       dto,
       project.rootPath,
@@ -154,6 +157,26 @@ export class TerminalService {
       );
     }
     return session.externalId;
+  }
+
+  /**
+   * Issue #242: a `card` target names a card of this project; another
+   * project's card, or none, is 404 before a ticket exists. The runner checks
+   * again and attaches only that card's `agentdock-card-*` session.
+   */
+  private async assertCard(dto: TerminalTicketDto): Promise<void> {
+    if (dto.kind !== 'card') return;
+    const card = await this.prisma.boardCard.findFirst({
+      where: { id: dto.cardId ?? '', projectId: dto.projectId },
+      select: { id: true },
+    });
+    if (!card) {
+      throw terminalError(
+        404,
+        TERMINAL_ERROR.notFound,
+        'No card with that id in this project',
+      );
+    }
   }
 
   async active(

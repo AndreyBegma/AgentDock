@@ -10,6 +10,7 @@ import {
 } from '@agentdock/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
+import { BoardService } from '../board/board.service';
 import { type BudgetRemaining, BudgetsService } from '../budgets';
 import { PrismaService } from '../database/prisma.service';
 import { QueueService } from '../queue/queue.service';
@@ -77,6 +78,7 @@ export class LocalHandlers {
     private readonly queue: QueueService,
     private readonly requests: ActionRequestsService,
     private readonly runnerSettings: RunnerSettingsService,
+    private readonly board: BoardService,
   ) {}
 
   readonly table: LocalHandlerTable = {
@@ -94,11 +96,32 @@ export class LocalHandlers {
     'handoff.create': (args, call) => this.handoff(args, call),
     'action.request': (args, call) => this.actionRequest(args, call),
     'away.set': (args, call) => this.awaySet(args.on, call),
-    // Issue #242: no session is a card's until the board module handles it.
-    'card.finish': async () => {
-      throw new LocalError('not_a_card_session', 'not a board card session');
-    },
+    'card.finish': (args, call) => this.cardFinish(args.summary, call),
   };
+
+  /**
+   * Issue #242 D6: the card worker's `finish_card`. The card is the one whose
+   * Claude session asks, in the asking runner's project — never an argument.
+   */
+  private async cardFinish(
+    summary: string,
+    call: LocalCall,
+  ): Promise<LocalMethodResult<'card.finish'>> {
+    const project = projectOf(call);
+    const session = call.session;
+    const finished =
+      session && session.runtime === 'claude'
+        ? await this.board.finishByWorker(
+            { id: project.id, runnerId: call.runnerId },
+            session.id,
+            summary,
+          )
+        : null;
+    if (!finished) {
+      throw new LocalError('not_a_card_session', 'not a board card session');
+    }
+    return { number: finished.number, finished: true };
+  }
 
   /** D16: plain text for the `SessionStart` hook, at most 2 000 characters. */
   private async sessionStart(
