@@ -28,6 +28,7 @@ import { TelegramModule } from './telegram';
 import { TerminalModule } from './terminal';
 import { UsageModule } from './usage/usage.module';
 import { WebhooksModule } from './webhooks';
+import { WorkflowsModule } from './workflows';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { WebhooksModule } from './webhooks';
     ProjectsModule,
     FleetModule,
     SessionsModule,
+    WorkflowsModule,
     UsageModule,
     PricesModule,
     QueueModule,
