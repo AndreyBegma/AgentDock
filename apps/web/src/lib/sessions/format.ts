@@ -1,6 +1,8 @@
 import {
   SESSION_ERROR,
   type SessionListQuery,
+  type SessionLiveState,
+  type SessionOrigin,
   type SessionRequestNode,
   type SessionToolNode,
   type SessionTotals,
@@ -8,6 +10,7 @@ import {
   type SessionTurnNode,
 } from '@agentdock/shared';
 import type { QuerySource, Runtime } from '@agentdock/shared/protocol';
+import type { Status } from '@andrewbehma/glass-ui/status-pill';
 import type { TraceNode } from '@andrewbehma/glass-ui/trace-tree';
 import { ApiError, describeError, type ErrorHint } from '../api';
 import {
@@ -47,6 +50,7 @@ export interface SessionFilterForm {
   runtime: string;
   model: string;
   slot: string;
+  origin: string;
   fromDate: string;
   toDate: string;
   unassigned: boolean;
@@ -57,9 +61,39 @@ export const EMPTY_FILTERS: SessionFilterForm = {
   runtime: '',
   model: '',
   slot: '',
+  origin: '',
   fromDate: '',
   toDate: '',
   unassigned: false,
+};
+
+/** Origins a person filters by; `unknown` is transcript-only and not a choice. */
+export const ORIGIN_FILTERS = ['manual', 'worker', 'run'] as const;
+
+export const ORIGIN_LABEL: Record<SessionOrigin, string> = {
+  unknown: 'Unknown',
+  manual: 'Manual',
+  worker: 'Worker',
+  run: 'Run',
+};
+
+/** Origin as the API may omit it: absent reads as `unknown`. */
+export const originOf = (s: { origin?: SessionOrigin }): SessionOrigin =>
+  s.origin ?? 'unknown';
+
+export const LIVE_STATE_LABEL: Record<SessionLiveState, string> = {
+  idle: 'Idle',
+  working: 'Working',
+  waiting: 'Waiting for you',
+  ended: 'Ended',
+};
+
+/** Live state on glass-ui's status scale; the same colours as slots and runs. */
+export const LIVE_STATE_PILL: Record<SessionLiveState, Status> = {
+  idle: 'idle',
+  working: 'running',
+  waiting: 'waiting',
+  ended: 'done',
 };
 
 /** `yyyy-mm-dd` from a date input as a local-time instant; `to` is exclusive. */
@@ -78,6 +112,7 @@ export function toQuery(form: SessionFilterForm): SessionListQuery {
   if (form.runtime) query.runtime = form.runtime as Runtime;
   if (form.model.trim()) query.model = form.model.trim();
   if (form.slot.trim()) query.slot = form.slot.trim();
+  if (form.origin) query.origin = form.origin as SessionOrigin;
   const from = dayBoundary(form.fromDate, false);
   const to = dayBoundary(form.toDate, true);
   if (from) query.from = from;
