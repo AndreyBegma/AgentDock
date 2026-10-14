@@ -27,10 +27,11 @@ const fingerprint = {
 };
 
 describe('uiprofile commands', () => {
-  it('both need an operator, and stay out of the allowlist until the runner handles them', () => {
+  it('both need an operator, and are in the allowlist the runner handles', () => {
     expect(uiprofileCommands['uiprofile.build'].minRole).toBe('operator');
     expect(uiprofileCommands['uiprofile.fingerprint'].minRole).toBe('operator');
-    expect(Object.hasOwn(commands, 'uiprofile.build')).toBe(false);
+    expect(Object.hasOwn(commands, 'uiprofile.build')).toBe(true);
+    expect(Object.hasOwn(commands, 'uiprofile.fingerprint')).toBe(true);
   });
 
   it('uiprofile.build takes the prompt as a field, never empty', () => {
