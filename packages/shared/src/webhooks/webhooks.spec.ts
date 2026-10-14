@@ -235,6 +235,33 @@ describe('buildWebhookEnvelope (D9, D10)', () => {
     ).toBeNull();
   });
 
+  it.each([
+    [
+      'schedule.failed',
+      { reason: 'runner_offline' },
+      { reason: 'runner_offline' },
+    ],
+    ['schedule.disabled', { disabledReason: 'failing' }, { reason: 'failing' }],
+  ])('maps the recorded %s event onto name and reason', (type, extra, out) => {
+    const envelope = buildWebhookEnvelope({
+      ...base,
+      type,
+      data: {
+        scheduleId: 's1',
+        scheduleName: 'Nightly',
+        firingId: '42',
+        kind: 'scheduled',
+        status: 'failed',
+        ...extra,
+      },
+    });
+    expect(envelope?.data).toEqual({
+      scheduleId: 's1',
+      name: 'Nightly',
+      ...out,
+    });
+  });
+
   it('drops values of the wrong type and keeps a null project', () => {
     const envelope = buildWebhookEnvelope({
       id: 'test_1',
