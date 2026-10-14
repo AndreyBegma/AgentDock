@@ -145,6 +145,8 @@ export const ACTION_GROUP_LABEL: Record<string, string> = {
   'local.': 'Claude Code',
   'action_request.': 'Action requests',
   'session_content.': 'Session content',
+  'card.': 'Board cards',
+  'board.': 'Board',
 };
 
 /** An action code as words; a code this build does not know shows as it came. */
