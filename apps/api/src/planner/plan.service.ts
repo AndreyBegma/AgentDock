@@ -7,6 +7,7 @@ import {
   type PlanDetail,
   type PlanListView,
   type PlanReviewDecision,
+  type PlanTaskVersionsView,
   type PlanVisibility,
   type Role,
 } from '@agentdock/shared';
@@ -26,9 +27,12 @@ import {
   toTaskView,
   toTurnView,
   turnInclude,
+  userRef,
+  userSelect,
 } from './plan-mapper';
 import { PlanStore } from './plan-store';
 import { type PlanCaller, PlanTurnService } from './plan-turn.service';
+import { toTaskVersionView, versionTurns } from './plan-versions';
 import { PlannerCommands } from './planner-commands';
 import { PlannerFailure, plannerError } from './planner-error';
 import { PlannerInstructionsService } from './planner-instructions.service';
@@ -189,6 +193,59 @@ export class PlanService {
       turns: turns.map(toTurnView),
       questions,
     });
+  }
+
+  /**
+   * D9: the plan versions a task appeared in, oldest first, each with the
+   * turn that produced it. Read through the same rule as the plan; a key no
+   * version holds is 404.
+   */
+  async taskVersions(
+    projectId: string,
+    userId: string,
+    planId: string,
+    key: string,
+  ): Promise<PlanTaskVersionsView> {
+    const plan = await this.store.readable(userId, projectId, planId);
+    const [rows, turns] = await Promise.all([
+      this.prisma.planTask.findMany({
+        where: { planId: plan.id, key },
+        orderBy: { planVersion: 'asc' },
+      }),
+      this.prisma.planTurn.findMany({
+        where: {
+          planId: plan.id,
+          action: { in: ['decompose', 'revise'] },
+          phase: 'succeeded',
+        },
+        select: {
+          id: true,
+          action: true,
+          author: userSelect,
+          finishedAt: true,
+          createdAt: true,
+        },
+      }),
+    ]);
+    if (rows.length === 0) {
+      throw plannerError(404, PLANNER_ERROR.notFound, 'Task not found');
+    }
+    const byVersion = versionTurns(
+      turns.map((t) => ({
+        id: t.id,
+        action: t.action === 'revise' ? 'revise' : 'decompose',
+        author: userRef(t.author),
+        finishedAt: t.finishedAt,
+        createdAt: t.createdAt,
+      })),
+    );
+    return {
+      key,
+      currentVersion: plan.version,
+      versions: rows.map((row) =>
+        toTaskVersionView(row, byVersion.get(row.planVersion) ?? null),
+      ),
+    };
   }
 
   /**
