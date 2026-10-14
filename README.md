@@ -13,7 +13,7 @@ request and every dollar in one web app, and lets you start, stop, approve and
 schedule them without opening a terminal.
 
 It is a self-hosted control plane for agent fleets driven by the
-[Code Sentinel](https://github.com/AndreyBegma/claude-code-plugin) orchestrator.
+[Code Sentinel](https://github.com/AndreyBegma/code-sentinel-skills) orchestrator.
 Without it, a fleet is a pile of tmux sessions, git worktrees, markdown files
 inside `.git` and GitHub labels — per project, per machine. Nothing shows the
 whole fleet, nothing remembers what ran, and nothing records what it cost.
