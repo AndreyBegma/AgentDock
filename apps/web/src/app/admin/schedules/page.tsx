@@ -8,7 +8,8 @@ import type {
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
-import { Field, Select } from '@andrewbehma/glass-ui/field';
+import { Select } from '@andrewbehma/glass-ui/field';
+import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import {
   Table,
@@ -16,11 +17,20 @@ import {
   TableHead,
   TableRow,
 } from '@andrewbehma/glass-ui/table';
+import { Toolbar } from '@andrewbehma/glass-ui/toolbar';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { PageHeader } from '../../../components/page-header/page-header';
 import { AsyncSection } from '../../../components/prerequisites/async-section';
 import { api } from '../../../lib/api';
+import {
+  type ChipDef,
+  type FilterCodec,
+} from '../../../lib/filters/url-filters';
+import {
+  useFilterChips,
+  useUrlFilters,
+} from '../../../lib/filters/use-url-filters';
 import { Time } from '../../../lib/format/time';
 import { formatFireTime } from '../../../lib/schedules/format';
 import { useSection } from '../../../lib/section/use-section';
@@ -31,6 +41,31 @@ import { ScheduleTable } from '../../(app)/projects/[projectId]/schedules/schedu
 const POLL_MS = 15_000;
 
 type EnabledFilter = 'all' | 'on' | 'off';
+
+interface ScheduleFilters {
+  enabled: EnabledFilter;
+}
+
+/** `?enabled=on|off`; "all" is the plain URL. */
+const FILTER_CODEC: FilterCodec<ScheduleFilters> = {
+  keys: ['enabled'],
+  parse: (params) => {
+    const value = params.get('enabled');
+    return { enabled: value === 'on' || value === 'off' ? value : 'all' };
+  },
+  search: ({ enabled }) => (enabled === 'all' ? '' : `?enabled=${enabled}`),
+};
+
+const CHIP_DEFS: ChipDef<ScheduleFilters>[] = [
+  {
+    key: 'enabled',
+    label: ({ enabled }) =>
+      enabled === 'all'
+        ? null
+        : `Show: ${enabled === 'on' ? 'Enabled' : 'Disabled'}`,
+    clear: { enabled: 'all' },
+  },
+];
 
 const enabledQuery = (filter: EnabledFilter): string =>
   filter === 'all' ? '' : `?enabled=${filter === 'on'}`;
@@ -53,13 +88,12 @@ function SystemJobs() {
 
   return (
     <section aria-labelledby="system-jobs">
-      <h2 id="system-jobs" className="mb-1 text-sm font-semibold">
-        System jobs
-      </h2>
-      <p className="mb-2 text-sm text-ink-2">
-        The API’s own recurring jobs, such as clean-ups. Read-only: they are not
-        schedules. Times are in UTC.
-      </p>
+      <SectionHeader
+        className="mb-2"
+        headingId="system-jobs"
+        title="System jobs"
+        description="The API’s own recurring jobs, such as clean-ups. Read-only: they are not schedules. Times are in UTC."
+      />
       <AsyncSection
         section={jobs}
         unavailable={{
@@ -117,8 +151,10 @@ function SystemJobs() {
   );
 }
 
-export default function AdminSchedulesPage() {
-  const [filter, setFilter] = useState<EnabledFilter>('all');
+function AdminSchedules() {
+  const url = useUrlFilters(FILTER_CODEC);
+  const filter = url.filters.enabled;
+  const chips = useFilterChips(url, CHIP_DEFS);
   const schedules = useSection(
     () => api<AdminScheduleView[]>(`/admin/schedules${enabledQuery(filter)}`),
     [filter],
@@ -149,26 +185,33 @@ export default function AdminSchedulesPage() {
             . Each schedule’s times are in the timezone shown under it.
           </>
         }
-        actions={
-          <Field label="Show" htmlFor="schedules-filter">
-            <Select
-              id="schedules-filter"
-              value={filter}
-              onChange={(e) =>
-                setFilter(
+      />
+
+      <Toolbar
+        aria-label="Filter schedules"
+        collapseBelow="sm"
+        activeFilters={chips.activeFilters}
+        onClearAll={chips.onClearAll}
+        filters={
+          <Select
+            aria-label="Show"
+            value={filter}
+            className="w-full sm:w-44"
+            onChange={(e) =>
+              url.set({
+                enabled:
                   e.target.value === 'on'
                     ? 'on'
                     : e.target.value === 'off'
                       ? 'off'
                       : 'all',
-                )
-              }
-            >
-              <option value="all">All</option>
-              <option value="on">Enabled</option>
-              <option value="off">Disabled</option>
-            </Select>
-          </Field>
+              })
+            }
+          >
+            <option value="all">All schedules</option>
+            <option value="on">Enabled</option>
+            <option value="off">Disabled</option>
+          </Select>
         }
       />
 
@@ -195,7 +238,10 @@ export default function AdminSchedulesPage() {
               title={`No ${filter === 'on' ? 'enabled' : 'disabled'} schedules`}
               description="Other schedules are hidden by the Show filter."
               action={
-                <Button variant="glass" onClick={() => setFilter('all')}>
+                <Button
+                  variant="glass"
+                  onClick={() => url.set({ enabled: 'all' })}
+                >
                   Show all
                 </Button>
               }
@@ -217,5 +263,13 @@ export default function AdminSchedulesPage() {
         onClose={() => setSelected(undefined)}
       />
     </div>
+  );
+}
+
+export default function AdminSchedulesPage() {
+  return (
+    <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+      <AdminSchedules />
+    </Suspense>
   );
 }
