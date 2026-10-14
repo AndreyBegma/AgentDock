@@ -19,6 +19,7 @@ import { watchedProject } from '../../control/target';
 import { TmuxControl } from '../../control/tmux';
 import { resolveFleetProject } from '../../fleet/project';
 import { errorMessage, type Logger } from '../../log';
+import { type RunSlots, SharedRunSlots } from '../../planner/slots';
 import {
   GH_TIMEOUT_MS,
   gitOk,
@@ -47,6 +48,11 @@ export interface ExecutorOptions {
   /** The tmux server: empty for the user's own, `['-L', name]` in tests. */
   tmuxServer?: readonly string[];
   maxConcurrentRuns: number;
+  /**
+   * The cap's slots, shared with plan turns (spec 172); without it the
+   * executor counts its own runs against `maxConcurrentRuns`.
+   */
+  slots?: RunSlots;
   maxTimeoutSec: number;
   emit: (event: UnsequencedEvent) => void;
   log: Logger;
@@ -58,7 +64,8 @@ export interface ExecutorOptions {
 
 type Listener = (record: RunRecord) => void;
 
-const ACTIVE: readonly SkillRunPhase[] = ['preparing', 'running', 'collecting'];
+/** A skill run's key in the shared slots. */
+const slotId = (runId: string): string => `run:${runId}`;
 
 /**
  * The skill run executor (D7, D10–D12). Each run is a headless session in its
@@ -71,6 +78,7 @@ const ACTIVE: readonly SkillRunPhase[] = ['preparing', 'running', 'collecting'];
 export class SkillRunExecutor {
   readonly store: RunStore;
   private readonly tmux: TmuxControl;
+  private readonly slots: RunSlots;
   /** Every run that has not reached a terminal phase. */
   private readonly active = new Map<string, RunRecord>();
   private readonly queue: string[] = [];
@@ -81,10 +89,12 @@ export class SkillRunExecutor {
   private ticking = false;
   private cancelTick: Cancel = () => {};
   private cancelCleanup: Cancel = () => {};
+  private offFree: () => void = () => {};
 
   constructor(private readonly options: ExecutorOptions) {
     this.store = new RunStore(options.runsDir);
     this.tmux = new TmuxControl(options.deps.exec, options.tmuxServer ?? []);
+    this.slots = options.slots ?? new SharedRunSlots(options.maxConcurrentRuns);
   }
 
   /** Picks up the runs a previous runner left, then starts the timers. */
@@ -96,6 +106,9 @@ export class SkillRunExecutor {
         continue;
       }
       this.active.set(record.runId, record);
+      // A run past `queued` holds its slot again; its session is live.
+      if (record.phase !== 'queued')
+        this.slots.tryAcquire(slotId(record.runId));
       if (record.phase === 'queued') this.queue.push(record.runId);
       else if (record.phase === 'preparing') {
         if (record.startedAt && (await this.tmux.find(record.session))) {
@@ -111,6 +124,7 @@ export class SkillRunExecutor {
         void this.end(record, record.endReason ?? 'vanished');
       }
     }
+    this.offFree = this.slots.onFree(() => this.pump());
     this.pump();
     const { clock } = this.options.deps;
     this.cancelTick = clock.setInterval(
@@ -127,6 +141,7 @@ export class SkillRunExecutor {
   stop(): void {
     this.cancelTick();
     this.cancelCleanup();
+    this.offFree();
   }
 
   /** Called on every phase change of every run. */
@@ -313,17 +328,17 @@ export class SkillRunExecutor {
     }
   }
 
-  /** Starts queued runs, oldest first, while the cap allows (D11). */
+  /** Starts queued runs, oldest first, while the shared cap has a slot (D11). */
   private pump(): void {
-    const running = () =>
-      [...this.active.values()].filter((r) => ACTIVE.includes(r.phase)).length;
-    while (
-      this.queue.length > 0 &&
-      running() < this.options.maxConcurrentRuns
-    ) {
-      const runId = this.queue.shift() as string;
+    while (this.queue.length > 0) {
+      const runId = this.queue[0] as string;
       const record = this.active.get(runId);
-      if (!record || record.phase !== 'queued') continue;
+      if (!record || record.phase !== 'queued') {
+        this.queue.shift();
+        continue;
+      }
+      if (!this.slots.tryAcquire(slotId(runId))) return;
+      this.queue.shift();
       this.setPhase(record, 'preparing');
       void this.prepare(record);
     }
@@ -463,6 +478,8 @@ export class SkillRunExecutor {
     const finishedAt = isoNow(this.options.deps.clock);
     record.finishedAt = finishedAt;
     this.active.delete(record.runId);
+    // Released before the event, so a run waiting on the slot starts next.
+    this.slots.release(slotId(record.runId));
     if (record.pr && !record.cleanedUp)
       this.awaitingPr.set(record.runId, record);
     this.setPhase(record, collected.phase);

@@ -50,7 +50,7 @@ const pathError = (args: unknown): boolean =>
   !planPublishSpecsArgsSchema.safeParse(args).success;
 
 describe('planner commands', () => {
-  it('are defined for the runner to register with its handlers', () => {
+  it('are in the commands map, added by the runner slot together with its handlers', () => {
     expect(Object.keys(plannerCommands).sort()).toEqual([
       'plan.cancel',
       'plan.close',
@@ -58,9 +58,8 @@ describe('planner commands', () => {
       'plan.queue_issues',
       'plan.turn',
     ]);
-    // Registered together with the runner's handlers (i172-runner), as skills were.
     for (const name of Object.keys(plannerCommands)) {
-      expect(Object.hasOwn(commands, name)).toBe(false);
+      expect(Object.hasOwn(commands, name)).toBe(true);
     }
   });
 

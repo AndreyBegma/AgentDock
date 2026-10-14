@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { join } from 'node:path';
-import type { HelloMessage, RunnerEvent } from '@agentdock/shared/protocol';
+import type {
+  CommandResultMessage,
+  HelloMessage,
+  RunnerEvent,
+} from '@agentdock/shared/protocol';
 import type { PairedConfig } from './config';
 import type { RunnerConnection } from './connection';
 import { runDaemon } from './daemon';
@@ -135,6 +139,31 @@ describe('daemon — OTLP receiver (spec 13)', () => {
     controller.abort();
     await done;
     expect(lines.join('\n')).not.toContain('otlp: receiver listening');
+  });
+
+  it('serves the plan.* commands (spec 172): a plan it never ran closes as nothing removed', async () => {
+    const { controller, done, live } = start({
+      enabled: false,
+      grpc: null,
+      http: 0,
+    });
+    await live();
+    server.send({
+      type: 'command',
+      id: 'cmd_plan_close',
+      name: 'plan.close',
+      args: { planId: 'plan_1', projectId: 'prj_fixture' },
+    });
+    const [result] = (await server.waitFor(
+      'command.result',
+    )) as CommandResultMessage[];
+    expect(result).toMatchObject({
+      id: 'cmd_plan_close',
+      ok: true,
+      output: { removed: false },
+    });
+    controller.abort();
+    await done;
   });
 
   it('runs without the receiver when its port is taken', async () => {

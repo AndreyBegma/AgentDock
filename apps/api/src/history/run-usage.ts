@@ -28,15 +28,38 @@ export const EMPTY_USAGE: RunUsage = {
 };
 
 /**
- * The requests of a run (spec 21 D8): its slot's sessions (#12) by
- * `(projectId, slotName)`, and of those the `llm_requests` within the run's
- * window. `usage_rollups` are not needed; when runs get a `runId` on their
- * requests (#13 D14) this join is the one place to change.
+ * The sessions of each run (#12):
+ * - a slot run (spec 21 D8): its slot's sessions, by `(projectId, slotName)`;
+ * - a plan turn (spec 172 D14): the Claude session it ran in — the task's
+ *   fork for a task turn, else the plan's — by its id on the project's
+ *   runner. The plan worktree sits outside the project root, so the session
+ *   has no `projectId` to match on.
+ * Skill runs record no session id, so they have no usage yet.
+ */
+const RUN_SESSIONS = Prisma.sql`
+  SELECT r2.id AS "runId", se2.id AS "sessionId"
+  FROM runs r2
+  JOIN slots s ON s.id = r2."slotId"
+  JOIN sessions se2 ON se2."projectId" = r2."projectId" AND se2."slotName" = s.name
+  UNION ALL
+  SELECT pt."runId", se2.id
+  FROM plan_turns pt
+  JOIN plans p ON p.id = pt."planId"
+  LEFT JOIN plan_tasks t ON t.id = pt."taskId"
+  JOIN projects pr ON pr.id = p."projectId"
+  JOIN sessions se2 ON se2."runnerId" = pr."runnerId"
+    AND se2.runtime = 'claude'
+    AND se2."externalId" = COALESCE(t."sessionId", p."sessionId")::text`;
+
+/**
+ * The requests of a run (spec 21 D8): of its sessions, the `llm_requests`
+ * within the run's window. `usage_rollups` are not needed; when runs get a
+ * `runId` on their requests (#13 D14) this join is the one place to change.
  */
 const RUN_REQUESTS = Prisma.sql`
   FROM runs r
-  JOIN slots s ON s.id = r."slotId"
-  JOIN sessions se ON se."projectId" = r."projectId" AND se."slotName" = s.name
+  JOIN (${RUN_SESSIONS}) rs ON rs."runId" = r.id
+  JOIN sessions se ON se.id = rs."sessionId"
   JOIN llm_requests l ON l."sessionId" = se.id
     AND l.ts >= r."startedAt" AND (r."endedAt" IS NULL OR l.ts <= r."endedAt")`;
 
