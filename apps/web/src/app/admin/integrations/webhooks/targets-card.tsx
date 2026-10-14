@@ -4,10 +4,12 @@ import type { WebhookSettingsView } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { Field, Textarea } from '@andrewbehma/glass-ui/field';
+import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../../../lib/api';
+import { useErrorToast } from '../../../../lib/section/use-error-toast';
 import {
   describeWebhooksError,
   parseTargets,
@@ -22,6 +24,7 @@ export function TargetsCard() {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState<string>();
+  const showError = useErrorToast();
 
   const load = useCallback(async () => {
     try {
@@ -61,7 +64,7 @@ export function TargetsCard() {
       setText(settings.allowedPrivateTargets.join('\n'));
       toast.success('Allowlist saved');
     } catch (err) {
-      toast.error(describeWebhooksError(err));
+      showError(describeWebhooksError(err));
     } finally {
       setBusy(false);
     }
@@ -73,16 +76,11 @@ export function TargetsCard() {
         aria-labelledby="private-targets"
         className="flex flex-col gap-3 p-4"
       >
-        <div>
-          <h2 id="private-targets" className="text-sm font-semibold">
-            Private-target allowlist
-          </h2>
-          <p className="max-w-prose text-sm text-ink-2">
-            Outbound webhooks to loopback, private, link-local or Tailscale
-            addresses are refused unless the host or CIDR is listed here. Hosts
-            are resolved at send time. A listed host may also use plain http.
-          </p>
-        </div>
+        <SectionHeader
+          headingId="private-targets"
+          title="Private-target allowlist"
+          description="Outbound webhooks to loopback, private, link-local or Tailscale addresses are refused unless the host or CIDR is listed here. Hosts are resolved at send time. A listed host may also use plain http."
+        />
         {loadError && saved === undefined ? (
           <SectionUnavailable
             title="The allowlist is not answering"
@@ -111,7 +109,7 @@ export function TargetsCard() {
           />
         </Field>
         <div>
-          <Button disabled={busy || !dirty} onClick={save}>
+          <Button variant="glass" disabled={busy || !dirty} onClick={save}>
             {busy ? 'Saving…' : 'Save allowlist'}
           </Button>
         </div>

@@ -7,8 +7,9 @@ import type {
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
-import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { Field, Input } from '@andrewbehma/glass-ui/field';
+import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import Link from 'next/link';
@@ -120,7 +121,7 @@ export default function TelegramIntegrationPage() {
             )}
 
             <Card pad="lg">
-              <h2 className="mb-4 text-lg font-bold">Status</h2>
+              <SectionHeader className="mb-4" title="Status" />
               <dl className="grid max-w-xl grid-cols-[10rem_1fr] gap-y-2 text-sm">
                 <dt className="text-ink-3">Bot</dt>
                 <dd>
@@ -152,7 +153,11 @@ export default function TelegramIntegrationPage() {
               {state.configured ? (
                 <div className="mt-4 flex flex-col gap-1">
                   <div className="flex gap-3">
-                    <Button disabled={busy} onClick={() => void test()}>
+                    <Button
+                      variant="glass"
+                      disabled={busy}
+                      onClick={() => void test()}
+                    >
                       Send test message
                     </Button>
                     <Button
@@ -178,11 +183,14 @@ export default function TelegramIntegrationPage() {
             </Card>
 
             <Card pad="lg">
-              <h2 className="mb-4 text-lg font-bold">
-                {state.configured
-                  ? 'Replace the bot token'
-                  : 'Set the bot token'}
-              </h2>
+              <SectionHeader
+                className="mb-4"
+                title={
+                  state.configured
+                    ? 'Replace the bot token'
+                    : 'Set the bot token'
+                }
+              />
               <form onSubmit={save} className="flex max-w-md flex-col gap-4">
                 <Field
                   label="Bot token"
@@ -235,35 +243,15 @@ export default function TelegramIntegrationPage() {
               </form>
             </Card>
 
-            <DialogRoot
+            <ConfirmDialog
               open={confirmRemove}
-              onOpenChange={(open) => !open && !busy && setConfirmRemove(false)}
-            >
-              <DialogContent
-                title="Remove the Telegram bot?"
-                description={removeBotConsequence(state)}
-                footer={
-                  <>
-                    <Button
-                      variant="glass"
-                      disabled={busy}
-                      onClick={() => setConfirmRemove(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      variant="danger"
-                      disabled={busy}
-                      onClick={() => void clear()}
-                    >
-                      Remove bot
-                    </Button>
-                  </>
-                }
-              >
-                {null}
-              </DialogContent>
-            </DialogRoot>
+              onOpenChange={setConfirmRemove}
+              title="Remove the Telegram bot?"
+              consequence={removeBotConsequence(state)}
+              verb="Remove bot"
+              busy={busy}
+              onConfirm={() => void clear()}
+            />
           </>
         )}
       </AsyncSection>
