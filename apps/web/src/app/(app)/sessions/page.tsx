@@ -30,6 +30,10 @@ import {
 } from 'react';
 import { PageHeader } from '../../../components/page-header/page-header';
 import { ScrollX } from '../../../components/scroll-x/scroll-x';
+import {
+  LiveStatePill,
+  OriginBadge,
+} from '../../../components/sessions/origin-badge';
 import { useCurrentUser } from '../../../components/shell/user-context';
 import { api } from '../../../lib/api';
 import { formatNumber } from '../../../lib/format';
@@ -47,6 +51,8 @@ import {
   formatTokens,
   hasSessionFilters,
   liveTopicFor,
+  ORIGIN_FILTERS,
+  ORIGIN_LABEL,
   queryString,
   type SessionFilterForm,
   sessionFormChanged,
@@ -134,6 +140,20 @@ function Filters({
               <option value="">Any runtime</option>
               <option value="claude">Claude Code</option>
               <option value="codex">Codex</option>
+            </Select>
+          </Field>
+          <Field label="Origin" htmlFor="sessions-origin">
+            <Select
+              id="sessions-origin"
+              value={form.origin}
+              onChange={(e) => onChange({ origin: e.target.value })}
+            >
+              <option value="">Any origin</option>
+              {ORIGIN_FILTERS.map((origin) => (
+                <option key={origin} value={origin}>
+                  {ORIGIN_LABEL[origin]}
+                </option>
+              ))}
             </Select>
           </Field>
           <Field label="From" htmlFor="sessions-from">
@@ -242,6 +262,16 @@ function useColumns() {
                 </span>
               </Tooltip>
             )}
+          </span>
+        ),
+      },
+      {
+        id: 'origin',
+        header: 'Origin',
+        cell: (s: SessionSummary) => (
+          <span className="flex min-w-0 flex-wrap items-center gap-2">
+            <OriginBadge session={s} />
+            <LiveStatePill session={s} />
           </span>
         ),
       },
@@ -476,7 +506,7 @@ export default function SessionsPage() {
               columns={columns}
               onRowActivate={(s) => router.push(`/sessions/${s.id}`)}
               stickyHeader={false}
-              className="min-w-[60rem]"
+              className="min-w-[68rem]"
             />
           </ScrollX>
           {nextCursor ? (

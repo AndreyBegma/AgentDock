@@ -115,3 +115,11 @@ export const setView = (
   state: WorkspaceState,
   view: WorkspaceView,
 ): WorkspaceState => ({ ...state, view });
+
+/**
+ * A link that lands on a project's Fleet with `slot` open and in front, as
+ * Overview's "Needs you" rows deep-link (#213). A name that is not a slot's
+ * opens the Fleet alone.
+ */
+export const slotHref = (projectId: string, slot: string): string =>
+  `/projects/${projectId}/fleet${toSearch(openSlot(EMPTY_WORKSPACE, slot))}`;

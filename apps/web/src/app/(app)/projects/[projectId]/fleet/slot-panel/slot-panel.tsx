@@ -8,8 +8,9 @@ import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import { SidePanel } from '@andrewbehma/glass-ui/side-panel';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
-import { Tabs, TabsItem } from '@andrewbehma/glass-ui/tabs';
+import { Tab, TabGroup, TabList, TabPanel } from '@andrewbehma/glass-ui/tabs';
 import { X } from 'lucide-react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { type ReactNode, useState } from 'react';
 import { ScrollX } from '../../../../../../components/scroll-x/scroll-x';
 import { TerminalSheet } from '../../../../../../components/terminal/terminal-sheet';
@@ -22,9 +23,8 @@ import { slotHue } from '../../../../../../lib/hue';
 import {
   NODE_PILL_LABEL,
   NODE_PILL_STATUS,
+  parseSlotTab,
   SLOT_PANEL_TABS,
-  type SlotPanelTab,
-  usesWorktree,
 } from '../../../../../../lib/slot/format';
 import { nodeOf } from '../../../../../../lib/slot/relations';
 import {
@@ -66,7 +66,8 @@ export interface SlotPanelProps {
  */
 export function SlotPanel(props: SlotPanelProps) {
   const wide = useWide();
-  // `key`: another slot starts on its own tab, outbox and data.
+  // `key`: another slot starts on its own outbox and data. The tab is the
+  // URL's, so moving between slots keeps the section in view.
   const body = <SlotPanelBody key={props.slot} {...props} />;
 
   if (wide === undefined) return null;
@@ -84,7 +85,10 @@ export function SlotPanel(props: SlotPanelProps) {
         minWidth={360}
         maxWidth={760}
         defaultWidth={460}
-        className="h-full min-h-0"
+        // The page scrolls, not the row: the panel holds its place under it,
+        // like the rail, so the chat's composer is on screen without
+        // scrolling the page to the panel's bottom (#213).
+        className="sticky top-3 h-[calc(100dvh-1.5rem)] min-h-0"
       >
         {body}
       </SidePanel>
@@ -167,18 +171,40 @@ function SlotPanelBody({
     projectId,
     slot,
   );
-  const [tab, setTab] = useState<SlotPanelTab>('chat');
+  // The tab is in the URL (`?tab=files`), so a link or a reload lands on it.
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const tab = parseSlotTab(searchParams.get('tab'));
+  const setTab = (next: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === 'chat') params.delete('tab');
+    else params.set('tab', next);
+    const search = params.toString().replace(/%2C/g, ',');
+    router.replace(`${pathname}${search ? `?${search}` : ''}`, {
+      scroll: false,
+    });
+  };
   const [attaching, setAttaching] = useState(false);
   const run = detail.data;
+  const ended = run?.status === 'ended';
+  // An ended slot's worktree is gone: neither tab asks the runner (#213).
+  // Each tab has its own request, so Files never shows Worktree's state.
+  const live = run !== undefined && !ended;
   const worktree = useSlotWorktree(
     projectId,
     slot,
-    usesWorktree(tab) && run !== undefined,
+    live && tab === 'worktree',
+    detailVersion,
+  );
+  const files = useSlotWorktree(
+    projectId,
+    slot,
+    live && tab === 'files',
     detailVersion,
   );
 
   const node = nodeOf(graph.data, slot);
-  const ended = run?.status === 'ended';
   const pill = run ? (
     <StatusPill
       status={SLOT_PILL_STATUS[run.status]}
@@ -228,53 +254,60 @@ function SlotPanelBody({
   } else {
     content = (
       <div className="flex flex-col gap-5">
-        {/* Seven tabs outgrow a narrow column: they keep their width and scroll. */}
-        <ScrollX edgeClassName="from-surface">
-          <Tabs aria-label="Agent sections" className="w-max min-w-full">
-            {SLOT_PANEL_TABS.map(({ id, label }) => (
-              <TabsItem
-                key={id}
-                current={tab === id}
-                layoutId="slot-panel-tab"
-                className="flex-none"
-              >
-                <button
-                  type="button"
-                  onClick={() => setTab(id)}
-                  aria-pressed={tab === id}
-                  className="relative flex w-full items-center justify-center whitespace-nowrap px-3 py-2 text-sm font-medium"
-                >
-                  {label}
-                </button>
-              </TabsItem>
-            ))}
-          </Tabs>
-        </ScrollX>
-        {tab === 'chat' ? (
-          <ChatTab
-            slot={slot}
-            conversation={conversation}
-            control={control}
-            writeReason={writeReason}
-          />
-        ) : tab === 'context' ? (
-          <ContextTab slot={run} />
-        ) : tab === 'worktree' ? (
-          <WorktreeTab worktree={worktree} />
-        ) : tab === 'files' ? (
-          <FilesTab worktree={worktree} />
-        ) : tab === 'tests' ? (
-          <TestsTab slot={run} conversation={conversation.data} />
-        ) : tab === 'settings' ? (
-          <SettingsTab projectId={projectId} slot={run} settings={settings} />
-        ) : (
-          <PaneTab
-            projectId={projectId}
-            slot={slot}
-            ended={ended}
-            onAttach={canAttach ? () => setAttaching(true) : undefined}
-          />
-        )}
+        <TabGroup value={tab} onValueChange={setTab}>
+          <div className="flex flex-col">
+            {/* Seven tabs outgrow the 426 px column: they keep their width
+              and scroll, with a fade at the edge that has more (#213). */}
+            <ScrollX edgeClassName="from-surface">
+              <TabList aria-label="Agent sections" className="w-max min-w-full">
+                {SLOT_PANEL_TABS.map(({ id, label }) => (
+                  <Tab
+                    key={id}
+                    value={id}
+                    className="flex-none whitespace-nowrap"
+                  >
+                    {label}
+                  </Tab>
+                ))}
+              </TabList>
+            </ScrollX>
+            <TabPanel value="chat" className="pt-5">
+              <ChatTab
+                slot={slot}
+                conversation={conversation}
+                control={control}
+                writeReason={writeReason}
+              />
+            </TabPanel>
+            <TabPanel value="context" className="pt-5">
+              <ContextTab slot={run} />
+            </TabPanel>
+            <TabPanel value="worktree" className="pt-5">
+              <WorktreeTab worktree={worktree} ended={ended} />
+            </TabPanel>
+            <TabPanel value="files" className="pt-5">
+              <FilesTab files={files} ended={ended} />
+            </TabPanel>
+            <TabPanel value="tests" className="pt-5">
+              <TestsTab slot={run} conversation={conversation.data} />
+            </TabPanel>
+            <TabPanel value="settings" className="pt-5">
+              <SettingsTab
+                projectId={projectId}
+                slot={run}
+                settings={settings}
+              />
+            </TabPanel>
+            <TabPanel value="pane" className="pt-5">
+              <PaneTab
+                projectId={projectId}
+                slot={slot}
+                ended={ended}
+                onAttach={canAttach ? () => setAttaching(true) : undefined}
+              />
+            </TabPanel>
+          </div>
+        </TabGroup>
         {relations}
       </div>
     );

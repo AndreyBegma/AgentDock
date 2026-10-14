@@ -53,7 +53,13 @@ export function TerminalSheet({
 
   const targetKey = target
     ? `${target.kind}:${
-        'slot' in target ? target.slot : 'runId' in target ? target.runId : ''
+        'slot' in target
+          ? target.slot
+          : 'runId' in target
+            ? target.runId
+            : 'sessionId' in target
+              ? target.sessionId
+              : ''
       }`
     : '';
   // Every target opens read-only, never in the previous target's mode.

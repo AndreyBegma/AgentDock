@@ -1,10 +1,12 @@
 'use client';
 
 import type { SlotWorktreeView } from '@agentdock/shared';
-import { Button } from '@andrewbehma/glass-ui/button';
+import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { KeyValueList } from '@andrewbehma/glass-ui/key-value-list';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { RefreshCw } from 'lucide-react';
+import Link from 'next/link';
 import type { ReactNode } from 'react';
 import {
   formatAgo,
@@ -17,6 +19,8 @@ import {
   FILE_STATUS_LABEL,
   FILE_STATUS_MARK,
   formatLineCounts,
+  isRunnerOutdated,
+  RUNNER_UPDATE_HREF,
   shortSha,
 } from '../../../../../../lib/slot/format';
 
@@ -26,16 +30,53 @@ const CHANGE_BRANCH_REASON =
 /**
  * The runner's answer for the slot's worktree, with Refresh and the time it
  * was read. A failure says why in a sentence, never as an empty list; the
- * last answer stays under it.
+ * last answer stays under it. An ended slot's worktree is gone, so the runner
+ * is not asked (#213); a runner too old to answer says to update it.
  */
 function WorktreeSection({
   worktree,
+  ended,
   children,
 }: {
   worktree: Section<SlotWorktreeView | undefined>;
+  ended: boolean;
   children: (view: SlotWorktreeView) => ReactNode;
 }) {
   const { data, error, loading, retry } = worktree;
+  if (ended) {
+    return (
+      <EmptyState
+        title="Worktree removed"
+        description="This slot has ended, and the orchestrator removes an ended slot’s worktree. Its branch and commits are on the pull request, if it opened one."
+      />
+    );
+  }
+  if (error !== null && isRunnerOutdated(error)) {
+    return (
+      <EmptyState
+        title="Update the runner"
+        description="The project’s runner is too old to read worktrees. Update it on its machine, then refresh."
+        action={
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <Link
+              href={RUNNER_UPDATE_HREF}
+              className={buttonClassName({ variant: 'glass', size: 'sm' })}
+            >
+              How to update
+            </Link>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={retry}
+              disabled={loading}
+            >
+              Refresh
+            </Button>
+          </div>
+        }
+      />
+    );
+  }
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -67,11 +108,13 @@ function WorktreeSection({
 
 export function WorktreeTab({
   worktree,
+  ended,
 }: {
   worktree: Section<SlotWorktreeView | undefined>;
+  ended: boolean;
 }) {
   return (
-    <WorktreeSection worktree={worktree}>
+    <WorktreeSection worktree={worktree} ended={ended}>
       {(view) => (
         <>
           <KeyValueList
@@ -150,12 +193,15 @@ export function WorktreeTab({
 }
 
 export function FilesTab({
-  worktree,
+  files,
+  ended,
 }: {
-  worktree: Section<SlotWorktreeView | undefined>;
+  /** Its own request and state, not the Worktree tab's (#213). */
+  files: Section<SlotWorktreeView | undefined>;
+  ended: boolean;
 }) {
   return (
-    <WorktreeSection worktree={worktree}>
+    <WorktreeSection worktree={files} ended={ended}>
       {(view) =>
         view.files.length === 0 ? (
           <p className="text-sm text-ink-2">
