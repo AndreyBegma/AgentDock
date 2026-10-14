@@ -78,8 +78,24 @@ export function formatLineCounts(
   return `+${additions ?? 0} −${deletions ?? 0}`;
 }
 
+/** Where "Update the runner" sends a person: the install page has the upgrade. */
+export const RUNNER_UPDATE_HREF = '/install';
+
+/**
+ * The runner answered `/worktree` with `unknown_command`: it predates
+ * `worktree.status`. The API passes the runner's code as the message's prefix
+ * (`unknown_command: unknown command: worktree.status`).
+ */
+export const isRunnerOutdated = (error: unknown): boolean =>
+  error instanceof ApiError &&
+  (error.code as string | undefined) === FLEET_ERROR.worktreeUnavailable &&
+  error.message.startsWith('unknown_command');
+
 /** Why `/worktree` gave no answer, as the panel says it. */
 export function describeWorktreeError(error: unknown): string {
+  if (isRunnerOutdated(error)) {
+    return 'The project’s runner is too old to read worktrees. Update the runner, then refresh.';
+  }
   if (error instanceof ApiError) {
     switch (error.code as string | undefined) {
       case FLEET_ERROR.runnerOffline:
@@ -87,7 +103,8 @@ export function describeWorktreeError(error: unknown): string {
       case FLEET_ERROR.runnerTimeout:
         return 'The runner did not answer in time. Refresh to ask again.';
       case FLEET_ERROR.worktreeUnavailable:
-        return `The runner could not read this worktree (${error.message}).`;
+        // The runner's own wording is not a sentence for a person (#213).
+        return 'The runner could not read this worktree. Refresh to try again.';
       case FLEET_ERROR.slotNotFound:
         return 'This slot has no run yet, so it has no worktree.';
     }
@@ -215,6 +232,14 @@ export function messageOutcome(
     error: describeOutcome(run)?.text ?? 'The message was not delivered.',
   };
 }
+
+/**
+ * The brief's round, as an id: `2026-10-14/1830` names the board the slot was
+ * dispatched from. It is not when the brief was written, so it is not drawn
+ * as a timestamp (#213).
+ */
+export const briefRoundLabel = (round: string | null): string =>
+  round === null ? '—' : `Round ${round}`;
 
 /** The short form of a commit sha. */
 export const shortSha = (sha: string): string => sha.slice(0, 7);

@@ -17,6 +17,8 @@ import type { Hue } from '@andrewbehma/glass-ui/hue';
 import type { MetaBarCounter } from '@andrewbehma/glass-ui/meta-bar';
 import type { Status } from '@andrewbehma/glass-ui/status-pill';
 import { slotHue } from '../hue';
+import { ORCHESTRATOR_PILL_STATUS } from '../status/pill';
+import { ORCHESTRATOR_STATUS_LABEL } from './format';
 
 /**
  * The agent workspace's canvas (#160), from `GET /projects/:id/fleet/graph`.
@@ -117,23 +119,33 @@ export function progressBar(
   };
 }
 
-export const ORCHESTRATOR_PILL_LABEL: Record<OrchestratorStatus, string> = {
-  running: 'Live',
-  idle: 'Active',
-  absent: 'Not running',
-  unknown: 'Unknown',
-};
-
-/** The header's pill: the orchestrator is the project's pulse. */
-export const ORCHESTRATOR_HEADER_STATUS: Record<OrchestratorStatus, Status> = {
-  running: 'running',
-  idle: 'idle',
-  absent: 'paused',
-  unknown: 'idle',
-};
+/**
+ * A node's pill. The orchestrator's says what the header and the card say
+ * (#213: one vocabulary), never the graph's `paused` for a stopped session.
+ */
+export function nodeStatus(node: FleetGraphNode): {
+  status: Status;
+  label: string;
+} {
+  if (node.kind === 'orchestrator') {
+    const status: OrchestratorStatus = node.orchestrator.status;
+    return {
+      status: ORCHESTRATOR_PILL_STATUS[status],
+      label: ORCHESTRATOR_STATUS_LABEL[status],
+    };
+  }
+  return {
+    status: PILL_STATUS[node.pill],
+    label: node.kind === 'planned' ? 'Planned' : PILL_LABEL[node.pill],
+  };
+}
 
 export interface FleetCounts {
-  agents: number;
+  /**
+   * Runs that have not ended — the same slots `FleetView.slots` lists, so the
+   * header's figure is the Orchestrator card's "Slots n / max" (#213).
+   */
+  active: number;
   worktrees: number;
   running: number;
   blocked: number;
@@ -143,7 +155,7 @@ export interface FleetCounts {
 /** What the header counts: slots only, the orchestrator is not an agent here. */
 export function fleetCounts(graph: FleetGraph): FleetCounts {
   const counts: FleetCounts = {
-    agents: 0,
+    active: 0,
     worktrees: 0,
     running: 0,
     blocked: 0,
@@ -151,8 +163,11 @@ export function fleetCounts(graph: FleetGraph): FleetCounts {
   };
   for (const node of graph.nodes) {
     if (node.kind === 'orchestrator') continue;
-    counts.agents += 1;
-    if (node.kind === 'slot' && node.branch !== null) counts.worktrees += 1;
+    if (node.kind === 'slot' && node.status !== 'ended') {
+      counts.active += 1;
+      // An ended run's worktree is removed; it is not one of the fleet's now.
+      if (node.branch !== null) counts.worktrees += 1;
+    }
     if (node.pill === 'running') counts.running += 1;
     if (node.pill === 'blocked') counts.blocked += 1;
     if (node.pill === 'done') counts.done += 1;
@@ -162,7 +177,7 @@ export function fleetCounts(graph: FleetGraph): FleetCounts {
 
 export function fleetCounters(counts: FleetCounts): MetaBarCounter[] {
   return [
-    { id: 'agents', value: counts.agents, label: 'Agents' },
+    { id: 'active', value: counts.active, label: 'Active' },
     { id: 'worktrees', value: counts.worktrees, label: 'Worktrees' },
     {
       id: 'running',
@@ -204,7 +219,7 @@ export function toCanvas(graph: FleetGraph): {
     nodes: graph.nodes.map((node) => ({
       id: node.id,
       data: node,
-      tone: PILL_STATUS[node.pill],
+      tone: nodeStatus(node).status,
       ...(nodeHue(node) ? { hue: nodeHue(node) } : {}),
       size:
         node.kind === 'orchestrator' ? ORCHESTRATOR_NODE_SIZE : AGENT_NODE_SIZE,
@@ -254,10 +269,10 @@ export function toDependencyFlow(graph: FleetGraph): {
     id: node.id,
     data: {
       title: nodeTitle(node),
-      status: PILL_LABEL[node.pill],
+      status: nodeStatus(node).label,
       meta: node.issue === null ? undefined : `#${node.issue}`,
     },
-    tone: PILL_STATUS[node.pill],
+    tone: nodeStatus(node).status,
     ...(nodeHue(node) ? { hue: nodeHue(node) } : {}),
   }));
   const edges: FlowEdge[] = graph.edges.map((edge) => ({

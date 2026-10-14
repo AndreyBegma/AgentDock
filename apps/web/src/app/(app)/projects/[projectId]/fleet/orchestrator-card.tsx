@@ -6,18 +6,14 @@ import type {
   OrchestratorStatus,
 } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
-import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
-import { Disclosure } from '@andrewbehma/glass-ui/disclosure';
 import { StatusDot } from '@andrewbehma/glass-ui/status-pill';
-import { toast } from '@andrewbehma/glass-ui/toast';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
-import { type ReactNode, useState } from 'react';
+import type { ReactNode } from 'react';
 import { PrerequisiteBanner } from '../../../../../components/prerequisites/prerequisite-banner';
 import { orchestratorSettingsHref } from '../../../../../lib/control/reasons';
 import {
-  boardErrorView,
   CHANNEL_EXPLANATION,
   channelChip,
   FLEET_FACT_HINT,
@@ -65,8 +61,8 @@ export function OrchestratorCard({
   isAdmin,
   settings,
   reasons,
-  startOpen,
-  onStartOpenChange,
+  showStart,
+  onStart,
   onAttach,
 }: {
   fleet: FleetView;
@@ -76,18 +72,18 @@ export function OrchestratorCard({
   isAdmin: boolean;
   settings: Section<OrchestratorSettingsView>;
   reasons: ControlReasons;
-  startOpen: boolean;
-  onStartOpenChange: (open: boolean) => void;
+  /** False on an empty fleet: the first-project checklist holds the Start. */
+  showStart: boolean;
+  onStart: () => void;
   /** Admins on a runner that can attach; absent hides the action. */
   onAttach?: () => void;
 }) {
-  const { orchestrator, latestRound, boardError } = fleet;
+  const { orchestrator, latestRound } = fleet;
   const channel = channelChip(fleet.fleetChannel);
   const channelNote = CHANNEL_EXPLANATION[fleet.fleetChannel];
-  const boardIssue = boardError ? boardErrorView(boardError) : null;
-  const [detailOpen, setDetailOpen] = useState(false);
   const status: OrchestratorStatus = orchestrator.status;
-  const profileMissing = settings.data?.effectiveProfile === null;
+  // On an empty fleet the checklist's first step says this; not twice.
+  const profileMissing = showStart && settings.data?.effectiveProfile === null;
   return (
     <Card pad="md" className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -132,7 +128,7 @@ export function OrchestratorCard({
           {fleet.base}
         </Fact>
         <Fact label="Slots" hint={FLEET_FACT_HINT.slots}>
-          {formatOccupancy(latestRound)}
+          {formatOccupancy(fleet.slots.length, latestRound)}
         </Fact>
         <Fact label="Last round" hint={FLEET_FACT_HINT.lastRound}>
           {latestRound
@@ -158,39 +154,10 @@ export function OrchestratorCard({
         settings={settings.data}
         reasons={reasons}
         showStop={showStopControl(status)}
-        startOpen={startOpen}
-        onStartOpenChange={onStartOpenChange}
+        showStart={showStart}
+        onStart={onStart}
       />
-      {boardIssue ? (
-        <Banner
-          tone="warn"
-          title={boardIssue.title}
-          action={
-            <Button
-              variant="glass"
-              size="sm"
-              onClick={() => {
-                navigator.clipboard
-                  .writeText(boardIssue.path)
-                  .then(() => toast.success('Path copied.'))
-                  .catch(() => toast.error('Could not copy the path.'));
-              }}
-            >
-              Copy path
-            </Button>
-          }
-        >
-          <Disclosure
-            className="mt-1 border-0 bg-transparent"
-            triggerClassName="px-0 py-1"
-            open={detailOpen}
-            onOpenChange={setDetailOpen}
-            trigger={detailOpen ? 'Hide detail' : 'Show detail'}
-          >
-            <p className="mt-1 text-sm">{boardIssue.detail}</p>
-          </Disclosure>
-        </Banner>
-      ) : null}
+      {/* The board's error is the page's one banner (#213); this card does not repeat it. */}
     </Card>
   );
 }

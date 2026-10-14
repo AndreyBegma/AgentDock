@@ -6,6 +6,7 @@ import type {
   FleetSlotNode,
 } from '@agentdock/shared';
 import { slotHue } from '../hue';
+import { ORCHESTRATOR_STATUS_LABEL } from './format';
 import {
   AGENT_NODE_SIZE,
   fleetCounters,
@@ -14,6 +15,7 @@ import {
   liveSlots,
   modelLine,
   nodeKey,
+  nodeStatus,
   ORCHESTRATOR_NODE_SIZE,
   progressBar,
   runningSentence,
@@ -118,6 +120,18 @@ describe('card lines', () => {
     expect(progressBar(orchestrator)).toBeNull();
   });
 
+  test('the orchestrator node speaks the header’s vocabulary, not "Paused" (#213)', () => {
+    const stopped: FleetOrchestratorNode = {
+      ...orchestrator,
+      pill: 'paused',
+      orchestrator: { ...orchestrator.orchestrator, status: 'absent' },
+    };
+    expect(nodeStatus(stopped).label).toBe(ORCHESTRATOR_STATUS_LABEL.absent);
+    expect(nodeStatus(stopped).label).toBe('Not running');
+    expect(nodeStatus(slot('a', { pill: 'paused' })).label).toBe('Paused');
+    expect(nodeStatus(planned('b')).label).toBe('Planned');
+  });
+
   test('a node is keyed in the URL by its slot', () => {
     expect(nodeKey(slot('i42'))).toBe('i42');
     expect(nodeKey(orchestrator)).toBe('orchestrator');
@@ -136,7 +150,7 @@ describe('fleetCounts', () => {
       ]),
     );
     expect(counts).toEqual({
-      agents: 4,
+      active: 3,
       worktrees: 2,
       running: 1,
       blocked: 1,
@@ -144,9 +158,25 @@ describe('fleetCounts', () => {
     });
   });
 
+  test('active is the runs that have not ended, as the card’s Slots counts them (#213)', () => {
+    // The audit: "0 Agents" beside "Slots 5 / 5". Both now count the same set.
+    const counts = fleetCounts(
+      graph([
+        orchestrator,
+        slot('a'),
+        slot('b', { status: 'stale', pill: 'paused' }),
+        slot('c', { status: 'ended', pill: 'done' }),
+        planned('d'),
+      ]),
+    );
+    expect(counts.active).toBe(2);
+    expect(counts.worktrees).toBe(2);
+    expect(counts.done).toBe(1);
+  });
+
   test('a counter is toned only when it has something to say', () => {
     const quiet = fleetCounters({
-      agents: 1,
+      active: 1,
       worktrees: 1,
       running: 0,
       blocked: 0,
@@ -154,7 +184,7 @@ describe('fleetCounts', () => {
     });
     expect(quiet.every((c) => c.tone === undefined)).toBe(true);
     const loud = fleetCounters({
-      agents: 2,
+      active: 2,
       worktrees: 2,
       running: 1,
       blocked: 1,

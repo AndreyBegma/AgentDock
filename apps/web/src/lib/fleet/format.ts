@@ -135,11 +135,18 @@ export function formatAheadBehind(
   return `↑${ahead ?? 0} ↓${behind ?? 0}`;
 }
 
-/** `occupied / max`, or `—` before any round was seen. */
+/**
+ * `active / max`: the slots that have not ended (`FleetView.slots`, what the
+ * header's "Active" counts) out of the latest round's ceiling. The round's own
+ * `occupied` is not used: it is the last board read, and a board that stopped
+ * parsing kept saying "5 / 5" beside "0 Agents" (#213). Just the count before
+ * any round was seen.
+ */
 export function formatOccupancy(
-  round: { occupied: number; max: number } | null,
+  active: number,
+  round: { max: number } | null,
 ): string {
-  return round ? `${round.occupied} / ${round.max}` : '—';
+  return round ? `${active} / ${round.max}` : String(active);
 }
 
 /** `YYYY-MM-DD/HHMM` → `YYYY-MM-DD HH:MM`; anything else is shown as given. */
@@ -226,12 +233,15 @@ export function describeFleetErrorHint(error: unknown): ErrorHint {
 export const describeFleetError = (error: unknown): string =>
   describeFleetErrorHint(error).text;
 
-/** The orchestrator's state as the card says it: what it means, not the enum. */
+/**
+ * The orchestrator's state: what it means, not the enum. The one vocabulary
+ * (#213) — the Fleet header, the card, the canvas node and Projects all say it.
+ */
 export const ORCHESTRATOR_STATUS_LABEL: Record<OrchestratorStatus, string> = {
   running: 'Running',
   idle: 'Idle',
   absent: 'Not running',
-  unknown: 'Status unknown',
+  unknown: 'Unknown',
 };
 
 export const ORCHESTRATOR_STATUS_HINT: Record<OrchestratorStatus, string> = {
@@ -246,7 +256,8 @@ export const ORCHESTRATOR_STATUS_HINT: Record<OrchestratorStatus, string> = {
 /** One-line hints for the orchestrator card’s facts. */
 export const FLEET_FACT_HINT = {
   base: 'The branch pull requests are opened against.',
-  slots: 'Slots in use out of the most the orchestrator runs at once.',
+  slots:
+    'Slots that have not ended, out of the most the orchestrator runs at once.',
   lastRound:
     'A round is one pass of the orchestrator: it reads the queue and dispatches workers.',
   session:
