@@ -1,6 +1,7 @@
 export * from './capabilities';
 export * from './commands';
 export * from './commands/approvals';
+export * from './commands/capture';
 export * from './commands/cards';
 export * from './commands/control';
 export * from './commands/github';
@@ -11,6 +12,7 @@ export * from './commands/terminal';
 export * from './commands/uiprofile';
 export * from './commands/worktree';
 export * from './envelope';
+export * from './events/capture';
 export * from './events/cards';
 export * from './events/fleet';
 export * from './events/hooks';

@@ -22,26 +22,33 @@ export type BoardMoveSource = 'person' | 'automatic';
  * - `finish` — the active round becomes `finished` (by the person for a drag);
  * - `collect` — send `card.collect`: entering Finished with work to collect (D8);
  * - `accept` — set `completedAt`/`completedById`, send `card.close` (D10);
- * - `reopen` — clear `completedAt`/`completedById`: leaving Completed.
+ * - `reopen` — clear `completedAt`/`completedById`: leaving Completed;
+ * - `accept_suggestion` — a person dragged an Inbox card to To Do: what
+ *   Accept does (#244 D9) — evidence stripped, `card.inbox_accepted`.
  */
 export type BoardMoveEffect =
   | 'stop'
   | 'finish'
   | 'collect'
   | 'accept'
-  | 'reopen';
+  | 'reopen'
+  | 'accept_suggestion';
 
 /**
  * - `card_running` — a round is active and the move would take the card out
  *   of In progress, not to Finished and without `stopWorker`;
  * - `automatic_to_completed` — only a person completes a card;
  * - `card_completed` — automation never moves a Completed card, so a late
- *   event cannot pull back a card the person accepted.
+ *   event cannot pull back a card the person accepted;
+ * - `invalid_move` — into or out of Inbox other than a person's Inbox → To Do
+ *   (#244 D9): a suggestion enters To Do only by Accept, and nothing else
+ *   enters the Inbox.
  */
 export type BoardMoveRefusal =
   | 'card_running'
   | 'automatic_to_completed'
-  | 'card_completed';
+  | 'card_completed'
+  | 'invalid_move';
 
 export interface BoardMoveInput {
   from: BoardColumn;
@@ -79,6 +86,11 @@ export const boardMoveRule = (move: BoardMoveInput): BoardMoveDecision => {
     return refuse('card_completed');
   }
   if (from === to) return { allowed: true, effects: [], offerRun: false };
+  if (from === 'inbox' || to === 'inbox') {
+    return from === 'inbox' && to === 'todo' && source === 'person'
+      ? { allowed: true, effects: ['accept_suggestion'], offerRun: false }
+      : refuse('invalid_move');
+  }
 
   const active = isActiveRoundPhase(roundPhase);
   const effects: BoardMoveEffect[] = [];

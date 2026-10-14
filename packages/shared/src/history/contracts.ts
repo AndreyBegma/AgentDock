@@ -20,6 +20,8 @@ export const RUN_KINDS = [
   'ui_profile',
   /** A board card round (issue #242 D4). */
   'card',
+  /** A card capture extraction (issue #244 D4). */
+  'card_capture',
 ] as const;
 export type RunKind = (typeof RUN_KINDS)[number];
 
@@ -51,6 +53,8 @@ export const RUN_TRIGGERS = [
   'user',
   'schedule',
   'webhook',
+  /** Card capture after a manual session idles or ends (issue #244 D2). */
+  'capture',
 ] as const;
 export type RunTrigger = (typeof RUN_TRIGGERS)[number];
 

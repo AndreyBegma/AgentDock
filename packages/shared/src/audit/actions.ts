@@ -116,6 +116,11 @@ export const AUDIT_ACTIONS = [
   'card.stopped',
   /** #243 D10: the card's Continue after design switch. */
   'card.design_continue_toggled',
+  /** #244 D12: a suggestion landed in the Inbox (system actor, `meta.captureId`). */
+  'card.captured',
+  'card.inbox_accepted',
+  'card.dismissed',
+  /** Also records the capture fields (#244 D12). */
   'board.settings_updated',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

@@ -223,6 +223,60 @@ describe('boardMoveRule', () => {
     ).toEqual({ allowed: true, effects: ['reopen'], offerRun: false });
   });
 
+  describe('Inbox (#244 D9)', () => {
+    it('accepts a suggestion a person drags to To Do', () => {
+      expect(
+        boardMoveRule(move({ from: 'inbox', to: 'todo', roundPhase: null })),
+      ).toEqual({
+        allowed: true,
+        effects: ['accept_suggestion'],
+        offerRun: false,
+      });
+    });
+
+    it('refuses every other move out of the Inbox', () => {
+      for (const to of ['in_progress', 'finished', 'completed'] as const) {
+        expect(
+          boardMoveRule(move({ from: 'inbox', to, roundPhase: null })),
+        ).toEqual({ allowed: false, error: 'invalid_move' });
+      }
+    });
+
+    it('refuses every move into the Inbox, by a person or automation', () => {
+      for (const from of [
+        'todo',
+        'in_progress',
+        'finished',
+        'completed',
+      ] as const) {
+        for (const source of ['person', 'automatic'] as const) {
+          const decision = boardMoveRule(
+            move({ from, to: 'inbox', roundPhase: null, source }),
+          );
+          // Automation never moves a Completed card, whatever the target.
+          const error =
+            from === 'completed' && source === 'automatic'
+              ? 'card_completed'
+              : 'invalid_move';
+          expect(decision).toEqual({ allowed: false, error });
+        }
+      }
+    });
+
+    it('never accepts a suggestion automatically', () => {
+      expect(
+        boardMoveRule(
+          move({
+            from: 'inbox',
+            to: 'todo',
+            roundPhase: null,
+            source: 'automatic',
+          }),
+        ),
+      ).toEqual({ allowed: false, error: 'invalid_move' });
+    });
+  });
+
   it('allows reordering inside a column', () => {
     for (const column of BOARD_COLUMNS) {
       expect(

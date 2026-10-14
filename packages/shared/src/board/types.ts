@@ -6,8 +6,12 @@ import { LOCAL_CARD_SUMMARY_MAX } from '../protocol/local';
  * enums mirror the Prisma enums of the same names.
  */
 
-/** D3. `inbox` arrives with auto-capture (#244). */
+/**
+ * D3. `inbox` (#244 D8/D9) holds captured suggestions; it is first, and only
+ * operators and above see it.
+ */
 export const BOARD_COLUMNS = [
+  'inbox',
   'todo',
   'in_progress',
   'finished',
@@ -22,8 +26,8 @@ export const isBoardColumn = (value: string): value is BoardColumn =>
 export const BOARD_CARD_KINDS = ['feature', 'bug'] as const;
 export type BoardCardKind = (typeof BOARD_CARD_KINDS)[number];
 
-/** Where a card came from; `manual` only until #244. */
-export const BOARD_CARD_SOURCES = ['manual'] as const;
+/** Where a card came from: a person, or capture (#244) — kept after Accept. */
+export const BOARD_CARD_SOURCES = ['manual', 'captured'] as const;
 export type BoardCardSource = (typeof BOARD_CARD_SOURCES)[number];
 
 /** D4: what started a round. */

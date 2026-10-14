@@ -300,7 +300,8 @@ describe('board (e2e)', () => {
       }
       const all = await board();
       expect(column(all, 'completed')).toEqual([3, 2, 1]);
-      const before = all.columns[3].cards[1].completedAt;
+      const before = all.columns.find((c) => c.column === 'completed')?.cards[1]
+        .completedAt;
       const page = (
         await w.operator.get(
           `${w.path()}/board?completedBefore=${encodeURIComponent(before ?? '')}`,

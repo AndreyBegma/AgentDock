@@ -15,6 +15,7 @@ import type { Status } from '@andrewbehma/glass-ui/status-pill';
 import { ApiError, describeError } from '../api';
 
 export const COLUMN_TITLE: Record<BoardColumn, string> = {
+  inbox: 'Inbox',
   todo: 'To Do',
   in_progress: 'In progress',
   finished: 'Finished',
@@ -22,6 +23,7 @@ export const COLUMN_TITLE: Record<BoardColumn, string> = {
 };
 
 export const COLUMN_HINT: Record<BoardColumn, string> = {
+  inbox: 'Suggested from your sessions. Accept or dismiss.',
   todo: 'Waiting for a worker.',
   in_progress: 'A worker is on it.',
   finished: 'Review it, send it back or accept it.',
@@ -101,9 +103,15 @@ export const parseCardParam = (raw: string | null): number | undefined => {
   return n > 0 ? n : undefined;
 };
 
-/** Every column in `BOARD_COLUMNS` order, even if the API left one out. */
+/**
+ * Every column in `BOARD_COLUMNS` order, even if the API left one out — except
+ * Inbox, which the API leaves out on purpose for a viewer (#244 D8).
+ */
 export const columnsOf = (view: BoardView) =>
-  BOARD_COLUMNS.map(
+  BOARD_COLUMNS.filter(
+    (column) =>
+      column !== 'inbox' || view.columns.some((c) => c.column === column),
+  ).map(
     (column) =>
       view.columns.find((c) => c.column === column) ?? {
         column,
@@ -117,6 +125,7 @@ export const MOVE_REFUSAL_TEXT: Record<BoardMoveRefusal, string> = {
     'A worker is running on this card. Stop it first, or mark the card finished.',
   automatic_to_completed: 'Only a person completes a card.',
   card_completed: 'This card is already completed.',
+  invalid_move: 'A suggestion leaves the Inbox only by Accept, into To Do.',
 };
 
 export const canRun = (card: BoardCardView): boolean =>

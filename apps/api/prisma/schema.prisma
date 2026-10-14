@@ -78,6 +78,7 @@ model User {
   boardCardsCompleted         BoardCard[]                   @relation("BoardCardCompletedBy")
   boardCardRounds             BoardCardRound[]
   boardSettingsUpdated        BoardSettings[]
+  cardDismissals              CardDismissal[]
 
   @@map("users")
 }
@@ -380,6 +381,8 @@ model Project {
   designSettings       DesignSettings?
   boardCards           BoardCard[]
   boardSettings        BoardSettings?
+  cardCaptures         CardCapture[]
+  cardDismissals       CardDismissal[]
 
   @@unique([runnerId, rootPath])
   @@map("projects")
@@ -670,6 +673,8 @@ model AgentSession {
   workflowMark   SessionWorkflowMark?
   contents       SessionContent[]
   actionRequests ActionRequest[]
+  cardCaptures   CardCapture[]
+  capturedCards  BoardCard[]          @relation("BoardCardSourceSession")
 
   @@unique([runnerId, runtime, externalId])
   @@index([projectId, startedAt])
@@ -1500,6 +1505,8 @@ enum RunKind {
   ui_profile
   /// A board card round (issue #242 D4).
   card
+  /// A card capture extraction (issue #244 D4).
+  card_capture
 }
 
 enum RunStatus {
@@ -1521,6 +1528,8 @@ enum RunTrigger {
   user
   schedule
   webhook
+  /// Card capture after a manual session idles or ends (issue #244 D2).
+  capture
 }
 
 /// One unit of agent work (D7, data-model.md). An `orchestrator_slot` run is a
@@ -1561,6 +1570,7 @@ model Run {
   uiProfiles        UiProfile[]
   firings           ScheduleFiring[]
   cardRound         BoardCardRound?
+  cardCapture       CardCapture?
   inboundDeliveries InboundDelivery[]
 
   @@index([projectId, startedAt])
@@ -2561,8 +2571,9 @@ model DesignComment {
 
 // ─── Board (issue #242, ADR-0024) ───────────────────────────────────────────
 
-/// Shared `BOARD_COLUMNS` (D3). `inbox` arrives with #244.
+/// Shared `BOARD_COLUMNS` (D3). `inbox` holds captured suggestions (#244 D8).
 enum BoardColumn {
+  inbox
   todo
   in_progress
   finished
@@ -2578,6 +2589,8 @@ enum BoardCardKind {
 /// Shared `BOARD_CARD_SOURCES`.
 enum BoardCardSource {
   manual
+  /// From card capture (#244); kept after Accept.
+  captured
 }
 
 /// Shared `CARD_ROUND_TRIGGERS` (D4).
@@ -2608,59 +2621,76 @@ enum CardFinishedBy {
 /// A work item AgentDock owns (ADR-0024), not a GitHub issue. Each Run or
 /// feedback is a round with its own `runs` row (D4).
 model BoardCard {
-  id            String          @id @default(cuid())
-  projectId     String
+  id                  String          @id @default(cuid())
+  projectId           String
   /// Per project, `C-<number>`: max + 1 under `pg_advisory_xact_lock` (D1).
-  number        Int
+  number              Int
   /// `^[a-z0-9]{8}$`: the worktree, tmux session and runner record (D5).
-  shortId       String          @unique
+  shortId             String          @unique
   /// At most 200 characters, checked by the DTO.
-  title         String
+  title               String
   /// Markdown, at most 20 000 characters.
-  body          String          @default("")
-  kind          BoardCardKind   @default(feature)
-  column        BoardColumn     @default(todo)
+  body                String          @default("")
+  kind                BoardCardKind   @default(feature)
+  column              BoardColumn     @default(todo)
   /// Fractional index inside the column (D3).
-  position      Float
-  source        BoardCardSource @default(manual)
-  issueOnRun    Boolean
-  specOnRun     Boolean
+  position            Float
+  source              BoardCardSource @default(manual)
+  issueOnRun          Boolean
+  specOnRun           Boolean
   /// Overrides the project's model from the next round (D12).
-  model         String?
+  model               String?
   /// #243 D5: approving the design starts round 1. Changeable until the design is approved.
-  continueAfterDesign Boolean   @default(false)
+  continueAfterDesign Boolean         @default(false)
   /// #243 D2: the design turns' Claude session — `--session-id` first, then `--resume`.
-  designSessionId String?       @db.Uuid
+  designSessionId     String?         @db.Uuid
   /// The Claude session, fixed at the first Run (D6).
-  sessionId     String?         @db.Uuid
-  branch        String?
+  sessionId           String?         @db.Uuid
+  branch              String?
   /// Display only: the runner owns the path.
-  worktree      String?
-  issueNumber   Int?
-  issueUrl      String?
-  specPath      String?
-  prNumber      Int?
-  prUrl         String?
+  worktree            String?
+  issueNumber         Int?
+  issueUrl            String?
+  specPath            String?
+  prNumber            Int?
+  prUrl               String?
   /// Nullable so deleting a user keeps the card.
-  createdById   String?
-  movedById     String?
-  completedById String?
-  movedAt       DateTime
-  completedAt   DateTime?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  createdById         String?
+  movedById           String?
+  completedById       String?
+  movedAt             DateTime
+  completedAt         DateTime?
+  /// #244: the extraction that suggested the card.
+  captureId           String?
+  /// #244: the manual session it was captured from; kept after Accept.
+  sourceSessionId     String?
+  /// #244: why it was suggested, at most 300 characters.
+  captureWhy          String?
+  /// #244: 0–1.
+  captureConfidence   Float?
+  /// #244 D8: `[{contentId, kind, excerpt}]`, excerpts of at most 300
+  /// characters; content-derived, so operators only. Accept clears it.
+  evidence            Json?
+  /// #244 D6: sha256 of the normalized title (shared `captureFingerprint`);
+  /// written on every card, so a suggestion matching it is dropped.
+  fingerprint         String?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
 
-  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdBy   User?            @relation("BoardCardCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  movedBy     User?            @relation("BoardCardMovedBy", fields: [movedById], references: [id], onDelete: SetNull)
-  completedBy User?            @relation("BoardCardCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
-  rounds      BoardCardRound[]
-  design      TaskDesign?
-  designTurns PlanTurn[]
+  project       Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy     User?            @relation("BoardCardCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  movedBy       User?            @relation("BoardCardMovedBy", fields: [movedById], references: [id], onDelete: SetNull)
+  completedBy   User?            @relation("BoardCardCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+  capture       CardCapture?     @relation(fields: [captureId], references: [id], onDelete: SetNull)
+  sourceSession AgentSession?    @relation("BoardCardSourceSession", fields: [sourceSessionId], references: [id], onDelete: SetNull)
+  rounds        BoardCardRound[]
+  design        TaskDesign?
+  designTurns   PlanTurn[]
 
   @@unique([projectId, number])
   @@index([projectId, column, position])
   @@index([sessionId])
+  @@index([projectId, fingerprint])
   @@map("board_cards")
 }
 
@@ -2699,16 +2729,101 @@ model BoardCardRound {
 
 /// A project's board settings (D2, D13). No row: the defaults.
 model BoardSettings {
-  projectId   String   @id
-  issueOnRun  Boolean  @default(false)
-  specOnRun   Boolean  @default(false)
+  projectId      String   @id
+  issueOnRun     Boolean  @default(false)
+  specOnRun      Boolean  @default(false)
   /// 1–10, checked by the DTO.
-  maxRunning  Int      @default(3)
-  updatedById String?
-  updatedAt   DateTime @updatedAt
+  maxRunning     Int      @default(3)
+  /// #244 D10: on only while the project's `shipSessionContent` is on;
+  /// turning content off turns it off.
+  captureEnabled Boolean  @default(false)
+  /// Shared `CAPTURE_MODELS`: `haiku` or `sonnet`, checked by the DTO.
+  captureModel   String   @default("haiku")
+  updatedById    String?
+  updatedAt      DateTime @updatedAt
 
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   updatedBy User?   @relation(fields: [updatedById], references: [id], onDelete: SetNull)
 
   @@map("board_settings")
+}
+
+// ─── Card capture (issue #244, ADR-0026) ────────────────────────────────────
+
+/// Shared `CAPTURE_STATUSES`.
+enum CardCaptureStatus {
+  queued
+  running
+  succeeded
+  failed
+  skipped
+}
+
+/// Shared `CAPTURE_SKIP_REASONS`.
+enum CardCaptureSkipReason {
+  too_little
+  rate_limited
+  inbox_full
+  budget_exceeded
+  runner_offline
+  capture_off
+}
+
+/// One extraction of a manual session's new content (D3, D4). The newest
+/// row's `contentToId` is the session's watermark: content is never sent
+/// twice. A content purge deletes the project's rows.
+model CardCapture {
+  id               String                 @id @default(cuid())
+  projectId        String
+  /// The manual session it reads.
+  sessionId        String
+  /// The `card_capture` run; null for an extraction skipped before it ran.
+  runId            String?                @unique
+  /// The extraction's own Claude session (`cards.extract` `sessionId`,
+  /// `--session-id`): how the run is priced (ADR-0009).
+  extractSessionId String?                @db.Uuid
+  /// `session_contents.id` range read; `contentToId` is the next watermark.
+  contentFromId    BigInt
+  contentToId      BigInt
+  inputChars       Int
+  status           CardCaptureStatus      @default(queued)
+  skipReason       CardCaptureSkipReason?
+  /// Never content; `contract_violation: …` for an output that broke D5.
+  error            String?
+  /// The model's result, at most 32 KiB; deleted with content retention.
+  resultText       String?
+  /// Cards it put in the Inbox.
+  suggested        Int                    @default(0)
+  createdAt        DateTime               @default(now())
+  finishedAt       DateTime?
+
+  project Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  run     Run?         @relation(fields: [runId], references: [id], onDelete: SetNull)
+  cards   BoardCard[]
+
+  @@index([projectId, createdAt])
+  @@index([sessionId, createdAt])
+  @@map("card_captures")
+}
+
+/// A dismissed suggestion's fingerprint (D9): blocks it for 90 days; a daily
+/// job deletes older rows.
+model CardDismissal {
+  id            String   @id @default(cuid())
+  projectId     String
+  /// sha256 of the normalized title (shared `captureFingerprint`).
+  fingerprint   String
+  /// At most 120 characters: the suggestion's title, for the record.
+  title         String
+  /// Nullable so deleting the user keeps the row.
+  dismissedById String?
+  createdAt     DateTime @default(now())
+
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  dismissedBy User?   @relation(fields: [dismissedById], references: [id], onDelete: SetNull)
+
+  @@index([projectId, fingerprint])
+  @@index([createdAt])
+  @@map("card_dismissals")
 }

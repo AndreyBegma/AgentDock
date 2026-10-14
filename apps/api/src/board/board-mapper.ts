@@ -4,11 +4,14 @@ import {
   type BoardCardView,
   type BoardSettingsView,
   type BoardUserRef,
+  CAPTURE_MODEL_DEFAULT,
   CARD_HOOKS_GRACE_MS,
+  type CardEvidenceView,
   type CardRoundBrief,
   type CardRoundView,
   cardLabel,
   isActiveRoundPhase,
+  isCaptureModel,
   type TaskDesignSummary,
 } from '@agentdock/shared';
 import {
@@ -126,10 +129,33 @@ export const toCardView = (
   design: designOf(card.design),
   continueAfterDesign: card.continueAfterDesign,
   costUsd: cardCost(card.rounds, facts.costs),
+  captureWhy: card.captureWhy,
+  captureConfidence: card.captureConfidence,
+  sourceSessionId: card.sourceSessionId,
   movedAt: card.movedAt.toISOString(),
   completedAt: iso(card.completedAt),
   updatedAt: card.updatedAt.toISOString(),
 });
+
+const isEvidence = (value: Prisma.JsonValue): value is Prisma.JsonObject =>
+  typeof value === 'object' &&
+  value !== null &&
+  !Array.isArray(value) &&
+  typeof value.contentId === 'string' &&
+  (value.kind === 'prompt' || value.kind === 'response') &&
+  typeof value.excerpt === 'string';
+
+/** #244 D8: `board_cards.evidence`; `null` when there is none. */
+const evidenceOf = (
+  json: Prisma.JsonValue | null,
+): CardEvidenceView[] | null =>
+  Array.isArray(json)
+    ? json.filter(isEvidence).map((e) => ({
+        contentId: String(e.contentId),
+        kind: e.kind === 'prompt' ? 'prompt' : 'response',
+        excerpt: String(e.excerpt),
+      }))
+    : null;
 
 const toRoundView = (
   card: BoardCard,
@@ -176,6 +202,7 @@ export const toCardDetail = (
   rounds: [...card.rounds]
     .sort((a, b) => a.round - b.round)
     .map((round) => toRoundView(card, round, facts)),
+  evidence: evidenceOf(card.evidence),
 });
 
 /** No row is the defaults (`isDefault: true`). */
@@ -189,6 +216,10 @@ export const toSettingsView = (
         issueOnRun: row.issueOnRun,
         specOnRun: row.specOnRun,
         maxRunning: row.maxRunning,
+        captureEnabled: row.captureEnabled,
+        captureModel: isCaptureModel(row.captureModel)
+          ? row.captureModel
+          : CAPTURE_MODEL_DEFAULT,
         isDefault: false,
         updatedAt: row.updatedAt.toISOString(),
       }
@@ -197,6 +228,8 @@ export const toSettingsView = (
         issueOnRun: false,
         specOnRun: false,
         maxRunning: BOARD_MAX_RUNNING_DEFAULT,
+        captureEnabled: false,
+        captureModel: CAPTURE_MODEL_DEFAULT,
         isDefault: true,
         updatedAt: null,
       };
