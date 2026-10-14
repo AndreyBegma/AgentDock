@@ -562,11 +562,6 @@ describe('agentdock-runner CLI', () => {
       expect(stdout).toEqual([]);
     });
 
-    it('mcp is a stub that says it is not implemented', async () => {
-      expect(await runCli(['mcp'], deps())).toBe(EXIT.failure);
-      expect(stderr.join('')).toContain('mcp is not implemented yet');
-    });
-
     it('away needs on or off, and fails when the daemon is down', async () => {
       expect(await runCli(['away', 'maybe'], deps())).toBe(EXIT.usage);
       expect(await runCli(['away', 'on'], deps())).toBe(EXIT.failure);
