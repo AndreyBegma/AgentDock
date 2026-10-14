@@ -33,6 +33,7 @@ describe('visibleNav', () => {
       'workspace/Overview',
       'workspace/Projects',
       'workspace/Activity',
+      'workspace/Tasks',
       'workspace/Sessions',
       'workspace/Usage',
       'workspace/Skills',
@@ -40,6 +41,7 @@ describe('visibleNav', () => {
       'admin/Users',
       'admin/Schedules',
       'admin/Budgets',
+      'admin/Planner',
       'admin/Audit',
       'admin/Prices',
       'admin/Integrations',
@@ -64,12 +66,14 @@ describe('visibleNav', () => {
       'workspace/Overview',
       'workspace/Projects',
       'workspace/Activity',
+      'workspace/Tasks',
       'workspace/Sessions',
       'workspace/Usage',
     ]);
     const inProject = labels('viewer', '/projects/p1/settings');
     for (const page of [
       'Fleet',
+      'Planner',
       'Queue',
       'Approvals',
       'Activity',
@@ -130,6 +134,13 @@ describe('activeEntryId: one active item', () => {
     );
   });
 
+  test('Tasks, the project Planner and the admin Planner each light one entry', () => {
+    expect(activeAt('viewer', '/tasks')).toBe('tasks');
+    expect(activeAt('viewer', '/projects/p1/planner')).toBe('planner');
+    expect(activeAt('viewer', '/projects/p1/planner/plan1')).toBe('planner');
+    expect(activeAt('admin', '/admin/planner')).toBe('admin-planner');
+  });
+
   test('a session detail lights Sessions; a page outside the rail lights nothing', () => {
     expect(activeAt('viewer', '/sessions/s1')).toBe('sessions');
     expect(activeAt('viewer', '/account')).toBeNull();
@@ -162,8 +173,8 @@ describe('tabBarSplit', () => {
     expect(split('admin', '/')).toEqual({
       tabs: ['Overview', 'Projects', 'Activity', 'Sessions', 'Usage'],
       more: [
-        'workspace: Skills',
-        'admin: Runners, Users, Schedules, Budgets, Audit, Prices, Integrations, Settings',
+        'workspace: Tasks, Skills',
+        'admin: Runners, Users, Schedules, Budgets, Planner, Audit, Prices, Integrations, Settings',
       ],
     });
   });
@@ -172,17 +183,17 @@ describe('tabBarSplit', () => {
     expect(split('admin', '/projects/p1/queue')).toEqual({
       tabs: ['Fleet', 'Queue', 'Approvals', 'Activity', 'History'],
       more: [
-        'project: Skills, Schedules, Settings',
-        'workspace: Overview, Projects, Activity, Sessions, Usage, Skills',
-        'admin: Runners, Users, Schedules, Budgets, Audit, Prices, Integrations, Settings',
+        'project: Planner, Skills, Schedules, Settings',
+        'workspace: Overview, Projects, Activity, Tasks, Sessions, Usage, Skills',
+        'admin: Runners, Users, Schedules, Budgets, Planner, Audit, Prices, Integrations, Settings',
       ],
     });
   });
 
-  test('a viewer gets five tabs and no Admin, and More may be empty', () => {
+  test('a viewer gets five tabs and no Admin; Tasks waits behind More', () => {
     const { tabs, more } = split('viewer', '/');
     expect(tabs).toHaveLength(5);
-    expect(more).toEqual([]);
+    expect(more).toEqual(['workspace: Tasks']);
   });
 
   test('tabs resolve the project id', () => {
