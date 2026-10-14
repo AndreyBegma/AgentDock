@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { LiveModule } from '../live/live.module';
 import { ProjectsModule } from '../projects';
 import { RunnersModule } from '../runners/runners.module';
+import { CardDesignTurnService } from './card-design-turn.service';
 import { PlanService } from './plan.service';
 import { PlanDocsSink } from './plan-docs-sink';
 import { PlanSendService } from './plan-send.service';
@@ -27,6 +28,7 @@ import { TasksQueryService } from './tasks-query.service';
   imports: [LiveModule, ProjectsModule, RunnersModule],
   controllers: [PlansController, PlannerAdminController, TasksController],
   providers: [
+    CardDesignTurnService,
     PlanDocsSink,
     PlanSendService,
     PlanService,
@@ -37,7 +39,8 @@ import { TasksQueryService } from './tasks-query.service';
     PlannerInstructionsService,
     TasksQueryService,
   ],
-  // The design stage (spec 223) runs its turns through the planner's.
-  exports: [PlanStore, PlanTurnService],
+  // The design stage (spec 223) runs its turns through the planner's — a
+  // board card's as well (#243).
+  exports: [CardDesignTurnService, PlanStore, PlanTurnService],
 })
 export class PlannerModule {}

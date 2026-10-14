@@ -16,8 +16,9 @@ import { sendMockup } from './mockup-response';
  * even though the web reaches it through its same-origin `/api` rewrite,
  * and the pin helper injected, never stored.
  *
- * Read follows the plan (D17): a member of the project who may read the
- * revision's plan. Anything else is 404, as if absent.
+ * Read follows the design's owner (ADR-0025): for a plan task, a member of
+ * the project who may read the revision's plan (D17); for a board card, any
+ * member of its project (#243 D8). Anything else is 404, as if absent.
  */
 @Controller('design-revisions')
 export class DesignMockupController {
@@ -37,17 +38,26 @@ export class DesignMockupController {
       select: {
         html: true,
         design: {
-          select: { plan: { select: { id: true, projectId: true } } },
+          select: {
+            plan: { select: { id: true, projectId: true } },
+            card: { select: { projectId: true } },
+          },
         },
       },
     });
-    const plan = revision?.design.plan;
-    const readable =
-      plan &&
-      (await this.access.resolve(user, plan.projectId)) &&
-      (await this.prisma.plan.count({
-        where: { id: plan.id, ...readablePlanWhere(user.id) },
-      })) > 0;
+    const owner = revision?.design;
+    let readable = false;
+    if (owner?.plan) {
+      readable =
+        (await this.access.resolve(user, owner.plan.projectId)) !== null &&
+        (await this.prisma.plan.count({
+          where: { id: owner.plan.id, ...readablePlanWhere(user.id) },
+        })) > 0;
+    } else if (owner?.card) {
+      // #243 D8: a card's design is the project's — every member reads it.
+      readable =
+        (await this.access.resolve(user, owner.card.projectId)) !== null;
+    }
     if (!revision || !readable) {
       throw designError(404, DESIGN_ERROR.notFound, 'Design not found');
     }

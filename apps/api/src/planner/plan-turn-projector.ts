@@ -19,20 +19,32 @@ import {
   type RunnerEvent,
 } from '@agentdock/shared/protocol';
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
-import type { Plan, PlanTask, Prisma } from '@prisma/client';
+import type {
+  BoardCard,
+  Plan,
+  PlanTask,
+  PlanTurn,
+  Prisma,
+} from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { applyDesignOutput, settleDesign } from '../design/design-apply';
+import { CARD_DESIGN_CONTRACT_VERSION } from '../design/design-prompt';
 import {
   type DesignGate,
   type DesignTurnPlan,
   designTurnPlanOf,
   withDesign,
 } from '../design/design-rules';
-import { applySuggestions, designGates } from '../design/design-store';
+import {
+  applySuggestions,
+  cardDesignTaskKey,
+  designGates,
+} from '../design/design-store';
 import {
   type RunnerEventSink,
   RunnerEventSinks,
 } from '../runners/runner-event-sinks';
+import { CardDesignTurnService } from './card-design-turn.service';
 import {
   afterGrill,
   type CurrentTask,
@@ -45,6 +57,18 @@ import { PlanStore } from './plan-store';
 import { PlanTurnService } from './plan-turn.service';
 
 type Tx = Prisma.TransactionClient;
+
+/** A plan's turn, with its plan. */
+type PlanOwnedTurn = PlanTurn & {
+  plan: Plan;
+  planId: string;
+  task: PlanTask | null;
+};
+/** A board card's design turn, with its card (#243 D2). */
+type CardTurn = PlanTurn & { card: BoardCard };
+type OwnedTurn =
+  | { kind: 'plan'; turn: PlanOwnedTurn }
+  | { kind: 'card'; turn: CardTurn };
 
 /** A turn the API starts once this one is applied (D7; spec 223 D4). */
 type Chain =
@@ -106,6 +130,7 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly store: PlanStore,
     private readonly turns: PlanTurnService,
+    private readonly cardTurns: CardDesignTurnService,
   ) {}
 
   onModuleInit(): void {
@@ -133,29 +158,38 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
     }
   }
 
-  /** The turn, if it belongs to that plan, run and project on this runner. */
+  /**
+   * The turn, if it belongs to that owner, run and project on this runner.
+   * ADR-0025: the event's `planId` is a plan's id, or — for a board card's
+   * design turn (#243 D2) — the card's.
+   */
   private async turnOf(
     runnerId: string,
     data: { turnId: string; planId: string; runId: string; projectId: string },
-  ) {
+  ): Promise<OwnedTurn | null> {
+    const owner = { projectId: data.projectId, project: { runnerId } };
     const turn = await this.prisma.planTurn.findFirst({
       where: {
         id: data.turnId,
-        planId: data.planId,
         runId: data.runId,
-        plan: { projectId: data.projectId, project: { runnerId } },
+        OR: [
+          { planId: data.planId, plan: owner },
+          { cardId: data.planId, card: owner },
+        ],
       },
-      include: { plan: true, task: true },
+      include: { plan: true, task: true, card: true },
     });
-    // ADR-0025: the `plan` filter above never matches a card's design turn;
-    // #243 iB-api projects those. This narrows the now-nullable owner.
-    if (!turn || turn.plan === null || turn.planId === null) {
-      this.logger.warn(
-        `runner ${runnerId}: plan turn ${data.turnId} of project ${data.projectId} not found, skipped`,
-      );
-      return null;
+    if (turn?.plan && turn.planId !== null) {
+      return {
+        kind: 'plan',
+        turn: { ...turn, plan: turn.plan, planId: turn.planId },
+      };
     }
-    return { ...turn, plan: turn.plan, planId: turn.planId };
+    if (turn?.card) return { kind: 'card', turn: { ...turn, card: turn.card } };
+    this.logger.warn(
+      `runner ${runnerId}: plan turn ${data.turnId} of project ${data.projectId} not found, skipped`,
+    );
+    return null;
   }
 
   /** `queued` → `running`. A terminal phase is settled by `finished`, which carries the result. */
@@ -164,21 +198,32 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
     data: PlanTurnPhaseChangedData,
   ): Promise<void> {
     if (data.phase !== 'running') return;
-    const turn = await this.turnOf(runnerId, data);
-    if (!turn) return;
+    const owned = await this.turnOf(runnerId, data);
+    if (!owned) return;
+    const { turn } = owned;
     const updated = await this.prisma.planTurn.updateMany({
       where: { id: turn.id, phase: 'queued' },
       data: { phase: 'running' },
     });
-    if (updated.count > 0) await this.publish(turn.plan, turn.runId);
+    if (updated.count === 0) return;
+    if (owned.kind === 'card') {
+      await this.publishCard(owned.turn.card, turn.runId);
+    } else {
+      await this.publish(owned.turn.plan, turn.runId);
+    }
   }
 
   private async finished(
     runnerId: string,
     data: PlanTurnFinishedData,
   ): Promise<void> {
-    const turn = await this.turnOf(runnerId, data);
-    if (!turn) return;
+    const owned = await this.turnOf(runnerId, data);
+    if (!owned) return;
+    if (owned.kind === 'card') {
+      await this.cardFinished(owned.turn, data);
+      return;
+    }
+    const { turn } = owned;
     const at = new Date(data.at);
     const resultText = data.resultText ?? null;
     let chain: Chain | null = null;
@@ -197,7 +242,7 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
     // Spec 223: a design turn that draws nothing puts its design back to rest.
     const unsettle = async (tx: Tx) => {
       if (turn.action === 'design' && turn.task) {
-        await settleDesign(tx, turn.planId, turn.task.key);
+        await settleDesign(tx, { planId: turn.planId, taskKey: turn.task.key });
       }
     };
 
@@ -263,7 +308,10 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
         if (!settled) return false;
         const next = await applyDesignOutput(
           tx,
-          { id: turn.id, planId: turn.planId, taskKey: turn.task.key },
+          {
+            id: turn.id,
+            owner: { planId: turn.planId, taskKey: turn.task.key },
+          },
           designPlan,
           parsed.output,
           parsed.html,
@@ -305,7 +353,10 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
         turn.authorId,
       );
       if (!started && turn.task) {
-        await settleDesign(this.prisma, turn.planId, turn.task.key);
+        await settleDesign(this.prisma, {
+          planId: turn.planId,
+          taskKey: turn.task.key,
+        });
         this.store.publishDesign(
           turn.plan.projectId,
           turn.planId,
@@ -319,6 +370,109 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
         next.taskId,
         turn.authorId,
       );
+    }
+  }
+
+  /**
+   * #243 D2: a board card's design turn ended. Validated against contract v2
+   * like a plan task's design turn — a violation fails the turn and stores no
+   * revision — then the next variant of the batch starts, or the design
+   * rests. No write turn follows a card's design (D7).
+   */
+  private async cardFinished(
+    turn: CardTurn,
+    data: PlanTurnFinishedData,
+  ): Promise<void> {
+    const at = new Date(data.at);
+    const resultText = data.resultText ?? null;
+    const owner = { cardId: turn.card.id };
+    const designPlan = designTurnPlanOf(
+      (
+        await this.prisma.run.findUnique({
+          where: { id: turn.runId },
+          select: { args: true },
+        })
+      )?.args,
+    );
+    let next: DesignTurnPlan | null = null;
+    const applied = await this.prisma.$transaction(async (tx) => {
+      const fail = async (
+        phase: 'failed' | 'cancelled',
+        error: string,
+      ): Promise<boolean> => {
+        const settled = await this.store.settleTurn(
+          turn.id,
+          { phase, error, resultText, at },
+          tx,
+        );
+        if (settled) await settleDesign(tx, owner);
+        return settled;
+      };
+      if (data.phase !== 'succeeded') {
+        return fail(data.phase, data.error ?? `the turn ended ${data.phase}`);
+      }
+      if (data.resultTruncated) {
+        return fail(
+          'failed',
+          'contract_violation: result_truncated: the result was cut at the event size limit',
+        );
+      }
+      if (!designPlan || turn.action !== 'design') {
+        return fail(
+          'failed',
+          'contract_violation: invalid_shape: the design turn lost its variant; generate it again',
+        );
+      }
+      const parsed = parsePlannerOutput(resultText ?? '', 'design', {
+        contractVersion: CARD_DESIGN_CONTRACT_VERSION,
+        taskKey: cardDesignTaskKey(turn.card.number),
+        variant: designPlan.variant,
+        openCommentIds: designPlan.comments,
+      });
+      if (!parsed.ok) {
+        return fail(
+          'failed',
+          `contract_violation: ${parsed.error.reason}: ${parsed.error.message}`,
+        );
+      }
+      if (!('html' in parsed) || typeof parsed.html !== 'string') {
+        return fail(
+          'failed',
+          'contract_violation: invalid_shape: the design turn drew no mockup',
+        );
+      }
+      const settled = await this.store.settleTurn(
+        turn.id,
+        {
+          phase: 'succeeded',
+          resultText,
+          output: parsed.output as Prisma.InputJsonValue,
+          at,
+        },
+        tx,
+      );
+      if (!settled) return false;
+      next = await applyDesignOutput(
+        tx,
+        { id: turn.id, owner },
+        designPlan,
+        parsed.output,
+        parsed.html,
+      );
+      return true;
+    });
+    if (!applied) return;
+    await this.publishCard(turn.card, turn.runId);
+    const batch = next as DesignTurnPlan | null;
+    if (!batch) return;
+    const started = await this.cardTurns.chain(
+      turn.card.id,
+      batch,
+      turn.authorId,
+    );
+    if (!started) {
+      await settleDesign(this.prisma, owner);
+      this.store.publishCardDesign(turn.card.projectId, turn.card.id);
     }
   }
 
@@ -469,5 +623,10 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
   private publish(plan: Plan, runId: string): Promise<void> {
     this.store.publish(plan.projectId, plan.id);
     return this.store.publishRun(plan.projectId, runId);
+  }
+
+  private publishCard(card: BoardCard, runId: string): Promise<void> {
+    this.store.publishCardDesign(card.projectId, card.id);
+    return this.store.publishRun(card.projectId, runId);
   }
 }

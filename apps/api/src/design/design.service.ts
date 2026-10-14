@@ -8,9 +8,12 @@ import {
 } from '@agentdock/shared';
 import { RUNNER_FEATURE_COMMANDS } from '@agentdock/shared/protocol';
 import { Injectable } from '@nestjs/common';
-import type { Plan, PlanTask, TaskDesign } from '@prisma/client';
+import type { BoardCard, Plan, PlanTask, TaskDesign } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
+import { cardNotFound } from '../board/board-error';
+import { BoardRoundsService } from '../board/board-rounds.service';
 import { PrismaService } from '../database/prisma.service';
+import { CardDesignTurnService } from '../planner/card-design-turn.service';
 import { callerOf, type PlanActor } from '../planner/plan.service';
 import { blockingOpen, questionsOf } from '../planner/plan-mapper';
 import { PlanStore } from '../planner/plan-store';
@@ -19,13 +22,14 @@ import { plannerError } from '../planner/planner-error';
 import { settleDesign } from './design-apply';
 import { DesignCommands } from './design-commands';
 import { designError } from './design-error';
+import { busyStatusOf, type DesignOwner } from './design-owner';
 import {
   batchOf,
   commentAnchor,
   type DesignTurnPlan,
   withDesign,
 } from './design-rules';
-import { defaultSkillsOf } from './design-store';
+import { type DesignKey, defaultSkillsOf, designWhere } from './design-store';
 import { loadDesignView } from './design-view';
 import { UiProfileService } from './ui-profile.service';
 import type { WaitingDesign } from './ui-profile-mapper';
@@ -46,10 +50,18 @@ const busy = () =>
     'A design turn or a profile build of this design is queued or running',
   );
 
+const approvedAlready = (what = 'The design is approved') =>
+  designError(409, DESIGN_ERROR.designApproved, what);
+
+/** How strictly a task owner is checked: any change, or only a comment. */
+type TaskCheck = 'change' | 'comment';
+
 /**
- * A task's design (docs/specs/223-design-stage.md D1–D4, D8–D11, D15, D17):
+ * A design (docs/specs/223-design-stage.md D1–D4, D8–D11, D15, D17; #243):
  * the switch, the variant count and skills, Generate, comments, Revise and
- * Approve. Turns are the planner's (`PlanTurnService`); the profile is
+ * Approve. One flow for both owners of ADR-0025 — a plan task, whose turns
+ * are the planner's (`PlanTurnService`), and a board card, whose turns are
+ * `CardDesignTurnService`'s — through the `DesignOwner` seam. The profile is
  * checked and built first (`UiProfileService`, D13).
  */
 @Injectable()
@@ -58,10 +70,14 @@ export class DesignService {
     private readonly prisma: PrismaService,
     private readonly store: PlanStore,
     private readonly turns: PlanTurnService,
+    private readonly cardTurns: CardDesignTurnService,
+    private readonly rounds: BoardRoundsService,
     private readonly profiles: UiProfileService,
     private readonly audit: AuditService,
     private readonly commands: DesignCommands,
   ) {}
+
+  // ─── Plan task ─────────────────────────────────────────────────────────────
 
   /** `GET …/tasks/:key/design`: read through the plan's rule (D17). */
   async view(
@@ -72,34 +88,151 @@ export class DesignService {
   ): Promise<TaskDesignView> {
     const plan = await this.store.readable(userId, projectId, planId);
     const project = await this.store.project(projectId);
-    return loadDesignView(this.prisma, project, plan.id, key);
+    return loadDesignView(this.prisma, project, {
+      planId: plan.id,
+      taskKey: key,
+    });
   }
 
-  /**
-   * `PATCH …/tasks/:key/design` (D2, D4, D15): the switch, the variant
-   * count, the skills. A task without a design row gets one. Switching moves
-   * the task between `ready` and `needs_design` (D1).
-   */
+  /** `PATCH …/tasks/:key/design` (D2, D4, D15). */
   async patch(
     plan: Plan,
     key: string,
     request: TaskDesignPatchRequest,
     actor: PlanActor,
   ): Promise<void> {
-    const task = await this.openTask(plan, key);
+    await this.patchOf(
+      await this.taskOwner(plan, key, 'change'),
+      request,
+      actor,
+    );
+  }
+
+  /** `POST …/design/generate` (D4, D13). */
+  async generate(plan: Plan, key: string, actor: PlanActor): Promise<void> {
+    await this.generateOf(await this.taskOwner(plan, key, 'change'), actor);
+  }
+
+  /** `POST …/design/revise` (D10). */
+  async revise(plan: Plan, key: string, actor: PlanActor): Promise<void> {
+    await this.reviseOf(await this.taskOwner(plan, key, 'change'), actor);
+  }
+
+  /** `POST …/design/comments` (D9). */
+  async comment(
+    plan: Plan,
+    key: string,
+    request: DesignCommentRequest,
+    actor: PlanActor,
+  ): Promise<void> {
+    await this.commentOf(
+      await this.taskOwner(plan, key, 'comment'),
+      request,
+      actor,
+    );
+  }
+
+  /** `POST …/design/approve` (D1, D4): the task's write turn is chained, once. */
+  async approve(
+    plan: Plan,
+    key: string,
+    revisionId: string,
+    actor: PlanActor,
+  ): Promise<void> {
+    await this.approveOf(
+      await this.taskOwner(plan, key, 'change'),
+      revisionId,
+      actor,
+    );
+  }
+
+  // ─── Board card (#243) ─────────────────────────────────────────────────────
+
+  /** `GET …/board/cards/:number/design`: any project viewer (D8). */
+  async cardView(projectId: string, number: number): Promise<TaskDesignView> {
+    const card = await this.card(projectId, number);
+    const project = await this.store.project(projectId);
+    return loadDesignView(this.prisma, project, { cardId: card.id });
+  }
+
+  async cardPatch(
+    projectId: string,
+    number: number,
+    request: TaskDesignPatchRequest,
+    actor: PlanActor,
+  ): Promise<void> {
+    await this.patchOf(await this.cardOwner(projectId, number), request, actor);
+  }
+
+  async cardGenerate(
+    projectId: string,
+    number: number,
+    actor: PlanActor,
+  ): Promise<void> {
+    await this.generateOf(await this.cardOwner(projectId, number), actor);
+  }
+
+  async cardRevise(
+    projectId: string,
+    number: number,
+    actor: PlanActor,
+  ): Promise<void> {
+    await this.reviseOf(await this.cardOwner(projectId, number), actor);
+  }
+
+  async cardComment(
+    projectId: string,
+    number: number,
+    request: DesignCommentRequest,
+    actor: PlanActor,
+  ): Promise<void> {
+    await this.commentOf(
+      await this.cardOwner(projectId, number),
+      request,
+      actor,
+    );
+  }
+
+  /**
+   * D6, D7: no write turn; `plan.close` drops the card's design worktree; and
+   * with "Continue after design" on, round 1 starts as the approver. When it
+   * cannot start, the approval stands, the card stays in To Do and the
+   * request answers with why.
+   */
+  async cardApprove(
+    projectId: string,
+    number: number,
+    revisionId: string,
+    actor: PlanActor,
+  ): Promise<void> {
+    await this.approveOf(
+      await this.cardOwner(projectId, number),
+      revisionId,
+      actor,
+    );
+  }
+
+  // ─── Both owners ───────────────────────────────────────────────────────────
+
+  /**
+   * The switch, the variant count, the skills (D2, D4, D15). An owner without
+   * a design row gets one. A task moves between `ready` and `needs_design`
+   * (D1).
+   */
+  private async patchOf(
+    owner: DesignOwner,
+    request: TaskDesignPatchRequest,
+    actor: PlanActor,
+  ): Promise<void> {
     const existing = await this.prisma.taskDesign.findUnique({
-      where: { planId_taskKey: { planId: plan.id, taskKey: key } },
+      where: designWhere(owner.key),
     });
     if (existing && isBusy(existing)) throw busy();
     if (
       existing?.status === 'approved' &&
       (request.variantCount !== undefined || request.skills !== undefined)
     ) {
-      throw designError(
-        409,
-        DESIGN_ERROR.designApproved,
-        'The design is approved',
-      );
+      throw approvedAlready();
     }
     const design = existing
       ? await this.prisma.taskDesign.update({
@@ -114,38 +247,40 @@ export class DesignService {
         })
       : await this.prisma.taskDesign.create({
           data: {
-            planId: plan.id,
-            taskKey: key,
+            ...owner.key,
             needed: request.needed ?? false,
             variantCount: request.variantCount ?? 1,
             skills:
               request.skills ??
-              (await defaultSkillsOf(this.prisma, plan.projectId)),
+              (await defaultSkillsOf(this.prisma, owner.projectId)),
           },
         });
-    await this.gateTask(task, design);
+    await owner.gate(design);
     const before = existing?.needed ?? false;
     if (design.needed !== before) {
       await this.audit.record({
         ...actor.ctx,
         action: 'design.toggled',
-        target: { type: 'plan', id: plan.id },
-        projectId: plan.projectId,
-        before: { key, needed: before },
-        after: { key, needed: design.needed },
+        target: owner.target,
+        projectId: owner.projectId,
+        before: { ...owner.label, needed: before },
+        after: { ...owner.label, needed: design.needed },
         result: 'ok',
       });
     }
-    this.store.publishDesign(plan.projectId, plan.id, key);
+    owner.publish();
   }
 
   /**
-   * `POST …/design/generate` (D4, D13): the first revision of every variant
-   * not drawn yet, one turn each, after the profile check — a missing or
-   * stale profile is built first and the turns start when it is done.
+   * Generate (D4, D13): the first revision of every variant not drawn yet,
+   * one turn each, after the profile check — a missing or stale profile is
+   * built first and the turns start when it is done.
    */
-  async generate(plan: Plan, key: string, actor: PlanActor): Promise<void> {
-    const { task, design } = await this.drawable(plan, key);
+  private async generateOf(
+    owner: DesignOwner,
+    actor: PlanActor,
+  ): Promise<void> {
+    const design = await this.drawable(owner);
     const revisions = await this.prisma.designRevision.findMany({
       where: { designId: design.id },
       select: { variant: true, archived: true },
@@ -157,12 +292,12 @@ export class DesignService {
         'Every variant is drawn; leave comments and revise it',
       );
     }
-    await this.start(plan, task, design, 'generate', [], actor);
+    await this.start(owner, design, 'generate', [], actor);
   }
 
-  /** `POST …/design/revise` (D10): every variant in play, with every open comment. */
-  async revise(plan: Plan, key: string, actor: PlanActor): Promise<void> {
-    const { task, design } = await this.drawable(plan, key);
+  /** Revise (D10): every variant in play, with every open comment. */
+  private async reviseOf(owner: DesignOwner, actor: PlanActor): Promise<void> {
+    const design = await this.drawable(owner);
     const open = await this.openComments(design.id);
     if (open.length === 0) {
       throw designError(
@@ -171,24 +306,19 @@ export class DesignService {
         'Revise needs an open comment',
       );
     }
-    await this.start(plan, task, design, 'revise', open, actor);
+    await this.start(owner, design, 'revise', open, actor);
   }
 
-  /** `POST …/design/comments` (D9): left on the revision in view. */
-  async comment(
-    plan: Plan,
-    key: string,
+  /** A comment (D9), left on the revision in view. */
+  private async commentOf(
+    owner: DesignOwner,
     request: DesignCommentRequest,
     actor: PlanActor,
   ): Promise<void> {
-    this.store.assertOpen(plan);
-    await this.store.task(plan, key);
-    const design = await this.designOf(plan, key);
-    if (!design.needed) throw this.off();
+    const design = await this.designOf(owner);
+    if (!design.needed) throw this.off(owner);
     if (design.status === 'approved') {
-      throw designError(
-        409,
-        DESIGN_ERROR.designApproved,
+      throw approvedAlready(
         'The design is approved; it takes no more comments',
       );
     }
@@ -217,30 +347,18 @@ export class DesignService {
         body: request.body,
       },
     });
-    this.store.publishDesign(plan.projectId, plan.id, key);
+    owner.publish();
   }
 
-  /**
-   * `POST …/design/approve` (D1, D4): picks one revision; the other variants
-   * are archived. The task leaves `needs_design`, and its write turn is
-   * chained — once.
-   */
-  async approve(
-    plan: Plan,
-    key: string,
+  /** Approve (D1, D4): picks one revision; the other variants are archived. */
+  private async approveOf(
+    owner: DesignOwner,
     revisionId: string,
     actor: PlanActor,
   ): Promise<void> {
-    const task = await this.openTask(plan, key);
-    const design = await this.designOf(plan, key);
-    if (!design.needed) throw this.off();
-    if (design.status === 'approved') {
-      throw designError(
-        409,
-        DESIGN_ERROR.designApproved,
-        'The design is approved',
-      );
-    }
+    const design = await this.designOf(owner);
+    if (!design.needed) throw this.off(owner);
+    if (design.status === 'approved') throw approvedAlready();
     if (isBusy(design)) throw busy();
     const revision = await this.prisma.designRevision.findFirst({
       where: { id: revisionId, designId: design.id },
@@ -254,6 +372,17 @@ export class DesignService {
       );
     }
     const approved = await this.prisma.$transaction(async (tx) => {
+      // Only the first of two concurrent approvals wins.
+      const claimed = await tx.taskDesign.updateMany({
+        where: { id: design.id, status: { not: 'approved' } },
+        data: {
+          status: 'approved',
+          approvedRevisionId: revision.id,
+          approvedById: actor.userId,
+          approvedAt: new Date(),
+        },
+      });
+      if (claimed.count === 0) throw approvedAlready();
       await tx.designRevision.updateMany({
         where: { designId: design.id },
         data: { archived: true },
@@ -262,34 +391,24 @@ export class DesignService {
         where: { designId: design.id, variant: revision.variant },
         data: { archived: false },
       });
-      return tx.taskDesign.update({
-        where: { id: design.id },
-        data: {
-          status: 'approved',
-          approvedRevisionId: revision.id,
-          approvedById: actor.userId,
-          approvedAt: new Date(),
-        },
-      });
+      return tx.taskDesign.findUniqueOrThrow({ where: { id: design.id } });
     });
-    const status = await this.gateTask(task, approved);
+    await owner.gate(approved);
     await this.audit.record({
       ...actor.ctx,
       action: 'design.approved',
-      target: { type: 'plan', id: plan.id },
-      projectId: plan.projectId,
+      target: owner.target,
+      projectId: owner.projectId,
       after: {
-        key,
+        ...owner.label,
         revisionId: revision.id,
         variant: revision.variant,
         revision: revision.revision,
       },
       result: 'ok',
     });
-    this.store.publishDesign(plan.projectId, plan.id, key);
-    if (status === 'ready' && blockingOpen(questionsOf(task.questions)) === 0) {
-      await this.turns.chain(plan.id, 'write', task.id, actor.userId);
-    }
+    owner.publish();
+    await owner.onApproved(approved, actor);
   }
 
   /**
@@ -304,39 +423,72 @@ export class DesignService {
     for (const w of waiting) {
       const design = await this.prisma.taskDesign.findUnique({
         where: { id: w.designId },
-        include: { plan: true },
+        include: {
+          plan: true,
+          card: { include: { _count: { select: { rounds: true } } } },
+        },
       });
       if (!design || !isBusy(design)) continue;
-      const { plan, taskKey } = design;
-      // ADR-0025: only a plan task's design waits here until #243 iB-api.
-      if (plan === null || taskKey === null) continue;
+      const key = this.keyOf(design);
+      if (!key) continue;
       const started =
         profileId !== undefined &&
-        (await this.startWaiting(plan, { ...design, taskKey }, w, profileId));
-      if (!started) await settleDesign(this.prisma, plan.id, taskKey);
-      this.store.publishDesign(plan.projectId, plan.id, taskKey);
+        (await this.startWaiting(design, key, w, profileId));
+      if (!started) await settleDesign(this.prisma, key);
+      if ('cardId' in key) {
+        if (design.card) {
+          this.store.publishCardDesign(design.card.projectId, key.cardId);
+        }
+      } else if (design.plan) {
+        this.store.publishDesign(
+          design.plan.projectId,
+          key.planId,
+          key.taskKey,
+        );
+      }
     }
   }
 
+  private keyOf(
+    design: Pick<TaskDesign, 'planId' | 'taskKey' | 'cardId'>,
+  ): DesignKey | null {
+    if (design.cardId !== null) return { cardId: design.cardId };
+    if (design.planId !== null && design.taskKey !== null) {
+      return { planId: design.planId, taskKey: design.taskKey };
+    }
+    return null;
+  }
+
   private async startWaiting(
-    plan: Plan,
-    design: TaskDesign & { taskKey: string },
+    design: TaskDesign & {
+      plan: Plan | null;
+      card: (BoardCard & { _count: { rounds: number } }) | null;
+    },
+    key: DesignKey,
     w: WaitingDesign,
     profileId: string | null,
   ): Promise<boolean> {
-    if (plan.status === 'sent' || plan.status === 'archived') return false;
+    const batch = await this.batch(design, w.mode, profileId);
+    if (!batch) return false;
+    if ('cardId' in key) {
+      // Designs freeze once a round exists (#243 "Out of scope").
+      if (!design.card || design.card._count.rounds > 0) return false;
+      return this.cardTurns.chain(key.cardId, batch, w.userId);
+    }
+    const plan = design.plan;
+    if (!plan || plan.status === 'sent' || plan.status === 'archived') {
+      return false;
+    }
     const task = await this.prisma.planTask.findUnique({
       where: {
         planId_key_planVersion: {
           planId: plan.id,
-          key: design.taskKey,
+          key: key.taskKey,
           planVersion: plan.version,
         },
       },
     });
     if (!task) return false;
-    const batch = await this.batch(design, w.mode, profileId);
-    if (!batch) return false;
     return this.turns.chainDesign(plan.id, task.id, batch, w.userId);
   }
 
@@ -372,25 +524,15 @@ export class DesignService {
    * puts the design back to rest.
    */
   private async start(
-    plan: Plan,
-    task: PlanTask,
+    owner: DesignOwner,
     design: TaskDesign,
     mode: DesignTurnPlan['mode'],
     comments: string[],
     actor: PlanActor,
   ): Promise<void> {
-    const active = await this.prisma.planTurn.count({
-      where: { planId: plan.id, phase: { in: ['queued', 'running'] } },
-    });
-    if (active > 0) {
-      throw plannerError(
-        409,
-        PLANNER_ERROR.turnInProgress,
-        'A turn of this plan is queued or running',
-      );
-    }
+    await owner.assertIdle();
     const caller: PlanCaller = callerOf(actor);
-    const project = await this.store.project(plan.projectId);
+    const project = await this.store.project(owner.projectId);
     // Every command the stage may need, before the profile check writes
     // anything (a joined build, a first fingerprint, the busy status) (#233).
     this.commands.assertServed(
@@ -404,31 +546,31 @@ export class DesignService {
     });
     await this.prisma.taskDesign.update({
       where: { id: design.id },
-      data: { status: mode === 'generate' ? 'generating' : 'revising' },
+      data: { status: busyStatusOf(mode) },
     });
-    this.store.publishDesign(plan.projectId, plan.id, task.key);
+    owner.publish();
     let turnId: string | null = null;
     if (readiness.kind === 'ready') {
       const batch = await this.batch(design, mode, readiness.profileId);
       if (!batch) {
-        await settleDesign(this.prisma, plan.id, task.key);
+        await settleDesign(this.prisma, owner.key);
         return;
       }
       try {
-        turnId = await this.turns.designTurn(plan, task, batch, caller);
+        turnId = await owner.runTurn(batch, caller);
       } catch (error) {
-        await settleDesign(this.prisma, plan.id, task.key);
-        this.store.publishDesign(plan.projectId, plan.id, task.key);
+        await settleDesign(this.prisma, owner.key);
+        owner.publish();
         throw error;
       }
     }
     await this.audit.record({
       ...actor.ctx,
       action: mode === 'generate' ? 'design.generated' : 'design.revised',
-      target: { type: 'plan', id: plan.id },
-      projectId: plan.projectId,
+      target: owner.target,
+      projectId: owner.projectId,
       after: {
-        key: task.key,
+        ...owner.label,
         variantCount: design.variantCount,
         ...(mode === 'revise' ? { comments } : {}),
         ...(readiness.kind === 'building'
@@ -439,50 +581,146 @@ export class DesignService {
     });
   }
 
-  /** A task whose design may still change: the plan open, the task not settled. */
-  private async openTask(plan: Plan, key: string): Promise<PlanTask> {
+  /** A design that takes a Generate or a Revise now. */
+  private async drawable(owner: DesignOwner): Promise<TaskDesign> {
+    const design = await this.designOf(owner);
+    if (!design.needed) throw this.off(owner);
+    if (design.status === 'approved') throw approvedAlready();
+    if (isBusy(design)) throw busy();
+    return design;
+  }
+
+  private async designOf(owner: DesignOwner): Promise<TaskDesign> {
+    const design = await this.prisma.taskDesign.findUnique({
+      where: designWhere(owner.key),
+    });
+    if (!design) throw this.off(owner);
+    return design;
+  }
+
+  private off(owner: DesignOwner) {
+    return designError(
+      409,
+      DESIGN_ERROR.designOff,
+      `The design of this ${owner.kind} is off`,
+    );
+  }
+
+  // ─── Owners ────────────────────────────────────────────────────────────────
+
+  /**
+   * A plan task's design, once the plan is open and — for a change — the
+   * task not settled (D2).
+   */
+  private async taskOwner(
+    plan: Plan,
+    key: string,
+    check: TaskCheck,
+  ): Promise<DesignOwner> {
     this.store.assertOpen(plan);
     const task = await this.store.task(plan, key);
-    if (task.frozen || (SETTLED as readonly string[]).includes(task.status)) {
+    if (
+      check === 'change' &&
+      (task.frozen || (SETTLED as readonly string[]).includes(task.status))
+    ) {
       throw designError(
         409,
         DESIGN_ERROR.taskFrozen,
         `Task ${key} is ${task.status}; its design no longer changes`,
       );
     }
-    return task;
+    let status = task.status;
+    return {
+      kind: 'task',
+      key: { planId: plan.id, taskKey: key },
+      projectId: plan.projectId,
+      target: { type: 'plan', id: plan.id },
+      label: { key },
+      gate: async (design) => {
+        status = await this.gateTask(task, design);
+      },
+      assertIdle: async () => {
+        const active = await this.prisma.planTurn.count({
+          where: { planId: plan.id, phase: { in: ['queued', 'running'] } },
+        });
+        if (active > 0) {
+          throw plannerError(
+            409,
+            PLANNER_ERROR.turnInProgress,
+            'A turn of this plan is queued or running',
+          );
+        }
+      },
+      runTurn: (batch, caller) =>
+        this.turns.designTurn(plan, task, batch, caller),
+      onApproved: async (_design, actor) => {
+        if (
+          status === 'ready' &&
+          blockingOpen(questionsOf(task.questions)) === 0
+        ) {
+          await this.turns.chain(plan.id, 'write', task.id, actor.userId);
+        }
+      },
+      publish: () => this.store.publishDesign(plan.projectId, plan.id, key),
+    };
   }
 
-  /** A design that takes a Generate or a Revise now. */
-  private async drawable(plan: Plan, key: string) {
-    const task = await this.openTask(plan, key);
-    const design = await this.designOf(plan, key);
-    if (!design.needed) throw this.off();
-    if (design.status === 'approved') {
+  /** A card's design, while Run has not started: designs freeze once a round exists. */
+  private async cardOwner(
+    projectId: string,
+    number: number,
+  ): Promise<DesignOwner> {
+    const card = await this.card(projectId, number);
+    const rounds = await this.prisma.boardCardRound.count({
+      where: { cardId: card.id },
+    });
+    if (rounds > 0) {
       throw designError(
         409,
-        DESIGN_ERROR.designApproved,
-        'The design is approved',
+        DESIGN_ERROR.taskFrozen,
+        `Card C-${number} has run; its design no longer changes`,
       );
     }
-    if (isBusy(design)) throw busy();
-    return { task, design };
+    return {
+      kind: 'card',
+      key: { cardId: card.id },
+      projectId,
+      target: { type: 'board_card', id: card.id },
+      label: { number },
+      gate: async () => {},
+      assertIdle: async () => {
+        const active = await this.prisma.planTurn.count({
+          where: { cardId: card.id, phase: { in: ['queued', 'running'] } },
+        });
+        if (active > 0) {
+          throw plannerError(
+            409,
+            PLANNER_ERROR.turnInProgress,
+            'A design turn of this card is queued or running',
+          );
+        }
+      },
+      runTurn: (batch, caller) => this.cardTurns.start(card, batch, caller),
+      onApproved: async (_design, actor) => {
+        await this.cardTurns.close(card, actor);
+        const fresh = await this.prisma.boardCard.findUnique({
+          where: { id: card.id },
+          select: { continueAfterDesign: true },
+        });
+        if (fresh?.continueAfterDesign) {
+          await this.rounds.run(projectId, number, {}, actor);
+        }
+      },
+      publish: () => this.store.publishCardDesign(projectId, card.id),
+    };
   }
 
-  private async designOf(plan: Plan, key: string): Promise<TaskDesign> {
-    const design = await this.prisma.taskDesign.findUnique({
-      where: { planId_taskKey: { planId: plan.id, taskKey: key } },
+  private async card(projectId: string, number: number): Promise<BoardCard> {
+    const card = await this.prisma.boardCard.findUnique({
+      where: { projectId_number: { projectId, number } },
     });
-    if (!design) throw this.off();
-    return design;
-  }
-
-  private off() {
-    return designError(
-      409,
-      DESIGN_ERROR.designOff,
-      'The design of this task is off',
-    );
+    if (!card) throw cardNotFound();
+    return card;
   }
 
   /** D1: the task's status follows its design; returns the status it has now. */

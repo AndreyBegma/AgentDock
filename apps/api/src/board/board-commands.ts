@@ -6,6 +6,9 @@ import {
   type IssueCreateArgs,
   type IssueCreateResult,
   isCommandName,
+  type PlanCloseArgs,
+  type PlanCloseResult,
+  planCloseResultSchema,
 } from '@agentdock/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import type { z } from 'zod';
@@ -47,7 +50,10 @@ export class BoardCommands {
   ) {}
 
   /** Throws 503 `command_unavailable` when `name` cannot be sent to `runnerId` now. */
-  assertReady(runnerId: string, name: CardCommandName | 'issue.create'): void {
+  assertReady(
+    runnerId: string,
+    name: CardCommandName | 'issue.create' | 'plan.close',
+  ): void {
     const wired: string = name;
     if (!isCommandName(wired)) {
       throw new BoardFailure(
@@ -100,6 +106,32 @@ export class BoardCommands {
   ): Promise<BoardSendResult<IssueCreateResult>> {
     this.assertReady(runnerId, 'issue.create');
     return this.commands.send(runnerId, 'issue.create', args, options);
+  }
+
+  /**
+   * #243 D2: a card's design turns run as `plan.turn` with `planId =
+   * card.id`; deleting the card closes that plan on the runner.
+   */
+  async closeDesign(
+    runnerId: string,
+    args: PlanCloseArgs,
+    options: SendOptions,
+  ): Promise<BoardSendResult<PlanCloseResult>> {
+    this.assertReady(runnerId, 'plan.close');
+    const result = await this.commands.send(
+      runnerId,
+      'plan.close',
+      args,
+      options,
+    );
+    if (result.status !== 'ok') return result;
+    const output = planCloseResultSchema.safeParse(result.output);
+    return output.success
+      ? { status: 'ok', output: output.data }
+      : {
+          status: 'error',
+          error: { code: 'internal', message: 'malformed result' },
+        };
   }
 }
 

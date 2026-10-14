@@ -75,6 +75,7 @@ export const toCommentView = (row: CommentRow): DesignCommentView => ({
 
 export const designInclude = {
   approvedBy: userSelect,
+  card: { select: { id: true, number: true } },
   revisions: {
     select: revisionSelect,
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
@@ -102,12 +103,15 @@ export const skillWarnings = (
     }));
 
 /**
- * ADR-0025: the task owner of a design row. A card's design is not read
- * through this mapper yet (#243 iB-api); one reaching it is a bug, not a view.
+ * ADR-0025: the owner of a design row — a plan task, or a board card. The
+ * database's CHECK holds exactly one; a row with neither is a bug, not a view.
  */
-const taskOwnerOf = (row: DesignRow): DesignOwnerView => {
+export const ownerOf = (row: DesignRow): DesignOwnerView => {
+  if (row.card) {
+    return { kind: 'card', cardId: row.card.id, number: row.card.number };
+  }
   if (row.planId === null || row.taskKey === null) {
-    throw new Error(`design ${row.id} has no plan task owner`);
+    throw new Error(`design ${row.id} has no owner`);
   }
   return { kind: 'task', planId: row.planId, taskKey: row.taskKey };
 };
@@ -121,7 +125,7 @@ export const toDesignView = (
   },
 ): TaskDesignView => ({
   id: row.id,
-  owner: taskOwnerOf(row),
+  owner: ownerOf(row),
   planId: row.planId,
   taskKey: row.taskKey,
   needed: row.needed,

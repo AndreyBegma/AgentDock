@@ -492,6 +492,31 @@ export class BoardWork {
     );
   }
 
+  /**
+   * #243 D2, in the background: `plan.close {planId: card.id}` drops the
+   * card's design worktree on the runner, cancelling a design turn in it.
+   */
+  closeDesign(project: BoardProject, cardId: string, actor: BoardActor): void {
+    this.track(
+      (async () => {
+        try {
+          boardOutput(
+            'plan.close',
+            await this.commands.closeDesign(
+              project.runnerId,
+              { planId: cardId, projectId: project.id },
+              { role: actor.role, ctx: actor.ctx },
+            ),
+          );
+        } catch (error) {
+          this.logger.warn(
+            `plan.close of card ${cardId} failed: ${(error as Error).message}`,
+          );
+        }
+      })(),
+    );
+  }
+
   /** Resolves once every background collect and close started so far has settled. */
   async settled(): Promise<void> {
     while (this.pending.size > 0) {

@@ -29,6 +29,25 @@ import {
 
 export type Db = Prisma.TransactionClient | PrismaService;
 
+/**
+ * ADR-0025: the owner of a design row — a plan task, or a board card (#243).
+ * Every read and write of one design goes through its owner's key.
+ */
+export type DesignKey =
+  | { planId: string; taskKey: string }
+  | { cardId: string };
+
+/** The unique `task_designs` lookup of an owner. */
+export const designWhere = (
+  key: DesignKey,
+): Prisma.TaskDesignWhereUniqueInput =>
+  'cardId' in key
+    ? { cardId: key.cardId }
+    : { planId_taskKey: { planId: key.planId, taskKey: key.taskKey } };
+
+/** #243 D2: a card's design turns answer the contract under this `taskKey`. */
+export const cardDesignTaskKey = (number: number): string => `card-${number}`;
+
 /** The project's current profile version: the highest. */
 export const currentProfile = (
   db: Db,

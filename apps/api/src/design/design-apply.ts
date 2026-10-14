@@ -5,25 +5,24 @@ import {
   nextOfBatch,
   restingStatus,
 } from './design-rules';
-import type { Db } from './design-store';
+import { type Db, type DesignKey, designWhere } from './design-store';
 
 /**
  * Applies a design turn (docs/specs/223-design-stage.md D4, D7, D10) inside
  * the turn's settle transaction: the next revision of its variant, the
  * comments it addressed, and the design's status. Returns the next turn of
  * the batch, if any — the projector starts it once the transaction commits.
+ * The design is the turn's owner's: a plan task's or a card's (ADR-0025).
  */
 export const applyDesignOutput = async (
   tx: Prisma.TransactionClient,
-  turn: { id: string; planId: string; taskKey: string },
+  turn: { id: string; owner: DesignKey },
   plan: DesignTurnPlan,
   output: DesignOutput,
   html: string,
 ): Promise<DesignTurnPlan | null> => {
   const design = await tx.taskDesign.findUnique({
-    where: {
-      planId_taskKey: { planId: turn.planId, taskKey: turn.taskKey },
-    },
+    where: designWhere(turn.owner),
     select: { id: true },
   });
   if (!design) return null;
@@ -71,13 +70,9 @@ export const applyDesignOutput = async (
  * reviewing what it has, or idle with nothing drawn. An approved design is
  * left alone.
  */
-export const settleDesign = async (
-  db: Db,
-  planId: string,
-  taskKey: string,
-): Promise<void> => {
+export const settleDesign = async (db: Db, owner: DesignKey): Promise<void> => {
   const design = await db.taskDesign.findUnique({
-    where: { planId_taskKey: { planId, taskKey } },
+    where: designWhere(owner),
     select: { id: true, status: true, _count: { select: { revisions: true } } },
   });
   if (!design || design.status === 'approved') return;

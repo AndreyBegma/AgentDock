@@ -40,7 +40,7 @@ import {
 } from './dto';
 
 /** A card's per-project number from the path; anything else is no card. */
-const cardNumber = (value: string): number => {
+export const cardNumber = (value: string): number => {
   if (!/^[1-9]\d{0,8}$/.test(value)) throw cardNotFound();
   return Number(value);
 };

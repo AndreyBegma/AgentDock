@@ -18,6 +18,7 @@ import { boardError } from './board-error';
 import {
   type CardFacts,
   type CardWithRounds,
+  cardDesignSelect,
   toCardDetail,
   toCardView,
   toSettingsView,
@@ -64,7 +65,10 @@ export class BoardService {
 
   /** `GET /board`: Completed holds the newest page, before `completedBefore`. */
   async board(projectId: string, completedBefore?: Date): Promise<BoardView> {
-    const include = { rounds: { orderBy: { round: 'desc' as const } } };
+    const include = {
+      rounds: { orderBy: { round: 'desc' as const } },
+      design: cardDesignSelect,
+    };
     const [open, completed, settings, running] = await Promise.all([
       this.prisma.boardCard.findMany({
         where: { projectId, column: { not: 'completed' } },
@@ -120,6 +124,7 @@ export class BoardService {
           orderBy: { round: 'desc' },
           include: { author: USER_REF },
         },
+        design: cardDesignSelect,
       },
     });
     if (!card) throw boardError(404, BOARD_ERROR.notFound, 'Card not found');
@@ -233,13 +238,26 @@ export class BoardService {
     actor: BoardActor,
   ): Promise<BoardCardDetail> {
     const card = await this.work.card(projectId, number);
+    const { continueAfterDesign, ...fields } = dto;
+    if (continueAfterDesign !== undefined) {
+      await this.toggleContinue(card, continueAfterDesign, actor);
+      // The switch alone is its own audit record, not a card edit.
+      if (Object.values(fields).every((v) => v === undefined)) {
+        this.work.publish(projectId, card.id);
+        return this.detail(projectId, number);
+      }
+    }
     const data = {
-      ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
-      ...(dto.body !== undefined ? { body: dto.body } : {}),
-      ...(dto.kind !== undefined ? { kind: dto.kind } : {}),
-      ...(dto.issueOnRun !== undefined ? { issueOnRun: dto.issueOnRun } : {}),
-      ...(dto.specOnRun !== undefined ? { specOnRun: dto.specOnRun } : {}),
-      ...(dto.model !== undefined ? { model: dto.model } : {}),
+      ...(fields.title !== undefined ? { title: fields.title.trim() } : {}),
+      ...(fields.body !== undefined ? { body: fields.body } : {}),
+      ...(fields.kind !== undefined ? { kind: fields.kind } : {}),
+      ...(fields.issueOnRun !== undefined
+        ? { issueOnRun: fields.issueOnRun }
+        : {}),
+      ...(fields.specOnRun !== undefined
+        ? { specOnRun: fields.specOnRun }
+        : {}),
+      ...(fields.model !== undefined ? { model: fields.model } : {}),
     };
     await this.prisma.boardCard.update({ where: { id: card.id }, data });
     const before = Object.fromEntries(
@@ -258,6 +276,43 @@ export class BoardService {
     return this.detail(projectId, number);
   }
 
+  /**
+   * #243 D5: "Continue after design" — approving the design starts round 1.
+   * It is the person's until the design is approved; after that the approval
+   * already did, or did not, start the worker.
+   */
+  private async toggleContinue(
+    card: CardWithRounds,
+    on: boolean,
+    actor: BoardActor,
+  ): Promise<void> {
+    if (card.continueAfterDesign === on) return;
+    const design = await this.prisma.taskDesign.findUnique({
+      where: { cardId: card.id },
+      select: { status: true },
+    });
+    if (design?.status === 'approved') {
+      throw boardError(
+        409,
+        BOARD_ERROR.designApproved,
+        'The design is approved; "Continue after design" no longer changes',
+      );
+    }
+    await this.prisma.boardCard.update({
+      where: { id: card.id },
+      data: { continueAfterDesign: on },
+    });
+    await this.audit.record({
+      ...actor.ctx,
+      action: 'card.design_continue_toggled',
+      target: { type: 'board_card', id: card.id },
+      projectId: card.projectId,
+      before: { number: card.number, continueAfterDesign: !on },
+      after: { number: card.number, continueAfterDesign: on },
+      result: 'ok',
+    });
+  }
+
   /** 409 `card_running` while a round is active; the worktree goes with it. */
   async delete(
     projectId: string,
@@ -272,7 +327,7 @@ export class BoardService {
         'The worker is running: stop it before deleting the card',
       );
     }
-    await this.prisma.$transaction(async (tx) => {
+    const designed = await this.prisma.$transaction(async (tx) => {
       const fresh = await this.work.lock(tx, card.id);
       if (isActiveRoundPhase(fresh.rounds[0]?.phase)) {
         throw boardError(
@@ -281,7 +336,10 @@ export class BoardService {
           'The worker is running: stop it before deleting the card',
         );
       }
+      // #243 D2: whether the runner holds a design worktree for the card.
+      const turns = await tx.planTurn.count({ where: { cardId: card.id } });
       await tx.boardCard.delete({ where: { id: card.id } });
+      return turns > 0;
     });
     await this.audit.record({
       ...actor.ctx,
@@ -292,8 +350,10 @@ export class BoardService {
       result: 'ok',
     });
     this.work.publish(projectId, card.id);
-    if (card.branch !== null) {
-      this.work.close(await this.work.project(projectId), card.id, actor);
+    if (card.branch !== null || designed) {
+      const project = await this.work.project(projectId);
+      if (card.branch !== null) this.work.close(project, card.id, actor);
+      if (designed) this.work.closeDesign(project, card.id, actor);
     }
   }
 

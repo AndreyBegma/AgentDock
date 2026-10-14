@@ -1,8 +1,13 @@
 import {
+  cardLabel,
   type DesignCommentKind,
   type DesignTheme,
+  designBytes,
+  PLANNER_BLOCK_TAG,
+  plannerOutputContract,
   type UiProfileSnippet,
 } from '@agentdock/shared';
+import { PLAN_TURN_PROMPT_MAX_BYTES } from '@agentdock/shared/protocol';
 
 /**
  * The design sections of a plan turn's prompt (docs/specs/223-design-stage.md
@@ -104,14 +109,17 @@ const commentsJson = (comments: readonly DesignPromptComment[]): string =>
     2,
   );
 
-/** The one-line instruction of a design turn. */
+/**
+ * The one-line instruction of a design turn. `subject` names the owner:
+ * ``task `t1` `` for a plan task, the card for a board card (#243).
+ */
 export const designWhat = (
-  taskKey: string,
+  subject: string,
   ctx: DesignPromptContext,
 ): string =>
   ctx.mode === 'generate'
-    ? `Draw variant ${ctx.variant} of ${ctx.variantCount} of the mockup of task \`${taskKey}\`.`
-    : `Revise variant ${ctx.variant} of the mockup of task \`${taskKey}\`: draw its revision ${(ctx.previous?.revision ?? 0) + 1}, answering the open comments.`;
+    ? `Draw variant ${ctx.variant} of ${ctx.variantCount} of the mockup of ${subject}.`
+    : `Revise variant ${ctx.variant} of the mockup of ${subject}: draw its revision ${(ctx.previous?.revision ?? 0) + 1}, answering the open comments.`;
 
 /**
  * The design turn's sections. `snippetLimit` caps how many of the profile's
@@ -200,3 +208,57 @@ export const approvedDesignSections = (d: ApprovedDesignContext): string[] => [
       )}`
     : 'No comments were left on it.',
 ];
+
+/** #243 D4: a card's design turns always answer contract version 2. */
+export const CARD_DESIGN_CONTRACT_VERSION = 2;
+
+/** What a board card's design turn carries besides the design (#243 D4). */
+export interface CardDesignPromptInput {
+  /** The project's effective planner instructions. */
+  instructions: string;
+  card: { number: number; title: string; body: string };
+  /** The key the turn's `agentdock-plan` block repeats (`cardDesignTaskKey`). */
+  taskKey: string;
+  design: DesignPromptContext;
+}
+
+const cardDesignPromptWith = (
+  input: CardDesignPromptInput,
+  design: string[],
+): string => {
+  const label = cardLabel(input.card.number);
+  const sections = [
+    input.instructions.trim(),
+    plannerOutputContract(CARD_DESIGN_CONTRACT_VERSION).trim(),
+    '# This turn',
+    `Action: \`design\`. ${designWhat(`board card ${label} (\`${input.taskKey}\`)`, input.design)}`,
+    `Answer with exactly one \`${PLANNER_BLOCK_TAG}\` block whose \`action\` is \`design\` and whose \`taskKey\` is \`${input.taskKey}\`.`,
+    '## The card',
+    fence(
+      'text',
+      `${label}: ${input.card.title}\n\n${input.card.body.trim() || '(no description)'}`,
+    ),
+    ...design,
+  ];
+  return `${sections.join('\n\n')}\n`;
+};
+
+/**
+ * #243 D4: the prompt of a board card's design turn — the instructions, the
+ * v2 contract, the `design` action, the card's title and body, then the
+ * design sections (profile, kit, skills, variant, open comments). A large
+ * kit's snippets are trimmed from the end until it fits the `plan.turn` cap,
+ * as a plan task's design turn does.
+ */
+export const cardDesignPrompt = (input: CardDesignPromptInput): string => {
+  const count = input.design.profile?.snippets.length ?? 0;
+  let prompt = cardDesignPromptWith(input, designSections(input.design));
+  for (
+    let keep = count - 1;
+    keep >= 0 && designBytes(prompt) > PLAN_TURN_PROMPT_MAX_BYTES;
+    keep -= 1
+  ) {
+    prompt = cardDesignPromptWith(input, designSections(input.design, keep));
+  }
+  return prompt;
+};
