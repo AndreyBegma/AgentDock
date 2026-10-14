@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import {
+  asPlannerContractVersion,
   PLANNER_ERROR,
+  type PlannerContractVersion,
   type PlanTurnAction,
   type PlanTurnInput,
   type Role,
@@ -19,12 +21,20 @@ import type { AuditContext } from '../audit/audit.types';
 import { SYSTEM_ACTOR, systemActorFor } from '../audit/audit.types';
 import { BudgetGate } from '../budgets/budget-gate';
 import { PrismaService } from '../database/prisma.service';
+import { type DesignTurnPlan, designTurnPlanOf } from '../design/design-rules';
+import {
+  loadApprovedDesign,
+  loadDesignPrompt,
+  profileHasUi,
+} from '../design/design-store';
 import { TALKABLE_STATUSES } from './plan-apply';
 import { questionsOf } from './plan-mapper';
-import { assemblePrompt } from './plan-prompt';
-import { PlanStore } from './plan-store';
+import { assemblePrompt, type PromptInput } from './plan-prompt';
+import { designFilePath, ISSUE_PLACEHOLDER } from './plan-send';
+import { type PlanProject, PlanStore } from './plan-store';
 import { PlannerCommands, plannerOutput } from './planner-commands';
 import { PlannerFailure, plannerError } from './planner-error';
+import { specDirOf } from './planner-instructions.service';
 
 /** Who acts: a person on a route, or the system chaining a turn for its author. */
 export interface PlanCaller {
@@ -38,6 +48,8 @@ interface TurnSpec {
   action: PlanTurnAction;
   task: PlanTask | null;
   input: PlanTurnInput;
+  /** Spec 223: what a design turn draws; kept in `runs.args.design`. */
+  design?: DesignTurnPlan;
 }
 
 const turnInProgress = () =>
@@ -167,7 +179,86 @@ export class PlanTurnService {
     }
     const task = turn.task ? await this.store.task(plan, turn.task.key) : null;
     const input = (turn.input ?? {}) as PlanTurnInput;
-    return this.run(plan, { action: turn.action, task, input }, caller);
+    let design: DesignTurnPlan | undefined;
+    if (turn.action === 'design') {
+      const run = await this.prisma.run.findUniqueOrThrow({
+        where: { id: turn.runId },
+        select: { args: true },
+      });
+      design = designTurnPlanOf(run.args) ?? undefined;
+      if (!design || !task) {
+        throw plannerError(
+          409,
+          PLANNER_ERROR.invalidArgs,
+          'The design turn cannot be retried; generate the design again',
+        );
+      }
+      await this.markDesign(plan.id, task.key, design.mode);
+    }
+    return this.run(plan, { action: turn.action, task, input, design }, caller);
+  }
+
+  /**
+   * Spec 223 D4, D10: one design turn — one variant of one task, in the
+   * task's fork session (D8). The variants of a batch run one after another:
+   * `PlanTurnProjector` starts the next when one is drawn.
+   */
+  designTurn(
+    plan: Plan,
+    task: PlanTask,
+    design: DesignTurnPlan,
+    caller: PlanCaller,
+  ): Promise<string> {
+    this.store.assertOpen(plan);
+    return this.run(
+      plan,
+      { action: 'design', task, input: {}, design },
+      caller,
+    );
+  }
+
+  /**
+   * The next design turn of a batch, or the first after a profile build
+   * (D13), for the person who asked for it. False when it did not start —
+   * the caller settles the design.
+   */
+  async chainDesign(
+    planId: string,
+    taskId: string,
+    design: DesignTurnPlan,
+    authorId: string | null,
+  ): Promise<boolean> {
+    try {
+      const plan = await this.prisma.plan.findUniqueOrThrow({
+        where: { id: planId },
+      });
+      const task = await this.prisma.planTask.findUniqueOrThrow({
+        where: { id: taskId },
+      });
+      await this.designTurn(plan, task, design, {
+        userId: authorId,
+        role: 'operator',
+        ctx: { actor: authorId ? systemActorFor(authorId) : SYSTEM_ACTOR },
+      });
+      return true;
+    } catch (error) {
+      this.logger.warn(
+        `plan ${planId}: design turn of variant ${design.variant} not started: ${(error as Error).message}`,
+      );
+      return false;
+    }
+  }
+
+  /** A retried design turn puts its design back to drawing. */
+  private markDesign(
+    planId: string,
+    taskKey: string,
+    mode: DesignTurnPlan['mode'],
+  ) {
+    return this.prisma.taskDesign.updateMany({
+      where: { planId, taskKey },
+      data: { status: mode === 'generate' ? 'generating' : 'revising' },
+    });
   }
 
   /** Kills the turn's session; the runner reports `cancelled`. */
@@ -249,15 +340,19 @@ export class PlanTurnService {
       userId: caller.userId,
     });
 
-    const [instructions, tasks, session] = await Promise.all([
+    const contractVersion = asPlannerContractVersion(plan.contractVersion);
+    const [instructions, tasks, session, designParts] = await Promise.all([
       this.prisma.plannerInstructions.findUniqueOrThrow({
         where: { id: plan.instructionsId },
         select: { body: true },
       }),
       this.store.currentTasks(this.prisma, plan),
       this.session(plan, spec.task),
+      this.designParts(plan, project, spec, contractVersion),
     ]);
     const prompt = assemblePrompt({
+      ...designParts,
+      contractVersion,
       instructions: instructions.body,
       action: spec.action,
       brief: plan.brief,
@@ -334,7 +429,7 @@ export class PlanTurnService {
           kind: 'plan',
           projectId: plan.projectId,
           title: spec.task
-            ? `Plan ${spec.action}: ${spec.task.key}`
+            ? `Plan ${spec.action}: ${spec.task.key}${spec.design ? ` v${spec.design.variant}` : ''}`
             : `Plan ${spec.action}`,
           runtime: profile.runtime,
           model: plan.model,
@@ -343,6 +438,7 @@ export class PlanTurnService {
             planId: plan.id,
             action: spec.action,
             ...(spec.task ? { taskKey: spec.task.key } : {}),
+            ...(spec.design ? { design: spec.design } : {}),
           },
           status: 'running',
           triggeredByType: 'user',
@@ -397,6 +493,68 @@ export class PlanTurnService {
       }
       throw error;
     }
+  }
+
+  /**
+   * Spec 223: what the prompt carries of the design stage — whether the
+   * project has a UI (v2 suggesting turns, D3), a design turn's context (D8),
+   * and a write turn's approved design (D16).
+   */
+  private async designParts(
+    plan: Plan,
+    project: PlanProject,
+    spec: TurnSpec,
+    contractVersion: PlannerContractVersion,
+  ): Promise<Pick<PromptInput, 'hasUi' | 'design' | 'approvedDesign'>> {
+    if (spec.action === 'design') {
+      const design =
+        spec.task && spec.design
+          ? await this.prisma.taskDesign.findUnique({
+              where: {
+                planId_taskKey: { planId: plan.id, taskKey: spec.task.key },
+              },
+              select: { id: true, variantCount: true, skills: true },
+            })
+          : null;
+      if (!design || !spec.design) {
+        throw plannerError(
+          409,
+          PLANNER_ERROR.invalidArgs,
+          'A design turn needs the task design',
+        );
+      }
+      return {
+        design: await loadDesignPrompt(
+          this.prisma,
+          project,
+          design,
+          spec.design,
+        ),
+      };
+    }
+    if (spec.action === 'write' && spec.task) {
+      const approved = await loadApprovedDesign(
+        this.prisma,
+        plan.id,
+        spec.task.key,
+      );
+      if (!approved) return {};
+      return {
+        approvedDesign: {
+          ...approved,
+          path: designFilePath(
+            specDirOf(project.codeSentinelConfig),
+            ISSUE_PLACEHOLDER,
+            spec.task.title,
+            approved.variant,
+          ),
+        },
+      };
+    }
+    if (contractVersion >= 2 && spec.action !== 'clarify') {
+      return { hasUi: await profileHasUi(this.prisma, plan.projectId) };
+    }
+    return {};
   }
 
   /**

@@ -18,6 +18,7 @@ import {
   plannerOutputSchemas,
   planQuestionRoundSchema,
   planTurnInputSchema,
+  type TaskDesignSummary,
 } from '@agentdock/shared';
 import type { Prisma } from '@prisma/client';
 
@@ -126,6 +127,7 @@ type TaskRow = Prisma.PlanTaskGetPayload<object>;
 export const toTaskView = (
   row: TaskRow,
   issue: PlanTaskIssueView | null,
+  design: TaskDesignSummary | null = null,
 ): PlanTaskView => {
   const questions = questionsOf(row.questions);
   return {
@@ -144,8 +146,7 @@ export const toTaskView = (
     frozen: row.frozen,
     issue,
     queuedAt: row.queuedAt?.toISOString() ?? null,
-    // Filled from `task_designs` by the design flow (spec 223, slot i223-api).
-    design: null,
+    design,
   };
 };
 

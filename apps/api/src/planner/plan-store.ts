@@ -1,4 +1,6 @@
 import {
+  DESIGN_LIVE_EVENT,
+  type DesignLiveChange,
   PLANNER_ERROR,
   PLANNER_LIVE_EVENT,
   type PlannerLiveChange,
@@ -236,6 +238,26 @@ export class PlanStore {
     } catch (error) {
       this.logger.warn(
         `run ${runId} update not published: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  /**
+   * Spec 223: a design changed. The plan's event as well, since its task
+   * card shows the design. Ids only; best effort.
+   */
+  publishDesign(projectId: string, planId: string, taskKey: string | null) {
+    this.publish(projectId, planId);
+    try {
+      this.live.publish(`project:${projectId}`, DESIGN_LIVE_EVENT, {
+        kind: 'design',
+        projectId,
+        planId,
+        taskKey,
+      } satisfies DesignLiveChange);
+    } catch (error) {
+      this.logger.warn(
+        `design ${planId}/${taskKey} update not published: ${(error as Error).message}`,
       );
     }
   }

@@ -14,13 +14,18 @@ import { readyLabelOf } from '../queue/queue-inputs';
 import { callerOf, type PlanActor, PlanService } from './plan.service';
 import { questionsOf } from './plan-mapper';
 import {
+  DESIGN_FALLBACK_DIR,
   dependencyOrder,
+  designFilePath,
   docsPrIssueBody,
   documentOf,
   findCycle,
+  ISSUE_PLACEHOLDER,
   rewriteDependsOn,
   type SendTask,
   specFilePath,
+  THIS_ISSUE,
+  withDesignPath,
 } from './plan-send';
 import { type PlanProject, PlanStore } from './plan-store';
 import { PlannerCommands, plannerOutput } from './planner-commands';
@@ -36,6 +41,12 @@ const asSendTask = (t: PlanTask): SendTask => ({
   questions: questionsOf(t.questions),
   document: t.document,
 });
+
+/** Spec 223 D16: what a task's approved design publishes. */
+interface ApprovedDesignFile {
+  variant: number;
+  html: string;
+}
 
 /** The cuid's tail: `docs/plan-<shortid>` (D10). */
 const shortIdOf = (planId: string): string =>
@@ -112,8 +123,12 @@ export class PlanSendService {
 
     const project = await this.store.project(plan.projectId);
     const { specOutput, specDir } = await this.publication(project);
-    const features = sending.filter((t) => t.kind === 'feature');
-    const publishes = specOutput === 'docs_pr' && features.length > 0;
+    const designs = await this.approvedDesigns(plan.id);
+    // D10, and spec 223 D16: a task with an approved design always goes
+    // through the docs pull request, whatever the project's specOutput.
+    const viaDocs = (t: Pick<PlanTask, 'key' | 'kind'>) =>
+      (specOutput === 'docs_pr' && t.kind === 'feature') || designs.has(t.key);
+    const publishes = sending.some(viaDocs);
     this.commands.assertReady(project.runnerId, 'issue.create');
     this.commands.assertReady(project.runnerId, 'plan.queue_issues');
     if (publishes) {
@@ -157,10 +172,27 @@ export class PlanSendService {
         const task = byKey.get(key);
         if (!task || numbers.has(key)) continue;
         const send = asSendTask(task);
+        const design = designs.get(key) ?? null;
         const body = rewriteDependsOn(
-          publishes && task.kind === 'feature' && specDir
-            ? docsPrIssueBody(send, specDir, branch)
-            : documentOf(send),
+          viaDocs(task) && specDir
+            ? docsPrIssueBody(send, specDir, branch, design?.variant ?? null)
+            : design
+              ? withDesignPath(
+                  documentOf(send),
+                  designFilePath(
+                    specDir,
+                    ISSUE_PLACEHOLDER,
+                    task.title,
+                    design.variant,
+                  ),
+                  designFilePath(
+                    specDir,
+                    THIS_ISSUE,
+                    task.title,
+                    design.variant,
+                  ),
+                )
+              : documentOf(send),
           task.dependsOn,
           numbers,
         );
@@ -195,13 +227,10 @@ export class PlanSendService {
         this.store.publish(plan.projectId, plan.id);
       }
 
-      // D10: with a docs pull request, features wait for its merge.
+      // D10: what the docs pull request carries waits for its merge.
       const now = await this.store.currentTasks(this.prisma, plan);
       const queueNow = now.filter(
-        (t) =>
-          t.issueNumber !== null &&
-          t.queuedAt === null &&
-          (!publishes || t.kind === 'bug'),
+        (t) => t.issueNumber !== null && t.queuedAt === null && !viaDocs(t),
       );
       await this.queue(project, queueNow, readyLabel, options);
 
@@ -209,11 +238,12 @@ export class PlanSendService {
         plan.docsPrNumber !== null && plan.docsPrUrl !== null
           ? { number: plan.docsPrNumber, url: plan.docsPrUrl }
           : null;
-      if (publishes && specDir && !docsPr) {
+      if (publishes && !docsPr) {
         docsPr = await this.publish(
           plan,
           project,
-          now,
+          now.filter(viaDocs),
+          designs,
           { specDir, branch },
           options,
         );
@@ -313,38 +343,101 @@ export class PlanSendService {
     return labelled;
   }
 
-  /** D10: one docs pull request with a file per feature, named after its issue. */
+  /**
+   * Spec 223 D16: the approved design of each task whose design is on — the
+   * stored HTML, which never holds the pin helper.
+   */
+  private async approvedDesigns(
+    planId: string,
+  ): Promise<Map<string, ApprovedDesignFile>> {
+    const rows = await this.prisma.taskDesign.findMany({
+      where: {
+        planId,
+        needed: true,
+        status: 'approved',
+        approvedRevisionId: { not: null },
+      },
+      select: {
+        taskKey: true,
+        approvedRevision: { select: { variant: true, html: true } },
+      },
+    });
+    return new Map(
+      rows.flatMap((r) =>
+        r.approvedRevision ? [[r.taskKey, r.approvedRevision] as const] : [],
+      ),
+    );
+  }
+
+  /**
+   * D10: one docs pull request with a specification per task that goes
+   * through it, named after its issue (with a `specDir`), and — spec 223
+   * D16 — the approved design of each task that has one.
+   */
   private async publish(
     plan: Plan,
     project: PlanProject,
     tasks: readonly PlanTask[],
-    target: { specDir: string; branch: string },
+    designs: ReadonlyMap<string, ApprovedDesignFile>,
+    target: { specDir: string | null; branch: string },
     options: Parameters<PlannerCommands['send']>[3],
   ): Promise<{ number: number; url: string }> {
+    const all = await this.store.currentTasks(this.prisma, plan);
     const numbers = new Map(
-      tasks
+      all
         .filter((t) => t.issueNumber !== null)
         .map((t) => [t.key, t.issueNumber as number]),
     );
-    const features = tasks.filter(
-      (t) => t.kind === 'feature' && t.issueNumber !== null,
+    const issued = tasks.filter((t) => t.issueNumber !== null);
+    const designPath = (t: PlanTask, variant: number) =>
+      designFilePath(target.specDir, t.issueNumber as number, t.title, variant);
+    const entries = issued.map((t) => {
+      const design = designs.get(t.key) ?? null;
+      const spec = target.specDir
+        ? {
+            path: specFilePath(
+              target.specDir,
+              t.issueNumber as number,
+              t.title,
+            ),
+            content: rewriteDependsOn(
+              design
+                ? withDesignPath(
+                    documentOf(asSendTask(t)),
+                    designFilePath(
+                      target.specDir,
+                      ISSUE_PLACEHOLDER,
+                      t.title,
+                      design.variant,
+                    ),
+                    designPath(t, design.variant),
+                  )
+                : documentOf(asSendTask(t)),
+              t.dependsOn,
+              numbers,
+            ),
+          }
+        : null;
+      const file = design
+        ? { path: designPath(t, design.variant), content: design.html }
+        : null;
+      return { task: t, spec, design: file };
+    });
+    const files = entries.flatMap((e) =>
+      [e.spec, e.design].filter((f) => f !== null),
     );
-    const files = features.map((t) => ({
-      path: specFilePath(target.specDir, t.issueNumber as number, t.title),
-      content: rewriteDependsOn(
-        documentOf(asSendTask(t)),
-        t.dependsOn,
-        numbers,
-      ),
-    }));
     const body = [
       `Specifications of the plan "${plan.title}" (version ${plan.version}).`,
       '',
-      ...features.map(
-        (t, i) => `- #${t.issueNumber} — ${t.title}: \`${files[i].path}\``,
+      ...entries.map(({ task: t, spec, design }) =>
+        [
+          `- #${t.issueNumber} — ${t.title}`,
+          spec ? `: \`${spec.path}\`` : '',
+          design ? ` · design \`${design.path}\`` : '',
+        ].join(''),
       ),
       '',
-      'The feature issues are queued when this pull request merges.',
+      'Their issues are queued when this pull request merges.',
       '',
     ].join('\n');
     const args = planPublishSpecsArgsSchema.safeParse({
@@ -352,7 +445,8 @@ export class PlanSendService {
       projectId: plan.projectId,
       root: project.rootPath,
       base: project.base,
-      specDir: target.specDir,
+      // Spec 223 "Open questions": designs of a project without a specDir live under docs/.
+      specDir: target.specDir ?? DESIGN_FALLBACK_DIR,
       branch: target.branch,
       files,
       title: `docs: specifications of plan "${plan.title}"`.slice(0, 256),

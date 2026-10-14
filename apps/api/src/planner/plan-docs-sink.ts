@@ -33,8 +33,9 @@ const mergedPr = (event: RunnerEvent): number | null => {
 };
 
 /**
- * D10 `docs_pr`: a sent plan's feature issues are queued when its docs pull
- * request merges. A `pr.closed` without `merged: true` (seen only leaving
+ * D10 `docs_pr`: a sent plan's issues that wait for its docs pull request —
+ * its features, and (spec 223 D16) every task with an approved design — are
+ * queued when it merges. A `pr.closed` without `merged: true` (seen only leaving
  * the open list) is not a merge; the features then wait for a later signal.
  */
 @Injectable()
@@ -74,11 +75,11 @@ export class PlanDocsSink implements RunnerEventSink, OnModuleInit {
     version: number;
     authorId: string | null;
   }): Promise<void> {
+    // Every issue send left unqueued is one that waits for this merge.
     const waiting = await this.prisma.planTask.findMany({
       where: {
         planId: plan.id,
         planVersion: plan.version,
-        kind: 'feature',
         status: 'issued',
         issueNumber: { not: null },
         queuedAt: null,
