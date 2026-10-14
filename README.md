@@ -5,6 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![agentdock-runner on npm](https://img.shields.io/npm/v/agentdock-runner?label=agentdock-runner)](https://www.npmjs.com/package/agentdock-runner)
 [![@andrewbehma/glass-ui on npm](https://img.shields.io/npm/v/@andrewbehma/glass-ui?label=%40andrewbehma%2Fglass-ui)](https://www.npmjs.com/package/@andrewbehma/glass-ui)
+[![Discord](https://img.shields.io/badge/Discord-join%20the%20community-5865F2?logo=discord&logoColor=white)](https://discord.gg/mkQARkBs4C)
 
 You run several AI coding agents — Claude Code and Codex — across many
 repositories and more than one machine. AgentDock shows every agent, every pull
