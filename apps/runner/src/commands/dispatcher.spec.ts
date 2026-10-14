@@ -4,6 +4,7 @@ import {
   commandResultMessageSchema,
   commands,
   DEFAULT_COMMAND_TIMEOUT_MS,
+  PLAN_TIMEOUTS_MS,
   SKILL_TIMEOUTS_MS,
   TERMINAL_ATTACH_TIMEOUT_MS,
 } from '@agentdock/shared/protocol';
@@ -247,6 +248,101 @@ describe('command dispatcher', () => {
       ).toBe('unsupported');
       expect(
         (await run('skill.cancel', { runId: 'run_1', projectId: 'prj_a' }))
+          .error?.code,
+      ).toBe('unsupported');
+    });
+  });
+
+  describe('plan.* (spec 172)', () => {
+    const turnArgs = {
+      planId: 'plan_1',
+      turnId: 'turn_1',
+      runId: 'run_1',
+      projectId: 'prj_a',
+      root: '/nowhere/a',
+      base: 'main',
+      session: { id: '11111111-1111-4111-8111-111111111111', resume: false },
+      prompt: 'Decompose.',
+      profileKey: 'claude-work',
+      model: 'opus',
+      timeoutSec: 1200,
+    };
+
+    it('is in the allowlist, operator-only, with its own timeouts', () => {
+      for (const name of [
+        'plan.turn',
+        'plan.cancel',
+        'plan.close',
+        'plan.publish_specs',
+        'plan.queue_issues',
+      ] as const) {
+        expect(commands[name].minRole).toBe('operator');
+      }
+      expect(commands['plan.turn'].timeoutMs).toBe(PLAN_TIMEOUTS_MS.turn);
+      expect(commands['plan.publish_specs'].timeoutMs).toBe(
+        PLAN_TIMEOUTS_MS.publishSpecs,
+      );
+    });
+
+    it('refuses a prompt in place of data, a shell field and a path escape as invalid_args', async () => {
+      const { run } = setup();
+      for (const args of [
+        { ...turnArgs, prompt: '' },
+        { ...turnArgs, command: 'claude -p "$(rm -rf ~)"' },
+        { ...turnArgs, session: { id: 'not-a-uuid', resume: false } },
+      ]) {
+        expect((await run('plan.turn', args)).error?.code).toBe('invalid_args');
+      }
+      expect(
+        (
+          await run('plan.publish_specs', {
+            planId: 'plan_1',
+            projectId: 'prj_a',
+            root: '/nowhere/a',
+            base: 'main',
+            specDir: 'docs/specs',
+            branch: 'docs/plan-abc12345',
+            files: [{ path: 'docs/specs/../../etc/x.md', content: 'x' }],
+            title: 'docs',
+            body: '',
+          })
+        ).error?.code,
+      ).toBe('invalid_args');
+    });
+
+    it('routes each command to the planner handlers', async () => {
+      const seen: string[] = [];
+      const { run } = setup({
+        'plan.turn': async () => {
+          seen.push('turn');
+          return { phase: 'queued' };
+        },
+        'plan.cancel': async () => {
+          seen.push('cancel');
+          return { cancelled: true };
+        },
+      });
+      expect((await run('plan.turn', turnArgs)).output).toEqual({
+        phase: 'queued',
+      });
+      expect(
+        (await run('plan.cancel', { planId: 'plan_1', turnId: 'turn_1' }))
+          .output,
+      ).toEqual({ cancelled: true });
+      expect(seen).toEqual(['turn', 'cancel']);
+    });
+
+    it('answers unsupported on a runner without a planner', async () => {
+      const { run } = setup();
+      expect((await run('plan.turn', turnArgs)).error?.code).toBe(
+        'unsupported',
+      );
+      expect(
+        (await run('plan.close', { planId: 'plan_1', projectId: 'prj_a' }))
+          .error?.code,
+      ).toBe('unsupported');
+      expect(
+        (await run('plan.queue_issues', { projectId: 'prj_a', numbers: [1] }))
           .error?.code,
       ).toBe('unsupported');
     });

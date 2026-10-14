@@ -32,6 +32,11 @@ import { acquireLock } from './lock';
 import { errorMessage, type Logger } from './log';
 import { otlpSettings, startOtlpReceiver } from './otlp';
 import { PaneStreamer } from './pane';
+import {
+  createPlannerHandlers,
+  PlanTurnExecutor,
+  SharedRunSlots,
+} from './planner';
 import { WatchList } from './projects/watch-list';
 import {
   createSkillHandlers,
@@ -60,7 +65,9 @@ export interface DaemonOptions {
   spawnPty?: SpawnPty;
   /** Skill runs' directories (spec 24 D7); `<state>/agentdock/runs` beside the spool by default. */
   runsDir?: string;
-  /** The argv that starts this runner; a skill run's session appends `exec-run <runDir>`. */
+  /** Plans' worktree records and turns (spec 172); `<state>/agentdock/plans` beside the runs by default. */
+  plansDir?: string;
+  /** The argv that starts this runner; a skill run's or plan turn's session appends `exec-run <dir>`. */
   selfCommand?: readonly string[];
   /** The skills.sh catalog is fetched with it; the global `fetch` by default. */
   fetch?: typeof fetch;
@@ -193,12 +200,25 @@ export const runDaemon = async (
       watchedProjects: () => watchList.current,
       fetch: options.fetch ?? fetch,
     };
+    // Skill runs and plan turns share the cap (spec 172 "Concurrency").
+    const slots = new SharedRunSlots(config.skills.maxConcurrentRuns);
+    const selfCommand = options.selfCommand ?? defaultSelfCommand();
     const runs = new SkillRunExecutor({
       deps: skillsDeps,
       runsDir: options.runsDir ?? join(dirname(options.spoolDir), 'runs'),
-      selfCommand: options.selfCommand ?? defaultSelfCommand(),
+      selfCommand,
       maxConcurrentRuns: config.skills.maxConcurrentRuns,
+      slots,
       maxTimeoutSec: config.skills.maxTimeoutSec,
+      emit: (event) => connection?.emit(event),
+      log,
+      otlpPort: () => otlp?.port ?? null,
+    });
+    const plans = new PlanTurnExecutor({
+      deps: skillsDeps,
+      plansDir: options.plansDir ?? join(dirname(options.spoolDir), 'plans'),
+      selfCommand,
+      slots,
       emit: (event) => connection?.emit(event),
       log,
       otlpPort: () => otlp?.port ?? null,
@@ -226,6 +246,7 @@ export const runDaemon = async (
           : undefined,
         terminal,
         skills: createSkillHandlers(skillsDeps, runs),
+        planner: createPlannerHandlers({ ...skillsDeps, log }, plans),
       }),
       disabledCommands: config.disabledCommands,
       clock,
@@ -304,6 +325,11 @@ export const runDaemon = async (
     await runs.start().catch((error) => {
       log.error('skills: cannot resume runs', { error: errorMessage(error) });
     });
+    await plans.start().catch((error) => {
+      log.error('planner: cannot resume turns', {
+        error: errorMessage(error),
+      });
+    });
     // Not awaited: a first scan of a large profile must not delay connecting.
     sessions?.start(watchList.current).catch((error) => {
       log.error('sessions: cannot start', { error: errorMessage(error) });
@@ -316,6 +342,7 @@ export const runDaemon = async (
     runLog.stop();
     // Sessions run on in tmux; the next start resumes watching them.
     runs.stop();
+    plans.stop();
     terminal.stop();
     await registry.stop();
     await sessions?.stop();

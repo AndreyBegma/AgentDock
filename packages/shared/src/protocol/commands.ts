@@ -3,6 +3,7 @@ import { capabilitiesSchema, hostSchema } from './capabilities';
 import { approvalCommands } from './commands/approvals';
 import { controlCommands } from './commands/control';
 import { githubCommands } from './commands/github';
+import { plannerCommands } from './commands/planner';
 import { queueCommands } from './commands/queue';
 import { skillCommands } from './commands/skills';
 import { terminalCommands } from './commands/terminal';
@@ -131,6 +132,7 @@ export const commands = {
   ...githubCommands,
   ...terminalCommands,
   ...skillCommands,
+  ...plannerCommands,
 } as const satisfies Record<string, CommandDefinition>;
 
 export type CommandName = keyof typeof commands;

@@ -14,6 +14,7 @@ import {
 } from '../control/orchestrator';
 import { messageSlot, stopSlot } from '../control/slot';
 import type { Exec } from '../detect/exec';
+import type { PlannerHandlers } from '../planner';
 import type { ProjectFs } from '../projects/fs';
 import { inspectProject, refreshProject } from '../projects/inspect';
 import type { SkillHandlers } from '../skills';
@@ -56,10 +57,16 @@ export interface HandlerContext {
   };
   /** Skills (spec 24); absent means this runner does not serve them. */
   skills?: SkillHandlers;
+  /** The planner (spec 172); absent means this runner does not serve plans. */
+  planner?: PlannerHandlers;
 }
 
 const noSkills = (): never => {
   throw new CommandFailure('unsupported', 'this runner does not serve skills');
+};
+
+const noPlanner = (): never => {
+  throw new CommandFailure('unsupported', 'this runner does not serve plans');
 };
 
 /** One handler per allowlisted command; each later command adds its own here. */
@@ -133,5 +140,14 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
     'skill.run': (args) => context.skills?.['skill.run'](args) ?? noSkills(),
     'skill.cancel': (args) =>
       context.skills?.['skill.cancel'](args) ?? noSkills(),
+    'plan.turn': (args) => context.planner?.['plan.turn'](args) ?? noPlanner(),
+    'plan.cancel': (args) =>
+      context.planner?.['plan.cancel'](args) ?? noPlanner(),
+    'plan.close': (args) =>
+      context.planner?.['plan.close'](args) ?? noPlanner(),
+    'plan.publish_specs': (args) =>
+      context.planner?.['plan.publish_specs'](args) ?? noPlanner(),
+    'plan.queue_issues': (args) =>
+      context.planner?.['plan.queue_issues'](args) ?? noPlanner(),
   };
 };
