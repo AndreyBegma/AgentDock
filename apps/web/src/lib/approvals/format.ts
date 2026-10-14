@@ -7,7 +7,7 @@ import {
 } from '@agentdock/shared';
 import { APPROVAL_NOTE_MAX_BYTES } from '@agentdock/shared/protocol';
 import type { RailBadge } from '@andrewbehma/glass-ui/nav-rail';
-import { ApiError, describeError } from '../api';
+import { ApiError, describeError, type ErrorHint } from '../api';
 import { updateRunnerText } from '../control/format';
 
 type Tone = 'ok' | 'warn' | 'danger' | 'neutral';
@@ -149,6 +149,18 @@ export const commandUnavailableText = (runnerName?: string | null): string =>
 export const COMMAND_UNAVAILABLE_TEXT = commandUnavailableText();
 
 /** Every approvals error as a sentence for the person. */
+/** `describeApprovalError` with the fix: a runner that is too old points at Runners. */
+export function describeApprovalHint(
+  error: unknown,
+  runnerName?: string | null,
+): ErrorHint {
+  const text = describeApprovalError(error, runnerName);
+  if (errorCode(error) === APPROVALS_ERROR.commandUnavailable) {
+    return { text, href: '/admin/runners', cta: 'Open Runners' };
+  }
+  return { text };
+}
+
 export function describeApprovalError(
   error: unknown,
   runnerName?: string | null,

@@ -10,6 +10,7 @@ import {
 } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
+import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Field, Select } from '@andrewbehma/glass-ui/field';
@@ -19,10 +20,10 @@ import {
   TableHead,
   TableRow,
 } from '@andrewbehma/glass-ui/table';
-import { toast } from '@andrewbehma/glass-ui/toast';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../../../../lib/api';
 import { describeProjectError } from '../../../../../lib/projects/format';
+import { useErrorToast } from '../../../../../lib/section/use-error-toast';
 
 /** "" is no override. */
 const NO_OVERRIDE = '';
@@ -44,6 +45,7 @@ function AddMemberDialog({
   const [userId, setUserId] = useState('');
   const [override, setOverride] = useState(NO_OVERRIDE);
   const [busy, setBusy] = useState(false);
+  const showError = useErrorToast();
 
   useEffect(() => {
     if (!open) return;
@@ -51,8 +53,8 @@ function AddMemberDialog({
     setOverride(NO_OVERRIDE);
     api<AdminUser[]>('/admin/users?status=active')
       .then(setUsers)
-      .catch((err) => toast.error(describeProjectError(err)));
-  }, [open]);
+      .catch((err) => showError(describeProjectError(err)));
+  }, [open, showError]);
 
   const candidates = users.filter(
     (user) =>
@@ -71,7 +73,7 @@ function AddMemberDialog({
       await api(`/projects/${projectId}/members`, { method: 'POST', body });
       onAdded();
     } catch (err) {
-      toast.error(describeProjectError(err));
+      showError(describeProjectError(err));
     } finally {
       setBusy(false);
     }
@@ -142,6 +144,9 @@ export function MembersTab({
 }) {
   const [members, setMembers] = useState<ProjectMemberView[]>();
   const [adding, setAdding] = useState(false);
+  const [removing, setRemoving] = useState<ProjectMemberView>();
+  const [busy, setBusy] = useState(false);
+  const showError = useErrorToast();
 
   const load = useCallback(async () => {
     try {
@@ -149,9 +154,9 @@ export function MembersTab({
         await api<ProjectMemberView[]>(`/projects/${projectId}/members`),
       );
     } catch (err) {
-      toast.error(describeProjectError(err));
+      showError(describeProjectError(err));
     }
-  }, [projectId]);
+  }, [projectId, showError]);
 
   useEffect(() => {
     load();
@@ -161,7 +166,7 @@ export function MembersTab({
     try {
       await task();
     } catch (err) {
-      toast.error(describeProjectError(err));
+      showError(describeProjectError(err));
     }
     await load();
   };
@@ -178,12 +183,17 @@ export function MembersTab({
     );
   };
 
-  const remove = (member: ProjectMemberView) =>
-    run(() =>
-      api(`/projects/${projectId}/members/${member.userId}`, {
+  const remove = async () => {
+    if (!removing) return;
+    setBusy(true);
+    await run(() =>
+      api(`/projects/${projectId}/members/${removing.userId}`, {
         method: 'DELETE',
       }),
     );
+    setBusy(false);
+    setRemoving(undefined);
+  };
 
   return (
     <Card pad="lg" className="flex flex-col gap-4">
@@ -251,7 +261,7 @@ export function MembersTab({
                         variant="ghost"
                         size="sm"
                         aria-label={`Remove ${member.email}`}
-                        onClick={() => remove(member)}
+                        onClick={() => setRemoving(member)}
                       >
                         Remove
                       </Button>
@@ -263,6 +273,19 @@ export function MembersTab({
           </tbody>
         </Table>
       )}
+
+      <ConfirmDialog
+        open={removing !== undefined}
+        onOpenChange={(open) => {
+          if (!open) setRemoving(undefined);
+        }}
+        title={`Remove ${removing?.email ?? 'this member'}?`}
+        consequence="They lose access to this project unless their global role is administrator. You can add them again later."
+        verb="Remove"
+        tone="danger"
+        busy={busy}
+        onConfirm={() => void remove()}
+      />
 
       {isAdmin ? (
         <AddMemberDialog

@@ -84,10 +84,17 @@ const positiveInt = (value: unknown): number | null => {
   return null;
 };
 
+/**
+ * Who a notification is about. A slot named by a bare number ("719") is the
+ * issue's number, not a name, and a title with no slot still names the issue,
+ * so neither reads as "719 is blocked".
+ */
 const who = (slot: string | null, issue: number | null): string => {
-  if (slot && issue) return `${slot} (#${issue})`;
-  if (slot) return slot;
-  if (issue) return `#${issue}`;
+  const named = slot && !/^\d+$/.test(slot) ? slot : null;
+  const number = issue ?? (slot && !named ? Number(slot) : null);
+  if (named && number) return `${named} (#${number})`;
+  if (named) return named;
+  if (number) return `Issue #${number}`;
   return 'The orchestrator';
 };
 

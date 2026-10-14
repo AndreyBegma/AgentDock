@@ -84,6 +84,25 @@ describe('draftFor (spec 22 D1)', () => {
     ).toBeNull();
   });
 
+  it('names the issue when a blocked title has no slot name', () => {
+    const blocked = (slot: string | null, issue: number | null) =>
+      draftFor(
+        event({
+          type: 'issue.blocked',
+          slot,
+          issue,
+          data: { kind: 'person' },
+        }),
+      )?.title;
+    expect(blocked(null, 719)).toBe('Issue #719 is blocked on a person');
+    // A slot named by the bare number is the issue, not a name.
+    expect(blocked('719', null)).toBe('Issue #719 is blocked on a person');
+    expect(blocked('719', 719)).toBe('Issue #719 is blocked on a person');
+    expect(blocked('i719-api', 719)).toBe(
+      'i719-api (#719) is blocked on a person',
+    );
+  });
+
   it('maps issue.blocked only when a person is needed', () => {
     expect(
       draftFor(
