@@ -40,6 +40,7 @@ GitHub issue via `/code-sentinel:spec`; large rows split into waves there.
 | M3.6 | Interactive terminal attach (admin only, audited) | · [#29](https://github.com/AndreyBegma/AgentDock/issues/29) |
 | M3.7 | Planner: brief → tasks grilled per task → reviewed → sent to the fleet, with a plan graph and a cross-project Tasks page | ADR-0019 · [#172](https://github.com/AndreyBegma/AgentDock/issues/172) |
 | M3.8 | Claude Code integration: plugin hooks + MCP through the runner, manual sessions first-class, opt-in content, away-mode remote approval | ADR-0020, ADR-0021 · [#201](https://github.com/AndreyBegma/AgentDock/issues/201) |
+| M3.9 | Design stage: a per-task HTML mockup from a cached UI profile, reviewed with pins and approved before the fleet builds it | ADR-0022 · [#223](https://github.com/AndreyBegma/AgentDock/issues/223) |
 
 ## M4 — Codex
 
