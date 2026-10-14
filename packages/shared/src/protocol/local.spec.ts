@@ -265,7 +265,7 @@ describe('the manual terminal target (spec 201 D23)', () => {
     expect(manualTerminalTargetSchema.safeParse(target).success).toBe(true);
   });
 
-  it('is not yet a kind the attach command accepts', () => {
-    expect(terminalTargetSchema.safeParse(target).success).toBe(false);
+  it('is a kind the attach command accepts', () => {
+    expect(terminalTargetSchema.safeParse(target).success).toBe(true);
   });
 });

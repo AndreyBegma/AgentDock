@@ -29,7 +29,11 @@ const terminalError = (
 };
 
 /** The target the runner resolves (D2): kind and ids, plus the project's root. */
-const targetOf = (dto: TerminalTicketDto, root: string): TerminalTarget => {
+const targetOf = (
+  dto: TerminalTicketDto,
+  root: string,
+  sessionId?: string,
+): TerminalTarget => {
   const base = { projectId: dto.projectId, root };
   if (dto.kind !== 'slot' && dto.slot !== undefined) {
     throw new BadRequestException(`slot is only allowed with kind slot`);
@@ -37,7 +41,12 @@ const targetOf = (dto: TerminalTicketDto, root: string): TerminalTarget => {
   if (dto.kind !== 'skill_run' && dto.runId !== undefined) {
     throw new BadRequestException(`runId is only allowed with kind skill_run`);
   }
+  if (dto.kind !== 'manual' && dto.sessionId !== undefined) {
+    throw new BadRequestException(`sessionId is only allowed with kind manual`);
+  }
   switch (dto.kind) {
+    case 'manual':
+      return { kind: 'manual', ...base, sessionId: sessionId ?? '' };
     case 'slot':
       return { kind: 'slot', ...base, slot: dto.slot ?? '' };
     case 'orchestrator':
@@ -78,7 +87,11 @@ export class TerminalService {
       },
     });
     if (!project) throw projectNotFound();
-    const target = targetOf(dto, project.rootPath);
+    const target = targetOf(
+      dto,
+      project.rootPath,
+      await this.manualSessionId(dto),
+    );
 
     const capabilities = capabilitiesSchema.safeParse(
       project.runner.capabilities,
@@ -110,6 +123,34 @@ export class TerminalService {
       mode: dto.mode,
     });
     return { ticket: issued.ticket, expiresAt: issued.expiresAt.toISOString() };
+  }
+
+  /**
+   * Spec 201 D23: a `manual` target names a session of this project that the
+   * runner's hook placed in a tmux session. The id may be the API's or Claude
+   * Code's own; the runner knows Claude Code's. Anything else is 404.
+   */
+  private async manualSessionId(
+    dto: TerminalTicketDto,
+  ): Promise<string | undefined> {
+    if (dto.kind !== 'manual') return undefined;
+    const requested = dto.sessionId ?? '';
+    const session = await this.prisma.agentSession.findFirst({
+      where: {
+        projectId: dto.projectId,
+        tmuxSession: { not: null },
+        OR: [{ id: requested }, { externalId: requested }],
+      },
+      select: { externalId: true },
+    });
+    if (!session) {
+      throw terminalError(
+        404,
+        TERMINAL_ERROR.notFound,
+        'No attachable session with that id in this project',
+      );
+    }
+    return session.externalId;
   }
 
   async active(

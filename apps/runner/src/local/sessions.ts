@@ -11,6 +11,8 @@ interface HookSession {
   cwd: string;
   claudePid: number | null;
   ended: boolean;
+  /** The `agentdock-manual-*` tmux session `SessionStart` reported (D23). */
+  tmuxSession: string | null;
 }
 
 /** `claude`, or a path or argv0 ending in it, possibly with a version suffix. */
@@ -45,6 +47,7 @@ export class HookSessions {
       cwd,
       claudePid: null,
       ended: false,
+      tmuxSession: null,
     });
     this.evict();
   }
@@ -54,11 +57,13 @@ export class HookSessions {
     sessionId: string,
     cwd: string,
     ancestors: readonly Ancestor[],
+    tmuxSession?: string,
   ): void {
     this.seen(sessionId, cwd);
     const session = this.sessions.get(sessionId);
     if (!session) return;
     session.ended = false;
+    session.tmuxSession = tmuxSession ?? null;
     const claude = ancestors.find((a) => isClaude(a.comm));
     if (!claude) return;
     if (session.claudePid !== null) this.byPid.delete(session.claudePid);
@@ -94,6 +99,15 @@ export class HookSessions {
 
   cwdOf(sessionId: string): string | undefined {
     return this.sessions.get(sessionId)?.cwd;
+  }
+
+  /** The manual tmux session a hook reported for a session, with its cwd (D23). */
+  manualOf(
+    sessionId: string,
+  ): { tmuxSession: string; cwd: string } | undefined {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.ended || !session.tmuxSession) return undefined;
+    return { tmuxSession: session.tmuxSession, cwd: session.cwd };
   }
 
   /** The watched project of a session's cwd (D22), now. */

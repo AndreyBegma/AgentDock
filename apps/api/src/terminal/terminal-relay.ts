@@ -114,6 +114,8 @@ export const targetKey = (target: TerminalTarget): string => {
       return `${target.projectId}:orchestrator`;
     case 'skill_run':
       return `${target.projectId}:skill_run:${target.runId}`;
+    case 'manual':
+      return `${target.projectId}:manual:${target.sessionId}`;
   }
 };
 
@@ -146,6 +148,8 @@ const auditTarget = (target: TerminalTarget) => {
       return { type: 'orchestrator', id: target.projectId };
     case 'skill_run':
       return { type: 'skill_run', id: target.runId };
+    case 'manual':
+      return { type: 'session', id: target.sessionId };
   }
 };
 

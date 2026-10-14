@@ -190,6 +190,8 @@ export const runDaemon = async (
       // The executor is built below; it exists by the time a command arrives.
       runSession: (projectId, root, runId) =>
         runs.runSession(projectId, root, runId),
+      // `hookSessions` is built below too; commands arrive after both exist.
+      manualSession: (sessionId) => hookSessions.manualOf(sessionId),
       unsupported: async () => {
         const tmux = await exec('tmux', ['-V']);
         return terminalUnsupported(
