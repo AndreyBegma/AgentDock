@@ -46,4 +46,17 @@ describe('HookSessions (spec 201 D10, D22)', () => {
     expect(sessions.cwdOf('b')).toBeUndefined();
     expect(sessions.resolve(1_001, undefined)).toBe('a');
   });
+
+  it('keeps the manual tmux session a SessionStart reported', () => {
+    const sessions = new HookSessions();
+    sessions.started('m', '/w/app', [], 'agentdock-manual-0a1b2c3d');
+    expect(sessions.manualOf('m')).toEqual({
+      tmuxSession: 'agentdock-manual-0a1b2c3d',
+      cwd: '/w/app',
+    });
+    sessions.started('plain', '/w/app', []);
+    expect(sessions.manualOf('plain')).toBeUndefined();
+    sessions.ended('m');
+    expect(sessions.manualOf('m')).toBeUndefined();
+  });
 });

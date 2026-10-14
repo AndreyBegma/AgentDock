@@ -1,8 +1,10 @@
 import {
+  manualTmuxSessionSchema,
   orchestratorSessionName,
   type TerminalTarget,
   type WatchedProject,
 } from '@agentdock/shared/protocol';
+import { correlateCwd } from '../adapters/correlate';
 import { CommandFailure } from '../commands/failure';
 import { resolveSlot, watchedProject } from '../control/target';
 import { TmuxControl } from '../control/tmux';
@@ -24,6 +26,14 @@ export interface ResolveDeps {
     root: string,
     runId: string,
   ) => string | null;
+  /**
+   * The tmux session and cwd the daemon recorded for a Claude session from its
+   * `SessionStart` hook (`HookSessions.manualOf`). Absent: `manual` targets
+   * are `unsupported`.
+   */
+  manualSession?: (
+    sessionId: string,
+  ) => { tmuxSession: string; cwd: string } | undefined;
 }
 
 /** Codes of the shared resolvers that mean "not a target of this project". */
@@ -91,6 +101,30 @@ const resolve = async (
         throw notFound(`run ${target.runId} of ${project.id} is not running`);
       }
       return session;
+    }
+    case 'manual': {
+      if (!deps.manualSession) {
+        throw new CommandFailure(
+          'unsupported',
+          'attaching to a manual session is not supported by this runner',
+        );
+      }
+      // Only what a hook of this machine reported (D23), only an
+      // `agentdock-manual-<hex>` name, and only one working inside this project.
+      const known = deps.manualSession(target.sessionId);
+      const name = manualTmuxSessionSchema.safeParse(known?.tmuxSession);
+      if (!known || !name.success) {
+        throw notFound(
+          `session ${target.sessionId} has no manual tmux session`,
+        );
+      }
+      if (correlateCwd(known.cwd, [project]).projectId !== project.id) {
+        throw notFound(`session ${target.sessionId} is not in ${project.id}`);
+      }
+      if (!(await tmux.find(name.data))) {
+        throw notFound(`session ${target.sessionId} is not running`);
+      }
+      return name.data;
     }
   }
 };
