@@ -5,10 +5,10 @@ import {
   DESIGN_VIEWPORT_MIN_PX,
 } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
+import { ResizableFrame } from '@andrewbehma/glass-ui/resizable-frame';
 import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { useEffect, useState } from 'react';
-import { FrameBox } from '../../../../../../components/design/frame-box';
 import { uiProfilePreviewSrc } from '../../../../../../lib/design/href';
 
 type PreviewState = 'checking' | 'ready' | 'missing' | 'failed';
@@ -77,7 +77,7 @@ export function ProfilePreview({
     );
   }
   return (
-    <FrameBox
+    <ResizableFrame
       width={width}
       height={PREVIEW_HEIGHT}
       min={DESIGN_VIEWPORT_MIN_PX}
@@ -92,6 +92,6 @@ export function ProfilePreview({
         referrerPolicy="no-referrer"
         className="block size-full border-0 bg-white"
       />
-    </FrameBox>
+    </ResizableFrame>
   );
 }

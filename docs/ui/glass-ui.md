@@ -1,7 +1,7 @@
 # glass-ui in AgentDock
 
 [glass-ui](https://github.com/AndreyBegma/glass-ui) is the only component
-library (ADR-0011), consumed from npm as `@andrewbehma/glass-ui`. Releases are tags on `main`, cut from `develop` through a release PR and published to npm; `v0.21.0` ships the M1 desk primitives (glass-ui#67), `v0.22.0` the M2 activity primitives (#70), `0.23.0` the npm package with compiled `dist/` (#89), `0.24.0` the look from the UI audit (canvas, accent, two surface levels, `Select`/`DateInput`, `TabBar` — #93), `0.27.0` the workspace patterns and NavRail groups (#94), `0.28.0` the navy palette, identity hues and status tokens (#109), `0.28.1` the flat navy glass button (glass-ui#127), `0.29.0` the style-system components (glass-ui#130–#135). AgentDock is on **0.29.0**.
+library (ADR-0011), consumed from npm as `@andrewbehma/glass-ui`. Releases are tags on `main`, cut from `develop` through a release PR and published to npm; `v0.21.0` ships the M1 desk primitives (glass-ui#67), `v0.22.0` the M2 activity primitives (#70), `0.23.0` the npm package with compiled `dist/` (#89), `0.24.0` the look from the UI audit (canvas, accent, two surface levels, `Select`/`DateInput`, `TabBar` — #93), `0.27.0` the workspace patterns and NavRail groups (#94), `0.28.0` the navy palette, identity hues and status tokens (#109), `0.28.1` the flat navy glass button (glass-ui#127), `0.29.0` the style-system components (glass-ui#130–#135), `0.30.0` `ResizableFrame` (glass-ui#139–#141). AgentDock is on **0.30.0**.
 
 ## Consumption
 
@@ -64,7 +64,7 @@ process state.
 | activity / agents | `Timeline`, `LogViewer`, `TraceTree`, `CodeBlock`, `Terminal`, `CronInput` |
 | forms | `Field`, `Input`, `Select`, `Combobox`, `Toggle`, `Checkbox`, `RadioGroup`, `NumberInput`, `DateInput`, `Textarea` |
 | overlays | `DialogRoot`, `SheetRoot`, `Menu*`, `ContextMenu*`, `Popover*`, `Tooltip`, `toast` |
-| misc | `Card` (`hue`), `Tabs`, `SegmentedControl`, `Disclosure`, `Tree`, `Avatar`, `KeyHint`, `Separator`, `SplitPane` |
+| misc | `Card` (`hue`), `Tabs`, `SegmentedControl`, `Disclosure`, `Tree`, `Avatar`, `KeyHint`, `Separator`, `SplitPane`, `ResizableFrame` (0.30.0: a controlled-width frame with splitter edges — the design viewer's mockup) |
 
 ## Added in 0.29.0
 
@@ -110,4 +110,3 @@ Until then AgentDock does without it rather than drawing it here (ADR-0011).
 | Gap | Effect in AgentDock |
 |---|---|
 | `TimelineItem` secondary action | A `Timeline` row with `href` is one anchor, so nothing inside it can be a link. Activity shows a pull request as a plain `#205` chip and the row opens the slot (#213); a PR link chip waits for a trailing-action slot on `TimelineItem` |
-| `ResizableFrame` ([glass-ui#139](https://github.com/AndreyBegma/glass-ui/issues/139)) — a controlled-width frame with a window-splitter edge | The design viewer and the style-kit preview (spec 223) set the mockup's width from presets and a typed width only; `components/design/frame-box.tsx` takes the same props and is swapped for the glass-ui component when it ships, which adds dragging the frame's edge |

@@ -9,6 +9,7 @@ import {
   type TaskDesignView,
 } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
+import { ResizableFrame } from '@andrewbehma/glass-ui/resizable-frame';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import { SidePanel } from '@andrewbehma/glass-ui/side-panel';
 import { useMemo, useState } from 'react';
@@ -29,7 +30,6 @@ import {
 } from '../../lib/design/viewer-state';
 import { ApproveDialog } from './approve-dialog';
 import { CommentsPanel } from './comments-panel';
-import { FrameBox } from './frame-box';
 import { GeneratePanel } from './generate-panel';
 import { MockupBanner } from './mockup-banner';
 import { type FramePin, MockupFrame } from './mockup-frame';
@@ -71,6 +71,10 @@ export function DesignViewer({
   const [draft, setDraft] = useState<FramePin | null>(null);
   const [approveOpen, setApproveOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  // While the frame's edge is dragged the width lives here; the URL takes it
+  // once, on release.
+  const [dragWidth, setDragWidth] = useState<number | null>(null);
+  const view = dragWidth === null ? state : { ...state, width: dragWidth };
 
   const writeBlock = designWriteBlock(design, canOperate);
   const reviseReason = reviseBlock(design, canOperate);
@@ -157,7 +161,7 @@ export function DesignViewer({
         {state.revision ? (
           <>
             <ViewerToolbar
-              state={state}
+              state={view}
               viewports={design.viewports}
               variants={variants}
               revisions={revisionsOf(design.revisions, state.variant)}
@@ -177,13 +181,18 @@ export function DesignViewer({
             >
               Comments and review ({openCount} open)
             </Button>
-            <FrameBox
-              width={state.width}
+            <ResizableFrame
+              className="shrink-0"
+              width={view.width}
               height={state.viewport.height}
               min={DESIGN_VIEWPORT_MIN_PX}
               max={DESIGN_VIEWPORT_MAX_PX}
               labels={{ resize: 'Resize the mockup' }}
-              onWidthChange={(width) => onChange({ kind: 'width', width })}
+              onWidthChange={setDragWidth}
+              onWidthCommit={(width) => {
+                setDragWidth(null);
+                onChange({ kind: 'width', width });
+              }}
             >
               <MockupFrame
                 src={state.revision.htmlUrl}
@@ -195,7 +204,7 @@ export function DesignViewer({
                   if (writeBlock === null) setDraft(pin);
                 }}
               />
-            </FrameBox>
+            </ResizableFrame>
           </>
         ) : (
           <GeneratePanel

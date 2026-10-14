@@ -109,7 +109,7 @@ export function GeneratePanel({
                 type="button"
                 aria-pressed={count === n}
                 disabled={writeBlock !== null}
-                className="min-w-10 px-3 py-1 text-xs"
+                className="w-full min-w-10 px-3 py-1 text-xs"
                 onClick={() => setCount(n)}
               >
                 {n}

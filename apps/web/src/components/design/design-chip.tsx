@@ -147,6 +147,7 @@ export function DesignChip({
             title="Design a task in a project without UI?"
             consequence="The project's UI profile says it has no user interface, so the planner suggested no design. A design costs a planner turn per variant and holds the task until you approve it."
             verb="Design anyway"
+            tone="default"
             busy={busy}
             onConfirm={() => {
               setWarnOpen(false);
