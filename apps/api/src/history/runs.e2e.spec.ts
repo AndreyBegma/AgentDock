@@ -292,10 +292,85 @@ describe('execution history (e2e)', () => {
       const abandoned = (await admin.get(`${url}?status=abandoned`).expect(200))
         .body as RunPage;
       expect(abandoned.items.map((r) => r.slot)).toEqual(['s3', 's1']);
+      // The status chips count under every filter but the status itself.
+      expect(abandoned.counts).toMatchObject({
+        running: 4,
+        abandoned: 2,
+        failed: 0,
+        succeeded: 0,
+      });
       const issue = (await admin.get(`${url}?issue=22`).expect(200))
         .body as RunPage;
       expect(issue.items.map((r) => r.slot)).toEqual(['s2']);
+      expect(issue.counts).toEqual({
+        running: 1,
+        blocked: 0,
+        waiting_person: 0,
+        succeeded: 0,
+        failed: 0,
+        abandoned: 0,
+      });
       await admin.get(`${url}?status=bogus`).expect(400);
+    });
+
+    it('names the plan of a planner run, and no plan for a slot run', async () => {
+      const user = await ctx.prisma.user.findUniqueOrThrow({
+        where: { email: 'admin@example.com' },
+      });
+      const instructions = await ctx.prisma.plannerInstructions.create({
+        data: { projectId, version: 1, body: 'plan well' },
+      });
+      const plan = await ctx.prisma.plan.create({
+        data: {
+          projectId,
+          authorId: user.id,
+          title: 'Exporter',
+          brief: 'Build an exporter',
+          mode: 'batch',
+          visibility: 'project',
+          status: 'drafting',
+          sessionId: '6f1c1d0e-5b7a-4c1e-9a52-1f3a7c9d2e10',
+          instructionsId: instructions.id,
+          contractVersion: 1,
+          profileKey: 'claude-main',
+          model: 'opus',
+        },
+      });
+      const run = await ctx.prisma.run.create({
+        data: {
+          kind: 'plan',
+          projectId,
+          title: 'Plan decompose',
+          status: 'failed',
+          outcome: 'plan.turn failed on the runner: unknown_command',
+          triggeredByType: 'user',
+          startedAt: at(5),
+          endedAt: at(6),
+          updatedAt: at(6),
+        },
+      });
+      await ctx.prisma.planTurn.create({
+        data: {
+          planId: plan.id,
+          runId: run.id,
+          action: 'decompose',
+          input: {},
+          phase: 'failed',
+        },
+      });
+      await slot('i21');
+      await projector.tick();
+
+      const page = (await admin.get(`/projects/${projectId}/runs`).expect(200))
+        .body as RunPage;
+      expect(page.items.map((r) => [r.kind, r.planId])).toEqual([
+        ['plan', plan.id],
+        ['orchestrator_slot', null],
+      ]);
+      const detail = (
+        await admin.get(`/projects/${projectId}/runs/${run.id}`).expect(200)
+      ).body as RunDetail;
+      expect(detail.planId).toBe(plan.id);
     });
 
     it('answers 404 for a run of another project', async () => {
