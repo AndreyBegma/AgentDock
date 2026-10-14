@@ -12,6 +12,7 @@ import {
 } from '@agentdock/shared';
 import type { Status } from '@andrewbehma/glass-ui/status-pill';
 import { ApiError } from '../api';
+import type { ChipDef, FilterCodec } from '../filters/url-filters';
 
 /** A task's status before its issue, or its live status after (spec 172 "Data / Schema"). */
 export type TaskStatus = PlanTaskStatus | PlanTaskLiveStatus;
@@ -146,6 +147,59 @@ export const hasTaskFilters = (filters: TaskFilters): boolean =>
 /** How many filters are set: the count on the phone's Filters trigger. */
 export const taskFilterCount = (filters: TaskFilters): number =>
   FILTER_KEYS.filter((key) => filters[key].trim() !== '').length;
+
+/** `/tasks`'s filters in the URL (`useUrlFilters`). */
+export const TASK_FILTER_CODEC: FilterCodec<TaskFilters> = {
+  keys: FILTER_KEYS,
+  parse: filtersFromSearch,
+  search: filtersSearch,
+};
+
+/**
+ * The filters as removable chips. The plan has no select — it comes in on a
+ * link from a plan — so its chip is the only place it shows.
+ */
+export const taskChipDefs = (
+  projectName: (id: string) => string,
+): ChipDef<TaskFilters>[] => [
+  {
+    key: 'q',
+    label: (f) => (f.q.trim() ? `Search: ${f.q.trim()}` : null),
+    clear: { q: '' },
+  },
+  {
+    key: 'projectId',
+    label: (f) => (f.projectId ? `Project: ${projectName(f.projectId)}` : null),
+    clear: { projectId: '' },
+  },
+  {
+    key: 'status',
+    label: (f) => (f.status ? `Status: ${TASK_STATUS_LABEL[f.status]}` : null),
+    clear: { status: '' },
+  },
+  {
+    key: 'kind',
+    label: (f) => (f.kind ? `Kind: ${TASK_KIND_LABEL[f.kind]}` : null),
+    clear: { kind: '' },
+  },
+  {
+    key: 'planId',
+    label: (f) => (f.planId ? 'One plan' : null),
+    clear: { planId: '' },
+  },
+];
+
+/**
+ * Whose Planner the empty list points to: the filtered project, else the
+ * only one; null when there is no single project to name.
+ */
+export function plannerTarget(
+  filters: Pick<TaskFilters, 'projectId'>,
+  projectIds: readonly string[],
+): string | null {
+  if (filters.projectId) return filters.projectId;
+  return projectIds.length === 1 ? projectIds[0] : null;
+}
 
 /** The `GET /tasks` query for the filters and a page cursor. */
 export function tasksQuery(filters: TaskFilters, cursor?: string): string {
