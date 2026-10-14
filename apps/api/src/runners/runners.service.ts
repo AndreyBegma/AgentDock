@@ -64,7 +64,8 @@ export class RunnersService {
   ): Promise<PairingCodeResponse> {
     const { runner, code, expiresAt } = await this.withFreshCode(async (tx) => {
       const created = await tx.runner.create({
-        data: { name, createdById: adminId },
+        // Spec 201 D8: local requests act as the creating admin until changed.
+        data: { name, createdById: adminId, localUserId: adminId },
       });
       return { runner: created, ...(await this.issueCode(tx, created.id)) };
     });
@@ -150,6 +151,21 @@ export class RunnersService {
       heartbeat: live?.heartbeat ?? null,
       ackedSeq: Number(runner.ackedSeq),
     };
+  }
+
+  /** One runner as the list shows it. */
+  async summary(id: string): Promise<AdminRunner> {
+    const live = this.connections.get(id);
+    const runner = await this.prisma.runner.findUnique({
+      where: { id },
+      include: activeProfiles,
+    });
+    if (!runner) throw notFound();
+    return toAdminRunner(
+      runner,
+      this.status(runner, live),
+      runner._count.profiles,
+    );
   }
 
   async rename(

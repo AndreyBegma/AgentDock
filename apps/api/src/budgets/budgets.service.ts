@@ -1,7 +1,9 @@
 import {
   BUDGET_ERROR,
+  type BudgetAction,
   type BudgetListQuery,
   type BudgetOverrideView,
+  type BudgetPeriod,
   type BudgetRecomputeResult,
   type BudgetScope,
   type BudgetView,
@@ -31,6 +33,18 @@ import type {
   BudgetOverrideDto,
   BudgetUpdateDto,
 } from './dto';
+
+/** One enabled budget's room left (spec 201 D15); money as decimal strings. */
+export interface BudgetRemaining {
+  budgetId: string;
+  scope: BudgetScope;
+  period: BudgetPeriod;
+  action: BudgetAction;
+  limitUsd: string;
+  spentUsd: string;
+  remainingUsd: string;
+  resetsAt: string;
+}
 
 /** Who changes a budget, for the audit log and `createdById` / `byId`. */
 export interface BudgetActor {
@@ -137,6 +151,53 @@ export class BudgetsService {
     return query.state
       ? views.filter((v) => v.current?.state === query.state)
       : views;
+  }
+
+  /**
+   * Spec 201 D15: what is left of every enabled budget that applies to work
+   * on `projectId` by `userId` — the project's budgets, then the user's.
+   * Each is evaluated fresh, like the gate; `remainingUsd` is `limit − spent`
+   * and goes negative past the limit.
+   */
+  async remaining(input: {
+    projectId: string;
+    userId: string | null;
+  }): Promise<BudgetRemaining[]> {
+    const budgets = await this.prisma.budget.findMany({
+      where: {
+        enabled: true,
+        OR: [
+          { scope: 'project', projectId: input.projectId },
+          ...(input.userId
+            ? [{ scope: 'user' as const, userId: input.userId }]
+            : []),
+        ],
+      },
+      select: { id: true, scope: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    const ordered = [
+      ...budgets.filter((b) => b.scope === 'project'),
+      ...budgets.filter((b) => b.scope === 'user'),
+    ];
+    const result: BudgetRemaining[] = [];
+    for (const { id } of ordered) {
+      const e = await this.evaluator.evaluate(id);
+      if (!e) continue;
+      const limit = e.budget.limitUsd;
+      const spent = e.row.spentUsd;
+      result.push({
+        budgetId: e.budget.id,
+        scope: e.budget.scope,
+        period: e.budget.period,
+        action: e.budget.action,
+        limitUsd: limit.toFixed(6),
+        spentUsd: spent.toFixed(6),
+        remainingUsd: limit.sub(spent).toFixed(6),
+        resetsAt: e.row.end.toISOString(),
+      });
+    }
+    return result;
   }
 
   async view(budgetId: string): Promise<BudgetView> {

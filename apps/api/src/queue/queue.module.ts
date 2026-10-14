@@ -27,6 +27,6 @@ import { QueueSink } from './queue-sink';
     QueueService,
     QueueSink,
   ],
-  exports: [QueueProjector],
+  exports: [QueueProjector, QueueService],
 })
 export class QueueModule {}

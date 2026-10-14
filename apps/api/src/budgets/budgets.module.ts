@@ -21,7 +21,8 @@ import { BudgetsService } from './budgets.service';
  * Budgets (docs/specs/28). Global so the gated entry points — #17's control
  * service, #24's skill runs, #13's rollup service — inject `BudgetGate` and
  * `BudgetSweep` without importing this module; each takes it `@Optional()`,
- * so a build without it means "allowed" (D11).
+ * so a build without it means "allowed" (D11). The local request router reads
+ * `BudgetsService.remaining` (spec 201 D15).
  */
 @Global()
 @Module({
@@ -39,6 +40,7 @@ import { BudgetsService } from './budgets.service';
     BudgetSweep,
     BudgetsService,
   ],
-  exports: [BudgetGate, BudgetSweep, BudgetClock],
+  // `BudgetsService` for spec 201's `budget.remaining` (D15).
+  exports: [BudgetGate, BudgetSweep, BudgetClock, BudgetsService],
 })
 export class BudgetsModule {}
