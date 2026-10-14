@@ -55,9 +55,10 @@ function ProjectsTable({ projects }: { projects: ProjectSummary[] }) {
         header: 'Project',
         cell: (project) => (
           <span className="flex items-start gap-2">
-            {/* The project's identity hue, as on its Overview card (#163). */}
+            {/* The project's identity hue, as on its Overview card (#163):
+                a square swatch, since a round dot means status (#213). */}
             <Badge
-              dot
+              shape="square"
               hue={projectHue(project.id)}
               aria-hidden="true"
               className="mt-1.5"
@@ -220,7 +221,8 @@ export default function ProjectsPage() {
       title="No projects yet"
       description="A project is a GitHub repository cloned on a paired runner. Connect one to start driving agents on it."
       action={
-        <Button variant="solid" size="sm" onClick={() => setConnecting(true)}>
+        // Glass: the header's Connect project is the page's one solid (#213).
+        <Button variant="glass" size="sm" onClick={() => setConnecting(true)}>
           Connect project
         </Button>
       }
@@ -234,7 +236,16 @@ export default function ProjectsPage() {
         description="Repositories on your runners that AgentDock can drive agents on."
         actions={
           isAdmin ? (
-            <Button variant="solid" onClick={() => setConnecting(true)}>
+            // With no project and no runner, "Pair a runner" below is the
+            // next step and the one solid; Connect would only say so (#213).
+            <Button
+              variant={
+                noOnlineRunner && projects.data?.length === 0
+                  ? 'glass'
+                  : 'solid'
+              }
+              onClick={() => setConnecting(true)}
+            >
               Connect project
             </Button>
           ) : undefined

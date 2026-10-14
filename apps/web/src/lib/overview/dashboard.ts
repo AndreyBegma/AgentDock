@@ -4,10 +4,14 @@ import type {
   FleetView,
   OrchestratorStatus,
   ProjectSummary,
+  RunSummary,
   SlotStatus,
   SlotSummary,
   UsageTimeseriesResponse,
 } from '@agentdock/shared';
+import { orchestratorSettingsHref } from '../control/reasons';
+import { ORCHESTRATOR_STATUS_LABEL } from '../fleet/format';
+import { slotHref } from '../fleet/workspace-url';
 
 /**
  * The Overview dashboard (issue #159) is composed from the per-project routes
@@ -75,6 +79,31 @@ export function waitingApprovals(views: Iterable<ApprovalsView>): number {
 }
 
 /**
+ * Where each Overview figure is explained (#213). Running slots go to
+ * Sessions: Fleet is per project, and Sessions lists every live one.
+ */
+export const OVERVIEW_TILE_HREF = {
+  running: '/sessions',
+  cost: '/usage?range=today',
+  merged: '/activity',
+} as const;
+
+/**
+ * Approvals has no cross-project page: the tile opens the first project, in
+ * the list's order, with a pull request waiting — else Projects.
+ */
+export function approvalsHref(
+  projects: readonly Pick<ProjectSummary, 'id'>[],
+  approvals: ReadonlyMap<string, ApprovalsView>,
+): string {
+  const first = projects.find((project) => {
+    const view = approvals.get(project.id);
+    return view !== undefined && awaiting(view).length > 0;
+  });
+  return first ? `/projects/${first.id}/approvals` : '/projects';
+}
+
+/**
  * Pull requests merged today. An event can reach the feed twice (the plugin
  * and the scraper both see a merge), so a PR counts once per project.
  */
@@ -90,7 +119,7 @@ export function mergedPullRequests(items: ActivityItem[]): number {
 export type NeedsYouItem = {
   /** Unique across the list. */
   key: string;
-  kind: 'blocked' | 'prompt' | 'approval';
+  kind: 'profile' | 'failed' | 'blocked' | 'prompt' | 'approval';
   projectId: string;
   projectName: string;
   /** "Slot i42 · #42", "PR #57 · fix the login" */
@@ -98,23 +127,72 @@ export type NeedsYouItem = {
   /** What the person is asked to do. */
   reason: string;
   href: string;
-  /** When it started waiting: the slot's last update, the approval's wait. */
-  since: string;
+  /**
+   * When it started waiting: the slot's last update, the approval's wait, the
+   * run's end. Null for a missing profile, which has no moment — it is
+   * listed first, since nothing on that project can start until it is set.
+   */
+  since: string | null;
 };
 
+/** How far back a failed run still asks for a look. */
+export const FAILED_RUN_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/** What `needsYou` knows beyond the fleets and approvals. */
+export interface NeedsYouExtra {
+  /** Each project's failed runs, as `/runs?status=failed` answered. */
+  failedRuns?: ReadonlyMap<string, readonly RunSummary[]>;
+  /** Projects with neither an orchestrator profile nor a default one. */
+  missingProfile?: ReadonlySet<string>;
+  now?: number;
+}
+
+/** "Slot i4 · #4", else the run's title, else its kind. */
+function runTitle(run: RunSummary): string {
+  if (run.slot !== null) return slotTitle({ name: run.slot, issue: run.issue });
+  return run.title ?? 'A run';
+}
+
 /**
- * What waits on a person, oldest first: slots whose last checkpoint is
- * `blocked`, slots whose pane sits on a permission or launch prompt, and pull
- * requests waiting for a merge approval.
+ * What waits on a person: projects that cannot start an orchestrator for want
+ * of a runtime profile, then, oldest first, runs that failed in the last 24
+ * hours, slots whose last checkpoint is `blocked`, slots whose pane sits on a
+ * permission or launch prompt, and pull requests waiting for a merge approval.
  */
 export function needsYou(
   projects: ProjectSummary[],
   fleets: ReadonlyMap<string, FleetView>,
   approvals: ReadonlyMap<string, ApprovalsView>,
+  { failedRuns, missingProfile, now = Date.now() }: NeedsYouExtra = {},
 ): NeedsYouItem[] {
   const items: NeedsYouItem[] = [];
   for (const project of projects) {
     const base = { projectId: project.id, projectName: project.displayName };
+    if (missingProfile?.has(project.id)) {
+      items.push({
+        ...base,
+        key: `profile:${project.id}`,
+        kind: 'profile',
+        title: 'No default runtime profile',
+        reason: 'Choose one so the orchestrator can start',
+        href: orchestratorSettingsHref(project.id),
+        since: null,
+      });
+    }
+    for (const run of failedRuns?.get(project.id) ?? []) {
+      if (run.status !== 'failed') continue;
+      const ended = run.endedAt ?? run.updatedAt;
+      if (now - Date.parse(ended) > FAILED_RUN_WINDOW_MS) continue;
+      items.push({
+        ...base,
+        key: `failed:${run.id}`,
+        kind: 'failed',
+        title: runTitle(run),
+        reason: 'Failed — see what went wrong',
+        href: `/projects/${project.id}/history/${run.id}`,
+        since: ended,
+      });
+    }
     for (const slot of fleets.get(project.id)?.slots ?? []) {
       if (slot.status === 'ended') continue;
       const title = slotTitle(slot);
@@ -125,7 +203,7 @@ export function needsYou(
           kind: 'blocked',
           title,
           reason: 'Blocked — waiting for a decision',
-          href: `/projects/${project.id}/fleet`,
+          href: slotHref(project.id, slot.name),
           since: slot.updatedAt,
         });
       } else if (slot.status === 'prompt') {
@@ -135,7 +213,7 @@ export function needsYou(
           kind: 'prompt',
           title,
           reason: 'Waiting on a prompt in its session',
-          href: `/projects/${project.id}/fleet`,
+          href: slotHref(project.id, slot.name),
           since: slot.updatedAt,
         });
       }
@@ -155,7 +233,10 @@ export function needsYou(
       });
     }
   }
-  return items.sort((a, b) => Date.parse(a.since) - Date.parse(b.since));
+  // A stable sort: missing profiles first, in project order; the rest by age.
+  const at = (item: NeedsYouItem) =>
+    item.since === null ? Number.NEGATIVE_INFINITY : Date.parse(item.since);
+  return items.sort((a, b) => at(a) - at(b));
 }
 
 /** "Slot i42 · #42" — the slot's name and, when it has one, its issue. */
@@ -183,14 +264,15 @@ export function costByProject(
   return byProject;
 }
 
-export const ORCHESTRATOR_LABEL: Record<OrchestratorStatus, string> = {
-  running: 'Orchestrator running',
-  idle: 'Orchestrator idle',
-  absent: 'Orchestrator stopped',
-  unknown: 'Orchestrator not seen yet',
-};
+/** "Orchestrator: Not running" — the Fleet's one vocabulary, named (#213). */
+export const orchestratorLabel = (status: OrchestratorStatus): string =>
+  `Orchestrator: ${ORCHESTRATOR_STATUS_LABEL[status]}`;
 
-/** "Round Oct 13, 14:05 · 3 of 5 slots" — a round's start and occupancy. */
+/**
+ * "Round Oct 13, 14:05 · up to 5 slots" — a round's start and ceiling. Not
+ * the board's `occupied`: a board that stopped parsing keeps its last figure,
+ * and the card beside it counts the live slots (#213).
+ */
 export function roundLabel(
   round: FleetView['latestRound'],
   formatDay: (iso: string) => string,
@@ -200,5 +282,5 @@ export function roundLabel(
     ? `${round.label.slice(0, 2)}:${round.label.slice(2)}`
     : round.label;
   const day = formatDay(`${round.date}T00:00:00`);
-  return `Round ${day}, ${hhmm} · ${round.occupied} of ${round.max} slots`;
+  return `Round ${day}, ${hhmm} · up to ${round.max} slots`;
 }

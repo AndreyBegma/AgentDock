@@ -8,6 +8,7 @@ import type {
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
+import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { Sparkline } from '@andrewbehma/glass-ui/sparkline';
@@ -16,9 +17,11 @@ import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import {
   ChevronRight,
   CircleCheck,
+  CircleX,
   GitPullRequest,
   MessageSquareWarning,
   OctagonAlert,
+  Settings2,
 } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
@@ -26,12 +29,14 @@ import { formatCost, formatDate, pluralize } from '../../lib/format';
 import { Time } from '../../lib/format/time';
 import { projectHue } from '../../lib/hue';
 import {
+  approvalsHref,
   costByProject,
   isAlive,
   mergedPullRequests,
   type NeedsYouItem,
   needsYou,
-  ORCHESTRATOR_LABEL,
+  OVERVIEW_TILE_HREF,
+  orchestratorLabel,
   roundLabel,
   runningSlots,
   waitingApprovals,
@@ -65,10 +70,13 @@ const notAnswering = (projects: ProjectSummary[]): string | undefined =>
       : `${projects.length} projects are not answering`;
 
 function Stats({
+  projects,
   facts,
   costToday,
   merged,
-}: Pick<ReturnType<typeof useDashboard>, 'facts' | 'costToday' | 'merged'>) {
+}: Pick<ReturnType<typeof useDashboard>, 'facts' | 'costToday' | 'merged'> & {
+  projects: ProjectSummary[];
+}) {
   const running = tileFigure(facts, (f) =>
     String(runningSlots(f.fleets.values())),
   );
@@ -97,13 +105,15 @@ function Stats({
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       {/* Each tile keeps one hue, echoing the status it counts (#163):
-          running teal, cost amber, merged green, waiting blue. */}
+          running teal, cost amber, merged green, waiting blue. Every tile
+          goes where its figure is explained (#213). */}
       <StatTile
         hue={2}
         label="Running slots"
         loading={facts.loading && !facts.data}
         value={running.value}
         hint={factsHint('Agent sessions alive now')}
+        href={OVERVIEW_TILE_HREF.running}
       />
       <StatTile
         hue={4}
@@ -115,7 +125,7 @@ function Stats({
             ? 'Usage is not answering'
             : 'API-equivalent, since midnight'
         }
-        href="/usage"
+        href={OVERVIEW_TILE_HREF.cost}
       />
       <StatTile
         hue={3}
@@ -125,7 +135,7 @@ function Stats({
         hint={
           mergedToday.failed ? 'Activity is not answering' : 'Since midnight'
         }
-        href="/activity"
+        href={OVERVIEW_TILE_HREF.merged}
       />
       <StatTile
         hue={1}
@@ -133,6 +143,11 @@ function Stats({
         loading={facts.loading && !facts.data}
         value={approvals.value}
         hint={factsHint('Pull requests waiting for a merge decision')}
+        href={
+          facts.data
+            ? approvalsHref(projects, facts.data.approvals)
+            : '/projects'
+        }
       />
     </div>
   );
@@ -170,7 +185,12 @@ function ProjectCard({
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 flex-col gap-0.5">
             <span className="flex min-w-0 items-center gap-2 font-semibold tracking-tight">
-              <Badge dot hue={projectHue(project.id)} aria-hidden="true" />
+              {/* Identity is square; a round dot means status (#213). */}
+              <Badge
+                shape="square"
+                hue={projectHue(project.id)}
+                aria-hidden="true"
+              />
               <span className="truncate">{project.displayName}</span>
             </span>
             <span className="inline-flex items-center gap-1.5 text-xs text-ink-3">
@@ -193,7 +213,7 @@ function ProjectCard({
             <>
               <StatusPill
                 status={ORCHESTRATOR_PILL_STATUS[fleet.orchestrator.status]}
-                label={ORCHESTRATOR_LABEL[fleet.orchestrator.status]}
+                label={orchestratorLabel(fleet.orchestrator.status)}
               />
               <span className="num text-ink-2">
                 {pluralize(live ?? 0, 'live slot')}
@@ -232,6 +252,8 @@ function ProjectCard({
 }
 
 const NEEDS_ICON: Record<NeedsYouItem['kind'], ReactNode> = {
+  profile: <Settings2 aria-hidden="true" className="size-4 text-warn" />,
+  failed: <CircleX aria-hidden="true" className="size-4 text-danger" />,
   blocked: <OctagonAlert aria-hidden="true" className="size-4 text-danger" />,
   prompt: (
     <MessageSquareWarning aria-hidden="true" className="size-4 text-warn" />
@@ -263,10 +285,12 @@ function NeedsYou({ items }: { items: NeedsYouItem[] }) {
                 {item.projectName} · {item.reason}
               </span>
             </span>
-            <Time
-              value={item.since}
-              className="shrink-0 text-xs whitespace-nowrap text-ink-3"
-            />
+            {item.since ? (
+              <Time
+                value={item.since}
+                className="shrink-0 text-xs whitespace-nowrap text-ink-3"
+              />
+            ) : null}
           </Link>
         </li>
       ))}
@@ -344,10 +368,7 @@ function Panel({
 }) {
   return (
     <Card pad="md" className="flex min-w-0 flex-col gap-2">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-base font-semibold tracking-tight">{title}</h2>
-        {action}
-      </div>
+      <SectionHeader title={title} {...(action ? { actions: action } : {})} />
       {children}
     </Card>
   );
@@ -383,28 +404,32 @@ export function Dashboard({ projects }: { projects: ProjectSummary[] }) {
   const { facts, cost7d, recent } = dashboard;
   const costs = cost7d.data ? costByProject(cost7d.data) : undefined;
   const waiting = facts.data
-    ? needsYou(projects, facts.data.fleets, facts.data.approvals)
+    ? needsYou(projects, facts.data.fleets, facts.data.approvals, {
+        failedRuns: facts.data.failedRuns,
+        missingProfile: facts.data.missingProfile,
+      })
     : undefined;
 
   return (
     <div className="flex flex-col gap-6">
-      <Stats {...dashboard} />
+      <Stats projects={projects} {...dashboard} />
 
       <section
         aria-labelledby="overview-projects"
         className="flex flex-col gap-3"
       >
-        <div className="flex items-center justify-between gap-2">
-          <h2
-            id="overview-projects"
-            className="text-base font-semibold tracking-tight"
-          >
-            Projects
-          </h2>
-          <Link href="/projects" className="text-sm text-ink-2 hover:underline">
-            All projects
-          </Link>
-        </div>
+        <SectionHeader
+          title="Projects"
+          headingId="overview-projects"
+          actions={
+            <Link
+              href="/projects"
+              className="text-sm text-ink-2 hover:underline"
+            >
+              All projects
+            </Link>
+          }
+        />
         {facts.error !== null && !facts.data ? (
           <Retry title="Project fleets are not answering" section={facts} />
         ) : null}

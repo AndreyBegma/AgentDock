@@ -5,6 +5,7 @@ import type {
   ApprovalsView,
   FleetView,
   ProjectSummary,
+  RunSummary,
   SlotSummary,
 } from '@agentdock/shared';
 import {
@@ -54,6 +55,43 @@ const slot = (over: Partial<SlotSummary>): SlotSummary => ({
   startedAt: '2026-10-13T08:00:00.000Z',
   endedAt: null,
   updatedAt: '2026-10-13T09:00:00.000Z',
+  ...over,
+});
+
+const run = (over: Partial<RunSummary>): RunSummary => ({
+  id: 'r',
+  kind: 'orchestrator_slot',
+  projectId: 'p1',
+  slotId: 's7',
+  slot: 'i7',
+  issue: 7,
+  title: null,
+  runtime: 'claude',
+  model: null,
+  profileKey: null,
+  output: 'pr',
+  status: 'failed',
+  outcome: null,
+  prNumber: null,
+  prUrl: null,
+  prChecks: null,
+  triggeredByType: 'orchestrator',
+  triggeredById: null,
+  startedAt: '2026-10-14T05:00:00.000Z',
+  endedAt: '2026-10-14T08:00:00.000Z',
+  durationMs: null,
+  updatedAt: '2026-10-14T08:00:00.000Z',
+  usage: {
+    input: 0,
+    output: 0,
+    cacheRead: 0,
+    cacheWrite5m: 0,
+    cacheWrite1h: 0,
+    reasoning: 0,
+    requests: 0,
+    costUsd: null,
+    unpricedRequests: 0,
+  },
   ...over,
 });
 
@@ -210,6 +248,51 @@ describe('needsYou', () => {
   test('a project whose fleet did not load contributes nothing', () => {
     expect(needsYou([project('p1')], new Map(), new Map())).toEqual([]);
   });
+
+  test('a blocked slot deep-links to itself on the Fleet (#213)', () => {
+    const [item] = needsYou(
+      [project('p1')],
+      new Map([
+        ['p1', fleet('p1', [slot({ name: 'i4', lastCheckpoint: 'blocked' })])],
+      ]),
+      new Map(),
+    );
+    expect(item?.href).toBe('/projects/p1/fleet?open=i4&focus=i4');
+  });
+
+  test('runs failed in the last 24 h, and a missing profile first (#213)', () => {
+    const now = Date.parse('2026-10-14T12:00:00.000Z');
+    const items = needsYou(
+      [project('p1'), project('p2')],
+      new Map(),
+      new Map(),
+      {
+        now,
+        failedRuns: new Map([
+          [
+            'p1',
+            [
+              run({ id: 'fresh', endedAt: '2026-10-14T06:00:00.000Z' }),
+              run({ id: 'old', endedAt: '2026-10-13T06:00:00.000Z' }),
+              run({ id: 'ok', status: 'succeeded' }),
+              run({ id: 'titled', slot: null, title: 'Nightly audit' }),
+            ],
+          ],
+        ]),
+        missingProfile: new Set(['p2']),
+      },
+    );
+    expect(items.map((i) => [i.kind, i.key])).toEqual([
+      ['profile', 'profile:p2'],
+      ['failed', 'failed:fresh'],
+      ['failed', 'failed:titled'],
+    ]);
+    expect(items[0]?.href).toBe('/projects/p2/settings?tab=orchestrator');
+    expect(items[0]?.since).toBeNull();
+    expect(items[1]?.title).toBe('Slot i7 · #7');
+    expect(items[1]?.href).toBe('/projects/p1/history/fresh');
+    expect(items[2]?.title).toBe('Nightly audit');
+  });
 });
 
 describe('labels', () => {
@@ -235,7 +318,7 @@ describe('labels', () => {
         },
         () => 'Oct 13',
       ),
-    ).toBe('Round Oct 13, 14:05 · 3 of 5 slots');
+    ).toBe('Round Oct 13, 14:05 · up to 5 slots');
     expect(roundLabel(null, () => '')).toBeNull();
   });
 });
