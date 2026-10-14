@@ -46,13 +46,16 @@ describe('daemon — OTLP receiver (spec 13)', () => {
     cleanup();
   });
 
-  const config = (otlp: PairedConfig['otlp']): PairedConfig => ({
+  const config = (
+    otlp: PairedConfig['otlp'],
+    disabledCommands: string[] = [],
+  ): PairedConfig => ({
     server: server.origin,
     runnerId: 'rn_1',
     token: TOKEN,
     profiles: [],
     projects: [{ id: 'prj_fixture', root: ROOT }],
-    disabledCommands: [],
+    disabledCommands,
     otlp,
     fleet: { pollSeconds: 15, prPollSeconds: 60, eventsPollSeconds: 5 },
     queue: { pollSeconds: 60 },
@@ -60,12 +63,12 @@ describe('daemon — OTLP receiver (spec 13)', () => {
     skills: { maxConcurrentRuns: 2, maxTimeoutSec: 21_600 },
   });
 
-  const start = (otlp: PairedConfig['otlp']) => {
+  const start = (otlp: PairedConfig['otlp'], disabledCommands?: string[]) => {
     const controller = new AbortController();
     const { log, lines } = memoryLogger();
     let connection: RunnerConnection | null = null;
     const done = runDaemon({
-      config: config(otlp),
+      config: config(otlp, disabledCommands),
       configFile: join(dir, 'runner.json'),
       home: dir,
       spoolDir: join(dir, 'spool'),
@@ -127,6 +130,27 @@ describe('daemon — OTLP receiver (spec 13)', () => {
     await expect(
       fetch(`http://127.0.0.1:${port}/v1/logs`, { method: 'POST' }),
     ).rejects.toThrow();
+  });
+
+  it('advertises the served commands and the disabled subset in hello (#233)', async () => {
+    const { controller, done, live } = start(
+      { enabled: false, grpc: null, http: 0 },
+      ['terminal.attach', 'not.a.command'],
+    );
+    const [hello] = (await server.waitFor('hello')) as HelloMessage[];
+    const commands = hello?.capabilities.commands;
+    expect(commands).toEqual([...(commands ?? [])].sort());
+    expect(commands).toEqual(
+      expect.arrayContaining([
+        'plan.turn',
+        'terminal.attach',
+        'worktree.status',
+      ]),
+    );
+    expect(hello?.capabilities.disabledCommands).toEqual(['terminal.attach']);
+    await live();
+    controller.abort();
+    await done;
   });
 
   it('starts no receiver when otlp.enabled is false', async () => {

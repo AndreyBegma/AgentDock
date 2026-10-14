@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import {
+  commandsCapability,
   ptyAvailable,
   terminalCapability,
   terminalUnsupported,
@@ -55,5 +56,36 @@ describe('terminal capability (spec 29 D3, D10)', () => {
 
   it('finds the PTY API on the Bun the runner is built with', () => {
     expect(ptyAvailable()).toBe(process.platform !== 'win32');
+  });
+});
+
+describe('commands capability (#233)', () => {
+  const handlers = {
+    'worktree.status': 1,
+    'plan.turn': 2,
+    'runner.describe': 3,
+  };
+
+  it('lists the handler keys sorted', () => {
+    expect(commandsCapability(handlers, []).commands).toEqual([
+      'plan.turn',
+      'runner.describe',
+      'worktree.status',
+    ]);
+  });
+
+  it('intersects the config with what the build serves, sorted and unique', () => {
+    expect(
+      commandsCapability(handlers, [
+        'worktree.status',
+        'plan.turn',
+        'worktree.status',
+        'gone.command',
+      ]).disabledCommands,
+    ).toEqual(['plan.turn', 'worktree.status']);
+  });
+
+  it('has no disabled commands when the config disables none', () => {
+    expect(commandsCapability(handlers, []).disabledCommands).toEqual([]);
   });
 });

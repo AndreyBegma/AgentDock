@@ -11,7 +11,7 @@ import { resolveIngestSince } from './adapters/ingest-since';
 import { Backoff } from './backoff';
 import type { Clock } from './clock';
 import { CollectorRegistry, collectors } from './collectors';
-import { createDispatcher } from './commands/dispatcher';
+import { type CommandHandlers, createDispatcher } from './commands/dispatcher';
 import { createHandlers } from './commands/handlers';
 import { loadConfig, type PairedConfig, saveConfig } from './config';
 import {
@@ -21,6 +21,7 @@ import {
   type StopReason,
 } from './connection';
 import {
+  commandsCapability,
   detectCapabilities,
   extractVersion,
   ptyAvailable,
@@ -135,7 +136,19 @@ export const runDaemon = async (
         profiles: capabilities.profiles.length,
         terminal,
       });
-      return { ...capabilities, terminal };
+      return {
+        ...capabilities,
+        terminal,
+        ...commandsCapability(handlers(), config.disabledCommands),
+      };
+    };
+
+    // The handlers need `redetect` (runner.describe), `redetect` needs their
+    // keys: built once below, read lazily here.
+    let builtHandlers: CommandHandlers | null = null;
+    const handlers = (): CommandHandlers => {
+      if (!builtHandlers) throw new Error('handlers are not built yet');
+      return builtHandlers;
     };
 
     // Collectors emit through the connection, which exists only below.
@@ -254,25 +267,26 @@ export const runDaemon = async (
       log,
     });
 
+    builtHandlers = createHandlers({
+      clock,
+      runnerVersion: RUNNER_VERSION,
+      host: options.host,
+      detectCapabilities: redetect,
+      exec,
+      watchedProjects: () => watchList.current,
+      pollCollectors: (projectId, targets) =>
+        registry.pollNow(projectId, targets),
+      profiles: () => config.profiles,
+      backfillSessions: sessions
+        ? (scope) => sessions.backfill(scope)
+        : undefined,
+      terminal,
+      skills: createSkillHandlers(skillsDeps, runs),
+      planner: createPlannerHandlers({ ...skillsDeps, log }, plans),
+      uiprofile: createUiProfileHandlers(skillsDeps, uiProfiles),
+    });
     const dispatch = createDispatcher({
-      handlers: createHandlers({
-        clock,
-        runnerVersion: RUNNER_VERSION,
-        host: options.host,
-        detectCapabilities: redetect,
-        exec,
-        watchedProjects: () => watchList.current,
-        pollCollectors: (projectId, targets) =>
-          registry.pollNow(projectId, targets),
-        profiles: () => config.profiles,
-        backfillSessions: sessions
-          ? (scope) => sessions.backfill(scope)
-          : undefined,
-        terminal,
-        skills: createSkillHandlers(skillsDeps, runs),
-        planner: createPlannerHandlers({ ...skillsDeps, log }, plans),
-        uiprofile: createUiProfileHandlers(skillsDeps, uiProfiles),
-      }),
+      handlers: builtHandlers,
       disabledCommands: config.disabledCommands,
       clock,
       log,

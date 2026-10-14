@@ -134,6 +134,25 @@ export const terminalCapability = (options: {
   !options.disabledCommands.includes('terminal.attach') &&
   terminalUnsupported(options.tmux, options.pty) === null;
 
+/**
+ * `capabilities.commands` / `disabledCommands` (#233): every command this
+ * build serves (its handler keys) and the subset the config switches off.
+ * A name in `disabledCommands` this build does not serve is dropped.
+ */
+export const commandsCapability = (
+  handlers: Readonly<Record<string, unknown>>,
+  disabledCommands: readonly string[],
+): { commands: string[]; disabledCommands: string[] } => {
+  const commands = Object.keys(handlers).sort();
+  const served = new Set(commands);
+  return {
+    commands,
+    disabledCommands: [...new Set(disabledCommands)]
+      .filter((name) => served.has(name))
+      .sort(),
+  };
+};
+
 export interface DetectOptions {
   exec: Exec;
   home: string;
