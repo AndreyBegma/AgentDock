@@ -1,4 +1,5 @@
 import {
+  cardTmuxSessionSchema,
   manualTmuxSessionSchema,
   orchestratorSessionName,
   type TerminalTarget,
@@ -34,6 +35,15 @@ export interface ResolveDeps {
   manualSession?: (
     sessionId: string,
   ) => { tmuxSession: string; cwd: string } | undefined;
+  /**
+   * The `agentdock-card-*` session of a card of this project, or null
+   * (`CardExecutor.cardSession`). Absent: `card` targets are `unsupported`.
+   */
+  cardSession?: (
+    projectId: string,
+    root: string,
+    cardId: string,
+  ) => string | null;
 }
 
 /** Codes of the shared resolvers that mean "not a target of this project". */
@@ -126,11 +136,24 @@ const resolve = async (
       }
       return name.data;
     }
-    case 'card':
-      // Issue #242: resolved once the card executor lands.
-      throw new CommandFailure(
-        'unsupported',
-        'attaching to a board card is not supported by this runner',
-      );
+    case 'card': {
+      if (!deps.cardSession) {
+        throw new CommandFailure(
+          'unsupported',
+          'attaching to a board card is not supported by this runner',
+        );
+      }
+      // Only the session this runner started for that card, and only when
+      // the card is this very project's (#242); the executor checks both.
+      const session = deps.cardSession(project.id, project.root, target.cardId);
+      const name = cardTmuxSessionSchema.safeParse(session);
+      if (!name.success) {
+        throw notFound(`card ${target.cardId} has no worker in ${project.id}`);
+      }
+      if (!(await tmux.find(name.data))) {
+        throw notFound(`the worker of card ${target.cardId} is not running`);
+      }
+      return name.data;
+    }
   }
 };

@@ -21,7 +21,10 @@ const errorResult = (code: string, message?: string): CallToolResult => ({
   structuredContent: { error: { code, ...(message ? { message } : {}) } },
 });
 
-/** The twelve tools of spec 201 D20, each a thin call to one local method (D7). */
+/**
+ * The twelve tools of spec 201 D20 and `finish_card` (#242 D6), each a thin
+ * call to one local method (D7).
+ */
 export const buildMcpServer = (request: McpRequest): McpServer => {
   const server = new McpServer({
     name: MCP_SERVER_NAME,

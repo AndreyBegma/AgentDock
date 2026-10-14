@@ -27,7 +27,7 @@ const text = (result: unknown): string =>
   (result as { content: { text: string }[] }).content[0]?.text ?? '';
 
 describe('agentdock MCP server (spec 201 D20)', () => {
-  it('answers tools/list with the twelve tools, named agentdock', async () => {
+  it('answers tools/list with the thirteen tools, named agentdock', async () => {
     const { client } = await connect(() => ({ ok: true, data: {} }));
     expect(client.getServerVersion()?.name).toBe(MCP_SERVER_NAME);
     const { tools } = await client.listTools();
@@ -44,6 +44,7 @@ describe('agentdock MCP server (spec 201 D20)', () => {
         'handoff',
         'request_action',
         'action_status',
+        'finish_card',
         'away',
       ].sort(),
     );
@@ -94,6 +95,11 @@ describe('agentdock MCP server (spec 201 D20)', () => {
         { method: 'action.status', args: { id: 'ar_1' } },
       ],
       ['away', { on: true }, { method: 'away.set', args: { on: true } }],
+      [
+        'finish_card',
+        { summary: 'Added the export.' },
+        { method: 'card.finish', args: { summary: 'Added the export.' } },
+      ],
     ];
     for (const [name, args, expected] of cases) {
       calls.length = 0;
@@ -153,6 +159,30 @@ describe('agentdock MCP server (spec 201 D20)', () => {
         error: { code, message: 'nope' },
       });
     }
+  });
+
+  it('finish_card outside a card session is a tool error not_a_card_session (#242)', async () => {
+    const { client, calls } = await connect(() => ({
+      ok: false,
+      error: {
+        code: 'not_a_card_session',
+        message: 'this session is not a board card worker',
+      },
+    }));
+    const result = await client.callTool({
+      name: 'finish_card',
+      arguments: { summary: 'Done.' },
+    });
+    expect(calls).toEqual([
+      { method: 'card.finish', args: { summary: 'Done.' } },
+    ]);
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toEqual({
+      error: {
+        code: 'not_a_card_session',
+        message: 'this session is not a board card worker',
+      },
+    });
   });
 
   it('rejects arguments outside the tool schema before calling the daemon', async () => {

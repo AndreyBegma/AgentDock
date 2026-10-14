@@ -41,6 +41,29 @@ describe('correlateCwd (D6)', () => {
     ).toEqual({ projectId: 'prj_inner' });
   });
 
+  it('gives a runner worktree its project but no slot (#242 D14)', () => {
+    for (const name of [
+      'card-x',
+      'run-x',
+      'plan-x',
+      'plan-docs-x',
+      'skill-x',
+      'uiprofile-x',
+    ]) {
+      expect(correlateCwd(`/srv/dev/.wt-app-${name}`, [APP])).toEqual({
+        projectId: 'prj_app',
+      });
+    }
+    expect(correlateCwd('/srv/dev/.wt-app-card-x/src', [APP])).toEqual({
+      projectId: 'prj_app',
+    });
+    // Only the whole prefix: a slot that merely starts with those letters stays one.
+    expect(correlateCwd('/srv/dev/.wt-app-runner-i4', [APP])).toEqual({
+      projectId: 'prj_app',
+      slot: 'runner-i4',
+    });
+  });
+
   it('prefers the longer repository name for a worktree', () => {
     expect(correlateCwd('/srv/dev/.wt-app-web-i1', [APP, APP_WEB])).toEqual({
       projectId: 'prj_app_web',

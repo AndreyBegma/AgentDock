@@ -144,48 +144,93 @@ const openPr = async (
     ).trim(),
   );
   if (!(ahead > 0)) return null;
-  const github = await githubOf(deps, record);
+  const github = await githubOf(deps, {
+    id: record.projectId,
+    root: record.root,
+  });
+  await pushBranch(deps, wt, record.branch);
+  const pr = await createPullRequest(deps, {
+    github,
+    base: record.base,
+    branch: record.branch,
+    title,
+    body: [
+      `Skill run \`${record.runId}\`: \`/${record.skill}\` on \`${record.base}\`.`,
+      '',
+      report
+        ? redact(report.split('\n')).join('\n')
+        : 'The run left no report.',
+      '',
+    ].join('\n'),
+  });
+  return { ...pr, github };
+};
+
+/** `owner/repo` of the project's GitHub origin; throws when there is none. */
+export const githubOf = async (
+  deps: Pick<SkillsDeps, 'exec'>,
+  project: { id: string; root: string },
+): Promise<string> => {
+  const fleet = await resolveFleetProject(deps.exec, project);
+  if (!fleet.github) throw new Error(`${project.root} has no GitHub remote`);
+  return fleet.github;
+};
+
+/** Pushes the worktree's `HEAD` to `origin/<branch>`, without the project's hooks. */
+export const pushBranch = async (
+  deps: Pick<SkillsDeps, 'exec'>,
+  worktree: string,
+  branch: string,
+): Promise<void> => {
   await gitOk(
-    exec,
+    deps.exec,
     [
       '-C',
-      wt,
+      worktree,
       ...NO_HOOKS,
       'push',
       '--quiet',
       'origin',
-      `HEAD:refs/heads/${record.branch}`,
+      `HEAD:refs/heads/${branch}`,
     ],
     NETWORK_TIMEOUT_MS,
   );
+};
+
+export interface PullRequestInput {
+  /** `owner/repo`. */
+  github: string;
+  base: string;
+  branch: string;
+  title: string;
+  body: string;
+}
+
+/**
+ * `gh pr create` of a pushed branch into the base (skill runs D10, board
+ * cards #242 D8). The body goes through a private temp file, never argv.
+ */
+export const createPullRequest = async (
+  deps: Pick<SkillsDeps, 'exec' | 'tempRoot'>,
+  pr: PullRequestInput,
+): Promise<{ number: number; url: string }> => {
   const dir = await mkdtemp(join(deps.tempRoot ?? tmpdir(), 'agentdock-pr-'));
   try {
     const bodyFile = join(dir, 'body.md');
-    await writeFile(
-      bodyFile,
-      [
-        `Skill run \`${record.runId}\`: \`/${record.skill}\` on \`${record.base}\`.`,
-        '',
-        report
-          ? redact(report.split('\n')).join('\n')
-          : 'The run left no report.',
-        '',
-      ].join('\n'),
-      { mode: 0o600 },
-    );
-    const created = await exec(
+    await writeFile(bodyFile, pr.body, { mode: 0o600 });
+    const created = await deps.exec(
       'gh',
       [
         'pr',
         'create',
         '--repo',
-        github,
+        pr.github,
         '--base',
-        record.base,
+        pr.base,
         '--head',
-        record.branch,
+        pr.branch,
         '--title',
-        title,
+        pr.title,
         '--body-file',
         bodyFile,
       ],
@@ -194,24 +239,12 @@ const openPr = async (
     if (!created || created.code !== 0) {
       throw new Error(`gh pr create failed: ${stderrLine(created)}`);
     }
-    const pr = parsePrUrl(created.stdout);
-    if (!pr) throw new Error('gh pr create printed no pull request URL');
-    return { ...pr, github };
+    const parsed = parsePrUrl(created.stdout);
+    if (!parsed) throw new Error('gh pr create printed no pull request URL');
+    return parsed;
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
-};
-
-const githubOf = async (
-  deps: SkillsDeps,
-  record: RunRecord,
-): Promise<string> => {
-  const fleet = await resolveFleetProject(deps.exec, {
-    id: record.projectId,
-    root: record.root,
-  });
-  if (!fleet.github) throw new Error(`${record.root} has no GitHub remote`);
-  return fleet.github;
 };
 
 /**
