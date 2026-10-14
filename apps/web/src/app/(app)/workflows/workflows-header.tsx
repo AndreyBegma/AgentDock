@@ -16,18 +16,20 @@ import {
   MenuTrigger,
 } from '@andrewbehma/glass-ui/menu';
 import { MetaBar, type MetaBarCounter } from '@andrewbehma/glass-ui/meta-bar';
+import { PageHeader } from '@andrewbehma/glass-ui/page-header';
 import { SegmentedControl } from '@andrewbehma/glass-ui/segmented-control';
+import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
-import { Download, RefreshCw, Waypoints } from 'lucide-react';
-import { formatDate, formatNumber } from '../../../lib/format';
+import { Download, RefreshCw } from 'lucide-react';
+import { formatNumber } from '../../../lib/format';
 import type { UsageRange } from '../../../lib/usage/format';
 import {
   exportFileName,
   orchestrationCsv,
-  STATUS_LABEL,
   summaryCsv,
   toolsCsv,
-} from '../../../lib/workflows/format';
+} from '../../../lib/workflows/export';
+import { formatUpdatedAt, STATUS_LABEL } from '../../../lib/workflows/format';
 import { Segment } from './segment';
 
 export interface WorkflowsData {
@@ -138,22 +140,19 @@ function ExportMenu({
 }
 
 /** All sessions · Active only · Ended. */
-export function StatusSegment({
+function StatusSegment({
   status,
   onStatus,
-  layoutId,
 }: {
   status: WorkflowStatus;
   onStatus: (status: WorkflowStatus) => void;
-  /** One per mounted copy: the header's and the filter row's never share a pill. */
-  layoutId: string;
 }) {
   return (
     <SegmentedControl aria-label="Sessions">
       {WORKFLOW_STATUSES.map((s) => (
         <Segment
           key={s}
-          layoutId={layoutId}
+          layoutId="workflows-status"
           active={status === s}
           onSelect={() => onStatus(s)}
         >
@@ -164,13 +163,18 @@ export function StatusSegment({
   );
 }
 
+/**
+ * The page's one header (#213): glass-ui `PageHeader` with the counters in
+ * `meta`. Live is the top bar's dot; the page says so only when it is *not*
+ * updating. Below `sm` the actions wrap under the title at full width.
+ */
 export function WorkflowsHeader({
   status,
   onStatus,
   data,
   range,
   query,
-  live,
+  stale,
   refreshing,
   onRefresh,
 }: {
@@ -179,8 +183,8 @@ export function WorkflowsHeader({
   data: WorkflowsData;
   range: UsageRange | null;
   query: string;
-  /** Polling and the last load of every section succeeded. */
-  live: boolean;
+  /** A section's last load failed: the figures on screen are not moving. */
+  stale: boolean;
   refreshing: boolean;
   onRefresh: () => void;
 }) {
@@ -202,47 +206,42 @@ export function WorkflowsHeader({
       ]
     : [];
   return (
-    <MetaBar
+    <PageHeader
       className="mb-6"
       title="Workflows"
-      icon={Waypoints}
-      color="series-2"
-      status={live ? 'running' : summary ? 'paused' : undefined}
-      statusLabel={live ? 'Live' : summary ? 'Not updating' : undefined}
       description="How agents work across sessions — Usage says what they cost."
-      counters={counters}
+      status={
+        stale && summary ? (
+          <StatusPill status="paused" label="Not updating" />
+        ) : undefined
+      }
+      meta={counters.length > 0 ? <MetaBar counters={counters} /> : undefined}
       actions={
-        <div className="flex flex-wrap items-center gap-2">
-          {/* The actions slot never shrinks: below md the segment would
-              push the page sideways, so it moves to the filter row. */}
-          <div className="hidden md:block">
-            <StatusSegment
-              status={status}
-              onStatus={onStatus}
-              layoutId="workflows-status-header"
-            />
+        <>
+          <StatusSegment status={status} onStatus={onStatus} />
+          <div className="flex items-center gap-1">
+            <Tooltip content={refreshing ? 'Loading…' : 'Refresh'}>
+              <Button
+                variant="ghost"
+                icon
+                aria-label="Refresh"
+                disabled={refreshing}
+                onClick={onRefresh}
+              >
+                <RefreshCw
+                  aria-hidden="true"
+                  className={`size-4 ${refreshing ? 'animate-spin' : ''}`}
+                />
+              </Button>
+            </Tooltip>
+            <ExportMenu data={data} range={range} query={query} />
+            {summary ? (
+              <span className="num ml-1 text-xs text-ink-3" role="status">
+                Updated {formatUpdatedAt(summary.computedAt)}
+              </span>
+            ) : null}
           </div>
-          <Tooltip content={refreshing ? 'Loading…' : 'Refresh'}>
-            <Button
-              variant="ghost"
-              icon
-              aria-label="Refresh"
-              disabled={refreshing}
-              onClick={onRefresh}
-            >
-              <RefreshCw
-                aria-hidden="true"
-                className={`size-4 ${refreshing ? 'animate-spin' : ''}`}
-              />
-            </Button>
-          </Tooltip>
-          <ExportMenu data={data} range={range} query={query} />
-          {summary ? (
-            <span className="num text-xs text-ink-3" role="status">
-              Updated {formatDate(summary.computedAt, 'time')}
-            </span>
-          ) : null}
-        </div>
+        </>
       }
     />
   );

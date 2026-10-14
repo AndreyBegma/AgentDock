@@ -10,22 +10,12 @@ import {
   type WorkflowOutcome,
   type WorkflowSankeyNode,
   type WorkflowStatus,
-  type WorkflowsOrchestrationResponse,
-  type WorkflowsSummaryResponse,
-  type WorkflowsToolsResponse,
   type WorkflowToolFlow,
-  type WorkflowToolTransition,
 } from '@agentdock/shared';
 import type { Runtime } from '@agentdock/shared/protocol';
-import { type Hue, hueFor } from '@andrewbehma/glass-ui/hue';
-import type {
-  SankeyColumn,
-  SankeyLink,
-  SankeyNode,
-  SankeyTone,
-} from '@andrewbehma/glass-ui/sankey';
 import { ApiError, describeError } from '../api';
-import { formatDuration, formatNumber } from '../format';
+import type { ChipDef, FilterCodec } from '../filters/url-filters';
+import { APP_LOCALE, formatDuration, formatNumber } from '../format';
 import {
   customRange,
   presetRange,
@@ -164,6 +154,53 @@ export function workflowsQuery(
   }
   return `?${params.toString()}`;
 }
+
+/** `/workflows`'s filters in the URL (`useUrlFilters`). */
+export const WORKFLOWS_FILTER_CODEC: FilterCodec<WorkflowsFilters> = {
+  keys: [
+    'range',
+    'from',
+    'to',
+    'projectId',
+    'profileKey',
+    'status',
+    ...NODE_FILTER_KEYS,
+  ],
+  parse: filtersFromSearch,
+  search: filtersSearch,
+};
+
+/**
+ * The filters in force as removable chips (#213): the project, the runtime
+ * profile and every graph filter. The range and the status are views —
+ * always set, never a chip.
+ */
+export const workflowsChipDefs = (names: {
+  project: (id: string) => string;
+  profile: (key: string) => string;
+}): ChipDef<WorkflowsFilters>[] => [
+  {
+    key: 'projectId',
+    label: (f) =>
+      f.projectId ? `Project: ${names.project(f.projectId)}` : null,
+    // A profile key belongs to one project's runner: it goes with it.
+    clear: { projectId: '', profileKey: '' },
+  },
+  {
+    key: 'profileKey',
+    label: (f) =>
+      f.profileKey ? `Runtime profile: ${names.profile(f.profileKey)}` : null,
+    clear: { profileKey: '' },
+  },
+  ...NODE_FILTER_KEYS.map(
+    (key): ChipDef<WorkflowsFilters> => ({
+      key,
+      label: (f) =>
+        nodeFilterChips(f).find((chip) => chip.key === key)?.label ?? null,
+      clear: { [key]: '' },
+    }),
+  ),
+];
 
 export const hasNodeFilters = (filters: WorkflowsFilters): boolean =>
   NODE_FILTER_KEYS.some((key) => filters[key] !== '');
@@ -309,10 +346,29 @@ export function nodeFilterChips(filters: WorkflowsFilters): NodeFilterChip[] {
 /** A tile with no data reads "—", never 0 (the contract's null). */
 export const NO_VALUE = '—';
 
+/**
+ * Always `digits` decimals (#213): "0.0" beside "0.3", so a rounded-down
+ * average never reads as an exact zero next to its neighbours.
+ */
 export const formatAverage = (value: number | null, digits = 1): string =>
   value === null
     ? NO_VALUE
-    : formatNumber(Number(value.toFixed(digits)), digits);
+    : value.toLocaleString(APP_LOCALE, {
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits,
+      });
+
+/** "Updated 16:44": the minute is enough for a figure that moves every 35 s. */
+export const formatUpdatedAt = (iso: string): string => {
+  const at = new Date(iso);
+  return Number.isNaN(at.getTime())
+    ? ''
+    : at.toLocaleTimeString(APP_LOCALE, {
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23',
+      });
+};
 
 /** 0–1 → "87.5%". */
 export const formatRate = (value: number | null): string =>
@@ -357,184 +413,6 @@ export const TILE_HINT = {
   compactions: 'Context compactions per session, over its whole subagent tree.',
   duration: "From the root session's start to the last event in its tree.",
 } as const;
-
-/* ── Sankeys ────────────────────────────────────────────────────────── */
-
-const OUTCOME_TONE: Record<WorkflowOutcome, SankeyTone> = {
-  completed: 'ok',
-  error: 'danger',
-  abandoned: 'warn',
-  active: 'accent',
-};
-
-/**
- * How an orchestration node is painted. Outcomes wear their state's tone;
- * runtimes and named subagent types an identity hue, stable by name, so a
- * type keeps its colour from one range to the next. The `~` buckets and
- * compactions are neutral: they are groupings, not things.
- */
-export function orchestrationNodeLook(
-  node: WorkflowSankeyNode,
-): Pick<SankeyNode, 'tone' | 'hue'> {
-  const filter = node.filter;
-  if (!filter) return { tone: 'neutral' };
-  switch (filter.key) {
-    case 'outcome':
-      return { tone: OUTCOME_TONE[filter.value] };
-    case 'runtime':
-      return { hue: hueFor(`runtime:${filter.value}`) };
-    case 'agentType':
-      return filter.value.startsWith('~')
-        ? { tone: 'neutral' }
-        : { hue: hueFor(`agent:${filter.value}`) };
-    case 'compactions':
-      return { tone: filter.value === 'many' ? 'series-4' : 'neutral' };
-  }
-}
-
-export interface SankeyInput {
-  columns: SankeyColumn[];
-  nodes: SankeyNode[];
-  links: SankeyLink[];
-}
-
-export function orchestrationSankey(
-  data: WorkflowsOrchestrationResponse,
-): SankeyInput {
-  return {
-    columns: data.columns.map(({ id, label }) => ({ id, label })),
-    nodes: data.nodes.map((node) => ({
-      id: node.id,
-      label: node.label,
-      column: node.column,
-      value: node.value,
-      ...orchestrationNodeLook(node),
-    })),
-    links: data.links,
-  };
-}
-
-/**
- * The API folds subagent types to the top 8, then "+N more", "Unknown type"
- * and "No subagents". Past that, glass-ui would fold again into its own
- * "+N more", whose click names no filter — so the graph is allowed them all.
- */
-export const ORCHESTRATION_MAX_PER_COLUMN = 12;
-
-export const toolHue = (tool: string): Hue => hueFor(`tool:${tool}`);
-
-/**
- * The tool flow as a two-column Sankey. A transition can loop (Bash → Bash)
- * and the graph can cycle, which one column cannot draw left to right, so a
- * tool has a node on each side: `from:<tool>` and `to:<tool>`, the same hue.
- */
-export function toolSankey(
-  transitions: readonly WorkflowToolTransition[],
-): SankeyInput {
-  const nodes = new Map<string, SankeyNode>();
-  const add = (side: 'from' | 'to', tool: string) => {
-    const id = `${side}:${tool}`;
-    if (!nodes.has(id)) {
-      nodes.set(id, { id, label: tool, column: side, hue: toolHue(tool) });
-    }
-    return id;
-  };
-  const links = transitions.map((t) => ({
-    source: add('from', t.from),
-    target: add('to', t.to),
-    value: t.count,
-  }));
-  return {
-    columns: [
-      { id: 'from', label: 'Tool' },
-      { id: 'to', label: 'Next tool' },
-    ],
-    nodes: [...nodes.values()],
-    links,
-  };
-}
-
-/* ── export ─────────────────────────────────────────────────────────── */
-
-type Cell = string | number | null;
-
-/**
- * One CSV field. Quoted when it carries a quote, comma or line break; text
- * that a spreadsheet would run as a formula gets a leading `'`, since tool
- * and type names come from agents.
- */
-function csvField(value: Cell): string {
-  if (value === null) return '';
-  if (typeof value === 'number') return String(value);
-  const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
-  return /[",\r\n]/.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
-}
-
-export const toCsv = (rows: readonly (readonly Cell[])[]): string =>
-  `${rows.map((row) => row.map(csvField).join(',')).join('\r\n')}\r\n`;
-
-export function summaryCsv(summary: WorkflowsSummaryResponse): string {
-  return toCsv([
-    ['metric', 'value'],
-    ['sessions', summary.sessions],
-    ['active', summary.active],
-    ['ended', summary.ended],
-    ...WORKFLOW_OUTCOMES.map((o): Cell[] => [
-      `outcome_${o}`,
-      summary.outcomes[o],
-    ]),
-    ['avg_depth', summary.avgDepth],
-    ['avg_subagents', summary.avgSubagents],
-    ['success_rate', summary.successRate],
-    [
-      'top_tool_flow',
-      summary.topToolFlow ? formatFlow(summary.topToolFlow) : null,
-    ],
-    ['top_tool_flow_count', summary.topToolFlow?.count ?? null],
-    ['avg_compactions', summary.avgCompactions],
-    ['avg_duration_ms', summary.avgDurationMs],
-    ['computed_at', summary.computedAt],
-  ]);
-}
-
-export function orchestrationCsv(data: WorkflowsOrchestrationResponse): string {
-  const byId = new Map(data.nodes.map((node) => [node.id, node]));
-  const column = (id: string) => byId.get(id)?.column ?? '';
-  const label = (id: string) => byId.get(id)?.label ?? id;
-  return toCsv([
-    ['source_column', 'source', 'target_column', 'target', 'sessions'],
-    ...data.links.map((link): Cell[] => [
-      column(link.source),
-      label(link.source),
-      column(link.target),
-      label(link.target),
-      link.value,
-    ]),
-  ]);
-}
-
-export function toolsCsv(data: WorkflowsToolsResponse): string {
-  return toCsv([
-    ['from', 'to', 'count', 'errors', 'error_share'],
-    ...data.transitions.map((t): Cell[] => [
-      t.from,
-      t.to,
-      t.count,
-      t.errors,
-      t.errorShare,
-    ]),
-  ]);
-}
-
-/** `workflows-tools-2026-10-07-to-2026-10-14.csv`: the range in the name. */
-export function exportFileName(
-  what: string,
-  range: UsageRange,
-  extension: 'csv' | 'json',
-): string {
-  const day = (iso: string) => iso.slice(0, 10);
-  return `workflows-${what}-${day(range.from)}-to-${day(range.to)}.${extension}`;
-}
 
 /* ── errors ─────────────────────────────────────────────────────────── */
 
