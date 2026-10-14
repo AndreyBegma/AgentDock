@@ -5,6 +5,7 @@ import {
   CARD_ISSUE_BODY_MAX,
   CARD_PR_MARKER,
   cardBranch,
+  cardDesignPath,
   cardIssueBody,
   cardLabel,
   cardPullRequestBody,
@@ -90,6 +91,22 @@ describe('naming', () => {
     ).toBe('docs/specs/41-add-login.md');
   });
 
+  it('places the approved design beside the spec, or under docs/design/cards (#243 D7)', () => {
+    const card = { number: 12, title: 'Add login', issueNumber: null };
+    expect(cardDesignPath('docs/specs/', card, 2)).toBe(
+      'docs/specs/card-12-add-login/design/2.html',
+    );
+    expect(cardDesignPath('docs/specs', { ...card, issueNumber: 41 }, 1)).toBe(
+      'docs/specs/41-add-login/design/1.html',
+    );
+    expect(cardDesignPath(null, { ...card, issueNumber: 41 }, 1)).toBe(
+      'docs/design/cards/C-12-add-login/1.html',
+    );
+    expect(cardDesignPath('', card, 3)).toBe(
+      'docs/design/cards/C-12-add-login/3.html',
+    );
+  });
+
   it('ends an issue body with the footer, cutting the body to fit', () => {
     const body = cardIssueBody('Do it.', 12);
     expect(body).toStartWith('Do it.');
@@ -155,10 +172,11 @@ describe('worker prompt', () => {
     base: 'develop',
     specPath: 'docs/specs/card-12-add-login.md',
     issueNumber: null,
+    design: null,
   };
 
   it('is versioned', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(1);
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(2);
   });
 
   it('names the card, branch, base and spec, and how to finish', () => {

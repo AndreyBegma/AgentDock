@@ -2347,7 +2347,10 @@ model PlanTask {
 /// whose output fails the contract keeps `resultText` and applies nothing.
 model PlanTurn {
   id         String         @id @default(cuid())
-  planId     String
+  /// Exactly one of `planId` / `cardId` (CHECK `plan_turns_owner_check`, ADR-0025).
+  planId     String?
+  /// A board card's design turn (#243 D2), sent as `plan.turn` with `planId = card.id`.
+  cardId     String?
   /// Set for a task's grill or write turn.
   taskId     String?
   runId      String         @unique
@@ -2364,13 +2367,15 @@ model PlanTurn {
   createdAt  DateTime       @default(now())
   finishedAt DateTime?
 
-  plan            Plan             @relation(fields: [planId], references: [id], onDelete: Cascade)
+  plan            Plan?            @relation(fields: [planId], references: [id], onDelete: Cascade)
+  card            BoardCard?       @relation(fields: [cardId], references: [id], onDelete: Cascade)
   task            PlanTask?        @relation(fields: [taskId], references: [id], onDelete: Cascade)
   run             Run              @relation(fields: [runId], references: [id], onDelete: Cascade)
   author          User?            @relation(fields: [authorId], references: [id], onDelete: SetNull)
   designRevisions DesignRevision[]
 
   @@index([planId, createdAt])
+  @@index([cardId, createdAt])
   @@index([taskId, createdAt])
   @@map("plan_turns")
 }
@@ -2458,10 +2463,13 @@ model DesignSettings {
 
 /// A task's design, keyed by `(planId, taskKey)` — not by a `plan_tasks` row,
 /// which is versioned per plan version while the design carries across them.
+/// A design has exactly one owner (ADR-0025): a plan task (`planId` and
+/// `taskKey`) or a board card (`cardId`) — CHECK `task_designs_owner_check`.
 model TaskDesign {
   id                 String           @id @default(cuid())
-  planId             String
-  taskKey            String
+  planId             String?
+  taskKey            String?
+  cardId             String?          @unique
   /// The person's switch (D2); starts as the planner's suggestion.
   needed             Boolean
   /// Whether the planner suggested it, and why (D2).
@@ -2479,7 +2487,8 @@ model TaskDesign {
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
 
-  plan             Plan             @relation(fields: [planId], references: [id], onDelete: Cascade)
+  plan             Plan?            @relation(fields: [planId], references: [id], onDelete: Cascade)
+  card             BoardCard?       @relation(fields: [cardId], references: [id], onDelete: Cascade)
   profile          UiProfile?       @relation(fields: [profileId], references: [id], onDelete: SetNull)
   approvedRevision DesignRevision?  @relation("TaskDesignApprovedRevision", fields: [approvedRevisionId], references: [id], onDelete: SetNull)
   approvedBy       User?            @relation(fields: [approvedById], references: [id], onDelete: SetNull)
@@ -2618,6 +2627,10 @@ model BoardCard {
   specOnRun     Boolean
   /// Overrides the project's model from the next round (D12).
   model         String?
+  /// #243 D5: approving the design starts round 1. Changeable until the design is approved.
+  continueAfterDesign Boolean   @default(false)
+  /// #243 D2: the design turns' Claude session — `--session-id` first, then `--resume`.
+  designSessionId String?       @db.Uuid
   /// The Claude session, fixed at the first Run (D6).
   sessionId     String?         @db.Uuid
   branch        String?
@@ -2642,6 +2655,8 @@ model BoardCard {
   movedBy     User?            @relation("BoardCardMovedBy", fields: [movedById], references: [id], onDelete: SetNull)
   completedBy User?            @relation("BoardCardCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
   rounds      BoardCardRound[]
+  design      TaskDesign?
+  designTurns PlanTurn[]
 
   @@unique([projectId, number])
   @@index([projectId, column, position])
