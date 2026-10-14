@@ -1,4 +1,5 @@
 import type {
+  PlanSummary,
   ProjectSummary,
   Role,
   RunSummary,
@@ -7,6 +8,7 @@ import type {
 import type { CommandPaletteGroup } from '@andrewbehma/glass-ui/command-palette';
 import {
   FolderGit2,
+  Lightbulb,
   LogOut,
   type LucideIcon,
   Palette,
@@ -14,7 +16,8 @@ import {
   SquareTerminal,
   User,
 } from 'lucide-react';
-import { runLabel, sessionLabel } from './crumbs';
+import { planHref } from '../../lib/planner/href';
+import { planLabel, runLabel, sessionLabel } from './crumbs';
 import { type VisibleSection, visibleNav } from './nav';
 
 /** What the palette opened with: the newest sessions and the current project's runs. */
@@ -31,12 +34,17 @@ export interface PaletteInput {
   projects: readonly ProjectSummary[];
   projectId: string | null;
   recent: RecentEntities;
+  /** The current project's plans; none outside a project. */
+  plans: readonly PlanSummary[];
   /** The theme the "Switch theme" action reads as its hint. */
   themeLabel: string;
 }
 
 /** Project pages listed for a query: every project times eight pages adds up. */
 const PROJECT_PAGES_MAX = 12;
+
+/** Plans listed: the newest, or the newest that match the query. */
+const PLANS_MAX = 5;
 
 /** Every word of the query appears in the text, in any order. */
 function matcher(query: string): (text: string) => boolean {
@@ -141,6 +149,16 @@ export function paletteGroups(input: PaletteInput): CommandPaletteGroup[] {
     })),
   ].filter((item) => matches(`${item.label} ${item.hint}`));
 
+  const plans: Item[] = [...input.plans]
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .map((plan) => ({
+      id: `go:${planHref(plan.projectId, plan.id)}`,
+      label: planLabel(plan),
+      icon: Lightbulb,
+    }))
+    .filter((item) => matches(`plan ${item.label}`))
+    .slice(0, PLANS_MAX);
+
   const actions: Item[] = [
     {
       id: 'action:theme',
@@ -155,6 +173,7 @@ export function paletteGroups(input: PaletteInput): CommandPaletteGroup[] {
     ...group('pages', 'Go to', pages),
     ...group('project-pages', 'Project pages', subPages),
     ...group('projects', 'Projects', projects),
+    ...group('plans', 'Plans', plans),
     ...group('recent', 'Recent', recent),
     ...group('admin', 'Admin', admin),
     ...group('actions', 'Actions', actions),

@@ -1,12 +1,6 @@
 'use client';
 
-import {
-  LIVE_CLOSE_CODES,
-  type ProjectSummary,
-  type PublicUser,
-  type RunPage,
-  type SessionListResponse,
-} from '@agentdock/shared';
+import { LIVE_CLOSE_CODES, type PublicUser } from '@agentdock/shared';
 import { ActionList } from '@andrewbehma/glass-ui/action-list';
 import { Avatar } from '@andrewbehma/glass-ui/avatar';
 import { Badge } from '@andrewbehma/glass-ui/badge';
@@ -36,17 +30,24 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
   useSyncExternalStore,
 } from 'react';
 import { api, describeError } from '../../lib/api';
+import { approvalsBadge } from '../../lib/approvals/format';
+import { attentionBadge } from '../../lib/fleet/format';
 import { useLiveStatus } from '../../lib/live/use-live';
 import { crumbsFor, pageTitleOf } from './crumbs';
 import { liveDotLabel, useLivePaused } from './live-status';
-import { activeEntryId, projectIdOf, tabBarSplit, visibleNav } from './nav';
+import {
+  activeEntryId,
+  isWideEntry,
+  projectIdOf,
+  tabBarSplit,
+  visibleNav,
+} from './nav';
 import { NotificationBell } from './notification-bell';
-import { paletteGroups, type RecentEntities } from './palette';
+import { paletteGroups } from './palette';
 import { ProjectSwitcher } from './project-switcher';
 import { Rail } from './rail';
 import {
@@ -59,16 +60,13 @@ import {
   type ThemeMode,
 } from './theme';
 import { useCrumbNames } from './use-crumb-names';
+import { useDocumentTitle } from './use-document-title';
+import { usePlans, useProjects, useRecent } from './use-shell-data';
 import { useSlotsNeedingAttention } from './use-slots-needing-attention';
 import { useWaitingApprovals } from './use-waiting-approvals';
 import { UserProvider } from './user-context';
 
 const COLLAPSE_QUERY = '(max-width: 1023px)';
-
-/** Rows the palette's Recent group lists per kind. */
-const RECENT_LIMIT = 5;
-
-const NO_RECENT: RecentEntities = { sessions: [], runs: [] };
 
 /** The tab bar's and More's anchors are Next links. */
 const renderLink: NonNullable<TabBarProps['link']> = ({
@@ -115,83 +113,6 @@ function useTheme(): [ThemeMode, (mode: ThemeMode) => void] {
   return [mode, choose];
 }
 
-/** The projects the caller may see, fetched once for the rail, trail and palette. */
-function useProjects(): ProjectSummary[] {
-  const [projects, setProjects] = useState<ProjectSummary[]>([]);
-  useEffect(() => {
-    let cancelled = false;
-    api<ProjectSummary[]>('/projects')
-      .then((list) => {
-        if (!cancelled && Array.isArray(list)) setProjects(list);
-      })
-      .catch(() => {
-        // No switcher and no project names; the Projects page still works.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-  return projects;
-}
-
-/** The newest sessions and the current project's runs, read when the palette opens. */
-function useRecent(open: boolean, projectId: string | null): RecentEntities {
-  const [recent, setRecent] = useState<RecentEntities>(NO_RECENT);
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    const sessions = api<SessionListResponse>(
-      `/sessions?limit=${RECENT_LIMIT}`,
-    ).then(
-      (page) => page.items,
-      () => [],
-    );
-    const runs = projectId
-      ? api<RunPage>(`/projects/${projectId}/runs?limit=${RECENT_LIMIT}`).then(
-          (page) => page.items,
-          () => [],
-        )
-      : Promise.resolve([]);
-    void Promise.all([sessions, runs]).then(([sessionItems, runItems]) => {
-      if (!cancelled) setRecent({ sessions: sessionItems, runs: runItems });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, projectId]);
-  return recent;
-}
-
-/** The root layout's `title.default`: what a page without metadata gets. */
-const DEFAULT_TITLE = 'AgentDock';
-
-/**
- * Client pages have no metadata of their own, so the trail names the tab.
- * Next writes the metadata title after this effect (it streams), so the
- * default is replaced whenever it appears, and so is the title this hook set
- * for the previous page; a page that set its own `metadata.title` keeps it.
- */
-function useDocumentTitle(title: string) {
-  const ours = useRef<string | null>(null);
-  useEffect(() => {
-    const apply = () => {
-      const current = document.title;
-      if (current === title) return;
-      if (current !== DEFAULT_TITLE && current !== ours.current) return;
-      document.title = title;
-      ours.current = title;
-    };
-    apply();
-    const observer = new MutationObserver(apply);
-    observer.observe(document.head, {
-      childList: true,
-      subtree: true,
-      characterData: true,
-    });
-    return () => observer.disconnect();
-  }, [title]);
-}
-
 function ConnectionDot({ status, paused }: ReturnType<typeof useLivePaused>) {
   const label = liveDotLabel(status, paused);
   const tone = status === 'connected' ? 'ok' : 'warn';
@@ -220,6 +141,7 @@ export function AppShell({
   const projectId = projectIdOf(pathname);
   const projects = useProjects();
   const recent = useRecent(paletteOpen, projectId);
+  const plans = usePlans(paletteOpen, projectId);
   const names = useCrumbNames(pathname, projects);
 
   useCommandPaletteShortcut(() => setPaletteOpen(true));
@@ -238,24 +160,28 @@ export function AppShell({
     [user.role, pathname],
   );
   const activeId = activeEntryId(sections, pathname);
+  const wide = isWideEntry(sections, activeId);
+  const projectName = projects.find(
+    (project) => project.id === projectId,
+  )?.displayName;
 
   const crumbs = useMemo(() => crumbsFor(pathname, names), [pathname, names]);
-  const pageTitle = pageTitleOf(crumbs);
-  useDocumentTitle(`${pageTitle} · AgentDock`);
+  useDocumentTitle(pageTitleOf(crumbs, projectName));
   const parent = crumbs.length > 1 ? crumbs.at(-2) : undefined;
 
-  // The rail's badges on Approvals and Fleet.
+  // The rail's and the tab bar's badges on Approvals and Fleet.
   const waitingApprovals = useWaitingApprovals(projectId);
   const slotsNeedingAttention = useSlotsNeedingAttention(projectId);
+  const tabBadges = {
+    approvals: approvalsBadge(waitingApprovals),
+    fleet: attentionBadge(slotsNeedingAttention),
+  } as const;
 
   // Below `lg`: five tabs, the rest in More's sheet, which a navigation closes.
   const { tabs, more } = useMemo(() => tabBarSplit(sections), [sections]);
   const [moreOpen, setMoreOpen] = useState(false);
   // biome-ignore lint/correctness/useExhaustiveDependencies: pathname is the trigger
   useEffect(() => setMoreOpen(false), [pathname]);
-  const projectName = projects.find(
-    (project) => project.id === projectId,
-  )?.displayName;
 
   const logout = useCallback(async () => {
     try {
@@ -280,6 +206,7 @@ export function AppShell({
       projects,
       projectId,
       recent,
+      plans,
       themeLabel: THEME_LABEL[theme],
     });
 
@@ -301,7 +228,8 @@ export function AppShell({
         Skip to content
       </a>
       <div
-        className={`flex min-h-screen ${narrow ? 'gap-2 p-2' : 'gap-3 p-3'}`}
+        // Below `lg` the page sits on a 16 px gutter (#213).
+        className={`flex min-h-screen ${narrow ? 'gap-2 px-4 py-2' : 'gap-3 p-3'}`}
       >
         {narrow ? null : (
           <aside className="sticky top-3 h-[calc(100vh-1.5rem)] shrink-0">
@@ -425,7 +353,8 @@ export function AppShell({
           <main
             id="main-content"
             tabIndex={-1}
-            className="mx-auto w-full max-w-5xl pb-6 focus:outline-none"
+            // A data page (the registry's `wide`) gets the wide column.
+            className={`mx-auto w-full pb-6 focus:outline-none ${wide ? 'max-w-7xl' : 'max-w-5xl'}`}
           >
             {children}
           </main>
@@ -441,6 +370,10 @@ export function AppShell({
                 icon: entry.icon,
                 href: entry.resolvedHref,
                 active: entry.id === activeId,
+                badge:
+                  entry.id === 'approvals' || entry.id === 'fleet'
+                    ? tabBadges[entry.id]
+                    : undefined,
               }))}
               link={renderLink}
               more={
