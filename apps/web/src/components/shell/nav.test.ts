@@ -77,6 +77,7 @@ describe('visibleNav', () => {
     for (const page of [
       'Fleet',
       'Planner',
+      'Board',
       'Queue',
       'Approvals',
       'Activity',
@@ -137,6 +138,11 @@ describe('activeEntryId: one active item', () => {
     );
   });
 
+  test('the project Board lights its own entry, not the Queue', () => {
+    expect(activeAt('viewer', '/projects/p1/board')).toBe('board');
+    expect(activeAt('viewer', '/projects/p1/queue')).toBe('queue');
+  });
+
   test('Tasks, the project Planner and the admin Planner each light one entry', () => {
     expect(activeAt('viewer', '/tasks')).toBe('tasks');
     expect(activeAt('viewer', '/projects/p1/planner')).toBe('planner');
@@ -190,7 +196,7 @@ describe('tabBarSplit', () => {
     expect(split('admin', '/projects/p1/queue')).toEqual({
       tabs: ['Fleet', 'Planner', 'Queue', 'Approvals', 'History'],
       more: [
-        'project: Activity, Skills, Schedules, Settings',
+        'project: Board, Activity, Skills, Schedules, Settings',
         'workspace: Overview, Projects, Activity, Tasks, Sessions, Usage, Workflows, Skills',
         'admin: Runners, Users, Schedules, Budgets, Planner instructions, Audit, Prices, Integrations, Settings',
       ],
@@ -219,6 +225,7 @@ describe('isWideEntry', () => {
     expect(wideAt('/sessions')).toBe(true);
     expect(wideAt('/projects/p1/history')).toBe(true);
     expect(wideAt('/projects/p1/history/r1')).toBe(true);
+    expect(wideAt('/projects/p1/board')).toBe(true);
     expect(wideAt('/admin/audit')).toBe(true);
   });
 

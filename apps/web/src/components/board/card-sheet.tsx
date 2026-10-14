@@ -1,0 +1,508 @@
+'use client';
+
+import {
+  BOARD_CARD_BODY_MAX,
+  BOARD_CARD_KINDS,
+  BOARD_CARD_TITLE_MAX,
+  type BoardCardDetail,
+  type BoardCardKind,
+  CARD_FEEDBACK_MAX,
+  type CardRoundView,
+} from '@agentdock/shared';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { Field, Input, Select, Textarea } from '@andrewbehma/glass-ui/field';
+import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
+import { Timeline, type TimelineItem } from '@andrewbehma/glass-ui/timeline';
+import { toast } from '@andrewbehma/glass-ui/toast';
+import { useEffect, useState } from 'react';
+import { fetchCard, sendFeedback, updateCard } from '../../lib/board/actions';
+import {
+  COLUMN_TITLE,
+  canAccept,
+  canGiveFeedback,
+  canMarkFinished,
+  canRetry,
+  canRun,
+  canStop,
+  describeBoardError,
+  hooksHint,
+  phaseLabel,
+  roundPill,
+} from '../../lib/board/format';
+import { formatCost } from '../../lib/format';
+import { Time } from '../../lib/format/time';
+import { safeHttpsUrl } from '../../lib/queue/format';
+import { Markdown } from '../markdown/markdown';
+import { CardOptionToggles } from './card-options';
+import type { CardActions } from './use-card-actions';
+
+const KIND_LABEL: Record<BoardCardKind, string> = {
+  feature: 'Feature',
+  bug: 'Bug',
+};
+
+/** The terminal button's state: offered, or disabled with the reason (D11). */
+export type TerminalAccess =
+  | { state: 'available'; open: () => void }
+  | { state: 'disabled'; reason: string };
+
+function roundTone(round: CardRoundView): TimelineItem['tone'] {
+  if (round.phase === 'failed') return 'danger';
+  if (round.phase === 'finished') return 'ok';
+  if (round.phase === 'waiting' || round.phase === 'ended') return 'warn';
+  return 'neutral';
+}
+
+function roundItems(rounds: CardRoundView[]): TimelineItem[] {
+  return rounds.map((round) => {
+    const cost = formatCost(round.costUsd);
+    return {
+      id: round.id,
+      at: round.startedAt,
+      tone: roundTone(round),
+      actor: round.author ? { name: round.author.email } : undefined,
+      title: (
+        <span>
+          Round {round.round} ·{' '}
+          {round.trigger === 'feedback' ? 'feedback' : 'run'} ·{' '}
+          {phaseLabel(round.phase)}
+        </span>
+      ),
+      meta: (
+        <span className="flex flex-col gap-1 text-xs">
+          {round.feedback ? (
+            <span className="whitespace-pre-wrap break-words">
+              “{round.feedback}”
+            </span>
+          ) : null}
+          {round.summary ? (
+            <span className="whitespace-pre-wrap break-words">
+              {round.summary}
+            </span>
+          ) : null}
+          {round.error ? (
+            <span className="text-danger">{round.error}</span>
+          ) : null}
+          {round.hooksMissing ? <span>{hooksHint}</span> : null}
+          {cost ? <span className="tabular-nums">{cost}</span> : null}
+        </span>
+      ),
+    };
+  });
+}
+
+function Links({ card }: { card: BoardCardDetail }) {
+  const pr = card.prUrl ? safeHttpsUrl(card.prUrl) : null;
+  const issue = card.issueUrl ? safeHttpsUrl(card.issueUrl) : null;
+  const items = [
+    card.prNumber !== null && { label: `PR #${card.prNumber}`, href: pr },
+    card.issueNumber !== null && {
+      label: `Issue #${card.issueNumber}`,
+      href: issue,
+    },
+  ].filter((x): x is { label: string; href: string | null } => x !== false);
+  if (items.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-3 text-sm">
+      {items.map(({ label, href }) =>
+        href ? (
+          <a
+            key={label}
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+            className="underline-offset-2 hover:underline"
+          >
+            {label}
+          </a>
+        ) : (
+          <span key={label}>{label}</span>
+        ),
+      )}
+    </div>
+  );
+}
+
+function CardDetailBody({
+  projectId,
+  card,
+  canOperate,
+  actions,
+  terminal,
+  onSaved,
+}: {
+  projectId: string;
+  card: BoardCardDetail;
+  canOperate: boolean;
+  actions: CardActions;
+  terminal: TerminalAccess;
+  onSaved: () => void;
+}) {
+  const [title, setTitle] = useState(card.title);
+  const [body, setBody] = useState(card.body);
+  const [kind, setKind] = useState(card.kind);
+  const [issueOnRun, setIssueOnRun] = useState(card.issueOnRun);
+  const [specOnRun, setSpecOnRun] = useState(card.specOnRun);
+  const [model, setModel] = useState(card.model ?? '');
+  const [preview, setPreview] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState('');
+  const [sending, setSending] = useState(false);
+
+  // A newer card (a live push) replaces the form unless the person is typing.
+  const dirty =
+    title !== card.title ||
+    body !== card.body ||
+    kind !== card.kind ||
+    issueOnRun !== card.issueOnRun ||
+    specOnRun !== card.specOnRun ||
+    model !== (card.model ?? '');
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await updateCard(projectId, card.number, {
+        title: title.trim(),
+        body,
+        kind,
+        issueOnRun,
+        specOnRun,
+        model: model.trim() === '' ? null : model.trim(),
+      });
+      toast.success(`${card.label} saved. It applies from the next round.`);
+      onSaved();
+    } catch (err) {
+      toast.error(describeBoardError(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const sendBack = async () => {
+    setSending(true);
+    try {
+      await sendFeedback(projectId, card.number, { text: feedback.trim() });
+      toast.success(`Feedback sent. ${card.label} is back in progress.`);
+      setFeedback('');
+      onSaved();
+    } catch (err) {
+      toast.error(describeBoardError(err));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const pill = roundPill(card.round);
+  const total = formatCost(card.costUsd);
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="font-medium">{COLUMN_TITLE[card.column]}</span>
+        {pill ? (
+          <StatusPill size="sm" status={pill.status} label={pill.label} />
+        ) : null}
+        {total ? (
+          <span className="ml-auto tabular-nums text-ink-2">{total}</span>
+        ) : null}
+      </div>
+      <Links card={card} />
+      {card.branch ? (
+        <p className="break-all font-mono text-xs text-ink-2">{card.branch}</p>
+      ) : null}
+      {card.round?.hooksMissing ? (
+        <p className="text-xs text-ink-2">{hooksHint}</p>
+      ) : null}
+
+      {canOperate ? (
+        <div className="flex flex-wrap gap-2">
+          {canAccept(card) ? (
+            <Button
+              variant="solid"
+              disabled={actions.busy}
+              onClick={() => actions.accept(card)}
+            >
+              Accept
+            </Button>
+          ) : null}
+          {canRun(card) || canRetry(card) ? (
+            <Button
+              variant={card.column === 'todo' ? 'solid' : 'glass'}
+              disabled={actions.busy}
+              onClick={() => actions.run(card)}
+            >
+              {canRetry(card) ? 'Run again' : 'Run'}
+            </Button>
+          ) : null}
+          {canMarkFinished(card) ? (
+            <Button
+              variant="glass"
+              disabled={actions.busy}
+              onClick={() => actions.markFinished(card)}
+            >
+              Mark finished
+            </Button>
+          ) : null}
+          {canStop(card) ? (
+            <Button
+              variant="glass"
+              disabled={actions.busy}
+              onClick={() => actions.askStop(card)}
+            >
+              Stop
+            </Button>
+          ) : null}
+          {card.sessionId ? (
+            terminal.state === 'available' ? (
+              <Button variant="glass" onClick={terminal.open}>
+                Open terminal
+              </Button>
+            ) : (
+              <Button variant="glass" disabled title={terminal.reason}>
+                Open terminal
+              </Button>
+            )
+          ) : null}
+        </div>
+      ) : null}
+      {canOperate && card.sessionId && terminal.state === 'disabled' ? (
+        <p className="-mt-3 text-xs text-ink-3">{terminal.reason}</p>
+      ) : null}
+
+      {canGiveFeedback(card) && canOperate ? (
+        <Field
+          label="Send back with feedback"
+          htmlFor="board-feedback"
+          hint="Resumes the same Claude session in the same worktree. The card returns to In progress."
+        >
+          <Textarea
+            id="board-feedback"
+            rows={4}
+            value={feedback}
+            maxLength={CARD_FEEDBACK_MAX}
+            onChange={(e) => setFeedback(e.target.value)}
+          />
+          <div className="mt-2">
+            <Button
+              variant="glass"
+              disabled={sending || feedback.trim() === ''}
+              onClick={sendBack}
+            >
+              {sending ? 'Sending…' : 'Send back'}
+            </Button>
+          </div>
+        </Field>
+      ) : null}
+
+      <section aria-label="Rounds" className="flex flex-col gap-2">
+        <h3 className="text-sm font-medium">Rounds</h3>
+        <Timeline
+          items={roundItems(card.rounds)}
+          empty={<p className="text-sm text-ink-3">No worker has run yet.</p>}
+        />
+      </section>
+
+      <form
+        className="flex flex-col gap-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (dirty && title.trim() !== '' && !saving) void save();
+        }}
+      >
+        <h3 className="text-sm font-medium">Card</h3>
+        <Field label="Title" htmlFor="board-card-title">
+          <Input
+            id="board-card-title"
+            value={title}
+            maxLength={BOARD_CARD_TITLE_MAX}
+            disabled={!canOperate}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+        </Field>
+        <Field label="What to do" htmlFor="board-card-body">
+          {preview ? (
+            <div className="rounded-control bg-surface p-3">
+              <Markdown>{body || '*Nothing written yet.*'}</Markdown>
+            </div>
+          ) : (
+            <Textarea
+              id="board-card-body"
+              rows={8}
+              value={body}
+              maxLength={BOARD_CARD_BODY_MAX}
+              disabled={!canOperate}
+              onChange={(e) => setBody(e.target.value)}
+            />
+          )}
+          <div className="mt-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              type="button"
+              onClick={() => setPreview((p) => !p)}
+            >
+              {preview ? 'Edit' : 'Preview'}
+            </Button>
+          </div>
+        </Field>
+        <Field label="Kind" htmlFor="board-card-kind">
+          <Select
+            id="board-card-kind"
+            value={kind}
+            disabled={!canOperate}
+            onChange={(e) =>
+              setKind(
+                BOARD_CARD_KINDS.find((k) => k === e.target.value) ?? kind,
+              )
+            }
+          >
+            {BOARD_CARD_KINDS.map((k) => (
+              <option key={k} value={k}>
+                {KIND_LABEL[k]}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field
+          label="Model"
+          htmlFor="board-card-model"
+          hint="Empty uses the project’s orchestrator model."
+        >
+          <Input
+            id="board-card-model"
+            value={model}
+            maxLength={100}
+            disabled={!canOperate}
+            onChange={(e) => setModel(e.target.value)}
+          />
+        </Field>
+        <CardOptionToggles
+          idPrefix="board-card"
+          issueOnRun={issueOnRun}
+          specOnRun={specOnRun}
+          disabled={!canOperate || card.round !== null}
+          onIssueOnRun={setIssueOnRun}
+          onSpecOnRun={setSpecOnRun}
+        />
+        {card.specPath ? (
+          <p className="break-all font-mono text-xs text-ink-2">
+            Spec: {card.specPath}
+          </p>
+        ) : null}
+        {canOperate ? (
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs text-ink-3">
+              Created <Time value={card.createdAt} />
+              {card.createdBy ? ` by ${card.createdBy.email}` : ''}
+            </span>
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                type="button"
+                disabled={actions.busy}
+                onClick={() => actions.askDelete(card)}
+              >
+                Delete
+              </Button>
+              <Button
+                variant="solid"
+                type="submit"
+                disabled={saving || !dirty || title.trim() === ''}
+              >
+                Save
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </form>
+    </div>
+  );
+}
+
+/** The latest detail for card `number`, refetched when `version` changes (a live push). */
+export function CardSheet({
+  projectId,
+  number,
+  title,
+  version,
+  canOperate,
+  actions,
+  terminal,
+  onChanged,
+  onClose,
+}: {
+  projectId: string;
+  number: number | undefined;
+  title: string | undefined;
+  version: number;
+  canOperate: boolean;
+  actions: CardActions;
+  terminal: TerminalAccess;
+  onChanged: () => void;
+  onClose: () => void;
+}) {
+  const [card, setCard] = useState<BoardCardDetail>();
+  const [error, setError] = useState<string>();
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: version is a refetch trigger
+  useEffect(() => {
+    if (number === undefined) return;
+    let cancelled = false;
+    fetchCard(projectId, number)
+      .then((detail) => {
+        if (cancelled) return;
+        setCard(detail);
+        setError(undefined);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(describeBoardError(err));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, number, version]);
+
+  const close = () => {
+    setCard(undefined);
+    setError(undefined);
+    onClose();
+  };
+
+  return (
+    <SheetRoot
+      open={number !== undefined}
+      onOpenChange={(open) => {
+        if (!open) close();
+      }}
+    >
+      {number !== undefined ? (
+        <SheetContent
+          side="right"
+          title={`C-${number} ${title ?? ''}`.trim()}
+          description="Board card"
+        >
+          {error ? (
+            <p role="alert" className="text-sm text-danger">
+              {error}
+            </p>
+          ) : card && card.number === number ? (
+            <CardDetailBody
+              // A new round resets the form; a push mid-typing does not.
+              key={`${card.id}:${card.rounds.length}`}
+              projectId={projectId}
+              card={card}
+              canOperate={canOperate}
+              actions={actions}
+              terminal={terminal}
+              onSaved={onChanged}
+            />
+          ) : (
+            <Skeleton className="h-64 w-full" />
+          )}
+        </SheetContent>
+      ) : null}
+    </SheetRoot>
+  );
+}

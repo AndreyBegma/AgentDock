@@ -15,6 +15,7 @@ import { describeProjectError } from '../../../../../lib/projects/format';
 import { useTabParam } from '../../../../../lib/projects/use-tab-param';
 import { STATUS_TONE } from '../../../../../lib/runners/format';
 import { useErrorToast } from '../../../../../lib/section/use-error-toast';
+import { BoardTab } from './board-tab';
 import { BudgetTab } from './budget/budget-tab';
 import { DesignTab } from './design/design-tab';
 import { DocsTab } from './docs-tab';
@@ -105,6 +106,13 @@ const TABS: readonly {
     ),
   },
   {
+    id: 'board',
+    label: 'Board',
+    render: ({ project, isAdmin }) => (
+      <BoardTab projectId={project.id} isAdmin={isAdmin} />
+    ),
+  },
+  {
     id: 'sessions',
     label: 'Sessions',
     render: ({ project, isAdmin, reload }) => (
@@ -178,7 +186,7 @@ export default function ProjectSettingsPage() {
       />
 
       <TabGroup value={tab} onValueChange={setTab}>
-        {/* Eight tabs do not fit a phone: the strip scrolls inside its box. */}
+        {/* Nine tabs do not fit a phone: the strip scrolls inside its box. */}
         <ScrollX>
           <TabList aria-label="Project settings" className="min-w-max">
             {TABS.map(({ id, label }) => (

@@ -59,7 +59,9 @@ export function TerminalSheet({
             ? target.runId
             : 'sessionId' in target
               ? target.sessionId
-              : ''
+              : 'cardId' in target
+                ? target.cardId
+                : ''
       }`
     : '';
   // Every target opens read-only, never in the previous target's mode.
