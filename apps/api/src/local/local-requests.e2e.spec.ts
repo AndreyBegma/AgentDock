@@ -93,6 +93,15 @@ describe('local requests over the runner socket (e2e)', () => {
     }
   };
 
+  /** Polls `condition` until it holds; fails after `timeoutMs`. */
+  const waitFor = async (condition: () => boolean, timeoutMs = 10_000) => {
+    const deadline = Date.now() + timeoutMs;
+    while (!condition()) {
+      if (Date.now() > deadline) throw new Error('waitFor timed out');
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+  };
+
   /** Answers `issue.create` like the runner's handler, numbering from 100. */
   const serveCommands = async () => {
     let number = 100;
@@ -270,16 +279,19 @@ describe('local requests over the runner socket (e2e)', () => {
     });
 
     // The writes acted as the local user, through the runner.
-    expect(commands.map((c) => [c.name, c.args.queue])).toEqual([
-      ['issue.create', false],
-      ['issue.create', true],
-    ]);
-    const handoffBody = commands[1].args.body as string;
+    const issueCreates = commands.filter((c) => c.name === 'issue.create');
+    expect(issueCreates.map((c) => c.args.queue)).toEqual([false, true]);
+    const handoffBody = issueCreates[1].args.body as string;
     expect(handoffBody).toContain('## Acceptance criteria');
     expect(handoffBody).toContain('Source branch: `fix/12-pairing`');
     expect(handoffBody).toContain(
       'Continue from branch `fix/12-pairing` if it exists.',
     );
+
+    // `card.finish` fires `card.collect` asynchronously: wait for it, then
+    // expect exactly one for the finished card.
+    await waitFor(() => commands.some((c) => c.name === 'card.collect'));
+    expect(commands.filter((c) => c.name === 'card.collect')).toHaveLength(1);
 
     const events = await ctx.prisma.event.findMany({
       where: { type: { in: [MANUAL_NOTE_EVENT, MANUAL_HANDOFF_EVENT] } },
