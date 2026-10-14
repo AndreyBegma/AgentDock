@@ -5,6 +5,7 @@ import {
   HOOK_SESSION_STARTED_EVENT,
   type HookEventType,
   hookEventDataSchemas,
+  manualTmuxSessionSchema,
   type UnsequencedEvent,
   type WatchedProject,
 } from '@agentdock/shared/protocol';
@@ -160,7 +161,15 @@ export class LocalService {
   private track(input: LocalEventArgs): void {
     const { sessions } = this.deps;
     if (input.type === HOOK_SESSION_STARTED_EVENT) {
-      sessions.started(input.sessionId, input.cwd, input.ancestors ?? []);
+      const tmux = manualTmuxSessionSchema.safeParse(
+        (input.data as Record<string, unknown> | undefined)?.tmuxSession,
+      );
+      sessions.started(
+        input.sessionId,
+        input.cwd,
+        input.ancestors ?? [],
+        tmux.success ? tmux.data : undefined,
+      );
     } else {
       sessions.seen(input.sessionId, input.cwd);
     }

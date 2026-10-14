@@ -30,11 +30,25 @@ const projectTarget = {
 };
 
 /**
+ * A session started by `agentdock-runner claude` (spec 201 D23): `sessionId`
+ * is Claude Code's session id. The runner resolves it to the
+ * `agentdock-manual-<hex>` tmux session its hook reported and refuses any it
+ * did not record.
+ */
+export const manualTerminalTargetSchema = z.strictObject({
+  kind: z.literal('manual'),
+  ...projectTarget,
+  sessionId: z.string().min(1).max(200),
+});
+export type ManualTerminalTarget = z.infer<typeof manualTerminalTargetSchema>;
+
+/**
  * What to attach to (D2). The runner resolves the tmux session name itself:
  * `slot` → `cs-<slot>` when the slot's worktree belongs to `root`,
  * `orchestrator` → the project's orchestrator session, `skill_run` →
- * `agentdock-run-<shortid>` of a live run of that project. There is no field
- * for a session name or a command, and an unknown field fails to parse.
+ * `agentdock-run-<shortid>` of a live run of that project, `manual` → the
+ * `agentdock-manual-*` session of a Claude session it recorded. There is no
+ * field for a session name or a command, and an unknown field fails to parse.
  */
 export const terminalTargetSchema = z.discriminatedUnion('kind', [
   z.strictObject({
@@ -48,23 +62,10 @@ export const terminalTargetSchema = z.discriminatedUnion('kind', [
     ...projectTarget,
     runId: terminalRunIdSchema,
   }),
+  manualTerminalTargetSchema,
 ]);
 export type TerminalTarget = z.infer<typeof terminalTargetSchema>;
 
-/**
- * A session started by `agentdock-runner claude` (spec 201 D23): the runner
- * resolves `sessionId` (Claude Code's session id) to the
- * `agentdock-manual-<hex>` tmux session its hook reported, and refuses any it
- * did not record. Defined here, joined to `terminalTargetSchema` by the
- * change that adds its runner resolver and API relay (i201-manual-attach), so
- * the union never names a kind nobody resolves.
- */
-export const manualTerminalTargetSchema = z.strictObject({
-  kind: z.literal('manual'),
-  ...projectTarget,
-  sessionId: z.string().min(1).max(200),
-});
-export type ManualTerminalTarget = z.infer<typeof manualTerminalTargetSchema>;
 export type TerminalTargetKind = TerminalTarget['kind'];
 
 /**
