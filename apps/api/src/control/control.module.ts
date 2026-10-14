@@ -22,5 +22,6 @@ import { OrchestratorSettingsService } from './orchestrator-settings.service';
     OrchestratorSettingsService,
     { provide: CONTROL_OPTIONS, useValue: defaultControlOptions },
   ],
+  exports: [ControlService],
 })
 export class ControlModule {}

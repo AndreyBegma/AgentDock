@@ -1,17 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ApprovalsModule } from '../approvals';
-import { CommandRunsService } from '../control/command-runs.service';
-import { ControlService } from '../control/control.service';
-import {
-  CONTROL_OPTIONS,
-  defaultControlOptions,
-} from '../control/control-options';
-import { OrchestratorSettingsService } from '../control/orchestrator-settings.service';
+import { ControlModule } from '../control';
 import { LiveModule } from '../live/live.module';
 import { NotificationsModule } from '../notifications';
 import { ProjectsModule } from '../projects';
-import { QueueService } from '../queue/queue.service';
-import { QueueCommands } from '../queue/queue-commands';
+import { QueueModule } from '../queue';
 import { RunnersModule } from '../runners/runners.module';
 import { ActionRequestExpiryJob } from './action-request-expiry.job';
 import { ActionRequestsController } from './action-requests.controller';
@@ -25,10 +18,10 @@ import { LocalRequestRouter } from './local-request-router';
  * `local.request` router the runner gateway hands requests to, the action
  * requests a session asks a person for, and their expiry job.
  *
- * `QueueModule` and `ControlModule` export nothing, so their stateless write
- * services are provided here again (each a plain class over Prisma, audit,
- * live and the runner command service) rather than changing those modules.
- * Exports `ActionRequestsService` for the Telegram buttons.
+ * Imports `QueueModule` and `ControlModule` for their write services rather
+ * than providing them again: a second `QueueCommands` is a second instance the
+ * queue controller does not use. Exports `ActionRequestsService` for the
+ * Telegram buttons.
  */
 @Module({
   imports: [
@@ -37,16 +30,12 @@ import { LocalRequestRouter } from './local-request-router';
     ApprovalsModule,
     LiveModule,
     NotificationsModule,
+    QueueModule,
+    ControlModule,
   ],
   controllers: [ActionRequestsController],
   providers: [
     { provide: LOCAL_OPTIONS, useFactory: () => localOptionsFromEnv() },
-    { provide: CONTROL_OPTIONS, useValue: defaultControlOptions },
-    CommandRunsService,
-    OrchestratorSettingsService,
-    ControlService,
-    QueueCommands,
-    QueueService,
     ActionRequestsService,
     ActionRequestExpiryJob,
     LocalHandlers,
