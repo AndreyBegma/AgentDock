@@ -676,6 +676,7 @@ handler.
 | `orchestrator.start` | `projectId, root, profileId, model, permissionMode, mode: start\|next` | operator | implemented (`commands/control.ts`): → `{ session, startedAt }`, timeout 30 s |
 | `orchestrator.stop` | `projectId, root` | operator | implemented: → `{ stopped }`, timeout 10 s |
 | `orchestrator.status` | `projectId, root` | viewer | implemented: → `{ present, state, session?, startedAt? }`, timeout 5 s |
+| `orchestrator.message` | `projectId, root, body, from` | operator | implemented (#189): → `{ delivered, reason?: absent\|prompt }`, timeout 10 s |
 | `slot.stop` | `projectId, root, slot` | operator | implemented: → `{ stopped }`, timeout 10 s |
 | `slot.message` | `projectId, root, slot, text, from` | operator | implemented: → `{ written: true, delivered }`, timeout 10 s |
 | `pr.inspect` | `projectId, root, pr` | viewer | defined (`commands/approvals.ts`): → `PrInspection` (head SHA, diff stats, ≤ 300 files, checks, mergeable), timeout 30 s |
@@ -774,6 +775,17 @@ spreads them in; the runner handlers live in `apps/runner/src/control/`.
   worktree's `.orchestrator-msg.md`, never typed into the pane; `from` is the
   requesting user's email. The file is always written; `delivered` is true
   only when the worker's session was live and the prompt was typed into it.
+- `orchestrator.message` (#189) is `slot.message`'s twin for the orchestrator:
+  the same 16 KB cap on `body`, the same `From:` header, operator role. Its args
+  never name a session or argv — the runner resolves the orchestrator's session
+  from the project, and the strict schema refuses any other field. The body is
+  never typed into the pane: it is written atomically to a file of its own,
+  `<git-common-dir>/cs-orchestrator/agentdock/msg-<time>-<rand>.md` (inside
+  `.git`, never committed, one file per message), then a fixed `Read <file>: …`
+  prompt is typed with `-l` and submitted with `C-m` in a separate call. With
+  no session (`reason: absent`), or with a dialog on its pane (`reason:
+  prompt`, where the submit would answer the dialog), nothing is written or
+  typed and `delivered` is false.
 - Every tmux target the runner sends is exact (`-t =<session>`): a bare name
   falls back to a prefix match, so `cs-i4` would hit `cs-i42`.
 - `orchestrator.status.state` is `running | idle | prompt | quota`, or

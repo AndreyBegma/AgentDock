@@ -37,6 +37,7 @@ export const AUDIT_ACTIONS = [
   'orchestrator.start',
   'orchestrator.stop',
   'orchestrator.settings',
+  'orchestrator.message',
   'slot.stop',
   'slot.message',
   'approval.approve',

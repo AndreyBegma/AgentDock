@@ -106,6 +106,8 @@ export function useControl(projectId: string, isAdmin = false) {
     start: (request: OrchestratorStartRequest) =>
       post('orchestrator.start', '/orchestrator/start', request),
     stop: () => post('orchestrator.stop', '/orchestrator/stop', {}),
+    messageOrchestrator: (body: string) =>
+      post('orchestrator.message', '/orchestrator/message', { body }),
     stopSlot: (slot: string) =>
       post('slot.stop', `/slots/${encodeURIComponent(slot)}/stop`, {}, slot),
     message: (slot: string, text: string) =>

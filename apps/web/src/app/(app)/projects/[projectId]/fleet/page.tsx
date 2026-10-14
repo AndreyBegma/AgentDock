@@ -187,6 +187,9 @@ function FleetWorkspace() {
     settings,
     orchestrator: orchestratorStatus,
   });
+  const orchestratorMessageReason = canOperate
+    ? (reasons.message?.text ?? null)
+    : 'Operators and admins can message the orchestrator.';
 
   const counts = useMemo(
     () => (graph.data ? fleetCounts(graph.data) : undefined),
@@ -368,6 +371,7 @@ function FleetWorkspace() {
                         focus={workspace.focus}
                         control={control}
                         canOperate={canOperate}
+                        orchestratorMessageReason={orchestratorMessageReason}
                         onOpen={open}
                         {...(onAttach ? { onAttach } : {})}
                       />
@@ -377,6 +381,7 @@ function FleetWorkspace() {
                         focus={workspace.focus}
                         control={control}
                         canOperate={canOperate}
+                        orchestratorMessageReason={orchestratorMessageReason}
                         onOpen={open}
                         {...(onAttach ? { onAttach } : {})}
                       />
@@ -395,6 +400,7 @@ function FleetWorkspace() {
                 canOperate={canOperate}
                 orchestrator={orchestratorStatus ?? 'unknown'}
                 reasons={reasons}
+                orchestratorMessageReason={orchestratorMessageReason}
                 liveSlots={liveSlots(graph.data)}
                 focusedSlot={focusedSlot}
                 hasOpen={workspace.open.length > 0}

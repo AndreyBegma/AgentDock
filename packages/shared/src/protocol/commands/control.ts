@@ -173,7 +173,54 @@ export const slotMessageResultSchema = z.object({
 });
 export type SlotMessageResult = z.infer<typeof slotMessageResultSchema>;
 
-/** The five control commands, with D9's minimum roles and D11's timeouts. */
+/** `orchestrator.message.body` has `slot.message`'s cap (#189). */
+export const ORCHESTRATOR_MESSAGE_MAX_BYTES = SLOT_MESSAGE_MAX_BYTES;
+
+/**
+ * `orchestrator.message` (#189). The runner resolves the orchestrator's
+ * session from the project; the caller never names a session or argv.
+ */
+export const orchestratorMessageArgsSchema = z.strictObject({
+  ...projectTarget,
+  body: z
+    .string()
+    .min(1)
+    .refine((t) => t.trim().length > 0, { message: 'must not be blank' })
+    .refine((t) => utf8Bytes(t) <= ORCHESTRATOR_MESSAGE_MAX_BYTES, {
+      message: `must be at most ${ORCHESTRATOR_MESSAGE_MAX_BYTES} bytes`,
+    }),
+  /** The requesting user's email, for the `From:` header. */
+  from: z.email(),
+});
+export type OrchestratorMessageArgs = z.infer<
+  typeof orchestratorMessageArgsSchema
+>;
+
+/**
+ * Why a message was not delivered: no orchestrator session (`absent`), or its
+ * pane shows a dialog (`prompt`), where the poke and its submit would answer
+ * the dialog instead.
+ */
+export const orchestratorMessageRefusalSchema = z.enum(['absent', 'prompt']);
+export type OrchestratorMessageRefusal = z.infer<
+  typeof orchestratorMessageRefusalSchema
+>;
+
+/** `reason` is set exactly when the message was not delivered; nothing was written then. */
+export const orchestratorMessageResultSchema = z
+  .object({
+    delivered: z.boolean(),
+    reason: orchestratorMessageRefusalSchema.optional(),
+  })
+  .refine((r) => r.delivered === (r.reason === undefined), {
+    message: '`reason` is set exactly when `delivered` is false',
+    path: ['reason'],
+  });
+export type OrchestratorMessageResult = z.infer<
+  typeof orchestratorMessageResultSchema
+>;
+
+/** The control commands, with D9's minimum roles and D11's timeouts. */
 export const controlCommands = {
   'orchestrator.start': {
     args: orchestratorStartArgsSchema,
@@ -192,6 +239,12 @@ export const controlCommands = {
     result: orchestratorStatusResultSchema,
     minRole: 'viewer',
     timeoutMs: CONTROL_TIMEOUTS_MS.status,
+  },
+  'orchestrator.message': {
+    args: orchestratorMessageArgsSchema,
+    result: orchestratorMessageResultSchema,
+    minRole: 'operator',
+    timeoutMs: CONTROL_TIMEOUTS_MS.message,
   },
   'slot.stop': {
     args: slotStopArgsSchema,

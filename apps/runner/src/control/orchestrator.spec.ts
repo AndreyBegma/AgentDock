@@ -1,8 +1,17 @@
-import { describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
+import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
+import { join } from 'node:path';
 import type { OrchestratorState } from '@agentdock/shared/protocol';
+import { createDispatcher } from '../commands/dispatcher';
+import { createHandlers } from '../commands/handlers';
 import type { ConfigProfile } from '../config';
+import { FakeClock } from '../testing/fake-clock';
+import { memoryLogger, tempDir } from '../testing/fixtures';
 import {
+  messageOrchestrator,
+  ORCHESTRATOR_MESSAGE_DIR,
   orchestratorArgv,
+  orchestratorMessagePrompt,
   orchestratorStatus,
   startOrchestrator,
   stopOrchestrator,
@@ -230,5 +239,140 @@ describe('orchestrator.status', () => {
       });
       expect(fake.tmuxCalls().some((c) => c[0] === 'send-keys')).toBe(false);
     }
+  });
+});
+
+describe('orchestrator.message', () => {
+  let cleanup: (() => void) | undefined;
+  afterEach(() => cleanup?.());
+
+  /** A real directory as the git common dir, so the file can be read back. */
+  const gitDir = () => {
+    const dir = tempDir();
+    cleanup = dir.cleanup;
+    return realpathSync(dir.dir);
+  };
+  const message = {
+    ...target,
+    body: 'Hold i43 until #188 merges.\n\nThen dispatch it.',
+    from: 'dev@example.com',
+  };
+  const messageDir = (dir: string) => join(dir, ORCHESTRATOR_MESSAGE_DIR);
+
+  it('writes the body to its own file in the git dir, then types the prompt and submits with C-m as a separate call', async () => {
+    const dir = gitDir();
+    const fake = fakeTmux({ gitDir: dir, sessions: { [SESSION]: '> ' } });
+
+    expect(await messageOrchestrator(message, fake.deps)).toEqual({
+      delivered: true,
+    });
+    const [name, ...others] = readdirSync(messageDir(dir));
+    expect(others).toEqual([]);
+    expect(name).toMatch(/^msg-2026-10-08T10-00-00-000Z-[0-9a-f]{6}\.md$/);
+    const file = join(messageDir(dir), name ?? '');
+    expect(readFileSync(file, 'utf8')).toBe(
+      'From: dev@example.com via AgentDock\n' +
+        'Date: 2026-10-08T10:00:00.000Z\n' +
+        '\n' +
+        'Hold i43 until #188 merges.\n\nThen dispatch it.\n',
+    );
+    // The body is never typed: only the fixed prompt, then the submit alone.
+    expect(fake.tmuxCalls().filter((c) => c[0] === 'send-keys')).toEqual([
+      [
+        'send-keys',
+        '-t',
+        `=${SESSION}:`,
+        '-l',
+        orchestratorMessagePrompt(file),
+      ],
+      ['send-keys', '-t', `=${SESSION}:`, 'C-m'],
+    ]);
+  });
+
+  it('keeps every message: a second one gets a file of its own', async () => {
+    const dir = gitDir();
+    const fake = fakeTmux({ gitDir: dir, sessions: { [SESSION]: '> ' } });
+    await messageOrchestrator(message, fake.deps);
+    await messageOrchestrator({ ...message, body: 'second' }, fake.deps);
+    expect(readdirSync(messageDir(dir))).toHaveLength(2);
+  });
+
+  it('writes and types nothing when the orchestrator is not running', async () => {
+    const dir = gitDir();
+    const fake = fakeTmux({ gitDir: dir });
+    expect(await messageOrchestrator(message, fake.deps)).toEqual({
+      delivered: false,
+      reason: 'absent',
+    });
+    expect(existsSync(messageDir(dir))).toBe(false);
+    expect(fake.tmuxCalls().some((c) => c[0] === 'send-keys')).toBe(false);
+  });
+
+  it('writes and types nothing while the pane shows a dialog, which the submit would answer', async () => {
+    const dir = gitDir();
+    const fake = fakeTmux({
+      gitDir: dir,
+      sessions: { [SESSION]: 'Do you trust the files in this folder?' },
+    });
+    expect(await messageOrchestrator(message, fake.deps)).toEqual({
+      delivered: false,
+      reason: 'prompt',
+    });
+    expect(existsSync(messageDir(dir))).toBe(false);
+    expect(fake.tmuxCalls().some((c) => c[0] === 'send-keys')).toBe(false);
+  });
+
+  it('delivers while the orchestrator is busy: the prompt queues behind its turn', async () => {
+    const fake = fakeTmux({
+      gitDir: gitDir(),
+      sessions: { [SESSION]: '✻ Thinking… (esc to interrupt)' },
+    });
+    expect(await messageOrchestrator(message, fake.deps)).toEqual({
+      delivered: true,
+    });
+  });
+
+  it('refuses a root that is not that project in the watch list', async () => {
+    const fake = fakeTmux({ sessions: { [SESSION]: '> ' } });
+    await expect(
+      messageOrchestrator({ ...message, root: '/srv/other' }, fake.deps),
+    ).rejects.toMatchObject({ code: 'path_not_allowed' });
+    expect(fake.tmuxCalls()).toEqual([]);
+  });
+
+  it('refuses a session, argv or slot field through the dispatcher', async () => {
+    const fake = fakeTmux({ sessions: { [SESSION]: '> ' } });
+    const clock = new FakeClock();
+    const dispatch = createDispatcher({
+      handlers: createHandlers({
+        clock,
+        runnerVersion: '0.0.0-test',
+        host: { hostname: 'h', os: 'linux', arch: 'x64' },
+        detectCapabilities: () => Promise.reject(new Error('unused')),
+        exec: fake.deps.exec,
+        watchedProjects: fake.deps.watchedProjects,
+        profiles: () => [],
+      }),
+      disabledCommands: [],
+      clock,
+      log: memoryLogger().log,
+    });
+    for (const extra of [
+      { session: 'cs-i42' },
+      { argv: ['sh', '-c', 'id'] },
+      { slot: 'i42' },
+    ]) {
+      const result = await dispatch({
+        type: 'command',
+        id: 'c1',
+        name: 'orchestrator.message',
+        args: { ...message, ...extra },
+      });
+      expect(result).toMatchObject({
+        ok: false,
+        error: { code: 'invalid_args' },
+      });
+    }
+    expect(fake.calls).toEqual([]);
   });
 });

@@ -46,6 +46,7 @@ export function AgentCanvas({
   focus,
   control,
   canOperate,
+  orchestratorMessageReason,
   onOpen,
   onAttach,
 }: {
@@ -54,6 +55,7 @@ export function AgentCanvas({
   focus: string | null;
   control: ReturnType<typeof useControl>;
   canOperate: boolean;
+  orchestratorMessageReason: string | null;
   onOpen: (key: string) => void;
   /** Admins on a runner that can attach; absent hides the action. */
   onAttach?: (key: string) => void;
@@ -80,6 +82,7 @@ export function AgentCanvas({
           selected={state.selected}
           control={control}
           canOperate={canOperate}
+          orchestratorMessageReason={orchestratorMessageReason}
           onOpen={() => onOpen(nodeKey(node.data))}
           {...(onAttach
             ? { onAttach: () => onAttach(nodeKey(node.data)) }
@@ -96,6 +99,7 @@ export function AgentList({
   focus,
   control,
   canOperate,
+  orchestratorMessageReason,
   onOpen,
   onAttach,
 }: {
@@ -103,6 +107,7 @@ export function AgentList({
   focus: string | null;
   control: ReturnType<typeof useControl>;
   canOperate: boolean;
+  orchestratorMessageReason: string | null;
   onOpen: (key: string) => void;
   onAttach?: (key: string) => void;
 }) {
@@ -117,6 +122,7 @@ export function AgentList({
               selected={focus === key}
               control={control}
               canOperate={canOperate}
+              orchestratorMessageReason={orchestratorMessageReason}
               onOpen={() => onOpen(key)}
               {...(onAttach ? { onAttach: () => onAttach(key) } : {})}
             />

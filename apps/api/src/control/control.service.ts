@@ -80,6 +80,15 @@ export const redactMessage = (args: CommandArgs<'slot.message'>) => ({
   textBytes: Buffer.byteLength(args.text),
 });
 
+/** #189: the orchestrator's message reaches the audit log the same way. */
+export const redactOrchestratorMessage = (
+  args: CommandArgs<'orchestrator.message'>,
+) => ({
+  ...args,
+  body: sha256(args.body),
+  bodyBytes: Buffer.byteLength(args.body),
+});
+
 /**
  * Orchestrator and slot control (spec 17): each action is a typed runner
  * command, recorded as a `command_runs` row, audited, and published live.
@@ -171,6 +180,30 @@ export class ControlService {
       prepare: async (project) => ({
         args: { projectId: caller.projectId, root: project.rootPath },
       }),
+    });
+  }
+
+  /**
+   * #189: the runner writes the message beside the orchestrator's board and
+   * pokes its session, which it resolves itself. Not delivered when the
+   * orchestrator is absent or its pane shows a dialog — an `ok` run either way.
+   */
+  messageOrchestrator(
+    caller: ControlCaller,
+    body: string,
+  ): Promise<CommandRunView> {
+    return this.execute(caller, {
+      command: 'orchestrator.message',
+      auditAction: 'orchestrator.message',
+      prepare: async (project) => ({
+        args: {
+          projectId: caller.projectId,
+          root: project.rootPath,
+          body,
+          from: caller.user.email,
+        },
+      }),
+      redact: redactOrchestratorMessage,
     });
   }
 

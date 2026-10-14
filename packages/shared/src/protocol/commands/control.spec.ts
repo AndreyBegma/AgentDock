@@ -4,13 +4,18 @@ import {
   commandErrorCodeSchema,
   commands,
   controlCommands,
+  isCommandName,
   ORCHESTRATOR_DEFAULTS,
+  ORCHESTRATOR_MESSAGE_MAX_BYTES,
   type OrchestratorStartArgs,
+  orchestratorMessageArgsSchema,
+  orchestratorMessageResultSchema,
   orchestratorModelSchema,
   orchestratorPermissionModeSchema,
   orchestratorSessionName,
   orchestratorStartArgsSchema,
   orchestratorStatusResultSchema,
+  parseCommand,
   SLOT_MESSAGE_MAX_BYTES,
   slotMessageArgsSchema,
   slotMessageResultSchema,
@@ -204,6 +209,70 @@ describe('slot.message result', () => {
   });
 });
 
+describe('orchestrator.message', () => {
+  const orchestratorMessage = {
+    ...target,
+    body: 'Hold i43 until #188 merges.',
+    from: 'operator@example.com',
+  };
+
+  it('is registered in the allowlist with its own schemas', () => {
+    expect(isCommandName('orchestrator.message')).toBe(true);
+    const definition = commands['orchestrator.message'];
+    expect(definition.args).toBe(orchestratorMessageArgsSchema);
+    expect(definition.result).toBe(orchestratorMessageResultSchema);
+    expect(parseCommand('orchestrator.message', orchestratorMessage).ok).toBe(
+      true,
+    );
+  });
+
+  it('refuses a session, argv or slot: the runner resolves the session', () => {
+    for (const extra of [
+      { session: 'agentdock-orch-acme-widget' },
+      { argv: ['claude', '--help'] },
+      { slot: 'i42' },
+      { text: 'the slot field name' },
+    ]) {
+      expect(
+        parseCommand('orchestrator.message', {
+          ...orchestratorMessage,
+          ...extra,
+        }).ok,
+      ).toBe(false);
+    }
+  });
+
+  it('has slot.message’s byte cap, and refuses a blank body or a non-email sender', () => {
+    expect(ORCHESTRATOR_MESSAGE_MAX_BYTES).toBe(SLOT_MESSAGE_MAX_BYTES);
+    const twoByte = 'é'.repeat(ORCHESTRATOR_MESSAGE_MAX_BYTES / 2);
+    expect(
+      orchestratorMessageArgsSchema.safeParse({
+        ...orchestratorMessage,
+        body: twoByte,
+      }).success,
+    ).toBe(true);
+    for (const bad of [
+      { ...orchestratorMessage, body: `${twoByte}é` },
+      { ...orchestratorMessage, body: '' },
+      { ...orchestratorMessage, body: ' \n ' },
+      { ...orchestratorMessage, from: 'not-an-email' },
+    ]) {
+      expect(orchestratorMessageArgsSchema.safeParse(bad).success).toBe(false);
+    }
+  });
+
+  it('carries a reason exactly when the message was not delivered', () => {
+    const parse = (r: object) =>
+      orchestratorMessageResultSchema.safeParse(r).success;
+    expect(parse({ delivered: true })).toBe(true);
+    expect(parse({ delivered: false, reason: 'absent' })).toBe(true);
+    expect(parse({ delivered: false, reason: 'prompt' })).toBe(true);
+    expect(parse({ delivered: false })).toBe(false);
+    expect(parse({ delivered: true, reason: 'absent' })).toBe(false);
+    expect(parse({ delivered: false, reason: 'busy' })).toBe(false);
+  });
+});
+
 describe('controlCommands', () => {
   it('carries the D9 roles and D11 timeouts', () => {
     expect(
@@ -217,6 +286,7 @@ describe('controlCommands', () => {
       'orchestrator.start': ['operator', CONTROL_TIMEOUTS_MS.start],
       'orchestrator.stop': ['operator', 10_000],
       'orchestrator.status': ['viewer', 5_000],
+      'orchestrator.message': ['operator', 10_000],
       'slot.stop': ['operator', 10_000],
       'slot.message': ['operator', 10_000],
     });

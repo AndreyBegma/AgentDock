@@ -15,6 +15,8 @@ export interface FakeTmuxOptions {
   worktrees?: string[];
   /** `origin`'s URL; none → the repo is the root's basename. */
   origin?: string | null;
+  /** What `rev-parse --git-common-dir` answers; default `<root>/.git`. */
+  gitDir?: string;
   profiles?: ConfigProfile[];
   /** `new-session` answers this failure instead of creating the session. */
   newSessionFails?: ExecResult;
@@ -52,6 +54,9 @@ export const fakeTmux = (options: FakeTmuxOptions = {}) => {
       );
     }
     if (rest === 'remote get-url origin' && origin) return ok(`${origin}\n`);
+    if (rest === 'rev-parse --path-format=absolute --git-common-dir') {
+      return ok(`${options.gitDir ?? `${project.root}/.git`}\n`);
+    }
     return fail('unsupported');
   };
 

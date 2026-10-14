@@ -1,4 +1,9 @@
+import { randomBytes } from 'node:crypto';
+import { mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
 import {
+  type OrchestratorMessageArgs,
+  type OrchestratorMessageResult,
   type OrchestratorPermissionMode,
   type OrchestratorStartArgs,
   type OrchestratorStartResult,
@@ -15,6 +20,7 @@ import { CommandFailure } from '../commands/failure';
 import type { ConfigProfile } from '../config';
 import { resolveFleetProject } from '../fleet/project';
 import type { ControlDeps } from './deps';
+import { messageFileContent, writeAtomically } from './slot';
 import { watchedProject } from './target';
 import { TmuxControl } from './tmux';
 
@@ -123,6 +129,73 @@ export const stopOrchestrator = async (
   if (!(await tmux.find(session))) return { stopped: false };
   await tmux.killSession(session);
   return { stopped: true };
+};
+
+/** Where `orchestrator.message` files go, under the git common dir (#189). */
+export const ORCHESTRATOR_MESSAGE_DIR = join('cs-orchestrator', 'agentdock');
+
+/** The poke typed into the orchestrator's pane; the body is never typed. */
+export const orchestratorMessagePrompt = (file: string): string =>
+  `Read ${file}: a message from the person via AgentDock`;
+
+/**
+ * The repository's common git dir, absolute — inside `.git`, so nothing put
+ * there is ever committed. The skill keeps its round board there too.
+ */
+const gitCommonDir = async (deps: ControlDeps, root: string) => {
+  const result = await deps.exec('git', [
+    '-C',
+    root,
+    'rev-parse',
+    '--path-format=absolute',
+    '--git-common-dir',
+  ]);
+  const dir = result?.code === 0 ? result.stdout.trim() : '';
+  if (!dir) {
+    throw new CommandFailure(
+      'not_a_repository',
+      `cannot find the git dir of ${root}`,
+    );
+  }
+  return dir;
+};
+
+/**
+ * `orchestrator.message` (#189), `slot.message`'s twin: the body goes to a
+ * file of its own, one per message so none overwrites another, and only a
+ * fixed prompt naming it is typed, then submitted in a separate call. Nothing
+ * is written when the session is absent, nor when its pane shows a dialog —
+ * the typed prompt and its submit would answer the dialog.
+ */
+export const messageOrchestrator = async (
+  args: OrchestratorMessageArgs,
+  deps: ControlDeps,
+): Promise<OrchestratorMessageResult> => {
+  const project = watchedProject(args, deps.watchedProjects());
+  const fleet = await resolveFleetProject(deps.exec, project);
+  const session = orchestratorSessionName(fleet.repo);
+  const tmux = tmuxOf(deps);
+  const text = (await tmux.find(session)) ? await tmux.capture(session) : null;
+  if (text === null) return { delivered: false, reason: 'absent' };
+  if (stateOf(text) === 'prompt') return { delivered: false, reason: 'prompt' };
+
+  const at = isoNow(deps.clock);
+  const dir = join(
+    await gitCommonDir(deps, project.root),
+    ORCHESTRATOR_MESSAGE_DIR,
+  );
+  await mkdir(dir, { recursive: true, mode: 0o700 });
+  const file = join(
+    dir,
+    `msg-${at.replace(/[:.]/g, '-')}-${randomBytes(3).toString('hex')}.md`,
+  );
+  await writeAtomically(
+    file,
+    messageFileContent({ from: args.from, text: args.body }, at),
+  );
+  await tmux.sendLiteral(session, orchestratorMessagePrompt(file));
+  await tmux.sendSubmit(session);
+  return { delivered: true };
 };
 
 /** #11's reading of one pane, as a single snapshot. */

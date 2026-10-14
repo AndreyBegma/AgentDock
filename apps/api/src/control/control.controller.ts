@@ -27,6 +27,7 @@ import { CommandRunsService } from './command-runs.service';
 import { type ControlCaller, ControlService } from './control.service';
 import {
   CommandRunListQueryDto,
+  OrchestratorMessageDto,
   OrchestratorSettingsDto,
   OrchestratorStartDto,
   SlotMessageDto,
@@ -76,6 +77,20 @@ export class ControlController {
     @AuditCtx() ctx: AuditContext,
   ): Promise<CommandRunView> {
     return this.control.stop(callerOf(access, user, ctx));
+  }
+
+  @Post('orchestrator/message')
+  @ProjectRole('operator')
+  messageOrchestrator(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Body() dto: OrchestratorMessageDto,
+  ): Promise<CommandRunView> {
+    return this.control.messageOrchestrator(
+      callerOf(access, user, ctx),
+      dto.body,
+    );
   }
 
   @Get('orchestrator/status')
