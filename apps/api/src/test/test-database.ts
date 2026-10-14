@@ -25,3 +25,15 @@ export const testDatabaseUrl = (): string => {
   }
   return value;
 };
+
+/**
+ * The database of one Jest worker: `agentdock_test` → `agentdock_2_test`, on
+ * the same server. `globalSetup` clones it from the migrated test database, so
+ * workers running in parallel never see each other's rows.
+ */
+export const workerDatabaseUrl = (workerId: string | number): string => {
+  const url = new URL(testDatabaseUrl());
+  const name = url.pathname.replace(/^\//, '');
+  url.pathname = `/${name.slice(0, -'_test'.length)}_${workerId}_test`;
+  return url.toString();
+};
