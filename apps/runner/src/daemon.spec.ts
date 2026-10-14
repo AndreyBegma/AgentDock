@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   CommandResultMessage,
@@ -8,6 +9,7 @@ import type {
 import type { PairedConfig } from './config';
 import type { RunnerConnection } from './connection';
 import { runDaemon } from './daemon';
+import { type HookDeps, runHook } from './hooks/run';
 import { FORBIDDEN, fixtureProtobuf, PROTOBUF_SESSION } from './otlp/testing';
 import { FakeClock } from './testing/fake-clock';
 import {
@@ -186,5 +188,139 @@ describe('daemon — OTLP receiver (spec 13)', () => {
     } finally {
       await taken.stop(true);
     }
+  });
+});
+
+describe('daemon — local socket (spec 201)', () => {
+  let dir = '';
+  let cleanup = () => {};
+  let server: MockServer;
+
+  beforeEach(() => {
+    ({ dir, cleanup } = tempDir());
+    server = new MockServer().start();
+    server.welcome = () => ({
+      type: 'welcome',
+      runnerId: 'rn_1',
+      config: {
+        projects: [{ id: 'prj_fixture', root: ROOT, shipContent: true }],
+        pollIntervalsMs: {},
+        awayMode: true,
+      },
+      ackedSeq: 0,
+    });
+  });
+  afterEach(() => {
+    server.stop();
+    cleanup();
+  });
+
+  const start = () => {
+    const controller = new AbortController();
+    let connection: RunnerConnection | null = null;
+    const done = runDaemon({
+      config: {
+        server: server.origin,
+        runnerId: 'rn_1',
+        token: TOKEN,
+        profiles: [],
+        projects: [],
+        disabledCommands: [],
+        otlp: { enabled: false, grpc: null, http: null },
+        fleet: { pollSeconds: 15, prPollSeconds: 60, eventsPollSeconds: 5 },
+        queue: { pollSeconds: 60 },
+        sessions: { enabled: false },
+        skills: { maxConcurrentRuns: 2, maxTimeoutSec: 21_600 },
+      },
+      configFile: join(dir, 'runner.json'),
+      home: dir,
+      spoolDir: join(dir, 'spool'),
+      offsetsFile: join(dir, 'offsets.json'),
+      host,
+      exec: machineWithoutCodex(),
+      clock: new FakeClock(),
+      log: memoryLogger().log,
+      signal: controller.signal,
+      onStart: (c) => {
+        connection = c;
+      },
+    });
+    const live = () => until(() => connection?.isLive === true);
+    return { controller, done, live };
+  };
+
+  const hookDeps = (stdin: unknown, stdout: string[]): HookDeps => ({
+    env: {},
+    os: 'linux',
+    socketPath: join(dir, 'runner.sock'),
+    cwd: ROOT,
+    ppid: 999_999,
+    stdin: () =>
+      new Response(JSON.stringify(stdin)).body as ReadableStream<Uint8Array>,
+    stdout: (t) => stdout.push(t),
+    stderr: () => {},
+    exec: async () => null,
+    readFile: () => {
+      throw new Error('ENOENT');
+    },
+  });
+
+  const GHP = `ghp_${'c'.repeat(36)}`;
+
+  it('spools hook events with source hook, redacted, and relays session-start context', async () => {
+    const { controller, done, live } = start();
+    await live();
+    expect(statSync(join(dir, 'runner.sock')).mode & 0o777).toBe(0o600);
+
+    const stdout: string[] = [];
+    await runHook(
+      ['user-prompt-submit'],
+      hookDeps({ session_id: 's-1', cwd: ROOT, prompt: `use ${GHP}` }, stdout),
+    );
+    await until(() =>
+      server
+        .of('events')
+        .some((m) => m.events.some((e) => e.type === 'hook.prompt_submitted')),
+    );
+    const event = server
+      .of('events')
+      .flatMap((m) => m.events)
+      .find((e) => e.type === 'hook.prompt_submitted');
+    expect(event).toMatchObject({
+      source: 'hook',
+      project: { repo: 'fixture', root: ROOT },
+      session: { runtime: 'claude', id: 's-1' },
+      data: { chars: GHP.length + 4, content: { truncated: false } },
+    });
+    expect(JSON.stringify(event)).not.toContain(GHP);
+
+    const pending = runHook(
+      ['session-start'],
+      hookDeps({ session_id: 's-1', cwd: ROOT, source: 'startup' }, stdout),
+    );
+    const [request] = await server.waitFor('local.request');
+    expect(request).toMatchObject({
+      method: 'context.sessionStart',
+      projectId: 'prj_fixture',
+      session: { runtime: 'claude', id: 's-1' },
+      via: 'hook',
+    });
+    server.send({
+      type: 'local.response',
+      id: request?.id ?? '',
+      ok: true,
+      data: { text: 'Project fixture.' },
+    });
+    expect(await pending).toBe(0);
+    expect(JSON.parse(stdout.join(''))).toEqual({
+      hookSpecificOutput: {
+        hookEventName: 'SessionStart',
+        additionalContext: 'Project fixture.',
+      },
+    });
+
+    controller.abort();
+    await done;
+    expect(existsSync(join(dir, 'runner.sock'))).toBe(false);
   });
 });

@@ -352,3 +352,35 @@ describe('otlp map — Codex (experimental)', () => {
   it.skip(`maps codex.sse_event usage — ${NO_CODEX_FIXTURE}`, () => {});
   it.skip(`correlates Codex OTel with its transcript — ${NO_CODEX_FIXTURE}`, () => {});
 });
+
+describe('mapLogRecords — sessions the runner did not launch (spec 201 D22)', () => {
+  it('takes the project of a record without agentdock.project from the hook session map', () => {
+    const { events } = mapLogRecords([record(REQUEST)], {
+      ...context(),
+      sessionProject: (id) => (id === 's-1' ? 'prj_fixture' : undefined),
+    });
+    expect(events[0]?.project).toEqual(PROJECT);
+  });
+
+  it('prefers agentdock.project over the session map', () => {
+    const { events } = mapLogRecords(
+      [record({ ...REQUEST, 'agentdock.project': 'prj_other' })],
+      {
+        ...context({
+          project: (id) =>
+            id === 'prj_other' ? { repo: 'o/other', root: '/o' } : PROJECT,
+        }),
+        sessionProject: () => 'prj_fixture',
+      },
+    );
+    expect(events[0]?.project).toEqual({ repo: 'o/other', root: '/o' });
+  });
+
+  it('leaves the project off when the session is unknown', () => {
+    const { events } = mapLogRecords([record(REQUEST)], {
+      ...context(),
+      sessionProject: () => undefined,
+    });
+    expect(events[0]?.project).toBeUndefined();
+  });
+});

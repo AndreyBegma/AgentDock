@@ -9,7 +9,12 @@ import {
   OtlpReceiver,
   type ReceiverDeps,
 } from './receiver';
-import { FORBIDDEN, fixtureJson, fixtureProtobuf } from './testing';
+import {
+  FORBIDDEN,
+  fixtureJson,
+  fixtureProtobuf,
+  JSON_SESSION,
+} from './testing';
 
 const silent = createLogger({ level: 'error', write: () => {} });
 
@@ -299,5 +304,31 @@ describe('otlp receiver — server', () => {
     const port = receiver.start();
     const second = new OtlpReceiver({ ...deps([]), port });
     expect(() => second.start()).toThrow();
+  });
+});
+
+describe('otlp receiver — sessions the runner did not launch (spec 201 D22)', () => {
+  it('resolves the project of a record without agentdock.project through the hook session map', async () => {
+    const emitted: UnsequencedEvent[] = [];
+    const asked: string[][] = [];
+    const body = fixtureJson().replaceAll('"agentdock.project"', '"x.project"');
+    const response = await handleOtlpRequest(
+      post('/v1/logs', body, { 'content-type': 'application/json' }),
+      LOCAL,
+      deps(emitted, {
+        sessionProject: (id) =>
+          id === JSON_SESSION ? 'prj_manual' : undefined,
+        projects: async (ids) => {
+          asked.push([...ids]);
+          return new Map([['prj_manual', { repo: 'acme/manual', root: '/m' }]]);
+        },
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(asked).toEqual([['prj_manual']]);
+    expect(emitted.length).toBeGreaterThan(0);
+    for (const event of emitted) {
+      expect(event.project).toEqual({ repo: 'acme/manual', root: '/m' });
+    }
   });
 });
