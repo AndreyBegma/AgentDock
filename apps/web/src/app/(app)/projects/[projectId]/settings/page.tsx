@@ -16,6 +16,7 @@ import { useTabParam } from '../../../../../lib/projects/use-tab-param';
 import { STATUS_TONE } from '../../../../../lib/runners/format';
 import { useErrorToast } from '../../../../../lib/section/use-error-toast';
 import { BudgetTab } from './budget/budget-tab';
+import { DesignTab } from './design/design-tab';
 import { DocsTab } from './docs-tab';
 import { GeneralTab } from './general-tab';
 import { GitHubAppRow } from './github-app-row';
@@ -93,6 +94,17 @@ const TABS: readonly {
     ),
   },
   {
+    id: 'design',
+    label: 'Design',
+    render: ({ project, isAdmin, canOperate }) => (
+      <DesignTab
+        projectId={project.id}
+        isAdmin={isAdmin}
+        canOperate={canOperate}
+      />
+    ),
+  },
+  {
     id: 'sessions',
     label: 'Sessions',
     render: ({ project, isAdmin, reload }) => (
@@ -166,7 +178,7 @@ export default function ProjectSettingsPage() {
       />
 
       <TabGroup value={tab} onValueChange={setTab}>
-        {/* Seven tabs do not fit a phone: the strip scrolls inside its box. */}
+        {/* Eight tabs do not fit a phone: the strip scrolls inside its box. */}
         <ScrollX>
           <TabList aria-label="Project settings" className="min-w-max">
             {TABS.map(({ id, label }) => (

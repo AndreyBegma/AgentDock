@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  DESIGN_LIVE_EVENT,
   PLANNER_LIVE_EVENT,
   type PlanDetail,
   type PlanReviewDecision,
@@ -37,9 +38,10 @@ const isPlannerChange = (data: unknown, planId: string): boolean =>
   (data as { planId: unknown }).planId === planId;
 
 /**
- * One plan, kept current: loaded once, refetched on every `planner` push for
- * this plan on `project:<id>` (the push carries ids only, so the refetch is
- * what is authorized), and after each of the person's own actions.
+ * One plan, kept current: loaded once, refetched on every `planner` or
+ * `design` push for this plan on `project:<id>` (the push carries ids only,
+ * so the refetch is what is authorized), and after each of the person's own
+ * actions.
  */
 export function usePlan(projectId: string, planId: string) {
   const [version, setVersion] = useState(0);
@@ -50,7 +52,13 @@ export function usePlan(projectId: string, planId: string) {
 
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useLive(`project:${projectId}`, (message) => {
-    if (message.event !== PLANNER_LIVE_EVENT) return;
+    // A design push changes a task card's chip and status (spec 223).
+    if (
+      message.event !== PLANNER_LIVE_EVENT &&
+      message.event !== DESIGN_LIVE_EVENT
+    ) {
+      return;
+    }
     if (!isPlannerChange(message.data, planId)) return;
     clearTimeout(timer.current);
     timer.current = setTimeout(

@@ -210,6 +210,7 @@ export function taskStatusView(task: Pick<PlanTaskView, 'status' | 'issue'>): {
 /** Task counts of a plan list row, most actionable first: "2 needs talk · 3 approved". */
 const COUNT_ORDER: readonly PlanTaskStatus[] = [
   'needs_talk',
+  'needs_design',
   'rewrite_requested',
   'ready',
   'draft',
@@ -347,6 +348,16 @@ export const canApprove = (
   task: Pick<PlanTaskView, 'status' | 'blockingOpen'>,
 ): boolean => task.blockingOpen === 0 && APPROVABLE.includes(task.status);
 
+/** Why Approve is off on a task card, when the reason is the task's own. */
+export function approveHint(
+  task: Pick<PlanTaskView, 'status' | 'blockingOpen'>,
+): string | undefined {
+  if (task.blockingOpen > 0) return 'Answer the blocking questions first.';
+  // Spec 223 D1: `needs_design` until the design is approved.
+  if (task.status === 'needs_design') return 'Approve the design first.';
+  return undefined;
+}
+
 /** D9: Revise plan runs when at least one rewrite is pending. */
 export const canRevise = (plan: PlanDetail): boolean =>
   !isClosed(plan) && plan.tasks.some((t) => t.status === 'rewrite_requested');
@@ -391,6 +402,8 @@ const ERROR_TEXT: Partial<Record<PlannerErrorCode, string>> = {
   turn_in_progress:
     'A turn of this plan is still running. Wait for it, or cancel it.',
   needs_talk: 'This task has a blocking question. Answer it before approving.',
+  design_not_approved:
+    'This task’s design is on and not approved yet. Approve the design first.',
   not_sendable:
     'Nothing to send: approve a task, and settle every blocking question.',
   plan_closed: 'This plan was sent or archived; it takes no more changes.',

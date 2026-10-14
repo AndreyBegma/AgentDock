@@ -11,6 +11,7 @@ import { STATUSES } from '@andrewbehma/glass-ui/status-pill';
 import { ApiError } from '../api';
 import { plan, task, turn } from './fixtures';
 import {
+  approveHint,
   canApprove,
   canRevise,
   describePlannerError,
@@ -168,6 +169,19 @@ describe('what the person may do', () => {
     );
     expect(canApprove(task({ status: 'approved' }))).toBe(false);
     expect(canApprove(task({ status: 'issued' }))).toBe(false);
+  });
+
+  test('approve waits on the design while the task needs one (spec 223 D1)', () => {
+    const needsDesign = task({ status: 'needs_design' });
+    expect(canApprove(needsDesign)).toBe(false);
+    expect(approveHint(needsDesign)).toBe('Approve the design first.');
+    expect(approveHint(task({ status: 'needs_talk', blockingOpen: 2 }))).toBe(
+      'Answer the blocking questions first.',
+    );
+    expect(approveHint(task())).toBeUndefined();
+    expect(taskCountsText({ needs_design: 2, approved: 1 })).toBe(
+      '2 needs design · 1 approved',
+    );
   });
 
   test('Send to fleet needs an approved task and none in needs_talk (D8)', () => {

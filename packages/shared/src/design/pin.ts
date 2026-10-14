@@ -64,13 +64,19 @@ export const mockupMessageSchema = z.discriminatedUnion('type', [
   }),
   /**
    * A click in pin mode: `x`/`y` relative to the document (page
-   * coordinates), and the CSS path of the element under it.
+   * coordinates), and the CSS path of the element under it. `clientX` /
+   * `clientY` are the same click in the frame's viewport: the viewer cannot
+   * read the mockup's scroll offset (opaque origin), so it anchors the
+   * comment box with these. Optional, so a helper served before they existed
+   * still parses; the viewer then opens the box beside the frame.
    */
   z.strictObject({
     source: z.literal(MOCKUP_MESSAGE_SOURCE),
     type: z.literal('pin'),
     x: coordinate,
     y: coordinate,
+    clientX: coordinate.optional(),
+    clientY: coordinate.optional(),
     selector: z.string().min(1).max(DESIGN_SELECTOR_MAX),
   }),
 ]);
@@ -120,7 +126,7 @@ export const MOCKUP_PIN_HELPER_SCRIPT = `(function () {
     e.preventDefault();
     e.stopPropagation();
     var target = e.target && e.target.nodeType === 1 ? e.target : document.body;
-    send({ type: 'pin', x: Math.max(0, e.pageX), y: Math.max(0, e.pageY), selector: cssPath(target) });
+    send({ type: 'pin', x: Math.max(0, e.pageX), y: Math.max(0, e.pageY), clientX: Math.max(0, e.clientX), clientY: Math.max(0, e.clientY), selector: cssPath(target) });
   }, true);
   window.addEventListener('message', function (e) {
     if (e.source !== window.parent) return;
