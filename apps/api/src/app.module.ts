@@ -9,6 +9,7 @@ import { BudgetsModule } from './budgets';
 import { BullmqModule } from './bullmq';
 import { ControlModule } from './control';
 import { DatabaseModule } from './database/database.module';
+import { DesignModule } from './design/design.module';
 import { FleetModule } from './fleet';
 import { GitHubAppModule } from './github-app';
 import { HealthController } from './health.controller';
@@ -63,6 +64,8 @@ import { WorkflowsModule } from './workflows';
     TerminalModule,
     SkillsModule,
     PlannerModule,
+    // Spec 223: the design stage, on top of the Planner.
+    DesignModule,
     SchedulesModule,
     BudgetsModule,
     // Before WebhooksModule: its `POST /hooks/:publicId` would otherwise
