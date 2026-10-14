@@ -2,7 +2,12 @@ import {
   EVENT_SCHEMA_VERSION,
   LLM_REQUEST_EVENT,
   type LlmRequestData,
+  SESSION_COMPACTED_EVENT,
+  SESSION_ERROR_EVENT,
+  SESSION_ERROR_KIND_MAX_LENGTH,
   SESSION_OBSERVED_EVENT,
+  type SessionCompactedData,
+  type SessionErrorData,
   type SessionEventType,
   type SessionObservedData,
   TOOL_CALL_EVENT,
@@ -91,6 +96,22 @@ const isoTime = (value: unknown): string | undefined => {
   const time = Date.parse(value);
   return Number.isNaN(time) ? undefined : new Date(time).toISOString();
 };
+
+/** The runtime's error code when it is one (`rate_limit`); anything else is `unknown`. */
+const errorKind = (value: unknown): string =>
+  typeof value === 'string' &&
+  value.length <= SESSION_ERROR_KIND_MAX_LENGTH &&
+  /^[a-z_]+$/.test(value)
+    ? value
+    : 'unknown';
+
+const httpStatus = (value: unknown): number | undefined =>
+  typeof value === 'number' &&
+  Number.isInteger(value) &&
+  value >= 100 &&
+  value <= 599
+    ? value
+    : undefined;
 
 const elapsed = (from: string, to: string): number | undefined => {
   const ms = Date.parse(to) - Date.parse(from);
@@ -207,7 +228,39 @@ export const parseClaudeLines = (
 
   const promptRef = () => (p.promptId ? { promptId: p.promptId } : {});
 
+  /**
+   * A request the runtime gave up on (#161). Only the error code and status
+   * are read; the message Claude Code wrote about it is content (D9).
+   */
+  const onApiError = (line: Json, ts: string) => {
+    const errorId = text(line.uuid);
+    if (!errorId) return;
+    const status = httpStatus(line.apiErrorStatus);
+    const data: SessionErrorData = {
+      errorId,
+      kind: errorKind(line.error),
+      ...(status !== undefined ? { status } : {}),
+      ...promptRef(),
+    };
+    emit(SESSION_ERROR_EVENT, ts, data);
+  };
+
+  /** A compaction of the conversation (#161): its trigger and size only. */
+  const onCompaction = (line: Json, ts: string) => {
+    const compactionId = text(line.uuid);
+    if (!compactionId) return;
+    const meta = isObject(line.compactMetadata) ? line.compactMetadata : {};
+    const preTokens = tokens(meta.preTokens);
+    const data: SessionCompactedData = {
+      compactionId,
+      trigger: meta.trigger === 'manual' ? 'manual' : 'auto',
+      ...(preTokens > 0 ? { preTokens } : {}),
+    };
+    emit(SESSION_COMPACTED_EVENT, ts, data);
+  };
+
   const onAssistant = (line: Json, ts: string) => {
+    if (line.isApiErrorMessage === true) onApiError(line, ts);
     const message = isObject(line.message) ? line.message : null;
     if (!message) return;
     const model = text(message.model);
@@ -331,6 +384,8 @@ export const parseClaudeLines = (
     else if (line.type === 'assistant') onAssistant(line, ts);
     else if (line.type === 'system' && line.subtype === 'turn_duration') {
       finishTurn(ts);
+    } else if (line.type === 'system' && line.subtype === 'compact_boundary') {
+      onCompaction(line, ts);
     }
     p.lastTs = ts;
   }

@@ -4,6 +4,8 @@ import { join } from 'node:path';
 import {
   type LlmRequestData,
   parseSessionEvent,
+  type SessionCompactedData,
+  type SessionErrorData,
   type SessionEvent,
   type SessionObservedData,
   type ToolCallData,
@@ -301,6 +303,90 @@ describe('claude adapter: subagents', () => {
       });
     }
     expect(requests[0].tokens.cacheWrite1h).toBe(800);
+  });
+});
+
+describe('claude adapter: compactions and API errors (#161)', () => {
+  const parse = (lines: object[]) =>
+    parseClaudeLines(
+      lines.map((l) => JSON.stringify(l)),
+      { observed: null, parser: freshClaudeParserState() },
+      { source: main(), projects: [] },
+    ).events.map((event, i) => {
+      const parsed = parseSessionEvent({ ...event, seq: i + 1 });
+      if (!parsed?.ok) throw new Error(`invalid ${event.type}`);
+      return parsed.event;
+    });
+
+  const prompt = {
+    type: 'user',
+    promptId: 'p-1',
+    cwd: '/srv/dev/acme',
+    timestamp: '2026-10-01T10:00:00.000Z',
+    message: { content: 'SENTINEL_PROMPT' },
+  };
+
+  it('sends a compact_boundary as session.compacted, with its trigger and size only', () => {
+    const events = parse([
+      prompt,
+      {
+        type: 'system',
+        subtype: 'compact_boundary',
+        uuid: 'c-1',
+        content: 'SENTINEL_SUMMARY',
+        timestamp: '2026-10-01T10:05:00.000Z',
+        compactMetadata: {
+          trigger: 'manual',
+          preTokens: 167000,
+          postTokens: 16990,
+          preCompactDiscoveredTools: ['SENTINEL_TOOL'],
+        },
+      },
+      {
+        type: 'system',
+        subtype: 'compact_boundary',
+        uuid: 'c-2',
+        timestamp: '2026-10-01T10:09:00.000Z',
+      },
+    ]);
+    const compactions = ofType<SessionCompactedData>(
+      events,
+      'session.compacted',
+    );
+    expect(compactions).toEqual([
+      { compactionId: 'c-1', trigger: 'manual', preTokens: 167000 },
+      { compactionId: 'c-2', trigger: 'auto' },
+    ]);
+    expect(events.find((e) => e.type === 'session.compacted')?.ts).toBe(
+      '2026-10-01T10:05:00.000Z',
+    );
+    expect(JSON.stringify(events)).not.toContain('SENTINEL');
+  });
+
+  it('sends an isApiErrorMessage line as session.error with its code and status, never its text', () => {
+    const error = (uuid: string, extra: object) => ({
+      type: 'assistant',
+      isApiErrorMessage: true,
+      uuid,
+      requestId: `req-${uuid}`,
+      timestamp: '2026-10-01T10:01:00.000Z',
+      message: {
+        model: '<synthetic>',
+        content: [{ type: 'text', text: 'SENTINEL_ERROR_TEXT' }],
+      },
+      ...extra,
+    });
+    const events = parse([
+      prompt,
+      error('e-1', { error: 'rate_limit', apiErrorStatus: 429 }),
+      error('e-2', { error: 'Some Message SENTINEL', apiErrorStatus: 9000 }),
+    ]);
+    expect(ofType<SessionErrorData>(events, 'session.error')).toEqual([
+      { errorId: 'e-1', kind: 'rate_limit', status: 429, promptId: 'p-1' },
+      { errorId: 'e-2', kind: 'unknown', promptId: 'p-1' },
+    ]);
+    expect(events.some((e) => e.type === 'llm.request')).toBe(false);
+    expect(JSON.stringify(events)).not.toContain('SENTINEL');
   });
 });
 

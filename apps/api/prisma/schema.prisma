@@ -330,6 +330,7 @@ model Project {
   slots                Slot[]
   orchestrator         FleetOrchestrator?
   sessions             AgentSession[]
+  workflows            SessionWorkflow[]
   issues               IssueCache[]
   queueStates          QueueStateRow[]
   issueFeed            IssueFeed?
@@ -607,15 +608,22 @@ model AgentSession {
   startedAt       DateTime
   lastEventAt     DateTime
   endedAt         DateTime?
+  /// A subagent's type (Claude's `agentType`, e.g. `Explore`), from its
+  /// requests' `agentName`; written by the workflows sink (#161).
+  agentType       String?
 
-  runner      Runner         @relation(fields: [runnerId], references: [id], onDelete: Cascade)
-  project     Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  parent      AgentSession?  @relation("SessionParent", fields: [parentSessionId], references: [id], onDelete: SetNull)
-  children    AgentSession[] @relation("SessionParent")
-  turns       Turn[]
-  llmRequests LlmRequest[]
-  toolCalls   ToolCall[]
-  spawnedBy   ToolCall[]     @relation("ToolCallChild")
+  runner        Runner               @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+  project       Project?             @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  parent        AgentSession?        @relation("SessionParent", fields: [parentSessionId], references: [id], onDelete: SetNull)
+  children      AgentSession[]       @relation("SessionParent")
+  turns         Turn[]
+  llmRequests   LlmRequest[]
+  toolCalls     ToolCall[]
+  spawnedBy     ToolCall[]           @relation("ToolCallChild")
+  compactions   SessionCompaction[]
+  errors        SessionError[]
+  workflow      SessionWorkflow?
+  workflowMark  SessionWorkflowMark?
 
   @@unique([runnerId, runtime, externalId])
   @@index([projectId, startedAt])
@@ -700,6 +708,105 @@ model ToolCall {
   @@unique([sessionId, toolUseId])
   @@index([childSessionId])
   @@map("tool_calls")
+}
+
+// ─── Workflows analytics (#161) ─────────────────────────────────────────────
+
+enum CompactionTrigger {
+  auto
+  manual
+}
+
+/// A `session.compacted` event: the runtime summarized the conversation.
+model SessionCompaction {
+  id           String            @id @default(cuid())
+  sessionId    String
+  /// The transcript line's id.
+  compactionId String
+  ts           DateTime
+  trigger      CompactionTrigger
+  preTokens    Int?
+
+  session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, compactionId])
+  @@map("session_compactions")
+}
+
+/// A `session.error` event: a request the runtime gave up on. `kind` is an
+/// error code, never a message (spec 12 D9).
+model SessionError {
+  id        String   @id @default(cuid())
+  sessionId String
+  /// The transcript line's id.
+  errorId   String
+  ts        DateTime
+  kind      String
+  status    Int?
+
+  session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, errorId])
+  @@map("session_errors")
+}
+
+/// A root session whose `session_workflows` row must be rebuilt: raised by
+/// the workflows sink each time an event reaches its tree, deleted by the
+/// projector once it built the row from that `seq`. Event times cannot be the
+/// cursor: a runner replaying its spool sends old ones.
+model SessionWorkflowMark {
+  sessionId String @id
+  seq       Int    @default(1)
+
+  session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("session_workflow_marks")
+}
+
+/// One root session's workflow facts, projected from its tree by
+/// `WorkflowsProjector` (#161). Definitions: `packages/shared/src/workflows`.
+model SessionWorkflow {
+  sessionId        String   @id
+  projectId        String?
+  runtime          Runtime
+  profileKey       String?
+  startedAt        DateTime
+  /// The latest `lastEventAt` in the tree.
+  lastEventAt      DateTime
+  depth            Int
+  subagents        Int
+  compactions      Int
+  /// A type name, or `~none` / `~unknown` (shared `WORKFLOW_AGENT_TYPE`).
+  primaryAgentType String
+  /// No LLM request in the tree came after its last `session.error`.
+  errored          Boolean
+  /// The root's last turn never finished.
+  lastTurnOpen     Boolean
+  builtAt          DateTime
+
+  session     AgentSession            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  project     Project?                @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  transitions SessionToolTransition[]
+
+  @@index([startedAt])
+  @@index([projectId, startedAt])
+  @@map("session_workflows")
+}
+
+/// Tool-call transitions inside one root session's tree (#161): `to` was
+/// called right after `from` in the same turn of the same session.
+model SessionToolTransition {
+  sessionId String
+  from      String
+  to        String
+  count     Int
+  /// Transitions whose `to` call failed.
+  errors    Int
+
+  workflow SessionWorkflow @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
+
+  @@id([sessionId, from, to])
+  @@map("session_tool_transitions")
 }
 
 // ─── Tokens and API-equivalent cost (docs/specs/13) ─────────────────────────
