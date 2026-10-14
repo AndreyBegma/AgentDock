@@ -7,6 +7,10 @@
 [![@andrewbehma/glass-ui on npm](https://img.shields.io/npm/v/@andrewbehma/glass-ui?label=%40andrewbehma%2Fglass-ui)](https://www.npmjs.com/package/@andrewbehma/glass-ui)
 [![Discord](https://img.shields.io/badge/Discord-join%20the%20community-5865F2?logo=discord&logoColor=white)](https://discord.gg/mkQARkBs4C)
 
+![The fleet view: every slot, its issue, model, status, last checkpoint and pull request](docs/screenshots/fleet.png)
+
+<sub>The fleet view, with example data. More on [agentdock.luna-realm.com](https://agentdock.luna-realm.com).</sub>
+
 You run several AI coding agents — Claude Code and Codex — across many
 repositories and more than one machine. AgentDock shows every agent, every pull
 request and every dollar in one web app, and lets you start, stop, approve and
