@@ -24,15 +24,16 @@ import { api } from '../../../../../lib/api';
 import { useLive } from '../../../../../lib/live/use-live';
 import {
   describePlannerError,
-  isRunnerTooOld,
   isRunnerTooOldError,
-  RUNNER_TOO_OLD_TEXT,
 } from '../../../../../lib/planner/format';
 import { planHref } from '../../../../../lib/planner/href';
+import {
+  plannerRunnerBlock,
+  runnerGateCopy,
+} from '../../../../../lib/planner/runner-support';
 import { useErrorToast } from '../../../../../lib/section/use-error-toast';
 import { useSection } from '../../../../../lib/section/use-section';
 import { skillRunProfiles } from '../../../../../lib/skills/format';
-import { RUNNER_UPDATE_HREF } from '../../../../../lib/slot/format';
 import { useProjectDetail } from '../use-project-detail';
 
 /** One refetch for a burst of pushes. */
@@ -80,11 +81,17 @@ export default function PlannerPage() {
 
   const showError = useErrorToast();
   const [createdTooOld, setCreatedTooOld] = useState(false);
-  // #213: until the runner advertises its commands, the planner learns it is
-  // too old from a turn it refused — the newest plan's, or the one just tried.
-  const newest = plans.data?.items[0];
-  const runnerTooOld =
-    createdTooOld || isRunnerTooOld(newest?.attention?.reason);
+  // #233: the runner's advert decides before any turn. Only a runner that
+  // advertises nothing still teaches it by refusing a turn (#213) — the
+  // newest plan's, or the one just tried.
+  const runnerBlock = plannerRunnerBlock({
+    project,
+    createdTooOld,
+    newestReason: plans.data?.items[0]?.attention?.reason,
+  });
+  const runnerCopy = runnerBlock
+    ? runnerGateCopy('planner', runnerBlock.gate)
+    : null;
 
   const create = async (request: CreatePlanRequest) => {
     try {
@@ -109,13 +116,13 @@ export default function PlannerPage() {
           description="Turn a brief into reviewed bugs and features, talk each one through, and send them to the fleet as issues."
         />
         {project ? <RunnerOfflineBanner project={project} /> : null}
-        {runnerTooOld && project?.runnerStatus !== 'offline' ? (
+        {runnerCopy ? (
           <PrerequisiteBanner
             tone="warn"
-            title="The runner is too old to plan"
-            body={RUNNER_TOO_OLD_TEXT}
-            href={RUNNER_UPDATE_HREF}
-            cta="Update the runner"
+            title={runnerCopy.title}
+            body={runnerCopy.body}
+            href={runnerCopy.href}
+            cta={runnerCopy.cta}
           />
         ) : null}
       </div>
@@ -130,6 +137,15 @@ export default function PlannerPage() {
             : canOperate
               ? null
               : 'Viewers can read shared plans; an operator starts one.'
+        }
+        runnerReason={
+          runnerCopy && runnerBlock?.known
+            ? {
+                text: runnerCopy.reason,
+                href: runnerCopy.href,
+                cta: runnerCopy.cta,
+              }
+            : null
         }
         onCreate={create}
       />

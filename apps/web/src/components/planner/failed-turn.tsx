@@ -6,12 +6,8 @@ import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { Disclosure } from '@andrewbehma/glass-ui/disclosure';
 import Link from 'next/link';
 import { useState } from 'react';
-import {
-  isContractViolation,
-  isRunnerTooOld,
-  RUNNER_TOO_OLD_TEXT,
-} from '../../lib/planner/format';
-import { RUNNER_UPDATE_HREF } from '../../lib/slot/format';
+import { isContractViolation } from '../../lib/planner/format';
+import { failedTurnCopy } from '../../lib/planner/runner-support';
 
 /**
  * A failed turn: the error and **Retry turn**. For a `contract_violation`
@@ -31,17 +27,11 @@ export function FailedTurn({
 }) {
   const [open, setOpen] = useState(false);
   const violation = isContractViolation(turn);
-  const tooOld = isRunnerTooOld(turn.error);
+  const copy = failedTurnCopy(turn);
   return (
     <Banner
       tone="danger"
-      title={
-        violation
-          ? 'The planner’s answer did not follow the contract'
-          : tooOld
-            ? 'The runner is too old to plan'
-            : 'The turn failed'
-      }
+      title={copy.title}
       action={
         canRetry ? (
           <Button
@@ -56,15 +46,10 @@ export function FailedTurn({
       }
     >
       <div className="flex min-w-0 flex-col gap-2">
-        <p className="break-words">
-          {violation ? 'Nothing was changed. ' : null}
-          {tooOld
-            ? RUNNER_TOO_OLD_TEXT
-            : (turn.error ?? 'The runner gave no reason.')}
-        </p>
-        {tooOld ? (
+        <p className="break-words">{copy.text}</p>
+        {copy.updateHref ? (
           <Link
-            href={RUNNER_UPDATE_HREF}
+            href={copy.updateHref}
             className={`${buttonClassName({ variant: 'glass', size: 'sm' })} self-start`}
           >
             Update the runner

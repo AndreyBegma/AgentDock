@@ -7,6 +7,12 @@ import {
 } from '@agentdock/shared';
 import type { Status } from '@andrewbehma/glass-ui/status-pill';
 import { ApiError, type Described } from '../api';
+import {
+  RUNNER_UPDATE_HREF,
+  type RunnerFacts,
+  type RunnerGate,
+  runnerGate,
+} from '../planner/runner-support';
 
 /**
  * The design stage's words and colours (spec 223 "UI"), on glass-ui's status
@@ -160,11 +166,27 @@ export function describeDesignError(
       cta: 'Open Design settings',
     };
   }
-  if (code === DESIGN_ERROR.commandUnavailable) {
-    return { text, href: '/install', cta: 'Update the runner' };
+  if (
+    code === DESIGN_ERROR.commandUnavailable ||
+    code === DESIGN_ERROR.runnerOutdated
+  ) {
+    return { text, href: RUNNER_UPDATE_HREF, cta: 'Update the runner' };
   }
   return text;
 }
+
+/**
+ * #233: what stops **Generate** before it is tried — a design turn needs
+ * `plan.turn` and both UI profile commands.
+ */
+export const generateRunnerGate = (
+  project: RunnerFacts | undefined,
+): RunnerGate | null => runnerGate(project, 'design');
+
+/** #233: what stops Settings → Design's **Build** / **Rebuild**. */
+export const rebuildRunnerGate = (
+  project: RunnerFacts | undefined,
+): RunnerGate | null => runnerGate(project, 'uiProfileBuild');
 
 /** "Variant 2 · revision 3". */
 export const revisionLabel = (variant: number, revision: number): string =>

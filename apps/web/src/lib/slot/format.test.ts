@@ -16,6 +16,7 @@ import {
   SLOT_PANEL_TABS,
   shortSha,
   usesWorktree,
+  worktreeRunnerGate,
 } from './format';
 
 const AT = '2026-10-14T10:00:00.000Z';
@@ -103,6 +104,51 @@ describe('describeWorktreeError', () => {
     expect(isRunnerOutdated(apiError(409, FLEET_ERROR.runnerOffline))).toBe(
       false,
     );
+  });
+
+  test('the API’s runner_outdated says "Update the runner" too (#233)', () => {
+    const outdated = apiError(
+      409,
+      FLEET_ERROR.runnerOutdated,
+      'The runner does not serve worktree.status',
+    );
+    expect(isRunnerOutdated(outdated)).toBe(true);
+    expect(describeWorktreeError(outdated)).toContain('Update the runner');
+  });
+});
+
+describe('worktreeRunnerGate', () => {
+  const project = (
+    runnerCommands: { commands: string[]; disabled: string[] } | null,
+    runnerStatus: 'online' | 'offline' = 'online',
+  ) => ({ runnerStatus, runnerCommands });
+
+  test('worktree.status missing or disabled: the tabs do not ask', () => {
+    expect(
+      worktreeRunnerGate(project({ commands: ['plan.turn'], disabled: [] })),
+    ).toBe('outdated');
+    expect(
+      worktreeRunnerGate(
+        project({
+          commands: ['worktree.status'],
+          disabled: ['worktree.status'],
+        }),
+      ),
+    ).toBe('disabled');
+  });
+
+  test('advertised, unknown or offline: the tabs ask as before', () => {
+    expect(
+      worktreeRunnerGate(
+        project({ commands: ['worktree.status'], disabled: [] }),
+      ),
+    ).toBeNull();
+    // Unknown: the refusal decides, through `isRunnerOutdated`.
+    expect(worktreeRunnerGate(project(null))).toBeNull();
+    expect(worktreeRunnerGate(undefined)).toBeNull();
+    expect(
+      worktreeRunnerGate(project({ commands: [], disabled: [] }, 'offline')),
+    ).toBeNull();
   });
 
   test('a network failure is the app-wide sentence', () => {

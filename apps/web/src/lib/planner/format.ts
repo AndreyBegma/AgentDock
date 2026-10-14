@@ -103,15 +103,21 @@ export const RUNNER_TOO_OLD_TEXT =
  * The runner answered `plan.turn` with `unknown_command`: it predates the
  * planner. The API keeps the runner's code in the message
  * (`plan.turn failed on the runner: unknown_command — …`), the same test
- * `lib/slot/format.ts` makes for worktrees. Until the runner advertises its
- * commands, this is how the planner learns it is too old.
+ * `lib/slot/format.ts` makes for worktrees. A runner that advertises its
+ * commands is gated before the try (`runner-support.ts`); this stays for an
+ * older runner, and for a turn that raced an update.
  */
 export const isRunnerTooOld = (text: string | null | undefined): boolean =>
   /\bunknown_command\b/.test(text ?? '');
 
-/** A failed planner request that says the runner is too old. */
+/**
+ * A failed planner request that says the runner is too old: the API's 409
+ * `runner_outdated` (#233), or the runner's own `unknown_command`.
+ */
 export const isRunnerTooOldError = (error: unknown): boolean =>
-  error instanceof ApiError && isRunnerTooOld(error.message);
+  error instanceof ApiError &&
+  (error.body?.error === PLANNER_ERROR.runnerOutdated ||
+    isRunnerTooOld(error.message));
 
 export const TASK_STATUS_LABEL: Record<PlanTaskStatus, string> = {
   draft: 'Draft',
@@ -429,7 +435,7 @@ export function describePlannerError(error: unknown): string {
     if (code === PLANNER_ERROR.dependencyCycle) {
       return `The tasks depend on each other in a cycle: ${error.message}`;
     }
-    if (isRunnerTooOld(error.message)) return RUNNER_TOO_OLD_TEXT;
+    if (isRunnerTooOldError(error)) return RUNNER_TOO_OLD_TEXT;
     // 503 `command_unavailable` is also an offline runner, not only an old one.
     if (
       code === PLANNER_ERROR.commandUnavailable &&
