@@ -273,7 +273,9 @@ export const CHANNEL_LABEL: Record<FleetChannel, string> = {
 
 /** One line that explains each slot term. */
 export const SLOT_TERM_HINT = {
-  brief: 'The task the orchestrator gave this worker.',
+  brief:
+    'The task the orchestrator gave this worker, from the round named here.',
+  modelWhy: 'The orchestrator’s reason for picking this model for the slot.',
   owns: 'Files and folders this worker may change.',
   never: 'Files and folders this worker must not open.',
   lead: 'A lead slot also owns shared files, such as the schema, that others wait on.',

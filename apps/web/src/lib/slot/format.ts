@@ -27,6 +27,10 @@ export const SLOT_PANEL_TABS = [
 ] as const;
 export type SlotPanelTab = (typeof SLOT_PANEL_TABS)[number]['id'];
 
+/** The panel's tab from the URL's `?tab=`; anything else is Chat (#213). */
+export const parseSlotTab = (value: string | null): SlotPanelTab =>
+  SLOT_PANEL_TABS.find((tab) => tab.id === value)?.id ?? 'chat';
+
 /** The tabs that read `/worktree`: the runner is asked only while one is open. */
 export const usesWorktree = (tab: SlotPanelTab): boolean =>
   tab === 'worktree' || tab === 'files';

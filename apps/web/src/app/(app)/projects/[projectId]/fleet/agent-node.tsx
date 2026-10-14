@@ -21,9 +21,9 @@ import {
   issueLine,
   modelLine,
   nodeHue,
+  nodeStatus,
   nodeTitle,
-  PILL_LABEL,
-  PILL_STATUS,
+  orchestratorPromptReason,
   progressBar,
 } from '../../../../../lib/fleet/graph';
 
@@ -76,6 +76,8 @@ export function MessagePrompt({
 
   const reason = disabledReason ?? (sending ? 'Sending…' : null);
   const name = toSlot ?? 'the orchestrator';
+  // The card's one-line box is narrow; its placeholder says only the verb.
+  const placeholder = toSlot || multiline ? `Message ${name}…` : 'Message…';
 
   return (
     <div className="nodrag nopan nowheel flex flex-col gap-1">
@@ -85,7 +87,7 @@ export function MessagePrompt({
         value={text}
         onValueChange={setText}
         onSubmit={send}
-        placeholder={`Message ${name}…`}
+        placeholder={placeholder}
         aria-label={
           toSlot ? `Message worker ${toSlot}` : 'Message the orchestrator'
         }
@@ -150,7 +152,10 @@ export function AgentNode({
       <MessagePrompt
         target={{ kind: 'orchestrator' }}
         control={control}
-        disabledReason={orchestratorMessageReason}
+        disabledReason={orchestratorPromptReason(
+          node.orchestrator.status,
+          orchestratorMessageReason,
+        )}
       />
     );
   } else if (node.kind === 'slot') {
@@ -175,8 +180,8 @@ export function AgentNode({
       title={title}
       icon={node.kind === 'orchestrator' ? Workflow : Bot}
       {...(hue ? { hue } : {})}
-      status={PILL_STATUS[node.pill]}
-      statusLabel={node.kind === 'planned' ? 'Planned' : PILL_LABEL[node.pill]}
+      status={nodeStatus(node).status}
+      statusLabel={nodeStatus(node).label}
       description={
         <span className="flex flex-col gap-0.5">
           {issueLine(node) ? (

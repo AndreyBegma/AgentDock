@@ -4,9 +4,9 @@ import type { SlotDetail } from '@agentdock/shared';
 import type { ReactNode } from 'react';
 import {
   formatAheadBehind,
-  formatRound,
   SLOT_TERM_HINT,
 } from '../../../../../../lib/fleet/format';
+import { briefRoundLabel } from '../../../../../../lib/slot/format';
 
 /**
  * Label over value, not side by side: the fence's globs and the model's
@@ -48,16 +48,19 @@ function Globs({ globs }: { globs: string[] }) {
 export function ContextTab({ slot }: { slot: SlotDetail }) {
   return (
     <dl className="flex flex-col gap-4">
+      {/* The round names the board the brief came from; it is an id, not a time (#213). */}
       <Row label="Brief" hint={SLOT_TERM_HINT.brief}>
-        {slot.round ? formatRound(slot.round) : '—'}
+        <code className="font-mono text-xs">{briefRoundLabel(slot.round)}</code>
         {slot.issue !== null ? ` · issue #${slot.issue}` : ''}
       </Row>
       <Row label="Model">
         {slot.model ?? 'model unknown'} · {slot.runtime}
-        {slot.modelWhy ? (
-          <span className="block text-ink-2">{slot.modelWhy}</span>
-        ) : null}
       </Row>
+      {slot.modelWhy ? (
+        <Row label="Why this model" hint={SLOT_TERM_HINT.modelWhy}>
+          <span className="text-ink-2">{slot.modelWhy}</span>
+        </Row>
+      ) : null}
       {slot.lead ? (
         <Row label="Lead" hint={SLOT_TERM_HINT.lead}>
           yes

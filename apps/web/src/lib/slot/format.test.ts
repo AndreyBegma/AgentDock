@@ -12,6 +12,7 @@ import {
   messageOutcome,
   ORCHESTRATOR_AUTHOR,
   OUTBOX_AUTHOR,
+  parseSlotTab,
   SLOT_PANEL_TABS,
   shortSha,
   usesWorktree,
@@ -199,6 +200,13 @@ describe('messageOutcome', () => {
 
 test('shortSha', () => {
   expect(shortSha('0b6445a1234567890')).toBe('0b6445a');
+});
+
+test('the tab in the URL is one of the panel’s, else Chat (#213)', () => {
+  expect(parseSlotTab('files')).toBe('files');
+  expect(parseSlotTab('pane')).toBe('pane');
+  expect(parseSlotTab('nope')).toBe('chat');
+  expect(parseSlotTab(null)).toBe('chat');
 });
 
 test('the brief’s round is an id, not a timestamp (#213)', () => {

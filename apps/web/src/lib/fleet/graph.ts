@@ -140,6 +140,20 @@ export function nodeStatus(node: FleetGraphNode): {
   };
 }
 
+/**
+ * What the orchestrator card's one-line prompt says when it is off. The full
+ * reason is a sentence the 288 px card cut mid-word ("…not running, so th",
+ * #213); the card says it in a few words, and Quick actions' "Message
+ * orchestrator" row keeps the whole sentence.
+ */
+export function orchestratorPromptReason(
+  status: OrchestratorStatus,
+  reason: string | null,
+): string | null {
+  if (reason === null) return null;
+  return status === 'absent' ? 'Start it to message it' : 'Messaging is off';
+}
+
 export interface FleetCounts {
   /**
    * Runs that have not ended — the same slots `FleetView.slots` lists, so the

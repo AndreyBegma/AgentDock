@@ -17,6 +17,7 @@ import {
   nodeKey,
   nodeStatus,
   ORCHESTRATOR_NODE_SIZE,
+  orchestratorPromptReason,
   progressBar,
   runningSentence,
   SINK_BUILD,
@@ -130,6 +131,18 @@ describe('card lines', () => {
     expect(nodeStatus(stopped).label).toBe('Not running');
     expect(nodeStatus(slot('a', { pill: 'paused' })).label).toBe('Paused');
     expect(nodeStatus(planned('b')).label).toBe('Planned');
+  });
+
+  test('the card’s prompt reason is a few words, not the cut-off sentence (#213)', () => {
+    const full =
+      'The orchestrator is not running, so there is nobody to message. Start it first.';
+    expect(orchestratorPromptReason('absent', full)).toBe(
+      'Start it to message it',
+    );
+    expect(orchestratorPromptReason('unknown', 'Runner offline …')).toBe(
+      'Messaging is off',
+    );
+    expect(orchestratorPromptReason('running', null)).toBeNull();
   });
 
   test('a node is keyed in the URL by its slot', () => {
