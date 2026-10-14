@@ -28,9 +28,12 @@ import {
   terminalUnsupported,
 } from './detect/capabilities';
 import type { Exec } from './detect/exec';
+import { LocalSocketServer } from './local/server';
+import { LocalService } from './local/service';
+import { HookSessions } from './local/sessions';
 import { acquireLock } from './lock';
 import { errorMessage, type Logger } from './log';
-import { otlpSettings, startOtlpReceiver } from './otlp';
+import { otlpSettings, ProjectDirectory, startOtlpReceiver } from './otlp';
 import { PaneStreamer } from './pane';
 import {
   createPlannerHandlers,
@@ -52,6 +55,11 @@ export interface DaemonOptions {
   config: PairedConfig;
   /** Where `config` was read from; the watch list is cached back into it. */
   configFile: string;
+  /**
+   * The local socket for the `agentdock` plugin (spec 201 D5);
+   * `<state>/agentdock/runner.sock` beside the spool by default, null for none.
+   */
+  localSocket?: string | null;
   home: string;
   spoolDir: string;
   /** Transcript read positions (spec 12 D5). */
@@ -273,6 +281,14 @@ export const runDaemon = async (
       };
     };
 
+    // Away mode (spec 201 D17) comes with every `welcome` and `config`.
+    let awayMode = false;
+    const hookSessions = new HookSessions();
+    const directory = new ProjectDirectory({
+      projects: () => watchList.current,
+      exec,
+    });
+
     const live = new RunnerConnection({
       server: config.server,
       token: config.token,
@@ -293,6 +309,7 @@ export const runDaemon = async (
       terminal,
       runLog,
       onConfig: (server) => {
+        awayMode = server.awayMode === true;
         sessions?.setProjects(server.projects).catch(() => {});
         watchList.apply(server.projects).catch((error) => {
           log.error('cannot apply the watch list', {
@@ -311,12 +328,53 @@ export const runDaemon = async (
       settings: otlpSettings(config.otlp),
       emit: (event) => live.emit(event),
       projects: () => watchList.current,
+      sessionProject: (id) => hookSessions.projectOf(id, watchList.current),
+      directory,
       exec,
       clock,
       log,
     });
     const otlpCapability = (): Capabilities['otlp'] =>
       otlp?.port ? { grpc: null, http: otlp.port } : null;
+
+    // The plugin's hook and MCP processes (spec 201 D5): bound after
+    // `runner.lock` is held, so a socket file left there is a dead daemon's.
+    const localService = new LocalService({
+      projects: () => watchList.current,
+      awayMode: () => awayMode,
+      online: () => live.isLive,
+      emit: (event) => {
+        live.emit(event);
+      },
+      relay: (request) => live.request(request),
+      envelope: async (projectId) =>
+        (await directory.resolve([projectId])).get(projectId),
+      sessions: hookSessions,
+      now: () => new Date(clock.now()).toISOString(),
+      log,
+    });
+    const socketPath =
+      options.localSocket === undefined
+        ? join(dirname(options.spoolDir), 'runner.sock')
+        : options.localSocket;
+    let local: LocalSocketServer | null = null;
+    if (socketPath) {
+      const server = new LocalSocketServer({
+        path: socketPath,
+        handle: (op, args) => localService.handle(op, args),
+        log,
+      });
+      try {
+        server.start();
+        local = server;
+        log.info('local: socket listening', { path: socketPath });
+      } catch (error) {
+        log.error('local: cannot open the socket', {
+          path: socketPath,
+          error: errorMessage(error),
+        });
+      }
+    }
 
     const onAbort = () => live.stop();
     if (options.signal?.aborted) live.stop();
@@ -348,6 +406,7 @@ export const runDaemon = async (
     await registry.stop();
     await sessions?.stop();
     await otlp?.stop();
+    local?.stop();
     return reason;
   } finally {
     release();

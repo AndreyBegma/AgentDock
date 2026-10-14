@@ -365,6 +365,78 @@ describe('RunnerConnection', () => {
     s.close(1006);
     await until(() => calls.includes('reset'));
   });
+
+  describe('local.request relay (spec 201 D6)', () => {
+    const relay = {
+      method: 'queue.list',
+      args: { limit: 5 },
+      projectId: 'prj_1',
+      session: { runtime: 'claude', id: 's-1' },
+      via: 'mcp' as const,
+    };
+
+    it('answers runner_offline at once when the socket is not live, sending nothing', async () => {
+      const s = server();
+      s.welcome = () => null;
+      const { connection } = connect(s.origin);
+      await s.waitFor('hello');
+      const result = await connection.request(relay);
+      expect(result).toEqual({
+        ok: false,
+        error: { code: 'runner_offline', message: expect.any(String) },
+      });
+      expect(s.of('local.request')).toEqual([]);
+    });
+
+    it('sends local.request and settles it with the matching local.response', async () => {
+      const s = server();
+      const { connection } = connect(s.origin);
+      await until(() => connection.isLive);
+      const pending = connection.request(relay);
+      const [sent] = await s.waitFor('local.request');
+      expect(sent).toMatchObject({ type: 'local.request', ...relay });
+      // A response nobody waits for is ignored.
+      s.send({ type: 'local.response', id: 'lr_other', ok: true, data: 1 });
+      s.send({
+        type: 'local.response',
+        id: sent.id,
+        ok: false,
+        error: { code: 'forbidden', message: 'viewer' },
+      });
+      expect(await pending).toEqual({
+        ok: false,
+        error: { code: 'forbidden', message: 'viewer' },
+      });
+    });
+
+    it('gives up with timeout after LOCAL_REQUEST_TIMEOUT_MS', async () => {
+      const s = server();
+      const { connection, clock } = connect(s.origin);
+      await until(() => connection.isLive);
+      const pending = connection.request(relay);
+      const [sent] = await s.waitFor('local.request');
+      clock.advance(15_000);
+      expect(await pending).toMatchObject({
+        ok: false,
+        error: { code: 'timeout' },
+      });
+      // A late answer changes nothing.
+      s.send({ type: 'local.response', id: sent.id, ok: true, data: {} });
+    });
+
+    it('answers runner_offline for what is in flight when the socket drops', async () => {
+      const s = server();
+      const { connection } = connect(s.origin);
+      await until(() => connection.isLive);
+      const pending = connection.request(relay);
+      await s.waitFor('local.request');
+      s.stop();
+      expect(await pending).toMatchObject({
+        ok: false,
+        error: { code: 'runner_offline' },
+      });
+    });
+  });
 });
 
 describe('batches', () => {

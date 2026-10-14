@@ -67,6 +67,16 @@ describe('WatchList', () => {
     expect(registry.projects).toEqual([A, B]);
   });
 
+  it('keeps the content flag in memory but never caches it (spec 201 D13)', async () => {
+    const { list, persisted } = setup([A]);
+    await list.apply([
+      { ...A, shipContent: true },
+      { ...B, shipContent: false },
+    ]);
+    expect(list.current).toEqual([{ ...A, shipContent: true }, B]);
+    expect(persisted).toEqual([[A, B]]);
+  });
+
   it('keeps applying the list when the cache cannot be written', async () => {
     const { log, lines } = memoryLogger();
     const registry = new CollectorRegistry({
