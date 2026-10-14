@@ -1,17 +1,37 @@
 import { z } from 'zod';
+import { DESIGN_RATIONALE_MAX, DESIGN_TITLE_MAX } from '../design/limits';
+import { designSuggestionSchema, designVariantSchema } from '../design/types';
 
 /**
  * The Planner (docs/specs/172-planner.md): plan, task, question and turn
- * types, and the output contract's shapes (v1). The contract is code, not
- * data (ADR-0019): every object here is strict, so a key the contract does
- * not name is a violation, never a silently dropped field.
+ * types, and the output contract's shapes (v1, and v2 of
+ * docs/specs/223-design-stage.md). The contract is code, not data
+ * (ADR-0019): every object here is strict, so a key the contract does not
+ * name is a violation, never a silently dropped field.
  */
 
-/** Bumped when the output shapes below change; each plan records the one it ran with (D11). */
-export const PLANNER_CONTRACT_VERSION = 1;
+/**
+ * Bumped when the output shapes below change; each plan records the one it
+ * ran with (D11) and keeps running under it. v2 adds design suggestions to
+ * tasks and the `design` action (spec 223).
+ */
+export const PLANNER_CONTRACT_VERSION = 2;
+export const PLANNER_CONTRACT_VERSIONS = [1, 2] as const;
+export type PlannerContractVersion = (typeof PLANNER_CONTRACT_VERSIONS)[number];
+
+/** A stored `plans.contractVersion` as a known version; an unknown one reads as the current. */
+export const asPlannerContractVersion = (
+  version: number,
+): PlannerContractVersion =>
+  (PLANNER_CONTRACT_VERSIONS as readonly number[]).includes(version)
+    ? (version as PlannerContractVersion)
+    : PLANNER_CONTRACT_VERSION;
 
 /** The tag of the one fenced block a turn's final message must hold (D17). */
 export const PLANNER_BLOCK_TAG = 'agentdock-plan';
+
+/** Spec 223 D7: the tag of the one block holding a design turn's HTML. */
+export const PLANNER_DESIGN_BLOCK_TAG = 'agentdock-design';
 
 /** Tasks per plan (open question: "a bigger brief is two plans"). */
 export const PLANNER_MAX_TASKS = 12;
@@ -62,10 +82,14 @@ export const PLAN_TASK_KINDS = ['bug', 'feature'] as const;
 export const planTaskKindSchema = z.enum(PLAN_TASK_KINDS);
 export type PlanTaskKind = z.infer<typeof planTaskKindSchema>;
 
-/** D6, D9: a task's state before and up to its issue. */
+/**
+ * D6, D9: a task's state before and up to its issue. `needs_design`: the
+ * design is on and not approved yet (spec 223 D1).
+ */
 export const PLAN_TASK_STATUSES = [
   'draft',
   'needs_talk',
+  'needs_design',
   'ready',
   'approved',
   'rejected',
@@ -100,13 +124,14 @@ export type PlanTaskKey = z.infer<typeof planTaskKeySchema>;
 
 // Turns
 
-/** D1, D16. */
+/** D1, D16; `design` is spec 223 D7. */
 export const PLAN_TURN_ACTIONS = [
   'decompose',
   'clarify',
   'grill',
   'write',
   'revise',
+  'design',
 ] as const;
 export const planTurnActionSchema = z.enum(PLAN_TURN_ACTIONS);
 export type PlanTurnAction = z.infer<typeof planTurnActionSchema>;
@@ -204,15 +229,31 @@ export const planTurnInputSchema = z.strictObject({
 });
 export type PlanTurnInput = z.infer<typeof planTurnInputSchema>;
 
-// Output contract (v1), one shape per action
+// Output contract, one shape per action
+//
+// Three families: v1 and v2 are what a turn is validated against, by its
+// plan's `contractVersion`; the unsuffixed schemas read either back (a stored
+// output of any version), so `design` is optional on them.
 
-export const plannedTaskSchema = z.strictObject({
+const plannedTaskShape = {
   key: planTaskKeySchema,
   kind: planTaskKindSchema,
   title: text(PLANNER_TITLE_MAX),
   summary: text(PLANNER_SUMMARY_MAX),
   dependsOn: z.array(planTaskKeySchema).max(PLANNER_MAX_TASKS),
   questions: planQuestionRoundSchema,
+};
+
+export const plannedTaskSchemaV1 = z.strictObject(plannedTaskShape);
+/** Spec 223 D2: every task carries the planner's design suggestion. */
+export const plannedTaskSchemaV2 = z.strictObject({
+  ...plannedTaskShape,
+  design: designSuggestionSchema,
+});
+/** A task of either version. */
+export const plannedTaskSchema = z.strictObject({
+  ...plannedTaskShape,
+  design: designSuggestionSchema.optional(),
 });
 export type PlannedTask = z.infer<typeof plannedTaskSchema>;
 
@@ -227,19 +268,30 @@ export const clarifyOutputSchema = z.strictObject({
 });
 export type ClarifyOutput = z.infer<typeof clarifyOutputSchema>;
 
-export const decomposeOutputSchema = z.strictObject({
-  action: z.literal('decompose'),
-  title: text(PLANNER_TITLE_MAX),
-  tasks: z.array(plannedTaskSchema).min(1).max(PLANNER_MAX_TASKS),
-});
+const decomposeOf = <T extends z.ZodType>(task: T) =>
+  z.strictObject({
+    action: z.literal('decompose'),
+    title: text(PLANNER_TITLE_MAX),
+    tasks: z.array(task).min(1).max(PLANNER_MAX_TASKS),
+  });
+export const decomposeOutputSchemaV1 = decomposeOf(plannedTaskSchemaV1);
+export const decomposeOutputSchemaV2 = decomposeOf(plannedTaskSchemaV2);
+export const decomposeOutputSchema = decomposeOf(plannedTaskSchema);
 export type DecomposeOutput = z.infer<typeof decomposeOutputSchema>;
 
-export const grillOutputSchema = z.strictObject({
+const grillShape = {
   action: z.literal('grill'),
   taskKey: planTaskKeySchema,
   questions: planQuestionRoundSchema,
   done: z.boolean(),
+};
+export const grillOutputSchemaV1 = z.strictObject(grillShape);
+/** Spec 223: a grill may update the task's design suggestion. */
+export const grillOutputSchema = z.strictObject({
+  ...grillShape,
+  design: designSuggestionSchema.optional(),
 });
+export const grillOutputSchemaV2 = grillOutputSchema;
 export type GrillOutput = z.infer<typeof grillOutputSchema>;
 
 export const writeOutputSchema = z.strictObject({
@@ -250,21 +302,67 @@ export const writeOutputSchema = z.strictObject({
 });
 export type WriteOutput = z.infer<typeof writeOutputSchema>;
 
-export const reviseOutputSchema = z.strictObject({
-  action: z.literal('revise'),
-  tasks: z
-    .array(z.union([plannedTaskSchema, frozenTaskRefSchema]))
-    .min(1)
-    .max(PLANNER_MAX_TASKS),
-});
+const reviseOf = <T extends z.ZodType>(task: T) =>
+  z.strictObject({
+    action: z.literal('revise'),
+    tasks: z
+      .array(z.union([task, frozenTaskRefSchema]))
+      .min(1)
+      .max(PLANNER_MAX_TASKS),
+  });
+export const reviseOutputSchemaV1 = reviseOf(plannedTaskSchemaV1);
+export const reviseOutputSchemaV2 = reviseOf(plannedTaskSchemaV2);
+export const reviseOutputSchema = reviseOf(plannedTaskSchema);
 export type ReviseOutput = z.infer<typeof reviseOutputSchema>;
 
+/**
+ * Spec 223 D7: a design turn's plan block; the HTML travels in the one
+ * `agentdock-design` block beside it. `addressed` lists the ids of the open
+ * comments this revision answers (D10). The same shape under every contract
+ * version: a v1 plan's design is switched on by hand.
+ */
+export const designOutputSchema = z.strictObject({
+  action: z.literal('design'),
+  taskKey: planTaskKeySchema,
+  variant: designVariantSchema,
+  title: text(DESIGN_TITLE_MAX),
+  rationale: text(DESIGN_RATIONALE_MAX),
+  addressed: z.array(z.string().min(1).max(64)).max(100),
+});
+export type DesignOutput = z.infer<typeof designOutputSchema>;
+
+/** What a v1 plan's turns are validated against. */
+export const plannerOutputSchemasV1 = {
+  clarify: clarifyOutputSchema,
+  decompose: decomposeOutputSchemaV1,
+  grill: grillOutputSchemaV1,
+  write: writeOutputSchema,
+  revise: reviseOutputSchemaV1,
+  design: designOutputSchema,
+} as const satisfies Record<PlanTurnAction, z.ZodType>;
+
+/** What a v2 plan's turns are validated against. */
+export const plannerOutputSchemasV2 = {
+  clarify: clarifyOutputSchema,
+  decompose: decomposeOutputSchemaV2,
+  grill: grillOutputSchemaV2,
+  write: writeOutputSchema,
+  revise: reviseOutputSchemaV2,
+  design: designOutputSchema,
+} as const satisfies Record<PlanTurnAction, z.ZodType>;
+
+/** The schemas a turn of a plan of `version` is validated against. */
+export const plannerOutputSchemasFor = (version: PlannerContractVersion) =>
+  version === 1 ? plannerOutputSchemasV1 : plannerOutputSchemasV2;
+
+/** Reads a stored output of any version back (`plan_turns.output`). */
 export const plannerOutputSchemas = {
   clarify: clarifyOutputSchema,
   decompose: decomposeOutputSchema,
   grill: grillOutputSchema,
   write: writeOutputSchema,
   revise: reviseOutputSchema,
+  design: designOutputSchema,
 } as const satisfies Record<PlanTurnAction, z.ZodType>;
 
 export type PlannerOutput<A extends PlanTurnAction = PlanTurnAction> = z.infer<

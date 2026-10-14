@@ -1,0 +1,246 @@
+import type {
+  DesignCommentKind,
+  DesignTheme,
+  TaskDesignStatus,
+  UiProfileSnippet,
+  UiProfileSource,
+  UiProfileStatus,
+  ViewportPreset,
+} from './types';
+
+/**
+ * HTTP contracts of the design stage (docs/specs/223-design-stage.md
+ * "API"): the UI profile, design settings, a task's design, its revisions
+ * and comments. Dates are ISO strings.
+ */
+
+export interface DesignUserRef {
+  id: string;
+  name: string;
+}
+
+// UI profile (D12–D14)
+
+/** One version of a project's profile (`ui_profiles` row). */
+export interface UiProfileVersionView {
+  id: string;
+  projectId: string;
+  version: number;
+  source: UiProfileSource;
+  hasUi: boolean;
+  summary: string;
+  kit: string;
+  snippets: UiProfileSnippet[];
+  fingerprintGlobs: string[];
+  fingerprint: string;
+  /** D14: the manual edits the build that wrote this version had to keep. */
+  obligations: string | null;
+  /** The `ui_profile` run that built it; null for a manual version. */
+  runId: string | null;
+  /** The person behind a manual version. */
+  author: DesignUserRef | null;
+  createdAt: string;
+}
+
+/** A row of the version list, without the heavy fields. */
+export interface UiProfileVersionSummary {
+  id: string;
+  version: number;
+  source: UiProfileSource;
+  hasUi: boolean;
+  author: DesignUserRef | null;
+  createdAt: string;
+}
+
+/** `GET /projects/:id/ui-profile`. */
+export interface UiProfileView {
+  status: UiProfileStatus;
+  /** Null with status `none`. */
+  current: UiProfileVersionView | null;
+  /** The running build's run, with status `building`. */
+  buildRunId: string | null;
+}
+
+/** `GET /projects/:id/ui-profile/versions`; `?version=` reads one as `UiProfileVersionView`. */
+export interface UiProfileVersionsView {
+  items: UiProfileVersionSummary[];
+}
+
+/** `PUT /projects/:id/ui-profile` (project admin): a `manual` version (D14). */
+export interface UiProfileUpdateRequest {
+  summary: string;
+  kit: string;
+  snippets: UiProfileSnippet[];
+  /** Default: the current version's. */
+  hasUi?: boolean;
+}
+
+/** `POST /projects/:id/ui-profile/rebuild` (operator). */
+export interface UiProfileRebuildResult {
+  runId: string;
+}
+
+// Design settings (D11, D15)
+
+/** `GET /projects/:id/design-settings`. No row: `DEFAULT_VIEWPORTS` and no skills. */
+export interface DesignSettingsView {
+  viewports: ViewportPreset[];
+  defaultSkills: string[];
+  /** False when no row exists and the defaults are shown. */
+  saved: boolean;
+  updatedBy: DesignUserRef | null;
+  updatedAt: string | null;
+}
+
+/** `PUT /projects/:id/design-settings` (project admin). */
+export interface DesignSettingsUpdateRequest {
+  viewports: ViewportPreset[];
+  defaultSkills: string[];
+}
+
+// A task's design (D1–D4, D9, D10)
+
+/** A design revision of one variant (`design_revisions` row), without its HTML. */
+export interface DesignRevisionView {
+  id: string;
+  variant: number;
+  revision: number;
+  title: string;
+  rationale: string;
+  turnId: string;
+  /** D4: a variant not picked on approve — readable, never published. */
+  archived: boolean;
+  /** `GET /design-revisions/:id/html`, through the web's `/api` rewrite. */
+  htmlUrl: string;
+  createdAt: string;
+}
+
+/** A comment (`design_comments` row). `screen` and `pin` carry their anchor. */
+export interface DesignCommentView {
+  id: string;
+  revisionId: string;
+  kind: DesignCommentKind;
+  viewport: string | null;
+  theme: DesignTheme | null;
+  x: number | null;
+  y: number | null;
+  selector: string | null;
+  body: string;
+  author: DesignUserRef | null;
+  /** D10: set once a revision lists it in `addressed`. */
+  addressedInRevisionId: string | null;
+  createdAt: string;
+}
+
+/** A design skill that is set but no longer installed (D15): skipped, shown as a warning. */
+export interface DesignSkillWarning {
+  skill: string;
+  message: string;
+}
+
+/** The design's state on a Planner task card (spec "UI"). */
+export interface TaskDesignSummary {
+  needed: boolean;
+  /** Whether the planner suggested it, and why (D2). */
+  suggested: boolean;
+  suggestionWhy: string | null;
+  variantCount: number;
+  status: TaskDesignStatus;
+  approvedRevisionId: string | null;
+}
+
+/** `GET /plans/:planId/tasks/:key/design` (plan reader). */
+export interface TaskDesignView extends TaskDesignSummary {
+  id: string;
+  planId: string;
+  taskKey: string;
+  skills: string[];
+  /** The profile version the latest revisions were drawn from. */
+  profileId: string | null;
+  approvedBy: DesignUserRef | null;
+  approvedAt: string | null;
+  /** Every revision of every variant, oldest first. */
+  revisions: DesignRevisionView[];
+  comments: DesignCommentView[];
+  warnings: DesignSkillWarning[];
+  /** The viewer's presets: the project's settings, or the defaults. */
+  viewports: ViewportPreset[];
+  /** A design turn queued or running. */
+  activeTurnId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** `PATCH /plans/:planId/tasks/:key/design` (operator). */
+export interface TaskDesignPatchRequest {
+  needed?: boolean;
+  variantCount?: number;
+  skills?: string[];
+}
+
+/** `POST /plans/:planId/tasks/:key/design/comments` (operator). */
+export interface DesignCommentRequest {
+  /** The revision in view; the comment records it (D10). */
+  revisionId: string;
+  kind: DesignCommentKind;
+  /** `screen` and `pin`. */
+  viewport?: string;
+  theme?: DesignTheme;
+  /** `pin` only, from the helper's `pin` message. */
+  x?: number;
+  y?: number;
+  selector?: string;
+  body: string;
+}
+
+/** `POST /plans/:planId/tasks/:key/design/approve` (operator): picks one variant (D4). */
+export interface DesignApproveRequest {
+  revisionId: string;
+}
+
+// Live
+
+/** Design writes push on the plan's channel, as the Planner's do (`PLANNER_LIVE_EVENT`). */
+export const DESIGN_LIVE_EVENT = 'design';
+
+export interface DesignLiveChange {
+  kind: 'design';
+  projectId: string;
+  planId: string;
+  taskKey: string | null;
+}
+
+// Errors
+
+/** Stable codes in the `error` field of a design route's error body. */
+export const DESIGN_ERROR = {
+  notFound: 'not_found',
+  forbidden: 'forbidden',
+  invalidArgs: 'invalid_args',
+  /** Approve of a task whose design is on and not approved (D1). */
+  designNotApproved: 'design_not_approved',
+  /** Generate, comment or revise on a task whose design is off. */
+  designOff: 'design_off',
+  /** A design turn or a profile build of this design is queued or running. */
+  designBusy: 'design_busy',
+  /** Revise with no open comment (D10). */
+  noOpenComments: 'no_open_comments',
+  /** The design is approved; it takes no more turns or comments. */
+  designApproved: 'design_approved',
+  /** The task is approved and frozen, or the plan is sent. */
+  taskFrozen: 'task_frozen',
+  profileBuildFailed: 'profile_build_failed',
+  contractViolation: 'contract_violation',
+  unsupportedRuntime: 'unsupported_runtime',
+  budgetExceeded: 'budget_exceeded',
+  commandUnavailable: 'command_unavailable',
+  commandFailed: 'command_failed',
+  runnerTimeout: 'runner_timeout',
+} as const;
+export type DesignErrorCode = (typeof DESIGN_ERROR)[keyof typeof DESIGN_ERROR];
+
+export interface DesignErrorBody {
+  statusCode: number;
+  error: DesignErrorCode;
+  message: string;
+}

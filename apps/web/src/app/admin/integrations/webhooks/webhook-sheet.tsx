@@ -12,7 +12,7 @@ import {
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
-import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Field, Select } from '@andrewbehma/glass-ui/field';
 import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
@@ -29,6 +29,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../../../lib/api';
 import { Time } from '../../../../lib/format/time';
 import { useLive } from '../../../../lib/live/use-live';
+import { useErrorToast } from '../../../../lib/section/use-error-toast';
 import {
   attemptErrorLabel,
   CIRCUIT_LABEL,
@@ -69,6 +70,7 @@ export function WebhookSheet({
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [status, setStatus] = useState<WebhookDeliveryStatus | ''>('');
   const [confirm, setConfirm] = useState<Confirm>();
+  const showError = useErrorToast();
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState<string>();
 
@@ -124,7 +126,7 @@ export function WebhookSheet({
       setDeliveries((current) => [...(current ?? []), ...page.items]);
       setNextCursor(page.nextCursor);
     } catch (err) {
-      toast.error(describeWebhooksError(err));
+      showError(describeWebhooksError(err));
     }
   };
 
@@ -133,7 +135,7 @@ export function WebhookSheet({
     try {
       await action();
     } catch (err) {
-      toast.error(describeWebhooksError(err));
+      showError(describeWebhooksError(err));
     } finally {
       setBusy(false);
     }
@@ -458,43 +460,21 @@ export function WebhookSheet({
         ) : null}
       </SheetRoot>
 
-      <DialogRoot
+      <ConfirmDialog
         open={confirm !== undefined}
-        onOpenChange={(open) => !open && !busy && setConfirm(undefined)}
-      >
-        <DialogContent
-          title={confirm === 'rotate' ? 'Rotate secret' : 'Delete webhook'}
-          description={
-            confirm === 'rotate'
-              ? 'A new secret is generated and shown once. Signing switches to it immediately — the old secret stops verifying.'
-              : 'The webhook and its delivery log are removed. This is audited.'
-          }
-          footer={
-            <>
-              <Button
-                variant="glass"
-                disabled={busy}
-                onClick={() => setConfirm(undefined)}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="danger"
-                disabled={busy}
-                onClick={confirm === 'rotate' ? rotate : remove}
-              >
-                {confirm === 'rotate' ? 'Rotate' : 'Delete'}
-              </Button>
-            </>
-          }
-        >
-          <p className="text-sm text-ink-2">
-            {confirm === 'delete'
-              ? 'This cannot be undone.'
-              : 'Update your receiver right after.'}
-          </p>
-        </DialogContent>
-      </DialogRoot>
+        onOpenChange={(open) => !open && setConfirm(undefined)}
+        title={
+          confirm === 'rotate' ? 'Rotate this secret?' : 'Delete this webhook?'
+        }
+        consequence={
+          confirm === 'rotate'
+            ? 'A new secret is generated and shown once. Signing switches to it immediately — the old secret stops verifying. Update your receiver right after.'
+            : 'The webhook and its delivery log are removed. This is audited and cannot be undone.'
+        }
+        verb={confirm === 'rotate' ? 'Rotate' : 'Delete'}
+        busy={busy}
+        onConfirm={confirm === 'rotate' ? rotate : remove}
+      />
     </>
   );
 }

@@ -181,6 +181,11 @@ Depends on <task key>      ← one line per dependency on another task of this p
 - A dependency on another task of this plan is written `Depends on <task key>`
   (`Depends on t2`); AgentDock rewrites it to the issue number when the plan is
   sent.
+- A task with an approved design gets a `## Design` section after `## UI`: the
+  path of the design file the turn gives you; what the mockup fixes (layout,
+  states, copy); what it does not — it is a picture, not code to copy, and the
+  worker builds it from the project's real components; and the decisions taken
+  in the design's comments.
 
 ### The parallel plan, for a feature large enough to split
 
@@ -229,6 +234,51 @@ Then write the plan under these rules:
 |---|---|---|
 | db/schema/schema.prisma | i<n>-schema | do not open it |
 ```
+
+## Suggesting a design (`decompose`, `grill`, `revise`)
+
+Every task you write in full carries a `design` suggestion: whether the person
+should see a mockup before the task is written, and why, in one line.
+
+- **Suggest one** when the task adds or changes something a person sees: a new
+  screen, a dialog, a changed layout, a new state of an existing component. A
+  bug whose fix changes what is on screen qualifies as much as a feature.
+- **Do not** for work with no visible surface — an API, a migration, a job, a
+  refactor — nor for a change so small the words already fix it (a label, a
+  colour token).
+- When the project's UI profile says it has no UI, `needed` is always `false`.
+- **Variants:** `1` when the layout is not in doubt; `2` or `3` only when there
+  are real layout choices the person should compare — and the `why` names
+  them. Every variant costs a turn.
+- A `grill` repeats `design` only when the conversation changed it.
+
+## Drawing a mockup (`design`)
+
+A design turn draws one variant of one task as a single self-contained HTML
+document. The turn gives you the task, the project's UI profile — its summary,
+its style kit and its component snippets — the design skills to apply, the
+variant number, and on a revise every open comment with its anchor.
+
+- **Look like the project.** Start from the style kit: include it in a
+  `<style>`, use its custom properties and its snippets' markup for every
+  component they cover. Invent a component only when the kit has none, and
+  build it from the kit's tokens.
+- **Draw the task, not the app.** Enough of the surrounding screen to place the
+  change, then the change itself with real-looking copy and data. Show the
+  states the task names — empty, loading, error, a long list — side by side or
+  behind a switch in the page.
+- **Both themes** when the profile has a dark theme: style through
+  `:root[data-theme="light"]` and `:root[data-theme="dark"]`; the viewer flips
+  the attribute.
+- **Responsive.** The viewer shows desktop and mobile widths; the layout holds
+  at both.
+- **Variants differ in layout**, not in colour. Say in `rationale` what this
+  variant chooses and what it gives up.
+- **On a revise**, answer every open comment you act on and list its id in
+  `addressed`. A pin's selector and point tell you the element. A comment you
+  disagree with stays open — say why in `rationale`.
+- Keep it small: a CDN script (Tailwind, a component library) is cheaper than
+  inlining it. The contract lists the hosts and the size limit.
 
 ## Never
 

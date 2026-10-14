@@ -113,6 +113,66 @@ describe('plan.publish_specs (D10)', () => {
     expect(existsSync(join(f.ws, '.wt-widget-plan-docs-abc12345'))).toBe(false);
   });
 
+  it('publishes approved .html designs next to the spec, byte for byte', async () => {
+    const { f, gh, args } = await setup();
+    const html =
+      '<!doctype html>\n<html><body><h1>Export — ünï</h1></body></html>\n';
+    await publishSpecs(
+      args({
+        files: [
+          { path: 'docs/specs/41-export.md', content: '# Export\n' },
+          { path: 'docs/specs/41-export/design/1.html', content: html },
+          { path: 'docs/specs/41-export/design/2.html', content: html },
+        ],
+      }),
+      f.deps(gh.exec),
+    );
+    const branch = 'docs/plan-abc12345';
+    expect(
+      (await f.run(f.origin, 'diff', '--name-only', `main..${branch}`)).split(
+        '\n',
+      ),
+    ).toEqual([
+      'docs/specs/41-export.md',
+      'docs/specs/41-export/design/1.html',
+      'docs/specs/41-export/design/2.html',
+    ]);
+    expect(
+      await f.run(
+        f.origin,
+        'show',
+        `${branch}:docs/specs/41-export/design/1.html`,
+      ),
+    ).toBe(html.trimEnd());
+  });
+
+  it('refuses a design file whose directory is a symlink out of specDir', async () => {
+    const { f, gh, args } = await setup();
+    const outside = join(f.ws, 'outside');
+    mkdirSync(outside);
+    mkdirSync(join(f.root, 'docs/specs/41-export'), { recursive: true });
+    symlinkSync(outside, join(f.root, 'docs/specs/41-export/design'));
+    await f.commitAll(f.root, 'design link');
+    await f.run(f.root, 'push', '-q', 'origin', 'main');
+
+    expect(
+      await codeOf(
+        publishSpecs(
+          args({
+            files: [
+              {
+                path: 'docs/specs/41-export/design/1.html',
+                content: '<html></html>',
+              },
+            ],
+          }),
+          f.deps(gh.exec),
+        ),
+      ),
+    ).toBe('path_not_allowed');
+    expect(existsSync(join(outside, '1.html'))).toBe(false);
+  });
+
   it('answers the open pull request a previous attempt opened, without pushing again', async () => {
     const { f, gh, args } = await setup();
     const calls: string[][] = [];

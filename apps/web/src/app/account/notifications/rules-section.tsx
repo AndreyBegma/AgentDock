@@ -4,12 +4,12 @@ import type {
   NotificationChannel,
   NotificationRulesView,
 } from '@agentdock/shared';
-import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
-import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
+import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
-import { api, describeError, describeErrorHint } from '../../../lib/api';
+import { AsyncSection } from '../../../components/prerequisites/async-section';
+import { api, describeErrorHint } from '../../../lib/api';
 import {
   type RuleRow,
   ruleRows,
@@ -58,62 +58,73 @@ export function RulesSection({ telegramLinked }: { telegramLinked: boolean }) {
 
   return (
     <Card pad="lg">
-      <h2 className="mb-1 text-lg font-bold">Rules</h2>
-      <p className="text-ink-2 mb-4 text-sm">
-        Choose which kinds reach you, and where.
-        {telegramLinked ? null : (
-          <> {LINK_TELEGRAM} above to turn on the Telegram column.</>
-        )}
-      </p>
-      {view === undefined ? (
-        rules.error !== null && !rules.loading ? (
-          <SectionUnavailable
-            title="Your notification rules could not be loaded"
-            stillWorks={`${describeError(rules.error)} Notifications keep arriving with the rules you saved before.`}
-            action={
-              <Button variant="glass" size="sm" onClick={rules.retry}>
-                Try again
-              </Button>
-            }
+      <SectionHeader
+        className="mb-4"
+        title="Rules"
+        description={
+          <>
+            Choose which kinds reach you, and where.
+            {telegramLinked ? null : (
+              <> {LINK_TELEGRAM} above to turn on the Telegram column.</>
+            )}
+          </>
+        }
+      />
+      <AsyncSection
+        section={rules}
+        unavailable={{
+          title: 'Your notification rules could not be loaded',
+          stillWorks:
+            'Notifications keep arriving with the rules you saved before.',
+        }}
+        isEmpty={() => false}
+        empty={null}
+        skeleton={<Skeleton className="h-40 w-full" />}
+      >
+        {() => (
+          <RuleSections
+            rows={rows}
+            onChange={(r, channel, value) => void change(r, channel, value)}
           />
-        ) : (
-          <Skeleton className="h-40 w-full" />
-        )
-      ) : (
-        <div className="flex flex-col gap-6">
-          {ruleSections(rows).map((section) => (
-            <section
-              key={section.group}
-              aria-labelledby={`rules-${section.group}`}
-            >
-              <div
-                className={`${RULE_GRID} items-end border-b border-line pb-2`}
-              >
-                <h3
-                  id={`rules-${section.group}`}
-                  className="text-sm font-semibold text-ink"
-                >
-                  {section.label}
-                </h3>
-                <span className="text-xs text-ink-3">In-app</span>
-                <span className="text-xs text-ink-3">Telegram</span>
-              </div>
-              <ul className="divide-y divide-line">
-                {section.rows.map((row) => (
-                  <RuleLine
-                    key={row.kind}
-                    row={row}
-                    onChange={(r, channel, value) =>
-                      void change(r, channel, value)
-                    }
-                  />
-                ))}
-              </ul>
-            </section>
-          ))}
-        </div>
-      )}
+        )}
+      </AsyncSection>
     </Card>
+  );
+}
+
+function RuleSections({
+  rows,
+  onChange,
+}: {
+  rows: RuleRow[];
+  onChange: (
+    row: RuleRow,
+    channel: NotificationChannel,
+    value: boolean,
+  ) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-6">
+      {ruleSections(rows).map((section) => (
+        <section key={section.group} aria-labelledby={`rules-${section.group}`}>
+          <div className={`${RULE_GRID} items-end border-b border-line pb-2`}>
+            <h3
+              id={`rules-${section.group}`}
+              className="text-sm font-semibold text-ink"
+            >
+              {section.label}
+            </h3>
+            <span className="text-xs text-ink-3">In-app</span>
+            <span className="text-xs text-ink-3">Telegram</span>
+          </div>
+          <ul className="divide-y divide-line">
+            {section.rows.map((row) => (
+              <RuleLine key={row.kind} row={row} onChange={onChange} />
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
   );
 }
 

@@ -69,7 +69,7 @@ function IntegrationCard({
       <div className="mt-auto pt-1">
         <Link
           href={href}
-          className={buttonClassName({ variant: 'solid', size: 'sm' })}
+          className={buttonClassName({ variant: 'glass', size: 'sm' })}
         >
           {status && notSetUp(status) ? `Set up ${title}` : `Manage ${title}`}
         </Link>

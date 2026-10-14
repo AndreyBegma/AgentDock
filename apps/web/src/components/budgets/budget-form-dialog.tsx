@@ -8,7 +8,6 @@ import {
   type BudgetView,
 } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
-import { Combobox } from '@andrewbehma/glass-ui/combobox';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
@@ -238,13 +237,18 @@ export function BudgetFormDialog({
           </Field>
 
           <Field label="Timezone" htmlFor="budget-timezone">
-            <Combobox
-              aria-label="Timezone"
-              options={zoneOptions}
-              value={form.timezone || null}
-              placeholder="Europe/Berlin"
-              onValueChange={(value) => set('timezone', value ?? '')}
-            />
+            <Select
+              id="budget-timezone"
+              value={form.timezone}
+              onChange={(e) => set('timezone', e.target.value)}
+            >
+              {form.timezone === '' ? <option value="">Choose…</option> : null}
+              {zoneOptions.map((zone) => (
+                <option key={zone.value} value={zone.value}>
+                  {zone.label}
+                </option>
+              ))}
+            </Select>
           </Field>
 
           <Field label="Limit (USD)" htmlFor="budget-limit">
@@ -252,7 +256,6 @@ export function BudgetFormDialog({
               id="budget-limit"
               inputMode="decimal"
               value={form.limit}
-              placeholder="10"
               onChange={(e) => set('limit', e.target.value)}
             />
           </Field>

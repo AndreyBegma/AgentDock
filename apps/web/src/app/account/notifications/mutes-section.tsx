@@ -5,7 +5,7 @@ import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { DateInput } from '@andrewbehma/glass-ui/date-input';
 import { Field, Select } from '@andrewbehma/glass-ui/field';
-import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
+import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import {
   Table,
@@ -15,8 +15,9 @@ import {
 } from '@andrewbehma/glass-ui/table';
 import Link from 'next/link';
 import { type FormEvent, useState } from 'react';
+import { AsyncSection } from '../../../components/prerequisites/async-section';
 import { DisabledReason } from '../../../components/prerequisites/disabled-reason';
-import { api, describeError, describeErrorHint } from '../../../lib/api';
+import { api, describeErrorHint } from '../../../lib/api';
 import { Time } from '../../../lib/format/time';
 import { fromDateInput, isFutureDay } from '../../../lib/notifications/format';
 import { useErrorToast } from '../../../lib/section/use-error-toast';
@@ -42,8 +43,9 @@ export function MutesSection() {
   const [busy, setBusy] = useState(false);
 
   const projects = section.data?.projects ?? [];
-  const mutes = section.data?.mutes;
-  const muted = new Set((mutes ?? []).map((mute) => mute.projectId));
+  const muted = new Set(
+    (section.data?.mutes ?? []).map((mute) => mute.projectId),
+  );
   const candidates = projects.filter((project) => !muted.has(project.id));
 
   const add = async (event: FormEvent) => {
@@ -95,11 +97,11 @@ export function MutesSection() {
 
   return (
     <Card pad="lg">
-      <h2 className="mb-1 text-lg font-bold">Muted projects</h2>
-      <p className="text-ink-2 mb-4 text-sm">
-        A muted project is still recorded here, but it does not count as unread
-        and is never sent to Telegram.
-      </p>
+      <SectionHeader
+        className="mb-4"
+        title="Muted projects"
+        description="A muted project is still recorded here, but it does not count as unread and is never sent to Telegram."
+      />
       <form onSubmit={add} className="mb-4 flex flex-col gap-2">
         <div className="flex flex-wrap items-end gap-3">
           <Field label="Project" htmlFor="mute-project">
@@ -128,82 +130,70 @@ export function MutesSection() {
               onChange={(e) => setUntil(e.target.value)}
             />
           </Field>
-          <Button type="submit" variant="solid" disabled={busy || !projectId}>
+          <Button type="submit" variant="glass" disabled={busy || !projectId}>
             Mute
           </Button>
         </div>
         {muteReason}
       </form>
-      {section.data === undefined ? (
-        section.error !== null && !section.loading ? (
-          <SectionUnavailable
-            title="Your muted projects could not be loaded"
-            stillWorks={`${describeError(section.error)} Nothing was unmuted.`}
-            action={
-              <Button variant="glass" size="sm" onClick={section.retry}>
-                Try again
-              </Button>
-            }
-          />
-        ) : (
-          <Skeleton className="h-16 w-full" />
-        )
-      ) : mutes === undefined || mutes.length === 0 ? (
-        <p className="text-ink-2 text-sm">
-          No project is muted. Mute a noisy one above;{' '}
-          <Link
-            href="/projects"
-            className="text-accent-ink underline underline-offset-2"
-          >
-            all projects
-          </Link>{' '}
-          are listed on Projects.
-        </p>
-      ) : (
-        <Table scroll>
-          <TableHead>
-            <TableRow>
-              <TableCell head>Project</TableCell>
-              <TableCell head>Until</TableCell>
-              <TableCell head>
-                <span className="sr-only">Actions</span>
-              </TableCell>
-            </TableRow>
-          </TableHead>
-          <tbody>
-            {mutes.map((mute) => (
-              <TableRow key={mute.projectId}>
-                <TableCell>{mute.projectName}</TableCell>
-                <TableCell>
-                  {mute.until ? (
-                    <Time value={mute.until} format="date" />
-                  ) : (
-                    'Until removed'
-                  )}
-                </TableCell>
-                <TableCell>
-                  <Button size="sm" onClick={() => void remove(mute)}>
-                    Unmute
-                  </Button>
+      <AsyncSection
+        section={section}
+        unavailable={{
+          title: 'Your muted projects could not be loaded',
+          stillWorks: 'Nothing was unmuted.',
+        }}
+        isEmpty={(loaded) => loaded.mutes.length === 0}
+        skeleton={<Skeleton className="h-16 w-full" />}
+        empty={
+          <p className="text-ink-2 text-sm">
+            No project is muted. Mute a noisy one above;{' '}
+            <Link
+              href="/projects"
+              className="text-accent-ink underline underline-offset-2"
+            >
+              all projects
+            </Link>{' '}
+            are listed on Projects.
+          </p>
+        }
+      >
+        {(loaded) => (
+          <Table scroll>
+            <TableHead>
+              <TableRow>
+                <TableCell head>Project</TableCell>
+                <TableCell head>Until</TableCell>
+                <TableCell head>
+                  <span className="sr-only">Actions</span>
                 </TableCell>
               </TableRow>
-            ))}
-          </tbody>
-        </Table>
-      )}
-      {section.data !== undefined && section.error !== null ? (
-        <div className="mt-3">
-          <SectionUnavailable
-            title="The list could not be refreshed"
-            stillWorks={describeError(section.error)}
-            action={
-              <Button variant="glass" size="sm" onClick={section.retry}>
-                Try again
-              </Button>
-            }
-          />
-        </div>
-      ) : null}
+            </TableHead>
+            <tbody>
+              {loaded.mutes.map((mute) => (
+                <TableRow key={mute.projectId}>
+                  <TableCell>{mute.projectName}</TableCell>
+                  <TableCell>
+                    {mute.until ? (
+                      <Time value={mute.until} format="date" />
+                    ) : (
+                      'Until removed'
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="glass"
+                      size="sm"
+                      onClick={() => void remove(mute)}
+                    >
+                      Unmute
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </tbody>
+          </Table>
+        )}
+      </AsyncSection>
     </Card>
   );
 }

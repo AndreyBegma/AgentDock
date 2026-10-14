@@ -7,6 +7,7 @@ import { plannerCommands } from './commands/planner';
 import { queueCommands } from './commands/queue';
 import { skillCommands } from './commands/skills';
 import { terminalCommands } from './commands/terminal';
+import { uiprofileCommands } from './commands/uiprofile';
 import { worktreeCommands } from './commands/worktree';
 import {
   SESSION_BACKFILL_TIMEOUT_MS,
@@ -134,6 +135,7 @@ export const commands = {
   ...terminalCommands,
   ...skillCommands,
   ...plannerCommands,
+  ...uiprofileCommands,
   ...worktreeCommands,
 } as const satisfies Record<string, CommandDefinition>;
 

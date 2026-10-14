@@ -3,6 +3,7 @@
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
 import {
   SegmentedControl,
@@ -26,38 +27,42 @@ export function FeedSection() {
 
   return (
     <Card pad="lg">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-bold">Notifications</h2>
-        <div className="flex items-center gap-3">
-          <SegmentedControl role="group" aria-label="Filter notifications">
-            {(['all', 'unread'] as const).map((value) => (
-              <SegmentedControlItem
-                key={value}
-                active={tab === value}
-                layoutId="notification-tab"
-              >
-                <button
-                  type="button"
-                  aria-pressed={tab === value}
-                  onClick={() => setTab(value)}
-                  className="relative w-full px-3 py-1 text-sm"
+      <SectionHeader
+        className="mb-4"
+        title="Notifications"
+        actions={
+          <div className="flex items-center gap-3">
+            <SegmentedControl role="group" aria-label="Filter notifications">
+              {(['all', 'unread'] as const).map((value) => (
+                <SegmentedControlItem
+                  key={value}
+                  active={tab === value}
+                  layoutId="notification-tab"
                 >
-                  {value === 'all'
-                    ? 'All'
-                    : `Unread${feed.unreadCount > 0 ? ` (${feed.unreadCount})` : ''}`}
-                </button>
-              </SegmentedControlItem>
-            ))}
-          </SegmentedControl>
-          <Button
-            size="sm"
-            disabled={feed.unreadCount === 0}
-            onClick={() => void feed.markAllRead()}
-          >
-            Mark all read
-          </Button>
-        </div>
-      </div>
+                  <button
+                    type="button"
+                    aria-pressed={tab === value}
+                    onClick={() => setTab(value)}
+                    className="relative w-full px-3 py-1 text-sm"
+                  >
+                    {value === 'all'
+                      ? 'All'
+                      : `Unread${feed.unreadCount > 0 ? ` (${feed.unreadCount})` : ''}`}
+                  </button>
+                </SegmentedControlItem>
+              ))}
+            </SegmentedControl>
+            <Button
+              variant="glass"
+              size="sm"
+              disabled={feed.unreadCount === 0}
+              onClick={() => void feed.markAllRead()}
+            >
+              Mark all read
+            </Button>
+          </div>
+        }
+      />
       {feed.failed ? (
         <div className="mb-3">
           <SectionUnavailable
@@ -108,7 +113,9 @@ export function FeedSection() {
       )}
       {feed.hasMore ? (
         <div className="mt-4 text-center">
-          <Button onClick={() => void feed.loadMore()}>Load more</Button>
+          <Button variant="glass" onClick={() => void feed.loadMore()}>
+            Load more
+          </Button>
         </div>
       ) : null}
     </Card>

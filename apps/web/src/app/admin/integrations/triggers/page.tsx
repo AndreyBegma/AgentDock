@@ -118,10 +118,7 @@ export default function AdminTriggersPage() {
         empty={
           <EmptyState
             title="URLs that start work from outside"
-            description="Create a trigger to let CI, a deploy hook or another system start a skill run or the next orchestrator round on a project."
-            action={
-              <Button onClick={() => setEditing('new')}>New trigger</Button>
-            }
+            description="Create a trigger to let CI, a deploy hook or another system start a skill run or the next orchestrator round on a project. New trigger is at the top of the page."
           />
         }
       >

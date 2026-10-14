@@ -5,8 +5,9 @@ import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
-import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import {
   Table,
@@ -30,6 +31,7 @@ import {
   ENCRYPTION_KEY_REMEDY,
   PUBLIC_URL_REMEDY,
 } from '../../../../lib/prerequisites/copy';
+import { useErrorToast } from '../../../../lib/section/use-error-toast';
 import { useSection } from '../../../../lib/section/use-section';
 import { ManualCard, RegisterCard } from './register-cards';
 
@@ -59,6 +61,7 @@ export default function GitHubAppPage() {
   const [callbackError, setCallbackError] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const showError = useErrorToast();
 
   // The API’s callback redirects here with `?registered=1` or `?error=<code>`.
   useEffect(() => {
@@ -82,7 +85,7 @@ export default function GitHubAppPage() {
       );
       load();
     } catch (err) {
-      toast.error(describeGitHubAppError(err));
+      showError(describeGitHubAppError(err));
     } finally {
       setBusy(false);
     }
@@ -96,7 +99,7 @@ export default function GitHubAppPage() {
       toast.success('GitHub App removed.');
       load();
     } catch (err) {
-      toast.error(describeGitHubAppError(err));
+      showError(describeGitHubAppError(err));
     } finally {
       setBusy(false);
     }
@@ -147,33 +150,15 @@ export default function GitHubAppPage() {
         }
       </AsyncSection>
 
-      <DialogRoot
+      <ConfirmDialog
         open={confirmDelete}
-        onOpenChange={(open) => {
-          if (!open) setConfirmDelete(false);
-        }}
-      >
-        <DialogContent
-          title="Remove the GitHub App?"
-          description="AgentDock forgets the App and its stored secrets, and runners go back to polling every 60 s. The App itself stays on GitHub — delete it there too."
-          footer={
-            <>
-              <Button variant="glass" onClick={() => setConfirmDelete(false)}>
-                Cancel
-              </Button>
-              <Button
-                variant="danger"
-                disabled={busy}
-                onClick={() => void remove()}
-              >
-                Remove
-              </Button>
-            </>
-          }
-        >
-          {null}
-        </DialogContent>
-      </DialogRoot>
+        onOpenChange={setConfirmDelete}
+        title="Remove the GitHub App?"
+        consequence="AgentDock forgets the App and its stored secrets, and runners go back to polling every 60 s. The App itself stays on GitHub — delete it there too."
+        verb="Remove"
+        busy={busy}
+        onConfirm={() => void remove()}
+      />
     </div>
   );
 }
@@ -255,11 +240,9 @@ function AppDetails({
               href={app.installUrl}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex"
+              className={buttonClassName({ variant: 'solid' })}
             >
-              <Button variant="solid" tabIndex={-1}>
-                Install on GitHub
-              </Button>
+              Install on GitHub
             </a>
             <Button variant="glass" disabled={busy} onClick={onResync}>
               Resync
@@ -314,7 +297,7 @@ function AppDetails({
         </dl>
       </Card>
 
-      <h2 className="text-lg font-bold">Installations</h2>
+      <SectionHeader title="Installations" />
       {app.installations.length === 0 ? (
         <EmptyState
           title="Not installed anywhere"
@@ -324,7 +307,7 @@ function AppDetails({
               href={app.installUrl}
               target="_blank"
               rel="noreferrer"
-              className={buttonClassName({ variant: 'solid', size: 'sm' })}
+              className={buttonClassName({ variant: 'glass', size: 'sm' })}
             >
               Install on GitHub
             </a>

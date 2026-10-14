@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 import {
   commands,
+  PLAN_DESIGN_FILE_MAX_BYTES,
+  PLAN_PUBLISH_DESIGNS_MAX,
+  PLAN_PUBLISH_SPECS_MAX,
   PLAN_QUEUE_ISSUES_MAX,
   PLAN_TURN_PROMPT_MAX_BYTES,
   planCancelArgsSchema,
@@ -219,6 +222,64 @@ describe('plan.publish_specs', () => {
     ).toBe(true);
     expect(pathError({ ...publish, branch: 'main' })).toBe(true);
     expect(pathError({ ...publish, files: [] })).toBe(true);
+  });
+
+  it('accepts design files in a design/ directory, and the docs/design fallback (spec 223 D16)', () => {
+    expect(
+      pathError({
+        ...publish,
+        files: [
+          ...publish.files,
+          { path: 'docs/specs/201-facts/design/2.html', content: '<html>' },
+        ],
+      }),
+    ).toBe(false);
+    expect(
+      pathError({
+        ...publish,
+        specDir: 'docs',
+        files: [{ path: 'docs/design/201-facts/1.html', content: '<html>' }],
+      }),
+    ).toBe(false);
+  });
+
+  it('refuses a design file outside design/, over 192 KiB, or more than 12 of a kind', () => {
+    expect(
+      pathError({
+        ...publish,
+        files: [{ path: 'docs/specs/201-facts.html', content: '<html>' }],
+      }),
+    ).toBe(true);
+    expect(
+      pathError({
+        ...publish,
+        files: [
+          {
+            path: 'docs/specs/201-facts/design/1.html',
+            content: 'x'.repeat(PLAN_DESIGN_FILE_MAX_BYTES + 1),
+          },
+        ],
+      }),
+    ).toBe(true);
+    const designs = Array.from(
+      { length: PLAN_PUBLISH_DESIGNS_MAX + 1 },
+      (_, i) => ({ path: `docs/specs/${i}-x/design/1.html`, content: 'x' }),
+    );
+    expect(pathError({ ...publish, files: designs })).toBe(true);
+    const specs = Array.from(
+      { length: PLAN_PUBLISH_SPECS_MAX + 1 },
+      (_, i) => ({
+        path: `docs/specs/${i}-x.md`,
+        content: 'x',
+      }),
+    );
+    expect(pathError({ ...publish, files: specs })).toBe(true);
+    expect(
+      pathError({
+        ...publish,
+        files: [...specs.slice(1), ...designs.slice(1)],
+      }),
+    ).toBe(false);
   });
 
   it('names the docs branch from the plan short id', () => {

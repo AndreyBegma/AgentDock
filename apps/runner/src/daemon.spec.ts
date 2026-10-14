@@ -168,6 +168,37 @@ describe('daemon — OTLP receiver (spec 13)', () => {
     await done;
   });
 
+  it('serves the uiprofile.* commands (spec 223): a fingerprint of an unwatched root is refused', async () => {
+    const { controller, done, live } = start({
+      enabled: false,
+      grpc: null,
+      http: 0,
+    });
+    await live();
+    server.send({
+      type: 'command',
+      id: 'cmd_uip_fp',
+      name: 'uiprofile.fingerprint',
+      args: {
+        projectId: 'prj_fixture',
+        root: '/not/watched',
+        base: 'main',
+        globs: ['src/**'],
+      },
+    });
+    const [result] = (await server.waitFor(
+      'command.result',
+    )) as CommandResultMessage[];
+    // Served (not `unknown_command` or `unsupported`) and confined to watched projects.
+    expect(result).toMatchObject({
+      id: 'cmd_uip_fp',
+      ok: false,
+      error: { code: 'path_not_allowed' },
+    });
+    controller.abort();
+    await done;
+  });
+
   it('runs without the receiver when its port is taken', async () => {
     const taken = Bun.serve({
       hostname: '127.0.0.1',

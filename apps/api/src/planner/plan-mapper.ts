@@ -93,6 +93,7 @@ export const roundsOf = (
           : [],
       );
     case 'write':
+    case 'design':
       return [];
   }
 };
@@ -143,6 +144,8 @@ export const toTaskView = (
     frozen: row.frozen,
     issue,
     queuedAt: row.queuedAt?.toISOString() ?? null,
+    // Filled from `task_designs` by the design flow (spec 223, slot i223-api).
+    design: null,
   };
 };
 

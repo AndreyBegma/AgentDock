@@ -5,16 +5,14 @@ import {
   BUDGET_SCOPES,
   BUDGET_STATES,
   type BudgetRecomputeResult,
-  type BudgetScope,
-  type BudgetState,
   type BudgetView,
   type ProjectSummary,
 } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
-import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
-import { Field, Select } from '@andrewbehma/glass-ui/field';
+import { Select } from '@andrewbehma/glass-ui/field';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import {
   Table,
@@ -23,13 +21,19 @@ import {
   TableRow,
 } from '@andrewbehma/glass-ui/table';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import { Toolbar } from '@andrewbehma/glass-ui/toolbar';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { BudgetFormDialog } from '../../../components/budgets/budget-form-dialog';
 import { OverrideDialog } from '../../../components/budgets/override-dialog';
 import { PageHeader } from '../../../components/page-header/page-header';
 import { AsyncSection } from '../../../components/prerequisites/async-section';
 import { api } from '../../../lib/api';
+import {
+  BUDGET_CHIP_DEFS,
+  BUDGET_FILTER_CODEC,
+  budgetFiltersSearch,
+} from '../../../lib/budgets/filters';
 import {
   ACTION_LABEL,
   budgetTone,
@@ -44,24 +48,26 @@ import {
   scopeName,
   unpricedHint,
 } from '../../../lib/budgets/format';
+import {
+  useFilterChips,
+  useUrlFilters,
+} from '../../../lib/filters/use-url-filters';
+import { useErrorToast } from '../../../lib/section/use-error-toast';
 import { useSection } from '../../../lib/section/use-section';
 
 /** The page polls; the budget tab is the one that listens to live events. */
 const POLL_MS = 15_000;
 
-const query = (scope: BudgetScope | '', state: BudgetState | ''): string => {
-  const params = new URLSearchParams();
-  if (scope) params.set('scope', scope);
-  if (state) params.set('state', state);
-  const text = params.toString();
-  return text ? `?${text}` : '';
-};
-
-export default function AdminBudgetsPage() {
-  const [scope, setScope] = useState<BudgetScope | ''>('');
-  const [state, setState] = useState<BudgetState | ''>('');
+function AdminBudgets() {
+  const url = useUrlFilters(BUDGET_FILTER_CODEC);
+  const { scope, state } = url.filters;
+  const chips = useFilterChips(url, BUDGET_CHIP_DEFS);
+  const showError = useErrorToast();
   const budgets = useSection(
-    () => api<BudgetView[]>(`/admin/budgets${query(scope, state)}`),
+    () =>
+      api<BudgetView[]>(
+        `/admin/budgets${budgetFiltersSearch({ scope, state })}`,
+      ),
     [scope, state],
   );
   const load = budgets.retry;
@@ -110,7 +116,7 @@ export default function AdminBudgetsPage() {
       toast.success(done);
       load();
     } catch (err) {
-      toast.error(describeBudgetsError(err));
+      showError(describeBudgetsError(err));
     } finally {
       setBusyId(null);
     }
@@ -146,7 +152,7 @@ export default function AdminBudgetsPage() {
       );
       load();
     } catch (err) {
-      toast.error(describeBudgetsError(err));
+      showError(describeBudgetsError(err));
     } finally {
       setRecomputing(false);
     }
@@ -165,8 +171,8 @@ export default function AdminBudgetsPage() {
             : 'A stop budget refuses new orchestrator starts and skill runs once used up; running workers are never stopped.'
         }
         actions={
-          noBudgets ? null : (
-            <>
+          <>
+            {noBudgets ? null : (
               <Button
                 variant="glass"
                 disabled={recomputing}
@@ -174,46 +180,60 @@ export default function AdminBudgetsPage() {
               >
                 {recomputing ? 'Recomputing…' : 'Recompute totals'}
               </Button>
-              <Button onClick={() => setEditing('new')}>New budget</Button>
-            </>
-          )
+            )}
+            <Button onClick={() => setEditing('new')}>New budget</Button>
+          </>
         }
       />
       {noBudgets ? null : (
-        <div className="flex flex-wrap items-end gap-3">
-          <Field label="Scope" htmlFor="budgets-scope">
-            <Select
-              id="budgets-scope"
-              value={scope}
-              onChange={(e) =>
-                setScope(BUDGET_SCOPES.find((s) => s === e.target.value) ?? '')
-              }
-            >
-              <option value="">All</option>
-              {BUDGET_SCOPES.map((s) => (
-                <option key={s} value={s}>
-                  {SCOPE_LABEL[s]}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="State" htmlFor="budgets-state">
-            <Select
-              id="budgets-state"
-              value={state}
-              onChange={(e) =>
-                setState(BUDGET_STATES.find((s) => s === e.target.value) ?? '')
-              }
-            >
-              <option value="">Any</option>
-              {BUDGET_STATES.map((s) => (
-                <option key={s} value={s}>
-                  {STATE_LABEL[s]}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <p className="max-w-prose pb-2 text-xs text-ink-3">
+        <div className="flex flex-col gap-2">
+          <Toolbar
+            aria-label="Filter budgets"
+            collapseBelow="sm"
+            activeFilters={chips.activeFilters}
+            onClearAll={chips.onClearAll}
+            filters={
+              <>
+                <Select
+                  aria-label="Scope"
+                  value={scope}
+                  className="w-full sm:w-44"
+                  onChange={(e) =>
+                    url.set({
+                      scope:
+                        BUDGET_SCOPES.find((s) => s === e.target.value) ?? '',
+                    })
+                  }
+                >
+                  <option value="">All scopes</option>
+                  {BUDGET_SCOPES.map((s) => (
+                    <option key={s} value={s}>
+                      {SCOPE_LABEL[s]}
+                    </option>
+                  ))}
+                </Select>
+                <Select
+                  aria-label="State"
+                  value={state}
+                  className="w-full sm:w-44"
+                  onChange={(e) =>
+                    url.set({
+                      state:
+                        BUDGET_STATES.find((s) => s === e.target.value) ?? '',
+                    })
+                  }
+                >
+                  <option value="">Any state</option>
+                  {BUDGET_STATES.map((s) => (
+                    <option key={s} value={s}>
+                      {STATE_LABEL[s]}
+                    </option>
+                  ))}
+                </Select>
+              </>
+            }
+          />
+          <p className="max-w-prose text-xs text-ink-3">
             Recompute totals adds up spend again from stored costs — run it
             after{' '}
             <Link
@@ -242,10 +262,7 @@ export default function AdminBudgetsPage() {
               action={
                 <Button
                   variant="glass"
-                  onClick={() => {
-                    setScope('');
-                    setState('');
-                  }}
+                  onClick={() => url.replace({ scope: '', state: '' })}
                 >
                   Clear filters
                 </Button>
@@ -254,10 +271,7 @@ export default function AdminBudgetsPage() {
           ) : (
             <EmptyState
               title="No budgets yet"
-              description="Cap what a project or a person may spend per day, week or month."
-              action={
-                <Button onClick={() => setEditing('new')}>New budget</Button>
-              }
+              description="Cap what a project or a person may spend per day, week or month. New budget is at the top of the page."
             />
           )
         }
@@ -401,35 +415,29 @@ export default function AdminBudgetsPage() {
         }}
       />
 
-      <DialogRoot
+      <ConfirmDialog
         open={deleting !== undefined}
-        onOpenChange={(open) => !open && setDeleting(undefined)}
-      >
-        <DialogContent
-          title="Delete budget"
-          description={
-            deleting
-              ? `The ${PERIOD_LABEL[deleting.period].toLowerCase()} budget of ${scopeName(deleting)} and its history are removed, and starts it refused are allowed again. This is audited.`
-              : undefined
-          }
-          footer={
-            <>
-              <Button variant="glass" onClick={() => setDeleting(undefined)}>
-                Cancel
-              </Button>
-              <Button
-                variant="danger"
-                disabled={busyId !== null}
-                onClick={remove}
-              >
-                Delete
-              </Button>
-            </>
-          }
-        >
-          <p className="text-sm text-ink-2">This cannot be undone.</p>
-        </DialogContent>
-      </DialogRoot>
+        onOpenChange={(open) => {
+          if (!open) setDeleting(undefined);
+        }}
+        title="Delete this budget?"
+        consequence={
+          deleting
+            ? `The ${PERIOD_LABEL[deleting.period].toLowerCase()} budget of ${scopeName(deleting)} and its history are removed, and starts it refused are allowed again. This is audited and cannot be undone.`
+            : undefined
+        }
+        verb="Delete"
+        busy={busyId !== null}
+        onConfirm={remove}
+      />
     </div>
+  );
+}
+
+export default function AdminBudgetsPage() {
+  return (
+    <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+      <AdminBudgets />
+    </Suspense>
   );
 }

@@ -1,3 +1,4 @@
+import type { TaskDesignSummary } from '../design/contracts';
 import type {
   PlanAnswer,
   PlanMode,
@@ -116,6 +117,8 @@ export interface PlanTaskView {
   frozen: boolean;
   issue: PlanTaskIssueView | null;
   queuedAt: string | null;
+  /** Spec 223: the task's design; null while no design row exists (off, never suggested). */
+  design: TaskDesignSummary | null;
 }
 
 /** The turn that produced a plan version: the decompose for 1, a revise after. */
@@ -294,6 +297,8 @@ export const PLANNER_ERROR = {
   turnNotFailed: 'turn_not_failed',
   /** `approve` while a blocking question is open (D6). */
   needsTalk: 'needs_talk',
+  /** `approve` while the task's design is on and not approved (spec 223 D1). */
+  designNotApproved: 'design_not_approved',
   /** Send found a cycle in `dependsOn`; the message names the tasks (D8). */
   dependencyCycle: 'dependency_cycle',
   /** Send with no approved task, or with a task in `needs_talk` (D8). */

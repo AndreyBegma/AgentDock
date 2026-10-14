@@ -3,7 +3,7 @@
 import type { PriceTestRequest, PriceTestResponse } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Field, Input } from '@andrewbehma/glass-ui/field';
-import { toast } from '@andrewbehma/glass-ui/toast';
+import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { type FormEvent, useState } from 'react';
 import { DisabledReason } from '../../../components/prerequisites/disabled-reason';
 import { api } from '../../../lib/api';
@@ -12,6 +12,7 @@ import {
   NO_VERSION_REASON,
   TEST_BUCKETS,
 } from '../../../lib/prices/format';
+import { useErrorToast } from '../../../lib/section/use-error-toast';
 import { describeUsageError, formatUsd } from '../../../lib/usage/format';
 
 /** Which price and tier the current version applies to a model id, and its cost. */
@@ -20,6 +21,7 @@ export function TestCalculator({ hasVersion }: { hasVersion: boolean }) {
   const [tokens, setTokens] = useState<Record<string, string>>({});
   const [result, setResult] = useState<PriceTestResponse>();
   const [busy, setBusy] = useState(false);
+  const showError = useErrorToast();
 
   const run = async (event: FormEvent) => {
     event.preventDefault();
@@ -29,7 +31,7 @@ export function TestCalculator({ hasVersion }: { hasVersion: boolean }) {
       if (!text) continue;
       const value = Number(text);
       if (!Number.isInteger(value) || value < 0) {
-        toast.error(
+        showError(
           `${BUCKET_LABEL[bucket]} tokens must be a whole number, 0 or more.`,
         );
         return;
@@ -45,7 +47,7 @@ export function TestCalculator({ hasVersion }: { hasVersion: boolean }) {
         }),
       );
     } catch (err) {
-      toast.error(describeUsageError(err));
+      showError(describeUsageError(err));
     } finally {
       setBusy(false);
     }
@@ -59,13 +61,12 @@ export function TestCalculator({ hasVersion }: { hasVersion: boolean }) {
 
   return (
     <section aria-labelledby="prices-test" className="mb-8">
-      <h2 id="prices-test" className="mb-1 text-sm font-medium">
-        Test calculator
-      </h2>
-      <p className="mb-3 text-xs text-ink-3">
-        Which price and tier the <em>current</em> version applies to a model id,
-        and what it costs. Save a draft as a new version to test its patterns.
-      </p>
+      <SectionHeader
+        className="mb-3"
+        headingId="prices-test"
+        title="Test calculator"
+        description="Which price and tier the current version applies to a model id, and what it costs. Save a draft as a new version to test its patterns."
+      />
       <form
         onSubmit={run}
         className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-4"

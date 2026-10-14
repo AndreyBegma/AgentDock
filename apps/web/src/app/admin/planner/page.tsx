@@ -4,11 +4,38 @@ import type {
   PlannerInstructionsUpdateRequest,
   PlannerInstructionsView,
 } from '@agentdock/shared';
+import { buttonClassName } from '@andrewbehma/glass-ui/button';
+import { ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { PageHeader } from '../../../components/page-header/page-header';
 import { AsyncSection } from '../../../components/prerequisites/async-section';
 import { api } from '../../../lib/api';
 import { useSection } from '../../../lib/section/use-section';
 import { InstructionsEditor } from './instructions-editor';
+
+/**
+ * A way back on a phone, where the top bar has no parent to offer for an
+ * admin page: one step back in the history, else Overview.
+ */
+function BackLink() {
+  const router = useRouter();
+  return (
+    <Link
+      href="/"
+      className={`${buttonClassName({ variant: 'ghost', size: 'sm' })} -ml-2 self-start lg:hidden`}
+      onClick={(event) => {
+        if (window.history.length > 1) {
+          event.preventDefault();
+          router.back();
+        }
+      }}
+    >
+      <ArrowLeft size={14} aria-hidden="true" />
+      Back
+    </Link>
+  );
+}
 
 export default function AdminPlannerPage() {
   const instructions = useSection(
@@ -27,6 +54,7 @@ export default function AdminPlannerPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <BackLink />
       <PageHeader
         className="mb-0"
         eyebrow="Admin"

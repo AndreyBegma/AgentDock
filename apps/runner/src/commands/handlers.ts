@@ -19,6 +19,7 @@ import type { PlannerHandlers } from '../planner';
 import type { ProjectFs } from '../projects/fs';
 import { inspectProject, refreshProject } from '../projects/inspect';
 import type { SkillHandlers } from '../skills';
+import type { UiProfileHandlers } from '../uiprofile';
 import {
   prApprove,
   prRequestChanges,
@@ -61,6 +62,8 @@ export interface HandlerContext {
   skills?: SkillHandlers;
   /** The planner (spec 172); absent means this runner does not serve plans. */
   planner?: PlannerHandlers;
+  /** UI profiles (spec 223); absent means this runner does not build them. */
+  uiprofile?: UiProfileHandlers;
 }
 
 const noSkills = (): never => {
@@ -69,6 +72,13 @@ const noSkills = (): never => {
 
 const noPlanner = (): never => {
   throw new CommandFailure('unsupported', 'this runner does not serve plans');
+};
+
+const noUiProfile = (): never => {
+  throw new CommandFailure(
+    'unsupported',
+    'this runner does not serve UI profiles',
+  );
 };
 
 /** One handler per allowlisted command; each later command adds its own here. */
@@ -152,6 +162,10 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
       context.planner?.['plan.publish_specs'](args) ?? noPlanner(),
     'plan.queue_issues': (args) =>
       context.planner?.['plan.queue_issues'](args) ?? noPlanner(),
+    'uiprofile.build': (args) =>
+      context.uiprofile?.['uiprofile.build'](args) ?? noUiProfile(),
+    'uiprofile.fingerprint': (args) =>
+      context.uiprofile?.['uiprofile.fingerprint'](args) ?? noUiProfile(),
     'worktree.status': (args) =>
       worktreeStatus(args, {
         exec: context.exec,

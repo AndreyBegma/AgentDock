@@ -1,6 +1,7 @@
 import {
   type ClarifyOutput,
   type DecomposeOutput,
+  type DesignOutput,
   type GrillOutput,
   type PlannerParseResult,
   type PlanTurnAction,
@@ -229,6 +230,16 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
   ): Promise<PlannerParseResult<PlanTurnAction>> {
     const body = text ?? '';
     switch (action) {
+      // Placeholder until the design flow lands (spec 223, slot i223-api).
+      case 'design':
+        return {
+          ok: false,
+          error: {
+            code: 'contract_violation',
+            reason: 'action_mismatch',
+            message: 'design turns are not handled yet',
+          },
+        };
       case 'clarify':
       case 'decompose':
         return parsePlannerOutput(body, action);
@@ -265,8 +276,12 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
       | DecomposeOutput
       | GrillOutput
       | WriteOutput
-      | ReviseOutput,
+      | ReviseOutput
+      | DesignOutput,
   ): Promise<Chain | null> {
+    // Placeholder until the design flow lands (spec 223, slot i223-api):
+    // `parse` refuses design turns, so none reaches here.
+    if (output.action === 'design') return null;
     // The turn may have been started on an older row; read the plan now.
     const plan = await tx.plan.findUniqueOrThrow({ where: { id: planRow.id } });
     switch (output.action) {

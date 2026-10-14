@@ -30,9 +30,17 @@ export const PLAN_TURN_MIN_TIMEOUT_SEC = 60;
 export const PLAN_TURN_MAX_TIMEOUT_SEC = 7200;
 /** `plan.queue_issues`: issues labelled in one command. */
 export const PLAN_QUEUE_ISSUES_MAX = 50;
-/** `plan.publish_specs`: one file per feature task, and a plan has at most 12. */
-export const PLAN_PUBLISH_FILES_MAX = 12;
+/**
+ * `plan.publish_specs`: one spec per feature task and one design per task
+ * with an approved design (spec 223 D16) — a plan has at most 12 tasks.
+ */
+export const PLAN_PUBLISH_SPECS_MAX = 12;
+export const PLAN_PUBLISH_DESIGNS_MAX = 12;
+export const PLAN_PUBLISH_FILES_MAX =
+  PLAN_PUBLISH_SPECS_MAX + PLAN_PUBLISH_DESIGNS_MAX;
 export const PLAN_SPEC_FILE_MAX_BYTES = 256 * 1024;
+/** Spec 223 "Protocol": an approved mockup, without the pin helper. */
+export const PLAN_DESIGN_FILE_MAX_BYTES = 192 * 1024;
 export const PLAN_PR_BODY_MAX_BYTES = 64 * 1024;
 
 /** Per-command timeouts. A turn returns once queued; publish commits, pushes and opens a PR. */
@@ -104,7 +112,12 @@ export const repoRelativeDirSchema = z
     { message: 'must be a relative path without "." or ".." segments' },
   );
 
-/** D10: `<specDir>/<issue>-<slug>.md`, as the runner writes it. */
+/**
+ * D10: `<specDir>/<issue>-<slug>.md`, as the runner writes it; and spec 223
+ * D16: a design, `<specDir>/<issue>-<slug>/design/<variant>.html` — or
+ * `docs/design/<issue>-<slug>/<variant>.html` for a project without a
+ * `specDir`, published with `specDir: "docs"`.
+ */
 export const planSpecFilePathSchema = z
   .string()
   .min(1)
@@ -118,7 +131,19 @@ export const planSpecFilePathSchema = z
       p.split('/').every((seg) => seg !== '' && seg !== '.'),
     { message: 'must be a relative path without "." or ".." segments' },
   )
-  .refine((p) => p.endsWith('.md'), { message: 'must be a .md file' });
+  .refine((p) => p.endsWith('.md') || p.endsWith('.html'), {
+    message: 'must be a .md or .html file',
+  });
+
+/** A design file: `.html` with a `design` directory between `specDir` and the file. */
+export const isPlanDesignFilePath = (specDir: string, path: string): boolean =>
+  path.endsWith('.html') &&
+  path.startsWith(`${specDir}/`) &&
+  path
+    .slice(specDir.length + 1)
+    .split('/')
+    .slice(0, -1)
+    .includes('design');
 
 /** D10: the docs pull request's branch, one per plan. */
 export const planDocsBranchSchema = z
@@ -183,16 +208,28 @@ export type PlanCloseResult = z.infer<typeof planCloseResultSchema>;
 
 // plan.publish_specs
 
-export const planSpecFileSchema = z.strictObject({
-  path: planSpecFilePathSchema,
-  content: maxBytes(PLAN_SPEC_FILE_MAX_BYTES),
-});
+export const planSpecFileSchema = z
+  .strictObject({
+    path: planSpecFilePathSchema,
+    content: maxBytes(PLAN_SPEC_FILE_MAX_BYTES),
+  })
+  .refine(
+    (f) =>
+      !f.path.endsWith('.html') ||
+      utf8Bytes(f.content) <= PLAN_DESIGN_FILE_MAX_BYTES,
+    {
+      message: `a design file must be at most ${PLAN_DESIGN_FILE_MAX_BYTES} bytes`,
+      path: ['content'],
+    },
+  );
 export type PlanSpecFile = z.infer<typeof planSpecFileSchema>;
 
 /**
  * D10: one docs pull request with exactly `files`, committed without
  * trailers. Every file sits under `specDir` (the project's, repeated here so
- * the schema can hold it), and no two files share a path.
+ * the schema can hold it), and no two files share a path. Spec 223 D16: up to
+ * `PLAN_PUBLISH_SPECS_MAX` `.md` specs and `PLAN_PUBLISH_DESIGNS_MAX` `.html`
+ * designs, each design under a `design/` directory.
  */
 export const planPublishSpecsArgsSchema = z
   .strictObject({
@@ -224,7 +261,32 @@ export const planPublishSpecsArgsSchema = z
         });
       }
       seen.add(f.path);
+      if (
+        f.path.endsWith('.html') &&
+        !isPlanDesignFilePath(a.specDir, f.path)
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['files', i, 'path'],
+          message: `a design file must sit in a design/ directory under ${a.specDir}/`,
+        });
+      }
     });
+    const designs = a.files.filter((f) => f.path.endsWith('.html')).length;
+    if (designs > PLAN_PUBLISH_DESIGNS_MAX) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['files'],
+        message: `at most ${PLAN_PUBLISH_DESIGNS_MAX} design files`,
+      });
+    }
+    if (a.files.length - designs > PLAN_PUBLISH_SPECS_MAX) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['files'],
+        message: `at most ${PLAN_PUBLISH_SPECS_MAX} spec files`,
+      });
+    }
   });
 export type PlanPublishSpecsArgs = z.infer<typeof planPublishSpecsArgsSchema>;
 
