@@ -121,6 +121,8 @@ export const toProjectDetail = (
   createdAt: project.createdAt.toISOString(),
   updatedAt: project.updatedAt.toISOString(),
   docsSource: project.docsSource ? toDocsSourceView(project.docsSource) : null,
+  // Read from the runner's capabilities by i233-api (#233); unknown until then.
+  runnerCommands: null,
 });
 
 export const toMemberView = (

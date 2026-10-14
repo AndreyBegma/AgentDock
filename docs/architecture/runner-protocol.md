@@ -111,7 +111,20 @@ still connects.
     ],
     "codeSentinel": { "version": "1.23.0", "path": "~/.claude-profiles/blacktoorroot/plugins/code-sentinel" },
     "otlp": { "grpc": 4317, "http": 4318 },
-    "terminal": true
+    "terminal": true,
+    "commands": [
+      "collector.poll", "issue.create", "issues.refresh",
+      "orchestrator.message", "orchestrator.start", "orchestrator.status", "orchestrator.stop",
+      "plan.cancel", "plan.close", "plan.turn",
+      "pr.approve", "pr.inspect", "pr.requestChanges", "pr.voidApproval",
+      "project.inspect", "project.refresh",
+      "runner.describe", "runner.ping", "session.backfill",
+      "skill.cancel", "skill.inspect", "skill.install", "skill.list",
+      "skill.run", "skill.search", "skill.uninstall",
+      "slot.message", "slot.stop", "terminal.attach",
+      "uiprofile.build", "uiprofile.fingerprint", "worktree.status"
+    ],
+    "disabledCommands": ["pr.approve"]
   }
 }
 ```
@@ -119,7 +132,19 @@ still connects.
 `terminal` says whether the runner serves `terminal.attach`: it has Bun's PTY
 API (Bun ≥ 1.3.5, POSIX), tmux ≥ 3.2, and the command is not in
 `disabledCommands`. An absent `terminal` means `false`, because a runner older
-than the feature never sends it; read it with `terminalAvailable()`.
+than the feature never sends it; read it with `terminalAvailable()`. It stays
+the machine fact even with `commands` below: `terminal.attach` can be served by
+the build and still have no PTY or tmux to run on.
+
+`commands` lists every command the runner build serves — its handler keys,
+sorted — and `disabledCommands` the subset its config switches off (#233,
+ADR-0023). Both are plain strings, not an enum of the allowlist: a runner newer
+than the API serves names the API does not know, and an enum would fail its
+whole hello. **An absent `commands` means unknown, never none** — a runner
+older than the field. An absent `disabledCommands` means none. Read them with
+`runnerCommandsOf()` and decide per command with `commandSupport()` /
+`commandsSupport()`: a feature checks the commands it needs, never the runner
+version. `protocolVersion` stays `1`; the fields are additive and optional.
 
 A profile is runtime + optional `binary` (the runtime's own name when absent) +
 `env` + `args` + `authenticated` (ADR-0006).

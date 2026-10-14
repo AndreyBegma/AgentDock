@@ -26,3 +26,4 @@ Numbered, never rewritten. A changed decision gets a new ADR that supersedes the
 | [0020](0020-claude-code-integration-through-the-runner.md) | Claude Code integration — hooks observe, MCP acts, both through the runner (amends ADR-0010) |
 | [0021](0021-session-content-is-opt-in-per-project.md) | Session content is opt-in per project (amends spec 12 D9) |
 | [0022](0022-design-stage-html-mockups-from-a-ui-profile.md) | The design stage draws HTML mockups from a cached UI profile — no external design tool, no dev server |
+| [0023](0023-runners-advertise-their-commands.md) | Runners advertise their commands; features check commands, never versions |
