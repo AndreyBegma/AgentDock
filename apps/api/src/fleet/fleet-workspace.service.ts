@@ -10,6 +10,7 @@ import {
 import {
   gitRefSchema,
   type Role,
+  RUNNER_FEATURE_COMMANDS,
   slotMessageSeenDataSchema,
   slotNameSchema,
 } from '@agentdock/shared/protocol';
@@ -260,6 +261,18 @@ export class FleetWorkspaceService {
         409,
         FLEET_ERROR.runnerOffline,
         'The runner is not connected',
+      );
+    }
+    if (
+      this.presence.missingCommand(
+        project.runnerId,
+        RUNNER_FEATURE_COMMANDS.worktree,
+      )
+    ) {
+      throw fleetError(
+        409,
+        FLEET_ERROR.runnerOutdated,
+        'The runner does not serve worktree.status; update it',
       );
     }
     const base = gitRefSchema.safeParse(

@@ -5,6 +5,7 @@ import {
   RUNNER_CLOSE_CODES,
   RUNNER_SOCKET_PATH,
   type RunnerMessage,
+  runnerCommandsOf,
   runnerMessageSchema,
 } from '@agentdock/shared/protocol';
 import { Inject, Logger } from '@nestjs/common';
@@ -200,7 +201,12 @@ class RunnerSocket {
       return;
     }
     clearTimeout(this.helloTimer);
-    const live = new LiveConnection(runnerId, this.socket, Date.now());
+    const live = new LiveConnection(
+      runnerId,
+      this.socket,
+      Date.now(),
+      runnerCommandsOf(hello.capabilities),
+    );
     this.live = live;
     // Attached and welcomed in one step, queued with the watch-list pushes:
     // a project connected meanwhile is either in this list or pushed as

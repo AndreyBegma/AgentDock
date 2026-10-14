@@ -24,6 +24,7 @@ import {
 } from '../runners/runner-options';
 import {
   adminSession,
+  capabilities,
   hello,
   pairedRunner,
   type RunnerE2eContext,
@@ -169,10 +170,10 @@ describe('agent workspace routes (e2e)', () => {
     return login(ctx, email);
   };
 
-  const runner = async () => {
+  const runner = async (message = hello()) => {
     const socket = new TestRunnerSocket(ctx.origin, token);
     closers.push(() => socket.socket.terminate());
-    await socket.connect(hello());
+    await socket.connect(message);
     return socket;
   };
 
@@ -568,6 +569,47 @@ describe('agent workspace routes (e2e)', () => {
         'runner_timeout',
       ]);
       expect(fake.worktree()).toHaveLength(2);
+    });
+
+    it('answers 409 runner_outdated, sending nothing, when the runner does not serve worktree.status (#233)', async () => {
+      const socket = await runner(
+        hello({
+          capabilities: {
+            ...capabilities,
+            commands: ['plan.turn', 'runner.ping'],
+          },
+        }),
+      );
+      const fake = new FakeRunner(socket);
+      await seedSlot(socket);
+      const refused = await member.get(`/projects/${a}/slots/i42/worktree`);
+      expect([refused.status, refused.body.error]).toEqual([
+        409,
+        'runner_outdated',
+      ]);
+      expect(refused.body.message).toContain('worktree.status');
+      expect(fake.worktree()).toEqual([]);
+    });
+
+    it('sends worktree.status when it is advertised, even turned off: the runner answers', async () => {
+      const socket = await runner(
+        hello({
+          capabilities: {
+            ...capabilities,
+            commands: ['worktree.status'],
+            disabledCommands: ['worktree.status'],
+          },
+        }),
+      );
+      const fake = new FakeRunner(socket);
+      await seedSlot(socket);
+      fake.answer = () => ({ ok: false, code: 'disabled' });
+      const refused = await member.get(`/projects/${a}/slots/i42/worktree`);
+      expect([refused.status, refused.body.error]).toEqual([
+        409,
+        'worktree_unavailable',
+      ]);
+      expect(fake.worktree()).toHaveLength(1);
     });
   });
 });

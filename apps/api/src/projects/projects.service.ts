@@ -29,7 +29,9 @@ import {
 } from './project-mapper';
 
 const withRelations = {
-  runner: { select: { id: true, name: true, revokedAt: true } },
+  runner: {
+    select: { id: true, name: true, revokedAt: true, capabilities: true },
+  },
   docsSource: true,
 } as const;
 

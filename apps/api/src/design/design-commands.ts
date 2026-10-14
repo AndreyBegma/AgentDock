@@ -1,5 +1,6 @@
 import { DESIGN_ERROR } from '@agentdock/shared';
 import {
+  type CommandName,
   isCommandName,
   type UiProfileCommandName,
   uiprofileCommands,
@@ -39,7 +40,11 @@ export class DesignCommands {
     private readonly presence: RunnerPresence,
   ) {}
 
-  /** Throws 503 `command_unavailable` when `name` cannot be sent to `runnerId` now. */
+  /**
+   * Throws 503 `command_unavailable` when `name` cannot be sent to `runnerId`
+   * now, and 409 `runner_outdated` when the runner's hello says it does not
+   * serve it (#233).
+   */
   assertReady(runnerId: string, name: UiProfileCommandName): void {
     const wired: string = name;
     if (!isCommandName(wired)) {
@@ -54,6 +59,23 @@ export class DesignCommands {
         503,
         DESIGN_ERROR.commandUnavailable,
         'The runner is not connected',
+      );
+    }
+    this.assertServed(runnerId, [wired]);
+  }
+
+  /**
+   * Throws 409 `runner_outdated` when the runner's hello says it does not
+   * serve one of `names` (#233). Unknown or disabled pass: the runner's own
+   * answer stays authoritative.
+   */
+  assertServed(runnerId: string, names: readonly CommandName[]): void {
+    const missing = this.presence.missingCommand(runnerId, names);
+    if (missing) {
+      throw designError(
+        409,
+        DESIGN_ERROR.runnerOutdated,
+        `The runner does not serve ${missing}; update it`,
       );
     }
   }
