@@ -63,6 +63,18 @@ export interface AdminRunner {
   lastSeenAt: string | null;
   revokedAt: string | null;
   createdAt: string;
+  /**
+   * Spec 201 D8, D17: the user local requests act as, and away mode.
+   * Optional until the API returns them.
+   */
+  localUserId?: string | null;
+  awayMode?: boolean;
+}
+
+/** `PATCH /runners/:id` (spec 201): `localUserId` admin only; `awayMode` admin or the local user. */
+export interface UpdateRunnerSettingsRequest {
+  localUserId?: string | null;
+  awayMode?: boolean;
 }
 
 /** A runtime profile mirrored from the runner's config (ADR-0006). */
