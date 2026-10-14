@@ -272,6 +272,11 @@ the packages it changed plus their dependents
 ([ADR-0018](docs/adr/0018-pull-requests-test-what-changed.md)). Pull requests
 target `develop`; a push to `develop` deploys staging.
 
+New `@andrewbehma/glass-ui` releases arrive as pull requests into `develop`
+from Renovate ([`renovate.json`](renovate.json)). Renovate watches only that
+package, pinned exactly, and a person merges its pull requests. Every other
+dependency is updated by hand.
+
 ## Documentation
 
 [`docs/`](docs/README.md) is the authority on what AgentDock is and how it is

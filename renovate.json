@@ -1,0 +1,23 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Only @andrewbehma/glass-ui, pinned, as pull requests into develop (#171). Every other dependency is updated by hand.",
+  "baseBranchPatterns": ["develop"],
+  "enabledManagers": ["bun"],
+  "dependencyDashboard": false,
+  "semanticCommits": "enabled",
+  "packageRules": [
+    {
+      "matchPackageNames": ["*"],
+      "enabled": false
+    },
+    {
+      "matchPackageNames": ["@andrewbehma/glass-ui"],
+      "enabled": true,
+      "rangeStrategy": "pin",
+      "semanticCommitType": "chore",
+      "semanticCommitScope": "web",
+      "labels": ["glass-ui"],
+      "automerge": false
+    }
+  ]
+}
