@@ -189,5 +189,7 @@ export const FLEET_ERROR = {
   runnerTimeout: 'runner_timeout',
   /** `/worktree`: the runner refused or failed; `message` says why. */
   worktreeUnavailable: 'worktree_unavailable',
+  /** 409 `/worktree`: the runner's advert does not list `worktree.status` (#233). */
+  runnerOutdated: 'runner_outdated',
 } as const;
 export type FleetErrorCode = (typeof FLEET_ERROR)[keyof typeof FLEET_ERROR];

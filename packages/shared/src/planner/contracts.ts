@@ -336,6 +336,8 @@ export const PLANNER_ERROR = {
   commandUnavailable: 'command_unavailable',
   commandFailed: 'command_failed',
   runnerTimeout: 'runner_timeout',
+  /** 409: the runner's advert does not list the command (#233); nothing was sent or written. */
+  runnerOutdated: 'runner_outdated',
 } as const;
 export type PlannerErrorCode =
   (typeof PLANNER_ERROR)[keyof typeof PLANNER_ERROR];
