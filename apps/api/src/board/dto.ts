@@ -102,6 +102,11 @@ export class UpdateBoardCardDto implements UpdateBoardCardRequest {
   @MaxLength(MODEL_MAX_LENGTH)
   @Matches(MODEL_PATTERN, { message: 'model is not a model name' })
   model?: string | null;
+
+  /** #243 D5: refused with `design_approved` once the design is approved. */
+  @IsOptional()
+  @IsBoolean()
+  continueAfterDesign?: boolean;
 }
 
 /** `POST /board/cards/:number/move` (D7). */

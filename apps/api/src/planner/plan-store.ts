@@ -1,4 +1,6 @@
 import {
+  BOARD_CHANGED_EVENT,
+  type BoardChangedData,
   DESIGN_LIVE_EVENT,
   type DesignLiveChange,
   PLANNER_ERROR,
@@ -258,6 +260,30 @@ export class PlanStore {
     } catch (error) {
       this.logger.warn(
         `design ${planId}/${taskKey} update not published: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  /**
+   * #243: a card's design changed — `design` with the card's id, and
+   * `board.changed`, since the card's face shows the design. Ids only; best
+   * effort.
+   */
+  publishCardDesign(projectId: string, cardId: string): void {
+    try {
+      this.live.publish(`project:${projectId}`, DESIGN_LIVE_EVENT, {
+        kind: 'design',
+        projectId,
+        planId: null,
+        taskKey: null,
+        cardId,
+      } satisfies DesignLiveChange);
+      this.live.publish(`project:${projectId}`, BOARD_CHANGED_EVENT, {
+        cardId,
+      } satisfies BoardChangedData);
+    } catch (error) {
+      this.logger.warn(
+        `card design ${cardId} update not published: ${(error as Error).message}`,
       );
     }
   }

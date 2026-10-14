@@ -9,6 +9,7 @@ import {
   type CardRoundView,
   cardLabel,
   isActiveRoundPhase,
+  type TaskDesignSummary,
 } from '@agentdock/shared';
 import {
   type BoardCard,
@@ -17,8 +18,33 @@ import {
   Prisma,
 } from '@prisma/client';
 
-/** A card with its rounds, newest first, as the board reads it. */
-export type CardWithRounds = BoardCard & { rounds: BoardCardRound[] };
+/** #243: what a card's face shows of its design — the Design chip. */
+export const cardDesignSelect = {
+  select: {
+    needed: true,
+    suggested: true,
+    suggestionWhy: true,
+    variantCount: true,
+    status: true,
+    approvedRevisionId: true,
+  },
+} as const satisfies Prisma.BoardCard$designArgs;
+
+type CardDesignRow = Prisma.TaskDesignGetPayload<typeof cardDesignSelect>;
+
+/**
+ * A card with its rounds, newest first, as the board reads it — and its
+ * design's summary where the read asked for it.
+ */
+export type CardWithRounds = BoardCard & {
+  rounds: BoardCardRound[];
+  design?: CardDesignRow | null;
+};
+
+/** #243: the Design chip; `null` when the card has no design or it is off. */
+const designOf = (
+  design: CardDesignRow | null | undefined,
+): TaskDesignSummary | null => (design?.needed ? { ...design } : null);
 
 export type CardWithPeople = CardWithRounds & {
   createdBy: BoardUserRef | null;
@@ -97,8 +123,7 @@ export const toCardView = (
   prNumber: card.prNumber,
   prUrl: card.prUrl,
   round: brief(card, card.rounds[0], facts),
-  // #243: the Design chip is read by iB-api; until then a card shows none.
-  design: null,
+  design: designOf(card.design),
   continueAfterDesign: card.continueAfterDesign,
   costUsd: cardCost(card.rounds, facts.costs),
   movedAt: card.movedAt.toISOString(),

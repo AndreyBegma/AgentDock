@@ -24,6 +24,7 @@ import { BoardWork } from './board-work';
     BoardSink,
     BoardWork,
   ],
-  exports: [BoardService],
+  // `BoardRoundsService` too: approving a card's design may start round 1 (#243 D6).
+  exports: [BoardRoundsService, BoardService],
 })
 export class BoardModule {}

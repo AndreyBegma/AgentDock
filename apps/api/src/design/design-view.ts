@@ -11,21 +11,27 @@ import {
   toDesignView,
   viewportsOf,
 } from './design-mapper';
-import { installedOf } from './design-store';
+import { type DesignKey, designWhere, installedOf } from './design-store';
+
+/** The design turn under way of an owner: its plan task's, or its card's. */
+const activeTurnWhere = (owner: DesignKey) =>
+  'cardId' in owner
+    ? { cardId: owner.cardId }
+    : { planId: owner.planId, task: { key: owner.taskKey } };
 
 /**
- * `GET …/tasks/:key/design` once the plan is known readable (D17): the
+ * `GET …/tasks/:key/design` once the plan is known readable (D17), and
+ * `GET …/board/cards/:number/design` once the project is (#243 D8): the
  * design with its revisions and comments, the skills no longer installed
  * (D15), the viewer's viewports (D11) and the design turn under way.
  */
 export const loadDesignView = async (
   prisma: PrismaService,
   project: { id: string; runnerId: string },
-  planId: string,
-  key: string,
+  owner: DesignKey,
 ): Promise<TaskDesignView> => {
   const row = await prisma.taskDesign.findUnique({
-    where: { planId_taskKey: { planId, taskKey: key } },
+    where: designWhere(owner),
     include: designInclude,
   });
   if (!row) {
@@ -39,9 +45,8 @@ export const loadDesignView = async (
     }),
     prisma.planTurn.findFirst({
       where: {
-        planId,
+        ...activeTurnWhere(owner),
         action: 'design',
-        task: { key },
         phase: { in: ['queued', 'running'] },
       },
       select: { id: true },

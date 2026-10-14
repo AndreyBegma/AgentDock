@@ -385,6 +385,48 @@ describe('design stage (e2e)', () => {
     }
   });
 
+  it('serves a card revision to every project member, and 404 to a non-member (#243 D8)', async () => {
+    await h.seedProfile();
+    const cards = `/projects/${h.projectId}/board/cards`;
+    const created = await h.author.send('post', cards, { title: 'Add login' });
+    expect(created.status).toBe(201);
+    const card = created.body as { id: string; number: number };
+    const base = `${cards}/${card.number}/design`;
+    expect((await h.author.send('patch', base, { needed: true })).status).toBe(
+      200,
+    );
+    expect((await h.author.send('post', `${base}/generate`)).status).toBe(201);
+    const turn = await h.ctx.prisma.planTurn.findFirstOrThrow({
+      where: { cardId: card.id, phase: { in: ['queued', 'running'] } },
+    });
+    await h.sinks.dispatch(h.runnerId, [
+      h.event('plan_turn.finished', {
+        planId: card.id,
+        turnId: turn.id,
+        runId: turn.runId,
+        projectId: h.projectId,
+        phase: 'succeeded',
+        at: new Date().toISOString(),
+        exitCode: 0,
+        resultText: designResult({ taskKey: 'card-1', variant: 1 }),
+        resultTruncated: false,
+      }),
+    ]);
+    const [revision] = ((await h.viewer.get(base)).body as TaskDesignView)
+      .revisions;
+    const url = `/design-revisions/${revision.id}/html`;
+    // No plan rule applies: a card's design is the project's.
+    for (const session of [h.author, h.other, h.viewer, h.admin]) {
+      const res = await session.get(url);
+      expect(res.status).toBe(200);
+      expect(String(res.headers['content-security-policy'])).toContain(
+        'sandbox allow-scripts',
+      );
+      expect(res.text).toContain(MOCKUP_PIN_HELPER_ATTRIBUTE);
+    }
+    expect((await h.outsider.get(url)).status).toBe(404);
+  });
+
   it('carries a pin to the next turn, revises every variant in play, and archives the variants not picked', async () => {
     const plan = await drawn(2);
     const base = h.designBase(plan.id, 't1');

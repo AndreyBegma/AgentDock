@@ -75,7 +75,7 @@ const WHAT: Record<PlanTurnAction, (input: PromptInput) => string> = {
     'Revise the plan. Apply every rewrite comment. Pass every frozen (approved) task through as `{ "key": "<key>" }` only, drop rejected tasks, and return every other task in full.',
   design: (i) =>
     i.design
-      ? designWhat(i.taskKey ?? '', i.design)
+      ? designWhat(`task \`${i.taskKey ?? ''}\``, i.design)
       : `Draw the mockup of task \`${i.taskKey}\`.`,
 };
 

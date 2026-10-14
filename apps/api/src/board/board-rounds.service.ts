@@ -7,6 +7,7 @@ import {
   type CardRoundPhase,
   type CardRoundTrigger,
   cardBranch,
+  cardDesignPath,
   cardFeedbackPrompt,
   cardIssueBody,
   cardLabel,
@@ -168,6 +169,8 @@ export class BoardRoundsService {
       card.rounds.some((r) => !UNSTARTED_PHASES.has(r.phase));
     const specDir = specDirOf(project.codeSentinelConfig);
     const firstStart = !resume;
+    // #243 D6: a needed design is approved before the worker starts.
+    const design = trigger === 'run' ? await this.approvedDesign(card) : null;
     if (firstStart && card.specOnRun && card.specPath === null && !specDir) {
       throw boardError(
         422,
@@ -225,6 +228,23 @@ export class BoardRoundsService {
             issueNumber: issue.number,
           })
         : null);
+    // #243 D7: round 1 commits the approved mockup into the card's branch,
+    // as stored — without the viewer's pin helper, which is never stored.
+    const designFile: CardRunFile | null =
+      firstStart && design
+        ? {
+            path: cardDesignPath(
+              specDir,
+              {
+                number: card.number,
+                title: card.title,
+                issueNumber: issue.number,
+              },
+              design.variant,
+            ),
+            content: design.html,
+          }
+        : null;
     const sessionId = card.sessionId ?? randomUUID();
     const prompt =
       trigger === 'feedback' && feedback !== null
@@ -240,12 +260,21 @@ export class BoardRoundsService {
               base: project.base,
               specPath,
               issueNumber: issue.number,
-              design: null,
+              design:
+                designFile && design
+                  ? {
+                      path: designFile.path,
+                      rationale: design.rationale,
+                      comments: design.comments,
+                    }
+                  : null,
             });
-    const files: CardRunFile[] =
-      firstStart && specPath !== null
+    const files: CardRunFile[] = [
+      ...(firstStart && specPath !== null
         ? [{ path: specPath, content: specContent(card, issue.number) }]
-        : [];
+        : []),
+      ...(designFile ? [designFile] : []),
+    ];
     const draft: Omit<CardRunArgs, 'runId'> = {
       cardId: card.id,
       projectId: project.id,
@@ -400,6 +429,49 @@ export class BoardRoundsService {
       throw error;
     }
     this.work.publish(project.id, card.id);
+  }
+
+  /**
+   * #243 D6, D7: the card's approved design for round 1 — `null` when the
+   * card has none or it is off; 409 `design_not_approved` while a needed
+   * design is not approved. The comments are the bodies the approved
+   * variant's revisions addressed, oldest first: the review's decisions.
+   */
+  private async approvedDesign(card: CardWithRounds): Promise<{
+    variant: number;
+    html: string;
+    rationale: string;
+    comments: string[];
+  } | null> {
+    const design = await this.prisma.taskDesign.findUnique({
+      where: { cardId: card.id },
+      select: {
+        id: true,
+        needed: true,
+        status: true,
+        approvedRevision: {
+          select: { variant: true, html: true, rationale: true },
+        },
+      },
+    });
+    if (!design?.needed) return null;
+    const approved = design.approvedRevision;
+    if (design.status !== 'approved' || !approved) {
+      throw boardError(
+        409,
+        BOARD_ERROR.designNotApproved,
+        `The design of ${cardLabel(card.number)} is not approved yet`,
+      );
+    }
+    const comments = await this.prisma.designComment.findMany({
+      where: {
+        designId: design.id,
+        addressedIn: { variant: approved.variant },
+      },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      select: { body: true },
+    });
+    return { ...approved, comments: comments.map((c) => c.body) };
   }
 
   /** D12: the orchestrator's profile, else the project default; `claude` only. */
