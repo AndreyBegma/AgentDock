@@ -61,10 +61,11 @@ from.
 
 **Count the cost**
 
-- **Sessions, tokens and cost** — Claude Code and Codex sessions as a tree of
-  turns, LLM requests, tools and subagents, each priced at API-equivalent cost
-  from a versioned price table; usage by project, issue, slot, model, runtime
-  and day
+- **Sessions, tokens and cost** — Claude Code sessions as a tree of turns,
+  LLM requests, tools and subagents, each priced at API-equivalent cost from a
+  versioned price table; usage by project, issue, slot, model, runtime and day.
+  Codex sessions are listed, but their transcripts are not parsed yet; Codex
+  token usage over OpenTelemetry is experimental and off by default
   ([sessions](docs/specs/12-agent-sessions.md),
   [cost](docs/specs/13-tokens-and-cost.md)).
 - **Budgets** — per project or per user, per day, week or month; alert at
@@ -302,8 +303,9 @@ Milestones M1 (see the fleet), M2 (steer it) and M3 (automate) are built. Next
 is **M4 — Codex in the fleet**, which is **not built yet**: Codex workers in
 orchestrator slots, fenced by their own worktree, sandbox and a pre-merge
 ownership check ([ADR-0013](docs/adr/0013-codex-workers-and-their-fence.md)),
-then Codex as the orchestrator. Today Codex sessions are read, priced and shown,
-and skills install for Codex profiles; orchestrator slots run Claude Code. The
+then Codex as the orchestrator. Today Codex sessions are listed (their transcripts
+are not parsed yet), skills install for Codex profiles, and orchestrator slots
+run Claude Code. The
 full plan is in [docs/product/roadmap.md](docs/product/roadmap.md).
 
 ## License
