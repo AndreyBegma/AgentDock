@@ -7,15 +7,10 @@ import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Tabs, TabsItem } from '@andrewbehma/glass-ui/tabs';
 import { X } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
-import { Time } from '../../lib/format/time';
-import {
-  KIND_LABEL,
-  TURN_ACTION_LABEL,
-  TURN_PHASE_PILL,
-  taskStatusView,
-} from '../../lib/planner/format';
+import { KIND_LABEL, taskStatusView } from '../../lib/planner/format';
 import { Markdown } from '../markdown/markdown';
 import { IssueLinks } from './issue-links';
+import { TaskHistory } from './task-history';
 
 const TABS = [
   { id: 'conversation', label: 'Conversation' },
@@ -27,14 +22,19 @@ type TabId = (typeof TABS)[number]['id'];
 /**
  * The right panel (spec 172 UI): the selected task's conversation, its
  * document, and its history. The conversation is the caller's, since it
- * talks to the API; this draws the frame and the two read-only tabs.
+ * talks to the API; this draws the frame and the two read-only tabs, the
+ * history loading the task's plan versions itself.
  */
 export function TaskPanel({
+  projectId,
+  planId,
   task,
   turns,
   conversation,
   onClose,
 }: {
+  projectId: string;
+  planId: string;
   task: PlanTaskView;
   /** The task's turns, oldest first. */
   turns: readonly PlanTurnView[];
@@ -110,36 +110,12 @@ export function TaskPanel({
           </p>
         )
       ) : (
-        <div className="flex flex-col gap-3">
-          <p className="text-sm text-ink-2">
-            In plan version {task.planVersion}
-            {task.frozen ? ', approved and frozen.' : '.'}
-          </p>
-          {turns.length === 0 ? (
-            <p className="text-sm text-ink-3">No turns about this task yet.</p>
-          ) : (
-            <ol className="flex flex-col gap-2">
-              {turns.map((t) => (
-                <li
-                  key={t.id}
-                  className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm"
-                >
-                  <StatusPill
-                    size="sm"
-                    status={TURN_PHASE_PILL[t.phase]}
-                    label={t.phase}
-                  />
-                  <span className="text-ink">
-                    {TURN_ACTION_LABEL[t.action]}
-                  </span>
-                  <span className="text-xs text-ink-3">
-                    {t.author.name} · <Time value={t.createdAt} />
-                  </span>
-                </li>
-              ))}
-            </ol>
-          )}
-        </div>
+        <TaskHistory
+          projectId={projectId}
+          planId={planId}
+          task={task}
+          turns={turns}
+        />
       )}
     </Card>
   );

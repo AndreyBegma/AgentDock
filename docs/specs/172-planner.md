@@ -174,6 +174,7 @@ A turn over the cap waits as `queued`.
 | POST | `/projects/:projectId/plans` | operator | `{ brief, mode, model?, profileKey? }`. Creates the plan (`private`) and its first turn (`clarify` in dialogue mode, `decompose` in batch mode) |
 | GET | `/projects/:projectId/plans` | viewer | plans the caller may read |
 | GET | `/projects/:projectId/plans/:planId` | reader of the plan | plan, current-version tasks, turns, graph |
+| GET | `/projects/:projectId/plans/:planId/tasks/:key/versions` | reader of the plan | the plan versions the task appeared in, oldest first: its state and document in each, and the turn that produced the version (decompose for 1, the k-th succeeded revise for k + 1) (#185) |
 | POST | `/projects/:projectId/plans/:planId/turns` | operator + reader | plan-level `{ message?, answers? }`. Refused while a turn is running (`turn_in_progress`) |
 | POST | `/projects/:projectId/plans/:planId/tasks/:key/turns` | operator + reader | task-level grill `{ message?, answers? }`. When the result says `done`, a `write` turn is chained |
 | POST | `/projects/:projectId/plans/:planId/tasks/:key/review` | operator + reader | `{ decision: approve \| reject \| rewrite, comment? }`. `approve` is refused while a blocking question is open (`needs_talk`) |
