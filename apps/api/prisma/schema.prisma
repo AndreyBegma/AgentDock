@@ -69,6 +69,10 @@ model User {
   plannerSettingsUpdated      PlannerSettings[]
   plans                       Plan[]
   planTurns                   PlanTurn[]
+  uiProfilesAuthored          UiProfile[]
+  designSettingsUpdated       DesignSettings[]
+  taskDesignsApproved         TaskDesign[]
+  designComments              DesignComment[]
 
   @@map("users")
 }
@@ -251,25 +255,25 @@ enum AuditResult {
 /// DELETE and TRUNCATE. Actor and project ids are plain columns, not foreign
 /// keys: records outlive users and projects, and a SET NULL would be an UPDATE.
 model AuditRecord {
-  seq           BigInt         @id @default(autoincrement())
-  ts            DateTime       @default(now())
-  actorType     AuditActorType
-  actorUserId   String?
-  actorRunnerId String?
+  seq               BigInt         @id @default(autoincrement())
+  ts                DateTime       @default(now())
+  actorType         AuditActorType
+  actorUserId       String?
+  actorRunnerId     String?
   /// A `system` actor's principal (#102); hashed only when set.
   actorOnBehalfOfId String?
-  action        String
-  targetType    String
-  targetId      String?
-  projectId     String?
-  before        Json?
-  after         Json?
-  result        AuditResult
-  meta          Json?
+  action            String
+  targetType        String
+  targetId          String?
+  projectId         String?
+  before            Json?
+  after             Json?
+  result            AuditResult
+  meta              Json?
   /// `hash` of the previous record by `seq`; 64 zeros for the first.
-  prevHash      String
+  prevHash          String
   /// sha256(prevHash ‖ canonical(record)), hex.
-  hash          String         @unique
+  hash              String         @unique
 
   @@index([ts])
   @@index([action, ts])
@@ -367,6 +371,8 @@ model Project {
   plans                Plan[]
   sessionContents      SessionContent[]
   actionRequests       ActionRequest[]
+  uiProfiles           UiProfile[]
+  designSettings       DesignSettings?
 
   @@unique([runnerId, rootPath])
   @@map("projects")
@@ -1468,6 +1474,8 @@ enum RunKind {
   schedule
   /// A Planner turn (docs/specs/172 D14).
   plan
+  /// A UI profile build (docs/specs/223 D13).
+  ui_profile
 }
 
 enum RunStatus {
@@ -1526,6 +1534,7 @@ model Run {
   slot              Slot?             @relation(fields: [slotId], references: [id], onDelete: Cascade)
   skillRun          SkillRun?
   planTurn          PlanTurn?
+  uiProfiles        UiProfile[]
   firings           ScheduleFiring[]
   inboundDeliveries InboundDelivery[]
 
@@ -2155,10 +2164,11 @@ enum PlanTaskKind {
   feature
 }
 
-/// Shared `PLAN_TASK_STATUSES` (D6, D9).
+/// Shared `PLAN_TASK_STATUSES` (D6, D9; `needs_design`: spec 223 D1).
 enum PlanTaskStatus {
   draft
   needs_talk
+  needs_design
   ready
   approved
   rejected
@@ -2166,13 +2176,14 @@ enum PlanTaskStatus {
   issued
 }
 
-/// Shared `PLAN_TURN_ACTIONS` (D16).
+/// Shared `PLAN_TURN_ACTIONS` (D16; `design`: spec 223 D7).
 enum PlanTurnAction {
   decompose
   clarify
   grill
   write
   revise
+  design
 }
 
 /// Shared `PLAN_TURN_PHASES`.
@@ -2264,6 +2275,7 @@ model Plan {
   instructions PlannerInstructions @relation(fields: [instructionsId], references: [id], onDelete: Restrict)
   tasks        PlanTask[]
   turns        PlanTurn[]
+  designs      TaskDesign[]
 
   @@index([projectId, updatedAt])
   @@index([authorId])
@@ -2327,12 +2339,188 @@ model PlanTurn {
   createdAt  DateTime       @default(now())
   finishedAt DateTime?
 
-  plan   Plan      @relation(fields: [planId], references: [id], onDelete: Cascade)
-  task   PlanTask? @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  run    Run       @relation(fields: [runId], references: [id], onDelete: Cascade)
-  author User?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  plan            Plan             @relation(fields: [planId], references: [id], onDelete: Cascade)
+  task            PlanTask?        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  run             Run              @relation(fields: [runId], references: [id], onDelete: Cascade)
+  author          User?            @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  designRevisions DesignRevision[]
 
   @@index([planId, createdAt])
   @@index([taskId, createdAt])
   @@map("plan_turns")
+}
+
+// ─── Design stage (spec 223) ────────────────────────────────────────────────
+
+/// Shared `UI_PROFILE_SOURCES` (D14).
+enum UiProfileSource {
+  agent
+  manual
+}
+
+/// Shared `TASK_DESIGN_STATUSES`.
+enum TaskDesignStatus {
+  idle
+  generating
+  reviewing
+  revising
+  approved
+}
+
+/// Shared `DESIGN_COMMENT_KINDS` (D9).
+enum DesignCommentKind {
+  general
+  screen
+  pin
+}
+
+/// Shared `DESIGN_THEMES`.
+enum DesignTheme {
+  light
+  dark
+}
+
+/// A project's UI profile, one row per version (D12). An agent version is
+/// built by a `ui_profile` run; a manual one is a person's edit, whose diff
+/// the next build keeps as `obligations` (D14).
+model UiProfile {
+  id               String          @id @default(cuid())
+  projectId        String
+  version          Int
+  source           UiProfileSource
+  hasUi            Boolean
+  /// Markdown: libraries, styling, tokens, components, patterns, themes, icons.
+  summary          String
+  /// The style kit's CSS (at most `UI_PROFILE_KIT_MAX_BYTES`).
+  kit              String
+  /// `[{ name, html }]` (shared `uiProfileSnippetSchema`).
+  snippets         Json            @default("[]")
+  fingerprintGlobs String[]        @default([])
+  /// SHA-256 hex of the files matching `fingerprintGlobs` on `origin/<base>`.
+  fingerprint      String
+  /// The manual edits this build was told to keep (D14).
+  obligations      String?
+  /// The build's run; null for a manual version.
+  runId            String?
+  /// The person behind a manual version; null for an agent build.
+  authorId         String?
+  createdAt        DateTime        @default(now())
+
+  project Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  run     Run?         @relation(fields: [runId], references: [id], onDelete: SetNull)
+  author  User?        @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  designs TaskDesign[]
+
+  @@unique([projectId, version])
+  @@map("ui_profiles")
+}
+
+/// A project's design settings (D11, D15). No row: the default viewports and
+/// no default skills.
+model DesignSettings {
+  projectId     String   @id
+  /// `[{ name, width, height, theme? }]` (shared `viewportPresetsSchema`).
+  viewports     Json
+  defaultSkills String[] @default([])
+  updatedById   String?
+  updatedAt     DateTime @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  updatedBy User?   @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@map("design_settings")
+}
+
+/// A task's design, keyed by `(planId, taskKey)` — not by a `plan_tasks` row,
+/// which is versioned per plan version while the design carries across them.
+model TaskDesign {
+  id                 String           @id @default(cuid())
+  planId             String
+  taskKey            String
+  /// The person's switch (D2); starts as the planner's suggestion.
+  needed             Boolean
+  /// Whether the planner suggested it, and why (D2).
+  suggested          Boolean          @default(false)
+  suggestionWhy      String?
+  /// 1–3 (D4), checked by the DTO and the contract.
+  variantCount       Int              @default(1)
+  skills             String[]         @default([])
+  /// The profile version the latest revisions were drawn from.
+  profileId          String?
+  status             TaskDesignStatus @default(idle)
+  approvedRevisionId String?          @unique
+  approvedById       String?
+  approvedAt         DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  plan             Plan             @relation(fields: [planId], references: [id], onDelete: Cascade)
+  profile          UiProfile?       @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  approvedRevision DesignRevision?  @relation("TaskDesignApprovedRevision", fields: [approvedRevisionId], references: [id], onDelete: SetNull)
+  approvedBy       User?            @relation(fields: [approvedById], references: [id], onDelete: SetNull)
+  revisions        DesignRevision[] @relation("TaskDesignRevisions")
+  comments         DesignComment[]
+
+  @@unique([planId, taskKey])
+  @@map("task_designs")
+}
+
+/// One revision of one variant of a design (D4, D10): the HTML a design turn
+/// drew. A variant not picked on approve is `archived` — readable, never
+/// published.
+model DesignRevision {
+  id        String   @id @default(cuid())
+  designId  String
+  /// 1–3.
+  variant   Int
+  revision  Int
+  title     String
+  rationale String
+  /// The validated mockup (at most `DESIGN_HTML_MAX_BYTES`), without the pin helper.
+  html      String
+  turnId    String
+  archived  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  design            TaskDesign      @relation("TaskDesignRevisions", fields: [designId], references: [id], onDelete: Cascade)
+  turn              PlanTurn        @relation(fields: [turnId], references: [id], onDelete: Cascade)
+  approvedFor       TaskDesign?     @relation("TaskDesignApprovedRevision")
+  comments          DesignComment[] @relation("DesignCommentRevision")
+  addressedComments DesignComment[] @relation("DesignCommentAddressedIn")
+
+  @@unique([designId, variant, revision])
+  @@index([turnId])
+  @@map("design_revisions")
+}
+
+/// A comment on a design (D9): general, on one screen (viewport and theme),
+/// or pinned to a point. It records the revision it was left on and the one
+/// that addressed it (D10).
+model DesignComment {
+  id                    String            @id @default(cuid())
+  designId              String
+  revisionId            String
+  /// Nullable so deleting the author keeps the comment.
+  authorId              String?
+  kind                  DesignCommentKind
+  /// A viewport preset's name; `screen` and `pin`.
+  viewport              String?
+  theme                 DesignTheme?
+  /// Document coordinates of a pin.
+  x                     Float?
+  y                     Float?
+  /// The CSS path of the element under a pin.
+  selector              String?
+  body                  String
+  addressedInRevisionId String?
+  createdAt             DateTime          @default(now())
+
+  design      TaskDesign      @relation(fields: [designId], references: [id], onDelete: Cascade)
+  revision    DesignRevision  @relation("DesignCommentRevision", fields: [revisionId], references: [id], onDelete: Cascade)
+  author      User?           @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  addressedIn DesignRevision? @relation("DesignCommentAddressedIn", fields: [addressedInRevisionId], references: [id], onDelete: SetNull)
+
+  @@index([designId, createdAt])
+  @@index([revisionId])
+  @@map("design_comments")
 }
