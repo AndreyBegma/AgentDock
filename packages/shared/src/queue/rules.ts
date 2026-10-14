@@ -142,27 +142,67 @@ const cells = (row: string): string[] =>
     .split('|')
     .map((c) => c.trim().replace(/^`|`$/g, ''));
 
-/** The slots of the `## Parallel plan` table; null when the body has no plan. */
-export const parseParallelPlan = (body: string): WaveSlot[] | null => {
+/** The `## Parallel plan` table: lower-cased header and data rows; null without a plan. */
+const parallelPlanTable = (
+  body: string,
+): { col: (name: string) => number; rows: string[][] } | null => {
   const [plan] = titled(body, PARALLEL_PLAN);
   if (!plan) return null;
-  const rows = plan.body.filter((l) => l.trim().startsWith('|'));
-  if (rows.length < 2) return [];
-  const header = cells(rows[0]).map((h) => h.toLowerCase());
+  const lines = plan.body.filter((l) => l.trim().startsWith('|'));
+  if (lines.length < 2) return { col: () => -1, rows: [] };
+  const header = cells(lines[0]).map((h) => h.toLowerCase());
   const col = (name: string) => header.indexOf(name);
   const slot = col('slot');
-  if (slot < 0) return [];
-  const lead = col('lead');
-  const model = col('model');
-  return rows
-    .slice(1)
-    .map(cells)
-    .filter((r) => !r.every((c) => /^:?-+:?$/.test(c)) && r[slot])
-    .map((r) => ({
-      slot: r[slot],
-      lead: lead >= 0 && /^(?:yes|true|✓|x)$/i.test(r[lead] ?? ''),
-      model: model >= 0 && r[model] ? r[model] : null,
-    }));
+  const rows =
+    slot < 0
+      ? []
+      : lines
+          .slice(1)
+          .map(cells)
+          .filter((r) => !r.every((c) => /^:?-+:?$/.test(c)) && r[slot]);
+  return { col, rows };
+};
+
+/** The slots of the `## Parallel plan` table; null when the body has no plan. */
+export const parseParallelPlan = (body: string): WaveSlot[] | null => {
+  const table = parallelPlanTable(body);
+  if (!table) return null;
+  const slot = table.col('slot');
+  const lead = table.col('lead');
+  const model = table.col('model');
+  return table.rows.map((r) => ({
+    slot: r[slot],
+    lead: lead >= 0 && /^(?:yes|true|✓|x)$/i.test(r[lead] ?? ''),
+    model: model >= 0 && r[model] ? r[model] : null,
+  }));
+};
+
+const WAVE_SLOT_NAME = /^[a-z0-9][a-z0-9-]*$/;
+
+/**
+ * The `Depends on` column of the `## Parallel plan` table: slot → the slots of
+ * the same plan it waits for (#160's wave edges). A cell lists slot names
+ * separated by commas or spaces; `—`, `-`, `none` and names not in the table
+ * are dropped. Every slot of the table has an entry; null without a plan.
+ */
+export const parseWaveDependencies = (
+  body: string,
+): Map<string, string[]> | null => {
+  const table = parallelPlanTable(body);
+  if (!table) return null;
+  const slot = table.col('slot');
+  const depends = table.col('depends on');
+  const slots = new Set(table.rows.map((r) => r[slot]));
+  return new Map(
+    table.rows.map((r) => {
+      const cell = depends >= 0 ? (r[depends] ?? '') : '';
+      const names = cell
+        .split(/[\s,;]+/)
+        .map((n) => n.replace(/^`|`$/g, ''))
+        .filter((n) => WAVE_SLOT_NAME.test(n) && slots.has(n) && n !== r[slot]);
+      return [r[slot], [...new Set(names)]];
+    }),
+  );
 };
 
 const SIZE_NEEDS_PLAN = /^size:\s*(?:xl|xxl)$/i;

@@ -36,6 +36,7 @@ export type SlotEvent = EventOf<
   | 'slot.dispatched'
   | 'slot.redispatched'
   | 'slot.checkpoint'
+  | 'slot.message_seen'
   | 'pr.opened'
   | 'pr.checks_changed'
   | 'pr.closed'
@@ -70,6 +71,13 @@ export class SlotProjection {
           : this.dispatched(applied as Applied<typeof event>);
       case 'slot.checkpoint':
         return this.checkpoint(applied as Applied<typeof event>);
+      case 'slot.message_seen': {
+        // No row of its own: the `events` row is the store (spec 160). It
+        // only names the run whose conversation changed, for the live push.
+        const row = await this.covering(this.slotName(event), applied.ts);
+        if (row) this.changed({ kind: 'conversation', id: row.id });
+        return;
+      }
       case 'pr.opened':
       case 'pr.checks_changed':
       case 'pr.closed':
