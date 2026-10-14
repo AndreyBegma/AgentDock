@@ -85,8 +85,17 @@ export function waitingApprovals(views: Iterable<ApprovalsView>): number {
 export const OVERVIEW_TILE_HREF = {
   running: '/sessions',
   cost: '/usage?range=today',
-  merged: '/activity',
 } as const;
+
+/**
+ * Activity filtered to today's merges, the tile's figure: `?type=pr.merged`
+ * and `?from=` the viewer's local day, as Activity's filter bar reads them.
+ */
+export function mergedTodayHref(now: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const day = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  return `/activity?type=pr.merged&from=${day}`;
+}
 
 /**
  * Approvals has no cross-project page: the tile opens the first project, in

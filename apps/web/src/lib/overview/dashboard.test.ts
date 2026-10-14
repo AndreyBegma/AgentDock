@@ -9,11 +9,14 @@ import type {
   SlotSummary,
 } from '@agentdock/shared';
 import {
+  approvalsHref,
   costByProject,
   lastSevenDays,
   mergedPullRequests,
+  mergedTodayHref,
   needsYou,
   nextHour,
+  OVERVIEW_TILE_HREF,
   roundLabel,
   runningSlots,
   slotTitle,
@@ -292,6 +295,32 @@ describe('needsYou', () => {
     expect(items[1]?.title).toBe('Slot i7 · #7');
     expect(items[1]?.href).toBe('/projects/p1/history/fresh');
     expect(items[2]?.title).toBe('Nightly audit');
+  });
+});
+
+describe('tile links (#213)', () => {
+  test('cost today is the Usage contract, merged is Activity filtered to today', () => {
+    expect(OVERVIEW_TILE_HREF.cost).toBe('/usage?range=today');
+    expect(mergedTodayHref(new Date(2026, 9, 4, 23, 30))).toBe(
+      '/activity?type=pr.merged&from=2026-10-04',
+    );
+  });
+
+  test('approvals open the first project with one waiting, else Projects', () => {
+    const waiting = approvals([approval({})]);
+    const decided = approvals([approval({ status: 'approved' })]);
+    expect(
+      approvalsHref(
+        [project('p1'), project('p2')],
+        new Map([
+          ['p1', decided],
+          ['p2', waiting],
+        ]),
+      ),
+    ).toBe('/projects/p2/approvals');
+    expect(approvalsHref([project('p1')], new Map([['p1', decided]]))).toBe(
+      '/projects',
+    );
   });
 });
 

@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { activityHref, itemTitle } from '../../lib/activity/format';
 import { formatCost, formatDate, pluralize } from '../../lib/format';
 import { Time } from '../../lib/format/time';
 import { projectHue } from '../../lib/hue';
@@ -33,6 +34,7 @@ import {
   costByProject,
   isAlive,
   mergedPullRequests,
+  mergedTodayHref,
   type NeedsYouItem,
   needsYou,
   OVERVIEW_TILE_HREF,
@@ -135,7 +137,7 @@ function Stats({
         hint={
           mergedToday.failed ? 'Activity is not answering' : 'Since midnight'
         }
-        href={OVERVIEW_TILE_HREF.merged}
+        href={mergedTodayHref()}
       />
       <StatTile
         hue={1}
@@ -317,6 +319,10 @@ function RecentActivity({
   return (
     <ul className="-mx-2 flex flex-col">
       {items.map((item) => {
+        // A slot's row opens that slot on its Fleet (#213), and a PR's URL is
+        // not part of the title — Activity's own rules, shared.
+        const href = activityHref(item);
+        const { title } = itemTitle(item);
         const body = (
           <>
             <Badge
@@ -326,7 +332,7 @@ function RecentActivity({
               className="mt-1.5 shrink-0"
             />
             <span className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-sm">{item.title}</span>
+              <span className="truncate text-sm">{title}</span>
               {item.projectId && names.has(item.projectId) ? (
                 <span className="truncate text-xs text-ink-3">
                   {names.get(item.projectId)}
@@ -343,8 +349,8 @@ function RecentActivity({
         const row = 'flex items-start gap-3 rounded-md px-2 py-2';
         return (
           <li key={item.id}>
-            {item.link ? (
-              <Link href={item.link} className={`${row} hover:bg-hover`}>
+            {href ? (
+              <Link href={href} className={`${row} hover:bg-hover`}>
                 {body}
               </Link>
             ) : (
