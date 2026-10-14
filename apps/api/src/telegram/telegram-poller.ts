@@ -5,6 +5,7 @@ import {
   OnApplicationBootstrap,
   OnModuleDestroy,
 } from '@nestjs/common';
+import { SchedulerRegistry } from '@nestjs/schedule';
 import { Client } from 'pg';
 import { PrismaService } from '../database/prisma.service';
 import { BotTokenStore } from '../notifications';
@@ -27,6 +28,7 @@ import { TELEGRAM_OPTIONS, type TelegramOptions } from './telegram-options';
 
 /** Session advisory lock: held by the one API instance that talks to Telegram. */
 const LOCK_KEY = 'telegram:poller';
+const JOB_NAME = 'telegram-delivery';
 /** `notification_matcher_state` is a single row; the matcher creates it. */
 const STATE_ID = 1;
 /** A heartbeat line every this many polls (about 30 min at the 30 s timeout). */
@@ -113,6 +115,7 @@ export class TelegramPoller implements OnApplicationBootstrap, OnModuleDestroy {
     private readonly linking: TelegramLinkingService,
     private readonly approvals: TelegramApprovalService,
     private readonly delivery: TelegramDeliveryService,
+    private readonly scheduler: SchedulerRegistry,
     @Inject(TELEGRAM_OPTIONS) private readonly options: TelegramOptions,
   ) {}
 
@@ -123,7 +126,7 @@ export class TelegramPoller implements OnApplicationBootstrap, OnModuleDestroy {
 
   async onModuleDestroy(): Promise<void> {
     this.abort.abort();
-    clearInterval(this.deliveryTimer);
+    this.stopDelivery();
     await this.release();
   }
 
@@ -288,7 +291,7 @@ export class TelegramPoller implements OnApplicationBootstrap, OnModuleDestroy {
     while (!signal.aborted) {
       if (!this.isLeader) {
         this.loopRunning = false;
-        clearInterval(this.deliveryTimer);
+        this.stopDelivery();
         const leader = await this.acquire().catch((error: unknown) => {
           this.logger.warn(
             `Telegram poller lock unavailable: ${safeMessage(error)}`,
@@ -319,7 +322,7 @@ export class TelegramPoller implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   private startDelivery(): void {
-    clearInterval(this.deliveryTimer);
+    this.stopDelivery();
     this.deliveryTimer = setInterval(() => {
       if (this.delivering || !this.isLeader) return;
       this.delivering = true;
@@ -335,6 +338,14 @@ export class TelegramPoller implements OnApplicationBootstrap, OnModuleDestroy {
         });
     }, this.options.deliveryIntervalMs);
     this.deliveryTimer.unref();
+    this.scheduler.addInterval(JOB_NAME, this.deliveryTimer);
+  }
+
+  private stopDelivery(): void {
+    clearInterval(this.deliveryTimer);
+    if (this.scheduler.doesExist('interval', JOB_NAME)) {
+      this.scheduler.deleteInterval(JOB_NAME);
+    }
   }
 
   private async currentOffset(): Promise<bigint> {
