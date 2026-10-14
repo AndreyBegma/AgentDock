@@ -1,7 +1,7 @@
 # glass-ui in AgentDock
 
 [glass-ui](https://github.com/AndreyBegma/glass-ui) is the only component
-library (ADR-0011), consumed from npm as `@andrewbehma/glass-ui`. Releases are tags on `main`, cut from `develop` through a release PR and published to npm; `v0.21.0` ships the M1 desk primitives (glass-ui#67), `v0.22.0` the M2 activity primitives (#70), `0.23.0` the npm package with compiled `dist/` (#89), `0.24.0` the look from the UI audit (canvas, accent, two surface levels, `Select`/`DateInput`, `TabBar` — #93), `0.27.0` the workspace patterns and NavRail groups (#94), `0.28.0` the navy palette, identity hues and status tokens (#109). AgentDock is on **0.28.0** (#163).
+library (ADR-0011), consumed from npm as `@andrewbehma/glass-ui`. Releases are tags on `main`, cut from `develop` through a release PR and published to npm; `v0.21.0` ships the M1 desk primitives (glass-ui#67), `v0.22.0` the M2 activity primitives (#70), `0.23.0` the npm package with compiled `dist/` (#89), `0.24.0` the look from the UI audit (canvas, accent, two surface levels, `Select`/`DateInput`, `TabBar` — #93), `0.27.0` the workspace patterns and NavRail groups (#94), `0.28.0` the navy palette, identity hues and status tokens (#109), `0.28.1` the flat navy glass button (glass-ui#127). AgentDock is on **0.28.1**.
 
 ## Consumption
 
