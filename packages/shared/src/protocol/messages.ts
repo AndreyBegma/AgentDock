@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { capabilitiesSchema } from './capabilities';
 import { commandErrorCodeSchema } from './commands';
 import { eventSchema, seqCursorSchema } from './envelope';
+import { localRequestMessageSchema, localResponseMessageSchema } from './local';
 import {
   anySubscribeMessageSchema,
   paneMessageSchema,
@@ -89,6 +90,11 @@ export const commandProgressMessageSchema = z.object({
 export const runnerServerConfigSchema = z.object({
   projects: z.array(watchedProjectSchema),
   pollIntervalsMs: z.record(z.string().min(1), z.number().int().positive()),
+  /**
+   * Away mode (spec 201 D17): the `PermissionRequest` hook routes prompts to
+   * action requests. Absent means off.
+   */
+  awayMode: z.boolean().optional(),
 });
 export type RunnerServerConfig = z.infer<typeof runnerServerConfigSchema>;
 
@@ -145,6 +151,7 @@ const runnerMessages = [
   paneMessageSchema,
   subscribeErrorMessageSchema,
   runLogMessageSchema,
+  localRequestMessageSchema,
   ...bothWayMessages,
 ] as const;
 
@@ -156,6 +163,7 @@ const serverOnlyMessages = [
   anySubscribeMessageSchema,
   unsubscribeMessageSchema,
   terminalResizeMessageSchema,
+  localResponseMessageSchema,
 ] as const;
 
 const serverMessages = [...serverOnlyMessages, ...bothWayMessages] as const;

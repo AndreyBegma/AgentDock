@@ -70,6 +70,8 @@ both sit at the root of that origin.
 | S ↔ R | `terminal.data` | `{ id, b64 }` — PTY bytes of an attach, ≤ 64 KiB decoded; S → R only on a `write` attach |
 | S → R | `terminal.resize` | `{ id, cols, rows }` |
 | S ↔ R | `terminal.close` | `{ id, reason: "client" \| "idle" \| "max_duration" \| "session_ended" \| "socket" }` |
+| R → S | `local.request` | `{ id, method, args, projectId?, session?, via }` — a runner-initiated request from the `agentdock` plugin, see below |
+| S → R | `local.response` | `{ id, ok, data?, error? }` |
 
 ### Sequence numbers
 
@@ -164,6 +166,14 @@ applied exactly like it; it does not touch the ack cursor. A reconnect's
   }
 }
 ```
+
+Two optional fields belong to the Claude Code integration
+([spec 201](../specs/201-claude-code-integration.md)):
+- `projects[].shipContent` — the project ships hook content (ADR-0021).
+  Absent means false, and the runner strips every content field before the
+  spool.
+- `config.awayMode` — the runner's `PermissionRequest` hook routes permission
+  prompts to action requests (D17). Absent means off.
 
 ### `heartbeat`
 
@@ -659,6 +669,69 @@ therefore capped by the runner.
 
 ```json
 { "type": "terminal.close", "id": "term_4c1d", "reason": "idle" }
+```
+
+### `local.request`, `local.response`
+
+The runner asks, and the server answers
+([ADR-0020](../adr/0020-claude-code-integration-through-the-runner.md),
+[spec 201](../specs/201-claude-code-integration.md) D6–D8). This is the only
+runner-initiated request in the protocol. The `agentdock` Claude Code plugin's
+hook and MCP processes reach the daemon over its local unix socket, and the
+daemon relays their request. Schemas are in `local.ts`.
+
+- **The allowlist.** `method` must be a key of `localMethods`, and `args` must
+  match that method's schema. Otherwise the answer is `unknown_method` or
+  `invalid_args`, audited as `local.request` with result `denied`.
+- **Authority.** The server acts as the runner's **local user** with
+  `min(role on the project, operator)`. With no local user, a non-member, or a
+  role below the method's `minRole`, the answer is `forbidden`.
+- **The project.** The project is never an argument. `projectId` is the daemon's
+  correlation of the session's cwd. The server checks that this runner watches
+  the project. A project method without one is `no_project`.
+- **Not spooled.** When the WSS is down, the daemon answers `runner_offline`
+  itself. A write is never delayed and replayed later. Both sides give up after
+  `LOCAL_REQUEST_TIMEOUT_MS` (15 s).
+
+| Method | Min role | Args | Result |
+|---|---|---|---|
+| `context.sessionStart` | viewer | `gitBranch?` | `{ text }` ≤ 2 000 chars, printed by the `SessionStart` hook |
+| `fleet.status` | viewer | — | orchestrator state and slots |
+| `queue.list` | viewer | `limit` ≤ 50 | open issues with ready / in-flight flags |
+| `budget.remaining` | viewer | — | enabled budgets with `limitUsd`, `spentUsd`, `remainingUsd` |
+| `approvals.list` | viewer | — | PRs awaiting approval and pending action requests |
+| `activity.recent` | viewer | `limit` ≤ 50 | recent activity items |
+| `sessions.recent` | viewer | `limit` ≤ 50 | recent sessions with origin and live state |
+| `action.status` | viewer | `id` | the action request |
+| `issue.create` | operator | `title, body, labels?, queue` | `{ number, url, queued }` |
+| `activity.note` | operator | `text` ≤ 2 000 | records the server event `manual.note` |
+| `handoff.create` | operator | `title, body, branch` | an issue queued for the fleet, plus `manual.handoff` |
+| `action.request` | operator | `kind, args, summary` | a pending action request (spec 201 D18) |
+| `away.set` | operator | `on` | the runner's away mode; needs no project |
+
+```json
+{
+  "type": "local.request",
+  "id": "lr_7f3a",
+  "method": "issue.create",
+  "args": { "title": "Flaky pairing test on macOS", "body": "Seen twice today.", "queue": true },
+  "projectId": "prj_agentdock",
+  "session": { "runtime": "claude", "id": "0c9e2f4a-5b1d-4e8a-9c3f-2a7b6d1e8f90" },
+  "via": "mcp"
+}
+```
+
+```json
+{
+  "type": "local.response",
+  "id": "lr_7f3a",
+  "ok": true,
+  "data": { "number": 214, "url": "https://github.com/AndreyBegma/AgentDock/issues/214", "queued": true }
+}
+```
+
+```json
+{ "type": "local.response", "id": "lr_7f40", "ok": false, "error": { "code": "forbidden", "message": "viewer on prj_agentdock" } }
 ```
 
 ## Commands (allowlist)

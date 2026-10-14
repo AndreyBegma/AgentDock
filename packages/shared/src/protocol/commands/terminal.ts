@@ -50,6 +50,21 @@ export const terminalTargetSchema = z.discriminatedUnion('kind', [
   }),
 ]);
 export type TerminalTarget = z.infer<typeof terminalTargetSchema>;
+
+/**
+ * A session started by `agentdock-runner claude` (spec 201 D23): the runner
+ * resolves `sessionId` (Claude Code's session id) to the
+ * `agentdock-manual-<hex>` tmux session its hook reported, and refuses any it
+ * did not record. Defined here, joined to `terminalTargetSchema` by the
+ * change that adds its runner resolver and API relay (i201-manual-attach), so
+ * the union never names a kind nobody resolves.
+ */
+export const manualTerminalTargetSchema = z.strictObject({
+  kind: z.literal('manual'),
+  ...projectTarget,
+  sessionId: z.string().min(1).max(200),
+});
+export type ManualTerminalTarget = z.infer<typeof manualTerminalTargetSchema>;
 export type TerminalTargetKind = TerminalTarget['kind'];
 
 /**

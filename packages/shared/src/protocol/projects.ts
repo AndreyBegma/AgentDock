@@ -19,6 +19,11 @@ export const watchedProjectSchema = z.object({
   root: z.string().min(1),
   /** Spec 27 D12. Absent means `unhealthy`: poll every 60 s. */
   githubApp: githubAppHealthSchema.optional(),
+  /**
+   * The project ships hook content (ADR-0021). Absent means false: the runner
+   * then strips every content field before the spool.
+   */
+  shipContent: z.boolean().optional(),
 });
 export type WatchedProject = z.infer<typeof watchedProjectSchema>;
 

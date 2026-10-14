@@ -5,6 +5,7 @@ import type {
   SessionBackfillResult,
   TokenBuckets,
 } from '../protocol';
+import type { SessionLiveState, SessionOrigin } from './manual';
 
 /** Stable codes in the `error` field of a sessions route's error body. */
 export const SESSION_ERROR = {
@@ -58,6 +59,8 @@ export interface SessionListQuery {
   from?: string;
   to?: string;
   unassigned?: boolean;
+  /** Spec 201 D14. */
+  origin?: SessionOrigin;
   cursor?: string;
   limit?: number;
 }
@@ -94,6 +97,18 @@ export interface SessionSummary {
   /** Subagent sessions anywhere below this one. */
   subagents: number;
   totals: SessionTotals;
+  /**
+   * Spec 201 D14. Optional until the API fills them; absent reads as
+   * `unknown` / null.
+   */
+  origin?: SessionOrigin;
+  issue?: number | null;
+  ownerId?: string | null;
+  liveState?: SessionLiveState | null;
+  /** Set for a session started by `agentdock-runner claude` (D23). */
+  tmuxSession?: string | null;
+  /** The session has stored content the caller may read (ADR-0021). */
+  hasContent?: boolean;
 }
 
 /** `GET /sessions`. Root sessions only; subagents appear in the tree. */

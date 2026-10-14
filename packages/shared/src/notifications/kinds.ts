@@ -21,6 +21,7 @@ export const NOTIFICATION_KINDS = [
   'budget.exceeded',
   'budget.threshold',
   'schedule.disabled',
+  'action.requested',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -127,6 +128,13 @@ export const NOTIFICATION_KIND_SPECS: Record<
     channels: BOTH,
     defaults: ON_ON,
     adminsOnly: true,
+  },
+  'action.requested': {
+    scope: 'project',
+    source: 'action_request.created (spec 201 D18)',
+    channels: BOTH,
+    defaults: ON_ON,
+    viewerDefaults: { inApp: false, telegram: false },
   },
 };
 
