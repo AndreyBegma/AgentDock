@@ -36,6 +36,7 @@ import {
   statusLabel,
 } from '../../../lib/runners/format';
 import { PROFILES_DETECT_COMMAND } from '../../../lib/runners/install';
+import { LocalSettings } from './local-settings';
 
 const POLL_MS = 10_000;
 
@@ -328,6 +329,15 @@ export function RunnerSheet({
                     </p>
                   )}
                 </section>
+
+                <LocalSettings
+                  runner={detail}
+                  disabled={isRevoked || busy}
+                  onChanged={() => {
+                    void load();
+                    onChanged();
+                  }}
+                />
 
                 <section aria-labelledby="runner-profiles">
                   <h3

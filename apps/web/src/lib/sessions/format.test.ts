@@ -15,6 +15,7 @@ import {
   formatTokens,
   hasSessionFilters,
   liveTopicFor,
+  originOf,
   queryString,
   sessionFormChanged,
   sumTotals,
@@ -94,6 +95,15 @@ describe('query', () => {
   test('the end date is exclusive: the next local midnight', () => {
     const q = toQuery({ ...EMPTY_FILTERS, toDate: '2026-10-08' });
     expect(q.to).toBe(new Date(2026, 9, 9).toISOString());
+  });
+  test('the origin filter is sent as `origin`', () => {
+    const q = toQuery({ ...EMPTY_FILTERS, origin: 'manual' });
+    expect(queryString(q)).toBe('?origin=manual');
+    expect(appliedFilterCount(q)).toBe(1);
+  });
+  test('an absent origin reads as unknown', () => {
+    expect(originOf({})).toBe('unknown');
+    expect(originOf({ origin: 'worker' })).toBe('worker');
   });
   test('cursor and limit are appended', () => {
     expect(

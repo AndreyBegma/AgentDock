@@ -1,6 +1,11 @@
 'use client';
 
-import type { SessionDetail, SessionTotals } from '@agentdock/shared';
+import type {
+  ProjectDetail,
+  ProjectMemberView,
+  SessionDetail,
+  SessionTotals,
+} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
@@ -18,10 +23,23 @@ import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PageHeader } from '../../../../components/page-header/page-header';
 import { ScrollX } from '../../../../components/scroll-x/scroll-x';
+import { AttachManualButton } from '../../../../components/sessions/attach-manual-button';
+import {
+  LiveStatePill,
+  OriginBadge,
+} from '../../../../components/sessions/origin-badge';
+import { SessionContentTimeline } from '../../../../components/sessions/session-content-timeline';
+import { useCurrentUser } from '../../../../components/shell/user-context';
 import { ApiError, api } from '../../../../lib/api';
 import { formatNumber, pluralize } from '../../../../lib/format';
 import { Time } from '../../../../lib/format/time';
 import { useLive } from '../../../../lib/live/use-live';
+import { useSection } from '../../../../lib/section/use-section';
+import {
+  canReadContent,
+  issueUrl,
+  ownerLabel,
+} from '../../../../lib/sessions/content';
 import {
   buildTrace,
   describeSessionError,
@@ -170,6 +188,8 @@ function describeNode(info: TreeNodeInfo): {
 
 export default function SessionPage() {
   const { id } = useParams<{ id: string }>();
+  const user = useCurrentUser();
+  const isAdmin = user.role === 'admin';
   const [detail, setDetail] = useState<SessionDetail>();
   const [missing, setMissing] = useState(false);
   // Any failure but "not found": say so and offer a retry, never a skeleton forever.
@@ -221,6 +241,24 @@ export default function SessionPage() {
     setSelected(trace.nodes[0]?.id);
   }, [trace]);
 
+  const projectId = detail?.session.projectId ?? null;
+  // The caller's role gates the content; the members name the owner. Both are
+  // optional context: the page never waits on them.
+  const project = useSection(
+    () =>
+      projectId
+        ? api<ProjectDetail>(`/projects/${projectId}`)
+        : Promise.resolve(null),
+    [projectId],
+  ).data;
+  const members = useSection(
+    () =>
+      projectId
+        ? api<ProjectMemberView[]>(`/projects/${projectId}/members`)
+        : Promise.resolve(null),
+    [projectId],
+  ).data;
+
   const name = detail ? sessionName(detail.session) : null;
   useEffect(() => {
     if (name) document.title = `${name} · Sessions · AgentDock`;
@@ -265,6 +303,11 @@ export default function SessionPage() {
   }
 
   const s = detail.session;
+  const issueHref = s.issue ? issueUrl(project?.repo, s.issue) : null;
+  const showContent =
+    s.hasContent === true &&
+    projectId !== null &&
+    canReadContent(project?.role);
   const origin = Date.parse(s.startedAt);
   const info = selected ? trace.info.get(selected) : undefined;
   const node = info ? describeNode(info) : null;
@@ -289,8 +332,32 @@ export default function SessionPage() {
                 </button>
               </Tooltip>
             )}
+            <OriginBadge session={s} />
+            <LiveStatePill session={s} />
             <span>{s.projectName ?? 'No project'}</span>
             {s.slotName ? <span>· slot {s.slotName}</span> : null}
+            {s.issue ? (
+              <span>
+                ·{' '}
+                {issueHref ? (
+                  <a
+                    href={issueHref}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-accent-ink underline underline-offset-2"
+                  >
+                    issue #{s.issue}
+                  </a>
+                ) : (
+                  `issue #${s.issue}`
+                )}
+              </span>
+            ) : null}
+            {s.ownerId ? (
+              <span>
+                · owner {ownerLabel(s.ownerId, user.id, members ?? undefined)}
+              </span>
+            ) : null}
             {s.gitBranch ? (
               <span className="font-mono text-xs">· {s.gitBranch}</span>
             ) : null}
@@ -299,6 +366,16 @@ export default function SessionPage() {
             </span>
             <span className="num">· {formatDuration(s.durationMs)}</span>
           </span>
+        }
+        actions={
+          <AttachManualButton
+            projectId={projectId}
+            sessionId={s.id}
+            runnerId={s.runnerId}
+            tmuxSession={s.tmuxSession}
+            isAdmin={isAdmin}
+            title={sessionName(s)}
+          />
         }
       />
 
@@ -376,6 +453,14 @@ export default function SessionPage() {
           </Card>
         ) : null}
       </div>
+
+      {showContent && projectId ? (
+        <SessionContentTimeline
+          projectId={projectId}
+          sessionId={s.id}
+          refreshKey={s.lastEventAt}
+        />
+      ) : null}
     </>
   );
 }
