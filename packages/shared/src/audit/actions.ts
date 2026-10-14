@@ -114,6 +114,8 @@ export const AUDIT_ACTIONS = [
   'card.finished',
   'card.accepted',
   'card.stopped',
+  /** #243 D10: the card's Continue after design switch. */
+  'card.design_continue_toggled',
   'board.settings_updated',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

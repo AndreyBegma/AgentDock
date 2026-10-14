@@ -67,9 +67,35 @@ export const cardSpecPath = (
   card: CardSpecPathInput,
 ): string => {
   const dir = specDir.replace(/\/+$/, '');
+  return `${dir}/${cardSpecStem(card)}.md`;
+};
+
+/** `<issue|card-n>-<slug>`: the spec's file name and the design's folder. */
+const cardSpecStem = (card: CardSpecPathInput): string => {
   const stem =
     card.issueNumber !== null ? `${card.issueNumber}` : `card-${card.number}`;
-  return `${dir}/${stem}-${cardSlug(card.title)}.md`;
+  return `${stem}-${cardSlug(card.title)}`;
+};
+
+/** #243 D7: where a card's approved mockup goes when the project has no `specDir`. */
+export const CARD_DESIGN_FALLBACK_DIR = 'docs/design/cards';
+
+/**
+ * #243 D7: the approved variant's file in the card's branch, repository-
+ * relative. With a `specDir`, beside the card's spec:
+ * `<specDir>/<issue|card-n>-<slug>/design/<variant>.html`; without one,
+ * `docs/design/cards/C-<n>-<slug>/<variant>.html`.
+ */
+export const cardDesignPath = (
+  specDir: string | null,
+  card: CardSpecPathInput,
+  variant: number,
+): string => {
+  const dir = specDir?.replace(/\/+$/, '') ?? '';
+  if (dir === '') {
+    return `${CARD_DESIGN_FALLBACK_DIR}/${cardLabel(card.number)}-${cardSlug(card.title)}/${variant}.html`;
+  }
+  return `${dir}/${cardSpecStem(card)}/design/${variant}.html`;
 };
 
 /** The largest issue body `issue.create` takes. */

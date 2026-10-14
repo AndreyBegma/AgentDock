@@ -240,6 +240,7 @@ export class BoardRoundsService {
               base: project.base,
               specPath,
               issueNumber: issue.number,
+              design: null,
             });
     const files: CardRunFile[] =
       firstStart && specPath !== null

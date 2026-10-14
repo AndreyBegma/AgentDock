@@ -8,6 +8,13 @@ Decisions: [ADR-0022](../adr/0022-design-stage-html-mockups-from-a-ui-profile.md
 [ADR-0001](../adr/0001-control-plane-and-per-machine-runner.md) ·
 Builds on: [#172](172-planner.md), [#24](24-skills.md), [#28](28-budgets.md)
 
+> **Amended by [ADR-0025](../adr/0025-a-design-has-one-owner-a-plan-task-or-a-board-card.md)
+> ([#243](https://github.com/AndreyBegma/AgentDock/issues/243)).** A design
+> now has exactly one owner: a plan task, as this spec describes, or a board
+> card. Everything below applies to a task's design unchanged; a card's design
+> reuses the profile, mockups, comments, pins, revise and approve, chains no
+> write turn, and is committed into the card's branch when the card runs.
+
 ## Summary
 
 The fleet implements UI tasks straight from text. The person sees the screen
@@ -68,7 +75,6 @@ built.
   the runner (ADR-0022).
 - **Checking the implemented screen against the approved mockup.** It needs
   the project's own rendering and is a separate roadmap item.
-- **A design outside a plan.** Every design belongs to a plan task.
 - **Installing skills from the design dialog.** Skills are installed through
   #24; the dialog lists installed ones.
 - **Codex** as the design or profile runtime: `unsupported_runtime`, as in #172.

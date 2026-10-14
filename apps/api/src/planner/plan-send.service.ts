@@ -364,7 +364,9 @@ export class PlanSendService {
     });
     return new Map(
       rows.flatMap((r) =>
-        r.approvedRevision ? [[r.taskKey, r.approvedRevision] as const] : [],
+        r.approvedRevision && r.taskKey !== null
+          ? [[r.taskKey, r.approvedRevision] as const]
+          : [],
       ),
     );
   }

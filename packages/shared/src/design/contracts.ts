@@ -149,11 +149,26 @@ export interface TaskDesignSummary {
   approvedRevisionId: string | null;
 }
 
-/** `GET /plans/:planId/tasks/:key/design` (plan reader). */
+/**
+ * ADR-0025: a design has exactly one owner — a plan task or a board card
+ * (#243). `number` is the card's per-project number (`C-<number>`).
+ */
+export type DesignOwnerView =
+  | { kind: 'task'; planId: string; taskKey: string }
+  | { kind: 'card'; cardId: string; number: number };
+export type DesignOwnerKind = DesignOwnerView['kind'];
+
+/**
+ * `GET /plans/:planId/tasks/:key/design` (plan reader) and
+ * `GET /projects/:projectId/board/cards/:number/design` (project viewer).
+ */
 export interface TaskDesignView extends TaskDesignSummary {
   id: string;
-  planId: string;
-  taskKey: string;
+  owner: DesignOwnerView;
+  /** The task owner's; `null` for a card's design. Prefer `owner`. */
+  planId: string | null;
+  /** The task owner's; `null` for a card's design. Prefer `owner`. */
+  taskKey: string | null;
   skills: string[];
   /** The profile version the latest revisions were drawn from. */
   profileId: string | null;
@@ -171,7 +186,7 @@ export interface TaskDesignView extends TaskDesignSummary {
   updatedAt: string;
 }
 
-/** `PATCH /plans/:planId/tasks/:key/design` (operator). */
+/** `PATCH /plans/:planId/tasks/:key/design` and `PATCH …/board/cards/:number/design` (operator). */
 export interface TaskDesignPatchRequest {
   needed?: boolean;
   variantCount?: number;
@@ -200,14 +215,21 @@ export interface DesignApproveRequest {
 
 // Live
 
-/** Design writes push on the plan's channel, as the Planner's do (`PLANNER_LIVE_EVENT`). */
+/**
+ * Design writes push on the plan's channel, as the Planner's do
+ * (`PLANNER_LIVE_EVENT`); a card's design on the project's, alongside
+ * `board.changed` (#243).
+ */
 export const DESIGN_LIVE_EVENT = 'design';
 
 export interface DesignLiveChange {
   kind: 'design';
   projectId: string;
-  planId: string;
+  /** `null` for a card's design. */
+  planId: string | null;
   taskKey: string | null;
+  /** Set for a card's design (#243). */
+  cardId?: string;
 }
 
 // Errors
@@ -227,7 +249,10 @@ export const DESIGN_ERROR = {
   noOpenComments: 'no_open_comments',
   /** The design is approved; it takes no more turns or comments. */
   designApproved: 'design_approved',
-  /** The task is approved and frozen, or the plan is sent. */
+  /**
+   * The task is approved and frozen, or the plan is sent; for a card, a
+   * round exists (#243: designs freeze once Run has started).
+   */
   taskFrozen: 'task_frozen',
   profileBuildFailed: 'profile_build_failed',
   contractViolation: 'contract_violation',

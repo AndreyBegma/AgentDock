@@ -97,6 +97,9 @@ export const toCardView = (
   prNumber: card.prNumber,
   prUrl: card.prUrl,
   round: brief(card, card.rounds[0], facts),
+  // #243: the Design chip is read by iB-api; until then a card shows none.
+  design: null,
+  continueAfterDesign: card.continueAfterDesign,
   costUsd: cardCost(card.rounds, facts.costs),
   movedAt: card.movedAt.toISOString(),
   completedAt: iso(card.completedAt),

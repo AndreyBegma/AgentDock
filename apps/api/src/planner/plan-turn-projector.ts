@@ -147,12 +147,15 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
       },
       include: { plan: true, task: true },
     });
-    if (!turn) {
+    // ADR-0025: the `plan` filter above never matches a card's design turn;
+    // #243 iB-api projects those. This narrows the now-nullable owner.
+    if (!turn || turn.plan === null || turn.planId === null) {
       this.logger.warn(
         `runner ${runnerId}: plan turn ${data.turnId} of project ${data.projectId} not found, skipped`,
       );
+      return null;
     }
-    return turn;
+    return { ...turn, plan: turn.plan, planId: turn.planId };
   }
 
   /** `queued` → `running`. A terminal phase is settled by `finished`, which carries the result. */

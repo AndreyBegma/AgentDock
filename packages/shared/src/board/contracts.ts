@@ -1,3 +1,4 @@
+import type { TaskDesignSummary } from '../design';
 import type { OrchestratorPermissionMode } from '../protocol';
 import type {
   BoardCardKind,
@@ -47,6 +48,10 @@ export interface BoardCardView {
   prUrl: string | null;
   /** The latest round; `null` before the first Run. */
   round: CardRoundBrief | null;
+  /** #243: the Design chip; `null` when the card has no design (off). */
+  design: TaskDesignSummary | null;
+  /** #243 D5: approving the design starts round 1. */
+  continueAfterDesign: boolean;
   /** Sum over every round's run, a decimal string; `null` when nothing is priced. */
   costUsd: string | null;
   movedAt: string;
@@ -147,6 +152,8 @@ export interface UpdateBoardCardRequest {
   issueOnRun?: boolean;
   specOnRun?: boolean;
   model?: string | null;
+  /** #243 D5: refused with `design_approved` once the design is approved. */
+  continueAfterDesign?: boolean;
 }
 
 /** `POST /board/cards/:number/move` (D7). `index` is the drop index in `column`. */
@@ -195,6 +202,10 @@ export const BOARD_ERROR = {
   unsupportedRuntime: 'unsupported_runtime',
   /** 503: the runner is offline or does not serve `card.*`. */
   commandUnavailable: 'command_unavailable',
+  /** 409 (#243 D6): Run on a card whose design is needed and not approved. */
+  designNotApproved: 'design_not_approved',
+  /** 409 (#243 D5): `continueAfterDesign` changed after the design was approved. */
+  designApproved: 'design_approved',
 } as const;
 export type BoardErrorCode = (typeof BOARD_ERROR)[keyof typeof BOARD_ERROR];
 
@@ -206,7 +217,7 @@ export interface BoardErrorBody {
   reason?: string;
 }
 
-/** Live: on `project:<id>` whenever a card or its round changes. */
+/** Live: on `project:<id>` whenever a card, its round or its design changes. */
 export const BOARD_CHANGED_EVENT = 'board.changed';
 export interface BoardChangedData {
   cardId: string;
