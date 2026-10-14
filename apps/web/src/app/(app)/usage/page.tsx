@@ -7,13 +7,13 @@ import type {
   UsageTimeseriesResponse,
 } from '@agentdock/shared';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
-import { PageHeader } from '@andrewbehma/glass-ui/page-header';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { SegmentedControl } from '@andrewbehma/glass-ui/segmented-control';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import Link from 'next/link';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { BudgetStrip } from '../../../components/budgets/budget-chip';
+import { PageHeader } from '../../../components/page-header/page-header';
 import { AsyncSection } from '../../../components/prerequisites/async-section';
 import { ScrollX } from '../../../components/scroll-x/scroll-x';
 import { useCurrentUser } from '../../../components/shell/user-context';
@@ -126,7 +126,6 @@ function UsageView() {
   return (
     <>
       <PageHeader
-        className="mb-6"
         title="Usage"
         description="API-equivalent cost — what these tokens would cost at public API prices. You run on subscriptions; this is not a bill."
         actions={

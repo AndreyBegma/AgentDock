@@ -3,10 +3,10 @@
 import type { ProjectSummary, TaskPage } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
-import { PageHeader } from '@andrewbehma/glass-ui/page-header';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import Link from 'next/link';
 import { type ComponentProps, Suspense, useEffect, useState } from 'react';
+import { PageHeader } from '../../../components/page-header/page-header';
 import { AsyncSection } from '../../../components/prerequisites/async-section';
 import { api } from '../../../lib/api';
 import { useUrlFilters } from '../../../lib/filters/use-url-filters';
@@ -100,7 +100,6 @@ function TasksView() {
   return (
     <>
       <PageHeader
-        className="mb-6"
         title="Tasks"
         description="Every task of the plans you can read, across your projects, from draft to merged."
       />

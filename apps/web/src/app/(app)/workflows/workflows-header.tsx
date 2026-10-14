@@ -16,11 +16,11 @@ import {
   MenuTrigger,
 } from '@andrewbehma/glass-ui/menu';
 import { MetaBar, type MetaBarCounter } from '@andrewbehma/glass-ui/meta-bar';
-import { PageHeader } from '@andrewbehma/glass-ui/page-header';
 import { SegmentedControl } from '@andrewbehma/glass-ui/segmented-control';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import { Download, RefreshCw } from 'lucide-react';
+import { PageHeader } from '../../../components/page-header/page-header';
 import { formatNumber } from '../../../lib/format';
 import type { UsageRange } from '../../../lib/usage/format';
 import {
@@ -207,7 +207,6 @@ export function WorkflowsHeader({
     : [];
   return (
     <PageHeader
-      className="mb-6"
       title="Workflows"
       description="How agents work across sessions — Usage says what they cost."
       status={

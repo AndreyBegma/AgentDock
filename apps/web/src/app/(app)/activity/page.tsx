@@ -1,6 +1,6 @@
 'use client';
 
-import { PageHeader } from '@andrewbehma/glass-ui/page-header';
+import { PageHeader } from '../../../components/page-header/page-header';
 import { useCurrentUser } from '../../../components/shell/user-context';
 import { ActivityFeed } from './feed';
 
@@ -9,7 +9,6 @@ export default function ActivityPage() {
   return (
     <>
       <PageHeader
-        className="mb-6"
         title="Activity"
         description="What happened across your projects: pull requests, blockers, runner changes and schedule runs."
       />
