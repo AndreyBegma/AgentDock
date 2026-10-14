@@ -279,6 +279,7 @@ describe('needsYou', () => {
               run({ id: 'old', endedAt: '2026-10-13T06:00:00.000Z' }),
               run({ id: 'ok', status: 'succeeded' }),
               run({ id: 'titled', slot: null, title: 'Nightly audit' }),
+              run({ id: 'skill', kind: 'skill', slot: null, title: null }),
             ],
           ],
         ]),
@@ -289,7 +290,9 @@ describe('needsYou', () => {
       ['profile', 'profile:p2'],
       ['failed', 'failed:fresh'],
       ['failed', 'failed:titled'],
+      ['failed', 'failed:skill'],
     ]);
+    expect(items[3]?.title).toBe('Skill run');
     expect(items[0]?.href).toBe('/projects/p2/settings?tab=orchestrator');
     expect(items[0]?.since).toBeNull();
     expect(items[1]?.title).toBe('Slot i7 · #7');

@@ -12,6 +12,7 @@ import type {
 import { orchestratorSettingsHref } from '../control/reasons';
 import { ORCHESTRATOR_STATUS_LABEL } from '../fleet/format';
 import { slotHref } from '../fleet/workspace-url';
+import { RUN_KIND_LABEL } from '../history/format';
 
 /**
  * The Overview dashboard (issue #159) is composed from the per-project routes
@@ -156,10 +157,10 @@ export interface NeedsYouExtra {
   now?: number;
 }
 
-/** "Slot i4 · #4", else the run's title, else its kind. */
+/** "Slot i4 · #4", else the run's title, else its kind ("Skill run"). */
 function runTitle(run: RunSummary): string {
   if (run.slot !== null) return slotTitle({ name: run.slot, issue: run.issue });
-  return run.title ?? 'A run';
+  return run.title ?? RUN_KIND_LABEL[run.kind];
 }
 
 /**
