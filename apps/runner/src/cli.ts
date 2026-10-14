@@ -307,7 +307,7 @@ const installServiceCommand = async ({
     return EXIT.ok;
   }
   mkdirSync(dirname(paths.serviceFile), { recursive: true });
-  writeFileSync(paths.serviceFile, serviceUnit(deps.execStart), {
+  writeFileSync(paths.serviceFile, serviceUnit(deps.execStart, deps.env.PATH), {
     mode: 0o644,
   });
   out(deps, `Wrote ${paths.serviceFile}`);
