@@ -10,11 +10,11 @@ import Link from 'next/link';
 import { Time } from '../../lib/format/time';
 import {
   canRevise,
-  PLAN_STATUS_LABEL,
-  PLAN_STATUS_PILL,
+  planPill,
   SEND_BLOCK_TEXT,
   sendBlock,
 } from '../../lib/planner/format';
+import { briefBeyondTitle } from '../../lib/planner/header';
 import { plannerHref } from '../../lib/planner/href';
 import { PageHeader } from '../page-header/page-header';
 
@@ -37,9 +37,12 @@ export function VisibilityChip({
 }
 
 /**
- * The plan's header (spec 172 UI): title, version, visibility with **Share
- * with project**, **Revise plan** when a rewrite is pending, and **Send to
- * fleet** when D8 allows; the reason sits in a tooltip when it does not.
+ * The plan's header (spec 172 UI, #213): title, version, the derived status
+ * (a failed newest turn reads Failed, not Drafting), visibility with **Share
+ * with project**, **Approve all drafts (n)**, **Revise plan** when a rewrite
+ * is pending, and **Send to fleet** — the screen's one solid — when D8
+ * allows; the reason sits in a tooltip when it does not. One button size.
+ * The brief is the description only where it says more than the title.
  */
 export function PlanHeader({
   plan,
@@ -47,7 +50,9 @@ export function PlanHeader({
   isAuthor,
   canWrite,
   busy,
+  approveCount,
   onShare,
+  onApproveAll,
   onRevise,
   onSend,
   onArchive,
@@ -58,27 +63,36 @@ export function PlanHeader({
   /** Operator, plan open. */
   canWrite: boolean;
   busy: boolean;
+  /** Drafts **Approve all drafts** would approve. */
+  approveCount: number;
   onShare: () => void;
+  onApproveAll: () => void;
   onRevise: () => void;
   onSend: () => void;
   onArchive: (() => void) | null;
 }) {
   const block = sendBlock(plan);
-  const revisable = canRevise(plan) && plan.activeTurnId === null;
+  const idle = plan.activeTurnId === null;
+  const revisable = canRevise(plan) && idle;
   const closed = plan.status === 'sent' || plan.status === 'archived';
+  const pill = planPill(plan);
+  const description = briefBeyondTitle(plan);
 
   return (
     <PageHeader
       className="mb-0"
       eyebrow={
         <span className="flex flex-wrap items-center gap-2">
+          {/* The breadcrumbs lead back on a desktop; a phone has none. */}
           <Link
             href={plannerHref(projectId)}
-            className="text-accent-ink underline underline-offset-2"
+            className="text-accent-ink underline underline-offset-2 lg:hidden"
           >
             Planner
           </Link>
-          <span aria-hidden="true">/</span>
+          <span aria-hidden="true" className="lg:hidden">
+            /
+          </span>
           <span>
             Version {plan.version} · {plan.author.name} · updated{' '}
             <Time value={plan.updatedAt} />
@@ -88,15 +102,16 @@ export function PlanHeader({
       title={
         <>
           <span className="min-w-0 break-words">{plan.title}</span>
-          <StatusPill
-            status={PLAN_STATUS_PILL[plan.status]}
-            label={PLAN_STATUS_LABEL[plan.status]}
-          />
+          <StatusPill status={pill.status} label={pill.label} />
           <VisibilityChip plan={plan} />
         </>
       }
       description={
-        <span className="line-clamp-2 whitespace-pre-line">{plan.brief}</span>
+        description ? (
+          <span className="line-clamp-2 whitespace-pre-line">
+            {description}
+          </span>
+        ) : undefined
       }
       actions={
         closed ? (
@@ -120,6 +135,15 @@ export function PlanHeader({
             {onArchive ? (
               <Button variant="ghost" disabled={busy} onClick={onArchive}>
                 Archive
+              </Button>
+            ) : null}
+            {canWrite && approveCount > 0 ? (
+              <Button
+                variant="glass"
+                disabled={busy || !idle}
+                onClick={onApproveAll}
+              >
+                Approve all drafts ({approveCount})
               </Button>
             ) : null}
             {canWrite ? (

@@ -22,6 +22,7 @@ const REFETCH_DEBOUNCE_MS = 250;
 export type PlanBusy =
   | { kind: 'turn'; taskKey: string | null }
   | { kind: 'review'; taskKey: string }
+  | { kind: 'approve_all' }
   | { kind: 'cancel' }
   | { kind: 'retry' }
   | { kind: 'revise' }
@@ -99,6 +100,25 @@ export function usePlan(projectId: string, planId: string) {
           body: comment === undefined ? { decision } : { decision, comment },
         }),
       ),
+    /**
+     * **Approve all drafts** (#213): one review per task, in order — there is
+     * no bulk route. A refusal stops there; the refetch shows which went
+     * through.
+     */
+    approveAll: (keys: readonly string[]) =>
+      run({ kind: 'approve_all' }, async () => {
+        try {
+          for (const key of keys) {
+            await api(`${taskApi(projectId, planId, key)}/review`, {
+              method: 'POST',
+              body: { decision: 'approve' },
+            });
+          }
+        } catch (error) {
+          setVersion((v) => v + 1);
+          throw error;
+        }
+      }),
     revise: () =>
       run({ kind: 'revise' }, () => api(`${base}/revise`, { method: 'POST' })),
     setVisibility: (visibility: PlanVisibility) =>

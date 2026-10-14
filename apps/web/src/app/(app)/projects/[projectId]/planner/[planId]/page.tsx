@@ -6,9 +6,10 @@ import {
   type PlanTaskView,
   projectRoleAtLeast,
 } from '@agentdock/shared';
-import { Button } from '@andrewbehma/glass-ui/button';
-import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { buttonClassName } from '@andrewbehma/glass-ui/button';
+import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -33,6 +34,7 @@ import {
   turnsOf,
   writeBlock,
 } from '../../../../../../lib/planner/format';
+import { approvableDrafts } from '../../../../../../lib/planner/header';
 import { planHref, plannerHref } from '../../../../../../lib/planner/href';
 import { pastRounds } from '../../../../../../lib/planner/rounds';
 import { usePlan } from '../../../../../../lib/planner/use-plan';
@@ -74,7 +76,7 @@ export default function PlanPage() {
         action={
           <Link
             href={plannerHref(projectId)}
-            className="text-sm text-accent-ink underline"
+            className={buttonClassName({ variant: 'glass' })}
           >
             Open the Planner
           </Link>
@@ -148,6 +150,7 @@ function PlanView({
   const canWrite = block === null;
   const active = activeTurn(plan);
   const selected = plan.tasks.find((t) => t.key === selectedKey) ?? null;
+  const drafts = approvableDrafts(plan);
 
   // On a phone the panel stacks below the cards: bring it into view.
   useEffect(() => {
@@ -242,7 +245,11 @@ function PlanView({
         isAuthor={isAuthor}
         canWrite={canWrite}
         busy={busy !== null}
+        approveCount={drafts.length}
         onShare={() => void actions.setVisibility('project').catch(() => {})}
+        onApproveAll={() =>
+          void actions.approveAll(drafts.map((t) => t.key)).catch(() => {})
+        }
         onRevise={() => void actions.revise().catch(() => {})}
         onSend={() => {
           setSendError(undefined);
@@ -256,11 +263,14 @@ function PlanView({
           aria-labelledby="plan-questions"
           className="flex max-w-3xl flex-col gap-3"
         >
-          <h2 id="plan-questions" className="text-sm font-semibold">
-            {plan.mode === 'dialogue'
-              ? 'Questions about the brief'
-              : 'Splitting the brief'}
-          </h2>
+          <SectionHeader
+            headingId="plan-questions"
+            title={
+              plan.mode === 'dialogue'
+                ? 'Questions about the brief'
+                : 'Splitting the brief'
+            }
+          />
           {conversationFor(null)}
         </section>
       ) : (
@@ -290,12 +300,17 @@ function PlanView({
                 selected ? 'lg:order-2 2xl:order-1' : 'lg:order-1'
               }`}
             >
-              <h2 id="plan-tasks" className="text-sm font-semibold">
-                Tasks{' '}
-                <span className="font-normal text-ink-3">
-                  ({plan.tasks.length})
-                </span>
-              </h2>
+              <SectionHeader
+                headingId="plan-tasks"
+                title={
+                  <>
+                    Tasks{' '}
+                    <span className="font-normal text-ink-3">
+                      ({plan.tasks.length})
+                    </span>
+                  </>
+                }
+              />
               {plan.tasks.map((task) => (
                 <TaskCard
                   key={task.key}
@@ -318,9 +333,7 @@ function PlanView({
                   : 'lg:order-2'
               }`}
             >
-              <h2 id="plan-graph" className="text-sm font-semibold">
-                Dependencies
-              </h2>
+              <SectionHeader headingId="plan-graph" title="Dependencies" />
               <PlanGraph
                 plan={plan}
                 selectedKey={selectedKey}
@@ -365,43 +378,24 @@ function PlanView({
         onOpenChange={setSending}
         onConfirm={() => void send()}
       />
-      <DialogRoot
+      <ConfirmDialog
         open={archiving}
         onOpenChange={(o) => busy === null && setArchiving(o)}
-      >
-        <DialogContent
-          title="Archive this plan?"
-          description="The plan stays readable, takes no more turns, and its worktree on the runner is removed. Issues already created are not touched."
-          footer={
-            <>
-              <Button
-                variant="glass"
-                disabled={busy !== null}
-                onClick={() => setArchiving(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="danger"
-                disabled={busy !== null}
-                onClick={() =>
-                  void actions
-                    .archive()
-                    .then(() => {
-                      setArchiving(false);
-                      onArchived();
-                    })
-                    .catch(() => {})
-                }
-              >
-                {busy?.kind === 'archive' ? 'Archiving…' : 'Archive'}
-              </Button>
-            </>
-          }
-        >
-          {null}
-        </DialogContent>
-      </DialogRoot>
+        title="Archive this plan?"
+        consequence="The plan stays readable, takes no more turns, and its worktree on the runner is removed. Issues already created are not touched."
+        verb="Archive"
+        tone="danger"
+        busy={busy?.kind === 'archive'}
+        onConfirm={() =>
+          void actions
+            .archive()
+            .then(() => {
+              setArchiving(false);
+              onArchived();
+            })
+            .catch(() => {})
+        }
+      />
     </div>
   );
 }
