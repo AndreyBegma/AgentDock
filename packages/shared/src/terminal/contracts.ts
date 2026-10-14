@@ -12,12 +12,16 @@ import {
  * messages and the browser's own text frames are in `protocol/terminal.ts`.
  */
 
-/** `POST /terminal/tickets` (admin). `slot` with `kind: 'slot'`, `runId` with `kind: 'skill_run'`. */
+/**
+ * `POST /terminal/tickets` (admin). `slot` with `kind: 'slot'`, `runId` with
+ * `kind: 'skill_run'`, `cardId` with `kind: 'card'` (issue #242).
+ */
 export interface TerminalTicketRequest {
   kind: TerminalTargetKind;
   projectId: string;
   slot?: string;
   runId?: string;
+  cardId?: string;
   mode: TerminalMode;
 }
 
@@ -36,6 +40,7 @@ export interface TerminalTargetView {
   projectId: string;
   slot: string | null;
   runId: string | null;
+  cardId: string | null;
 }
 
 /** One live attach, as `GET /terminal/active?projectId=` lists it (D9). */

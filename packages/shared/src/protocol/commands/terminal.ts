@@ -7,6 +7,7 @@ import {
   terminalModeSchema,
   terminalRowsSchema,
 } from '../terminal';
+import { cardIdSchema } from './cards';
 import { slotNameSchema } from './control';
 
 /**
@@ -43,12 +44,25 @@ export const manualTerminalTargetSchema = z.strictObject({
 export type ManualTerminalTarget = z.infer<typeof manualTerminalTargetSchema>;
 
 /**
+ * A board card's worker (issue #242): the runner resolves `cardId` to the
+ * `agentdock-card-<shortid>` session it started for that card, and refuses a
+ * card of another project.
+ */
+export const cardTerminalTargetSchema = z.strictObject({
+  kind: z.literal('card'),
+  ...projectTarget,
+  cardId: cardIdSchema,
+});
+export type CardTerminalTarget = z.infer<typeof cardTerminalTargetSchema>;
+
+/**
  * What to attach to (D2). The runner resolves the tmux session name itself:
  * `slot` → `cs-<slot>` when the slot's worktree belongs to `root`,
  * `orchestrator` → the project's orchestrator session, `skill_run` →
  * `agentdock-run-<shortid>` of a live run of that project, `manual` → the
- * `agentdock-manual-*` session of a Claude session it recorded. There is no
- * field for a session name or a command, and an unknown field fails to parse.
+ * `agentdock-manual-*` session of a Claude session it recorded, `card` →
+ * the `agentdock-card-*` session of that project's card. There is no field
+ * for a session name or a command, and an unknown field fails to parse.
  */
 export const terminalTargetSchema = z.discriminatedUnion('kind', [
   z.strictObject({
@@ -63,6 +77,7 @@ export const terminalTargetSchema = z.discriminatedUnion('kind', [
     runId: terminalRunIdSchema,
   }),
   manualTerminalTargetSchema,
+  cardTerminalTargetSchema,
 ]);
 export type TerminalTarget = z.infer<typeof terminalTargetSchema>;
 

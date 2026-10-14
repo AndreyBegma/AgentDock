@@ -3,6 +3,7 @@ export * from './activity';
 export * from './approvals';
 export * from './audit';
 export * from './auth';
+export * from './board';
 export * from './budgets';
 export * from './control';
 export * from './design';

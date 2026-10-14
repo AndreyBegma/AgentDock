@@ -116,6 +116,8 @@ export const targetKey = (target: TerminalTarget): string => {
       return `${target.projectId}:skill_run:${target.runId}`;
     case 'manual':
       return `${target.projectId}:manual:${target.sessionId}`;
+    case 'card':
+      return `${target.projectId}:card:${target.cardId}`;
   }
 };
 
@@ -150,6 +152,8 @@ const auditTarget = (target: TerminalTarget) => {
       return { type: 'skill_run', id: target.runId };
     case 'manual':
       return { type: 'session', id: target.sessionId };
+    case 'card':
+      return { type: 'board_card', id: target.cardId };
   }
 };
 
@@ -159,6 +163,7 @@ const targetView = (target: TerminalTarget) => ({
   projectId: target.projectId,
   slot: target.kind === 'slot' ? target.slot : null,
   runId: target.kind === 'skill_run' ? target.runId : null,
+  cardId: target.kind === 'card' ? target.cardId : null,
 });
 
 /**

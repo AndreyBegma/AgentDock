@@ -27,3 +27,4 @@ Numbered, never rewritten. A changed decision gets a new ADR that supersedes the
 | [0021](0021-session-content-is-opt-in-per-project.md) | Session content is opt-in per project (amends spec 12 D9) |
 | [0022](0022-design-stage-html-mockups-from-a-ui-profile.md) | The design stage draws HTML mockups from a cached UI profile — no external design tool, no dev server |
 | [0023](0023-runners-advertise-their-commands.md) | Runners advertise their commands; features check commands, never versions |
+| [0024](0024-board-cards-and-dedicated-card-workers.md) | Board cards are work items AgentDock owns; each runs a dedicated interactive worker outside the orchestrator (amends ADR-0004, scopes ADR-0005) |

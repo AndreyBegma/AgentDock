@@ -48,6 +48,7 @@ const ARGS: Record<LocalMethodName, unknown> = {
     summary: 'Start the fleet on the ready queue',
   },
   'away.set': { on: true },
+  'card.finish': { summary: 'Done.' },
 };
 
 /**
@@ -179,9 +180,11 @@ describe('local requests over the runner socket (e2e)', () => {
     const responses = new Map<LocalMethodName, LocalResponseMessage>();
     let actionId = '';
     // `action.request` first: `action.status` asks about the request it made.
+    // `card.finish` needs a card session; the board's own e2e covers it.
+    const swept = localMethodNames.filter((m) => m !== 'card.finish');
     const order = [
       'action.request',
-      ...localMethodNames.filter((m) => m !== 'action.request'),
+      ...swept.filter((m) => m !== 'action.request'),
     ] as LocalMethodName[];
     for (const method of order) {
       const args = method === 'action.status' ? { id: actionId } : ARGS[method];
@@ -204,7 +207,7 @@ describe('local requests over the runner socket (e2e)', () => {
         actionId = (response.data as { id: string }).id;
       }
     }
-    expect(responses.size).toBe(localMethodNames.length);
+    expect(responses.size).toBe(swept.length);
 
     const context = responses.get('context.sessionStart')?.data as {
       text: string;

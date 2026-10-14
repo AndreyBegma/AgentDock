@@ -193,6 +193,7 @@ describe('TerminalRelay', () => {
               projectId: 'p1',
               slot: 'i42',
               runId: null,
+              cardId: null,
             },
             mode: 'read',
             session: 'cs-i42',
@@ -293,7 +294,13 @@ describe('TerminalRelay', () => {
       expect(relay.active('p1')).toEqual([
         {
           id: attach?.id,
-          target: { kind: 'slot', projectId: 'p1', slot: 'i42', runId: null },
+          target: {
+            kind: 'slot',
+            projectId: 'p1',
+            slot: 'i42',
+            runId: null,
+            cardId: null,
+          },
           mode: 'write',
           user: { id: 'u1', email: 'ada@example.com' },
           since: new Date(0).toISOString(),

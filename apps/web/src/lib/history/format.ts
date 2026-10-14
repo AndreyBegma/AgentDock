@@ -45,6 +45,7 @@ export const RUN_KIND_LABEL: Record<RunKind, string> = {
   schedule: 'Scheduled start',
   plan: 'Planner turn',
   ui_profile: 'UI profile build',
+  card: 'Board card round',
 };
 
 export const isRunKind = (value: string): value is RunKind =>
