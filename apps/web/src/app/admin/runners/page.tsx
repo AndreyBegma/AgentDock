@@ -11,7 +11,6 @@ import { type Column, DataTable } from '@andrewbehma/glass-ui/data-table';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Field, Input } from '@andrewbehma/glass-ui/field';
-import { toast } from '@andrewbehma/glass-ui/toast';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { type FormEvent, useEffect, useState } from 'react';
@@ -32,6 +31,7 @@ import {
   statusLabel,
 } from '../../../lib/runners/format';
 import { ADD_RUNNER_PARAM, INSTALL_PATH } from '../../../lib/runners/install';
+import { useErrorToast } from '../../../lib/section/use-error-toast';
 import { useSection } from '../../../lib/section/use-section';
 import { PairingDialog } from './pairing-dialog';
 import { RunnerSheet } from './runner-sheet';
@@ -50,6 +50,7 @@ function AddRunnerDialog({
 }) {
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
+  const showError = useErrorToast();
 
   useEffect(() => {
     if (open) setName('');
@@ -68,7 +69,7 @@ function AddRunnerDialog({
         }),
       );
     } catch (err) {
-      toast.error(describeRunnerError(err));
+      showError(describeRunnerError(err));
     } finally {
       setBusy(false);
     }
@@ -268,6 +269,7 @@ function RunnersTable() {
   const [adding, setAdding] = useState(false);
   const [pairing, setPairing] = useState<PairingCodeResponse | null>(null);
   const [selected, setSelected] = useState<string>();
+  const showError = useErrorToast();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -308,7 +310,7 @@ function RunnersTable() {
         ),
       );
     } catch (err) {
-      toast.error(describeRunnerError(err));
+      showError(describeRunnerError(err));
     }
   };
 

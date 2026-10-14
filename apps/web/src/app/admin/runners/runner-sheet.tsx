@@ -9,6 +9,7 @@ import type {
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
+import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Field, Input } from '@andrewbehma/glass-ui/field';
@@ -36,6 +37,7 @@ import {
   statusLabel,
 } from '../../../lib/runners/format';
 import { PROFILES_DETECT_COMMAND } from '../../../lib/runners/install';
+import { useErrorToast } from '../../../lib/section/use-error-toast';
 import { LocalSettings } from './local-settings';
 
 const POLL_MS = 10_000;
@@ -75,15 +77,16 @@ export function RunnerSheet({
   const [dialog, setDialog] = useState<Dialog>();
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
+  const showError = useErrorToast();
 
   const load = useCallback(async () => {
     if (!runnerId) return;
     try {
       setDetail(await api<AdminRunnerDetail>(`/admin/runners/${runnerId}`));
     } catch (err) {
-      toast.error(describeRunnerError(err));
+      showError(describeRunnerError(err));
     }
-  }, [runnerId]);
+  }, [runnerId, showError]);
 
   useEffect(() => {
     setDetail(undefined);
@@ -98,7 +101,7 @@ export function RunnerSheet({
     try {
       return await task();
     } catch (err) {
-      toast.error(describeRunnerError(err));
+      showError(describeRunnerError(err));
       return undefined;
     } finally {
       setBusy(false);
@@ -112,7 +115,7 @@ export function RunnerSheet({
     if (!result) return;
     const { ok, text } = pingMessage(result);
     if (ok) toast.success(text);
-    else toast.error(text);
+    else showError(text);
   };
 
   const newCode = async () => {
@@ -492,29 +495,18 @@ export function RunnerSheet({
         </DialogContent>
       </DialogRoot>
 
-      <DialogRoot
+      <ConfirmDialog
         open={dialog === 'revoke'}
         onOpenChange={(open) => {
           if (!open) setDialog(undefined);
         }}
-      >
-        <DialogContent
-          title="Revoke runner"
-          description={`${detail?.name ?? 'This runner'} will be disconnected now and refused when it reconnects. Its row and events stay. To use the machine again, pair a new runner.`}
-          footer={
-            <>
-              <Button variant="ghost" onClick={() => setDialog(undefined)}>
-                Cancel
-              </Button>
-              <Button variant="danger" disabled={busy} onClick={revoke}>
-                Revoke
-              </Button>
-            </>
-          }
-        >
-          {null}
-        </DialogContent>
-      </DialogRoot>
+        title={`Revoke ${detail?.name ?? 'this runner'}?`}
+        consequence="It will be disconnected now and refused when it reconnects. Its row and events stay. To use the machine again, pair a new runner."
+        verb="Revoke"
+        tone="danger"
+        busy={busy}
+        onConfirm={() => void revoke()}
+      />
     </>
   );
 }
