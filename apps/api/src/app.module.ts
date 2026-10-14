@@ -14,6 +14,7 @@ import { GitHubAppModule } from './github-app';
 import { HealthController } from './health.controller';
 import { HistoryModule } from './history';
 import { LiveModule } from './live/live.module';
+import { LocalModule } from './local';
 import { NotificationsModule } from './notifications';
 import { PaneModule } from './pane';
 import { PlannerModule } from './planner';
@@ -56,6 +57,8 @@ import { WorkflowsModule } from './workflows';
     HistoryModule,
     ApprovalsModule,
     NotificationsModule,
+    // Spec 201: the `local.request` router and action requests.
+    LocalModule,
     TelegramModule,
     TerminalModule,
     SkillsModule,

@@ -109,4 +109,4 @@ Until then AgentDock does without it rather than drawing it here (ADR-0011).
 
 | Gap | Effect in AgentDock |
 |---|---|
-| none known | `TabBarItem.badge` landed in 0.29.0 and is adopted by the shell unit (A1) |
+| `TimelineItem` secondary action | A `Timeline` row with `href` is one anchor, so nothing inside it can be a link. Activity shows a pull request as a plain `#205` chip and the row opens the slot (#213); a PR link chip waits for a trailing-action slot on `TimelineItem` |

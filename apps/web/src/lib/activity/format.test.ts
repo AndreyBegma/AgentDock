@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'bun:test';
 import type { ActivityItem } from '@agentdock/shared';
 import {
+  ACTIVITY_FILTER_CODEC,
+  activityChipDefs,
+  activityHref,
   actorName,
   EMPTY_ACTIVITY_FILTERS,
   formFromSearch,
@@ -8,10 +11,12 @@ import {
   groupRows,
   hasActivityFilters,
   itemMeta,
+  itemTitle,
   LIVE_PROJECT_BUDGET,
   matchesQuery,
   mergeItems,
   moreFilterCount,
+  PROJECT_ACTIVITY_FILTER_CODEC,
   parseLiveItem,
   planLive,
   queryString,
@@ -200,6 +205,131 @@ describe('presentation', () => {
     );
     expect(t.tone).toBe('danger');
     expect(t.href).toBe('/projects/p1/fleet');
+  });
+});
+
+describe('activityHref', () => {
+  test("a slot's item opens its panel in front on Fleet", () => {
+    expect(
+      activityHref(item({ slot: 'i185', link: '/projects/p1/fleet' })),
+    ).toBe('/projects/p1/fleet?open=i185&focus=i185');
+  });
+
+  test('any other link is the API one, as it is', () => {
+    expect(
+      activityHref(item({ slot: 'i185', link: '/projects/p1/schedules' })),
+    ).toBe('/projects/p1/schedules');
+    expect(activityHref(item({ link: '/projects/p1/fleet' }))).toBe(
+      '/projects/p1/fleet',
+    );
+  });
+
+  test('a fleet link of another project, or a name that is no slot, is not rewritten', () => {
+    expect(
+      activityHref(item({ slot: 'i185', link: '/projects/p2/fleet' })),
+    ).toBe('/projects/p2/fleet');
+    expect(
+      activityHref(item({ slot: 'Bad Name', link: '/projects/p1/fleet' })),
+    ).toBe('/projects/p1/fleet');
+  });
+
+  test('never an outside link', () => {
+    expect(
+      activityHref(item({ slot: 'i1', link: '//evil.example' })),
+    ).toBeUndefined();
+  });
+
+  test('the timeline item uses it', () => {
+    expect(
+      toTimelineItem(item({ slot: 'i2', link: '/projects/p1/fleet' })).href,
+    ).toBe('/projects/p1/fleet?open=i2&focus=i2');
+  });
+});
+
+describe('itemTitle', () => {
+  test('a trailing PR URL becomes the number', () => {
+    expect(
+      itemTitle(
+        item({
+          title:
+            'i185: pull request open — https://github.com/acme/app/pull/205',
+        }),
+      ),
+    ).toEqual({ title: 'i185: pull request open', prNumber: 205 });
+  });
+
+  test("the item's own number wins over the URL's", () => {
+    expect(
+      itemTitle(
+        item({
+          title: 'i1: pull request open https://github.com/a/b/pull/3/files',
+          prNumber: 4,
+        }),
+      ),
+    ).toEqual({ title: 'i1: pull request open', prNumber: 4 });
+  });
+
+  test('a title without a PR URL is left as it is', () => {
+    expect(itemTitle(item({ title: 'i1: blocked on review' }))).toEqual({
+      title: 'i1: blocked on review',
+      prNumber: null,
+    });
+  });
+
+  test('a title that is only the URL keeps it rather than going blank', () => {
+    const only = 'https://github.com/a/b/pull/7';
+    expect(itemTitle(item({ title: only })).title).toBe(only);
+  });
+
+  test('meta and the timeline item read the number from the URL', () => {
+    const titled = item({
+      title: 'i9: pull request open — https://github.com/a/b/pull/12',
+    });
+    expect(itemMeta(titled)).toContain('PR #12');
+    expect(toTimelineItem(titled).title).toBe('i9: pull request open');
+  });
+});
+
+describe('filters in the URL', () => {
+  test('a project feed never writes or reads the project', () => {
+    const params = new URLSearchParams('project=p9&category=fleet&tab=x');
+    expect(PROJECT_ACTIVITY_FILTER_CODEC.parse(params).projectId).toBe('');
+    expect(
+      PROJECT_ACTIVITY_FILTER_CODEC.search({
+        ...EMPTY_ACTIVITY_FILTERS,
+        projectId: 'p9',
+        slot: 'i1',
+      }),
+    ).toBe('?slot=i1');
+    expect(PROJECT_ACTIVITY_FILTER_CODEC.keys).not.toContain('project');
+    expect(ACTIVITY_FILTER_CODEC.keys).toContain('project');
+  });
+
+  test('chips name each filter in force', () => {
+    const defs = activityChipDefs({
+      project: () => 'Alpha',
+      actor: () => 'dev@example.test',
+    });
+    const labels = defs.flatMap(
+      (d) =>
+        d.label({
+          projectId: 'p1',
+          category: 'fleet',
+          type: 'pr.opened',
+          actor: 'u1',
+          slot: 'i3',
+          fromDate: '2026-10-01',
+          toDate: '',
+        }) ?? [],
+    );
+    expect(labels).toEqual([
+      'Project: Alpha',
+      'Category: Fleet',
+      'Type: PR opened',
+      'Actor: dev@example.test',
+      'Slot: i3',
+      'From 2026-10-01',
+    ]);
   });
 });
 

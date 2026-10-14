@@ -8,10 +8,12 @@ import {
   filtersSearch,
   hasTaskFilters,
   mergeTaskRows,
+  plannerTarget,
   rowStatus,
   TASK_PILL_STATUS,
   TASK_STATUS_LABEL,
   TASK_STATUSES,
+  taskChipDefs,
   taskFilterCount,
   taskPlannerHref,
   tasksQuery,
@@ -158,5 +160,48 @@ describe('describePlannerError', () => {
     expect(describePlannerError(new Error('x'))).toBe(
       'Could not reach the server.',
     );
+  });
+});
+
+describe('plannerTarget', () => {
+  test('the filtered project wins', () => {
+    expect(plannerTarget({ projectId: 'b' }, ['a', 'b'])).toBe('b');
+  });
+
+  test('else the only project', () => {
+    expect(plannerTarget({ projectId: '' }, ['a'])).toBe('a');
+  });
+
+  test('none when there is no single project to name', () => {
+    expect(plannerTarget({ projectId: '' }, ['a', 'b'])).toBeNull();
+    expect(plannerTarget({ projectId: '' }, [])).toBeNull();
+  });
+});
+
+describe('taskChipDefs', () => {
+  const defs = taskChipDefs((id) => (id === 'p1' ? 'Alpha' : 'another'));
+  const labels = (filters: typeof EMPTY_TASK_FILTERS) =>
+    defs.flatMap((d) => d.label(filters) ?? []);
+
+  test('every filter in force is a chip, the plan included', () => {
+    expect(
+      labels({
+        projectId: 'p1',
+        kind: 'bug',
+        status: 'pr_open',
+        planId: 'plan1',
+        q: ' login ',
+      }),
+    ).toEqual([
+      'Search: login',
+      'Project: Alpha',
+      `Status: ${TASK_STATUS_LABEL.pr_open}`,
+      'Kind: Bug',
+      'One plan',
+    ]);
+  });
+
+  test('no filter, no chip', () => {
+    expect(labels(EMPTY_TASK_FILTERS)).toEqual([]);
   });
 });

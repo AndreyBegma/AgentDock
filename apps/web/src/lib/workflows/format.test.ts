@@ -5,29 +5,28 @@ import type {
   WorkflowsSummaryResponse,
 } from '@agentdock/shared';
 import { ApiError } from '../api';
+import { exportFileName, orchestrationCsv, summaryCsv, toCsv } from './export';
 import {
   applyNodeFilter,
   DEFAULT_WORKFLOWS_FILTERS,
   describeWorkflowsError,
-  exportFileName,
   filtersFromSearch,
   filtersSearch,
   formatAverage,
   formatAverageDuration,
   formatFlow,
   formatRate,
+  formatUpdatedAt,
   hasNodeFilters,
   nodeFilterChips,
-  orchestrationCsv,
-  orchestrationNodeLook,
   rangeOf,
   STATUS_LABEL,
-  summaryCsv,
-  toCsv,
-  toolSankey,
+  WORKFLOWS_FILTER_CODEC,
   type WorkflowsFilters,
+  workflowsChipDefs,
   workflowsQuery,
 } from './format';
+import { orchestrationNodeLook, toolLabel, toolSankey } from './sankey';
 
 const parse = (search: string) =>
   filtersFromSearch(new URLSearchParams(search));
@@ -195,8 +194,21 @@ describe('tile formatting', () => {
   });
 
   test('a real zero is a zero', () => {
-    expect(formatAverage(0)).toBe('0');
+    expect(formatAverage(0)).toBe('0.0');
     expect(formatRate(0)).toBe('0%');
+  });
+
+  test('averages keep their decimal, so 0.0 sits beside 0.3 (#213)', () => {
+    expect(formatAverage(0.04)).toBe('0.0');
+    expect(formatAverage(0.3)).toBe('0.3');
+    expect(formatAverage(2)).toBe('2.0');
+    expect(formatAverage(1234.56)).toBe('1,234.6');
+  });
+
+  test('"Updated hh:mm", no seconds', () => {
+    const at = new Date(2026, 9, 14, 9, 4, 7).toISOString();
+    expect(formatUpdatedAt(at)).toBe('09:04');
+    expect(formatUpdatedAt('not a date')).toBe('');
   });
 
   test('averages, rates, flows and durations', () => {
@@ -260,6 +272,80 @@ describe('toolSankey', () => {
     }
     const hue = (id: string) => graph.nodes.find((n) => n.id === id)?.hue;
     expect(hue('from:Bash')).toBe(hue('to:Bash'));
+  });
+
+  test('an MCP tool is labelled short; the id keeps the full name', () => {
+    const tool = 'mcp__plugin_playwright_playwright__browser_navigate';
+    const graph = toolSankey([
+      { from: tool, to: 'Bash', count: 1, errors: 0, errorShare: 0 },
+    ]);
+    const source = graph.nodes.find((n) => n.id === `from:${tool}`);
+    expect(source?.label).toBe('playwright · browser_navigate');
+  });
+});
+
+describe('toolLabel', () => {
+  test('a built-in tool is its own name', () => {
+    expect(toolLabel('Bash')).toBe('Bash');
+  });
+
+  test('an MCP tool reads server · tool', () => {
+    expect(toolLabel('mcp__glitchtip__list_issues')).toBe(
+      'glitchtip · list_issues',
+    );
+    expect(toolLabel('mcp__claude_ai_Google_Drive__search')).toBe(
+      'claude_ai_Google_Drive · search',
+    );
+  });
+
+  test("a plugin's repeated server name is said once", () => {
+    expect(toolLabel('mcp__plugin_context7_context7__query-docs')).toBe(
+      'context7 · query-docs',
+    );
+  });
+});
+
+describe('filters in the URL and chips', () => {
+  test('the codec owns every key the page writes', () => {
+    const search = filtersSearch(
+      filters({
+        range: 'custom',
+        fromDate: '2026-10-01',
+        projectId: 'p1',
+        profileKey: 'k',
+        status: 'ended',
+        runtime: 'claude',
+        agentType: 'Explore',
+        compactions: 'one',
+        outcome: 'error',
+      }),
+    );
+    for (const key of new URLSearchParams(search).keys()) {
+      expect(WORKFLOWS_FILTER_CODEC.keys).toContain(key);
+    }
+  });
+
+  test('project, profile and graph filters are chips; range and status are not', () => {
+    const defs = workflowsChipDefs({
+      project: () => 'Alpha',
+      profile: () => 'Opus fast',
+    });
+    const set = filters({
+      range: '30d',
+      status: 'ended',
+      projectId: 'p1',
+      profileKey: 'k',
+      outcome: 'error',
+    });
+    expect(defs.flatMap((d) => d.label(set) ?? [])).toEqual([
+      'Project: Alpha',
+      'Runtime profile: Opus fast',
+      'Outcome: Error',
+    ]);
+    expect(defs.find((d) => d.key === 'projectId')?.clear).toEqual({
+      projectId: '',
+      profileKey: '',
+    });
   });
 });
 

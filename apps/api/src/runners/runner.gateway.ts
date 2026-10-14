@@ -13,6 +13,7 @@ import type { RawData, WebSocket } from 'ws';
 import { bearerToken } from './credentials';
 import { LiveConnection, RunnerConnections } from './runner-connections';
 import { RunnerIngestService } from './runner-ingest.service';
+import { RunnerLocalRequests } from './runner-local-requests';
 import { RUNNER_OPTIONS, type RunnerOptions } from './runner-options';
 import { RunnerStreams } from './runner-streams';
 import { RunnerWatchList } from './runner-watch-list';
@@ -26,6 +27,7 @@ interface Deps {
   connections: RunnerConnections;
   watchList: RunnerWatchList;
   streams: RunnerStreams;
+  localRequests: RunnerLocalRequests;
   options: RunnerOptions;
   logger: Logger;
 }
@@ -163,7 +165,29 @@ class RunnerSocket {
       case 'terminal.close':
         this.deps.streams.deliverTerminal(runnerId, message);
         return;
+      case 'local.request':
+        this.local(runnerId, live, message);
+        return;
     }
+  }
+
+  /**
+   * Answered off the frame queue (spec 201 D6): a handler may send the runner
+   * a command — `issue.create` for `create_issue` — whose `command.result`
+   * arrives on this same queue, so awaiting it here would deadlock.
+   */
+  private local(
+    runnerId: string,
+    live: LiveConnection,
+    request: Extract<RunnerMessage, { type: 'local.request' }>,
+  ): void {
+    void this.deps.localRequests.answer(runnerId, request).then((response) => {
+      if (!live.send(response)) {
+        this.deps.logger.debug(
+          `runner ${runnerId}: local.response ${request.id} not sent, socket gone`,
+        );
+      }
+    });
   }
 
   private async hello(
@@ -236,6 +260,7 @@ export class RunnerGateway implements OnGatewayConnection {
     private readonly connections: RunnerConnections,
     private readonly watchList: RunnerWatchList,
     private readonly streams: RunnerStreams,
+    private readonly localRequests: RunnerLocalRequests,
     @Inject(RUNNER_OPTIONS) private readonly options: RunnerOptions,
   ) {}
 
@@ -245,6 +270,7 @@ export class RunnerGateway implements OnGatewayConnection {
       connections: this.connections,
       watchList: this.watchList,
       streams: this.streams,
+      localRequests: this.localRequests,
       options: this.options,
       logger: this.logger,
     });

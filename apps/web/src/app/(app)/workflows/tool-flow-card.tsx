@@ -7,11 +7,13 @@ import type {
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { DataTable } from '@andrewbehma/glass-ui/data-table';
 import { Sankey } from '@andrewbehma/glass-ui/sankey';
+import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { type ReactNode, useMemo } from 'react';
 import { ScrollX } from '../../../components/scroll-x/scroll-x';
 import { formatNumber } from '../../../lib/format';
-import { formatRate, toolSankey } from '../../../lib/workflows/format';
+import { formatRate } from '../../../lib/workflows/format';
+import { toolSankey } from '../../../lib/workflows/sankey';
 
 /** Past this many tools a side folds into "+N more"; the table still lists every row. */
 const TOOLS_PER_COLUMN = 12;
@@ -82,18 +84,16 @@ export function ToolFlowCard({
   );
   return (
     <section aria-labelledby="workflows-tools">
-      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3">
-        <h2 id="workflows-tools" className="text-sm font-medium">
-          2. Tool execution flow
-        </h2>
-        {data && data.transitions.length > 0 ? (
-          <p className="num text-xs text-ink-3">
-            Top {formatNumber(data.transitions.length)} of{' '}
-            {formatNumber(data.distinctTransitions)} distinct transitions,{' '}
-            {formatNumber(data.totalTransitions)} in all
-          </p>
-        ) : null}
-      </div>
+      <SectionHeader
+        className="mb-2"
+        headingId="workflows-tools"
+        title="2. Tool execution flow"
+        description={
+          data && data.transitions.length > 0
+            ? `Top ${formatNumber(data.transitions.length)} of ${formatNumber(data.distinctTransitions)} distinct transitions, ${formatNumber(data.totalTransitions)} in all. A long tool name is shortened on the graph; the table below has it whole.`
+            : undefined
+        }
+      />
       {unavailable}
       {graph && data ? (
         data.transitions.length === 0 ? (
