@@ -1,23 +1,31 @@
 import type { z } from 'zod';
+import { DESIGN_CDN_ALLOWLIST } from '../design/cdn';
+import { DESIGN_HTML_MAX_BYTES, DESIGN_VARIANTS_MAX } from '../design/limits';
+import { validateMockup } from '../design/validate';
 import {
   isPlannedTask,
   PLANNER_BLOCK_TAG,
   PLANNER_CONTRACT_VERSION,
+  PLANNER_DESIGN_BLOCK_TAG,
   PLANNER_MAX_OPTIONS,
   PLANNER_MAX_QUESTIONS,
   PLANNER_MAX_TASKS,
   type PlannedTask,
+  type PlannerContractVersion,
   type PlannerOutput,
   type PlanTaskKind,
   type PlanTurnAction,
-  plannerOutputSchemas,
+  plannerOutputSchemasFor,
 } from './types';
 
 /**
- * The output contract, v1 (docs/specs/172-planner.md "Output contract",
- * D17). The API extracts the one `agentdock-plan` block of a turn's final
- * message and validates it here. A turn that fails is `contract_violation`
- * and applies nothing, so `reason` exists to say why — not to recover.
+ * The output contract, v1 and v2 (docs/specs/172-planner.md "Output
+ * contract", D17; docs/specs/223-design-stage.md "Output contract (v2)").
+ * The API extracts the one `agentdock-plan` block of a turn's final message
+ * — and, for a design turn, the one `agentdock-design` block — and validates
+ * them here against the plan's contract version. A turn that fails is
+ * `contract_violation` and applies nothing, so `reason` exists to say why —
+ * not to recover.
  */
 
 export const PLANNER_VIOLATION_REASONS = [
@@ -50,6 +58,22 @@ export const PLANNER_VIOLATION_REASONS = [
   'missing_acceptance_criteria',
   /** A bug document without `## Reproduction`. */
   'missing_reproduction',
+  /** Design: no `agentdock-design` block, or one that is never closed. */
+  'no_design_block',
+  /** Design: two or more `agentdock-design` blocks. */
+  'multiple_design_blocks',
+  /** Design: the HTML is over `DESIGN_HTML_MAX_BYTES`. */
+  'design_too_large',
+  /** Design: a resource from a host that is not on the CDN allowlist. */
+  'design_host_not_allowed',
+  /** Design: a CDN package URL without an exact version. */
+  'design_unpinned_version',
+  /** Design: network calls, a form submit, top navigation. */
+  'design_forbidden_feature',
+  /** Design: `variant` is not the variant the turn was asked for. */
+  'variant_mismatch',
+  /** Design: `addressed` names a comment that is not open on the design. */
+  'unknown_comment',
 ] as const;
 export type PlannerViolationReason = (typeof PLANNER_VIOLATION_REASONS)[number];
 
@@ -59,24 +83,47 @@ export interface PlannerContractViolation {
   message: string;
 }
 
+/** A design turn's result also carries the validated HTML, kept out of `output`. */
 export type PlannerParseResult<A extends PlanTurnAction> =
-  | { ok: true; output: PlannerOutput<A> }
+  | ({ ok: true; output: PlannerOutput<A> } & (A extends 'design'
+      ? { html: string }
+      : unknown))
   | { ok: false; error: PlannerContractViolation };
+
+/**
+ * Every context: the plan's contract version — its turns are validated
+ * against the version it was created with. Default: the current version.
+ */
+interface VersionContext {
+  contractVersion?: PlannerContractVersion;
+}
 
 /** What the API knows about the turn that the output alone cannot say. */
 export interface PlannerParseContexts {
-  clarify: undefined;
-  decompose: undefined;
+  clarify: VersionContext;
+  decompose: VersionContext;
   /** The task the grill turn was about. */
-  grill: { taskKey: string };
+  grill: VersionContext & { taskKey: string };
   /** The task, and its kind: it decides which heading the document needs. */
-  write: { taskKey: string; taskKind: PlanTaskKind };
+  write: VersionContext & { taskKey: string; taskKind: PlanTaskKind };
   /** The keys of the approved tasks, which must pass through unchanged (D9). */
-  revise: { frozenKeys: readonly string[] };
+  revise: VersionContext & { frozenKeys: readonly string[] };
+  /**
+   * The task, the variant the turn draws, and the ids of the design's open
+   * comments — the only ones `addressed` may name (spec 223 D10).
+   */
+  design: VersionContext & {
+    taskKey: string;
+    variant: number;
+    openCommentIds: readonly string[];
+  };
 }
 
 type ContextArgs<A extends PlanTurnAction> =
-  PlannerParseContexts[A] extends undefined ? [] : [PlannerParseContexts[A]];
+  // biome-ignore lint/complexity/noBannedTypes: an empty context is optional
+  {} extends PlannerParseContexts[A]
+    ? [context?: PlannerParseContexts[A]]
+    : [context: PlannerParseContexts[A]];
 
 const violation = (
   reason: PlannerViolationReason,
@@ -89,12 +136,16 @@ const violation = (
 const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})(.*)$/;
 
 /**
- * The contents of every fenced block tagged `agentdock-plan` (CommonMark
- * fences: ``` or ~~~, closed by a fence of the same character at least as
- * long). Other fenced blocks are skipped whole, so a tag quoted inside one is
- * not a block. `null` marks a tagged block that is never closed.
+ * The contents of every fenced block tagged `tag` (CommonMark fences: ``` or
+ * ~~~, closed by a fence of the same character at least as long). Other
+ * fenced blocks are skipped whole, so a tag quoted inside one is not a block
+ * — which is why a design block, whose HTML may hold a ``` line, is fenced
+ * with four backticks. `null` marks a tagged block that is never closed.
  */
-export const extractPlannerBlocks = (text: string): (string | null)[] => {
+export const extractFencedBlocks = (
+  text: string,
+  tag: string,
+): (string | null)[] => {
   const blocks: (string | null)[] = [];
   const lines = text.split(/\r?\n/);
   let i = 0;
@@ -124,11 +175,14 @@ export const extractPlannerBlocks = (text: string): (string | null)[] => {
       body.push(lines[i]);
       i += 1;
     }
-    if (info === PLANNER_BLOCK_TAG)
-      blocks.push(closed ? body.join('\n') : null);
+    if (info === tag) blocks.push(closed ? body.join('\n') : null);
   }
   return blocks;
 };
+
+/** Every `agentdock-plan` block of a turn's final message. */
+export const extractPlannerBlocks = (text: string): (string | null)[] =>
+  extractFencedBlocks(text, PLANNER_BLOCK_TAG);
 
 type Issue = z.core.$ZodIssue;
 
@@ -215,9 +269,37 @@ export const PLANNER_REQUIRED_HEADING: Record<PlanTaskKind, string> = {
   bug: 'Reproduction',
 };
 
+/** Spec 223 D7: the one design block, its HTML validated against D6. */
+const parseDesignBlock = (
+  text: string,
+):
+  | { ok: true; html: string }
+  | { ok: false; error: PlannerContractViolation } => {
+  const blocks = extractFencedBlocks(text, PLANNER_DESIGN_BLOCK_TAG);
+  if (blocks.length > 1) {
+    return violation(
+      'multiple_design_blocks',
+      `expected one ${PLANNER_DESIGN_BLOCK_TAG} block, found ${blocks.length}`,
+    );
+  }
+  const html = blocks[0];
+  if (html === undefined || html === null) {
+    return violation(
+      'no_design_block',
+      html === null
+        ? `the ${PLANNER_DESIGN_BLOCK_TAG} block is never closed`
+        : `no ${PLANNER_DESIGN_BLOCK_TAG} block`,
+    );
+  }
+  const check = validateMockup(html);
+  if (!check.ok) return violation(check.reason, check.message);
+  return { ok: true, html };
+};
+
 /**
- * Validates a turn's final message against the v1 contract for `action`.
- * `grill`, `write` and `revise` take the context only the API knows.
+ * Validates a turn's final message against the contract for `action`, in the
+ * plan's contract version. `grill`, `write`, `revise` and `design` take the
+ * context only the API knows.
  */
 export function parsePlannerOutput<A extends PlanTurnAction>(
   text: string,
@@ -267,9 +349,10 @@ export function parsePlannerOutput(
     );
   }
 
-  const parsed = plannerOutputSchemas[action].safeParse(json);
+  const version = context?.contractVersion ?? PLANNER_CONTRACT_VERSION;
+  const parsed = plannerOutputSchemasFor(version)[action].safeParse(json);
   if (!parsed.success) return shapeViolation(parsed.error.issues);
-  const output = parsed.data;
+  const output: PlannerOutput = parsed.data;
 
   switch (output.action) {
     case 'clarify':
@@ -339,14 +422,86 @@ export function parsePlannerOutput(
       );
       return bad ?? { ok: true, output };
     }
+    case 'design': {
+      const ctx = context as PlannerParseContexts['design'];
+      if (output.taskKey !== ctx.taskKey) {
+        return violation(
+          'task_mismatch',
+          `expected task ${ctx.taskKey}, got ${output.taskKey}`,
+        );
+      }
+      if (output.variant !== ctx.variant) {
+        return violation(
+          'variant_mismatch',
+          `expected variant ${ctx.variant}, got ${output.variant}`,
+        );
+      }
+      const open = new Set(ctx.openCommentIds);
+      const unknown = output.addressed.find((id) => !open.has(id));
+      if (unknown !== undefined) {
+        return violation(
+          'unknown_comment',
+          `addressed names ${unknown}, which is not an open comment of this design`,
+        );
+      }
+      const design = parseDesignBlock(text);
+      if (!design.ok) return design;
+      const parsedDesign: PlannerParseResult<'design'> = {
+        ok: true,
+        output,
+        html: design.html,
+      };
+      return parsedDesign;
+    }
   }
 }
 
+const CDN_HOSTS = DESIGN_CDN_ALLOWLIST.map(
+  (s) => `\`${s.host}${s.pathPrefix === '/' ? '' : s.pathPrefix}\``,
+).join(', ');
+
 /**
- * The fixed contract text the API appends after the instructions on every
- * turn (D11, ADR-0019), and the editors show read-only.
+ * Spec 223 D6, D7: the design action's rules. Part of the v2 text; the API
+ * appends it alone to a design turn of a v1 plan, whose contract text does
+ * not carry it (a v1 plan's design is switched on by hand).
  */
-export const PLANNER_OUTPUT_CONTRACT = `# Output contract (v${PLANNER_CONTRACT_VERSION})
+export const PLANNER_DESIGN_CONTRACT = `## The design action
+
+A \`design\` turn draws one variant of the task's mockup. Its final message
+holds the usual \`${PLANNER_BLOCK_TAG}\` block **and** exactly one fenced block
+tagged \`${PLANNER_DESIGN_BLOCK_TAG}\`, fenced with four backticks, holding
+one self-contained HTML document:
+
+~~~text
+\`\`\`\`${PLANNER_DESIGN_BLOCK_TAG}
+<!doctype html>
+<html lang="en" data-theme="light"> … </html>
+\`\`\`\`
+~~~
+
+The mockup's rules — a mockup that breaks one fails the turn:
+
+- At most ${DESIGN_HTML_MAX_BYTES / 1024} KiB of HTML. Inline CSS and JS are allowed.
+- External scripts, styles, fonts and images only from ${CDN_HOSTS}, over HTTPS. No other host, and no relative URL: inline it or use a \`data:\` URL (images and fonts only).
+- Every script or package URL names an exact version: \`react@18.3.1\`, never \`react@18\` or \`latest\`.
+- No network calls (\`fetch\`, \`XMLHttpRequest\`, \`WebSocket\`, \`EventSource\`, \`sendBeacon\`), no form that submits, no navigation of the top or parent window, no \`window.open\`, no \`<iframe>\`, \`<object>\`, \`<embed>\` or \`<base>\`, no link to another site.
+- The theme switches through \`:root[data-theme="light"]\` and \`:root[data-theme="dark"]\`.
+- \`variant\` is the variant the turn names (1–${DESIGN_VARIANTS_MAX}); \`addressed\` lists only ids of the open comments the turn gave you.
+`;
+
+const TASK_DESIGN_LINE = `
+  "design": DesignSuggestion`;
+
+/**
+ * The fixed contract text of `version` the API appends after the
+ * instructions on every turn of a plan of that version (D11, ADR-0019), and
+ * the editors show read-only.
+ */
+export const plannerOutputContract = (
+  version: PlannerContractVersion,
+): string => {
+  const v2 = version >= 2;
+  return `# Output contract (v${version})
 
 This contract is fixed. It overrides anything above it about the shape of
 your answer.
@@ -365,14 +520,23 @@ Question = {
   "options": [ { "id": string, "label": string, "detail"?: string } ],   // 0–${PLANNER_MAX_OPTIONS}
   "recommendation": { "optionId"?: string, "text": string, "why": string },
   "blocking": boolean        // true only when there is no safe default
-}
+}${
+    v2
+      ? `
+DesignSuggestion = {
+  "needed": boolean,         // does this task need a mockup before it is written?
+  "why": string,             // one line
+  "variants": 1 | 2 | 3      // 1 for an unambiguous change; 2–3 for real layout choices
+}`
+      : ''
+  }
 Task = {
   "key": string,             // stable within the plan: "t1", "t2" … ^[a-z][a-z0-9-]{0,31}$
   "kind": "bug" | "feature",
   "title": string,
   "summary": string,
   "dependsOn": [ key ],      // keys of other tasks of this plan
-  "questions": [ Question ]
+  "questions": [ Question ]${v2 ? `,${TASK_DESIGN_LINE}` : ''}
 }
 \`\`\`
 
@@ -381,9 +545,14 @@ The object depends on the turn's action:
 \`\`\`
 clarify   → { "action": "clarify", "questions": [ Question ], "done": boolean }
 decompose → { "action": "decompose", "title": string, "tasks": [ Task ] }
-grill     → { "action": "grill", "taskKey": key, "questions": [ Question ], "done": boolean }
+grill     → { "action": "grill", "taskKey": key, "questions": [ Question ], "done": boolean${v2 ? ', "design"?: DesignSuggestion' : ''} }
 write     → { "action": "write", "taskKey": key, "document": markdown, "assumptions": [ string ] }
-revise    → { "action": "revise", "tasks": [ Task | { "key": key } ] }
+revise    → { "action": "revise", "tasks": [ Task | { "key": key } ] }${
+    v2
+      ? `
+design    → { "action": "design", "taskKey": key, "variant": 1 | 2 | 3, "title": string, "rationale": string, "addressed": [ commentId ] }`
+      : ''
+  }
 \`\`\`
 
 Rules:
@@ -395,5 +564,17 @@ Rules:
 - \`grill\` and \`write\` answer about the task the turn names, and repeat its key in \`taskKey\`.
 - A \`write\` document for a feature has a \`## Acceptance criteria\` section; for a bug, a \`## Reproduction\` section.
 - \`revise\` lists every approved task as \`{ "key": "<key>" }\` alone, unchanged, and leaves rejected tasks out. Every other task is written in full.
-- The \`document\` is a JSON string: newlines are \`\\n\`.
-`;
+- The \`document\` is a JSON string: newlines are \`\\n\`.${
+    v2
+      ? `
+- Every task written in full carries \`design\`. A \`grill\` repeats it only when the conversation changed it.
+
+${PLANNER_DESIGN_CONTRACT}`
+      : '\n'
+  }`;
+};
+
+/** The current version's contract text — the one new plans run with. */
+export const PLANNER_OUTPUT_CONTRACT = plannerOutputContract(
+  PLANNER_CONTRACT_VERSION,
+);
