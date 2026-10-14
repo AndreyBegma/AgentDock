@@ -314,6 +314,8 @@ token counts only: no prompt, response, thinking or tool-argument text (D9).
 | `turn.started` / `turn.finished` | `promptId` | per user prompt; the envelope `ts` is the moment |
 | `llm.request` | `requestId, model, tokens: { input, output, cacheRead, cacheWrite5m, cacheWrite1h, reasoning }, querySource, promptId?, durationMs?, durationApprox?, ttftMs?, stopReason?, agentName?` | once per `requestId`; re-sent with newer usage, the last wins (D4) |
 | `tool.call` | `toolUseId, tool, startedAt, promptId?, endedAt?, ok?, durationMs?, decision?, childSessionId?` | at the `tool_use`, and again with `endedAt`/`ok` at its result |
+| `session.compacted` | `compactionId, trigger: auto\|manual, preTokens?` | once per compaction of the conversation (Claude `compact_boundary`); `compactionId` is the line's id (#161) |
+| `session.error` | `errorId, kind, status?, promptId?` | once per request the runtime gave up on (Claude `isApiErrorMessage`); `kind` is the error code, `[a-z_]` only, never a message (#161) |
 
 - `projectId` and `slot` are the adapter's correlation (D6). `projectId` comes
   from the watch list; the API stores it only when that project belongs to the
@@ -390,6 +392,33 @@ token counts only: no prompt, response, thinking or tool-argument text (D9).
         "ok": true,
         "durationMs": 5300,
         "childSessionId": "agent-a3f9c2"
+      }
+    },
+    {
+      "v": 1,
+      "seq": 18244,
+      "ts": "2026-10-07T19:12:30.000Z",
+      "type": "session.compacted",
+      "source": "transcript",
+      "session": { "runtime": "claude", "id": "0f6c1e2a-5d1b-4c4e-9a51-7f1d2b8e9c30" },
+      "data": {
+        "compactionId": "edafb60c-3517-4cfd-980d-def95e7646eb",
+        "trigger": "auto",
+        "preTokens": 167000
+      }
+    },
+    {
+      "v": 1,
+      "seq": 18245,
+      "ts": "2026-10-07T19:20:02.000Z",
+      "type": "session.error",
+      "source": "transcript",
+      "session": { "runtime": "claude", "id": "0f6c1e2a-5d1b-4c4e-9a51-7f1d2b8e9c30" },
+      "data": {
+        "errorId": "1ca4b4bf-990b-43e8-8fa6-d599a983ba5a",
+        "kind": "rate_limit",
+        "status": 429,
+        "promptId": "6c0d9a1e-0b47-4f0e-8f6e-2a7d4c1b9e55"
       }
     }
   ]
