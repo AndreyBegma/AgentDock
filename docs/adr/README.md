@@ -23,3 +23,5 @@ Numbered, never rewritten. A changed decision gets a new ADR that supersedes the
 | [0017](0017-runner-distribution-homebrew-and-npm.md) | The runner ships as prebuilt binaries through Homebrew and npm |
 | [0018](0018-pull-requests-test-what-changed.md) | Pull requests test what changed; develop is not tested twice (amends ADR-0016) |
 | [0019](0019-planner-instructions-live-in-agentdock.md) | The Planner's instructions live in AgentDock, editable, behind a fixed output contract (scopes ADR-0005) |
+| [0020](0020-claude-code-integration-through-the-runner.md) | Claude Code integration — hooks observe, MCP acts, both through the runner (amends ADR-0010) |
+| [0021](0021-session-content-is-opt-in-per-project.md) | Session content is opt-in per project (amends spec 12 D9) |
