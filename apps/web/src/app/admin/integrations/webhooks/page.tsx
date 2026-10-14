@@ -94,10 +94,7 @@ export default function AdminWebhooksPage() {
         empty={
           <EmptyState
             title="Where AgentDock sends its events"
-            description="Create a webhook to send events — pull requests, blocked issues, agents waiting for a person — to n8n, Slack or your own bot."
-            action={
-              <Button onClick={() => setEditing('new')}>New webhook</Button>
-            }
+            description="Create a webhook to send events — pull requests, blocked issues, agents waiting for a person — to n8n, Slack or your own bot. New webhook is at the top of the page."
           />
         }
       >

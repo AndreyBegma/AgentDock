@@ -11,7 +11,7 @@ import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
-import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Field, Textarea } from '@andrewbehma/glass-ui/field';
 import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
@@ -28,6 +28,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../../../lib/api';
 import { Time } from '../../../../lib/format/time';
 import { useLive } from '../../../../lib/live/use-live';
+import { useErrorToast } from '../../../../lib/section/use-error-toast';
 import { triggerUrl } from '../../../../lib/webhooks/events';
 import {
   actionSummary,
@@ -63,6 +64,7 @@ export function TriggerSheet({
 }) {
   const [detail, setDetail] = useState<InboundTriggerDetail>();
   const [confirm, setConfirm] = useState<Confirm>();
+  const showError = useErrorToast();
   const [busy, setBusy] = useState(false);
   const [payload, setPayload] = useState('{\n  \n}');
   const [verdict, setVerdict] = useState<InboundDryRunResult | string>();
@@ -103,7 +105,7 @@ export function TriggerSheet({
     try {
       await action();
     } catch (err) {
-      toast.error(describeWebhooksError(err));
+      showError(describeWebhooksError(err));
     } finally {
       setBusy(false);
     }
@@ -398,43 +400,22 @@ export function TriggerSheet({
         ) : null}
       </SheetRoot>
 
-      <DialogRoot
+      <ConfirmDialog
         open={confirm !== undefined}
-        onOpenChange={(open) => !open && !busy && setConfirm(undefined)}
-      >
-        <DialogContent
-          title={confirm === 'rotate' ? 'Rotate secret' : 'Delete trigger'}
-          description={
-            confirm === 'rotate'
-              ? 'A new secret is generated and shown once. The previous secret keeps verifying for 24 hours.'
-              : 'The trigger and its delivery log are removed; its URL starts answering 404. This is audited.'
-          }
-          footer={
-            <>
-              <Button
-                variant="glass"
-                disabled={busy}
-                onClick={() => setConfirm(undefined)}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant={confirm === 'delete' ? 'danger' : 'solid'}
-                disabled={busy}
-                onClick={confirm === 'rotate' ? rotate : remove}
-              >
-                {confirm === 'rotate' ? 'Rotate' : 'Delete'}
-              </Button>
-            </>
-          }
-        >
-          <p className="text-sm text-ink-2">
-            {confirm === 'delete'
-              ? 'This cannot be undone.'
-              : 'Update your caller soon.'}
-          </p>
-        </DialogContent>
-      </DialogRoot>
+        onOpenChange={(open) => !open && setConfirm(undefined)}
+        title={
+          confirm === 'rotate' ? 'Rotate this secret?' : 'Delete this trigger?'
+        }
+        consequence={
+          confirm === 'rotate'
+            ? 'A new secret is generated and shown once. The previous secret keeps verifying for 24 hours, so update your caller soon.'
+            : 'The trigger and its delivery log are removed; its URL starts answering 404. This is audited and cannot be undone.'
+        }
+        verb={confirm === 'rotate' ? 'Rotate' : 'Delete'}
+        tone={confirm === 'rotate' ? 'default' : 'danger'}
+        busy={busy}
+        onConfirm={confirm === 'rotate' ? rotate : remove}
+      />
     </>
   );
 }

@@ -12,6 +12,7 @@ import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
 import { Disclosure } from '@andrewbehma/glass-ui/disclosure';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Field, Input } from '@andrewbehma/glass-ui/field';
+import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import {
@@ -315,12 +316,12 @@ export default function AdminPricesPage() {
               <div className="flex flex-col gap-4">
                 {grouped.used.length > 0 ? (
                   <section aria-labelledby="prices-used">
-                    <h2 id="prices-used" className="mb-2 text-sm font-semibold">
-                      Models you used
-                      <span className="ml-2 font-normal text-ink-3 num">
-                        last 30 days · {grouped.used.length}
-                      </span>
-                    </h2>
+                    <SectionHeader
+                      className="mb-2"
+                      headingId="prices-used"
+                      title="Models you used"
+                      description={`Last 30 days · ${grouped.used.length}`}
+                    />
                     {modelTable(grouped.used)}
                   </section>
                 ) : null}
@@ -366,9 +367,11 @@ export default function AdminPricesPage() {
           <TestCalculator hasVersion />
 
           <section aria-labelledby="prices-history">
-            <h2 id="prices-history" className="mb-2 text-sm font-medium">
-              Version history
-            </h2>
+            <SectionHeader
+              className="mb-2"
+              headingId="prices-history"
+              title="Version history"
+            />
             {versions ? (
               <Table scroll>
                 <TableHead>

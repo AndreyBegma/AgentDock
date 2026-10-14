@@ -12,6 +12,7 @@ import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
 import { Field, Input, Textarea } from '@andrewbehma/glass-ui/field';
+import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { DisabledReason } from '../../../../components/prerequisites/disabled-reason';
@@ -74,7 +75,7 @@ export function RegisterCard({ view }: { view: Unregistered }) {
 
   return (
     <Card pad="lg">
-      <h2 className="mb-2 text-lg font-bold">Register the App</h2>
+      <SectionHeader className="mb-2" title="Register the App" />
       <p className="mb-4 max-w-prose text-sm text-ink-2">
         One read-only GitHub App for this instance. GitHub shows the permissions
         before you confirm; AgentDock never writes to GitHub through it.
@@ -195,7 +196,7 @@ export function ManualCard({
 
   return (
     <Card pad="lg">
-      <h2 className="mb-2 text-lg font-bold">Enter credentials by hand</h2>
+      <SectionHeader className="mb-2" title="Enter credentials by hand" />
       <p className="mb-4 max-w-prose text-sm text-ink-2">
         For an App you create yourself on GitHub. The private key and the
         webhook secret are stored encrypted and are never shown again.
@@ -332,7 +333,7 @@ export function ManualCard({
           <div>
             <Button
               type="submit"
-              variant="solid"
+              variant="glass"
               disabled={busy || !view.encryptionAvailable}
               aria-describedby={
                 view.encryptionAvailable ? undefined : 'gh-manual-reason'
