@@ -19,6 +19,7 @@ import {
   PROJECT_ACTIVITY_FILTER_CODEC,
   parseLiveItem,
   planLive,
+  prLink,
   queryString,
   safeLink,
   TYPE_OPTIONS,
@@ -243,6 +244,34 @@ describe('activityHref', () => {
     expect(
       toTimelineItem(item({ slot: 'i2', link: '/projects/p1/fleet' })).href,
     ).toBe('/projects/p1/fleet?open=i2&focus=i2');
+  });
+});
+
+describe('prLink', () => {
+  test('the checkpoint prUrl wins, https only', () => {
+    expect(
+      prLink(item({ data: { prUrl: 'https://github.com/a/b/pull/7' } })),
+    ).toBe('https://github.com/a/b/pull/7');
+    expect(prLink(item({ data: { prUrl: 'javascript:alert(1)' } }))).toBe(
+      undefined,
+    );
+    expect(
+      prLink(item({ data: { prUrl: 'http://github.com/a/b/pull/7' } })),
+    ).toBe(undefined);
+  });
+
+  test('falls back to the URL at the end of the title', () => {
+    expect(
+      prLink(
+        item({
+          title: 'i1: pull request open — https://github.com/a/b/pull/3',
+        }),
+      ),
+    ).toBe('https://github.com/a/b/pull/3');
+  });
+
+  test('no URL, no link', () => {
+    expect(prLink(item({ title: 'i1: blocked', data: {} }))).toBe(undefined);
   });
 });
 
