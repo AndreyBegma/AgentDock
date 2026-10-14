@@ -6,9 +6,11 @@ import { Button } from '@andrewbehma/glass-ui/button';
 import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
 import { Disclosure } from '@andrewbehma/glass-ui/disclosure';
 import { Field, Textarea } from '@andrewbehma/glass-ui/field';
+import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { useEffect, useRef, useState } from 'react';
 import { Time } from '../../../lib/format/time';
+import { useErrorToast } from '../../../lib/section/use-error-toast';
 import { describePlannerError } from '../../../lib/tasks/format';
 import { DiffView } from './diff-view';
 
@@ -62,6 +64,7 @@ export function InstructionsEditor({
   const [comparison, setComparison] = useState<Comparison>();
   const [contractOpen, setContractOpen] = useState(false);
   const editor = useRef<HTMLTextAreaElement>(null);
+  const showError = useErrorToast();
 
   // A save, or a live reload, brings a new current version: the editor follows.
   const currentId = current?.id;
@@ -85,7 +88,7 @@ export function InstructionsEditor({
       await onSave(draft.trim() === '' ? '' : draft);
       toast.success(clearing ? 'Override cleared' : 'Saved as a new version');
     } catch (err) {
-      toast.error(describePlannerError(err));
+      showError(describePlannerError(err));
     } finally {
       setBusy(false);
     }
@@ -120,7 +123,10 @@ export function InstructionsEditor({
             value={draft}
             readOnly={!canEdit}
             rows={18}
-            className="font-mono text-xs"
+            // The prompt is hard-wrapped as written: keep its lines whole and
+            // scroll sideways, rather than re-wrapping them raggedly.
+            wrap="off"
+            className="overflow-x-auto whitespace-pre font-mono text-xs"
             onChange={(e) => setDraft(e.target.value)}
           />
         </Field>
@@ -177,7 +183,7 @@ export function InstructionsEditor({
       ) : null}
 
       <section className="flex flex-col gap-2" aria-label="Versions">
-        <h2 className="text-base font-semibold">Versions</h2>
+        <SectionHeader title="Versions" />
         {versions.length === 0 ? (
           <p className="text-sm text-ink-2">No version has been saved yet.</p>
         ) : (
@@ -199,22 +205,22 @@ export function InstructionsEditor({
                     </span>
                   </span>
                   <span className="flex gap-2">
-                    <Button
-                      variant="glass"
-                      size="sm"
-                      aria-label={`Diff version ${version.version} against ${previous ? `version ${previous.version}` : 'nothing'}`}
-                      onClick={() =>
-                        setComparison({
-                          label: previous
-                            ? `Version ${version.version} against version ${previous.version}`
-                            : `Version ${version.version}`,
-                          before: previous?.body ?? '',
-                          after: version.body,
-                        })
-                      }
-                    >
-                      Diff
-                    </Button>
+                    {previous ? (
+                      <Button
+                        variant="glass"
+                        size="sm"
+                        aria-label={`Diff version ${version.version} against version ${previous.version}`}
+                        onClick={() =>
+                          setComparison({
+                            label: `Version ${version.version} against version ${previous.version}`,
+                            before: previous.body,
+                            after: version.body,
+                          })
+                        }
+                      >
+                        Diff
+                      </Button>
+                    ) : null}
                     {canEdit && !isCurrent ? (
                       <Button
                         variant="glass"
