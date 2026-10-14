@@ -29,12 +29,13 @@ interface RunWatch {
 }
 
 /**
- * The skill run live log (spec 24 D13), on the pane relay's pattern (#18):
+ * The live log of skill runs (spec 24 D13) and plan turns (#183), on the
+ * pane relay's pattern (#18):
  * one runner `run_log` subscription per watched run, however many browsers
  * watch it. A new viewer resubscribes, so the runner replays its backlog; the
  * last one leaving unsubscribes. Rendered lines are relayed as `/live`
  * events and never stored. A run that already ended is not subscribed: its
- * report is in `skill_runs`.
+ * report is in `skill_runs`, a turn's output in `plan_turns`.
  *
  * Transitions run on one queue, in arrival order.
  */
@@ -140,19 +141,22 @@ export class RunLogRelay implements LiveTopicHooks, RunnerStreamListener {
   /** The run a newly watched topic streams from; null if it is gone or over. */
   private async open(topic: LiveTopic): Promise<RunWatch | null> {
     const { projectId, runId } = parseRunTopic(topic);
-    const run = await this.prisma.skillRun.findFirst({
-      where: { runId, run: { projectId, kind: 'skill' } },
+    const run = await this.prisma.run.findFirst({
+      where: { id: runId, projectId, kind: { in: ['skill', 'plan'] } },
       select: {
-        phase: true,
-        run: { select: { project: { select: { runnerId: true } } } },
+        skillRun: { select: { phase: true } },
+        planTurn: { select: { phase: true } },
+        project: { select: { runnerId: true } },
       },
     });
-    if (!run || isTerminalSkillRunPhase(run.phase)) return null;
+    // A plan turn's phases are a subset of a skill run's.
+    const phase = run?.skillRun?.phase ?? run?.planTurn?.phase;
+    if (!run || !phase || isTerminalSkillRunPhase(phase)) return null;
     return {
       topic,
       projectId,
       runId,
-      runnerId: run.run.project.runnerId,
+      runnerId: run.project.runnerId,
       viewers: new Set(),
       id: null,
     };

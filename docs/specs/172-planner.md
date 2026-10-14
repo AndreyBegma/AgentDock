@@ -232,7 +232,10 @@ All of it is glass-ui (ADR-0011) and dark-first, following #163's look.
   - **Dialogue mode before decomposition:** the centre shows plan-level
     question rounds in place of the graph.
   - **A running turn:** a `Spinner` and the live log line (#24 D13 relay with
-    kind `run_log`), and a Cancel action.
+    kind `run_log`), and a Cancel action. The turn's `runs` row keys the
+    `run:` topic; the runner tails the turn's `stream.jsonl`, and the topic
+    is authorized by the plan's read rule (D13), so a private plan's log
+    reaches its author only (#183).
   - **A failed turn:** the error, with **Retry turn**. For a
     `contract_violation`, the raw output sits in a `Disclosure`.
 - **`/tasks`:** a `DataTable` of tasks across the caller's projects. Columns:

@@ -7,6 +7,7 @@ import { Spinner } from '@andrewbehma/glass-ui/spinner';
 import { useEffect, useState } from 'react';
 import { formatDuration } from '../../lib/format';
 import { turnActionText } from '../../lib/planner/format';
+import { useRunLog } from '../../lib/skills/use-run-log';
 
 /** Elapsed time moves by the second while a turn runs. */
 const ELAPSED_TICK_MS = 1_000;
@@ -21,12 +22,29 @@ function useElapsed(since: string): number {
 }
 
 /**
- * Where a running turn's live log line mounts. Plan turns do not stream a
- * log yet (the runner relay is a follow-up to #172), so it renders nothing;
- * the follow-up fills it from the run's `run_log` topic (#24 D13).
+ * The newest line of a running turn's log, from its run's `run_log` topic
+ * (#24 D13, #183); nothing while it is queued or has said nothing yet. It is
+ * kept out of the card's live region: a line per second is not announced.
  */
-export function TurnLogLine(_props: { turn: PlanTurnView }) {
-  return null;
+export function TurnLogLine({
+  projectId,
+  turn,
+}: {
+  projectId: string;
+  turn: PlanTurnView;
+}) {
+  const { log } = useRunLog(projectId, turn.runId, turn.phase === 'running');
+  const last = log.rows.at(-1);
+  if (!last) return null;
+  return (
+    <span
+      className="truncate text-xs text-ink-3"
+      title={last.text}
+      aria-live="off"
+    >
+      {last.text}
+    </span>
+  );
 }
 
 /**
@@ -34,11 +52,13 @@ export function TurnLogLine(_props: { turn: PlanTurnView }) {
  * it has taken, and Cancel.
  */
 export function RunningTurn({
+  projectId,
   turn,
   canCancel,
   cancelling,
   onCancel,
 }: {
+  projectId: string;
   turn: PlanTurnView;
   canCancel: boolean;
   cancelling: boolean;
@@ -62,7 +82,7 @@ export function RunningTurn({
         <span className="text-xs text-ink-3 tabular-nums">
           {formatDuration(elapsed)}
         </span>
-        <TurnLogLine turn={turn} />
+        <TurnLogLine projectId={projectId} turn={turn} />
       </div>
       {canCancel ? (
         <Button

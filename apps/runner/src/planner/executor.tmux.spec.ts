@@ -10,6 +10,11 @@ import {
 import { CommandFailure } from '../commands/failure';
 import type { ConfigProfile } from '../config';
 import { SkillRunExecutor } from '../skills/run/executor';
+import {
+  type RunLogOutbound,
+  RunLogStreamer,
+  runLogSources,
+} from '../skills/run/log';
 import { skillsWorkspace, withFakeGh } from '../skills/testing';
 import { FakeClock } from '../testing/fake-clock';
 import { memoryLogger } from '../testing/fixtures';
@@ -552,5 +557,65 @@ describe.skipIf(!tmuxInstalled)('plan turns (real tmux, fake claude)', () => {
     }
     expect(runs.record('run_s1')?.phase).toBe('succeeded');
     expect(await t.until('turn_2', ['succeeded', 'failed'])).toBe('succeeded');
+  });
+
+  it('tails a turn’s stream for its runId, after the turn left memory too (#183)', async () => {
+    const t = await setup();
+    await t.executor.run(t.args());
+    expect(await t.until('turn_1', ['succeeded', 'failed'])).toBe('succeeded');
+
+    const tail = (executor: PlanTurnExecutor, projectId: string) => {
+      const sent: RunLogOutbound[] = [];
+      const streamer = new RunLogStreamer({
+        runs: runLogSources(executor),
+        send: (m) => {
+          sent.push(m);
+          return true;
+        },
+        clock: t.clock,
+        log: t.log,
+      });
+      streamer.subscribe({
+        type: 'subscribe',
+        id: 's1',
+        kind: 'run_log',
+        projectId,
+        runId: 'run_t1',
+      });
+      return sent;
+    };
+    const expected: RunLogOutbound[] = [
+      {
+        type: 'run_log',
+        id: 's1',
+        frame: {
+          type: 'lines',
+          backlog: true,
+          lines: [
+            { kind: 'system', text: 'session started · claude-opus-5-5' },
+            { kind: 'result', text: expect.stringContaining('Planned.') },
+          ],
+        },
+      },
+      {
+        type: 'run_log',
+        id: 's1',
+        frame: { type: 'ended', phase: 'succeeded' },
+      },
+    ];
+    expect(tail(t.executor, t.f.project.id)).toEqual(expected);
+    // A fresh executor knows the turn only from its directory.
+    const restarted = new PlanTurnExecutor({
+      deps: t.deps,
+      plansDir: t.executor.store.plansDir,
+      selfCommand: [],
+      slots: new SharedRunSlots(1),
+      emit: () => {},
+      log: t.log,
+    });
+    expect(tail(restarted, t.f.project.id)).toEqual(expected);
+    expect(tail(restarted, 'prj_other')).toEqual([
+      { type: 'subscribe.error', id: 's1', code: 'not_found' },
+    ]);
   });
 });
