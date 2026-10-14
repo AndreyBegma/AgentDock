@@ -110,3 +110,4 @@ Until then AgentDock does without it rather than drawing it here (ADR-0011).
 | Gap | Effect in AgentDock |
 |---|---|
 | `TimelineItem` secondary action | A `Timeline` row with `href` is one anchor, so nothing inside it can be a link. Activity shows a pull request as a plain `#205` chip and the row opens the slot (#213); a PR link chip waits for a trailing-action slot on `TimelineItem` |
+| `ResizableFrame` ([glass-ui#139](https://github.com/AndreyBegma/glass-ui/issues/139)) — a controlled-width frame with a window-splitter edge | The design viewer and the style-kit preview (spec 223) set the mockup's width from presets and a typed width only; `components/design/frame-box.tsx` takes the same props and is swapped for the glass-ui component when it ships, which adds dragging the frame's edge |
