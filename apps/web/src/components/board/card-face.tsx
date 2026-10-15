@@ -33,11 +33,14 @@ export function CardFace({
   projectId,
   card,
   canOperate,
+  compact = false,
   onOpen,
 }: {
   projectId: string;
   card: BoardCardView;
   canOperate: boolean;
+  /** C-29 Compact density: the issue and PR links are left to the sheet. */
+  compact?: boolean;
   onOpen: (card: BoardCardView) => void;
 }) {
   const offer = approveRunOffer(card);
@@ -46,7 +49,9 @@ export function CardFace({
   const prHref = card.prUrl ? safeHttpsUrl(card.prUrl) : null;
   const issueHref = card.issueUrl ? safeHttpsUrl(card.issueUrl) : null;
   return (
-    <div className="flex min-w-0 flex-col gap-1.5 text-sm">
+    <div
+      className={`flex min-w-0 flex-col text-sm ${compact ? 'gap-1' : 'gap-1.5'}`}
+    >
       <div className="flex items-center gap-2 text-xs text-ink-2">
         <span className="font-mono">{card.label}</span>
         {card.kind === 'bug' ? (
@@ -118,7 +123,7 @@ export function CardFace({
           ) : null}
         </div>
       ) : null}
-      {card.prNumber !== null || card.issueNumber !== null ? (
+      {!compact && (card.prNumber !== null || card.issueNumber !== null) ? (
         <div className="flex flex-wrap gap-1.5 text-xs">
           {card.prNumber !== null ? (
             <Link href={prHref}>{prChipText(card)}</Link>
