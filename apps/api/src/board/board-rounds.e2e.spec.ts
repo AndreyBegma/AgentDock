@@ -341,7 +341,7 @@ describe('board rounds (e2e)', () => {
     expect(detail.costUsd).toBe('1.750000');
   });
 
-  it('a Codex default profile → 422 unsupported_runtime', async () => {
+  it('a Codex default profile → 422 no_profile (not_claude)', async () => {
     const codex = await w.ctx.prisma.runtimeProfile.create({
       data: {
         runnerId: w.runnerId,
@@ -360,7 +360,12 @@ describe('board rounds (e2e)', () => {
     await w.createCard();
     const response = await w.runCard(1);
     expect(response.status).toBe(422);
-    expect(response.body.error).toBe('unsupported_runtime');
+    expect(response.body).toMatchObject({
+      error: 'no_profile',
+      reason: 'not_claude',
+      source: 'default',
+      profileKey: 'codex-main',
+    });
   });
 
   it('records card.run_started as an error when the runner refuses', async () => {
