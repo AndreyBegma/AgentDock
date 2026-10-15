@@ -23,6 +23,7 @@ import {
   type SocketFactory,
   type StopReason,
 } from './connection';
+import { TmuxServerGuard } from './control/tmux-server';
 import {
   commandsCapability,
   detectCapabilities,
@@ -32,6 +33,7 @@ import {
   terminalUnsupported,
 } from './detect/capabilities';
 import type { Exec } from './detect/exec';
+import type { Env } from './env';
 import { GitAuth } from './git-auth';
 import { LocalSocketServer } from './local/server';
 import { LocalService } from './local/service';
@@ -73,6 +75,8 @@ export interface DaemonOptions {
   offsetsFile: string;
   host: Host;
   exec: Exec;
+  /** The runner's environment; `process.env` by default. */
+  env?: Env;
   clock: Clock;
   log: Logger;
   createSocket?: SocketFactory;
@@ -123,7 +127,12 @@ export const runDaemon = async (
   const { config, home, clock, log } = options;
   // #329 D1: every git child of the runner goes through this one wrapper.
   const gitAuth = new GitAuth(options.exec);
-  const exec = gitAuth.wrap(options.exec);
+  // #327: a tmux server the runner starts never lives in the unit's cgroup.
+  const tmuxServer = new TmuxServerGuard({
+    env: options.env ?? process.env,
+    log,
+  });
+  const exec = tmuxServer.wrap(gitAuth.wrap(options.exec));
   mkdirSync(options.spoolDir, { recursive: true, mode: 0o700 });
   const release = acquireLock(join(options.spoolDir, 'runner.lock'));
   try {

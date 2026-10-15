@@ -80,6 +80,8 @@ describe('daemon — OTLP receiver (spec 13)', () => {
       offsetsFile: join(dir, 'offsets.json'),
       host,
       exec,
+      // Not the test process's: it may run under a systemd unit (#327).
+      env: {},
       clock: new FakeClock(),
       log,
       signal: controller.signal,
@@ -327,6 +329,7 @@ describe('daemon — local socket (spec 201)', () => {
       offsetsFile: join(dir, 'offsets.json'),
       host,
       exec: machineWithoutCodex(),
+      env: {},
       clock: new FakeClock(),
       log: memoryLogger().log,
       signal: controller.signal,
