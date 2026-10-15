@@ -23,6 +23,7 @@ import {
   TRACKED_TEXT,
   trackedSessionHref,
 } from '../../lib/board/format';
+import { prChipText } from '../../lib/board/pull-request';
 import { formatCost } from '../../lib/format';
 import { safeHttpsUrl } from '../../lib/queue/format';
 import { ApproveRunLink, CardFaceDesign } from './card-design';
@@ -120,7 +121,7 @@ export function CardFace({
       {card.prNumber !== null || card.issueNumber !== null ? (
         <div className="flex flex-wrap gap-1.5 text-xs">
           {card.prNumber !== null ? (
-            <Link href={prHref}>PR #{card.prNumber}</Link>
+            <Link href={prHref}>{prChipText(card)}</Link>
           ) : null}
           {card.issueNumber !== null ? (
             <Link href={issueHref}>Issue #{card.issueNumber}</Link>

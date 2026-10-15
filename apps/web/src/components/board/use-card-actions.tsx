@@ -1,6 +1,11 @@
 'use client';
 
-import type { AcceptSuggestionRequest, BoardCardView } from '@agentdock/shared';
+import type {
+  AcceptBoardCardRequest,
+  AcceptSuggestionRequest,
+  BoardCardView,
+} from '@agentdock/shared';
+import type { RunnerCommands } from '@agentdock/shared/protocol';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { type ReactNode, useCallback, useState } from 'react';
@@ -8,6 +13,7 @@ import { acceptedMessage } from '../../lib/board/accept';
 import {
   acceptCard,
   acceptSuggestion,
+  collectCard,
   deleteCard,
   dismissAllSuggestions,
   dismissSuggestion,
@@ -16,6 +22,7 @@ import {
   stopCard,
 } from '../../lib/board/actions';
 import { describeBoardError } from '../../lib/board/format';
+import { collectMessage } from '../../lib/board/pull-request';
 import { AcceptDialog } from './accept-dialog';
 
 /** The card's own buttons, shared by the board's menu and the card sheet. */
@@ -23,6 +30,8 @@ export interface CardActions {
   run: (card: BoardCardView) => void;
   markFinished: (card: BoardCardView) => void;
   accept: (card: BoardCardView) => void;
+  /** #329 D5: Create pull request. Resolves `true` when a PR is open or there was nothing to open. */
+  createPullRequest: (card: BoardCardView) => Promise<boolean>;
   /** #244 D9: Accept an Inbox card, with the edits of Edit & accept. Resolves `true` when it worked. */
   acceptSuggestion: (
     card: BoardCardView,
@@ -47,11 +56,14 @@ type Pending =
 export function useCardActions({
   projectId,
   runnerName,
+  runnerCommands,
   onChanged,
   onDeleted,
 }: {
   projectId: string;
   runnerName?: string | null;
+  /** What the runner advertised (#233); gates the branch cleanup (#329 D9). */
+  runnerCommands?: RunnerCommands | null;
   /** Refetch the board and the open sheet. */
   onChanged: () => void;
   onDeleted: (card: BoardCardView) => void;
@@ -79,22 +91,22 @@ export function useCardActions({
     [runnerName, onChanged],
   );
 
-  // #273 D10: Accept asks first; `headSha` also merges the pull request.
-  const accept = async (card: BoardCardView, headSha?: string) => {
+  // #273 D10: Accept asks first; the request merges (`merge`), closes the PR
+  // (#329 D8 `closePr`) or only moves the card.
+  const accept = async (
+    card: BoardCardView,
+    request: AcceptBoardCardRequest,
+  ) => {
     setBusy(true);
     try {
-      const done = await acceptCard(
-        projectId,
-        card.number,
-        headSha ? { merge: { headSha } } : {},
-      );
-      const message = acceptedMessage(card.label, done.merge);
+      const done = await acceptCard(projectId, card.number, request);
+      const message = acceptedMessage(card.label, done.merge, done.prClose);
       if (message.warn) toast.warning(message.text);
       else toast.success(message.text);
       setAccepting(undefined);
     } catch (err) {
       toast.error(describeBoardError(err, runnerName));
-      // A refused merge usually means the PR moved: show it again.
+      // A refused merge or close usually means the PR moved: show it again.
       setAcceptVersion((v) => v + 1);
     } finally {
       setBusy(false);
@@ -164,6 +176,22 @@ export function useCardActions({
         `${card.label} marked finished.`,
       ),
     accept: (card) => setAccepting(card),
+    createPullRequest: async (card) => {
+      setBusy(true);
+      try {
+        const done = await collectCard(projectId, card.number);
+        const message = collectMessage(card.label, done.collect);
+        if (message.ok) toast.success(message.text);
+        else toast.error(message.text);
+        return message.ok;
+      } catch (err) {
+        toast.error(describeBoardError(err, runnerName));
+        return false;
+      } finally {
+        setBusy(false);
+        onChanged();
+      }
+    },
     acceptSuggestion: (card, edits) =>
       perform(
         () => acceptSuggestion(projectId, card.number, edits),
@@ -185,7 +213,8 @@ export function useCardActions({
           card={accepting}
           busy={busy}
           version={acceptVersion}
-          onAccept={(card, headSha) => void accept(card, headSha)}
+          runnerCommands={runnerCommands}
+          onAccept={(card, request) => void accept(card, request)}
           onClose={() => setAccepting(undefined)}
         />
         <ConfirmDialog

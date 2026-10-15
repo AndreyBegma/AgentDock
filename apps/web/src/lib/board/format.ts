@@ -348,6 +348,19 @@ export function describeMergeFailure(
   }
 }
 
+/** #329 D8: the runner refused to close the PR; the card stays in Finished. */
+export function describePrCloseFailure(
+  reason: unknown,
+  message?: unknown,
+): string {
+  if (reason === 'merged') {
+    return 'The pull request was merged meanwhile, so it cannot be closed. Open the dialog again.';
+  }
+  return typeof message === 'string' && message !== ''
+    ? `gh failed to close the pull request: ${message}`
+    : 'gh failed to close the pull request.';
+}
+
 /**
  * #273 D9: why approving the design did not start the worker. The codes that
  * need no detail read like the same refusal on Run; any other falls back to
@@ -420,6 +433,14 @@ export function describeBoardError(
       const body = error instanceof ApiError ? error.body : null;
       return describeMergeFailure(body?.reason, body?.message);
     }
+    case BOARD_ERROR.prCloseFailed: {
+      const body = error instanceof ApiError ? error.body : null;
+      return describePrCloseFailure(body?.reason, body?.message);
+    }
+    case BOARD_ERROR.branchDeleteRefused:
+      return 'A terminal card’s branch is your session branch, so AgentDock does not delete it.';
+    case BOARD_ERROR.noBranch:
+      return 'This card never ran, so there is no branch to open a pull request from.';
     case BOARD_ERROR.noPullRequest:
       return 'This card has no pull request to merge.';
     case BOARD_ERROR.notTracked:

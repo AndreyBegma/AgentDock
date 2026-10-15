@@ -10,6 +10,7 @@ import type {
   CardFeedbackRequest,
   CardPullRequestView,
   ClaimAttachmentsRequest,
+  CollectBoardCardResponse,
   CreateBoardCardRequest,
   DismissAllResult,
   MoveBoardCardRequest,
@@ -88,6 +89,12 @@ export const acceptCard = (
   api<AcceptBoardCardResponse>(`${cardPath(projectId, number)}/accept`, {
     method: 'POST',
     body,
+  });
+
+/** #329 D5: Create pull request — collects the card's work now; a failed collect is an answer, not an error. */
+export const collectCard = (projectId: string, number: number) =>
+  api<CollectBoardCardResponse>(`${cardPath(projectId, number)}/collect`, {
+    method: 'POST',
   });
 
 /** #273 D10: the card's pull request as Accept would merge it. */
