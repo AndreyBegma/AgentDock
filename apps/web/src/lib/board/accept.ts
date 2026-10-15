@@ -18,7 +18,15 @@ export type AcceptChoice =
 export function acceptChoice(
   prNumber: number | null,
   pr: CardPullRequestView | null,
+  options: { fleet?: boolean } = {},
 ): AcceptChoice {
+  // #282 D4: Accept on a fleet card never merges; the orchestrator does.
+  if (options.fleet) {
+    return {
+      kind: 'accept_only',
+      reason: 'The orchestrator merges a fleet pull request, not this page.',
+    };
+  }
   if (prNumber === null) {
     return { kind: 'accept_only', reason: 'This card has no pull request.' };
   }

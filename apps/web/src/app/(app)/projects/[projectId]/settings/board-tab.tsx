@@ -12,12 +12,17 @@ import { Field, Input } from '@andrewbehma/glass-ui/field';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
-import { CardOptionToggles } from '../../../../../components/board/card-options';
+import {
+  AutoCollectToggle,
+  CardOptionToggles,
+} from '../../../../../components/board/card-options';
 import {
   fetchBoardSettings,
   saveBoardSettings,
 } from '../../../../../lib/board/actions';
 import {
+  AUTO_COLLECT_DEFAULT_HINT,
+  AUTO_COLLECT_DEFAULT_LABEL,
   describeBoardError,
   parseMaxRunning,
 } from '../../../../../lib/board/format';
@@ -41,6 +46,7 @@ export function BoardTab({
   const [settings, setSettings] = useState<BoardSettingsView>();
   const [issueOnRun, setIssueOnRun] = useState(false);
   const [specOnRun, setSpecOnRun] = useState(false);
+  const [autoCollectTracked, setAutoCollectTracked] = useState(false);
   const [maxRunning, setMaxRunning] = useState('3');
   const [captureEnabled, setCaptureEnabled] = useState(false);
   const [captureModel, setCaptureModel] = useState<CaptureModel>('haiku');
@@ -53,6 +59,7 @@ export function BoardTab({
       setSettings(view);
       setIssueOnRun(view.issueOnRun);
       setSpecOnRun(view.specOnRun);
+      setAutoCollectTracked(view.autoCollectTracked);
       setMaxRunning(String(view.maxRunning));
       setCaptureEnabled(view.captureEnabled);
       setCaptureModel(view.captureModel);
@@ -71,6 +78,7 @@ export function BoardTab({
   const dirty =
     issueOnRun !== settings.issueOnRun ||
     specOnRun !== settings.specOnRun ||
+    autoCollectTracked !== settings.autoCollectTracked ||
     limit !== settings.maxRunning ||
     captureEnabled !== settings.captureEnabled ||
     captureModel !== settings.captureModel;
@@ -83,6 +91,7 @@ export function BoardTab({
       await saveBoardSettings(projectId, {
         issueOnRun,
         specOnRun,
+        autoCollectTracked,
         maxRunning: limit,
         captureEnabled: captureEnabled && contentOn,
         captureModel,
@@ -113,6 +122,14 @@ export function BoardTab({
               disabled={!isAdmin}
               onIssueOnRun={setIssueOnRun}
               onSpecOnRun={setSpecOnRun}
+            />
+            <AutoCollectToggle
+              id="board-set-auto-collect"
+              checked={autoCollectTracked}
+              disabled={!isAdmin}
+              label={AUTO_COLLECT_DEFAULT_LABEL}
+              hint={AUTO_COLLECT_DEFAULT_HINT}
+              onChange={setAutoCollectTracked}
             />
             <Field
               label="Workers at once"

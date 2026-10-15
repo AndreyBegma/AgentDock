@@ -45,7 +45,8 @@ export function AcceptDialog({
 }) {
   const [loaded, setLoaded] = useState<PullRequest>({ state: 'loading' });
   const number = card?.number;
-  const hasPr = card?.prNumber != null;
+  const fleet = card?.source === 'fleet';
+  const hasPr = card?.prNumber != null && !fleet;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: version is a refetch trigger
   useEffect(() => {
@@ -78,7 +79,7 @@ export function AcceptDialog({
     loaded.state === 'ready' && card
       ? loaded.error && hasPr
         ? { kind: 'accept_only', reason: loaded.error }
-        : acceptChoice(card.prNumber, loaded.pr)
+        : acceptChoice(card.prNumber, loaded.pr, { fleet })
       : null;
   const pr = loaded.state === 'ready' ? loaded.pr : null;
 
