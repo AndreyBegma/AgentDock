@@ -32,7 +32,8 @@ export type CaptureStatus = (typeof CAPTURE_STATUSES)[number];
  * - `inbox_full` — the Inbox holds `CAPTURE_INBOX_MAX` cards (D7);
  * - `budget_exceeded` — a project budget's hard stop (D7);
  * - `runner_offline` — still offline after `CAPTURE_OFFLINE_BACKOFF_MAX_MS` (D7);
- * - `capture_off` — content or capture was turned off before it ran (D1).
+ * - `capture_off` — content or capture was turned off before it ran (D1);
+ * - `no_profile` — no usable runtime profile (#272 D8).
  *
  * An output that breaks the D5 contract is not a skip: the row is `failed`
  * with `error` = `contract_violation: <CaptureViolation>` (`captureViolationError`).
@@ -44,6 +45,7 @@ export const CAPTURE_SKIP_REASONS = [
   'budget_exceeded',
   'runner_offline',
   'capture_off',
+  'no_profile',
 ] as const;
 export type CaptureSkipReason = (typeof CAPTURE_SKIP_REASONS)[number];
 
