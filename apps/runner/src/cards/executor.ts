@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { CARD_SESSION_POLL_MS } from '@agentdock/shared';
 import {
   type CardCloseArgs,
@@ -23,6 +24,7 @@ import { profileOf, type SkillsDeps } from '../skills/deps';
 import { RUN_FILES, writeJsonAtomic } from '../skills/run/record';
 import { type AttachmentSource, syncAttachments } from './attachments';
 import {
+  collectBranch,
   collectCard,
   commitFiles,
   ensureWorktree,
@@ -232,15 +234,28 @@ export class CardExecutor {
       });
     }
     return this.serial(args.cardId, async () => {
+      const { deps } = this.options;
       const record = this.store.load(args.cardId);
       if (
-        !record ||
-        record.projectId !== args.projectId ||
-        record.root !== args.root
+        record &&
+        (record.projectId !== args.projectId || record.root !== args.root)
       ) {
         throw new CommandFailure(
           'not_found',
-          `card ${args.cardId} has no worktree in ${args.projectId}`,
+          'the card belongs to another project on this runner',
+        );
+      }
+      // #344: Accept's `card.close` removed the worktree and the record; the
+      // branch it kept is collected from a temporary worktree.
+      if (!record || !existsSync(record.worktree)) {
+        return collectBranch(
+          deps,
+          {
+            projectId: args.projectId,
+            root: project.root,
+            branch: args.branch,
+          },
+          args,
         );
       }
       if (record.branch !== args.branch) {
@@ -249,7 +264,7 @@ export class CardExecutor {
           `card ${args.cardId} works on ${record.branch}, not ${args.branch}`,
         );
       }
-      return collectCard(this.options.deps, record, args);
+      return collectCard(deps, record, args);
     });
   }
 

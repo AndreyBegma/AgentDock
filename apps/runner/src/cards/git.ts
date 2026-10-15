@@ -3,10 +3,13 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
   realpathSync,
+  rmSync,
   writeFileSync,
 } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, sep } from 'node:path';
 import { cardWipCommitMessage } from '@agentdock/shared';
 import type {
@@ -310,6 +313,55 @@ export const collectCard = async (
     prUrl: pr.url,
     prState: pr.state,
   };
+};
+
+/**
+ * #344: `card.collect` of a card with no worktree here — `card.close` removed
+ * it on Accept, and the runner's record with it. The branch it kept (or
+ * `origin/<branch>`, when it was pushed and deleted) is checked out in a
+ * temporary worktree and collected as usual; the worktree goes afterwards,
+ * and the local branch too once every commit of it is on origin.
+ */
+export const collectBranch = async (
+  deps: GitDeps,
+  card: Pick<CardRecord, 'projectId' | 'root' | 'branch'>,
+  args: CardCollectArgs,
+): Promise<CardCollectResult> => {
+  const { root, branch } = card;
+  await fetchRef(deps, root, branch);
+  const local = await commitOf(deps, root, `refs/heads/${branch}`);
+  const remote = local
+    ? null
+    : await commitOf(deps, root, `refs/remotes/origin/${branch}`);
+  if (!local && !remote) {
+    throw new CommandFailure(
+      'not_found',
+      `branch ${branch} is neither on the runner nor on origin`,
+    );
+  }
+  const dir = mkdtempSync(
+    join(deps.tempRoot ?? tmpdir(), 'agentdock-collect-'),
+  );
+  const worktree = join(dir, 'worktree');
+  try {
+    await gitOk(deps.exec, [
+      '-C',
+      root,
+      'worktree',
+      'add',
+      '--quiet',
+      ...(local
+        ? [worktree, branch]
+        : ['--no-track', '-b', branch, worktree, `origin/${branch}`]),
+    ]);
+    try {
+      return await collectCard(deps, { ...card, worktree }, args);
+    } finally {
+      await removeCardWorktree(deps, { root, worktree, branch });
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 };
 
 /**
