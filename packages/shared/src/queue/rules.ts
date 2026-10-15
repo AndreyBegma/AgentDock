@@ -142,13 +142,25 @@ const cells = (row: string): string[] =>
     .split('|')
     .map((c) => c.trim().replace(/^`|`$/g, ''));
 
+/** A slot name: what dispatch accepts, and what the `Depends on` cell may list. */
+const WAVE_SLOT_NAME = /^[a-z0-9][a-z0-9-]*$/;
+
+/** The first contiguous run of `|` lines; later tables are not the plan. */
+const firstTable = (section: string[]): string[] => {
+  const start = section.findIndex((l) => l.trim().startsWith('|'));
+  if (start < 0) return [];
+  const rest = section.slice(start);
+  const end = rest.findIndex((l) => !l.trim().startsWith('|'));
+  return end < 0 ? rest : rest.slice(0, end);
+};
+
 /** The `## Parallel plan` table: lower-cased header and data rows; null without a plan. */
 const parallelPlanTable = (
   body: string,
 ): { col: (name: string) => number; rows: string[][] } | null => {
   const [plan] = titled(body, PARALLEL_PLAN);
   if (!plan) return null;
-  const lines = plan.body.filter((l) => l.trim().startsWith('|'));
+  const lines = firstTable(plan.body);
   if (lines.length < 2) return { col: () => -1, rows: [] };
   const header = cells(lines[0]).map((h) => h.toLowerCase());
   const col = (name: string) => header.indexOf(name);
@@ -159,7 +171,11 @@ const parallelPlanTable = (
       : lines
           .slice(1)
           .map(cells)
-          .filter((r) => !r.every((c) => /^:?-+:?$/.test(c)) && r[slot]);
+          .filter(
+            (r) =>
+              !r.every((c) => /^:?-+:?$/.test(c)) &&
+              WAVE_SLOT_NAME.test(r[slot] ?? ''),
+          );
   return { col, rows };
 };
 
@@ -176,8 +192,6 @@ export const parseParallelPlan = (body: string): WaveSlot[] | null => {
     model: model >= 0 && r[model] ? r[model] : null,
   }));
 };
-
-const WAVE_SLOT_NAME = /^[a-z0-9][a-z0-9-]*$/;
 
 /**
  * The `Depends on` column of the `## Parallel plan` table: slot → the slots of
