@@ -15,6 +15,11 @@ import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { LiveService } from '../live/live.service';
 import { projectNotFound } from '../projects';
+import {
+  type NoProfileFailure,
+  type ResolvedProfile,
+  RuntimeProfileResolver,
+} from '../readiness';
 import { readablePlan } from './plan-access';
 import { questionsOf } from './plan-mapper';
 import { planNotFound, plannerError } from './planner-error';
@@ -61,6 +66,7 @@ export class PlanStore {
   constructor(
     private readonly prisma: PrismaService,
     private readonly live: LiveService,
+    private readonly profiles: RuntimeProfileResolver,
   ) {}
 
   /** The plan, if `userId` may read it (D12); 404 otherwise. */
@@ -134,41 +140,18 @@ export class PlanStore {
   }
 
   /**
-   * The named profile, else the project's default (#10 D13, D14): on the
-   * project runner, present, and `claude` — codex cannot plan.
+   * The project's one runtime-profile rule (#272 D1): the named key, else the
+   * orchestrator profile, else the default — on the project runner, present,
+   * and `claude`. A refusal is `422 no_profile` (D2), a planner failure
+   * unless the caller names its own.
    */
-  async profile(project: PlanProject, key?: string) {
-    const where = key
-      ? { runnerId_key: { runnerId: project.runnerId, key } }
-      : project.defaultProfileId
-        ? { id: project.defaultProfileId }
-        : null;
-    if (!where) {
-      throw plannerError(
-        422,
-        PLANNER_ERROR.noProfile,
-        'Name a runtime profile, or set the project default',
-      );
-    }
-    const profile = await this.prisma.runtimeProfile.findUnique({
-      where,
-      select: { key: true, runtime: true, runnerId: true, missing: true },
-    });
-    if (!profile || profile.runnerId !== project.runnerId || profile.missing) {
-      throw plannerError(
-        422,
-        PLANNER_ERROR.unknownProfile,
-        'The profile is not available on the project runner',
-      );
-    }
-    if (profile.runtime !== 'claude') {
-      throw plannerError(
-        422,
-        PLANNER_ERROR.unsupportedRuntime,
-        `Plan turns need a claude profile; ${profile.key} is ${profile.runtime}`,
-      );
-    }
-    return profile;
+  profile(
+    project: PlanProject,
+    key?: string,
+    fail: NoProfileFailure = (details, message) =>
+      plannerError(422, PLANNER_ERROR.noProfile, message, details),
+  ): Promise<ResolvedProfile> {
+    return this.profiles.require(project, { key }, fail);
   }
 
   /** A sent or archived plan takes no more turns, reviews or revisions. */

@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { ConditionalModule } from '@nestjs/config';
 import { BoardModule } from '../board';
 import { ProjectsModule } from '../projects';
+import { ReadinessModule } from '../readiness';
 import { RunnersModule } from '../runners/runners.module';
 import { CaptureController } from './capture.controller';
 import { CaptureService } from './capture.service';
@@ -22,6 +23,7 @@ import { CaptureWorker } from './capture-worker';
   imports: [
     BoardModule,
     ProjectsModule,
+    ReadinessModule,
     RunnersModule,
     ConditionalModule.registerWhen(
       BullModule.registerQueue({ name: CAPTURE_QUEUE }),
