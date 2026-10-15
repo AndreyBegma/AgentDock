@@ -18,6 +18,7 @@ import {
 } from '../control/orchestrator';
 import { messageSlot, stopSlot } from '../control/slot';
 import type { Exec } from '../detect/exec';
+import type { DocsHandlers } from '../docs';
 import type { NormalizeHandlers } from '../normalize';
 import type { PlannerHandlers } from '../planner';
 import type { ProjectFs } from '../projects/fs';
@@ -76,6 +77,8 @@ export interface HandlerContext {
   normalize?: NormalizeHandlers;
   /** Card model assessment (#322); absent means this runner does not assess cards. */
   assess?: AssessHandlers;
+  /** Docs repositories (#379); absent means this runner does not write to them. */
+  docs?: DocsHandlers;
 }
 
 const noAssess = (): never => {
@@ -105,6 +108,13 @@ const noCapture = (): never => {
 
 const noSkills = (): never => {
   throw new CommandFailure('unsupported', 'this runner does not serve skills');
+};
+
+const noDocs = (): never => {
+  throw new CommandFailure(
+    'unsupported',
+    'this runner does not write to docs repositories',
+  );
 };
 
 const noPlanner = (): never => {
@@ -235,5 +245,9 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
       context.normalize?.['text.normalize'](args) ?? noNormalize(),
     'card.assess': (args) =>
       context.assess?.['card.assess'](args) ?? noAssess(),
+    'docs.publish_specs': (args) =>
+      context.docs?.['docs.publish_specs'](args) ?? noDocs(),
+    'docs.pr_state': (args) =>
+      context.docs?.['docs.pr_state'](args) ?? noDocs(),
   };
 };

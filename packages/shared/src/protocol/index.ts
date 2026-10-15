@@ -5,6 +5,7 @@ export * from './commands/assess';
 export * from './commands/capture';
 export * from './commands/cards';
 export * from './commands/control';
+export * from './commands/docs';
 export * from './commands/github';
 export * from './commands/planner';
 export * from './commands/queue';

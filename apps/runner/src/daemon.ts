@@ -33,6 +33,7 @@ import {
   terminalUnsupported,
 } from './detect/capabilities';
 import type { Exec } from './detect/exec';
+import { createDocsHandlers } from './docs';
 import type { Env } from './env';
 import { GitAuth } from './git-auth';
 import { LocalSocketServer } from './local/server';
@@ -362,6 +363,7 @@ export const runDaemon = async (
       capture: createCaptureHandlers(capture),
       normalize: createNormalizeHandlers(normalize),
       assess: createAssessHandlers(assess),
+      docs: createDocsHandlers(skillsDeps),
     });
     const dispatch = createDispatcher({
       handlers: builtHandlers,

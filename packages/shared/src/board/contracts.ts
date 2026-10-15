@@ -285,7 +285,16 @@ export interface BoardCardDetail extends BoardCardView {
   branch: string | null;
   /** Display only: the runner owns the path. */
   worktree: string | null;
+  /**
+   * The spec's path: on the card's branch, or — with `specPr` — relative to
+   * the docs repository's root.
+   */
   specPath: string | null;
+  /**
+   * #379: the docs repository pull request that adds the spec, when the
+   * project's specs live in an external docs repository; else `null`.
+   */
+  specPr: { repo: string; number: number; url: string } | null;
   /** The card's Claude session (D6); `null` before the first Run. */
   sessionId: string | null;
   createdBy: BoardUserRef | null;
@@ -470,8 +479,15 @@ export const BOARD_ERROR = {
   notRunning: 'not_running',
   /** 409: feedback outside Finished, or Accept of a card not in Finished. */
   wrongColumn: 'wrong_column',
-  /** 422: `specOnRun` and the project has no `specDir` (D2). */
+  /** 422: `specOnRun` and the project has no Spec folder nor `specDir` (D2). */
   noSpecDir: 'no_spec_dir',
+  /**
+   * 422 (#379): `specOnRun` and the project's docs are a remote repository
+   * with no local clone path to write the spec in.
+   */
+  noDocsClone: 'no_docs_clone',
+  /** 409 (#379): the runner does not serve `docs.publish_specs`; update it. */
+  runnerOutdated: 'runner_outdated',
   /**
    * 422: the runner refused a non-Claude profile. Profile selection itself
    * answers `no_profile` (#272 D2).

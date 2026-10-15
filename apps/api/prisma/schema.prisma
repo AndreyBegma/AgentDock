@@ -442,6 +442,9 @@ model DocsSource {
   classified Json
   candidates Json
   manual     Boolean        @default(false)
+  /// #379: where specs go, relative to the docs root. Set in Settings ›
+  /// Docs source; detection and a refresh leave it alone.
+  specDir    String?
   updatedAt  DateTime       @updatedAt
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -2330,6 +2333,9 @@ model Plan {
   worktree        String?
   docsPrNumber    Int?
   docsPrUrl       String?
+  /// #379: `owner/name` of the docs repository the docs PR is in; null when
+  /// it is the project's own repository.
+  docsPrRepo      String?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
   sentAt          DateTime?
@@ -2751,6 +2757,11 @@ model BoardCard {
   issueNumber             Int?
   issueUrl                String?
   specPath                String?
+  /// #379: a spec written to an external docs repository — its `owner/name`
+  /// and pull request. Null when the spec is on the card's branch.
+  specRepo                String?
+  specPrNumber            Int?
+  specPrUrl               String?
   prNumber                Int?
   prUrl                   String?
   /// #329 D6: from the PR poll, else the last `card.collect` / `card.merge`;

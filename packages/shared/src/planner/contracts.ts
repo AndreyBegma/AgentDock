@@ -241,6 +241,11 @@ export interface PlanDetail extends PlanSummary {
   model: string;
   docsPrNumber: number | null;
   docsPrUrl: string | null;
+  /**
+   * #379: `owner/name` of the docs repository the docs PR is in; `null` when
+   * it is the project's own repository.
+   */
+  docsPrRepo: string | null;
   tasks: PlanTaskView[];
   turns: PlanTurnView[];
   graph: PlanGraphView;
@@ -377,6 +382,11 @@ export const PLANNER_ERROR = {
   runnerTimeout: 'runner_timeout',
   /** 409: the runner's advert does not list the command (#233); nothing was sent or written. */
   runnerOutdated: 'runner_outdated',
+  /**
+   * 422 (#379): `docs_pr` and the project's docs are a remote repository
+   * with no local clone path to write the specs in.
+   */
+  noDocsClone: 'no_docs_clone',
   /** 409 (#337 D7): Create cards on a plan whose cards exist. */
   cardsExist: 'cards_exist',
   /**
