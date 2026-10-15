@@ -38,7 +38,12 @@ import { approvalsBadge } from '../../lib/approvals/format';
 import { attentionBadge } from '../../lib/fleet/format';
 import { useLiveStatus } from '../../lib/live/use-live';
 import { crumbsFor, pageTitleOf } from './crumbs';
-import { liveDotLabel, useLivePaused } from './live-status';
+import {
+  liveDotLabel,
+  RESTARTING_BANNER_TEXT,
+  useLivePaused,
+  useServerRestarting,
+} from './live-status';
 import {
   activeEntryId,
   isWideEntry,
@@ -149,6 +154,7 @@ export function AppShell({
   // The bell holds the `user:<id>` subscription that keeps the socket (and the dot) alive.
   const { status, closeCode } = useLiveStatus();
   const live = useLivePaused();
+  const restarting = useServerRestarting();
   useEffect(() => {
     if (status === 'offline' && closeCode === LIVE_CLOSE_CODES.unauthorized) {
       router.replace('/login');
@@ -332,7 +338,13 @@ export function AppShell({
             </MenuRoot>
           </header>
 
-          {live.paused && closeCode !== LIVE_CLOSE_CODES.unauthorized ? (
+          {restarting ? (
+            <Banner tone="warn">{RESTARTING_BANNER_TEXT}</Banner>
+          ) : null}
+
+          {!restarting &&
+          live.paused &&
+          closeCode !== LIVE_CLOSE_CODES.unauthorized ? (
             <Banner
               tone="warn"
               title="Live updates paused."
