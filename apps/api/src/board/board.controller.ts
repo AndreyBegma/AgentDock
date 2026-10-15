@@ -3,6 +3,7 @@ import type {
   BoardCardDetail,
   BoardSettingsView,
   BoardView,
+  CardDependenciesView,
   CardPullRequestView,
   CollectBoardCardResponse,
   DismissAllResult,
@@ -30,6 +31,7 @@ import {
   type ResolvedProjectAccess,
 } from '../projects';
 import { BoardService } from './board.service';
+import { BoardDependencies } from './board-dependencies.service';
 import { cardNotFound } from './board-error';
 import { BoardInboxService } from './board-inbox.service';
 import { BoardRoundsService } from './board-rounds.service';
@@ -37,6 +39,7 @@ import type { BoardActor } from './board-work';
 import {
   AcceptBoardCardDto,
   AcceptSuggestionDto,
+  AddCardDependencyDto,
   BoardQueryDto,
   CardFeedbackDto,
   CreateBoardCardDto,
@@ -71,6 +74,7 @@ export class BoardController {
     private readonly board: BoardService,
     private readonly rounds: BoardRoundsService,
     private readonly inbox: BoardInboxService,
+    private readonly deps: BoardDependencies,
   ) {}
 
   @Get('board')
@@ -133,6 +137,49 @@ export class BoardController {
     await this.board.delete(
       access.projectId,
       cardNumber(number),
+      actorOf(access, user, ctx),
+    );
+  }
+
+  @Get('board/cards/:number/dependencies')
+  dependencies(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @Param('number') number: string,
+  ): Promise<CardDependenciesView> {
+    return this.deps.list(access.projectId, cardNumber(number), access.role);
+  }
+
+  @Post('board/cards/:number/dependencies')
+  @HttpCode(200)
+  @ProjectRole('operator')
+  addDependency(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Param('number') number: string,
+    @Body() dto: AddCardDependencyDto,
+  ): Promise<CardDependenciesView> {
+    return this.deps.add(
+      access.projectId,
+      cardNumber(number),
+      dto.dependsOn,
+      actorOf(access, user, ctx),
+    );
+  }
+
+  @Delete('board/cards/:number/dependencies/:dependsOn')
+  @ProjectRole('operator')
+  removeDependency(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Param('number') number: string,
+    @Param('dependsOn') dependsOn: string,
+  ): Promise<CardDependenciesView> {
+    return this.deps.remove(
+      access.projectId,
+      cardNumber(number),
+      cardNumber(dependsOn),
       actorOf(access, user, ctx),
     );
   }

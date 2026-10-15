@@ -1,8 +1,14 @@
 import type { BoardErrorBody, BoardErrorCode } from '@agentdock/shared';
 import { HttpException } from '@nestjs/common';
 
-/** A refusal's details beside its message: `reason`, and `no_profile`'s source and key (#272 D2). */
-type BoardErrorExtra = Pick<BoardErrorBody, 'reason' | 'source' | 'profileKey'>;
+/**
+ * A refusal's details beside its message: `reason`, `no_profile`'s source and
+ * key (#272 D2), and `dependency_open`'s open dependencies (#337 D8).
+ */
+type BoardErrorExtra = Pick<
+  BoardErrorBody,
+  'reason' | 'source' | 'profileKey' | 'dependencies'
+>;
 
 /**
  * An HTTP error of the board routes, shaped like every other API error. Its

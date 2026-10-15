@@ -38,6 +38,7 @@ import { RuntimeProfileResolver } from '../readiness';
 import { TextNormalizer } from '../text/text-normalizer';
 import { TextOwners } from '../text/text-owners';
 import { BoardCommands, boardOutput } from './board-commands';
+import { BoardDependencies } from './board-dependencies.service';
 import { boardError, cardNotFound } from './board-error';
 import {
   type CardFacts,
@@ -113,6 +114,7 @@ export class BoardService implements OnModuleInit {
     private readonly attachments: AttachmentsService,
     private readonly assessor: CardAssessor,
     private readonly profiles: RuntimeProfileResolver,
+    private readonly dependencies: BoardDependencies,
   ) {}
 
   /**
@@ -292,7 +294,7 @@ export class BoardService implements OnModuleInit {
     const trackedIds = cards
       .map((c) => c.trackedSessionId)
       .filter((id): id is string => id !== null);
-    const [usage, hooked, alive, attachmentCounts] = await Promise.all([
+    const [usage, hooked, alive, attachmentCounts, deps] = await Promise.all([
       usageByRun(this.prisma, runIds),
       sessionIds.length === 0
         ? Promise.resolve([])
@@ -312,6 +314,7 @@ export class BoardService implements OnModuleInit {
             select: { id: true },
           }),
       this.attachments.counts(cards.map((c) => c.id)),
+      this.dependencies.refsOf(cards.map((c) => c.id)),
     ]);
     const costs = new Map<string, string>();
     for (const [runId, u] of usage) {
@@ -322,6 +325,7 @@ export class BoardService implements OnModuleInit {
       hooked: new Set(hooked.map((s) => s.externalId)),
       alive: new Set(alive.map((s) => s.id)),
       attachmentCounts,
+      dependencies: deps,
       now: new Date(),
     };
   }

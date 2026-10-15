@@ -47,6 +47,7 @@ import { RuntimeProfileResolver } from '../readiness';
 import { TextNormalizer } from '../text/text-normalizer';
 import { BoardService } from './board.service';
 import { BoardCommands, boardOutput } from './board-commands';
+import { BoardDependencies } from './board-dependencies.service';
 import { BoardFailure, boardError } from './board-error';
 import type { CardWithRounds } from './board-mapper';
 import { toSettingsView } from './board-mapper';
@@ -125,6 +126,7 @@ export class BoardRoundsService {
     private readonly profiles: RuntimeProfileResolver,
     private readonly text: TextNormalizer,
     private readonly attachments: AttachmentsService,
+    private readonly dependencies: BoardDependencies,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
 
@@ -150,6 +152,11 @@ export class BoardRoundsService {
         'A suggestion runs once it is accepted',
       );
     }
+    // #337 D8: an open dependency warns; the person may run anyway.
+    await this.dependencies.assertRunnable(
+      card.id,
+      dto.ignoreDependencies === true,
+    );
     await this.start(card, 'run', dto, null, actor);
     return this.board.detail(projectId, number);
   }

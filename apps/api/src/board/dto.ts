@@ -1,6 +1,7 @@
 import {
   type AcceptBoardCardRequest,
   type AcceptSuggestionRequest,
+  type AddCardDependencyRequest,
   BOARD_CARD_BODY_MAX,
   BOARD_CARD_KINDS,
   BOARD_CARD_TITLE_MAX,
@@ -179,6 +180,19 @@ export class RunBoardCardDto implements RunBoardCardRequest {
   @IsOptional()
   @IsIn(orchestratorPermissionModeSchema.options)
   permissionMode?: OrchestratorPermissionMode;
+
+  /** #337 D8: run although a dependency is not in Completed. */
+  @IsOptional()
+  @IsBoolean()
+  ignoreDependencies?: boolean;
+}
+
+/** `POST /board/cards/:number/dependencies` (#337 D8). */
+export class AddCardDependencyDto implements AddCardDependencyRequest {
+  @IsInt()
+  @Min(1)
+  @Max(999_999_999)
+  dependsOn!: number;
 }
 
 /** `POST /board/cards/:number/feedback` (D9). */

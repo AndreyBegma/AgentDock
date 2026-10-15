@@ -7,6 +7,7 @@ import { RunnersModule } from '../runners/runners.module';
 import { BoardController } from './board.controller';
 import { BoardService, FleetCardEditsRef } from './board.service';
 import { BoardCommands } from './board-commands';
+import { BoardDependencies } from './board-dependencies.service';
 import { BoardInboxService } from './board-inbox.service';
 import { BoardRoundsService } from './board-rounds.service';
 import { BoardSink } from './board-sink';
@@ -28,6 +29,7 @@ import { CollectRetryTimer } from './collect-retry-timer';
   controllers: [BoardController, BoardAttachmentsController],
   providers: [
     BoardCommands,
+    BoardDependencies,
     BoardInboxService,
     BoardRoundsService,
     BoardService,
