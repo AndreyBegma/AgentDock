@@ -70,7 +70,6 @@ function Item({
       <div className="flex flex-wrap items-center gap-2">
         <Badge
           tone={SETUP_STATE_TONE[item.state]}
-          dot
           size="sm"
           label={SETUP_STATE_LABEL[item.state]}
         />
