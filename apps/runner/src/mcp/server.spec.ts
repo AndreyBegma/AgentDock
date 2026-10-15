@@ -27,7 +27,7 @@ const text = (result: unknown): string =>
   (result as { content: { text: string }[] }).content[0]?.text ?? '';
 
 describe('agentdock MCP server (spec 201 D20)', () => {
-  it('answers tools/list with the thirteen tools, named agentdock', async () => {
+  it('answers tools/list with the fourteen tools, named agentdock', async () => {
     const { client } = await connect(() => ({ ok: true, data: {} }));
     expect(client.getServerVersion()?.name).toBe(MCP_SERVER_NAME);
     const { tools } = await client.listTools();
@@ -45,6 +45,7 @@ describe('agentdock MCP server (spec 201 D20)', () => {
         'request_action',
         'action_status',
         'finish_card',
+        'track_card',
         'away',
       ].sort(),
     );
@@ -95,6 +96,19 @@ describe('agentdock MCP server (spec 201 D20)', () => {
         { method: 'action.status', args: { id: 'ar_1' } },
       ],
       ['away', { on: true }, { method: 'away.set', args: { on: true } }],
+      [
+        'track_card',
+        { title: 'Fix login', body: 'Redirect loops.', kind: 'bug' },
+        {
+          method: 'card.track',
+          args: { title: 'Fix login', body: 'Redirect loops.', kind: 'bug' },
+        },
+      ],
+      [
+        'track_card',
+        { title: 'Add export' },
+        { method: 'card.track', args: { title: 'Add export' } },
+      ],
       [
         'finish_card',
         { summary: 'Added the export.' },
@@ -183,6 +197,40 @@ describe('agentdock MCP server (spec 201 D20)', () => {
         message: 'this session is not a board card worker',
       },
     });
+  });
+
+  it('track_card from a non-manual session is a tool error not_a_manual_session (#282)', async () => {
+    const { client, calls } = await connect(() => ({
+      ok: false,
+      error: {
+        code: 'not_a_manual_session',
+        message: 'only a person’s own session can track a card',
+      },
+    }));
+    const result = await client.callTool({
+      name: 'track_card',
+      arguments: { title: 'Fix login' },
+    });
+    expect(calls).toEqual([
+      { method: 'card.track', args: { title: 'Fix login' } },
+    ]);
+    expect(result.isError).toBe(true);
+    expect(text(result)).toContain('not_a_manual_session');
+  });
+
+  it('track_card rejects an empty title and an unknown kind before the daemon', async () => {
+    const { client, calls } = await connect(() => ({ ok: true, data: {} }));
+    for (const args of [
+      { title: '' },
+      { title: 'x', kind: 'chore' },
+      { title: 'x'.repeat(201) },
+    ]) {
+      const result = await client
+        .callTool({ name: 'track_card', arguments: args })
+        .catch(() => ({ isError: true }));
+      expect(result.isError).toBe(true);
+    }
+    expect(calls).toEqual([]);
   });
 
   it('rejects arguments outside the tool schema before calling the daemon', async () => {
