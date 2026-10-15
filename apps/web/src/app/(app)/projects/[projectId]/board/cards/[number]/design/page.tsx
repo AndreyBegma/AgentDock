@@ -169,6 +169,7 @@ export default function CardDesignViewerPage() {
                 busy={section.busy}
                 actions={section.actions}
                 approval={approval}
+                launch={card.data}
                 onChange={(change) =>
                   router.replace(
                     `${window.location.pathname}${applyViewerChange(search, change)}`,

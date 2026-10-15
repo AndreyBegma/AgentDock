@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  type CardDesignLaunchRequest,
   DESIGN_VIEWPORT_MAX_PX,
   DESIGN_VIEWPORT_MIN_PX,
   type DesignCommentRequest,
@@ -13,6 +14,7 @@ import { ResizableFrame } from '@andrewbehma/glass-ui/resizable-frame';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import { SidePanel } from '@andrewbehma/glass-ui/side-panel';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { LaunchCard } from '../../lib/board/launch';
 import {
   approveBlock,
   designWriteBlock,
@@ -38,6 +40,7 @@ import {
   wheelZoom,
   zoomKey,
 } from '../../lib/design/zoom';
+import { LaunchPopover } from '../board/launch-popover';
 import { ApproveDialog } from './approve-dialog';
 import { CommentsPanel } from './comments-panel';
 import { DesignFailure } from './design-failure';
@@ -50,9 +53,9 @@ import { ViewerToolbar } from './viewer-toolbar';
 
 export interface DesignViewerActions {
   patch: (body: TaskDesignPatchRequest) => Promise<unknown>;
-  generate: () => Promise<unknown>;
+  generate: (body?: CardDesignLaunchRequest) => Promise<unknown>;
   comment: (body: DesignCommentRequest) => Promise<unknown>;
-  revise: () => Promise<unknown>;
+  revise: (body?: CardDesignLaunchRequest) => Promise<unknown>;
   approve: (body: { revisionId: string }) => Promise<unknown>;
   stop: () => Promise<unknown>;
 }
@@ -71,6 +74,7 @@ export function DesignViewer({
   busy,
   actions,
   approval,
+  launch,
   onChange,
 }: {
   projectId: string;
@@ -84,6 +88,12 @@ export function DesignViewer({
     consequence: string;
     onApproveAndRun?: (revisionId: string) => Promise<unknown>;
   };
+  /**
+   * A card's design (#322 D1): the card, so Generate and Revise open the
+   * launch popover. A plan task's design (ADR-0025) leaves it out and keeps
+   * its plain buttons.
+   */
+  launch?: LaunchCard;
   onChange: (change: ViewerChange) => void;
 }) {
   const [pinMode, setPinMode] = useState(false);
@@ -182,14 +192,30 @@ export function DesignViewer({
   const panel = (
     <div className="flex flex-col gap-4 p-4">
       <div className="flex flex-wrap gap-2">
-        <Button
-          variant="glass"
-          disabled={reviseReason !== null || busy !== null}
-          title={reviseReason ?? undefined}
-          onClick={() => void actions.revise().catch(() => {})}
-        >
-          {busy === 'revise' ? 'Starting…' : `Revise design (${openCount})`}
-        </Button>
+        {launch ? (
+          <LaunchPopover
+            projectId={projectId}
+            card={launch}
+            kind="design"
+            variant="glass"
+            label={
+              busy === 'revise' ? 'Starting…' : `Revise design (${openCount})`
+            }
+            actionLabel="Revise"
+            disabled={reviseReason !== null || busy !== null}
+            title={reviseReason ?? undefined}
+            onLaunch={actions.revise}
+          />
+        ) : (
+          <Button
+            variant="glass"
+            disabled={reviseReason !== null || busy !== null}
+            title={reviseReason ?? undefined}
+            onClick={() => void actions.revise().catch(() => {})}
+          >
+            {busy === 'revise' ? 'Starting…' : `Revise design (${openCount})`}
+          </Button>
+        )}
         <Button
           variant="solid"
           disabled={approveReason !== null || busy !== null}
@@ -331,6 +357,7 @@ export function DesignViewer({
             busy={busy === 'generate' || busy === 'patch'}
             onPatch={actions.patch}
             onGenerate={actions.generate}
+            launch={launch}
           />
         )}
       </section>

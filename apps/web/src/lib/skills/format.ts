@@ -204,8 +204,6 @@ export function runProfileReason(
 export const skillRunsHref = (projectId: string): string =>
   `/projects/${projectId}/history?kind=skill`;
 
-export const SKILL_MODELS = ['opus', 'sonnet', 'haiku', 'fable'] as const;
-
 export const SKILL_OUTPUT_LABEL = {
   report: 'Report — nothing is pushed',
   pr: 'Pull request — changes go to a PR',
