@@ -197,6 +197,11 @@ export class CaptureService {
     if (!project.shipSessionContent || !settings?.captureEnabled) {
       return skip('capture_off');
     }
+    // #282 D5: the session's work is on the Board already, as its tracked card.
+    const tracked = await this.prisma.boardCard.count({
+      where: { trackedSessionId: session.id },
+    });
+    if (tracked > 0) return skip('tracked');
 
     await this.giveUpStale(project.id, now);
     if (await this.busy(project.id)) {
