@@ -445,14 +445,18 @@ export class BoardService implements OnModuleInit {
         actor,
       );
     }
-    if (card.source === 'fleet') await this.fleetEdited(card, data);
+    if (card.source === 'fleet') await this.fleetEdited(card, data, actor);
     return this.detail(projectId, number);
   }
 
-  /** #282 D4: a stored text edit of a `fleet` card reaches its running slot. */
+  /**
+   * #282 D4: a stored text edit of a `fleet` card reaches its running slot,
+   * sent as the person who made it. The board's own edits tell no slot.
+   */
   private async fleetEdited(
     card: CardWithRounds,
     data: { title?: string; body?: string; kind?: BoardCardKind },
+    actor: BoardActor,
   ): Promise<void> {
     const change = cardChange(
       { title: card.title, body: card.body, kind: card.kind },
@@ -463,16 +467,20 @@ export class BoardService implements OnModuleInit {
       },
     );
     const port = this.fleetEdits.get();
-    if (!change || !port) return;
+    const userId = actor.userId;
+    if (!change || !port || userId === null) return;
     try {
-      // TODO(i309-contract): pass `editor: { userId, email }` once
-      // `FleetCardEdit` carries it.
+      const { email } = await this.prisma.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { email: true },
+      });
       await port.cardEdited({
         projectId: card.projectId,
         cardId: card.id,
         number: card.number,
         label: cardLabel(card.number),
         change,
+        editor: { userId, email },
       });
     } catch (error) {
       // The edit is stored either way (the port's contract).
