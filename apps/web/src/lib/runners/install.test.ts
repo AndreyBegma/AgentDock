@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
   BUN_INSTALL_COMMAND,
+  CLAUDE_CODE_PATH,
   INSTALL_COMMANDS,
   installGuide,
   isLocalUrl,
@@ -24,6 +25,17 @@ describe('the /install guide', () => {
     expect(guide.run).toBe(RUN_COMMAND);
     expect(guide.version).toBe(VERSION_COMMAND);
     expect(guide.profiles).toBe(PROFILES_DETECT_COMMAND);
+  });
+
+  test('/install#claude-code has the profiles and setup commands', () => {
+    expect(CLAUDE_CODE_PATH).toBe('/install#claude-code');
+    expect(guide.claudeCode).toEqual({
+      listProfiles: 'agentdock-runner profiles',
+      setup: 'agentdock-runner setup claude --profile <key>',
+      dryRun: 'agentdock-runner setup claude --profile <key> --dry-run',
+      uninstall: 'agentdock-runner setup claude --profile <key> --uninstall',
+      status: 'agentdock-runner status',
+    });
   });
 
   test("pairs with the page's origin plus /api", () => {

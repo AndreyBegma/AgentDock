@@ -363,7 +363,7 @@ export function RunnerSheet({
                     <Table scroll>
                       <TableHead>
                         <TableRow>
-                          <TableCell head>Profile</TableCell>
+                          <TableCell head>Profile key</TableCell>
                           <TableCell head>Runtime</TableCell>
                           <TableCell head>Auth</TableCell>
                         </TableRow>

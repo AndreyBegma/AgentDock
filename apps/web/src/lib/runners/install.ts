@@ -65,6 +65,25 @@ export const RUN_COMMAND = 'agentdock-runner run';
 export const PROFILES_DETECT_COMMAND =
   'agentdock-runner profiles --detect --write';
 
+/** The anchor of "Connect Claude Code sessions" on `/install` (#281 D6). */
+export const CLAUDE_CODE_PATH = `${INSTALL_PATH}#claude-code`;
+
+/** Lists the runtime profiles; the first column is the key `setup` takes. */
+export const PROFILES_LIST_COMMAND = 'agentdock-runner profiles';
+
+/** Installs the agentdock plugin into one Claude profile (spec 201 D21). */
+export const SETUP_CLAUDE_COMMAND =
+  'agentdock-runner setup claude --profile <key>';
+
+/** What `setup claude` would change, without changing it. */
+export const SETUP_CLAUDE_DRY_RUN_COMMAND = `${SETUP_CLAUDE_COMMAND} --dry-run`;
+
+/** Takes the plugin and the telemetry setting out of the profile again. */
+export const SETUP_CLAUDE_UNINSTALL_COMMAND = `${SETUP_CLAUDE_COMMAND} --uninstall`;
+
+/** Shows the runner's config, connectivity and spool. */
+export const RUNNER_STATUS_COMMAND = 'agentdock-runner status';
+
 /**
  * How to keep the daemon running across logouts and reboots. It depends on how
  * the runner was installed, not on the OS (ADR-0017): Homebrew runs it as a
@@ -135,6 +154,13 @@ export function installGuide(origin: string) {
     keepOnline: KEEP_ONLINE_COMMANDS,
     run: RUN_COMMAND,
     profiles: PROFILES_DETECT_COMMAND,
+    claudeCode: {
+      listProfiles: PROFILES_LIST_COMMAND,
+      setup: SETUP_CLAUDE_COMMAND,
+      dryRun: SETUP_CLAUDE_DRY_RUN_COMMAND,
+      uninstall: SETUP_CLAUDE_UNINSTALL_COMMAND,
+      status: RUNNER_STATUS_COMMAND,
+    },
     health: `${server}/health`,
     healthCheck: `curl ${server}/health`,
     npmPrefix: NPM_PREFIX_COMMAND,

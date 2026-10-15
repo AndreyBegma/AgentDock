@@ -8,6 +8,8 @@ import {
   approveRunOffer,
   autoRunReason,
   confidenceLabel,
+  HOOKS_GUIDE_LABEL,
+  hooksGuideHref,
   hooksHint,
   isSuggestion,
   roundPill,
@@ -84,9 +86,12 @@ export function CardFace({
           ) : null}
           {card.round?.hooksMissing ? (
             <Tooltip content={hooksHint}>
-              <span>
-                <Chip size="sm">hooks not installed</Chip>
-              </span>
+              <NextLink
+                href={hooksGuideHref(projectId)}
+                aria-label={`hooks not set up. ${HOOKS_GUIDE_LABEL}`}
+              >
+                <Chip size="sm">hooks not set up</Chip>
+              </NextLink>
             </Tooltip>
           ) : null}
         </div>
