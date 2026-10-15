@@ -33,6 +33,8 @@ import {
   canRun,
   canStop,
   describeBoardError,
+  HOOKS_GUIDE_LABEL,
+  hooksGuideHref,
   hooksHint,
   phaseLabel,
   roundPill,
@@ -69,6 +71,7 @@ function roundTone(round: CardRoundView): TimelineItem['tone'] {
 }
 
 function roundItems(
+  projectId: string,
   rounds: CardRoundView[],
   notes: TextNotes,
   canOperate: boolean,
@@ -109,7 +112,17 @@ function roundItems(
           {round.error ? (
             <span className="text-danger">{round.error}</span>
           ) : null}
-          {round.hooksMissing ? <span>{hooksHint}</span> : null}
+          {round.hooksMissing ? (
+            <span>
+              {hooksHint}{' '}
+              <NextLink
+                href={hooksGuideHref(projectId)}
+                className="text-accent-ink underline-offset-2 hover:underline"
+              >
+                {HOOKS_GUIDE_LABEL}
+              </NextLink>
+            </span>
+          ) : null}
           {cost ? <span className="tabular-nums">{cost}</span> : null}
         </span>
       ),
@@ -307,7 +320,15 @@ function CardDetailBody({
             </p>
           ) : null}
           {card.round?.hooksMissing ? (
-            <p className="text-xs text-ink-2">{hooksHint}</p>
+            <p className="text-xs text-ink-2">
+              {hooksHint}{' '}
+              <NextLink
+                href={hooksGuideHref(projectId)}
+                className="text-accent-ink underline-offset-2 hover:underline"
+              >
+                {HOOKS_GUIDE_LABEL}
+              </NextLink>
+            </p>
           ) : null}
 
           {failure ? (
@@ -436,7 +457,7 @@ function CardDetailBody({
         <section aria-label="Rounds" className="flex flex-col gap-2">
           <SectionHeader title="Rounds" headingLevel={3} />
           <Timeline
-            items={roundItems(card.rounds, notes, canOperate)}
+            items={roundItems(projectId, card.rounds, notes, canOperate)}
             empty={<p className="text-sm text-ink-3">No worker has run yet.</p>}
           />
         </section>

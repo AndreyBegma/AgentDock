@@ -18,6 +18,10 @@ import {
 import type { Status } from '@andrewbehma/glass-ui/status-pill';
 import { ApiError, describeError } from '../api';
 import { describeNoProfile } from '../readiness/copy';
+import {
+  PROFILES_LIST_COMMAND,
+  SETUP_CLAUDE_COMMAND,
+} from '../runners/install';
 
 export const COLUMN_TITLE: Record<BoardColumn, string> = {
   inbox: 'Inbox',
@@ -358,6 +362,16 @@ export function parseMaxRunning(raw: string): number | null {
   return n >= BOARD_MAX_RUNNING_MIN && n <= BOARD_MAX_RUNNING_MAX ? n : null;
 }
 
-/** D6: shown when no hook event arrived after the start. */
-export const hooksHint =
-  'The agentdock plugin is not installed in this project, so the card only moves when the session ends or you mark it finished.';
+/**
+ * #281 D6: shown when no hook event arrived after the start. Names the cause,
+ * the profile key and the command; the card does not know its profile, so the
+ * key is the one `agentdock-runner profiles` lists.
+ */
+export const hooksHint = `No hook events from this card's session: the agentdock plugin is not set up for its runtime profile, so the card moves only when the session ends or you mark it finished. Find the profile key with \`${PROFILES_LIST_COMMAND}\` (first column, or Admin → Runners → Profile key), then run \`${SETUP_CLAUDE_COMMAND}\` and restart the session.`;
+
+/** The link text after the hint. */
+export const HOOKS_GUIDE_LABEL = 'How to set it up';
+
+/** #281 D6: the Settings › Sessions checklist of the card's project. */
+export const hooksGuideHref = (projectId: string): string =>
+  `/projects/${projectId}/settings?tab=sessions`;

@@ -413,6 +413,51 @@ export function InstallGuide() {
             <Command code={guide.profiles} />
           </Section>
 
+          <Section id="claude-code" title="Connect Claude Code sessions">
+            <p>
+              Sessions you start in your own terminal reach the Board only when
+              the agentdock plugin is set up in the Claude Code profile they run
+              in. Do this once per profile, on the runner&apos;s machine.
+            </p>
+            <ol className="flex list-decimal flex-col gap-3 pl-5">
+              <li className="flex flex-col gap-2">
+                <span>
+                  Find the profile key. It is the first column of the list, and
+                  the <Mono>Profile key</Mono> column in Admin → Runners:
+                </span>
+                <Command code={guide.claudeCode.listProfiles} />
+              </li>
+              <li className="flex flex-col gap-2">
+                <span>
+                  Set up the plugin and telemetry for that profile, with its key
+                  instead of <Mono>&lt;key&gt;</Mono>:
+                </span>
+                <Command code={guide.claudeCode.setup} />
+                <span className="text-sm">
+                  To see what it would change first, add <Mono>--dry-run</Mono>:
+                </span>
+                <Command code={guide.claudeCode.dryRun} />
+              </li>
+              <li>
+                Restart the open Claude Code sessions of that profile. A running
+                session does not load a new plugin.
+              </li>
+              <li className="flex flex-col gap-2">
+                <span>
+                  Verify: start a session in a project, then check that it shows
+                  as Manual in Sessions. The runner&apos;s own state is here:
+                </span>
+                <Command code={guide.claudeCode.status} />
+              </li>
+            </ol>
+            <p className="text-sm">
+              The project also needs session content and capture turned on;
+              Settings → Sessions shows the checklist. To take the plugin out
+              again:
+            </p>
+            <Command code={guide.claudeCode.uninstall} />
+          </Section>
+
           <Section id="troubleshooting" title="Troubleshooting">
             <dl className="flex flex-col gap-4">
               <div>

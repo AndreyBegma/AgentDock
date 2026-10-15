@@ -15,6 +15,9 @@ import {
   columnsOf,
   describeBoardError,
   designBlocksRun,
+  HOOKS_GUIDE_LABEL,
+  hooksGuideHref,
+  hooksHint,
   parseCardParam,
   parseMaxRunning,
   roundPill,
@@ -276,5 +279,21 @@ describe('parsers', () => {
     expect(parseMaxRunning('11')).toBeNull();
     expect(parseMaxRunning('2.5')).toBeNull();
     expect(parseMaxRunning('')).toBeNull();
+  });
+});
+
+describe('hooksHint (#281 D6)', () => {
+  test('names the cause, the key and the exact command', () => {
+    expect(hooksHint).toContain('plugin is not set up for its runtime profile');
+    expect(hooksHint).toContain('agentdock-runner profiles');
+    expect(hooksHint).toContain(
+      'agentdock-runner setup claude --profile <key>',
+    );
+    expect(hooksHint).not.toContain('not installed in this project');
+  });
+
+  test('links the Settings › Sessions checklist of the project', () => {
+    expect(HOOKS_GUIDE_LABEL).toBe('How to set it up');
+    expect(hooksGuideHref('p1')).toBe('/projects/p1/settings?tab=sessions');
   });
 });
