@@ -299,4 +299,4 @@ After both land: runner release 0.8.0.
 - **A1 (assumption) — `fable` is selectable but never recommended.** Its
   cost/benefit for card work is not established in `docs/`.
 
-Depends on #282 (closed) · #309 (closed)
+Depends on #282 (closed) · #309 (closed) · #324 (apps/api/src/text and schema contention: i322-api and i322-contract are cut after #324 merges)
