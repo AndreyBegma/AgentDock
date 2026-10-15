@@ -1,3 +1,6 @@
+import { BOARD_ERROR } from '@agentdock/shared';
+import { BoardFailure } from '../board/board-error';
+import { BudgetGate } from '../budgets/budget-gate';
 import { CardDesignHarness } from './testing/card-design-e2e';
 import { designResult, profileResult } from './testing/design-e2e';
 
@@ -203,5 +206,146 @@ describe('card design (e2e, #243)', () => {
     expect((await h.author.get(h.cardDesignBase(bare.number))).status).toBe(
       404,
     );
+  });
+
+  describe('approve and continue (#273 D8, D9)', () => {
+    /** A card whose one-variant design is drawn, with Continue after design `on`. */
+    const reviewing = async (on: boolean) => {
+      await h.seedProfile();
+      const card = await h.designedCard(1);
+      if (on) {
+        const toggled = await h.author.send('patch', h.cardPath(card.number), {
+          continueAfterDesign: true,
+        });
+        expect(toggled.status).toBe(200);
+      }
+      expect((await generate(card.number)).status).toBe(201);
+      await h.finishCard(card.id, designResult({ taskKey: KEY, variant: 1 }));
+      const [revision] = (await h.cardDesign(card.number)).revisions;
+      return { card, revisionId: revision.id };
+    };
+
+    const approve = (number: number, revisionId: string) =>
+      h.author.send('post', `${h.cardDesignBase(number)}/approve`, {
+        revisionId,
+      });
+
+    const failure = async (number: number) =>
+      (await h.author.get(h.cardPath(number))).body.autoRunFailure;
+
+    it('with Continue off answers run: null', async () => {
+      const { card, revisionId } = await reviewing(false);
+      const answered = await approve(card.number, revisionId);
+      expect(answered.status).toBe(200);
+      expect(answered.body).toMatchObject({ status: 'approved', run: null });
+      expect(h.cardSentOf('card.run')).toHaveLength(0);
+    });
+
+    it('with Continue on and room answers run: started', async () => {
+      const { card, revisionId } = await reviewing(true);
+      const answered = await approve(card.number, revisionId);
+      expect(answered.status).toBe(200);
+      expect(answered.body.run).toEqual({ status: 'started', round: 1 });
+      expect(h.cardSentOf('card.run')).toHaveLength(1);
+      expect(await failure(card.number)).toBeNull();
+    });
+
+    it('max_running: 200, approved, run_failed stored on the card; a later Run clears it', async () => {
+      const { card, revisionId } = await reviewing(true);
+      await h.ctx.prisma.boardSettings.upsert({
+        where: { projectId: h.projectId },
+        create: { projectId: h.projectId, maxRunning: 1 },
+        update: { maxRunning: 1 },
+      });
+      const busy = await h.createCard({ title: 'Busy' });
+      expect(
+        (await h.author.send('post', `${h.cardPath(busy.number)}/run`, {}))
+          .status,
+      ).toBe(200);
+
+      const answered = await approve(card.number, revisionId);
+      expect(answered.status).toBe(200);
+      expect(answered.body.status).toBe('approved');
+      expect(answered.body.run).toMatchObject({
+        status: 'run_failed',
+        code: 'max_running',
+      });
+      expect(answered.body.run.message).toContain('1 of 1');
+      expect(await failure(card.number)).toMatchObject({
+        code: 'max_running',
+      });
+      const [audit] = await h.auditOf('card.auto_run_failed');
+      expect(audit.after).toMatchObject({ error: 'max_running' });
+      expect(audit.targetId).toBe(card.id);
+
+      await h.ctx.prisma.boardSettings.update({
+        where: { projectId: h.projectId },
+        data: { maxRunning: 3 },
+      });
+      expect(
+        (await h.author.send('post', `${h.cardPath(card.number)}/run`, {}))
+          .status,
+      ).toBe(200);
+      expect(await failure(card.number)).toBeNull();
+    });
+
+    it('a hard-stop budget: run_failed with budget_exceeded', async () => {
+      const { card, revisionId } = await reviewing(true);
+      const check = jest.spyOn(h.ctx.app.get(BudgetGate), 'check');
+      check.mockResolvedValue({
+        allowed: false,
+        budgetId: 'b1',
+        scope: 'project',
+        resetsAt: new Date('2026-11-01T00:00:00Z'),
+      });
+      const answered = await approve(card.number, revisionId);
+      expect(answered.status).toBe(200);
+      expect(answered.body.run).toMatchObject({
+        status: 'run_failed',
+        code: 'budget_exceeded',
+      });
+      expect(await failure(card.number)).toMatchObject({
+        code: 'budget_exceeded',
+      });
+    });
+
+    it('a runner without card.run: run_failed with command_unavailable', async () => {
+      const { card, revisionId } = await reviewing(true);
+      jest
+        .mocked(h.boardCommands.assertReady)
+        .mockImplementation((_runner, name) => {
+          if (name === 'card.run') {
+            throw new BoardFailure(
+              503,
+              BOARD_ERROR.commandUnavailable,
+              'The runner does not serve card.run; update it',
+            );
+          }
+        });
+      const answered = await approve(card.number, revisionId);
+      expect(answered.status).toBe(200);
+      expect(answered.body.run).toEqual({
+        status: 'run_failed',
+        code: 'command_unavailable',
+        message: 'The runner does not serve card.run; update it',
+      });
+      const stored = await h.ctx.prisma.boardCard.findUniqueOrThrow({
+        where: { id: card.id },
+        include: { rounds: true },
+      });
+      expect(stored.column).toBe('todo');
+      expect(stored.rounds).toHaveLength(0);
+      expect(stored.autoRunError).toBe('command_unavailable');
+
+      // Switching the design off: the failure no longer applies.
+      expect(
+        (
+          await h.author.send('patch', h.cardDesignBase(card.number), {
+            needed: false,
+          })
+        ).status,
+      ).toBe(200);
+      expect(await failure(card.number)).toBeNull();
+    });
   });
 });

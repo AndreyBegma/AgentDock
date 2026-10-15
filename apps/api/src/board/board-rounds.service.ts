@@ -2,15 +2,16 @@ import { randomUUID } from 'node:crypto';
 import {
   BOARD_ERROR,
   type BoardCardDetail,
-  CARD_CONTINUE_PROMPT,
   CARD_WORKER_PROMPT_VERSION,
+  type CardChange,
   type CardRoundPhase,
   type CardRoundTrigger,
   cardBranch,
+  cardChange,
   cardDesignPath,
-  cardFeedbackPrompt,
   cardIssueBody,
   cardLabel,
+  cardNextRoundPrompt,
   cardSpecPath,
   cardWorkerPrompt,
   isActiveRoundPhase,
@@ -68,6 +69,19 @@ const UNSTARTED_PHASES: ReadonlySet<CardRoundPhase> = new Set([
   'queued',
   'failed',
 ]);
+
+/**
+ * #273 D1: how the card's text differs from what the worker was last given —
+ * the snapshot of the newest round that started Claude. `null` without one.
+ */
+const changeSinceLastRound = (card: CardWithRounds): CardChange | null => {
+  const last = card.rounds.find((r) => !UNSTARTED_PHASES.has(r.phase));
+  if (!last) return null;
+  return cardChange(
+    { title: last.cardTitle, body: last.cardBody, kind: last.cardKind },
+    { title: card.title, body: card.body, kind: card.kind },
+  );
+};
 
 /**
  * Starting a round (issue #242 D4, D5, D9, D12, D13): Run — round 1 or a
@@ -261,28 +275,30 @@ export class BoardRoundsService {
         : null;
     const sessionId = card.sessionId ?? randomUUID();
     const prompt =
-      trigger === 'feedback' && feedback !== null
-        ? cardFeedbackPrompt(feedback)
-        : resume
-          ? CARD_CONTINUE_PROMPT
-          : cardWorkerPrompt({
-              number: card.number,
-              title: card.title,
-              body: card.body,
-              kind: card.kind,
-              branch,
-              base: project.base,
-              specPath,
-              issueNumber: issue.number,
-              design:
-                designFile && design
-                  ? {
-                      path: designFile.path,
-                      rationale: design.rationale,
-                      comments: design.comments,
-                    }
-                  : null,
-            });
+      resume || (trigger === 'feedback' && feedback !== null)
+        ? cardNextRoundPrompt({
+            label: cardLabel(card.number),
+            change: changeSinceLastRound(card),
+            feedback: trigger === 'feedback' ? feedback : null,
+          })
+        : cardWorkerPrompt({
+            number: card.number,
+            title: card.title,
+            body: card.body,
+            kind: card.kind,
+            branch,
+            base: project.base,
+            specPath,
+            issueNumber: issue.number,
+            design:
+              designFile && design
+                ? {
+                    path: designFile.path,
+                    rationale: design.rationale,
+                    comments: design.comments,
+                  }
+                : null,
+          });
     const files: CardRunFile[] = [
       ...(firstStart && specPath !== null
         ? [{ path: specPath, content: specContent(card, issue.number) }]
@@ -363,6 +379,10 @@ export class BoardRoundsService {
           branch,
           specPath,
           ...(dto.model !== undefined ? { model: dto.model } : {}),
+          // #273 D9: a round started; an earlier auto-run failure is history.
+          autoRunError: null,
+          autoRunMessage: null,
+          autoRunFailedAt: null,
         },
       });
       return created;

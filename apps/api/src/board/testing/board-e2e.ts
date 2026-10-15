@@ -21,6 +21,32 @@ export const ROOT_B = '/srv/dev/gadget';
 
 export type CardHandler = (args: Record<string, unknown>) => unknown;
 
+type WorldCommand = CardCommandName | 'issue.create' | 'pr.inspect';
+
+/** 40 hex: the head `pr.inspect` answers with by default. */
+export const HEAD_SHA = 'a'.repeat(40);
+
+/** A `pr.inspect` answer for PR #77 of the world's repository. */
+export const prInspection = (extra: Record<string, unknown> = {}) => ({
+  number: 77,
+  url: 'https://github.com/acme/widget/pull/77',
+  title: 'C-1 Add login',
+  body: 'Closes #41',
+  state: 'open',
+  headSha: HEAD_SHA,
+  additions: 10,
+  deletions: 2,
+  changedFiles: 3,
+  files: [],
+  filesTruncated: false,
+  checks: 'pass',
+  checkList: [],
+  mergeable: 'MERGEABLE',
+  mergeStateStatus: 'CLEAN',
+  fetchedAt: '2026-10-15T12:00:00.000Z',
+  ...extra,
+});
+
 /** A runner answer: `ok` with an output, or an error code. */
 export const ok = <T>(output: T): BoardSendResult<T> => ({
   status: 'ok',
@@ -50,7 +76,7 @@ export class BoardWorld {
   operatorOfB!: Session;
   outsider!: Session;
   operatorId!: string;
-  handlers: Partial<Record<CardCommandName | 'issue.create', CardHandler>> = {};
+  handlers: Partial<Record<WorldCommand, CardHandler>> = {};
   /** Set to make `assertReady` refuse like an offline runner. */
   offline = false;
   private seq = 0;
@@ -77,15 +103,22 @@ export class BoardWorld {
       .mockImplementation(async (_runner, args) =>
         this.answer('issue.create', args as unknown as Record<string, unknown>),
       );
+    jest
+      .spyOn(this.commands, 'inspectPr')
+      .mockImplementation(async (runnerId, args) => {
+        this.commands.assertReady(runnerId, 'pr.inspect');
+        return this.answer('pr.inspect', { ...args });
+      });
   }
 
   private answer(
-    name: CardCommandName | 'issue.create',
+    name: WorldCommand,
     args: Record<string, unknown>,
   ): BoardSendResult<never> {
     const handler = this.handlers[name];
     if (handler) return handler(args) as BoardSendResult<never>;
-    const defaults: Record<CardCommandName | 'issue.create', unknown> = {
+    const defaults: Record<WorldCommand, unknown> = {
+      'pr.inspect': prInspection(),
       'card.run': {
         phase: 'starting',
         tmuxSession: `agentdock-card-${String(args.shortId)}`,
@@ -121,6 +154,7 @@ export class BoardWorld {
   async reset(): Promise<void> {
     jest.mocked(this.commands.send).mockClear();
     jest.mocked(this.commands.createIssue).mockClear();
+    jest.mocked(this.commands.inspectPr).mockClear();
     this.handlers = {};
     this.offline = false;
     await resetDatabase(this.ctx.prisma);

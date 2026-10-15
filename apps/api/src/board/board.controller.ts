@@ -1,7 +1,9 @@
 import type {
+  AcceptBoardCardResponse,
   BoardCardDetail,
   BoardSettingsView,
   BoardView,
+  CardPullRequestView,
   DismissAllResult,
 } from '@agentdock/shared';
 import {
@@ -32,6 +34,7 @@ import { BoardInboxService } from './board-inbox.service';
 import { BoardRoundsService } from './board-rounds.service';
 import type { BoardActor } from './board-work';
 import {
+  AcceptBoardCardDto,
   AcceptSuggestionDto,
   BoardQueryDto,
   CardFeedbackDto,
@@ -211,8 +214,26 @@ export class BoardController {
     @CurrentUser() user: AuthUser,
     @AuditCtx() ctx: AuditContext,
     @Param('number') number: string,
-  ): Promise<BoardCardDetail> {
+    @Body() dto: AcceptBoardCardDto,
+  ): Promise<AcceptBoardCardResponse> {
     return this.board.accept(
+      access.projectId,
+      cardNumber(number),
+      dto,
+      actorOf(access, user, ctx),
+    );
+  }
+
+  /** #273 D10: operator — the read goes to the runner's `gh`. */
+  @Get('board/cards/:number/pull-request')
+  @ProjectRole('operator')
+  pullRequest(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Param('number') number: string,
+  ): Promise<CardPullRequestView> {
+    return this.board.pullRequest(
       access.projectId,
       cardNumber(number),
       actorOf(access, user, ctx),
