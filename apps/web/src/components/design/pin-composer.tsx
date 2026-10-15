@@ -9,17 +9,8 @@ import {
   PopoverRoot,
 } from '@andrewbehma/glass-ui/popover';
 import { useState } from 'react';
+import { anchorAt } from '../../lib/design/zoom';
 import type { FramePin } from './mockup-frame';
-
-/**
- * Where the click was, in the page's viewport: the frame's box plus the
- * click's place in the frame. A helper that sends no viewport position (one
- * served before it did) anchors at the frame's top edge instead.
- */
-const anchorAt = (pin: FramePin): { left: number; top: number } =>
-  pin.clientX !== undefined && pin.clientY !== undefined
-    ? { left: pin.frame.left + pin.clientX, top: pin.frame.top + pin.clientY }
-    : { left: pin.frame.left + pin.frame.width / 2, top: pin.frame.top };
 
 /**
  * The comment box a pin-mode click opens, at the point (spec 223 "UI"). Its
@@ -28,6 +19,7 @@ const anchorAt = (pin: FramePin): { left: number; top: number } =>
  */
 export function PinComposer({
   pin,
+  zoom,
   number,
   screen,
   busy,
@@ -35,6 +27,8 @@ export function PinComposer({
   onCancel,
 }: {
   pin: FramePin | null;
+  /** The scale the pin was placed at: `pin.frame` is the scaled box (spec 335 D5). */
+  zoom: number;
   /** The number the marker shows. */
   number: number;
   /** "Mobile · dark": where the pin will show. */
@@ -44,7 +38,7 @@ export function PinComposer({
   onCancel: () => void;
 }) {
   const [body, setBody] = useState('');
-  const at = pin ? anchorAt(pin) : null;
+  const at = pin ? anchorAt(pin, pin.frame, zoom) : null;
   const text = body.trim();
 
   const save = async () => {

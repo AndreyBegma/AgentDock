@@ -7,6 +7,7 @@ import {
   type DesignTheme,
   type ViewportPreset,
 } from '@agentdock/shared';
+import { clampZoom, type Zoom } from './zoom';
 
 /**
  * The viewer's state (spec 223 D11), all of it in the URL so a link opens
@@ -24,6 +25,8 @@ export interface ViewerState {
   width: number;
   /** True when `w` differs from the preset's width. */
   customWidth: boolean;
+  /** `zoom`: `fit` (the default) or a scale such as 0.75 (spec 335 D4). */
+  zoom: Zoom;
 }
 
 /** The URL keys, so a link and the parser agree. */
@@ -33,7 +36,15 @@ export const VIEWER_PARAM = {
   viewport: 'vp',
   theme: 'theme',
   width: 'w',
+  zoom: 'zoom',
 } as const;
+
+/** `zoom=fit`, a number clamped to the bounds, anything else is Fit. */
+export function parseZoom(raw: string | null): Zoom {
+  if (raw === null || !/^\d*\.?\d+$/.test(raw)) return 'fit';
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? clampZoom(n) : 'fit';
+}
 
 export const clampWidth = (width: number): number =>
   Math.min(
@@ -105,6 +116,7 @@ export function resolveViewerState(
     theme,
     width,
     customWidth: width !== viewport.width,
+    zoom: parseZoom(params.get(VIEWER_PARAM.zoom)),
   };
 }
 
@@ -114,7 +126,8 @@ export type ViewerChange =
   | { kind: 'revision'; revisionId: string }
   | { kind: 'viewport'; viewport: ViewportPreset }
   | { kind: 'theme'; theme: DesignTheme }
-  | { kind: 'width'; width: number };
+  | { kind: 'width'; width: number }
+  | { kind: 'zoom'; zoom: Zoom };
 
 /**
  * The next query string. Choosing a variant or a preset drops what it
@@ -147,6 +160,11 @@ export function applyViewerChange(
       break;
     case 'width':
       next.set(VIEWER_PARAM.width, String(clampWidth(change.width)));
+      break;
+    case 'zoom':
+      // Fit is the default: it leaves the URL clean.
+      if (change.zoom === 'fit') next.delete(VIEWER_PARAM.zoom);
+      else next.set(VIEWER_PARAM.zoom, String(clampZoom(change.zoom)));
       break;
   }
   const query = next.toString();
