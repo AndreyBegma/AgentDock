@@ -5,6 +5,7 @@ import type {
   TerminalAttachResult,
   WatchedProject,
 } from '@agentdock/shared/protocol';
+import type { CaptureHandlers } from '../capture';
 import type { CardHandlers } from '../cards';
 import { type Clock, isoNow } from '../clock';
 import type { ConfigProfile } from '../config';
@@ -67,12 +68,21 @@ export interface HandlerContext {
   uiprofile?: UiProfileHandlers;
   /** Board card workers (#242); absent means this runner does not run them. */
   cards?: CardHandlers;
+  /** Card capture (#244); absent means this runner does not extract cards. */
+  capture?: CaptureHandlers;
 }
 
 const noCards = (): never => {
   throw new CommandFailure(
     'unsupported',
     'this runner does not run board card workers',
+  );
+};
+
+const noCapture = (): never => {
+  throw new CommandFailure(
+    'unsupported',
+    'this runner does not run card capture',
   );
 };
 
@@ -186,5 +196,7 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
     'card.collect': (args) =>
       context.cards?.['card.collect'](args) ?? noCards(),
     'card.close': (args) => context.cards?.['card.close'](args) ?? noCards(),
+    'cards.extract': (args) =>
+      context.capture?.['cards.extract'](args) ?? noCapture(),
   };
 };
