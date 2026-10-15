@@ -60,3 +60,4 @@ ask for it.
 | [#322](https://github.com/AndreyBegma/AgentDock/issues/322) | [322-card-profile-and-model-recommendation](322-card-profile-and-model-recommendation.md) | Profile and model at launch, recommended model (ADR-0032) | #282, #309 | queued |
 | [#324](https://github.com/AndreyBegma/AgentDock/issues/324) | [324-deepl-translation-at-save](324-deepl-translation-at-save.md) | English at save time with DeepL (ADR-0033) | #271 | shipped — [#328](https://github.com/AndreyBegma/AgentDock/pull/328) |
 | [#329](https://github.com/AndreyBegma/AgentDock/issues/329) | [329-card-pr-and-cleanup](329-card-pr-and-cleanup.md) | A card always reaches a PR; Accept cleans up its branch | #273, #282 | queued |
+| [#335](https://github.com/AndreyBegma/AgentDock/issues/335) | [335-design-viewer-zoom](335-design-viewer-zoom.md) | Zoom in the design viewer (Fit, presets, Ctrl+wheel) | #223 | queued |
