@@ -6,6 +6,7 @@ import { LiveModule } from '../live/live.module';
 import { ProjectsModule } from '../projects';
 import { ReadinessModule } from '../readiness';
 import { RunnersModule } from '../runners/runners.module';
+import { DeepLClient } from './deepl-client';
 import { TextController } from './text.controller';
 import { TextCommands } from './text-commands';
 import { TextNormalizer } from './text-normalizer';
@@ -18,7 +19,8 @@ import { TextWorker } from './text-worker';
 
 /**
  * Text normalization (issue #271, ADR-0027): the free text people save is
- * stored in English, translated by a small model on the project's runner.
+ * stored in English, translated by a small model on the project's runner —
+ * or, with `DEEPL_API_KEY` set, by DeepL inside the save (#324, ADR-0033).
  * The owner services (Board, Planner, Design) inject `TextNormalizer` to
  * request normalization and register their hooks with `TextOwners`. The
  * `text-normalize` queue is registered only with a `REDIS_URL`.
@@ -44,6 +46,7 @@ import { TextWorker } from './text-worker';
   ],
   controllers: [TextController],
   providers: [
+    DeepLClient,
     TextCommands,
     TextNormalizer,
     TextOwners,
