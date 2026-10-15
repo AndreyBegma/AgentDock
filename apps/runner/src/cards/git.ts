@@ -1,7 +1,9 @@
 import {
+  appendFileSync,
   existsSync,
   lstatSync,
   mkdirSync,
+  readFileSync,
   realpathSync,
   writeFileSync,
 } from 'node:fs';
@@ -26,7 +28,34 @@ import {
 import { createPullRequest, githubOf, pushBranch } from '../skills/run/collect';
 import type { CardRecord } from './record';
 
-type GitDeps = Pick<SkillsDeps, 'exec' | 'tempRoot'>;
+export type GitDeps = Pick<SkillsDeps, 'exec' | 'tempRoot'>;
+
+/**
+ * #309 D9: adds `pattern` to the worktree's git exclude (`info/exclude`, which
+ * git reads for every worktree of the repository) unless a line already has
+ * it, so `git status` and `add -A` never see the runner's own files.
+ */
+export const excludeFromGit = async (
+  deps: GitDeps,
+  worktree: string,
+  pattern: string,
+): Promise<void> => {
+  const path = (
+    await gitOk(deps.exec, [
+      '-C',
+      worktree,
+      'rev-parse',
+      '--path-format=absolute',
+      '--git-path',
+      'info/exclude',
+    ])
+  ).trim();
+  const current = existsSync(path) ? readFileSync(path, 'utf8') : '';
+  if (current.split('\n').some((line) => line.trim() === pattern)) return;
+  mkdirSync(dirname(path), { recursive: true });
+  const separator = current === '' || current.endsWith('\n') ? '' : '\n';
+  appendFileSync(path, `${separator}${pattern}\n`);
+};
 
 /** The commit of a ref, or null when it does not exist. */
 const commitOf = async (
