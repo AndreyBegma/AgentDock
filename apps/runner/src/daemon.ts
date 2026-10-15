@@ -277,6 +277,7 @@ export const runDaemon = async (
       deps: skillsDeps,
       cardsDir: options.cardsDir ?? join(dirname(options.spoolDir), 'cards'),
       selfCommand,
+      attachmentSource: { server: config.server, token: config.token },
       emit: (event) => connection?.emit(event),
       log,
       otlpPort: () => otlp?.port ?? null,

@@ -52,6 +52,9 @@ COPY --from=builder --chown=node:node /app/package.json /app/tsconfig.json ./
 COPY --from=builder --chown=node:node /app/node_modules node_modules/
 COPY --from=builder --chown=node:node /app/packages/shared packages/shared/
 COPY --from=builder --chown=node:node /app/apps/api apps/api/
+# The attachments volume's mount point (ADR-0031): a new named volume takes
+# this directory's owner, so the API (uid node) can write into it.
+RUN mkdir -p /data/attachments && chown node:node /data/attachments
 
 USER node
 WORKDIR /app/apps/api
