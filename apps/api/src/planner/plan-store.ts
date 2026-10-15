@@ -56,6 +56,8 @@ export interface PlanProject {
   defaultProfileId: string | null;
   readyLabelOverride: string | null;
   codeSentinelConfig: Prisma.JsonValue;
+  /** The runner's last hello `runnerVersion`; null before one (#337 D10). */
+  runnerVersion: string | null;
 }
 
 /** Reads shared by the planner services, and the one live push (spec "Live"). */
@@ -132,11 +134,16 @@ export class PlanStore {
         defaultProfileId: true,
         readyLabelOverride: true,
         codeSentinelConfig: true,
+        runner: { select: { version: true } },
       },
     });
     if (!project) throw projectNotFound();
-    const { baseBranch, baseOverride, ...rest } = project;
-    return { ...rest, base: baseOverride ?? baseBranch };
+    const { baseBranch, baseOverride, runner, ...rest } = project;
+    return {
+      ...rest,
+      base: baseOverride ?? baseBranch,
+      runnerVersion: runner.version,
+    };
   }
 
   /**
@@ -154,9 +161,16 @@ export class PlanStore {
     return this.profiles.require(project, { key }, fail);
   }
 
-  /** A sent or archived plan takes no more turns, reviews or revisions. */
+  /**
+   * A sent, archived or done (#337: it made its cards) plan takes no more
+   * turns, reviews or revisions.
+   */
   assertOpen(plan: { status: string }): void {
-    if (plan.status === 'sent' || plan.status === 'archived') {
+    if (
+      plan.status === 'sent' ||
+      plan.status === 'archived' ||
+      plan.status === 'done'
+    ) {
       throw plannerError(
         409,
         PLANNER_ERROR.planClosed,

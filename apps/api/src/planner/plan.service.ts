@@ -18,15 +18,18 @@ import {
   Optional,
 } from '@nestjs/common';
 import type { Plan, PlanTaskStatus } from '@prisma/client';
+import { AttachmentsService } from '../attachments/attachments.service';
 import { AuditService } from '../audit/audit.service';
 import type { AuditContext } from '../audit/audit.types';
 import { BudgetGate } from '../budgets/budget-gate';
 import { PrismaService } from '../database/prisma.service';
 import { designBlocks } from '../design/design-rules';
 import { designSummaries } from '../design/design-store';
+import { UserSettingsService } from '../settings/user-settings.service';
 import { TextNormalizer } from '../text/text-normalizer';
 import { TextOwners } from '../text/text-owners';
 import { readablePlanWhere } from './plan-access';
+import { intakeRound } from './plan-intake';
 import {
   blockingOpen,
   planInclude,
@@ -61,9 +64,6 @@ export const callerOf = (actor: PlanActor): PlanCaller => ({
   ctx: actor.ctx,
 });
 
-/** D14: a plan runs on opus unless it says otherwise. */
-const DEFAULT_MODEL = 'opus';
-
 /** The brief's first line, cut to a title; decompose replaces it. */
 export const titleOf = (brief: string): string => {
   const line =
@@ -96,6 +96,8 @@ export class PlanService implements OnModuleInit {
     private readonly audit: AuditService,
     private readonly text: TextNormalizer,
     private readonly textOwners: TextOwners,
+    private readonly attachments: AttachmentsService,
+    private readonly userSettings: UserSettingsService,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
 
@@ -151,27 +153,56 @@ export class PlanService implements OnModuleInit {
     actor: PlanActor,
     request: CreatePlanRequest,
   ): Promise<PlanDetail> {
+    const card = request.mode === 'card';
+    const attachmentIds = request.attachmentIds ?? [];
+    if (!card && attachmentIds.length > 0) {
+      throw plannerError(
+        409,
+        PLANNER_ERROR.wrongMode,
+        'Attachments belong to a card intake',
+      );
+    }
     const project = await this.store.project(projectId);
     const profile = await this.store.profile(project, request.profileKey);
     this.commands.assertReady(project.runnerId, 'plan.turn');
     await this.budgets?.assertAllowed({ projectId, userId: actor.userId });
     const instructions = await this.instructions.effective(projectId);
+    // #337 D10: refused before the plan exists.
+    await this.attachments.assertPlanClaimable(
+      projectId,
+      null,
+      attachmentIds,
+      actor,
+    );
+    // #337 D9: the one picked at the start, else the caller's planning model.
+    const model =
+      request.model ?? (await this.userSettings.planningModel(actor.userId));
 
-    const plan = await this.prisma.plan.create({
-      data: {
-        projectId,
-        authorId: actor.userId,
-        title: titleOf(request.brief),
-        brief: request.brief,
-        mode: request.mode,
-        visibility: 'private',
-        status: request.mode === 'dialogue' ? 'clarifying' : 'drafting',
-        sessionId: randomUUID(),
-        instructionsId: instructions.id,
-        contractVersion: PLANNER_CONTRACT_VERSION,
-        profileKey: profile.key,
-        model: request.model ?? DEFAULT_MODEL,
-      },
+    const plan = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.plan.create({
+        data: {
+          projectId,
+          authorId: actor.userId,
+          title: titleOf(request.brief),
+          brief: request.brief,
+          mode: request.mode,
+          visibility: 'private',
+          // #337: an intake asks rounds, as a dialogue plan does.
+          status: request.mode === 'batch' ? 'drafting' : 'clarifying',
+          sessionId: randomUUID(),
+          instructionsId: instructions.id,
+          contractVersion: PLANNER_CONTRACT_VERSION,
+          profileKey: profile.key,
+          model,
+        },
+      });
+      await this.attachments.claimForPlan(
+        tx,
+        { projectId, planId: created.id },
+        attachmentIds,
+        actor,
+      );
+      return created;
     });
     await this.audit.record({
       ...actor.ctx,
@@ -183,17 +214,22 @@ export class PlanService implements OnModuleInit {
         model: plan.model,
         profileKey: plan.profileKey,
         instructionsId: plan.instructionsId,
+        ...(attachmentIds.length > 0 ? { attachmentIds } : {}),
       },
       result: 'ok',
     });
     // #271 D3: the first turn reads the brief as stored once the request
     // resolves — English when DeepL answered inside it (#324 D1), else as typed.
-    await this.text.request(
-      projectId,
-      { ownerType: 'plan', ownerId: plan.id },
-      [{ field: 'brief', text: plan.brief }],
-      { authorId: actor.userId },
-    );
+    // #337 D5: an intake keeps the person's words as typed — the model asks
+    // in their language and writes the card in English itself.
+    if (!card) {
+      await this.text.request(
+        projectId,
+        { ownerType: 'plan', ownerId: plan.id },
+        [{ field: 'brief', text: plan.brief }],
+        { authorId: actor.userId },
+      );
+    }
     const stored = await this.prisma.plan.findUniqueOrThrow({
       where: { id: plan.id },
     });
@@ -264,9 +300,11 @@ export class PlanService implements OnModuleInit {
         include: turnInclude,
         orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       }),
-      plan.status === 'clarifying'
-        ? this.store.planRound(planId)
-        : Promise.resolve([]),
+      plan.status !== 'clarifying'
+        ? Promise.resolve([])
+        : plan.mode === 'card'
+          ? intakeRound(this.prisma, planId)
+          : this.store.planRound(planId),
     ]);
     const [issueOf, designs] = await Promise.all([
       loadIssueViews(this.prisma, projectId, tasks),
@@ -512,6 +550,8 @@ export class PlanService implements OnModuleInit {
       where: { id: plan.id },
       data: { status: 'archived' },
     });
+    // #337 D2: a discarded intake made no card; its files go to the sweep.
+    await this.attachments.releasePlan(plan.id);
     this.store.publish(plan.projectId, plan.id);
   }
 

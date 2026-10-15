@@ -1,10 +1,12 @@
 import {
   asPlannerContractVersion,
+  type CardDraft,
   type ClarifyOutput,
   type DecomposeOutput,
   type DesignOutput,
   type GrillOutput,
   type IntakeOutput,
+  isIntakeCard,
   isPlannedTask,
   type PlannerParseResult,
   type PlanTurnAction,
@@ -27,6 +29,9 @@ import type {
   PlanTurn,
   Prisma,
 } from '@prisma/client';
+import { AttachmentsService } from '../attachments/attachments.service';
+import { SYSTEM_ACTOR, systemActorFor } from '../audit/audit.types';
+import { BoardPlanCards } from '../board/board-plan-cards';
 import { PrismaService } from '../database/prisma.service';
 import { applyDesignOutput, settleDesign } from '../design/design-apply';
 import { CARD_DESIGN_CONTRACT_VERSION } from '../design/design-prompt';
@@ -53,7 +58,8 @@ import {
   revisedTasks,
   type TaskDraft,
 } from './plan-apply';
-import { questionsOf } from './plan-mapper';
+import { intakeTurnState } from './plan-intake';
+import { inputOf, questionsOf } from './plan-mapper';
 import { PlanStore } from './plan-store';
 import { PlanTurnService } from './plan-turn.service';
 
@@ -70,6 +76,12 @@ type CardTurn = PlanTurn & { card: BoardCard };
 type OwnedTurn =
   | { kind: 'plan'; turn: PlanOwnedTurn }
   | { kind: 'card'; turn: CardTurn };
+
+/** #337 D6: the card an intake wrote, and the attachments it took from the plan. */
+interface MadeCard {
+  card: BoardCard;
+  attachmentIds: string[];
+}
 
 /** A turn the API starts once this one is applied (D7; spec 223 D4). */
 type Chain =
@@ -132,6 +144,8 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
     private readonly store: PlanStore,
     private readonly turns: PlanTurnService,
     private readonly cardTurns: CardDesignTurnService,
+    private readonly planCards: BoardPlanCards,
+    private readonly attachments: AttachmentsService,
   ) {}
 
   onModuleInit(): void {
@@ -228,6 +242,10 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
     const at = new Date(data.at);
     const resultText = data.resultText ?? null;
     let chain: Chain | null = null;
+    /** #337 D6: the card an intake wrote, announced once committed. */
+    let made: MadeCard | null = null;
+    /** #337: the intake's card was not English — asked once more. */
+    let reask = false;
 
     const designPlan =
       turn.action === 'design'
@@ -264,14 +282,7 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
       }
       const parsed = data.resultTruncated
         ? null
-        : await this.parse(
-            tx,
-            turn.plan,
-            turn.task,
-            turn.action,
-            resultText,
-            designPlan,
-          );
+        : await this.parse(tx, turn, turn.action, resultText, designPlan);
       if (!parsed?.ok) {
         const why = parsed
           ? `${parsed.error.reason}: ${parsed.error.message}`
@@ -287,6 +298,8 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
           tx,
         );
         if (settled) await unsettle(tx);
+        // #337 spec "Risks": a card in another language is asked again once.
+        reask = settled && parsed?.error.reason === 'not_english';
         return settled;
       }
       if (
@@ -333,11 +346,27 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
         tx,
       );
       if (!settled) return false;
+      if (parsed.output.action === 'intake') {
+        // #337 D4: a round waits for the person; the card closes the intake.
+        made = isIntakeCard(parsed.output)
+          ? await this.writeCard(tx, turn.planId, parsed.output.cardDraft)
+          : null;
+        return true;
+      }
       chain = await this.apply(tx, turn.plan, turn.task, parsed.output);
       return true;
     });
     if (!applied) return;
     await this.publish(turn.plan, turn.runId);
+    const card = made as MadeCard | null;
+    if (card) await this.announceCard(card, turn.authorId);
+    if (reask) {
+      await this.turns.chainIntake(
+        turn.planId,
+        inputOf(turn.input),
+        turn.authorId,
+      );
+    }
     if (turn.action === 'design') {
       this.store.publishDesign(
         turn.plan.projectId,
@@ -477,15 +506,65 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
     }
   }
 
+  /**
+   * #337 D6: the intake's card, in Todo with the plan as its origin, its
+   * attachments re-claimed from the plan; the plan is `done`. Nothing when
+   * the intake was closed meanwhile.
+   */
+  private async writeCard(
+    tx: Tx,
+    planId: string,
+    draft: CardDraft,
+  ): Promise<MadeCard | null> {
+    await tx.$queryRaw`SELECT id FROM plans WHERE id = ${planId} FOR UPDATE`;
+    const plan = await tx.plan.findUniqueOrThrow({ where: { id: planId } });
+    if (plan.mode !== 'card' || plan.status !== 'clarifying') return null;
+    const [card] = await this.planCards.create(tx, {
+      projectId: plan.projectId,
+      planId: plan.id,
+      authorId: plan.authorId,
+      drafts: [{ title: draft.title, body: draft.body, kind: draft.kind }],
+    });
+    const attachmentIds = await this.attachments.claimPlanOntoCard(
+      tx,
+      plan.id,
+      card.id,
+    );
+    await tx.plan.update({
+      where: { id: plan.id },
+      data: { status: 'done', title: draft.title },
+    });
+    return { card, attachmentIds };
+  }
+
+  /** After commit: the card's audit, live event and assessment, for the intake's author. */
+  private async announceCard(
+    made: MadeCard,
+    authorId: string | null,
+  ): Promise<void> {
+    const actor = {
+      userId: authorId,
+      role: 'operator' as const,
+      ctx: { actor: authorId ? systemActorFor(authorId) : SYSTEM_ACTOR },
+    };
+    await this.planCards.announce([made.card], actor);
+    await this.attachments.recordClaim(
+      made.card.projectId,
+      { cardId: made.card.id },
+      made.attachmentIds,
+      actor,
+    );
+  }
+
   /** Validates against the contract with what only the API knows (D17). */
   private async parse(
     tx: Tx,
-    plan: Plan,
-    task: PlanTask | null,
+    turn: PlanOwnedTurn,
     action: PlanTurnAction,
     text: string | null,
     designPlan: DesignTurnPlan | null,
   ): Promise<PlannerParseResult<PlanTurnAction>> {
+    const { plan, task } = turn;
     const body = text ?? '';
     // D11: a plan's turns are validated against the version it was created with.
     const contractVersion = asPlannerContractVersion(plan.contractVersion);
@@ -522,11 +601,10 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
           taskKind: task?.kind ?? 'feature',
         });
       case 'intake':
-        // #337 placeholder: i337-api passes the intake's real state.
+        // #337 D4: rounds asked before this turn, its Enough, the re-ask.
         return parsePlannerOutput(body, 'intake', {
           contractVersion,
-          roundsAsked: 0,
-          generate: false,
+          ...(await intakeTurnState(tx, plan.id, turn)),
         });
       case 'revise': {
         const approved = await tx.planTask.findMany({
@@ -559,8 +637,8 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
       | DesignOutput
       | IntakeOutput,
   ): Promise<Chain | null> {
-    // A design turn is applied by `applyDesignOutput` before this is reached.
-    // #337: i337-api applies intakes.
+    // A design turn is applied by `applyDesignOutput`, an intake by
+    // `writeCard`, before this is reached.
     if (output.action === 'design' || output.action === 'intake') return null;
     // The turn may have been started on an older row; read the plan now.
     const plan = await tx.plan.findUniqueOrThrow({ where: { id: planRow.id } });

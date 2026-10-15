@@ -9,6 +9,7 @@ import { BoardService, FleetCardEditsRef } from './board.service';
 import { BoardCommands } from './board-commands';
 import { BoardDependencies } from './board-dependencies.service';
 import { BoardInboxService } from './board-inbox.service';
+import { BoardPlanCards } from './board-plan-cards';
 import { BoardRoundsService } from './board-rounds.service';
 import { BoardSink } from './board-sink';
 import { BoardTerminalService } from './board-terminal.service';
@@ -31,6 +32,7 @@ import { CollectRetryTimer } from './collect-retry-timer';
     BoardCommands,
     BoardDependencies,
     BoardInboxService,
+    BoardPlanCards,
     BoardRoundsService,
     BoardService,
     BoardSink,
@@ -41,7 +43,9 @@ import { CollectRetryTimer } from './collect-retry-timer';
   ],
   // `BoardRoundsService` too: approving a card's design may start round 1 (#243 D6).
   // `BoardWork`: card capture puts suggestions in the Inbox (#244).
+  // `BoardPlanCards`: a card intake and Create cards make cards (#337 D6, D7).
   exports: [
+    BoardPlanCards,
     BoardRoundsService,
     BoardService,
     BoardTerminalService,

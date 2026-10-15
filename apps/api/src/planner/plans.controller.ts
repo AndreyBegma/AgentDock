@@ -41,7 +41,10 @@ import { PlanTurnService } from './plan-turn.service';
 import { plannerError } from './planner-error';
 import { PlannerInstructionsService } from './planner-instructions.service';
 
-/** A turn's input: a message, answers, or both — never neither (D7). */
+/**
+ * A turn's input: a message, answers, or both — never neither (D7); or, on
+ * a card intake, Enough — generate on its own (#337 D3).
+ */
 const turnInputOf = (dto: PlanTurnDto): PlanTurnInput => {
   const parsed = planTurnInputSchema.safeParse({
     ...(dto.message !== undefined ? { message: dto.message } : {}),
@@ -50,10 +53,13 @@ const turnInputOf = (dto: PlanTurnDto): PlanTurnInput => {
           answers: dto.answers.map((a) => ({
             questionId: a.questionId,
             ...(a.optionId !== undefined ? { optionId: a.optionId } : {}),
+            ...(a.optionIds !== undefined ? { optionIds: a.optionIds } : {}),
             ...(a.text !== undefined ? { text: a.text } : {}),
           })),
         }
       : {}),
+    ...(dto.generate === true ? { generate: true } : {}),
+    ...(dto.attachmentIds?.length ? { attachmentIds: dto.attachmentIds } : {}),
   });
   if (!parsed.success) {
     throw plannerError(
@@ -62,7 +68,11 @@ const turnInputOf = (dto: PlanTurnDto): PlanTurnInput => {
       z.prettifyError(parsed.error),
     );
   }
-  if (!parsed.data.message && !parsed.data.answers?.length) {
+  if (
+    !parsed.data.message &&
+    !parsed.data.answers?.length &&
+    !parsed.data.generate
+  ) {
     throw plannerError(
       400,
       PLANNER_ERROR.invalidArgs,

@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
+import { BoardModule } from '../board/board.module';
 import { LiveModule } from '../live/live.module';
 import { ProjectsModule } from '../projects';
 import { ReadinessModule } from '../readiness';
 import { RunnersModule } from '../runners/runners.module';
+import { SettingsModule } from '../settings/settings.module';
 import { CardDesignTurnService } from './card-design-turn.service';
 import { PlanService } from './plan.service';
 import { PlanDocsSink } from './plan-docs-sink';
@@ -26,7 +28,16 @@ import { TasksQueryService } from './tasks-query.service';
  * request's merge queues the features (`PlanDocsSink`).
  */
 @Module({
-  imports: [LiveModule, ProjectsModule, ReadinessModule, RunnersModule],
+  // #337: an intake and Create cards make board cards (`BoardModule`); a
+  // plan's model defaults to its author's planning model (`SettingsModule`).
+  imports: [
+    BoardModule,
+    LiveModule,
+    ProjectsModule,
+    ReadinessModule,
+    RunnersModule,
+    SettingsModule,
+  ],
   controllers: [PlansController, PlannerAdminController, TasksController],
   providers: [
     CardDesignTurnService,

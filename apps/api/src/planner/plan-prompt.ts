@@ -1,7 +1,9 @@
 import {
+  answerOptionIds,
   designBytes,
   PLANNER_BLOCK_TAG,
   PLANNER_DESIGN_CONTRACT,
+  PLANNER_INTAKE_CONTRACT,
   type PlanMode,
   type PlannerContractVersion,
   type PlanQuestion,
@@ -57,6 +59,24 @@ export interface PromptInput {
   design?: DesignPromptContext;
   /** Spec 223 D16: a write turn of a task whose design is approved. */
   approvedDesign?: ApprovedDesignContext;
+  /** #337 D4: an intake turn's state — rounds asked, and whether it must write the card. */
+  intake?: IntakePromptState;
+  /**
+   * #337 D9: a project's own Planner instructions, for an intake — whose
+   * `instructions` are the card-mode ones.
+   */
+  projectInstructions?: string | null;
+  /** #337 D10: the worktree paths of the files the runner placed for the turn. */
+  attachments?: readonly string[];
+}
+
+export interface IntakePromptState {
+  roundsAsked: number;
+  maxRounds: number;
+  /** The person pressed Enough — generate (D3). */
+  generate: boolean;
+  /** No fifth round, and none after Enough (`intakeMustGenerate`). */
+  mustGenerate: boolean;
 }
 
 /** Actions whose output carries design suggestions under contract v2. */
@@ -77,9 +97,20 @@ const WHAT: Record<PlanTurnAction, (input: PromptInput) => string> = {
     i.design
       ? designWhat(`task \`${i.taskKey ?? ''}\``, i.design)
       : `Draw the mockup of task \`${i.taskKey}\`.`,
-  // #337 placeholder: i337-api owns the intake prompt.
-  intake: () =>
-    'Interview the person about the card they asked for: ask the next round of questions, or write the card when nothing material is unknown.',
+  intake: (i) => {
+    const state = i.intake;
+    if (!state) {
+      return 'Interview the person about the card they asked for: ask the next round of questions, or write the card when nothing material is unknown.';
+    }
+    const asked = `Rounds asked so far: ${state.roundsAsked} of ${state.maxRounds}.`;
+    if (state.generate) {
+      return `${asked} The person asked to generate: write the card now. Every question they left unanswered takes its recommendation — record those under \`## Open questions\`.`;
+    }
+    if (state.mustGenerate) {
+      return `${asked} No more rounds may be asked: write the card now, recording every default you took under \`## Open questions\`.`;
+    }
+    return `${asked} Ask the next round of questions only if something material is still unknown; otherwise write the card now.`;
+  },
 };
 
 const UI_LINE = {
@@ -106,15 +137,15 @@ const answersText = (
 ): string[] =>
   (input.answers ?? []).map((a) => {
     const question = round.find((q) => q.id === a.questionId);
-    const option = question?.options.find((o) => o.id === a.optionId);
     const head = question
       ? `${question.id} — ${question.title}`
       : `${a.questionId} (not in the current round)`;
-    const parts = [
-      option ? `option ${option.id}: ${option.label}` : null,
-      a.optionId && !option ? `option ${a.optionId}` : null,
-      a.text ? `answer: ${a.text}` : null,
-    ].filter((p): p is string => p !== null);
+    // #337 D3: a multiple-choice answer picks several.
+    const picked = answerOptionIds(a).map((id) => {
+      const option = question?.options.find((o) => o.id === id);
+      return option ? `option ${option.id}: ${option.label}` : `option ${id}`;
+    });
+    const parts = [...picked, ...(a.text ? [`answer: ${a.text}`] : [])];
     return `- ${head}: ${parts.join('; ')}`;
   });
 
@@ -141,7 +172,57 @@ export const assemblePrompt = (input: PromptInput): string => {
   return prompt;
 };
 
+/** The person's input of a turn: the last round's answers, then their message. */
+const inputSections = (input: PromptInput): string[] => {
+  const sections: string[] = [];
+  const answers = answersText(input.round, input.input);
+  if (answers.length > 0) {
+    sections.push(
+      '## Answers to the last round',
+      fence('text', answers.join('\n')),
+    );
+  }
+  if (input.input.message) {
+    sections.push('## Message', fence('text', input.input.message));
+  }
+  return sections;
+};
+
+/**
+ * #337 D1, D4–D6: an intake turn — the card-mode instructions, the project's
+ * own (D9), the intake contract in place of the plan's, what the person asked
+ * for as typed (D5), and the files placed for the turn (D10).
+ */
+const assembleIntake = (input: PromptInput): string => {
+  const sections = [
+    input.instructions.trim(),
+    ...(input.projectInstructions?.trim()
+      ? [
+          '# Project instructions',
+          "The project's own Planner instructions. Where they speak about splitting plans or writing documents, they do not apply to a card intake; everything they say about the project does.",
+          input.projectInstructions.trim(),
+        ]
+      : []),
+    PLANNER_INTAKE_CONTRACT.trim(),
+    '# This turn',
+    `Action: \`intake\`. ${WHAT.intake(input)}`,
+    `Answer with exactly one \`${PLANNER_BLOCK_TAG}\` block whose \`action\` is \`intake\`.`,
+    '## What the person asked for',
+    fence('text', input.brief),
+  ];
+  if (input.attachments && input.attachments.length > 0) {
+    sections.push(
+      '## Attached files',
+      'The person attached these files; they are in your working directory. Read them — a screenshot shows what they mean.',
+      input.attachments.map((path) => `- \`${path}\``).join('\n'),
+    );
+  }
+  sections.push(...inputSections(input));
+  return `${sections.join('\n\n')}\n`;
+};
+
 const assembleWith = (input: PromptInput, design: string[]): string => {
+  if (input.action === 'intake') return assembleIntake(input);
   const state = {
     title: input.plan.title,
     mode: input.plan.mode,
@@ -197,15 +278,6 @@ const assembleWith = (input: PromptInput, design: string[]): string => {
         : 'None.',
     );
   }
-  const answers = answersText(input.round, input.input);
-  if (answers.length > 0) {
-    sections.push(
-      '## Answers to the last round',
-      fence('text', answers.join('\n')),
-    );
-  }
-  if (input.input.message) {
-    sections.push('## Message', fence('text', input.input.message));
-  }
+  sections.push(...inputSections(input));
   return `${sections.join('\n\n')}\n`;
 };

@@ -259,7 +259,12 @@ export class AttachmentsService {
     if (!runner) throw new UnauthorizedException('A runner token is required');
     if (!ATTACHMENT_ID_PATTERN.test(id)) throw attachmentNotFound();
     const row = await this.prisma.attachment.findFirst({
-      where: { id, cardId: { not: null }, project: { runnerId: runner } },
+      // A card's, or a card intake's (#337 D10) — never a pending upload.
+      where: {
+        id,
+        OR: [{ cardId: { not: null } }, { planId: { not: null } }],
+        project: { runnerId: runner },
+      },
     });
     if (!row) throw attachmentNotFound();
     return this.bytesOf(row);
@@ -399,6 +404,112 @@ export class AttachmentsService {
     });
   }
 
+  /**
+   * #337 D6, D10: refuses before anything is written — like `assertClaimable`
+   * for a card, with the room counted on the plan, whose card takes them all.
+   */
+  async assertPlanClaimable(
+    projectId: string,
+    planId: string | null,
+    ids: readonly string[],
+    actor: Pick<AttachmentActor, 'userId'>,
+  ): Promise<void> {
+    if (ids.length === 0) return;
+    const claimable = await this.prisma.attachment.count({
+      where: this.pendingOf(projectId, ids, actor.userId),
+    });
+    if (claimable !== ids.length) throw this.notClaimable();
+    await this.assertPlanRoom(planId, ids.length, this.prisma);
+  }
+
+  /**
+   * #337 D10: a card intake claims pending uploads while it runs — `planId`
+   * set, `expiresAt` cleared — inside the caller's transaction. Re-checks
+   * what `assertPlanClaimable` did.
+   */
+  async claimForPlan(
+    tx: Prisma.TransactionClient,
+    target: { projectId: string; planId: string },
+    ids: readonly string[],
+    actor: Pick<AttachmentActor, 'userId'>,
+  ): Promise<void> {
+    if (ids.length === 0) return;
+    await this.assertPlanRoom(target.planId, ids.length, tx);
+    const { count } = await tx.attachment.updateMany({
+      where: this.pendingOf(target.projectId, ids, actor.userId),
+      data: { planId: target.planId, expiresAt: null },
+    });
+    if (count !== ids.length) throw this.notClaimable();
+  }
+
+  /**
+   * #337 D10: every attachment of the plan so far, and `claiming` — checked
+   * with `assertPlanClaimable`, about to join it — in upload order: each
+   * `plan.turn` carries them all.
+   */
+  async planRefs(
+    planId: string,
+    claiming: readonly string[] = [],
+  ): Promise<AttachmentRef[]> {
+    const rows = await this.prisma.attachment.findMany({
+      where: {
+        OR: [
+          { planId },
+          ...(claiming.length > 0 ? [{ id: { in: [...claiming] } }] : []),
+        ],
+      },
+      orderBy: UPLOAD_ORDER,
+    });
+    return rows.map(toAttachmentRef);
+  }
+
+  /**
+   * #337 D6: the generated card re-claims its intake's attachments, inside
+   * the transaction that creates it. Returns their ids.
+   */
+  async claimPlanOntoCard(
+    tx: Prisma.TransactionClient,
+    planId: string,
+    cardId: string,
+  ): Promise<string[]> {
+    const rows = await tx.attachment.findMany({
+      where: { planId, cardId: null },
+      select: { id: true },
+    });
+    if (rows.length === 0) return [];
+    await tx.attachment.updateMany({
+      where: { id: { in: rows.map((r) => r.id) } },
+      data: { cardId },
+    });
+    return rows.map((r) => r.id);
+  }
+
+  /**
+   * #337 D2: a discarded intake made no card — its attachments go back to the
+   * sweep, which removes them with their files.
+   */
+  async releasePlan(planId: string): Promise<void> {
+    await this.prisma.attachment.updateMany({
+      where: { planId, cardId: null },
+      data: { expiresAt: new Date() },
+    });
+  }
+
+  private async assertPlanRoom(
+    planId: string | null,
+    adding: number,
+    db: Db,
+  ): Promise<void> {
+    const held =
+      planId === null ? 0 : await db.attachment.count({ where: { planId } });
+    if (held + adding > ATTACHMENTS_PER_CARD_MAX) {
+      throw attachmentRefused(
+        ATTACHMENT_REFUSAL.tooMany,
+        `A card holds at most ${ATTACHMENTS_PER_CARD_MAX} attachments`,
+      );
+    }
+  }
+
   private pendingOf(
     projectId: string,
     ids: readonly string[],
@@ -409,6 +520,8 @@ export class AttachmentsService {
       id: { in: [...ids] },
       projectId,
       cardId: null,
+      // #337: an intake's upload is claimed, though it has no card yet.
+      planId: null,
       uploaderId: userId ?? '',
       expiresAt: { gt: new Date() },
     };
