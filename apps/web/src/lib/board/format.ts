@@ -14,6 +14,7 @@ import {
   type CardRoundBrief,
   type CardRoundPhase,
   isActiveRoundPhase,
+  PLAN_TASK_MOVE_REFUSAL_TEXT,
 } from '@agentdock/shared';
 import type { Status } from '@andrewbehma/glass-ui/status-pill';
 import { ApiError, describeError } from '../api';
@@ -131,6 +132,7 @@ export const MOVE_REFUSAL_TEXT: Record<BoardMoveRefusal, string> = {
   automatic_to_completed: 'Only a person completes a card.',
   card_completed: 'This card is already completed.',
   invalid_move: 'A suggestion leaves the Inbox only by Accept, into To Do.',
+  plan_task_derived: PLAN_TASK_MOVE_REFUSAL_TEXT,
 };
 
 /** #273 D7: the card's design is on and not approved, so the server would refuse Run. */
