@@ -21,11 +21,13 @@ import {
   Injectable,
   Logger,
   type OnApplicationBootstrap,
+  type OnModuleInit,
 } from '@nestjs/common';
 import type { BoardCard, Prisma, Slot } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { type AuditContext, userActor } from '../audit/audit.types';
 import { BOARD_SYSTEM_ACTOR, BoardWork } from '../board';
+import { FleetCardEditsRef } from '../board/board.service';
 import { ControlService } from '../control/control.service';
 import { PrismaService } from '../database/prisma.service';
 import {
@@ -34,12 +36,6 @@ import {
 } from '../runners/runner-event-sinks';
 
 type Tx = Prisma.TransactionClient;
-
-/** Who edited a `fleet` card: the `From:` of the slot message and its audit actor. */
-export interface FleetCardEditor {
-  userId: string;
-  email: string;
-}
 
 /** #282 D4: a `fleet` card's slot fields, for `BoardCardView.fleet`. */
 export const cardFleetView = (
@@ -157,7 +153,11 @@ export const fleetEditMessage = (edit: FleetCardEdit): string => {
  */
 @Injectable()
 export class BoardFleetService
-  implements FleetCardEdits, RunnerEventSink, OnApplicationBootstrap
+  implements
+    FleetCardEdits,
+    RunnerEventSink,
+    OnModuleInit,
+    OnApplicationBootstrap
 {
   readonly name = 'board-fleet';
   private readonly logger = new Logger(BoardFleetService.name);
@@ -168,7 +168,13 @@ export class BoardFleetService
     private readonly work: BoardWork,
     private readonly control: ControlService,
     private readonly audit: AuditService,
+    private readonly edits: FleetCardEditsRef,
   ) {}
+
+  /** `BoardService.update` tells the fleet of a fleet card's edit through this. */
+  onModuleInit(): void {
+    this.edits.set(this);
+  }
 
   onApplicationBootstrap(): void {
     this.sinks.register(this);
@@ -411,10 +417,10 @@ export class BoardFleetService
    * not running, an unslotted card or an offline runner gets nothing, and
    * nothing here throws — the edit is stored either way.
    */
-  async cardEdited(
-    edit: FleetCardEdit & { editor: FleetCardEditor },
-  ): Promise<void> {
+  async cardEdited(edit: FleetCardEdit): Promise<void> {
     const { editor } = edit;
+    // Attachments live in card worktrees; a slot's worktree has none.
+    if (edit.change.fields.length === 0) return;
     try {
       const card = await this.prisma.boardCard.findUnique({
         where: { id: edit.cardId },

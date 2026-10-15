@@ -235,18 +235,14 @@ describe('board fleet mirror (e2e, #282 D4)', () => {
   describe('an edit of the card text', () => {
     const edit = async (body: string) => {
       const [card] = await fleetCards();
-      await fleet.cardEdited({
-        projectId: w.a,
-        cardId: card.id,
-        number: card.number,
-        label: `C-${card.number}`,
-        change: {
-          fields: ['body'],
-          before: { title: card.title, kind: card.kind, body: card.body },
-          now: { title: card.title, kind: card.kind, body },
-        },
-        editor: { userId: w.operatorId, email: 'op@x.test' },
-      });
+      const response = await w.operator.send(
+        'patch',
+        `${w.path()}/board/cards/${card.number}`,
+        { body },
+      );
+      expect(response.status).toBe(200);
+      // The edit is stored like any card's.
+      expect((await fleetCards())[0].body).toBe(body);
       return card;
     };
     const slotMessages = () =>
