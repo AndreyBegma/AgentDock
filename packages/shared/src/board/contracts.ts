@@ -6,6 +6,7 @@ import type {
   PrInspectState,
 } from '../protocol';
 import type { ProfileSource } from '../readiness';
+import type { CardKindSource } from '../text/limits';
 import type {
   CaptureModel,
   CaptureSkipReason,
@@ -50,6 +51,8 @@ export interface BoardCardView {
   label: string;
   title: string;
   kind: BoardCardKind;
+  /** #271 D9: `auto` while the model may still set kind ("Auto" badge). */
+  kindSource: CardKindSource;
   column: BoardColumn;
   position: number;
   source: BoardCardSource;
