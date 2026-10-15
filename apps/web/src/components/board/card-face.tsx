@@ -1,4 +1,4 @@
-import type { BoardCardView } from '@agentdock/shared';
+import type { BoardCardView, CardRoundBrief } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Chip } from '@andrewbehma/glass-ui/chip';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
@@ -15,7 +15,7 @@ import {
   fleetSummary,
   HOOKS_GUIDE_LABEL,
   hooksGuideHref,
-  hooksHint,
+  hooksNotice,
   isSessionAlive,
   isSuggestion,
   roundPill,
@@ -124,14 +124,7 @@ export function CardFace({
             <StatusPill size="sm" status={pill.status} label={pill.label} />
           ) : null}
           {card.round?.hooksMissing ? (
-            <Tooltip content={hooksHint}>
-              <NextLink
-                href={hooksGuideHref(projectId)}
-                aria-label={`hooks not set up. ${HOOKS_GUIDE_LABEL}`}
-              >
-                <Chip size="sm">hooks not set up</Chip>
-              </NextLink>
-            </Tooltip>
+            <HooksChip projectId={projectId} card={card} round={card.round} />
           ) : null}
         </div>
       ) : null}
@@ -150,6 +143,35 @@ export function CardFace({
 }
 
 /** #282 D1: a card tracked from a terminal session: the badge, the state, the session link. */
+/** #367 D3: the chip names what the round's launch facts say, not a plugin to set up. */
+function HooksChip({
+  projectId,
+  card,
+  round,
+}: {
+  projectId: string;
+  card: BoardCardView;
+  round: CardRoundBrief;
+}) {
+  const notice = hooksNotice(card, round);
+  return (
+    <Tooltip content={notice.text}>
+      {notice.guide ? (
+        <NextLink
+          href={hooksGuideHref(projectId)}
+          aria-label={`${notice.chip}. ${HOOKS_GUIDE_LABEL}`}
+        >
+          <Chip size="sm">{notice.chip}</Chip>
+        </NextLink>
+      ) : (
+        <span>
+          <Chip size="sm">{notice.chip}</Chip>
+        </span>
+      )}
+    </Tooltip>
+  );
+}
+
 function TerminalFace({ card }: { card: BoardCardView }) {
   const session = trackedSessionHref(card);
   return (

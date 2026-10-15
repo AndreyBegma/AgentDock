@@ -7,6 +7,8 @@ import type { TaskDesignSummary, TaskDesignView } from '../design';
 import type { FleetStage } from '../fleet';
 import type {
   CardMergeMethod,
+  CardRunWiring,
+  CardRunWiringReason,
   OrchestratorPermissionMode,
   PrChecks,
   PrInspectState,
@@ -50,6 +52,13 @@ export interface CardRoundBrief {
   waitingAt: string | null;
   /** D6: no hook event within `CARD_HOOKS_GRACE_MS` of the start. */
   hooksMissing: boolean;
+  /**
+   * #367 D3: how the round's session reports; `null` before it started. The
+   * API always sends both; optional so older fixtures stay valid.
+   */
+  wiring?: CardRunWiring | null;
+  /** #367 D3: with `wiring: 'none'`, why. */
+  wiringReason?: CardRunWiringReason | null;
 }
 
 /**
@@ -231,6 +240,9 @@ export interface CardRoundView {
   exitCode: number | null;
   error: string | null;
   hooksMissing: boolean;
+  /** #367 D3: as on `CardRoundBrief`. */
+  wiring: CardRunWiring | null;
+  wiringReason: CardRunWiringReason | null;
   /** This round's run, a decimal string. */
   costUsd: string | null;
   startedAt: string;

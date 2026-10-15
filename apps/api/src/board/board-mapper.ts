@@ -23,6 +23,12 @@ import {
   type TaskDesignSummary,
 } from '@agentdock/shared';
 import {
+  type CardRunWiring,
+  type CardRunWiringReason,
+  cardRunWiringReasonSchema,
+  cardRunWiringSchema,
+} from '@agentdock/shared/protocol';
+import {
   type BoardCard,
   type BoardCardRound,
   type BoardSettings,
@@ -127,6 +133,22 @@ const hooksMissing = (
   facts.now.getTime() - round.startedAt.getTime() >= CARD_HOOKS_GRACE_MS &&
   !(card.sessionId !== null && facts.hooked.has(card.sessionId));
 
+/** #367 D3: a round's launch facts as stored (`null` until it started). */
+export const wiringOf = (
+  round: Pick<BoardCardRound, 'wiring' | 'wiringReason'>,
+): {
+  wiring: CardRunWiring | null;
+  wiringReason: CardRunWiringReason | null;
+} => {
+  const wiring = cardRunWiringSchema.safeParse(round.wiring);
+  if (!wiring.success) return { wiring: null, wiringReason: null };
+  const reason = cardRunWiringReasonSchema.safeParse(round.wiringReason);
+  return {
+    wiring: wiring.data,
+    wiringReason: wiring.data === 'none' && reason.success ? reason.data : null,
+  };
+};
+
 const brief = (
   card: BoardCard,
   round: BoardCardRound | undefined,
@@ -139,6 +161,7 @@ const brief = (
         finishedBy: round.finishedBy,
         waitingAt: iso(round.waitingAt),
         hooksMissing: hooksMissing(card, round, facts),
+        ...wiringOf(round),
       }
     : null;
 
@@ -242,6 +265,7 @@ const toRoundView = (
   exitCode: round.exitCode,
   error: round.error,
   hooksMissing: hooksMissing(card, round, facts),
+  ...wiringOf(round),
   costUsd: facts.costs.get(round.runId) ?? null,
   startedAt: round.startedAt.toISOString(),
   waitingAt: iso(round.waitingAt),

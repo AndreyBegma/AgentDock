@@ -2879,6 +2879,11 @@ model BoardCardRound {
   phase           CardRoundPhase   @default(queued)
   /// `agentdock-card-<shortId>`.
   tmuxSession     String?
+  /// #367 D3: how the round's session reports (`plugin` | `injected` | `none`),
+  /// from `card_run.started`; `null` until that event arrives.
+  wiring          String?
+  /// #367 D3: with `wiring = none`, why (shared `cardRunWiringReasonSchema`).
+  wiringReason    String?
   finishedBy      CardFinishedBy?
   /// From `finish_card` (D6), at most 4 000 characters.
   summary         String?
