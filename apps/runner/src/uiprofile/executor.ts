@@ -7,6 +7,8 @@ import {
   skillRunShortIdSchema,
   type UiProfileBuildArgs,
   type UiProfileBuildResult,
+  type UiProfileCancelArgs,
+  type UiProfileCancelResult,
   type UnsequencedEvent,
   uiProfileBuildArgsSchema,
   uiProfileBuildFinishedDataSchema,
@@ -75,6 +77,7 @@ const buildRecordSchema = uiProfileBuildArgsSchema
     queuedAt: z.iso.datetime(),
     startedAt: z.iso.datetime().optional(),
     finishedAt: z.iso.datetime().optional(),
+    cancelRequested: z.boolean().optional(),
   });
 type BuildRecord = z.infer<typeof buildRecordSchema>;
 
@@ -219,6 +222,31 @@ export class UiProfileBuildExecutor {
     return { phase: build.phase === 'queued' ? 'queued' : 'running' };
   }
 
+  /**
+   * `uiprofile.cancel` (#275 D5): a queued build leaves the queue, a preparing
+   * one is flagged, a running one loses its session; each ends `cancelled`.
+   */
+  async cancel(args: UiProfileCancelArgs): Promise<UiProfileCancelResult> {
+    if (!this.record(args.runId)) {
+      throw new CommandFailure('not_found', `no build ${args.runId}`);
+    }
+    const live = this.active.get(args.runId);
+    if (!live || this.busy.has(args.runId)) return { cancelled: false };
+    if (live.phase === 'queued') {
+      const at = this.queue.indexOf(live.runId);
+      if (at >= 0) this.queue.splice(at, 1);
+      await this.finish(live, { phase: 'cancelled', resultTruncated: false });
+      return { cancelled: true };
+    }
+    live.cancelRequested = true;
+    this.save(live);
+    // Still preparing: `prepare` sees the flag before or after the session starts.
+    if (this.preparing.has(live.runId)) return { cancelled: true };
+    await this.kill(live);
+    await this.end(live, 'cancelled');
+    return { cancelled: true };
+  }
+
   /** Checks every running build once: exited, vanished, or over its timeout. */
   async tick(): Promise<void> {
     if (this.ticking) return;
@@ -317,6 +345,13 @@ export class UiProfileBuildExecutor {
         cwd: build.worktree,
         stdin: join(this.dir(build.runId), PROMPT_FILE),
       };
+      if (build.cancelRequested) {
+        await this.finish(build, {
+          phase: 'cancelled',
+          resultTruncated: false,
+        });
+        return;
+      }
       writeJsonAtomic(this.file(build.runId, 'launch'), spec);
       build.startedAt = isoNow(deps.clock);
       this.save(build);
@@ -328,6 +363,12 @@ export class UiProfileBuildExecutor {
       );
       if (!created.ok) {
         throw new Error(`tmux new-session failed: ${created.stderr}`);
+      }
+      this.preparing.delete(build.runId);
+      if (build.cancelRequested) {
+        // Cancelled while the session was being created.
+        await this.kill(build);
+        await this.end(build, 'cancelled');
       }
     } catch (error) {
       this.options.log.warn('uiprofile: a build failed to start', {

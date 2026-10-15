@@ -166,8 +166,16 @@ const setup = async () => {
     call,
     worktree,
     recordDir,
+    slots,
   };
 };
+
+const finishedOf = (events: UnsequencedEvent[], runId: string) =>
+  events.find(
+    (e) =>
+      e.type === 'uiprofile_build.finished' &&
+      (e.data as UiProfileBuildFinishedData).runId === runId,
+  )?.data as UiProfileBuildFinishedData | undefined;
 
 const codeOf = async (work: Promise<unknown>) => {
   const error = await work.then(
@@ -291,6 +299,50 @@ describe.skipIf(!tmuxInstalled)(
         error: 'origin/nope does not exist',
       });
       expect(existsSync(t.worktree)).toBe(false);
+    });
+
+    it('cancels a running build: its session is killed, it ends cancelled, the worktree goes', async () => {
+      const t = await setup();
+      await t.executor.run(t.args({ profileKey: 'claude-slow' }));
+      for (let i = 0; i < 200 && !existsSync(join(t.recordDir, '0')); i++) {
+        await Bun.sleep(25);
+      }
+      expect(await t.executor.cancel({ runId: 'run_b1' })).toEqual({
+        cancelled: true,
+      });
+      const done = finishedOf(t.events, 'run_b1');
+      expect(done?.phase).toBe('cancelled');
+      expect(t.phases('run_b1')).toEqual(['queued', 'running', 'cancelled']);
+      expect(existsSync(t.worktree)).toBe(false);
+      // Already over: nothing to cancel, and no second end.
+      expect(await t.executor.cancel({ runId: 'run_b1' })).toEqual({
+        cancelled: false,
+      });
+    });
+
+    it('cancels a queued build: it leaves the queue and never starts', async () => {
+      const t = await setup();
+      // Both shared slots taken by someone else, so the build stays queued.
+      expect(t.slots.tryAcquire('other:1')).toBe(true);
+      expect(t.slots.tryAcquire('other:2')).toBe(true);
+      expect(await t.executor.run(t.args())).toEqual({ phase: 'queued' });
+      expect(await t.executor.cancel({ runId: 'run_b1' })).toEqual({
+        cancelled: true,
+      });
+      expect(finishedOf(t.events, 'run_b1')?.phase).toBe('cancelled');
+      expect(t.phases('run_b1')).toEqual(['queued', 'cancelled']);
+      // Freed slots do not start it.
+      t.slots.release('other:1');
+      t.slots.release('other:2');
+      await Bun.sleep(100);
+      expect(existsSync(join(t.recordDir, '0'))).toBe(false);
+    });
+
+    it('answers cancel of an unknown run with not_found', async () => {
+      const t = await setup();
+      expect(await codeOf(t.executor.cancel({ runId: 'run_zzz' }))).toBe(
+        'not_found',
+      );
     });
 
     it('answers the run log of a build it knows and nothing for another', async () => {

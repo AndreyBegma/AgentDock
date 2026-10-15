@@ -83,12 +83,18 @@ export const runLogFrames = (
   id: string,
   lines: readonly RunLogLine[],
   backlog: boolean,
+  lastOutputAt?: string,
 ): RunLogMessage[] => {
   const frames: RunLogMessage[] = [];
   const frame = (batch: RunLogLine[]): RunLogMessage => ({
     type: 'run_log',
     id,
-    frame: { type: 'lines', backlog, lines: batch },
+    frame: {
+      type: 'lines',
+      backlog,
+      lines: batch,
+      ...(lastOutputAt ? { lastOutputAt } : {}),
+    },
   });
   let batch: RunLogLine[] = [];
   let size = Buffer.byteLength(JSON.stringify(frame([])));
@@ -147,7 +153,7 @@ export class RunLogStreamer {
         backlog.splice(0, backlog.length - RUN_LOG_BACKLOG_LINES);
       }
     }
-    for (const frame of runLogFrames(id, backlog, true))
+    for (const frame of runLogFrames(id, backlog, true, this.outputAt(runId)))
       this.options.send(frame);
     if (isTerminalSkillRunPhase(record.phase)) {
       this.ended(id, record);
@@ -189,7 +195,8 @@ export class RunLogStreamer {
         for (let more = this.read(sub); more !== null; more = this.read(sub)) {
           lines.push(...more);
         }
-        for (const frame of runLogFrames(sub.id, lines, false))
+        const at = lines.length > 0 ? this.outputAt(sub.runId) : undefined;
+        for (const frame of runLogFrames(sub.id, lines, false, at))
           this.options.send(frame);
         if (!record || isTerminalSkillRunPhase(record.phase)) {
           this.subs.delete(sub.id);
@@ -203,6 +210,26 @@ export class RunLogStreamer {
       });
     } finally {
       this.polling = false;
+    }
+  }
+
+  /**
+   * When the stream was last written (#275 D4): the append-only file's mtime
+   * stands for "a new line". Undefined when the file cannot be read.
+   */
+  private outputAt(runId: string): string | undefined {
+    let fd: number;
+    try {
+      fd = openSync(this.options.runs.streamFile(runId), 'r');
+    } catch {
+      return undefined;
+    }
+    try {
+      return fstatSync(fd).mtime.toISOString();
+    } catch {
+      return undefined;
+    } finally {
+      closeSync(fd);
     }
   }
 

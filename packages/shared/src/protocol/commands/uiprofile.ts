@@ -22,6 +22,7 @@ import { gitRefSchema, profileKeySchema, skillRunIdSchema } from './skills';
  * `commands` allowlist only together with its runner handlers: the runner's
  * `CommandHandlers` needs a handler for every key of that map, so an entry
  * without one breaks the runner build (the skills and planner precedent).
+ * `uiprofile.cancel` (#275) is in the map with its handler.
  *
  * The control plane never reads the project's files (ADR-0001): the build
  * runs on the runner, and the fingerprint is computed there.
@@ -127,10 +128,6 @@ export type UiProfileCancelArgs = z.infer<typeof uiProfileCancelArgsSchema>;
 export const uiProfileCancelResultSchema = z.object({ cancelled: z.boolean() });
 export type UiProfileCancelResult = z.infer<typeof uiProfileCancelResultSchema>;
 
-/**
- * Defined here, entered in `uiprofileCommands` only together with its runner
- * handler (see the note at the top of this file).
- */
 export const uiprofileCancelCommand = {
   args: uiProfileCancelArgsSchema,
   result: uiProfileCancelResultSchema,
@@ -138,7 +135,7 @@ export const uiprofileCancelCommand = {
   timeoutMs: UIPROFILE_TIMEOUTS_MS.cancel,
 } as const satisfies CommandDefinition;
 
-/** The two UI profile commands; both need an operator (spec "Protocol"). */
+/** The UI profile commands; all need an operator (spec "Protocol"). */
 export const uiprofileCommands = {
   'uiprofile.build': {
     args: uiProfileBuildArgsSchema,
@@ -152,6 +149,7 @@ export const uiprofileCommands = {
     minRole: 'operator',
     timeoutMs: UIPROFILE_TIMEOUTS_MS.fingerprint,
   },
+  'uiprofile.cancel': uiprofileCancelCommand,
 } as const satisfies Record<string, CommandDefinition>;
 
 export type UiProfileCommandName = keyof typeof uiprofileCommands;
