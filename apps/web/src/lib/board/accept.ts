@@ -11,7 +11,7 @@ export type AcceptChoice =
   /** Open and mergeable here: both actions. */
   | { kind: 'merge'; headSha: string }
   /** Merged before: Accept only, and it closes the issue. */
-  | { kind: 'already_merged' }
+  | { kind: 'already_merged'; headSha: string }
   /** Accept without merging, with the reason it is the only action. */
   | { kind: 'accept_only'; reason: string };
 
@@ -29,7 +29,9 @@ export function acceptChoice(
         'The pull request could not be read, so it cannot be merged here.',
     };
   }
-  if (pr.state === 'merged') return { kind: 'already_merged' };
+  if (pr.state === 'merged') {
+    return { kind: 'already_merged', headSha: pr.headSha };
+  }
   if (pr.state === 'closed') {
     return {
       kind: 'accept_only',

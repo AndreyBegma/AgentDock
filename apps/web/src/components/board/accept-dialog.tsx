@@ -100,9 +100,20 @@ export function AcceptDialog({
             <Button
               variant={choice?.kind === 'merge' ? 'glass' : 'solid'}
               disabled={busy || choice === null || !card}
-              onClick={() => card && onAccept(card)}
+              onClick={() =>
+                card &&
+                // Already merged: the merge request is what closes the issue (D13).
+                onAccept(
+                  card,
+                  choice?.kind === 'already_merged'
+                    ? choice.headSha
+                    : undefined,
+                )
+              }
             >
-              Accept without merging
+              {choice?.kind === 'already_merged'
+                ? 'Accept'
+                : 'Accept without merging'}
             </Button>
             {choice?.kind === 'merge' && card ? (
               <Button

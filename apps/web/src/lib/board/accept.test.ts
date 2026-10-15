@@ -25,6 +25,7 @@ describe('acceptChoice (#273 D10)', () => {
   test('a merged PR is “already merged”', () => {
     expect(acceptChoice(7, pr({ state: 'merged', canMerge: false }))).toEqual({
       kind: 'already_merged',
+      headSha: SHA,
     });
   });
 
