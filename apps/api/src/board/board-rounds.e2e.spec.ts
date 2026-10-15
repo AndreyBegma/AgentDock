@@ -4,7 +4,7 @@ import {
   CARD_WORKER_PROMPT_VERSION,
 } from '@agentdock/shared';
 import { BudgetGate } from '../budgets/budget-gate';
-import { BoardWorld, failed } from './testing/board-e2e';
+import { BoardWorld, failed, ROOT_A } from './testing/board-e2e';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -387,7 +387,7 @@ describe('board rounds (e2e)', () => {
       ]);
       expect(sent.prompt).toContain('docs/specs/card-1-add-login.md');
       expect((await w.card(1)).specPath).toBe('docs/specs/card-1-add-login.md');
-      expect((await w.card(1)).specPr).toBeNull();
+      expect((await w.card(1)).specPrUrl).toBeNull();
     });
 
     describe('a spec in an external docs repository (#379)', () => {
@@ -442,10 +442,10 @@ describe('board rounds (e2e)', () => {
         );
         const card = await w.card(1);
         expect(card.specPath).toBe('prs/41-add-login.md');
-        expect(card.specPr).toEqual({
-          repo: 'acme/widget-documentation',
-          number: 5,
-          url: 'https://github.com/acme/widget-documentation/pull/5',
+        expect(card).toMatchObject({
+          specRepo: 'acme/widget-documentation',
+          specPrNumber: 5,
+          specPrUrl: 'https://github.com/acme/widget-documentation/pull/5',
         });
       });
 
