@@ -175,6 +175,7 @@ describe('daemon — OTLP receiver (spec 13)', () => {
     expect(commands).toEqual([...(commands ?? [])].sort());
     expect(commands).toEqual(
       expect.arrayContaining([
+        'card.assess',
         'plan.turn',
         'terminal.attach',
         'worktree.status',
