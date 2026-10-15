@@ -87,7 +87,8 @@ describe('planner (e2e)', () => {
         visibility: 'private',
         status: 'drafting',
         mode: 'batch',
-        model: 'opus',
+        // #337 D9: the author's planning model, `sonnet` without a setting.
+        model: 'sonnet',
         profileKey: 'claude-main',
         instructionsVersion: 1,
       });
@@ -98,7 +99,7 @@ describe('planner (e2e)', () => {
         root: ROOT,
         base: 'develop',
         profileKey: 'claude-main',
-        model: 'opus',
+        model: 'sonnet',
         timeoutSec: 1200,
         session: { resume: false },
       });
@@ -718,7 +719,7 @@ describe('planner (e2e)', () => {
         id: run.id,
         kind: 'plan',
         status: 'succeeded',
-        model: 'opus',
+        model: 'sonnet',
         profileKey: 'claude-main',
         triggeredByType: 'user',
         triggeredById: h.authorId,

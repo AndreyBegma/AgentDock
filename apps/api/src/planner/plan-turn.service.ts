@@ -1,11 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import {
   asPlannerContractVersion,
+  attachmentWorktreePath,
+  checkRoundAnswers,
+  intakeMustGenerate,
   PLANNER_ERROR,
+  PLANNER_INTAKE_MAX_ROUNDS,
+  type PlanQuestion,
   type PlanTurnAction,
   type PlanTurnInput,
   type Role,
   textAnswerField,
+  withRecommendations,
 } from '@agentdock/shared';
 import {
   PLAN_TURN_DEFAULT_TIMEOUT_SEC,
@@ -16,6 +22,7 @@ import {
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import type { Plan, PlanTask, Prisma } from '@prisma/client';
 import { z } from 'zod';
+import { AttachmentsService } from '../attachments/attachments.service';
 import { AuditService } from '../audit/audit.service';
 import type { AuditContext } from '../audit/audit.types';
 import { SYSTEM_ACTOR, systemActorFor } from '../audit/audit.types';
@@ -24,6 +31,12 @@ import { PrismaService } from '../database/prisma.service';
 import type { DesignTurnPlan } from '../design/design-rules';
 import { TextNormalizer } from '../text/text-normalizer';
 import { TALKABLE_STATUSES } from './plan-apply';
+import {
+  intakeRound,
+  intakeTurnState,
+  readCardInstructions,
+  runnerTakesPlanAttachments,
+} from './plan-intake';
 import { questionsOf } from './plan-mapper';
 import { assemblePrompt } from './plan-prompt';
 import { PlanStore } from './plan-store';
@@ -47,7 +60,32 @@ interface TurnSpec {
   design?: DesignTurnPlan;
   /** #271: the input is the person's new words (not a retry's copy). */
   normalize?: boolean;
+  /** #337 D10: pending uploads the turn claims onto its plan, checked already. */
+  claim?: readonly string[];
 }
+
+/**
+ * #337 D3: answers fit the round they answer — their own options, one option
+ * for a single-choice question; 400 otherwise. An intake (`strict`) also
+ * refuses a question it never asked. A clarify or grill turn keeps taking an
+ * answer to a question outside its round, as it always has: the prompt
+ * marks it "not in the current round".
+ */
+const assertAnswers = (
+  round: readonly PlanQuestion[],
+  input: PlanTurnInput,
+  strict = false,
+): void => {
+  if (!input.answers?.length) return;
+  const asked = new Set(round.map((q) => q.id));
+  const answers = strict
+    ? input.answers
+    : input.answers.filter((a) => asked.has(a.questionId));
+  const check = checkRoundAnswers(round, answers);
+  if (!check.ok) {
+    throw plannerError(400, PLANNER_ERROR.invalidArgs, check.message);
+  }
+};
 
 const turnInProgress = () =>
   plannerError(
@@ -79,18 +117,31 @@ export class PlanTurnService {
     private readonly commands: PlannerCommands,
     private readonly audit: AuditService,
     private readonly text: TextNormalizer,
+    private readonly attachments: AttachmentsService,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
 
-  /** `POST …/turns`: the next plan-level round — clarify, or decompose when that failed. */
+  /**
+   * `POST …/turns`: the next plan-level round — clarify, or decompose when
+   * that failed; a card plan's next intake turn (#337 D1).
+   */
   async planTurn(
     plan: Plan,
     input: PlanTurnInput,
     caller: PlanCaller,
   ): Promise<string> {
     this.store.assertOpen(plan);
+    if (plan.mode === 'card') return this.intakeTurn(plan, input, caller);
+    if (input.generate !== undefined || input.attachmentIds !== undefined) {
+      throw plannerError(
+        409,
+        PLANNER_ERROR.wrongMode,
+        'Enough — generate and attachments belong to a card intake',
+      );
+    }
     let action: PlanTurnAction;
     if (plan.status === 'clarifying') {
+      assertAnswers(await this.store.planRound(plan.id), input);
       action = 'clarify';
     } else if (
       plan.status === 'drafting' &&
@@ -111,6 +162,84 @@ export class PlanTurnService {
     );
   }
 
+  /**
+   * #337 D3, D4, D10: an intake turn answers the open round, sends a message,
+   * or says Enough — generate, which fills every unanswered question with its
+   * recommendation. Files that come with it join the plan's. The person's
+   * words are kept as typed (D5): no normalization.
+   */
+  private async intakeTurn(
+    plan: Plan,
+    input: PlanTurnInput,
+    caller: PlanCaller,
+  ): Promise<string> {
+    if (plan.status !== 'clarifying') {
+      throw plannerError(
+        409,
+        PLANNER_ERROR.planClosed,
+        `The intake is ${plan.status}`,
+      );
+    }
+    const round = await intakeRound(this.prisma, plan.id);
+    assertAnswers(round, input, true);
+    const answers =
+      input.generate === true
+        ? withRecommendations(round, input.answers ?? [])
+        : input.answers;
+    const { attachmentIds, ...rest } = input;
+    const claim = attachmentIds ?? [];
+    await this.attachments.assertPlanClaimable(
+      plan.projectId,
+      plan.id,
+      claim,
+      caller,
+    );
+    return this.run(
+      plan,
+      {
+        action: 'intake',
+        task: null,
+        input: {
+          ...rest,
+          ...(answers && answers.length > 0 ? { answers } : {}),
+          ...(claim.length > 0 ? { attachmentIds: claim } : {}),
+        },
+        claim,
+      },
+      caller,
+    );
+  }
+
+  /**
+   * #337 spec "Risks": a card written in another language is asked again
+   * once, with the same input; the next turn's card is taken as it is.
+   */
+  async chainIntake(
+    planId: string,
+    input: PlanTurnInput,
+    authorId: string | null,
+  ): Promise<void> {
+    try {
+      const plan = await this.prisma.plan.findUniqueOrThrow({
+        where: { id: planId },
+      });
+      const { attachmentIds: _claimed, ...again } = input;
+      await this.run(
+        plan,
+        { action: 'intake', task: null, input: again },
+        {
+          userId: authorId,
+          role: 'operator',
+          ctx: { actor: authorId ? systemActorFor(authorId) : SYSTEM_ACTOR },
+        },
+      );
+    } catch (error) {
+      this.logger.warn(
+        `plan ${planId}: intake re-ask not started: ${(error as Error).message}`,
+      );
+    }
+  }
+
   /** `POST …/tasks/:key/turns`: a grill round of one task (D7). */
   async taskTurn(
     plan: Plan,
@@ -119,7 +248,15 @@ export class PlanTurnService {
     caller: PlanCaller,
   ): Promise<string> {
     this.store.assertOpen(plan);
+    if (input.generate !== undefined || input.attachmentIds !== undefined) {
+      throw plannerError(
+        409,
+        PLANNER_ERROR.wrongMode,
+        'Enough — generate and attachments belong to a card intake',
+      );
+    }
     const task = await this.store.task(plan, key);
+    assertAnswers(questionsOf(task.questions), input);
     if (!TALKABLE_STATUSES.includes(task.status)) {
       throw plannerError(
         409,
@@ -323,19 +460,51 @@ export class PlanTurnService {
     });
 
     const contractVersion = asPlannerContractVersion(plan.contractVersion);
-    const [instructions, tasks, session, designParts] = await Promise.all([
-      this.prisma.plannerInstructions.findUniqueOrThrow({
-        where: { id: plan.instructionsId },
-        select: { body: true },
-      }),
-      this.store.currentTasks(this.prisma, plan),
-      this.session(plan, spec.task),
-      designPromptParts(this.prisma, plan, project, spec, contractVersion),
-    ]);
+    const intake = spec.action === 'intake';
+    const [instructions, tasks, session, designParts, files] =
+      await Promise.all([
+        this.prisma.plannerInstructions.findUniqueOrThrow({
+          where: { id: plan.instructionsId },
+          select: { body: true, projectId: true },
+        }),
+        this.store.currentTasks(this.prisma, plan),
+        this.session(plan, spec.task),
+        designPromptParts(this.prisma, plan, project, spec, contractVersion),
+        // #337 D10: an older runner gets the turn without the files.
+        intake && runnerTakesPlanAttachments(project.runnerVersion)
+          ? this.attachments.planRefs(plan.id, spec.claim)
+          : Promise.resolve(null),
+      ]);
+    const intakeState = intake
+      ? await intakeTurnState(this.prisma, plan.id, {
+          id: '',
+          input: spec.input as Prisma.JsonValue,
+          createdAt: new Date(),
+        })
+      : null;
     const prompt = assemblePrompt({
       ...designParts,
       contractVersion,
-      instructions: instructions.body,
+      // #337 D9: an intake runs on the card-mode instructions; a project's
+      // own instructions (an override, not the global default) apply too.
+      instructions: intake ? readCardInstructions() : instructions.body,
+      ...(intake
+        ? {
+            projectInstructions:
+              instructions.projectId !== null ? instructions.body : null,
+            intake: intakeState
+              ? {
+                  roundsAsked: intakeState.roundsAsked,
+                  maxRounds: PLANNER_INTAKE_MAX_ROUNDS,
+                  generate: intakeState.generate,
+                  mustGenerate: intakeMustGenerate(intakeState),
+                }
+              : undefined,
+            attachments: (files ?? []).map((f) =>
+              attachmentWorktreePath(f.id, f.name),
+            ),
+          }
+        : {}),
       action: spec.action,
       brief: plan.brief,
       plan: { title: plan.title, mode: plan.mode, version: plan.version },
@@ -355,9 +524,11 @@ export class PlanTurnService {
       round:
         spec.action === 'clarify'
           ? await this.store.planRound(plan.id)
-          : spec.task
-            ? questionsOf(spec.task.questions)
-            : [],
+          : intake
+            ? await intakeRound(this.prisma, plan.id)
+            : spec.task
+              ? questionsOf(spec.task.questions)
+              : [],
       input: spec.input,
     });
     const draft = {
@@ -367,6 +538,7 @@ export class PlanTurnService {
       base: project.base,
       session,
       prompt,
+      ...(files && files.length > 0 ? { attachments: files } : {}),
       profileKey: profile.key,
       model: plan.model,
       timeoutSec: PLAN_TURN_DEFAULT_TIMEOUT_SEC,
@@ -393,6 +565,15 @@ export class PlanTurnService {
         select: { id: true },
       });
       if (active) throw turnInProgress();
+      // #337 D10: the turn's new files join the plan with it.
+      if (spec.claim && spec.claim.length > 0) {
+        await this.attachments.claimForPlan(
+          tx,
+          { projectId: plan.projectId, planId: plan.id },
+          spec.claim,
+          caller,
+        );
+      }
       if (spec.task && spec.task.sessionId === null) {
         await tx.planTask.update({
           where: { id: spec.task.id },

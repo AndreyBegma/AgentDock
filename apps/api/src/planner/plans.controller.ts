@@ -1,4 +1,5 @@
 import {
+  type CreatePlanCardsResponse,
   PLANNER_ERROR,
   type PlanDetail,
   type PlanListView,
@@ -35,13 +36,17 @@ import {
   PlanVisibilityDto,
 } from './dto';
 import { callerOf, type PlanActor, PlanService } from './plan.service';
+import { PlanCardsService } from './plan-cards.service';
 import { PlanSendService } from './plan-send.service';
 import { PlanStore } from './plan-store';
 import { PlanTurnService } from './plan-turn.service';
 import { plannerError } from './planner-error';
 import { PlannerInstructionsService } from './planner-instructions.service';
 
-/** A turn's input: a message, answers, or both — never neither (D7). */
+/**
+ * A turn's input: a message, answers, or both — never neither (D7); or, on
+ * a card intake, Enough — generate on its own (#337 D3).
+ */
 const turnInputOf = (dto: PlanTurnDto): PlanTurnInput => {
   const parsed = planTurnInputSchema.safeParse({
     ...(dto.message !== undefined ? { message: dto.message } : {}),
@@ -50,10 +55,13 @@ const turnInputOf = (dto: PlanTurnDto): PlanTurnInput => {
           answers: dto.answers.map((a) => ({
             questionId: a.questionId,
             ...(a.optionId !== undefined ? { optionId: a.optionId } : {}),
+            ...(a.optionIds !== undefined ? { optionIds: a.optionIds } : {}),
             ...(a.text !== undefined ? { text: a.text } : {}),
           })),
         }
       : {}),
+    ...(dto.generate === true ? { generate: true } : {}),
+    ...(dto.attachmentIds?.length ? { attachmentIds: dto.attachmentIds } : {}),
   });
   if (!parsed.success) {
     throw plannerError(
@@ -62,7 +70,11 @@ const turnInputOf = (dto: PlanTurnDto): PlanTurnInput => {
       z.prettifyError(parsed.error),
     );
   }
-  if (!parsed.data.message && !parsed.data.answers?.length) {
+  if (
+    !parsed.data.message &&
+    !parsed.data.answers?.length &&
+    !parsed.data.generate
+  ) {
     throw plannerError(
       400,
       PLANNER_ERROR.invalidArgs,
@@ -94,7 +106,18 @@ export class PlansController {
     private readonly sender: PlanSendService,
     private readonly store: PlanStore,
     private readonly instructions: PlannerInstructionsService,
+    private readonly planCards: PlanCardsService,
   ) {}
+
+  /**
+   * A plan the caller may read and that still takes work: not one from
+   * before the Board planner (#337 D11), which stays read-only.
+   */
+  private async writable(userId: string, projectId: string, planId: string) {
+    const plan = await this.store.readable(userId, projectId, planId);
+    this.store.assertCurrent(plan);
+    return plan;
+  }
 
   @Post('plans')
   @ProjectRole('operator')
@@ -143,7 +166,7 @@ export class PlansController {
     @Param('planId') planId: string,
     @Body() dto: PlanTurnDto,
   ): Promise<PlanDetail> {
-    const plan = await this.store.readable(user.id, access.projectId, planId);
+    const plan = await this.writable(user.id, access.projectId, planId);
     const actor = actorOf(access, user, ctx);
     await this.turns.planTurn(plan, turnInputOf(dto), callerOf(actor));
     return this.plans.detail(access.projectId, user.id, planId);
@@ -159,7 +182,7 @@ export class PlansController {
     @Param('key') key: string,
     @Body() dto: PlanTurnDto,
   ): Promise<PlanDetail> {
-    const plan = await this.store.readable(user.id, access.projectId, planId);
+    const plan = await this.writable(user.id, access.projectId, planId);
     const actor = actorOf(access, user, ctx);
     await this.turns.taskTurn(plan, key, turnInputOf(dto), callerOf(actor));
     return this.plans.detail(access.projectId, user.id, planId);
@@ -176,7 +199,7 @@ export class PlansController {
     @Param('key') key: string,
     @Body() dto: PlanTaskReviewDto,
   ): Promise<PlanDetail> {
-    const plan = await this.store.readable(user.id, access.projectId, planId);
+    const plan = await this.writable(user.id, access.projectId, planId);
     await this.plans.review(
       plan,
       key,
@@ -195,7 +218,7 @@ export class PlansController {
     @AuditCtx() ctx: AuditContext,
     @Param('planId') planId: string,
   ): Promise<PlanDetail> {
-    const plan = await this.store.readable(user.id, access.projectId, planId);
+    const plan = await this.writable(user.id, access.projectId, planId);
     await this.turns.revise(plan, callerOf(actorOf(access, user, ctx)));
     return this.plans.detail(access.projectId, user.id, planId);
   }
@@ -228,9 +251,22 @@ export class PlansController {
     @AuditCtx() ctx: AuditContext,
     @Param('planId') planId: string,
   ): Promise<PlanDetail> {
-    const plan = await this.store.readable(user.id, access.projectId, planId);
+    const plan = await this.writable(user.id, access.projectId, planId);
     await this.sender.send(plan, actorOf(access, user, ctx));
     return this.plans.detail(access.projectId, user.id, planId);
+  }
+
+  /** #337 D7: Create cards — the alternative to Send to fleet. */
+  @Post('plans/:planId/cards')
+  @ProjectRole('operator')
+  async cards(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Param('planId') planId: string,
+  ): Promise<CreatePlanCardsResponse> {
+    const plan = await this.writable(user.id, access.projectId, planId);
+    return this.planCards.create(plan, actorOf(access, user, ctx));
   }
 
   @Post('plans/:planId/archive')
@@ -271,7 +307,7 @@ export class PlansController {
     @Param('planId') planId: string,
     @Param('turnId') turnId: string,
   ): Promise<PlanDetail> {
-    const plan = await this.store.readable(user.id, access.projectId, planId);
+    const plan = await this.writable(user.id, access.projectId, planId);
     await this.turns.retry(plan, turnId, callerOf(actorOf(access, user, ctx)));
     return this.plans.detail(access.projectId, user.id, planId);
   }

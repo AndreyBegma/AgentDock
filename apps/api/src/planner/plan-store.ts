@@ -27,6 +27,8 @@ import { planNotFound, plannerError } from './planner-error';
 type Db = Prisma.TransactionClient | PrismaService;
 
 const TURN_ERROR_MAX = 2000;
+/** #337 D11: the first contract version of plans started on the Board. */
+const BOARD_PLANNER_CONTRACT_VERSION = 3;
 /** `runs.outcome`, as skill runs cut it. */
 const OUTCOME_MAX = 500;
 
@@ -56,6 +58,8 @@ export interface PlanProject {
   defaultProfileId: string | null;
   readyLabelOverride: string | null;
   codeSentinelConfig: Prisma.JsonValue;
+  /** The runner's last hello `runnerVersion`; null before one (#337 D10). */
+  runnerVersion: string | null;
 }
 
 /** Reads shared by the planner services, and the one live push (spec "Live"). */
@@ -132,11 +136,16 @@ export class PlanStore {
         defaultProfileId: true,
         readyLabelOverride: true,
         codeSentinelConfig: true,
+        runner: { select: { version: true } },
       },
     });
     if (!project) throw projectNotFound();
-    const { baseBranch, baseOverride, ...rest } = project;
-    return { ...rest, base: baseOverride ?? baseBranch };
+    const { baseBranch, baseOverride, runner, ...rest } = project;
+    return {
+      ...rest,
+      base: baseOverride ?? baseBranch,
+      runnerVersion: runner.version,
+    };
   }
 
   /**
@@ -154,13 +163,36 @@ export class PlanStore {
     return this.profiles.require(project, { key }, fail);
   }
 
-  /** A sent or archived plan takes no more turns, reviews or revisions. */
+  /**
+   * A sent, archived or done (#337: it made its cards) plan takes no more
+   * turns, reviews or revisions.
+   */
   assertOpen(plan: { status: string }): void {
-    if (plan.status === 'sent' || plan.status === 'archived') {
+    if (
+      plan.status === 'sent' ||
+      plan.status === 'archived' ||
+      plan.status === 'done'
+    ) {
       throw plannerError(
         409,
         PLANNER_ERROR.planClosed,
         `The plan is ${plan.status}`,
+      );
+    }
+  }
+
+  /**
+   * #337 D11: a plan from before the Planner moved onto the Board (contract
+   * v1, v2) is read-only — no turns, reviews, revisions, send or cards. Its
+   * tasks keep projecting onto the Board; it can still be shared or
+   * archived. New plans start on the Board, under v3 or later.
+   */
+  assertCurrent(plan: { contractVersion: number }): void {
+    if (plan.contractVersion < BOARD_PLANNER_CONTRACT_VERSION) {
+      throw plannerError(
+        409,
+        PLANNER_ERROR.planClosed,
+        'This plan predates the Board planner and is read-only; start a New Plan on the Board',
       );
     }
   }

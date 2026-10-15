@@ -7,6 +7,7 @@ import {
   type BoardUserRef,
   CAPTURE_MODEL_DEFAULT,
   CARD_HOOKS_GRACE_MS,
+  type CardDependencyRef,
   type CardEvidenceView,
   type CardFleetView,
   type CardRoundBrief,
@@ -77,6 +78,8 @@ export interface CardFacts {
   alive: ReadonlySet<string>;
   /** #309: attachments of each card, its rounds' included; absent is none. */
   attachmentCounts: ReadonlyMap<string, number>;
+  /** #337 D8: the cards each one runs after, in number order; absent is none. */
+  dependencies: ReadonlyMap<string, CardDependencyRef[]>;
   now: Date;
 }
 
@@ -197,6 +200,8 @@ export const toCardView = (
   completedAt: iso(card.completedAt),
   updatedAt: card.updatedAt.toISOString(),
   attachmentCount: facts.attachmentCounts.get(card.id) ?? 0,
+  dependsOn: facts.dependencies.get(card.id) ?? [],
+  planId: card.planId,
 });
 
 const isEvidence = (value: Prisma.JsonValue): value is Prisma.JsonObject =>
