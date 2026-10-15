@@ -28,7 +28,13 @@ export class PlannerAdminController {
   }
 }
 
-/** Tasks of every plan the caller may read, across their projects. */
+/**
+ * Tasks of every plan the caller may read, across their projects.
+ *
+ * @deprecated Issue #270 D9: `GET /work` (the Work List) replaces it for the
+ * web. Kept unchanged for one release so the API and web merge in either
+ * order; a follow-up removes it.
+ */
 @Controller('tasks')
 export class TasksController {
   constructor(private readonly tasks: TasksQueryService) {}
