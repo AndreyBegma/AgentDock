@@ -34,6 +34,7 @@ import { TerminalModule } from './terminal';
 import { TerminalSetupModule } from './terminal-setup';
 import { UsageModule } from './usage/usage.module';
 import { WebhooksModule } from './webhooks';
+import { WorkModule } from './work';
 import { WorkflowsModule } from './workflows';
 
 @Module({
@@ -78,6 +79,8 @@ import { WorkflowsModule } from './workflows';
     BoardModule,
     // Issue #244: candidate cards from manual sessions, into the Inbox.
     CaptureModule,
+    // Issue #270: one Work surface — the List and the Board's plan tasks.
+    WorkModule,
     SchedulesModule,
     BudgetsModule,
     // Before WebhooksModule: its `POST /hooks/:publicId` would otherwise
