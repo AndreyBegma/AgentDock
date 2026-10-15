@@ -1,4 +1,5 @@
 import {
+  ATTACHMENTS_PER_CARD_MAX,
   type CreatePlanRequest,
   PLAN_MODES,
   PLAN_REVIEW_DECISIONS,
@@ -6,6 +7,7 @@ import {
   PLAN_TASK_LIVE_STATUSES,
   PLAN_TASK_STATUSES,
   PLAN_VISIBILITIES,
+  PLANNER_MAX_OPTIONS,
   PLANNER_MAX_QUESTIONS,
   PLANNER_QUESTION_MAX,
   PLANNER_SPEC_OUTPUTS,
@@ -26,7 +28,9 @@ import {
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
+  ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsIn,
   IsNotEmpty,
   IsOptional,
@@ -52,6 +56,8 @@ const MODEL_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:[\]-]*$/;
 const PROFILE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 /** The planner's short ids (questions, options). */
 const SHORT_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$/;
+/** `attachmentIdSchema`. */
+const ATTACHMENT_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
 /** `POST /projects/:projectId/plans`. */
 export class CreatePlanDto implements CreatePlanRequest {
@@ -74,6 +80,17 @@ export class CreatePlanDto implements CreatePlanRequest {
   @MaxLength(64)
   @Matches(PROFILE_PATTERN, { message: 'profileKey must be a profile id' })
   profileKey?: string;
+
+  /** #337 D10: pending uploads the intake claims. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(ATTACHMENTS_PER_CARD_MAX)
+  @IsString({ each: true })
+  @Matches(ATTACHMENT_ID, {
+    each: true,
+    message: 'attachmentIds must be attachment ids',
+  })
+  attachmentIds?: string[];
 }
 
 export class PlanAnswerDto {
@@ -85,6 +102,18 @@ export class PlanAnswerDto {
   @IsString()
   @Matches(SHORT_ID, { message: 'optionId must be an option id' })
   optionId?: string;
+
+  /** #337 D3: the picks of a `multiple` question. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(PLANNER_MAX_OPTIONS)
+  @IsString({ each: true })
+  @Matches(SHORT_ID, {
+    each: true,
+    message: 'optionIds must be option ids',
+  })
+  optionIds?: string[];
 
   @IsOptional()
   @IsString()
@@ -107,6 +136,22 @@ export class PlanTurnDto {
   @ValidateNested({ each: true })
   @Type(() => PlanAnswerDto)
   answers?: PlanAnswerDto[];
+
+  /** #337 D3: Enough — generate. */
+  @IsOptional()
+  @IsBoolean()
+  generate?: boolean;
+
+  /** #337 D10: files that came with the answer. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(ATTACHMENTS_PER_CARD_MAX)
+  @IsString({ each: true })
+  @Matches(ATTACHMENT_ID, {
+    each: true,
+    message: 'attachmentIds must be attachment ids',
+  })
+  attachmentIds?: string[];
 }
 
 /** `POST …/tasks/:key/review`. */

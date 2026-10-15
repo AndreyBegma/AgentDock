@@ -1,6 +1,9 @@
 import {
   type FrozenTaskRef,
+  intakeRoundsAsked,
+  isIntakeCard,
   isPlannedTask,
+  PLANNER_INTAKE_MAX_ROUNDS,
   type PlanDetail,
   type PlanGraphView,
   type PlannedTask,
@@ -97,6 +100,11 @@ export const roundsOf = (
     case 'write':
     case 'design':
       return [];
+    case 'intake':
+      // #337 D4: a round, or the card — which opens none.
+      return isIntakeCard(out)
+        ? []
+        : [{ taskKey: null, questions: out.questions }];
   }
 };
 
@@ -154,6 +162,7 @@ export const toTaskView = (
     issue,
     queuedAt: row.queuedAt?.toISOString() ?? null,
     design,
+    cardId: row.cardId,
   };
 };
 
@@ -240,4 +249,11 @@ export const toDetail = ({
   activeTurnId:
     turns.find((t) => t.phase === 'queued' || t.phase === 'running')?.id ??
     null,
+  intake:
+    plan.mode === 'card'
+      ? {
+          roundsAsked: intakeRoundsAsked(turns),
+          maxRounds: PLANNER_INTAKE_MAX_ROUNDS,
+        }
+      : null,
 });

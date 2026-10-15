@@ -138,9 +138,51 @@ export interface BoardCardView {
   autoCollect: boolean;
   /** #309: attachments of the card and its rounds — the paperclip on the face when above 0. */
   attachmentCount: number;
+  /**
+   * #337 D8: the cards this one runs after — "after C-12" on the face.
+   * Optional until every route that answers a card fills it; absent reads as
+   * none.
+   */
+  dependsOn?: CardDependencyRef[];
+  /**
+   * #337 D6, D7: the plan the card came from (a New Card intake or Create
+   * cards). Optional like `dependsOn`; absent reads as null.
+   */
+  planId?: string | null;
   movedAt: string;
   completedAt: string | null;
   updatedAt: string;
+}
+
+/** #337 D8: a card another one depends on, as the face and Run's warning name it. */
+export interface CardDependencyRef {
+  number: number;
+  /** `C-<number>`. */
+  label: string;
+  /** Open while not `completed`. */
+  column: BoardColumn;
+}
+
+/** #337 D8: one dependency as the card sheet lists it. */
+export interface CardDependencyView extends CardDependencyRef {
+  title: string;
+}
+
+/** `GET /board/cards/:number/dependencies` (#337 D8): number order. */
+export interface CardDependenciesView {
+  dependsOn: CardDependencyView[];
+}
+
+/**
+ * `POST /board/cards/:number/dependencies` (#337 D8, operator): the card runs
+ * after card `dependsOn` of the same project. Itself, a number that names no
+ * card of the project, or a link that closes a cycle is refused —
+ * `invalid_dependency` (400) or `dependency_cycle` (409). An existing link is
+ * kept as it is. Answers with `CardDependenciesView`; `DELETE
+ * …/dependencies/:dependsOn` removes one the same way.
+ */
+export interface AddCardDependencyRequest {
+  dependsOn: number;
 }
 
 /** #244 D8: one evidence excerpt of an Inbox card, at most `CAPTURE_EVIDENCE_EXCERPT_MAX` characters. */
@@ -340,6 +382,11 @@ export interface RunBoardCardRequest {
    */
   profileKey?: string;
   permissionMode?: OrchestratorPermissionMode;
+  /**
+   * #337 D8: run although a dependency is not in Completed. Without it, such
+   * a Run is 409 `dependency_open` naming the open ones.
+   */
+  ignoreDependencies?: boolean;
 }
 
 /** `POST /board/cards/:number/feedback` (D9). */
@@ -463,6 +510,15 @@ export const BOARD_ERROR = {
   prCloseFailed: 'pr_close_failed',
   /** 422 (#329 D7/D8): `deleteBranch: true` on a `terminal` card. */
   branchDeleteRefused: 'branch_delete_refused',
+  /**
+   * 409 (#337 D8): Run on a card with a dependency not in Completed, without
+   * `ignoreDependencies`; `dependencies` names the open ones.
+   */
+  dependencyOpen: 'dependency_open',
+  /** 409 (#337 D8): the dependency would close a cycle. */
+  dependencyCycle: 'dependency_cycle',
+  /** 400 (#337 D8): the card itself, or a number that is no card of this project. */
+  invalidDependency: 'invalid_dependency',
 } as const;
 export type BoardErrorCode = (typeof BOARD_ERROR)[keyof typeof BOARD_ERROR];
 
@@ -482,6 +538,8 @@ export interface BoardErrorBody {
   profileKey?: string;
   /** `attachment_error`: why the attachment was refused (#309). */
   code?: AttachmentRefusal;
+  /** `dependency_open` (#337 D8): the open dependencies — "C-12 is not completed yet". */
+  dependencies?: CardDependencyRef[];
 }
 
 /** #273 D9: why approving the design did not start round 1. */

@@ -4,6 +4,7 @@ export * from './capture-input';
 export * from './capture-limits';
 export * from './capture-prompt';
 export * from './contracts';
+export * from './dependencies';
 export * from './moves';
 export * from './naming';
 export * from './positions';

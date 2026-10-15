@@ -1,4 +1,4 @@
-import { PLANNER_OUTPUT_CONTRACT, type PlanQuestion } from '@agentdock/shared';
+import { type PlanQuestion, plannerOutputContract } from '@agentdock/shared';
 import {
   assemblePrompt,
   type PromptInput,
@@ -46,7 +46,9 @@ describe('assemblePrompt', () => {
   it('puts the instructions first and the fixed contract after them (D11)', () => {
     const prompt = assemblePrompt(base);
     const instructions = prompt.indexOf('INSTRUCTIONS v3');
-    const contract = prompt.indexOf(PLANNER_OUTPUT_CONTRACT.trim());
+    const contract = prompt.indexOf(
+      plannerOutputContract(base.contractVersion).trim(),
+    );
     expect(instructions).toBe(0);
     expect(contract).toBeGreaterThan(instructions);
     expect(prompt).toContain('Action: `decompose`');

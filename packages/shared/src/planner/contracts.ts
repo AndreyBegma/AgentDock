@@ -22,12 +22,39 @@ import type {
 
 // Requests
 
-/** `POST /projects/:projectId/plans`. Defaults: model `opus`, the project's default profile (D14). */
+/**
+ * `POST /projects/:projectId/plans`. Defaults: the caller's planning model
+ * (#337 D9, `GET /me/settings`), the project's default profile (D14).
+ *
+ * #337 D2: `mode: 'card'` is New Card — `brief` is What to do, as typed, and
+ * the first intake turn starts at once. `attachmentIds` (D10): pending
+ * uploads of the caller in this project, claimed by the plan and passed to
+ * `plan.turn`; the generated card claims them in turn.
+ */
 export interface CreatePlanRequest {
   brief: string;
   mode: PlanMode;
   model?: string;
   profileKey?: string;
+  attachmentIds?: string[];
+}
+
+/**
+ * `POST /projects/:projectId/plans/:planId/cards` (#337 D7): Create cards —
+ * one Todo card per task of the current version, with Depends-on links
+ * mirroring `dependsOn`. Once per plan: then 409 `cards_exist`. A `card`
+ * plan is 409 `wrong_mode`: its card comes from the intake.
+ */
+export interface CreatePlanCardsResponse {
+  /** In task order. */
+  cards: PlanCreatedCard[];
+}
+
+export interface PlanCreatedCard {
+  taskKey: string;
+  /** The card's per-project number; `label` is `C-<number>`. */
+  number: number;
+  label: string;
 }
 
 /** `POST …/plans/:planId/turns` and `…/tasks/:key/turns`: a chat message, a round's answers, or both (D7). */
@@ -119,6 +146,8 @@ export interface PlanTaskView {
   queuedAt: string | null;
   /** Spec 223: the task's design; null while no design row exists (off, never suggested). */
   design: TaskDesignSummary | null;
+  /** #337 D7: the board card Create cards made from the task; null before. */
+  cardId: string | null;
 }
 
 /** The turn that produced a plan version: the decompose for 1, a revise after. */
@@ -217,6 +246,16 @@ export interface PlanDetail extends PlanSummary {
   graph: PlanGraphView;
   /** A turn queued or running: new turns are refused (`turn_in_progress`). */
   activeTurnId: string | null;
+  /** #337 D4: a `card` plan's progress; null for any other mode. */
+  intake: PlanIntakeView | null;
+}
+
+/** #337 D3, D4: where a card intake stands. */
+export interface PlanIntakeView {
+  /** Question rounds its turns opened (`intakeRoundsAsked`). */
+  roundsAsked: number;
+  /** `PLANNER_INTAKE_MAX_ROUNDS`: after this many, the next turn writes the card. */
+  maxRounds: number;
 }
 
 /** `GET /tasks` query. */
@@ -338,6 +377,13 @@ export const PLANNER_ERROR = {
   runnerTimeout: 'runner_timeout',
   /** 409: the runner's advert does not list the command (#233); nothing was sent or written. */
   runnerOutdated: 'runner_outdated',
+  /** 409 (#337 D7): Create cards on a plan whose cards exist. */
+  cardsExist: 'cards_exist',
+  /**
+   * 409 (#337): a route that does not fit the plan's mode — Create cards or
+   * Send on a `card` plan, an intake turn on any other.
+   */
+  wrongMode: 'wrong_mode',
 } as const;
 export type PlannerErrorCode =
   (typeof PLANNER_ERROR)[keyof typeof PLANNER_ERROR];

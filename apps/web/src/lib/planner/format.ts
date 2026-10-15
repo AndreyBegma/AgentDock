@@ -33,6 +33,7 @@ export const PLAN_STATUS_LABEL: Record<PlanStatus, string> = {
   sending: 'Sending',
   sent: 'Sent',
   archived: 'Archived',
+  done: 'Done',
 };
 
 export const PLAN_STATUS_PILL: Record<PlanStatus, Status> = {
@@ -44,6 +45,8 @@ export const PLAN_STATUS_PILL: Record<PlanStatus, Status> = {
   sending: 'running',
   sent: 'done',
   archived: 'idle',
+  // #337: the plan made its cards.
+  done: 'done',
 };
 
 /**
@@ -253,6 +256,7 @@ export function turnActionText(
     write: `Writing ${task}’s document…`,
     revise: 'Revising the plan…',
     design: `Drawing ${task}’s mockup…`,
+    intake: 'Thinking about the card…',
   };
   return sentence[turn.action];
 }
@@ -305,6 +309,7 @@ export const TURN_ACTION_LABEL: Record<PlanTurnAction, string> = {
   write: 'Write the document',
   revise: 'Revise the plan',
   design: 'Draw the mockup',
+  intake: 'Shape the card',
 };
 
 const TURN_PHASE_WORD: Record<PlanTurnPhase, string> = {

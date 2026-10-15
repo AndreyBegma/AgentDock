@@ -82,8 +82,22 @@ model User {
   textNormalizations          TextNormalization[]
   textSettingsUpdated         TextSettings[]
   attachmentsUploaded         Attachment[]
+  settings                    UserSettings?
 
   @@map("users")
+}
+
+/// #337 D9: a person's own settings. No row: the defaults (shared
+/// `USER_SETTINGS_DEFAULTS`).
+model UserSettings {
+  userId        String   @id
+  /// The model New Card and New Plan preselect; null: `PLANNING_MODEL_DEFAULT`.
+  planningModel String?
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
 }
 
 /// A login session. Named `UserSession` because `Session` is reserved for agent
@@ -2183,10 +2197,11 @@ model GitHubProjectHealth {
 
 // ─── Planner (spec 172) ─────────────────────────────────────────────────────
 
-/// Shared `PLAN_MODES` (D2).
+/// Shared `PLAN_MODES` (D2; `card`: #337 D1, a New Card intake).
 enum PlanMode {
   batch
   dialogue
+  card
 }
 
 /// Shared `PLAN_VISIBILITIES` (D12).
@@ -2195,7 +2210,7 @@ enum PlanVisibility {
   project
 }
 
-/// Shared `PLAN_STATUSES`.
+/// Shared `PLAN_STATUSES` (`done`: #337 D6, a plan that made its cards).
 enum PlanStatus {
   clarifying
   drafting
@@ -2203,6 +2218,7 @@ enum PlanStatus {
   sending
   sent
   archived
+  done
 }
 
 /// Shared `PLAN_TASK_KINDS` (D4).
@@ -2223,7 +2239,7 @@ enum PlanTaskStatus {
   issued
 }
 
-/// Shared `PLAN_TURN_ACTIONS` (D16; `design`: spec 223 D7).
+/// Shared `PLAN_TURN_ACTIONS` (D16; `design`: spec 223 D7; `intake`: #337 D1).
 enum PlanTurnAction {
   decompose
   clarify
@@ -2231,6 +2247,7 @@ enum PlanTurnAction {
   write
   revise
   design
+  intake
 }
 
 /// Shared `PLAN_TURN_PHASES`.
@@ -2324,6 +2341,10 @@ model Plan {
   turns              PlanTurn[]
   designs            TaskDesign[]
   textNormalizations TextNormalization[]
+  /// #337 D6, D7: the board cards this plan made.
+  cards              BoardCard[]
+  /// #337 D6, D10: an intake's attachments, held until its card claims them.
+  attachments        Attachment[]
 
   @@index([projectId, updatedAt])
   @@index([authorId])
@@ -2354,10 +2375,13 @@ model PlanTask {
   issueNumber    Int?
   issueUrl       String?
   queuedAt       DateTime?
+  /// #337 D7: the board card Create cards made from this task.
+  cardId         String?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
   plan               Plan                @relation(fields: [planId], references: [id], onDelete: Cascade)
+  card               BoardCard?          @relation("PlanTaskCard", fields: [cardId], references: [id], onDelete: SetNull)
   turns              PlanTurn[]
   textNormalizations TextNormalization[]
 
@@ -2783,28 +2807,55 @@ model BoardCard {
   fleetStage              String?
   /// The slot left the projection; the card keeps its last column.
   fleetSlotGone           Boolean          @default(false)
+  /// #337 D6, D7: the plan the card came from — a New Card intake or a New
+  /// Plan's Create cards; kept as its origin.
+  planId                  String?
   createdAt               DateTime         @default(now())
   updatedAt               DateTime         @updatedAt
 
-  project            Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  trackedSession     AgentSession?       @relation("BoardCardTrackedSession", fields: [trackedSessionId], references: [id], onDelete: SetNull)
-  createdBy          User?               @relation("BoardCardCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  movedBy            User?               @relation("BoardCardMovedBy", fields: [movedById], references: [id], onDelete: SetNull)
-  completedBy        User?               @relation("BoardCardCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
-  capture            CardCapture?        @relation(fields: [captureId], references: [id], onDelete: SetNull)
-  sourceSession      AgentSession?       @relation("BoardCardSourceSession", fields: [sourceSessionId], references: [id], onDelete: SetNull)
+  project            Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  plan               Plan?                 @relation(fields: [planId], references: [id], onDelete: SetNull)
+  trackedSession     AgentSession?         @relation("BoardCardTrackedSession", fields: [trackedSessionId], references: [id], onDelete: SetNull)
+  createdBy          User?                 @relation("BoardCardCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  movedBy            User?                 @relation("BoardCardMovedBy", fields: [movedById], references: [id], onDelete: SetNull)
+  completedBy        User?                 @relation("BoardCardCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+  capture            CardCapture?          @relation(fields: [captureId], references: [id], onDelete: SetNull)
+  sourceSession      AgentSession?         @relation("BoardCardSourceSession", fields: [sourceSessionId], references: [id], onDelete: SetNull)
   rounds             BoardCardRound[]
   design             TaskDesign?
   designTurns        PlanTurn[]
   textNormalizations TextNormalization[]
   attachments        Attachment[]
+  /// #337 D7: the plan task Create cards made this card from.
+  planTasks          PlanTask[]            @relation("PlanTaskCard")
+  /// #337 D8: the cards this one runs after.
+  dependsOn          BoardCardDependency[] @relation("BoardCardDependsOn")
+  /// #337 D8: the cards that run after this one.
+  dependants         BoardCardDependency[] @relation("BoardCardDependant")
 
   @@unique([projectId, number])
   @@unique([projectId, fleetIssue, fleetSlot])
   @@index([projectId, column, position])
   @@index([sessionId])
   @@index([projectId, fingerprint])
+  @@index([planId])
   @@map("board_cards")
+}
+
+/// #337 D8: `cardId` runs after `dependsOnId`. Both cards are of one project
+/// and the graph has no cycle — the API checks both on insert (shared
+/// `findDependencyCycle`). Run warns on an open dependency; nothing blocks.
+model BoardCardDependency {
+  cardId      String
+  dependsOnId String
+  createdAt   DateTime @default(now())
+
+  card      BoardCard @relation("BoardCardDependsOn", fields: [cardId], references: [id], onDelete: Cascade)
+  dependsOn BoardCard @relation("BoardCardDependant", fields: [dependsOnId], references: [id], onDelete: Cascade)
+
+  @@id([cardId, dependsOnId])
+  @@index([dependsOnId])
+  @@map("board_card_dependencies")
 }
 
 /// One Run or feedback of a card (D4), with its `runs` row of kind `card`.
@@ -2862,6 +2913,9 @@ model Attachment {
   cardId     String?
   /// Set for an attachment that came with a round's feedback.
   roundId    String?
+  /// #337 D6, D10: claimed by a card intake while it runs (`expiresAt`
+  /// cleared); the generated card claims it from the plan.
+  planId     String?
   /// Nullable so deleting the uploader keeps the attachment.
   uploaderId String?
   /// The display name (D6), at most 200 characters.
@@ -2880,9 +2934,11 @@ model Attachment {
   project  Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
   card     BoardCard?      @relation(fields: [cardId], references: [id], onDelete: Cascade)
   round    BoardCardRound? @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  plan     Plan?           @relation(fields: [planId], references: [id], onDelete: SetNull)
   uploader User?           @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
 
   @@index([cardId, createdAt])
+  @@index([planId])
   @@index([projectId])
   @@index([expiresAt])
   @@map("attachments")

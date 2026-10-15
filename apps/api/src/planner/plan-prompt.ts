@@ -77,6 +77,9 @@ const WHAT: Record<PlanTurnAction, (input: PromptInput) => string> = {
     i.design
       ? designWhat(`task \`${i.taskKey ?? ''}\``, i.design)
       : `Draw the mockup of task \`${i.taskKey}\`.`,
+  // #337 placeholder: i337-api owns the intake prompt.
+  intake: () =>
+    'Interview the person about the card they asked for: ask the next round of questions, or write the card when nothing material is unknown.',
 };
 
 const UI_LINE = {

@@ -4,6 +4,7 @@ import {
   type DecomposeOutput,
   type DesignOutput,
   type GrillOutput,
+  type IntakeOutput,
   isPlannedTask,
   type PlannerParseResult,
   type PlanTurnAction,
@@ -520,6 +521,13 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
           taskKey: task?.key ?? '',
           taskKind: task?.kind ?? 'feature',
         });
+      case 'intake':
+        // #337 placeholder: i337-api passes the intake's real state.
+        return parsePlannerOutput(body, 'intake', {
+          contractVersion,
+          roundsAsked: 0,
+          generate: false,
+        });
       case 'revise': {
         const approved = await tx.planTask.findMany({
           where: {
@@ -548,10 +556,12 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
       | GrillOutput
       | WriteOutput
       | ReviseOutput
-      | DesignOutput,
+      | DesignOutput
+      | IntakeOutput,
   ): Promise<Chain | null> {
     // A design turn is applied by `applyDesignOutput` before this is reached.
-    if (output.action === 'design') return null;
+    // #337: i337-api applies intakes.
+    if (output.action === 'design' || output.action === 'intake') return null;
     // The turn may have been started on an older row; read the plan now.
     const plan = await tx.plan.findUniqueOrThrow({ where: { id: planRow.id } });
     switch (output.action) {

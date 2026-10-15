@@ -2,11 +2,20 @@ import type { z } from 'zod';
 import { DESIGN_CDN_ALLOWLIST } from '../design/cdn';
 import { DESIGN_HTML_MAX_BYTES, DESIGN_VARIANTS_MAX } from '../design/limits';
 import { validateMockup } from '../design/validate';
+import { isReliablyEnglish } from '../text/english';
+import type { PlanTurnView } from './contracts';
 import {
+  CARD_DRAFT_SECTIONS,
+  CARD_DRAFT_TITLE_MAX,
+  type CardDraft,
+  intakeCardOutputSchema,
+  intakeRoundOutputSchema,
+  isIntakeCard,
   isPlannedTask,
   PLANNER_BLOCK_TAG,
   PLANNER_CONTRACT_VERSION,
   PLANNER_DESIGN_BLOCK_TAG,
+  PLANNER_INTAKE_MAX_ROUNDS,
   PLANNER_MAX_OPTIONS,
   PLANNER_MAX_QUESTIONS,
   PLANNER_MAX_TASKS,
@@ -74,6 +83,15 @@ export const PLANNER_VIOLATION_REASONS = [
   'variant_mismatch',
   /** Design: `addressed` names a comment that is not open on the design. */
   'unknown_comment',
+  /**
+   * Intake (#337 D3, D4): a question round where the turn had to write the
+   * card — after `PLANNER_INTAKE_MAX_ROUNDS` rounds, or on Enough — generate.
+   */
+  'must_generate',
+  /** Intake (#337 D6): the card's body lacks one of `CARD_DRAFT_SECTIONS`. */
+  'missing_card_section',
+  /** Intake (#337 D5, ADR-0027 §6): the card's title or body is not English. */
+  'not_english',
 ] as const;
 export type PlannerViolationReason = (typeof PLANNER_VIOLATION_REASONS)[number];
 
@@ -117,7 +135,39 @@ export interface PlannerParseContexts {
     variant: number;
     openCommentIds: readonly string[];
   };
+  /** #337: what decides whether the intake turn may still ask. */
+  intake: VersionContext & IntakeTurnState;
 }
+
+/**
+ * #337 D3, D4: a card intake's state before a turn. `roundsAsked`: the
+ * question rounds its earlier turns opened. `generate`: the person pressed
+ * Enough — generate. `acceptNonEnglish`: the one re-ask of a non-English card
+ * is over — the card is taken and shown with a "Not English" warning (spec
+ * "Risks").
+ */
+export interface IntakeTurnState {
+  roundsAsked: number;
+  generate: boolean;
+  acceptNonEnglish?: boolean;
+}
+
+/**
+ * #337 D4: the rounds an intake asked — its succeeded `intake` turns that
+ * opened one. A failed turn, or one that wrote the card, opened none.
+ */
+export const intakeRoundsAsked = (
+  turns: readonly Pick<PlanTurnView, 'action' | 'phase' | 'rounds'>[],
+): number =>
+  turns.filter(
+    (t) =>
+      t.action === 'intake' && t.phase === 'succeeded' && t.rounds.length > 0,
+  ).length;
+
+/** #337 D4: the next intake turn must write the card — no fifth round, and none after Enough. */
+export const intakeMustGenerate = (
+  state: Pick<IntakeTurnState, 'roundsAsked' | 'generate'>,
+): boolean => state.generate || state.roundsAsked >= PLANNER_INTAKE_MAX_ROUNDS;
 
 type ContextArgs<A extends PlanTurnAction> =
   // biome-ignore lint/complexity/noBannedTypes: an empty context is optional
@@ -269,6 +319,25 @@ export const PLANNER_REQUIRED_HEADING: Record<PlanTaskKind, string> = {
   bug: 'Reproduction',
 };
 
+/** #337 D6: the `CARD_DRAFT_SECTIONS` a card body lacks, in order. */
+export const missingCardSections = (body: string): string[] =>
+  CARD_DRAFT_SECTIONS.filter((section) => !hasHeading(body, section));
+
+const SECTION_LINE = new RegExp(
+  `^##[ \\t]+(?:${CARD_DRAFT_SECTIONS.join('|')})[ \\t]*#*[ \\t]*$`,
+  'gim',
+);
+
+/**
+ * #337 D5: the card's title and body pass ADR-0027 §6's English check. The
+ * fixed section headings are left out of the body first: they are English in
+ * any card and would carry a body in another Latin-script language over the
+ * function-word share.
+ */
+export const isCardDraftEnglish = (draft: Pick<CardDraft, 'title' | 'body'>) =>
+  isReliablyEnglish(draft.title) &&
+  isReliablyEnglish(draft.body.replace(SECTION_LINE, ''));
+
 /** Spec 223 D7: the one design block, its HTML validated against D6. */
 const parseDesignBlock = (
   text: string,
@@ -350,7 +419,15 @@ export function parsePlannerOutput(
   }
 
   const version = context?.contractVersion ?? PLANNER_CONTRACT_VERSION;
-  const parsed = plannerOutputSchemasFor(version)[action].safeParse(json);
+  // #337: an intake names its branch by its key, so a bad card reports the
+  // card's error rather than the round's "unknown key cardDraft".
+  const schema =
+    action === 'intake'
+      ? typeof json === 'object' && json !== null && 'cardDraft' in json
+        ? intakeCardOutputSchema
+        : intakeRoundOutputSchema
+      : plannerOutputSchemasFor(version)[action];
+  const parsed = schema.safeParse(json);
   if (!parsed.success) return shapeViolation(parsed.error.issues);
   const output: PlannerOutput = parsed.data;
 
@@ -453,6 +530,37 @@ export function parsePlannerOutput(
       };
       return parsedDesign;
     }
+    case 'intake': {
+      const ctx = context as PlannerParseContexts['intake'];
+      if (!isIntakeCard(output)) {
+        if (intakeMustGenerate(ctx)) {
+          return violation(
+            'must_generate',
+            ctx.generate
+              ? 'the person asked to generate: write the card now'
+              : `${PLANNER_INTAKE_MAX_ROUNDS} rounds were asked: write the card now`,
+          );
+        }
+        return { ok: true, output };
+      }
+      const missing = missingCardSections(output.cardDraft.body);
+      if (missing.length > 0) {
+        return violation(
+          'missing_card_section',
+          `the card body needs ${missing.map((s) => `"## ${s}"`).join(', ')}`,
+        );
+      }
+      if (
+        ctx.acceptNonEnglish !== true &&
+        !isCardDraftEnglish(output.cardDraft)
+      ) {
+        return violation(
+          'not_english',
+          'the card title and body must be written in English',
+        );
+      }
+      return { ok: true, output };
+    }
   }
 }
 
@@ -492,6 +600,25 @@ The mockup's rules — a mockup that breaks one fails the turn:
 const TASK_DESIGN_LINE = `
   "design": DesignSuggestion`;
 
+/** #337 D3, contract v3. */
+const MULTIPLE_RULE =
+  '- Set `"multiple": true` only when several options can hold at once. The person may always answer in their own words instead of, or beside, the options.';
+
+/** The Question shape as the contract text of `version` writes it. */
+const questionShape = (version: PlannerContractVersion): string => `Question = {
+  "id": string,              // short, unique within the round: "q1"
+  "title": string,
+  "question": string,
+  "options": [ { "id": string, "label": string, "detail"?: string } ],   // 0–${PLANNER_MAX_OPTIONS}${
+    version >= 3
+      ? `
+  "multiple"?: boolean,      // true: the person may pick several options`
+      : ''
+  }
+  "recommendation": { "optionId"?: string, "text": string, "why": string },
+  "blocking": boolean        // true only when there is no safe default
+}`;
+
 /**
  * The fixed contract text of `version` the API appends after the
  * instructions on every turn of a plan of that version (D11, ADR-0019), and
@@ -513,23 +640,16 @@ is closed: a key it does not name makes the whole turn fail, and nothing of it
 is applied.
 
 \`\`\`
-Question = {
-  "id": string,              // short, unique within the round: "q1"
-  "title": string,
-  "question": string,
-  "options": [ { "id": string, "label": string, "detail"?: string } ],   // 0–${PLANNER_MAX_OPTIONS}
-  "recommendation": { "optionId"?: string, "text": string, "why": string },
-  "blocking": boolean        // true only when there is no safe default
-}${
-    v2
-      ? `
+${questionShape(version)}${
+  v2
+    ? `
 DesignSuggestion = {
   "needed": boolean,         // does this task need a mockup before it is written?
   "why": string,             // one line
   "variants": 1 | 2 | 3      // 1 for an unambiguous change; 2–3 for real layout choices
 }`
-      : ''
-  }
+    : ''
+}
 Task = {
   "key": string,             // stable within the plan: "t1", "t2" … ^[a-z][a-z0-9-]{0,31}$
   "kind": "bug" | "feature",
@@ -559,7 +679,9 @@ Rules:
 
 - \`action\` is the action the turn names.
 - At most ${PLANNER_MAX_TASKS} tasks per plan, and at most ${PLANNER_MAX_QUESTIONS} questions per round.
-- \`recommendation.optionId\`, when present, is the id of one of that question's options.
+- \`recommendation.optionId\`, when present, is the id of one of that question's options.${
+    version >= 3 ? `\n${MULTIPLE_RULE}` : ''
+  }
 - Every key in \`dependsOn\` is the key of another task of the plan; no task depends on itself.
 - \`grill\` and \`write\` answer about the task the turn names, and repeat its key in \`taskKey\`.
 - A \`write\` document for a feature has a \`## Acceptance criteria\` section; for a bug, a \`## Reproduction\` section.
@@ -578,3 +700,49 @@ ${PLANNER_DESIGN_CONTRACT}`
 export const PLANNER_OUTPUT_CONTRACT = plannerOutputContract(
   PLANNER_CONTRACT_VERSION,
 );
+
+/**
+ * #337 D1, D4–D6: the fixed contract text of a `card` plan — a card intake.
+ * The API appends it after the card-mode instructions on every intake turn,
+ * in place of `plannerOutputContract`: an intake neither decomposes nor
+ * writes documents. It exists from contract v3 on.
+ */
+export const PLANNER_INTAKE_CONTRACT = `# Output contract (v${PLANNER_CONTRACT_VERSION}, card intake)
+
+This contract is fixed. It overrides anything above it about the shape of
+your answer.
+
+Your final message must contain exactly one fenced block tagged
+\`${PLANNER_BLOCK_TAG}\`, holding one JSON object — and no other block with
+that tag. Write anything else you want to say outside it. Every object below
+is closed: a key it does not name makes the whole turn fail, and nothing of it
+is applied.
+
+\`\`\`
+${questionShape(PLANNER_CONTRACT_VERSION)}
+CardDraft = {
+  "title": string,           // imperative, at most ${CARD_DRAFT_TITLE_MAX} characters
+  "kind": "bug" | "feature",
+  "body": markdown           // the four sections below, in this order
+}
+\`\`\`
+
+Every intake turn answers with one of:
+
+\`\`\`
+intake → { "action": "intake", "questions": [ Question ] }   // a round: 1–${PLANNER_MAX_QUESTIONS} questions
+intake → { "action": "intake", "cardDraft": CardDraft }      // the card
+\`\`\`
+
+Rules:
+
+- \`action\` is \`intake\`.
+- Ask a round only while something material is unknown; write the card as soon as nothing is.
+- At most ${PLANNER_INTAKE_MAX_ROUNDS} rounds. After the ${PLANNER_INTAKE_MAX_ROUNDS}th, or when the turn says the person asked to generate, write the card — a round then fails the turn.
+- Questions, options and anything you say outside the block are in the language of the person's latest text.
+- The card — \`title\`, \`body\` — is in English, whatever language the person wrote in.
+- The \`body\` has exactly these \`##\` sections: ${CARD_DRAFT_SECTIONS.map((s) => `\`## ${s}\``).join(', ')}. Acceptance criteria are checkable bullets; each open question names the default taken.
+- \`recommendation.optionId\`, when present, is the id of one of that question's options.
+${MULTIPLE_RULE}
+- The \`body\` is a JSON string: newlines are \`\\n\`.
+`;
