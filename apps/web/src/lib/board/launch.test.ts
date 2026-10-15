@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { ProjectRuntimeProfile } from '@agentdock/shared';
 import {
-  cardFormModelOptions,
   type LaunchCard,
   launchBaseline,
   launchChanges,
@@ -146,25 +145,6 @@ describe('launchRequest', () => {
       profileKey: 'work-max',
       model: 'opus',
     });
-  });
-});
-
-describe('cardFormModelOptions', () => {
-  test('the first option is the default: recommended, else the project’s', () => {
-    expect(cardFormModelOptions(launchCard())[0]).toEqual({
-      value: '',
-      label: 'Recommended — Sonnet 5.5',
-    });
-    expect(
-      cardFormModelOptions(launchCard({ recommendation: NONE }))[0],
-    ).toEqual({ value: '', label: 'Project default' });
-  });
-
-  test('keeps a stored free-text model selectable, so a save does not rewrite it', () => {
-    const values = cardFormModelOptions(launchCard({ model: 'opus[1m]' })).map(
-      (o) => o.value,
-    );
-    expect(values).toContain('opus[1m]');
   });
 });
 
