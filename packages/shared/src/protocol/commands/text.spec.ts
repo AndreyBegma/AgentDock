@@ -83,7 +83,8 @@ describe('textCommands', () => {
     expect(textCommands['text.normalize'].minRole).toBe('operator');
   });
 
-  it('is not on the allowlist until the runner serves it', () => {
-    expect(Object.hasOwn(commands, 'text.normalize')).toBe(false);
+  it('is on the allowlist, served by the runner', () => {
+    expect(Object.hasOwn(commands, 'text.normalize')).toBe(true);
+    expect(commands['text.normalize']).toBe(textCommands['text.normalize']);
   });
 });

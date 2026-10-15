@@ -59,7 +59,7 @@ export type CaptureSpawn = (spec: {
   stdinFile: string;
 }) => CaptureProcess;
 
-const bunSpawn: CaptureSpawn = ({ command, cwd, env, stdinFile }) => {
+export const bunSpawn: CaptureSpawn = ({ command, cwd, env, stdinFile }) => {
   const proc = Bun.spawn([...command], {
     cwd,
     env,
@@ -94,7 +94,7 @@ interface Extraction {
   kill: () => void;
 }
 
-const lastLine = (stderr: string): string | null => {
+export const lastLine = (stderr: string): string | null => {
   const last = stderr
     .split('\n')
     .map((l) => l.trim())
@@ -103,7 +103,7 @@ const lastLine = (stderr: string): string | null => {
   return last ? (redact([last])[0] ?? '').slice(0, 300) : null;
 };
 
-const inside = (root: string, path: string): boolean => {
+export const inside = (root: string, path: string): boolean => {
   const rel = relative(resolve(root), resolve(path));
   return rel === '' || (!rel.startsWith(`..${sep}`) && rel !== '..');
 };
