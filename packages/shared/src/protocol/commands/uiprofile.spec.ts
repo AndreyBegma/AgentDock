@@ -2,9 +2,13 @@ import { describe, expect, it } from 'bun:test';
 import { UIPROFILE_FINGERPRINT_MAX_GLOBS } from '../../design/limits';
 import {
   commands,
+  RUNNER_FEATURE_COMMANDS,
   uiProfileBuildArgsSchema,
+  uiProfileCancelArgsSchema,
+  uiProfileCancelResultSchema,
   uiProfileFingerprintArgsSchema,
   uiProfileFingerprintResultSchema,
+  uiprofileCancelCommand,
   uiprofileCommands,
 } from '../index';
 
@@ -85,5 +89,28 @@ describe('uiprofile commands', () => {
         files: 12,
       }).success,
     ).toBe(false);
+  });
+
+  it('uiprofile.cancel takes only a run id, answers {cancelled}, needs an operator', () => {
+    expect(uiprofileCancelCommand.minRole).toBe('operator');
+    expect(uiprofileCancelCommand.timeoutMs).toBe(15_000);
+    expect(
+      uiProfileCancelArgsSchema.safeParse({ runId: 'cmrun0001' }).success,
+    ).toBe(true);
+    for (const bad of [
+      {},
+      { runId: '' },
+      { runId: 'cmrun0001', projectId: 'prj_1' },
+    ]) {
+      expect(uiProfileCancelArgsSchema.safeParse(bad).success).toBe(false);
+    }
+    expect(
+      uiProfileCancelResultSchema.safeParse({ cancelled: true }).success,
+    ).toBe(true);
+    expect(uiProfileCancelResultSchema.safeParse({}).success).toBe(false);
+  });
+
+  it('uiprofile.cancel is not a design feature command: older runners keep generating', () => {
+    expect(RUNNER_FEATURE_COMMANDS.design).not.toContain('uiprofile.cancel');
   });
 });

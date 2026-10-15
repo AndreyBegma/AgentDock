@@ -31,6 +31,7 @@ import { gitRefSchema, profileKeySchema, skillRunIdSchema } from './skills';
 export const UIPROFILE_TIMEOUTS_MS = {
   build: 30_000,
   fingerprint: 60_000,
+  cancel: 15_000,
 } as const;
 
 const utf8Bytes = (text: string): number =>
@@ -107,6 +108,35 @@ export const uiProfileFingerprintResultSchema = z.object({
 export type UiProfileFingerprintResult = z.infer<
   typeof uiProfileFingerprintResultSchema
 >;
+
+// uiprofile.cancel
+
+/**
+ * #275 D5, mirroring `plan.cancel`: a queued build leaves the queue, a
+ * preparing one is flagged, a running one has its session killed; each ends
+ * with `uiprofile_build.finished` phase `cancelled`. An unknown run is
+ * `not_found`. Not in `RUNNER_FEATURE_COMMANDS.design`: an older runner still
+ * generates, it just cannot stop a build.
+ */
+export const uiProfileCancelArgsSchema = z.strictObject({
+  runId: skillRunIdSchema,
+});
+export type UiProfileCancelArgs = z.infer<typeof uiProfileCancelArgsSchema>;
+
+/** `false` when the build had already ended. */
+export const uiProfileCancelResultSchema = z.object({ cancelled: z.boolean() });
+export type UiProfileCancelResult = z.infer<typeof uiProfileCancelResultSchema>;
+
+/**
+ * Defined here, entered in `uiprofileCommands` only together with its runner
+ * handler (see the note at the top of this file).
+ */
+export const uiprofileCancelCommand = {
+  args: uiProfileCancelArgsSchema,
+  result: uiProfileCancelResultSchema,
+  minRole: 'operator',
+  timeoutMs: UIPROFILE_TIMEOUTS_MS.cancel,
+} as const satisfies CommandDefinition;
 
 /** The two UI profile commands; both need an operator (spec "Protocol"). */
 export const uiprofileCommands = {

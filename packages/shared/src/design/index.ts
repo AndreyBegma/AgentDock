@@ -4,5 +4,6 @@ export * from './csp';
 export * from './limits';
 export * from './pin';
 export * from './profile';
+export * from './progress';
 export * from './types';
 export * from './validate';
