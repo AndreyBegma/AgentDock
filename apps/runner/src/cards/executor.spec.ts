@@ -143,3 +143,26 @@ describe('card.collect in a terminal session cwd (#282 D3)', () => {
     ).toBe('path_not_allowed');
   });
 });
+
+describe('card.collect of a card whose worktree card.close removed (#344)', () => {
+  it('collects the kept branch instead of answering not_found', async () => {
+    const { f, executor, args, originHead } = await setup();
+    // What card.close leaves: no card record, no worktree, the unpushed branch.
+    const worktree = join(f.ws, '.wt-widget-card-ab12cd34');
+    await f.run(f.root, 'worktree', 'add', '-q', '-b', BRANCH, worktree);
+    f.write(worktree, { 'src/pairing.ts': 'export const fixed = true;\n' });
+    await f.commitAll(worktree, 'fix: the pairing flake');
+    const head = await f.run(worktree, 'rev-parse', 'HEAD');
+    await f.run(f.root, 'worktree', 'remove', '--force', worktree);
+    const { cwd: _cwd, ...fleet } = args(f.root);
+
+    expect(await executor.collect(fleet)).toEqual({
+      ahead: 1,
+      pushed: true,
+      prNumber: 7,
+      prUrl: 'https://github.com/acme/widget/pull/7',
+      prState: 'open',
+    });
+    expect(await originHead()).toBe(head);
+  });
+});

@@ -94,6 +94,10 @@ The product owner asked (2026-10-15) for these outcomes:
   - The sheet shows `collectError` above the button: "No pull request:
     <error>".
   - It resets the automatic attempts.
+  - In Completed the card's worktree is already gone: Accept's `card.close`
+    removed it and the runner's record with it. `card.collect` then checks
+    the branch `card.close` kept (or `origin/<branch>`) out in a temporary
+    worktree, collects it as usual, and removes that worktree again (#344).
 - **D6 — The PR link everywhere.**
   - The card face and the sheet header show `PR #<n>` with the PR's state in
     **every column** where the card has a `prUrl`. A card dragged back to In
