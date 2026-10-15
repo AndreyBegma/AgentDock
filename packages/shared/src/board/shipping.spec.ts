@@ -27,13 +27,25 @@ const check = (
 ): CardCheck => ({ name, bucket, link });
 
 describe('cardCiStateOf (#359 D5)', () => {
-  it('is none without checks', () => {
+  it('is none without checks, or with only cancelled and skipped ones', () => {
     expect(cardCiStateOf([])).toBe('none');
+    expect(cardCiStateOf([check('a', 'cancel'), check('b', 'skipping')])).toBe(
+      'none',
+    );
   });
 
-  it('is green when every check passed or was skipped', () => {
+  it('is green when every counted check passed', () => {
     expect(cardCiStateOf([check('a', 'pass'), check('b', 'skipping')])).toBe(
       'green',
+    );
+  });
+
+  it('ignores a cancelled check — a superseded pipeline is not a failure', () => {
+    expect(cardCiStateOf([check('a', 'pass'), check('b', 'cancel')])).toBe(
+      'green',
+    );
+    expect(cardCiStateOf([check('a', 'pending'), check('b', 'cancel')])).toBe(
+      'pending',
     );
   });
 
@@ -43,11 +55,8 @@ describe('cardCiStateOf (#359 D5)', () => {
     );
   });
 
-  it('is red on a failed or cancelled check, even while others run', () => {
+  it('is red only on a real failure, even while others run', () => {
     expect(cardCiStateOf([check('a', 'pending'), check('b', 'fail')])).toBe(
-      'red',
-    );
-    expect(cardCiStateOf([check('a', 'pass'), check('b', 'cancel')])).toBe(
       'red',
     );
   });
@@ -58,7 +67,8 @@ describe('failedCardChecks and cardCiChecksOf (#359 D5)', () => {
     const checks = [
       check('lint', 'pass'),
       check('test', 'fail'),
-      check('e2e', 'cancel', null),
+      check('stale', 'cancel'),
+      check('e2e', 'fail', null),
       ...Array.from({ length: CARD_CI_CHECKS_STORED_MAX + 5 }, (_, i) =>
         check(`x${i}`, 'fail'),
       ),

@@ -23,29 +23,34 @@ export const cardCiCheckSchema = z.object({
 });
 export type CardCiCheck = z.infer<typeof cardCiCheckSchema>;
 
-const FAILED_BUCKETS: ReadonlySet<CardCheck['bucket']> = new Set([
-  'fail',
+/**
+ * Checks that say nothing about the head: CI cancels a superseded pipeline on
+ * every push, and a skipped check did not run.
+ */
+const IGNORED_BUCKETS: ReadonlySet<CardCheck['bucket']> = new Set([
   'cancel',
+  'skipping',
 ]);
 
 /**
- * #359 D5: the head's checks as one state. No checks is `none` — the
- * repository has none, or they have not registered yet. A failed or
- * cancelled check is `red` even while others still run, so a fix round does
- * not wait for the slowest check; otherwise a running one is `pending`;
- * passed and skipped checks are `green`.
+ * #359 D5: the head's checks as one state. Cancelled and skipped checks are
+ * ignored. No other check is `none` — the repository has none, or they have
+ * not registered yet. A failed check is `red` even while others still run,
+ * so a fix round does not wait for the slowest check; otherwise a running
+ * one is `pending`; when every one passed, `green`.
  */
 export const cardCiStateOf = (checks: readonly CardCheck[]): CardCiState => {
-  if (checks.length === 0) return 'none';
-  if (checks.some((c) => FAILED_BUCKETS.has(c.bucket))) return 'red';
-  if (checks.some((c) => c.bucket === 'pending')) return 'pending';
+  const counted = checks.filter((c) => !IGNORED_BUCKETS.has(c.bucket));
+  if (counted.length === 0) return 'none';
+  if (counted.some((c) => c.bucket === 'fail')) return 'red';
+  if (counted.some((c) => c.bucket === 'pending')) return 'pending';
   return 'green';
 };
 
 /** #359 D5: the failed checks, in the order `gh` listed them, as `ciChecks` keeps them. */
 export const failedCardChecks = (checks: readonly CardCheck[]): CardCiCheck[] =>
   checks
-    .filter((c) => FAILED_BUCKETS.has(c.bucket))
+    .filter((c) => c.bucket === 'fail')
     .slice(0, CARD_CI_CHECKS_STORED_MAX)
     .map(({ name, link }) => ({ name, link }));
 
