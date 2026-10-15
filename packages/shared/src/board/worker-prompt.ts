@@ -10,12 +10,20 @@ import type { BoardCardKind } from './types';
  * D17: the card worker's prompt. Fixed, versioned code — not cs-worker, not
  * editable (ADR-0024 scopes ADR-0005). A change to the text bumps
  * `CARD_WORKER_PROMPT_VERSION`, which the API records on each round's run.
- * Version 4 (#309 D10): the `## Attachments` sections.
+ * Version 4 (#309 D10): the `## Attachments` sections. Version 5 (#359 D3):
+ * the pull request description file.
  */
-export const CARD_WORKER_PROMPT_VERSION = 4;
+export const CARD_WORKER_PROMPT_VERSION = 5;
 
 /** The MCP tool the worker calls when done (D6). */
 export const FINISH_CARD_TOOL = 'finish_card';
+
+/**
+ * #359 D3: the PR description the worker writes, worktree-relative. Under
+ * `.agentdock/`, which the runner git-excludes; `card.collect` makes it the
+ * PR body.
+ */
+export const CARD_PR_DESCRIPTION_FILE = '.agentdock/pull-request.md';
 
 /** #243 D7: the addressed comment bodies the `## Design` section carries, in UTF-8 bytes. */
 export const CARD_DESIGN_COMMENTS_MAX_BYTES = 4 * 1024;
@@ -194,6 +202,33 @@ export const cardWorkerPrompt = (card: CardWorkerPromptInput): string => {
   }
 };
 
+/**
+ * #359 D3: what the worker writes to `CARD_PR_DESCRIPTION_FILE` before it
+ * finishes — the spec (and design) link, `Closes #n` with an issue, what
+ * changed, and the acceptance checklist.
+ */
+const pullRequestSection = (card: CardWorkerPromptInput): string[] => {
+  const blob = `https://github.com/<owner>/<repo>/blob/${card.branch}/`;
+  const lines = [
+    `Before you finish, write the pull request's description to \`${CARD_PR_DESCRIPTION_FILE}\` in this worktree. It is git-excluded — do not commit it; AgentDock makes it the pull request's body. Keep it current in later rounds. It holds, in this order:`,
+    '',
+  ];
+  if (card.specPath !== null) {
+    const design = card.design ? ` · Design: ${blob}${card.design.path}` : '';
+    lines.push(
+      `- \`Spec: ${blob}${card.specPath}${design}\` — <owner>/<repo> from \`git remote get-url origin\`;`,
+    );
+  }
+  if (card.issueNumber !== null) {
+    lines.push(`- \`Closes #${card.issueNumber}\`;`);
+  }
+  lines.push(
+    '- `## What changed and why` — short, by module;',
+    '- `## Acceptance criteria` — the checklist from the spec (or the card): `[x]` with how you checked it, `[ ]` with why not.',
+  );
+  return lines;
+};
+
 const assemblePrompt = (
   card: CardWorkerPromptInput,
   body: string,
@@ -230,7 +265,9 @@ const assemblePrompt = (
     '',
     '## When you are done',
     '',
-    `Call the \`${FINISH_CARD_TOOL}\` tool with a short summary of what you changed and how you checked it.`,
+    ...pullRequestSection(card),
+    '',
+    `Then call the \`${FINISH_CARD_TOOL}\` tool with a short summary of what you changed and how you checked it.`,
     `If the \`${FINISH_CARD_TOOL}\` tool is not available, reply with the summary followed by the single word DONE, and stop.`,
   );
   return lines.join('\n');

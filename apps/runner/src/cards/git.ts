@@ -11,7 +11,12 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, sep } from 'node:path';
-import { cardWipCommitMessage } from '@agentdock/shared';
+import {
+  AGENTDOCK_WORKTREE_DIR,
+  CARD_PR_DESCRIPTION_FILE,
+  CARD_PR_MARKER,
+  cardWipCommitMessage,
+} from '@agentdock/shared';
 import type {
   CardCollectArgs,
   CardCollectPrState,
@@ -233,6 +238,101 @@ const openPullRequest = async (
   };
 };
 
+/** GitHub refuses a PR body over 65 536 characters; room is left for the marker. */
+const PR_DESCRIPTION_MAX_CHARS = 60_000;
+
+/**
+ * #359 D3: the worker's `.agentdock/pull-request.md`, or null when it is
+ * missing, empty, not a regular file, or reached through a symlink — a link
+ * could put any file the runner can read into a public PR.
+ */
+export const readPullRequestDescription = (worktree: string): string | null => {
+  const path = join(worktree, CARD_PR_DESCRIPTION_FILE);
+  try {
+    if (!lstatSync(path).isFile()) return null;
+    // `.agentdock` itself may not be a link either.
+    const real = join(realpathSync(worktree), CARD_PR_DESCRIPTION_FILE);
+    if (realpathSync(path) !== real) return null;
+    const text = readFileSync(path, 'utf8').trim();
+    if (!text) return null;
+    return text.length > PR_DESCRIPTION_MAX_CHARS
+      ? `${text.slice(0, PR_DESCRIPTION_MAX_CHARS - 1)}…`
+      : text;
+  } catch {
+    return null;
+  }
+};
+
+const isMarkerLine = (line: string): boolean =>
+  line.trimStart().startsWith(`${CARD_PR_MARKER}:`);
+
+/**
+ * #359 D3: the worker's description, with the API's `AgentDock-Card:` line —
+ * the one the API traces the PR by — as its only marker. A marker the worker
+ * wrote is dropped, so a PR never names another card.
+ */
+export const pullRequestBodyOf = (
+  description: string,
+  apiBody: string,
+): string => {
+  const marker = apiBody.split('\n').find(isMarkerLine)?.trim();
+  const text = description
+    .split('\n')
+    .filter((line) => !isMarkerLine(line))
+    .join('\n')
+    .trim();
+  return marker ? `${text}\n\n${marker}\n` : `${text}\n`;
+};
+
+/**
+ * #359 D3: without the worker's file, the API's body led by the links to the
+ * spec (`.md`) and the design (`.html`) `card.run` committed on the branch.
+ */
+export const fallbackPullRequestBody = (
+  apiBody: string,
+  github: string,
+  branch: string,
+  specFiles: readonly string[],
+): string => {
+  const url = (path: string) =>
+    `https://github.com/${github}/blob/${branch.split('/').map(encodeURIComponent).join('/')}/${path
+      .split('/')
+      .map(encodeURIComponent)
+      .join('/')}`;
+  const link = (path: string) => `[${path}](${url(path)})`;
+  const spec = specFiles.find((p) => p.endsWith('.md'));
+  const design = specFiles.find((p) => p.endsWith('.html'));
+  const parts = [
+    ...(spec ? [`Spec: ${link(spec)}`] : []),
+    ...(design ? [`approved design: ${link(design)}`] : []),
+  ];
+  return parts.length > 0 ? `${parts.join(' · ')}\n\n${apiBody}` : apiBody;
+};
+
+/** `gh pr edit <n> --body-file`, the body in a private temporary file. */
+const editPullRequestBody = async (
+  deps: GitDeps,
+  github: string,
+  number: number,
+  body: string,
+): Promise<void> => {
+  const dir = mkdtempSync(join(deps.tempRoot ?? tmpdir(), 'agentdock-pr-'));
+  try {
+    const file = join(dir, 'body.md');
+    writeFileSync(file, body, { mode: 0o600 });
+    const edited = await deps.exec(
+      'gh',
+      ['pr', 'edit', String(number), '--repo', github, '--body-file', file],
+      { timeoutMs: GH_TIMEOUT_MS },
+    );
+    if (!edited || edited.code !== 0) {
+      throw new Error(`gh pr edit failed: ${stderrLine(edited)}`);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+};
+
 /**
  * D8: commit the leftovers, push, and open a PR into the base unless one is
  * open for the branch already — then it is only pushed. Nothing ahead of
@@ -242,7 +342,8 @@ const openPullRequest = async (
  */
 export const collectCard = async (
   deps: GitDeps,
-  record: Pick<CardRecord, 'projectId' | 'root' | 'worktree' | 'branch'>,
+  record: Pick<CardRecord, 'projectId' | 'root' | 'worktree' | 'branch'> &
+    Partial<Pick<CardRecord, 'specFiles'>>,
   args: CardCollectArgs,
 ): Promise<CardCollectResult> => {
   const wt = record.worktree;
@@ -261,6 +362,9 @@ export const collectCard = async (
       `${wt} is on ${current ?? 'a detached HEAD'}, not ${record.branch}`,
     );
   }
+  // #359 D3: the description is the PR's body, never a commit — also in a
+  // worktree from before `card.run` excluded `.agentdock/` on every round.
+  await excludeFromGit(deps, wt, `${AGENTDOCK_WORKTREE_DIR}/`);
   await gitOk(deps.exec, ['-C', wt, 'add', '-A']);
   if (
     !(await gitSucceeds(deps.exec, ['-C', wt, 'diff', '--cached', '--quiet']))
@@ -294,15 +398,32 @@ export const collectCard = async (
     root: record.root,
   });
   await pushBranch(deps, wt, record.branch);
+  // #359 D3: the worker's description is the body — of a new PR, and of an
+  // open one, edited. Without it, a new PR gets the API's body with the spec
+  // link, and an open one keeps its body.
+  const description = readPullRequestDescription(wt);
+  const body =
+    description !== null
+      ? pullRequestBodyOf(description, args.body)
+      : fallbackPullRequestBody(
+          args.body,
+          github,
+          record.branch,
+          record.specFiles ?? [],
+        );
   // #329 D3: an open PR is reported whether this collect opened it or not,
   // so the API fills a link it lost.
-  const pr: OpenPr = (await openPullRequest(deps, github, record.branch)) ?? {
+  const open = await openPullRequest(deps, github, record.branch);
+  if (open && description !== null) {
+    await editPullRequestBody(deps, github, open.number, body);
+  }
+  const pr: OpenPr = open ?? {
     ...(await createPullRequest(deps, {
       github,
       base: args.base,
       branch: record.branch,
       title: args.title,
-      body: args.body,
+      body,
     })),
     state: 'open',
   };

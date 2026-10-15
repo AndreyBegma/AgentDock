@@ -7,6 +7,7 @@ import type {
 import type { ConfigProfile } from '../config';
 import { runEnv } from '../skills/run/launch';
 import type { LaunchSpec } from '../skills/run/record';
+import type { CardWiringFiles } from './wiring';
 
 /** The Claude CLI's `--permission-mode` value for each protocol mode (as spec 17 D3). */
 const CLI_PERMISSION_MODE: Record<OrchestratorPermissionMode, string> = {
@@ -36,11 +37,18 @@ export const cardSessionFlags = (session: CardSession): string[] =>
 export const cardArgv = (
   profile: ConfigProfile,
   args: Pick<CardRunArgs, 'session' | 'model' | 'permissionMode' | 'prompt'>,
+  wiring?: CardWiringFiles,
 ): { binary: string; args: string[] } => ({
   binary: profile.binary ?? profile.runtime,
   args: [
     ...profile.args,
     ...cardSessionFlags(args.session),
+    // #367 D1: the round's hooks and MCP server, when the profile has no
+    // plugin. Checked against Claude Code 2.1.301: both load on
+    // `--session-id` and on `--resume`.
+    ...(wiring
+      ? ['--settings', wiring.settings, '--mcp-config', wiring.mcp]
+      : []),
     '--model',
     args.model,
     '--permission-mode',
@@ -63,8 +71,9 @@ export const cardLaunchSpec = (
   >,
   worktree: string,
   otlpPort: number | null,
+  wiring?: CardWiringFiles,
 ): LaunchSpec => ({
-  ...cardArgv(profile, args),
+  ...cardArgv(profile, args, wiring),
   env: runEnv(profile, args, otlpPort),
   cwd: worktree,
   interactive: true,

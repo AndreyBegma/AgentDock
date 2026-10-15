@@ -68,8 +68,9 @@ describe('attachments delivered to the card worker (e2e, #309 D9, D10)', () => {
     const run = await w.ctx.prisma.run.findUniqueOrThrow({
       where: { id: card.rounds[0].runId },
     });
-    expect(run.args).toMatchObject({ promptVersion: 4 });
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(4);
+    expect(run.args).toMatchObject({
+      promptVersion: CARD_WORKER_PROMPT_VERSION,
+    });
     // The audit keeps ids and hashes, never the names.
     const call = jest
       .mocked(w.commands.send)
