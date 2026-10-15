@@ -2767,6 +2767,7 @@ enum CardCaptureSkipReason {
   budget_exceeded
   runner_offline
   capture_off
+  no_profile
 }
 
 /// One extraction of a manual session's new content (D3, D4). The newest

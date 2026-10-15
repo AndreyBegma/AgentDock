@@ -1,3 +1,4 @@
+import type { NoProfileReason, ProfileSource } from '../readiness';
 import type {
   DesignCommentKind,
   DesignTheme,
@@ -263,6 +264,8 @@ export const DESIGN_ERROR = {
   runnerTimeout: 'runner_timeout',
   /** 409: the runner's advert does not list the command (#233); nothing was sent or written. */
   runnerOutdated: 'runner_outdated',
+  /** 422 (#272 D2): no usable runtime profile; `reason`, `source`, `profileKey`. */
+  noProfile: 'no_profile',
 } as const;
 export type DesignErrorCode = (typeof DESIGN_ERROR)[keyof typeof DESIGN_ERROR];
 
@@ -270,4 +273,10 @@ export interface DesignErrorBody {
   statusCode: number;
   error: DesignErrorCode;
   message: string;
+  /** `no_profile` (#272 D2): why no profile can run it. */
+  reason?: NoProfileReason;
+  /** `no_profile`: the setting that named the profile. */
+  source?: ProfileSource | null;
+  /** `no_profile`: the unusable profile's key. */
+  profileKey?: string;
 }
