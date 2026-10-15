@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import {
+  ATTACHMENTS_PER_CARD_MAX,
+  attachmentRefSchema,
+} from '../../attachments';
 import type { CommandDefinition } from '../commands';
 import { absolutePathSchema } from '../projects';
 import { orchestratorModelSchema } from './control';
@@ -168,6 +172,22 @@ export const planTurnArgsSchema = z.strictObject({
   prompt: maxBytes(PLAN_TURN_PROMPT_MAX_BYTES).refine((p) => p.trim() !== '', {
     message: 'must not be empty',
   }),
+  /**
+   * #337 D10: the files attached in New Card or in an answer. Before the turn
+   * starts, the runner makes `<worktree>/.agentdock/attachments/` hold exactly
+   * these — every attachment of the plan so far, in upload order, because the
+   * worktree is the plan's for its life and unlisted files are removed — as
+   * `card.run` does (#309 D9: download, size and SHA-256 check). A file that
+   * cannot be had fails the turn (`attachments_unavailable`) rather than
+   * running it blind. Absent is an empty list.
+   */
+  attachments: z
+    .array(attachmentRefSchema)
+    .max(ATTACHMENTS_PER_CARD_MAX)
+    .refine((list) => new Set(list.map((f) => f.id)).size === list.length, {
+      message: 'attachment ids must be distinct',
+    })
+    .optional(),
   profileKey: profileKeySchema,
   model: orchestratorModelSchema,
   timeoutSec: z
