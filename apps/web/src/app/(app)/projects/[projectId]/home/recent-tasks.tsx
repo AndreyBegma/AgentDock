@@ -53,9 +53,12 @@ export function RecentTasks({
             >
               {runTitle(run)}
             </NextLink>
-            <span className="text-xs text-ink-3">
-              {RUN_KIND_LABEL[run.kind]}
-            </span>
+            {/* A run with no title is already named by its kind. */}
+            {runTitle(run) !== RUN_KIND_LABEL[run.kind] ? (
+              <span className="text-xs text-ink-3">
+                {RUN_KIND_LABEL[run.kind]}
+              </span>
+            ) : null}
           </span>
         ),
       },

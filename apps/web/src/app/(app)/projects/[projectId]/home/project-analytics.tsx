@@ -265,7 +265,8 @@ export function ThroughputCard({
           series={series}
           height={184}
           yMin={0}
-          formatY={(y) => formatNumber(y, 0)}
+          // Runs are whole: a fractional tick gets no label.
+          formatY={(y) => (Number.isInteger(y) ? formatNumber(y, 0) : '')}
         />
       ) : runs.error !== null ? (
         <p className="py-8 text-center text-sm text-ink-3">

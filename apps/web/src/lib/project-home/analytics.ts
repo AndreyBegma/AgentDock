@@ -209,8 +209,8 @@ export interface KindShare {
 }
 
 /**
- * Where the agents' time went, by kind of run, largest first. A run still at
- * work counts up to `now`.
+ * Where the agents' time went, by kind of run, largest first. A run without a
+ * recorded duration counts from its start to its end, or to `now` while at work.
  */
 export function timeByKind(
   runs: readonly RunSummary[],
@@ -219,9 +219,9 @@ export function timeByKind(
   const ms = new Map<RunKind, number>();
   for (const run of runs) {
     if (!isTask(run)) continue;
+    const end = run.endedAt === null ? now : Date.parse(run.endedAt);
     const spent =
-      run.durationMs ??
-      (run.endedAt === null ? Math.max(0, now - Date.parse(run.startedAt)) : 0);
+      run.durationMs ?? Math.max(0, end - Date.parse(run.startedAt));
     if (spent > 0) ms.set(run.kind, (ms.get(run.kind) ?? 0) + spent);
   }
   const total = [...ms.values()].reduce((sum, v) => sum + v, 0);

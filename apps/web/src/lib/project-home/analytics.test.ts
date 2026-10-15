@@ -232,6 +232,11 @@ describe('time by kind', () => {
     );
     expect(share?.ms).toBe(30 * 60_000);
   });
+
+  test('an ended run without a duration counts start to end', () => {
+    const [share] = timeByKind([run({ durationMs: null })], NOW.getTime());
+    expect(share?.ms).toBe(3 * 3_600_000);
+  });
 });
 
 test('shortDuration', () => {
