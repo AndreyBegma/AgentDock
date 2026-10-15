@@ -10,8 +10,12 @@ import {
   type BoardMoveRefusal,
   type BoardMoveSource,
   boardMoveRule,
+  CARD_COLLECT_AUTO_ATTEMPTS_MAX,
+  CARD_COLLECT_ERROR_MAX,
+  CARD_COLLECT_RETRY_DELAY_MS,
   CARD_FINISHED_EVENT,
   type CardAutoRunFailure,
+  type CardCollectOutcome,
   type CardFinishedBy,
   type CardFinishedEventData,
   cardLabel,
@@ -23,17 +27,19 @@ import {
   rebalancedPositions,
 } from '@agentdock/shared';
 import { API_EVENT_SOURCE } from '@agentdock/shared/protocol';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { type BoardCard, Prisma, type RunStatus } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { type AuditContext, SYSTEM_ACTOR } from '../audit/audit.types';
 import { PrismaService } from '../database/prisma.service';
 import { LiveService } from '../live/live.service';
 import { projectNotFound } from '../projects';
+import { RunnerConnectHooks } from '../runners/runner-connect-hooks';
 import { recordServerEvent } from '../server-events/server-events';
 import { BoardCommands, boardOutput } from './board-commands';
 import { BoardFailure, boardError, cardNotFound } from './board-error';
 import type { CardWithRounds } from './board-mapper';
+import { CollectRetryTimer } from './collect-retry-timer';
 
 type Tx = Prisma.TransactionClient;
 
@@ -81,6 +87,38 @@ export const TERMINAL_NO_BRANCH =
 /** #282 D3: a `terminal` card whose session works on the project's base. */
 export const terminalOnBase = (base: string): string =>
   `The session works on the base branch ${base}: nothing was pushed and no pull request was opened`;
+
+/**
+ * #329: what started a collect — the round's move to Finished, an automatic
+ * retry (D4), or a person's Create pull request (D5).
+ */
+export type CollectTrigger = 'move' | 'retry' | 'manual';
+
+/** #329 D4: a card an automatic retry may still claim. */
+const RETRYABLE = {
+  column: 'finished',
+  collectState: 'failed',
+  collectAttempts: { lt: CARD_COLLECT_AUTO_ATTEMPTS_MAX },
+} satisfies Prisma.BoardCardWhereInput;
+
+/** #329 D2: the runner pushed commits yet reported no open PR. */
+export const PUSHED_WITHOUT_PR =
+  'The branch has commits ahead of the base, but the runner reported no open pull request';
+
+const failedCollect = (error: string): CardCollectOutcome => ({
+  state: 'failed',
+  error: error.slice(0, CARD_COLLECT_ERROR_MAX),
+  ahead: null,
+  prNumber: null,
+  prUrl: null,
+});
+
+type CardForCollect = Prisma.BoardCardGetPayload<{
+  include: {
+    rounds: true;
+    trackedSession: { select: { cwd: true; gitBranch: true } };
+  };
+}>;
 
 /** The `runs.status` a round's end gives its run. */
 const RUN_STATUS_OF: Record<'finished' | 'failed' | 'cancelled', RunStatus> = {
@@ -143,7 +181,7 @@ const refusalOf = (
  * through here, so a rule is enforced in one place.
  */
 @Injectable()
-export class BoardWork {
+export class BoardWork implements OnModuleInit {
   private readonly logger = new Logger(BoardWork.name);
   private readonly pending = new Set<Promise<void>>();
 
@@ -152,7 +190,17 @@ export class BoardWork {
     private readonly commands: BoardCommands,
     private readonly live: LiveService,
     private readonly audit: AuditService,
+    private readonly retryTimer: CollectRetryTimer,
+    private readonly connectHooks: RunnerConnectHooks,
   ) {}
+
+  /** #329 D4: a failed collect is retried when its runner connects. */
+  onModuleInit(): void {
+    this.connectHooks.register({
+      name: 'board',
+      connected: (runnerId) => this.retryCollectsOf(runnerId),
+    });
+  }
 
   async project(projectId: string): Promise<BoardProject> {
     const row = await this.prisma.project.findUnique({
@@ -531,16 +579,37 @@ export class BoardWork {
     this.publish(project.id, card.id);
   }
 
-  /** D8, in the background: the runner's push can take up to 180 s. */
-  collect(cardId: string): void {
+  /**
+   * D8, in the background: the runner's push can take up to 180 s. `move`
+   * is the round's own collect; `retry` is #329 D4's automatic one.
+   */
+  collect(cardId: string, trigger: 'move' | 'retry' = 'move'): void {
     this.track(
-      this.collectNow(cardId).catch((error: unknown) => {
-        this.logger.error(
-          `card.collect of ${cardId} failed`,
-          error instanceof Error ? error.stack : String(error),
-        );
-      }),
+      this.collectNow(cardId, trigger).then(
+        () => undefined,
+        (error: unknown) => {
+          this.logger.error(
+            `card.collect of ${cardId} failed`,
+            error instanceof Error ? error.stack : String(error),
+          );
+        },
+      ),
     );
+  }
+
+  /**
+   * #329 D4, on the runner's `hello`: every card of its projects whose
+   * collect failed, still in Finished, with automatic attempts left.
+   */
+  async retryCollectsOf(runnerId: string): Promise<void> {
+    const cards = await this.prisma.boardCard.findMany({
+      where: {
+        project: { runnerId },
+        ...RETRYABLE,
+      },
+      select: { id: true },
+    });
+    for (const card of cards) this.collect(card.id, 'retry');
   }
 
   /** D10, in the background: kill tmux, remove the worktree. Never merges. */
@@ -604,10 +673,41 @@ export class BoardWork {
   }
 
   /**
+   * #329 D2: marks the card's collect `pending` and counts the attempt. The
+   * round's own collect starts a new count; the manual one (D5) resets it
+   * and is not counted; an automatic retry claims the card only while it is
+   * still retryable (D4), so a timer and a `hello` never both run it, and a
+   * card a person moved out of Finished is left alone.
+   */
+  private async claimCollect(
+    cardId: string,
+    trigger: CollectTrigger,
+  ): Promise<boolean> {
+    const { count } = await this.prisma.boardCard.updateMany({
+      where:
+        trigger === 'retry' ? { id: cardId, ...RETRYABLE } : { id: cardId },
+      data: {
+        collectState: 'pending',
+        collectAttempts:
+          trigger === 'retry' ? { increment: 1 } : trigger === 'move' ? 1 : 0,
+      },
+    });
+    return count > 0;
+  }
+
+  /**
    * D8: commit leftovers, push, open a PR once; store it. Then D15's
    * `card.finished`, once per round, naming the PR when there is one.
+   *
+   * #329 D2: every attempt stores its outcome on the card, for every
+   * source; D3: an open PR the runner reports fills a lost `prUrl`; D4: a
+   * failed round's or manual collect is retried once after two minutes.
+   * Returns the outcome, or `null` when there was no attempt.
    */
-  private async collectNow(cardId: string): Promise<void> {
+  async collectNow(
+    cardId: string,
+    trigger: CollectTrigger,
+  ): Promise<CardCollectOutcome | null> {
     const card = await this.prisma.boardCard.findUnique({
       where: { id: cardId },
       include: {
@@ -615,7 +715,26 @@ export class BoardWork {
         trackedSession: { select: { cwd: true, gitBranch: true } },
       },
     });
-    if (!card) return;
+    // A board card that never ran has nothing to collect, and no failure.
+    if (!card || (card.source !== 'terminal' && card.branch === null)) {
+      return null;
+    }
+    if (!(await this.claimCollect(cardId, trigger))) return null;
+    const outcome = await this.collectOnRunner(card);
+    if (outcome.state === 'failed' && trigger !== 'retry') {
+      // "Once after 2 minutes": only the attempt that opened the failure arms it.
+      this.retryTimer.schedule(card.id, CARD_COLLECT_RETRY_DELAY_MS, () =>
+        this.collect(card.id, 'retry'),
+      );
+    } else if (outcome.state !== 'failed') {
+      this.retryTimer.cancel(card.id);
+    }
+    return outcome;
+  }
+
+  private async collectOnRunner(
+    card: CardForCollect,
+  ): Promise<CardCollectOutcome> {
     const terminal = card.source === 'terminal';
     // #282 D3: a terminal card collects in its tracked session's checkout.
     const target = terminal
@@ -625,17 +744,20 @@ export class BoardWork {
         }
       : { branch: card.branch, cwd: null };
     if (target.branch === null || (terminal && target.cwd === null)) {
-      if (terminal) await this.terminalCollectFailed(card, TERMINAL_NO_BRANCH);
-      return;
+      // Only a terminal card gets here (`collectNow`).
+      await this.terminalCollectFailed(card, TERMINAL_NO_BRANCH);
+      return this.storeCollect(card, failedCollect(TERMINAL_NO_BRANCH));
     }
     const project = await this.project(card.projectId);
     if (terminal && target.branch === project.base) {
       // The base is never committed to or pushed by the board.
-      await this.terminalCollectFailed(card, terminalOnBase(project.base));
-      return;
+      const message = terminalOnBase(project.base);
+      await this.terminalCollectFailed(card, message);
+      return this.storeCollect(card, failedCollect(message));
     }
     const round = card.rounds[0] ?? null;
     let pr = { prNumber: card.prNumber, prUrl: card.prUrl };
+    let outcome: CardCollectOutcome;
     try {
       const summary =
         card.rounds.find((r) => r.summary !== null)?.summary ?? null;
@@ -663,28 +785,42 @@ export class BoardWork {
         ),
       );
       const { prNumber, prUrl } = output;
-      const opened = prNumber !== undefined && prUrl !== undefined;
-      if (opened) pr = { prNumber, prUrl };
+      // D3: the open PR, new or existing.
+      const open = prNumber !== undefined && prUrl !== undefined;
+      if (open) pr = { prNumber, prUrl };
+      outcome = open
+        ? {
+            state: 'ok',
+            error: null,
+            ahead: output.ahead,
+            prNumber,
+            prUrl,
+          }
+        : output.ahead === 0
+          ? {
+              state: 'no_changes',
+              error: null,
+              ahead: 0,
+              prNumber: null,
+              prUrl: null,
+            }
+          : { ...failedCollect(PUSHED_WITHOUT_PR), ahead: output.ahead };
       // A terminal card's earlier failure no longer holds once one succeeds.
-      const cleared = terminal && card.autoRunError !== null;
-      if (opened || cleared) {
-        await this.prisma.boardCard.update({
-          where: { id: card.id },
-          data: {
-            ...(opened ? pr : {}),
-            ...(cleared
-              ? {
-                  autoRunError: null,
-                  autoRunMessage: null,
-                  autoRunFailedAt: null,
-                }
-              : {}),
-          },
-        });
-        this.publish(project.id, card.id);
-      }
+      const cleared =
+        terminal && card.autoRunError !== null && outcome.state !== 'failed';
+      await this.storeCollect(card, outcome, {
+        // An older runner reports no state: its PR is open (D6).
+        ...(open ? { ...pr, prState: output.prState ?? 'open' } : {}),
+        ...(cleared
+          ? {
+              autoRunError: null,
+              autoRunMessage: null,
+              autoRunFailedAt: null,
+            }
+          : {}),
+      });
     } catch (error) {
-      const message = (error as Error).message;
+      const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(
         `card.collect of ${cardLabel(card.number)} failed: ${message}`,
       );
@@ -695,7 +831,38 @@ export class BoardWork {
           error instanceof BoardFailure ? error.code : 'unknown',
         );
       }
+      outcome = await this.storeCollect(card, failedCollect(message));
     }
+    await this.finished(project, card, round, pr);
+    return outcome;
+  }
+
+  /** #329 D2: the outcome of one collect attempt, on the card. */
+  private async storeCollect(
+    card: Pick<BoardCard, 'id' | 'projectId'>,
+    outcome: CardCollectOutcome,
+    extra: Prisma.BoardCardUpdateInput = {},
+  ): Promise<CardCollectOutcome> {
+    await this.prisma.boardCard.update({
+      where: { id: card.id },
+      data: {
+        ...extra,
+        collectState: outcome.state,
+        collectError: outcome.error,
+        collectedAt: new Date(),
+      },
+    });
+    this.publish(card.projectId, card.id);
+    return outcome;
+  }
+
+  /** D15: `card.finished`, once per round, naming the PR when there is one. */
+  private async finished(
+    project: BoardProject,
+    card: CardForCollect,
+    round: CardForCollect['rounds'][number] | null,
+    pr: { prNumber: number | null; prUrl: string | null },
+  ): Promise<void> {
     if (!round || round.finishedBy === null) return;
     const data: CardFinishedEventData = {
       cardId: card.id,

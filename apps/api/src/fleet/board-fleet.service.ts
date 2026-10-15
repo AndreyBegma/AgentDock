@@ -287,6 +287,8 @@ export class BoardFleetService
         fleetSlotGone: slotGoneOf(slot),
         prNumber: slot.prNumber,
         prUrl: slot.prUrl,
+        // #329 D6: the PR's state from the fleet's PR poll.
+        prState: slot.prNumber === null ? null : slot.prState,
       };
       const to = columnOf(slot);
       let card = byKey.get(`${issue}:${slot.name}`);
@@ -319,7 +321,8 @@ export class BoardFleetService
         card.fleetStage !== fields.fleetStage ||
         card.fleetSlotGone !== fields.fleetSlotGone ||
         card.prNumber !== fields.prNumber ||
-        card.prUrl !== fields.prUrl
+        card.prUrl !== fields.prUrl ||
+        card.prState !== fields.prState
       ) {
         await tx.boardCard.update({ where: { id: card.id }, data: fields });
         touched.push(card.id);
@@ -346,6 +349,7 @@ export class BoardFleetService
         fleetSlotGone: false,
         prNumber: null,
         prUrl: null,
+        prState: null,
       });
       created.push(card);
       touched.push(card.id);
@@ -366,7 +370,7 @@ export class BoardFleetService
     slot: string | null,
     fields: Pick<
       BoardCard,
-      'fleetStage' | 'fleetSlotGone' | 'prNumber' | 'prUrl'
+      'fleetStage' | 'fleetSlotGone' | 'prNumber' | 'prUrl' | 'prState'
     >,
   ): Promise<BoardCard> {
     const cached = await tx.issueCache.findUnique({
