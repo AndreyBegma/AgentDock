@@ -47,10 +47,9 @@ import {
   FLEET_EDIT_HINT,
   fleetHref,
   fleetSummary,
-  HOOKS_COMMANDS,
   HOOKS_GUIDE_LABEL,
   hooksGuideHref,
-  hooksHint,
+  hooksNotice,
   isFleetCard,
   isTerminalCard,
   phaseLabel,
@@ -123,7 +122,6 @@ interface RoundAttachments {
 }
 
 function roundItems(
-  projectId: string,
   rounds: CardRoundView[],
   notes: TextNotes,
   canOperate: boolean,
@@ -173,15 +171,8 @@ function roundItems(
             <span className="text-danger">{round.error}</span>
           ) : null}
           {round.hooksMissing ? (
-            <span>
-              {hooksHint}{' '}
-              <NextLink
-                href={hooksGuideHref(projectId)}
-                className="text-accent-ink underline-offset-2 hover:underline"
-              >
-                {HOOKS_GUIDE_LABEL}
-              </NextLink>
-            </span>
+            // A round is a runner launch, whatever the card's source.
+            <span>{hooksNotice({ source: 'manual' }, round).text}</span>
           ) : null}
           {cost ? <span className="tabular-nums">{cost}</span> : null}
         </span>
@@ -474,23 +465,30 @@ function CardDetailBody({
               {card.branch}
             </p>
           ) : null}
-          {card.round?.hooksMissing ? (
-            <div className="flex flex-col gap-2 text-xs text-ink-2">
-              <p>{hooksHint}</p>
-              {HOOKS_COMMANDS.map((item) => (
-                <div key={item.code} className="flex flex-col gap-1">
-                  <span>{item.label}</span>
-                  <CodeBlock code={item.code} defaultWrap />
-                </div>
-              ))}
-              <NextLink
-                href={hooksGuideHref(projectId)}
-                className="text-accent-ink underline-offset-2 hover:underline"
-              >
-                {HOOKS_GUIDE_LABEL}
-              </NextLink>
-            </div>
-          ) : null}
+          {card.round?.hooksMissing
+            ? (() => {
+                const notice = hooksNotice(card, card.round);
+                return (
+                  <div className="flex flex-col gap-2 text-xs text-ink-2">
+                    <p>{notice.text}</p>
+                    {notice.commands.map((item) => (
+                      <div key={item.code} className="flex flex-col gap-1">
+                        <span>{item.label}</span>
+                        <CodeBlock code={item.code} defaultWrap />
+                      </div>
+                    ))}
+                    {notice.guide ? (
+                      <NextLink
+                        href={hooksGuideHref(projectId)}
+                        className="text-accent-ink underline-offset-2 hover:underline"
+                      >
+                        {HOOKS_GUIDE_LABEL}
+                      </NextLink>
+                    ) : null}
+                  </div>
+                );
+              })()
+            : null}
 
           {failure ? (
             <Banner tone="warn">
@@ -642,7 +640,7 @@ function CardDetailBody({
         <section aria-label="Rounds" className="flex flex-col gap-2">
           <SectionHeader title="Rounds" headingLevel={3} />
           <Timeline
-            items={roundItems(projectId, card.rounds, notes, canOperate, {
+            items={roundItems(card.rounds, notes, canOperate, {
               byRound,
               user,
               canRemove: filesEditable,

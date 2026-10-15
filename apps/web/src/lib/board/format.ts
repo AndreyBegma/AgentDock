@@ -14,14 +14,17 @@ import {
   type CardRoundBrief,
   type CardRoundPhase,
   isActiveRoundPhase,
+  isMirroredCardSource,
   PLAN_TASK_MOVE_REFUSAL_TEXT,
 } from '@agentdock/shared';
+import type { CardRunWiringReason } from '@agentdock/shared/protocol';
 import type { Status } from '@andrewbehma/glass-ui/status-pill';
 import { ApiError, describeError } from '../api';
 import { STAGE_LABEL } from '../fleet/graph';
 import { describeNoProfile } from '../readiness/copy';
 import {
   PROFILES_LIST_COMMAND,
+  RUNNER_STATUS_COMMAND,
   SETUP_CLAUDE_COMMAND,
 } from '../runners/install';
 
@@ -470,22 +473,93 @@ export function parseMaxRunning(raw: string): number | null {
   return n >= BOARD_MAX_RUNNING_MIN && n <= BOARD_MAX_RUNNING_MAX ? n : null;
 }
 
-/**
- * #281 D6: shown when no hook event arrived after the start. Names the cause,
- * the profile key and the command; the card does not know its profile, so the
- * key is the one `agentdock-runner profiles` lists.
- */
-export const hooksHint =
-  "No hook events from this card's session: the agentdock plugin is not set up for its runtime profile, so the card moves only when the session ends or you mark it finished.";
+const HOOKS_CONSEQUENCE =
+  'the card moves only when the session ends or you mark it finished.';
 
-/** The commands behind the hint, shown as code blocks next to it. */
-export const HOOKS_COMMANDS = [
-  { label: 'Find the profile key (first column)', code: PROFILES_LIST_COMMAND },
-  {
-    label: 'Set up that profile, then restart its sessions',
-    code: SETUP_CLAUDE_COMMAND,
-  },
-] as const;
+/** #367 D3: why a round launched by the runner reports no hooks. */
+const WIRING_REASON_TEXT: Record<CardRunWiringReason, string> = {
+  runner_outdated: `The runner that started this round is older than 0.10.0, so it did not add AgentDock hooks to the session; ${HOOKS_CONSEQUENCE} Update the runner, then run the card again.`,
+  settings_write_failed: `The runner could not write this round's hook settings, so the session started without AgentDock hooks; ${HOOKS_CONSEQUENCE} Check the runner's log and the disk it writes to, then run the card again.`,
+  claude_too_old: `The Claude Code on this runner does not accept --settings, so the session started without AgentDock hooks; ${HOOKS_CONSEQUENCE} Update Claude Code, then run the card again.`,
+};
+
+/** The profile placeholder of `SETUP_CLAUDE_COMMAND`. */
+const PROFILE_PLACEHOLDER = '<key>';
+
+/** The setup commands of a terminal or fleet card, naming its profile if known. */
+const setupCommands = (profileKey: string | null) =>
+  profileKey
+    ? ([
+        {
+          label: `Set up profile ${profileKey}, then restart its sessions`,
+          code: SETUP_CLAUDE_COMMAND.replace(PROFILE_PLACEHOLDER, profileKey),
+        },
+      ] as const)
+    : ([
+        {
+          label: 'Find the profile key (first column)',
+          code: PROFILES_LIST_COMMAND,
+        },
+        {
+          label: 'Set up that profile, then restart its sessions',
+          code: SETUP_CLAUDE_COMMAND,
+        },
+      ] as const);
+
+export interface HooksNotice {
+  /** The hint, in prose with no markdown. */
+  text: string;
+  /** The chip on the card's face. */
+  chip: string;
+  /** Commands shown as code blocks next to the hint. */
+  commands: readonly { label: string; code: string }[];
+  /** Whether the Settings › Sessions checklist is the way out. */
+  guide: boolean;
+}
+
+/**
+ * #281 D6, #367 D3/D4: what a card says when no hook event arrived after the
+ * start. A card the runner launches is wired by the runner, so it names the
+ * round's launch facts, never "set up the plugin"; a terminal or fleet card
+ * runs outside the runner and keeps the plugin's setup commands, for its own
+ * profile when the card knows it.
+ */
+export const hooksNotice = (
+  card: Pick<BoardCardView, 'source'> & { profileKey?: string | null },
+  round: Pick<CardRoundBrief, 'wiring' | 'wiringReason'>,
+): HooksNotice => {
+  const { wiring = null, wiringReason = null } = round;
+  if (isMirroredCardSource(card.source)) {
+    return {
+      text: `No hook events from this card's session: the agentdock plugin is not set up for the profile it runs in, so ${HOOKS_CONSEQUENCE}`,
+      chip: 'hooks not set up',
+      commands: setupCommands(card.profileKey ?? null),
+      guide: true,
+    };
+  }
+  if (wiring === 'none') {
+    return {
+      text: wiringReason
+        ? WIRING_REASON_TEXT[wiringReason]
+        : `The runner started this round without AgentDock hooks; ${HOOKS_CONSEQUENCE}`,
+      chip: 'no hooks',
+      commands: [],
+      guide: false,
+    };
+  }
+  const via =
+    wiring === 'plugin'
+      ? "the profile's agentdock plugin"
+      : wiring === 'injected'
+        ? "the runner's own hook settings"
+        : 'AgentDock hooks';
+  return {
+    text: `The session started with ${via}, but no hook event reached AgentDock within 2 minutes; ${HOOKS_CONSEQUENCE} Check that the runner is online and can reach the API.`,
+    chip: 'no hook events',
+    commands: [{ label: 'Check the runner', code: RUNNER_STATUS_COMMAND }],
+    guide: false,
+  };
+};
 
 /** The link text after the hint: what the checklist holds. */
 export const HOOKS_GUIDE_LABEL = 'See the exact command for each profile';
