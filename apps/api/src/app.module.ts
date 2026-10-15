@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ActivityModule } from './activity';
 import { AdminModule } from './admin/admin.module';
 import { ApprovalsModule } from './approvals';
+import { AttachmentsModule } from './attachments/attachments.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { BoardModule } from './board';
@@ -84,6 +85,9 @@ import { WorkflowsModule } from './workflows';
     WorkModule,
     // Issue #271: saved text normalized to English on the runner.
     TextModule,
+    // Issue #309: attachments on board cards. Global, and `forRoot()` here:
+    // its conditional queue must not be registered while the graph loads.
+    AttachmentsModule.forRoot(),
     SchedulesModule,
     BudgetsModule,
     // Before WebhooksModule: its `POST /hooks/:publicId` would otherwise

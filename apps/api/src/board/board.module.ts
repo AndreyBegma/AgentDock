@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { BoardAttachmentsController } from '../attachments/board-attachments.controller';
 import { LiveModule } from '../live/live.module';
 import { ProjectsModule } from '../projects';
 import { ReadinessModule } from '../readiness';
@@ -20,8 +21,10 @@ import { BoardWork } from './board-work';
  * `BoardTerminalService` for `card.track` (#282 D1).
  */
 @Module({
+  // #309: `AttachmentsService` comes from the global `AttachmentsModule`.
   imports: [LiveModule, ProjectsModule, ReadinessModule, RunnersModule],
-  controllers: [BoardController],
+  // #309: claiming attachments onto a card is a card route.
+  controllers: [BoardController, BoardAttachmentsController],
   providers: [
     BoardCommands,
     BoardInboxService,

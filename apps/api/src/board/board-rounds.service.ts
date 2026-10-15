@@ -3,9 +3,11 @@ import {
   BOARD_ERROR,
   type BoardCardDetail,
   CARD_WORKER_PROMPT_VERSION,
+  type CardAttachmentBrief,
   type CardChange,
   type CardRoundPhase,
   type CardRoundTrigger,
+  cardAttachmentSnapshotSchema,
   cardBranch,
   cardChange,
   cardDesignPath,
@@ -31,6 +33,11 @@ import {
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
+import {
+  AttachmentsService,
+  toAttachmentBrief,
+  toAttachmentRef,
+} from '../attachments/attachments.service';
 import { AuditService } from '../audit/audit.service';
 import { BudgetGate } from '../budgets/budget-gate';
 import { PrismaService } from '../database/prisma.service';
@@ -72,15 +79,29 @@ const UNSTARTED_PHASES: ReadonlySet<CardRoundPhase> = new Set([
 ]);
 
 /**
+ * #309 D10: a round's `cardAttachments`; a row from before the snapshot
+ * existed — or one that does not parse — knew of none.
+ */
+const snapshotOf = (json: Prisma.JsonValue): CardAttachmentBrief[] => {
+  const parsed = cardAttachmentSnapshotSchema.safeParse(json);
+  return parsed.success ? parsed.data : [];
+};
+
+/**
  * #273 D1: how the card's text differs from what the worker was last given —
  * the snapshot of the newest round that started Claude. `null` without one.
+ * #309 D10: and which attachments were added or removed since.
  */
-const changeSinceLastRound = (card: CardWithRounds): CardChange | null => {
+const changeSinceLastRound = (
+  card: CardWithRounds,
+  attachments: readonly CardAttachmentBrief[],
+): CardChange | null => {
   const last = card.rounds.find((r) => !UNSTARTED_PHASES.has(r.phase));
   if (!last) return null;
   return cardChange(
     { title: last.cardTitle, body: last.cardBody, kind: last.cardKind },
     { title: card.title, body: card.body, kind: card.kind },
+    { before: snapshotOf(last.cardAttachments), now: attachments },
   );
 };
 
@@ -100,6 +121,7 @@ export class BoardRoundsService {
     private readonly audit: AuditService,
     private readonly profiles: RuntimeProfileResolver,
     private readonly text: TextNormalizer,
+    private readonly attachments: AttachmentsService,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
 
@@ -147,7 +169,14 @@ export class BoardRoundsService {
         'Feedback goes to a card in Finished that has run',
       );
     }
-    await this.start(card, 'feedback', {}, dto.text.trim(), actor);
+    await this.start(
+      card,
+      'feedback',
+      {},
+      dto.text.trim(),
+      actor,
+      dto.attachmentIds ?? [],
+    );
     return this.board.detail(projectId, number);
   }
 
@@ -165,6 +194,8 @@ export class BoardRoundsService {
     dto: RunBoardCardDto,
     feedback: string | null,
     actor: BoardActor,
+    /** #309 D3: pending uploads that come with the feedback. */
+    claimIds: readonly string[] = [],
   ): Promise<void> {
     const project = await this.work.project(card.projectId);
     if (isActiveRoundPhase(card.rounds[0]?.phase)) throw this.running();
@@ -211,6 +242,12 @@ export class BoardRoundsService {
 
     this.commands.assertReady(project.runnerId, 'card.run');
     await this.assertRoom(project.id);
+    await this.attachments.assertClaimable(
+      project.id,
+      card.id,
+      claimIds,
+      actor,
+    );
     // D13: a hard-stop budget refuses with 409 `budget_exceeded`.
     await this.budgets?.assertAllowed({
       projectId: project.id,
@@ -276,11 +313,15 @@ export class BoardRoundsService {
           }
         : null;
     const sessionId = card.sessionId ?? randomUUID();
+    // #309 D9, D10: what the card holds once this round's claim is made.
+    const attached = await this.attachments.withClaim(card.id, claimIds);
+    const attachmentRefs = attached.map(toAttachmentRef);
+    const attachmentBriefs = attached.map(toAttachmentBrief);
     const prompt =
       resume || (trigger === 'feedback' && feedback !== null)
         ? cardNextRoundPrompt({
             label: cardLabel(card.number),
-            change: changeSinceLastRound(card),
+            change: changeSinceLastRound(card, attachmentBriefs),
             feedback: trigger === 'feedback' ? feedback : null,
           })
         : cardWorkerPrompt({
@@ -300,6 +341,7 @@ export class BoardRoundsService {
                     comments: design.comments,
                   }
                 : null,
+            attachments: attachmentBriefs,
           });
     const files: CardRunFile[] = [
       ...(firstStart && specPath !== null
@@ -317,6 +359,8 @@ export class BoardRoundsService {
       session: { id: sessionId, resume },
       prompt,
       ...(files.length > 0 ? { files } : {}),
+      // Absent is none: the runner then prunes what an earlier round left.
+      ...(attachmentRefs.length > 0 ? { attachments: attachmentRefs } : {}),
       profileKey: profile.key,
       model,
       permissionMode,
@@ -369,11 +413,18 @@ export class BoardRoundsService {
           cardTitle: card.title,
           cardBody: card.body,
           cardKind: card.kind,
+          cardAttachments: attachmentBriefs,
           authorId: actor.userId,
           phase: 'queued',
           startedAt: now,
         },
       });
+      await this.attachments.claim(
+        tx,
+        { projectId: project.id, cardId: card.id, roundId: created.id },
+        claimIds,
+        actor,
+      );
       await tx.boardCard.update({
         where: { id: card.id },
         data: {
@@ -390,6 +441,12 @@ export class BoardRoundsService {
       return created;
     });
     this.work.publishRun(project.id, round.runId, 'running');
+    await this.attachments.recordClaim(
+      project.id,
+      { cardId: card.id, roundId: round.id },
+      claimIds,
+      actor,
+    );
     // #271 D3: this round reads the feedback as typed; later reads get English.
     if (feedback !== null) {
       await this.text.request(
@@ -440,6 +497,15 @@ export class BoardRoundsService {
               prompt: `[${prompt.length} chars]`,
               ...(files.length > 0
                 ? { files: files.map((f) => ({ path: f.path })) }
+                : {}),
+              // Names are the person's text too: ids and hashes only.
+              ...(attachmentRefs.length > 0
+                ? {
+                    attachments: attachmentRefs.map((a) => ({
+                      id: a.id,
+                      sha256: a.sha256,
+                    })),
+                  }
                 : {}),
             },
           },

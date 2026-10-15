@@ -1,4 +1,5 @@
 import {
+  type AttachmentView,
   BOARD_MAX_RUNNING_DEFAULT,
   type BoardCardDetail,
   type BoardCardView,
@@ -73,6 +74,8 @@ export interface CardFacts {
   hooked: ReadonlySet<string>;
   /** #282 D1: tracked sessions (`sessions.id`) that have not ended. */
   alive: ReadonlySet<string>;
+  /** #309: attachments of each card, its rounds' included; absent is none. */
+  attachmentCounts: ReadonlyMap<string, number>;
   now: Date;
 }
 
@@ -189,8 +192,7 @@ export const toCardView = (
   movedAt: card.movedAt.toISOString(),
   completedAt: iso(card.completedAt),
   updatedAt: card.updatedAt.toISOString(),
-  // #309: i309-api fills the count.
-  attachmentCount: 0,
+  attachmentCount: facts.attachmentCounts.get(card.id) ?? 0,
 });
 
 const isEvidence = (value: Prisma.JsonValue): value is Prisma.JsonObject =>
@@ -238,9 +240,11 @@ const toRoundView = (
   endedAt: iso(round.endedAt),
 });
 
+/** `attachments`: the card's and its rounds', oldest first (#309). */
 export const toCardDetail = (
   card: CardWithPeople,
   facts: CardFacts,
+  attachments: AttachmentView[],
 ): BoardCardDetail => ({
   ...toCardView(card, facts),
   body: card.body,
@@ -259,8 +263,7 @@ export const toCardDetail = (
     .sort((a, b) => a.round - b.round)
     .map((round) => toRoundView(card, round, facts)),
   evidence: evidenceOf(card.evidence),
-  // #309: i309-api fills the attachments.
-  attachments: [],
+  attachments,
 });
 
 /** No row is the defaults (`isDefault: true`). */
