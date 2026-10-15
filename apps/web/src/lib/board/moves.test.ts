@@ -66,8 +66,15 @@ describe('decideDrop', () => {
     expect(decideDrop(view, drop('nope', 'todo', 'finished')).kind).toBe(
       'ignore',
     );
-    expect(decideDrop(view, drop('card-1', 'todo', 'inbox')).kind).toBe(
+    expect(decideDrop(view, drop('card-1', 'todo', 'archive')).kind).toBe(
       'ignore',
+    );
+  });
+
+  test('a drop onto the Inbox is refused (#244 D9)', () => {
+    const view = boardView([card(1, 'todo')]);
+    expect(decideDrop(view, drop('card-1', 'todo', 'inbox')).kind).toBe(
+      'refused',
     );
   });
 });

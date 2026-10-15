@@ -1,6 +1,11 @@
 import type { TaskDesignSummary } from '../design';
 import type { OrchestratorPermissionMode } from '../protocol';
 import type {
+  CaptureModel,
+  CaptureSkipReason,
+  CaptureStatus,
+} from './capture-limits';
+import type {
   BoardCardKind,
   BoardCardSource,
   BoardColumn,
@@ -54,9 +59,27 @@ export interface BoardCardView {
   continueAfterDesign: boolean;
   /** Sum over every round's run, a decimal string; `null` when nothing is priced. */
   costUsd: string | null;
+  /** #244: why capture suggested the card; `null` for a manual card. */
+  captureWhy: string | null;
+  /** #244: 0–1; `null` for a manual card. */
+  captureConfidence: number | null;
+  /**
+   * #244: the manual session it was captured from (opens its content
+   * timeline); kept after Accept. `null` for a manual card, or once the
+   * session is gone.
+   */
+  sourceSessionId: string | null;
   movedAt: string;
   completedAt: string | null;
   updatedAt: string;
+}
+
+/** #244 D8: one evidence excerpt of an Inbox card, at most `CAPTURE_EVIDENCE_EXCERPT_MAX` characters. */
+export interface CardEvidenceView {
+  /** `session_contents.id`, a decimal string. */
+  contentId: string;
+  kind: 'prompt' | 'response';
+  excerpt: string;
 }
 
 export interface BoardColumnView {
@@ -70,7 +93,10 @@ export interface BoardColumnView {
 /** `GET /board`. */
 export interface BoardView {
   projectId: string;
-  /** Every column of `BOARD_COLUMNS`, in that order. */
+  /**
+   * Every column of `BOARD_COLUMNS`, in that order — except `inbox` for a
+   * viewer (#244 D8: Inbox cards are content-derived).
+   */
   columns: BoardColumnView[];
   /** Active rounds now, against `settings.maxRunning`. */
   running: number;
@@ -123,6 +149,11 @@ export interface BoardCardDetail extends BoardCardView {
   createdAt: string;
   /** Oldest first. */
   rounds: CardRoundView[];
+  /**
+   * #244 D8: an Inbox card's evidence, operators only (the card sheet).
+   * `null` once accepted — Accept strips it — and for a manual card.
+   */
+  evidence: CardEvidenceView[] | null;
 }
 
 /** `GET /board-settings`; with no row, the defaults and `isDefault: true`. */
@@ -131,6 +162,12 @@ export interface BoardSettingsView {
   issueOnRun: boolean;
   specOnRun: boolean;
   maxRunning: number;
+  /**
+   * #244 D10: on only while the project's `shipSessionContent` (on the
+   * project view) is on.
+   */
+  captureEnabled: boolean;
+  captureModel: CaptureModel;
   isDefault: boolean;
   updatedAt: string | null;
 }
@@ -179,6 +216,56 @@ export interface UpdateBoardSettingsRequest {
   issueOnRun: boolean;
   specOnRun: boolean;
   maxRunning: number;
+  /**
+   * #244 D10: `true` while the project's content is off is refused with
+   * `capture_needs_content`. Absent keeps the stored value.
+   */
+  captureEnabled?: boolean;
+  /** Absent keeps the stored value. */
+  captureModel?: CaptureModel;
+}
+
+/**
+ * `POST /board/cards/:number/accept-suggestion` (#244 D9, operator): the
+ * Inbox card moves to the top of To Do, its evidence stripped. The fields
+ * edit it on the way (Edit & accept).
+ */
+export interface AcceptSuggestionRequest {
+  title?: string;
+  body?: string;
+  kind?: BoardCardKind;
+}
+
+/** `POST /board/inbox/dismiss-all` (#244, operator). */
+export interface DismissAllResult {
+  dismissed: number;
+}
+
+/** One extraction (`card_captures`), as `GET /board/captures` lists it (operator). */
+export interface CardCaptureView {
+  id: string;
+  /** The manual session it read. */
+  sessionId: string;
+  status: CaptureStatus;
+  skipReason: CaptureSkipReason | null;
+  /** Why it failed — `contract_violation: …` included; never content. */
+  error: string | null;
+  /** Cards it put in the Inbox. */
+  suggested: number;
+  inputChars: number;
+  /** The `card_capture` run; `null` for an extraction skipped before it ran. */
+  runId: string | null;
+  /** The run's cost, a decimal string; `null` when nothing is priced. */
+  costUsd: string | null;
+  createdAt: string;
+  finishedAt: string | null;
+}
+
+/** `GET /board/captures?cursor=`: newest first, `CAPTURE_PAGE_SIZE` per page. */
+export interface CardCapturePage {
+  items: CardCaptureView[];
+  /** Pass as `?cursor=` for the next page; `null` on the last. */
+  nextCursor: string | null;
 }
 
 /** Stable codes in the `error` field of a board route's error body. */
@@ -206,6 +293,10 @@ export const BOARD_ERROR = {
   designNotApproved: 'design_not_approved',
   /** 409 (#243 D5): `continueAfterDesign` changed after the design was approved. */
   designApproved: 'design_approved',
+  /** 409 (#244 D9): a move into or out of Inbox other than Inbox → To Do. */
+  invalidMove: 'invalid_move',
+  /** 422 (#244 D10): `captureEnabled: true` while the project ships no session content. */
+  captureNeedsContent: 'capture_needs_content',
 } as const;
 export type BoardErrorCode = (typeof BOARD_ERROR)[keyof typeof BOARD_ERROR];
 
@@ -245,4 +336,17 @@ export interface CardWaitingEventData {
   number: number;
   title: string;
   round: number;
+}
+
+/**
+ * #244 D11: an extraction put cards in the Inbox. Folds per spec 22 D6. It
+ * carries counts and ids only — never a title, which is content-derived.
+ */
+export const CARDS_SUGGESTED_EVENT = 'cards.suggested';
+
+export interface CardsSuggestedEventData {
+  captureId: string;
+  sessionId: string;
+  count: number;
+  cardIds: string[];
 }

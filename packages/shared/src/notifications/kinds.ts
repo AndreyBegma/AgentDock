@@ -9,6 +9,9 @@ import type { Role } from '../auth';
  * `schedule.disabled` comes from an automatic schedule disable (spec 25 D10)
  * and goes to project admins and active admins only. `card.finished` and
  * `card.waiting` come from board card workers (issue #242 D15).
+ * `cards.suggested` comes from card capture (issue #244 D11): suggestions are
+ * content-derived, so it goes to operators and admins only, and never quotes
+ * content.
  */
 export const NOTIFICATION_KINDS = [
   'person.needed',
@@ -25,6 +28,7 @@ export const NOTIFICATION_KINDS = [
   'action.requested',
   'card.finished',
   'card.waiting',
+  'cards.suggested',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -52,6 +56,12 @@ export interface NotificationKindSpec {
   viewerDefaults?: ChannelSwitches;
   /** Only recipients whose role on the project is `admin` receive it. */
   adminsOnly?: true;
+  /**
+   * Only recipients whose role on the project is `operator` or `admin`
+   * receive it, whatever a viewer's rules say: the kind is content-derived
+   * (ADR-0021 §5).
+   */
+  operatorsOnly?: true;
   /** Declared, never emitted yet. */
   reserved?: true;
 }
@@ -151,6 +161,14 @@ export const NOTIFICATION_KIND_SPECS: Record<
     source: 'card.waiting (issue #242 D15)',
     channels: BOTH,
     defaults: ON_OFF,
+  },
+  'cards.suggested': {
+    scope: 'project',
+    source: 'cards.suggested (issue #244 D11)',
+    channels: BOTH,
+    defaults: ON_OFF,
+    viewerDefaults: { inApp: false, telegram: false },
+    operatorsOnly: true,
   },
 };
 

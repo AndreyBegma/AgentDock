@@ -62,9 +62,21 @@ describe('what a card offers', () => {
 });
 
 describe('the view', () => {
-  test('columnsOf keeps the four columns in order, even when one is missing', () => {
+  test('columnsOf keeps the columns in order, even when one is missing', () => {
     const view = boardView([card(1, 'todo')]);
     view.columns = view.columns.filter((c) => c.column !== 'finished');
+    expect(columnsOf(view).map((c) => c.column)).toEqual([
+      'inbox',
+      'todo',
+      'in_progress',
+      'finished',
+      'completed',
+    ]);
+  });
+
+  test('columnsOf leaves out the Inbox the API left out for a viewer', () => {
+    const view = boardView([card(1, 'todo')]);
+    view.columns = view.columns.filter((c) => c.column !== 'inbox');
     expect(columnsOf(view).map((c) => c.column)).toEqual([
       'todo',
       'in_progress',
