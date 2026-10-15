@@ -186,15 +186,19 @@ export class PlanService implements OnModuleInit {
       },
       result: 'ok',
     });
-    // #271 D3: the first turn reads the brief as typed.
+    // #271 D3: the first turn reads the brief as stored once the request
+    // resolves — English when DeepL answered inside it (#324 D1), else as typed.
     await this.text.request(
       projectId,
       { ownerType: 'plan', ownerId: plan.id },
       [{ field: 'brief', text: plan.brief }],
       { authorId: actor.userId },
     );
+    const stored = await this.prisma.plan.findUniqueOrThrow({
+      where: { id: plan.id },
+    });
     try {
-      await this.turns.planTurn(plan, {}, callerOf(actor));
+      await this.turns.planTurn(stored, {}, callerOf(actor));
     } catch (error) {
       if (!(error instanceof PlannerFailure)) throw error;
       this.logger.warn(`plan ${plan.id}: first turn failed: ${error.message}`);

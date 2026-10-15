@@ -102,12 +102,8 @@ export class TextWorker implements OnApplicationBootstrap, OnModuleDestroy {
   ): Promise<NormalizeOutcome> {
     const outcome = await this.normalizer.process(job.data);
     if (outcome.kind !== 'deferred') return outcome;
-    if (outcome.offlineSince !== undefined) {
-      await job.updateData({
-        ...job.data,
-        offlineSince: outcome.offlineSince,
-        offlineAttempts: outcome.offlineAttempts,
-      });
+    if (outcome.data !== undefined && Object.keys(outcome.data).length > 0) {
+      await job.updateData({ ...job.data, ...outcome.data });
     }
     await job.moveToDelayed(outcome.untilMs, token);
     throw new DelayedError();
