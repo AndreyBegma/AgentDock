@@ -11,6 +11,7 @@ import {
   MenuSeparator,
   MenuTrigger,
 } from '@andrewbehma/glass-ui/menu';
+import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import { ChevronsUpDown, FolderGit2, List } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { RUNNER_STATUS_LABEL, STATUS_TONE } from '../../lib/runners/format';
@@ -31,13 +32,17 @@ function RunnerDot({ project }: { project: ProjectSummary }) {
  * name, its runner's status and a chevron, opening the projects the caller may
  * see: at the head of the rail, and in More's sheet on a phone (#163).
  * Renders nothing while there are no projects; the Projects page still works.
+ * `compact` (C-14, the collapsed rail): a square with the status dot alone,
+ * the project's name in a tooltip.
  */
 export function ProjectSwitcher({
   projects,
   projectId,
+  compact = false,
 }: {
   projects: readonly ProjectSummary[];
   projectId: string | null;
+  compact?: boolean;
 }) {
   const router = useRouter();
   if (projects.length === 0) return null;
@@ -47,7 +52,26 @@ export function ProjectSwitcher({
     ? `Switch project, current: ${current.displayName}, runner ${RUNNER_STATUS_LABEL[current.runnerStatus]}`
     : 'Choose a project';
 
-  const trigger = (
+  const status = current ? (
+    <RunnerDot project={current} />
+  ) : (
+    <FolderGit2 size={16} aria-hidden="true" className="text-ink-3" />
+  );
+
+  const trigger = compact ? (
+    <button
+      type="button"
+      aria-label={label}
+      className={buttonClassName({
+        variant: 'glass',
+        size: 'md',
+        full: true,
+        className: 'justify-center px-0',
+      })}
+    >
+      {status}
+    </button>
+  ) : (
     <button
       type="button"
       aria-label={label}
@@ -59,11 +83,7 @@ export function ProjectSwitcher({
       })}
     >
       <span className="flex min-w-0 items-center gap-2">
-        {current ? (
-          <RunnerDot project={current} />
-        ) : (
-          <FolderGit2 size={16} aria-hidden="true" className="text-ink-3" />
-        )}
+        {status}
         <span className={`truncate ${current ? 'text-ink' : 'text-ink-2'}`}>
           {current?.displayName ?? 'Choose a project'}
         </span>
@@ -78,7 +98,16 @@ export function ProjectSwitcher({
 
   return (
     <MenuRoot>
-      <MenuTrigger asChild>{trigger}</MenuTrigger>
+      {compact ? (
+        <Tooltip
+          content={current?.displayName ?? 'Choose a project'}
+          side="right"
+        >
+          <MenuTrigger asChild>{trigger}</MenuTrigger>
+        </Tooltip>
+      ) : (
+        <MenuTrigger asChild>{trigger}</MenuTrigger>
+      )}
       <MenuContent align="start" className="max-h-[60vh] overflow-y-auto">
         <MenuLabel>Projects</MenuLabel>
         {projects.map((project) => (
