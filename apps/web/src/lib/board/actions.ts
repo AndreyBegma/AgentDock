@@ -1,4 +1,6 @@
 import type {
+  AcceptBoardCardRequest,
+  AcceptBoardCardResponse,
   AcceptSuggestionRequest,
   BoardCardDetail,
   BoardCardView,
@@ -6,6 +8,7 @@ import type {
   BoardView,
   CardCapturePage,
   CardFeedbackRequest,
+  CardPullRequestView,
   CreateBoardCardRequest,
   DismissAllResult,
   MoveBoardCardRequest,
@@ -64,8 +67,20 @@ export const sendFeedback = (
 export const finishCard = (projectId: string, number: number) =>
   api(`${cardPath(projectId, number)}/finish`, { method: 'POST' });
 
-export const acceptCard = (projectId: string, number: number) =>
-  api(`${cardPath(projectId, number)}/accept`, { method: 'POST' });
+/** #273 D13: with `merge` the PR is merged first; without it, the card only moves (D14). */
+export const acceptCard = (
+  projectId: string,
+  number: number,
+  body: AcceptBoardCardRequest = {},
+) =>
+  api<AcceptBoardCardResponse>(`${cardPath(projectId, number)}/accept`, {
+    method: 'POST',
+    body,
+  });
+
+/** #273 D10: the card's pull request as Accept would merge it. */
+export const fetchPullRequest = (projectId: string, number: number) =>
+  api<CardPullRequestView>(`${cardPath(projectId, number)}/pull-request`);
 
 export const stopCard = (projectId: string, number: number) =>
   api(`${cardPath(projectId, number)}/stop`, { method: 'POST' });

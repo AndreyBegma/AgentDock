@@ -167,7 +167,14 @@ export function BoardColumns({
           aria-label="Project board"
           columns={columns}
           onMove={onMove}
-          renderCard={(item) => <CardFace card={item.card} onOpen={onOpen} />}
+          renderCard={(item) => (
+            <CardFace
+              projectId={projectId}
+              card={item.card}
+              canOperate={canOperate}
+              onOpen={onOpen}
+            />
+          )}
           renderCardMenu={(item) => {
             const card = item.card;
             if (isSuggestion(card)) {
