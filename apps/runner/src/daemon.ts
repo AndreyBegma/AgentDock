@@ -8,6 +8,7 @@ import {
 } from '@agentdock/shared/protocol';
 import { adapters, SessionWatcher } from './adapters';
 import { resolveIngestSince } from './adapters/ingest-since';
+import { AssessExecutor, createAssessHandlers } from './assess';
 import { Backoff } from './backoff';
 import { CaptureExecutor, createCaptureHandlers } from './capture';
 import { CardExecutor, createCardHandlers } from './cards';
@@ -90,6 +91,8 @@ export interface DaemonOptions {
   captureDir?: string;
   /** Text normalization's per-run directories (#271); `<state>/agentdock/normalize` beside the runs by default. */
   normalizeDir?: string;
+  /** Card model assessment's per-run directories (#322); `<state>/agentdock/assess` beside the runs by default. */
+  assessDir?: string;
   /** The argv that starts this runner; a skill run's, plan turn's or card's session appends `exec-run <dir>`. */
   selfCommand?: readonly string[];
   /** The skills.sh catalog is fetched with it; the global `fetch` by default. */
@@ -312,6 +315,15 @@ export const runDaemon = async (
       log,
       otlpPort: () => otlp?.port ?? null,
     });
+    // Card model assessment (#322): headless; the API limits concurrency.
+    const assess = new AssessExecutor({
+      deps: skillsDeps,
+      assessDir: options.assessDir ?? join(dirname(options.spoolDir), 'assess'),
+      env: process.env,
+      emit: (event) => connection?.emit(event),
+      log,
+      otlpPort: () => otlp?.port ?? null,
+    });
     const runLog = new RunLogStreamer({
       runs: runLogSources(runs, plans, uiProfiles),
       send: (message) => connection?.sendMessage(message) ?? false,
@@ -339,6 +351,7 @@ export const runDaemon = async (
       cards: createCardHandlers(cards),
       capture: createCaptureHandlers(capture),
       normalize: createNormalizeHandlers(normalize),
+      assess: createAssessHandlers(assess),
     });
     const dispatch = createDispatcher({
       handlers: builtHandlers,
@@ -503,6 +516,7 @@ export const runDaemon = async (
     cards.stop();
     capture.stop();
     normalize.stop();
+    assess.stop();
     terminal.stop();
     await registry.stop();
     await sessions?.stop();
