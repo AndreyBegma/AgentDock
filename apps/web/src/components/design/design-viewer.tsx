@@ -30,6 +30,8 @@ import {
 } from '../../lib/design/viewer-state';
 import { ApproveDialog } from './approve-dialog';
 import { CommentsPanel } from './comments-panel';
+import { DesignFailure } from './design-failure';
+import { DesignProgress } from './design-progress';
 import { GeneratePanel } from './generate-panel';
 import { MockupBanner } from './mockup-banner';
 import { type FramePin, MockupFrame } from './mockup-frame';
@@ -42,6 +44,7 @@ export interface DesignViewerActions {
   comment: (body: DesignCommentRequest) => Promise<unknown>;
   revise: () => Promise<unknown>;
   approve: (body: { revisionId: string }) => Promise<unknown>;
+  stop: () => Promise<unknown>;
 }
 
 /**
@@ -164,6 +167,28 @@ export function DesignViewer({
     <div className="flex min-h-0 flex-1">
       <div className="flex min-w-0 flex-1 flex-col gap-3 overflow-auto p-4">
         <MockupBanner design={design} />
+        {design.progress ? (
+          <DesignProgress
+            projectId={projectId}
+            progress={design.progress}
+            canStop={canOperate}
+            stopping={busy === 'stop'}
+            onStop={() => void actions.stop().catch(() => {})}
+          />
+        ) : design.lastFailure ? (
+          <DesignFailure
+            failure={design.lastFailure}
+            canRetry={canOperate && design.needed}
+            retrying={busy === 'generate' || busy === 'revise'}
+            onRetry={() =>
+              void (
+                design.lastFailure?.mode === 'revise'
+                  ? actions.revise()
+                  : actions.generate()
+              ).catch(() => {})
+            }
+          />
+        ) : null}
         {state.revision ? (
           <>
             <ViewerToolbar
@@ -212,7 +237,7 @@ export function DesignViewer({
               />
             </ResizableFrame>
           </>
-        ) : (
+        ) : design.progress ? null : (
           <GeneratePanel
             projectId={projectId}
             design={design}

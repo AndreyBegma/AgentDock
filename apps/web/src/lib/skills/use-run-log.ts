@@ -41,6 +41,8 @@ const ERROR_SENTENCE: Partial<Record<LiveErrorCode, string>> = {
 
 export interface RunLogView {
   log: RunLogState;
+  /** When the newest live line arrived here (ms); null before any (#275 D4). */
+  lastLineAt: number | null;
   connected: boolean;
   /** A sentence when the server refused the topic. */
   error: string | undefined;
@@ -59,6 +61,7 @@ export function useRunLog(
 ): RunLogView {
   const [log, dispatch] = useReducer(reduce, EMPTY_RUN_LOG);
   const [error, setError] = useState<string>();
+  const [lastLineAt, setLastLineAt] = useState<number | null>(null);
   const status = useLiveStatus();
   const topic = enabled ? (runTopic(projectId, runId) as LiveTopic) : null;
 
@@ -66,6 +69,7 @@ export function useRunLog(
   useEffect(() => {
     dispatch({ type: 'reset' });
     setError(undefined);
+    setLastLineAt(null);
   }, [topic]);
 
   useEffect(() => {
@@ -80,7 +84,15 @@ export function useRunLog(
       return;
     }
     const parsed = runLogFrameSchema.safeParse(message.data);
-    if (parsed.success) dispatch({ type: 'frame', frame: parsed.data });
+    if (!parsed.success) return;
+    dispatch({ type: 'frame', frame: parsed.data });
+    if (
+      parsed.data.type === 'lines' &&
+      !parsed.data.backlog &&
+      parsed.data.lines.length > 0
+    ) {
+      setLastLineAt(Date.now());
+    }
   }, []);
 
   useLive(topic, onMessage, {
@@ -88,5 +100,5 @@ export function useRunLog(
       setError(ERROR_SENTENCE[code] ?? 'The live log could not be opened.'),
   });
 
-  return { log, connected: status.status === 'connected', error };
+  return { log, lastLineAt, connected: status.status === 'connected', error };
 }

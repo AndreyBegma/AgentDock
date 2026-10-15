@@ -13,7 +13,7 @@ import {
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
 import { Ellipsis } from 'lucide-react';
 import Link from 'next/link';
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { api, type Described } from '../../lib/api';
 import { updateCard } from '../../lib/board/actions';
 import { describeBoardError } from '../../lib/board/format';
@@ -23,6 +23,7 @@ import {
   canChangeContinue,
   canToggleCardDesign,
   cardDesignChipState,
+  cardDesignChipText,
   describeDesignError,
   opensCardDesign,
 } from '../../lib/design/format';
@@ -43,19 +44,32 @@ const CHIP_TONE: Record<CardDesignChipState, 'neutral' | 'ok'> = {
   approved: 'ok',
 };
 
+/** The chip's clock ticks once a second, and only while the design is drawn (#275 D8). */
+function useClock(active: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 1_000);
+    return () => clearInterval(id);
+  }, [active]);
+  return now;
+}
+
 /**
  * The Design chip on a card's face (#243): shown once the design is on, with
  * a second one while the worker will start by itself on approval.
  */
 export function CardFaceDesign({ card }: { card: BoardCardView }) {
   const state = cardDesignChipState(card.design);
+  const now = useClock(state === 'generating');
   if (state === 'off') return null;
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       <Badge
         size="md"
         tone={CHIP_TONE[state]}
-        label={CARD_DESIGN_CHIP_LABEL[state]}
+        label={cardDesignChipText(card.design, now)}
       />
       {card.continueAfterDesign && state !== 'approved' ? (
         <Badge size="md" label="Runs after design" />
