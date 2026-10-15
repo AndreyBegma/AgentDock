@@ -1,6 +1,7 @@
 import {
   type HookCliName,
   hookCliNameSchema,
+  hooksDisabled,
 } from '@agentdock/shared/protocol';
 import { connectLocal, type LocalClient } from '../local/client';
 import type { LocalCommandDeps } from '../local/subcommand';
@@ -75,6 +76,8 @@ export const runHook = async (
   args: readonly string[],
   deps: HookDeps,
 ): Promise<number> => {
+  // A card-capture extraction (#244 D4) must not become a captured session.
+  if (hooksDisabled(deps.env)) return 0;
   const name = hookCliNameSchema.safeParse(args[0]);
   if (!name.success || args.length !== 1) {
     deps.stderr(`agentdock-runner hook: unknown hook ${args.join(' ')}\n`);

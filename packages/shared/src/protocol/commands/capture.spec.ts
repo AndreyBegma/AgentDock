@@ -82,8 +82,9 @@ describe('captureCommands', () => {
     expect(captureCommands['cards.extract'].minRole).toBe('operator');
   });
 
-  it('enters the allowlist only with its runner handler', () => {
-    expect(Object.hasOwn(commands, 'cards.extract')).toBe(false);
+  it('is on the allowlist, now that the runner serves it', () => {
+    expect(Object.hasOwn(commands, 'cards.extract')).toBe(true);
+    expect(commands['cards.extract']).toBe(captureCommands['cards.extract']);
   });
 });
 

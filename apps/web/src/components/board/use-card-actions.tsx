@@ -1,12 +1,15 @@
 'use client';
 
-import type { BoardCardView } from '@agentdock/shared';
+import type { AcceptSuggestionRequest, BoardCardView } from '@agentdock/shared';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { type ReactNode, useCallback, useState } from 'react';
 import {
   acceptCard,
+  acceptSuggestion,
   deleteCard,
+  dismissAllSuggestions,
+  dismissSuggestion,
   finishCard,
   runCard,
   stopCard,
@@ -18,6 +21,15 @@ export interface CardActions {
   run: (card: BoardCardView) => void;
   markFinished: (card: BoardCardView) => void;
   accept: (card: BoardCardView) => void;
+  /** #244 D9: Accept an Inbox card, with the edits of Edit & accept. Resolves `true` when it worked. */
+  acceptSuggestion: (
+    card: BoardCardView,
+    edits?: AcceptSuggestionRequest,
+  ) => Promise<boolean>;
+  /** #244 D9: deletes the card and remembers its fingerprint. */
+  dismiss: (card: BoardCardView) => Promise<boolean>;
+  /** #244: asks first, then dismisses every Inbox card. */
+  askDismissAll: (count: number) => void;
   /** Both ask first (`ConfirmDialog`). */
   askStop: (card: BoardCardView) => void;
   askDelete: (card: BoardCardView) => void;
@@ -26,7 +38,9 @@ export interface CardActions {
   dialogs: ReactNode;
 }
 
-type Pending = { kind: 'stop' | 'delete'; card: BoardCardView };
+type Pending =
+  | { kind: 'stop' | 'delete'; card: BoardCardView }
+  | { kind: 'dismiss-all'; count: number };
 
 export function useCardActions({
   projectId,
@@ -44,13 +58,15 @@ export function useCardActions({
   const [pending, setPending] = useState<Pending>();
 
   const perform = useCallback(
-    async (job: () => Promise<unknown>, done: string) => {
+    async (job: () => Promise<unknown>, done: string): Promise<boolean> => {
       setBusy(true);
       try {
         await job();
         toast.success(done);
+        return true;
       } catch (err) {
         toast.error(describeBoardError(err, runnerName));
+        return false;
       } finally {
         setBusy(false);
         onChanged();
@@ -61,6 +77,14 @@ export function useCardActions({
 
   const confirm = async () => {
     if (!pending) return;
+    if (pending.kind === 'dismiss-all') {
+      await perform(
+        () => dismissAllSuggestions(projectId),
+        'Dismissed every suggestion.',
+      );
+      setPending(undefined);
+      return;
+    }
     const { kind, card } = pending;
     if (kind === 'stop') {
       await perform(
@@ -74,6 +98,31 @@ export function useCardActions({
       }, `Deleted ${card.label}.`);
     }
     setPending(undefined);
+  };
+
+  const dialogTitle = (): string => {
+    if (pending?.kind === 'dismiss-all') {
+      return pending.count === 1
+        ? 'Dismiss the suggestion?'
+        : `Dismiss all ${pending.count} suggestions?`;
+    }
+    return pending?.kind === 'stop'
+      ? `Stop the worker of ${pending.card.label}?`
+      : `Delete ${pending?.card.label ?? 'the card'}?`;
+  };
+
+  const dialogConsequence = (): string => {
+    if (pending?.kind === 'dismiss-all') {
+      return 'The cards are deleted. AgentDock remembers their titles for 90 days so the same suggestion does not come back.';
+    }
+    return pending?.kind === 'stop'
+      ? 'The tmux session is killed. The work already committed in the worktree stays; you can run the card again.'
+      : 'The card and its rounds are removed, and its worktree is cleaned up. A pull request it opened stays on GitHub.';
+  };
+
+  const verb = (): string => {
+    if (pending?.kind === 'dismiss-all') return 'Dismiss all';
+    return pending?.kind === 'stop' ? 'Stop worker' : 'Delete';
   };
 
   return {
@@ -92,6 +141,17 @@ export function useCardActions({
         () => acceptCard(projectId, card.number),
         `${card.label} accepted.`,
       ),
+    acceptSuggestion: (card, edits) =>
+      perform(
+        () => acceptSuggestion(projectId, card.number, edits),
+        `${card.label} is in To Do.`,
+      ),
+    dismiss: (card) =>
+      perform(
+        () => dismissSuggestion(projectId, card.number),
+        `Dismissed ${card.label}.`,
+      ),
+    askDismissAll: (count) => setPending({ kind: 'dismiss-all', count }),
     askStop: (card) => setPending({ kind: 'stop', card }),
     askDelete: (card) => setPending({ kind: 'delete', card }),
     busy,
@@ -101,17 +161,9 @@ export function useCardActions({
         onOpenChange={(open) => {
           if (!open && !busy) setPending(undefined);
         }}
-        title={
-          pending?.kind === 'stop'
-            ? `Stop the worker of ${pending.card.label}?`
-            : `Delete ${pending?.card.label ?? 'the card'}?`
-        }
-        consequence={
-          pending?.kind === 'stop'
-            ? 'The tmux session is killed. The work already committed in the worktree stays; you can run the card again.'
-            : 'The card and its rounds are removed, and its worktree is cleaned up. A pull request it opened stays on GitHub.'
-        }
-        verb={pending?.kind === 'stop' ? 'Stop worker' : 'Delete'}
+        title={dialogTitle()}
+        consequence={dialogConsequence()}
+        verb={verb()}
         tone="danger"
         busy={busy}
         onConfirm={() => void confirm()}

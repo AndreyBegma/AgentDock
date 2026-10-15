@@ -1,8 +1,16 @@
 import type { BoardCardView } from '@agentdock/shared';
+import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Chip } from '@andrewbehma/glass-ui/chip';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
-import { hooksHint, roundPill } from '../../lib/board/format';
+import NextLink from 'next/link';
+import {
+  confidenceLabel,
+  hooksHint,
+  isSuggestion,
+  roundPill,
+  sessionHref,
+} from '../../lib/board/format';
 import { formatCost } from '../../lib/format';
 import { safeHttpsUrl } from '../../lib/queue/format';
 import { CardFaceDesign } from './card-design';
@@ -38,6 +46,7 @@ export function CardFace({
         {card.title}
       </button>
       <CardFaceDesign card={card} />
+      {isSuggestion(card) ? <SuggestionFace card={card} /> : null}
       {pill || card.round?.hooksMissing ? (
         <div className="flex flex-wrap items-center gap-1.5">
           {pill ? (
@@ -61,6 +70,35 @@ export function CardFace({
             <Link href={issueHref}>Issue #{card.issueNumber}</Link>
           ) : null}
         </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** #244: what an Inbox card adds — the why, the confidence and the session it came from. */
+function SuggestionFace({ card }: { card: BoardCardView }) {
+  const confidence = confidenceLabel(card.captureConfidence);
+  const session = sessionHref(card.sourceSessionId);
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Badge tone="warn" size="sm" label="Suggested" />
+        {confidence ? (
+          <span className="text-xs tabular-nums text-ink-2">
+            {confidence} sure
+          </span>
+        ) : null}
+      </div>
+      {card.captureWhy ? (
+        <p className="break-words text-xs text-ink-2">{card.captureWhy}</p>
+      ) : null}
+      {session ? (
+        <NextLink
+          href={session}
+          className="text-xs text-accent-ink underline-offset-2 hover:underline"
+        >
+          Source session
+        </NextLink>
       ) : null}
     </div>
   );

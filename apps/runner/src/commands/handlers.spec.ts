@@ -31,6 +31,48 @@ const cases: [CardCommandName, unknown][] = [
   ['card.close', { ...CARD, removeWorktree: true }],
 ];
 
+describe('cards.extract handler (#244)', () => {
+  const args = {
+    runId: 'run_1',
+    projectId: 'prj_a',
+    sessionId: '11111111-1111-4111-8111-111111111111',
+    prompt: 'extract',
+    profileKey: 'claude-work',
+    model: 'haiku' as const,
+    timeoutSec: 180,
+  };
+
+  it('answers unsupported on a runner without the capture executor', async () => {
+    const handlers = createHandlers(context());
+    const outcome = await Promise.resolve()
+      .then(() => handlers['cards.extract'](args))
+      .then(
+        () => 'resolved',
+        (error: unknown) =>
+          error instanceof CommandFailure ? error.code : String(error),
+      );
+    expect(outcome).toBe('unsupported');
+  });
+
+  it('hands the command to the capture executor', async () => {
+    const seen: string[] = [];
+    const handlers = createHandlers(
+      context({
+        capture: {
+          'cards.extract': async (a) => {
+            seen.push(a.runId);
+            return { phase: 'running' };
+          },
+        },
+      }),
+    );
+    expect(await handlers['cards.extract'](args)).toEqual({
+      phase: 'running',
+    });
+    expect(seen).toEqual(['run_1']);
+  });
+});
+
 describe('card command handlers (#242)', () => {
   it('answers unsupported on a runner without the card executor', async () => {
     const handlers = createHandlers(context());
