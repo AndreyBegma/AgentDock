@@ -96,6 +96,7 @@ describe('card.merge (#273 D11–D13)', () => {
       method: 'squash',
       mergeCommit: MERGE_COMMIT,
       issueClosed: true,
+      branchDeleted: false,
     });
     expect(calls('pr', 'merge')).toEqual([
       [
@@ -142,6 +143,7 @@ describe('card.merge (#273 D11–D13)', () => {
       method: 'squash',
       mergeCommit: MERGE_COMMIT,
       issueClosed: true,
+      branchDeleted: false,
     });
     expect(calls('pr', 'merge')).toEqual([]);
     expect(calls('issue', 'close')).toHaveLength(1);
@@ -250,6 +252,7 @@ describe('card.merge (#273 D11–D13)', () => {
       mergeCommit: MERGE_COMMIT,
       issueClosed: false,
       issueError: 'HTTP 403: Resource not accessible',
+      branchDeleted: false,
     });
   });
 

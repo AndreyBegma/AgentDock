@@ -750,7 +750,7 @@ export class BoardService implements OnModuleInit {
       { to: 'completed', index: 0, source: 'person' },
       actor,
     );
-    return { ...(await this.detail(projectId, number)), merge };
+    return { ...(await this.detail(projectId, number)), merge, prClose: null };
   }
 
   /** #273 D13: `card.merge`, audited; a refusal is 409 `merge_failed`. */
@@ -836,6 +836,10 @@ export class BoardService implements OnModuleInit {
       issueClosed: output.issueClosed,
       ...(output.issueError !== undefined
         ? { issueError: output.issueError }
+        : {}),
+      branchDeleted: output.branchDeleted,
+      ...(output.branchError !== undefined
+        ? { branchError: output.branchError }
         : {}),
     };
   }

@@ -152,6 +152,24 @@ describe('messageSchema', () => {
     ).toBe(false);
   });
 
+  it('#329 D1: gitAuth is optional, next to the git version', () => {
+    const { capabilities } = hello();
+    const { gitAuth: _, ...older } = capabilities;
+    expect(capabilitiesSchema.parse(older).gitAuth).toBeUndefined();
+    for (const github of ['gh', 'native']) {
+      expect(
+        capabilitiesSchema.parse({ ...capabilities, gitAuth: { github } })
+          .gitAuth,
+      ).toEqual({ github });
+    }
+    expect(
+      capabilitiesSchema.safeParse({
+        ...capabilities,
+        gitAuth: { github: 'ssh' },
+      }).success,
+    ).toBe(false);
+  });
+
   describe('advertised commands (#233)', () => {
     it('documents a commands list of real command names', () => {
       const { capabilities } = hello();

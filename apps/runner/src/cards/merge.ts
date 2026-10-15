@@ -125,6 +125,7 @@ export const mergeCard = async (
         method,
         mergeCommit: shaOf(view.mergeCommit?.oid),
         ...(await closeIssue(gh, github, args)),
+        branchDeleted: false,
       };
     }
     if (view.state !== 'OPEN') {
@@ -157,6 +158,7 @@ export const mergeCard = async (
       method,
       mergeCommit: await mergeCommitOf(gh, github, pr),
       ...(await closeIssue(gh, github, args)),
+      branchDeleted: false,
     };
   } catch (error) {
     if (error instanceof Refused) {

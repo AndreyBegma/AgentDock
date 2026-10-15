@@ -64,6 +64,7 @@ describe('what the dialog says', () => {
     method: 'merge',
     mergeCommit: SHA,
     issueClosed: true,
+    branchDeleted: false,
     ...extra,
   });
 
