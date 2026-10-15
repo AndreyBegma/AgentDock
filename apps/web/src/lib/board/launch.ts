@@ -62,6 +62,43 @@ export function launchDefaults(card: LaunchCard, kind: LaunchKind): LaunchForm {
 }
 
 /**
+ * What "Use defaults" returns to (D2, D3): the resolver's profile and the
+ * recommendation for the action, without the card's overrides.
+ */
+export function launchBaseline(
+  card: Pick<LaunchCard, 'recommendation'>,
+  kind: LaunchKind,
+): LaunchForm {
+  return {
+    profileKey: DEFAULT_VALUE,
+    model: recommendationFor(card.recommendation, kind)?.model ?? DEFAULT_VALUE,
+  };
+}
+
+/** Which of the two the form has moved off the baseline. */
+export function launchChanges(
+  form: LaunchForm,
+  card: Pick<LaunchCard, 'recommendation'>,
+  kind: LaunchKind,
+): ('profile' | 'model')[] {
+  const baseline = launchBaseline(card, kind);
+  return [
+    ...(form.profileKey !== baseline.profileKey ? (['profile'] as const) : []),
+    ...(form.model !== baseline.model ? (['model'] as const) : []),
+  ];
+}
+
+/** The note under the group while a non-default is chosen (D3); `null` otherwise. */
+export function launchSavedNote(
+  changes: readonly ('profile' | 'model')[],
+  label: string,
+): string | null {
+  return changes.length === 0
+    ? null
+    : `Your ${changes.join(' and ')} choice is saved on ${label} and used by its next design turns, including auto-starts.`;
+}
+
+/**
  * The model select's options (D2, D4): the catalog with the recommended one
  * suffixed, a stored value outside the catalog as its own option, and "Project
  * default" first while the form follows neither an override nor a

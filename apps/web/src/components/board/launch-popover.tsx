@@ -92,6 +92,86 @@ export function LaunchPopover({
   );
 }
 
+/**
+ * The profile and model selects (#322 D1), shared by the popover and the
+ * Generate panel's inline "Runs on" group. Loads the runner's Claude profiles
+ * when mounted. `modelHint` puts the recommendation's reason under the model;
+ * the inline group draws it on its own line instead.
+ */
+export function LaunchSelects({
+  projectId,
+  card,
+  kind,
+  form,
+  onChange,
+  modelHint = false,
+  disabled = false,
+}: {
+  projectId: string;
+  card: LaunchCard;
+  kind: LaunchKind;
+  form: LaunchForm;
+  onChange: (form: LaunchForm) => void;
+  modelHint?: boolean;
+  disabled?: boolean;
+}) {
+  const profiles = useLaunchProfiles(projectId, !disabled);
+  const list = profiles.data ?? [];
+  const byKey = new Map(list.map((p) => [p.key, p]));
+  const models = launchModelOptions(card, kind);
+  const idPrefix = `launch-${kind}`;
+  return (
+    <>
+      <Field
+        label="Claude profile"
+        htmlFor={`${idPrefix}-profile`}
+        hint={
+          profiles.error
+            ? 'The runner’s profiles could not be loaded; the default is used.'
+            : undefined
+        }
+      >
+        <Select
+          id={`${idPrefix}-profile`}
+          value={form.profileKey}
+          disabled={disabled}
+          onChange={(e) => onChange({ ...form, profileKey: e.target.value })}
+        >
+          <option value={DEFAULT_VALUE}>
+            {defaultProfileOptionLabel(list)}
+          </option>
+          {profileKeysWith(list, form.profileKey).map((key) => {
+            const profile = byKey.get(key);
+            return (
+              <option key={key} value={key}>
+                {profile ? profileOptionLabel(profile) : key}
+              </option>
+            );
+          })}
+        </Select>
+      </Field>
+      <Field
+        label="Model"
+        htmlFor={`${idPrefix}-model`}
+        hint={modelHint ? recommendationNote(card, kind) : undefined}
+      >
+        <Select
+          id={`${idPrefix}-model`}
+          value={form.model}
+          disabled={disabled}
+          onChange={(e) => onChange({ ...form, model: e.target.value })}
+        >
+          {models.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </Select>
+      </Field>
+    </>
+  );
+}
+
 /** Mounted only while the popover is open, so the profiles load on demand. */
 function LaunchFields({
   projectId,
@@ -110,11 +190,6 @@ function LaunchFields({
     launchDefaults(card, kind),
   );
   const [busy, setBusy] = useState(false);
-  const profiles = useLaunchProfiles(projectId, true);
-  const list = profiles.data ?? [];
-  const byKey = new Map(list.map((p) => [p.key, p]));
-  const models = launchModelOptions(card, kind);
-  const idPrefix = `launch-${kind}`;
 
   const start = async () => {
     setBusy(true);
@@ -135,54 +210,14 @@ function LaunchFields({
         void start();
       }}
     >
-      <Field
-        label="Claude profile"
-        htmlFor={`${idPrefix}-profile`}
-        hint={
-          profiles.error
-            ? 'The runner’s profiles could not be loaded; the default is used.'
-            : undefined
-        }
-      >
-        <Select
-          id={`${idPrefix}-profile`}
-          value={form.profileKey}
-          onChange={(e) =>
-            setForm((current) => ({ ...current, profileKey: e.target.value }))
-          }
-        >
-          <option value={DEFAULT_VALUE}>
-            {defaultProfileOptionLabel(list)}
-          </option>
-          {profileKeysWith(list, form.profileKey).map((key) => {
-            const profile = byKey.get(key);
-            return (
-              <option key={key} value={key}>
-                {profile ? profileOptionLabel(profile) : key}
-              </option>
-            );
-          })}
-        </Select>
-      </Field>
-      <Field
-        label="Model"
-        htmlFor={`${idPrefix}-model`}
-        hint={recommendationNote(card, kind)}
-      >
-        <Select
-          id={`${idPrefix}-model`}
-          value={form.model}
-          onChange={(e) =>
-            setForm((current) => ({ ...current, model: e.target.value }))
-          }
-        >
-          {models.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </Select>
-      </Field>
+      <LaunchSelects
+        projectId={projectId}
+        card={card}
+        kind={kind}
+        form={form}
+        onChange={setForm}
+        modelHint
+      />
       <div className="flex justify-end">
         <Button variant="solid" type="submit" disabled={busy}>
           {busy ? 'Starting…' : actionLabel}

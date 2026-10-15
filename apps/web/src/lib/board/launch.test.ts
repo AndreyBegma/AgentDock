@@ -3,9 +3,12 @@ import type { ProjectRuntimeProfile } from '@agentdock/shared';
 import {
   cardFormModelOptions,
   type LaunchCard,
+  launchBaseline,
+  launchChanges,
   launchDefaults,
   launchModelOptions,
   launchRequest,
+  launchSavedNote,
   NO_RECOMMENDATION_TEXT,
   profileKeysWith,
   recommendationNote,
@@ -54,6 +57,43 @@ describe('launchDefaults (D2)', () => {
     expect(
       launchDefaults(launchCard({ recommendation: NONE }), 'work').model,
     ).toBe('');
+  });
+});
+
+describe('Use defaults (D3)', () => {
+  test('the baseline is the resolver and the recommendation, never the override', () => {
+    const card = launchCard({ designModel: 'haiku', profileKey: 'work-max' });
+    expect(launchBaseline(card, 'design')).toEqual({
+      profileKey: '',
+      model: 'opus',
+    });
+    expect(
+      launchBaseline(launchCard({ recommendation: NONE }), 'work'),
+    ).toEqual({ profileKey: '', model: '' });
+  });
+
+  test('names what moved off it, and nothing when the card follows the defaults', () => {
+    const card = launchCard();
+    expect(
+      launchChanges(launchDefaults(card, 'design'), card, 'design'),
+    ).toEqual([]);
+    expect(
+      launchChanges(
+        { profileKey: 'work-max', model: 'sonnet' },
+        card,
+        'design',
+      ),
+    ).toEqual(['profile', 'model']);
+    expect(
+      launchChanges({ profileKey: '', model: 'sonnet' }, card, 'design'),
+    ).toEqual(['model']);
+  });
+
+  test('the saved note appears only for a non-default choice', () => {
+    expect(launchSavedNote([], 'C-15')).toBeNull();
+    expect(launchSavedNote(['profile', 'model'], 'C-15')).toBe(
+      'Your profile and model choice is saved on C-15 and used by its next design turns, including auto-starts.',
+    );
   });
 });
 

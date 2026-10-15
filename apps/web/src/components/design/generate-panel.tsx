@@ -2,6 +2,7 @@
 
 import {
   type CardDesignLaunchRequest,
+  claudeModelLabel,
   DESIGN_SKILLS_MAX,
   DESIGN_VARIANTS_MAX,
   DESIGN_VARIANTS_MIN,
@@ -19,13 +20,22 @@ import {
 } from '@andrewbehma/glass-ui/segmented-control';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api';
-import type { LaunchCard } from '../../lib/board/launch';
+import {
+  type LaunchCard,
+  type LaunchForm,
+  launchBaseline,
+  launchChanges,
+  launchDefaults,
+  launchRequest,
+  launchSavedNote,
+  NO_RECOMMENDATION_TEXT,
+} from '../../lib/board/launch';
 import { generateRunnerGate } from '../../lib/design/format';
 import { installedSkillsApi } from '../../lib/design/href';
 import { runnerGateCopy } from '../../lib/planner/runner-support';
 import { useReadiness } from '../../lib/readiness/use-readiness';
 import { useSection } from '../../lib/section/use-section';
-import { LaunchPopover } from '../board/launch-popover';
+import { LaunchSelects } from '../board/launch-popover';
 import { DisabledReason } from '../prerequisites/disabled-reason';
 import { ReadinessNotice } from '../readiness/readiness-notice';
 
@@ -55,9 +65,14 @@ export function GeneratePanel({
   busy: boolean;
   onPatch: (body: TaskDesignPatchRequest) => Promise<unknown>;
   onGenerate: (body?: CardDesignLaunchRequest) => Promise<unknown>;
-  /** A card's design (#322 D1): Generate opens the launch popover. */
+  /** A card's design (#322 D1): the inline "Runs on" group, sent with Generate. */
   launch?: LaunchCard;
 }) {
+  // #322 D1: a card's profile and model, chosen here instead of in a popover.
+  const [runsOn, setRunsOn] = useState<LaunchForm>(() =>
+    launch ? launchDefaults(launch, 'design') : { profileKey: '', model: '' },
+  );
+  const runsOnChanges = launch ? launchChanges(runsOn, launch, 'design') : [];
   const [count, setCount] = useState(design.variantCount);
   const [skills, setSkills] = useState<string[]>(design.skills);
   useEffect(() => setCount(design.variantCount), [design.variantCount]);
@@ -107,7 +122,7 @@ export function GeneratePanel({
   const generate = async () => {
     try {
       if (changed) await onPatch({ variantCount: count, skills });
-      await onGenerate();
+      await onGenerate(launch ? launchRequest(runsOn) : undefined);
     } catch {
       // Toasted by the caller.
     }
@@ -174,6 +189,48 @@ export function GeneratePanel({
         />
       </Field>
 
+      {launch ? (
+        <fieldset
+          aria-labelledby="design-runs-on"
+          className="flex min-w-0 flex-col gap-3 rounded-control border border-line p-3"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span id="design-runs-on" className="text-sm font-medium">
+              Runs on
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              type="button"
+              disabled={runsOnChanges.length === 0 || writeBlock !== null}
+              onClick={() => setRunsOn(launchBaseline(launch, 'design'))}
+            >
+              Use defaults
+            </Button>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <LaunchSelects
+              projectId={projectId}
+              card={launch}
+              kind="design"
+              form={runsOn}
+              onChange={setRunsOn}
+              disabled={writeBlock !== null}
+            />
+          </div>
+          <p className="text-xs text-ink-2">
+            {launch.recommendation.design
+              ? `Recommended: ${launch.recommendation.design.reason}`
+              : NO_RECOMMENDATION_TEXT}
+          </p>
+          {launchSavedNote(runsOnChanges, 'this card') ? (
+            <p role="status" className="text-xs text-ink-2">
+              {launchSavedNote(runsOnChanges, 'this card')}
+            </p>
+          ) : null}
+        </fieldset>
+      ) : null}
+
       {writeBlock ? (
         <p className="text-xs text-ink-3">{writeBlock}</p>
       ) : runnerCopy ? (
@@ -194,30 +251,21 @@ export function GeneratePanel({
           exclude={['runner_outdated']}
         />
       ) : null}
+      <Button
+        variant="solid"
+        disabled={blocked || busy}
+        aria-describedby={describedBy}
+        onClick={() => void generate()}
+      >
+        {busy ? 'Starting…' : 'Generate'}
+      </Button>
       {launch ? (
-        <LaunchPopover
-          projectId={projectId}
-          card={launch}
-          kind="design"
-          label={busy ? 'Starting…' : 'Generate'}
-          actionLabel="Generate"
-          disabled={blocked || busy}
-          describedBy={describedBy}
-          onLaunch={async (request) => {
-            if (changed) await onPatch({ variantCount: count, skills });
-            await onGenerate(request);
-          }}
-        />
-      ) : (
-        <Button
-          variant="solid"
-          disabled={blocked || busy}
-          aria-describedby={describedBy}
-          onClick={() => void generate()}
-        >
-          {busy ? 'Starting…' : 'Generate'}
-        </Button>
-      )}
+        <p className="text-center text-xs text-ink-3">
+          {count} {count === 1 ? 'variant' : 'variants'} ·{' '}
+          {runsOn.model ? claudeModelLabel(runsOn.model) : 'Project model'} on{' '}
+          {runsOn.profileKey || 'the default profile'}
+        </p>
+      ) : null}
     </section>
   );
 }
