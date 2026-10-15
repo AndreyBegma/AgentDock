@@ -64,3 +64,4 @@ ask for it.
 | [#337](https://github.com/AndreyBegma/AgentDock/issues/337) | [337-planner-on-the-board](337-planner-on-the-board.md) | Planner on the Board: New Card interviews, New Plan makes cards (ADR-0034) | #172, #273, #309, #322 | queued |
 | [#348](https://github.com/AndreyBegma/AgentDock/issues/348) | [348-card-hooks-hint-knows-the-plugin](348-card-hooks-hint-knows-the-plugin.md) | The card hooks hint knows whether the plugin is set up | #281 | queued |
 | [#353](https://github.com/AndreyBegma/AgentDock/issues/353) | [353-survive-api-restart](353-survive-api-restart.md) | Web survives an API restart: banner, read retry, terminal reconnect | — | queued |
+| [#359](https://github.com/AndreyBegma/AgentDock/issues/359) | [359-card-ships-itself](359-card-ships-itself.md) | A card ships itself: draft PR, CI fix rounds, auto-merge (ADR-0035) | #329, #337 | queued |
