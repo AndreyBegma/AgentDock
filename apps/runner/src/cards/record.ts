@@ -46,6 +46,11 @@ export const cardRecordSchema = z.object({
   phase: cardRecordPhaseSchema,
   startedAt: z.iso.datetime(),
   endedAt: z.iso.datetime().optional(),
+  /**
+   * #359 D3: the paths `card.run` committed (the spec, a design), kept
+   * across rounds; the PR body links them when the worker wrote none.
+   */
+  specFiles: z.array(z.string().min(1)).optional(),
 });
 export type CardRecord = z.infer<typeof cardRecordSchema>;
 

@@ -22,6 +22,7 @@ import {
   CARD_BODY_CUT_SUFFIX,
   CARD_CONTINUE_PROMPT,
   CARD_DESIGN_COMMENTS_MAX_BYTES,
+  CARD_PR_DESCRIPTION_FILE,
   CARD_WORKER_PROMPT_VERSION,
   type CardText,
   type CardWorkerPromptInput,
@@ -151,6 +152,42 @@ describe('worker prompt — ## Design (#243 D7)', () => {
   });
 });
 
+describe('worker prompt v5 — the pull request description (#359 D3)', () => {
+  const plain: CardWorkerPromptInput = { ...card, design: null };
+  const blob = 'https://github.com/<owner>/<repo>/blob/card/c12-add-login/';
+
+  it('asks for the description file before finish_card, git-excluded and uncommitted', () => {
+    const prompt = cardWorkerPrompt(plain);
+    expect(CARD_PR_DESCRIPTION_FILE).toBe('.agentdock/pull-request.md');
+    const at = prompt.indexOf(`\`${CARD_PR_DESCRIPTION_FILE}\``);
+    expect(at).toBeGreaterThan(prompt.indexOf('## When you are done'));
+    expect(at).toBeLessThan(prompt.indexOf('Then call the `finish_card` tool'));
+    expect(prompt).toContain('git-excluded — do not commit it');
+    expect(prompt).toContain('`## What changed and why`');
+    expect(prompt).toContain('`## Acceptance criteria`');
+    expect(prompt).toContain('`[x]` with how you checked it');
+  });
+
+  it('links the spec on the branch, and the design beside it', () => {
+    expect(cardWorkerPrompt(plain)).toContain(
+      `\`Spec: ${blob}docs/specs/card-12-add-login.md\``,
+    );
+    expect(cardWorkerPrompt(card)).toContain(
+      `\`Spec: ${blob}docs/specs/card-12-add-login.md · Design: ${blob}${path}\``,
+    );
+    expect(cardWorkerPrompt({ ...plain, specPath: null })).not.toContain(
+      '`Spec:',
+    );
+  });
+
+  it('asks for Closes #n only when the card has an issue', () => {
+    expect(cardWorkerPrompt(plain)).not.toContain('Closes #');
+    expect(cardWorkerPrompt({ ...plain, issueNumber: 41 })).toContain(
+      '`Closes #41`',
+    );
+  });
+});
+
 describe('next round prompt — card edits reach the worker (#273 D1–D4)', () => {
   const before: CardText = {
     title: 'Add login',
@@ -158,8 +195,8 @@ describe('next round prompt — card edits reach the worker (#273 D1–D4)', () 
     kind: 'feature',
   };
 
-  it('is version 4', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(4);
+  it('is version 5', () => {
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(5);
   });
 
   it('cardChange is null for identical text, whitespace around it aside', () => {

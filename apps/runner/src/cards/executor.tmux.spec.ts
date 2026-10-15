@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from 'bun:test';
-import { chmodSync, existsSync, readFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   CardRunArgs,
@@ -204,10 +204,16 @@ describe.skipIf(!tmuxInstalled)(
 
       // The binary received the prompt as one element, metacharacters intact.
       const argv = await t.argvOf('run_1');
+      // #367 D1: the profile has no agentdock plugin — the round's wiring.
+      const roundDir = join(t.cardsDir, 'card_1', 'rounds', 'run_1');
       expect(argv).toEqual([
         '--strict-mcp-config',
         '--session-id',
         SESSION_ID,
+        '--settings',
+        join(roundDir, 'agentdock-settings.json'),
+        '--mcp-config',
+        join(roundDir, 'agentdock-mcp.json'),
         '--model',
         'opus',
         '--permission-mode',
@@ -217,6 +223,32 @@ describe.skipIf(!tmuxInstalled)(
         worktree,
       ]);
       expect(existsSync(join(worktree, 'pwned'))).toBe(false);
+      const mcp = JSON.parse(
+        readFileSync(join(roundDir, 'agentdock-mcp.json'), 'utf8'),
+      );
+      expect(mcp.mcpServers.agentdock).toEqual({
+        command: process.execPath,
+        args: [MAIN, 'mcp'],
+      });
+      expect(
+        t.phases('run_1').find((d) => d.phase === 'running'),
+      ).toMatchObject({ wiring: 'injected' });
+      expect(
+        t.phases('run_1').find((d) => d.phase === 'running')?.wiringReason,
+      ).toBeUndefined();
+      // #359 D3: `.agentdock/` is excluded without any attachment.
+      expect(
+        readFileSync(
+          await t.f.run(
+            worktree,
+            'rev-parse',
+            '--path-format=absolute',
+            '--git-path',
+            'info/exclude',
+          ),
+          'utf8',
+        ),
+      ).toContain('.agentdock/');
 
       await t.untilEnded(t.executor, 'run_1');
       expect(t.phases('run_1').map((d) => d.phase)).toEqual([
@@ -237,6 +269,57 @@ describe.skipIf(!tmuxInstalled)(
       expect(t.phases('run_1').filter((d) => d.phase === 'ended')).toHaveLength(
         1,
       );
+    });
+
+    it('#367 D2: a profile that reports the agentdock plugin launches without --settings and --mcp-config', async () => {
+      const t = await setup();
+      t.f.write(t.f.profileDir, {
+        'plugins/installed_plugins.json': JSON.stringify({
+          plugins: {
+            'agentdock@agentdock': [
+              { version: '0.9.2', installPath: '/x', scope: 'user' },
+            ],
+          },
+        }),
+      });
+      await t.executor.run(t.args());
+      const argv = await t.argvOf('run_1');
+      expect(argv).not.toContain('--settings');
+      expect(argv).not.toContain('--mcp-config');
+      expect(
+        existsSync(
+          join(t.cardsDir, 'card_1', 'rounds', 'run_1', 'agentdock-mcp.json'),
+        ),
+      ).toBe(false);
+      expect(
+        t.phases('run_1').find((d) => d.phase === 'running'),
+      ).toMatchObject({ wiring: 'plugin' });
+    });
+
+    it('#367 D3: a round whose wiring cannot be written still starts, unwired, with the reason', async () => {
+      const t = await setup();
+      // A directory where the settings file goes: the atomic rename fails.
+      mkdirSync(
+        join(
+          t.cardsDir,
+          'card_1',
+          'rounds',
+          'run_1',
+          'agentdock-settings.json',
+          'in-the-way',
+        ),
+        { recursive: true },
+      );
+      await t.executor.run(t.args());
+      const argv = await t.argvOf('run_1');
+      expect(argv).not.toContain('--settings');
+      expect(argv).not.toContain('--mcp-config');
+      expect(
+        t.phases('run_1').find((d) => d.phase === 'running'),
+      ).toMatchObject({
+        wiring: 'none',
+        wiringReason: 'settings_write_failed',
+      });
     });
 
     it('feedback resumes in the same worktree, replacing a live session without reporting it ended (D9); stop reports nothing either', async () => {

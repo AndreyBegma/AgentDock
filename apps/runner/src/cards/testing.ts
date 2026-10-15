@@ -5,7 +5,7 @@ import { skillsWorkspace, withFakeGh } from '../skills/testing';
  * The skills workspace (real git, a bare origin, project `widget` on GitHub's
  * `acme/widget`) with a `gh` that also answers `pr list --head`: the PRs
  * `pr create` opened so far, all open, so a second collect finds the first
- * PR instead of opening another.
+ * PR instead of opening another — and records `pr edit` with its body.
  */
 export const cardsWorkspace = async () => {
   const f = await skillsWorkspace();
@@ -17,7 +17,13 @@ export const cardsWorkspace = async () => {
     isDraft?: boolean;
   }[] = [];
   const listCalls: string[][] = [];
+  const edits: { args: string[]; body: string }[] = [];
   const exec: Exec = async (binary, args, options) => {
+    if (binary === 'gh' && args[0] === 'pr' && args[1] === 'edit') {
+      const file = args[args.indexOf('--body-file') + 1] ?? '';
+      edits.push({ args: [...args], body: await Bun.file(file).text() });
+      return { code: 0, stdout: '', stderr: '' };
+    }
     if (binary === 'gh' && args[0] === 'pr' && args[1] === 'list') {
       listCalls.push([...args]);
       const head = args[args.indexOf('--head') + 1];
@@ -49,5 +55,5 @@ export const cardsWorkspace = async () => {
   };
   const prCreates = () =>
     gh.calls.filter((c) => c.args[0] === 'pr' && c.args[1] === 'create');
-  return { ...f, exec, gh, open, listCalls, prCreates };
+  return { ...f, exec, gh, open, listCalls, edits, prCreates };
 };
