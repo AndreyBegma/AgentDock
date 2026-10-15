@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { PairingService } from './pairing.service';
 import { RunnerGateway } from './runner.gateway';
 import { RunnerCommandService } from './runner-command.service';
+import { RunnerConnectHooks } from './runner-connect-hooks';
 import { RunnerConnections } from './runner-connections';
 import { RunnerEventSinks } from './runner-event-sinks';
 import { RunnerIngestService } from './runner-ingest.service';
@@ -27,6 +28,7 @@ import { RunnersService } from './runners.service';
   providers: [
     { provide: RUNNER_OPTIONS, useValue: defaultRunnerOptions },
     RunnerConnections,
+    RunnerConnectHooks,
     RunnerEventSinks,
     RunnerIngestService,
     RunnerCommandService,
@@ -47,6 +49,8 @@ import { RunnersService } from './runners.service';
     RunnerWatchList,
     RunnerPresence,
     RunnerEventSinks,
+    // #329 D4: the board retries failed collects when a runner connects.
+    RunnerConnectHooks,
     RunnerStreams,
     // Spec 201: the local module registers its router and sets away mode.
     RunnerLocalRequests,

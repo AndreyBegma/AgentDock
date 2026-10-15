@@ -262,4 +262,255 @@ describe('board accept with merge (e2e, #273)', () => {
       expect(w.sent('card.merge')).toEqual([]);
     });
   });
+
+  describe('#329 D7: merge and delete the branch', () => {
+    it('sends deleteBranch, reports branchDeleted, stores merged and closes the worktree', async () => {
+      await finished();
+      w.handlers['card.merge'] = (args) =>
+        ok({
+          merged: true,
+          alreadyMerged: false,
+          method: 'merge',
+          mergeCommit: null,
+          issueClosed: true,
+          branchDeleted: args.deleteBranch === true,
+        });
+      const response = await post(1, 'accept', {
+        merge: { headSha: HEAD_SHA, deleteBranch: true },
+      });
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        column: 'completed',
+        prState: 'merged',
+        merge: { merged: true, branchDeleted: true },
+        prClose: null,
+      });
+      expect(w.sent('card.merge')[0].deleteBranch).toBe(true);
+      await w.work.settled();
+      expect(w.sent('card.close')).toEqual([
+        expect.objectContaining({ removeWorktree: true }),
+      ]);
+      const [merged] = await w.audit('card.merged');
+      expect(merged.after).toMatchObject({ branchDeleted: true });
+    });
+
+    it('a merge without deleteBranch sends no such arg, as an older runner expects', async () => {
+      await finished();
+      const response = await post(1, 'accept', {
+        merge: { headSha: HEAD_SHA, deleteBranch: false },
+      });
+      expect(response.status).toBe(200);
+      expect(response.body.merge).toMatchObject({ branchDeleted: false });
+      expect(w.sent('card.merge')[0]).not.toHaveProperty('deleteBranch');
+    });
+
+    it('a failed deletion never undoes the merge', async () => {
+      await finished();
+      w.handlers['card.merge'] = () =>
+        ok({
+          merged: true,
+          alreadyMerged: false,
+          method: 'merge',
+          mergeCommit: null,
+          issueClosed: true,
+          branchDeleted: false,
+          branchError: 'HTTP 422: Reference does not exist',
+        });
+      const response = await post(1, 'accept', {
+        merge: { headSha: HEAD_SHA, deleteBranch: true },
+      });
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        column: 'completed',
+        merge: {
+          branchDeleted: false,
+          branchError: 'HTTP 422: Reference does not exist',
+        },
+      });
+    });
+
+    it('a runner without card.prClose → 503 command_unavailable, nothing sent', async () => {
+      await finished();
+      w.prCloseAdvertised = false;
+      const response = await post(1, 'accept', {
+        merge: { headSha: HEAD_SHA, deleteBranch: true },
+      });
+      expect(response.status).toBe(503);
+      expect(response.body.error).toBe('command_unavailable');
+      expect(w.sent('card.merge')).toEqual([]);
+      expect((await w.card(1)).column).toBe('finished');
+    });
+
+    it('a terminal card → 422 branch_delete_refused, on merge and on close', async () => {
+      await finished();
+      await w.ctx.prisma.boardCard.updateMany({
+        data: { source: 'terminal' },
+      });
+      for (const body of [
+        { merge: { headSha: HEAD_SHA, deleteBranch: true } },
+        { closePr: { deleteBranch: true, closeIssue: false } },
+      ]) {
+        const response = await post(1, 'accept', body);
+        expect(response.status).toBe(422);
+        expect(response.body.error).toBe('branch_delete_refused');
+      }
+      expect(w.sent('card.merge')).toEqual([]);
+      expect(w.prCloses()).toEqual([]);
+      expect((await w.card(1)).column).toBe('finished');
+    });
+  });
+
+  describe('#329 D8: accept without merging, closing the PR', () => {
+    it('sends card.prClose, moves to Completed, stores closed, audits card.pr_closed', async () => {
+      await finished();
+      const response = await post(1, 'accept', {
+        closePr: { deleteBranch: true, closeIssue: false },
+      });
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        column: 'completed',
+        prState: 'closed',
+        merge: null,
+        prClose: {
+          closed: true,
+          alreadyClosed: false,
+          branchDeleted: true,
+          issueClosed: false,
+        },
+      });
+      const card = await w.card(1);
+      expect(w.prCloses()).toEqual([
+        {
+          cardId: card.id,
+          projectId: w.a,
+          root: '/srv/dev/widget',
+          pr: 77,
+          deleteBranch: true,
+          issue: null,
+          comment: 'Closed from the AgentDock Board (C-1)',
+        },
+      ]);
+      expect(w.sent('card.merge')).toEqual([]);
+      const [closed] = await w.audit('card.pr_closed');
+      expect(closed.after).toMatchObject({
+        pr: 77,
+        alreadyClosed: false,
+        branchDeleted: true,
+        issueClosed: false,
+      });
+    });
+
+    it('closes the issue as not planned only when ticked', async () => {
+      await finished();
+      const response = await post(1, 'accept', {
+        closePr: { deleteBranch: false, closeIssue: true },
+      });
+      expect(response.status).toBe(200);
+      expect(w.prCloses()[0]).toMatchObject({
+        deleteBranch: false,
+        issue: 41,
+      });
+      expect(response.body.prClose).toMatchObject({ issueClosed: true });
+    });
+
+    it('a refusal → 409 pr_close_failed with the reason, the card stays in Finished', async () => {
+      await finished();
+      w.handlers['card.prClose'] = () =>
+        ok({
+          closed: false,
+          error: 'merged',
+          message: 'pull request #77 is merged',
+        });
+      const response = await post(1, 'accept', {
+        closePr: { deleteBranch: true, closeIssue: false },
+      });
+      expect(response.status).toBe(409);
+      expect(response.body).toMatchObject({
+        error: 'pr_close_failed',
+        reason: 'merged',
+        message: 'pull request #77 is merged',
+      });
+      const card = await w.card(1);
+      expect(card).toMatchObject({ column: 'finished', prState: 'open' });
+      await w.work.settled();
+      expect(w.sent('card.close')).toEqual([]);
+      const [failure] = await w.audit('card.pr_close_failed');
+      expect(failure).toMatchObject({
+        result: 'error',
+        after: { pr: 77, reason: 'merged' },
+      });
+    });
+
+    it('leave the PR open: nothing is sent to GitHub', async () => {
+      await finished();
+      const response = await post(1, 'accept');
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        column: 'completed',
+        prClose: null,
+        prState: 'open',
+      });
+      expect(w.prCloses()).toEqual([]);
+      expect(w.sent('card.merge')).toEqual([]);
+    });
+
+    it('a runner without card.prClose → 503 command_unavailable, nothing sent', async () => {
+      await finished();
+      w.prCloseAdvertised = false;
+      const response = await post(1, 'accept', {
+        closePr: { deleteBranch: false, closeIssue: false },
+      });
+      expect(response.status).toBe(503);
+      expect(response.body.error).toBe('command_unavailable');
+      expect(w.prCloses()).toEqual([]);
+      expect((await w.card(1)).column).toBe('finished');
+    });
+
+    it('merge with closePr → 400; a closePr missing a field → 400', async () => {
+      await finished();
+      for (const body of [
+        {
+          merge: { headSha: HEAD_SHA },
+          closePr: { deleteBranch: false, closeIssue: false },
+        },
+        { closePr: { deleteBranch: true } },
+      ]) {
+        expect((await post(1, 'accept', body)).status).toBe(400);
+      }
+      expect(w.prCloses()).toEqual([]);
+      expect(w.sent('card.merge')).toEqual([]);
+    });
+
+    it('no PR → 409 no_pull_request', async () => {
+      await finished();
+      await w.ctx.prisma.boardCard.updateMany({
+        data: { prNumber: null, prUrl: null },
+      });
+      const response = await post(1, 'accept', {
+        closePr: { deleteBranch: false, closeIssue: false },
+      });
+      expect(response.status).toBe(409);
+      expect(response.body.error).toBe('no_pull_request');
+      expect(w.prCloses()).toEqual([]);
+    });
+
+    it("is 403 for a viewer, 404 for another project's card", async () => {
+      await finished();
+      const body = { closePr: { deleteBranch: true, closeIssue: false } };
+      expect(
+        (await w.viewer.send('post', `${w.path()}/board/cards/1/accept`, body))
+          .status,
+      ).toBe(403);
+      expect(
+        (
+          await w.admin.send(
+            'post',
+            `${w.path(w.b)}/board/cards/1/accept`,
+            body,
+          )
+        ).status,
+      ).toBe(404);
+      expect(w.prCloses()).toEqual([]);
+    });
+  });
 });

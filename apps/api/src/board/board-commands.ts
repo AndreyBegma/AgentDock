@@ -1,8 +1,11 @@
 import { BOARD_ERROR } from '@agentdock/shared';
 import {
   type CardCommandName,
+  type CardPrCloseArgs,
+  type CardPrCloseResult,
   type CommandErrorCode,
   cardCommands,
+  cardPrCloseResultSchema,
   type IssueCreateArgs,
   type IssueCreateResult,
   isCommandName,
@@ -55,7 +58,12 @@ export class BoardCommands {
   /** Throws 503 `command_unavailable` when `name` cannot be sent to `runnerId` now. */
   assertReady(
     runnerId: string,
-    name: CardCommandName | 'issue.create' | 'plan.close' | 'pr.inspect',
+    name:
+      | CardCommandName
+      | 'card.prClose'
+      | 'issue.create'
+      | 'plan.close'
+      | 'pr.inspect',
   ): void {
     const wired: string = name;
     if (!isCommandName(wired)) {
@@ -90,6 +98,42 @@ export class BoardCommands {
       if (error instanceof BoardFailure) return false;
       throw error;
     }
+  }
+
+  /**
+   * #329 D7–D9: whether the connected runner advertises `card.prClose`. Its
+   * release also takes `card.merge`'s `deleteBranch`; a runner that
+   * advertised nothing (`unknown`) is older than both.
+   */
+  advertisesPrClose(runnerId: string): boolean {
+    const wired: string = 'card.prClose';
+    if (!isCommandName(wired)) return false;
+    const support = this.presence.commandSupport(runnerId, wired);
+    return support === 'supported' || support === 'disabled';
+  }
+
+  /**
+   * #329 D8: `card.prClose`. Until i329-runner enters it in the `commands`
+   * allowlist, `assertReady` answers 503 `command_unavailable` and nothing
+   * is sent.
+   */
+  async closePr(
+    runnerId: string,
+    args: CardPrCloseArgs,
+    options: SendOptions,
+  ): Promise<BoardSendResult<CardPrCloseResult>> {
+    this.assertReady(runnerId, 'card.prClose');
+    const wired: string = 'card.prClose';
+    if (!isCommandName(wired)) throw new Error('unreachable');
+    const result = await this.commands.send(runnerId, wired, args, options);
+    if (result.status !== 'ok') return result;
+    const output = cardPrCloseResultSchema.safeParse(result.output);
+    return output.success
+      ? { status: 'ok', output: output.data }
+      : {
+          status: 'error',
+          error: { code: 'internal', message: 'malformed result' },
+        };
   }
 
   /** #273 D10: the card's PR as `gh pr view` reads it on the runner. */

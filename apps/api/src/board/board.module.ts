@@ -12,6 +12,7 @@ import { BoardRoundsService } from './board-rounds.service';
 import { BoardSink } from './board-sink';
 import { BoardTerminalService } from './board-terminal.service';
 import { BoardWork } from './board-work';
+import { CollectRetryTimer } from './collect-retry-timer';
 
 /**
  * The project Board (issue #242, ADR-0024): cards AgentDock owns, each worked
@@ -33,6 +34,7 @@ import { BoardWork } from './board-work';
     BoardSink,
     BoardTerminalService,
     BoardWork,
+    CollectRetryTimer,
     FleetCardEditsRef,
   ],
   // `BoardRoundsService` too: approving a card's design may start round 1 (#243 D6).
