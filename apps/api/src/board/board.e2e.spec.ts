@@ -127,6 +127,33 @@ describe('board (e2e)', () => {
         expect.objectContaining({ removeWorktree: true }),
       ]);
     });
+
+    it('shows when a drawing card design started (#275 D8)', async () => {
+      const drawing = await w.createCard({ title: 'Drawing' });
+      const resting = await w.createCard({ title: 'Resting' });
+      const since = new Date('2026-10-15T09:00:00.000Z');
+      await w.ctx.prisma.taskDesign.createMany({
+        data: [
+          {
+            cardId: drawing.id,
+            needed: true,
+            status: 'generating',
+            busySince: since,
+          },
+          { cardId: resting.id, needed: true, status: 'reviewing' },
+        ],
+      });
+      const cards = (await board()).columns.flatMap((c) => c.cards);
+      expect(cards.find((c) => c.number === drawing.number)?.design).toEqual(
+        expect.objectContaining({
+          status: 'generating',
+          busySince: since.toISOString(),
+        }),
+      );
+      expect(
+        cards.find((c) => c.number === resting.number)?.design?.busySince,
+      ).toBeNull();
+    });
   });
 
   describe('moves', () => {

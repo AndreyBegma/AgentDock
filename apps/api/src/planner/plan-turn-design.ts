@@ -41,7 +41,10 @@ export const retriedDesign = async (
   }
   await prisma.taskDesign.updateMany({
     where: { planId, taskKey: task.key },
-    data: { status: design.mode === 'generate' ? 'generating' : 'revising' },
+    data: {
+      status: design.mode === 'generate' ? 'generating' : 'revising',
+      busySince: new Date(),
+    },
   });
   return design;
 };

@@ -33,6 +33,7 @@ import {
 } from '../projects';
 import { DesignService } from './design.service';
 import { DesignSettingsService } from './design-settings.service';
+import { DesignStopService } from './design-stop.service';
 import {
   DesignApproveDto,
   DesignCommentDto,
@@ -64,6 +65,7 @@ const actorOf = (
 export class DesignController {
   constructor(
     private readonly designs: DesignService,
+    private readonly stops: DesignStopService,
     private readonly profiles: UiProfileService,
     private readonly settings: DesignSettingsService,
     private readonly store: PlanStore,
@@ -181,6 +183,22 @@ export class DesignController {
   ): Promise<TaskDesignView> {
     const plan = await this.store.readable(user.id, access.projectId, planId);
     await this.designs.generate(plan, key, actorOf(access, user, ctx));
+    return this.designs.view(access.projectId, user.id, planId, key);
+  }
+
+  /** #275 D5: no body; nothing running is 409 `design_not_running`. */
+  @Post('plans/:planId/tasks/:key/design/stop')
+  @HttpCode(200)
+  @ProjectRole('operator')
+  async stop(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Param('planId') planId: string,
+    @Param('key') key: string,
+  ): Promise<TaskDesignView> {
+    const plan = await this.store.readable(user.id, access.projectId, planId);
+    await this.stops.stop(plan, key, actorOf(access, user, ctx));
     return this.designs.view(access.projectId, user.id, planId, key);
   }
 

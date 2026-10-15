@@ -132,8 +132,8 @@ export const restingStatus = (drawn: boolean): TaskDesignStatus =>
 /**
  * What a design turn's run carries in `runs.args.design` (D4, D10): the
  * variant it draws, the variants still to draw after it in this batch, the
- * profile it draws from, and the comments open when the batch started — the
- * only ones its `addressed` may name.
+ * profile it draws from, the comments open when the batch started — the
+ * only ones its `addressed` may name — and the build it waited for, if any.
  */
 export const designTurnPlanSchema = z.strictObject({
   mode: z.enum(['generate', 'revise']),
@@ -141,6 +141,8 @@ export const designTurnPlanSchema = z.strictObject({
   remaining: z.array(z.number().int().min(1).max(3)).max(2),
   comments: z.array(z.string().min(1).max(64)).max(100),
   profileId: z.string().min(1).nullable(),
+  /** #275 D1: the build this batch waited for — its turns are step 2 of 2. */
+  profileBuildRunId: z.string().min(1).optional(),
 });
 export type DesignTurnPlan = z.infer<typeof designTurnPlanSchema>;
 

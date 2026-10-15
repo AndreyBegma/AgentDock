@@ -21,6 +21,7 @@ import {
   type ResolvedProjectAccess,
 } from '../projects';
 import { DesignService } from './design.service';
+import { DesignStopService } from './design-stop.service';
 import { DesignApproveDto, DesignCommentDto, TaskDesignPatchDto } from './dto';
 
 const actorOf = (
@@ -31,14 +32,17 @@ const actorOf = (
 
 /**
  * A board card's design (#243 "API", D8; ADR-0025): any project viewer
- * reads it; the switch, Generate, comments, Revise and Approve need an
+ * reads it; the switch, Generate, comments, Revise, Stop and Approve need an
  * operator. A project the caller cannot see is 404 on every route. Writes
  * answer the design as it now is.
  */
 @Controller('projects/:projectId/board/cards/:number/design')
 @UseGuards(ProjectAccessGuard)
 export class CardDesignController {
-  constructor(private readonly designs: DesignService) {}
+  constructor(
+    private readonly designs: DesignService,
+    private readonly stops: DesignStopService,
+  ) {}
 
   @Get()
   view(
@@ -117,6 +121,21 @@ export class CardDesignController {
       n,
       actorOf(access, user, ctx),
     );
+    return this.designs.cardView(access.projectId, n);
+  }
+
+  /** #275 D5: no body; nothing running is 409 `design_not_running`. */
+  @Post('stop')
+  @HttpCode(200)
+  @ProjectRole('operator')
+  async stop(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Param('number') number: string,
+  ): Promise<TaskDesignView> {
+    const n = cardNumber(number);
+    await this.stops.cardStop(access.projectId, n, actorOf(access, user, ctx));
     return this.designs.cardView(access.projectId, n);
   }
 

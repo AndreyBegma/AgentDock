@@ -380,6 +380,7 @@ export class DesignService {
           approvedRevisionId: revision.id,
           approvedById: actor.userId,
           approvedAt: new Date(),
+          busySince: null,
         },
       });
       if (claimed.count === 0) throw approvedAlready();
@@ -414,11 +415,12 @@ export class DesignService {
   /**
    * D13: a profile build finished — the designs waiting for it start their
    * turns with the new version, or rest when it failed (`profileId`
-   * undefined).
+   * undefined). Their turns record `buildRunId` as step 1 of 2 (#275 D1).
    */
   async afterBuild(
     waiting: readonly WaitingDesign[],
     profileId: string | null | undefined,
+    buildRunId?: string,
   ): Promise<void> {
     for (const w of waiting) {
       const design = await this.prisma.taskDesign.findUnique({
@@ -433,7 +435,7 @@ export class DesignService {
       if (!key) continue;
       const started =
         profileId !== undefined &&
-        (await this.startWaiting(design, key, w, profileId));
+        (await this.startWaiting(design, key, w, profileId, buildRunId));
       if (!started) await settleDesign(this.prisma, key);
       if ('cardId' in key) {
         if (design.card) {
@@ -467,9 +469,13 @@ export class DesignService {
     key: DesignKey,
     w: WaitingDesign,
     profileId: string | null,
+    buildRunId: string | undefined,
   ): Promise<boolean> {
-    const batch = await this.batch(design, w.mode, profileId);
-    if (!batch) return false;
+    const drawn = await this.batch(design, w.mode, profileId);
+    if (!drawn) return false;
+    const batch: DesignTurnPlan = buildRunId
+      ? { ...drawn, profileBuildRunId: buildRunId }
+      : drawn;
     if ('cardId' in key) {
       // Designs freeze once a round exists (#243 "Out of scope").
       if (!design.card || design.card._count.rounds > 0) return false;
@@ -546,7 +552,7 @@ export class DesignService {
     });
     await this.prisma.taskDesign.update({
       where: { id: design.id },
-      data: { status: busyStatusOf(mode) },
+      data: { status: busyStatusOf(mode), busySince: new Date() },
     });
     owner.publish();
     let turnId: string | null = null;

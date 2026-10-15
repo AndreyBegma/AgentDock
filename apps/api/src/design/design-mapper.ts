@@ -1,7 +1,9 @@
 import {
   DEFAULT_VIEWPORTS,
   type DesignCommentView,
+  type DesignFailureView,
   type DesignOwnerView,
+  type DesignProgressView,
   type DesignRevisionView,
   type DesignSkillWarning,
   type TaskDesignView,
@@ -122,6 +124,8 @@ export const toDesignView = (
     warnings: DesignSkillWarning[];
     viewports: ViewportPreset[];
     activeTurnId: string | null;
+    progress: DesignProgressView | null;
+    lastFailure: DesignFailureView | null;
   },
 ): TaskDesignView => ({
   id: row.id,
@@ -143,9 +147,9 @@ export const toDesignView = (
   warnings: extra.warnings,
   viewports: extra.viewports,
   activeTurnId: extra.activeTurnId,
-  busySince: null,
-  progress: null,
-  lastFailure: null,
+  busySince: row.busySince?.toISOString() ?? null,
+  progress: extra.progress,
+  lastFailure: extra.lastFailure,
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(),
 });
