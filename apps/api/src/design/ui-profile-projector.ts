@@ -189,7 +189,7 @@ export class UiProfileProjector implements RunnerEventSink, OnModuleInit {
       result: 'ok',
     });
     await this.store.publishRun(run.projectId, run.id);
-    await this.designs.afterBuild(waiting, created.id);
+    await this.designs.afterBuild(waiting, created.id, run.id);
   }
 
   /**

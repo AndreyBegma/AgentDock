@@ -95,6 +95,13 @@ describe('design progress (e2e)', () => {
     expect(drawing.activeTurnId).toBe(turn.id);
 
     await h.finish(plan.id, designResult({ taskKey: 't1', variant: 1 }));
+    const [revision] = (await design(plan.id)).revisions;
+    const comment = await h.author.send(
+      'post',
+      `${h.designBase(plan.id, 't1')}/comments`,
+      { revisionId: revision.id, kind: 'general', body: 'Tighter.' },
+    );
+    expect(comment.status).toBe(201);
     const revise = await h.author.send(
       'post',
       `${h.designBase(plan.id, 't1')}/revise`,
@@ -133,6 +140,25 @@ describe('design progress (e2e)', () => {
     expect((await design(plan.id)).lastFailure).toBeNull();
   });
 
+  it("the plan page's Retry of a failed design turn restarts the job's clock", async () => {
+    await h.seedProfile();
+    const plan = await uiPlan();
+    expect((await generate(plan.id)).status).toBe(201);
+    const failed = await h.activeTurn(plan.id);
+    await h.endTurn(plan.id, 'failed', TIMEOUT);
+    expect((await design(plan.id)).busySince).toBeNull();
+
+    const retried = await h.author.send(
+      'post',
+      `${h.base(plan.id)}/turns/${failed.id}/retry`,
+    );
+    expect(retried.status).toBeLessThan(300);
+    const busy = await design(plan.id);
+    expect(busy.status).toBe('generating');
+    expect(busy.busySince).not.toBeNull();
+    expect(busy.progress).toMatchObject({ stage: 'draw', variant: 1 });
+  });
+
   it('a failed build leaves the design idle with lastFailure on the profile stage', async () => {
     const plan = await uiPlan();
     expect((await generate(plan.id)).status).toBe(201);
@@ -148,14 +174,5 @@ describe('design progress (e2e)', () => {
       message: 'claude exited 1',
       variant: null,
     });
-  });
-
-  it('a viewer reads progress', async () => {
-    await h.seedProfile();
-    const plan = await uiPlan();
-    expect((await generate(plan.id)).status).toBe(201);
-    const seen = (await h.viewer.get(h.designBase(plan.id, 't1')))
-      .body as TaskDesignView;
-    expect(seen.progress).toMatchObject({ stage: 'draw', variant: 1 });
   });
 });

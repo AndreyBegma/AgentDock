@@ -41,6 +41,6 @@ import { TasksQueryService } from './tasks-query.service';
   ],
   // The design stage (spec 223) runs its turns through the planner's — a
   // board card's as well (#243).
-  exports: [CardDesignTurnService, PlanStore, PlanTurnService],
+  exports: [CardDesignTurnService, PlanStore, PlanTurnService, PlannerCommands],
 })
 export class PlannerModule {}
