@@ -65,3 +65,5 @@ ask for it.
 | [#348](https://github.com/AndreyBegma/AgentDock/issues/348) | [348-card-hooks-hint-knows-the-plugin](348-card-hooks-hint-knows-the-plugin.md) | The card hooks hint knows whether the plugin is set up | #281 | queued |
 | [#353](https://github.com/AndreyBegma/AgentDock/issues/353) | [353-survive-api-restart](353-survive-api-restart.md) | Web survives an API restart: banner, read retry, terminal reconnect | — | shipped — [#358](https://github.com/AndreyBegma/AgentDock/pull/358) |
 | [#359](https://github.com/AndreyBegma/AgentDock/issues/359) | [359-card-ships-itself](359-card-ships-itself.md) | A card ships itself: draft PR, CI fix rounds, auto-merge (ADR-0035) | #329, #337 | queued |
+| [#367](https://github.com/AndreyBegma/AgentDock/issues/367) | [367-card-sessions-always-wired](367-card-sessions-always-wired.md) | Card sessions carry hooks + finish_card without profile setup | #281 | queued |
+| [#368](https://github.com/AndreyBegma/AgentDock/issues/368) | [368-staging-deploy-no-drops](368-staging-deploy-no-drops.md) | Staging deploy does not drop requests (Caddy retries) | — | queued |
