@@ -44,12 +44,6 @@ export function AttachmentList({
               mime={a.mime}
               thumbnailUrl={image ? href : undefined}
               status="done"
-              meta={
-                <span className="text-xs text-ink-3">
-                  {a.uploaderName ? `${a.uploaderName} · ` : ''}
-                  <Time value={a.createdAt} />
-                </span>
-              }
               actions={
                 <span className="flex gap-1">
                   <a
@@ -75,6 +69,10 @@ export function AttachmentList({
                 </span>
               }
             />
+            <p className="px-2 text-xs text-ink-3">
+              {a.uploaderName ? `${a.uploaderName} · ` : ''}
+              <Time value={a.createdAt} />
+            </p>
           </li>
         );
       })}

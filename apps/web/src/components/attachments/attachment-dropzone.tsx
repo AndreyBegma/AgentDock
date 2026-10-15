@@ -23,6 +23,12 @@ import {
 } from '../../lib/attachments/format';
 import type { AttachmentUploads } from '../../lib/attachments/use-attachment-uploads';
 
+/** A refusal (4xx) says the file itself is wrong, so sending it again changes nothing. */
+const retryable = (state: UploadItem['state']): boolean =>
+  state.status === 'canceled' ||
+  (state.status === 'error' &&
+    (state.httpStatus === undefined || state.httpStatus >= 500));
+
 /** The `FileItem` row of one upload in flight, finished or failed. */
 function UploadRow({
   item,
@@ -67,7 +73,7 @@ function UploadRow({
         }
         actions={
           <span className="flex gap-1">
-            {state.status === 'error' || state.status === 'canceled' ? (
+            {retryable(state) ? (
               <Button
                 variant="ghost"
                 size="sm"
