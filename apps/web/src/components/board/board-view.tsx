@@ -28,6 +28,7 @@ import {
   canStop,
   columnsOf,
   describeBoardError,
+  isSuggestion,
   toItem,
 } from '../../lib/board/format';
 import { CardFace } from './card-face';
@@ -75,6 +76,15 @@ export function BoardColumns({
     footer:
       c.cards.length === 0 ? (
         <p className="px-1 text-xs text-ink-3">{COLUMN_HINT[c.column]}</p>
+      ) : c.column === 'inbox' && canOperate ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={actions.busy || busy}
+          onClick={() => actions.askDismissAll(c.cards.length)}
+        >
+          Dismiss all
+        </Button>
       ) : undefined,
   }));
 
@@ -146,6 +156,34 @@ export function BoardColumns({
         renderCard={(item) => <CardFace card={item.card} onOpen={onOpen} />}
         renderCardMenu={(item) => {
           const card = item.card;
+          if (isSuggestion(card)) {
+            return (
+              <>
+                <MenuSeparator />
+                <MenuItem onSelect={() => onOpen(card)}>Open</MenuItem>
+                {canOperate ? (
+                  <>
+                    <MenuItem
+                      disabled={actions.busy || busy}
+                      onSelect={() => void actions.acceptSuggestion(card)}
+                    >
+                      Accept
+                    </MenuItem>
+                    <MenuItem onSelect={() => onOpen(card)}>
+                      Edit & accept…
+                    </MenuItem>
+                    <MenuItem
+                      tone="danger"
+                      disabled={actions.busy || busy}
+                      onSelect={() => void actions.dismiss(card)}
+                    >
+                      Dismiss
+                    </MenuItem>
+                  </>
+                ) : null}
+              </>
+            );
+          }
           return (
             <>
               <MenuSeparator />

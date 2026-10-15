@@ -16,6 +16,7 @@ import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Timeline, type TimelineItem } from '@andrewbehma/glass-ui/timeline';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import NextLink from 'next/link';
 import { useEffect, useState } from 'react';
 import { fetchCard, sendFeedback, updateCard } from '../../lib/board/actions';
 import {
@@ -30,6 +31,7 @@ import {
   hooksHint,
   phaseLabel,
   roundPill,
+  sessionHref,
 } from '../../lib/board/format';
 import { formatCost } from '../../lib/format';
 import { Time } from '../../lib/format/time';
@@ -37,6 +39,7 @@ import { safeHttpsUrl } from '../../lib/queue/format';
 import { Markdown } from '../markdown/markdown';
 import { CardDesignSection } from './card-design';
 import { CardOptionToggles } from './card-options';
+import { SuggestionSheetBody } from './suggestion-sheet';
 import type { CardActions } from './use-card-actions';
 
 const KIND_LABEL: Record<BoardCardKind, string> = {
@@ -210,6 +213,18 @@ function CardDetailBody({
         ) : null}
       </div>
       <Links card={card} />
+      {card.source === 'captured' && sessionHref(card.sourceSessionId) ? (
+        <p className="text-xs text-ink-2">
+          Suggested from{' '}
+          <NextLink
+            href={sessionHref(card.sourceSessionId) ?? '#'}
+            className="text-accent-ink underline-offset-2 hover:underline"
+          >
+            a Claude Code session
+          </NextLink>
+          .
+        </p>
+      ) : null}
       {card.branch ? (
         <p className="break-all font-mono text-xs text-ink-2">{card.branch}</p>
       ) : null}
@@ -496,16 +511,26 @@ export function CardSheet({
               {error}
             </p>
           ) : card && card.number === number ? (
-            <CardDetailBody
-              // A new round resets the form; a push mid-typing does not.
-              key={`${card.id}:${card.rounds.length}`}
-              projectId={projectId}
-              card={card}
-              canOperate={canOperate}
-              actions={actions}
-              terminal={terminal}
-              onSaved={onChanged}
-            />
+            card.column === 'inbox' ? (
+              <SuggestionSheetBody
+                key={card.id}
+                card={card}
+                canOperate={canOperate}
+                actions={actions}
+                onDone={close}
+              />
+            ) : (
+              <CardDetailBody
+                // A new round resets the form; a push mid-typing does not.
+                key={`${card.id}:${card.rounds.length}`}
+                projectId={projectId}
+                card={card}
+                canOperate={canOperate}
+                actions={actions}
+                terminal={terminal}
+                onSaved={onChanged}
+              />
+            )
           ) : (
             <Skeleton className="h-64 w-full" />
           )}

@@ -7,6 +7,10 @@ import {
   type BoardColumn,
   type BoardMoveRefusal,
   type BoardView,
+  type CaptureModel,
+  type CaptureSkipReason,
+  type CaptureStatus,
+  type CardCaptureView,
   type CardRoundBrief,
   type CardRoundPhase,
   isActiveRoundPhase,
@@ -150,6 +154,60 @@ export const canStop = (card: BoardCardView): boolean =>
 export const canMarkFinished = (card: BoardCardView): boolean =>
   card.column === 'in_progress' && isRoundActive(card.round);
 
+/** #244 D9: an Inbox card is accepted or dismissed, never run. */
+export const isSuggestion = (card: BoardCardView): boolean =>
+  card.column === 'inbox';
+
+/** The confidence as a whole percent: `0.74` → `74%`; none for a manual card. */
+export const confidenceLabel = (confidence: number | null): string | null =>
+  confidence === null || !Number.isFinite(confidence)
+    ? null
+    : `${Math.round(Math.min(Math.max(confidence, 0), 1) * 100)}%`;
+
+/** The source session's page (its content timeline); none once the session is gone. */
+export const sessionHref = (sessionId: string | null): string | null =>
+  sessionId === null ? null : `/sessions/${encodeURIComponent(sessionId)}`;
+
+export const CAPTURE_STATUS_PILL: Record<CaptureStatus, RoundPill> = {
+  queued: { status: 'idle', label: 'Queued' },
+  running: { status: 'running', label: 'Running' },
+  succeeded: { status: 'done', label: 'Done' },
+  failed: { status: 'error', label: 'Failed' },
+  skipped: { status: 'blocked', label: 'Skipped' },
+};
+
+export const CAPTURE_SKIP_TEXT: Record<CaptureSkipReason, string> = {
+  too_little: 'Too little new content',
+  rate_limited: 'Rate limit reached',
+  inbox_full: 'Inbox is full',
+  budget_exceeded: 'Budget hard stop',
+  runner_offline: 'Runner was offline',
+  capture_off: 'Capture was turned off',
+};
+
+/** What a capture row says about its outcome: the skip reason, the error, or the count. */
+export function captureOutcome(capture: CardCaptureView): string {
+  if (capture.status === 'skipped' && capture.skipReason) {
+    return CAPTURE_SKIP_TEXT[capture.skipReason];
+  }
+  if (capture.status === 'failed') return capture.error ?? 'Failed';
+  if (capture.status === 'succeeded') {
+    return capture.suggested === 1
+      ? '1 card suggested'
+      : `${capture.suggested} cards suggested`;
+  }
+  return '';
+}
+
+export const CAPTURE_MODEL_LABEL: Record<CaptureModel, string> = {
+  haiku: 'Haiku (fast, cheap)',
+  sonnet: 'Sonnet (better judgement, dearer)',
+};
+
+/** Shown beside the Capture toggle: content goes to a model on the runner. */
+export const CAPTURE_WARNING =
+  'While capture is on, the prompts and final responses of your manual Claude Code sessions are sent to a small model on this project’s runner, which proposes cards. Tool inputs and outputs are never used. Suggestions are visible to operators only; accepting one drops the evidence and keeps the link to its session.';
+
 const errorCode = (error: unknown): string | undefined =>
   error instanceof ApiError ? error.code : undefined;
 
@@ -188,6 +246,10 @@ export function describeBoardError(
       return 'The design is approved, so “Continue after design” can no longer change.';
     case BOARD_ERROR.commandUnavailable:
       return `The runner${runnerName ? ` ${runnerName}` : ''} is offline or too old to run card workers.`;
+    case BOARD_ERROR.invalidMove:
+      return MOVE_REFUSAL_TEXT.invalid_move;
+    case BOARD_ERROR.captureNeedsContent:
+      return 'Capture reads session content. Turn on “Keep session content” in the Sessions tab first.';
     default:
       break;
   }

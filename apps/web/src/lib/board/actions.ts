@@ -1,10 +1,13 @@
 import type {
+  AcceptSuggestionRequest,
   BoardCardDetail,
   BoardCardView,
   BoardSettingsView,
   BoardView,
+  CardCapturePage,
   CardFeedbackRequest,
   CreateBoardCardRequest,
+  DismissAllResult,
   MoveBoardCardRequest,
   RunBoardCardRequest,
   UpdateBoardCardRequest,
@@ -66,6 +69,33 @@ export const acceptCard = (projectId: string, number: number) =>
 
 export const stopCard = (projectId: string, number: number) =>
   api(`${cardPath(projectId, number)}/stop`, { method: 'POST' });
+
+/** #244 D9: Accept (or Edit & accept) an Inbox card; it lands at the top of To Do. */
+export const acceptSuggestion = (
+  projectId: string,
+  number: number,
+  body: AcceptSuggestionRequest = {},
+) =>
+  api(`${cardPath(projectId, number)}/accept-suggestion`, {
+    method: 'POST',
+    body,
+  });
+
+/** #244 D9: Dismiss deletes the card and remembers its fingerprint. */
+export const dismissSuggestion = (projectId: string, number: number) =>
+  api(`${cardPath(projectId, number)}/dismiss`, { method: 'POST' });
+
+export const dismissAllSuggestions = (projectId: string) =>
+  api<DismissAllResult>(`${base(projectId)}/inbox/dismiss-all`, {
+    method: 'POST',
+  });
+
+export const fetchCaptures = (projectId: string, cursor?: string) =>
+  api<CardCapturePage>(
+    cursor
+      ? `${base(projectId)}/captures?cursor=${encodeURIComponent(cursor)}`
+      : `${base(projectId)}/captures`,
+  );
 
 export const fetchBoardSettings = (projectId: string) =>
   api<BoardSettingsView>(`/projects/${projectId}/board-settings`);

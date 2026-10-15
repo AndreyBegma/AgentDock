@@ -108,8 +108,13 @@ const TABS: readonly {
   {
     id: 'board',
     label: 'Board',
-    render: ({ project, isAdmin }) => (
-      <BoardTab projectId={project.id} isAdmin={isAdmin} />
+    render: ({ project, isAdmin, canOperate }) => (
+      <BoardTab
+        projectId={project.id}
+        isAdmin={isAdmin}
+        canOperate={canOperate}
+        contentOn={project.shipSessionContent ?? false}
+      />
     ),
   },
   {

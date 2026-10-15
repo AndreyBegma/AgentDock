@@ -77,6 +77,24 @@ describe('decideDrop', () => {
       'refused',
     );
   });
+
+  test('Inbox → To Do is a plain move: the server reads it as Accept', () => {
+    const view = boardView([card(1, 'inbox', { source: 'captured' })]);
+    const decision = decideDrop(view, drop('card-1', 'inbox', 'todo'));
+    expect(decision.kind).toBe('move');
+  });
+
+  test('Inbox → Finished or In progress is refused with the Inbox sentence', () => {
+    const view = boardView([card(1, 'inbox', { source: 'captured' })]);
+    for (const to of ['finished', 'in_progress', 'completed']) {
+      const decision = decideDrop(view, drop('card-1', 'inbox', to));
+      expect(decision.kind).toBe('refused');
+      if (decision.kind === 'refused') {
+        expect(decision.error).toBe('invalid_move');
+        expect(decision.text).toContain('Inbox');
+      }
+    }
+  });
 });
 
 describe('moveRequest', () => {
