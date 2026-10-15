@@ -73,10 +73,71 @@ describe('the local method allowlist (spec 201 D7)', () => {
       'activity.note',
       'handoff.create',
       'action.request',
+      'card.track',
       'away.set',
     ] as const) {
       expect(localMethods[name].minRole).toBe('operator');
     }
+  });
+
+  describe('card.track (issue #282 D1)', () => {
+    it('takes a title, and a body and a kind when given', () => {
+      expect(
+        parseLocalRequest('card.track', { title: '  Fix login  ' }),
+      ).toEqual({
+        ok: true,
+        method: 'card.track',
+        args: { title: 'Fix login' },
+      });
+      expect(
+        parseLocalRequest('card.track', {
+          title: 'Fix login',
+          body: 'The form loses the email.',
+          kind: 'bug',
+        }).ok,
+      ).toBe(true);
+    });
+
+    it('refuses a blank or over-long title, an over-long body and an unknown kind', () => {
+      for (const args of [
+        { title: '   ' },
+        { title: 'x'.repeat(201) },
+        { title: 't', body: 'x'.repeat(20_001) },
+        { title: 't', kind: 'chore' },
+      ]) {
+        const parsed = parseLocalRequest('card.track', args);
+        expect(parsed.ok).toBe(false);
+        if (!parsed.ok) expect(parsed.error.code).toBe('invalid_args');
+      }
+    });
+
+    it('never names a card or a session: the request session resolves it', () => {
+      const parsed = parseLocalRequest('card.track', {
+        title: 't',
+        number: 3,
+      });
+      expect(parsed.ok).toBe(false);
+    });
+
+    it('answers the card number, label and url', () => {
+      const result = localMethods['card.track'].result;
+      expect(
+        result.safeParse({ number: 7, label: 'C-7', url: 'https://a/b' })
+          .success,
+      ).toBe(true);
+      expect(result.safeParse({ number: 7, label: 'C-7' }).success).toBe(false);
+    });
+
+    it('has an error code for a session that is not manual', () => {
+      expect(
+        localResponseMessageSchema.safeParse({
+          type: 'local.response',
+          id: 'lr_1',
+          ok: false,
+          error: { code: 'not_a_manual_session' },
+        }).success,
+      ).toBe(true);
+    });
   });
 
   it('sends local.request from the runner and local.response from the server only', () => {

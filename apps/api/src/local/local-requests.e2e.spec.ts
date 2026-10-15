@@ -51,6 +51,7 @@ const ARGS: Record<LocalMethodName, unknown> = {
   },
   'away.set': { on: true },
   'card.finish': { summary: 'Done.' },
+  'card.track': { title: 'Track the pairing fix' },
 };
 
 /**
@@ -235,7 +236,9 @@ describe('local requests over the runner socket (e2e)', () => {
     // `card.finish` asks from the session of a board card's running worker.
     await seedCardSession();
     // `action.request` first: `action.status` asks about the request it made.
-    const swept = localMethodNames;
+    // #282: `card.track` has only a stub handler until i282-api-terminal
+    // lands the real one; that slot owns this file and puts it back here.
+    const swept = localMethodNames.filter((m) => m !== 'card.track');
     const order = [
       'action.request',
       ...swept.filter((m) => m !== 'action.request'),

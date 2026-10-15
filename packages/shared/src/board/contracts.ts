@@ -1,4 +1,5 @@
 import type { TaskDesignSummary, TaskDesignView } from '../design';
+import type { FleetStage } from '../fleet';
 import type {
   CardMergeMethod,
   OrchestratorPermissionMode,
@@ -20,6 +21,7 @@ import type {
   CardRoundPhase,
   CardRoundTrigger,
 } from './types';
+import type { CardChange } from './worker-prompt';
 
 /**
  * HTTP contracts of the Board (issue #242 "API"). Every route is under
@@ -41,6 +43,32 @@ export interface CardRoundBrief {
   waitingAt: string | null;
   /** D6: no hook event within `CARD_HOOKS_GRACE_MS` of the start. */
   hooksMissing: boolean;
+}
+
+/**
+ * #282 D1: a `terminal` card's session — "Tracked from a terminal session".
+ * While `alive`, Run, Stop and feedback are hidden: the session is the work.
+ */
+export interface CardTrackingView {
+  /** The tracked session (`sessions.id`): the card links to its timeline. */
+  sessionId: string;
+  /** Not ended and not stale (ADR-0024 D6). */
+  alive: boolean;
+}
+
+/** #282 D4: a `fleet` card's slot (ADR-0030 §4). */
+export interface CardFleetView {
+  /** The GitHub issue the slot works; the card's `issueUrl` links it. */
+  issue: number;
+  /**
+   * The slot's name — the Fleet node to link; `null` for a `cs:ready` issue
+   * no slot has picked up yet (the card is in To Do).
+   */
+  slot: string | null;
+  /** How far the slot got (`FLEET_STAGES`); `null` before its first checkpoint. */
+  stage: FleetStage | null;
+  /** The slot left the projection: the card keeps its last column ("Slot gone"). */
+  slotGone: boolean;
 }
 
 /** One card on the board. */
@@ -80,6 +108,15 @@ export interface BoardCardView {
   sourceSessionId: string | null;
   /** #273 D9: approving the design did not start the worker; `null` otherwise. */
   autoRunFailure: CardAutoRunFailure | null;
+  /** #282 D1: set for a `terminal` card, `null` for any other source. */
+  tracking: CardTrackingView | null;
+  /** #282 D4: set for a `fleet` card, `null` for any other source. */
+  fleet: CardFleetView | null;
+  /**
+   * #282 D3: Automatic work — push and open a pull request when the tracked
+   * session finishes. Meaningful for a `terminal` card only; `false` otherwise.
+   */
+  autoCollect: boolean;
   movedAt: string;
   completedAt: string | null;
   updatedAt: string;
@@ -179,6 +216,8 @@ export interface BoardSettingsView {
    */
   captureEnabled: boolean;
   captureModel: CaptureModel;
+  /** #282 D3: the `autoCollect` a new `terminal` card starts with; off by default. */
+  autoCollectTracked: boolean;
   isDefault: boolean;
   updatedAt: string | null;
 }
@@ -202,6 +241,8 @@ export interface UpdateBoardCardRequest {
   model?: string | null;
   /** #243 D5: refused with `design_approved` once the design is approved. */
   continueAfterDesign?: boolean;
+  /** #282 D3: a `terminal` card only; any other card is refused `not_tracked`. */
+  autoCollect?: boolean;
 }
 
 /** `POST /board/cards/:number/move` (D7). `index` is the drop index in `column`. */
@@ -234,6 +275,8 @@ export interface UpdateBoardSettingsRequest {
   captureEnabled?: boolean;
   /** Absent keeps the stored value. */
   captureModel?: CaptureModel;
+  /** #282 D3. Absent keeps the stored value. */
+  autoCollectTracked?: boolean;
 }
 
 /**
@@ -317,6 +360,8 @@ export const BOARD_ERROR = {
   mergeFailed: 'merge_failed',
   /** 409 / 404 (#273 D13): the card has no pull request. */
   noPullRequest: 'no_pull_request',
+  /** 422 (#282 D3): `autoCollect` on a card that is not a `terminal` card. */
+  notTracked: 'not_tracked',
 } as const;
 export type BoardErrorCode = (typeof BOARD_ERROR)[keyof typeof BOARD_ERROR];
 
@@ -414,6 +459,32 @@ export interface CardMergeOutcome {
 export type AcceptBoardCardResponse = BoardCardDetail & {
   merge: CardMergeOutcome | null;
 };
+
+/**
+ * #282 D4: a person changed a `fleet` card's text. The edit is stored like
+ * any card's; the GitHub issue is not rewritten.
+ */
+export interface FleetCardEdit {
+  projectId: string;
+  cardId: string;
+  number: number;
+  /** `C-<number>`. */
+  label: string;
+  /** What changed, as `cardChange` reports it — never `null` here. */
+  change: CardChange;
+}
+
+/**
+ * #282 D4: the one seam between the board and the fleet. `BoardService.update`
+ * calls it, when provided, after storing an edit of a `fleet` card; the fleet
+ * module implements it by sending the running slot one `slot.message`
+ * worded by `cardNextRoundPrompt({ label, change, feedback: null })`. A slot
+ * that is not running is not messaged. It must not throw for an offline
+ * runner: the edit is stored either way.
+ */
+export interface FleetCardEdits {
+  cardEdited(edit: FleetCardEdit): Promise<void>;
+}
 
 /** Live: on `project:<id>` whenever a card, its round or its design changes. */
 export const BOARD_CHANGED_EVENT = 'board.changed';

@@ -137,6 +137,7 @@ export const MOVE_REFUSAL_TEXT: Record<BoardMoveRefusal, string> = {
   card_completed: 'This card is already completed.',
   invalid_move: 'A suggestion leaves the Inbox only by Accept, into To Do.',
   plan_task_derived: PLAN_TASK_MOVE_REFUSAL_TEXT,
+  fleet_slot: 'A fleet card follows its slot. Accept it once it is finished.',
 };
 
 /** #273 D7: the card's design is on and not approved, so the server would refuse Run. */
@@ -221,6 +222,7 @@ export const CAPTURE_SKIP_TEXT: Record<CaptureSkipReason, string> = {
   runner_offline: 'Runner was offline',
   capture_off: 'Capture was turned off',
   no_profile: 'No runtime profile',
+  tracked: 'Session tracks a card',
 };
 
 /** What a capture row says about its outcome: the skip reason, the error, or the count. */

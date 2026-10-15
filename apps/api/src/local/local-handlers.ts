@@ -97,6 +97,13 @@ export class LocalHandlers {
     'action.request': (args, call) => this.actionRequest(args, call),
     'away.set': (args, call) => this.awaySet(args.on, call),
     'card.finish': (args, call) => this.cardFinish(args.summary, call),
+    // #282 D1: i282-api-terminal replaces this with the real handler.
+    'card.track': () => {
+      throw new LocalError(
+        'not_a_manual_session',
+        'card.track is not served yet',
+      );
+    },
   };
 
   /**

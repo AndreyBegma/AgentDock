@@ -33,7 +33,9 @@ export type CaptureStatus = (typeof CAPTURE_STATUSES)[number];
  * - `budget_exceeded` — a project budget's hard stop (D7);
  * - `runner_offline` — still offline after `CAPTURE_OFFLINE_BACKOFF_MAX_MS` (D7);
  * - `capture_off` — content or capture was turned off before it ran (D1);
- * - `no_profile` — no usable runtime profile (#272 D8).
+ * - `no_profile` — no usable runtime profile (#272 D8);
+ * - `tracked` — the session tracks a card (`card.track`, #282 D5), so its
+ *   work is on the Board already and a suggestion would be a duplicate.
  *
  * An output that breaks the D5 contract is not a skip: the row is `failed`
  * with `error` = `contract_violation: <CaptureViolation>` (`captureViolationError`).
@@ -46,6 +48,7 @@ export const CAPTURE_SKIP_REASONS = [
   'runner_offline',
   'capture_off',
   'no_profile',
+  'tracked',
 ] as const;
 export type CaptureSkipReason = (typeof CAPTURE_SKIP_REASONS)[number];
 

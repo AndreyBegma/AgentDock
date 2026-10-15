@@ -49,6 +49,8 @@ export const localErrorCodeSchema = z.enum([
   'internal',
   /** `card.finish` from a session that is not a board card's worker (issue #242). */
   'not_a_card_session',
+  /** `card.track` from a session that is not a person's own `manual` one (issue #282 D1). */
+  'not_a_manual_session',
 ]);
 export type LocalErrorCode = z.infer<typeof localErrorCodeSchema>;
 
@@ -214,6 +216,39 @@ export const localCardFinishResultSchema = z.object({
 });
 
 /**
+ * A card's title and body limits and its kinds; `BOARD_CARD_TITLE_MAX`,
+ * `BOARD_CARD_BODY_MAX` and `BOARD_CARD_KINDS` in the board module. Defined
+ * here because the board module imports this one.
+ */
+export const LOCAL_CARD_TITLE_MAX = 200;
+export const LOCAL_CARD_BODY_MAX = 20_000;
+export const LOCAL_CARD_KINDS = ['feature', 'bug'] as const;
+
+/**
+ * `card.track` (issue #282 D1, ADR-0030 §1): the `track_card` tool of a
+ * person's own terminal session. The card is resolved from the request's
+ * `session.id`: the first call creates card C-n In progress with
+ * `source: terminal`, linked to the session; a later call from the same
+ * session updates that card's title and body (and `kind`, when given) and
+ * never creates a second one. Any session that is not `manual` is answered
+ * `not_a_manual_session`.
+ */
+export const localCardTrackArgsSchema = z.strictObject({
+  title: z.string().trim().min(1).max(LOCAL_CARD_TITLE_MAX),
+  body: z.string().max(LOCAL_CARD_BODY_MAX).optional(),
+  /** Only when it is obvious; absent leaves it to the normalization (#271 D9). */
+  kind: z.enum(LOCAL_CARD_KINDS).optional(),
+});
+export const localCardTrackResultSchema = z.object({
+  /** The card's per-project number. */
+  number: z.number().int().positive(),
+  /** `C-<number>`. */
+  label: z.string().min(1),
+  /** The card on the Board, in the web app. */
+  url: z.string().min(1),
+});
+
+/**
  * The local method allowlist (D7). Each later change adds its method here and
  * its handler to the API's router in the same change.
  */
@@ -293,6 +328,12 @@ export const localMethods = {
   'card.finish': {
     args: localCardFinishArgsSchema,
     result: localCardFinishResultSchema,
+    minRole: 'operator',
+    needsProject: true,
+  },
+  'card.track': {
+    args: localCardTrackArgsSchema,
+    result: localCardTrackResultSchema,
     minRole: 'operator',
     needsProject: true,
   },
