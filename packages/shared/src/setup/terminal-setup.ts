@@ -104,6 +104,8 @@ export interface TerminalSetupProfileSources {
   sessionKeys: readonly (string | null)[];
   /** Profiles of the project's `card` runs, last 7 days. */
   cardRunKeys: readonly (string | null)[];
+  /** Claude profiles the project's runner reports (`reportedClaudeProfileKeysOf`). */
+  reportedKeys?: readonly string[];
 }
 
 /** D3: the profile keys the checklist lists, deduplicated, in source order. */
@@ -115,6 +117,7 @@ export const terminalSetupProfileKeys = (
     sources.orchestratorKey,
     ...sources.sessionKeys,
     ...sources.cardRunKeys,
+    ...(sources.reportedKeys ?? []),
   ].filter((key): key is string => typeof key === 'string' && key.length > 0);
   return [...new Set(keys)];
 };
@@ -147,6 +150,31 @@ const pluginSteps = (key: string): SetupStep[] => [
   RESTART_NOTE,
   { kind: 'note', text: 'A new session then shows as Manual in Sessions.' },
 ];
+
+/**
+ * No Claude profile is known — none configured, none seen on a session, none
+ * reported by the runner (offline, or an older one): the person is told how to
+ * list the keys and which command takes one.
+ */
+const unknownProfilePlugin = (): TerminalSetupItem => ({
+  id: 'plugin',
+  state: 'unknown',
+  optional: false,
+  steps: [
+    {
+      kind: 'command',
+      code: 'agentdock-runner profiles',
+      label: 'List the profile keys: the first column',
+    },
+    {
+      kind: 'command',
+      code: 'agentdock-runner setup claude --profile <key>',
+      label: 'Install the agentdock plugin into the profile you work in',
+    },
+    RESTART_NOTE,
+    { kind: 'note', text: 'A new session then shows as Manual in Sessions.' },
+  ],
+});
 
 const pluginState = ({
   agentdock,
@@ -272,6 +300,9 @@ export const terminalSetup = (facts: TerminalSetupFacts): TerminalSetupView => {
         },
       ],
     },
+    ...(facts.profiles.some((profile) => profile.runtime !== 'codex')
+      ? []
+      : [unknownProfilePlugin()]),
     ...perProfile.map((items) => items.plugin),
     ...perProfile.flatMap((items) => items.loaded),
     {

@@ -152,6 +152,57 @@ describe('terminal setup (e2e)', () => {
     expect(stateOf(plugins(view), 'claude-main')).toBe('done');
   });
 
+  it('lists the profiles the runner reports when none is configured and no session exists', async () => {
+    await h.ctx.prisma.project.update({
+      where: { id: h.projectId },
+      data: { defaultProfileId: null },
+    });
+    await h.ctx.prisma.runner.update({
+      where: { id: h.runnerId },
+      data: {
+        capabilities: {
+          profiles: [
+            {
+              id: 'claude-alpha',
+              runtime: 'claude',
+              agentdock: { plugin: null, telemetry: false },
+            },
+            { id: 'claude-beta', runtime: 'claude' },
+            { id: 'codex-gamma', runtime: 'codex' },
+          ],
+        },
+      },
+    });
+    const view = await read();
+    expect(plugins(view).map((p) => [p.profileKey, p.state])).toEqual([
+      ['claude-alpha', 'todo'],
+      ['claude-beta', 'unknown'],
+    ]);
+    const alpha = plugins(view)[0];
+    expect(
+      alpha.steps.flatMap((s) => (s.kind === 'command' ? [s.code] : [])),
+    ).toContain('agentdock-runner setup claude --profile claude-alpha');
+  });
+
+  it('emits one unknown plugin item with the listing steps when nothing is known', async () => {
+    await h.ctx.prisma.project.update({
+      where: { id: h.projectId },
+      data: { defaultProfileId: null },
+    });
+    const view = await read();
+    expect(plugins(view)).toHaveLength(1);
+    expect(plugins(view)[0]).toMatchObject({ state: 'unknown' });
+    expect(plugins(view)[0].profileKey).toBeUndefined();
+    expect(
+      plugins(view)[0].steps.flatMap((s) =>
+        s.kind === 'command' ? [s.code] : [],
+      ),
+    ).toEqual([
+      'agentdock-runner profiles',
+      'agentdock-runner setup claude --profile <key>',
+    ]);
+  });
+
   it('flags plugin_loaded for sessions that started after the runner last reported', async () => {
     const reported = new Date(Date.now() - 2 * 60 * 60 * 1000);
     await h.ctx.prisma.runner.update({

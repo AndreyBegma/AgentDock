@@ -252,6 +252,47 @@ describe('terminalSetup', () => {
     expect(view.complete).toBe(true);
   });
 
+  describe('no Claude profile is known', () => {
+    const none = { ...ready, profiles: [] };
+
+    it('emits one unknown plugin item that says how to list profiles, then set up', () => {
+      const plugins = terminalSetup(none).items.filter(
+        (entry) => entry.id === 'plugin',
+      );
+      expect(plugins).toHaveLength(1);
+      expect(plugins[0]).toMatchObject({
+        state: 'unknown',
+        optional: false,
+      });
+      expect(plugins[0].profileKey).toBeUndefined();
+      expect(commands(plugins[0].steps)).toEqual([
+        'agentdock-runner profiles',
+        'agentdock-runner setup claude --profile <key>',
+      ]);
+      expect(terminalSetup(none).complete).toBe(false);
+    });
+
+    it('does the same when only a Codex profile is known', () => {
+      const view = terminalSetup({
+        ...ready,
+        profiles: [claude('cx', { runtime: 'codex', agentdock: null })],
+      });
+      expect(
+        view.items.filter(
+          (entry) => entry.id === 'plugin' && entry.profileKey === undefined,
+        ),
+      ).toHaveLength(1);
+    });
+
+    it('is not emitted once a Claude profile is listed', () => {
+      expect(
+        terminalSetup(ready).items.filter(
+          (entry) => entry.id === 'plugin' && entry.profileKey === undefined,
+        ),
+      ).toHaveLength(0);
+    });
+  });
+
   it('is todo while the runner is offline', () => {
     const facts = { ...ready, runnerConnected: false };
     expect(item(facts, 'runner_online')?.state).toBe('todo');
@@ -281,6 +322,18 @@ describe('terminalSetupProfileKeys', () => {
         cardRunKeys: ['orch', 'worker'],
       }),
     ).toEqual(['main', 'orch', 'personal', 'worker']);
+  });
+
+  it('adds the profiles the runner reports last, deduplicated', () => {
+    expect(
+      terminalSetupProfileKeys({
+        defaultKey: 'main',
+        orchestratorKey: null,
+        sessionKeys: [],
+        cardRunKeys: [],
+        reportedKeys: ['alt', 'main'],
+      }),
+    ).toEqual(['main', 'alt']);
   });
 
   it('is empty with nothing set', () => {
