@@ -3,6 +3,7 @@ import type { CardCaptureView } from '@agentdock/shared';
 import { ApiError } from '../api';
 import { boardView, card } from './fixtures';
 import {
+  CAPTURE_SKIP_TEXT,
   captureOutcome,
   columnsOf,
   confidenceLabel,
@@ -88,6 +89,13 @@ describe('describeBoardError (#244)', () => {
   test('capture without content points to the Sessions setting', () => {
     const err = new ApiError(422, 'capture_needs_content' as never, 'x');
     expect(describeBoardError(err)).toContain('Keep session content');
+  });
+
+  test('a capture skipped for want of a profile says so', () => {
+    expect(
+      captureOutcome(capture({ status: 'skipped', skipReason: 'no_profile' })),
+    ).toBe('No runtime profile');
+    expect(CAPTURE_SKIP_TEXT.no_profile).toBe('No runtime profile');
   });
 
   test('an invalid move explains how a suggestion leaves the Inbox', () => {

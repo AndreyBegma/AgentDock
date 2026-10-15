@@ -1,4 +1,6 @@
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
+import type { ReactNode } from 'react';
+import { ReadinessSlot } from '../readiness/readiness-notice';
 
 /**
  * glass-ui's `Toggle` has no `disabled`: a locked one is inert (no pointer, no
@@ -10,6 +12,7 @@ function OptionToggle({
   disabled,
   label,
   hint,
+  notice,
   onChange,
 }: {
   id: string;
@@ -17,6 +20,8 @@ function OptionToggle({
   disabled?: boolean;
   label: string;
   hint: string;
+  /** Why the option cannot take effect now (rule R1). */
+  notice?: ReactNode;
   onChange: (value: boolean) => void;
 }) {
   return (
@@ -38,12 +43,14 @@ function OptionToggle({
         <span id={id}>{label}</span>
       </div>
       <span className="text-xs text-ink-3">{hint}</span>
+      {notice}
     </div>
   );
 }
 
 /** D2: the two things starting work can also do. Both default to off. */
 export function CardOptionToggles({
+  projectId,
   idPrefix,
   issueOnRun,
   specOnRun,
@@ -51,6 +58,7 @@ export function CardOptionToggles({
   onIssueOnRun,
   onSpecOnRun,
 }: {
+  projectId: string;
   idPrefix: string;
   issueOnRun: boolean;
   specOnRun: boolean;
@@ -74,6 +82,11 @@ export function CardOptionToggles({
         disabled={disabled}
         label="Write a spec on Run"
         hint="Committed first on the card’s branch, so it lands in the pull request. Needs a spec directory in the project’s docs source."
+        notice={
+          specOnRun ? (
+            <ReadinessSlot projectId={projectId} action="spec_on_run" />
+          ) : null
+        }
         onChange={onSpecOnRun}
       />
     </div>

@@ -106,6 +106,7 @@ export function BoardTab({
               runs at once. A card can override the toggles.
             </p>
             <CardOptionToggles
+              projectId={projectId}
               idPrefix="board-set"
               issueOnRun={issueOnRun}
               specOnRun={specOnRun}

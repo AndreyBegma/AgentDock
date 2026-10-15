@@ -223,6 +223,22 @@ describe('describeDesignError', () => {
     }
   });
 
+  test('no_profile says why and links the settings that fix it (#272)', () => {
+    const err = new ApiError(422, undefined, 'raw', undefined, {
+      error: 'no_profile',
+      reason: 'none',
+      source: null,
+    });
+    expect(describeDesignError(err, 'p1')).toEqual({
+      text: expect.stringContaining('Settings › General'),
+      href: '/projects/p1/settings?tab=general',
+      cta: 'Open project settings',
+    });
+    expect(describeDesignError(err)).toEqual(
+      expect.stringContaining('no runtime profile'),
+    );
+  });
+
   test('a budget stop links the budget', () => {
     expect(describeDesignError(refused(409, 'budget_exceeded'), 'p1')).toEqual({
       text: expect.any(String),

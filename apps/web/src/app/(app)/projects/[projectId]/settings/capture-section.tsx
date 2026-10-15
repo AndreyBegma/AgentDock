@@ -16,6 +16,7 @@ import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
+import { ReadinessSlot } from '../../../../../components/readiness/readiness-notice';
 import { fetchCaptures } from '../../../../../lib/board/actions';
 import {
   CAPTURE_MODEL_LABEL,
@@ -86,6 +87,9 @@ export function CaptureFields({
           <span className="text-sm">{enabled && contentOn ? 'on' : 'off'}</span>
         )}
       </div>
+      {enabled && contentOn ? (
+        <ReadinessSlot projectId={projectId} action="capture" />
+      ) : null}
       <Field
         label="Model"
         htmlFor="board-capture-model"

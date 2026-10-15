@@ -34,6 +34,7 @@ import { useCardActions } from '../../../../../components/board/use-card-actions
 import { PageHeader } from '../../../../../components/page-header/page-header';
 import { AsyncSection } from '../../../../../components/prerequisites/async-section';
 import { RunnerOfflineBanner } from '../../../../../components/prerequisites/prerequisite-banner';
+import { ReadinessBanner } from '../../../../../components/readiness/readiness-banner';
 import { useLivePaused } from '../../../../../components/shell/live-status';
 import { LiveStatusBadge } from '../../../../../components/shell/live-status-badge';
 import { TerminalSheet } from '../../../../../components/terminal/terminal-sheet';
@@ -45,6 +46,7 @@ import {
   parseCardParam,
 } from '../../../../../lib/board/format';
 import { useLive } from '../../../../../lib/live/use-live';
+import { useReadiness } from '../../../../../lib/readiness/use-readiness';
 import { useSection } from '../../../../../lib/section/use-section';
 import { useTerminalAvailable } from '../../../../../lib/terminal/use-terminal-available';
 import { useProjectDetail } from '../use-project-detail';
@@ -93,6 +95,7 @@ function BoardScreen() {
   const canAttach = useTerminalAvailable(project?.runnerId, isAdmin);
 
   const board = useSection(() => fetchBoard(projectId), [projectId, version]);
+  const readiness = useReadiness(projectId);
 
   // Older Completed pages are fetched by hand; a fresh first page resets them.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the board reloads → start over
@@ -206,6 +209,11 @@ function BoardScreen() {
           }
         />
         {project ? <RunnerOfflineBanner project={project} /> : null}
+        <ReadinessBanner
+          projectId={projectId}
+          readiness={readiness}
+          captureOn={board.data?.settings.captureEnabled ?? false}
+        />
       </div>
 
       <AsyncSection

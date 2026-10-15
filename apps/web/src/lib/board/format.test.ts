@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { ApiError } from '../api';
 import { boardView, card, round } from './fixtures';
 import {
   canAccept,
@@ -9,6 +10,7 @@ import {
   canStop,
   cardByNumber,
   columnsOf,
+  describeBoardError,
   parseCardParam,
   parseMaxRunning,
   roundPill,
@@ -95,6 +97,34 @@ describe('the view', () => {
     const view = boardView([card(1, 'todo'), card(2, 'completed')]);
     expect(cardByNumber(view, 2)?.id).toBe('card-2');
     expect(cardByNumber(view, 9)).toBeUndefined();
+  });
+});
+
+describe('describeBoardError for a profile (#272 D7)', () => {
+  test('no_profile names Settings › General', () => {
+    const err = new ApiError(422, 'no_profile' as never, 'x', undefined, {
+      error: 'no_profile',
+      reason: 'none',
+      source: null,
+    });
+    expect(describeBoardError(err)).toContain('Settings › General');
+  });
+
+  test('no_profile from the orchestrator profile names Settings › Orchestrator', () => {
+    const err = new ApiError(422, 'no_profile' as never, 'x', undefined, {
+      error: 'no_profile',
+      reason: 'not_claude',
+      source: 'orchestrator',
+      profileKey: 'codex',
+    });
+    expect(describeBoardError(err)).toContain('Settings › Orchestrator');
+  });
+
+  test('unsupported_runtime no longer blames the project’s profile', () => {
+    const err = new ApiError(422, 'unsupported_runtime' as never, 'x');
+    const text = describeBoardError(err);
+    expect(text).not.toMatch(/Codex/);
+    expect(text).toMatch(/runner refused/);
   });
 });
 

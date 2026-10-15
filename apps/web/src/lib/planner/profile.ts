@@ -17,7 +17,7 @@ export function initialProfileKey(
 
 /** Where the default runtime profile is set. */
 export const profileSettingsHref = (projectId: string): string =>
-  `/projects/${projectId}/settings?tab=orchestrator`;
+  `/projects/${projectId}/settings?tab=general`;
 
 /**
  * Why **Plan** is off for want of a profile (rule R1), as the next step; null
