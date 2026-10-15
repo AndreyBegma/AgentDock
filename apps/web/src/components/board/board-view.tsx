@@ -23,6 +23,12 @@ import {
   moveRequest,
 } from '../../lib/board/board-state';
 import {
+  type BoardFilter,
+  isFiltering,
+  matchesFilter,
+  unfilteredIndex,
+} from '../../lib/board/filter';
+import {
   approveRunOffer,
   COLUMN_HINT,
   COLUMN_TITLE,
@@ -65,6 +71,8 @@ export function BoardColumns({
   canOperate,
   canTerminal,
   actions,
+  filter,
+  compact,
   onOpen,
   onOpenPlanTask,
   onOpenTerminal,
@@ -78,6 +86,9 @@ export function BoardColumns({
   canOperate: boolean;
   canTerminal: boolean;
   actions: CardActions;
+  /** C-29: what the toolbar hides; a hidden card is still in the column. */
+  filter: BoardFilter;
+  compact: boolean;
   onOpen: (card: BoardCardView) => void;
   onOpenPlanTask: (task: BoardPlanTaskView) => void;
   onOpenTerminal: (card: BoardCardView) => void;
@@ -93,15 +104,26 @@ export function BoardColumns({
   const phone = usePhone();
 
   const items = boardItems(shown, planTasks);
-  const allColumns: BoardColumn<WorkBoardItem>[] = columnsOf(shown).map(
-    (c) => ({
+  const filtering = isFiltering(filter);
+  const allColumns: BoardColumn<WorkBoardItem>[] = columnsOf(shown).map((c) => {
+    const all = items.get(c.column) ?? [];
+    const cards = filtering
+      ? all.filter((item) => matchesFilter(item, filter))
+      : all;
+    return {
       id: c.column,
       title: COLUMN_TITLE[c.column],
-      cards: items.get(c.column) ?? [],
+      // `shown/total` while a filter hides some of the column.
+      header: filtering ? (
+        <span className="text-xs text-ink-3 tabular-nums">of {all.length}</span>
+      ) : undefined,
+      cards,
       footer:
-        (items.get(c.column) ?? []).length === 0 ? (
+        all.length === 0 ? (
           <p className="px-1 text-xs text-ink-3">{COLUMN_HINT[c.column]}</p>
-        ) : c.column === 'inbox' && canOperate ? (
+        ) : cards.length === 0 ? (
+          <p className="px-1 text-xs text-ink-3">No cards match.</p>
+        ) : c.column === 'inbox' && canOperate && !filtering ? (
           <Button
             variant="ghost"
             size="sm"
@@ -111,8 +133,8 @@ export function BoardColumns({
             Dismiss all
           </Button>
         ) : undefined,
-    }),
-  );
+    };
+  });
 
   const columns = visibleColumns(allColumns, phone);
 
@@ -142,12 +164,27 @@ export function BoardColumns({
     }
   };
 
+  /** Under a filter the board reports an index among the visible cards. */
+  const withFullIndex = (dropped: DropMove): DropMove => {
+    if (!filtering) return dropped;
+    const full = view.columns
+      .find((c) => c.column === dropped.toColumnId)
+      ?.cards.filter((c) => c.id !== dropped.id)
+      .map((c) => c.id);
+    const visible = allColumns
+      .find((c) => c.id === dropped.toColumnId)
+      ?.cards.filter((c) => c.id !== dropped.id)
+      .map((c) => c.id);
+    if (!full || !visible) return dropped;
+    return { ...dropped, index: unfilteredIndex(full, visible, dropped.index) };
+  };
+
   const onMove = (dropped: DropMove) => {
     if (!canOperate) {
       toast.error('Only operators can move cards.');
       return;
     }
-    const move = clampDropIndex(view, dropped);
+    const move = clampDropIndex(view, withFullIndex(dropped));
     const decision = decideDrop(view, move);
     switch (decision.kind) {
       case 'ignore':
@@ -183,9 +220,9 @@ export function BoardColumns({
 
   return (
     <>
-      {/* `contents`: no box of its own, it only carries the column width glass-ui reads. */}
+      {/* Fills the height the page leaves; glass-ui's `Board` scrolls each column in it. */}
       <div
-        className="contents"
+        className="flex min-h-0 flex-1 flex-col"
         style={
           {
             '--board-column': boardColumnWidth(columns.length),
@@ -193,6 +230,7 @@ export function BoardColumns({
         }
       >
         <Board<WorkBoardItem>
+          className="flex-1 pb-0.5"
           aria-label="Project board"
           columns={columns}
           onMove={onMove}
@@ -204,6 +242,7 @@ export function BoardColumns({
                 projectId={projectId}
                 card={item.card}
                 canOperate={canOperate}
+                compact={compact}
                 onOpen={onOpen}
               />
             )

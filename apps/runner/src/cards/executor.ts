@@ -1,5 +1,8 @@
 import { existsSync } from 'node:fs';
-import { CARD_SESSION_POLL_MS } from '@agentdock/shared';
+import {
+  AGENTDOCK_WORKTREE_DIR,
+  CARD_SESSION_POLL_MS,
+} from '@agentdock/shared';
 import {
   type CardCloseArgs,
   type CardCloseResult,
@@ -7,6 +10,7 @@ import {
   type CardCollectResult,
   type CardRunArgs,
   type CardRunPhase,
+  type CardRunPhaseChangedData,
   type CardRunResult,
   type CardStopArgs,
   type CardStopResult,
@@ -28,10 +32,12 @@ import {
   collectCard,
   commitFiles,
   ensureWorktree,
+  excludeFromGit,
   removeCardWorktree,
 } from './git';
 import { cardLaunchSpec, cardWorktreePath } from './launch';
 import { type CardRecord, CardStore } from './record';
+import { type CardWiring, wireCardRound } from './wiring';
 
 export interface CardExecutorOptions {
   deps: SkillsDeps;
@@ -150,10 +156,22 @@ export class CardExecutor {
         runId: args.runId,
         phase: 'starting',
         startedAt: isoNow(deps.clock),
+        // #359 D3: the spec (and design) the PR links; only round 1 sends them.
+        specFiles: args.files?.length
+          ? args.files.map((f) => f.path)
+          : previous?.specFiles,
       };
       this.setPhase(record, 'starting');
+      let wiring: CardWiring;
       try {
         await ensureWorktree(deps, record);
+        // #359 D3: the worker's PR description goes under `.agentdock/`,
+        // excluded whether or not the card has attachments.
+        await excludeFromGit(
+          deps,
+          record.worktree,
+          `${AGENTDOCK_WORKTREE_DIR}/`,
+        );
         // #309 D9: before the session starts or resumes; a file that cannot
         // be had fails the command with `attachments_unavailable`.
         await syncAttachments(
@@ -164,6 +182,20 @@ export class CardExecutor {
         );
         await commitFiles(deps, record.worktree, args.files ?? []);
         const roundDir = this.store.createRound(record.cardId, record.runId);
+        // #367 D1, D2: hooks and `finish_card` without per-profile setup.
+        wiring = wireCardRound(
+          profile,
+          deps.home,
+          roundDir,
+          this.options.selfCommand,
+        );
+        if (wiring.wiring === 'none') {
+          this.options.log.warn('cards: the round starts without wiring', {
+            cardId: record.cardId,
+            runId: record.runId,
+            reason: wiring.wiringReason,
+          });
+        }
         writeJsonAtomic(
           `${roundDir}/${RUN_FILES.launch}`,
           cardLaunchSpec(
@@ -171,6 +203,7 @@ export class CardExecutor {
             args,
             record.worktree,
             this.options.otlpPort?.() ?? null,
+            wiring.files,
           ),
         );
         const created = await this.tmux.newSession(
@@ -193,7 +226,10 @@ export class CardExecutor {
         if (error instanceof CommandFailure) throw error;
         throw new Error(eventError(error));
       }
-      this.setPhase(record, 'running');
+      this.setPhase(record, 'running', {
+        wiring: wiring.wiring,
+        ...(wiring.wiringReason ? { wiringReason: wiring.wiringReason } : {}),
+      });
       return { phase: 'running', tmuxSession };
     });
   }
@@ -350,7 +386,10 @@ export class CardExecutor {
   private setPhase(
     record: CardRecord,
     phase: CardRecord['phase'],
-    extra: { exitCode?: number; error?: string } = {},
+    extra: Pick<
+      CardRunPhaseChangedData,
+      'exitCode' | 'error' | 'wiring' | 'wiringReason'
+    > = {},
   ): void {
     record.phase = phase;
     this.store.save(record);

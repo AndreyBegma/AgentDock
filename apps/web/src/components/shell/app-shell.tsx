@@ -46,6 +46,7 @@ import {
 } from './live-status';
 import {
   activeEntryId,
+  isFillEntry,
   isWideEntry,
   projectIdOf,
   tabBarSplit,
@@ -55,6 +56,7 @@ import { NotificationBell } from './notification-bell';
 import { paletteGroups } from './palette';
 import { ProjectSwitcher } from './project-switcher';
 import { Rail } from './rail';
+import { useRailCollapsed, useRailToggleShortcut } from './rail-collapse';
 import {
   applyTheme,
   isThemeMode,
@@ -151,6 +153,14 @@ export function AppShell({
 
   useCommandPaletteShortcut(() => setPaletteOpen(true));
 
+  // From `lg` up the rail narrows to icons and back (C-14); ⌘\ toggles it.
+  const [railCollapsed, setRailCollapsed] = useRailCollapsed();
+  const toggleRail = useCallback(
+    () => setRailCollapsed(!railCollapsed),
+    [railCollapsed, setRailCollapsed],
+  );
+  useRailToggleShortcut(!narrow, toggleRail);
+
   // The bell holds the `user:<id>` subscription that keeps the socket (and the dot) alive.
   const { status, closeCode } = useLiveStatus();
   const live = useLivePaused();
@@ -167,6 +177,8 @@ export function AppShell({
   );
   const activeId = activeEntryId(sections, pathname);
   const wide = isWideEntry(sections, activeId);
+  // Locked to the viewport only where there is a rail; a phone scrolls the page.
+  const fill = isFillEntry(sections, activeId, pathname) && !narrow;
   const projectName = projects.find(
     (project) => project.id === projectId,
   )?.displayName;
@@ -235,7 +247,7 @@ export function AppShell({
       </a>
       <div
         // Below `lg` the page sits on a 16 px gutter (#213).
-        className={`flex min-h-screen ${narrow ? 'gap-2 px-4 py-2' : 'gap-3 p-3'}`}
+        className={`flex ${fill ? 'h-screen overflow-hidden' : 'min-h-screen'} ${narrow ? 'gap-2 px-4 py-2' : 'gap-3 p-3'}`}
       >
         {narrow ? null : (
           <aside className="sticky top-3 h-[calc(100vh-1.5rem)] shrink-0">
@@ -246,11 +258,13 @@ export function AppShell({
               projectId={projectId}
               waitingApprovals={waitingApprovals}
               slotsNeedingAttention={slotsNeedingAttention}
+              collapsed={railCollapsed}
+              onCollapsedChange={setRailCollapsed}
             />
           </aside>
         )}
 
-        <div className="flex min-w-0 flex-1 flex-col gap-3">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
           <header
             className={`glass rounded-surface flex min-h-12 items-center py-2 ${narrow ? 'gap-0.5 px-2' : 'gap-3 px-4'}`}
           >
@@ -366,7 +380,11 @@ export function AppShell({
             id="main-content"
             tabIndex={-1}
             // A data page (the registry's `wide`) gets the wide column.
-            className={`mx-auto w-full pb-6 focus:outline-none ${wide ? 'max-w-7xl' : 'max-w-5xl'}`}
+            className={
+              fill
+                ? 'flex min-h-0 w-full flex-1 flex-col focus:outline-none'
+                : `mx-auto w-full pb-6 focus:outline-none ${wide ? 'max-w-7xl' : 'max-w-5xl'}`
+            }
           >
             {children}
           </main>

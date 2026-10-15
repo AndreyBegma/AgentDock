@@ -47,6 +47,11 @@ export interface NavEntry {
    * so every page below it (a run under History, a session under Sessions).
    */
   wide?: boolean;
+  /**
+   * A page that fills the screen (C-29): the shell locks to the viewport, the
+   * page drops the width cap and scrolls its own regions, not the window.
+   */
+  fill?: boolean;
 }
 
 export interface NavSection {
@@ -168,6 +173,7 @@ export const NAV: NavSection[] = [
       {
         id: 'board',
         wide: true,
+        fill: true,
         href: '/projects/:projectId/board',
         label: 'Work',
         icon: KanbanSquare,
@@ -434,5 +440,24 @@ export function isWideEntry(
   if (!activeId) return false;
   return sections.some((section) =>
     section.entries.some((entry) => entry.id === activeId && entry.wide),
+  );
+}
+
+/**
+ * Whether the page itself — not a page below it, a card's design under Board —
+ * is the active entry and fills the screen; false off the nav.
+ */
+export function isFillEntry(
+  sections: readonly VisibleSection[],
+  activeId: string | null,
+  pathname: string,
+): boolean {
+  if (!activeId) return false;
+  const path = pathname.replace(/\/+$/, '');
+  return sections.some((section) =>
+    section.entries.some(
+      (entry) =>
+        entry.id === activeId && entry.fill && entry.resolvedHref === path,
+    ),
   );
 }

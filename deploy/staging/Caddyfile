@@ -13,11 +13,23 @@
 :80 {
 	# The API has no /api prefix of its own; the runner pairs with
 	# https://<host>/api and dials wss://<host>/api/runner.
+	#
+	# A deploy replaces the containers (20-60 s with migrate and seed). Instead of
+	# a 502 while the name does not resolve or the port is closed, a request or
+	# WebSocket upgrade is held and retried until the upstream answers (#368).
 	handle_path /api/* {
-		reverse_proxy api:8180
+		reverse_proxy api:8180 {
+			lb_try_duration 60s
+			lb_try_interval 250ms
+			health_uri /health
+			health_interval 2s
+		}
 	}
 
 	handle {
-		reverse_proxy web:3517
+		reverse_proxy web:3517 {
+			lb_try_duration 60s
+			lb_try_interval 250ms
+		}
 	}
 }

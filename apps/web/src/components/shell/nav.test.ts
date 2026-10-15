@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   activeEntryId,
   isActive,
+  isFillEntry,
   isWideEntry,
   projectIdOf,
   tabBarSplit,
@@ -273,5 +274,19 @@ describe('projectIdOf / isActive', () => {
   test('an exact entry does not match the pages below it', () => {
     expect(isActive('/projects', '/projects/p1', true)).toBe(false);
     expect(isActive('/projects', '/projects', true)).toBe(true);
+  });
+});
+
+describe('isFillEntry', () => {
+  const fillAt = (path: string) => {
+    const sections = visibleNav('admin', path);
+    return isFillEntry(sections, activeEntryId(sections, path), path);
+  };
+
+  test('the board fills the screen; the pages below it and the others do not', () => {
+    expect(fillAt('/projects/p1/board')).toBe(true);
+    expect(fillAt('/projects/p1/board/')).toBe(true);
+    expect(fillAt('/projects/p1/board/cards/3/design')).toBe(false);
+    expect(fillAt('/projects/p1/fleet')).toBe(false);
   });
 });

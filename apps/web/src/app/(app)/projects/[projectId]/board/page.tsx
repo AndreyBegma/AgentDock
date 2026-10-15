@@ -32,6 +32,10 @@ import {
   useRef,
   useState,
 } from 'react';
+import {
+  BoardToolbar,
+  type Density,
+} from '../../../../../components/board/board-toolbar';
 import { BoardColumns } from '../../../../../components/board/board-view';
 import {
   CardSheet,
@@ -52,16 +56,24 @@ import { useCurrentUser } from '../../../../../components/shell/user-context';
 import { TerminalSheet } from '../../../../../components/terminal/terminal-sheet';
 import { fetchBoard } from '../../../../../lib/board/actions';
 import {
+  boardFilterCodec,
+  boardMeta,
+  isFiltering,
+  matchesFilter,
+} from '../../../../../lib/board/filter';
+import {
   cardByNumber,
   describeBoardError,
   isNotFound,
   parseCardParam,
 } from '../../../../../lib/board/format';
 import {
+  boardItems,
   fetchPlanTasks,
   findPlanTask,
   parsePlanTaskParam,
 } from '../../../../../lib/board/plan-tasks';
+import { useUrlFilters } from '../../../../../lib/filters/use-url-filters';
 import { useLive } from '../../../../../lib/live/use-live';
 import { useReadiness } from '../../../../../lib/readiness/use-readiness';
 import { useSection } from '../../../../../lib/section/use-section';
@@ -104,6 +116,8 @@ function BoardScreen() {
   const [older, setOlder] = useState<BoardCardView[]>([]);
   const [olderHasMore, setOlderHasMore] = useState<boolean>();
   const [loadingOlder, setLoadingOlder] = useState(false);
+  const [density, setDensity] = useState<Density>('comfortable');
+  const url = useUrlFilters(boardFilterCodec);
   const live = useLivePaused();
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -155,6 +169,15 @@ function BoardScreen() {
       ),
     };
   }, [board.data, older]);
+
+  // The header's figures follow the filter: what is running, what waits on you.
+  const meta = useMemo(() => {
+    if (!view) return undefined;
+    const items = [...boardItems(view, planTaskItems).values()]
+      .flat()
+      .filter((item) => matchesFilter(item, url.filters));
+    return { ...boardMeta(items), shown: items.length };
+  }, [view, planTaskItems, url.filters]);
 
   const completed = view?.columns.find((c) => c.column === 'completed');
   const lastCompleted = completed?.cards.at(-1);
@@ -258,14 +281,15 @@ function BoardScreen() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3">
+    // The shell gives the page the screen's height; the board takes what the header and toolbar leave.
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="flex shrink-0 flex-col gap-3">
         <PageHeader
           className="mb-0"
           title="Work"
           description={
-            view
-              ? `${view.running} of ${view.settings.maxRunning} workers running`
+            view && meta
+              ? `${view.running} of ${view.settings.maxRunning} workers running · ${meta.shown} ${meta.shown === 1 ? 'card' : 'cards'}${isFiltering(url.filters) ? ' shown' : ''} · ${meta.running} running · ${meta.waiting} waiting on you`
               : undefined
           }
           actions={
@@ -315,17 +339,22 @@ function BoardScreen() {
       </div>
 
       {canOperate ? (
-        <DraftsStrip
-          projectId={projectId}
-          userId={user.id}
-          version={version}
-          onResume={resumeDraft}
-          onDiscarded={(plan) => {
-            if (plan.id === intakeId) setParams({ intake: undefined });
-            if (plan.id === planPanelId) closePlanPanel();
-          }}
-        />
+        // Fixed height above the board: the columns scroll, the page does not.
+        <div className="shrink-0">
+          <DraftsStrip
+            projectId={projectId}
+            userId={user.id}
+            version={version}
+            onResume={resumeDraft}
+            onDiscarded={(plan) => {
+              if (plan.id === intakeId) setParams({ intake: undefined });
+              if (plan.id === planPanelId) closePlanPanel();
+            }}
+          />
+        </div>
       ) : null}
+
+      <BoardToolbar url={url} density={density} onDensityChange={setDensity} />
 
       <AsyncSection
         section={board}
@@ -347,13 +376,15 @@ function BoardScreen() {
                 canOperate={canOperate}
                 canTerminal={canAttach}
                 actions={actions}
+                filter={url.filters}
+                compact={density === 'compact'}
                 onOpen={(card) => select(card.number)}
                 onOpenPlanTask={selectPlanTask}
                 onOpenTerminal={setAttaching}
                 onReload={reload}
               />
               {hasMoreOlder && lastCompleted?.completedAt ? (
-                <div>
+                <div className="shrink-0">
                   <Button
                     variant="glass"
                     disabled={loadingOlder}
