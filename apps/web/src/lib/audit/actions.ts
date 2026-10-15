@@ -122,6 +122,7 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   'card.merge_failed': "Failed to merge a card's pull request",
   'card.auto_run_failed': "A card's worker did not start after design approval",
   'board.settings_updated': 'Changed board settings',
+  'text.settings_updated': 'Changed the text settings',
 };
 
 /** The action filter's groups: the prefix before the dot. */
@@ -155,6 +156,7 @@ export const ACTION_GROUP_LABEL: Record<string, string> = {
   'session_content.': 'Session content',
   'card.': 'Board cards',
   'board.': 'Board',
+  'text.': 'Text',
 };
 
 /** An action code as words; a code this build does not know shows as it came. */
