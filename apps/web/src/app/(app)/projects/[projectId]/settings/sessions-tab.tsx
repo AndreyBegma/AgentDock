@@ -14,6 +14,7 @@ import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
 import { type FormEvent, useEffect, useState } from 'react';
+import { TerminalSetupCard } from '../../../../../components/setup/terminal-setup-card';
 import { api } from '../../../../../lib/api';
 import {
   CONTENT_WARNING,
@@ -92,6 +93,7 @@ export function SessionsTab({
 
   return (
     <div className="flex flex-col gap-4">
+      <TerminalSetupCard projectId={project.id} isAdmin={isAdmin} />
       <Card pad="lg" className="flex flex-col gap-6">
         <SectionHeader
           title="Session content"
