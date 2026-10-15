@@ -36,6 +36,7 @@ import { LocalService } from './local/service';
 import { HookSessions } from './local/sessions';
 import { acquireLock } from './lock';
 import { errorMessage, type Logger } from './log';
+import { createNormalizeHandlers, NormalizeExecutor } from './normalize';
 import { otlpSettings, ProjectDirectory, startOtlpReceiver } from './otlp';
 import { PaneStreamer } from './pane';
 import {
@@ -86,6 +87,8 @@ export interface DaemonOptions {
   cardsDir?: string;
   /** Card capture's per-extraction directories (#244); `<state>/agentdock/capture` beside the runs by default. */
   captureDir?: string;
+  /** Text normalization's per-run directories (#271); `<state>/agentdock/normalize` beside the runs by default. */
+  normalizeDir?: string;
   /** The argv that starts this runner; a skill run's, plan turn's or card's session appends `exec-run <dir>`. */
   selfCommand?: readonly string[];
   /** The skills.sh catalog is fetched with it; the global `fetch` by default. */
@@ -288,6 +291,16 @@ export const runDaemon = async (
       log,
       otlpPort: () => otlp?.port ?? null,
     });
+    // Text normalization (#271): headless; the API limits concurrency.
+    const normalize = new NormalizeExecutor({
+      deps: skillsDeps,
+      normalizeDir:
+        options.normalizeDir ?? join(dirname(options.spoolDir), 'normalize'),
+      env: process.env,
+      emit: (event) => connection?.emit(event),
+      log,
+      otlpPort: () => otlp?.port ?? null,
+    });
     const runLog = new RunLogStreamer({
       runs: runLogSources(runs, plans, uiProfiles),
       send: (message) => connection?.sendMessage(message) ?? false,
@@ -314,6 +327,7 @@ export const runDaemon = async (
       uiprofile: createUiProfileHandlers(skillsDeps, uiProfiles),
       cards: createCardHandlers(cards),
       capture: createCaptureHandlers(capture),
+      normalize: createNormalizeHandlers(normalize),
     });
     const dispatch = createDispatcher({
       handlers: builtHandlers,
@@ -475,6 +489,7 @@ export const runDaemon = async (
     uiProfiles.stop();
     cards.stop();
     capture.stop();
+    normalize.stop();
     terminal.stop();
     await registry.stop();
     await sessions?.stop();

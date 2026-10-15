@@ -123,6 +123,7 @@ export const toCardView = (
   label: cardLabel(card.number),
   title: card.title,
   kind: card.kind,
+  kindSource: card.kindSource,
   column: card.column,
   position: card.position,
   source: card.source,
