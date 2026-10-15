@@ -86,6 +86,14 @@ fi
 
 # ── deploy ──────────────────────────────────────────────────────────────────
 cd "$STAGING_DIR"
+# The API first, and wait for it, so api and web are never down together; the
+# proxy holds requests meanwhile (#368). The rest follows once it is healthy.
+echo "Restarting the API and waiting for it (up to ${HEALTH_TIMEOUT}s)..."
+if ! docker compose up -d --remove-orphans --wait --wait-timeout "$HEALTH_TIMEOUT" api; then
+  echo "agentdock-staging-api did not become healthy within ${HEALTH_TIMEOUT}s" >&2
+  docker logs --tail 60 agentdock-staging-api >&2 || true
+  exit 1
+fi
 docker compose up -d --remove-orphans
 if [ "$caddy_changed" = true ]; then
   docker compose restart proxy
