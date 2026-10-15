@@ -113,6 +113,11 @@ export class UpdateBoardCardDto implements UpdateBoardCardRequest {
   @IsOptional()
   @IsBoolean()
   continueAfterDesign?: boolean;
+
+  /** #282 D3: a `terminal` card only; any other is refused `not_tracked`. */
+  @IsOptional()
+  @IsBoolean()
+  autoCollect?: boolean;
 }
 
 /** `POST /board/cards/:number/move` (D7). */
@@ -173,6 +178,11 @@ export class UpdateBoardSettingsDto implements UpdateBoardSettingsRequest {
   @IsOptional()
   @IsIn(CAPTURE_MODELS)
   captureModel?: CaptureModel;
+
+  /** #282 D3: the `autoCollect` a new terminal card starts with. */
+  @IsOptional()
+  @IsBoolean()
+  autoCollectTracked?: boolean;
 }
 
 /** #273 D13: the head the person saw in the accept dialog. */

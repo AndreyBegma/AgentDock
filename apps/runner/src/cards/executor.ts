@@ -21,6 +21,7 @@ import { resolveFleetProject } from '../fleet/project';
 import { errorMessage, type Logger } from '../log';
 import { profileOf, type SkillsDeps } from '../skills/deps';
 import { RUN_FILES, writeJsonAtomic } from '../skills/run/record';
+import { type AttachmentSource, syncAttachments } from './attachments';
 import {
   collectCard,
   commitFiles,
@@ -43,6 +44,8 @@ export interface CardExecutorOptions {
   /** The OTLP receiver's bound port, null when it is off. */
   otlpPort?: () => number | null;
   pollMs?: number;
+  /** Where `card.run` downloads attachments from (#309 D9): the API and the runner token. */
+  attachmentSource?: AttachmentSource;
 }
 
 /** An event's `error`: one line, at most 500 characters, no stack. */
@@ -145,6 +148,14 @@ export class CardExecutor {
       this.setPhase(record, 'starting');
       try {
         await ensureWorktree(deps, record);
+        // #309 D9: before the session starts or resumes; a file that cannot
+        // be had fails the command with `attachments_unavailable`.
+        await syncAttachments(
+          deps,
+          record.worktree,
+          args.attachments ?? [],
+          this.options.attachmentSource,
+        );
         await commitFiles(deps, record.worktree, args.files ?? []);
         const roundDir = this.store.createRound(record.cardId, record.runId);
         writeJsonAtomic(

@@ -271,7 +271,7 @@ describe('board rounds (e2e)', () => {
       const run = await w.ctx.prisma.run.findUniqueOrThrow({
         where: { id: card.rounds[1].runId },
       });
-      expect(run.args).toMatchObject({ promptVersion: 3 });
+      expect(run.args).toMatchObject({ promptVersion: 4 });
 
       // A second feedback without edits: the plain feedback prompt.
       await post(1, 'finish');

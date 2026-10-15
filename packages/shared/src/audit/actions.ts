@@ -128,6 +128,12 @@ export const AUDIT_ACTIONS = [
   'card.merge_failed',
   /** #273 D9: approving the design did not start the worker (`after: { code }`). */
   'card.auto_run_failed',
+  /** #309 D7: an upload stored, pending (`after: { name, mime, size }`). */
+  'attachment.added',
+  /** #309 D7: pending uploads claimed onto a card (`after: { cardId, roundId?, attachmentIds }`). */
+  'attachment.claimed',
+  /** #309 D7: an attachment deleted by its uploader or an admin (`before: { name, cardId }`). */
+  'attachment.removed',
   /** Also records the capture fields (#244 D12). */
   'board.settings_updated',
   /** #271 D13: the per-project "Store text in English" switch (`after: { normalizeEnabled }`). */

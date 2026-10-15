@@ -79,6 +79,11 @@ export const commandErrorCodeSchema = z.enum([
   'too_large',
   /** The catalog or the forge did not answer (spec 24 D1/D2). */
   'upstream_unavailable',
+  /**
+   * `card.run` could not download an attachment, or its size or SHA-256 did
+   * not match (#309 D9); the worker was not started.
+   */
+  'attachments_unavailable',
 ]);
 export type CommandErrorCode = z.infer<typeof commandErrorCodeSchema>;
 

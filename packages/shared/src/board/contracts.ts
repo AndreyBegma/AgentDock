@@ -1,3 +1,4 @@
+import type { AttachmentRefusal, AttachmentView } from '../attachments';
 import type { TaskDesignSummary, TaskDesignView } from '../design';
 import type { FleetStage } from '../fleet';
 import type {
@@ -117,6 +118,8 @@ export interface BoardCardView {
    * session finishes. Meaningful for a `terminal` card only; `false` otherwise.
    */
   autoCollect: boolean;
+  /** #309: attachments of the card and its rounds — the paperclip on the face when above 0. */
+  attachmentCount: number;
   movedAt: string;
   completedAt: string | null;
   updatedAt: string;
@@ -202,6 +205,11 @@ export interface BoardCardDetail extends BoardCardView {
    * `null` once accepted — Accept strips it — and for a manual card.
    */
   evidence: CardEvidenceView[] | null;
+  /**
+   * #309: the card's and its rounds' attachments, oldest first. A round's
+   * own carry its `roundId`.
+   */
+  attachments: AttachmentView[];
 }
 
 /** `GET /board-settings`; with no row, the defaults and `isDefault: true`. */
@@ -229,6 +237,12 @@ export interface CreateBoardCardRequest {
   kind?: BoardCardKind;
   issueOnRun?: boolean;
   specOnRun?: boolean;
+  /**
+   * #309 D3: pending uploads to claim, at most `ATTACHMENTS_PER_CARD_MAX`.
+   * Each must be pending, in this project and uploaded by the caller, else
+   * 422 `attachment_error` `not_claimable`.
+   */
+  attachmentIds?: string[];
 }
 
 /** `PATCH /board/cards/:number`: applies from the next round. `model: null` clears it. */
@@ -261,6 +275,8 @@ export interface RunBoardCardRequest {
 /** `POST /board/cards/:number/feedback` (D9). */
 export interface CardFeedbackRequest {
   text: string;
+  /** #309 D3: pending uploads claimed onto the card and the new round. */
+  attachmentIds?: string[];
 }
 
 /** `PUT /board-settings` (project admin). */
@@ -362,6 +378,12 @@ export const BOARD_ERROR = {
   noPullRequest: 'no_pull_request',
   /** 422 (#282 D3): `autoCollect` on a card that is not a `terminal` card. */
   notTracked: 'not_tracked',
+  /** 422 (#309): an attachment refused on create, feedback or claim, with `code`. */
+  attachmentError: 'attachment_error',
+  /** 409 (#309): attachments of a card in Completed do not change. */
+  cardCompleted: 'card_completed',
+  /** 502 (#309 D9): the runner could not download or verify an attachment for `card.run`. */
+  attachmentsUnavailable: 'attachments_unavailable',
 } as const;
 export type BoardErrorCode = (typeof BOARD_ERROR)[keyof typeof BOARD_ERROR];
 
@@ -378,6 +400,8 @@ export interface BoardErrorBody {
   source?: ProfileSource | null;
   /** `no_profile`: the unusable profile's key. */
   profileKey?: string;
+  /** `attachment_error`: why the attachment was refused (#309). */
+  code?: AttachmentRefusal;
 }
 
 /** #273 D9: why approving the design did not start round 1. */
@@ -472,6 +496,8 @@ export interface FleetCardEdit {
   label: string;
   /** What changed, as `cardChange` reports it — never `null` here. */
   change: CardChange;
+  /** #282: who edited; slot.message needs the sender. */
+  editor: { userId: string; email: string };
 }
 
 /**

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { commandErrorCodeSchema } from '../commands';
 import { localMethods, parseLocalRequest } from '../local';
 import {
   CARD_MERGE_COMMENT_MAX_BYTES,
@@ -154,6 +155,52 @@ describe('card.run args', () => {
         tmuxSession: 'cs-i12',
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('card.run attachments (#309 D9)', () => {
+  const ref = (id: string) => ({
+    id,
+    name: `${id} shot.png`,
+    mime: 'image/png',
+    size: 2048,
+    sha256: 'f'.repeat(64),
+  });
+
+  it('lists the attachments by id, name, type, size and SHA-256', () => {
+    const parsed = cardRunArgsSchema.safeParse({
+      ...runArgs,
+      attachments: [ref('a1'), ref('a2')],
+    });
+    expect(parsed.success).toBe(true);
+    expect(parsed.data?.attachments?.map((a) => a.id)).toEqual(['a1', 'a2']);
+  });
+
+  it('takes an absent list and an empty one', () => {
+    expect(cardRunArgsSchema.safeParse(runArgs).success).toBe(true);
+    expect(
+      cardRunArgsSchema.safeParse({ ...runArgs, attachments: [] }).success,
+    ).toBe(true);
+  });
+
+  it('refuses more than 20, a repeated id, and an id that is a path', () => {
+    const many = Array.from({ length: 21 }, (_, i) => ref(`a${i}`));
+    for (const attachments of [
+      many,
+      [ref('a1'), ref('a1')],
+      [ref('../a1')],
+      [{ ...ref('a1'), path: '/etc/passwd' }],
+    ]) {
+      expect(
+        cardRunArgsSchema.safeParse({ ...runArgs, attachments }).success,
+      ).toBe(false);
+    }
+  });
+
+  it('fails the run with attachments_unavailable', () => {
+    expect(
+      commandErrorCodeSchema.safeParse('attachments_unavailable').success,
+    ).toBe(true);
   });
 });
 

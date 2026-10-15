@@ -7,6 +7,7 @@ import {
   type BoardColumn,
   type BoardMoveDecision,
   type BoardMoveEffect,
+  type BoardMoveRefusal,
   type BoardMoveSource,
   boardMoveRule,
   CARD_FINISHED_EVENT,
@@ -22,7 +23,7 @@ import {
 } from '@agentdock/shared';
 import { API_EVENT_SOURCE } from '@agentdock/shared/protocol';
 import { Injectable, Logger } from '@nestjs/common';
-import { Prisma, type RunStatus } from '@prisma/client';
+import { type BoardCard, Prisma, type RunStatus } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { type AuditContext, SYSTEM_ACTOR } from '../audit/audit.types';
 import { PrismaService } from '../database/prisma.service';
@@ -72,6 +73,10 @@ const newShortId = (): string =>
     () => SHORT_ID_ALPHABET[randomInt(SHORT_ID_ALPHABET.length)],
   ).join('');
 
+/** #282 D3: why a `terminal` card with Automatic work got no pull request. */
+export const TERMINAL_COLLECT_UNSUPPORTED =
+  'Automatic work is not supported yet for terminal cards: nothing was pushed and no pull request was opened';
+
 /** The `runs.status` a round's end gives its run. */
 const RUN_STATUS_OF: Record<'finished' | 'failed' | 'cancelled', RunStatus> = {
   finished: 'succeeded',
@@ -93,6 +98,19 @@ export interface MoveRequest {
   edits?: Record<string, unknown>;
 }
 
+/** The message of each `move_refused` reason. */
+const MOVE_REFUSED: Record<
+  Exclude<BoardMoveRefusal, 'card_running' | 'invalid_move'>,
+  string
+> = {
+  automatic_to_completed: 'Only a person completes a card',
+  card_completed: 'A completed card is moved only by a person',
+  plan_task_derived: 'A completed card is moved only by a person',
+  // #282 D4: the column follows the slot.
+  fleet_slot:
+    'A fleet card follows its slot: the one move it takes is Finished → Completed',
+};
+
 const refusalOf = (
   decision: Extract<BoardMoveDecision, { allowed: false }>,
 ): BoardFailure =>
@@ -108,14 +126,9 @@ const refusalOf = (
           BOARD_ERROR.invalidMove,
           'A suggestion leaves the Inbox only for To Do, and nothing else enters it',
         )
-      : boardError(
-          409,
-          BOARD_ERROR.moveRefused,
-          decision.error === 'automatic_to_completed'
-            ? 'Only a person completes a card'
-            : 'A completed card is moved only by a person',
-          { reason: decision.error },
-        );
+      : boardError(409, BOARD_ERROR.moveRefused, MOVE_REFUSED[decision.error], {
+          reason: decision.error,
+        });
 
 /**
  * The board's shared moves and side effects (issue #242 D7, D8, D10): column
@@ -358,6 +371,10 @@ export class BoardWork {
       roundPhase: card.rounds[0]?.phase ?? null,
       source: request.source,
       stopWorker: request.stopWorker,
+      // #282: a fleet card follows its slot; a terminal card collects only
+      // with Automatic work on.
+      cardSource: card.source,
+      autoCollect: card.autoCollect,
     });
   }
 
@@ -590,6 +607,10 @@ export class BoardWork {
       where: { id: cardId },
       include: { rounds: { orderBy: { round: 'desc' } } },
     });
+    if (card?.source === 'terminal') {
+      await this.terminalCollectUnsupported(card);
+      return;
+    }
     if (!card || card.branch === null) return;
     const project = await this.project(card.projectId);
     const round = card.rounds[0] ?? null;
@@ -647,6 +668,32 @@ export class BoardWork {
         ...data,
       }),
     );
+  }
+
+  /**
+   * #282 D3: Automatic work on a `terminal` card collects in its session's
+   * own cwd and branch. The runner's `card.collect` serves only a card
+   * worktree today, so nothing is sent: the card says why, and has no PR.
+   * TODO(i282-collect): send the session-cwd mode of `card.collect` here.
+   */
+  private async terminalCollectUnsupported(card: BoardCard): Promise<void> {
+    await this.prisma.boardCard.update({
+      where: { id: card.id },
+      data: {
+        autoRunError: 'unknown',
+        autoRunMessage: TERMINAL_COLLECT_UNSUPPORTED,
+        autoRunFailedAt: new Date(),
+      },
+    });
+    await this.audit.record({
+      actor: SYSTEM_ACTOR,
+      action: 'card.auto_run_failed',
+      target: { type: 'board_card', id: card.id },
+      projectId: card.projectId,
+      after: { number: card.number, reason: 'terminal_collect_unsupported' },
+      result: 'ok',
+    });
+    this.publish(card.projectId, card.id);
   }
 
   /** A `card.*` server event (ADR-0014), once per key. */

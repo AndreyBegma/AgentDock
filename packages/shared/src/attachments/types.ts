@@ -1,0 +1,142 @@
+/**
+ * The upload allowlist (issue #309 D5, ADR-0031 §5). The type is decided by
+ * the content signature — never by the name or the browser's MIME type. Only
+ * a file with no binary signature looks at its extension, and then only to
+ * accept it as text.
+ */
+
+export const ATTACHMENT_IMAGE_MIMES = [
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+] as const;
+
+export const ATTACHMENT_TEXT_MIMES = [
+  'text/plain',
+  'text/markdown',
+  'text/csv',
+  'application/json',
+  'text/x-diff',
+] as const;
+
+/** Every MIME type an attachment can be stored with: the detected one. */
+export const ATTACHMENT_MIMES = [
+  ...ATTACHMENT_IMAGE_MIMES,
+  'application/pdf',
+  ...ATTACHMENT_TEXT_MIMES,
+] as const;
+export type AttachmentMime = (typeof ATTACHMENT_MIMES)[number];
+
+/** D5: the extensions a signature-less UTF-8 file is accepted under, and its MIME. */
+export const ATTACHMENT_TEXT_EXTENSIONS: Readonly<
+  Record<string, AttachmentMime>
+> = {
+  '.txt': 'text/plain',
+  '.md': 'text/markdown',
+  '.log': 'text/plain',
+  '.csv': 'text/csv',
+  '.json': 'application/json',
+  '.diff': 'text/x-diff',
+  '.patch': 'text/x-diff',
+};
+
+const MIMES: ReadonlySet<string> = new Set(ATTACHMENT_MIMES);
+
+export const isAttachmentMime = (value: string): value is AttachmentMime =>
+  MIMES.has(value);
+
+const ascii = (text: string): number[] =>
+  [...text].map((ch) => ch.charCodeAt(0));
+
+/** `bytes` holds `expected` at `offset`; `null` in `expected` matches any byte. */
+const startsWith = (
+  bytes: Uint8Array,
+  expected: readonly (number | null)[],
+  offset = 0,
+): boolean =>
+  bytes.length >= offset + expected.length &&
+  expected.every((b, i) => b === null || bytes[offset + i] === b);
+
+const SIGNATURES: readonly {
+  mime: AttachmentMime;
+  matches: (bytes: Uint8Array) => boolean;
+}[] = [
+  {
+    mime: 'image/png',
+    matches: (b) =>
+      startsWith(b, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+  },
+  { mime: 'image/jpeg', matches: (b) => startsWith(b, [0xff, 0xd8, 0xff]) },
+  {
+    mime: 'image/gif',
+    matches: (b) =>
+      startsWith(b, ascii('GIF87a')) || startsWith(b, ascii('GIF89a')),
+  },
+  {
+    mime: 'image/webp',
+    matches: (b) =>
+      startsWith(b, ascii('RIFF')) && startsWith(b, ascii('WEBP'), 8),
+  },
+  { mime: 'application/pdf', matches: (b) => startsWith(b, ascii('%PDF-')) },
+];
+
+/** The longest prefix a binary signature reads. */
+export const ATTACHMENT_SIGNATURE_BYTES = 12;
+
+/** The MIME type of a binary signature at the start of `head`, or `null`. */
+export const attachmentSignatureMime = (
+  head: Uint8Array,
+): AttachmentMime | null =>
+  SIGNATURES.find((s) => s.matches(head))?.mime ?? null;
+
+/** The extension of `name`, lower case with its dot; `''` without one. */
+export const attachmentExtension = (name: string): string => {
+  const base = name.slice(
+    Math.max(name.lastIndexOf('/'), name.lastIndexOf('\\')) + 1,
+  );
+  const dot = base.lastIndexOf('.');
+  return dot > 0 ? base.slice(dot).toLowerCase() : '';
+};
+
+/** D5: valid UTF-8 with no NUL byte. */
+export const isAttachmentText = (bytes: Uint8Array): boolean => {
+  if (bytes.includes(0)) return false;
+  try {
+    new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * D5: the type an upload is stored with, from its whole content; `null` is
+ * `unsupported_type`. A binary signature wins over the name (a PNG named
+ * `.txt` is `image/png`); a file without one is text only when it is valid
+ * UTF-8, has no NUL, and its extension is a text extension. SVG, HTML and
+ * archives have neither, so they are refused.
+ */
+export const detectAttachmentMime = (
+  bytes: Uint8Array,
+  name: string,
+): AttachmentMime | null => {
+  const signed = attachmentSignatureMime(bytes);
+  if (signed !== null) return signed;
+  const text = ATTACHMENT_TEXT_EXTENSIONS[attachmentExtension(name)];
+  return text !== undefined && isAttachmentText(bytes) ? text : null;
+};
+
+const INLINE: ReadonlySet<string> = new Set(ATTACHMENT_IMAGE_MIMES);
+
+/**
+ * D8: raster images are served `inline`; everything else as `attachment`,
+ * with `Content-Security-Policy: sandbox`.
+ */
+export const attachmentDisposition = (
+  mime: AttachmentMime,
+): 'inline' | 'attachment' => (INLINE.has(mime) ? 'inline' : 'attachment');
+
+/** D10: the type as the worker prompt names it. */
+export const attachmentKindLabel = (mime: AttachmentMime): string =>
+  INLINE.has(mime) ? 'image' : mime === 'application/pdf' ? 'PDF' : 'text';

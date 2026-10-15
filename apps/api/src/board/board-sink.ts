@@ -7,6 +7,7 @@ import {
   type CardRunPhaseChangedData,
   cardRunEventDataSchemas,
   HOOK_PROMPT_SUBMITTED_EVENT,
+  HOOK_SESSION_ENDED_EVENT,
   HOOK_STOPPED_EVENT,
   isCardRunEventType,
   parseHookEvent,
@@ -22,6 +23,7 @@ import {
   type RunnerEventSink,
   RunnerEventSinks,
 } from '../runners/runner-event-sinks';
+import { BoardTerminalService } from './board-terminal.service';
 import {
   ACTIVE_PHASES,
   BOARD_SYSTEM_ACTOR,
@@ -51,6 +53,7 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
     private readonly sinks: RunnerEventSinks,
     private readonly prisma: PrismaService,
     private readonly work: BoardWork,
+    private readonly terminal: BoardTerminalService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -209,6 +212,11 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
     session: { runtime: string; id: string },
   ): Promise<void> {
     if (session.runtime !== 'claude' || !UUID.test(session.id)) return;
+    // #282 D2: a tracked session's end moves its card to Finished. The
+    // sessions sink, registered earlier, has written its `endedAt` by now.
+    if (type === HOOK_SESSION_ENDED_EVENT) {
+      await this.terminal.sessionEnded(runnerId, session.id);
+    }
     const card = await this.prisma.boardCard.findFirst({
       where: { sessionId: session.id, project: { runnerId } },
       include: {
