@@ -3,6 +3,7 @@ import { commandErrorCodeSchema } from '../commands';
 import { localMethods, parseLocalRequest } from '../local';
 import {
   CARD_MERGE_COMMENT_MAX_BYTES,
+  CARD_PR_CLOSE_COMMENT_MAX_BYTES,
   CARD_RUN_FILE_MAX_BYTES,
   CARD_RUN_PROMPT_MAX_BYTES,
   CARD_TIMEOUTS_MS,
@@ -12,6 +13,9 @@ import {
   cardCommands,
   cardMergeArgsSchema,
   cardMergeResultSchema,
+  cardPrCloseArgsSchema,
+  cardPrCloseCommands,
+  cardPrCloseResultSchema,
   cardRunArgsSchema,
   cardRunResultSchema,
   cardSessionName,
@@ -308,11 +312,12 @@ describe('card.merge (#273 D11, D13)', () => {
     ).toBe(true);
   });
 
-  it('rejects an extra key — no command text, no branch deletion', () => {
+  it('rejects an extra key — no command text, no branch to name', () => {
     for (const extra of [
       { command: 'gh pr merge 41 --admin' },
-      { deleteBranch: true },
+      { branch: 'main' },
       { args: ['--admin'] },
+      { deleteBranch: 'yes' },
     ]) {
       expect(
         cardMergeArgsSchema.safeParse({ ...mergeArgs, ...extra }).success,
@@ -373,6 +378,161 @@ describe('card.merge (#273 D11, D13)', () => {
         message: 'x',
       }).success,
     ).toBe(false);
+  });
+
+  it('#329 D7: deleteBranch is optional, and branchDeleted reads as false when absent', () => {
+    expect(
+      cardMergeArgsSchema.safeParse({ ...mergeArgs, deleteBranch: true })
+        .success,
+    ).toBe(true);
+    expect(cardMergeArgsSchema.parse(mergeArgs).deleteBranch).toBeUndefined();
+    const older = {
+      merged: true,
+      alreadyMerged: false,
+      method: 'squash',
+      mergeCommit: 'b'.repeat(40),
+      issueClosed: true,
+    };
+    expect(cardMergeResultSchema.parse(older)).toEqual({
+      ...older,
+      merged: true,
+      method: 'squash',
+      branchDeleted: false,
+    });
+    expect(
+      cardMergeResultSchema.parse({
+        ...older,
+        branchDeleted: false,
+        branchError: 'HTTP 422: Reference does not exist',
+      }),
+    ).toMatchObject({ branchDeleted: false, branchError: expect.any(String) });
+    expect(
+      cardMergeResultSchema.safeParse({
+        ...older,
+        branchError: 'x'.repeat(501),
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('card.collect result (#329 D3, D6)', () => {
+  const pr = { prNumber: 41, prUrl: 'https://github.com/o/r/pull/41' };
+
+  it('carries an open PR with its state, also one it did not open', () => {
+    expect(
+      cardCollectResultSchema.safeParse({
+        ahead: 3,
+        pushed: false,
+        ...pr,
+        prState: 'draft',
+      }).success,
+    ).toBe(true);
+    expect(
+      cardCollectResultSchema.safeParse({ ahead: 3, pushed: true, ...pr })
+        .success,
+    ).toBe(true);
+  });
+
+  it('refuses a state without a PR, or a state a collect cannot see', () => {
+    expect(
+      cardCollectResultSchema.safeParse({
+        ahead: 0,
+        pushed: false,
+        prState: 'open',
+      }).success,
+    ).toBe(false);
+    for (const prState of ['merged', 'closed']) {
+      expect(
+        cardCollectResultSchema.safeParse({
+          ahead: 1,
+          pushed: true,
+          ...pr,
+          prState,
+        }).success,
+      ).toBe(false);
+    }
+  });
+});
+
+describe('card.prClose (#329 D8)', () => {
+  const closeArgs = {
+    cardId: runArgs.cardId,
+    projectId: 'p1',
+    root: '/home/me/app',
+    pr: 41,
+    deleteBranch: true,
+    issue: null,
+    comment: 'Closed from the AgentDock Board (C-12)',
+  };
+
+  it('accepts a close, with or without the issue', () => {
+    expect(cardPrCloseArgsSchema.safeParse(closeArgs).success).toBe(true);
+    expect(
+      cardPrCloseArgsSchema.safeParse({
+        ...closeArgs,
+        deleteBranch: false,
+        issue: 12,
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects a branch name, command text, a relative root and a bad comment', () => {
+    for (const bad of [
+      { branch: 'main' },
+      { command: 'gh pr close 41' },
+      { root: 'app' },
+      { pr: 0 },
+      { deleteBranch: undefined },
+      { comment: '' },
+      { comment: 'a\u0000b' },
+      { comment: 'x'.repeat(CARD_PR_CLOSE_COMMENT_MAX_BYTES + 1) },
+    ]) {
+      expect(
+        cardPrCloseArgsSchema.safeParse({ ...closeArgs, ...bad }).success,
+      ).toBe(false);
+    }
+  });
+
+  it('a result is a close or a refusal with its reason', () => {
+    expect(
+      cardPrCloseResultSchema.safeParse({
+        closed: true,
+        alreadyClosed: false,
+        branchDeleted: true,
+        issueClosed: false,
+      }).success,
+    ).toBe(true);
+    expect(
+      cardPrCloseResultSchema.safeParse({
+        closed: true,
+        alreadyClosed: true,
+        branchDeleted: false,
+        branchError: 'HTTP 403',
+        issueClosed: false,
+        issueError: 'gh offline',
+      }).success,
+    ).toBe(true);
+    expect(
+      cardPrCloseResultSchema.safeParse({
+        closed: false,
+        error: 'merged',
+        message: 'pull request #41 is merged',
+      }).success,
+    ).toBe(true);
+    expect(
+      cardPrCloseResultSchema.safeParse({
+        closed: false,
+        error: 'head_changed',
+        message: 'x',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('is an operator command, kept out of the allowlist until its handler lands', () => {
+    const def = cardPrCloseCommands['card.prClose'];
+    expect(def.minRole).toBe('operator');
+    expect(def.timeoutMs).toBe(CARD_TIMEOUTS_MS.prClose);
+    expect(Object.keys(cardCommands)).not.toContain('card.prClose');
   });
 });
 

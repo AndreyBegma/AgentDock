@@ -2645,37 +2645,59 @@ enum CardFinishedBy {
   person
 }
 
+/// Shared `CARD_COLLECT_STATES` (#329 D2): how the card's last `card.collect` went.
+enum CardCollectState {
+  /// Never collected.
+  none
+  /// A collect is running now.
+  pending
+  /// A PR was opened or is already open (`prUrl` set).
+  ok
+  /// `ahead: 0` — nothing to push.
+  no_changes
+  /// The runner failed it; `collectError` says why.
+  failed
+}
+
+/// Shared `CARD_PR_STATES` (#329 D6): the card's PR as last seen.
+enum CardPrState {
+  open
+  draft
+  merged
+  closed
+}
+
 /// A work item AgentDock owns (ADR-0024), not a GitHub issue. Each Run or
 /// feedback is a round with its own `runs` row (D4).
 model BoardCard {
-  id                  String          @id @default(cuid())
+  id                  String           @id @default(cuid())
   projectId           String
   /// Per project, `C-<number>`: max + 1 under `pg_advisory_xact_lock` (D1).
   number              Int
   /// `^[a-z0-9]{8}$`: the worktree, tmux session and runner record (D5).
-  shortId             String          @unique
+  shortId             String           @unique
   /// At most 200 characters, checked by the DTO.
   title               String
   /// Markdown, at most 20 000 characters.
-  body                String          @default("")
-  kind                BoardCardKind   @default(feature)
+  body                String           @default("")
+  kind                BoardCardKind    @default(feature)
   /// #271 D9: `auto` lets the normalization classify `kind` until the first
   /// Run fixes the branch; a person setting kind makes it `person`.
-  kindSource          CardKindSource  @default(auto)
-  column              BoardColumn     @default(todo)
+  kindSource          CardKindSource   @default(auto)
+  column              BoardColumn      @default(todo)
   /// Fractional index inside the column (D3).
   position            Float
-  source              BoardCardSource @default(manual)
+  source              BoardCardSource  @default(manual)
   issueOnRun          Boolean
   specOnRun           Boolean
   /// Overrides the project's model from the next round (D12).
   model               String?
   /// #243 D5: approving the design starts round 1. Changeable until the design is approved.
-  continueAfterDesign Boolean         @default(false)
+  continueAfterDesign Boolean          @default(false)
   /// #243 D2: the design turns' Claude session — `--session-id` first, then `--resume`.
-  designSessionId     String?         @db.Uuid
+  designSessionId     String?          @db.Uuid
   /// The Claude session, fixed at the first Run (D6).
-  sessionId           String?         @db.Uuid
+  sessionId           String?          @db.Uuid
   branch              String?
   /// Display only: the runner owns the path.
   worktree            String?
@@ -2684,6 +2706,18 @@ model BoardCard {
   specPath            String?
   prNumber            Int?
   prUrl               String?
+  /// #329 D6: from the PR poll, else the last `card.collect` / `card.merge`;
+  /// `null` while the card has no PR or its state is not known yet.
+  prState             CardPrState?
+  /// #329 D2: written on every collect attempt, for every source.
+  collectState        CardCollectState @default(none)
+  /// #329 D2: the runner's one-line message of a failed collect, at most 500
+  /// characters; cleared by a collect that does not fail.
+  collectError        String?
+  /// #329 D4: automatic attempts since the last manual collect (at most 3).
+  collectAttempts     Int              @default(0)
+  /// When the last collect attempt ended.
+  collectedAt         DateTime?
   /// Nullable so deleting a user keeps the card.
   createdById         String?
   movedById           String?
@@ -2712,10 +2746,10 @@ model BoardCard {
   autoRunFailedAt     DateTime?
   /// #282 D1: the manual session a `terminal` card tracks; unique, so a
   /// second `card.track` of the session updates its card.
-  trackedSessionId    String?         @unique
+  trackedSessionId    String?          @unique
   /// #282 D3: Automatic work — collect when the tracked session finishes.
   /// Starts from `board_settings.autoCollectTracked`.
-  autoCollect         Boolean         @default(false)
+  autoCollect         Boolean          @default(false)
   /// #282 D4: a `fleet` card's key is `(projectId, fleetIssue, fleetSlot)`;
   /// `fleetSlot` is null for a `cs:ready` issue no slot has picked up. Postgres
   /// treats nulls as distinct, so that row is kept unique by the partial index
@@ -2725,9 +2759,9 @@ model BoardCard {
   /// Shared `FLEET_STAGES`, written by the fleet projector.
   fleetStage          String?
   /// The slot left the projection; the card keeps its last column.
-  fleetSlotGone       Boolean         @default(false)
-  createdAt           DateTime        @default(now())
-  updatedAt           DateTime        @updatedAt
+  fleetSlotGone       Boolean          @default(false)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
 
   project            Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
   trackedSession     AgentSession?       @relation("BoardCardTrackedSession", fields: [trackedSessionId], references: [id], onDelete: SetNull)

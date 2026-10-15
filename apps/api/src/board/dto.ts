@@ -201,14 +201,36 @@ export class AcceptMergeDto {
   @IsString()
   @Matches(/^[0-9a-f]{40}$/, { message: 'headSha must be 40 lower-case hex' })
   headSha!: string;
+
+  /** #329 D7: delete the PR's head branch on GitHub after the merge. */
+  @IsOptional()
+  @IsBoolean()
+  deleteBranch?: boolean;
 }
 
-/** `POST /board/cards/:number/accept` (#273 D13): no `merge` moves only (D14). */
+/** #329 D8: Accept without merging, closing the card's PR. */
+export class AcceptClosePrDto {
+  @IsBoolean()
+  deleteBranch!: boolean;
+
+  @IsBoolean()
+  closeIssue!: boolean;
+}
+
+/**
+ * `POST /board/cards/:number/accept` (#273 D13): no `merge` and no `closePr`
+ * moves only (D14). `merge` with `closePr` is refused with 400 (#329).
+ */
 export class AcceptBoardCardDto implements AcceptBoardCardRequest {
   @IsOptional()
   @ValidateNested()
   @Type(() => AcceptMergeDto)
   merge?: AcceptMergeDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AcceptClosePrDto)
+  closePr?: AcceptClosePrDto;
 }
 
 /** `POST /board/cards/:number/accept-suggestion` (#244 D9): Edit & accept. */

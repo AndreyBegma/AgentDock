@@ -81,8 +81,20 @@ export const capabilitiesSchema = z.object({
   commands: commandListSchema.optional(),
   /** The subset of `commands` the runner config disables (`disabledCommands`). Absent = none. */
   disabledCommands: commandListSchema.optional(),
+  /**
+   * #329 D1: how the runner's git reaches GitHub. Absent means unknown — a
+   * runner older than the field. Next to `git`, which stays the version.
+   */
+  gitAuth: z.object({ github: z.enum(['gh', 'native']) }).optional(),
 });
 export type Capabilities = z.infer<typeof capabilitiesSchema>;
+
+/**
+ * #329 D1: `gh` — every git child gets the `GIT_CONFIG_*` settings that
+ * route GitHub through HTTPS and `gh auth git-credential`; `native` — `gh` is
+ * not authenticated, so git uses the machine's own setup (SSH agent, helpers).
+ */
+export type GitGithubAuth = NonNullable<Capabilities['gitAuth']>['github'];
 
 /** Whether the UI may offer an attach on this runner; absent `terminal` is `false`. */
 export const terminalAvailable = (capabilities: Capabilities): boolean =>
