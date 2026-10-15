@@ -150,6 +150,9 @@ export function DesignViewer({
         </div>
       ) : null}
       <CommentsPanel
+        projectId={projectId}
+        owner={design.owner}
+        canOperate={canOperate}
         comments={design.comments}
         revisionId={revisionId}
         screen={screen}
