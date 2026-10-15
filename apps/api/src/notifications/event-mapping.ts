@@ -1,6 +1,7 @@
 import {
   CARD_FINISHED_EVENT,
   CARD_WAITING_EVENT,
+  CARDS_SUGGESTED_EVENT,
   cardLabel,
   type NotificationKind,
   SCHEDULE_DISABLED_LIVE_EVENT,
@@ -274,6 +275,24 @@ export const draftFor = (event: MatchableEvent): NotificationDraft | null => {
           : 'Review it on the board: accept it, or send feedback.',
         page: 'board',
         card: number,
+      };
+    }
+    // Issue #244 D11: only the API records it; counts only — a suggestion's
+    // title is content-derived, so it is never quoted.
+    case CARDS_SUGGESTED_EVENT: {
+      if (event.source !== API_EVENT_SOURCE) return null;
+      const count = positiveInt(data.count);
+      if (!count) return null;
+      return {
+        kind: 'cards.suggested',
+        slot: null,
+        issue: null,
+        title:
+          count === 1
+            ? 'A card was suggested'
+            : `${count} cards were suggested`,
+        body: 'Capture found follow-up work in a session; review it in the Inbox.',
+        page: 'board',
       };
     }
     default:

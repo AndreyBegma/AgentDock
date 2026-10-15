@@ -5,6 +5,7 @@ import { RunnersModule } from '../runners/runners.module';
 import { BoardController } from './board.controller';
 import { BoardService } from './board.service';
 import { BoardCommands } from './board-commands';
+import { BoardInboxService } from './board-inbox.service';
 import { BoardRoundsService } from './board-rounds.service';
 import { BoardSink } from './board-sink';
 import { BoardWork } from './board-work';
@@ -19,12 +20,14 @@ import { BoardWork } from './board-work';
   controllers: [BoardController],
   providers: [
     BoardCommands,
+    BoardInboxService,
     BoardRoundsService,
     BoardService,
     BoardSink,
     BoardWork,
   ],
   // `BoardRoundsService` too: approving a card's design may start round 1 (#243 D6).
-  exports: [BoardRoundsService, BoardService],
+  // `BoardWork`: card capture puts suggestions in the Inbox (#244).
+  exports: [BoardRoundsService, BoardService, BoardWork],
 })
 export class BoardModule {}

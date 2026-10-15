@@ -1,4 +1,5 @@
 import {
+  type AcceptSuggestionRequest,
   BOARD_CARD_BODY_MAX,
   BOARD_CARD_KINDS,
   BOARD_CARD_TITLE_MAX,
@@ -7,7 +8,9 @@ import {
   BOARD_MAX_RUNNING_MIN,
   type BoardCardKind,
   type BoardColumn,
+  CAPTURE_MODELS,
   CARD_FEEDBACK_MAX,
+  type CaptureModel,
   type CardFeedbackRequest,
   type CreateBoardCardRequest,
   type MoveBoardCardRequest,
@@ -158,4 +161,31 @@ export class UpdateBoardSettingsDto implements UpdateBoardSettingsRequest {
   @Min(BOARD_MAX_RUNNING_MIN)
   @Max(BOARD_MAX_RUNNING_MAX)
   maxRunning!: number;
+
+  /** #244 D10: `true` needs the project's session content on. */
+  @IsOptional()
+  @IsBoolean()
+  captureEnabled?: boolean;
+
+  @IsOptional()
+  @IsIn(CAPTURE_MODELS)
+  captureModel?: CaptureModel;
+}
+
+/** `POST /board/cards/:number/accept-suggestion` (#244 D9): Edit & accept. */
+export class AcceptSuggestionDto implements AcceptSuggestionRequest {
+  @IsOptional()
+  @IsString()
+  @Matches(/\S/, { message: 'title must not be blank' })
+  @MaxLength(BOARD_CARD_TITLE_MAX)
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(BOARD_CARD_BODY_MAX)
+  body?: string;
+
+  @IsOptional()
+  @IsIn(BOARD_CARD_KINDS)
+  kind?: BoardCardKind;
 }

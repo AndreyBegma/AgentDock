@@ -2,6 +2,7 @@ import type {
   BoardCardDetail,
   BoardSettingsView,
   BoardView,
+  DismissAllResult,
 } from '@agentdock/shared';
 import {
   Body,
@@ -27,9 +28,11 @@ import {
 } from '../projects';
 import { BoardService } from './board.service';
 import { cardNotFound } from './board-error';
+import { BoardInboxService } from './board-inbox.service';
 import { BoardRoundsService } from './board-rounds.service';
 import type { BoardActor } from './board-work';
 import {
+  AcceptSuggestionDto,
   BoardQueryDto,
   CardFeedbackDto,
   CreateBoardCardDto,
@@ -53,8 +56,9 @@ const actorOf = (
 
 /**
  * The project Board (issue #242 "API", D11): viewers read; operators create,
- * edit, move, run, give feedback, stop, accept and delete; a project admin
- * edits the settings. A project the caller cannot see is 404 on every route.
+ * edit, move, run, give feedback, stop, accept and delete, and see and work
+ * the Inbox (#244 D8, D9); a project admin edits the settings. A project the
+ * caller cannot see is 404 on every route.
  */
 @Controller('projects/:projectId')
 @UseGuards(ProjectAccessGuard)
@@ -62,6 +66,7 @@ export class BoardController {
   constructor(
     private readonly board: BoardService,
     private readonly rounds: BoardRoundsService,
+    private readonly inbox: BoardInboxService,
   ) {}
 
   @Get('board')
@@ -72,6 +77,7 @@ export class BoardController {
     return this.board.board(
       access.projectId,
       query.completedBefore ? new Date(query.completedBefore) : undefined,
+      access.role,
     );
   }
 
@@ -91,7 +97,7 @@ export class BoardController {
     @ProjectAccess() access: ResolvedProjectAccess,
     @Param('number') number: string,
   ): Promise<BoardCardDetail> {
-    return this.board.detail(access.projectId, cardNumber(number));
+    return this.board.detail(access.projectId, cardNumber(number), access.role);
   }
 
   @Patch('board/cards/:number')
@@ -211,6 +217,51 @@ export class BoardController {
       cardNumber(number),
       actorOf(access, user, ctx),
     );
+  }
+
+  @Post('board/cards/:number/accept-suggestion')
+  @HttpCode(200)
+  @ProjectRole('operator')
+  acceptSuggestion(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Param('number') number: string,
+    @Body() dto: AcceptSuggestionDto,
+  ): Promise<BoardCardDetail> {
+    return this.inbox.accept(
+      access.projectId,
+      cardNumber(number),
+      dto,
+      actorOf(access, user, ctx),
+    );
+  }
+
+  @Post('board/cards/:number/dismiss')
+  @HttpCode(204)
+  @ProjectRole('operator')
+  async dismiss(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Param('number') number: string,
+  ): Promise<void> {
+    await this.inbox.dismiss(
+      access.projectId,
+      cardNumber(number),
+      actorOf(access, user, ctx),
+    );
+  }
+
+  @Post('board/inbox/dismiss-all')
+  @HttpCode(200)
+  @ProjectRole('operator')
+  dismissAll(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+  ): Promise<DismissAllResult> {
+    return this.inbox.dismissAll(access.projectId, actorOf(access, user, ctx));
   }
 
   @Post('board/cards/:number/stop')

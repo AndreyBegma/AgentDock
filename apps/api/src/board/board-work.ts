@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto';
 import {
   ACTIVE_CARD_ROUND_PHASES,
   BOARD_CHANGED_EVENT,
@@ -21,7 +22,7 @@ import {
 } from '@agentdock/shared';
 import { API_EVENT_SOURCE } from '@agentdock/shared/protocol';
 import { Injectable, Logger } from '@nestjs/common';
-import type { Prisma, RunStatus } from '@prisma/client';
+import { Prisma, type RunStatus } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { type AuditContext, SYSTEM_ACTOR } from '../audit/audit.types';
 import { PrismaService } from '../database/prisma.service';
@@ -62,6 +63,15 @@ export interface BoardProject {
 
 export const ACTIVE_PHASES = [...ACTIVE_CARD_ROUND_PHASES];
 
+const SHORT_ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
+
+/** D5: the 8-character id of a card's worktree, tmux session and runner record. */
+const newShortId = (): string =>
+  Array.from(
+    { length: 8 },
+    () => SHORT_ID_ALPHABET[randomInt(SHORT_ID_ALPHABET.length)],
+  ).join('');
+
 /** The `runs.status` a round's end gives its run. */
 const RUN_STATUS_OF: Record<'finished' | 'failed' | 'cancelled', RunStatus> = {
   finished: 'succeeded',
@@ -79,6 +89,8 @@ export interface MoveRequest {
   finishedBy?: CardFinishedBy;
   /** The worker's `finish_card` summary. */
   summary?: string;
+  /** `accept_suggestion` (#244 D9): the fields Edit & accept changed, for the audit record. */
+  edits?: Record<string, unknown>;
 }
 
 const refusalOf = (
@@ -90,14 +102,20 @@ const refusalOf = (
         BOARD_ERROR.cardRunning,
         'The worker is running: stop it first, or move the card to Finished',
       )
-    : boardError(
-        409,
-        BOARD_ERROR.moveRefused,
-        decision.error === 'automatic_to_completed'
-          ? 'Only a person completes a card'
-          : 'A completed card is moved only by a person',
-        { reason: decision.error },
-      );
+    : decision.error === 'invalid_move'
+      ? boardError(
+          409,
+          BOARD_ERROR.invalidMove,
+          'A suggestion leaves the Inbox only for To Do, and nothing else enters it',
+        )
+      : boardError(
+          409,
+          BOARD_ERROR.moveRefused,
+          decision.error === 'automatic_to_completed'
+            ? 'Only a person completes a card'
+            : 'A completed card is moved only by a person',
+          { reason: decision.error },
+        );
 
 /**
  * The board's shared moves and side effects (issue #242 D7, D8, D10): column
@@ -156,6 +174,23 @@ export class BoardWork {
     });
     if (!card) throw cardNotFound();
     return card;
+  }
+
+  /**
+   * D1: the project's next card number and a fresh short id. Takes the
+   * project's number lock for the rest of the transaction, so concurrent
+   * creates never collide.
+   */
+  async nextCard(
+    tx: Tx,
+    projectId: string,
+  ): Promise<{ number: number; shortId: string }> {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`board-number:${projectId}`}))`;
+    const last = await tx.boardCard.aggregate({
+      where: { projectId },
+      _max: { number: true },
+    });
+    return { number: (last._max.number ?? 0) + 1, shortId: newShortId() };
   }
 
   /** Locks the card's row for the transaction and reads it again. */
@@ -218,6 +253,8 @@ export class BoardWork {
           : await this.place(tx, fresh, request.to, request.index);
       const accept = decision.effects.includes('accept');
       const reopen = decision.effects.includes('reopen');
+      // #244 D8: the evidence is content; an accepted card keeps none.
+      const suggestion = decision.effects.includes('accept_suggestion');
       await tx.boardCard.update({
         where: { id: fresh.id },
         data: {
@@ -228,6 +265,7 @@ export class BoardWork {
             : { movedAt: now, movedById: actor.userId ?? null }),
           ...(accept ? { completedAt: now, completedById: actor.userId } : {}),
           ...(reopen ? { completedAt: null, completedById: null } : {}),
+          ...(suggestion ? { evidence: Prisma.DbNull } : {}),
         },
       });
       return { fresh, decision, ended };
@@ -285,6 +323,20 @@ export class BoardWork {
         target,
         projectId: project.id,
         after: { number: fresh.number },
+        result: 'ok',
+      });
+    }
+    if (effects.includes('accept_suggestion')) {
+      await this.audit.record({
+        ...actor.ctx,
+        action: 'card.inbox_accepted',
+        target,
+        projectId: project.id,
+        after: {
+          number: fresh.number,
+          captureId: fresh.captureId,
+          ...(request.edits ?? {}),
+        },
         result: 'ok',
       });
     }

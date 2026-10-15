@@ -204,9 +204,14 @@ export class NotificationMatcher
       return [];
     }
     const everyone = await this.writer.projectRecipients(tx, projectId);
-    const recipients = NOTIFICATION_KIND_SPECS[draft.kind].adminsOnly
+    const spec = NOTIFICATION_KIND_SPECS[draft.kind];
+    // A content-derived kind never reaches a viewer, whatever their rules say
+    // (ADR-0021 §5, #244 D11).
+    const recipients = spec.adminsOnly
       ? everyone.filter((r) => r.role === 'admin')
-      : everyone;
+      : spec.operatorsOnly
+        ? everyone.filter((r) => r.role !== 'viewer')
+        : everyone;
     return this.writer.write(
       tx,
       this.input(draft, event, projectId),

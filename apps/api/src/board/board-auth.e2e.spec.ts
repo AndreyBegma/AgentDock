@@ -93,6 +93,94 @@ describe('board authorization (e2e)', () => {
     }
   });
 
+  describe('the Inbox (#244 D8): operators only', () => {
+    /** Card 2 of project A, a suggestion in the Inbox. */
+    const suggestion = async () => {
+      const now = new Date();
+      await w.ctx.prisma.boardCard.create({
+        data: {
+          projectId: w.a,
+          number: 2,
+          shortId: 'inbox001',
+          title: 'Suggested',
+          column: 'inbox',
+          position: 1,
+          source: 'captured',
+          issueOnRun: false,
+          specOnRun: false,
+          movedAt: now,
+          evidence: [{ contentId: '1', kind: 'prompt', excerpt: 'secret' }],
+        },
+      });
+    };
+    const INBOX_WRITES: [string, object?][] = [
+      ['/board/cards/2/accept-suggestion', {}],
+      ['/board/cards/2/dismiss'],
+      ['/board/inbox/dismiss-all'],
+    ];
+
+    beforeEach(suggestion);
+
+    it("a viewer's board has no Inbox, and an Inbox card is not found", async () => {
+      const viewer = await w.viewer.get(`${w.path()}/board`);
+      expect(viewer.status).toBe(200);
+      const columns = (viewer.body.columns as { column: string }[]).map(
+        (c) => c.column,
+      );
+      expect(columns).toEqual(['todo', 'in_progress', 'finished', 'completed']);
+      expect(JSON.stringify(viewer.body)).not.toContain('Suggested');
+      expect((await w.viewer.get(`${w.path()}/board/cards/2`)).status).toBe(
+        404,
+      );
+      expect((await w.viewer.get(`${w.path()}/board/cards/1`)).status).toBe(
+        200,
+      );
+
+      const operator = await w.operator.get(`${w.path()}/board`);
+      expect(operator.body.columns[0]).toMatchObject({ column: 'inbox' });
+      const card = await w.operator.get(`${w.path()}/board/cards/2`);
+      expect(card.status).toBe(200);
+      expect(card.body.evidence).toHaveLength(1);
+    });
+
+    it('a viewer is 403 on accept, dismiss and the captures list', async () => {
+      for (const [path, body] of INBOX_WRITES) {
+        const response = await w.viewer.send(
+          'post',
+          `${w.path()}${path}`,
+          body,
+        );
+        expect([path, response.status]).toEqual([path, 403]);
+      }
+      expect((await w.viewer.get(`${w.path()}/board/captures`)).status).toBe(
+        403,
+      );
+      expect(await w.ctx.prisma.boardCard.count({ where: { number: 2 } })).toBe(
+        1,
+      );
+    });
+
+    it('a non-member is 404 on them', async () => {
+      for (const [path, body] of INBOX_WRITES) {
+        const response = await w.outsider.send(
+          'post',
+          `${w.path()}${path}`,
+          body,
+        );
+        expect([path, response.status]).toEqual([path, 404]);
+      }
+      expect((await w.outsider.get(`${w.path()}/board/captures`)).status).toBe(
+        404,
+      );
+    });
+
+    it('an operator lists the captures', async () => {
+      const response = await w.operator.get(`${w.path()}/board/captures`);
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ items: [], nextCursor: null });
+    });
+  });
+
   it('a card of another project is not found through this project', async () => {
     await w.createCard({ title: 'Other' }, w.operatorOfB, w.b);
     await w.ctx.prisma.boardCard.deleteMany({ where: { projectId: w.a } });

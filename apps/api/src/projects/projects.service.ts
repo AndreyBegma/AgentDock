@@ -271,10 +271,20 @@ export class ProjectsService {
     }
     if (Object.keys(after).length === 0) return this.toDetail(project, 'admin');
 
-    const updated = await this.prisma.project.update({
-      where: { id: projectId },
-      data,
-      include: withRelations,
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.project.update({
+        where: { id: projectId },
+        data,
+        include: withRelations,
+      });
+      // #244 D10: capture reads content, so turning content off turns it off.
+      if (after.shipSessionContent === false) {
+        await tx.boardSettings.updateMany({
+          where: { projectId, captureEnabled: true },
+          data: { captureEnabled: false },
+        });
+      }
+      return row;
     });
     await this.audit.record({
       ...ctx,
