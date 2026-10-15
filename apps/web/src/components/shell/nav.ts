@@ -163,14 +163,8 @@ export const NAV: NavSection[] = [
         minRole: 'viewer',
         enabled: true,
       },
-      {
-        id: 'planner',
-        href: '/projects/:projectId/planner',
-        label: 'Planner',
-        icon: Lightbulb,
-        minRole: 'viewer',
-        enabled: true,
-      },
+      // #337 D11: no Planner entry — New Card and New Plan live on the Board;
+      // `/projects/:id/planner` stays reachable, read-only, off the nav.
       {
         id: 'board',
         wide: true,
@@ -373,7 +367,7 @@ export function visibleNav(role: Role, pathname: string): VisibleSection[] {
 /**
  * The phone's tab bar (#163): five places, the rest behind More. Outside a
  * project the workspace's five; inside one, the project's home and its
- * working pages — Planner and the project's Activity behind More (#213, C-6).
+ * working pages — the project's Activity behind More (#213, C-6).
  */
 const TAB_IDS = {
   workspace: ['overview', 'projects', 'activity', 'sessions', 'usage'],
