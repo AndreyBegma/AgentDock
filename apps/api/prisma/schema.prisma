@@ -81,6 +81,7 @@ model User {
   cardDismissals              CardDismissal[]
   textNormalizations          TextNormalization[]
   textSettingsUpdated         TextSettings[]
+  attachmentsUploaded         Attachment[]
 
   @@map("users")
 }
@@ -387,6 +388,7 @@ model Project {
   cardDismissals       CardDismissal[]
   textNormalizations   TextNormalization[]
   textSettings         TextSettings?
+  attachments          Attachment[]
 
   @@unique([runnerId, rootPath])
   @@map("projects")
@@ -2738,6 +2740,7 @@ model BoardCard {
   design             TaskDesign?
   designTurns        PlanTurn[]
   textNormalizations TextNormalization[]
+  attachments        Attachment[]
 
   @@unique([projectId, number])
   @@unique([projectId, fleetIssue, fleetSlot])
@@ -2749,41 +2752,83 @@ model BoardCard {
 
 /// One Run or feedback of a card (D4), with its `runs` row of kind `card`.
 model BoardCardRound {
-  id          String           @id @default(cuid())
-  cardId      String
-  round       Int
-  runId       String           @unique
-  trigger     CardRoundTrigger
+  id              String           @id @default(cuid())
+  cardId          String
+  round           Int
+  runId           String           @unique
+  trigger         CardRoundTrigger
   /// The person's feedback (D9), at most 8 000 characters.
-  feedback    String?
+  feedback        String?
   /// #273 D1: the card text this round's prompt was built from.
-  cardTitle   String
-  cardBody    String
-  cardKind    BoardCardKind
+  cardTitle       String
+  cardBody        String
+  cardKind        BoardCardKind
+  /// #309 D10: the card's attachments this round's prompt was built from,
+  /// `[{id, name, mime}]` (shared `cardAttachmentSnapshotSchema`).
+  cardAttachments Json             @default("[]")
   /// Nullable so deleting the author keeps the round.
-  authorId    String?
-  phase       CardRoundPhase   @default(queued)
+  authorId        String?
+  phase           CardRoundPhase   @default(queued)
   /// `agentdock-card-<shortId>`.
-  tmuxSession String?
-  finishedBy  CardFinishedBy?
+  tmuxSession     String?
+  finishedBy      CardFinishedBy?
   /// From `finish_card` (D6), at most 4 000 characters.
-  summary     String?
-  exitCode    Int?
-  error       String?
-  startedAt   DateTime         @default(now())
-  waitingAt   DateTime?
-  finishedAt  DateTime?
-  endedAt     DateTime?
+  summary         String?
+  exitCode        Int?
+  error           String?
+  startedAt       DateTime         @default(now())
+  waitingAt       DateTime?
+  finishedAt      DateTime?
+  endedAt         DateTime?
 
   card   BoardCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
   run    Run       @relation(fields: [runId], references: [id], onDelete: Cascade)
   author User?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
 
   textNormalizations TextNormalization[]
+  attachments        Attachment[]
 
   @@unique([cardId, round])
   @@index([phase])
   @@map("board_card_rounds")
+}
+
+/// #309 (ADR-0031): a file or screenshot on a board card or one round's
+/// feedback. The bytes live in `ATTACHMENTS_DIR` as `<projectId>/<id>`, behind
+/// the `AttachmentStore` port; a cascade deletes rows, never files — the
+/// service removes them after the delete commits, and the sweep catches the rest.
+model Attachment {
+  id         String    @id @default(cuid())
+  projectId  String
+  /// Null while pending (D3): bound to the project and the uploader until a
+  /// card claims it.
+  cardId     String?
+  /// Set for an attachment that came with a round's feedback.
+  roundId    String?
+  /// Nullable so deleting the uploader keeps the attachment.
+  uploaderId String?
+  /// The display name (D6), at most 200 characters.
+  name       String
+  /// Detected from the content (D5), one of the shared `ATTACHMENT_MIMES`.
+  mime       String
+  /// Bytes, at most 25 MiB.
+  size       Int
+  /// Lower-case hex SHA-256 of the bytes.
+  sha256     String
+  /// Set while pending (upload + 24 h), cleared on claim; the sweep deletes
+  /// pending rows past it.
+  expiresAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  project  Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  card     BoardCard?      @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  round    BoardCardRound? @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  uploader User?           @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
+
+  @@index([cardId, createdAt])
+  @@index([projectId])
+  @@index([expiresAt])
+  @@map("attachments")
 }
 
 /// A project's board settings (D2, D13). No row: the defaults.
