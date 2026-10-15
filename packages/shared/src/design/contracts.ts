@@ -1,5 +1,11 @@
 import type { NoProfileReason, ProfileSource } from '../readiness';
 import type {
+  DesignBatchMode,
+  DesignFailureReason,
+  DesignProgressPhase,
+  DesignProgressStage,
+} from './progress';
+import type {
   DesignCommentKind,
   DesignTheme,
   TaskDesignStatus,
@@ -148,6 +154,11 @@ export interface TaskDesignSummary {
   variantCount: number;
   status: TaskDesignStatus;
   approvedRevisionId: string | null;
+  /**
+   * #275 D2, D8: when the current Generate or Revise started (ISO); null at
+   * rest. The card face chip counts the whole job from it.
+   */
+  busySince: string | null;
 }
 
 /**
@@ -183,8 +194,47 @@ export interface TaskDesignView extends TaskDesignSummary {
   viewports: ViewportPreset[];
   /** A design turn queued or running. */
   activeTurnId: string | null;
+  /** #275 D1: what the busy design is doing; null at rest. */
+  progress: DesignProgressView | null;
+  /** #275 D6: why the last batch ended without a revision; only at rest. */
+  lastFailure: DesignFailureView | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * #275 D1: the step a busy design is on. `profile` is the `ui_profile` run
+ * whose `args.waiting` holds this design; `draw` / `revise` is its queued or
+ * running design turn.
+ */
+export interface DesignProgressView {
+  stage: DesignProgressStage;
+  /** `queued` reads "Waiting for a free runner slot…" and never stalls (D4). */
+  phase: DesignProgressPhase;
+  /** The build's or the turn's run: the `run_log` topic (D3). */
+  runId: string;
+  /** The design turn; null on the profile stage. Stop cancels it (D5). */
+  turnId: string | null;
+  /** The variant being drawn or revised; null on the profile stage. */
+  variant: number | null;
+  variantCount: number;
+  /** 1 on the profile stage, 2 for a turn of a batch that began with a build, else null. */
+  step: 1 | 2 | null;
+  /** `task_designs.busySince`: the whole job's clock (D2), ISO. */
+  startedAt: string;
+}
+
+/** #275 D6: the last batch's failure, derived at read time. */
+export interface DesignFailureView {
+  stage: DesignProgressStage;
+  /** The failed batch's mode: Retry calls Generate or Revise with it. */
+  mode: DesignBatchMode;
+  reason: DesignFailureReason;
+  /** The turn's error or the build's outcome; empty when none was recorded. */
+  message: string;
+  /** The variant whose turn failed; null on the profile stage. */
+  variant: number | null;
+  at: string;
 }
 
 /** `PATCH /plans/:planId/tasks/:key/design` and `PATCH …/board/cards/:number/design` (operator). */
@@ -264,6 +314,8 @@ export const DESIGN_ERROR = {
   runnerTimeout: 'runner_timeout',
   /** 409: the runner's advert does not list the command (#233); nothing was sent or written. */
   runnerOutdated: 'runner_outdated',
+  /** #275 D5: Stop with no build or design turn of this design running. */
+  designNotRunning: 'design_not_running',
   /** 422 (#272 D2): no usable runtime profile; `reason`, `source`, `profileKey`. */
   noProfile: 'no_profile',
 } as const;

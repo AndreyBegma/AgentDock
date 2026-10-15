@@ -49,6 +49,12 @@ export const DESIGN_VIEWPORT_MAX_PX = 7680;
 /** D15: design skills per project default or per design. */
 export const DESIGN_SKILLS_MAX = 12;
 
+/**
+ * #275 D4: a running build or design turn with no output for this long is
+ * shown as "may be stuck". A queued one never stalls.
+ */
+export const STALL_AFTER_MS = 300_000;
+
 /** UTF-8 size, the unit every byte limit above is in. */
 export const designBytes = (text: string): number =>
   new TextEncoder().encode(text).length;
