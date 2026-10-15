@@ -31,6 +31,7 @@ import {
   terminalUnsupported,
 } from './detect/capabilities';
 import type { Exec } from './detect/exec';
+import { GitAuth } from './git-auth';
 import { LocalSocketServer } from './local/server';
 import { LocalService } from './local/service';
 import { HookSessions } from './local/sessions';
@@ -116,7 +117,10 @@ const countTmuxSessions = async (exec: Exec): Promise<number> => {
 export const runDaemon = async (
   options: DaemonOptions,
 ): Promise<StopReason> => {
-  const { config, home, exec, clock, log } = options;
+  const { config, home, clock, log } = options;
+  // #329 D1: every git child of the runner goes through this one wrapper.
+  const gitAuth = new GitAuth(options.exec);
+  const exec = gitAuth.wrap(options.exec);
   mkdirSync(options.spoolDir, { recursive: true, mode: 0o700 });
   const release = acquireLock(join(options.spoolDir, 'runner.lock'));
   try {
@@ -128,12 +132,16 @@ export const runDaemon = async (
     log.info('spool opened', { ...spool.stats() });
 
     const redetect = async (): Promise<Capabilities> => {
-      const capabilities = await detectCapabilities({
-        exec,
-        home,
-        // The receiver's port as bound, not as configured (spec 13).
-        config: { profiles: config.profiles, otlp: otlpCapability() },
-      });
+      const [capabilities, github] = await Promise.all([
+        detectCapabilities({
+          exec,
+          home,
+          // The receiver's port as bound, not as configured (spec 13).
+          config: { profiles: config.profiles, otlp: otlpCapability() },
+        }),
+        // Each (re)connect re-checks, so a later `gh auth login` takes effect.
+        gitAuth.probe(),
+      ]);
       const terminal = terminalCapability({
         tmux: capabilities.tmux,
         disabledCommands: config.disabledCommands,
@@ -144,10 +152,12 @@ export const runDaemon = async (
         codex: capabilities.runtimes.codex?.version ?? null,
         profiles: capabilities.profiles.length,
         terminal,
+        gitAuth: github,
       });
       return {
         ...capabilities,
         terminal,
+        gitAuth: { github },
         ...commandsCapability(handlers(), config.disabledCommands),
       };
     };
@@ -454,6 +464,8 @@ export const runDaemon = async (
     const onAbort = () => live.stop();
     if (options.signal?.aborted) live.stop();
     options.signal?.addEventListener('abort', onAbort, { once: true });
+    // Before any resumed run or card can fetch or push.
+    await gitAuth.probe();
     await watchList.start();
     // Runs a previous runner left are picked up; their events go to the spool.
     await runs.start().catch((error) => {

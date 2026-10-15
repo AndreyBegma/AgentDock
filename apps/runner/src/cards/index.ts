@@ -7,11 +7,13 @@ import type { CardExecutor } from './executor';
 
 export { CardExecutor, type CardExecutorOptions } from './executor';
 export { type CardMergeDeps, mergeCard } from './merge';
+export { type CardPrCloseDeps, closeCardPr } from './pr-close';
 
 /**
  * The executor's `card.*` handlers (issue #242 "Runner"). `card.merge`
  * (#273) holds no card state — no worktree, no tmux — so `createHandlers`
- * serves it with `mergeCard` beside these, for a runner that runs cards.
+ * serves it with `mergeCard` beside these, for a runner that runs cards;
+ * `card.prClose` (#329 D8) likewise with `closeCardPr`.
  */
 export type CardHandlers = {
   [N in Exclude<CardCommandName, 'card.merge'>]: (

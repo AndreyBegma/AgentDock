@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { capabilitiesSchema, hostSchema } from './capabilities';
 import { approvalCommands } from './commands/approvals';
 import { captureCommands } from './commands/capture';
-import { cardCommands } from './commands/cards';
+import { cardCommands, cardPrCloseCommands } from './commands/cards';
 import { controlCommands } from './commands/control';
 import { githubCommands } from './commands/github';
 import { plannerCommands } from './commands/planner';
@@ -146,6 +146,7 @@ export const commands = {
   ...uiprofileCommands,
   ...worktreeCommands,
   ...cardCommands,
+  ...cardPrCloseCommands,
   ...captureCommands,
   ...textCommands,
 } as const satisfies Record<string, CommandDefinition>;

@@ -3,6 +3,8 @@ import { chmodSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cardPullRequestBody } from '@agentdock/shared';
 import type { CardCollectArgs } from '@agentdock/shared/protocol';
+import type { Exec, ExecOptions } from '../detect/exec';
+import { GITHUB_GIT_CONFIG, GitAuth } from '../git-auth';
 import { REAL_PROCESS_TIMEOUT_MS } from '../testing/projects';
 import { collectCard, ensureWorktree, removeCardWorktree } from './git';
 import { cardWorktreePath } from './launch';
@@ -85,6 +87,7 @@ describe('card.collect (#242 D8)', () => {
       pushed: true,
       prNumber: 7,
       prUrl: 'https://github.com/acme/widget/pull/7',
+      prState: 'open',
     });
     expect(
       await f.run(record.worktree, 'log', '-1', '--format=%s', 'HEAD'),
@@ -119,6 +122,7 @@ describe('card.collect (#242 D8)', () => {
       pushed: true,
       prNumber: 7,
       prUrl: 'https://github.com/acme/widget/pull/7',
+      prState: 'open',
     });
     expect(f.prCreates()).toHaveLength(1);
     expect(f.listCalls.at(-1)).toEqual(
@@ -145,6 +149,92 @@ describe('card.collect (#242 D8)', () => {
     ).toBe('refused');
     writeFileSync(join(record.worktree, 'notes.md'), 'left over\n');
     expect((await collectCard(deps, record, args)).pushed).toBe(true);
+  });
+});
+
+describe('card.collect reports the open PR (#329 D3, D6)', () => {
+  it('fills a lost link: a PR already open is reported, none is opened', async () => {
+    const { f, record, deps, args } = await setup();
+    f.open.push({
+      number: 41,
+      url: 'https://github.com/acme/widget/pull/41',
+      head: BRANCH,
+    });
+    writeFileSync(join(record.worktree, 'notes.md'), 'work\n');
+    expect(await collectCard(deps, record, args)).toEqual({
+      ahead: 1,
+      pushed: true,
+      prNumber: 41,
+      prUrl: 'https://github.com/acme/widget/pull/41',
+      prState: 'open',
+    });
+    expect(f.prCreates()).toHaveLength(0);
+  });
+
+  it('reports a draft PR as draft', async () => {
+    const { f, record, deps, args } = await setup();
+    f.open.push({
+      number: 41,
+      url: 'https://github.com/acme/widget/pull/41',
+      head: BRANCH,
+      isDraft: true,
+    });
+    writeFileSync(join(record.worktree, 'notes.md'), 'work\n');
+    expect((await collectCard(deps, record, args)).prState).toBe('draft');
+    expect(f.listCalls.at(-1)).toEqual(
+      expect.arrayContaining(['--json', 'number,url,isDraft']),
+    );
+  });
+});
+
+describe('card.collect without an SSH agent (#329 D1)', () => {
+  const recorded = (exec: Exec, ghLoggedIn: boolean) => {
+    const calls: { binary: string; args: string[]; options?: ExecOptions }[] =
+      [];
+    const inner: Exec = async (binary, argv, options) => {
+      calls.push({ binary, args: [...argv], options });
+      if (binary === 'gh' && argv[0] === 'auth') {
+        return { code: ghLoggedIn ? 0 : 1, stdout: '', stderr: '' };
+      }
+      return exec(binary, argv, options);
+    };
+    return { inner, calls };
+  };
+
+  it('runs every git child, the push included, with the gh settings', async () => {
+    const { f, record, args } = await setup();
+    const { inner, calls } = recorded(f.exec, true);
+    const auth = new GitAuth(inner);
+    expect(await auth.probe()).toBe('gh');
+    writeFileSync(join(record.worktree, 'notes.md'), 'work\n');
+    const result = await collectCard(
+      { exec: auth.wrap(inner), tempRoot: f.ws },
+      record,
+      args,
+    );
+    expect(result.pushed).toBe(true);
+    const git = calls.filter((c) => c.binary === 'git');
+    const push = git.find((c) => c.args.includes('push'));
+    expect(push?.options?.gitConfig).toEqual(GITHUB_GIT_CONFIG);
+    for (const call of git) {
+      expect(call.options?.gitConfig).toEqual(GITHUB_GIT_CONFIG);
+    }
+    // gh itself is never given git settings.
+    for (const call of calls.filter((c) => c.binary === 'gh')) {
+      expect(call.options?.gitConfig).toBeUndefined();
+    }
+  });
+
+  it('sets nothing when gh is not authenticated', async () => {
+    const { f, record, args } = await setup();
+    const { inner, calls } = recorded(f.exec, false);
+    const auth = new GitAuth(inner);
+    expect(await auth.probe()).toBe('native');
+    writeFileSync(join(record.worktree, 'notes.md'), 'work\n');
+    await collectCard({ exec: auth.wrap(inner), tempRoot: f.ws }, record, args);
+    for (const call of calls) {
+      expect(call.options?.gitConfig).toBeUndefined();
+    }
   });
 });
 

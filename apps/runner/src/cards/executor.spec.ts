@@ -73,6 +73,7 @@ describe('card.collect in a terminal session cwd (#282 D3)', () => {
       pushed: true,
       prNumber: 7,
       prUrl: 'https://github.com/acme/widget/pull/7',
+      prState: 'open',
     });
     expect(await f.run(f.root, 'log', '-1', '--format=%s', 'HEAD')).toBe(
       'chore: card C-12 work in progress',

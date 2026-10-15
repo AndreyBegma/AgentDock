@@ -29,8 +29,23 @@ const args: CardMergeArgs = {
   comment: 'Completed as C-12 on the AgentDock board; merged in #41.',
 };
 
+const BRANCH = 'feat/42-export-csv';
+
 interface Fake {
-  pr?: { state: string; headRefOid: string; mergeCommit?: { oid: string } };
+  pr?: {
+    state: string;
+    headRefOid: string;
+    mergeCommit?: { oid: string };
+    headRefName?: string;
+    baseRefName?: string;
+    isCrossRepository?: boolean;
+  };
+  /** #329 D7: the repository's default branch. */
+  defaultBranch?: string;
+  /** `gh api repos/…/git/ref/heads/<branch>`; the branch at HEAD by default. */
+  ref?: ExecResult;
+  /** `gh api -X DELETE …`. */
+  del?: ExecResult;
   /** The state after `gh pr merge` succeeds. */
   merge?: ExecResult;
   repo?: Record<string, boolean>;
@@ -60,7 +75,12 @@ const setup = (fake: Fake) => {
     gh.push([...argv]);
     const [noun, verb] = argv;
     if (noun === 'pr' && verb === 'view') {
-      const pr = fake.pr ?? { state: 'OPEN', headRefOid: HEAD };
+      const pr = {
+        headRefName: BRANCH,
+        baseRefName: 'main',
+        isCrossRepository: false,
+        ...(fake.pr ?? { state: 'OPEN', headRefOid: HEAD }),
+      };
       return ok(
         merged
           ? { ...pr, state: 'MERGED', mergeCommit: { oid: MERGE_COMMIT } }
@@ -72,7 +92,15 @@ const setup = (fake: Fake) => {
       merged = result.code === 0;
       return result;
     }
-    if (noun === 'repo' && verb === 'view') return ok(fake.repo ?? {});
+    if (noun === 'repo' && verb === 'view') {
+      return argv.includes('defaultBranchRef')
+        ? ok({ defaultBranchRef: { name: fake.defaultBranch ?? 'main' } })
+        : ok(fake.repo ?? {});
+    }
+    if (noun === 'api') {
+      if (argv.includes('DELETE')) return fake.del ?? ok('');
+      return fake.ref ?? ok({ object: { sha: fake.pr?.headRefOid ?? HEAD } });
+    }
     if (noun === 'issue' && verb === 'view') {
       return fake.issue === null
         ? fail('could not resolve to an issue')
@@ -302,5 +330,132 @@ describe('card.merge (#273 D11–D13)', () => {
       mergeCard({ ...args, root: '/home/me/other' }, deps),
     ).rejects.toBeInstanceOf(CommandFailure);
     expect(gh).toEqual([]);
+  });
+});
+
+describe('card.merge deleteBranch (#329 D7)', () => {
+  const del = [
+    'api',
+    '-X',
+    'DELETE',
+    `repos/acme/widget/git/refs/heads/${BRANCH}`,
+  ];
+  const deleteArgs: CardMergeArgs = { ...args, deleteBranch: true };
+
+  it('deletes the PR head on GitHub only after the merge succeeded', async () => {
+    const { deps, gh } = setup({});
+    expect(await mergeCard(deleteArgs, deps)).toMatchObject({
+      merged: true,
+      alreadyMerged: false,
+      branchDeleted: true,
+    });
+    const merged = gh.findIndex((c) => c[0] === 'pr' && c[1] === 'merge');
+    const deleted = gh.findIndex((c) => c.join(' ') === del.join(' '));
+    expect(merged).toBeGreaterThanOrEqual(0);
+    expect(deleted).toBeGreaterThan(merged);
+    expect(gh[0]).toEqual(
+      expect.arrayContaining([
+        '--json',
+        'state,mergeCommit,headRefName,headRefOid,baseRefName,isCrossRepository',
+      ]),
+    );
+  });
+
+  it('a refused merge deletes nothing', async () => {
+    const { deps, calls } = setup({ merge: fail('not mergeable') });
+    expect(await mergeCard(deleteArgs, deps)).toMatchObject({ merged: false });
+    expect(calls('api', '-X')).toEqual([]);
+  });
+
+  it('deletes the head of a PR merged before', async () => {
+    const { deps, gh } = setup({
+      pr: {
+        state: 'MERGED',
+        headRefOid: HEAD,
+        mergeCommit: { oid: MERGE_COMMIT },
+      },
+    });
+    expect(await mergeCard(deleteArgs, deps)).toMatchObject({
+      alreadyMerged: true,
+      branchDeleted: true,
+    });
+    expect(gh).toContainEqual(del);
+  });
+
+  it('never deletes the base, the default branch or a fork head', async () => {
+    for (const fake of [
+      {
+        pr: {
+          state: 'OPEN',
+          headRefOid: HEAD,
+          headRefName: 'main',
+          baseRefName: 'main',
+        },
+      },
+      {
+        pr: {
+          state: 'OPEN',
+          headRefOid: HEAD,
+          headRefName: 'develop',
+          baseRefName: 'release',
+        },
+        defaultBranch: 'develop',
+      },
+      { pr: { state: 'OPEN', headRefOid: HEAD, isCrossRepository: true } },
+    ] satisfies Fake[]) {
+      const { deps, calls } = setup(fake);
+      const result = await mergeCard(deleteArgs, deps);
+      expect(result).toMatchObject({
+        merged: true,
+        branchDeleted: false,
+        branchError: expect.stringContaining('left in place'),
+      });
+      expect(calls('api', '-X')).toEqual([]);
+    }
+  });
+
+  it('leaves a branch that moved past the PR head', async () => {
+    const { deps, calls } = setup({
+      ref: ok({ object: { sha: 'd'.repeat(40) } }),
+    });
+    expect(await mergeCard(deleteArgs, deps)).toMatchObject({
+      merged: true,
+      branchDeleted: false,
+      branchError: expect.stringContaining('moved past'),
+    });
+    expect(calls('api', '-X')).toEqual([]);
+  });
+
+  it('a branch already gone is deleted; a refused deletion keeps the merge', async () => {
+    const gone = setup({ ref: fail('gh: Not Found (HTTP 404)') });
+    expect(await mergeCard(deleteArgs, gone.deps)).toMatchObject({
+      merged: true,
+      branchDeleted: true,
+    });
+    expect(gone.calls('api', '-X')).toEqual([]);
+
+    const refused = setup({ del: fail('HTTP 403: Resource not accessible') });
+    expect(await mergeCard(deleteArgs, refused.deps)).toEqual({
+      merged: true,
+      alreadyMerged: false,
+      method: 'squash',
+      mergeCommit: MERGE_COMMIT,
+      issueClosed: true,
+      branchDeleted: false,
+      branchError: 'HTTP 403: Resource not accessible',
+    });
+  });
+
+  it('encodes a branch name into the ref path', async () => {
+    const { deps, gh } = setup({
+      pr: { state: 'OPEN', headRefOid: HEAD, headRefName: 'fix/a#b' },
+    });
+    await mergeCard(deleteArgs, deps);
+    expect(gh).toContainEqual([
+      'api',
+      '-X',
+      'DELETE',
+      'repos/acme/widget/git/refs/heads/fix/a%23b',
+    ]);
   });
 });

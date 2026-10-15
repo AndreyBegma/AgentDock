@@ -6,7 +6,7 @@ import type {
   WatchedProject,
 } from '@agentdock/shared/protocol';
 import type { CaptureHandlers } from '../capture';
-import { type CardHandlers, mergeCard } from '../cards';
+import { type CardHandlers, closeCardPr, mergeCard } from '../cards';
 import { type Clock, isoNow } from '../clock';
 import type { ConfigProfile } from '../config';
 import {
@@ -211,6 +211,13 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
     'card.merge': (args) =>
       context.cards
         ? mergeCard(args, {
+            exec: context.exec,
+            watchedProjects: context.watchedProjects,
+          })
+        : noCards(),
+    'card.prClose': (args) =>
+      context.cards
+        ? closeCardPr(args, {
             exec: context.exec,
             watchedProjects: context.watchedProjects,
           })

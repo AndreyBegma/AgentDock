@@ -7,9 +7,18 @@ import type {
 } from '@agentdock/shared/protocol';
 import { z } from 'zod';
 import { watchedProject } from '../control/target';
-import type { Exec, ExecResult } from '../detect/exec';
-import { GH_TIMEOUT_MS } from '../skills/deps';
+import type { Exec } from '../detect/exec';
 import { githubOf } from '../skills/run/collect';
+import {
+  type BranchOutcome,
+  deleteHeadBranch,
+  firstLine,
+  type Gh,
+  ghOf,
+  PR_HEAD_FIELDS,
+  parsed,
+  prHeadSchema,
+} from './github';
 
 export interface CardMergeDeps {
   exec: Exec;
@@ -34,16 +43,6 @@ const repoViewSchema = z.looseObject({
 const issueViewSchema = z.looseObject({ state: z.string() });
 
 const SHA = /^[0-9a-f]{40}$/;
-
-/** `gh`'s first line of complaint, at most 500 characters. */
-const firstLine = (result: ExecResult | null): string => {
-  if (!result) return 'gh is not available or timed out';
-  const line = `${result.stderr}\n${result.stdout}`
-    .split('\n')
-    .map((l) => l.trim())
-    .find((l) => l.length > 0);
-  return (line ?? `gh exited with ${result.code}`).slice(0, 500);
-};
 
 class Refused extends Error {
   constructor(
@@ -73,30 +72,23 @@ const classify = (message: string): CardMergeFailReason => {
   return 'gh_failed';
 };
 
-const parsed = <T>(schema: z.ZodType<T>, stdout: string): T | null => {
-  try {
-    const result = schema.safeParse(JSON.parse(stdout));
-    return result.success ? result.data : null;
-  } catch {
-    return null;
-  }
-};
-
 /**
  * #273 D11–D13 (ADR-0029): merges a board card's PR through `gh`, bound to
  * the head the person saw, then closes the card's issue when it is still
  * open. Every `gh` call is an argument array against the project's GitHub
- * repository; nothing here deletes a branch (D15). A refusal is a result —
- * nothing was merged — never a thrown command error, except for a target
- * that is not a watched project.
+ * repository. A refusal is a result — nothing was merged — never a thrown
+ * command error, except for a target that is not a watched project.
+ *
+ * #329 D7: with `deleteBranch`, once the PR is merged — now or before — its
+ * head branch is deleted on GitHub (`deleteHeadBranch`); without it, nothing
+ * here deletes a branch (D15). A failed deletion never undoes the merge.
  */
 export const mergeCard = async (
   args: CardMergeArgs,
   deps: CardMergeDeps,
 ): Promise<CardMergeResult> => {
   const project = watchedProject(args, deps.watchedProjects());
-  const gh = (ghArgs: string[]) =>
-    deps.exec('gh', ghArgs, { timeoutMs: GH_TIMEOUT_MS });
+  const gh = ghOf(deps.exec);
   try {
     const github = await githubOf(deps, project);
     const pr = String(args.pr);
@@ -107,11 +99,25 @@ export const mergeCard = async (
       '--repo',
       github,
       '--json',
-      'state,headRefOid,mergeCommit',
+      args.deleteBranch
+        ? `state,mergeCommit,${PR_HEAD_FIELDS}`
+        : 'state,headRefOid,mergeCommit',
     ]);
     const view =
       viewed?.code === 0 ? parsed(prViewSchema, viewed.stdout) : null;
     if (!view) throw new Refused('gh_failed', firstLine(viewed));
+    // Only after the merge: a refused merge leaves the branch alone.
+    const branch = async (): Promise<BranchOutcome> => {
+      if (!args.deleteBranch) return { branchDeleted: false };
+      const head = viewed ? parsed(prHeadSchema, viewed.stdout) : null;
+      if (!head) {
+        return {
+          branchDeleted: false,
+          branchError: `gh pr view printed no head for #${pr}`,
+        };
+      }
+      return deleteHeadBranch(gh, github, head);
+    };
 
     const methodOf = async (): Promise<CardMergeMethod> =>
       args.method ?? (await repositoryMethod(gh, github));
@@ -125,7 +131,7 @@ export const mergeCard = async (
         method,
         mergeCommit: shaOf(view.mergeCommit?.oid),
         ...(await closeIssue(gh, github, args)),
-        branchDeleted: false,
+        ...(await branch()),
       };
     }
     if (view.state !== 'OPEN') {
@@ -158,7 +164,7 @@ export const mergeCard = async (
       method,
       mergeCommit: await mergeCommitOf(gh, github, pr),
       ...(await closeIssue(gh, github, args)),
-      branchDeleted: false,
+      ...(await branch()),
     };
   } catch (error) {
     if (error instanceof Refused) {
@@ -172,8 +178,6 @@ export const mergeCard = async (
     };
   }
 };
-
-type Gh = (args: string[]) => Promise<ExecResult | null>;
 
 const shaOf = (oid: string | undefined): string | null =>
   oid && SHA.test(oid) ? oid : null;
