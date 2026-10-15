@@ -35,3 +35,4 @@ Numbered, never rewritten. A changed decision gets a new ADR that supersedes the
 | [0029](0029-accepting-a-board-card-may-merge-its-pull-request-through-the-runner.md) | Accepting a board card may merge its pull request through the runner (amends ADR-0024 §6) |
 | [0030](0030-terminal-work-and-fleet-work-appear-on-the-board.md) | Terminal work and fleet work appear on the Board (amends ADR-0024 §1 and §6) |
 | [0031](0031-attachments-are-stored-by-the-api-on-a-local-volume.md) | Attachments are stored by the API on a local volume and reach the card worker through the runner |
+| [0032](0032-a-cards-model-is-recommended-by-a-runner-side-assessment.md) | A card's model is recommended by a runner-side `haiku` assessment; profile and model are picked at launch (extends ADR-0027) |
