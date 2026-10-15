@@ -134,6 +134,42 @@ describe('card capture runs (e2e)', () => {
     expect(w.extracted()).toEqual([]);
   });
 
+  it('skips a session that tracks a card as tracked, and creates no run (#282 D5)', async () => {
+    const sessionId = await w.manualSession();
+    await w.prompt('m1', LONG_PROMPT);
+    await w.ctx.prisma.boardCard.create({
+      data: {
+        projectId: w.a,
+        number: 1,
+        shortId: 'trk00001',
+        title: 'Tracked work',
+        column: 'in_progress',
+        position: 0,
+        issueOnRun: false,
+        specOnRun: false,
+        source: 'terminal',
+        trackedSessionId: sessionId,
+        movedAt: new Date(),
+      },
+    });
+    const outcome = await w.capture.extract({ sessionId });
+    expect(outcome).toMatchObject({ kind: 'skipped', reason: 'tracked' });
+    expect(
+      await w.ctx.prisma.cardCapture.findMany({ where: { projectId: w.a } }),
+    ).toEqual([
+      expect.objectContaining({
+        status: 'skipped',
+        skipReason: 'tracked',
+        runId: null,
+      }),
+    ]);
+    expect(
+      await w.ctx.prisma.run.count({ where: { kind: 'card_capture' } }),
+    ).toBe(0);
+    expect(w.extracted()).toEqual([]);
+    expect(await w.inbox()).toEqual([]);
+  });
+
   it('a contract violation stores the error and the result, and applies nothing', async () => {
     const { runId, captureId, contentId } = await start();
     const two = `${cardsBlock([])}\n${cardsBlock([

@@ -7,9 +7,13 @@ import {
   CAPTURE_MODEL_DEFAULT,
   CARD_HOOKS_GRACE_MS,
   type CardEvidenceView,
+  type CardFleetView,
   type CardRoundBrief,
   type CardRoundView,
+  type CardTrackingView,
   cardLabel,
+  FLEET_STAGES,
+  type FleetStage,
   isActiveRoundPhase,
   isCaptureModel,
   isCardAutoRunCode,
@@ -67,8 +71,39 @@ export interface CardFacts {
   costs: ReadonlyMap<string, string>;
   /** Card sessions a hook event has reached (the board sink claimed them). */
   hooked: ReadonlySet<string>;
+  /** #282 D1: tracked sessions (`sessions.id`) that have not ended. */
+  alive: ReadonlySet<string>;
   now: Date;
 }
+
+/** #282 D1: a `terminal` card's session; `null` once the session row is gone. */
+const trackingOf = (
+  card: BoardCard,
+  facts: CardFacts,
+): CardTrackingView | null =>
+  card.source === 'terminal' && card.trackedSessionId !== null
+    ? {
+        sessionId: card.trackedSessionId,
+        alive: facts.alive.has(card.trackedSessionId),
+      }
+    : null;
+
+const isFleetStage = (value: string): value is FleetStage =>
+  (FLEET_STAGES as readonly string[]).includes(value);
+
+/** #282 D4: a `fleet` card's slot, as the fleet projector wrote it. */
+const fleetOf = (card: BoardCard): CardFleetView | null =>
+  card.source === 'fleet' && card.fleetIssue !== null
+    ? {
+        issue: card.fleetIssue,
+        slot: card.fleetSlot,
+        stage:
+          card.fleetStage !== null && isFleetStage(card.fleetStage)
+            ? card.fleetStage
+            : null,
+        slotGone: card.fleetSlotGone,
+      }
+    : null;
 
 const iso = (date: Date | null): string | null => date?.toISOString() ?? null;
 
@@ -148,13 +183,14 @@ export const toCardView = (
           at: card.autoRunFailedAt.toISOString(),
         }
       : null,
-  // #282: i282-api-terminal and i282-api-fleet fill tracking and fleet.
-  tracking: null,
-  fleet: null,
+  tracking: trackingOf(card, facts),
+  fleet: fleetOf(card),
   autoCollect: card.autoCollect,
   movedAt: card.movedAt.toISOString(),
   completedAt: iso(card.completedAt),
   updatedAt: card.updatedAt.toISOString(),
+  // #309: i309-api fills the count.
+  attachmentCount: 0,
 });
 
 const isEvidence = (value: Prisma.JsonValue): value is Prisma.JsonObject =>
@@ -223,6 +259,8 @@ export const toCardDetail = (
     .sort((a, b) => a.round - b.round)
     .map((round) => toRoundView(card, round, facts)),
   evidence: evidenceOf(card.evidence),
+  // #309: i309-api fills the attachments.
+  attachments: [],
 });
 
 /** No row is the defaults (`isDefault: true`). */

@@ -11,6 +11,10 @@ import {
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { BoardService } from '../board/board.service';
+import {
+  BoardTerminalService,
+  NotAManualSession,
+} from '../board/board-terminal.service';
 import { type BudgetRemaining, BudgetsService } from '../budgets';
 import { PrismaService } from '../database/prisma.service';
 import { QueueService } from '../queue/queue.service';
@@ -79,6 +83,7 @@ export class LocalHandlers {
     private readonly requests: ActionRequestsService,
     private readonly runnerSettings: RunnerSettingsService,
     private readonly board: BoardService,
+    private readonly terminal: BoardTerminalService,
   ) {}
 
   readonly table: LocalHandlerTable = {
@@ -97,18 +102,13 @@ export class LocalHandlers {
     'action.request': (args, call) => this.actionRequest(args, call),
     'away.set': (args, call) => this.awaySet(args.on, call),
     'card.finish': (args, call) => this.cardFinish(args.summary, call),
-    // #282 D1: i282-api-terminal replaces this with the real handler.
-    'card.track': () => {
-      throw new LocalError(
-        'not_a_manual_session',
-        'card.track is not served yet',
-      );
-    },
+    'card.track': (args, call) => this.cardTrack(args, call),
   };
 
   /**
    * Issue #242 D6: the card worker's `finish_card`. The card is the one whose
    * Claude session asks, in the asking runner's project — never an argument.
+   * #282 D2: a person's session that tracks a card finishes that card.
    */
   private async cardFinish(
     summary: string,
@@ -116,18 +116,50 @@ export class LocalHandlers {
   ): Promise<LocalMethodResult<'card.finish'>> {
     const project = projectOf(call);
     const session = call.session;
+    const target = { id: project.id, runnerId: call.runnerId };
     const finished =
       session && session.runtime === 'claude'
-        ? await this.board.finishByWorker(
-            { id: project.id, runnerId: call.runnerId },
-            session.id,
-            summary,
-          )
+        ? ((await this.board.finishByWorker(target, session.id, summary)) ??
+          (await this.terminal.finishBySession(target, session.id)))
         : null;
     if (!finished) {
       throw new LocalError('not_a_card_session', 'not a board card session');
     }
     return { number: finished.number, finished: true };
+  }
+
+  /**
+   * #282 D1: `track_card` — the card of the asking session, created on the
+   * first call and updated on every later one. Acts as the local user.
+   */
+  private async cardTrack(
+    args: LocalMethodArgs<'card.track'>,
+    call: LocalCall,
+  ): Promise<LocalMethodResult<'card.track'>> {
+    const project = projectOf(call);
+    const session = call.session;
+    if (!session || session.runtime !== 'claude') {
+      throw new LocalError(
+        'not_a_manual_session',
+        "not a person's own Claude Code session",
+      );
+    }
+    try {
+      return await this.terminal.track(
+        { id: project.id, runnerId: call.runnerId },
+        session.id,
+        args,
+        { userId: call.user.id, role: call.role, ctx: call.ctx },
+      );
+    } catch (error) {
+      if (error instanceof NotAManualSession) {
+        throw new LocalError(
+          'not_a_manual_session',
+          "not a person's own Claude Code session",
+        );
+      }
+      throw error;
+    }
   }
 
   /** D16: plain text for the `SessionStart` hook, at most 2 000 characters. */
