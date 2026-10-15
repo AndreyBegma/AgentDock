@@ -61,6 +61,11 @@ import {
   trackedSessionHref,
   trackedStatusText,
 } from '../../lib/board/format';
+import {
+  canCreatePr,
+  noPrText,
+  prChipText,
+} from '../../lib/board/pull-request';
 import { formatCost } from '../../lib/format';
 import { Time } from '../../lib/format/time';
 import { safeHttpsUrl } from '../../lib/queue/format';
@@ -177,7 +182,7 @@ function Links({ card }: { card: BoardCardDetail }) {
   const pr = card.prUrl ? safeHttpsUrl(card.prUrl) : null;
   const issue = card.issueUrl ? safeHttpsUrl(card.issueUrl) : null;
   const items = [
-    card.prNumber !== null && { label: `PR #${card.prNumber}`, href: pr },
+    card.prNumber !== null && { label: prChipText(card) ?? '', href: pr },
     card.issueNumber !== null && {
       label: `Issue #${card.issueNumber}`,
       href: issue,
@@ -379,6 +384,22 @@ function CardDetailBody({
             ) : null}
           </div>
           <Links card={card} />
+          {canCreatePr(card) ? (
+            <div className="flex flex-col gap-2">
+              <Banner tone={noPrText(card).tone}>{noPrText(card).text}</Banner>
+              {canOperate ? (
+                <div>
+                  <Button
+                    variant="glass"
+                    disabled={actions.busy || card.collectState === 'pending'}
+                    onClick={() => void actions.createPullRequest(card)}
+                  >
+                    Create pull request
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           {card.source === 'captured' && sessionHref(card.sourceSessionId) ? (
             <p className="text-xs text-ink-2">
               Suggested from{' '}
