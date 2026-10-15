@@ -61,3 +61,4 @@ ask for it.
 | [#324](https://github.com/AndreyBegma/AgentDock/issues/324) | [324-deepl-translation-at-save](324-deepl-translation-at-save.md) | English at save time with DeepL (ADR-0033) | #271 | shipped — [#328](https://github.com/AndreyBegma/AgentDock/pull/328) |
 | [#329](https://github.com/AndreyBegma/AgentDock/issues/329) | [329-card-pr-and-cleanup](329-card-pr-and-cleanup.md) | A card always reaches a PR; Accept cleans up its branch | #273, #282 | queued |
 | [#335](https://github.com/AndreyBegma/AgentDock/issues/335) | [335-design-viewer-zoom](335-design-viewer-zoom.md) | Zoom in the design viewer (Fit, presets, Ctrl+wheel) | #223 | queued |
+| [#337](https://github.com/AndreyBegma/AgentDock/issues/337) | [337-planner-on-the-board](337-planner-on-the-board.md) | Planner on the Board: New Card interviews, New Plan makes cards (ADR-0034) | #172, #273, #309, #322 | queued |

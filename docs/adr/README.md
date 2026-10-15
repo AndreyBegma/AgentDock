@@ -37,3 +37,4 @@ Numbered, never rewritten. A changed decision gets a new ADR that supersedes the
 | [0031](0031-attachments-are-stored-by-the-api-on-a-local-volume.md) | Attachments are stored by the API on a local volume and reach the card worker through the runner |
 | [0032](0032-a-cards-model-is-recommended-by-a-runner-side-assessment.md) | A card's model is recommended by a runner-side `haiku` assessment; profile and model are picked at launch (extends ADR-0027) |
 | [0033](0033-deepl-translates-stored-text-at-save-time.md) | DeepL translates stored text at save time; the runner `haiku` path is the fallback (amends ADR-0027 §3, §4, §7) |
+| [0034](0034-the-planner-lives-on-the-board-and-makes-cards.md) | The Planner lives on the Board: New Card is an interview, New Plan makes cards (amends ADR-0028) |
