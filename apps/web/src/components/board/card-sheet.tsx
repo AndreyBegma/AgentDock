@@ -9,8 +9,10 @@ import {
   CARD_FEEDBACK_MAX,
   type CardRoundView,
 } from '@agentdock/shared';
+import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Field, Input, Select, Textarea } from '@andrewbehma/glass-ui/field';
+import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
@@ -20,6 +22,8 @@ import NextLink from 'next/link';
 import { useEffect, useState } from 'react';
 import { fetchCard, sendFeedback, updateCard } from '../../lib/board/actions';
 import {
+  approveRunOffer,
+  autoRunReason,
   COLUMN_TITLE,
   canAccept,
   canGiveFeedback,
@@ -39,7 +43,7 @@ import { safeHttpsUrl } from '../../lib/queue/format';
 import { useReadiness } from '../../lib/readiness/use-readiness';
 import { Markdown } from '../markdown/markdown';
 import { ReadinessNotice } from '../readiness/readiness-notice';
-import { CardDesignSection } from './card-design';
+import { ApproveRunLink, CardDesignSection } from './card-design';
 import { CardOptionToggles } from './card-options';
 import { SuggestionSheetBody } from './suggestion-sheet';
 import type { CardActions } from './use-card-actions';
@@ -131,7 +135,11 @@ function Links({ card }: { card: BoardCardDetail }) {
   );
 }
 
+const FORM_ID = 'board-card-form';
+
+/** The sheet of one card (#273 D17): Run, Design, Rounds, then the Card form with Save pinned. */
 function CardDetailBody({
+  sheetTitle,
   projectId,
   card,
   canOperate,
@@ -139,6 +147,7 @@ function CardDetailBody({
   terminal,
   onSaved,
 }: {
+  sheetTitle: string;
   projectId: string;
   card: BoardCardDetail;
   canOperate: boolean;
@@ -205,258 +214,304 @@ function CardDetailBody({
   const pill = roundPill(card.round);
   const total = formatCost(card.costUsd);
 
+  const offer = approveRunOffer(card);
+  const failure = card.autoRunFailure;
+
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="font-medium">{COLUMN_TITLE[card.column]}</span>
-        {pill ? (
-          <StatusPill size="sm" status={pill.status} label={pill.label} />
-        ) : null}
-        {total ? (
-          <span className="ml-auto tabular-nums text-ink-2">{total}</span>
-        ) : null}
-      </div>
-      <Links card={card} />
-      {card.source === 'captured' && sessionHref(card.sourceSessionId) ? (
-        <p className="text-xs text-ink-2">
-          Suggested from{' '}
-          <NextLink
-            href={sessionHref(card.sourceSessionId) ?? '#'}
-            className="text-accent-ink underline-offset-2 hover:underline"
-          >
-            a Claude Code session
-          </NextLink>
-          .
-        </p>
-      ) : null}
-      {card.branch ? (
-        <p className="break-all font-mono text-xs text-ink-2">{card.branch}</p>
-      ) : null}
-      {card.round?.hooksMissing ? (
-        <p className="text-xs text-ink-2">{hooksHint}</p>
-      ) : null}
-
-      {canOperate ? (
-        <div className="flex flex-wrap gap-2">
-          {canAccept(card) ? (
-            <Button
-              variant="solid"
-              disabled={actions.busy}
-              onClick={() => actions.accept(card)}
-            >
-              Accept
-            </Button>
-          ) : null}
-          {canRun(card) || canRetry(card) ? (
-            <Button
-              variant={card.column === 'todo' ? 'solid' : 'glass'}
-              disabled={actions.busy || runBlocked}
-              aria-describedby={runBlocked ? 'board-run-reason' : undefined}
-              onClick={() => actions.run(card)}
-            >
-              {canRetry(card) ? 'Run again' : 'Run'}
-            </Button>
-          ) : null}
-          {canMarkFinished(card) ? (
-            <Button
-              variant="glass"
-              disabled={actions.busy}
-              onClick={() => actions.markFinished(card)}
-            >
-              Mark finished
-            </Button>
-          ) : null}
-          {canStop(card) ? (
-            <Button
-              variant="glass"
-              disabled={actions.busy}
-              onClick={() => actions.askStop(card)}
-            >
-              Stop
-            </Button>
-          ) : null}
-          {card.sessionId ? (
-            terminal.state === 'available' ? (
-              <Button variant="glass" onClick={terminal.open}>
-                Open terminal
-              </Button>
-            ) : (
-              <Button variant="glass" disabled title={terminal.reason}>
-                Open terminal
-              </Button>
-            )
-          ) : null}
-        </div>
-      ) : null}
-      {canOperate && (canRun(card) || canRetry(card)) ? (
-        <div className="-mt-3">
-          <ReadinessNotice
-            id="board-run-reason"
-            projectId={projectId}
-            action="run"
-            readiness={readiness}
-          />
-        </div>
-      ) : null}
-      {canOperate && card.sessionId && terminal.state === 'disabled' ? (
-        <p className="-mt-3 text-xs text-ink-3">{terminal.reason}</p>
-      ) : null}
-
-      {canGiveFeedback(card) && canOperate ? (
-        <Field
-          label="Send back with feedback"
-          htmlFor="board-feedback"
-          hint="Resumes the same Claude session in the same worktree. The card returns to In progress."
-        >
-          <Textarea
-            id="board-feedback"
-            rows={4}
-            value={feedback}
-            maxLength={CARD_FEEDBACK_MAX}
-            onChange={(e) => setFeedback(e.target.value)}
-          />
-          <div className="mt-2">
-            <Button
-              variant="glass"
-              disabled={sending || feedback.trim() === ''}
-              onClick={sendBack}
-            >
-              {sending ? 'Sending…' : 'Send back'}
-            </Button>
-          </div>
-        </Field>
-      ) : null}
-
-      <CardDesignSection
-        projectId={projectId}
-        card={card}
-        canOperate={canOperate}
-        onChanged={onSaved}
-      />
-
-      <section aria-label="Rounds" className="flex flex-col gap-2">
-        <h3 className="text-sm font-medium">Rounds</h3>
-        <Timeline
-          items={roundItems(card.rounds)}
-          empty={<p className="text-sm text-ink-3">No worker has run yet.</p>}
-        />
-      </section>
-
-      <form
-        className="flex flex-col gap-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (dirty && title.trim() !== '' && !saving) void save();
-        }}
-      >
-        <h3 className="text-sm font-medium">Card</h3>
-        <Field label="Title" htmlFor="board-card-title">
-          <Input
-            id="board-card-title"
-            value={title}
-            maxLength={BOARD_CARD_TITLE_MAX}
-            disabled={!canOperate}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-        </Field>
-        <Field label="What to do" htmlFor="board-card-body">
-          {preview ? (
-            <div className="rounded-control bg-surface p-3">
-              <Markdown>{body || '*Nothing written yet.*'}</Markdown>
-            </div>
-          ) : (
-            <Textarea
-              id="board-card-body"
-              rows={8}
-              value={body}
-              maxLength={BOARD_CARD_BODY_MAX}
-              disabled={!canOperate}
-              onChange={(e) => setBody(e.target.value)}
-            />
-          )}
-          <div className="mt-2">
+    <SheetContent
+      side="right"
+      title={sheetTitle}
+      description="Board card"
+      footer={
+        canOperate ? (
+          <div className="flex items-center justify-end gap-2">
             <Button
               variant="ghost"
-              size="sm"
               type="button"
-              onClick={() => setPreview((p) => !p)}
+              disabled={actions.busy}
+              onClick={() => actions.askDelete(card)}
             >
-              {preview ? 'Edit' : 'Preview'}
+              Delete
+            </Button>
+            <Button
+              variant="solid"
+              type="submit"
+              form={FORM_ID}
+              disabled={saving || !dirty || title.trim() === ''}
+            >
+              {saving ? 'Saving…' : 'Save'}
             </Button>
           </div>
-        </Field>
-        <Field label="Kind" htmlFor="board-card-kind">
-          <Select
-            id="board-card-kind"
-            value={kind}
-            disabled={!canOperate}
-            onChange={(e) =>
-              setKind(
-                BOARD_CARD_KINDS.find((k) => k === e.target.value) ?? kind,
-              )
-            }
-          >
-            {BOARD_CARD_KINDS.map((k) => (
-              <option key={k} value={k}>
-                {KIND_LABEL[k]}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field
-          label="Model"
-          htmlFor="board-card-model"
-          hint="Empty uses the project’s orchestrator model."
-        >
-          <Input
-            id="board-card-model"
-            value={model}
-            maxLength={100}
-            disabled={!canOperate}
-            onChange={(e) => setModel(e.target.value)}
-          />
-        </Field>
-        <CardOptionToggles
+        ) : undefined
+      }
+    >
+      <div className="flex flex-col gap-6">
+        <section aria-label="Run" className="flex flex-col gap-4">
+          <SectionHeader title="Run" headingLevel={3} />
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="font-medium">{COLUMN_TITLE[card.column]}</span>
+            {pill ? (
+              <StatusPill size="sm" status={pill.status} label={pill.label} />
+            ) : null}
+            {total ? (
+              <span className="ml-auto tabular-nums text-ink-2">{total}</span>
+            ) : null}
+          </div>
+          <Links card={card} />
+          {card.source === 'captured' && sessionHref(card.sourceSessionId) ? (
+            <p className="text-xs text-ink-2">
+              Suggested from{' '}
+              <NextLink
+                href={sessionHref(card.sourceSessionId) ?? '#'}
+                className="text-accent-ink underline-offset-2 hover:underline"
+              >
+                a Claude Code session
+              </NextLink>
+              .
+            </p>
+          ) : null}
+          {card.branch ? (
+            <p className="break-all font-mono text-xs text-ink-2">
+              {card.branch}
+            </p>
+          ) : null}
+          {card.round?.hooksMissing ? (
+            <p className="text-xs text-ink-2">{hooksHint}</p>
+          ) : null}
+
+          {failure ? (
+            <Banner tone="warn">
+              Design approved — the worker did not start:{' '}
+              {autoRunReason(failure)}.
+            </Banner>
+          ) : null}
+
+          {canOperate ? (
+            <div className="flex flex-wrap gap-2">
+              {canAccept(card) ? (
+                <Button
+                  variant="solid"
+                  disabled={actions.busy}
+                  onClick={() => actions.accept(card)}
+                >
+                  Accept
+                </Button>
+              ) : null}
+              {canRun(card) || canRetry(card) ? (
+                <Button
+                  variant={card.column === 'todo' ? 'solid' : 'glass'}
+                  disabled={actions.busy || runBlocked}
+                  aria-describedby={runBlocked ? 'board-run-reason' : undefined}
+                  onClick={() => actions.run(card)}
+                >
+                  {canRetry(card) ? 'Run again' : 'Run'}
+                </Button>
+              ) : null}
+              {offer ? (
+                <ApproveRunLink
+                  projectId={projectId}
+                  card={card}
+                  offer={offer}
+                  variant={card.column === 'todo' ? 'solid' : 'glass'}
+                  describedBy="board-approve-run-reason"
+                />
+              ) : null}
+              {canMarkFinished(card) ? (
+                <Button
+                  variant="glass"
+                  disabled={actions.busy}
+                  onClick={() => actions.markFinished(card)}
+                >
+                  Mark finished
+                </Button>
+              ) : null}
+              {canStop(card) ? (
+                <Button
+                  variant="glass"
+                  disabled={actions.busy}
+                  onClick={() => actions.askStop(card)}
+                >
+                  Stop
+                </Button>
+              ) : null}
+              {card.sessionId ? (
+                terminal.state === 'available' ? (
+                  <Button variant="glass" onClick={terminal.open}>
+                    Open terminal
+                  </Button>
+                ) : (
+                  <Button variant="glass" disabled title={terminal.reason}>
+                    Open terminal
+                  </Button>
+                )
+              ) : null}
+            </div>
+          ) : null}
+          {canOperate && (canRun(card) || canRetry(card)) ? (
+            <div className="-mt-3">
+              <ReadinessNotice
+                id="board-run-reason"
+                projectId={projectId}
+                action="run"
+                readiness={readiness}
+              />
+            </div>
+          ) : null}
+          {canOperate && offer?.reason ? (
+            <p
+              id="board-approve-run-reason"
+              className="-mt-3 text-xs text-ink-3"
+            >
+              {offer.reason}
+            </p>
+          ) : null}
+          {canOperate && card.sessionId && terminal.state === 'disabled' ? (
+            <p className="-mt-3 text-xs text-ink-3">{terminal.reason}</p>
+          ) : null}
+
+          {canGiveFeedback(card) && canOperate ? (
+            <Field
+              label="Send back with feedback"
+              htmlFor="board-feedback"
+              hint="Resumes the same Claude session in the same worktree. The card returns to In progress."
+            >
+              <Textarea
+                id="board-feedback"
+                rows={4}
+                value={feedback}
+                maxLength={CARD_FEEDBACK_MAX}
+                onChange={(e) => setFeedback(e.target.value)}
+              />
+              <div className="mt-2">
+                <Button
+                  variant="glass"
+                  disabled={sending || feedback.trim() === ''}
+                  onClick={sendBack}
+                >
+                  {sending ? 'Sending…' : 'Send back'}
+                </Button>
+              </div>
+            </Field>
+          ) : null}
+        </section>
+
+        <CardDesignSection
           projectId={projectId}
-          idPrefix="board-card"
-          issueOnRun={issueOnRun}
-          specOnRun={specOnRun}
-          disabled={!canOperate || card.round !== null}
-          onIssueOnRun={setIssueOnRun}
-          onSpecOnRun={setSpecOnRun}
+          card={card}
+          canOperate={canOperate}
+          onChanged={onSaved}
         />
-        {card.specPath ? (
-          <p className="break-all font-mono text-xs text-ink-2">
-            Spec: {card.specPath}
-          </p>
-        ) : null}
-        {canOperate ? (
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-xs text-ink-3">
-              Created <Time value={card.createdAt} />
-              {card.createdBy ? ` by ${card.createdBy.email}` : ''}
-            </span>
-            <div className="flex gap-2">
+
+        <section aria-label="Rounds" className="flex flex-col gap-2">
+          <SectionHeader title="Rounds" headingLevel={3} />
+          <Timeline
+            items={roundItems(card.rounds)}
+            empty={<p className="text-sm text-ink-3">No worker has run yet.</p>}
+          />
+        </section>
+
+        <form
+          id={FORM_ID}
+          aria-label="Card"
+          className="flex flex-col gap-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (dirty && title.trim() !== '' && !saving) void save();
+          }}
+        >
+          <SectionHeader title="Card" headingLevel={3} />
+          {card.sessionId ? (
+            <p className="-mt-2 text-xs text-ink-3">
+              Changes go to the worker with the next round.
+            </p>
+          ) : null}
+          <Field label="Title" htmlFor="board-card-title">
+            <Input
+              id="board-card-title"
+              value={title}
+              maxLength={BOARD_CARD_TITLE_MAX}
+              disabled={!canOperate}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </Field>
+          <Field label="What to do" htmlFor="board-card-body">
+            {preview ? (
+              <div className="rounded-control bg-surface p-3">
+                <Markdown>{body || '*Nothing written yet.*'}</Markdown>
+              </div>
+            ) : (
+              <Textarea
+                id="board-card-body"
+                rows={8}
+                value={body}
+                maxLength={BOARD_CARD_BODY_MAX}
+                disabled={!canOperate}
+                onChange={(e) => setBody(e.target.value)}
+              />
+            )}
+            <div className="mt-2">
               <Button
                 variant="ghost"
+                size="sm"
                 type="button"
-                disabled={actions.busy}
-                onClick={() => actions.askDelete(card)}
+                onClick={() => setPreview((p) => !p)}
               >
-                Delete
-              </Button>
-              <Button
-                variant="solid"
-                type="submit"
-                disabled={saving || !dirty || title.trim() === ''}
-              >
-                Save
+                {preview ? 'Edit' : 'Preview'}
               </Button>
             </div>
-          </div>
-        ) : null}
-      </form>
-    </div>
+          </Field>
+          <Field label="Kind" htmlFor="board-card-kind">
+            <Select
+              id="board-card-kind"
+              value={kind}
+              disabled={!canOperate}
+              onChange={(e) =>
+                setKind(
+                  BOARD_CARD_KINDS.find((k) => k === e.target.value) ?? kind,
+                )
+              }
+            >
+              {BOARD_CARD_KINDS.map((k) => (
+                <option key={k} value={k}>
+                  {KIND_LABEL[k]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field
+            label="Model"
+            htmlFor="board-card-model"
+            hint="Empty uses the project’s orchestrator model."
+          >
+            <Input
+              id="board-card-model"
+              value={model}
+              maxLength={100}
+              disabled={!canOperate}
+              onChange={(e) => setModel(e.target.value)}
+            />
+          </Field>
+          <CardOptionToggles
+            projectId={projectId}
+            idPrefix="board-card"
+            issueOnRun={issueOnRun}
+            specOnRun={specOnRun}
+            disabled={!canOperate || card.round !== null}
+            onIssueOnRun={setIssueOnRun}
+            onSpecOnRun={setSpecOnRun}
+          />
+          {card.specPath ? (
+            <p className="break-all font-mono text-xs text-ink-2">
+              Spec: {card.specPath}
+            </p>
+          ) : null}
+          <span className="text-xs text-ink-3">
+            Created <Time value={card.createdAt} />
+            {card.createdBy ? ` by ${card.createdBy.email}` : ''}
+          </span>
+        </form>
+      </div>
+    </SheetContent>
   );
 }
 
@@ -503,6 +558,8 @@ export function CardSheet({
     };
   }, [projectId, number, version]);
 
+  const sheetTitle = `C-${number} ${title ?? ''}`.trim();
+
   const close = () => {
     setCard(undefined);
     setError(undefined);
@@ -517,17 +574,29 @@ export function CardSheet({
       }}
     >
       {number !== undefined ? (
-        <SheetContent
-          side="right"
-          title={`C-${number} ${title ?? ''}`.trim()}
-          description="Board card"
-        >
-          {error ? (
-            <p role="alert" className="text-sm text-danger">
-              {error}
-            </p>
-          ) : card && card.number === number ? (
-            card.column === 'inbox' ? (
+        card && card.number === number && !error && card.column !== 'inbox' ? (
+          <CardDetailBody
+            // A new round resets the form; a push mid-typing does not.
+            key={`${card.id}:${card.rounds.length}`}
+            sheetTitle={sheetTitle}
+            projectId={projectId}
+            card={card}
+            canOperate={canOperate}
+            actions={actions}
+            terminal={terminal}
+            onSaved={onChanged}
+          />
+        ) : (
+          <SheetContent
+            side="right"
+            title={sheetTitle}
+            description="Board card"
+          >
+            {error ? (
+              <p role="alert" className="text-sm text-danger">
+                {error}
+              </p>
+            ) : card && card.number === number ? (
               <SuggestionSheetBody
                 key={card.id}
                 card={card}
@@ -536,21 +605,10 @@ export function CardSheet({
                 onDone={close}
               />
             ) : (
-              <CardDetailBody
-                // A new round resets the form; a push mid-typing does not.
-                key={`${card.id}:${card.rounds.length}`}
-                projectId={projectId}
-                card={card}
-                canOperate={canOperate}
-                actions={actions}
-                terminal={terminal}
-                onSaved={onChanged}
-              />
-            )
-          ) : (
-            <Skeleton className="h-64 w-full" />
-          )}
-        </SheetContent>
+              <Skeleton className="h-64 w-full" />
+            )}
+          </SheetContent>
+        )
       ) : null}
     </SheetRoot>
   );

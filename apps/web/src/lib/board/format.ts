@@ -133,9 +133,14 @@ export const MOVE_REFUSAL_TEXT: Record<BoardMoveRefusal, string> = {
   invalid_move: 'A suggestion leaves the Inbox only by Accept, into To Do.',
 };
 
+/** #273 D7: the card's design is on and not approved, so the server would refuse Run. */
+export const designBlocksRun = (card: BoardCardView): boolean =>
+  card.design?.needed === true && card.design.status !== 'approved';
+
 export const canRun = (card: BoardCardView): boolean =>
   (card.column === 'todo' || card.column === 'finished') &&
-  !isRoundActive(card.round);
+  !isRoundActive(card.round) &&
+  !designBlocksRun(card);
 
 export const canGiveFeedback = (card: BoardCardView): boolean =>
   card.column === 'finished' && !isRoundActive(card.round);
@@ -147,7 +152,32 @@ export const canAccept = (card: BoardCardView): boolean =>
 export const canRetry = (card: BoardCardView): boolean =>
   card.column === 'in_progress' &&
   card.round !== null &&
-  !isRoundActive(card.round);
+  !isRoundActive(card.round) &&
+  !designBlocksRun(card);
+
+/** #273 D7: **Approve & run** takes Run's place while the design blocks it. */
+export interface ApproveRunOffer {
+  enabled: boolean;
+  /** Why it is disabled; `null` when enabled. */
+  reason: string | null;
+}
+
+/**
+ * Where Run would be, the card's design is not approved: the offer is a link
+ * to the viewer, enabled only once there is a design to approve (`reviewing`).
+ */
+export function approveRunOffer(card: BoardCardView): ApproveRunOffer | null {
+  if (!designBlocksRun(card)) return null;
+  const startable =
+    (card.column === 'todo' ||
+      card.column === 'finished' ||
+      (card.column === 'in_progress' && card.round !== null)) &&
+    !isRoundActive(card.round);
+  if (!startable) return null;
+  return card.design?.status === 'reviewing'
+    ? { enabled: true, reason: null }
+    : { enabled: false, reason: 'The design is being drawn' };
+}
 
 export const canStop = (card: BoardCardView): boolean =>
   isRoundActive(card.round);
@@ -216,6 +246,55 @@ const errorCode = (error: unknown): string | undefined =>
 export const isNotFound = (error: unknown): boolean =>
   error instanceof ApiError && error.status === 404;
 
+/** #273 D13: a refused merge, by `reason`; `message` is the runner's one line. */
+export function describeMergeFailure(
+  reason: unknown,
+  message?: unknown,
+): string {
+  switch (reason) {
+    case 'head_changed':
+      return 'The branch changed since you opened this — review it again.';
+    case 'not_mergeable':
+      return 'GitHub refuses the merge: checks or branch protection.';
+    case 'closed':
+      return 'The pull request is closed.';
+    default:
+      return typeof message === 'string' && message !== ''
+        ? `gh failed: ${message}`
+        : 'gh failed to merge the pull request.';
+  }
+}
+
+/**
+ * #273 D9: why approving the design did not start the worker. The codes that
+ * need no detail read like the same refusal on Run; any other falls back to
+ * the server's message.
+ */
+export function autoRunReason(
+  failure: NonNullable<BoardCardView['autoRunFailure']>,
+): string {
+  switch (failure.code) {
+    case BOARD_ERROR.maxRunning:
+    case BOARD_ERROR.budgetExceeded:
+    case BOARD_ERROR.noSpecDir:
+    case BOARD_ERROR.unsupportedRuntime:
+    case BOARD_ERROR.cardRunning:
+    case BOARD_ERROR.commandUnavailable:
+      // `ApiError.code` is typed for auth codes; a board code travels in it too.
+      return describeBoardError(
+        new ApiError(
+          409,
+          failure.code as ApiError['code'],
+          failure.message,
+          undefined,
+          null,
+        ),
+      ).replace(/\.$/, '');
+    default:
+      return failure.message.replace(/\.$/, '');
+  }
+}
+
 /** Every board error as a sentence for the person; the server's text last. */
 export function describeBoardError(
   error: unknown,
@@ -254,6 +333,12 @@ export function describeBoardError(
       return MOVE_REFUSAL_TEXT.invalid_move;
     case BOARD_ERROR.captureNeedsContent:
       return 'Capture reads session content. Turn on “Keep session content” in the Sessions tab first.';
+    case BOARD_ERROR.mergeFailed: {
+      const body = error instanceof ApiError ? error.body : null;
+      return describeMergeFailure(body?.reason, body?.message);
+    }
+    case BOARD_ERROR.noPullRequest:
+      return 'This card has no pull request to merge.';
     default:
       break;
   }

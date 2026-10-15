@@ -10,13 +10,17 @@ import {
   MenuRoot,
   MenuTrigger,
 } from '@andrewbehma/glass-ui/menu';
+import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
 import { Ellipsis } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useId, useState } from 'react';
 import { api, type Described } from '../../lib/api';
 import { updateCard } from '../../lib/board/actions';
-import { describeBoardError } from '../../lib/board/format';
+import {
+  type ApproveRunOffer,
+  describeBoardError,
+} from '../../lib/board/format';
 import {
   CARD_DESIGN_CHIP_LABEL,
   type CardDesignChipState,
@@ -75,6 +79,49 @@ export function CardFaceDesign({ card }: { card: BoardCardView }) {
         <Badge size="md" label="Runs after design" />
       ) : null}
     </div>
+  );
+}
+
+/**
+ * #273 D7: **Approve & run**, where Run would be while the design blocks it.
+ * A link to the card's design viewer, whose dialog approves and runs; off
+ * with the reason until there is a design in review.
+ */
+export function ApproveRunLink({
+  projectId,
+  card,
+  offer,
+  variant = 'solid',
+  size,
+  describedBy,
+}: {
+  projectId: string;
+  card: BoardCardView;
+  offer: ApproveRunOffer;
+  variant?: 'solid' | 'glass';
+  size?: 'sm';
+  describedBy?: string;
+}) {
+  if (offer.enabled) {
+    return (
+      <Link
+        href={cardDesignHref(projectId, card.number)}
+        className={buttonClassName({ variant, size })}
+      >
+        Approve & run
+      </Link>
+    );
+  }
+  return (
+    <Button
+      variant={variant}
+      size={size}
+      disabled
+      title={offer.reason ?? undefined}
+      aria-describedby={describedBy}
+    >
+      Approve & run
+    </Button>
   );
 }
 
@@ -146,7 +193,7 @@ export function CardDesignSection({
 
   return (
     <section aria-label="Design" className="flex flex-col gap-3">
-      <h3 className="text-sm font-medium">Design</h3>
+      <SectionHeader title="Design" headingLevel={3} />
       <div className="flex flex-wrap items-center gap-2">
         <Badge
           id={chipId}
