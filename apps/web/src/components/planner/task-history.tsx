@@ -6,7 +6,7 @@ import type {
   PlanTurnView,
 } from '@agentdock/shared';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { api } from '../../lib/api';
 import { Time } from '../../lib/format/time';
 import {
@@ -17,8 +17,10 @@ import {
 import { taskApi } from '../../lib/planner/href';
 import { shownVersion, versionTurnText } from '../../lib/planner/versions';
 import { useSection } from '../../lib/section/use-section';
+import { useTextNotes } from '../../lib/text/use-text-notes';
 import { Markdown } from '../markdown/markdown';
 import { AsyncSection } from '../prerequisites/async-section';
+import { NormalizedNote } from '../text/normalized-note';
 
 /**
  * The History tab (spec 172 UI, #185): the plan versions the task appeared
@@ -46,6 +48,7 @@ export function TaskHistory({
     [projectId, planId, task.key, task.id, task.status, task.document],
   );
   const [picked, setPicked] = useState<number | null>(null);
+  const notes = useTextNotes(projectId, { planId }, task.id);
 
   return (
     <div className="flex flex-col gap-4">
@@ -67,7 +70,18 @@ export function TaskHistory({
           }
         >
           {(view) => (
-            <VersionPicker view={view} picked={picked} onPick={setPicked} />
+            <VersionPicker
+              view={view}
+              picked={picked}
+              onPick={setPicked}
+              commentNote={
+                <NormalizedNote
+                  view={notes.view('plan_task', task.id, 'rewriteComment')}
+                  canOperate={false}
+                  onRetry={notes.retry}
+                />
+              }
+            />
           )}
         </AsyncSection>
       </section>
@@ -107,10 +121,13 @@ function VersionPicker({
   view,
   picked,
   onPick,
+  commentNote,
 }: {
   view: PlanTaskVersionsView;
   picked: number | null;
   onPick: (version: number) => void;
+  /** The current task's review-comment note; shown for the current version only. */
+  commentNote: ReactNode;
 }) {
   const shown = shownVersion(view, picked);
   return (
@@ -159,6 +176,9 @@ function VersionPicker({
               Rewrite asked: {shown.rewriteComment}
             </p>
           ) : null}
+          {shown.rewriteComment && shown.version === view.currentVersion
+            ? commentNote
+            : null}
           {shown.document ? (
             <Markdown>{shown.document}</Markdown>
           ) : (

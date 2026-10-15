@@ -17,6 +17,7 @@ import { toast } from '@andrewbehma/glass-ui/toast';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useEffect, useState } from 'react';
+import { TextSettingsCard } from '../../../../../components/text/text-settings-card';
 import { api } from '../../../../../lib/api';
 import { mismatchSentence } from '../../../../../lib/approvals/format';
 import {
@@ -237,6 +238,8 @@ export function GeneralTab({
           )}
         </form>
       </Card>
+
+      <TextSettingsCard projectId={project.id} isAdmin={isAdmin} />
 
       {isAdmin ? (
         <Card

@@ -14,6 +14,8 @@ import { Field, Input, Select, Textarea } from '@andrewbehma/glass-ui/field';
 import Link from 'next/link';
 import { useState } from 'react';
 import { confidenceLabel, sessionHref } from '../../lib/board/format';
+import { useTextNotes } from '../../lib/text/use-text-notes';
+import { NormalizedNote } from '../text/normalized-note';
 import type { CardActions } from './use-card-actions';
 
 const KIND_LABEL: Record<BoardCardKind, string> = {
@@ -27,11 +29,13 @@ const KIND_LABEL: Record<BoardCardKind, string> = {
  * on its way to To Do.
  */
 export function SuggestionSheetBody({
+  projectId,
   card,
   canOperate,
   actions,
   onDone,
 }: {
+  projectId: string;
   card: BoardCardDetail;
   canOperate: boolean;
   actions: CardActions;
@@ -41,6 +45,7 @@ export function SuggestionSheetBody({
   const [title, setTitle] = useState(card.title);
   const [body, setBody] = useState(card.body);
   const [kind, setKind] = useState(card.kind);
+  const notes = useTextNotes(projectId, { cardId: card.id });
   const confidence = confidenceLabel(card.captureConfidence);
   const session = sessionHref(card.sourceSessionId);
 
@@ -128,6 +133,11 @@ export function SuggestionSheetBody({
             disabled={!canOperate}
             onChange={(e) => setTitle(e.target.value)}
           />
+          <NormalizedNote
+            view={notes.view('board_card', card.id, 'title')}
+            canOperate={canOperate}
+            onRetry={notes.retry}
+          />
         </Field>
         <Field label="What to do" htmlFor="inbox-card-body">
           <Textarea
@@ -137,6 +147,11 @@ export function SuggestionSheetBody({
             maxLength={BOARD_CARD_BODY_MAX}
             disabled={!canOperate}
             onChange={(e) => setBody(e.target.value)}
+          />
+          <NormalizedNote
+            view={notes.view('board_card', card.id, 'body')}
+            canOperate={canOperate}
+            onRetry={notes.retry}
           />
         </Field>
         <Field label="Kind" htmlFor="inbox-card-kind">
