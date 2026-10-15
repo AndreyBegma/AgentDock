@@ -6,6 +6,8 @@ import {
 } from '@agentdock/shared/protocol';
 import { resetDatabase, type Session } from '../test/e2e-app';
 import { generateRunnerToken } from './credentials';
+import { RunnerConnectHooks } from './runner-connect-hooks';
+import { RunnerPresence } from './runner-presence';
 import {
   adminSession,
   capabilities,
@@ -149,6 +151,26 @@ describe('/runner gateway (e2e)', () => {
   });
 
   describe('hello', () => {
+    it('#329 D4: runs the connect hooks once the runner is welcomed', async () => {
+      const { runnerId, token } = await pairedRunner(ctx, admin);
+      // Whether the runner could take a command when its hook ran.
+      const connected: { id: string; live: boolean }[] = [];
+      ctx.app.get(RunnerConnectHooks).register({
+        name: 'test',
+        connected: async (id) => {
+          connected.push({
+            id,
+            live: ctx.app.get(RunnerPresence).isConnected(id),
+          });
+        },
+      });
+      await open(token).connect();
+      const seen = await eventually('the connect hook', async () =>
+        connected.find((c) => c.id === runnerId),
+      );
+      expect(seen).toEqual({ id: runnerId, live: true });
+    });
+
     it('welcomes with the cursor and mirrors capabilities and profiles', async () => {
       const { runnerId, token } = await pairedRunner(ctx, admin);
       const socket = open(token);

@@ -153,6 +153,8 @@ describe('board fleet mirror (e2e, #282 D4)', () => {
       column: 'finished',
       prNumber: 7,
       prUrl: PR_URL,
+      // #329 D6: the state from the fleet's PR poll.
+      prState: 'open',
       fleetStage: 'pr_open',
     });
   });

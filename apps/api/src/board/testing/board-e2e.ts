@@ -4,6 +4,7 @@ import type {
   RunnerEvent,
 } from '@agentdock/shared/protocol';
 import { seedProject } from '../../fleet/testing/fleet-e2e';
+import { RunnerConnectHooks } from '../../runners/runner-connect-hooks';
 import { RunnerEventSinks } from '../../runners/runner-event-sinks';
 import {
   createE2eApp,
@@ -15,13 +16,25 @@ import {
 } from '../../test/e2e-app';
 import { BoardCommands, type BoardSendResult } from '../board-commands';
 import { BoardWork } from '../board-work';
+import { CollectRetryTimer } from '../collect-retry-timer';
 
 export const ROOT_A = '/srv/dev/widget';
 export const ROOT_B = '/srv/dev/gadget';
 
 export type CardHandler = (args: Record<string, unknown>) => unknown;
 
-type WorldCommand = CardCommandName | 'issue.create' | 'pr.inspect';
+type WorldCommand =
+  | CardCommandName
+  | 'card.prClose'
+  | 'issue.create'
+  | 'pr.inspect';
+
+/** #329 D4: a retry the board scheduled, captured instead of a real timer. */
+export interface ScheduledRetry {
+  cardId: string;
+  delayMs: number;
+  run: () => void;
+}
 
 /** 40 hex: the head `pr.inspect` answers with by default. */
 export const HEAD_SHA = 'a'.repeat(40);
@@ -79,6 +92,11 @@ export class BoardWorld {
   handlers: Partial<Record<WorldCommand, CardHandler>> = {};
   /** Set to make `assertReady` refuse like an offline runner. */
   offline = false;
+  /** #329 D9: whether the runner advertises `card.prClose`. */
+  prCloseAdvertised = true;
+  /** #329 D4: the delayed collect retries scheduled so far, oldest first. */
+  retries: ScheduledRetry[] = [];
+  connectHooks!: RunnerConnectHooks;
   private seq = 0;
   private auditFrom = 0n;
 
@@ -98,6 +116,20 @@ export class BoardWorld {
       .mockImplementation(async (_runner, name, args) =>
         this.answer(name, args as Record<string, unknown>),
       );
+    jest
+      .spyOn(this.commands, 'closePr')
+      .mockImplementation(async (runnerId, args) => {
+        this.commands.assertReady(runnerId, 'card.prClose');
+        return this.answer('card.prClose', { ...args });
+      });
+    jest
+      .spyOn(this.commands, 'advertisesPrClose')
+      .mockImplementation(() => this.prCloseAdvertised);
+    this.connectHooks = this.ctx.app.get(RunnerConnectHooks);
+    const timer = this.ctx.app.get(CollectRetryTimer);
+    jest.spyOn(timer, 'schedule').mockImplementation((cardId, delayMs, run) => {
+      this.retries.push({ cardId, delayMs, run });
+    });
     jest
       .spyOn(this.commands, 'createIssue')
       .mockImplementation(async (_runner, args) =>
@@ -130,6 +162,12 @@ export class BoardWorld {
         prNumber: 77,
         prUrl: 'https://github.com/acme/widget/pull/77',
       },
+      'card.prClose': {
+        closed: true,
+        alreadyClosed: false,
+        branchDeleted: Boolean(args.deleteBranch),
+        issueClosed: args.issue !== null && args.issue !== undefined,
+      },
       'card.close': {
         stopped: false,
         worktreeRemoved: true,
@@ -141,6 +179,8 @@ export class BoardWorld {
         method: 'merge',
         mergeCommit: null,
         issueClosed: true,
+        // What the result schema's default makes of an older runner's answer.
+        branchDeleted: false,
       },
       'issue.create': {
         number: 41,
@@ -155,8 +195,11 @@ export class BoardWorld {
     jest.mocked(this.commands.send).mockClear();
     jest.mocked(this.commands.createIssue).mockClear();
     jest.mocked(this.commands.inspectPr).mockClear();
+    jest.mocked(this.commands.closePr).mockClear();
     this.handlers = {};
     this.offline = false;
+    this.prCloseAdvertised = true;
+    this.retries = [];
     await resetDatabase(this.ctx.prisma);
     ({ runnerId: this.runnerId, projectId: this.a } = await seedProject(
       this.ctx.prisma,
@@ -224,6 +267,13 @@ export class BoardWorld {
       .mocked(this.commands.send)
       .mock.calls.filter(([, n]) => n === name)
       .map(([, , args]) => args as Record<string, unknown>);
+  }
+
+  /** #329 D8: the `card.prClose` commands sent, oldest first. */
+  prCloses(): Record<string, unknown>[] {
+    return jest
+      .mocked(this.commands.closePr)
+      .mock.calls.map(([, args]) => ({ ...args }));
   }
 
   issues(): IssueCreateArgs[] {

@@ -10,7 +10,9 @@ import {
   type BoardView,
   CARD_SUMMARY_MAX,
   type CardMergeOutcome,
+  type CardPrCloseOutcome,
   type CardPullRequestView,
+  type CollectBoardCardResponse,
   captureFingerprint,
   cardChange,
   cardLabel,
@@ -19,7 +21,12 @@ import {
   type Role,
 } from '@agentdock/shared';
 import { roleAtLeast } from '@agentdock/shared/protocol';
-import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  type OnModuleInit,
+} from '@nestjs/common';
 import type { BoardCard } from '@prisma/client';
 import { AttachmentsService } from '../attachments/attachments.service';
 import { AuditService } from '../audit/audit.service';
@@ -29,7 +36,7 @@ import { mergeMethodOf } from '../planner/planner-instructions.service';
 import { TextNormalizer } from '../text/text-normalizer';
 import { TextOwners } from '../text/text-owners';
 import { BoardCommands, boardOutput } from './board-commands';
-import { boardError } from './board-error';
+import { boardError, cardNotFound } from './board-error';
 import {
   type CardFacts,
   type CardWithRounds,
@@ -739,10 +746,31 @@ export class BoardService implements OnModuleInit {
         'Only a card in Finished is accepted',
       );
     }
-    // #282 D4: a fleet card's PR is the orchestrator's to merge, never Accept's.
+    if (dto.merge && dto.closePr) {
+      throw new BadRequestException(
+        'Accept either merges the pull request or closes it, not both',
+      );
+    }
+    // #282 D4: a fleet card's PR is the orchestrator's to merge or close,
+    // never Accept's.
+    const fleet = card.source === 'fleet';
+    const deleteBranch =
+      (dto.merge?.deleteBranch ?? false) ||
+      (dto.closePr?.deleteBranch ?? false);
+    if (!fleet && deleteBranch) this.assertMayDeleteBranch(project, card);
     const merge =
-      dto.merge && card.source !== 'fleet'
-        ? await this.merge(project, card, dto.merge.headSha, actor)
+      dto.merge && !fleet
+        ? await this.merge(
+            project,
+            card,
+            dto.merge.headSha,
+            dto.merge.deleteBranch ?? false,
+            actor,
+          )
+        : null;
+    const prClose =
+      dto.closePr && !fleet
+        ? await this.closePr(project, card, dto.closePr, actor)
         : null;
     await this.work.move(
       project,
@@ -750,7 +778,183 @@ export class BoardService implements OnModuleInit {
       { to: 'completed', index: 0, source: 'person' },
       actor,
     );
-    return { ...(await this.detail(projectId, number)), merge, prClose: null };
+    return { ...(await this.detail(projectId, number)), merge, prClose };
+  }
+
+  /**
+   * #329 D7/D8/D9: deleting the PR's branch is refused for a `terminal`
+   * card — its branch is the person's session branch — and needs a runner
+   * that advertises `card.prClose`, whose release takes `deleteBranch`.
+   */
+  private assertMayDeleteBranch(
+    project: BoardProject,
+    card: CardWithRounds,
+  ): void {
+    if (card.source === 'terminal') {
+      throw boardError(
+        422,
+        BOARD_ERROR.branchDeleteRefused,
+        "A terminal card's branch is the session's branch: it is never deleted",
+      );
+    }
+    this.assertServesPrClose(project);
+  }
+
+  /** #329 D9: 503 `command_unavailable` for a runner older than `card.prClose`. */
+  private assertServesPrClose(project: BoardProject): void {
+    this.commands.assertReady(project.runnerId, 'card.prClose');
+    if (!this.commands.advertisesPrClose(project.runnerId)) {
+      throw boardError(
+        503,
+        BOARD_ERROR.commandUnavailable,
+        'The runner does not serve card.prClose; update it',
+      );
+    }
+  }
+
+  /**
+   * #329 D8: Accept without merging closes the card's PR through
+   * `card.prClose`, audited; a refusal is 409 `pr_close_failed` and the card
+   * stays in Finished.
+   */
+  private async closePr(
+    project: BoardProject,
+    card: CardWithRounds,
+    request: { deleteBranch: boolean; closeIssue: boolean },
+    actor: BoardActor,
+  ): Promise<CardPrCloseOutcome> {
+    if (isActiveRoundPhase(card.rounds[0]?.phase)) {
+      throw boardError(
+        409,
+        BOARD_ERROR.cardRunning,
+        'A worker is running on this card',
+      );
+    }
+    const pr = card.prNumber;
+    if (pr === null) {
+      throw boardError(
+        409,
+        BOARD_ERROR.noPullRequest,
+        `${cardLabel(card.number)} has no pull request to close`,
+      );
+    }
+    this.assertServesPrClose(project);
+    const issue = request.closeIssue ? card.issueNumber : null;
+    const output = boardOutput(
+      'card.prClose',
+      await this.commands.closePr(
+        project.runnerId,
+        {
+          cardId: card.id,
+          projectId: project.id,
+          root: project.rootPath,
+          pr,
+          deleteBranch: request.deleteBranch,
+          issue,
+          comment: `Closed from the AgentDock Board (${cardLabel(card.number)})`,
+        },
+        { role: actor.role, ctx: actor.ctx },
+      ),
+    );
+    const target = { type: 'board_card', id: card.id } as const;
+    if (!output.closed) {
+      await this.audit.record({
+        ...actor.ctx,
+        action: 'card.pr_close_failed',
+        target,
+        projectId: project.id,
+        after: { number: card.number, pr, reason: output.error },
+        result: 'error',
+        meta: { message: output.message },
+      });
+      throw boardError(
+        409,
+        BOARD_ERROR.prCloseFailed,
+        output.message || `Closing #${pr} was refused`,
+        { reason: output.error },
+      );
+    }
+    await this.prisma.boardCard.update({
+      where: { id: card.id },
+      data: { prState: 'closed' },
+    });
+    await this.audit.record({
+      ...actor.ctx,
+      action: 'card.pr_closed',
+      target,
+      projectId: project.id,
+      after: {
+        number: card.number,
+        pr,
+        alreadyClosed: output.alreadyClosed,
+        branchDeleted: output.branchDeleted,
+        issueClosed: output.issueClosed,
+      },
+      result: 'ok',
+    });
+    return {
+      closed: true,
+      alreadyClosed: output.alreadyClosed,
+      branchDeleted: output.branchDeleted,
+      ...(output.branchError !== undefined
+        ? { branchError: output.branchError }
+        : {}),
+      issueClosed: output.issueClosed,
+      ...(output.issueError !== undefined
+        ? { issueError: output.issueError }
+        : {}),
+    };
+  }
+
+  /**
+   * `POST …/collect` (#329 D5, operator): Create pull request. Runs
+   * `card.collect` now for a card in Finished or Completed that has a
+   * branch, resetting the automatic attempts; a failed collect is an answer.
+   */
+  async collect(
+    projectId: string,
+    number: number,
+    actor: BoardActor,
+  ): Promise<CollectBoardCardResponse> {
+    const card = await this.prisma.boardCard.findUnique({
+      where: { projectId_number: { projectId, number } },
+      include: { trackedSession: { select: { gitBranch: true } } },
+    });
+    if (!card) throw cardNotFound();
+    if (card.column !== 'finished' && card.column !== 'completed') {
+      throw boardError(
+        409,
+        BOARD_ERROR.wrongColumn,
+        'Only a card in Finished or Completed opens a pull request',
+      );
+    }
+    // #282 D3: a terminal card's branch is its tracked session's.
+    const branch =
+      card.source === 'terminal'
+        ? (card.trackedSession?.gitBranch ?? null)
+        : card.branch;
+    if (branch === null) {
+      throw boardError(
+        409,
+        BOARD_ERROR.noBranch,
+        `${cardLabel(card.number)} has no branch to push`,
+      );
+    }
+    const collect = await this.work.collectNow(card.id, 'manual');
+    if (collect === null) throw cardNotFound();
+    await this.audit.record({
+      ...actor.ctx,
+      action: 'card.collect_requested',
+      target: { type: 'board_card', id: card.id },
+      projectId,
+      after: {
+        number: card.number,
+        state: collect.state,
+        ...(collect.prNumber !== null ? { pr: collect.prNumber } : {}),
+      },
+      result: collect.state === 'failed' ? 'error' : 'ok',
+    });
+    return { ...(await this.detail(projectId, number)), collect };
   }
 
   /** #273 D13: `card.merge`, audited; a refusal is 409 `merge_failed`. */
@@ -758,6 +962,7 @@ export class BoardService implements OnModuleInit {
     project: BoardProject,
     card: CardWithRounds,
     headSha: string,
+    deleteBranch: boolean,
     actor: BoardActor,
   ): Promise<CardMergeOutcome> {
     if (isActiveRoundPhase(card.rounds[0]?.phase)) {
@@ -789,6 +994,8 @@ export class BoardService implements OnModuleInit {
           method: mergeMethodOf(project.codeSentinelConfig),
           issue: card.issueNumber,
           comment: `Completed as ${cardLabel(card.number)} on the AgentDock board; merged in #${pr}.`,
+          // #329 D9: an older runner refuses the arg; it is sent only when asked.
+          ...(deleteBranch ? { deleteBranch } : {}),
         },
         { role: actor.role, ctx: actor.ctx },
       ),
@@ -825,8 +1032,14 @@ export class BoardService implements OnModuleInit {
           : {}),
         alreadyMerged: output.alreadyMerged,
         issueClosed: output.issueClosed,
+        branchDeleted: output.branchDeleted,
       },
       result: 'ok',
+    });
+    // #329 D6: the card's PR state from the merge result.
+    await this.prisma.boardCard.update({
+      where: { id: card.id },
+      data: { prState: 'merged' },
     });
     return {
       merged: true,
