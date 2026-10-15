@@ -121,6 +121,9 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   'card.merged': "Merged a card's pull request",
   'card.merge_failed': "Failed to merge a card's pull request",
   'card.auto_run_failed': "A card's worker did not start after design approval",
+  'attachment.added': 'Uploaded an attachment',
+  'attachment.claimed': 'Attached files to a card',
+  'attachment.removed': 'Removed an attachment',
   'board.settings_updated': 'Changed board settings',
   'text.settings_updated': 'Changed the text settings',
 };
@@ -155,6 +158,7 @@ export const ACTION_GROUP_LABEL: Record<string, string> = {
   'action_request.': 'Action requests',
   'session_content.': 'Session content',
   'card.': 'Board cards',
+  'attachment.': 'Attachments',
   'board.': 'Board',
   'text.': 'Text',
 };

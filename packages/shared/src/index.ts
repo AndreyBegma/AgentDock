@@ -1,6 +1,7 @@
 export * from './action-requests';
 export * from './activity';
 export * from './approvals';
+export * from './attachments';
 export * from './audit';
 export * from './auth';
 export * from './board';

@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import {
+  ATTACHMENTS_PER_CARD_MAX,
+  attachmentRefSchema,
+} from '../../attachments';
 import type { CommandDefinition } from '../commands';
 import { absolutePathSchema } from '../projects';
 import { headShaSchema } from './approvals';
@@ -113,6 +117,14 @@ const cardTarget = {
  * tmux `agentdock-card-<shortId>` running `exec-run` with `interactive: true`.
  * A later round reuses the worktree and resumes the session. The round
  * outlives this command: progress arrives as `card_run.*` events.
+ *
+ * #309 D9: before it launches or resumes the session, the runner makes
+ * `<worktree>/.agentdock/attachments/` hold exactly `attachments` — each
+ * missing file downloaded from `runnerAttachmentPath(id)`, its size and
+ * SHA-256 checked, written atomically as `attachmentFileName(id, name)`;
+ * unlisted files removed; `.agentdock/` git-excluded. Absent is an empty
+ * list. A download or check that fails fails the command with
+ * `attachments_unavailable`.
  */
 export const cardRunArgsSchema = z
   .strictObject({
@@ -125,6 +137,11 @@ export const cardRunArgsSchema = z
     session: cardSessionSchema,
     prompt: cardPromptSchema,
     files: z.array(cardRunFileSchema).max(CARD_RUN_FILES_MAX).optional(),
+    /** #309 D9: every attachment of the card and its rounds, in upload order. */
+    attachments: z
+      .array(attachmentRefSchema)
+      .max(ATTACHMENTS_PER_CARD_MAX)
+      .optional(),
     profileKey: profileKeySchema,
     model: orchestratorModelSchema,
     permissionMode: orchestratorPermissionModeSchema,
@@ -134,6 +151,12 @@ export const cardRunArgsSchema = z
       new Set((a.files ?? []).map((f) => f.path)).size ===
       (a.files ?? []).length,
     { message: 'file paths must be distinct', path: ['files'] },
+  )
+  .refine(
+    (a) =>
+      new Set((a.attachments ?? []).map((f) => f.id)).size ===
+      (a.attachments ?? []).length,
+    { message: 'attachment ids must be distinct', path: ['attachments'] },
   );
 export type CardRunArgs = z.infer<typeof cardRunArgsSchema>;
 
