@@ -26,7 +26,6 @@ import {
   useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
 } from 'react';
 import { BudgetExceededBanner } from '../../../../../components/budgets/exceeded-banner';
 import { AsyncSection } from '../../../../../components/prerequisites/async-section';
@@ -70,30 +69,14 @@ import { SlotPanel } from './slot-panel';
 import { SlotsView } from './slots-view';
 import { StartOrchestratorDialog } from './start-dialog';
 import { useControlReasons } from './use-control-reasons';
+import { useDesktop } from './use-desktop';
 
 /** Pushes arrive in bursts (one per projected batch); one refetch covers them. */
 const REFETCH_DEBOUNCE_MS = 300;
 /** Ages in the table are relative to now. */
 const AGE_TICK_MS = 30_000;
-/** Where the canvas is drawn; below it a phone gets the list (and the panel a sheet). */
-const DESKTOP_QUERY = '(min-width: 1024px)';
 const DEPENDENCIES_ID = 'fleet-dependencies';
 const NEXT_WAVE_BRIEF = 'Plan the next wave of work for this project.';
-
-function subscribeDesktop(onChange: () => void) {
-  const query = window.matchMedia(DESKTOP_QUERY);
-  query.addEventListener('change', onChange);
-  return () => query.removeEventListener('change', onChange);
-}
-
-/** True at the canvas's width. False on the server: the first paint is the list. */
-function useDesktop(): boolean {
-  return useSyncExternalStore(
-    subscribeDesktop,
-    () => window.matchMedia(DESKTOP_QUERY).matches,
-    () => false,
-  );
-}
 
 export default function FleetPage() {
   // `useSearchParams` needs a boundary, or the route cannot prerender its shell.

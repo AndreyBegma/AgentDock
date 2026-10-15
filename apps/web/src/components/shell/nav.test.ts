@@ -76,6 +76,7 @@ describe('visibleNav', () => {
     expect(labels('viewer', '/').join()).not.toContain('Tasks');
     const inProject = labels('viewer', '/projects/p1/settings');
     for (const page of [
+      'Project',
       'Fleet',
       'Planner',
       'Work',
@@ -122,7 +123,12 @@ describe('activeEntryId: one active item', () => {
 
   test('/projects is active only on the list itself', () => {
     expect(activeAt('viewer', '/projects')).toBe('projects');
-    expect(activeAt('viewer', '/projects/p1')).toBeNull();
+    expect(activeAt('viewer', '/projects/p1')).toBe('project-home');
+  });
+
+  test('the project home lights only on itself, never under a sub-page', () => {
+    expect(activeAt('viewer', '/projects/p1/fleet')).toBe('fleet');
+    expect(activeAt('viewer', '/projects/p1/queue')).toBe('queue');
   });
 
   test('the project Activity does not light the workspace Activity', () => {
@@ -201,11 +207,11 @@ describe('tabBarSplit', () => {
     });
   });
 
-  test('inside a project: its working pages with Planner, Activity first in More', () => {
+  test('inside a project: its home and working pages, Planner first in More', () => {
     expect(split('admin', '/projects/p1/queue')).toEqual({
-      tabs: ['Fleet', 'Planner', 'Work', 'Queue', 'Approvals'],
+      tabs: ['Project', 'Fleet', 'Work', 'Queue', 'Approvals'],
       more: [
-        'project: Activity, History, Skills, Schedules, Settings',
+        'project: Planner, Activity, History, Skills, Schedules, Settings',
         'workspace: Overview, Projects, Activity, Work, Sessions, Usage, Workflows, Skills',
         'admin: Runners, Users, Schedules, Budgets, Planner instructions, Audit, Prices, Integrations, Settings',
       ],
@@ -220,7 +226,7 @@ describe('tabBarSplit', () => {
 
   test('tabs resolve the project id', () => {
     const { tabs } = tabBarSplit(visibleNav('viewer', '/projects/p1'));
-    expect(tabs[0]?.resolvedHref).toBe('/projects/p1/fleet');
+    expect(tabs[0]?.resolvedHref).toBe('/projects/p1');
   });
 });
 
