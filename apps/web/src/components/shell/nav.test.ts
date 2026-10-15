@@ -194,9 +194,9 @@ describe('tabBarSplit', () => {
 
   test('inside a project: its working pages with Planner, Activity first in More', () => {
     expect(split('admin', '/projects/p1/queue')).toEqual({
-      tabs: ['Fleet', 'Planner', 'Queue', 'Approvals', 'History'],
+      tabs: ['Fleet', 'Planner', 'Board', 'Queue', 'Approvals'],
       more: [
-        'project: Board, Activity, Skills, Schedules, Settings',
+        'project: Activity, History, Skills, Schedules, Settings',
         'workspace: Overview, Projects, Activity, Tasks, Sessions, Usage, Workflows, Skills',
         'admin: Runners, Users, Schedules, Budgets, Planner instructions, Audit, Prices, Integrations, Settings',
       ],
