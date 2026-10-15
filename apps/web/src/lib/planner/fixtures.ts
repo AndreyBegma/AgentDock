@@ -37,6 +37,7 @@ export const task = (over: Partial<PlanTaskView> = {}): PlanTaskView => ({
   issue: null,
   queuedAt: null,
   design: null,
+  cardId: null,
   ...over,
 });
 
@@ -110,6 +111,7 @@ export const plan = (over: Partial<PlanDetail> = {}): PlanDetail => {
       ),
     },
     activeTurnId: null,
+    intake: null,
     ...over,
   };
 };

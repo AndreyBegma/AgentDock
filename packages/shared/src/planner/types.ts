@@ -1,6 +1,9 @@
 import { z } from 'zod';
+import { attachmentIdSchema } from '../attachments/contracts';
+import { ATTACHMENTS_PER_CARD_MAX } from '../attachments/limits';
 import { DESIGN_RATIONALE_MAX, DESIGN_TITLE_MAX } from '../design/limits';
 import { designSuggestionSchema, designVariantSchema } from '../design/types';
+import { LOCAL_CARD_BODY_MAX } from '../protocol/local';
 
 /**
  * The Planner (docs/specs/172-planner.md): plan, task, question and turn
@@ -13,10 +16,11 @@ import { designSuggestionSchema, designVariantSchema } from '../design/types';
 /**
  * Bumped when the output shapes below change; each plan records the one it
  * ran with (D11) and keeps running under it. v2 adds design suggestions to
- * tasks and the `design` action (spec 223).
+ * tasks and the `design` action (spec 223). v3 adds multiple-choice
+ * questions and the card intake's `intake` action (#337 D3, D4).
  */
-export const PLANNER_CONTRACT_VERSION = 2;
-export const PLANNER_CONTRACT_VERSIONS = [1, 2] as const;
+export const PLANNER_CONTRACT_VERSION = 3;
+export const PLANNER_CONTRACT_VERSIONS = [1, 2, 3] as const;
 export type PlannerContractVersion = (typeof PLANNER_CONTRACT_VERSIONS)[number];
 
 /** A stored `plans.contractVersion` as a known version; an unknown one reads as the current. */
@@ -47,10 +51,27 @@ export const PLANNER_QUESTION_MAX = 4000;
 export const PLANNER_DOCUMENT_MAX = 100_000;
 export const PLANNER_ASSUMPTIONS_MAX = 50;
 
+/**
+ * #337 D4: question rounds a card intake may ask. After the last one, the
+ * next turn must write the card (`intakeMustGenerate`).
+ */
+export const PLANNER_INTAKE_MAX_ROUNDS = 4;
+/** #337 D6: a generated card's title. */
+export const CARD_DRAFT_TITLE_MAX = 80;
+/** #337 D6: a generated card's body — the board's card body limit. */
+export const CARD_DRAFT_BODY_MAX = LOCAL_CARD_BODY_MAX;
+/** #337 D6: the `##` sections a generated card's body carries, in order. */
+export const CARD_DRAFT_SECTIONS = [
+  'What to do',
+  'Acceptance criteria',
+  'Out of scope',
+  'Open questions',
+] as const;
+
 // Plans
 
-/** D2. */
-export const PLAN_MODES = ['batch', 'dialogue'] as const;
+/** D2; `card` is #337 D1: a New Card intake, ending in exactly one card. */
+export const PLAN_MODES = ['batch', 'dialogue', 'card'] as const;
 export const planModeSchema = z.enum(PLAN_MODES);
 export type PlanMode = z.infer<typeof planModeSchema>;
 
@@ -59,6 +80,10 @@ export const PLAN_VISIBILITIES = ['private', 'project'] as const;
 export const planVisibilitySchema = z.enum(PLAN_VISIBILITIES);
 export type PlanVisibility = z.infer<typeof planVisibilitySchema>;
 
+/**
+ * `done` (#337 D6, D7): the plan made its board cards — an intake its one
+ * card, a plan its Create cards. Like `sent`, it takes no more turns.
+ */
 export const PLAN_STATUSES = [
   'clarifying',
   'drafting',
@@ -66,6 +91,7 @@ export const PLAN_STATUSES = [
   'sending',
   'sent',
   'archived',
+  'done',
 ] as const;
 export const planStatusSchema = z.enum(PLAN_STATUSES);
 export type PlanStatus = z.infer<typeof planStatusSchema>;
@@ -124,7 +150,10 @@ export type PlanTaskKey = z.infer<typeof planTaskKeySchema>;
 
 // Turns
 
-/** D1, D16; `design` is spec 223 D7. */
+/**
+ * D1, D16; `design` is spec 223 D7; `intake` is #337 D1 — every turn of a
+ * `card` plan, which opens a round or writes the card.
+ */
 export const PLAN_TURN_ACTIONS = [
   'decompose',
   'clarify',
@@ -132,6 +161,7 @@ export const PLAN_TURN_ACTIONS = [
   'write',
   'revise',
   'design',
+  'intake',
 ] as const;
 export const planTurnActionSchema = z.enum(PLAN_TURN_ACTIONS);
 export type PlanTurnAction = z.infer<typeof planTurnActionSchema>;
@@ -172,6 +202,11 @@ export type PlanRecommendation = z.infer<typeof planRecommendationSchema>;
 /**
  * D6, D7. `blocking`: no safe default — the task is `needs_talk` until it is
  * answered. A non-blocking question's recommendation is the default taken.
+ * `multiple` (#337 D3, contract v3): checkboxes — the answer may pick several
+ * options; absent is single choice. A free answer is always accepted.
+ *
+ * `multiple` is accepted under every contract version: only v3's text offers
+ * it, so an older plan's model never writes it, and reading it back is safe.
  */
 export const planQuestionSchema = z
   .strictObject({
@@ -179,6 +214,7 @@ export const planQuestionSchema = z
     title: text(PLANNER_TITLE_MAX),
     question: text(PLANNER_QUESTION_MAX),
     options: z.array(planQuestionOptionSchema).max(PLANNER_MAX_OPTIONS),
+    multiple: z.boolean().optional(),
     recommendation: planRecommendationSchema,
     blocking: z.boolean(),
   })
@@ -210,22 +246,50 @@ export const planQuestionRoundSchema = z
     message: 'question ids must be unique within a round',
   });
 
-/** One answer of a round, in a turn's input: an option, words, or both. */
+/**
+ * One answer of a round, in a turn's input: an option, words, or both.
+ * `optionIds` (#337 D3) picks several options of a `multiple` question; it
+ * and `optionId` are never sent together. Whether the picks fit the question
+ * is `checkRoundAnswers`'s, which needs the round.
+ */
 export const planAnswerSchema = z
   .strictObject({
     questionId: idSchema,
     optionId: idSchema.optional(),
+    optionIds: z.array(idSchema).min(1).max(PLANNER_MAX_OPTIONS).optional(),
     text: text(PLANNER_QUESTION_MAX).optional(),
   })
-  .refine((a) => a.optionId !== undefined || a.text !== undefined, {
-    message: 'an answer needs an optionId or text',
-  });
+  .refine(
+    (a) =>
+      a.optionId !== undefined ||
+      a.optionIds !== undefined ||
+      a.text !== undefined,
+    { message: 'an answer needs an optionId, optionIds or text' },
+  )
+  .refine((a) => a.optionId === undefined || a.optionIds === undefined, {
+    message: 'an answer has optionId or optionIds, not both',
+  })
+  .refine(
+    (a) =>
+      a.optionIds === undefined ||
+      new Set(a.optionIds).size === a.optionIds.length,
+    { path: ['optionIds'], message: 'optionIds must be unique' },
+  );
 export type PlanAnswer = z.infer<typeof planAnswerSchema>;
 
-/** A turn's input as the API stores it (`plan_turns.input`). */
+/**
+ * A turn's input as the API stores it (`plan_turns.input`). #337: `generate`
+ * is Enough — generate (D3): the turn must write the card; `attachmentIds`
+ * are the files that came with it, passed to `plan.turn` (D10).
+ */
 export const planTurnInputSchema = z.strictObject({
   message: text(PLANNER_SUMMARY_MAX).optional(),
   answers: z.array(planAnswerSchema).max(PLANNER_MAX_QUESTIONS).optional(),
+  generate: z.boolean().optional(),
+  attachmentIds: z
+    .array(attachmentIdSchema)
+    .max(ATTACHMENTS_PER_CARD_MAX)
+    .optional(),
 });
 export type PlanTurnInput = z.infer<typeof planTurnInputSchema>;
 
@@ -331,7 +395,48 @@ export const designOutputSchema = z.strictObject({
 });
 export type DesignOutput = z.infer<typeof designOutputSchema>;
 
-/** What a v1 plan's turns are validated against. */
+/**
+ * #337 D6: the card an intake writes — English, whatever the person's
+ * language (D5). The body carries the `CARD_DRAFT_SECTIONS`, checked by the
+ * parser. It lands in Todo with `kindSource = auto`.
+ */
+export const cardDraftSchema = z.strictObject({
+  title: text(CARD_DRAFT_TITLE_MAX),
+  kind: planTaskKindSchema,
+  body: text(CARD_DRAFT_BODY_MAX),
+});
+export type CardDraft = z.infer<typeof cardDraftSchema>;
+
+/**
+ * #337 D1, D4: a card intake's turn either opens a question round or writes
+ * the card — never both, never neither. A round has at least one question.
+ */
+export const intakeRoundOutputSchema = z.strictObject({
+  action: z.literal('intake'),
+  questions: planQuestionRoundSchema.min(1),
+});
+export const intakeCardOutputSchema = z.strictObject({
+  action: z.literal('intake'),
+  cardDraft: cardDraftSchema,
+});
+export const intakeOutputSchema = z.union([
+  intakeRoundOutputSchema,
+  intakeCardOutputSchema,
+]);
+export type IntakeOutput = z.infer<typeof intakeOutputSchema>;
+export type IntakeRoundOutput = z.infer<typeof intakeRoundOutputSchema>;
+export type IntakeCardOutput = z.infer<typeof intakeCardOutputSchema>;
+
+/** An intake output that wrote the card. */
+export const isIntakeCard = (
+  output: IntakeOutput,
+): output is IntakeCardOutput => 'cardDraft' in output;
+
+/**
+ * What a v1 plan's turns are validated against. `intake` is listed under
+ * every version only to keep the record total: a `card` plan is always v3
+ * or later, and the API sends `intake` to `card` plans alone.
+ */
 export const plannerOutputSchemasV1 = {
   clarify: clarifyOutputSchema,
   decompose: decomposeOutputSchemaV1,
@@ -339,9 +444,13 @@ export const plannerOutputSchemasV1 = {
   write: writeOutputSchema,
   revise: reviseOutputSchemaV1,
   design: designOutputSchema,
+  intake: intakeOutputSchema,
 } as const satisfies Record<PlanTurnAction, z.ZodType>;
 
-/** What a v2 plan's turns are validated against. */
+/**
+ * What a v2 and a v3 plan's turns are validated against: v3 changes the
+ * text (multiple choice, the intake), not these shapes.
+ */
 export const plannerOutputSchemasV2 = {
   clarify: clarifyOutputSchema,
   decompose: decomposeOutputSchemaV2,
@@ -349,6 +458,7 @@ export const plannerOutputSchemasV2 = {
   write: writeOutputSchema,
   revise: reviseOutputSchemaV2,
   design: designOutputSchema,
+  intake: intakeOutputSchema,
 } as const satisfies Record<PlanTurnAction, z.ZodType>;
 
 /** The schemas a turn of a plan of `version` is validated against. */
@@ -363,6 +473,7 @@ export const plannerOutputSchemas = {
   write: writeOutputSchema,
   revise: reviseOutputSchema,
   design: designOutputSchema,
+  intake: intakeOutputSchema,
 } as const satisfies Record<PlanTurnAction, z.ZodType>;
 
 export type PlannerOutput<A extends PlanTurnAction = PlanTurnAction> = z.infer<

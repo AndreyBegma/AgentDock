@@ -5,6 +5,7 @@ import {
   extractPlannerBlocks,
   PLAN_TURN_ACTIONS,
   PLANNER_DESIGN_CONTRACT,
+  PLANNER_INTAKE_CONTRACT,
   PLANNER_MAX_QUESTIONS,
   PLANNER_MAX_TASKS,
   PLANNER_OUTPUT_CONTRACT,
@@ -604,11 +605,14 @@ describe('extractPlannerBlocks', () => {
 
 describe('the fixed contract and the default instructions', () => {
   it('the contract text names every action and the block tag', () => {
-    for (const action of PLAN_TURN_ACTIONS) {
+    // #337: the intake has its own text, appended to `card` plans instead.
+    for (const action of PLAN_TURN_ACTIONS.filter((a) => a !== 'intake')) {
       expect(PLANNER_OUTPUT_CONTRACT).toContain(`"action": "${action}"`);
     }
+    expect(PLANNER_OUTPUT_CONTRACT).not.toContain('"action": "intake"');
+    expect(PLANNER_INTAKE_CONTRACT).toContain('"action": "intake"');
     expect(PLANNER_OUTPUT_CONTRACT).toContain('agentdock-plan');
-    expect(PLANNER_OUTPUT_CONTRACT).toContain('# Output contract (v2)');
+    expect(PLANNER_OUTPUT_CONTRACT).toContain('# Output contract (v3)');
     expect(PLANNER_OUTPUT_CONTRACT).toContain(PLANNER_DESIGN_CONTRACT);
     for (const host of ['cdnjs.cloudflare.com', 'cdn.jsdelivr.net/npm/']) {
       expect(PLANNER_DESIGN_CONTRACT).toContain(host);
