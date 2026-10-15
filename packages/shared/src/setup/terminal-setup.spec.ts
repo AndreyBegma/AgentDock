@@ -193,9 +193,28 @@ describe('terminalSetup', () => {
       expect(
         capture?.steps.some(
           (step) =>
-            step.kind === 'note' && step.text.includes('capture_needs_content'),
+            step.kind === 'note' &&
+            step.text.startsWith('Turn on session content first'),
         ),
       ).toBe(true);
+    });
+
+    it('shows no internals — status codes, error codes, ADR numbers — in any step', () => {
+      const view = terminalSetup({
+        ...ready,
+        shipSessionContent: false,
+        captureEnabled: false,
+      });
+      const texts = view.items.flatMap((entry) =>
+        entry.steps.flatMap((step) => {
+          if (step.kind === 'note') return [step.text];
+          if (step.kind === 'link') return [step.label];
+          return step.label ? [step.label] : [];
+        }),
+      );
+      for (const text of [...texts, view.closing]) {
+        expect(text).not.toMatch(/ADR-\d+|\b4\d\d\b|capture_needs_content/);
+      }
     });
 
     it('is not blocked once content is on', () => {

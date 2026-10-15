@@ -278,7 +278,7 @@ export const terminalSetup = (facts: TerminalSetupFacts): TerminalSetupView => {
     capture.blockedBy = 'content';
     capture.steps.unshift({
       kind: 'note',
-      text: 'Turn on session content first: capture reads it, and is refused without it (422 capture_needs_content).',
+      text: 'Turn on session content first: capture reads it, and is refused without it.',
     });
   }
 
@@ -317,7 +317,7 @@ export const terminalSetup = (facts: TerminalSetupFacts): TerminalSetupView => {
         },
         {
           kind: 'note',
-          text: 'Session content is prompts, replies and tool input and output from hook events, redacted on the runner and kept for the project’s retention (ADR-0021).',
+          text: 'Session content is prompts, replies and tool input and output from hook events, redacted on the runner and kept for the project’s retention.',
         },
       ],
     },
