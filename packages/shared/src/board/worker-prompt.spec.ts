@@ -7,10 +7,21 @@ import {
   cardPromptSchema,
 } from '../protocol';
 import { cardDesignPath } from './naming';
-import { BOARD_CARD_BODY_MAX, BOARD_CARD_TITLE_MAX } from './types';
 import {
+  BOARD_CARD_BODY_MAX,
+  BOARD_CARD_TITLE_MAX,
+  CARD_FEEDBACK_MAX,
+} from './types';
+import {
+  CARD_BODY_CUT_SUFFIX,
+  CARD_CONTINUE_PROMPT,
   CARD_DESIGN_COMMENTS_MAX_BYTES,
+  CARD_WORKER_PROMPT_VERSION,
+  type CardText,
   type CardWorkerPromptInput,
+  cardChange,
+  cardFeedbackPrompt,
+  cardNextRoundPrompt,
   cardWorkerPrompt,
 } from './worker-prompt';
 
@@ -131,5 +142,140 @@ describe('worker prompt — ## Design (#243 D7)', () => {
     expect(CARD_RUN_FILE_MAX_BYTES).toBeGreaterThanOrEqual(
       DESIGN_HTML_MAX_BYTES,
     );
+  });
+});
+
+describe('next round prompt — card edits reach the worker (#273 D1–D4)', () => {
+  const before: CardText = {
+    title: 'Add login',
+    body: 'Users sign in with a password.',
+    kind: 'feature',
+  };
+
+  it('is version 3', () => {
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(3);
+  });
+
+  it('cardChange is null for identical text, whitespace around it aside', () => {
+    expect(cardChange(before, { ...before })).toBeNull();
+    expect(
+      cardChange(before, { ...before, body: `  ${before.body}\n` }),
+    ).toBeNull();
+  });
+
+  it('cardChange lists exactly the changed fields', () => {
+    expect(cardChange(before, { ...before, title: 'Add SSO' })?.fields).toEqual(
+      ['title'],
+    );
+    expect(cardChange(before, { ...before, body: 'Use SSO.' })?.fields).toEqual(
+      ['body'],
+    );
+    expect(
+      cardChange(before, { title: 'Fix login', body: 'Broken.', kind: 'bug' })
+        ?.fields,
+    ).toEqual(['title', 'kind', 'body']);
+  });
+
+  it('is `continue` with no change and no feedback', () => {
+    expect(
+      cardNextRoundPrompt({ label: 'C-12', change: null, feedback: null }),
+    ).toBe(CARD_CONTINUE_PROMPT);
+    expect(CARD_CONTINUE_PROMPT).toBe('continue');
+  });
+
+  it("with feedback only, is today's feedback prompt", () => {
+    expect(
+      cardNextRoundPrompt({
+        label: 'C-12',
+        change: null,
+        feedback: ' Rename the button. ',
+      }),
+    ).toBe(cardFeedbackPrompt(' Rename the button. '));
+    expect(cardFeedbackPrompt('Rename the button.')).toBe(
+      'Review feedback: Rename the button.\n\nAddress it on the same branch, commit, then call finish_card.',
+    );
+  });
+
+  it('a title change carries the section, the new title and what it was', () => {
+    const prompt = cardNextRoundPrompt({
+      label: 'C-12',
+      change: cardChange(before, { ...before, title: 'Add SSO' }),
+      feedback: null,
+    });
+    expect(prompt).toContain('## Card changed');
+    expect(prompt).toContain(
+      'The person edited card C-12 after your last round. The text below replaces what you were given before.',
+    );
+    expect(prompt).toContain('Title: Add SSO (was: Add login)');
+    expect(prompt).not.toContain('### What to do');
+    expect(prompt).toContain(
+      'Continue the work with the card as it is now, on the same branch; commit, then call finish_card.',
+    );
+  });
+
+  it('a body change carries the full body and the title without "was"', () => {
+    const body = 'Users sign in with SSO.\n\n- Google\n- GitHub';
+    const prompt = cardNextRoundPrompt({
+      label: 'C-12',
+      change: cardChange(before, { ...before, body }),
+      feedback: null,
+    });
+    expect(prompt).toContain('Title: Add login\n');
+    expect(prompt).not.toContain('(was:');
+    expect(prompt).toContain(`### What to do\n\n${body}`);
+  });
+
+  it('a kind change names both kinds', () => {
+    const prompt = cardNextRoundPrompt({
+      label: 'C-12',
+      change: cardChange(before, { ...before, kind: 'bug' }),
+      feedback: null,
+    });
+    expect(prompt).toContain('Kind: bug fix (was: feature)');
+  });
+
+  it('a change with feedback carries both, the section first', () => {
+    const prompt = cardNextRoundPrompt({
+      label: 'C-12',
+      change: cardChange(before, { ...before, title: 'Add SSO' }),
+      feedback: 'Rename the button.',
+    });
+    expect(prompt.indexOf('## Card changed')).toBeLessThan(
+      prompt.indexOf('## Review feedback'),
+    );
+    expect(prompt).toContain(
+      '## Review feedback\n\nRename the button.\n\nAddress it on the same branch, commit, then call finish_card.',
+    );
+    expect(prompt).not.toContain('Continue the work');
+  });
+
+  it('fits card.run at the largest body and feedback, the feedback intact', () => {
+    const feedback = '語'.repeat(CARD_FEEDBACK_MAX);
+    const title = '語'.repeat(BOARD_CARD_TITLE_MAX);
+    const prompt = cardNextRoundPrompt({
+      label: 'C-999999',
+      change: cardChange(before, {
+        title,
+        body: '語'.repeat(BOARD_CARD_BODY_MAX),
+        kind: 'bug',
+      }),
+      feedback,
+    });
+    expect(bytes(prompt)).toBeLessThanOrEqual(CARD_RUN_PROMPT_MAX_BYTES);
+    expect(cardPromptSchema.safeParse(prompt).success).toBe(true);
+    expect(prompt).toContain(feedback);
+    expect(prompt).toContain(`Title: ${title} (was: Add login)`);
+    expect(prompt).toContain(CARD_BODY_CUT_SUFFIX);
+  });
+
+  it('does not cut a body that fits', () => {
+    const body = '語'.repeat(BOARD_CARD_BODY_MAX);
+    const prompt = cardNextRoundPrompt({
+      label: 'C-12',
+      change: cardChange(before, { ...before, body }),
+      feedback: null,
+    });
+    expect(prompt).toContain(body);
+    expect(prompt).not.toContain(CARD_BODY_CUT_SUFFIX);
   });
 });

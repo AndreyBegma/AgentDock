@@ -45,6 +45,7 @@ export const card = (
   captureWhy: null,
   captureConfidence: null,
   sourceSessionId: null,
+  autoRunFailure: null,
   movedAt: '2026-10-14T10:00:00.000Z',
   completedAt: null,
   updatedAt: '2026-10-14T10:00:00.000Z',

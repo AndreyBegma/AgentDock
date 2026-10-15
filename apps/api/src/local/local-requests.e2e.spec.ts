@@ -164,7 +164,15 @@ describe('local requests over the runner socket (e2e)', () => {
         branch: 'card/c1-add-login',
         movedAt: now,
         rounds: {
-          create: { round: 1, runId: run.id, trigger: 'run', phase: 'running' },
+          create: {
+            round: 1,
+            runId: run.id,
+            trigger: 'run',
+            phase: 'running',
+            cardTitle: 'Add login',
+            cardBody: '',
+            cardKind: 'feature',
+          },
         },
       },
     });

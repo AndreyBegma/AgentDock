@@ -7,7 +7,7 @@ import type { BoardCardKind } from './types';
  * editable (ADR-0024 scopes ADR-0005). A change to the text bumps
  * `CARD_WORKER_PROMPT_VERSION`, which the API records on each round's run.
  */
-export const CARD_WORKER_PROMPT_VERSION = 2;
+export const CARD_WORKER_PROMPT_VERSION = 3;
 
 /** The MCP tool the worker calls when done (D6). */
 export const FINISH_CARD_TOOL = 'finish_card';
@@ -43,10 +43,10 @@ export interface CardWorkerPromptInput {
 const utf8Bytes = (text: string): number =>
   new TextEncoder().encode(text).length;
 
-/** `text` cut at a code point to at most `max` UTF-8 bytes, `…` included. */
-const cutToBytes = (text: string, max: number): string => {
+/** `text` cut at a code point to at most `max` UTF-8 bytes, `suffix` included. */
+const cutToBytes = (text: string, max: number, suffix = '…'): string => {
   if (utf8Bytes(text) <= max) return text;
-  const room = max - utf8Bytes('…');
+  const room = max - utf8Bytes(suffix);
   if (room <= 0) return '';
   let kept = '';
   let used = 0;
@@ -56,7 +56,7 @@ const cutToBytes = (text: string, max: number): string => {
     kept += ch;
     used += size;
   }
-  return `${kept.trimEnd()}…`;
+  return `${kept.trimEnd()}${suffix}`;
 };
 
 /**
@@ -177,3 +177,121 @@ export const cardFeedbackPrompt = (feedback: string): string =>
 
 /** A retry after a failed, ended or cancelled round resumes with this. */
 export const CARD_CONTINUE_PROMPT = 'continue';
+
+/** #273 D1: the card text a round's prompt was built from. */
+export interface CardText {
+  title: string;
+  body: string;
+  kind: BoardCardKind;
+}
+
+export type CardTextField = keyof CardText;
+
+/** #273 D1: what changed between the last started round's snapshot and the card now. */
+export interface CardChange {
+  /** The changed fields, in `title`, `kind`, `body` order; never empty. */
+  fields: CardTextField[];
+  before: CardText;
+  now: CardText;
+}
+
+const CARD_TEXT_FIELDS: readonly CardTextField[] = ['title', 'kind', 'body'];
+
+/** #273 D1: `null` when the text is the same, surrounding whitespace aside. */
+export const cardChange = (
+  before: CardText,
+  now: CardText,
+): CardChange | null => {
+  const fields = CARD_TEXT_FIELDS.filter(
+    (field) => before[field].trim() !== now[field].trim(),
+  );
+  return fields.length > 0 ? { fields, before, now } : null;
+};
+
+export interface CardNextRoundInput {
+  /** `C-<number>`. */
+  label: string;
+  change: CardChange | null;
+  /** A feedback round's text, at most `CARD_FEEDBACK_MAX` characters; `null` for a Run. */
+  feedback: string | null;
+}
+
+/** #273 D4: what a body cut to fit the prompt ends with. */
+export const CARD_BODY_CUT_SUFFIX = '… (cut to fit)';
+
+const kindName = (kind: BoardCardKind): string =>
+  kind === 'bug' ? 'bug fix' : 'feature';
+
+const changeSection = (
+  label: string,
+  change: CardChange,
+  body: string | null,
+): string[] => {
+  const { before, now, fields } = change;
+  const lines = [
+    '## Card changed',
+    '',
+    `The person edited card ${label} after your last round. The text below replaces what you were given before.`,
+    '',
+    fields.includes('title')
+      ? `Title: ${now.title} (was: ${before.title})`
+      : `Title: ${now.title}`,
+  ];
+  if (fields.includes('kind')) {
+    lines.push(`Kind: ${kindName(now.kind)} (was: ${kindName(before.kind)})`);
+  }
+  if (body !== null) {
+    lines.push('', '### What to do', '', body || '(no description)');
+  }
+  return lines;
+};
+
+const assembleNextRound = (
+  input: CardNextRoundInput & { change: CardChange },
+  body: string | null,
+): string => {
+  const lines = changeSection(input.label, input.change, body);
+  if (input.feedback !== null) {
+    lines.push(
+      '',
+      '## Review feedback',
+      '',
+      input.feedback.trim(),
+      '',
+      `Address it on the same branch, commit, then call ${FINISH_CARD_TOOL}.`,
+    );
+  } else {
+    lines.push(
+      '',
+      `Continue the work with the card as it is now, on the same branch; commit, then call ${FINISH_CARD_TOOL}.`,
+    );
+  }
+  return lines.join('\n');
+};
+
+/**
+ * #273 D3: the prompt of a round that resumes the card's session (a Run
+ * after a stop, a failure or an end, or feedback). Without a change it is
+ * what it always was; with one, a `## Card changed` section carries the full
+ * current text (D2). The prompt always fits `card.run` (D4): the title and
+ * the feedback are never cut, the body is cut at a code point.
+ */
+export const cardNextRoundPrompt = (input: CardNextRoundInput): string => {
+  const { change, feedback } = input;
+  if (change === null) {
+    return feedback === null
+      ? CARD_CONTINUE_PROMPT
+      : cardFeedbackPrompt(feedback);
+  }
+  const withChange = { ...input, change };
+  if (!change.fields.includes('body'))
+    return assembleNextRound(withChange, null);
+  const body = change.now.body.trim();
+  const prompt = assembleNextRound(withChange, body);
+  const over = utf8Bytes(prompt) - CARD_RUN_PROMPT_MAX_BYTES;
+  if (over <= 0) return prompt;
+  return assembleNextRound(
+    withChange,
+    cutToBytes(body, utf8Bytes(body) - over, CARD_BODY_CUT_SUFFIX),
+  );
+};

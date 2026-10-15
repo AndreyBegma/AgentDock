@@ -12,6 +12,7 @@ import {
   cardLabel,
   isActiveRoundPhase,
   isCaptureModel,
+  isCardAutoRunCode,
   type TaskDesignSummary,
 } from '@agentdock/shared';
 import {
@@ -136,6 +137,16 @@ export const toCardView = (
   captureWhy: card.captureWhy,
   captureConfidence: card.captureConfidence,
   sourceSessionId: card.sourceSessionId,
+  autoRunFailure:
+    card.autoRunError !== null && card.autoRunFailedAt !== null
+      ? {
+          code: isCardAutoRunCode(card.autoRunError)
+            ? card.autoRunError
+            : 'unknown',
+          message: card.autoRunMessage ?? '',
+          at: card.autoRunFailedAt.toISOString(),
+        }
+      : null,
   movedAt: card.movedAt.toISOString(),
   completedAt: iso(card.completedAt),
   updatedAt: card.updatedAt.toISOString(),
