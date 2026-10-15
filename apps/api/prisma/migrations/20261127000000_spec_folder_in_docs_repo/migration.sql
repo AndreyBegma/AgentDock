@@ -5,7 +5,11 @@
 ALTER TABLE "docs_sources" ADD COLUMN     "specDir" TEXT;
 
 -- AlterTable
-ALTER TABLE "plans" ADD COLUMN     "docsPrRepo" TEXT;
+ALTER TABLE "plans" ADD COLUMN     "docsPrRepo" TEXT,
+ADD COLUMN     "designPrNumber" INTEGER,
+ADD COLUMN     "designPrUrl" TEXT,
+ADD COLUMN     "docsPrMergedAt" TIMESTAMP(3),
+ADD COLUMN     "designPrMergedAt" TIMESTAMP(3);
 
 -- AlterTable
 ALTER TABLE "board_cards" ADD COLUMN     "specRepo" TEXT,

@@ -125,7 +125,10 @@ describe('describeBoardError', () => {
       'budget',
     );
     expect(describeBoardError(error(422, 'no_spec_dir'))).toContain(
-      'spec directory',
+      'Spec folder in Settings › Docs source',
+    );
+    expect(describeBoardError(error(422, 'no_docs_clone'))).toContain(
+      'local clone path',
     );
     expect(
       describeBoardError(error(503, 'command_unavailable'), 'r1'),

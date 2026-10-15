@@ -387,6 +387,128 @@ describe('board rounds (e2e)', () => {
       ]);
       expect(sent.prompt).toContain('docs/specs/card-1-add-login.md');
       expect((await w.card(1)).specPath).toBe('docs/specs/card-1-add-login.md');
+      expect((await w.card(1)).specPr).toBeNull();
+    });
+
+    describe('a spec in an external docs repository (#379)', () => {
+      const DOCS = '/srv/dev/widget-documentation';
+      const docsSource = (data: {
+        kind: 'sibling_repo' | 'remote_repo' | 'in_repo';
+        localPath: string | null;
+        specDir: string | null;
+      }) =>
+        w.ctx.prisma.docsSource.upsert({
+          where: { projectId: w.a },
+          create: {
+            projectId: w.a,
+            repo: 'acme/widget-documentation',
+            isGitRepo: true,
+            evidence: [],
+            classified: { specs: [], adr: [], roadmap: [], reports: [] },
+            candidates: [],
+            ...data,
+          },
+          update: data,
+        });
+
+      it('opens a docs pull request and starts the worker without the spec on the branch', async () => {
+        await docsSource({
+          kind: 'sibling_repo',
+          localPath: DOCS,
+          specDir: 'prs',
+        });
+        await w.createCard({ specOnRun: true, issueOnRun: true });
+        const response = await w.runCard(1);
+        expect(response.status).toBe(200);
+        const [published] = w.docsSpecs();
+        expect(published).toMatchObject({
+          projectId: w.a,
+          root: ROOT_A,
+          docsRoot: DOCS,
+          specDir: 'prs',
+          files: [
+            {
+              path: 'prs/41-add-login.md',
+              content: expect.stringContaining('# C-1: Add login'),
+            },
+          ],
+          body: expect.stringContaining('acme/widget#41'),
+        });
+        expect(String(published.branch)).toMatch(/^docs\/card-[a-z0-9]{8}$/);
+        const [sent] = w.sent('card.run');
+        expect(sent.files).toBeUndefined();
+        expect(sent.prompt).toContain(
+          'Specification: prs/41-add-login.md in the docs repository acme/widget-documentation',
+        );
+        const card = await w.card(1);
+        expect(card.specPath).toBe('prs/41-add-login.md');
+        expect(card.specPr).toEqual({
+          repo: 'acme/widget-documentation',
+          number: 5,
+          url: 'https://github.com/acme/widget-documentation/pull/5',
+        });
+      });
+
+      it('keeps in-repo docs on the card branch, under the docs root', async () => {
+        await docsSource({
+          kind: 'in_repo',
+          localPath: `${ROOT_A}/docs`,
+          specDir: 'specs',
+        });
+        await w.createCard({ specOnRun: true });
+        await w.runCard(1);
+        expect(w.docsSpecs()).toEqual([]);
+        const [sent] = w.sent('card.run');
+        expect(sent.files).toEqual([
+          {
+            path: 'docs/specs/card-1-add-login.md',
+            content: expect.any(String),
+          },
+        ]);
+      });
+
+      it('refuses a remote docs repository without a local clone → 422 no_docs_clone', async () => {
+        await docsSource({
+          kind: 'remote_repo',
+          localPath: null,
+          specDir: 'prs',
+        });
+        await w.createCard({ specOnRun: true });
+        const response = await w.runCard(1);
+        expect(response.status).toBe(422);
+        expect(response.body.error).toBe('no_docs_clone');
+        expect(response.body.message).toContain('local clone');
+        expect(w.docsSpecs()).toEqual([]);
+        expect(w.sent('card.run')).toEqual([]);
+      });
+
+      it('refuses a runner without docs.publish_specs before it writes anything', async () => {
+        await docsSource({
+          kind: 'sibling_repo',
+          localPath: DOCS,
+          specDir: 'prs',
+        });
+        w.unserved.add('docs.publish_specs');
+        await w.createCard({ specOnRun: true, issueOnRun: true });
+        const response = await w.runCard(1);
+        expect(response.status).toBe(503);
+        expect(response.body.error).toBe('command_unavailable');
+        expect(jest.mocked(w.commands.createIssue)).not.toHaveBeenCalled();
+        expect(w.sent('card.run')).toEqual([]);
+      });
+
+      it('names the Spec folder setting without one', async () => {
+        await docsSource({
+          kind: 'sibling_repo',
+          localPath: DOCS,
+          specDir: null,
+        });
+        await w.createCard({ specOnRun: true });
+        const response = await w.runCard(1);
+        expect(response.status).toBe(422);
+        expect(response.body.error).toBe('no_spec_dir');
+        expect(response.body.message).toContain('Spec folder');
+      });
     });
   });
 

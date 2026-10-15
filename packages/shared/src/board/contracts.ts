@@ -486,8 +486,6 @@ export const BOARD_ERROR = {
    * with no local clone path to write the spec in.
    */
   noDocsClone: 'no_docs_clone',
-  /** 409 (#379): the runner does not serve `docs.publish_specs`; update it. */
-  runnerOutdated: 'runner_outdated',
   /**
    * 422: the runner refused a non-Claude profile. Profile selection itself
    * answers `no_profile` (#272 D2).

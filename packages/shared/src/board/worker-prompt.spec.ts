@@ -180,6 +180,28 @@ describe('worker prompt v5 — the pull request description (#359 D3)', () => {
     );
   });
 
+  it('points to a spec in an external docs repository (#379)', () => {
+    const external = cardWorkerPrompt({
+      ...plain,
+      specPath: 'prs/41-add-login.md',
+      specPr: {
+        repo: 'acme/app-documentation',
+        url: 'https://github.com/acme/app-documentation/pull/3',
+        branch: 'docs/card-abc12345',
+      },
+    });
+    expect(external).toContain(
+      'Specification: prs/41-add-login.md in the docs repository acme/app-documentation, on its branch docs/card-abc12345 (pull request https://github.com/acme/app-documentation/pull/3)',
+    );
+    expect(external).toContain(
+      'gh api repos/acme/app-documentation/contents/prs/41-add-login.md?ref=docs/card-abc12345',
+    );
+    expect(external).not.toContain('already committed on this branch');
+    expect(external).toContain(
+      '`Spec: https://github.com/acme/app-documentation/pull/3`;',
+    );
+  });
+
   it('asks for Closes #n only when the card has an issue', () => {
     expect(cardWorkerPrompt(plain)).not.toContain('Closes #');
     expect(cardWorkerPrompt({ ...plain, issueNumber: 41 })).toContain(
@@ -195,8 +217,8 @@ describe('next round prompt — card edits reach the worker (#273 D1–D4)', () 
     kind: 'feature',
   };
 
-  it('is version 5', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(5);
+  it('is version 6', () => {
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(6);
   });
 
   it('cardChange is null for identical text, whitespace around it aside', () => {

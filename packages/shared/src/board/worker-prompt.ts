@@ -11,9 +11,10 @@ import type { BoardCardKind } from './types';
  * editable (ADR-0024 scopes ADR-0005). A change to the text bumps
  * `CARD_WORKER_PROMPT_VERSION`, which the API records on each round's run.
  * Version 4 (#309 D10): the `## Attachments` sections. Version 5 (#359 D3):
- * the pull request description file.
+ * the pull request description file. Version 6 (#379): a spec in an
+ * external docs repository.
  */
-export const CARD_WORKER_PROMPT_VERSION = 5;
+export const CARD_WORKER_PROMPT_VERSION = 6;
 
 /** The MCP tool the worker calls when done (D6). */
 export const FINISH_CARD_TOOL = 'finish_card';
@@ -46,8 +47,16 @@ export interface CardWorkerPromptInput {
   kind: BoardCardKind;
   branch: string;
   base: string;
-  /** Repository-relative; the spec the runner committed first (D2). */
+  /**
+   * The spec the runner committed first (D2): repository-relative — or,
+   * with `specPr`, relative to the docs repository's root.
+   */
   specPath: string | null;
+  /**
+   * #379: the spec is in an external docs repository, added by this pull
+   * request on `branch`; not on the card's branch. Absent is none.
+   */
+  specPr?: { repo: string; url: string; branch: string } | null;
   issueNumber: number | null;
   /** #243: the approved design; `null` when the card has none. */
   design: CardWorkerDesign | null;
@@ -213,7 +222,12 @@ const pullRequestSection = (card: CardWorkerPromptInput): string[] => {
     `Before you finish, write the pull request's description to \`${CARD_PR_DESCRIPTION_FILE}\` in this worktree. It is git-excluded — do not commit it; AgentDock makes it the pull request's body. Keep it current in later rounds. It holds, in this order:`,
     '',
   ];
-  if (card.specPath !== null) {
+  if (card.specPath !== null && card.specPr) {
+    const design = card.design ? ` · Design: ${blob}${card.design.path}` : '';
+    lines.push(
+      `- \`Spec: ${card.specPr.url}${design}\`${design ? ' — <owner>/<repo> from `git remote get-url origin`' : ''};`,
+    );
+  } else if (card.specPath !== null) {
     const design = card.design ? ` · Design: ${blob}${card.design.path}` : '';
     lines.push(
       `- \`Spec: ${blob}${card.specPath}${design}\` — <owner>/<repo> from \`git remote get-url origin\`;`,
@@ -245,7 +259,11 @@ const assemblePrompt = (
   if (card.issueNumber !== null) {
     lines.push(`GitHub issue: #${card.issueNumber}`);
   }
-  if (card.specPath !== null) {
+  if (card.specPath !== null && card.specPr) {
+    lines.push(
+      `Specification: ${card.specPath} in the docs repository ${card.specPr.repo}, on its branch ${card.specPr.branch} (pull request ${card.specPr.url}) — read it first with \`gh api repos/${card.specPr.repo}/contents/${card.specPath}?ref=${card.specPr.branch} -H "Accept: application/vnd.github.raw"\`. Do not commit to the docs repository.`,
+    );
+  } else if (card.specPath !== null) {
     lines.push(
       `Specification: ${card.specPath} (already committed on this branch — read it first)`,
     );

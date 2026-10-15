@@ -193,12 +193,20 @@ function roundItems(
 function Links({ card }: { card: BoardCardDetail }) {
   const pr = card.prUrl ? safeHttpsUrl(card.prUrl) : null;
   const issue = card.issueUrl ? safeHttpsUrl(card.issueUrl) : null;
+  // #379: the spec's pull request in an external docs repository.
+  const spec = card.specPr
+    ? {
+        label: `Spec ${card.specPr.repo}#${card.specPr.number}`,
+        href: safeHttpsUrl(card.specPr.url),
+      }
+    : null;
   const items = [
     card.prNumber !== null && { label: prChipText(card) ?? '', href: pr },
     card.issueNumber !== null && {
       label: `Issue #${card.issueNumber}`,
       href: issue,
     },
+    spec ?? false,
   ].filter((x): x is { label: string; href: string | null } => x !== false);
   if (items.length === 0) return null;
   return (

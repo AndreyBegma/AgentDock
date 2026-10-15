@@ -197,7 +197,7 @@ export const KIND_HUE: Record<PlanTaskKind, Hue> = {
 
 export const SPEC_OUTPUT_LABEL: Record<PlannerSpecOutput, string> = {
   docs_pr:
-    'Specifications go to one docs pull request; features are queued when it merges, bugs at once.',
+    'Specifications go to one docs pull request — in the docs repository when the docs live there; features are queued when it merges, bugs at once.',
   issue_body:
     'Each issue body is the whole specification; every issue is queued at once.',
 };

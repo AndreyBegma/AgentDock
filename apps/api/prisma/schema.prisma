@@ -2313,32 +2313,39 @@ model PlannerSettings {
 /// A plan: a brief and its tasks, across versions (D1, D9). One Claude
 /// session per plan (`sessionId`, D3); its read-only worktree (D15).
 model Plan {
-  id              String         @id @default(cuid())
-  projectId       String
+  id               String         @id @default(cuid())
+  projectId        String
   /// Nullable so deleting the author keeps a sent plan's record; a private
   /// plan without an author is readable by nobody (D12).
-  authorId        String?
-  title           String
-  brief           String
-  mode            PlanMode
-  visibility      PlanVisibility @default(private)
-  status          PlanStatus
-  version         Int            @default(1)
-  sessionId       String         @db.Uuid
+  authorId         String?
+  title            String
+  brief            String
+  mode             PlanMode
+  visibility       PlanVisibility @default(private)
+  status           PlanStatus
+  version          Int            @default(1)
+  sessionId        String         @db.Uuid
   /// The instructions version the plan runs with (D11).
-  instructionsId  String
-  contractVersion Int
-  profileKey      String
-  model           String
-  worktree        String?
-  docsPrNumber    Int?
-  docsPrUrl       String?
+  instructionsId   String
+  contractVersion  Int
+  profileKey       String
+  model            String
+  worktree         String?
+  docsPrNumber     Int?
+  docsPrUrl        String?
   /// #379: `owner/name` of the docs repository the docs PR is in; null when
   /// it is the project's own repository.
-  docsPrRepo      String?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  sentAt          DateTime?
+  docsPrRepo       String?
+  /// #379: with an external docs repository, the approved designs stay in the
+  /// code repository, in a PR of their own (spec 223 D16 fallback directory).
+  designPrNumber   Int?
+  designPrUrl      String?
+  /// #379: when each PR was seen merged; the issues waiting on it queue then.
+  docsPrMergedAt   DateTime?
+  designPrMergedAt DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  sentAt           DateTime?
 
   project            Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
   author             User?               @relation(fields: [authorId], references: [id], onDelete: SetNull)

@@ -243,6 +243,7 @@ export const toDetail = ({
   model: plan.model,
   docsPrNumber: plan.docsPrNumber,
   docsPrUrl: plan.docsPrUrl,
+  docsPrRepo: plan.docsPrRepo,
   tasks,
   turns,
   graph: graphOf(tasks),

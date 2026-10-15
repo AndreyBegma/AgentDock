@@ -151,7 +151,10 @@ export function PlanHeader({
               rel="noreferrer noopener"
               className="text-sm text-accent-ink underline underline-offset-2"
             >
-              Docs pull request #{plan.docsPrNumber}
+              Docs pull request{' '}
+              {plan.docsPrRepo
+                ? `${plan.docsPrRepo}#${plan.docsPrNumber}`
+                : `#${plan.docsPrNumber}`}
             </a>
           ) : undefined
         ) : readOnly ? (
