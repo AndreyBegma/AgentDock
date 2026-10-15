@@ -53,6 +53,7 @@ export const card = (
   movedAt: '2026-10-14T10:00:00.000Z',
   completedAt: null,
   updatedAt: '2026-10-14T10:00:00.000Z',
+  attachmentCount: 0,
   ...extra,
 });
 

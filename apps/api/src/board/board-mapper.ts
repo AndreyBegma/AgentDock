@@ -189,6 +189,8 @@ export const toCardView = (
   movedAt: card.movedAt.toISOString(),
   completedAt: iso(card.completedAt),
   updatedAt: card.updatedAt.toISOString(),
+  // #309: i309-api fills the count.
+  attachmentCount: 0,
 });
 
 const isEvidence = (value: Prisma.JsonValue): value is Prisma.JsonObject =>
@@ -257,6 +259,8 @@ export const toCardDetail = (
     .sort((a, b) => a.round - b.round)
     .map((round) => toRoundView(card, round, facts)),
   evidence: evidenceOf(card.evidence),
+  // #309: i309-api fills the attachments.
+  attachments: [],
 });
 
 /** No row is the defaults (`isDefault: true`). */

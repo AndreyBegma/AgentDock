@@ -1,4 +1,10 @@
 import { describe, expect, it } from 'bun:test';
+import {
+  ATTACHMENT_NAME_MAX,
+  ATTACHMENTS_PER_CARD_MAX,
+  attachmentWorktreePath,
+  type CardAttachmentBrief,
+} from '../attachments';
 import { DESIGN_HTML_MAX_BYTES, DESIGN_RATIONALE_MAX } from '../design';
 import {
   CARD_RUN_FILE_MAX_BYTES,
@@ -152,8 +158,8 @@ describe('next round prompt — card edits reach the worker (#273 D1–D4)', () 
     kind: 'feature',
   };
 
-  it('is version 3', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(3);
+  it('is version 4', () => {
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(4);
   });
 
   it('cardChange is null for identical text, whitespace around it aside', () => {
@@ -277,5 +283,187 @@ describe('next round prompt — card edits reach the worker (#273 D1–D4)', () 
     });
     expect(prompt).toContain(body);
     expect(prompt).not.toContain(CARD_BODY_CUT_SUFFIX);
+  });
+});
+
+describe('worker prompt v4 — attachments (#309 D10)', () => {
+  const shot: CardAttachmentBrief = {
+    id: 'att1',
+    name: 'login error.png',
+    mime: 'image/png',
+  };
+  const log: CardAttachmentBrief = {
+    id: 'att2',
+    name: 'server.log',
+    mime: 'text/plain',
+  };
+  const spec: CardAttachmentBrief = {
+    id: 'att3',
+    name: 'brief.pdf',
+    mime: 'application/pdf',
+  };
+  const text: CardText = {
+    title: 'Add login',
+    body: 'Users sign in with a password.',
+    kind: 'feature',
+  };
+
+  it('has no attachments section without attachments', () => {
+    expect(cardWorkerPrompt(card)).not.toContain('## Attachments');
+    expect(cardWorkerPrompt({ ...card, attachments: [] })).not.toContain(
+      '## Attachments',
+    );
+  });
+
+  it('lists each attachment by worktree path, type and name, and says to open images with Read', () => {
+    const prompt = cardWorkerPrompt({
+      ...card,
+      attachments: [shot, log, spec],
+    });
+    expect(prompt).toContain('## Attachments');
+    expect(prompt).toContain(
+      '- `.agentdock/attachments/att1-login_error.png` (image) — login error.png',
+    );
+    expect(prompt).toContain(
+      '- `.agentdock/attachments/att2-server.log` (text) — server.log',
+    );
+    expect(prompt).toContain(
+      '- `.agentdock/attachments/att3-brief.pdf` (PDF) — brief.pdf',
+    );
+    expect(prompt).toContain('Open an image with the Read tool');
+    expect(prompt).toContain('do not commit');
+    expect(prompt.indexOf('## The card')).toBeLessThan(
+      prompt.indexOf('## Attachments'),
+    );
+    expect(prompt.indexOf('## Attachments')).toBeLessThan(
+      prompt.indexOf('## How to work'),
+    );
+  });
+
+  it('every listed path is the one the runner writes', () => {
+    const prompt = cardWorkerPrompt({ ...card, attachments: [shot, log] });
+    for (const a of [shot, log]) {
+      expect(prompt).toContain(attachmentWorktreePath(a.id, a.name));
+    }
+  });
+
+  it('fits card.run at the largest card with 20 attachments, every path kept', () => {
+    const attachments = Array.from(
+      { length: ATTACHMENTS_PER_CARD_MAX },
+      (_, i): CardAttachmentBrief => ({
+        id: `cm1attachment${String(i).padStart(12, '0')}`,
+        name: `${'語'.repeat(ATTACHMENT_NAME_MAX - 4)}.png`,
+        mime: 'image/png',
+      }),
+    );
+    const prompt = cardWorkerPrompt({
+      ...card,
+      title: '語'.repeat(BOARD_CARD_TITLE_MAX),
+      body: '語'.repeat(BOARD_CARD_BODY_MAX),
+      attachments,
+    });
+    expect(bytes(prompt)).toBeLessThanOrEqual(CARD_RUN_PROMPT_MAX_BYTES);
+    expect(cardPromptSchema.safeParse(prompt).success).toBe(true);
+    for (const a of attachments) {
+      expect(prompt).toContain(attachmentWorktreePath(a.id, a.name));
+    }
+  });
+
+  it('keeps the whole body and the names when they fit', () => {
+    const body = '語'.repeat(1000);
+    const prompt = cardWorkerPrompt({ ...card, body, attachments: [shot] });
+    expect(prompt).toContain(body);
+    expect(prompt).toContain('— login error.png');
+    expect(prompt).not.toContain(CARD_BODY_CUT_SUFFIX);
+  });
+
+  it('cardChange reports attachments added and removed since the last round', () => {
+    const change = cardChange(text, text, {
+      before: [shot, log],
+      now: [log, spec],
+    });
+    expect(change?.fields).toEqual([]);
+    expect(change?.attachments).toEqual({ added: [spec], removed: [shot] });
+  });
+
+  it('cardChange is null when neither the text nor the attachments changed', () => {
+    expect(cardChange(text, text, { before: [shot], now: [shot] })).toBeNull();
+    expect(cardChange(text, text)).toBeNull();
+    expect(
+      cardChange(text, { ...text, title: 'Add SSO' })?.attachments,
+    ).toEqual({ added: [], removed: [] });
+  });
+
+  it('a round after an attachment was added says so, with its path', () => {
+    const prompt = cardNextRoundPrompt({
+      label: 'C-12',
+      change: cardChange(text, text, { before: [], now: [shot] }),
+      feedback: null,
+    });
+    expect(prompt).toContain('## Attachments changed');
+    expect(prompt).toContain(
+      'The person changed the attachments of card C-12 after your last round.',
+    );
+    expect(prompt).toContain(
+      'Added:\n- `.agentdock/attachments/att1-login_error.png` (image) — login error.png',
+    );
+    expect(prompt).toContain('Open an image with the Read tool');
+    expect(prompt).not.toContain('## Card changed');
+    expect(prompt).toContain('Continue the work with the card as it is now');
+  });
+
+  it('names the removed attachments', () => {
+    const prompt = cardNextRoundPrompt({
+      label: 'C-12',
+      change: cardChange(text, text, { before: [shot], now: [] }),
+      feedback: null,
+    });
+    expect(prompt).toContain('Removed (no longer there — disregard them):');
+    expect(prompt).toContain('- login error.png');
+    expect(prompt).not.toContain('Added:');
+  });
+
+  it('feedback with attachments carries the text change, the attachments, then the feedback', () => {
+    const prompt = cardNextRoundPrompt({
+      label: 'C-12',
+      change: cardChange(
+        text,
+        { ...text, title: 'Add SSO' },
+        { before: [], now: [shot] },
+      ),
+      feedback: 'See the screenshot.',
+    });
+    const changed = prompt.indexOf('## Card changed');
+    const files = prompt.indexOf('## Attachments changed');
+    const feedback = prompt.indexOf('## Review feedback');
+    expect(changed).toBeGreaterThanOrEqual(0);
+    expect(changed).toBeLessThan(files);
+    expect(files).toBeLessThan(feedback);
+  });
+
+  it('fits card.run at the largest body and feedback with 20 added attachments', () => {
+    const attachments = Array.from(
+      { length: ATTACHMENTS_PER_CARD_MAX },
+      (_, i): CardAttachmentBrief => ({
+        id: `cm1attachment${String(i).padStart(12, '0')}`,
+        name: `${'語'.repeat(ATTACHMENT_NAME_MAX - 4)}.png`,
+        mime: 'image/png',
+      }),
+    );
+    const feedback = '語'.repeat(CARD_FEEDBACK_MAX);
+    const prompt = cardNextRoundPrompt({
+      label: 'C-999999',
+      change: cardChange(
+        text,
+        { ...text, body: '語'.repeat(BOARD_CARD_BODY_MAX) },
+        { before: [], now: attachments },
+      ),
+      feedback,
+    });
+    expect(bytes(prompt)).toBeLessThanOrEqual(CARD_RUN_PROMPT_MAX_BYTES);
+    expect(prompt).toContain(feedback);
+    for (const a of attachments) {
+      expect(prompt).toContain(attachmentWorktreePath(a.id, a.name));
+    }
   });
 });
