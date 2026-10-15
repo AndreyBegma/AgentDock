@@ -4,6 +4,7 @@ import type {
   AcceptBoardCardRequest,
   AcceptSuggestionRequest,
   BoardCardView,
+  RunBoardCardRequest,
 } from '@agentdock/shared';
 import type { RunnerCommands } from '@agentdock/shared/protocol';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
@@ -27,7 +28,12 @@ import { AcceptDialog } from './accept-dialog';
 
 /** The card's own buttons, shared by the board's menu and the card sheet. */
 export interface CardActions {
-  run: (card: BoardCardView) => void;
+  /**
+   * Run / Run again. #322: the launch popover sends its profile and model;
+   * without a request the API follows the card's overrides, then the defaults.
+   * Resolves `true` when the worker started.
+   */
+  run: (card: BoardCardView, request?: RunBoardCardRequest) => Promise<boolean>;
   markFinished: (card: BoardCardView) => void;
   accept: (card: BoardCardView) => void;
   /** #329 D5: Create pull request. Resolves `true` when a PR is open or there was nothing to open. */
@@ -165,9 +171,9 @@ export function useCardActions({
   };
 
   return {
-    run: (card) =>
-      void perform(
-        () => runCard(projectId, card.number),
+    run: (card, request) =>
+      perform(
+        () => runCard(projectId, card.number, request),
         `Started a worker on ${card.label}.`,
       ),
     markFinished: (card) =>

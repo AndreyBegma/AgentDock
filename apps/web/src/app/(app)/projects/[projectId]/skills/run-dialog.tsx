@@ -1,9 +1,10 @@
 'use client';
 
-import type {
-  InstalledSkillView,
-  ProjectRuntimeProfile,
-  SkillRunView,
+import {
+  CLAUDE_MODELS,
+  type InstalledSkillView,
+  type ProjectRuntimeProfile,
+  type SkillRunView,
 } from '@agentdock/shared';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
@@ -28,7 +29,6 @@ import {
   type RunForm,
   runFormProblem,
   runProfileReason,
-  SKILL_MODELS,
   SKILL_OUTPUT_LABEL,
   toRunRequest,
   utf8Bytes,
@@ -181,8 +181,10 @@ export function RunDialog({
               onChange={(e) => set('model', e.target.value)}
             />
             <datalist id="skill-run-models">
-              {SKILL_MODELS.map((model) => (
-                <option key={model} value={model} />
+              {CLAUDE_MODELS.map((model) => (
+                <option key={model.alias} value={model.alias}>
+                  {model.label}
+                </option>
               ))}
             </datalist>
           </Field>

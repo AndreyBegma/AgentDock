@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  type CardDesignLaunchRequest,
   DESIGN_SKILLS_MAX,
   DESIGN_VARIANTS_MAX,
   DESIGN_VARIANTS_MIN,
@@ -18,11 +19,13 @@ import {
 } from '@andrewbehma/glass-ui/segmented-control';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api';
+import type { LaunchCard } from '../../lib/board/launch';
 import { generateRunnerGate } from '../../lib/design/format';
 import { installedSkillsApi } from '../../lib/design/href';
 import { runnerGateCopy } from '../../lib/planner/runner-support';
 import { useReadiness } from '../../lib/readiness/use-readiness';
 import { useSection } from '../../lib/section/use-section';
+import { LaunchPopover } from '../board/launch-popover';
 import { DisabledReason } from '../prerequisites/disabled-reason';
 import { ReadinessNotice } from '../readiness/readiness-notice';
 
@@ -44,13 +47,16 @@ export function GeneratePanel({
   busy,
   onPatch,
   onGenerate,
+  launch,
 }: {
   projectId: string;
   design: TaskDesignView;
   writeBlock: string | null;
   busy: boolean;
   onPatch: (body: TaskDesignPatchRequest) => Promise<unknown>;
-  onGenerate: () => Promise<unknown>;
+  onGenerate: (body?: CardDesignLaunchRequest) => Promise<unknown>;
+  /** A card's design (#322 D1): Generate opens the launch popover. */
+  launch?: LaunchCard;
 }) {
   const [count, setCount] = useState(design.variantCount);
   const [skills, setSkills] = useState<string[]>(design.skills);
@@ -87,6 +93,16 @@ export function GeneratePanel({
   const changed =
     count !== design.variantCount ||
     skills.join('\n') !== design.skills.join('\n');
+
+  const blocked = writeBlock !== null || runnerCopy !== null || notReady;
+  const describedBy =
+    writeBlock !== null
+      ? undefined
+      : runnerCopy
+        ? 'design-runner-reason'
+        : notReady
+          ? 'design-readiness-reason'
+          : undefined;
 
   const generate = async () => {
     try {
@@ -178,24 +194,30 @@ export function GeneratePanel({
           exclude={['runner_outdated']}
         />
       ) : null}
-      <Button
-        variant="solid"
-        disabled={
-          writeBlock !== null || runnerCopy !== null || notReady || busy
-        }
-        aria-describedby={
-          writeBlock !== null
-            ? undefined
-            : runnerCopy
-              ? 'design-runner-reason'
-              : notReady
-                ? 'design-readiness-reason'
-                : undefined
-        }
-        onClick={() => void generate()}
-      >
-        {busy ? 'Starting…' : 'Generate'}
-      </Button>
+      {launch ? (
+        <LaunchPopover
+          projectId={projectId}
+          card={launch}
+          kind="design"
+          label={busy ? 'Starting…' : 'Generate'}
+          actionLabel="Generate"
+          disabled={blocked || busy}
+          describedBy={describedBy}
+          onLaunch={async (request) => {
+            if (changed) await onPatch({ variantCount: count, skills });
+            await onGenerate(request);
+          }}
+        />
+      ) : (
+        <Button
+          variant="solid"
+          disabled={blocked || busy}
+          aria-describedby={describedBy}
+          onClick={() => void generate()}
+        >
+          {busy ? 'Starting…' : 'Generate'}
+        </Button>
+      )}
     </section>
   );
 }

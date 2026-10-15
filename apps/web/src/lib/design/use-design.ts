@@ -2,6 +2,7 @@
 
 import {
   BOARD_CHANGED_EVENT,
+  type CardDesignLaunchRequest,
   DESIGN_LIVE_EVENT,
   type DesignApproveRequest,
   type DesignCommentRequest,
@@ -140,14 +141,19 @@ export function useDesignAt(
   const actions = {
     patch: (body: TaskDesignPatchRequest) =>
       run('patch', () => api<TaskDesignView>(base, { method: 'PATCH', body })),
-    generate: () =>
-      run('generate', () => api(`${base}/generate`, { method: 'POST' })),
+    /** #322 D1: a card's launch popover sends its profile and model; a plan task's sends nothing. */
+    generate: (body?: CardDesignLaunchRequest) =>
+      run('generate', () =>
+        api(`${base}/generate`, { method: 'POST', ...(body ? { body } : {}) }),
+      ),
     comment: (body: DesignCommentRequest) =>
       run('comment', () =>
         api<DesignCommentView>(`${base}/comments`, { method: 'POST', body }),
       ),
-    revise: () =>
-      run('revise', () => api(`${base}/revise`, { method: 'POST' })),
+    revise: (body?: CardDesignLaunchRequest) =>
+      run('revise', () =>
+        api(`${base}/revise`, { method: 'POST', ...(body ? { body } : {}) }),
+      ),
     approve: (body: DesignApproveRequest) =>
       run('approve', () => api(`${base}/approve`, { method: 'POST', body })),
     /** #275 D5: stops the running stage; the design settles at rest. */

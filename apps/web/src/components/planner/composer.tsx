@@ -1,9 +1,10 @@
 'use client';
 
-import type {
-  CreatePlanRequest,
-  PlanMode,
-  ProjectRuntimeProfile,
+import {
+  CLAUDE_MODELS,
+  type CreatePlanRequest,
+  type PlanMode,
+  type ProjectRuntimeProfile,
 } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
@@ -17,7 +18,7 @@ import {
   initialProfileKey,
   planProfileReason,
 } from '../../lib/planner/profile';
-import { profileOptionLabel, SKILL_MODELS } from '../../lib/skills/format';
+import { profileOptionLabel } from '../../lib/skills/format';
 import { DisabledReason } from '../prerequisites/disabled-reason';
 
 const MODES: { value: PlanMode; label: string; hint: string }[] = [
@@ -171,9 +172,9 @@ export function Composer({
                 disabled={off}
                 onChange={(e) => setModel(e.target.value)}
               >
-                {SKILL_MODELS.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
+                {CLAUDE_MODELS.map((m) => (
+                  <option key={m.alias} value={m.alias}>
+                    {m.label}
                   </option>
                 ))}
               </Select>
