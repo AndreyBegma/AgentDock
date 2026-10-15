@@ -24,6 +24,7 @@ const STATIC: Record<string, string> = {
 const NO_PAGE = [
   /^\/admin$/,
   /^\/projects\/[^/]+\/skills\/runs$/,
+  // A card opens as `?card=<n>` on the board (#275 D9).
   /^\/projects\/[^/]+\/board\/cards$/,
   /^\/projects\/[^/]+\/board\/cards\/[^/]+$/,
 ];

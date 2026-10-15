@@ -14,6 +14,7 @@ import {
   canToggleCardDesign,
   canToggleDesign,
   cardDesignChipState,
+  cardDesignChipText,
   DESIGN_STATUS_PILL,
   describeDesignError,
   designChipState,
@@ -53,6 +54,31 @@ describe('the Design chip on a board card (#243)', () => {
     expect(cardDesignChipState(summary({ status: 'approved' }))).toBe(
       'approved',
     );
+  });
+
+  test('a drawing design carries the whole job’s clock (#275 D8)', () => {
+    const now = Date.parse('2026-10-15T10:03:12.000Z');
+    const busySince = '2026-10-15T10:00:00.000Z';
+    expect(
+      cardDesignChipText(summary({ status: 'generating', busySince }), now),
+    ).toBe('Drawing design · 3:12');
+    expect(
+      cardDesignChipText(summary({ status: 'revising', busySince }), now),
+    ).toBe('Drawing design · 3:12');
+  });
+
+  test('no clock without busySince, and none at rest', () => {
+    const now = Date.parse('2026-10-15T10:03:12.000Z');
+    expect(cardDesignChipText(summary({ status: 'generating' }), now)).toBe(
+      'Drawing design',
+    );
+    expect(
+      cardDesignChipText(
+        summary({ status: 'reviewing', busySince: '2026-10-15T10:00:00.000Z' }),
+        now,
+      ),
+    ).toBe('Design in review');
+    expect(cardDesignChipText(null, now)).toBe('Design off');
   });
 
   test('the design and the switch freeze with the first round', () => {

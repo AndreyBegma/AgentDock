@@ -59,6 +59,32 @@ describe('applyRunLogFrame', () => {
   });
 });
 
+describe('lastOutputAt', () => {
+  const at = '2026-10-15T10:00:00.000Z';
+  const later = '2026-10-15T10:04:00.000Z';
+
+  test('is kept from backlog and live frames, and a frame without it keeps the last', () => {
+    let state = applyRunLogFrame(EMPTY_RUN_LOG, {
+      ...lines(true, 'a'),
+      lastOutputAt: at,
+    } as RunLogFrame);
+    expect(state.lastOutputAt).toBe(at);
+    state = applyRunLogFrame(state, lines(false, 'b'));
+    expect(state.lastOutputAt).toBe(at);
+    state = applyRunLogFrame(state, {
+      ...lines(false, 'c'),
+      lastOutputAt: later,
+    } as RunLogFrame);
+    expect(state.lastOutputAt).toBe(later);
+  });
+
+  test('stays null from an older runner', () => {
+    expect(applyRunLogFrame(EMPTY_RUN_LOG, lines(true, 'a')).lastOutputAt).toBe(
+      null,
+    );
+  });
+});
+
 describe('rowText', () => {
   test('prefixes by kind', () => {
     expect(rowText({ kind: 'tool', text: 'Read x' })).toBe('› Read x');
