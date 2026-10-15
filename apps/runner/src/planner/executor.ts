@@ -63,10 +63,10 @@ export interface PlanExecutorOptions {
   otlpPort?: () => number | null;
   /**
    * #337 D10: where `plan.turn` downloads attachments from — the API and the
-   * runner token, as for `card.run`. Without it a turn that lists an
-   * attachment fails with `attachments_unavailable`.
+   * runner token, as for `card.run`. Required, so a missing wiring is a
+   * compile error, not a turn that fails at run time (#326).
    */
-  attachmentSource?: AttachmentSource;
+  attachmentSource: AttachmentSource;
   tickMs?: number;
   cleanupMs?: number;
   idleMs?: number;

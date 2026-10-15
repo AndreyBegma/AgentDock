@@ -758,6 +758,10 @@ describe.skipIf(!tmuxInstalled)('plan turns (real tmux, fake claude)', () => {
       slots: new SharedRunSlots(1),
       emit: () => {},
       log: t.log,
+      attachmentSource: {
+        server: 'https://agentdock.example.test',
+        token: 't',
+      },
     });
     expect(tail(restarted, t.f.project.id)).toEqual(expected);
     expect(tail(restarted, 'prj_other')).toEqual([
