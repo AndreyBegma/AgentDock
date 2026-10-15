@@ -1,6 +1,7 @@
 import { z } from 'zod';
+import { headShaSchema } from '../commands/approvals';
 import { cardIdSchema, cardTmuxSessionSchema } from '../commands/cards';
-import { skillRunIdSchema } from '../commands/skills';
+import { gitRefSchema, skillRunIdSchema } from '../commands/skills';
 
 /**
  * Card worker events (issue #242 "Runner"). A round outlives the `card.run`
@@ -89,3 +90,46 @@ export const CARD_RUN_EVENT_TYPES = Object.keys(
 
 export const isCardRunEventType = (type: string): type is CardRunEventType =>
   Object.hasOwn(cardRunEventDataSchemas, type);
+
+/**
+ * #359 D1: the runner's session poll pushed the round's committed HEAD of
+ * `branch` and, when none was open, opened a draft PR. Sent after every push
+ * (at most one per `CARD_PUSH_MIN_INTERVAL_MS`), and with the PR whenever one
+ * is open, so the API fills the card's `prUrl` while it is In progress and a
+ * new head resets its CI state.
+ *
+ * Its own map, outside `cardRunEventDataSchemas`: the board sink enters it
+ * together with its handler.
+ */
+export const cardRunPushedDataSchema = z
+  .object({
+    cardId: cardIdSchema,
+    runId: skillRunIdSchema,
+    projectId: z.string().min(1),
+    at: z.iso.datetime(),
+    branch: gitRefSchema,
+    /** The pushed commit, now the PR's head. */
+    headSha: headShaSchema,
+    prNumber: z.number().int().positive().optional(),
+    prUrl: z.url({ protocol: /^https$/ }).optional(),
+    /** With a PR only; `draft` until collect marks it ready (D3). */
+    prState: z.enum(['open', 'draft']).optional(),
+  })
+  .refine((d) => (d.prNumber === undefined) === (d.prUrl === undefined), {
+    message: 'prNumber and prUrl go together',
+    path: ['prUrl'],
+  })
+  .refine((d) => d.prState === undefined || d.prNumber !== undefined, {
+    message: 'prState needs a PR',
+    path: ['prState'],
+  });
+export type CardRunPushedData = z.infer<typeof cardRunPushedDataSchema>;
+
+export const cardPushEventDataSchemas = {
+  'card_run.pushed': cardRunPushedDataSchema,
+} as const;
+
+export type CardPushEventType = keyof typeof cardPushEventDataSchemas;
+
+export const isCardPushEventType = (type: string): type is CardPushEventType =>
+  Object.hasOwn(cardPushEventDataSchemas, type);

@@ -216,7 +216,7 @@ describe('worker prompt', () => {
   };
 
   it('is versioned', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(5);
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(6);
   });
 
   it('names the card, branch, base and spec, and how to finish', () => {

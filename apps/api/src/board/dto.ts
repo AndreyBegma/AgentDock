@@ -234,6 +234,12 @@ export class UpdateBoardSettingsDto implements UpdateBoardSettingsRequest {
   @IsOptional()
   @IsBoolean()
   autoCollectTracked?: boolean;
+
+  /** #359 D7: `null` returns to the default (on unless the base is main). */
+  @ValidateIf((dto: UpdateBoardSettingsDto) => dto.autoMergeCards !== null)
+  @IsOptional()
+  @IsBoolean()
+  autoMergeCards?: boolean | null;
 }
 
 /** #273 D13: the head the person saw in the accept dialog. */

@@ -20,10 +20,12 @@ import type {
   CaptureSkipReason,
   CaptureStatus,
 } from './capture-limits';
+import type { CardCiCheck } from './shipping';
 import type {
   BoardCardKind,
   BoardCardSource,
   BoardColumn,
+  CardCiState,
   CardCollectState,
   CardFinishedBy,
   CardPrState,
@@ -116,6 +118,22 @@ export interface BoardCardView {
    * sheet's "No pull request: <error>"; `null` otherwise.
    */
   collectError: string | null;
+  /** #359 D5: the checks on the PR's head — the CI dot beside the PR chip. */
+  ciState: CardCiState;
+  /** #359 D5: the failed checks while `ciState` is `red`; empty otherwise. */
+  ciChecks: CardCiCheck[];
+  /**
+   * #359 D6: `ci_fix` rounds on the current PR, of `CARD_CI_FIX_ATTEMPTS_MAX`
+   * — "Fixing CI (2/3)".
+   */
+  ciFixAttempts: number;
+  /**
+   * #359 D6: CI still failing after the budget — "CI still failing after 3
+   * fixes"; nothing is automated until a person acts.
+   */
+  needsPerson: boolean;
+  /** #359 D8: the latest PR merged (ISO) — the Merged badge; `null` otherwise. */
+  mergedAt: string | null;
   /** The latest round; `null` before the first Run. */
   round: CardRoundBrief | null;
   /** #243: the Design chip; `null` when the card has no design (off). */
@@ -306,6 +324,8 @@ export interface BoardCardDetail extends BoardCardView {
   createdAt: string;
   /** Oldest first. */
   rounds: CardRoundView[];
+  /** #359 D8: every PR the card opened, oldest first; the last is `prUrl`'s. */
+  pullRequests: CardPullRequestRef[];
   /**
    * #244 D8: an Inbox card's evidence, operators only (the card sheet).
    * `null` once accepted — Accept strips it — and for a manual card.
@@ -316,6 +336,18 @@ export interface BoardCardDetail extends BoardCardView {
    * own carry its `roundId`.
    */
   attachments: AttachmentView[];
+}
+
+/** #359 D8: one PR of a card, as the card sheet lists it. */
+export interface CardPullRequestRef {
+  number: number;
+  url: string;
+  /** Its head branch: the card's, then `<branch>-<k>` for a follow-up. */
+  branch: string;
+  state: CardPrState;
+  /** The round that opened it. */
+  round: number;
+  createdAt: string;
 }
 
 /** `GET /board-settings`; with no row, the defaults and `isDefault: true`. */
@@ -332,6 +364,13 @@ export interface BoardSettingsView {
   captureModel: CaptureModel;
   /** #282 D3: the `autoCollect` a new `terminal` card starts with; off by default. */
   autoCollectTracked: boolean;
+  /**
+   * #359 D7: merge a card's PR when it enters Finished green; `null` follows
+   * `autoMergeCardsDefault`.
+   */
+  autoMergeCards: boolean | null;
+  /** #359 D7: `cardAutoMergeDefault` of the project's base — on for develop, off for main. */
+  autoMergeCardsDefault: boolean;
   isDefault: boolean;
   updatedAt: string | null;
 }
@@ -422,6 +461,8 @@ export interface UpdateBoardSettingsRequest {
   captureModel?: CaptureModel;
   /** #282 D3. Absent keeps the stored value. */
   autoCollectTracked?: boolean;
+  /** #359 D7. Absent keeps the stored value; `null` returns to the default. */
+  autoMergeCards?: boolean | null;
 }
 
 /**
