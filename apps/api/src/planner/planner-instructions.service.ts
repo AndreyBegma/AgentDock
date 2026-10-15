@@ -23,9 +23,7 @@ import { toInstructionsVersion, versionInclude } from './plan-mapper';
 import { plannerError } from './planner-error';
 
 /** The `orchestrator` object of a code-sentinel config, if it is one. */
-const orchestratorOf = (
-  config: Prisma.JsonValue,
-): Prisma.JsonObject | null => {
+const orchestratorOf = (config: Prisma.JsonValue): Prisma.JsonObject | null => {
   if (!config || typeof config !== 'object' || Array.isArray(config)) {
     return null;
   }

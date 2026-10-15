@@ -232,6 +232,105 @@ describe('board rounds (e2e)', () => {
     });
   });
 
+  describe('card edits reach the next round (#273 D1–D3)', () => {
+    const edit = (number: number, body: object) =>
+      w.operator.send('patch', `${w.path()}/board/cards/${number}`, body);
+
+    const promptOf = (index: number) =>
+      String(w.sent('card.run')[index].prompt);
+
+    it('feedback after an edit carries the section and the new body; the round stores its snapshot', async () => {
+      await w.createCard({ title: 'Add login', body: 'Users sign in.' });
+      await w.runCard(1);
+      await post(1, 'finish');
+      expect(
+        (await edit(1, { title: 'Add SSO', body: 'Sign in with Google.' }))
+          .status,
+      ).toBe(200);
+
+      expect(
+        (await post(1, 'feedback', { text: 'Rename the button.' })).status,
+      ).toBe(200);
+      const prompt = promptOf(1);
+      expect(prompt).toContain('## Card changed');
+      expect(prompt).toContain('Title: Add SSO (was: Add login)');
+      expect(prompt).toContain('### What to do\n\nSign in with Google.');
+      expect(prompt).toContain('## Review feedback\n\nRename the button.');
+
+      const card = await w.card(1);
+      expect(card.rounds[0]).toMatchObject({
+        cardTitle: 'Add login',
+        cardBody: 'Users sign in.',
+        cardKind: 'feature',
+      });
+      expect(card.rounds[1]).toMatchObject({
+        cardTitle: 'Add SSO',
+        cardBody: 'Sign in with Google.',
+        cardKind: 'feature',
+      });
+      const run = await w.ctx.prisma.run.findUniqueOrThrow({
+        where: { id: card.rounds[1].runId },
+      });
+      expect(run.args).toMatchObject({ promptVersion: 3 });
+
+      // A second feedback without edits: the plain feedback prompt.
+      await post(1, 'finish');
+      await post(1, 'feedback', { text: 'Now the colour.' });
+      expect(promptOf(2)).toBe(
+        'Review feedback: Now the colour.\n\nAddress it on the same branch, commit, then call finish_card.',
+      );
+    });
+
+    it('edits made while a round runs reach the round after it', async () => {
+      await w.createCard({ title: 'Add login', body: 'Users sign in.' });
+      await w.runCard(1);
+      await edit(1, { kind: 'bug' });
+      await post(1, 'finish');
+      await post(1, 'feedback', { text: 'Again.' });
+      expect(promptOf(1)).toContain('Kind: bug fix (was: feature)');
+    });
+
+    it('Run after a stopped round with an edited title is the section plus continue', async () => {
+      await w.createCard({ title: 'Add login' });
+      await w.runCard(1);
+      await post(1, 'stop');
+      await edit(1, { title: 'Add SSO' });
+      expect((await w.runCard(1)).status).toBe(200);
+      const prompt = promptOf(1);
+      expect(prompt).not.toBe(CARD_CONTINUE_PROMPT);
+      expect(prompt).toContain('Title: Add SSO (was: Add login)');
+      expect(prompt).toContain(
+        'Continue the work with the card as it is now, on the same branch; commit, then call finish_card.',
+      );
+    });
+
+    it('compares against the last round that started Claude, not a failed one', async () => {
+      await w.createCard({ title: 'Add login' });
+      await w.runCard(1);
+      await post(1, 'stop');
+      await edit(1, { title: 'Add SSO' });
+      w.handlers['card.run'] = () => failed('internal');
+      expect((await w.runCard(1)).status).toBe(502);
+      w.handlers['card.run'] = undefined;
+      expect((await w.runCard(1)).status).toBe(200);
+      // Round 2 failed before Claude started: round 3 still carries the edit.
+      expect(promptOf(2)).toContain('Title: Add SSO (was: Add login)');
+    });
+
+    it('leaves no round without its snapshot (the migration backfill)', async () => {
+      await w.createCard();
+      await w.runCard(1);
+      const [{ count }] = await w.ctx.prisma.$queryRaw<{ count: bigint }[]>`
+        SELECT count(*) AS count FROM board_card_rounds
+        WHERE "cardTitle" IS NULL OR "cardBody" IS NULL OR "cardKind" IS NULL`;
+      expect(count).toBe(0n);
+      const [column] = await w.ctx.prisma.$queryRaw<{ nullable: string }[]>`
+        SELECT is_nullable AS nullable FROM information_schema.columns
+        WHERE table_name = 'board_card_rounds' AND column_name = 'cardTitle'`;
+      expect(column.nullable).toBe('NO');
+    });
+  });
+
   describe('issue and spec (D2)', () => {
     it('issueOnRun creates an unqueued issue and names the branch after it', async () => {
       await w.createCard({ issueOnRun: true, kind: 'bug', title: 'Crash' });

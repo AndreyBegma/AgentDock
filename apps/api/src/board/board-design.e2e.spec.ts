@@ -135,9 +135,13 @@ describe('board × design (e2e, #243)', () => {
           );
         }
       });
+    // #273 D8: the approval answers 200 with the run's failure.
     const answered = await approve(card.number, view.revisions[0].id);
-    expect(answered.status).toBe(503);
-    expect(answered.body.error).toBe(BOARD_ERROR.commandUnavailable);
+    expect(answered.status).toBe(200);
+    expect(answered.body.run).toMatchObject({
+      status: 'run_failed',
+      code: BOARD_ERROR.commandUnavailable,
+    });
     expect((await h.cardDesign(card.number)).status).toBe('approved');
     const stored = await h.ctx.prisma.boardCard.findUniqueOrThrow({
       where: { id: card.id },

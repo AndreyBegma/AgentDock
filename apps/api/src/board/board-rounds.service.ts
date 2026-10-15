@@ -282,23 +282,23 @@ export class BoardRoundsService {
             feedback: trigger === 'feedback' ? feedback : null,
           })
         : cardWorkerPrompt({
-              number: card.number,
-              title: card.title,
-              body: card.body,
-              kind: card.kind,
-              branch,
-              base: project.base,
-              specPath,
-              issueNumber: issue.number,
-              design:
-                designFile && design
-                  ? {
-                      path: designFile.path,
-                      rationale: design.rationale,
-                      comments: design.comments,
-                    }
-                  : null,
-            });
+            number: card.number,
+            title: card.title,
+            body: card.body,
+            kind: card.kind,
+            branch,
+            base: project.base,
+            specPath,
+            issueNumber: issue.number,
+            design:
+              designFile && design
+                ? {
+                    path: designFile.path,
+                    rationale: design.rationale,
+                    comments: design.comments,
+                  }
+                : null,
+          });
     const files: CardRunFile[] = [
       ...(firstStart && specPath !== null
         ? [{ path: specPath, content: specContent(card, issue.number) }]

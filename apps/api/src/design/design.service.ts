@@ -193,7 +193,11 @@ export class DesignService {
       // #273 D9: the design the failed auto-run followed no longer stands.
       await this.prisma.boardCard.updateMany({
         where: { projectId, number, autoRunError: { not: null } },
-        data: { autoRunError: null, autoRunMessage: null, autoRunFailedAt: null },
+        data: {
+          autoRunError: null,
+          autoRunMessage: null,
+          autoRunFailedAt: null,
+        },
       });
     }
   }
@@ -794,7 +798,8 @@ export class DesignService {
         action: 'card.auto_run_failed',
         target: { type: 'board_card', id: card.id },
         projectId: card.projectId,
-        after: { number: card.number, code },
+        // `code` is a redacted audit key (auth codes): the refusal goes as `error`.
+        after: { number: card.number, error: code },
         result: 'error',
         meta: { message },
       });

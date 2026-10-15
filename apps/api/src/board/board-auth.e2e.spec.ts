@@ -181,6 +181,45 @@ describe('board authorization (e2e)', () => {
     });
   });
 
+  describe('the pull request and accept with merge (#273 D16): operators only', () => {
+    const MERGE = { merge: { headSha: 'a'.repeat(40) } };
+
+    beforeEach(() =>
+      w.ctx.prisma.boardCard.updateMany({
+        where: { projectId: w.a },
+        data: { prNumber: 77, column: 'finished' },
+      }),
+    );
+
+    it('a viewer is 403 on GET …/pull-request and on accept with merge', async () => {
+      expect(
+        (await w.viewer.get(`${w.path()}/board/cards/1/pull-request`)).status,
+      ).toBe(403);
+      expect(
+        (await w.viewer.send('post', `${w.path()}/board/cards/1/accept`, MERGE))
+          .status,
+      ).toBe(403);
+      expect(jest.mocked(w.commands.inspectPr)).not.toHaveBeenCalled();
+      expect(w.sent('card.merge')).toEqual([]);
+    });
+
+    it('a non-member is 404 on them', async () => {
+      expect(
+        (await w.outsider.get(`${w.path()}/board/cards/1/pull-request`)).status,
+      ).toBe(404);
+      expect(
+        (
+          await w.outsider.send(
+            'post',
+            `${w.path()}/board/cards/1/accept`,
+            MERGE,
+          )
+        ).status,
+      ).toBe(404);
+      expect(w.sent('card.merge')).toEqual([]);
+    });
+  });
+
   it('a card of another project is not found through this project', async () => {
     await w.createCard({ title: 'Other' }, w.operatorOfB, w.b);
     await w.ctx.prisma.boardCard.deleteMany({ where: { projectId: w.a } });
