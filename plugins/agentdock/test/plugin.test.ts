@@ -87,6 +87,32 @@ describe('manifests', () => {
   });
 });
 
+describe('track-work skill (#282)', () => {
+  const skill = readFileSync(
+    join(pluginDir, 'skills/track-work/SKILL.md'),
+    'utf8',
+  );
+
+  test('has frontmatter naming the skill, with a description', () => {
+    expect(skill.startsWith('---\n')).toBe(true);
+    const front = skill.split('---')[1] ?? '';
+    expect(front).toContain('name: track-work');
+    expect(front).toContain('description:');
+  });
+
+  test('tells the model to call track_card once and what is not work', () => {
+    expect(skill).toContain('mcp__plugin_agentdock_agentdock__track_card');
+    expect(skill).toContain('once');
+    expect(skill).toContain('Questions');
+    expect(skill).toContain('not_a_manual_session');
+  });
+
+  test('plugin version is bumped for the new skill', () => {
+    const p = readJson(join(pluginDir, '.claude-plugin/plugin.json'));
+    expect(p.version).toBe('0.2.0');
+  });
+});
+
 describe('hooks.json shape', () => {
   test('declares exactly the spec events', () => {
     expect(Object.keys(hooksFile.hooks).sort()).toEqual(

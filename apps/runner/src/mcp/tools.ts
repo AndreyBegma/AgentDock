@@ -3,7 +3,10 @@ import {
   actionRequestKindSchema,
 } from '@agentdock/shared';
 import {
+  LOCAL_CARD_BODY_MAX,
+  LOCAL_CARD_KINDS,
   LOCAL_CARD_SUMMARY_MAX,
+  LOCAL_CARD_TITLE_MAX,
   LOCAL_NOTE_MAX,
   type LocalMethodName,
 } from '@agentdock/shared/protocol';
@@ -135,6 +138,29 @@ export const MCP_TOOLS = [
         .min(1)
         .max(LOCAL_CARD_SUMMARY_MAX)
         .describe('What was done on the card, for the pull request body.'),
+    },
+  },
+  {
+    name: 'track_card',
+    description:
+      'Track the work the person just asked you to do as a card on the AgentDock Board (In progress, linked to this session). Call it once per piece of work; a second call from the same session updates that card and never creates another. Only for a person’s own terminal session; any other session is refused (not_a_manual_session).',
+    method: 'card.track',
+    input: {
+      title: z
+        .string()
+        .trim()
+        .min(1)
+        .max(LOCAL_CARD_TITLE_MAX)
+        .describe('A short title of the work, like an issue title.'),
+      body: z
+        .string()
+        .max(LOCAL_CARD_BODY_MAX)
+        .optional()
+        .describe('What is being done and why; markdown.'),
+      kind: z
+        .enum(LOCAL_CARD_KINDS)
+        .optional()
+        .describe('feature or bug, only when it is obvious.'),
     },
   },
   {
