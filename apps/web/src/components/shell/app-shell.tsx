@@ -266,7 +266,7 @@ export function AppShell({
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
           <header
-            className={`glass rounded-surface flex min-h-12 items-center py-2 ${narrow ? 'gap-0.5 px-2' : 'gap-3 px-4'}`}
+            className={`glass rounded-surface flex h-14 shrink-0 items-center ${narrow ? 'gap-0.5 px-2' : 'gap-3 px-4'}`}
           >
             {narrow ? (
               // A phone has no room for the trail: the page, and a way up.
