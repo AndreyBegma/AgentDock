@@ -367,10 +367,20 @@ export function parseMaxRunning(raw: string): number | null {
  * the profile key and the command; the card does not know its profile, so the
  * key is the one `agentdock-runner profiles` lists.
  */
-export const hooksHint = `No hook events from this card's session: the agentdock plugin is not set up for its runtime profile, so the card moves only when the session ends or you mark it finished. Find the profile key with \`${PROFILES_LIST_COMMAND}\` (first column, or Admin → Runners → Profile key), then run \`${SETUP_CLAUDE_COMMAND}\` and restart the session.`;
+export const hooksHint =
+  "No hook events from this card's session: the agentdock plugin is not set up for its runtime profile, so the card moves only when the session ends or you mark it finished.";
 
-/** The link text after the hint. */
-export const HOOKS_GUIDE_LABEL = 'How to set it up';
+/** The commands behind the hint, shown as code blocks next to it. */
+export const HOOKS_COMMANDS = [
+  { label: 'Find the profile key (first column)', code: PROFILES_LIST_COMMAND },
+  {
+    label: 'Set up that profile, then restart its sessions',
+    code: SETUP_CLAUDE_COMMAND,
+  },
+] as const;
+
+/** The link text after the hint: what the checklist holds. */
+export const HOOKS_GUIDE_LABEL = 'See the exact command for each profile';
 
 /** #281 D6: the Settings › Sessions checklist of the card's project. */
 export const hooksGuideHref = (projectId: string): string =>

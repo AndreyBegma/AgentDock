@@ -15,6 +15,7 @@ import {
   columnsOf,
   describeBoardError,
   designBlocksRun,
+  HOOKS_COMMANDS,
   HOOKS_GUIDE_LABEL,
   hooksGuideHref,
   hooksHint,
@@ -283,17 +284,21 @@ describe('parsers', () => {
 });
 
 describe('hooksHint (#281 D6)', () => {
-  test('names the cause, the key and the exact command', () => {
+  test('names the cause in prose, with no markdown to show as text', () => {
     expect(hooksHint).toContain('plugin is not set up for its runtime profile');
-    expect(hooksHint).toContain('agentdock-runner profiles');
-    expect(hooksHint).toContain(
-      'agentdock-runner setup claude --profile <key>',
-    );
+    expect(hooksHint).not.toContain('`');
     expect(hooksHint).not.toContain('not installed in this project');
   });
 
+  test('the commands are separate, for code blocks', () => {
+    expect(HOOKS_COMMANDS.map((item) => item.code)).toEqual([
+      'agentdock-runner profiles',
+      'agentdock-runner setup claude --profile <key>',
+    ]);
+  });
+
   test('links the Settings › Sessions checklist of the project', () => {
-    expect(HOOKS_GUIDE_LABEL).toBe('How to set it up');
+    expect(HOOKS_GUIDE_LABEL).toBe('See the exact command for each profile');
     expect(hooksGuideHref('p1')).toBe('/projects/p1/settings?tab=sessions');
   });
 });

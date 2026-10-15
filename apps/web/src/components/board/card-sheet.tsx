@@ -12,6 +12,7 @@ import {
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
+import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
 import { Field, Input, Select, Textarea } from '@andrewbehma/glass-ui/field';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
@@ -33,6 +34,7 @@ import {
   canRun,
   canStop,
   describeBoardError,
+  HOOKS_COMMANDS,
   HOOKS_GUIDE_LABEL,
   hooksGuideHref,
   hooksHint,
@@ -320,15 +322,21 @@ function CardDetailBody({
             </p>
           ) : null}
           {card.round?.hooksMissing ? (
-            <p className="text-xs text-ink-2">
-              {hooksHint}{' '}
+            <div className="flex flex-col gap-2 text-xs text-ink-2">
+              <p>{hooksHint}</p>
+              {HOOKS_COMMANDS.map((item) => (
+                <div key={item.code} className="flex flex-col gap-1">
+                  <span>{item.label}</span>
+                  <CodeBlock code={item.code} defaultWrap />
+                </div>
+              ))}
               <NextLink
                 href={hooksGuideHref(projectId)}
                 className="text-accent-ink underline-offset-2 hover:underline"
               >
                 {HOOKS_GUIDE_LABEL}
               </NextLink>
-            </p>
+            </div>
           ) : null}
 
           {failure ? (
