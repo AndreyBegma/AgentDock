@@ -143,6 +143,9 @@ export const toDesignView = (
   warnings: extra.warnings,
   viewports: extra.viewports,
   activeTurnId: extra.activeTurnId,
+  busySince: null,
+  progress: null,
+  lastFailure: null,
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(),
 });

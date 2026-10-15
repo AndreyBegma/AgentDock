@@ -1,15 +1,18 @@
 import { describe, expect, it } from 'bun:test';
+import { runLogLinesFrameSchema } from '../protocol/pane';
 import {
   buildMockupCsp,
   checkCdnUrl,
   DESIGN_CDN_ALLOWLIST,
   DESIGN_HTML_MAX_BYTES,
+  designFailureReasonOf,
   fingerprintGlobSchema,
   injectPinHelper,
   MOCKUP_PIN_HELPER_ATTRIBUTE,
   MOCKUP_RESPONSE_HEADERS,
   mockupMessageSchema,
   parseUiProfileOutput,
+  STALL_AFTER_MS,
   UI_PROFILE_KIT_MAX_BYTES,
   validateMockup,
   viewerMessageSchema,
@@ -309,5 +312,55 @@ describe('parseUiProfileOutput', () => {
     const parsed = parseUiProfileOutput(text);
     expect(parsed.ok).toBe(false);
     if (!parsed.ok) expect(parsed.error.reason).toBe(reason);
+  });
+});
+
+describe('designFailureReasonOf (#275 D6)', () => {
+  it('reads the runner timeout sentence as timed_out', () => {
+    expect(designFailureReasonOf('the turn exceeded its 1200 s timeout')).toBe(
+      'timed_out',
+    );
+  });
+
+  it('reads any other error, or none, as failed', () => {
+    expect(
+      designFailureReasonOf('the session ended without an exit status'),
+    ).toBe('failed');
+    expect(designFailureReasonOf('timeout talking to GitHub')).toBe('failed');
+    expect(designFailureReasonOf(null)).toBe('failed');
+  });
+
+  it('reads a cancelled turn or an abandoned build as stopped', () => {
+    expect(
+      designFailureReasonOf('the turn exceeded its 1200 s timeout', true),
+    ).toBe('stopped');
+    expect(designFailureReasonOf(null, true)).toBe('stopped');
+  });
+
+  it('keeps the stall threshold at 5 minutes', () => {
+    expect(STALL_AFTER_MS).toBe(5 * 60 * 1000);
+  });
+});
+
+describe('run_log lines frame (#275 D4)', () => {
+  const frame = { type: 'lines', backlog: true, lines: [] };
+
+  it('parses with and without lastOutputAt', () => {
+    expect(runLogLinesFrameSchema.safeParse(frame).success).toBe(true);
+    const parsed = runLogLinesFrameSchema.safeParse({
+      ...frame,
+      lastOutputAt: '2026-10-15T10:00:00.000Z',
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.lastOutputAt).toBe('2026-10-15T10:00:00.000Z');
+    }
+  });
+
+  it('refuses a lastOutputAt that is not an ISO time', () => {
+    expect(
+      runLogLinesFrameSchema.safeParse({ ...frame, lastOutputAt: 'yesterday' })
+        .success,
+    ).toBe(false);
   });
 });

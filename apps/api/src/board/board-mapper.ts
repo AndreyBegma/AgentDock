@@ -47,7 +47,8 @@ export type CardWithRounds = BoardCard & {
 /** #243: the Design chip; `null` when the card has no design or it is off. */
 const designOf = (
   design: CardDesignRow | null | undefined,
-): TaskDesignSummary | null => (design?.needed ? { ...design } : null);
+): TaskDesignSummary | null =>
+  design?.needed ? { ...design, busySince: null } : null;
 
 export type CardWithPeople = CardWithRounds & {
   createdBy: BoardUserRef | null;

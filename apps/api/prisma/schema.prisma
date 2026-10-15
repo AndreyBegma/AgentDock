@@ -2494,6 +2494,8 @@ model TaskDesign {
   approvedRevisionId String?          @unique
   approvedById       String?
   approvedAt         DateTime?
+  /// #275 D2: when the current Generate or Revise started; null at rest.
+  busySince          DateTime?
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
 

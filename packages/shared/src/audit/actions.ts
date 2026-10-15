@@ -99,6 +99,8 @@ export const AUDIT_ACTIONS = [
   'design.revised',
   'design.approved',
   'design.settings_updated',
+  /** #275 D5: `meta` `{stage, runId, turnId?}`. */
+  'design.stopped',
   'uiprofile.built',
   'uiprofile.edited',
   'action_request.created',

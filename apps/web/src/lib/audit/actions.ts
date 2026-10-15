@@ -98,6 +98,7 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   'design.revised': 'Revised a design',
   'design.approved': 'Approved a design',
   'design.settings_updated': 'Changed the design settings',
+  'design.stopped': 'Stopped a design run',
   'uiprofile.built': 'Built the UI profile',
   'uiprofile.edited': 'Edited the UI profile',
   'action_request.created': 'Requested an action from a session',
