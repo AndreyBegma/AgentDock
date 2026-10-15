@@ -180,26 +180,40 @@ export type CardStopResult = z.infer<typeof cardStopResultSchema>;
 /**
  * D8: commit leftovers (`chore: card C-<number> work in progress`), push, and
  * open a PR into `base` when none is open for `branch` (else push only).
+ *
+ * #282 D3: with `cwd`, a `terminal` card collects its tracked session's work
+ * instead of a card worktree. The runner takes `cwd` only inside `root` or
+ * one of the worktrees git lists for it (else `path_not_allowed`), collects
+ * in the checkout that holds it, and only when that checkout is on `branch`
+ * (else `invalid_args`). `branch` is never `base`: the base is not committed
+ * to or pushed.
  */
-export const cardCollectArgsSchema = z.strictObject({
-  ...cardTarget,
-  root: absolutePathSchema,
-  base: gitRefSchema,
-  branch: gitRefSchema,
-  /** The card's per-project number, for the leftovers commit message. */
-  number: z.number().int().positive(),
-  title: z
-    .string()
-    .min(1)
-    .max(256)
-    .refine((t) => !/[\r\n]/.test(t), { message: 'must be one line' }),
-  body: z
-    .string()
-    .refine(noNul, { message: 'must not contain NUL' })
-    .refine((t) => utf8Bytes(t) <= CARD_COLLECT_BODY_MAX_BYTES, {
-      message: `must be at most ${CARD_COLLECT_BODY_MAX_BYTES} bytes`,
-    }),
-});
+export const cardCollectArgsSchema = z
+  .strictObject({
+    ...cardTarget,
+    root: absolutePathSchema,
+    base: gitRefSchema,
+    branch: gitRefSchema,
+    /** #282 D3: the tracked session's cwd; absent for a card worktree. */
+    cwd: absolutePathSchema.optional(),
+    /** The card's per-project number, for the leftovers commit message. */
+    number: z.number().int().positive(),
+    title: z
+      .string()
+      .min(1)
+      .max(256)
+      .refine((t) => !/[\r\n]/.test(t), { message: 'must be one line' }),
+    body: z
+      .string()
+      .refine(noNul, { message: 'must not contain NUL' })
+      .refine((t) => utf8Bytes(t) <= CARD_COLLECT_BODY_MAX_BYTES, {
+        message: `must be at most ${CARD_COLLECT_BODY_MAX_BYTES} bytes`,
+      }),
+  })
+  .refine((a) => a.branch !== a.base, {
+    message: 'must not be the base branch',
+    path: ['branch'],
+  });
 export type CardCollectArgs = z.infer<typeof cardCollectArgsSchema>;
 
 export const cardCollectResultSchema = z

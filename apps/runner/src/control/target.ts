@@ -1,3 +1,5 @@
+import { realpathSync } from 'node:fs';
+import { sep } from 'node:path';
 import type { WatchedProject } from '@agentdock/shared/protocol';
 import { parseWorktreeList } from '../collectors/worktrees/worktrees';
 import { CommandFailure } from '../commands/failure';
@@ -24,6 +26,68 @@ export const watchedProject = (
     );
   }
   return project;
+};
+
+const realOrNull = (path: string): string | null => {
+  try {
+    return realpathSync(path);
+  } catch {
+    return null;
+  }
+};
+
+const isWithin = (path: string, dir: string): boolean =>
+  path === dir || path.startsWith(dir.endsWith(sep) ? dir : `${dir}${sep}`);
+
+/**
+ * #282 D3: the checkout of `project` that holds `cwd` — the root, or one of
+ * the worktrees git lists for it — as its real path. Anything else is
+ * `path_not_allowed`: a path outside them is never run in, and a path inside
+ * whose git top level is another repository (a nested clone) is refused too.
+ */
+export const projectCheckout = async (
+  exec: Exec,
+  project: WatchedProject,
+  cwd: string,
+): Promise<string> => {
+  const refused = (why: string) =>
+    new CommandFailure('path_not_allowed', `${cwd} ${why}`);
+  const listed = await exec('git', [
+    '-C',
+    project.root,
+    'worktree',
+    'list',
+    '--porcelain',
+  ]);
+  if (!listed || listed.code !== 0) {
+    throw new CommandFailure(
+      'not_a_repository',
+      `cannot list the worktrees of ${project.root}`,
+    );
+  }
+  const checkouts = [
+    project.root,
+    ...parseWorktreeList(listed.stdout)
+      .filter((entry) => !entry.prunable)
+      .map((entry) => entry.path),
+  ]
+    .map(realOrNull)
+    .filter((path): path is string => path !== null);
+  const real = realOrNull(cwd);
+  // The innermost checkout: a worktree may live inside the root.
+  const holder = real
+    ? checkouts
+        .filter((checkout) => isWithin(real, checkout))
+        .sort((a, b) => b.length - a.length)[0]
+    : undefined;
+  if (!real || !holder) {
+    throw refused(`is not inside ${project.root} or one of its worktrees`);
+  }
+  const top = await exec('git', ['-C', real, 'rev-parse', '--show-toplevel']);
+  if (!top || top.code !== 0 || realOrNull(top.stdout.trim()) !== holder) {
+    throw refused(`is not in a checkout of ${project.root}`);
+  }
+  return holder;
 };
 
 export interface SlotTarget {

@@ -4,7 +4,6 @@ import { acceptChoice } from './accept';
 import { decideDrop } from './board-state';
 import { boardView, card, round } from './fixtures';
 import {
-  autoCollectPending,
   canAccept,
   canDelete,
   canGiveFeedback,
@@ -79,19 +78,6 @@ describe('a live terminal card', () => {
         decideDrop(view, drop('card-1', 'finished', 'completed')).kind,
       ).toBe('move');
     }
-  });
-
-  test('says why Automatic work opened no pull request', () => {
-    expect(
-      autoCollectPending(terminal(1, 'finished', false, { autoCollect: true })),
-    ).toBe(true);
-    expect(autoCollectPending(terminal(1, 'finished', false))).toBe(false);
-    expect(
-      autoCollectPending(
-        terminal(1, 'finished', false, { autoCollect: true, prNumber: 4 }),
-      ),
-    ).toBe(false);
-    expect(autoCollectPending(card(1, 'finished'))).toBe(false);
   });
 });
 

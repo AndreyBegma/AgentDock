@@ -216,14 +216,31 @@ const openPullRequest = async (
 /**
  * D8: commit the leftovers, push, and open a PR into the base unless one is
  * open for the branch already — then it is only pushed. Nothing ahead of
- * `origin/<base>` is "No changes": nothing is pushed or opened.
+ * `origin/<base>` is "No changes": nothing is pushed or opened. The checkout
+ * must be on `branch` — a session that switched branches (#282 D3) is
+ * `invalid_args`, so nothing is committed to a branch the API did not name.
  */
 export const collectCard = async (
   deps: GitDeps,
-  record: CardRecord,
+  record: Pick<CardRecord, 'projectId' | 'root' | 'worktree' | 'branch'>,
   args: CardCollectArgs,
 ): Promise<CardCollectResult> => {
   const wt = record.worktree;
+  const head = await deps.exec('git', [
+    '-C',
+    wt,
+    'symbolic-ref',
+    '--quiet',
+    '--short',
+    'HEAD',
+  ]);
+  const current = head?.code === 0 ? head.stdout.trim() : null;
+  if (current !== record.branch) {
+    throw new CommandFailure(
+      'invalid_args',
+      `${wt} is on ${current ?? 'a detached HEAD'}, not ${record.branch}`,
+    );
+  }
   await gitOk(deps.exec, ['-C', wt, 'add', '-A']);
   if (
     !(await gitSucceeds(deps.exec, ['-C', wt, 'diff', '--cached', '--quiet']))
