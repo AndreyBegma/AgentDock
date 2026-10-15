@@ -51,13 +51,15 @@ export const workStatusOfTaskStatus = (
 /**
  * D2, D3: the column of a plan task on the board, given its plan. A task of
  * an `archived` plan is on the board only once issued — the fleet may still
- * be working on it; an unissued one is not.
+ * be working on it; an unissued one is not. A `done` plan's tasks became
+ * board cards (#337 D7): the cards stand for them, so they leave too.
  */
 export const boardColumnOfPlanTask = (task: {
   planStatus: PlanStatus;
   status: PlanTaskStatus;
   liveStatus: PlanTaskLiveStatus | null;
 }): BoardColumn | null =>
-  task.planStatus === 'archived' && task.status !== 'issued'
+  (task.planStatus === 'archived' || task.planStatus === 'done') &&
+  task.status !== 'issued'
     ? null
     : planTaskBoardColumn(task.status, task.liveStatus);

@@ -86,6 +86,12 @@ describe('Create cards (e2e, #337)', () => {
     expect(detail.status).toBe('done');
     expect(detail.tasks.every((t) => t.cardId !== null)).toBe(true);
     expect(await h.auditOf('card.created')).toHaveLength(4);
+    // The cards stand for the tasks: the read-only projection drops them.
+    const projected = await h.author.get(
+      `/projects/${h.projectId}/work/plan-tasks`,
+    );
+    expect(projected.status).toBe(200);
+    expect(projected.body.items).toEqual([]);
 
     const again = await createCards(plan.id);
     expect(again.status).toBe(409);
