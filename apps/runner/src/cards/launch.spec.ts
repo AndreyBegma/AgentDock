@@ -76,6 +76,32 @@ describe('card worker launch (#242 D5)', () => {
     expect(spec.env.OTEL_EXPORTER_OTLP_ENDPOINT).toContain(':4318');
   });
 
+  // #367 D1: checked against Claude Code 2.1.301 — hooks from `--settings`
+  // and the server from `--mcp-config` load on `--session-id` and `--resume`.
+  it('#367 D1: injected wiring adds --settings and --mcp-config before the model, on both rounds', () => {
+    const wiring = {
+      settings: '/state/cards/card_1/rounds/run_r2/agentdock-settings.json',
+      mcp: '/state/cards/card_1/rounds/run_r2/agentdock-mcp.json',
+    };
+    for (const resume of [false, true]) {
+      const spec = cardLaunchSpec(profile, args(resume), '/wt', null, wiring);
+      expect(spec.args.slice(3, 8)).toEqual([
+        '--settings',
+        wiring.settings,
+        '--mcp-config',
+        wiring.mcp,
+        '--model',
+      ]);
+      expect(spec.args.slice(-2)).toEqual(['--', PROMPT]);
+    }
+  });
+
+  it('#367 D2: without wiring there is neither flag', () => {
+    const { args: argv } = cardArgv(profile, args(false));
+    expect(argv).not.toContain('--settings');
+    expect(argv).not.toContain('--mcp-config');
+  });
+
   it('maps every permission mode to the CLI value', () => {
     const modes = {
       auto: 'auto',

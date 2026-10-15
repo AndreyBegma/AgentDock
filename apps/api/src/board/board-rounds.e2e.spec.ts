@@ -1,4 +1,8 @@
-import { type BoardCardDetail, CARD_CONTINUE_PROMPT } from '@agentdock/shared';
+import {
+  type BoardCardDetail,
+  CARD_CONTINUE_PROMPT,
+  CARD_WORKER_PROMPT_VERSION,
+} from '@agentdock/shared';
 import { BudgetGate } from '../budgets/budget-gate';
 import { BoardWorld, failed } from './testing/board-e2e';
 
@@ -271,7 +275,9 @@ describe('board rounds (e2e)', () => {
       const run = await w.ctx.prisma.run.findUniqueOrThrow({
         where: { id: card.rounds[1].runId },
       });
-      expect(run.args).toMatchObject({ promptVersion: 4 });
+      expect(run.args).toMatchObject({
+        promptVersion: CARD_WORKER_PROMPT_VERSION,
+      });
 
       // A second feedback without edits: the plain feedback prompt.
       await post(1, 'finish');

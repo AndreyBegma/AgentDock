@@ -55,6 +55,7 @@ import { NotificationBell } from './notification-bell';
 import { paletteGroups } from './palette';
 import { ProjectSwitcher } from './project-switcher';
 import { Rail } from './rail';
+import { useRailCollapsed, useRailToggleShortcut } from './rail-collapse';
 import {
   applyTheme,
   isThemeMode,
@@ -151,6 +152,14 @@ export function AppShell({
 
   useCommandPaletteShortcut(() => setPaletteOpen(true));
 
+  // From `lg` up the rail narrows to icons and back (C-14); ⌘\ toggles it.
+  const [railCollapsed, setRailCollapsed] = useRailCollapsed();
+  const toggleRail = useCallback(
+    () => setRailCollapsed(!railCollapsed),
+    [railCollapsed, setRailCollapsed],
+  );
+  useRailToggleShortcut(!narrow, toggleRail);
+
   // The bell holds the `user:<id>` subscription that keeps the socket (and the dot) alive.
   const { status, closeCode } = useLiveStatus();
   const live = useLivePaused();
@@ -246,6 +255,8 @@ export function AppShell({
               projectId={projectId}
               waitingApprovals={waitingApprovals}
               slotsNeedingAttention={slotsNeedingAttention}
+              collapsed={railCollapsed}
+              onCollapsedChange={setRailCollapsed}
             />
           </aside>
         )}
