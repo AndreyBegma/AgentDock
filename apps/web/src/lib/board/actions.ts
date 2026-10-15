@@ -2,11 +2,13 @@ import type {
   AcceptBoardCardRequest,
   AcceptBoardCardResponse,
   AcceptSuggestionRequest,
+  AddCardDependencyRequest,
   BoardCardDetail,
   BoardCardView,
   BoardSettingsView,
   BoardView,
   CardCapturePage,
+  CardDependenciesView,
   CardFeedbackRequest,
   CardPullRequestView,
   ClaimAttachmentsRequest,
@@ -59,6 +61,30 @@ export const runCard = (
   number: number,
   body: RunBoardCardRequest = {},
 ) => api(`${cardPath(projectId, number)}/run`, { method: 'POST', body });
+
+/** #337 D8: the cards this one runs after, with their columns. */
+export const fetchDependencies = (projectId: string, number: number) =>
+  api<CardDependenciesView>(`${cardPath(projectId, number)}/dependencies`);
+
+export const addDependency = (
+  projectId: string,
+  number: number,
+  body: AddCardDependencyRequest,
+) =>
+  api<CardDependenciesView>(`${cardPath(projectId, number)}/dependencies`, {
+    method: 'POST',
+    body,
+  });
+
+export const removeDependency = (
+  projectId: string,
+  number: number,
+  dependsOn: number,
+) =>
+  api<CardDependenciesView>(
+    `${cardPath(projectId, number)}/dependencies/${dependsOn}`,
+    { method: 'DELETE' },
+  );
 
 export const sendFeedback = (
   projectId: string,

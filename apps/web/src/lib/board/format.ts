@@ -445,6 +445,12 @@ export function describeBoardError(
       return 'This card has no pull request to merge.';
     case BOARD_ERROR.notTracked:
       return 'Automatic work belongs to cards tracked from a terminal session.';
+    case BOARD_ERROR.dependencyCycle:
+      return 'That would make the cards wait for each other in a circle.';
+    case BOARD_ERROR.invalidDependency:
+      return 'A card cannot depend on itself, or on a number that is no card of this project.';
+    case BOARD_ERROR.dependencyOpen:
+      return 'A card it depends on is not completed yet.';
     default:
       break;
   }

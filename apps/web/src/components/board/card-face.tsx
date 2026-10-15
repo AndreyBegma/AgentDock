@@ -6,6 +6,7 @@ import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import { Paperclip } from 'lucide-react';
 import NextLink from 'next/link';
 import { attachmentCountLabel } from '../../lib/attachments/format';
+import { dependencyChip } from '../../lib/board/dependencies';
 import {
   approveRunOffer,
   autoRunReason,
@@ -28,7 +29,7 @@ import { formatCost } from '../../lib/format';
 import { safeHttpsUrl } from '../../lib/queue/format';
 import { ApproveRunLink, CardFaceDesign } from './card-design';
 
-/** What a card shows on the board: label, title, kind, round state, PR and issue, cost. */
+/** What a card shows on the board: label, title, kind, dependencies, round state, PR and issue, cost. */
 export function CardFace({
   projectId,
   card,
@@ -45,6 +46,8 @@ export function CardFace({
   const cost = formatCost(card.costUsd);
   const prHref = card.prUrl ? safeHttpsUrl(card.prUrl) : null;
   const issueHref = card.issueUrl ? safeHttpsUrl(card.issueUrl) : null;
+  // #337 D8: "after C-12", warning while it is not completed.
+  const after = dependencyChip(card.dependsOn);
   return (
     <div className="flex min-w-0 flex-col gap-1.5 text-sm">
       <div className="flex items-center gap-2 text-xs text-ink-2">
@@ -64,6 +67,15 @@ export function CardFace({
             <Paperclip aria-hidden="true" className="size-3" />
             {card.attachmentCount}
           </span>
+        ) : null}
+        {after ? (
+          <Chip
+            size="sm"
+            tone={after.open ? 'warn' : 'neutral'}
+            title={after.title}
+          >
+            {after.text}
+          </Chip>
         ) : null}
         {cost ? <span className="ml-auto tabular-nums">{cost}</span> : null}
       </div>
