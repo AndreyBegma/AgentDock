@@ -8,7 +8,11 @@ import {
   type PlannerSettingsView,
   type PlannerSpecOutput,
 } from '@agentdock/shared';
-import { repoRelativeDirSchema } from '@agentdock/shared/protocol';
+import {
+  type CardMergeMethod,
+  cardMergeMethodSchema,
+  repoRelativeDirSchema,
+} from '@agentdock/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
@@ -18,12 +22,10 @@ import { projectNotFound } from '../projects';
 import { toInstructionsVersion, versionInclude } from './plan-mapper';
 import { plannerError } from './planner-error';
 
-/**
- * The project's `specDir` (#10, `orchestrator.specDir`) when `plan.publish_specs`
- * can write to it: a repository-relative directory. A path outside the
- * repository (`../x-documentation/prs`) or a URL is not one (spec 172 Q4).
- */
-export const specDirOf = (config: Prisma.JsonValue): string | null => {
+/** The `orchestrator` object of a code-sentinel config, if it is one. */
+const orchestratorOf = (
+  config: Prisma.JsonValue,
+): Prisma.JsonObject | null => {
   if (!config || typeof config !== 'object' || Array.isArray(config)) {
     return null;
   }
@@ -35,7 +37,32 @@ export const specDirOf = (config: Prisma.JsonValue): string | null => {
   ) {
     return null;
   }
+  return orchestrator;
+};
+
+/**
+ * The project's `specDir` (#10, `orchestrator.specDir`) when `plan.publish_specs`
+ * can write to it: a repository-relative directory. A path outside the
+ * repository (`../x-documentation/prs`) or a URL is not one (spec 172 Q4).
+ */
+export const specDirOf = (config: Prisma.JsonValue): string | null => {
+  const orchestrator = orchestratorOf(config);
+  if (!orchestrator) return null;
   const parsed = repoRelativeDirSchema.safeParse(orchestrator.specDir);
+  return parsed.success ? parsed.data : null;
+};
+
+/**
+ * #273 D12: the project's `orchestrator.mergeMethod` — the method the fleet
+ * merges with, and a board card's Accept. `null` when it is absent or not
+ * `merge | squash | rebase`: the runner then takes the repository's default.
+ */
+export const mergeMethodOf = (
+  config: Prisma.JsonValue,
+): CardMergeMethod | null => {
+  const orchestrator = orchestratorOf(config);
+  if (!orchestrator) return null;
+  const parsed = cardMergeMethodSchema.safeParse(orchestrator.mergeMethod);
   return parsed.success ? parsed.data : null;
 };
 

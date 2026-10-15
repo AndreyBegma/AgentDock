@@ -1,4 +1,5 @@
 import {
+  type AcceptBoardCardRequest,
   type AcceptSuggestionRequest,
   BOARD_CARD_BODY_MAX,
   BOARD_CARD_KINDS,
@@ -22,6 +23,7 @@ import {
   type OrchestratorPermissionMode,
   orchestratorPermissionModeSchema,
 } from '@agentdock/shared/protocol';
+import { Type } from 'class-transformer';
 import {
   IsBoolean,
   IsIn,
@@ -35,6 +37,7 @@ import {
   MaxLength,
   Min,
   ValidateIf,
+  ValidateNested,
 } from 'class-validator';
 
 /** `orchestratorModelSchema`: never a flag. */
@@ -170,6 +173,21 @@ export class UpdateBoardSettingsDto implements UpdateBoardSettingsRequest {
   @IsOptional()
   @IsIn(CAPTURE_MODELS)
   captureModel?: CaptureModel;
+}
+
+/** #273 D13: the head the person saw in the accept dialog. */
+export class AcceptMergeDto {
+  @IsString()
+  @Matches(/^[0-9a-f]{40}$/, { message: 'headSha must be 40 lower-case hex' })
+  headSha!: string;
+}
+
+/** `POST /board/cards/:number/accept` (#273 D13): no `merge` moves only (D14). */
+export class AcceptBoardCardDto implements AcceptBoardCardRequest {
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AcceptMergeDto)
+  merge?: AcceptMergeDto;
 }
 
 /** `POST /board/cards/:number/accept-suggestion` (#244 D9): Edit & accept. */
