@@ -331,9 +331,12 @@ export function turnBody(
   const lines: string[] = [];
   if (turn.input.message) lines.push(turn.input.message);
   for (const a of turn.input.answers ?? []) {
-    const parts = [a.optionId, a.text].filter(Boolean).join(' — ');
+    const parts = [a.optionIds?.join(', ') ?? a.optionId, a.text]
+      .filter(Boolean)
+      .join(' — ');
     lines.push(`${a.questionId}: ${parts}`);
   }
+  if (turn.input.generate) lines.push('Enough — generate');
   lines.push(
     `${TURN_ACTION_LABEL[turn.action]} · ${TURN_PHASE_WORD[turn.phase]}`,
   );

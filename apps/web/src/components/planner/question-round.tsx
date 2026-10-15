@@ -14,6 +14,7 @@ import {
   roundProblem,
   setAnswerText,
   toAnswers,
+  toggleOption,
 } from '../../lib/planner/answers';
 import { QuestionCard } from './question-card';
 
@@ -85,6 +86,9 @@ export function QuestionRound({
           answer={round[q.id]}
           disabled={off}
           onPick={(optionId) => setRound((r) => pickOption(r, q.id, optionId))}
+          onToggle={(optionId, checked) =>
+            setRound((r) => toggleOption(r, q, optionId, checked))
+          }
           onText={(text) => setRound((r) => setAnswerText(r, q.id, text))}
           onAccept={() => setRound((r) => acceptRecommendation(r, q))}
         />

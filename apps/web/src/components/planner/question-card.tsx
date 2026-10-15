@@ -4,6 +4,7 @@ import type { PlanQuestion } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
+import { Checkbox } from '@andrewbehma/glass-ui/checkbox';
 import { Field, Textarea } from '@andrewbehma/glass-ui/field';
 import { Radio, RadioGroup } from '@andrewbehma/glass-ui/radio-group';
 import { Sparkles } from 'lucide-react';
@@ -12,8 +13,9 @@ import { type CardAnswer, isRecommended } from '../../lib/planner/answers';
 
 /**
  * One question of a round (D7): its number, title and question, the options
- * as native radios (arrow keys move between them), the planner's
- * recommendation with its one line of why, and a free-text answer. Every
+ * as native radios (arrow keys move between them) — or checkboxes for a
+ * `multiple` question (#337 D3) — the planner's recommendation with its one
+ * line of why, and **Write your own**, offered on every question. Every
  * control is a native input, so the card is keyboard operable as it stands.
  */
 export function QuestionCard({
@@ -22,6 +24,7 @@ export function QuestionCard({
   answer,
   disabled,
   onPick,
+  onToggle,
   onText,
   onAccept,
 }: {
@@ -31,6 +34,8 @@ export function QuestionCard({
   answer: CardAnswer | undefined;
   disabled?: boolean;
   onPick: (optionId: string) => void;
+  /** #337 D3: checks or unchecks an option of a `multiple` question. */
+  onToggle: (optionId: string, checked: boolean) => void;
   onText: (text: string) => void;
   onAccept: () => void;
 }) {
@@ -64,7 +69,28 @@ export function QuestionCard({
         </Button>
       </Recommendation>
 
-      {question.options.length > 0 ? (
+      {question.options.length > 0 && question.multiple === true ? (
+        <fieldset className="flex min-w-0 flex-col gap-2">
+          <legend className="mb-1 text-xs font-medium text-ink-3">
+            Pick any that apply
+          </legend>
+          {question.options.map((option) => (
+            <Checkbox
+              key={option.id}
+              id={`${base}-${option.id}`}
+              label={
+                option.id === rec.optionId
+                  ? `${option.label} (recommended)`
+                  : option.label
+              }
+              hint={option.detail}
+              checked={answer?.optionIds?.includes(option.id) ?? false}
+              disabled={disabled}
+              onChange={(e) => onToggle(option.id, e.target.checked)}
+            />
+          ))}
+        </fieldset>
+      ) : question.options.length > 0 ? (
         <RadioGroup label={question.title} className="flex flex-col gap-2">
           {question.options.map((option) => (
             <Radio
@@ -86,13 +112,13 @@ export function QuestionCard({
       ) : null}
 
       <Field
-        label={
-          question.options.length > 0 ? 'Or in your own words' : 'Your answer'
-        }
+        label={question.options.length > 0 ? 'Write your own' : 'Your answer'}
         htmlFor={`${base}-text`}
         hint={
           question.options.length > 0
-            ? 'Sent with the option, if one is picked.'
+            ? question.multiple === true
+              ? 'Sent with the options you checked, or on its own.'
+              : 'Sent with the option, if one is picked.'
             : undefined
         }
       >
