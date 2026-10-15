@@ -47,11 +47,20 @@ export function NormalizedNote({
     return (
       <PopoverRoot>
         <PopoverTrigger asChild>
-          <Button variant="ghost" size="sm" type="button">
+          <Button
+            variant="ghost"
+            size="sm"
+            type="button"
+            className="self-start"
+          >
             Show original
           </Button>
         </PopoverTrigger>
-        <PopoverContent title="Original text" align="start" className="w-96">
+        <PopoverContent
+          title="Original text"
+          align="start"
+          className="w-96 max-w-[calc(100vw-2rem)]"
+        >
           <p className="max-h-72 overflow-y-auto whitespace-pre-wrap break-words text-sm">
             {note.original}
           </p>
