@@ -750,14 +750,18 @@ describe('planner (e2e)', () => {
       expect(created.status).toBe(409);
     });
 
-    it('refuses a codex profile with unsupported_runtime', async () => {
+    it('refuses a codex profile with no_profile', async () => {
       const refused = await h.author.send('post', h.base(), {
         brief: 'Plan it',
         mode: 'batch',
         profileKey: 'codex-main',
       });
       expect(refused.status).toBe(422);
-      expect(refused.body).toMatchObject({ error: 'unsupported_runtime' });
+      expect(refused.body).toMatchObject({
+        error: 'no_profile',
+        reason: 'not_claude',
+        source: 'explicit',
+      });
     });
   });
 

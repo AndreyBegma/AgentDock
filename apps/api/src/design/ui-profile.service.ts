@@ -336,7 +336,7 @@ export class UiProfileService {
 
   /**
    * Starts `uiprofile.build` (D13, D18): a `ui_profile` run on the project's
-   * default profile and opus, refused by a budget like any run (#28). The
+   * runtime profile (#272 D1) and opus, refused by a budget like any run (#28). The
    * prompt carries the obligations of the manual versions since the last
    * agent build (D14).
    */
@@ -346,7 +346,12 @@ export class UiProfileService {
     reason: BuildReason,
     waiting: WaitingDesign[],
   ): Promise<string> {
-    const profile = await this.store.profile(project);
+    const profile = await this.store.profile(
+      project,
+      undefined,
+      (details, message) =>
+        designError(422, DESIGN_ERROR.noProfile, message, details),
+    );
     this.commands.assertReady(project.runnerId, 'uiprofile.build');
     await this.budgets?.assertAllowed({
       projectId: project.id,

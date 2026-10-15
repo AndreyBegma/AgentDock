@@ -28,6 +28,7 @@ import { AuditService } from '../audit/audit.service';
 import { BOARD_SYSTEM_ACTOR, BoardWork } from '../board';
 import { BudgetGate } from '../budgets/budget-gate';
 import { PrismaService } from '../database/prisma.service';
+import { RuntimeProfileResolver } from '../readiness';
 import {
   evidenceExcerpts,
   knownFingerprints,
@@ -109,6 +110,7 @@ export class CaptureService {
     private readonly commands: CaptureCommands,
     private readonly queue: CaptureQueue,
     private readonly audit: AuditService,
+    private readonly profiles: RuntimeProfileResolver,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
 
@@ -292,27 +294,11 @@ export class CaptureService {
       contentToId: BigInt(input.selection.contentToId),
       inputChars: input.selection.inputChars,
     };
-    const profile = await this.profile(project);
-    if (!profile) {
-      const capture = await this.prisma.cardCapture.create({
-        data: {
-          projectId: project.id,
-          sessionId: session.id,
-          contentFromId: watermark ?? 0n,
-          contentToId: watermark ?? 0n,
-          inputChars: range.inputChars,
-          status: 'failed',
-          error: 'no_profile: set a Claude runtime profile for the project',
-          finishedAt: now,
-        },
-        select: { id: true },
-      });
-      return {
-        kind: 'failed',
-        captureId: capture.id,
-        error: 'no_profile',
-      };
-    }
+    // #272 D1: the orchestrator's profile, else the project default; none
+    // usable is a skip the UI can name (D8), not a failure.
+    const pick = await this.profiles.resolve(project);
+    if (!pick.ok) return skip('no_profile', range.inputChars);
+    const { profile } = pick;
     const model =
       settings.captureModel && isCaptureModel(settings.captureModel)
         ? settings.captureModel
@@ -738,26 +724,5 @@ export class CaptureService {
 
   private async lockProject(tx: Tx, projectId: string): Promise<void> {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`card-capture:${projectId}`}))`;
-  }
-
-  /** D4: the orchestrator's profile, else the project default; `claude` only. */
-  private async profile(project: CaptureProject) {
-    const settings = await this.prisma.projectOrchestratorSettings.findUnique({
-      where: { projectId: project.id },
-      select: { profileId: true },
-    });
-    const id = settings?.profileId ?? project.defaultProfileId;
-    const profile = id
-      ? await this.prisma.runtimeProfile.findUnique({
-          where: { id },
-          select: { key: true, runtime: true, runnerId: true, missing: true },
-        })
-      : null;
-    return profile &&
-      profile.runnerId === project.runnerId &&
-      !profile.missing &&
-      profile.runtime === 'claude'
-      ? profile
-      : null;
   }
 }
