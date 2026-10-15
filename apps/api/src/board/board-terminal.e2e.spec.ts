@@ -431,6 +431,7 @@ describe('terminal cards (e2e)', () => {
             number: 1,
             label: 'C-1',
             change: expect.objectContaining({ fields: ['body'] }),
+            editor: { userId: w.operatorId, email: 'op@x.test' },
           }),
         ]);
         // Nothing changed: the slot is not told.
