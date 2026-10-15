@@ -45,6 +45,10 @@ import {
 } from '../../lib/overview/dashboard';
 import { RUNNER_STATUS_LABEL, STATUS_TONE } from '../../lib/runners/format';
 import type { Section } from '../../lib/section/use-section';
+import {
+  type TerminalSetupNeed,
+  terminalSetupNeeds,
+} from '../../lib/setup/format';
 import { ORCHESTRATOR_PILL_STATUS } from '../../lib/status/pill';
 import { costOrBlank, sparkValues } from '../../lib/usage/format';
 import type { ProjectFacts } from './use-dashboard';
@@ -263,8 +267,14 @@ const NEEDS_ICON: Record<NeedsYouItem['kind'], ReactNode> = {
   approval: <GitPullRequest aria-hidden="true" className="size-4 text-ink-2" />,
 };
 
-function NeedsYou({ items }: { items: NeedsYouItem[] }) {
-  if (items.length === 0) {
+function NeedsYou({
+  items,
+  setup,
+}: {
+  items: NeedsYouItem[];
+  setup: TerminalSetupNeed[];
+}) {
+  if (items.length === 0 && setup.length === 0) {
     return (
       <p className="flex items-center gap-2 py-2 text-sm text-ink-2">
         <CircleCheck aria-hidden="true" className="size-4 text-ok" />
@@ -274,6 +284,22 @@ function NeedsYou({ items }: { items: NeedsYouItem[] }) {
   }
   return (
     <ul className="-mx-2 flex flex-col">
+      {setup.map((need) => (
+        <li key={need.key}>
+          <Link
+            href={need.href}
+            className="flex items-start gap-3 rounded-md px-2 py-2 hover:bg-hover"
+          >
+            <span className="mt-0.5 shrink-0">{NEEDS_ICON.profile}</span>
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="truncate text-sm font-medium">{need.title}</span>
+              <span className="truncate text-xs text-ink-3">
+                {need.projectName} · {need.reason}
+              </span>
+            </span>
+          </Link>
+        </li>
+      ))}
       {items.map((item) => (
         <li key={item.key}>
           <Link
@@ -461,7 +487,13 @@ export function Dashboard({ projects }: { projects: ProjectSummary[] }) {
                   listed.
                 </p>
               ) : null}
-              <NeedsYou items={waiting} />
+              <NeedsYou
+                items={waiting}
+                setup={terminalSetupNeeds(
+                  projects,
+                  facts.data?.terminalSetup ?? new Map(),
+                )}
+              />
             </>
           ) : facts.error !== null ? (
             <Retry title="Could not check what waits on you" section={facts} />

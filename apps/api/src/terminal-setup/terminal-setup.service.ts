@@ -1,5 +1,6 @@
 import {
   profileAgentdockOf,
+  reportedClaudeProfileKeysOf,
   type TerminalSetupProfileFacts,
   type TerminalSetupSessionCounts,
   type TerminalSetupView,
@@ -110,6 +111,7 @@ export class TerminalSetupService {
       orchestratorKey: project.orchestratorSettings?.profile?.key ?? null,
       sessionKeys: [...counts.keys()],
       cardRunKeys: cardRuns.map((run) => run.profileKey),
+      reportedKeys: reportedClaudeProfileKeysOf(project.runner.capabilities),
     });
     const runtimes = new Map(profileRows.map((p) => [p.key, p.runtime]));
     const reports = profileAgentdockOf(project.runner.capabilities);

@@ -193,9 +193,28 @@ describe('terminalSetup', () => {
       expect(
         capture?.steps.some(
           (step) =>
-            step.kind === 'note' && step.text.includes('capture_needs_content'),
+            step.kind === 'note' &&
+            step.text.startsWith('Turn on session content first'),
         ),
       ).toBe(true);
+    });
+
+    it('shows no internals — status codes, error codes, ADR numbers — in any step', () => {
+      const view = terminalSetup({
+        ...ready,
+        shipSessionContent: false,
+        captureEnabled: false,
+      });
+      const texts = view.items.flatMap((entry) =>
+        entry.steps.flatMap((step) => {
+          if (step.kind === 'note') return [step.text];
+          if (step.kind === 'link') return [step.label];
+          return step.label ? [step.label] : [];
+        }),
+      );
+      for (const text of [...texts, view.closing]) {
+        expect(text).not.toMatch(/ADR-\d+|\b4\d\d\b|capture_needs_content/);
+      }
     });
 
     it('is not blocked once content is on', () => {
@@ -252,6 +271,47 @@ describe('terminalSetup', () => {
     expect(view.complete).toBe(true);
   });
 
+  describe('no Claude profile is known', () => {
+    const none = { ...ready, profiles: [] };
+
+    it('emits one unknown plugin item that says how to list profiles, then set up', () => {
+      const plugins = terminalSetup(none).items.filter(
+        (entry) => entry.id === 'plugin',
+      );
+      expect(plugins).toHaveLength(1);
+      expect(plugins[0]).toMatchObject({
+        state: 'unknown',
+        optional: false,
+      });
+      expect(plugins[0].profileKey).toBeUndefined();
+      expect(commands(plugins[0].steps)).toEqual([
+        'agentdock-runner profiles',
+        'agentdock-runner setup claude --profile <key>',
+      ]);
+      expect(terminalSetup(none).complete).toBe(false);
+    });
+
+    it('does the same when only a Codex profile is known', () => {
+      const view = terminalSetup({
+        ...ready,
+        profiles: [claude('cx', { runtime: 'codex', agentdock: null })],
+      });
+      expect(
+        view.items.filter(
+          (entry) => entry.id === 'plugin' && entry.profileKey === undefined,
+        ),
+      ).toHaveLength(1);
+    });
+
+    it('is not emitted once a Claude profile is listed', () => {
+      expect(
+        terminalSetup(ready).items.filter(
+          (entry) => entry.id === 'plugin' && entry.profileKey === undefined,
+        ),
+      ).toHaveLength(0);
+    });
+  });
+
   it('is todo while the runner is offline', () => {
     const facts = { ...ready, runnerConnected: false };
     expect(item(facts, 'runner_online')?.state).toBe('todo');
@@ -281,6 +341,18 @@ describe('terminalSetupProfileKeys', () => {
         cardRunKeys: ['orch', 'worker'],
       }),
     ).toEqual(['main', 'orch', 'personal', 'worker']);
+  });
+
+  it('adds the profiles the runner reports last, deduplicated', () => {
+    expect(
+      terminalSetupProfileKeys({
+        defaultKey: 'main',
+        orchestratorKey: null,
+        sessionKeys: [],
+        cardRunKeys: [],
+        reportedKeys: ['alt', 'main'],
+      }),
+    ).toEqual(['main', 'alt']);
   });
 
   it('is empty with nothing set', () => {

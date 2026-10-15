@@ -8,6 +8,7 @@ import {
   type MoveBoardCardRequest,
 } from '@agentdock/shared';
 import { findCard, MOVE_REFUSAL_TEXT } from './format';
+import { isPlanTaskItemId } from './plan-tasks';
 
 /** What glass-ui's `Board` reports for a drop (or a menu command). */
 export interface DropMove {
@@ -38,6 +39,27 @@ export function decideDrop(
   move: DropMove,
   options: { stopWorker?: boolean; skipRunOffer?: boolean } = {},
 ): DropDecision {
+  if (
+    isPlanTaskItemId(move.id) &&
+    isBoardColumn(move.fromColumnId) &&
+    isBoardColumn(move.toColumnId)
+  ) {
+    // D5: a plan task is on the board read-only; the rule refuses every move.
+    const refusal = boardMoveRule({
+      item: 'plan_task',
+      from: move.fromColumnId,
+      to: move.toColumnId,
+      roundPhase: null,
+      source: 'person',
+    });
+    return refusal.allowed
+      ? { kind: 'ignore' }
+      : {
+          kind: 'refused',
+          error: refusal.error,
+          text: MOVE_REFUSAL_TEXT[refusal.error],
+        };
+  }
   const card = findCard(view, move.id);
   if (
     !card ||
@@ -67,6 +89,18 @@ export function decideDrop(
     return { kind: 'offer-run', card, move };
   }
   return { kind: 'move', card, move };
+}
+
+/**
+ * D4: plan tasks sit after the cards of a column and cannot be reordered, so
+ * a drop index counted among everything on the board is clamped to the
+ * column's cards (the moved card excluded).
+ */
+export function clampDropIndex(view: BoardView, move: DropMove): DropMove {
+  if (!isBoardColumn(move.toColumnId)) return move;
+  const target = view.columns.find((c) => c.column === move.toColumnId);
+  const cards = (target?.cards ?? []).filter((c) => c.id !== move.id).length;
+  return move.index <= cards ? move : { ...move, index: cards };
 }
 
 /** The body of `POST /board/cards/:number/move`. */

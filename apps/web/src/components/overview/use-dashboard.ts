@@ -8,6 +8,7 @@ import type {
   ProjectSummary,
   RunPage,
   RunSummary,
+  TerminalSetupView,
   UsageSummaryResponse,
   UsageTimeseriesResponse,
 } from '@agentdock/shared';
@@ -36,6 +37,12 @@ export interface ProjectFacts {
   failedRuns: Map<string, RunSummary[]>;
   /** Projects whose orchestrator has no profile, its own or the default. */
   missingProfile: Set<string>;
+  /**
+   * Each operator-or-up project's "Terminal → Board" checklist (#281). A
+   * project whose checklist did not answer is absent — an API that predates the
+   * endpoint must not read as a problem, so it is not in `failed`.
+   */
+  terminalSetup: Map<string, TerminalSetupView>;
   /** Projects where any of these did not answer — never shown as zero. */
   failed: ProjectSummary[];
 }
@@ -51,13 +58,17 @@ async function loadProjectFacts(
   const results = await Promise.all(
     projects.map(async (project) => {
       const base = `/projects/${project.id}`;
-      const [fleet, approvals, runs, settings] = await Promise.allSettled([
-        api<FleetView>(`${base}/fleet`),
-        api<ApprovalsView>(`${base}/approvals`),
-        api<RunPage>(`${base}/runs?status=failed&limit=${FAILED_RUNS_LIMIT}`),
-        api<OrchestratorSettingsView>(`${base}/orchestrator/settings`),
-      ]);
-      return { project, fleet, approvals, runs, settings };
+      const [fleet, approvals, runs, settings, setup] =
+        await Promise.allSettled([
+          api<FleetView>(`${base}/fleet`),
+          api<ApprovalsView>(`${base}/approvals`),
+          api<RunPage>(`${base}/runs?status=failed&limit=${FAILED_RUNS_LIMIT}`),
+          api<OrchestratorSettingsView>(`${base}/orchestrator/settings`),
+          project.role === 'viewer'
+            ? Promise.reject(new Error('viewer'))
+            : api<TerminalSetupView>(`${base}/terminal-setup`),
+        ]);
+      return { project, fleet, approvals, runs, settings, setup };
     }),
   );
   const facts: ProjectFacts = {
@@ -65,9 +76,13 @@ async function loadProjectFacts(
     approvals: new Map(),
     failedRuns: new Map(),
     missingProfile: new Set(),
+    terminalSetup: new Map(),
     failed: [],
   };
-  for (const { project, fleet, approvals, runs, settings } of results) {
+  for (const { project, fleet, approvals, runs, settings, setup } of results) {
+    if (setup.status === 'fulfilled') {
+      facts.terminalSetup.set(project.id, setup.value);
+    }
     if (fleet.status === 'fulfilled') facts.fleets.set(project.id, fleet.value);
     if (approvals.status === 'fulfilled') {
       facts.approvals.set(project.id, approvals.value);

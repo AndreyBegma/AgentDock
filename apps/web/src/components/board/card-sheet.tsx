@@ -12,6 +12,7 @@ import {
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
+import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
 import { Field, Input, Select, Textarea } from '@andrewbehma/glass-ui/field';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
@@ -33,6 +34,9 @@ import {
   canRun,
   canStop,
   describeBoardError,
+  HOOKS_COMMANDS,
+  HOOKS_GUIDE_LABEL,
+  hooksGuideHref,
   hooksHint,
   phaseLabel,
   roundPill,
@@ -69,6 +73,7 @@ function roundTone(round: CardRoundView): TimelineItem['tone'] {
 }
 
 function roundItems(
+  projectId: string,
   rounds: CardRoundView[],
   notes: TextNotes,
   canOperate: boolean,
@@ -109,7 +114,17 @@ function roundItems(
           {round.error ? (
             <span className="text-danger">{round.error}</span>
           ) : null}
-          {round.hooksMissing ? <span>{hooksHint}</span> : null}
+          {round.hooksMissing ? (
+            <span>
+              {hooksHint}{' '}
+              <NextLink
+                href={hooksGuideHref(projectId)}
+                className="text-accent-ink underline-offset-2 hover:underline"
+              >
+                {HOOKS_GUIDE_LABEL}
+              </NextLink>
+            </span>
+          ) : null}
           {cost ? <span className="tabular-nums">{cost}</span> : null}
         </span>
       ),
@@ -307,7 +322,21 @@ function CardDetailBody({
             </p>
           ) : null}
           {card.round?.hooksMissing ? (
-            <p className="text-xs text-ink-2">{hooksHint}</p>
+            <div className="flex flex-col gap-2 text-xs text-ink-2">
+              <p>{hooksHint}</p>
+              {HOOKS_COMMANDS.map((item) => (
+                <div key={item.code} className="flex flex-col gap-1">
+                  <span>{item.label}</span>
+                  <CodeBlock code={item.code} defaultWrap />
+                </div>
+              ))}
+              <NextLink
+                href={hooksGuideHref(projectId)}
+                className="text-accent-ink underline-offset-2 hover:underline"
+              >
+                {HOOKS_GUIDE_LABEL}
+              </NextLink>
+            </div>
           ) : null}
 
           {failure ? (
@@ -436,7 +465,7 @@ function CardDetailBody({
         <section aria-label="Rounds" className="flex flex-col gap-2">
           <SectionHeader title="Rounds" headingLevel={3} />
           <Timeline
-            items={roundItems(card.rounds, notes, canOperate)}
+            items={roundItems(projectId, card.rounds, notes, canOperate)}
             empty={<p className="text-sm text-ink-3">No worker has run yet.</p>}
           />
         </section>

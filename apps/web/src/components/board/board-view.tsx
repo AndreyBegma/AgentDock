@@ -1,6 +1,10 @@
 'use client';
 
-import type { BoardCardView, BoardView } from '@agentdock/shared';
+import type {
+  BoardCardView,
+  BoardPlanTaskView,
+  BoardView,
+} from '@agentdock/shared';
 import { Board, type BoardColumn } from '@andrewbehma/glass-ui/board';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
@@ -12,6 +16,7 @@ import { type CSSProperties, useState } from 'react';
 import { moveCard, runCard } from '../../lib/board/actions';
 import {
   applyDrop,
+  clampDropIndex,
   type DropDecision,
   type DropMove,
   decideDrop,
@@ -19,7 +24,6 @@ import {
 } from '../../lib/board/board-state';
 import {
   approveRunOffer,
-  type BoardItem,
   COLUMN_HINT,
   COLUMN_TITLE,
   canAccept,
@@ -31,11 +35,17 @@ import {
   columnsOf,
   describeBoardError,
   isSuggestion,
-  toItem,
 } from '../../lib/board/format';
+import {
+  boardItems,
+  isPlanItem,
+  type WorkBoardItem,
+} from '../../lib/board/plan-tasks';
 import { cardDesignHref } from '../../lib/design/href';
+import { planHref } from '../../lib/planner/href';
 import { boardColumnWidth, usePhone, visibleColumns } from './board-layout';
 import { CardFace } from './card-face';
+import { PlanTaskFace } from './plan-task-face';
 import type { CardActions } from './use-card-actions';
 
 type Asking = Extract<DropDecision, { kind: 'confirm-stop' | 'offer-run' }>;
@@ -49,21 +59,26 @@ type Asking = Extract<DropDecision, { kind: 'confirm-stop' | 'offer-run' }>;
 export function BoardColumns({
   projectId,
   view,
+  planTasks,
   runnerName,
   canOperate,
   canTerminal,
   actions,
   onOpen,
+  onOpenPlanTask,
   onOpenTerminal,
   onReload,
 }: {
   projectId: string;
   view: BoardView;
+  /** #270: read-only plan tasks, after the cards of their column (D4). */
+  planTasks: readonly BoardPlanTaskView[];
   runnerName?: string | null;
   canOperate: boolean;
   canTerminal: boolean;
   actions: CardActions;
   onOpen: (card: BoardCardView) => void;
+  onOpenPlanTask: (task: BoardPlanTaskView) => void;
   onOpenTerminal: (card: BoardCardView) => void;
   onReload: () => void;
 }) {
@@ -76,24 +91,27 @@ export function BoardColumns({
 
   const phone = usePhone();
 
-  const allColumns: BoardColumn<BoardItem>[] = columnsOf(shown).map((c) => ({
-    id: c.column,
-    title: COLUMN_TITLE[c.column],
-    cards: c.cards.map(toItem),
-    footer:
-      c.cards.length === 0 ? (
-        <p className="px-1 text-xs text-ink-3">{COLUMN_HINT[c.column]}</p>
-      ) : c.column === 'inbox' && canOperate ? (
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={actions.busy || busy}
-          onClick={() => actions.askDismissAll(c.cards.length)}
-        >
-          Dismiss all
-        </Button>
-      ) : undefined,
-  }));
+  const items = boardItems(shown, planTasks);
+  const allColumns: BoardColumn<WorkBoardItem>[] = columnsOf(shown).map(
+    (c) => ({
+      id: c.column,
+      title: COLUMN_TITLE[c.column],
+      cards: items.get(c.column) ?? [],
+      footer:
+        (items.get(c.column) ?? []).length === 0 ? (
+          <p className="px-1 text-xs text-ink-3">{COLUMN_HINT[c.column]}</p>
+        ) : c.column === 'inbox' && canOperate ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={actions.busy || busy}
+            onClick={() => actions.askDismissAll(c.cards.length)}
+          >
+            Dismiss all
+          </Button>
+        ) : undefined,
+    }),
+  );
 
   const columns = visibleColumns(allColumns, phone);
 
@@ -121,11 +139,12 @@ export function BoardColumns({
     }
   };
 
-  const onMove = (move: DropMove) => {
+  const onMove = (dropped: DropMove) => {
     if (!canOperate) {
       toast.error('Only operators can move cards.');
       return;
     }
+    const move = clampDropIndex(view, dropped);
     const decision = decideDrop(view, move);
     switch (decision.kind) {
       case 'ignore':
@@ -167,19 +186,41 @@ export function BoardColumns({
           } as CSSProperties
         }
       >
-        <Board<BoardItem>
+        <Board<WorkBoardItem>
           aria-label="Project board"
           columns={columns}
           onMove={onMove}
-          renderCard={(item) => (
-            <CardFace
-              projectId={projectId}
-              card={item.card}
-              canOperate={canOperate}
-              onOpen={onOpen}
-            />
-          )}
+          renderCard={(item) =>
+            isPlanItem(item) ? (
+              <PlanTaskFace task={item.planTask} onOpen={onOpenPlanTask} />
+            ) : (
+              <CardFace
+                projectId={projectId}
+                card={item.card}
+                canOperate={canOperate}
+                onOpen={onOpen}
+              />
+            )
+          }
           renderCardMenu={(item) => {
+            if (isPlanItem(item)) {
+              const task = item.planTask;
+              return (
+                <>
+                  <MenuSeparator />
+                  <MenuItem onSelect={() => onOpenPlanTask(task)}>
+                    Open
+                  </MenuItem>
+                  <MenuItem
+                    onSelect={() =>
+                      router.push(planHref(projectId, task.planId, task.key))
+                    }
+                  >
+                    Open in Planner
+                  </MenuItem>
+                </>
+              );
+            }
             const card = item.card;
             if (isSuggestion(card)) {
               return (

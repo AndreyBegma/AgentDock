@@ -14,10 +14,15 @@ import {
   type CardRoundBrief,
   type CardRoundPhase,
   isActiveRoundPhase,
+  PLAN_TASK_MOVE_REFUSAL_TEXT,
 } from '@agentdock/shared';
 import type { Status } from '@andrewbehma/glass-ui/status-pill';
 import { ApiError, describeError } from '../api';
 import { describeNoProfile } from '../readiness/copy';
+import {
+  PROFILES_LIST_COMMAND,
+  SETUP_CLAUDE_COMMAND,
+} from '../runners/install';
 
 export const COLUMN_TITLE: Record<BoardColumn, string> = {
   inbox: 'Inbox',
@@ -131,6 +136,7 @@ export const MOVE_REFUSAL_TEXT: Record<BoardMoveRefusal, string> = {
   automatic_to_completed: 'Only a person completes a card.',
   card_completed: 'This card is already completed.',
   invalid_move: 'A suggestion leaves the Inbox only by Accept, into To Do.',
+  plan_task_derived: PLAN_TASK_MOVE_REFUSAL_TEXT,
 };
 
 /** #273 D7: the card's design is on and not approved, so the server would refuse Run. */
@@ -358,6 +364,26 @@ export function parseMaxRunning(raw: string): number | null {
   return n >= BOARD_MAX_RUNNING_MIN && n <= BOARD_MAX_RUNNING_MAX ? n : null;
 }
 
-/** D6: shown when no hook event arrived after the start. */
+/**
+ * #281 D6: shown when no hook event arrived after the start. Names the cause,
+ * the profile key and the command; the card does not know its profile, so the
+ * key is the one `agentdock-runner profiles` lists.
+ */
 export const hooksHint =
-  'The agentdock plugin is not installed in this project, so the card only moves when the session ends or you mark it finished.';
+  "No hook events from this card's session: the agentdock plugin is not set up for its runtime profile, so the card moves only when the session ends or you mark it finished.";
+
+/** The commands behind the hint, shown as code blocks next to it. */
+export const HOOKS_COMMANDS = [
+  { label: 'Find the profile key (first column)', code: PROFILES_LIST_COMMAND },
+  {
+    label: 'Set up that profile, then restart its sessions',
+    code: SETUP_CLAUDE_COMMAND,
+  },
+] as const;
+
+/** The link text after the hint: what the checklist holds. */
+export const HOOKS_GUIDE_LABEL = 'See the exact command for each profile';
+
+/** #281 D6: the Settings › Sessions checklist of the card's project. */
+export const hooksGuideHref = (projectId: string): string =>
+  `/projects/${projectId}/settings?tab=sessions`;

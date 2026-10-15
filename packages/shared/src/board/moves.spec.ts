@@ -284,4 +284,47 @@ describe('boardMoveRule', () => {
       ).toEqual({ allowed: true, effects: [], offerRun: false });
     }
   });
+
+  describe('plan tasks (#270 D5)', () => {
+    const PHASES = [null, ...CARD_ROUND_PHASES] as const;
+
+    it('refuses every move of a plan task, reorders included, for both sources', () => {
+      for (const from of BOARD_COLUMNS) {
+        for (const to of BOARD_COLUMNS) {
+          for (const source of ['person', 'automatic'] as const) {
+            for (const stopWorker of [undefined, true]) {
+              expect(
+                boardMoveRule(
+                  move({ item: 'plan_task', from, to, source, stopWorker }),
+                ),
+              ).toEqual({ allowed: false, error: 'plan_task_derived' });
+            }
+          }
+        }
+      }
+    });
+
+    it('decides a card exactly as before, whether item is card or omitted', () => {
+      for (const from of BOARD_COLUMNS) {
+        for (const to of BOARD_COLUMNS) {
+          for (const source of ['person', 'automatic'] as const) {
+            for (const roundPhase of PHASES) {
+              for (const stopWorker of [undefined, true]) {
+                const input = move({
+                  from,
+                  to,
+                  source,
+                  roundPhase,
+                  stopWorker,
+                });
+                expect(boardMoveRule({ ...input, item: 'card' })).toEqual(
+                  boardMoveRule(input),
+                );
+              }
+            }
+          }
+        }
+      }
+    });
+  });
 });

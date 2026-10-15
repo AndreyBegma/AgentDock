@@ -31,4 +31,5 @@ Numbered, never rewritten. A changed decision gets a new ADR that supersedes the
 | [0025](0025-a-design-has-one-owner-a-plan-task-or-a-board-card.md) | A design has exactly one owner — a plan task or a board card (amends ADR-0022 §3) |
 | [0026](0026-card-capture-reads-opt-in-session-content.md) | Card capture reads opt-in session content with a small model on the project's runner (amends ADR-0021) |
 | [0027](0027-stored-text-is-normalized-to-english-on-the-runner.md) | Stored text is normalized to English on the runner (extends ADR-0026) |
+| [0028](0028-one-work-surface-for-cards-and-plan-tasks.md) | One work surface: plan tasks are projected read-only onto the Board, one List replaces Tasks (scopes ADR-0024 §2) |
 | [0029](0029-accepting-a-board-card-may-merge-its-pull-request-through-the-runner.md) | Accepting a board card may merge its pull request through the runner (amends ADR-0024 §6) |

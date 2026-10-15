@@ -10,6 +10,32 @@ const profileAdvertSchema = z.object({
   agentdock: profileAgentdockSchema,
 });
 
+const reportedProfileSchema = z.object({
+  id: z.string().min(1),
+  runtime: z.string().optional(),
+});
+
+/**
+ * The keys of the Claude profiles a runner's stored capabilities advertise, in
+ * advertised order (#281 D3). Read per entry like `profileAgentdockOf`, so a
+ * malformed entry does not hide the rest; a Codex profile is left out (it
+ * reports no hooks), a profile with no runtime is read as Claude.
+ */
+export const reportedClaudeProfileKeysOf = (
+  capabilities: unknown,
+): string[] => {
+  const parsed = profilesAdvertSchema.safeParse(capabilities);
+  if (!parsed.success) return [];
+  const keys: string[] = [];
+  for (const entry of parsed.data.profiles) {
+    const profile = reportedProfileSchema.safeParse(entry);
+    if (profile.success && profile.data.runtime !== 'codex') {
+      keys.push(profile.data.id);
+    }
+  }
+  return keys;
+};
+
 /**
  * Each profile's D1 report (#281) from stored or received capabilities JSON, by
  * profile key. A profile without a valid `agentdock` is left out: unknown, never

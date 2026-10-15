@@ -25,6 +25,7 @@ export * from './terminal';
 export * from './text';
 export * from './usage';
 export * from './webhooks';
+export * from './work';
 export * from './workflows';
 
 export const formatDate = (date: Date): string =>

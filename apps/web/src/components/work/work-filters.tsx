@@ -1,6 +1,11 @@
 'use client';
 
-import { PLAN_TASK_KINDS, type ProjectSummary } from '@agentdock/shared';
+import {
+  type ProjectSummary,
+  WORK_QUERY_TEXT_MAX,
+  WORK_SOURCES,
+  WORK_STATUSES,
+} from '@agentdock/shared';
 import { SearchField, Select } from '@andrewbehma/glass-ui/field';
 import { Toolbar } from '@andrewbehma/glass-ui/toolbar';
 import { useMemo } from 'react';
@@ -8,48 +13,48 @@ import {
   type UrlFilters,
   useFilterChips,
   useSearchDraft,
-} from '../../../lib/filters/use-url-filters';
+} from '../../lib/filters/use-url-filters';
 import {
-  TASK_KIND_LABEL,
-  TASK_STATUS_LABEL,
-  TASK_STATUSES,
-  type TaskFilters,
-  taskChipDefs,
-} from '../../../lib/tasks/format';
+  type WorkFilters as Filters,
+  WORK_KIND_LABEL,
+  WORK_SOURCE_LABEL,
+  WORK_STATUS_LABEL,
+  workChipDefs,
+} from '../../lib/work/format';
 
 /**
- * The filters of `/tasks` — the canonical bar (#213): a search that applies
- * when typing pauses, three instant selects, the filters in force as chips.
+ * The filters of `/work` — the canonical bar (#213): a search that applies
+ * when typing pauses, four instant selects, the filters in force as chips.
  * Below `sm` they fold into "Filters (n)" and a sheet.
  */
-export function TasksFilters({
+export function WorkFilters({
   url,
   projects,
 }: {
-  url: UrlFilters<TaskFilters>;
+  url: UrlFilters<Filters>;
   projects: ProjectSummary[];
 }) {
   const { filters, set } = url;
   const search = useSearchDraft(filters.q, (q) => set({ q }));
   const defs = useMemo(() => {
     const names = new Map(projects.map((p) => [p.id, p.displayName]));
-    return taskChipDefs((id) => names.get(id) ?? 'another project');
+    return workChipDefs((id) => names.get(id) ?? 'another project');
   }, [projects]);
   const chips = useFilterChips(url, defs);
 
   return (
     <Toolbar
-      aria-label="Filter tasks"
+      aria-label="Filter work"
       collapseBelow="sm"
       activeFilters={chips.activeFilters}
       onClearAll={chips.onClearAll}
       filters={
         <>
           <SearchField
-            aria-label="Search tasks"
+            aria-label="Search work"
             value={search.draft}
-            maxLength={200}
-            placeholder="Title or key"
+            maxLength={WORK_QUERY_TEXT_MAX}
+            placeholder="Title, C-12, t3 or #12"
             className="w-full sm:w-52"
             onChange={(e) => search.setDraft(e.target.value)}
             onKeyDown={(e) => {
@@ -70,17 +75,34 @@ export function TasksFilters({
             ))}
           </Select>
           <Select
+            aria-label="Source"
+            value={filters.source}
+            className="w-full sm:w-36"
+            onChange={(e) =>
+              set({ source: e.target.value as Filters['source'] })
+            }
+          >
+            <option value="">Any source</option>
+            {WORK_SOURCES.map((source) => (
+              <option key={source} value={source}>
+                {WORK_SOURCE_LABEL[source]}
+              </option>
+            ))}
+          </Select>
+          <Select
             aria-label="Kind"
             value={filters.kind}
             className="w-full sm:w-36"
-            onChange={(e) =>
-              set({ kind: e.target.value as TaskFilters['kind'] })
-            }
+            onChange={(e) => set({ kind: e.target.value as Filters['kind'] })}
           >
             <option value="">Any kind</option>
-            {PLAN_TASK_KINDS.map((kind) => (
+            {(
+              Object.keys(WORK_KIND_LABEL) as Array<
+                keyof typeof WORK_KIND_LABEL
+              >
+            ).map((kind) => (
               <option key={kind} value={kind}>
-                {TASK_KIND_LABEL[kind]}
+                {WORK_KIND_LABEL[kind]}
               </option>
             ))}
           </Select>
@@ -89,13 +111,13 @@ export function TasksFilters({
             value={filters.status}
             className="w-full sm:w-40"
             onChange={(e) =>
-              set({ status: e.target.value as TaskFilters['status'] })
+              set({ status: e.target.value as Filters['status'] })
             }
           >
             <option value="">Any status</option>
-            {TASK_STATUSES.map((status) => (
+            {WORK_STATUSES.map((status) => (
               <option key={status} value={status}>
-                {TASK_STATUS_LABEL[status]}
+                {WORK_STATUS_LABEL[status]}
               </option>
             ))}
           </Select>

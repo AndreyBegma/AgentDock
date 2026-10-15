@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 import { capabilitiesSchema } from '../protocol';
-import { profileAgentdockOf } from './agentdock-report';
+import {
+  profileAgentdockOf,
+  reportedClaudeProfileKeysOf,
+} from './agentdock-report';
 
 const profile = (id: string, extra: Record<string, unknown> = {}) => ({
   id,
@@ -49,6 +52,34 @@ describe('runtimeProfileSchema.agentdock', () => {
         ]),
       ).success,
     ).toBe(false);
+  });
+});
+
+describe('reportedClaudeProfileKeysOf', () => {
+  it('lists the advertised Claude profiles in order, with or without a report', () => {
+    expect(
+      reportedClaudeProfileKeysOf(
+        capabilities([
+          profile('main', { agentdock: { plugin: null, telemetry: false } }),
+          profile('old'),
+          profile('cx', { runtime: 'codex' }),
+        ]),
+      ),
+    ).toEqual(['main', 'old']);
+  });
+
+  it('reads a stored profile with no runtime as Claude, and skips malformed entries', () => {
+    expect(
+      reportedClaudeProfileKeysOf({
+        profiles: [{ id: 'a' }, 'nope', { id: '' }, { id: 'b' }],
+      }),
+    ).toEqual(['a', 'b']);
+  });
+
+  it('is empty for JSON that is not a capabilities object', () => {
+    for (const value of [null, undefined, 'x', [], { profiles: 'x' }]) {
+      expect(reportedClaudeProfileKeysOf(value)).toEqual([]);
+    }
   });
 });
 

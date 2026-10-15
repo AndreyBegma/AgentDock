@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { ApiError } from '../api';
-import { applyDrop } from './board-state';
+import { applyDrop, clampDropIndex } from './board-state';
 import { boardView, card } from './fixtures';
 import { describeBoardError } from './format';
 
@@ -60,6 +60,43 @@ describe('applyDrop', () => {
         index: 0,
       }),
     ).toBe(view);
+  });
+});
+
+describe('clampDropIndex (#270 D4)', () => {
+  const view = boardView([
+    card(1, 'todo'),
+    card(2, 'in_progress'),
+    card(3, 'in_progress'),
+  ]);
+  const drop = (id: string, from: string, to: string, index: number) => ({
+    id,
+    fromColumnId: from,
+    toColumnId: to,
+    index,
+  });
+
+  test('keeps an index that lands among the cards', () => {
+    const move = drop('card-1', 'todo', 'in_progress', 1);
+    expect(clampDropIndex(view, move)).toBe(move);
+  });
+
+  test('pulls an index past the plan tasks back to the end of the cards', () => {
+    expect(
+      clampDropIndex(view, drop('card-1', 'todo', 'in_progress', 5)).index,
+    ).toBe(2);
+  });
+
+  test('does not count the moved card within its own column', () => {
+    expect(
+      clampDropIndex(view, drop('card-2', 'in_progress', 'in_progress', 4))
+        .index,
+    ).toBe(1);
+  });
+
+  test('an unknown column is left alone', () => {
+    const move = drop('card-1', 'todo', 'nowhere', 9);
+    expect(clampDropIndex(view, move)).toBe(move);
   });
 });
 

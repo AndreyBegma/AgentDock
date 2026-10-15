@@ -3,10 +3,17 @@
 import {
   BOARD_CHANGED_EVENT,
   type BoardCardView,
+  type BoardPlanTaskView,
   type BoardView,
+  PLANNER_LIVE_EVENT,
+  QUEUE_LIVE_EVENT,
 } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import {
+  SegmentedControl,
+  SegmentedControlItem,
+} from '@andrewbehma/glass-ui/segmented-control';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import Link from 'next/link';
@@ -30,6 +37,7 @@ import {
   type TerminalAccess,
 } from '../../../../../components/board/card-sheet';
 import { NewCardDialog } from '../../../../../components/board/new-card-dialog';
+import { PlanTaskSheet } from '../../../../../components/board/plan-task-sheet';
 import { useCardActions } from '../../../../../components/board/use-card-actions';
 import { PageHeader } from '../../../../../components/page-header/page-header';
 import { AsyncSection } from '../../../../../components/prerequisites/async-section';
@@ -45,6 +53,11 @@ import {
   isNotFound,
   parseCardParam,
 } from '../../../../../lib/board/format';
+import {
+  fetchPlanTasks,
+  findPlanTask,
+  parsePlanTaskParam,
+} from '../../../../../lib/board/plan-tasks';
 import { useLive } from '../../../../../lib/live/use-live';
 import { useReadiness } from '../../../../../lib/readiness/use-readiness';
 import { useSection } from '../../../../../lib/section/use-section';
@@ -69,6 +82,10 @@ function BoardScreen() {
   const pathname = usePathname();
   const params = useSearchParams();
   const selected = parseCardParam(params.get('card'));
+  const selectedPlanTask = parsePlanTaskParam(
+    params.get('plan'),
+    params.get('task'),
+  );
   /** Bumped by a live push or a mutation; the board and the sheet depend on it. */
   const [version, setVersion] = useState(0);
   const [creating, setCreating] = useState(false);
@@ -82,7 +99,14 @@ function BoardScreen() {
   const reload = useCallback(() => setVersion((v) => v + 1), []);
 
   useLive(`project:${projectId}`, (message) => {
-    if (message.event !== BOARD_CHANGED_EVENT) return;
+    // D14: a plan task moves with its plan (planner) and its issue (queue).
+    if (
+      message.event !== BOARD_CHANGED_EVENT &&
+      message.event !== PLANNER_LIVE_EVENT &&
+      message.event !== QUEUE_LIVE_EVENT
+    ) {
+      return;
+    }
     clearTimeout(timer.current);
     timer.current = setTimeout(reload, REFETCH_DEBOUNCE_MS);
   });
@@ -95,6 +119,12 @@ function BoardScreen() {
   const canAttach = useTerminalAvailable(project?.runnerId, isAdmin);
 
   const board = useSection(() => fetchBoard(projectId), [projectId, version]);
+  const planTasks = useSection(
+    () => fetchPlanTasks(projectId),
+    [projectId, version],
+  );
+  const planTaskItems: readonly BoardPlanTaskView[] =
+    planTasks.data?.items ?? [];
   const readiness = useReadiness(projectId);
 
   // Older Completed pages are fetched by hand; a fresh first page resets them.
@@ -148,6 +178,21 @@ function BoardScreen() {
     });
   };
 
+  const selectPlanTask = (task: BoardPlanTaskView | undefined) => {
+    const next = new URLSearchParams(params.toString());
+    if (!task) {
+      next.delete('plan');
+      next.delete('task');
+    } else {
+      next.set('plan', task.planId);
+      next.set('task', task.key);
+    }
+    const query = next.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, {
+      scroll: false,
+    });
+  };
+
   const actions = useCardActions({
     projectId,
     runnerName: project?.runnerName,
@@ -191,7 +236,7 @@ function BoardScreen() {
       <div className="flex flex-col gap-3">
         <PageHeader
           className="mb-0"
-          title="Board"
+          title="Work"
           description={
             view
               ? `${view.running} of ${view.settings.maxRunning} workers running`
@@ -200,6 +245,25 @@ function BoardScreen() {
           actions={
             <>
               {live.status !== 'connected' ? <LiveStatusBadge /> : null}
+              <SegmentedControl role="group" aria-label="View">
+                <SegmentedControlItem active={false} layoutId="work-view">
+                  <Link
+                    href={`/work?projectId=${encodeURIComponent(projectId)}`}
+                    className="block w-full min-w-16 px-3 py-1.5 text-center text-sm whitespace-nowrap"
+                  >
+                    List
+                  </Link>
+                </SegmentedControlItem>
+                <SegmentedControlItem active layoutId="work-view">
+                  <button
+                    type="button"
+                    aria-pressed
+                    className="w-full min-w-16 px-3 py-1.5 text-sm whitespace-nowrap"
+                  >
+                    Board
+                  </button>
+                </SegmentedControlItem>
+              </SegmentedControl>
               {canOperate ? (
                 <Button variant="solid" onClick={() => setCreating(true)}>
                   New card
@@ -231,11 +295,13 @@ function BoardScreen() {
               <BoardColumns
                 projectId={projectId}
                 view={view}
+                planTasks={planTaskItems}
                 runnerName={project?.runnerName}
                 canOperate={canOperate}
                 canTerminal={canAttach}
                 actions={actions}
                 onOpen={(card) => select(card.number)}
+                onOpenPlanTask={selectPlanTask}
                 onOpenTerminal={setAttaching}
                 onReload={reload}
               />
@@ -278,6 +344,22 @@ function BoardScreen() {
         terminal={terminal}
         onChanged={reload}
         onClose={() => select(undefined)}
+      />
+
+      <PlanTaskSheet
+        projectId={projectId}
+        open={selectedPlanTask !== undefined}
+        task={
+          selectedPlanTask
+            ? findPlanTask(
+                planTaskItems,
+                selectedPlanTask.planId,
+                selectedPlanTask.key,
+              )
+            : undefined
+        }
+        loading={planTasks.data === undefined && planTasks.error === undefined}
+        onClose={() => selectPlanTask(undefined)}
       />
 
       {actions.dialogs}
