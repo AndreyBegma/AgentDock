@@ -33,6 +33,7 @@ describe('the Design chip on a board card (#243)', () => {
     variantCount: 2,
     status: 'idle',
     approvedRevisionId: null,
+    busySince: null,
     ...over,
   });
 
@@ -129,6 +130,7 @@ const summary = (over: Partial<TaskDesignSummary> = {}): TaskDesignSummary => ({
   variantCount: 1,
   status: 'idle',
   approvedRevisionId: null,
+  busySince: null,
   ...over,
 });
 

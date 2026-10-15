@@ -191,6 +191,7 @@ const ERROR_TEXT: Record<DesignErrorCode, string> = {
   command_failed: 'The runner could not run it. Try again.',
   runner_timeout: 'The runner did not answer in time. Try again.',
   runner_outdated: 'The runner is too old for this. Update the runner.',
+  design_not_running: 'Nothing of this design is running.',
 };
 
 /** A sentence for the person, and where the fix is when it is elsewhere. */
