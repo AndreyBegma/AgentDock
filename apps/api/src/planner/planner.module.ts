@@ -7,6 +7,7 @@ import { RunnersModule } from '../runners/runners.module';
 import { SettingsModule } from '../settings/settings.module';
 import { CardDesignTurnService } from './card-design-turn.service';
 import { PlanService } from './plan.service';
+import { PlanCardsService } from './plan-cards.service';
 import { PlanDocsSink } from './plan-docs-sink';
 import { PlanSendService } from './plan-send.service';
 import { PlanStore } from './plan-store';
@@ -42,6 +43,7 @@ import { TasksQueryService } from './tasks-query.service';
   providers: [
     CardDesignTurnService,
     PlanDocsSink,
+    PlanCardsService,
     PlanSendService,
     PlanService,
     PlanStore,
