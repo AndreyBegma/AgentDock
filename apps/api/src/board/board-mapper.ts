@@ -30,6 +30,7 @@ export const cardDesignSelect = {
     variantCount: true,
     status: true,
     approvedRevisionId: true,
+    busySince: true,
   },
 } as const satisfies Prisma.BoardCard$designArgs;
 
@@ -48,7 +49,9 @@ export type CardWithRounds = BoardCard & {
 const designOf = (
   design: CardDesignRow | null | undefined,
 ): TaskDesignSummary | null =>
-  design?.needed ? { ...design, busySince: null } : null;
+  design?.needed
+    ? { ...design, busySince: design.busySince?.toISOString() ?? null }
+    : null;
 
 export type CardWithPeople = CardWithRounds & {
   createdBy: BoardUserRef | null;

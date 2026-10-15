@@ -143,13 +143,19 @@ export const designSummaries = async (
       variantCount: true,
       status: true,
       approvedRevisionId: true,
+      busySince: true,
     },
   });
   return new Map(
-    rows.flatMap(({ taskKey, ...summary }) =>
+    rows.flatMap(({ taskKey, busySince, ...summary }) =>
       taskKey === null
         ? []
-        : [[taskKey, { ...summary, busySince: null }] as const],
+        : [
+            [
+              taskKey,
+              { ...summary, busySince: busySince?.toISOString() ?? null },
+            ] as const,
+          ],
     ),
   );
 };

@@ -59,7 +59,7 @@ export const applyDesignOutput = async (
     where: { id: design.id },
     data: {
       profileId: plan.profileId,
-      ...(next ? {} : { status: 'reviewing' }),
+      ...(next ? {} : { status: 'reviewing', busySince: null }),
     },
   });
   return next;
@@ -67,8 +67,8 @@ export const applyDesignOutput = async (
 
 /**
  * A design whose turn failed, was cancelled, or never started: back to
- * reviewing what it has, or idle with nothing drawn. An approved design is
- * left alone.
+ * reviewing what it has, or idle with nothing drawn, its job's clock
+ * stopped (#275 D2). An approved design is left alone.
  */
 export const settleDesign = async (db: Db, owner: DesignKey): Promise<void> => {
   const design = await db.taskDesign.findUnique({
@@ -78,6 +78,9 @@ export const settleDesign = async (db: Db, owner: DesignKey): Promise<void> => {
   if (!design || design.status === 'approved') return;
   await db.taskDesign.update({
     where: { id: design.id },
-    data: { status: restingStatus(design._count.revisions > 0) },
+    data: {
+      status: restingStatus(design._count.revisions > 0),
+      busySince: null,
+    },
   });
 };

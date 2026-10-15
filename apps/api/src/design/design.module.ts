@@ -9,6 +9,7 @@ import { DesignService } from './design.service';
 import { DesignCommands } from './design-commands';
 import { DesignMockupController } from './design-mockup.controller';
 import { DesignSettingsService } from './design-settings.service';
+import { DesignStopService } from './design-stop.service';
 import { UiProfileService } from './ui-profile.service';
 import { UiProfileProjector } from './ui-profile-projector';
 
@@ -18,7 +19,7 @@ import { UiProfileProjector } from './ui-profile-projector';
  * endpoint. Design turns are the Planner's; profile builds arrive as
  * `uiprofile_build.*` events (`UiProfileProjector`). A board card's design
  * (#243, ADR-0025) runs the same flow; approving it may start the card's
- * round 1 (`BoardModule`).
+ * round 1 (`BoardModule`). Stop (#275) cancels the turn or leaves the build.
  */
 @Module({
   imports: [BoardModule, PlannerModule, ProjectsModule, RunnersModule],
@@ -27,6 +28,7 @@ import { UiProfileProjector } from './ui-profile-projector';
     DesignCommands,
     DesignService,
     DesignSettingsService,
+    DesignStopService,
     UiProfileProjector,
     UiProfileService,
   ],

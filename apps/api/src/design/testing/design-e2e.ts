@@ -120,6 +120,52 @@ export class DesignHarness extends PlannerHarness {
     ]);
   }
 
+  /** The runner reports the running build ended `phase` with `error` (#275 D6). */
+  async endBuild(phase: 'failed' | 'cancelled', error: string): Promise<void> {
+    const run = await this.activeBuild();
+    await this.sinks.dispatch(this.runnerId, [
+      this.event('uiprofile_build.finished', {
+        runId: run.id,
+        projectId: this.projectId,
+        phase,
+        at: new Date().toISOString(),
+        exitCode: 1,
+        error,
+        resultTruncated: false,
+      }),
+    ]);
+  }
+
+  /**
+   * The runner reports the active design turn of a plan or a card (`hostId`,
+   * the `planId` it runs under) ended `phase` with `error` (#275 D6).
+   */
+  async endTurn(
+    hostId: string,
+    phase: 'failed' | 'cancelled',
+    error: string,
+  ): Promise<void> {
+    const turn = await this.ctx.prisma.planTurn.findFirstOrThrow({
+      where: {
+        OR: [{ planId: hostId }, { cardId: hostId }],
+        phase: { in: ['queued', 'running'] },
+      },
+    });
+    await this.sinks.dispatch(this.runnerId, [
+      this.event('plan_turn.finished', {
+        planId: hostId,
+        turnId: turn.id,
+        runId: turn.runId,
+        projectId: this.projectId,
+        phase,
+        at: new Date().toISOString(),
+        exitCode: 1,
+        error,
+        resultTruncated: false,
+      }),
+    ]);
+  }
+
   /** A profile version written straight to the database. */
   seedProfile(
     over: {
