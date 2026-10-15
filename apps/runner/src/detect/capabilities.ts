@@ -1,6 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Capabilities } from '@agentdock/shared/protocol';
+import type {
+  Capabilities,
+  ProfileAgentdock,
+} from '@agentdock/shared/protocol';
 import { z } from 'zod';
 import type { ConfigProfile, RunnerConfig } from '../config';
 import type { Exec } from './exec';
@@ -81,6 +84,76 @@ export const readCodeSentinel = (
   }
   return null;
 };
+
+/** The installed version of `agentdock@*` — user scope first — or null. */
+const readAgentdockPlugin = (configDir: string): string | null => {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(
+      readFileSync(
+        join(configDir, 'plugins', 'installed_plugins.json'),
+        'utf8',
+      ),
+    );
+  } catch {
+    return null;
+  }
+  const parsed = installedPluginsSchema.safeParse(raw);
+  if (!parsed.success) return null;
+  for (const [key, installs] of Object.entries(parsed.data.plugins)) {
+    if (!key.startsWith('agentdock@')) continue;
+    const install =
+      installs.find((i) => i.scope === 'user') ?? installs[0] ?? null;
+    if (install) return install.version;
+  }
+  return null;
+};
+
+const settingsEnvSchema = z.object({
+  env: z.record(z.string(), z.unknown()).optional(),
+});
+
+/**
+ * Whether `settings.json` → `env.OTEL_EXPORTER_OTLP_ENDPOINT` points at the
+ * runner's OTLP http port on this machine (#281 D1). False when the receiver
+ * is off, the file is unreadable, or the endpoint names another host or port.
+ */
+const readTelemetry = (configDir: string, port: number | null): boolean => {
+  if (port === null) return false;
+  let raw: unknown;
+  try {
+    raw = JSON.parse(readFileSync(join(configDir, 'settings.json'), 'utf8'));
+  } catch {
+    return false;
+  }
+  const parsed = settingsEnvSchema.safeParse(raw);
+  const endpoint = parsed.success
+    ? parsed.data.env?.OTEL_EXPORTER_OTLP_ENDPOINT
+    : undefined;
+  if (typeof endpoint !== 'string') return false;
+  try {
+    const url = new URL(endpoint);
+    return (
+      url.protocol === 'http:' &&
+      ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname) &&
+      Number(url.port) === port
+    );
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * The agentdock plugin and telemetry state of one Claude profile (#281 D1),
+ * read from its config directory — never a guess.
+ */
+export const readProfileAgentdock = (
+  configDir: string,
+  otlpPort: number | null,
+): ProfileAgentdock => ({
+  plugin: readAgentdockPlugin(configDir),
+  telemetry: readTelemetry(configDir, otlpPort),
+});
 
 /** `a.b.c` ≥ `min`, comparing the leading numbers; an unparsable version is not. */
 export const versionAtLeast = (
@@ -188,7 +261,17 @@ export const detectCapabilities = async (
       claude: claude ? { version: claude } : null,
       codex: codex ? { version: codex } : null,
     },
-    profiles: withAuthentication(config.profiles, home),
+    profiles: withAuthentication(config.profiles, home).map((profile) =>
+      profile.runtime === 'claude'
+        ? {
+            ...profile,
+            agentdock: readProfileAgentdock(
+              claudeConfigDir(profile, home),
+              config.otlp?.http ?? null,
+            ),
+          }
+        : profile,
+    ),
     codeSentinel,
     otlp: config.otlp,
   };
