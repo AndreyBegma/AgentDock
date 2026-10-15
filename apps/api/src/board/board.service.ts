@@ -4,6 +4,7 @@ import {
   BOARD_COMPLETED_PAGE_SIZE,
   BOARD_ERROR,
   type BoardCardDetail,
+  type BoardCardKind,
   type BoardColumnView,
   type BoardSettingsView,
   type BoardView,
@@ -11,12 +12,14 @@ import {
   type CardMergeOutcome,
   type CardPullRequestView,
   captureFingerprint,
+  cardChange,
   cardLabel,
+  type FleetCardEdits,
   isActiveRoundPhase,
   type Role,
 } from '@agentdock/shared';
 import { roleAtLeast } from '@agentdock/shared/protocol';
-import { Injectable, type OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import type { BoardCard } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
@@ -58,6 +61,24 @@ const USER_REF = { select: { id: true, email: true } } as const;
 const seesInbox = (role: Role | undefined): boolean =>
   role === undefined || roleAtLeast(role, 'operator');
 
+/**
+ * #282 D4: holds the fleet's `FleetCardEdits` port. The fleet module imports
+ * the board module and sets it at startup; without it, a fleet card's edit is
+ * stored and no slot is told.
+ */
+@Injectable()
+export class FleetCardEditsRef {
+  private port: FleetCardEdits | null = null;
+
+  set(port: FleetCardEdits | null): void {
+    this.port = port;
+  }
+
+  get(): FleetCardEdits | null {
+    return this.port;
+  }
+}
+
 /** A Claude session id of a card: a uuid, so it can be looked up as one. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -69,6 +90,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  */
 @Injectable()
 export class BoardService implements OnModuleInit {
+  private readonly logger = new Logger(BoardService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly work: BoardWork,
@@ -76,6 +99,7 @@ export class BoardService implements OnModuleInit {
     private readonly commands: BoardCommands,
     private readonly text: TextNormalizer,
     private readonly textOwners: TextOwners,
+    private readonly fleetEdits: FleetCardEditsRef,
   ) {}
 
   /** #271 D10: a card's English title carries its own fingerprint (#244 D6). */
@@ -233,7 +257,10 @@ export class BoardService implements OnModuleInit {
     const sessionIds = cards
       .map((c) => c.sessionId)
       .filter((id): id is string => id !== null);
-    const [usage, hooked] = await Promise.all([
+    const trackedIds = cards
+      .map((c) => c.trackedSessionId)
+      .filter((id): id is string => id !== null);
+    const [usage, hooked, alive] = await Promise.all([
       usageByRun(this.prisma, runIds),
       sessionIds.length === 0
         ? Promise.resolve([])
@@ -245,6 +272,13 @@ export class BoardService implements OnModuleInit {
             },
             select: { externalId: true },
           }),
+      // #282 D2: alive = not ended (no stale detection for manual sessions).
+      trackedIds.length === 0
+        ? Promise.resolve([])
+        : this.prisma.agentSession.findMany({
+            where: { id: { in: trackedIds }, endedAt: null },
+            select: { id: true },
+          }),
     ]);
     const costs = new Map<string, string>();
     for (const [runId, u] of usage) {
@@ -253,6 +287,7 @@ export class BoardService implements OnModuleInit {
     return {
       costs,
       hooked: new Set(hooked.map((s) => s.externalId)),
+      alive: new Set(alive.map((s) => s.id)),
       now: new Date(),
     };
   }
@@ -331,14 +366,28 @@ export class BoardService implements OnModuleInit {
     actor: BoardActor,
   ): Promise<BoardCardDetail> {
     const card = await this.work.card(projectId, number);
-    const { continueAfterDesign, ...fields } = dto;
+    const { continueAfterDesign, autoCollect, ...fields } = dto;
+    // #282 D3: Automatic work is a terminal card's; refused before anything is written.
+    if (autoCollect !== undefined && card.source !== 'terminal') {
+      throw boardError(
+        422,
+        BOARD_ERROR.notTracked,
+        'Automatic work is set on a card tracked from a terminal session only',
+      );
+    }
     if (continueAfterDesign !== undefined) {
       await this.toggleContinue(card, continueAfterDesign, actor);
-      // The switch alone is its own audit record, not a card edit.
-      if (Object.values(fields).every((v) => v === undefined)) {
-        this.work.publish(projectId, card.id);
-        return this.detail(projectId, number);
-      }
+    }
+    if (autoCollect !== undefined) {
+      await this.toggleAutoCollect(card, autoCollect, actor);
+    }
+    // A switch alone is its own audit record, not a card edit.
+    if (
+      (continueAfterDesign !== undefined || autoCollect !== undefined) &&
+      Object.values(fields).every((v) => v === undefined)
+    ) {
+      this.work.publish(projectId, card.id);
+      return this.detail(projectId, number);
     }
     const data = {
       ...(fields.title !== undefined ? { title: fields.title.trim() } : {}),
@@ -396,7 +445,71 @@ export class BoardService implements OnModuleInit {
         actor,
       );
     }
+    if (card.source === 'fleet') await this.fleetEdited(card, data, actor);
     return this.detail(projectId, number);
+  }
+
+  /**
+   * #282 D4: a stored text edit of a `fleet` card reaches its running slot,
+   * sent as the person who made it. The board's own edits tell no slot.
+   */
+  private async fleetEdited(
+    card: CardWithRounds,
+    data: { title?: string; body?: string; kind?: BoardCardKind },
+    actor: BoardActor,
+  ): Promise<void> {
+    const change = cardChange(
+      { title: card.title, body: card.body, kind: card.kind },
+      {
+        title: data.title ?? card.title,
+        body: data.body ?? card.body,
+        kind: data.kind ?? card.kind,
+      },
+    );
+    const port = this.fleetEdits.get();
+    const userId = actor.userId;
+    if (!change || !port || userId === null) return;
+    try {
+      const { email } = await this.prisma.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { email: true },
+      });
+      await port.cardEdited({
+        projectId: card.projectId,
+        cardId: card.id,
+        number: card.number,
+        label: cardLabel(card.number),
+        change,
+        editor: { userId, email },
+      });
+    } catch (error) {
+      // The edit is stored either way (the port's contract).
+      this.logger.warn(
+        `fleet edit of ${cardLabel(card.number)} not delivered: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  /** #282 D3: Automatic work — collect when the tracked session finishes. */
+  private async toggleAutoCollect(
+    card: CardWithRounds,
+    on: boolean,
+    actor: BoardActor,
+  ): Promise<void> {
+    if (card.autoCollect === on) return;
+    await this.prisma.boardCard.update({
+      where: { id: card.id },
+      data: { autoCollect: on },
+    });
+    await this.audit.record({
+      ...actor.ctx,
+      action: 'card.updated',
+      target: { type: 'board_card', id: card.id },
+      projectId: card.projectId,
+      before: { number: card.number, autoCollect: !on },
+      after: { number: card.number, autoCollect: on },
+      result: 'ok',
+    });
   }
 
   /**
@@ -544,9 +657,11 @@ export class BoardService implements OnModuleInit {
         'Only a card in Finished is accepted',
       );
     }
-    const merge = dto.merge
-      ? await this.merge(project, card, dto.merge.headSha, actor)
-      : null;
+    // #282 D4: a fleet card's PR is the orchestrator's to merge, never Accept's.
+    const merge =
+      dto.merge && card.source !== 'fleet'
+        ? await this.merge(project, card, dto.merge.headSha, actor)
+        : null;
     await this.work.move(
       project,
       card,
@@ -773,6 +888,9 @@ export class BoardService implements OnModuleInit {
       ...(dto.captureModel !== undefined
         ? { captureModel: dto.captureModel }
         : {}),
+      ...(dto.autoCollectTracked !== undefined
+        ? { autoCollectTracked: dto.autoCollectTracked }
+        : {}),
       updatedById: actor.userId,
     };
     const row = await this.prisma.boardSettings.upsert({
@@ -791,6 +909,7 @@ export class BoardService implements OnModuleInit {
         maxRunning: before.maxRunning,
         captureEnabled: before.captureEnabled,
         captureModel: before.captureModel,
+        autoCollectTracked: before.autoCollectTracked,
       },
       after: {
         issueOnRun: row.issueOnRun,
@@ -798,6 +917,7 @@ export class BoardService implements OnModuleInit {
         maxRunning: row.maxRunning,
         captureEnabled: row.captureEnabled,
         captureModel: row.captureModel,
+        autoCollectTracked: row.autoCollectTracked,
       },
       result: 'ok',
     });

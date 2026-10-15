@@ -179,6 +179,22 @@ describe('local requests over the runner socket (e2e)', () => {
     });
   };
 
+  /** The sweep's own session `sess-manual-1`, as its hooks made it: manual. */
+  const seedManualSession = () =>
+    ctx.prisma.agentSession.create({
+      data: {
+        runnerId,
+        runtime: 'claude',
+        externalId: 'sess-manual-1',
+        projectId,
+        cwd: ROOT,
+        origin: 'manual',
+        ownerId: localUserId,
+        startedAt: new Date(),
+        lastEventAt: new Date(),
+      },
+    });
+
   beforeAll(async () => {
     ctx = await createRunnerE2eApp();
   });
@@ -235,10 +251,10 @@ describe('local requests over the runner socket (e2e)', () => {
     let actionId = '';
     // `card.finish` asks from the session of a board card's running worker.
     await seedCardSession();
+    // `card.track` asks from a person's own session (#282 D1).
+    const manual = await seedManualSession();
     // `action.request` first: `action.status` asks about the request it made.
-    // #282: `card.track` has only a stub handler until i282-api-terminal
-    // lands the real one; that slot owns this file and puts it back here.
-    const swept = localMethodNames.filter((m) => m !== 'card.track');
+    const swept = localMethodNames;
     const order = [
       'action.request',
       ...swept.filter((m) => m !== 'action.request'),
@@ -288,6 +304,10 @@ describe('local requests over the runner socket (e2e)', () => {
       number: 1,
       finished: true,
     });
+    expect(responses.get('card.track')?.data).toMatchObject({
+      number: 2,
+      label: 'C-2',
+    });
 
     // The writes acted as the local user, through the runner.
     const issueCreates = commands.filter((c) => c.name === 'issue.create');
@@ -309,8 +329,16 @@ describe('local requests over the runner socket (e2e)', () => {
       orderBy: { id: 'asc' },
     });
     expect(events.map((e) => [e.type, e.source, e.data])).toEqual([
-      [MANUAL_NOTE_EVENT, 'api', { text: 'Investigating the pairing flake' }],
-      [MANUAL_HANDOFF_EVENT, 'api', { issue: 102, branch: 'fix/12-pairing' }],
+      [
+        MANUAL_NOTE_EVENT,
+        'api',
+        { text: 'Investigating the pairing flake', sessionId: manual.id },
+      ],
+      [
+        MANUAL_HANDOFF_EVENT,
+        'api',
+        { issue: 102, branch: 'fix/12-pairing', sessionId: manual.id },
+      ],
     ]);
 
     const writes = await ctx.prisma.auditRecord.findMany({
@@ -330,6 +358,7 @@ describe('local requests over the runner socket (e2e)', () => {
       ['activity.note', 'ok', localUserId, 'mcp'],
       ['handoff.create', 'ok', localUserId, 'mcp'],
       ['card.finish', 'ok', localUserId, 'mcp'],
+      ['card.track', 'ok', localUserId, 'mcp'],
       ['away.set', 'ok', localUserId, 'mcp'],
     ]);
     const issueAudit = await ctx.prisma.auditRecord.findFirst({
@@ -356,6 +385,17 @@ describe('local requests over the runner socket (e2e)', () => {
     });
     expect(card.column).toBe('in_progress');
     expect(card.rounds[0].phase).toBe('running');
+  });
+
+  it('refuses card.track for a local user who is not a project member, and creates no card (#282 D1)', async () => {
+    await seedManualSession();
+    await ctx.prisma.projectMember.delete({
+      where: { projectId_userId: { projectId, userId: localUserId } },
+    });
+    const refused = await ask('card.track', ARGS['card.track']);
+    expect(refused.ok).toBe(false);
+    expect(refused.error?.code).toBe('forbidden');
+    expect(await ctx.prisma.boardCard.count()).toBe(0);
   });
 
   it('pushes away mode to the runner in `config`', async () => {
