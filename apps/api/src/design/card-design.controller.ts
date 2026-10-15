@@ -1,4 +1,7 @@
-import type { TaskDesignView } from '@agentdock/shared';
+import type {
+  CardDesignApproveResponse,
+  TaskDesignView,
+} from '@agentdock/shared';
 import {
   Body,
   Controller,
@@ -148,14 +151,14 @@ export class CardDesignController {
     @AuditCtx() ctx: AuditContext,
     @Param('number') number: string,
     @Body() dto: DesignApproveDto,
-  ): Promise<TaskDesignView> {
+  ): Promise<CardDesignApproveResponse> {
     const n = cardNumber(number);
-    await this.designs.cardApprove(
+    const run = await this.designs.cardApprove(
       access.projectId,
       n,
       dto.revisionId,
       actorOf(access, user, ctx),
     );
-    return this.designs.cardView(access.projectId, n);
+    return { ...(await this.designs.cardView(access.projectId, n)), run };
   }
 }

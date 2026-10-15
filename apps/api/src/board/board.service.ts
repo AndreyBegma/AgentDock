@@ -1,4 +1,5 @@
 import {
+  type AcceptBoardCardResponse,
   BOARD_COLUMNS,
   BOARD_COMPLETED_PAGE_SIZE,
   BOARD_ERROR,
@@ -7,7 +8,10 @@ import {
   type BoardSettingsView,
   type BoardView,
   CARD_SUMMARY_MAX,
+  type CardMergeOutcome,
+  type CardPullRequestView,
   captureFingerprint,
+  cardLabel,
   isActiveRoundPhase,
   type Role,
 } from '@agentdock/shared';
@@ -16,6 +20,8 @@ import { Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
 import { usageByRun } from '../history/run-usage';
+import { mergeMethodOf } from '../planner/planner-instructions.service';
+import { BoardCommands, boardOutput } from './board-commands';
 import { boardError } from './board-error';
 import {
   type CardFacts,
@@ -29,9 +35,11 @@ import {
   ACTIVE_PHASES,
   BOARD_SYSTEM_ACTOR,
   type BoardActor,
+  type BoardProject,
   BoardWork,
 } from './board-work';
 import type {
+  AcceptBoardCardDto,
   CreateBoardCardDto,
   MoveBoardCardDto,
   UpdateBoardCardDto,
@@ -62,6 +70,7 @@ export class BoardService {
     private readonly prisma: PrismaService,
     private readonly work: BoardWork,
     private readonly audit: AuditService,
+    private readonly commands: BoardCommands,
   ) {}
 
   /**
@@ -428,12 +437,18 @@ export class BoardService {
     return this.detail(projectId, number);
   }
 
-  /** `POST …/accept` (D10): Finished → Completed. */
+  /**
+   * `POST …/accept` (D10): Finished → Completed. With `merge` (#273 D13,
+   * ADR-0029), the card's PR is merged first through the runner's `gh`,
+   * bound to the head the person saw; a refused merge leaves the card in
+   * Finished. Without it, the move only (D14).
+   */
   async accept(
     projectId: string,
     number: number,
+    dto: AcceptBoardCardDto,
     actor: BoardActor,
-  ): Promise<BoardCardDetail> {
+  ): Promise<AcceptBoardCardResponse> {
     const project = await this.work.project(projectId);
     const card = await this.work.card(projectId, number);
     if (card.column !== 'finished') {
@@ -443,13 +458,144 @@ export class BoardService {
         'Only a card in Finished is accepted',
       );
     }
+    const merge = dto.merge
+      ? await this.merge(project, card, dto.merge.headSha, actor)
+      : null;
     await this.work.move(
       project,
       card,
       { to: 'completed', index: 0, source: 'person' },
       actor,
     );
-    return this.detail(projectId, number);
+    return { ...(await this.detail(projectId, number)), merge };
+  }
+
+  /** #273 D13: `card.merge`, audited; a refusal is 409 `merge_failed`. */
+  private async merge(
+    project: BoardProject,
+    card: CardWithRounds,
+    headSha: string,
+    actor: BoardActor,
+  ): Promise<CardMergeOutcome> {
+    if (isActiveRoundPhase(card.rounds[0]?.phase)) {
+      throw boardError(
+        409,
+        BOARD_ERROR.cardRunning,
+        'A worker is running on this card',
+      );
+    }
+    const pr = card.prNumber;
+    if (pr === null) {
+      throw boardError(
+        409,
+        BOARD_ERROR.noPullRequest,
+        `${cardLabel(card.number)} has no pull request to merge`,
+      );
+    }
+    const output = boardOutput(
+      'card.merge',
+      await this.commands.send(
+        project.runnerId,
+        'card.merge',
+        {
+          cardId: card.id,
+          projectId: project.id,
+          root: project.rootPath,
+          pr,
+          headSha,
+          method: mergeMethodOf(project.codeSentinelConfig),
+          issue: card.issueNumber,
+          comment: `Completed as ${cardLabel(card.number)} on the AgentDock board; merged in #${pr}.`,
+        },
+        { role: actor.role, ctx: actor.ctx },
+      ),
+    );
+    const target = { type: 'board_card', id: card.id } as const;
+    if (!output.merged) {
+      await this.audit.record({
+        ...actor.ctx,
+        action: 'card.merge_failed',
+        target,
+        projectId: project.id,
+        after: { number: card.number, pr, reason: output.error },
+        result: 'error',
+        meta: { message: output.message },
+      });
+      throw boardError(
+        409,
+        BOARD_ERROR.mergeFailed,
+        output.message || `The merge of #${pr} was refused`,
+        { reason: output.error },
+      );
+    }
+    await this.audit.record({
+      ...actor.ctx,
+      action: 'card.merged',
+      target,
+      projectId: project.id,
+      after: {
+        number: card.number,
+        pr,
+        method: output.method,
+        ...(output.mergeCommit !== null
+          ? { mergeCommit: output.mergeCommit }
+          : {}),
+        alreadyMerged: output.alreadyMerged,
+        issueClosed: output.issueClosed,
+      },
+      result: 'ok',
+    });
+    return {
+      merged: true,
+      alreadyMerged: output.alreadyMerged,
+      method: output.method,
+      mergeCommit: output.mergeCommit,
+      issueClosed: output.issueClosed,
+      ...(output.issueError !== undefined
+        ? { issueError: output.issueError }
+        : {}),
+    };
+  }
+
+  /**
+   * `GET …/pull-request` (#273 D10, operator): the card's PR as `pr.inspect`
+   * reads it on the runner, and how Accept would merge it.
+   */
+  async pullRequest(
+    projectId: string,
+    number: number,
+    actor: BoardActor,
+  ): Promise<CardPullRequestView> {
+    const project = await this.work.project(projectId);
+    const card = await this.work.card(projectId, number);
+    if (card.prNumber === null) {
+      throw boardError(
+        404,
+        BOARD_ERROR.noPullRequest,
+        `${cardLabel(card.number)} has no pull request`,
+      );
+    }
+    const pr = boardOutput(
+      'pr.inspect',
+      await this.commands.inspectPr(
+        project.runnerId,
+        { projectId: project.id, root: project.rootPath, pr: card.prNumber },
+        { role: actor.role, ctx: actor.ctx },
+      ),
+    );
+    return {
+      number: pr.number,
+      url: pr.url,
+      state: pr.state,
+      headSha: pr.headSha,
+      mergeable: pr.mergeable,
+      mergeStateStatus: pr.mergeStateStatus,
+      checks: pr.checks,
+      method: mergeMethodOf(project.codeSentinelConfig),
+      canMerge:
+        pr.state === 'open' &&
+        this.commands.serves(project.runnerId, 'card.merge'),
+    };
   }
 
   /** `POST …/stop`: kill the worker; the round is `cancelled`. */

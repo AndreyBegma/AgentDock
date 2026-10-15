@@ -24,6 +24,7 @@ import { PlannerModule } from './planner';
 import { PricesModule } from './prices/prices.module';
 import { ProjectsModule } from './projects/projects.module';
 import { QueueModule } from './queue';
+import { ReadinessModule } from './readiness';
 import { RunnersModule } from './runners/runners.module';
 import { SchedulesModule } from './schedules';
 import { SessionsModule } from './sessions/sessions.module';
@@ -66,6 +67,8 @@ import { WorkflowsModule } from './workflows';
     TerminalModule,
     SkillsModule,
     PlannerModule,
+    // Issue #272: the one runtime-profile rule and project readiness.
+    ReadinessModule,
     // Spec 223: the design stage, on top of the Planner.
     DesignModule,
     // Issue #242: the project Board and its card workers.

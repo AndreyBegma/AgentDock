@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { LiveModule } from '../live/live.module';
 import { ProjectsModule } from '../projects';
+import { ReadinessModule } from '../readiness';
 import { RunnersModule } from '../runners/runners.module';
 import { CardDesignTurnService } from './card-design-turn.service';
 import { PlanService } from './plan.service';
@@ -25,7 +26,7 @@ import { TasksQueryService } from './tasks-query.service';
  * request's merge queues the features (`PlanDocsSink`).
  */
 @Module({
-  imports: [LiveModule, ProjectsModule, RunnersModule],
+  imports: [LiveModule, ProjectsModule, ReadinessModule, RunnersModule],
   controllers: [PlansController, PlannerAdminController, TasksController],
   providers: [
     CardDesignTurnService,

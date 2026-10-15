@@ -106,6 +106,34 @@ describe('card capture runs (e2e)', () => {
     ]);
   });
 
+  it('with no runtime profile, stores a no_profile skip and creates no run (#272 D8)', async () => {
+    await w.ctx.prisma.projectOrchestratorSettings.deleteMany({
+      where: { projectId: w.a },
+    });
+    await w.ctx.prisma.project.update({
+      where: { id: w.a },
+      data: { defaultProfileId: null },
+    });
+    const sessionId = await w.manualSession();
+    await w.prompt('m1', LONG_PROMPT);
+    const outcome = await w.capture.extract({ sessionId });
+    expect(outcome).toMatchObject({ kind: 'skipped', reason: 'no_profile' });
+    expect(
+      await w.ctx.prisma.cardCapture.findMany({ where: { projectId: w.a } }),
+    ).toEqual([
+      expect.objectContaining({
+        status: 'skipped',
+        skipReason: 'no_profile',
+        error: null,
+        runId: null,
+      }),
+    ]);
+    expect(
+      await w.ctx.prisma.run.count({ where: { kind: 'card_capture' } }),
+    ).toBe(0);
+    expect(w.extracted()).toEqual([]);
+  });
+
   it('a contract violation stores the error and the result, and applies nothing', async () => {
     const { runId, captureId, contentId } = await start();
     const two = `${cardsBlock([])}\n${cardsBlock([

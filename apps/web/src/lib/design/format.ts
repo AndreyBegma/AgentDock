@@ -255,6 +255,13 @@ export function describeDesignError(
       cta: 'Open Design settings',
     };
   }
+  // 503 `command_unavailable` is also an offline runner, not only an old one.
+  if (
+    code === DESIGN_ERROR.commandUnavailable &&
+    /not connected/i.test(error.message)
+  ) {
+    return 'The project’s runner is offline. Start it, then try again.';
+  }
   if (
     code === DESIGN_ERROR.commandUnavailable ||
     code === DESIGN_ERROR.runnerOutdated

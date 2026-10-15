@@ -1,13 +1,16 @@
 import {
+  type CardAutoRun,
+  type CardAutoRunFailure,
   DESIGN_COMMENTS_PER_TURN_MAX,
   DESIGN_ERROR,
   type DesignCommentRequest,
+  isCardAutoRunCode,
   PLANNER_ERROR,
   type TaskDesignPatchRequest,
   type TaskDesignView,
 } from '@agentdock/shared';
 import { RUNNER_FEATURE_COMMANDS } from '@agentdock/shared/protocol';
-import { Injectable } from '@nestjs/common';
+import { HttpException, Injectable } from '@nestjs/common';
 import type { BoardCard, Plan, PlanTask, TaskDesign } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { cardNotFound } from '../board/board-error';
@@ -52,6 +55,30 @@ const busy = () =>
 
 const approvedAlready = (what = 'The design is approved') =>
   designError(409, DESIGN_ERROR.designApproved, what);
+
+/** #273 D8: `CardAutoRun.message` is at most this many characters. */
+const AUTO_RUN_MESSAGE_MAX = 500;
+
+/**
+ * #273 D8: why a start was refused — the refusal's `error` when it is a
+ * board code (`max_running`, `budget_exceeded`, `command_unavailable`, …),
+ * else `unknown`, with its message.
+ */
+const autoRunFailureOf = (
+  error: unknown,
+): { code: CardAutoRunFailure['code']; message: string } => {
+  const body = error instanceof HttpException ? error.getResponse() : null;
+  const code =
+    body !== null &&
+    typeof body === 'object' &&
+    'error' in body &&
+    typeof body.error === 'string' &&
+    isCardAutoRunCode(body.error)
+      ? body.error
+      : 'unknown';
+  const message = error instanceof Error ? error.message : String(error);
+  return { code, message: message.slice(0, AUTO_RUN_MESSAGE_MAX) };
+};
 
 /** How strictly a task owner is checked: any change, or only a comment. */
 type TaskCheck = 'change' | 'comment';
@@ -162,6 +189,17 @@ export class DesignService {
     actor: PlanActor,
   ): Promise<void> {
     await this.patchOf(await this.cardOwner(projectId, number), request, actor);
+    if (request.needed !== undefined) {
+      // #273 D9: the design the failed auto-run followed no longer stands.
+      await this.prisma.boardCard.updateMany({
+        where: { projectId, number, autoRunError: { not: null } },
+        data: {
+          autoRunError: null,
+          autoRunMessage: null,
+          autoRunFailedAt: null,
+        },
+      });
+    }
   }
 
   async cardGenerate(
@@ -204,12 +242,17 @@ export class DesignService {
     number: number,
     revisionId: string,
     actor: PlanActor,
-  ): Promise<void> {
+  ): Promise<CardAutoRun | null> {
+    // #273 D8: what Continue after design did; `null` while it is off.
+    let run: CardAutoRun | null = null;
     await this.approveOf(
-      await this.cardOwner(projectId, number),
+      await this.cardOwner(projectId, number, (outcome) => {
+        run = outcome;
+      }),
       revisionId,
       actor,
     );
+    return run;
   }
 
   // ─── Both owners ───────────────────────────────────────────────────────────
@@ -675,6 +718,7 @@ export class DesignService {
   private async cardOwner(
     projectId: string,
     number: number,
+    onAutoRun: (run: CardAutoRun) => void = () => {},
   ): Promise<DesignOwner> {
     const card = await this.card(projectId, number);
     const rounds = await this.prisma.boardCardRound.count({
@@ -714,11 +758,54 @@ export class DesignService {
           select: { continueAfterDesign: true },
         });
         if (fresh?.continueAfterDesign) {
-          await this.rounds.run(projectId, number, {}, actor);
+          onAutoRun(await this.autoRun(card, actor));
         }
       },
       publish: () => this.store.publishCardDesign(projectId, card.id),
     };
+  }
+
+  /**
+   * #273 D8, D9: round 1 as the approver. A refused start never fails the
+   * approval, which has committed: it is stored on the card, audited and
+   * answered as `run_failed`.
+   */
+  private async autoRun(
+    card: BoardCard,
+    actor: PlanActor,
+  ): Promise<CardAutoRun> {
+    try {
+      const detail = await this.rounds.run(
+        card.projectId,
+        card.number,
+        {},
+        actor,
+      );
+      return { status: 'started', round: detail.round?.round ?? 1 };
+    } catch (error) {
+      const { code, message } = autoRunFailureOf(error);
+      const at = new Date();
+      await this.prisma.boardCard.update({
+        where: { id: card.id },
+        data: {
+          autoRunError: code,
+          autoRunMessage: message,
+          autoRunFailedAt: at,
+        },
+      });
+      await this.audit.record({
+        ...actor.ctx,
+        action: 'card.auto_run_failed',
+        target: { type: 'board_card', id: card.id },
+        projectId: card.projectId,
+        // `code` is a redacted audit key (auth codes): the refusal goes as `error`.
+        after: { number: card.number, error: code },
+        result: 'error',
+        meta: { message },
+      });
+      this.store.publishCardDesign(card.projectId, card.id);
+      return { status: 'run_failed', code, message };
+    }
   }
 
   private async card(projectId: string, number: number): Promise<BoardCard> {

@@ -8,7 +8,10 @@ import {
   isCommandName,
   type PlanCloseArgs,
   type PlanCloseResult,
+  type PrInspectArgs,
+  type PrInspection,
   planCloseResultSchema,
+  prInspectionSchema,
 } from '@agentdock/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import type { z } from 'zod';
@@ -52,7 +55,7 @@ export class BoardCommands {
   /** Throws 503 `command_unavailable` when `name` cannot be sent to `runnerId` now. */
   assertReady(
     runnerId: string,
-    name: CardCommandName | 'issue.create' | 'plan.close',
+    name: CardCommandName | 'issue.create' | 'plan.close' | 'pr.inspect',
   ): void {
     const wired: string = name;
     if (!isCommandName(wired)) {
@@ -76,6 +79,40 @@ export class BoardCommands {
         `The runner does not serve ${name}; update it`,
       );
     }
+  }
+
+  /** Whether `name` can be sent to `runnerId` now — `assertReady` without the throw. */
+  serves(runnerId: string, name: CardCommandName): boolean {
+    try {
+      this.assertReady(runnerId, name);
+      return true;
+    } catch (error) {
+      if (error instanceof BoardFailure) return false;
+      throw error;
+    }
+  }
+
+  /** #273 D10: the card's PR as `gh pr view` reads it on the runner. */
+  async inspectPr(
+    runnerId: string,
+    args: PrInspectArgs,
+    options: SendOptions,
+  ): Promise<BoardSendResult<PrInspection>> {
+    this.assertReady(runnerId, 'pr.inspect');
+    const result = await this.commands.send(
+      runnerId,
+      'pr.inspect',
+      args,
+      options,
+    );
+    if (result.status !== 'ok') return result;
+    const output = prInspectionSchema.safeParse(result.output);
+    return output.success
+      ? { status: 'ok', output: output.data }
+      : {
+          status: 'error',
+          error: { code: 'internal', message: 'malformed result' },
+        };
   }
 
   async send<N extends CardCommandName>(

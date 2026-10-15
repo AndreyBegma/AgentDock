@@ -2,15 +2,16 @@ import { randomUUID } from 'node:crypto';
 import {
   BOARD_ERROR,
   type BoardCardDetail,
-  CARD_CONTINUE_PROMPT,
   CARD_WORKER_PROMPT_VERSION,
+  type CardChange,
   type CardRoundPhase,
   type CardRoundTrigger,
   cardBranch,
+  cardChange,
   cardDesignPath,
-  cardFeedbackPrompt,
   cardIssueBody,
   cardLabel,
+  cardNextRoundPrompt,
   cardSpecPath,
   cardWorkerPrompt,
   isActiveRoundPhase,
@@ -34,6 +35,7 @@ import { AuditService } from '../audit/audit.service';
 import { BudgetGate } from '../budgets/budget-gate';
 import { PrismaService } from '../database/prisma.service';
 import { specDirOf } from '../planner/planner-instructions.service';
+import { RuntimeProfileResolver } from '../readiness';
 import { BoardService } from './board.service';
 import { BoardCommands, boardOutput } from './board-commands';
 import { BoardFailure, boardError } from './board-error';
@@ -43,7 +45,6 @@ import {
   ACTIVE_PHASES,
   BOARD_SYSTEM_ACTOR,
   type BoardActor,
-  type BoardProject,
   BoardWork,
 } from './board-work';
 import type { CardFeedbackDto, RunBoardCardDto } from './dto';
@@ -70,6 +71,19 @@ const UNSTARTED_PHASES: ReadonlySet<CardRoundPhase> = new Set([
 ]);
 
 /**
+ * #273 D1: how the card's text differs from what the worker was last given —
+ * the snapshot of the newest round that started Claude. `null` without one.
+ */
+const changeSinceLastRound = (card: CardWithRounds): CardChange | null => {
+  const last = card.rounds.find((r) => !UNSTARTED_PHASES.has(r.phase));
+  if (!last) return null;
+  return cardChange(
+    { title: last.cardTitle, body: last.cardBody, kind: last.cardKind },
+    { title: card.title, body: card.body, kind: card.kind },
+  );
+};
+
+/**
  * Starting a round (issue #242 D4, D5, D9, D12, D13): Run — round 1 or a
  * retry — and feedback. Everything that can be refused is refused before a
  * row exists or a command is sent; the round is then a `runs` row of kind
@@ -83,6 +97,7 @@ export class BoardRoundsService {
     private readonly board: BoardService,
     private readonly commands: BoardCommands,
     private readonly audit: AuditService,
+    private readonly profiles: RuntimeProfileResolver,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
 
@@ -154,9 +169,15 @@ export class BoardRoundsService {
 
     const settings = await this.prisma.projectOrchestratorSettings.findUnique({
       where: { projectId: project.id },
-      select: { profileId: true, model: true, permissionMode: true },
+      select: { model: true, permissionMode: true },
     });
-    const profile = await this.profile(project, settings?.profileId ?? null);
+    // #272 D1: the orchestrator's profile, else the project default.
+    const profile = await this.profiles.require(
+      project,
+      {},
+      (details, message) =>
+        boardError(422, BOARD_ERROR.noProfile, message, details),
+    );
     const permissionMode: OrchestratorPermissionMode =
       dto.permissionMode ??
       settings?.permissionMode ??
@@ -254,28 +275,30 @@ export class BoardRoundsService {
         : null;
     const sessionId = card.sessionId ?? randomUUID();
     const prompt =
-      trigger === 'feedback' && feedback !== null
-        ? cardFeedbackPrompt(feedback)
-        : resume
-          ? CARD_CONTINUE_PROMPT
-          : cardWorkerPrompt({
-              number: card.number,
-              title: card.title,
-              body: card.body,
-              kind: card.kind,
-              branch,
-              base: project.base,
-              specPath,
-              issueNumber: issue.number,
-              design:
-                designFile && design
-                  ? {
-                      path: designFile.path,
-                      rationale: design.rationale,
-                      comments: design.comments,
-                    }
-                  : null,
-            });
+      resume || (trigger === 'feedback' && feedback !== null)
+        ? cardNextRoundPrompt({
+            label: cardLabel(card.number),
+            change: changeSinceLastRound(card),
+            feedback: trigger === 'feedback' ? feedback : null,
+          })
+        : cardWorkerPrompt({
+            number: card.number,
+            title: card.title,
+            body: card.body,
+            kind: card.kind,
+            branch,
+            base: project.base,
+            specPath,
+            issueNumber: issue.number,
+            design:
+              designFile && design
+                ? {
+                    path: designFile.path,
+                    rationale: design.rationale,
+                    comments: design.comments,
+                  }
+                : null,
+          });
     const files: CardRunFile[] = [
       ...(firstStart && specPath !== null
         ? [{ path: specPath, content: specContent(card, issue.number) }]
@@ -356,6 +379,10 @@ export class BoardRoundsService {
           branch,
           specPath,
           ...(dto.model !== undefined ? { model: dto.model } : {}),
+          // #273 D9: a round started; an earlier auto-run failure is history.
+          autoRunError: null,
+          autoRunMessage: null,
+          autoRunFailedAt: null,
         },
       });
       return created;
@@ -482,32 +509,6 @@ export class BoardRoundsService {
       select: { body: true },
     });
     return { ...approved, comments: comments.map((c) => c.body) };
-  }
-
-  /** D12: the orchestrator's profile, else the project default; `claude` only. */
-  private async profile(project: BoardProject, profileId: string | null) {
-    const id = profileId ?? project.defaultProfileId;
-    const profile = id
-      ? await this.prisma.runtimeProfile.findUnique({
-          where: { id },
-          select: { key: true, runtime: true, runnerId: true, missing: true },
-        })
-      : null;
-    if (!profile || profile.runnerId !== project.runnerId || profile.missing) {
-      throw boardError(
-        422,
-        BOARD_ERROR.unsupportedRuntime,
-        'Set a Claude runtime profile for the project first',
-      );
-    }
-    if (profile.runtime !== 'claude') {
-      throw boardError(
-        422,
-        BOARD_ERROR.unsupportedRuntime,
-        `Card workers need a claude profile; ${profile.key} is ${profile.runtime}`,
-      );
-    }
-    return profile;
   }
 
   /** Serializes round starts of one project, so `maxRunning` holds. */

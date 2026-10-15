@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { cardLabel, PLANNER_ERROR } from '@agentdock/shared';
+import { cardLabel, DESIGN_ERROR, PLANNER_ERROR } from '@agentdock/shared';
 import {
   ORCHESTRATOR_DEFAULTS,
   PLAN_TURN_DEFAULT_TIMEOUT_SEC,
@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { SYSTEM_ACTOR, systemActorFor } from '../audit/audit.types';
 import { BudgetGate } from '../budgets/budget-gate';
 import { PrismaService } from '../database/prisma.service';
+import { designError } from '../design/design-error';
 import { cardDesignPrompt } from '../design/design-prompt';
 import type { DesignTurnPlan } from '../design/design-rules';
 import { cardDesignTaskKey, loadDesignPrompt } from '../design/design-store';
@@ -61,7 +62,12 @@ export class CardDesignTurnService {
     caller: PlanCaller,
   ): Promise<string> {
     const project = await this.store.project(card.projectId);
-    const profile = await this.store.profile(project);
+    const profile = await this.store.profile(
+      project,
+      undefined,
+      (details, message) =>
+        designError(422, DESIGN_ERROR.noProfile, message, details),
+    );
     this.commands.assertReady(project.runnerId, 'plan.turn');
     await this.budgets?.assertAllowed({
       projectId: card.projectId,
