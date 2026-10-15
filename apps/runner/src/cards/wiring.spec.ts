@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import {
-  chmodSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -42,10 +41,7 @@ const SELF = ['/opt/agentdock/bin/agentdock-runner'];
 
 let dirs: string[] = [];
 afterEach(() => {
-  for (const dir of dirs) {
-    chmodSync(dir, 0o700);
-    rmSync(dir, { recursive: true, force: true });
-  }
+  for (const dir of dirs) rmSync(dir, { recursive: true, force: true });
   dirs = [];
 });
 const temp = () => {
@@ -145,8 +141,10 @@ describe('card wiring (#367 D1, D2)', () => {
   });
 
   it('is unwired with the reason when the round directory cannot be written', () => {
-    const roundDir = temp();
-    chmodSync(roundDir, 0o500);
+    // A regular file where the round directory should be: ENOTDIR, for root
+    // too (CI runs as root, which ignores a read-only mode).
+    const roundDir = join(temp(), 'not-a-directory');
+    writeFileSync(roundDir, '');
     expect(wireCardRound(profileIn(temp()), '/home/u', roundDir, SELF)).toEqual(
       { wiring: 'none', wiringReason: 'settings_write_failed' },
     );
