@@ -44,8 +44,12 @@ export interface CardExecutorOptions {
   /** The OTLP receiver's bound port, null when it is off. */
   otlpPort?: () => number | null;
   pollMs?: number;
-  /** Where `card.run` downloads attachments from (#309 D9): the API and the runner token. */
-  attachmentSource?: AttachmentSource;
+  /**
+   * Where `card.run` downloads attachments from (#309 D9): the API and the
+   * runner token. Required: without it every card with an attachment fails
+   * with `attachments_unavailable`.
+   */
+  attachmentSource: AttachmentSource;
 }
 
 /** An event's `error`: one line, at most 500 characters, no stack. */

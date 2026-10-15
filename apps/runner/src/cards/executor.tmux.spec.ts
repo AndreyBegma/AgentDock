@@ -90,6 +90,7 @@ const setup = async () => {
       cardsDir,
       selfCommand: [process.execPath, MAIN],
       tmuxServer,
+      attachmentSource: { server: 'http://127.0.0.1:1', token: 'test' },
       emit: (event) => events.push(event),
       log: memoryLogger().log,
     });

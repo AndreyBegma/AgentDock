@@ -30,6 +30,7 @@ const setup = async () => {
     deps: f.deps(f.exec),
     cardsDir: join(f.ws, 'state', 'cards'),
     selfCommand: ['true'],
+    attachmentSource: { server: 'http://127.0.0.1:1', token: 'test' },
     emit: () => {},
     log: memoryLogger().log,
   });
