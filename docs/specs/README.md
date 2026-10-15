@@ -63,3 +63,4 @@ ask for it.
 | [#335](https://github.com/AndreyBegma/AgentDock/issues/335) | [335-design-viewer-zoom](335-design-viewer-zoom.md) | Zoom in the design viewer (Fit, presets, Ctrl+wheel) | #223 | shipped — [#338](https://github.com/AndreyBegma/AgentDock/pull/338) |
 | [#337](https://github.com/AndreyBegma/AgentDock/issues/337) | [337-planner-on-the-board](337-planner-on-the-board.md) | Planner on the Board: New Card interviews, New Plan makes cards (ADR-0034) | #172, #273, #309, #322 | queued |
 | [#348](https://github.com/AndreyBegma/AgentDock/issues/348) | [348-card-hooks-hint-knows-the-plugin](348-card-hooks-hint-knows-the-plugin.md) | The card hooks hint knows whether the plugin is set up | #281 | queued |
+| [#353](https://github.com/AndreyBegma/AgentDock/issues/353) | [353-survive-api-restart](353-survive-api-restart.md) | Web survives an API restart: banner, read retry, terminal reconnect | — | queued |
