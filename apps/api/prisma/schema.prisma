@@ -2650,6 +2650,8 @@ enum BoardCardSource {
 enum CardRoundTrigger {
   run
   feedback
+  /// #359 D6: started by AgentDock for a red check or a merge conflict.
+  ci_fix
 }
 
 /// Shared `CARD_ROUND_PHASES` (D4, D6).
@@ -2691,6 +2693,15 @@ enum CardPrState {
   draft
   merged
   closed
+}
+
+/// Shared `CARD_CI_STATES` (#359 D5): the checks on the card's PR head.
+enum CardCiState {
+  /// No PR, or the head has no checks.
+  none
+  pending
+  green
+  red
 }
 
 /// A work item AgentDock owns (ADR-0024), not a GitHub issue. Each Run or
@@ -2765,6 +2776,21 @@ model BoardCard {
   collectAttempts         Int              @default(0)
   /// When the last collect attempt ended.
   collectedAt             DateTime?
+  /// #359 D5: the checks on `ciHeadSha`, from the last `card.checks`.
+  ciState                 CardCiState      @default(none)
+  /// #359 D5: the failed checks, `[{name, link}]` (shared `cardCiCheckSchema`);
+  /// `null` unless `ciState` is `red`.
+  ciChecks                Json?
+  /// #359 D5, D6: the PR head `ciState` describes; a red head is acted on once.
+  ciHeadSha               String?
+  /// #359 D5: when `card.checks` last answered.
+  ciCheckedAt             DateTime?
+  /// #359 D6: `ci_fix` rounds on the current PR (at most 3).
+  ciFixAttempts           Int              @default(0)
+  /// #359 D6: CI still failing after the budget — no automation until a person acts.
+  needsPerson             Boolean          @default(false)
+  /// #359 D8: when the latest PR merged; the card stays in Finished as Merged.
+  mergedAt                DateTime?
   /// Nullable so deleting a user keeps the card.
   createdById             String?
   movedById               String?
@@ -2832,6 +2858,8 @@ model BoardCard {
   dependsOn          BoardCardDependency[] @relation("BoardCardDependsOn")
   /// #337 D8: the cards that run after this one.
   dependants         BoardCardDependency[] @relation("BoardCardDependant")
+  /// #359 D8: every PR the card opened; `prUrl` is the latest.
+  pullRequests       BoardCardPullRequest[]
 
   @@unique([projectId, number])
   @@unique([projectId, fleetIssue, fleetSlot])
@@ -2856,6 +2884,26 @@ model BoardCardDependency {
   @@id([cardId, dependsOnId])
   @@index([dependsOnId])
   @@map("board_card_dependencies")
+}
+
+/// #359 D8: one PR of a card. A follow-up after a merge opens a new branch
+/// and a new PR; every one is kept.
+model BoardCardPullRequest {
+  id        String      @id @default(cuid())
+  cardId    String
+  number    Int
+  url       String
+  /// The PR's head branch.
+  branch    String
+  state     CardPrState
+  /// The round that opened it.
+  round     Int
+  createdAt DateTime    @default(now())
+
+  card BoardCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@unique([cardId, number])
+  @@map("board_card_pull_requests")
 }
 
 /// One Run or feedback of a card (D4), with its `runs` row of kind `card`.
@@ -2963,6 +3011,9 @@ model BoardSettings {
   captureModel       String   @default("haiku")
   /// #282 D3: the `autoCollect` a new `terminal` card starts with.
   autoCollectTracked Boolean  @default(false)
+  /// #359 D7: merge a card's PR on entering Finished. `null` is the default:
+  /// on for a base other than the default branch (shared `cardAutoMergeDefault`).
+  autoMergeCards     Boolean?
   updatedById        String?
   updatedAt          DateTime @updatedAt
 

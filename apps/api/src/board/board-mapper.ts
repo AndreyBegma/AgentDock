@@ -10,9 +10,12 @@ import {
   type CardDependencyRef,
   type CardEvidenceView,
   type CardFleetView,
+  type CardPullRequestRef,
   type CardRoundBrief,
   type CardRoundView,
   type CardTrackingView,
+  cardAutoMergeDefault,
+  cardCiChecksOf,
   cardLabel,
   cardRecommendationOf,
   FLEET_STAGES,
@@ -30,6 +33,7 @@ import {
 } from '@agentdock/shared/protocol';
 import {
   type BoardCard,
+  type BoardCardPullRequest,
   type BoardCardRound,
   type BoardSettings,
   Prisma,
@@ -72,7 +76,24 @@ export type CardWithPeople = CardWithRounds & {
   movedBy: BoardUserRef | null;
   completedBy: BoardUserRef | null;
   rounds: (BoardCardRound & { author: BoardUserRef | null })[];
+  /** #359 D8: the card's PRs, where the read included them; absent is none. */
+  pullRequests?: BoardCardPullRequest[];
 };
+
+/** #359 D8: the card's PRs, oldest first. */
+const pullRequestsOf = (
+  rows: readonly BoardCardPullRequest[] | undefined,
+): CardPullRequestRef[] =>
+  [...(rows ?? [])]
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+    .map((pr) => ({
+      number: pr.number,
+      url: pr.url,
+      branch: pr.branch,
+      state: pr.state,
+      round: pr.round,
+      createdAt: pr.createdAt.toISOString(),
+    }));
 
 /** What the mapper needs besides the rows. */
 export interface CardFacts {
@@ -199,6 +220,11 @@ export const toCardView = (
   prState: card.prState,
   collectState: card.collectState,
   collectError: card.collectState === 'failed' ? card.collectError : null,
+  ciState: card.ciState,
+  ciChecks: card.ciState === 'red' ? cardCiChecksOf(card.ciChecks) : [],
+  ciFixAttempts: card.ciFixAttempts,
+  needsPerson: card.needsPerson,
+  mergedAt: iso(card.mergedAt),
   round: brief(card, card.rounds[0], facts),
   design: designOf(card.design),
   continueAfterDesign: card.continueAfterDesign,
@@ -298,16 +324,24 @@ export const toCardDetail = (
   rounds: [...card.rounds]
     .sort((a, b) => a.round - b.round)
     .map((round) => toRoundView(card, round, facts)),
+  pullRequests: pullRequestsOf(card.pullRequests),
   evidence: evidenceOf(card.evidence),
   attachments,
 });
 
-/** No row is the defaults (`isDefault: true`). */
+/**
+ * No row is the defaults (`isDefault: true`). #359 D7: `baseBranch` is the
+ * project's base, which decides `autoMergeCardsDefault`; without it the
+ * default reads as off, the safe side.
+ */
 export const toSettingsView = (
   projectId: string,
   row: BoardSettings | null,
-): BoardSettingsView =>
-  row
+  baseBranch: string | null = null,
+): BoardSettingsView => {
+  const autoMergeCardsDefault =
+    baseBranch !== null && cardAutoMergeDefault(baseBranch);
+  return row
     ? {
         projectId,
         issueOnRun: row.issueOnRun,
@@ -318,6 +352,8 @@ export const toSettingsView = (
           ? row.captureModel
           : CAPTURE_MODEL_DEFAULT,
         autoCollectTracked: row.autoCollectTracked,
+        autoMergeCards: row.autoMergeCards,
+        autoMergeCardsDefault,
         isDefault: false,
         updatedAt: row.updatedAt.toISOString(),
       }
@@ -329,6 +365,9 @@ export const toSettingsView = (
         captureEnabled: false,
         captureModel: CAPTURE_MODEL_DEFAULT,
         autoCollectTracked: false,
+        autoMergeCards: null,
+        autoMergeCardsDefault,
         isDefault: true,
         updatedAt: null,
       };
+};

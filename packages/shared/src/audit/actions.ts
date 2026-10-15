@@ -122,7 +122,10 @@ export const AUDIT_ACTIONS = [
   'card.captured',
   'card.inbox_accepted',
   'card.dismissed',
-  /** #273 D16: Accept merged the card's PR (`after: { pr, method, mergeCommit?, issueClosed }`). */
+  /**
+   * #273 D16: Accept merged the card's PR (`after: { pr, method, mergeCommit?, issueClosed }`).
+   * #359 D7: also the auto-merge, by the system actor.
+   */
   'card.merged',
   /** #273 D16: the runner refused the merge (`after: { pr, reason }`, result error). */
   'card.merge_failed',

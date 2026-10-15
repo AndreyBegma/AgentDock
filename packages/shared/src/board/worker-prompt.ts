@@ -4,6 +4,7 @@ import { attachmentWorktreePath } from '../attachments/names';
 import { attachmentKindLabel } from '../attachments/types';
 import { CARD_RUN_PROMPT_MAX_BYTES } from '../protocol/commands/cards';
 import { cardLabel } from './naming';
+import type { CardCiCheck } from './shipping';
 import type { BoardCardKind } from './types';
 
 /**
@@ -11,9 +12,10 @@ import type { BoardCardKind } from './types';
  * editable (ADR-0024 scopes ADR-0005). A change to the text bumps
  * `CARD_WORKER_PROMPT_VERSION`, which the API records on each round's run.
  * Version 4 (#309 D10): the `## Attachments` sections. Version 5 (#359 D3):
- * the pull request description file.
+ * the pull request description file. Version 6 (#359 D1, D6): AgentDock
+ * pushes during the round; the `ci_fix` round prompt.
  */
-export const CARD_WORKER_PROMPT_VERSION = 5;
+export const CARD_WORKER_PROMPT_VERSION = 6;
 
 /** The MCP tool the worker calls when done (D6). */
 export const FINISH_CARD_TOOL = 'finish_card';
@@ -260,7 +262,7 @@ const assemblePrompt = (
     "- Follow the repository's CLAUDE.md / AGENTS.md.",
     '- Commit your work as you go, with clear messages.',
     '- Run the tests and checks the repository defines before you finish.',
-    '- Do not push and do not open a pull request: AgentDock does that when the card is finished.',
+    '- Do not push and do not open a pull request: AgentDock pushes your commits as you make them and keeps a draft pull request open for this branch.',
     '- If something is unclear, ask in this session and wait for the person.',
     '',
     '## When you are done',
@@ -279,6 +281,71 @@ export const cardFeedbackPrompt = (feedback: string): string =>
 
 /** A retry after a failed, ended or cancelled round resumes with this. */
 export const CARD_CONTINUE_PROMPT = 'continue';
+
+/** #359 D6: failed checks a `ci_fix` prompt names one by one; the rest are counted. */
+export const CARD_CI_FIX_CHECKS_LISTED_MAX = 10;
+
+/** #359 D6: the project's checks as the prompt names them, in UTF-8 bytes. */
+export const CARD_CI_FIX_CHECKS_TEXT_MAX_BYTES = 4 * 1024;
+
+/**
+ * #359 D6: why AgentDock started a `ci_fix` round.
+ * - `red` — a check failed on `headSha`; `checks` is the project's own
+ *   check commands (`orchestrator.checks`), `null` when it has none.
+ * - `conflict` — the PR conflicts with `base`.
+ */
+export type CardCiFixInput =
+  | {
+      reason: 'red';
+      headSha: string;
+      failed: readonly CardCiCheck[];
+      checks: string | null;
+    }
+  | { reason: 'conflict'; base: string };
+
+const failedCheckLine = (check: CardCiCheck): string =>
+  check.link === null
+    ? `- ${oneLine(check.name)}`
+    : `- ${oneLine(check.name)} — ${check.link}`;
+
+/**
+ * #359 D6: the prompt of a `ci_fix` round, resuming the card's session. A red
+ * check: "CI failed on <head>: <check> — <link> (and the rest). Reproduce it
+ * with the project's checks, fix it, commit, and call finish_card." A
+ * conflict: merge `origin/<base>`, resolve, commit. CI logs are not quoted —
+ * the worker reproduces the failure itself (spec, out of scope).
+ */
+export const cardCiFixPrompt = (input: CardCiFixInput): string => {
+  if (input.reason === 'conflict') {
+    return [
+      `The pull request of this branch conflicts with ${input.base}.`,
+      '',
+      `Merge origin/${input.base} into this branch (git fetch origin ${input.base}, then git merge origin/${input.base}), resolve the conflicts, run the project's checks, commit the merge, and call ${FINISH_CARD_TOOL}.`,
+      'Do not rebase and do not push: AgentDock pushes your commits.',
+    ].join('\n');
+  }
+  const listed = input.failed.slice(0, CARD_CI_FIX_CHECKS_LISTED_MAX);
+  const rest = input.failed.length - listed.length;
+  const checks = input.checks?.trim()
+    ? cutToBytes(input.checks.trim(), CARD_CI_FIX_CHECKS_TEXT_MAX_BYTES)
+    : null;
+  const lines = [
+    `CI failed on ${input.headSha.slice(0, 12)}:`,
+    '',
+    ...(listed.length > 0
+      ? listed.map(failedCheckLine)
+      : ['- (the failed checks were not named)']),
+  ];
+  if (rest > 0) lines.push(`- (and ${rest} more)`);
+  lines.push(
+    '',
+    checks !== null
+      ? `Reproduce the failure with the project's checks:\n\n${checks}\n`
+      : "Reproduce the failure with the checks the repository's CLAUDE.md / AGENTS.md defines.",
+    `Fix it, commit, and call ${FINISH_CARD_TOOL}. Do not push: AgentDock pushes your commits.`,
+  );
+  return lines.join('\n');
+};
 
 /** #273 D1: the card text a round's prompt was built from. */
 export interface CardText {

@@ -64,8 +64,11 @@ export const isMirroredCardSource = (
 ): source is MirroredCardSource =>
   (MIRRORED_CARD_SOURCES as readonly BoardCardSource[]).includes(source);
 
-/** D4: what started a round. */
-export const CARD_ROUND_TRIGGERS = ['run', 'feedback'] as const;
+/**
+ * D4: what started a round. `ci_fix` (#359 D6) is AgentDock's own round for a
+ * red check or a merge conflict on the card's PR.
+ */
+export const CARD_ROUND_TRIGGERS = ['run', 'feedback', 'ci_fix'] as const;
 export type CardRoundTrigger = (typeof CARD_ROUND_TRIGGERS)[number];
 
 /**
@@ -143,6 +146,28 @@ export type CardPrState = (typeof CARD_PR_STATES)[number];
 
 export const isCardPrState = (value: string): value is CardPrState =>
   (CARD_PR_STATES as readonly string[]).includes(value);
+
+/**
+ * #359 D5: the checks on the head of the card's PR.
+ * - `none` — no PR, or the head has no checks;
+ * - `pending` — a check is still running;
+ * - `green` — every check passed (or was skipped);
+ * - `red` — a check failed or was cancelled; `ciChecks` names them.
+ */
+export const CARD_CI_STATES = ['none', 'pending', 'green', 'red'] as const;
+export type CardCiState = (typeof CARD_CI_STATES)[number];
+
+export const isCardCiState = (value: string): value is CardCiState =>
+  (CARD_CI_STATES as readonly string[]).includes(value);
+
+/** #359 D6: `ci_fix` rounds per PR; the next red sets `needsPerson`. */
+export const CARD_CI_FIX_ATTEMPTS_MAX = 3;
+
+/** #359 D5: how often the API reads a PR's checks while any is pending. */
+export const CARD_CI_POLL_MS = 60_000;
+
+/** #359 D1: the runner pushes a card's committed HEAD at most this often. */
+export const CARD_PUSH_MIN_INTERVAL_MS = 30_000;
 
 export const BOARD_CARD_TITLE_MAX = LOCAL_CARD_TITLE_MAX;
 /** Markdown. */
