@@ -37,6 +37,7 @@ import { BudgetExceededBanner } from '../../../../components/budgets/exceeded-ba
 import { PageHeader } from '../../../../components/page-header/page-header';
 import { RunnerOfflineBanner } from '../../../../components/prerequisites/prerequisite-banner';
 import { api } from '../../../../lib/api';
+import { boardNewPlanHref } from '../../../../lib/board/href';
 import { useControl } from '../../../../lib/control/use-control';
 import {
   isNotFound,
@@ -44,7 +45,6 @@ import {
 } from '../../../../lib/fleet/format';
 import { projectHue } from '../../../../lib/hue';
 import { useLive } from '../../../../lib/live/use-live';
-import { plannerBriefHref } from '../../../../lib/planner/href';
 import {
   PROJECT_PERIODS,
   parsePeriod,
@@ -287,7 +287,7 @@ function ProjectHome() {
               ))}
             </SegmentedControl>
             <NextLink
-              href={plannerBriefHref(projectId, NEXT_WAVE_BRIEF)}
+              href={boardNewPlanHref(projectId, NEXT_WAVE_BRIEF)}
               className={buttonClassName({ variant: 'glass' })}
             >
               Plan next wave

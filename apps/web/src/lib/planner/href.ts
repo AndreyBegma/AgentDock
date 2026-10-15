@@ -14,10 +14,6 @@ export const planHref = (
     taskKey ? `?task=${encodeURIComponent(taskKey)}` : ''
   }`;
 
-/** `?brief=` prefills the composer (the Fleet canvas's "Plan this", #160). */
-export const plannerBriefHref = (projectId: string, brief: string): string =>
-  `${plannerHref(projectId)}?brief=${encodeURIComponent(brief)}`;
-
 /** The base path of every planner route of a plan. */
 export const planApi = (projectId: string, planId: string): string =>
   `/projects/${projectId}/plans/${planId}`;

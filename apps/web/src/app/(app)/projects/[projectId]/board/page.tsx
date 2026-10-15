@@ -6,6 +6,7 @@ import {
   type BoardPlanTaskView,
   type BoardView,
   PLANNER_LIVE_EVENT,
+  type PlanSummary,
   QUEUE_LIVE_EVENT,
 } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
@@ -36,7 +37,9 @@ import {
   CardSheet,
   type TerminalAccess,
 } from '../../../../../components/board/card-sheet';
+import { DraftsStrip } from '../../../../../components/board/drafts-strip';
 import { NewCardDialog } from '../../../../../components/board/new-card-dialog';
+import { PlanPanel } from '../../../../../components/board/plan-panel';
 import { PlanTaskSheet } from '../../../../../components/board/plan-task-sheet';
 import { useCardActions } from '../../../../../components/board/use-card-actions';
 import { PageHeader } from '../../../../../components/page-header/page-header';
@@ -45,6 +48,7 @@ import { RunnerOfflineBanner } from '../../../../../components/prerequisites/pre
 import { ReadinessBanner } from '../../../../../components/readiness/readiness-banner';
 import { useLivePaused } from '../../../../../components/shell/live-status';
 import { LiveStatusBadge } from '../../../../../components/shell/live-status-badge';
+import { useCurrentUser } from '../../../../../components/shell/user-context';
 import { TerminalSheet } from '../../../../../components/terminal/terminal-sheet';
 import { fetchBoard } from '../../../../../lib/board/actions';
 import {
@@ -86,6 +90,13 @@ function BoardScreen() {
     params.get('plan'),
     params.get('task'),
   );
+  // #337: the New Card intake (`?intake=`) and the New Plan panel
+  // (`?newPlan=1`, then `?planPanel=`) live in the URL, so a reload or a
+  // Drafts Resume lands on them.
+  const intakeId = params.get('intake') ?? undefined;
+  const planPanelId = params.get('planPanel') ?? undefined;
+  const planPanelOpen = planPanelId !== undefined || params.has('newPlan');
+  const user = useCurrentUser();
   /** Bumped by a live push or a mutation; the board and the sheet depend on it. */
   const [version, setVersion] = useState(0);
   const [creating, setCreating] = useState(false);
@@ -168,15 +179,29 @@ function BoardScreen() {
     }
   };
 
-  const select = (number: number | undefined) => {
+  /** Sets (a string) or removes (undefined) each named search param. */
+  const setParams = (changes: Record<string, string | undefined>) => {
     const next = new URLSearchParams(params.toString());
-    if (number === undefined) next.delete('card');
-    else next.set('card', String(number));
+    for (const [key, value] of Object.entries(changes)) {
+      if (value === undefined) next.delete(key);
+      else next.set(key, value);
+    }
     const query = next.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, {
       scroll: false,
     });
   };
+
+  const select = (number: number | undefined) =>
+    setParams({ card: number === undefined ? undefined : String(number) });
+
+  const closePlanPanel = () =>
+    setParams({ newPlan: undefined, planPanel: undefined, brief: undefined });
+
+  const resumeDraft = (plan: PlanSummary) =>
+    plan.mode === 'card'
+      ? setParams({ intake: plan.id })
+      : setParams({ newPlan: undefined, planPanel: plan.id });
 
   const selectPlanTask = (task: BoardPlanTaskView | undefined) => {
     const next = new URLSearchParams(params.toString());
@@ -266,9 +291,17 @@ function BoardScreen() {
                 </SegmentedControlItem>
               </SegmentedControl>
               {canOperate ? (
-                <Button variant="solid" onClick={() => setCreating(true)}>
-                  New card
-                </Button>
+                <>
+                  <Button
+                    variant="glass"
+                    onClick={() => setParams({ newPlan: '1' })}
+                  >
+                    New plan
+                  </Button>
+                  <Button variant="solid" onClick={() => setCreating(true)}>
+                    New card
+                  </Button>
+                </>
               ) : null}
             </>
           }
@@ -280,6 +313,19 @@ function BoardScreen() {
           captureOn={board.data?.settings.captureEnabled ?? false}
         />
       </div>
+
+      {canOperate ? (
+        <DraftsStrip
+          projectId={projectId}
+          userId={user.id}
+          version={version}
+          onResume={resumeDraft}
+          onDiscarded={(plan) => {
+            if (plan.id === intakeId) setParams({ intake: undefined });
+            if (plan.id === planPanelId) closePlanPanel();
+          }}
+        />
+      ) : null}
 
       <AsyncSection
         section={board}
@@ -323,16 +369,57 @@ function BoardScreen() {
       </AsyncSection>
 
       {canOperate ? (
-        <NewCardDialog
-          projectId={projectId}
-          open={creating}
-          settings={board.data?.settings}
-          onOpenChange={setCreating}
-          onCreated={(number) => {
-            reload();
-            select(number);
-          }}
-        />
+        <>
+          <NewCardDialog
+            projectId={projectId}
+            project={project}
+            open={creating || intakeId !== undefined}
+            planId={intakeId}
+            board={board.data}
+            onOpenChange={(open) => {
+              setCreating(open);
+              // Closing keeps the intake as a draft (D2).
+              if (!open && intakeId) setParams({ intake: undefined });
+            }}
+            onStarted={(planId) => {
+              setCreating(false);
+              setParams({ intake: planId });
+              reload();
+            }}
+            onCreated={(number) => {
+              setCreating(false);
+              setParams({ intake: undefined, card: String(number) });
+            }}
+          />
+          <PlanPanel
+            projectId={projectId}
+            project={project}
+            open={planPanelOpen}
+            planId={planPanelId}
+            initialBrief={params.get('brief') ?? ''}
+            userId={user.id}
+            onOpenChange={(open) => {
+              if (!open) closePlanPanel();
+            }}
+            onStarted={(planId) => {
+              setParams({
+                newPlan: undefined,
+                brief: undefined,
+                planPanel: planId,
+              });
+              reload();
+            }}
+            onCardsCreated={(created) => {
+              toast.success(
+                created.cards.length === 1
+                  ? `${created.cards[0]?.label} is in Todo.`
+                  : `${created.cards.length} cards are in Todo.`,
+              );
+              closePlanPanel();
+              reload();
+            }}
+          />
+        </>
       ) : null}
 
       <CardSheet
