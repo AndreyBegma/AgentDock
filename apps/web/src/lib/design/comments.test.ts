@@ -95,7 +95,7 @@ describe('what the design takes now', () => {
   test('nothing while a turn runs, or once approved', () => {
     const block = (over: Parameters<typeof design>[0]) =>
       designWriteBlock(design(over), true);
-    expect(block({ activeTurnId: 't' })).toMatch(/drawing/);
+    expect(block({ activeTurnId: 't' })).toMatch(/design run is under way/);
     expect(block({ status: 'approved' })).toMatch(/approved/);
     expect(block({ needed: false })).toMatch(/off/);
   });
