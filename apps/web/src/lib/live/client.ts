@@ -1,4 +1,5 @@
 import {
+  BOARD_CHANGED_EVENT,
   LIVE_CLOSE_CODES,
   type LiveClientMessage,
   type LiveErrorCode,
@@ -6,6 +7,7 @@ import {
   type LiveTopic,
   liveServerMessageSchema,
 } from '@agentdock/shared';
+import { type Reachability, reachability } from './reachability';
 
 /** What the status dot shows: connected, trying again, or given up. */
 export type LiveStatus = 'connected' | 'reconnecting' | 'offline';
@@ -35,7 +37,15 @@ export interface LiveClientOptions {
   random?: () => number;
   setTimer?: (fn: () => void, ms: number) => unknown;
   clearTimer?: (id: unknown) => void;
+  /** Where an abnormal close and a successful open are reported; the tab's by default. */
+  reachability?: Reachability;
 }
+
+/** The event replayed to project topics after a gap, so the board refetches (spec 353 D5). */
+export const RESYNC_EVENT = BOARD_CHANGED_EVENT;
+
+/** A close the server did not ask for: the socket dropped, or the API was gone. */
+export const isAbnormalClose = (code: number): boolean => code !== 1000;
 
 export const BACKOFF_MIN_MS = 1_000;
 export const BACKOFF_MAX_MS = 30_000;
@@ -67,6 +77,9 @@ export class LiveClient {
   private readonly random: () => number;
   private readonly setTimer: (fn: () => void, ms: number) => unknown;
   private readonly clearTimer: (id: unknown) => void;
+  private readonly reachability: Reachability;
+  /** The socket dropped abnormally since it last opened; the next open is a recovery. */
+  private gap = false;
   private socket: LiveSocket | null = null;
   private open = false;
   private attempt = 0;
@@ -75,6 +88,7 @@ export class LiveClient {
   private snapshot: LiveSnapshot = { status: 'reconnecting', closeCode: null };
 
   constructor(private readonly options: LiveClientOptions) {
+    this.reachability = options.reachability ?? reachability;
     this.random = options.random ?? Math.random;
     this.setTimer = options.setTimer ?? ((fn, ms) => setTimeout(fn, ms));
     this.clearTimer =
@@ -142,10 +156,14 @@ export class LiveClient {
       if (this.socket !== socket) return;
       this.open = true;
       this.attempt = 0;
+      const recovered = this.gap || this.reachability.isUnreachable();
+      this.gap = false;
+      this.reachability.markReachable();
       this.setSnapshot({ status: 'connected', closeCode: null });
       for (const topic of this.handlers.keys()) {
         this.send({ type: 'subscribe', topic });
       }
+      if (recovered) this.resync();
       this.pingTimer = this.setTimer(this.ping, PING_INTERVAL_MS);
     };
     socket.onmessage = (event) => {
@@ -160,6 +178,10 @@ export class LiveClient {
         this.setSnapshot({ status: 'offline', closeCode: event.code });
         return;
       }
+      if (isAbnormalClose(event.code)) {
+        this.gap = true;
+        this.reachability.markUnreachable();
+      }
       this.setSnapshot({ status: 'reconnecting', closeCode: null });
       if (this.handlers.size === 0) return;
       const delay = backoffDelay(this.attempt, this.random);
@@ -169,6 +191,27 @@ export class LiveClient {
         if (this.handlers.size > 0) this.connect();
       }, delay);
     };
+  }
+
+  /**
+   * Pushes missed during a gap are gone, so each project topic's handlers get
+   * one synthetic board change: the board and the open card sheet refetch once
+   * (their own debounce folds it with a real push).
+   */
+  private resync() {
+    const ts = new Date().toISOString();
+    for (const [topic, handlers] of this.handlers) {
+      if (!topic.startsWith('project:')) continue;
+      for (const handler of handlers) {
+        handler({
+          type: 'event',
+          topic,
+          event: RESYNC_EVENT,
+          data: null,
+          ts,
+        });
+      }
+    }
   }
 
   private disconnect() {

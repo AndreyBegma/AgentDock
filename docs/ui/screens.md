@@ -109,6 +109,19 @@ be out of date." with Reload. A page that shows the socket's state uses
 `LiveStatusBadge`: Live, Reconnecting…, or Live updates paused — never
 "Offline", which reads as the runner.
 
+**The server is restarting** (#353). A staging deploy leaves the API gone for
+10–30 s. A failed `fetch`, a 502/503/504, or an abnormal close of the live
+socket marks the app unreachable (`lib/live/reachability.ts`); the first
+success clears it. After 1.5 s of it the shell shows a slim warn banner —
+"Reconnecting to AgentDock… (the server may be restarting)" — in place of the
+"Live updates paused" one; a shorter blip shows nothing. `GET`/`HEAD` retry
+with backoff (0.5, 1, 2, 4, 8 s, 30 s in all); a write is never retried and
+fails with "AgentDock was restarting — nothing was changed. Try again". A real
+404 keeps its not-found text. After the live socket reconnects from a gap the
+board and the open card sheet refetch once. A terminal attach that has not
+attached within 10 s is retried ("Reconnecting… (attempt n)"); after 30 s it
+reads "Could not connect" with **Retry**.
+
 ## First run
 
 A fresh install has an admin and nothing else. The path to a first project

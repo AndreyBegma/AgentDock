@@ -70,6 +70,8 @@ export function inputFrames(text: string): Uint8Array<ArrayBuffer>[] {
 export type TerminalPhase =
   | 'requesting'
   | 'connecting'
+  | 'reconnecting'
+  | 'failed'
   | 'attached'
   | 'ended'
   | 'refused';
@@ -77,6 +79,8 @@ export type TerminalPhase =
 export const TERMINAL_PHASE_LABEL: Record<TerminalPhase, string> = {
   requesting: 'Requesting access…',
   connecting: 'Connecting…',
+  reconnecting: 'Reconnecting…',
+  failed: 'Could not connect',
   attached: 'Attached',
   ended: 'Detached',
   refused: 'Not attached',

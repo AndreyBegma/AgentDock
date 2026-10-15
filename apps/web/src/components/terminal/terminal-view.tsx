@@ -12,7 +12,11 @@ import type {
 } from '@agentdock/shared/protocol';
 import '@xterm/xterm/css/xterm.css';
 import { useEffect, useRef } from 'react';
-import { api } from '../../lib/api';
+import { ApiUnreachableError, api } from '../../lib/api';
+import {
+  AttachSupervisor,
+  isTransientCloseCode,
+} from '../../lib/terminal/attach';
 import {
   CLOSE_REASON_LABEL,
   clampSize,
@@ -128,7 +132,6 @@ export function TerminalView({
         term.dispose();
       };
 
-      status({ phase: 'requesting' });
       const request: TicketRequest = {
         kind,
         projectId,
@@ -138,72 +141,127 @@ export function TerminalView({
         ...(sessionId ? { sessionId } : {}),
         ...(cardId ? { cardId } : {}),
       };
-      let ticket: TerminalTicketResponse;
-      try {
-        ticket = await api<TerminalTicketResponse>('/terminal/tickets', {
-          method: 'POST',
-          body: request,
-        });
-      } catch (error) {
-        status({ phase: 'refused', message: describeTicketError(error) });
-        return;
-      }
-      if (disposed) return;
-
-      status({ phase: 'connecting' });
-      const ws = new WebSocket(terminalSocketUrl(ticket.ticket, size()));
-      ws.binaryType = 'arraybuffer';
-      socket = ws;
-
-      // The last word wins: a `closed` frame explains the close that follows.
-      let outcome: TerminalStatus | undefined;
-
-      ws.onmessage = (event) => {
-        if (typeof event.data !== 'string') {
-          term.write(new Uint8Array(event.data as ArrayBuffer));
-          return;
-        }
-        let frame: unknown;
-        try {
-          frame = JSON.parse(event.data);
-        } catch {
-          return;
-        }
-        const parsed = terminalServerFrameSchema.safeParse(frame);
-        if (!parsed.success) return;
-        const value = parsed.data;
-        if (value.type === 'attached') {
-          status({ phase: 'attached' });
-          if (mode === 'write') term.focus();
-        } else if (value.type === 'error') {
-          outcome = {
-            phase: 'refused',
-            message: describeRefusal(value.code, value.heldBy),
-          };
-        } else {
-          const reason: TerminalCloseReason = value.reason;
-          outcome = { phase: 'ended', message: CLOSE_REASON_LABEL[reason] };
-        }
-      };
-      ws.onclose = (event) => {
-        status(
-          outcome ?? {
-            phase: 'refused',
-            message: describeCloseCode(event.code),
-          },
-        );
-      };
 
       if (mode === 'write') {
         term.onData((data) => {
-          if (ws.readyState !== WebSocket.OPEN) return;
-          for (const bytes of inputFrames(data)) ws.send(bytes);
+          if (socket?.readyState !== WebSocket.OPEN) return;
+          for (const bytes of inputFrames(data)) socket.send(bytes);
         });
         term.onBinary((data) => {
-          if (ws.readyState !== WebSocket.OPEN) return;
-          ws.send(Uint8Array.from(data, (c) => c.charCodeAt(0)));
+          if (socket?.readyState !== WebSocket.OPEN) return;
+          socket.send(Uint8Array.from(data, (c) => c.charCodeAt(0)));
         });
       }
+
+      // An attempt that is abandoned (timeout, retry) must not report late.
+      let generation = 0;
+
+      const attempt = async (n: number) => {
+        const mine = generation;
+        const stale = () => disposed || mine !== generation;
+        if (n === 1) status({ phase: 'requesting' });
+        let ticket: TerminalTicketResponse;
+        try {
+          ticket = await api<TerminalTicketResponse>('/terminal/tickets', {
+            method: 'POST',
+            body: request,
+          });
+        } catch (error) {
+          if (stale()) return;
+          if (error instanceof ApiUnreachableError) {
+            supervisor.attemptFailed();
+            return;
+          }
+          supervisor.dispose();
+          status({ phase: 'refused', message: describeTicketError(error) });
+          return;
+        }
+        if (stale()) return;
+
+        if (n === 1) status({ phase: 'connecting' });
+        const ws = new WebSocket(terminalSocketUrl(ticket.ticket, size()));
+        ws.binaryType = 'arraybuffer';
+        socket = ws;
+        let attached = false;
+
+        // The last word wins: a `closed` frame explains the close that follows.
+        let outcome: TerminalStatus | undefined;
+
+        ws.onmessage = (event) => {
+          if (stale()) return;
+          if (typeof event.data !== 'string') {
+            term.write(new Uint8Array(event.data as ArrayBuffer));
+            return;
+          }
+          let frame: unknown;
+          try {
+            frame = JSON.parse(event.data);
+          } catch {
+            return;
+          }
+          const parsed = terminalServerFrameSchema.safeParse(frame);
+          if (!parsed.success) return;
+          const value = parsed.data;
+          if (value.type === 'attached') {
+            attached = true;
+            supervisor.attached();
+            if (mode === 'write') term.focus();
+          } else if (value.type === 'error') {
+            outcome = {
+              phase: 'refused',
+              message: describeRefusal(value.code, value.heldBy),
+            };
+          } else {
+            const reason: TerminalCloseReason = value.reason;
+            outcome = { phase: 'ended', message: CLOSE_REASON_LABEL[reason] };
+          }
+        };
+        ws.onclose = (event) => {
+          if (stale()) return;
+          if (!attached && !outcome && isTransientCloseCode(event.code)) {
+            supervisor.attemptFailed();
+            return;
+          }
+          supervisor.dispose();
+          status(
+            outcome ?? {
+              phase: 'refused',
+              message: describeCloseCode(event.code),
+            },
+          );
+        };
+      };
+
+      const supervisor = new AttachSupervisor({
+        start: (n) => void attempt(n),
+        abort: () => {
+          generation += 1;
+          const old = socket;
+          socket = undefined;
+          if (old) {
+            old.onclose = null;
+            old.close();
+          }
+        },
+        onState: (state) => {
+          if (state.phase === 'attached') status({ phase: 'attached' });
+          else if (state.phase === 'reconnecting') {
+            status({
+              phase: 'reconnecting',
+              message: `Reconnecting… (attempt ${state.attempt})`,
+            });
+          } else if (state.phase === 'failed') {
+            status({ phase: 'failed', message: 'Could not connect' });
+          }
+        },
+      });
+      const stopAttach = cleanup;
+      cleanup = () => {
+        generation += 1;
+        supervisor.dispose();
+        stopAttach();
+      };
+      supervisor.begin();
     })();
 
     return () => {

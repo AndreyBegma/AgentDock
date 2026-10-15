@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { LiveEventMessage } from '@agentdock/shared';
+import { BOARD_CHANGED_EVENT, type LiveEventMessage } from '@agentdock/shared';
 import {
   BACKOFF_MAX_MS,
   backoffDelay,
@@ -7,6 +7,7 @@ import {
   type LiveSocket,
   PING_INTERVAL_MS,
 } from './client';
+import { Reachability } from './reachability';
 
 class FakeSocket implements LiveSocket {
   onopen: (() => void) | null = null;
@@ -35,7 +36,12 @@ function setup() {
   const sockets: FakeSocket[] = [];
   const timers: { id: number; fn: () => void; ms: number }[] = [];
   let nextId = 1;
+  const unreachable = new Reachability({
+    setTimer: () => 0,
+    clearTimer: () => {},
+  });
   const client = new LiveClient({
+    reachability: unreachable,
     url: 'ws://test/live',
     createSocket: () => {
       const socket = new FakeSocket();
@@ -60,7 +66,7 @@ function setup() {
     const [timer] = timers.splice(index, 1);
     timer?.fn();
   };
-  return { client, sockets, timers, fire };
+  return { client, sockets, timers, fire, reachability: unreachable };
 }
 
 const event = (topic: string, name = 'x'): LiveEventMessage => ({
@@ -245,5 +251,50 @@ describe('LiveClient', () => {
     sockets[0]?.open();
     sockets[0]?.open();
     expect(calls).toBe(1);
+  });
+
+  describe('after an outage (spec 353 D5)', () => {
+    test('an abnormal drop marks unreachable and the reopen clears it', () => {
+      const { client, sockets, fire, reachability } = setup();
+      client.subscribe('project:p1', () => {});
+      sockets[0]?.open();
+      sockets[0]?.drop(1006);
+      expect(reachability.isUnreachable()).toBe(true);
+      fire(1_000);
+      sockets[1]?.open();
+      expect(reachability.isUnreachable()).toBe(false);
+    });
+
+    test('the board refetches once on the reconnect that follows a gap', () => {
+      const { client, sockets, fire } = setup();
+      const seen: string[] = [];
+      client.subscribe('project:p1', (message) => seen.push(message.event));
+      sockets[0]?.open();
+      expect(seen).toEqual([]);
+      sockets[0]?.drop(1006);
+      fire(1_000);
+      sockets[1]?.open();
+      expect(seen).toEqual([BOARD_CHANGED_EVENT]);
+      sockets[1]?.open();
+      expect(seen).toEqual([BOARD_CHANGED_EVENT]);
+    });
+
+    test('a reconnect that never lost the API does not refetch, and other topics are left alone', () => {
+      const { client, sockets, fire } = setup();
+      const board: string[] = [];
+      const user: string[] = [];
+      client.subscribe('project:p1', (message) => board.push(message.event));
+      client.subscribe('admin', (message) => user.push(message.event));
+      sockets[0]?.open();
+      sockets[0]?.drop(1000);
+      fire(1_000);
+      sockets[1]?.open();
+      expect(board).toEqual([]);
+      sockets[1]?.drop(1006);
+      fire(1_000);
+      sockets[2]?.open();
+      expect(board).toEqual([BOARD_CHANGED_EVENT]);
+      expect(user).toEqual([]);
+    });
   });
 });
