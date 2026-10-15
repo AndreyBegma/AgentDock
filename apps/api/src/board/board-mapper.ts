@@ -148,6 +148,10 @@ export const toCardView = (
           at: card.autoRunFailedAt.toISOString(),
         }
       : null,
+  // #282: i282-api-terminal and i282-api-fleet fill tracking and fleet.
+  tracking: null,
+  fleet: null,
+  autoCollect: card.autoCollect,
   movedAt: card.movedAt.toISOString(),
   completedAt: iso(card.completedAt),
   updatedAt: card.updatedAt.toISOString(),
@@ -236,6 +240,7 @@ export const toSettingsView = (
         captureModel: isCaptureModel(row.captureModel)
           ? row.captureModel
           : CAPTURE_MODEL_DEFAULT,
+        autoCollectTracked: row.autoCollectTracked,
         isDefault: false,
         updatedAt: row.updatedAt.toISOString(),
       }
@@ -246,6 +251,7 @@ export const toSettingsView = (
         maxRunning: BOARD_MAX_RUNNING_DEFAULT,
         captureEnabled: false,
         captureModel: CAPTURE_MODEL_DEFAULT,
+        autoCollectTracked: false,
         isDefault: true,
         updatedAt: null,
       };
