@@ -110,6 +110,19 @@ describe('agentdock-runner hook (spec 201 D11–D17)', () => {
     expect(stdout).toEqual([]);
   });
 
+  it('exits 0 at once and prints nothing under AGENTDOCK_HOOKS=off (#244 D4)', async () => {
+    daemon(() => ({ ok: true, data: { text: 'Project app, base develop.' } }));
+    for (const name of ['session-start', 'permission-request', 'stop']) {
+      const outcome = await runHook(
+        [name],
+        deps(fixture(name), { env: { AGENTDOCK_HOOKS: 'off' } }),
+      );
+      expect(outcome).toBe(0);
+    }
+    expect(calls).toEqual([]);
+    expect(stdout).toEqual([]);
+  });
+
   it('session-start reports the event with branch, tmux and ancestors, then prints additionalContext', async () => {
     daemon(({ op }) =>
       op === 'request'

@@ -9,6 +9,7 @@ import {
 import { adapters, SessionWatcher } from './adapters';
 import { resolveIngestSince } from './adapters/ingest-since';
 import { Backoff } from './backoff';
+import { CaptureExecutor, createCaptureHandlers } from './capture';
 import { CardExecutor, createCardHandlers } from './cards';
 import type { Clock } from './clock';
 import { CollectorRegistry, collectors } from './collectors';
@@ -83,6 +84,8 @@ export interface DaemonOptions {
   uiprofileDir?: string;
   /** Board card workers (#242); `<state>/agentdock/cards` beside the runs by default. */
   cardsDir?: string;
+  /** Card capture's per-extraction directories (#244); `<state>/agentdock/capture` beside the runs by default. */
+  captureDir?: string;
   /** The argv that starts this runner; a skill run's, plan turn's or card's session appends `exec-run <dir>`. */
   selfCommand?: readonly string[];
   /** The skills.sh catalog is fetched with it; the global `fetch` by default. */
@@ -275,6 +278,16 @@ export const runDaemon = async (
       log,
       otlpPort: () => otlp?.port ?? null,
     });
+    // Card capture (#244): headless, one per project; the API limits the rest.
+    const capture = new CaptureExecutor({
+      deps: skillsDeps,
+      capturesDir:
+        options.captureDir ?? join(dirname(options.spoolDir), 'capture'),
+      env: process.env,
+      emit: (event) => connection?.emit(event),
+      log,
+      otlpPort: () => otlp?.port ?? null,
+    });
     const runLog = new RunLogStreamer({
       runs: runLogSources(runs, plans, uiProfiles),
       send: (message) => connection?.sendMessage(message) ?? false,
@@ -300,6 +313,7 @@ export const runDaemon = async (
       planner: createPlannerHandlers({ ...skillsDeps, log }, plans),
       uiprofile: createUiProfileHandlers(skillsDeps, uiProfiles),
       cards: createCardHandlers(cards),
+      capture: createCaptureHandlers(capture),
     });
     const dispatch = createDispatcher({
       handlers: builtHandlers,
@@ -460,6 +474,7 @@ export const runDaemon = async (
     plans.stop();
     uiProfiles.stop();
     cards.stop();
+    capture.stop();
     terminal.stop();
     await registry.stop();
     await sessions?.stop();
