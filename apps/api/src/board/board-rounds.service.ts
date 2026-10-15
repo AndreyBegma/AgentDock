@@ -101,6 +101,13 @@ export class BoardRoundsService {
         'A completed card does not run; move it back first',
       );
     }
+    if (card.column === 'inbox') {
+      throw boardError(
+        409,
+        BOARD_ERROR.wrongColumn,
+        'A suggestion runs once it is accepted',
+      );
+    }
     await this.start(card, 'run', dto, null, actor);
     return this.board.detail(projectId, number);
   }

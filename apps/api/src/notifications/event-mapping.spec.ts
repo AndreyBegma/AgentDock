@@ -265,6 +265,34 @@ describe('draftFor (spec 22 D1)', () => {
       expect(JSON.stringify(draft)).not.toContain('secret');
     });
 
+    it('maps cards.suggested with counts only, never a title (#244 D11)', () => {
+      const draft = draftFor(
+        card('cards.suggested', {
+          captureId: 'cap1',
+          sessionId: 's1',
+          count: 3,
+          cardIds: ['c1', 'c2', 'c3'],
+          title: 'secret suggestion',
+        }),
+      );
+      expect(draft).toEqual({
+        kind: 'cards.suggested',
+        slot: null,
+        issue: null,
+        title: '3 cards were suggested',
+        body: 'Capture found follow-up work in a session; review it in the Inbox.',
+        page: 'board',
+      });
+      expect(JSON.stringify(draft)).not.toContain('secret');
+      expect(draftFor(card('cards.suggested', { count: 1 }))?.title).toBe(
+        'A card was suggested',
+      );
+      expect(draftFor(card('cards.suggested', { count: 1 }, 'runner'))).toBe(
+        null,
+      );
+      expect(draftFor(card('cards.suggested', { count: 0 }))).toBeNull();
+    });
+
     it('does not let a runner forge a card event, and needs a number', () => {
       for (const type of ['card.finished', 'card.waiting']) {
         expect(draftFor(card(type, { number: 1 }, 'runner'))).toBeNull();

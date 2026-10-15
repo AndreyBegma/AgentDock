@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { BoardModule } from './board';
 import { BudgetsModule } from './budgets';
 import { BullmqModule } from './bullmq';
+import { CaptureModule } from './capture';
 import { ControlModule } from './control';
 import { DatabaseModule } from './database/database.module';
 import { DesignModule } from './design/design.module';
@@ -69,6 +70,8 @@ import { WorkflowsModule } from './workflows';
     DesignModule,
     // Issue #242: the project Board and its card workers.
     BoardModule,
+    // Issue #244: candidate cards from manual sessions, into the Inbox.
+    CaptureModule,
     SchedulesModule,
     BudgetsModule,
     // Before WebhooksModule: its `POST /hooks/:publicId` would otherwise

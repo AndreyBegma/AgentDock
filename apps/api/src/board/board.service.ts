@@ -1,4 +1,3 @@
-import { randomInt } from 'node:crypto';
 import {
   BOARD_COLUMNS,
   BOARD_COMPLETED_PAGE_SIZE,
@@ -8,8 +7,11 @@ import {
   type BoardSettingsView,
   type BoardView,
   CARD_SUMMARY_MAX,
+  captureFingerprint,
   isActiveRoundPhase,
+  type Role,
 } from '@agentdock/shared';
+import { roleAtLeast } from '@agentdock/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
@@ -36,15 +38,14 @@ import type {
   UpdateBoardSettingsDto,
 } from './dto';
 
-const SHORT_ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
 const USER_REF = { select: { id: true, email: true } } as const;
 
-/** D5: the 8-character id of a card's worktree, tmux session and runner record. */
-const newShortId = (): string =>
-  Array.from(
-    { length: 8 },
-    () => SHORT_ID_ALPHABET[randomInt(SHORT_ID_ALPHABET.length)],
-  ).join('');
+/**
+ * #244 D8: Inbox cards are content-derived, so only operators and above see
+ * them (ADR-0021 §5). A role left out is the board's own read: everything.
+ */
+const seesInbox = (role: Role | undefined): boolean =>
+  role === undefined || roleAtLeast(role, 'operator');
 
 /** A Claude session id of a card: a uuid, so it can be looked up as one. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -63,15 +64,28 @@ export class BoardService {
     private readonly audit: AuditService,
   ) {}
 
-  /** `GET /board`: Completed holds the newest page, before `completedBefore`. */
-  async board(projectId: string, completedBefore?: Date): Promise<BoardView> {
+  /**
+   * `GET /board`: Completed holds the newest page, before `completedBefore`.
+   * A viewer gets no Inbox column (#244 D8).
+   */
+  async board(
+    projectId: string,
+    completedBefore?: Date,
+    role?: Role,
+  ): Promise<BoardView> {
+    const inbox = seesInbox(role);
     const include = {
       rounds: { orderBy: { round: 'desc' as const } },
       design: cardDesignSelect,
     };
     const [open, completed, settings, running] = await Promise.all([
       this.prisma.boardCard.findMany({
-        where: { projectId, column: { not: 'completed' } },
+        where: {
+          projectId,
+          column: inbox
+            ? { not: 'completed' }
+            : { notIn: ['completed', 'inbox'] },
+        },
         include,
         orderBy: [{ position: 'asc' }, { number: 'asc' }],
       }),
@@ -90,7 +104,8 @@ export class BoardService {
     ]);
     const page = completed.slice(0, BOARD_COMPLETED_PAGE_SIZE);
     const facts = await this.facts([...open, ...page]);
-    const columns: BoardColumnView[] = BOARD_COLUMNS.map((column) =>
+    const shown = BOARD_COLUMNS.filter((column) => inbox || column !== 'inbox');
+    const columns: BoardColumnView[] = shown.map((column) =>
       column === 'completed'
         ? {
             column,
@@ -113,7 +128,12 @@ export class BoardService {
     };
   }
 
-  async detail(projectId: string, number: number): Promise<BoardCardDetail> {
+  /** A viewer asking for an Inbox card finds none (#244 D8). */
+  async detail(
+    projectId: string,
+    number: number,
+    role?: Role,
+  ): Promise<BoardCardDetail> {
     const card = await this.prisma.boardCard.findUnique({
       where: { projectId_number: { projectId, number } },
       include: {
@@ -127,7 +147,9 @@ export class BoardService {
         design: cardDesignSelect,
       },
     });
-    if (!card) throw boardError(404, BOARD_ERROR.notFound, 'Card not found');
+    if (!card || (card.column === 'inbox' && !seesInbox(role))) {
+      throw boardError(404, BOARD_ERROR.notFound, 'Card not found');
+    }
     return toCardDetail(card, await this.facts([card]));
   }
 
@@ -182,12 +204,9 @@ export class BoardService {
       await this.prisma.boardSettings.findUnique({ where: { projectId } }),
     );
     const now = new Date();
+    const title = dto.title.trim();
     const card = await this.prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`board-number:${projectId}`}))`;
-      const last = await tx.boardCard.aggregate({
-        where: { projectId },
-        _max: { number: true },
-      });
+      const next = await this.work.nextCard(tx, projectId);
       const position = await this.work.place(
         tx,
         { id: '', projectId },
@@ -197,9 +216,9 @@ export class BoardService {
       return tx.boardCard.create({
         data: {
           projectId,
-          number: (last._max.number ?? 0) + 1,
-          shortId: newShortId(),
-          title: dto.title.trim(),
+          ...next,
+          title,
+          fingerprint: captureFingerprint(title),
           body: dto.body ?? '',
           kind: dto.kind ?? 'feature',
           column: 'todo',
@@ -259,7 +278,16 @@ export class BoardService {
         : {}),
       ...(fields.model !== undefined ? { model: fields.model } : {}),
     };
-    await this.prisma.boardCard.update({ where: { id: card.id }, data });
+    await this.prisma.boardCard.update({
+      where: { id: card.id },
+      data: {
+        ...data,
+        // #244 D6: every card carries its title's fingerprint.
+        ...(data.title !== undefined
+          ? { fingerprint: captureFingerprint(data.title) }
+          : {}),
+      },
+    });
     const before = Object.fromEntries(
       Object.keys(data).map((k) => [k, card[k as keyof typeof data]]),
     );
@@ -489,10 +517,30 @@ export class BoardService {
     actor: BoardActor,
   ): Promise<BoardSettingsView> {
     const before = await this.settings(projectId);
+    if (dto.captureEnabled === true && !before.captureEnabled) {
+      const project = await this.prisma.project.findUnique({
+        where: { id: projectId },
+        select: { shipSessionContent: true },
+      });
+      // #244 D10: capture reads content, so it needs content shipped.
+      if (!project?.shipSessionContent) {
+        throw boardError(
+          422,
+          BOARD_ERROR.captureNeedsContent,
+          'Turn on session content for the project before capture',
+        );
+      }
+    }
     const data = {
       issueOnRun: dto.issueOnRun,
       specOnRun: dto.specOnRun,
       maxRunning: dto.maxRunning,
+      ...(dto.captureEnabled !== undefined
+        ? { captureEnabled: dto.captureEnabled }
+        : {}),
+      ...(dto.captureModel !== undefined
+        ? { captureModel: dto.captureModel }
+        : {}),
       updatedById: actor.userId,
     };
     const row = await this.prisma.boardSettings.upsert({
@@ -509,11 +557,15 @@ export class BoardService {
         issueOnRun: before.issueOnRun,
         specOnRun: before.specOnRun,
         maxRunning: before.maxRunning,
+        captureEnabled: before.captureEnabled,
+        captureModel: before.captureModel,
       },
       after: {
         issueOnRun: row.issueOnRun,
         specOnRun: row.specOnRun,
         maxRunning: row.maxRunning,
+        captureEnabled: row.captureEnabled,
+        captureModel: row.captureModel,
       },
       result: 'ok',
     });
