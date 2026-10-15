@@ -233,6 +233,34 @@ describe('card.stop, card.collect, card.close', () => {
     ).toBe(false);
   });
 
+  it('collect takes a terminal session cwd (#282 D3): absolute only, never on the base', () => {
+    const args = {
+      ...target,
+      root: '/home/me/app',
+      base: 'develop',
+      branch: 'fix/12-pairing',
+      cwd: '/home/me/app/packages/web',
+      number: 12,
+      title: 'Fix the pairing flake',
+      body: '',
+    };
+    const parsed = cardCollectArgsSchema.safeParse(args);
+    expect(parsed.success).toBe(true);
+    expect(parsed.data?.cwd).toBe('/home/me/app/packages/web');
+    expect(
+      cardCollectArgsSchema.safeParse({ ...args, cwd: 'packages/web' }).success,
+    ).toBe(false);
+    expect(cardCollectArgsSchema.safeParse({ ...args, cwd: '' }).success).toBe(
+      false,
+    );
+    const onBase = cardCollectArgsSchema.safeParse({
+      ...args,
+      branch: 'develop',
+    });
+    expect(onBase.success).toBe(false);
+    expect(onBase.error?.issues[0]?.path).toEqual(['branch']);
+  });
+
   it('collect reports a PR as number and URL together', () => {
     expect(
       cardCollectResultSchema.safeParse({ ahead: 0, pushed: false }).success,
