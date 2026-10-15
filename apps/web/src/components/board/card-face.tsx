@@ -3,7 +3,9 @@ import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Chip } from '@andrewbehma/glass-ui/chip';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
+import { Paperclip } from 'lucide-react';
 import NextLink from 'next/link';
+import { attachmentCountLabel } from '../../lib/attachments/format';
 import {
   approveRunOffer,
   autoRunReason,
@@ -50,6 +52,17 @@ export function CardFace({
           <Chip size="sm" tone="danger">
             Bug
           </Chip>
+        ) : null}
+        {card.attachmentCount > 0 ? (
+          <span
+            className="flex items-center gap-0.5 tabular-nums"
+            role="img"
+            aria-label={attachmentCountLabel(card.attachmentCount)}
+            title={attachmentCountLabel(card.attachmentCount)}
+          >
+            <Paperclip aria-hidden="true" className="size-3" />
+            {card.attachmentCount}
+          </span>
         ) : null}
         {cost ? <span className="ml-auto tabular-nums">{cost}</span> : null}
       </div>

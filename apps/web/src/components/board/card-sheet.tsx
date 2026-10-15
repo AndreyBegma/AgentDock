@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  type AttachmentView,
   BOARD_CARD_BODY_MAX,
   BOARD_CARD_KINDS,
   BOARD_CARD_TITLE_MAX,
@@ -22,6 +23,12 @@ import { Timeline, type TimelineItem } from '@andrewbehma/glass-ui/timeline';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import NextLink from 'next/link';
 import { useEffect, useRef, useState } from 'react';
+import { ApiError } from '../../lib/api';
+import {
+  describeUploadFailure,
+  splitByRound,
+} from '../../lib/attachments/format';
+import { useAttachmentUploads } from '../../lib/attachments/use-attachment-uploads';
 import { fetchCard, sendFeedback, updateCard } from '../../lib/board/actions';
 import {
   AUTO_COLLECT_HINT,
@@ -59,8 +66,13 @@ import { Time } from '../../lib/format/time';
 import { safeHttpsUrl } from '../../lib/queue/format';
 import { useReadiness } from '../../lib/readiness/use-readiness';
 import { type TextNotes, useTextNotes } from '../../lib/text/use-text-notes';
+import { AttachmentDropzone } from '../attachments/attachment-dropzone';
+import { AttachmentList } from '../attachments/attachment-list';
+import { CardAttachmentsSection } from '../attachments/card-attachments-section';
+import { useRemoveAttachment } from '../attachments/use-remove-attachment';
 import { Markdown } from '../markdown/markdown';
 import { ReadinessNotice } from '../readiness/readiness-notice';
+import { useCurrentUser } from '../shell/user-context';
 import { NormalizedNote } from '../text/normalized-note';
 import { ApproveRunLink, CardDesignSection } from './card-design';
 import { AutoCollectToggle, CardOptionToggles } from './card-options';
@@ -84,11 +96,21 @@ function roundTone(round: CardRoundView): TimelineItem['tone'] {
   return 'neutral';
 }
 
+/** What the rounds' attachment lists need: who is looking, and what Remove does. */
+interface RoundAttachments {
+  byRound: Map<string, AttachmentView[]>;
+  user: { id: string; role: string };
+  canRemove: boolean;
+  removing?: string;
+  onRemove: (attachment: AttachmentView) => void;
+}
+
 function roundItems(
   projectId: string,
   rounds: CardRoundView[],
   notes: TextNotes,
   canOperate: boolean,
+  files: RoundAttachments,
 ): TimelineItem[] {
   return rounds.map((round) => {
     const cost = formatCost(round.costUsd);
@@ -118,6 +140,13 @@ function roundItems(
               onRetry={notes.retry}
             />
           ) : null}
+          <AttachmentList
+            attachments={files.byRound.get(round.id) ?? []}
+            user={files.user}
+            canRemove={files.canRemove}
+            removing={files.removing}
+            onRemove={files.onRemove}
+          />
           {round.summary ? (
             <span className="whitespace-pre-wrap break-words">
               {round.summary}
@@ -211,6 +240,11 @@ function CardDetailBody({
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [sending, setSending] = useState(false);
+  const user = useCurrentUser();
+  const feedbackFiles = useAttachmentUploads(projectId);
+  const { removing, remove } = useRemoveAttachment(projectId, onSaved);
+  const { card: cardFiles, byRound } = splitByRound(card.attachments);
+  const filesEditable = canOperate && card.column !== 'completed';
   const notes = useTextNotes(
     projectId,
     { cardId: card.id },
@@ -272,12 +306,22 @@ function CardDetailBody({
   const sendBack = async () => {
     setSending(true);
     try {
-      await sendFeedback(projectId, card.number, { text: feedback.trim() });
+      await sendFeedback(projectId, card.number, {
+        text: feedback.trim(),
+        ...(feedbackFiles.done.length > 0
+          ? { attachmentIds: feedbackFiles.done.map((d) => d.view.id) }
+          : {}),
+      });
       toast.success(`Feedback sent. ${card.label} is back in progress.`);
       setFeedback('');
+      feedbackFiles.forget(feedbackFiles.done.map((d) => d.item));
       onSaved();
     } catch (err) {
-      toast.error(describeBoardError(err));
+      toast.error(
+        err instanceof ApiError && err.body?.error === 'attachment_error'
+          ? describeUploadFailure(err.status, err.body)
+          : describeBoardError(err),
+      );
     } finally {
       setSending(false);
     }
@@ -514,9 +558,17 @@ function CardDetailBody({
                 onChange={(e) => setFeedback(e.target.value)}
               />
               <div className="mt-2">
+                <AttachmentDropzone
+                  uploads={feedbackFiles}
+                  label="Attach files to the feedback"
+                />
+              </div>
+              <div className="mt-2">
                 <Button
                   variant="glass"
-                  disabled={sending || feedback.trim() === ''}
+                  disabled={
+                    sending || feedbackFiles.busy || feedback.trim() === ''
+                  }
                   onClick={sendBack}
                 >
                   {sending ? 'Sending…' : 'Send back'}
@@ -538,10 +590,28 @@ function CardDetailBody({
         <section aria-label="Rounds" className="flex flex-col gap-2">
           <SectionHeader title="Rounds" headingLevel={3} />
           <Timeline
-            items={roundItems(projectId, card.rounds, notes, canOperate)}
+            items={roundItems(projectId, card.rounds, notes, canOperate, {
+              byRound,
+              user,
+              canRemove: filesEditable,
+              removing,
+              onRemove: (a) => void remove(a),
+            })}
             empty={<p className="text-sm text-ink-3">No worker has run yet.</p>}
           />
         </section>
+
+        <CardAttachmentsSection
+          projectId={projectId}
+          number={card.number}
+          attachments={cardFiles}
+          user={user}
+          canOperate={canOperate}
+          completed={card.column === 'completed'}
+          removing={removing}
+          onRemove={(a) => void remove(a)}
+          onChanged={onSaved}
+        />
 
         <form
           id={FORM_ID}
