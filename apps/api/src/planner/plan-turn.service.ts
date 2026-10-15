@@ -65,15 +65,23 @@ interface TurnSpec {
 }
 
 /**
- * #337 D3: answers fit the round they answer — known questions, once each,
- * their own options, one option for a single-choice question. 400 otherwise.
+ * #337 D3: answers fit the round they answer — their own options, one option
+ * for a single-choice question; 400 otherwise. An intake (`strict`) also
+ * refuses a question it never asked. A clarify or grill turn keeps taking an
+ * answer to a question outside its round, as it always has: the prompt
+ * marks it "not in the current round".
  */
 const assertAnswers = (
   round: readonly PlanQuestion[],
   input: PlanTurnInput,
+  strict = false,
 ): void => {
   if (!input.answers?.length) return;
-  const check = checkRoundAnswers(round, input.answers);
+  const asked = new Set(round.map((q) => q.id));
+  const answers = strict
+    ? input.answers
+    : input.answers.filter((a) => asked.has(a.questionId));
+  const check = checkRoundAnswers(round, answers);
   if (!check.ok) {
     throw plannerError(400, PLANNER_ERROR.invalidArgs, check.message);
   }
@@ -173,7 +181,7 @@ export class PlanTurnService {
       );
     }
     const round = await intakeRound(this.prisma, plan.id);
-    assertAnswers(round, input);
+    assertAnswers(round, input, true);
     const answers =
       input.generate === true
         ? withRecommendations(round, input.answers ?? [])

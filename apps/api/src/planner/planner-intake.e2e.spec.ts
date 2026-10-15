@@ -4,7 +4,7 @@ import {
   PLANNER_INTAKE_MAX_ROUNDS,
   type PlanDetail,
 } from '@agentdock/shared';
-import { block, PlannerHarness } from './testing/planner-e2e';
+import { block, PlannerHarness, question } from './testing/planner-e2e';
 
 /** #337 D1–D6, D9, D10: New Card is a `card` plan that interviews, then writes one card. */
 
@@ -220,6 +220,27 @@ describe('card intake (e2e, #337)', () => {
         })
       ).status,
     ).toBe(201);
+  });
+
+  it('checks a clarify round’s picks too, and still takes an answer to a question outside it', async () => {
+    const plan = await h.createPlan('dialogue');
+    await h.finish(
+      plan.id,
+      block({
+        action: 'clarify',
+        questions: [question('q1', false)],
+        done: false,
+      }),
+    );
+    const two = await turn(plan.id, {
+      answers: [{ questionId: 'q1', optionIds: ['yes', 'no'] }],
+    });
+    expect(two.status).toBe(400);
+    // As before #337: the prompt marks it "not in the current round".
+    const outside = await turn(plan.id, {
+      answers: [{ questionId: 'q9', text: 'Только для админов.' }],
+    });
+    expect(outside.status).toBe(201);
   });
 
   it('Enough — generate sends the unanswered questions as their recommendations and the next turn must write the card', async () => {
