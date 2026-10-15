@@ -210,20 +210,6 @@ export const AUTO_COLLECT_DEFAULT_LABEL =
 export const AUTO_COLLECT_DEFAULT_HINT =
   'What a card tracked from a terminal session starts with: push and open a pull request when its session ends. A card can override it. Off by default.';
 
-/**
- * Orchestrator note on #282: collecting a terminal session's work is a
- * follow-up. A Finished terminal card with Automatic work on and no pull
- * request says so, rather than looking forgotten.
- */
-export const autoCollectPending = (card: BoardCardView): boolean =>
-  isTerminalCard(card) &&
-  card.autoCollect &&
-  card.column === 'finished' &&
-  card.prNumber === null;
-
-export const AUTO_COLLECT_PENDING_TEXT =
-  'Automatic work is on, but no pull request was opened: collecting a terminal session’s work is not available yet.';
-
 /** The Fleet page with the card's slot open; none for an issue no slot picked up. */
 export const fleetHref = (
   projectId: string,
