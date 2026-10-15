@@ -147,7 +147,9 @@ export const designSummaries = async (
   });
   return new Map(
     rows.flatMap(({ taskKey, ...summary }) =>
-      taskKey === null ? [] : [[taskKey, summary] as const],
+      taskKey === null
+        ? []
+        : [[taskKey, { ...summary, busySince: null }] as const],
     ),
   );
 };
