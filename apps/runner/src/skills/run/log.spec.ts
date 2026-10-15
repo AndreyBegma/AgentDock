@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { appendFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   RUN_LOG_BACKLOG_LINES,
@@ -75,6 +75,7 @@ describe('RunLogStreamer', () => {
             { kind: 'assistant', text: 'one' },
             { kind: 'assistant', text: 'two' },
           ],
+          lastOutputAt: expect.any(String),
         },
       },
     ]);
@@ -107,6 +108,7 @@ describe('RunLogStreamer', () => {
           type: 'lines',
           backlog: false,
           lines: [{ kind: 'result', text: 'Done.' }],
+          lastOutputAt: expect.any(String),
         },
       },
       {
@@ -117,6 +119,31 @@ describe('RunLogStreamer', () => {
     ]);
     expect(t.streamer.subscriptionCount).toBe(0);
     expect(t.clock.pending()).toEqual([]);
+  });
+
+  it('stamps backlog and live frames with the stream file mtime as lastOutputAt', () => {
+    const t = setup();
+    appendFileSync(t.stream, text('one'));
+    utimesSync(
+      t.stream,
+      new Date('2026-10-15T10:00:00Z'),
+      new Date('2026-10-15T10:00:00Z'),
+    );
+    t.streamer.subscribe(subscribe);
+    const at = (m: RunLogOutbound | undefined) =>
+      m?.type === 'run_log' && m.frame.type === 'lines'
+        ? m.frame.lastOutputAt
+        : 'no frame';
+    expect(at(t.sent[0])).toBe('2026-10-15T10:00:00.000Z');
+
+    appendFileSync(t.stream, text('two'));
+    utimesSync(
+      t.stream,
+      new Date('2026-10-15T10:05:00Z'),
+      new Date('2026-10-15T10:05:00Z'),
+    );
+    t.clock.advance(500);
+    expect(at(t.sent[1])).toBe('2026-10-15T10:05:00.000Z');
   });
 
   it('keeps only the newest backlog lines', () => {

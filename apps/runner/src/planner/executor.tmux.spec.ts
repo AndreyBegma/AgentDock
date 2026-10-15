@@ -591,6 +591,7 @@ describe.skipIf(!tmuxInstalled)('plan turns (real tmux, fake claude)', () => {
         frame: {
           type: 'lines',
           backlog: true,
+          lastOutputAt: expect.any(String),
           lines: [
             { kind: 'system', text: 'session started · claude-opus-5-5' },
             { kind: 'result', text: expect.stringContaining('Planned.') },
