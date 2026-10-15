@@ -9,6 +9,7 @@ import type {
 import type { PairedConfig } from './config';
 import type { RunnerConnection } from './connection';
 import { runDaemon } from './daemon';
+import type { Exec } from './detect/exec';
 import { type HookDeps, runHook } from './hooks/run';
 import { FORBIDDEN, fixtureProtobuf, PROTOBUF_SESSION } from './otlp/testing';
 import { FakeClock } from './testing/fake-clock';
@@ -63,7 +64,11 @@ describe('daemon — OTLP receiver (spec 13)', () => {
     skills: { maxConcurrentRuns: 2, maxTimeoutSec: 21_600 },
   });
 
-  const start = (otlp: PairedConfig['otlp'], disabledCommands?: string[]) => {
+  const start = (
+    otlp: PairedConfig['otlp'],
+    disabledCommands?: string[],
+    exec: Exec = machineWithoutCodex(),
+  ) => {
     const controller = new AbortController();
     const { log, lines } = memoryLogger();
     let connection: RunnerConnection | null = null;
@@ -74,7 +79,9 @@ describe('daemon — OTLP receiver (spec 13)', () => {
       spoolDir: join(dir, 'spool'),
       offsetsFile: join(dir, 'offsets.json'),
       host,
-      exec: machineWithoutCodex(),
+      exec,
+      // Not the test process's: it may run under a systemd unit (#327).
+      env: {},
       clock: new FakeClock(),
       log,
       signal: controller.signal,
@@ -85,6 +92,34 @@ describe('daemon — OTLP receiver (spec 13)', () => {
     const live = () => until(() => connection?.isLive === true);
     return { controller, done, live, lines };
   };
+
+  it('reports how git reaches GitHub in hello, and serves card.prClose (#329 D1, D8)', async () => {
+    const machine = machineWithoutCodex();
+    const loggedIn: Exec = async (binary, args, options) =>
+      binary === 'gh' && args.join(' ') === 'auth status --hostname github.com'
+        ? { code: 0, stdout: '', stderr: '' }
+        : machine(binary, args, options);
+    let hellos = 0;
+    for (const [exec, github] of [
+      [loggedIn, 'gh'],
+      [machine, 'native'],
+    ] as const) {
+      hellos += 1;
+      const { controller, done, live } = start(
+        { enabled: false, grpc: null, http: 0 },
+        [],
+        exec,
+      );
+      const hello = (
+        (await server.waitFor('hello', hellos)) as HelloMessage[]
+      ).at(-1);
+      expect(hello?.capabilities.gitAuth).toEqual({ github });
+      expect(hello?.capabilities.commands).toContain('card.prClose');
+      await live();
+      controller.abort();
+      await done;
+    }
+  });
 
   it('reports the bound port in hello and spools an export as llm.request events', async () => {
     // Port 0 picks a free one; the config schema would refuse it, the daemon does not care.
@@ -142,6 +177,7 @@ describe('daemon — OTLP receiver (spec 13)', () => {
     expect(commands).toEqual([...(commands ?? [])].sort());
     expect(commands).toEqual(
       expect.arrayContaining([
+        'card.assess',
         'plan.turn',
         'terminal.attach',
         'worktree.status',
@@ -293,6 +329,7 @@ describe('daemon — local socket (spec 201)', () => {
       offsetsFile: join(dir, 'offsets.json'),
       host,
       exec: machineWithoutCodex(),
+      env: {},
       clock: new FakeClock(),
       log: memoryLogger().log,
       signal: controller.signal,

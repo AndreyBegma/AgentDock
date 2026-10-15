@@ -1,10 +1,18 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from 'bun:test';
-import { chmodSync, writeFileSync } from 'node:fs';
+import { chmodSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cardPullRequestBody } from '@agentdock/shared';
 import type { CardCollectArgs } from '@agentdock/shared/protocol';
+import { CommandFailure } from '../commands/failure';
+import type { Exec, ExecOptions } from '../detect/exec';
+import { GITHUB_GIT_CONFIG, GitAuth } from '../git-auth';
 import { REAL_PROCESS_TIMEOUT_MS } from '../testing/projects';
-import { collectCard, ensureWorktree, removeCardWorktree } from './git';
+import {
+  collectBranch,
+  collectCard,
+  ensureWorktree,
+  removeCardWorktree,
+} from './git';
 import { cardWorktreePath } from './launch';
 import type { CardRecord } from './record';
 import { cardsWorkspace } from './testing';
@@ -85,6 +93,7 @@ describe('card.collect (#242 D8)', () => {
       pushed: true,
       prNumber: 7,
       prUrl: 'https://github.com/acme/widget/pull/7',
+      prState: 'open',
     });
     expect(
       await f.run(record.worktree, 'log', '-1', '--format=%s', 'HEAD'),
@@ -119,6 +128,7 @@ describe('card.collect (#242 D8)', () => {
       pushed: true,
       prNumber: 7,
       prUrl: 'https://github.com/acme/widget/pull/7',
+      prState: 'open',
     });
     expect(f.prCreates()).toHaveLength(1);
     expect(f.listCalls.at(-1)).toEqual(
@@ -145,6 +155,168 @@ describe('card.collect (#242 D8)', () => {
     ).toBe('refused');
     writeFileSync(join(record.worktree, 'notes.md'), 'left over\n');
     expect((await collectCard(deps, record, args)).pushed).toBe(true);
+  });
+});
+
+describe('card.collect after card.close removed the worktree (#344)', () => {
+  const localHead = (f: {
+    run: (cwd: string, ...a: string[]) => Promise<string>;
+    root: string;
+  }) =>
+    f
+      .run(f.root, 'rev-parse', '--verify', '--quiet', `refs/heads/${BRANCH}`)
+      .catch(() => null);
+  const collectWorktrees = (ws: string) =>
+    readdirSync(ws).filter((name) => name.startsWith('agentdock-collect-'));
+
+  it('pushes the kept local branch, opens the PR, then drops the temporary worktree and the pushed branch', async () => {
+    const { f, record, deps, args, originHead } = await setup();
+    f.write(record.worktree, { 'src/export.ts': 'export const csv = 1;\n' });
+    await f.commitAll(record.worktree, 'feat: export as CSV');
+    const head = await f.run(record.worktree, 'rev-parse', 'HEAD');
+    expect((await removeCardWorktree(deps, record)).branchDeleted).toBe(false);
+
+    expect(await collectBranch(deps, record, args)).toEqual({
+      ahead: 1,
+      pushed: true,
+      prNumber: 7,
+      prUrl: 'https://github.com/acme/widget/pull/7',
+      prState: 'open',
+    });
+    expect(await originHead()).toBe(head);
+    expect(f.prCreates()).toHaveLength(1);
+    expect(await localHead(f)).toBeNull();
+    expect(collectWorktrees(f.ws)).toEqual([]);
+    expect(
+      await f.run(f.root, 'worktree', 'list', '--porcelain'),
+    ).not.toContain('agentdock-collect-');
+  });
+
+  it('opens the PR of a branch that is only on origin, leaving no local branch', async () => {
+    const { f, record, deps, args, originHead } = await setup();
+    f.write(record.worktree, { 'src/export.ts': 'export const csv = 1;\n' });
+    await f.commitAll(record.worktree, 'feat: export as CSV');
+    await f.run(
+      record.worktree,
+      'push',
+      '-q',
+      'origin',
+      `HEAD:refs/heads/${BRANCH}`,
+    );
+    expect((await removeCardWorktree(deps, record)).branchDeleted).toBe(true);
+
+    expect(await collectBranch(deps, record, args)).toMatchObject({
+      ahead: 1,
+      pushed: true,
+      prNumber: 7,
+    });
+    expect(f.prCreates()).toHaveLength(1);
+    expect(await originHead()).not.toBeNull();
+    expect(await localHead(f)).toBeNull();
+    expect(collectWorktrees(f.ws)).toEqual([]);
+  });
+
+  it('answers not_found, naming the branch and no ids, when the branch is nowhere', async () => {
+    const { f, record, deps, args } = await setup();
+    await removeCardWorktree(deps, record);
+    await f.run(f.root, 'branch', '-q', '-D', BRANCH);
+
+    const error = await collectBranch(deps, record, args).catch(
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(CommandFailure);
+    expect((error as CommandFailure).code).toBe('not_found');
+    expect((error as CommandFailure).message).toBe(
+      `branch ${BRANCH} is neither on the runner nor on origin`,
+    );
+    expect(f.gh.calls).toEqual([]);
+    expect(collectWorktrees(f.ws)).toEqual([]);
+  });
+});
+
+describe('card.collect reports the open PR (#329 D3, D6)', () => {
+  it('fills a lost link: a PR already open is reported, none is opened', async () => {
+    const { f, record, deps, args } = await setup();
+    f.open.push({
+      number: 41,
+      url: 'https://github.com/acme/widget/pull/41',
+      head: BRANCH,
+    });
+    writeFileSync(join(record.worktree, 'notes.md'), 'work\n');
+    expect(await collectCard(deps, record, args)).toEqual({
+      ahead: 1,
+      pushed: true,
+      prNumber: 41,
+      prUrl: 'https://github.com/acme/widget/pull/41',
+      prState: 'open',
+    });
+    expect(f.prCreates()).toHaveLength(0);
+  });
+
+  it('reports a draft PR as draft', async () => {
+    const { f, record, deps, args } = await setup();
+    f.open.push({
+      number: 41,
+      url: 'https://github.com/acme/widget/pull/41',
+      head: BRANCH,
+      isDraft: true,
+    });
+    writeFileSync(join(record.worktree, 'notes.md'), 'work\n');
+    expect((await collectCard(deps, record, args)).prState).toBe('draft');
+    expect(f.listCalls.at(-1)).toEqual(
+      expect.arrayContaining(['--json', 'number,url,isDraft']),
+    );
+  });
+});
+
+describe('card.collect without an SSH agent (#329 D1)', () => {
+  const recorded = (exec: Exec, ghLoggedIn: boolean) => {
+    const calls: { binary: string; args: string[]; options?: ExecOptions }[] =
+      [];
+    const inner: Exec = async (binary, argv, options) => {
+      calls.push({ binary, args: [...argv], options });
+      if (binary === 'gh' && argv[0] === 'auth') {
+        return { code: ghLoggedIn ? 0 : 1, stdout: '', stderr: '' };
+      }
+      return exec(binary, argv, options);
+    };
+    return { inner, calls };
+  };
+
+  it('runs every git child, the push included, with the gh settings', async () => {
+    const { f, record, args } = await setup();
+    const { inner, calls } = recorded(f.exec, true);
+    const auth = new GitAuth(inner);
+    expect(await auth.probe()).toBe('gh');
+    writeFileSync(join(record.worktree, 'notes.md'), 'work\n');
+    const result = await collectCard(
+      { exec: auth.wrap(inner), tempRoot: f.ws },
+      record,
+      args,
+    );
+    expect(result.pushed).toBe(true);
+    const git = calls.filter((c) => c.binary === 'git');
+    const push = git.find((c) => c.args.includes('push'));
+    expect(push?.options?.gitConfig).toEqual(GITHUB_GIT_CONFIG);
+    for (const call of git) {
+      expect(call.options?.gitConfig).toEqual(GITHUB_GIT_CONFIG);
+    }
+    // gh itself is never given git settings.
+    for (const call of calls.filter((c) => c.binary === 'gh')) {
+      expect(call.options?.gitConfig).toBeUndefined();
+    }
+  });
+
+  it('sets nothing when gh is not authenticated', async () => {
+    const { f, record, args } = await setup();
+    const { inner, calls } = recorded(f.exec, false);
+    const auth = new GitAuth(inner);
+    expect(await auth.probe()).toBe('native');
+    writeFileSync(join(record.worktree, 'notes.md'), 'work\n');
+    await collectCard({ exec: auth.wrap(inner), tempRoot: f.ws }, record, args);
+    for (const call of calls) {
+      expect(call.options?.gitConfig).toBeUndefined();
+    }
   });
 });
 

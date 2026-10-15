@@ -40,6 +40,8 @@ export const CARD_TIMEOUTS_MS = {
   close: 30_000,
   /** #273: `gh pr view`, `gh pr merge`, then the issue. */
   merge: 90_000,
+  /** #329 D8: `gh pr close`, the branch, then the issue. */
+  prClose: 60_000,
 } as const;
 
 /** `card.run` prompt: one argv element read from `launch.json`, never a shell string (D5). */
@@ -216,18 +218,35 @@ export const cardCollectArgsSchema = z
   });
 export type CardCollectArgs = z.infer<typeof cardCollectArgsSchema>;
 
+/** #329 D6: the open PR's state as `card.collect` saw it. */
+export const cardCollectPrStateSchema = z.enum(['open', 'draft']);
+export type CardCollectPrState = z.infer<typeof cardCollectPrStateSchema>;
+
 export const cardCollectResultSchema = z
   .object({
     /** Commits on the branch ahead of `origin/<base>`; `0` is "No changes". */
     ahead: z.number().int().nonnegative(),
     pushed: z.boolean(),
-    /** The open PR of the branch, new or existing. */
+    /**
+     * The open PR of the branch, new or existing. #329 D3: always reported
+     * when one is open — also when this collect did not open it, so the API
+     * fills a lost `prUrl`.
+     */
     prNumber: z.number().int().positive().optional(),
     prUrl: z.url({ protocol: /^https$/ }).optional(),
+    /**
+     * #329 D6: with a PR only. Absent — a runner older than the field — is
+     * read as `open`.
+     */
+    prState: cardCollectPrStateSchema.optional(),
   })
   .refine((r) => (r.prNumber === undefined) === (r.prUrl === undefined), {
     message: 'prNumber and prUrl go together',
     path: ['prUrl'],
+  })
+  .refine((r) => r.prState === undefined || r.prNumber !== undefined, {
+    message: 'prState needs a PR',
+    path: ['prState'],
   });
 export type CardCollectResult = z.infer<typeof cardCollectResultSchema>;
 
@@ -265,7 +284,16 @@ export type CardMergeMethod = z.infer<typeof cardMergeMethodSchema>;
  * --match-head-commit <headSha>`, never a command text — then closes `issue`
  * with `comment` when it is still open (`Closes #n` does nothing on a
  * non-default base). `method: null` takes the repository's first allowed
- * method, merge → squash → rebase. Never deletes the branch (D15).
+ * method, merge → squash → rebase.
+ *
+ * #329 D7: with `deleteBranch`, after the PR is merged — now or before — the
+ * runner deletes the PR's head branch on GitHub (`gh api -X DELETE
+ * repos/<o>/<r>/git/refs/heads/<head>`), the head read from the PR itself;
+ * never the base, never any other branch. Absent is `false` (D15: an API
+ * older than the arg). A runner that advertises `card.prClose` takes this arg
+ * (they ship in the same release, D9); an older one refuses it as
+ * `invalid_args`, so the API sends it only to a runner that advertises
+ * `card.prClose`.
  */
 export const cardMergeArgsSchema = z.strictObject({
   ...cardTarget,
@@ -282,8 +310,13 @@ export const cardMergeArgsSchema = z.strictObject({
     .refine((t) => utf8Bytes(t) <= CARD_MERGE_COMMENT_MAX_BYTES, {
       message: `must be at most ${CARD_MERGE_COMMENT_MAX_BYTES} bytes`,
     }),
+  /** #329 D7: delete the PR's head branch on GitHub after the merge. */
+  deleteBranch: z.boolean().optional(),
 });
 export type CardMergeArgs = z.infer<typeof cardMergeArgsSchema>;
+
+/** #329 D7/D8: the one line of a failed step, as results carry it. */
+const stepErrorSchema = z.string().max(500);
 
 /** The PR is merged — now, or before (`alreadyMerged`). */
 export const cardMergeSuccessSchema = z.object({
@@ -294,7 +327,15 @@ export const cardMergeSuccessSchema = z.object({
   mergeCommit: headShaSchema.nullable(),
   issueClosed: z.boolean(),
   /** One line: why closing the issue failed. */
-  issueError: z.string().max(500).optional(),
+  issueError: stepErrorSchema.optional(),
+  /**
+   * #329 D7: the head branch was deleted. `false` when not asked, or the
+   * deletion failed (`branchError`) — which never undoes the merge. Absent —
+   * a runner older than the field — is `false`.
+   */
+  branchDeleted: z.boolean().default(false),
+  /** One line: why deleting the branch failed. */
+  branchError: stepErrorSchema.optional(),
 });
 export type CardMergeSuccess = z.infer<typeof cardMergeSuccessSchema>;
 
@@ -359,3 +400,90 @@ export const cardCommands = {
 } as const satisfies Record<string, CommandDefinition>;
 
 export type CardCommandName = keyof typeof cardCommands;
+
+// card.prClose
+
+/** #329 D8: the PR comment and the issue comment `card.prClose` posts, in UTF-8 bytes. */
+export const CARD_PR_CLOSE_COMMENT_MAX_BYTES = CARD_MERGE_COMMENT_MAX_BYTES;
+
+/**
+ * #329 D8 (ADR-0010, advertised per ADR-0023): Accept without merging closes
+ * the card's PR through the runner's `gh`, in the project root —
+ * `gh pr close <pr> --repo <o/r> --comment <comment>`, never a command text
+ * (the API words it "Closed from the AgentDock Board (C-<n>)").
+ *
+ * - `deleteBranch`: then deletes the PR's head branch on GitHub as
+ *   `card.merge` does (D7) — the head read from the PR, never the base.
+ * - `issue`: then closes that issue as `not planned` with `comment`, when it
+ *   is still open; `null` leaves the issue alone (the default in the dialog).
+ *
+ * A merged PR is refused (`merged`); an already closed one is a success with
+ * `alreadyClosed`, and the branch and issue steps still run.
+ *
+ * Its own group, outside `cardCommands`: the `commands` allowlist enters it
+ * beside them, with its runner handler (the capture and text precedent).
+ */
+export const cardPrCloseArgsSchema = z.strictObject({
+  ...cardTarget,
+  root: absolutePathSchema,
+  pr: z.number().int().positive(),
+  deleteBranch: z.boolean(),
+  issue: z.number().int().positive().nullable(),
+  comment: z
+    .string()
+    .min(1)
+    .refine(noNul, { message: 'must not contain NUL' })
+    .refine((t) => utf8Bytes(t) <= CARD_PR_CLOSE_COMMENT_MAX_BYTES, {
+      message: `must be at most ${CARD_PR_CLOSE_COMMENT_MAX_BYTES} bytes`,
+    }),
+});
+export type CardPrCloseArgs = z.infer<typeof cardPrCloseArgsSchema>;
+
+/** The PR is closed — now, or before (`alreadyClosed`). */
+export const cardPrCloseSuccessSchema = z.object({
+  closed: z.literal(true),
+  alreadyClosed: z.boolean(),
+  /** `false` when not asked, or the deletion failed (`branchError`). */
+  branchDeleted: z.boolean(),
+  branchError: stepErrorSchema.optional(),
+  /** `false` when not asked (`issue: null`), already closed, or it failed (`issueError`). */
+  issueClosed: z.boolean(),
+  issueError: stepErrorSchema.optional(),
+});
+export type CardPrCloseSuccess = z.infer<typeof cardPrCloseSuccessSchema>;
+
+/**
+ * #329 D8: why the close was refused; the API answers 409 `pr_close_failed`
+ * with it as `reason` and keeps the card in Finished.
+ */
+export const cardPrCloseFailReasonSchema = z.enum(['merged', 'gh_failed']);
+export type CardPrCloseFailReason = z.infer<typeof cardPrCloseFailReasonSchema>;
+
+/** A refused close is a result, not a command error: nothing was closed. */
+export const cardPrCloseFailureSchema = z.object({
+  closed: z.literal(false),
+  error: cardPrCloseFailReasonSchema,
+  message: stepErrorSchema,
+});
+export type CardPrCloseFailure = z.infer<typeof cardPrCloseFailureSchema>;
+
+export const cardPrCloseResultSchema = z.discriminatedUnion('closed', [
+  cardPrCloseSuccessSchema,
+  cardPrCloseFailureSchema,
+]);
+export type CardPrCloseResult = z.infer<typeof cardPrCloseResultSchema>;
+
+/**
+ * #329 D8: `card.prClose`, an operator command, in the `commands` allowlist
+ * next to `cardCommands` (served by the runner's `closeCardPr`).
+ */
+export const cardPrCloseCommands = {
+  'card.prClose': {
+    args: cardPrCloseArgsSchema,
+    result: cardPrCloseResultSchema,
+    minRole: 'operator',
+    timeoutMs: CARD_TIMEOUTS_MS.prClose,
+  },
+} as const satisfies Record<string, CommandDefinition>;
+
+export type CardPrCloseCommandName = keyof typeof cardPrCloseCommands;

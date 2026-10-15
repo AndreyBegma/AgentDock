@@ -3,14 +3,18 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
   realpathSync,
+  rmSync,
   writeFileSync,
 } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, sep } from 'node:path';
 import { cardWipCommitMessage } from '@agentdock/shared';
 import type {
   CardCollectArgs,
+  CardCollectPrState,
   CardCollectResult,
   CardRunFile,
 } from '@agentdock/shared/protocol';
@@ -178,15 +182,25 @@ export const commitFiles = async (
 };
 
 const openPrSchema = z.array(
-  z.object({ number: z.number().int().positive(), url: z.string().min(1) }),
+  z.object({
+    number: z.number().int().positive(),
+    url: z.string().min(1),
+    isDraft: z.boolean().optional(),
+  }),
 );
+
+interface OpenPr {
+  number: number;
+  url: string;
+  state: CardCollectPrState;
+}
 
 /** The open PR of `branch`, or null; throws when `gh` cannot answer. */
 const openPullRequest = async (
   deps: GitDeps,
   github: string,
   branch: string,
-): Promise<{ number: number; url: string } | null> => {
+): Promise<OpenPr | null> => {
   const listed = await deps.exec(
     'gh',
     [
@@ -199,7 +213,7 @@ const openPullRequest = async (
       '--state',
       'open',
       '--json',
-      'number,url',
+      'number,url,isDraft',
       '--limit',
       '1',
     ],
@@ -210,7 +224,13 @@ const openPullRequest = async (
   }
   const parsed = openPrSchema.safeParse(JSON.parse(listed.stdout || '[]'));
   if (!parsed.success) throw new Error('gh pr list printed no PR list');
-  return parsed.data[0] ?? null;
+  const pr = parsed.data[0];
+  if (!pr) return null;
+  return {
+    number: pr.number,
+    url: pr.url,
+    state: pr.isDraft ? 'draft' : 'open',
+  };
 };
 
 /**
@@ -274,16 +294,74 @@ export const collectCard = async (
     root: record.root,
   });
   await pushBranch(deps, wt, record.branch);
-  const pr =
-    (await openPullRequest(deps, github, record.branch)) ??
-    (await createPullRequest(deps, {
+  // #329 D3: an open PR is reported whether this collect opened it or not,
+  // so the API fills a link it lost.
+  const pr: OpenPr = (await openPullRequest(deps, github, record.branch)) ?? {
+    ...(await createPullRequest(deps, {
       github,
       base: args.base,
       branch: record.branch,
       title: args.title,
       body: args.body,
-    }));
-  return { ahead, pushed: true, prNumber: pr.number, prUrl: pr.url };
+    })),
+    state: 'open',
+  };
+  return {
+    ahead,
+    pushed: true,
+    prNumber: pr.number,
+    prUrl: pr.url,
+    prState: pr.state,
+  };
+};
+
+/**
+ * #344: `card.collect` of a card with no worktree here — `card.close` removed
+ * it on Accept, and the runner's record with it. The branch it kept (or
+ * `origin/<branch>`, when it was pushed and deleted) is checked out in a
+ * temporary worktree and collected as usual; the worktree goes afterwards,
+ * and the local branch too once every commit of it is on origin.
+ */
+export const collectBranch = async (
+  deps: GitDeps,
+  card: Pick<CardRecord, 'projectId' | 'root' | 'branch'>,
+  args: CardCollectArgs,
+): Promise<CardCollectResult> => {
+  const { root, branch } = card;
+  await fetchRef(deps, root, branch);
+  const local = await commitOf(deps, root, `refs/heads/${branch}`);
+  const remote = local
+    ? null
+    : await commitOf(deps, root, `refs/remotes/origin/${branch}`);
+  if (!local && !remote) {
+    throw new CommandFailure(
+      'not_found',
+      `branch ${branch} is neither on the runner nor on origin`,
+    );
+  }
+  const dir = mkdtempSync(
+    join(deps.tempRoot ?? tmpdir(), 'agentdock-collect-'),
+  );
+  const worktree = join(dir, 'worktree');
+  try {
+    await gitOk(deps.exec, [
+      '-C',
+      root,
+      'worktree',
+      'add',
+      '--quiet',
+      ...(local
+        ? [worktree, branch]
+        : ['--no-track', '-b', branch, worktree, `origin/${branch}`]),
+    ]);
+    try {
+      return await collectCard(deps, { ...card, worktree }, args);
+    } finally {
+      await removeCardWorktree(deps, { root, worktree, branch });
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 };
 
 /**

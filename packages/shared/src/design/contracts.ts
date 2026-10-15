@@ -259,6 +259,24 @@ export interface DesignCommentRequest {
   body: string;
 }
 
+/**
+ * `POST …/board/cards/:number/design/generate` and `…/design/revise`
+ * (operator), from the card's launch popover (#322 D1). Both are optional: an
+ * empty body starts as before. Each is stored on the card only when it
+ * differs from the default (D3) — `profileKey` as the card's, shared with its
+ * work; `model` as its `designModel`. Plan-task designs take no body
+ * (ADR-0025: the Planner owns them).
+ */
+export interface CardDesignLaunchRequest {
+  /**
+   * A Claude profile of the project's runner (`profileKeySchema`); an
+   * unknown or non-Claude key is 422 `no_profile` (D9).
+   */
+  profileKey?: string;
+  /** A model alias or id (`orchestratorModelSchema`). */
+  model?: string;
+}
+
 /** `POST /plans/:planId/tasks/:key/design/approve` (operator): picks one variant (D4). */
 export interface DesignApproveRequest {
   revisionId: string;

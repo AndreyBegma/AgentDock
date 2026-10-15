@@ -8,6 +8,7 @@ import {
 } from '@agentdock/shared/protocol';
 import { adapters, SessionWatcher } from './adapters';
 import { resolveIngestSince } from './adapters/ingest-since';
+import { AssessExecutor, createAssessHandlers } from './assess';
 import { Backoff } from './backoff';
 import { CaptureExecutor, createCaptureHandlers } from './capture';
 import { CardExecutor, createCardHandlers } from './cards';
@@ -22,6 +23,7 @@ import {
   type SocketFactory,
   type StopReason,
 } from './connection';
+import { TmuxServerGuard } from './control/tmux-server';
 import {
   commandsCapability,
   detectCapabilities,
@@ -31,6 +33,8 @@ import {
   terminalUnsupported,
 } from './detect/capabilities';
 import type { Exec } from './detect/exec';
+import type { Env } from './env';
+import { GitAuth } from './git-auth';
 import { LocalSocketServer } from './local/server';
 import { LocalService } from './local/service';
 import { HookSessions } from './local/sessions';
@@ -71,6 +75,8 @@ export interface DaemonOptions {
   offsetsFile: string;
   host: Host;
   exec: Exec;
+  /** The runner's environment; `process.env` by default. */
+  env?: Env;
   clock: Clock;
   log: Logger;
   createSocket?: SocketFactory;
@@ -89,6 +95,8 @@ export interface DaemonOptions {
   captureDir?: string;
   /** Text normalization's per-run directories (#271); `<state>/agentdock/normalize` beside the runs by default. */
   normalizeDir?: string;
+  /** Card model assessment's per-run directories (#322); `<state>/agentdock/assess` beside the runs by default. */
+  assessDir?: string;
   /** The argv that starts this runner; a skill run's, plan turn's or card's session appends `exec-run <dir>`. */
   selfCommand?: readonly string[];
   /** The skills.sh catalog is fetched with it; the global `fetch` by default. */
@@ -116,7 +124,15 @@ const countTmuxSessions = async (exec: Exec): Promise<number> => {
 export const runDaemon = async (
   options: DaemonOptions,
 ): Promise<StopReason> => {
-  const { config, home, exec, clock, log } = options;
+  const { config, home, clock, log } = options;
+  // #329 D1: every git child of the runner goes through this one wrapper.
+  const gitAuth = new GitAuth(options.exec);
+  // #327: a tmux server the runner starts never lives in the unit's cgroup.
+  const tmuxServer = new TmuxServerGuard({
+    env: options.env ?? process.env,
+    log,
+  });
+  const exec = tmuxServer.wrap(gitAuth.wrap(options.exec));
   mkdirSync(options.spoolDir, { recursive: true, mode: 0o700 });
   const release = acquireLock(join(options.spoolDir, 'runner.lock'));
   try {
@@ -128,12 +144,16 @@ export const runDaemon = async (
     log.info('spool opened', { ...spool.stats() });
 
     const redetect = async (): Promise<Capabilities> => {
-      const capabilities = await detectCapabilities({
-        exec,
-        home,
-        // The receiver's port as bound, not as configured (spec 13).
-        config: { profiles: config.profiles, otlp: otlpCapability() },
-      });
+      const [capabilities, github] = await Promise.all([
+        detectCapabilities({
+          exec,
+          home,
+          // The receiver's port as bound, not as configured (spec 13).
+          config: { profiles: config.profiles, otlp: otlpCapability() },
+        }),
+        // Each (re)connect re-checks, so a later `gh auth login` takes effect.
+        gitAuth.probe(),
+      ]);
       const terminal = terminalCapability({
         tmux: capabilities.tmux,
         disabledCommands: config.disabledCommands,
@@ -144,10 +164,12 @@ export const runDaemon = async (
         codex: capabilities.runtimes.codex?.version ?? null,
         profiles: capabilities.profiles.length,
         terminal,
+        gitAuth: github,
       });
       return {
         ...capabilities,
         terminal,
+        gitAuth: { github },
         ...commandsCapability(handlers(), config.disabledCommands),
       };
     };
@@ -277,6 +299,7 @@ export const runDaemon = async (
       deps: skillsDeps,
       cardsDir: options.cardsDir ?? join(dirname(options.spoolDir), 'cards'),
       selfCommand,
+      attachmentSource: { server: config.server, token: config.token },
       emit: (event) => connection?.emit(event),
       log,
       otlpPort: () => otlp?.port ?? null,
@@ -296,6 +319,15 @@ export const runDaemon = async (
       deps: skillsDeps,
       normalizeDir:
         options.normalizeDir ?? join(dirname(options.spoolDir), 'normalize'),
+      env: process.env,
+      emit: (event) => connection?.emit(event),
+      log,
+      otlpPort: () => otlp?.port ?? null,
+    });
+    // Card model assessment (#322): headless; the API limits concurrency.
+    const assess = new AssessExecutor({
+      deps: skillsDeps,
+      assessDir: options.assessDir ?? join(dirname(options.spoolDir), 'assess'),
       env: process.env,
       emit: (event) => connection?.emit(event),
       log,
@@ -328,6 +360,7 @@ export const runDaemon = async (
       cards: createCardHandlers(cards),
       capture: createCaptureHandlers(capture),
       normalize: createNormalizeHandlers(normalize),
+      assess: createAssessHandlers(assess),
     });
     const dispatch = createDispatcher({
       handlers: builtHandlers,
@@ -453,6 +486,8 @@ export const runDaemon = async (
     const onAbort = () => live.stop();
     if (options.signal?.aborted) live.stop();
     options.signal?.addEventListener('abort', onAbort, { once: true });
+    // Before any resumed run or card can fetch or push.
+    await gitAuth.probe();
     await watchList.start();
     // Runs a previous runner left are picked up; their events go to the spool.
     await runs.start().catch((error) => {
@@ -490,6 +525,7 @@ export const runDaemon = async (
     cards.stop();
     capture.stop();
     normalize.stop();
+    assess.stop();
     terminal.stop();
     await registry.stop();
     await sessions?.stop();

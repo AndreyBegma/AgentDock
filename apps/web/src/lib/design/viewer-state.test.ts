@@ -114,4 +114,65 @@ describe('applyViewerChange', () => {
     );
     expect(clampWidth(412.6)).toBe(413);
   });
+
+  test('a zoom is kept next to the rest, and Fit leaves the URL', () => {
+    expect(applyViewerChange(params, { kind: 'zoom', zoom: 0.5 })).toBe(
+      '?variant=1&rev=rev-1-1&vp=Mobile&w=500&zoom=0.5',
+    );
+    const zoomed = new URLSearchParams('vp=Mobile&zoom=0.5');
+    expect(applyViewerChange(zoomed, { kind: 'zoom', zoom: 'fit' })).toBe(
+      '?vp=Mobile',
+    );
+  });
+
+  test('a zoom is clamped on the way out', () => {
+    const empty = new URLSearchParams();
+    expect(applyViewerChange(empty, { kind: 'zoom', zoom: 9 })).toBe('?zoom=2');
+  });
+
+  test('choosing a preset keeps the zoom', () => {
+    const next = applyViewerChange(new URLSearchParams('zoom=0.75'), {
+      kind: 'viewport',
+      viewport: { name: 'Mobile', width: 390, height: 844 },
+    });
+    expect(next).toBe('?zoom=0.75&vp=Mobile');
+  });
+});
+
+describe('zoom in the URL', () => {
+  test('defaults to Fit', () => {
+    expect(resolve('').zoom).toBe('fit');
+  });
+
+  test('fit and a number parse', () => {
+    expect(resolve('zoom=fit').zoom).toBe('fit');
+    expect(resolve('zoom=0.75').zoom).toBe(0.75);
+    expect(resolve('zoom=1').zoom).toBe(1);
+  });
+
+  test('out of range is clamped', () => {
+    expect(resolve('zoom=0.01').zoom).toBe(0.25);
+    expect(resolve('zoom=9').zoom).toBe(2);
+  });
+
+  test('garbage is Fit', () => {
+    for (const raw of ['abc', '', '-1', '0', '1e3', '0.5x', 'NaN', '.']) {
+      expect(resolve(`zoom=${raw}`).zoom).toBe('fit');
+    }
+  });
+
+  test('round-trips through the URL', () => {
+    for (const zoom of [0.25, 0.4, 0.5, 0.75, 1, 1.25, 2] as const) {
+      const query = applyViewerChange(new URLSearchParams(), {
+        kind: 'zoom',
+        zoom,
+      });
+      expect(resolve(query.slice(1)).zoom).toBe(zoom);
+    }
+    const fit = applyViewerChange(new URLSearchParams('zoom=0.5'), {
+      kind: 'zoom',
+      zoom: 'fit',
+    });
+    expect(resolve(fit.slice(1)).zoom).toBe('fit');
+  });
 });

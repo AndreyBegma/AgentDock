@@ -44,6 +44,9 @@ import { AttachmentIds } from '../attachments/dto';
 /** `orchestratorModelSchema`: never a flag. */
 const MODEL_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:[\]-]*$/;
 const MODEL_MAX_LENGTH = 100;
+/** `profileKeySchema`. */
+const PROFILE_KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+const PROFILE_KEY_MAX_LENGTH = 64;
 
 /** `GET /board`. */
 export class BoardQueryDto {
@@ -115,6 +118,22 @@ export class UpdateBoardCardDto implements UpdateBoardCardRequest {
   @Matches(MODEL_PATTERN, { message: 'model is not a model name' })
   model?: string | null;
 
+  /** #322 D3: `null` clears the design model override. */
+  @ValidateIf((dto: UpdateBoardCardDto) => dto.designModel !== null)
+  @IsOptional()
+  @IsString()
+  @MaxLength(MODEL_MAX_LENGTH)
+  @Matches(MODEL_PATTERN, { message: 'designModel is not a model name' })
+  designModel?: string | null;
+
+  /** #322 D3: `null` clears the profile override. */
+  @ValidateIf((dto: UpdateBoardCardDto) => dto.profileKey !== null)
+  @IsOptional()
+  @IsString()
+  @MaxLength(PROFILE_KEY_MAX_LENGTH)
+  @Matches(PROFILE_KEY_PATTERN, { message: 'profileKey must be a profile id' })
+  profileKey?: string | null;
+
   /** #243 D5: refused with `design_approved` once the design is approved. */
   @IsOptional()
   @IsBoolean()
@@ -149,6 +168,13 @@ export class RunBoardCardDto implements RunBoardCardRequest {
   @MaxLength(MODEL_MAX_LENGTH)
   @Matches(MODEL_PATTERN, { message: 'model is not a model name' })
   model?: string;
+
+  /** #322 D9: the resolver refuses an unknown or non-Claude key (422 `no_profile`). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(PROFILE_KEY_MAX_LENGTH)
+  @Matches(PROFILE_KEY_PATTERN, { message: 'profileKey must be a profile id' })
+  profileKey?: string;
 
   @IsOptional()
   @IsIn(orchestratorPermissionModeSchema.options)
@@ -201,14 +227,36 @@ export class AcceptMergeDto {
   @IsString()
   @Matches(/^[0-9a-f]{40}$/, { message: 'headSha must be 40 lower-case hex' })
   headSha!: string;
+
+  /** #329 D7: delete the PR's head branch on GitHub after the merge. */
+  @IsOptional()
+  @IsBoolean()
+  deleteBranch?: boolean;
 }
 
-/** `POST /board/cards/:number/accept` (#273 D13): no `merge` moves only (D14). */
+/** #329 D8: Accept without merging, closing the card's PR. */
+export class AcceptClosePrDto {
+  @IsBoolean()
+  deleteBranch!: boolean;
+
+  @IsBoolean()
+  closeIssue!: boolean;
+}
+
+/**
+ * `POST /board/cards/:number/accept` (#273 D13): no `merge` and no `closePr`
+ * moves only (D14). `merge` with `closePr` is refused with 400 (#329).
+ */
 export class AcceptBoardCardDto implements AcceptBoardCardRequest {
   @IsOptional()
   @ValidateNested()
   @Type(() => AcceptMergeDto)
   merge?: AcceptMergeDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AcceptClosePrDto)
+  closePr?: AcceptClosePrDto;
 }
 
 /** `POST /board/cards/:number/accept-suggestion` (#244 D9): Edit & accept. */

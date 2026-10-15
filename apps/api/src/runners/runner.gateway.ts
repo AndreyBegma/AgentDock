@@ -12,6 +12,7 @@ import { Inject, Logger } from '@nestjs/common';
 import { type OnGatewayConnection, WebSocketGateway } from '@nestjs/websockets';
 import type { RawData, WebSocket } from 'ws';
 import { bearerToken } from './credentials';
+import { RunnerConnectHooks } from './runner-connect-hooks';
 import { LiveConnection, RunnerConnections } from './runner-connections';
 import { RunnerIngestService } from './runner-ingest.service';
 import { RunnerLocalRequests } from './runner-local-requests';
@@ -29,6 +30,7 @@ interface Deps {
   watchList: RunnerWatchList;
   streams: RunnerStreams;
   localRequests: RunnerLocalRequests;
+  connectHooks: RunnerConnectHooks;
   options: RunnerOptions;
   logger: Logger;
 }
@@ -220,6 +222,9 @@ class RunnerSocket {
     // After the welcome: a `subscribe` sent from here is the runner's first.
     this.deps.streams.connected(live);
     this.deps.logger.log(`runner ${runnerId} connected`);
+    // Off the frame queue (#329 D4): a hook may send a command, whose result
+    // arrives on this same queue.
+    void this.deps.connectHooks.connected(runnerId);
   }
 
   private close(code: number, reason: string): void {
@@ -267,6 +272,7 @@ export class RunnerGateway implements OnGatewayConnection {
     private readonly watchList: RunnerWatchList,
     private readonly streams: RunnerStreams,
     private readonly localRequests: RunnerLocalRequests,
+    private readonly connectHooks: RunnerConnectHooks,
     @Inject(RUNNER_OPTIONS) private readonly options: RunnerOptions,
   ) {}
 
@@ -277,6 +283,7 @@ export class RunnerGateway implements OnGatewayConnection {
       watchList: this.watchList,
       streams: this.streams,
       localRequests: this.localRequests,
+      connectHooks: this.connectHooks,
       options: this.options,
       logger: this.logger,
     });

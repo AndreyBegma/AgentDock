@@ -12,6 +12,10 @@ export interface TextJobData {
   offlineAttempts?: number;
   /** D11: when the runner was first found offline for this job (epoch ms). */
   offlineSince?: number;
+  /** #324 D2: DeepL calls this job made that failed. */
+  deeplAttempts?: number;
+  /** #324 D2: DeepL gave up on it; the runner's `text.normalize` only. */
+  runnerOnly?: boolean;
 }
 
 export type TextQueueHandle = Queue<TextJobData>;
@@ -41,7 +45,11 @@ export class TextQueue {
    * Queues the request, `delayMs` from now. A finished job of the same
    * request (a retry) is replaced; a waiting or running one is kept.
    */
-  async add(normalizationId: string, delayMs = 0): Promise<void> {
+  async add(
+    normalizationId: string,
+    delayMs = 0,
+    data: Omit<TextJobData, 'normalizationId'> = {},
+  ): Promise<void> {
     const queue = this.queue;
     if (!queue) return;
     const jobId = textNormalizeJobId(normalizationId);
@@ -53,7 +61,7 @@ export class TextQueue {
     }
     await queue.add(
       NORMALIZE_JOB,
-      { normalizationId },
+      { ...data, normalizationId },
       { ...JOB_OPTIONS, jobId, delay: delayMs },
     );
   }

@@ -196,6 +196,7 @@ function BoardScreen() {
   const actions = useCardActions({
     projectId,
     runnerName: project?.runnerName,
+    runnerCommands: project?.runnerCommands,
     onChanged: reload,
     onDeleted: (card) => {
       if (card.number === selected) select(undefined);

@@ -1,3 +1,7 @@
+import type {
+  CardDesignRecommendableModel,
+  CardRecommendableModel,
+} from '../assess/limits';
 import type { AttachmentRefusal, AttachmentView } from '../attachments';
 import type { TaskDesignSummary, TaskDesignView } from '../design';
 import type { FleetStage } from '../fleet';
@@ -18,7 +22,9 @@ import type {
   BoardCardKind,
   BoardCardSource,
   BoardColumn,
+  CardCollectState,
   CardFinishedBy,
+  CardPrState,
   CardRoundPhase,
   CardRoundTrigger,
 } from './types';
@@ -89,6 +95,18 @@ export interface BoardCardView {
   issueUrl: string | null;
   prNumber: number | null;
   prUrl: string | null;
+  /**
+   * #329 D6: the PR's state as last seen; `null` without a PR, or before
+   * anything has read its state.
+   */
+  prState: CardPrState | null;
+  /** #329 D2: how the last `card.collect` went; `none` before the first. */
+  collectState: CardCollectState;
+  /**
+   * #329 D2: the runner's one line when `collectState` is `failed` — the
+   * sheet's "No pull request: <error>"; `null` otherwise.
+   */
+  collectError: string | null;
   /** The latest round; `null` before the first Run. */
   round: CardRoundBrief | null;
   /** #243: the Design chip; `null` when the card has no design (off). */
@@ -179,14 +197,48 @@ export interface CardRoundView {
   endedAt: string | null;
 }
 
+/** #322 D6: one recommended model, with its one-line reason. */
+export interface CardModelRecommendation<
+  M extends CardRecommendableModel = CardRecommendableModel,
+> {
+  model: M;
+  reason: string;
+}
+
+/**
+ * #322 D6, D7: a card's recommendations for its work and its design. Each is
+ * `null` until an assessment applied — runner offline or too old, no Claude
+ * profile, a budget stop, an answer out of contract: the popover shows "No
+ * recommendation yet" and launch does not wait.
+ */
+export interface CardRecommendationView {
+  work: CardModelRecommendation | null;
+  design: CardModelRecommendation<CardDesignRecommendableModel> | null;
+  /** When the last assessment applied (ISO); `null` before the first. */
+  assessedAt: string | null;
+}
+
 /** `GET /board/cards/:number`. */
 export interface BoardCardDetail extends BoardCardView {
   /** Markdown. */
   body: string;
   issueOnRun: boolean;
   specOnRun: boolean;
-  /** Overrides the project's model from the next round (D12). */
+  /**
+   * Overrides the project's model from the next round (D12). #322 D3: the
+   * work model the person chose, kept only when it differed from the default.
+   */
   model: string | null;
+  /**
+   * #322 D3: the Claude profile the person chose for the card's work and
+   * design, kept only when it differed from the resolver's pick; `null`
+   * follows the resolver.
+   */
+  profileKey: string | null;
+  /** #322 D3: the design turns' model override; `null` follows the default. */
+  designModel: string | null;
+  /** #322 D6: the last applied assessment; its parts are `null` without one (D7). */
+  recommendation: CardRecommendationView;
   /** Fixed at the first Run (D5). */
   branch: string | null;
   /** Display only: the runner owns the path. */
@@ -245,7 +297,11 @@ export interface CreateBoardCardRequest {
   attachmentIds?: string[];
 }
 
-/** `PATCH /board/cards/:number`: applies from the next round. `model: null` clears it. */
+/**
+ * `PATCH /board/cards/:number`: applies from the next round. `null` clears an
+ * override — `model`, `designModel`, `profileKey` — which is what choosing the
+ * default option in the card form sends (#322 D3).
+ */
 export interface UpdateBoardCardRequest {
   title?: string;
   body?: string;
@@ -253,6 +309,10 @@ export interface UpdateBoardCardRequest {
   issueOnRun?: boolean;
   specOnRun?: boolean;
   model?: string | null;
+  /** #322 D3: the design turns' model override. */
+  designModel?: string | null;
+  /** #322 D3, D9: a Claude profile of the project's runner. */
+  profileKey?: string | null;
   /** #243 D5: refused with `design_approved` once the design is approved. */
   continueAfterDesign?: boolean;
   /** #282 D3: a `terminal` card only; any other card is refused `not_tracked`. */
@@ -266,9 +326,19 @@ export interface MoveBoardCardRequest {
   stopWorker?: boolean;
 }
 
-/** `POST /board/cards/:number/run`: round 1, or a retry; `model` overrides for this card (D12). */
+/**
+ * `POST /board/cards/:number/run`: round 1, or a retry; `model` overrides for
+ * this card (D12). #322 D3: the popover sends `profileKey` and `model`; each is
+ * stored on the card only when it differs from what the default would have
+ * picked without the card's override.
+ */
 export interface RunBoardCardRequest {
   model?: string;
+  /**
+   * #322 D9: a Claude profile of the project's runner (`profileKeySchema`); an
+   * unknown or non-Claude key is 422 `no_profile`.
+   */
+  profileKey?: string;
   permissionMode?: OrchestratorPermissionMode;
 }
 
@@ -384,6 +454,15 @@ export const BOARD_ERROR = {
   cardCompleted: 'card_completed',
   /** 502 (#309 D9): the runner could not download or verify an attachment for `card.run`. */
   attachmentsUnavailable: 'attachments_unavailable',
+  /** 409 (#329 D5): Create pull request on a card with no `branch` — it never ran. */
+  noBranch: 'no_branch',
+  /**
+   * 409 (#329 D8): the runner refused to close the PR, with `reason`
+   * (`CardPrCloseFailReason`); the card stays in Finished.
+   */
+  prCloseFailed: 'pr_close_failed',
+  /** 422 (#329 D7/D8): `deleteBranch: true` on a `terminal` card. */
+  branchDeleteRefused: 'branch_delete_refused',
 } as const;
 export type BoardErrorCode = (typeof BOARD_ERROR)[keyof typeof BOARD_ERROR];
 
@@ -393,7 +472,8 @@ export interface BoardErrorBody {
   message: string;
   /**
    * `move_refused`: the `BoardMoveRefusal`; `no_profile`: the
-   * `NoProfileReason`; `merge_failed`: the `CardMergeFailReason`.
+   * `NoProfileReason`; `merge_failed`: the `CardMergeFailReason`;
+   * `pr_close_failed`: the `CardPrCloseFailReason`.
    */
   reason?: string;
   /** `no_profile`: the setting that named the profile (#272 D2). */
@@ -459,11 +539,32 @@ export interface CardPullRequestView {
   canMerge: boolean;
 }
 
-/** `POST /board/cards/:number/accept` (#273 D13). No `merge`: move only (D14). */
+/**
+ * `POST /board/cards/:number/accept` (#273 D13). Neither `merge` nor
+ * `closePr`: move only, the PR left open (D14, #329 D8). `merge` and
+ * `closePr` together are refused with 400.
+ */
 export interface AcceptBoardCardRequest {
   merge?: {
     /** The head the person saw in the dialog, 40 lower-case hex. */
     headSha: string;
+    /**
+     * #329 D7: delete the PR's head branch on GitHub after the merge. Absent
+     * is `false`. `true` on a `terminal` card is refused with 422
+     * `branch_delete_refused`: its branch is the person's session branch.
+     */
+    deleteBranch?: boolean;
+  };
+  /**
+   * #329 D8: Accept without merging, and close the card's PR through
+   * `card.prClose`. The card moves to Completed only when the command
+   * succeeds.
+   */
+  closePr?: {
+    /** Delete the PR's head branch on GitHub after closing it; `terminal`: 422 as above. */
+    deleteBranch: boolean;
+    /** Close the linked issue as `not planned`; off in the dialog by default. */
+    closeIssue: boolean;
   };
 }
 
@@ -477,11 +578,60 @@ export interface CardMergeOutcome {
   issueClosed: boolean;
   /** Why closing the issue failed; the card is accepted anyway. */
   issueError?: string;
+  /** #329 D7: the head branch was deleted on GitHub; `false` when not asked or it failed. */
+  branchDeleted: boolean;
+  /** #329 D7: why deleting the branch failed; the merge stands. */
+  branchError?: string;
 }
 
-/** `merge` is `null` for an Accept without merging. */
+/** #329 D8: how closing the PR on Accept went. */
+export interface CardPrCloseOutcome {
+  closed: true;
+  /** The PR was closed before Accept; nothing was closed now. */
+  alreadyClosed: boolean;
+  /** The head branch was deleted on GitHub; `false` when not asked or it failed. */
+  branchDeleted: boolean;
+  /** Why deleting the branch failed; the card is accepted anyway. */
+  branchError?: string;
+  /** The issue was closed as `not planned`; `false` when not asked or it failed. */
+  issueClosed: boolean;
+  /** Why closing the issue failed; the card is accepted anyway. */
+  issueError?: string;
+}
+
+/**
+ * `merge` is `null` for an Accept without merging; `prClose` (#329 D8) is
+ * `null` unless the Accept closed the PR.
+ */
 export type AcceptBoardCardResponse = BoardCardDetail & {
   merge: CardMergeOutcome | null;
+  prClose: CardPrCloseOutcome | null;
+};
+
+/**
+ * #329 D5: what a manual collect did. `failed` is an answer, not an error
+ * status: the card stores it and shows "No pull request: <error>".
+ */
+export interface CardCollectOutcome {
+  state: Extract<CardCollectState, 'ok' | 'no_changes' | 'failed'>;
+  /** The runner's one line for `failed`; `null` otherwise. */
+  error: string | null;
+  /** Commits ahead of the base; `null` when the collect failed. */
+  ahead: number | null;
+  /** The open PR, new or existing; `null` for `no_changes` and `failed`. */
+  prNumber: number | null;
+  prUrl: string | null;
+}
+
+/**
+ * `POST /board/cards/:number/collect` (#329 D5, operator): Create pull
+ * request. Runs `card.collect` now, resets the automatic attempts, and
+ * answers with the stored card and the outcome. Offered for a card in
+ * Finished or Completed with a `branch`, no `prUrl`, and a `collectState`
+ * other than `no_changes`; otherwise 409 `wrong_column` / `no_branch`.
+ */
+export type CollectBoardCardResponse = BoardCardDetail & {
+  collect: CardCollectOutcome;
 };
 
 /**

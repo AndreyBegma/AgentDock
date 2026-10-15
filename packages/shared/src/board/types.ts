@@ -104,6 +104,46 @@ export const isActiveRoundPhase = (
 export const CARD_FINISHED_BY = ['worker', 'session_end', 'person'] as const;
 export type CardFinishedBy = (typeof CARD_FINISHED_BY)[number];
 
+/**
+ * #329 D2: how the card's last `card.collect` went, written on every attempt
+ * for every source.
+ * - `none` — never collected;
+ * - `pending` — a collect is running now;
+ * - `ok` — a PR was opened, or one is already open (`prUrl` set);
+ * - `no_changes` — `ahead: 0`, nothing to push;
+ * - `failed` — the runner failed it; `collectError` says why.
+ */
+export const CARD_COLLECT_STATES = [
+  'none',
+  'pending',
+  'ok',
+  'no_changes',
+  'failed',
+] as const;
+export type CardCollectState = (typeof CARD_COLLECT_STATES)[number];
+
+export const isCardCollectState = (value: string): value is CardCollectState =>
+  (CARD_COLLECT_STATES as readonly string[]).includes(value);
+
+/** #329 D2: `collectError`, the runner's one line, at most this many characters. */
+export const CARD_COLLECT_ERROR_MAX = 500;
+
+/** #329 D4: automatic collect attempts after a failure, counted by `collectAttempts`. */
+export const CARD_COLLECT_AUTO_ATTEMPTS_MAX = 3;
+
+/** #329 D4: a failed collect is retried once after this delay. */
+export const CARD_COLLECT_RETRY_DELAY_MS = 2 * 60 * 1000;
+
+/**
+ * #329 D6: the card's PR as last seen — from the PR poll, else from a
+ * `card.collect` / `card.merge` / `card.prClose` result.
+ */
+export const CARD_PR_STATES = ['open', 'draft', 'merged', 'closed'] as const;
+export type CardPrState = (typeof CARD_PR_STATES)[number];
+
+export const isCardPrState = (value: string): value is CardPrState =>
+  (CARD_PR_STATES as readonly string[]).includes(value);
+
 export const BOARD_CARD_TITLE_MAX = LOCAL_CARD_TITLE_MAX;
 /** Markdown. */
 export const BOARD_CARD_BODY_MAX = LOCAL_CARD_BODY_MAX;

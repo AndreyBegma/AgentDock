@@ -1,17 +1,33 @@
 'use client';
 
-import type { BoardCardView, CardPullRequestView } from '@agentdock/shared';
+import type {
+  AcceptBoardCardRequest,
+  BoardCardView,
+  CardPullRequestView,
+} from '@agentdock/shared';
+import type { RunnerCommands } from '@agentdock/shared/protocol';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
+import { Checkbox } from '@andrewbehma/glass-ui/checkbox';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { Radio, RadioGroup } from '@andrewbehma/glass-ui/radio-group';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { useEffect, useState } from 'react';
 import {
   type AcceptChoice,
+  type AcceptOptions,
   acceptChoice,
+  BRANCH_CLEANUP_HINT,
+  type BranchCleanupGate,
+  branchCleanupGate,
   CHECKS_PILL,
+  defaultAcceptOptions,
+  deleteBranchControl,
+  isTerminalCard,
   mergeMethodText,
+  mergeRequest,
+  noMergeRequest,
 } from '../../lib/board/accept';
 import { fetchPullRequest } from '../../lib/board/actions';
 import { describeBoardError } from '../../lib/board/format';
@@ -31,6 +47,7 @@ export function AcceptDialog({
   card,
   busy,
   version,
+  runnerCommands,
   onAccept,
   onClose,
 }: {
@@ -39,12 +56,24 @@ export function AcceptDialog({
   card: BoardCardView | undefined;
   busy: boolean;
   version: number;
-  /** `headSha` merges; none only moves the card. */
-  onAccept: (card: BoardCardView, headSha?: string) => void;
+  /** What the runner advertised; gates the branch cleanup (#329 D9). */
+  runnerCommands?: RunnerCommands | null;
+  /** `merge` merges, `closePr` closes the PR, `{}` only moves the card. */
+  onAccept: (card: BoardCardView, request: AcceptBoardCardRequest) => void;
   onClose: () => void;
 }) {
   const [loaded, setLoaded] = useState<PullRequest>({ state: 'loading' });
+  const [options, setOptions] = useState<AcceptOptions>(
+    defaultAcceptOptions({ source: 'manual' }),
+  );
   const number = card?.number;
+  const source = card?.source;
+
+  // Each card opens with its own defaults (a terminal card keeps its branch).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset per card
+  useEffect(() => {
+    setOptions(defaultAcceptOptions({ source: source ?? 'manual' }));
+  }, [number, source]);
   const fleet = card?.source === 'fleet';
   const hasPr = card?.prNumber != null && !fleet;
 
@@ -83,6 +112,16 @@ export function AcceptDialog({
       : null;
   const pr = loaded.state === 'ready' ? loaded.pr : null;
 
+  // #329 D7/D8/D9: the branch and close choices, gated by the runner's advert.
+  const gate = branchCleanupGate(runnerCommands);
+  const canClose = !!card && !fleet && pr?.state === 'open';
+  const closing = canClose && gate === 'ok' && options.closePr;
+  const deleteControl = card
+    ? deleteBranchControl(card, options, gate)
+    : { checked: false, disabled: true, hint: null };
+  const acceptWithoutMerge = (c: BoardCardView) =>
+    onAccept(c, noMergeRequest(c, options, gate));
+
   return (
     <DialogRoot
       open={card !== undefined}
@@ -101,26 +140,34 @@ export function AcceptDialog({
             <Button
               variant={choice?.kind === 'merge' ? 'glass' : 'solid'}
               disabled={busy || choice === null || !card}
-              onClick={() =>
-                card &&
+              onClick={() => {
+                if (!card) return;
                 // Already merged: the merge request is what closes the issue (D13).
-                onAccept(
-                  card,
-                  choice?.kind === 'already_merged'
-                    ? choice.headSha
-                    : undefined,
-                )
-              }
+                if (choice?.kind === 'already_merged') {
+                  onAccept(card, { merge: { headSha: choice.headSha } });
+                } else {
+                  acceptWithoutMerge(card);
+                }
+              }}
             >
               {choice?.kind === 'already_merged'
                 ? 'Accept'
-                : 'Accept without merging'}
+                : closing
+                  ? busy
+                    ? 'Closing…'
+                    : 'Close pull request and accept'
+                  : 'Accept without merging'}
             </Button>
             {choice?.kind === 'merge' && card ? (
               <Button
                 variant="solid"
                 disabled={busy}
-                onClick={() => onAccept(card, choice.headSha)}
+                onClick={() =>
+                  onAccept(
+                    card,
+                    mergeRequest(card, choice.headSha, options, gate),
+                  )
+                }
               >
                 {busy ? 'Merging…' : 'Merge pull request'}
               </Button>
@@ -134,10 +181,30 @@ export function AcceptDialog({
           <div className="flex flex-col gap-3 text-sm">
             {pr ? <PullRequestBlock pr={pr} /> : null}
             {choice.kind === 'merge' ? (
-              <p className="text-ink-2">
-                The pull request is merged through the runner, then the card
-                moves to Completed and its issue is closed.
-              </p>
+              <>
+                <p className="text-ink-2">
+                  The pull request is merged through the runner, then the card
+                  moves to Completed and its issue is closed.
+                </p>
+                <Checkbox
+                  label="Delete the branch on GitHub"
+                  hint={deleteControl.hint ?? undefined}
+                  checked={deleteControl.checked}
+                  disabled={busy || deleteControl.disabled}
+                  onChange={(e) =>
+                    setOptions({ ...options, deleteBranch: e.target.checked })
+                  }
+                />
+              </>
+            ) : null}
+            {canClose ? (
+              <ClosePrChoice
+                card={card}
+                options={options}
+                gate={gate}
+                busy={busy}
+                onChange={setOptions}
+              />
             ) : null}
             {choice.kind === 'already_merged' ? (
               <Banner tone="ok" title="Already merged">
@@ -146,14 +213,77 @@ export function AcceptDialog({
             ) : null}
             {choice.kind === 'accept_only' ? (
               <Banner tone="info" title="Nothing to merge here">
-                {choice.reason} Accepting only moves the card; the pull request
-                and the issue are left as they are.
+                {choice.reason}{' '}
+                {closing
+                  ? 'Accepting closes the pull request, then moves the card.'
+                  : 'Accepting only moves the card; the pull request and the issue are left as they are.'}
               </Banner>
             ) : null}
           </div>
         )}
       </DialogContent>
     </DialogRoot>
+  );
+}
+
+/**
+ * #329 D8: under Accept without merging — leave the PR open (the default), or
+ * close it and delete its branch. Hidden with the update hint on a runner
+ * that does not serve `card.prClose` (D9).
+ */
+function ClosePrChoice({
+  card,
+  options,
+  gate,
+  busy,
+  onChange,
+}: {
+  card: BoardCardView;
+  options: AcceptOptions;
+  gate: BranchCleanupGate;
+  busy: boolean;
+  onChange: (options: AcceptOptions) => void;
+}) {
+  if (gate !== 'ok') {
+    return <p className="text-xs text-ink-2">{BRANCH_CLEANUP_HINT[gate]}</p>;
+  }
+  const keepsBranch = isTerminalCard(card);
+  return (
+    <div className="flex flex-col gap-2">
+      <RadioGroup label="If you accept without merging">
+        <Radio
+          name="accept-pr"
+          label="Leave the PR open"
+          checked={!options.closePr}
+          disabled={busy}
+          onChange={() => onChange({ ...options, closePr: false })}
+        />
+        <Radio
+          name="accept-pr"
+          label={
+            keepsBranch ? 'Close the PR' : 'Close the PR and delete its branch'
+          }
+          hint={
+            keepsBranch
+              ? 'A terminal card’s branch is your session branch, so it is kept.'
+              : undefined
+          }
+          checked={options.closePr}
+          disabled={busy}
+          onChange={() => onChange({ ...options, closePr: true })}
+        />
+      </RadioGroup>
+      {options.closePr && card.issueNumber !== null ? (
+        <Checkbox
+          label="Close the issue as not planned"
+          checked={options.closeIssue}
+          disabled={busy}
+          onChange={(e) =>
+            onChange({ ...options, closeIssue: e.target.checked })
+          }
+        />
+      ) : null}
+    </div>
   );
 }
 

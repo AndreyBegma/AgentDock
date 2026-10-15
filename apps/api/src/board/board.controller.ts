@@ -4,6 +4,7 @@ import type {
   BoardSettingsView,
   BoardView,
   CardPullRequestView,
+  CollectBoardCardResponse,
   DismissAllResult,
 } from '@agentdock/shared';
 import {
@@ -220,6 +221,23 @@ export class BoardController {
       access.projectId,
       cardNumber(number),
       dto,
+      actorOf(access, user, ctx),
+    );
+  }
+
+  /** #329 D5: Create pull request — `card.collect` now, answered with its outcome. */
+  @Post('board/cards/:number/collect')
+  @HttpCode(200)
+  @ProjectRole('operator')
+  collect(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Param('number') number: string,
+  ): Promise<CollectBoardCardResponse> {
+    return this.board.collect(
+      access.projectId,
+      cardNumber(number),
       actorOf(access, user, ctx),
     );
   }

@@ -1,0 +1,77 @@
+import type {
+  BoardCardDetail,
+  BoardCardView,
+  CardCollectOutcome,
+  CardPrState,
+} from '@agentdock/shared';
+
+/** #329 D6: the PR's state as the card shows it, next to `PR #n`. */
+export const PR_STATE_LABEL: Record<CardPrState, string> = {
+  open: 'Open',
+  draft: 'Draft',
+  merged: 'Merged',
+  closed: 'Closed',
+};
+
+/** `PR #7` alone while the state is unknown, else `PR #7 · Merged`. */
+export function prChipText(
+  card: Pick<BoardCardView, 'prNumber' | 'prState'>,
+): string | null {
+  if (card.prNumber === null) return null;
+  return card.prState
+    ? `PR #${card.prNumber} · ${PR_STATE_LABEL[card.prState]}`
+    : `PR #${card.prNumber}`;
+}
+
+/**
+ * #329 D5: Create pull request is offered in Finished or Completed, with a
+ * `branch`, no `prUrl`, and a collect that did not find "nothing to push".
+ */
+export const canCreatePr = (
+  card: Pick<BoardCardDetail, 'column' | 'branch' | 'prUrl' | 'collectState'>,
+): boolean =>
+  (card.column === 'finished' || card.column === 'completed') &&
+  card.branch !== null &&
+  card.prUrl === null &&
+  card.collectState !== 'no_changes';
+
+/** The sheet's line above Create pull request. */
+export function noPrText(
+  card: Pick<BoardCardView, 'collectState' | 'collectError'>,
+): { tone: 'warn' | 'info'; text: string } {
+  if (card.collectState === 'failed') {
+    return {
+      tone: 'warn',
+      text: `No pull request: ${card.collectError ?? 'collecting the work failed.'}`,
+    };
+  }
+  if (card.collectState === 'pending') {
+    return { tone: 'info', text: 'Opening the pull request…' };
+  }
+  return { tone: 'info', text: 'No pull request yet.' };
+}
+
+/** The toast after a manual collect; `failed` is an answer, not an error status. */
+export function collectMessage(
+  label: string,
+  outcome: CardCollectOutcome,
+): { text: string; ok: boolean } {
+  if (outcome.state === 'ok') {
+    return {
+      text: outcome.prNumber
+        ? `${label}: pull request #${outcome.prNumber} is open.`
+        : `${label}: pull request opened.`,
+      ok: true,
+    };
+  }
+  if (outcome.state === 'no_changes') {
+    return {
+      text: `${label} has no commits ahead of the base, so there is nothing to open.`,
+      ok: true,
+    };
+  }
+  return {
+    text: `No pull request for ${label}: ${outcome.error ?? 'collecting the work failed.'}`,
+    ok: false,
+  };
+}

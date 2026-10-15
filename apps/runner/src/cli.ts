@@ -205,6 +205,7 @@ const runCommand = async ({
     offsetsFile: paths.offsetsFile,
     host: deps.host,
     exec: deps.exec ?? createExec(deps.env),
+    env: deps.env,
     clock: deps.clock,
     log,
     createSocket: deps.createSocket,

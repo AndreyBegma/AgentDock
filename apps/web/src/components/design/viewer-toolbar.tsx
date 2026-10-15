@@ -15,10 +15,17 @@ import {
   SegmentedControl,
   SegmentedControlItem,
 } from '@andrewbehma/glass-ui/segmented-control';
-import { Crosshair } from 'lucide-react';
+import { Crosshair, Minus, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { revisionLabel } from '../../lib/design/format';
 import type { ViewerChange, ViewerState } from '../../lib/design/viewer-state';
+import {
+  stepZoom,
+  ZOOM_MAX,
+  ZOOM_MIN,
+  ZOOM_PRESETS,
+  zoomPercent,
+} from '../../lib/design/zoom';
 
 const THEME_LABEL: Record<DesignTheme, string> = {
   light: 'Light',
@@ -27,11 +34,12 @@ const THEME_LABEL: Record<DesignTheme, string> = {
 
 /**
  * The viewer's toolbar (spec 223 D11): viewport presets, a typed width,
- * light/dark, the variant and the revision, and pin mode. Every choice is a
- * `ViewerChange`; the page keeps them in the URL.
+ * light/dark, the zoom (spec 335), the variant and the revision, and pin
+ * mode. Every choice is a `ViewerChange`; the page keeps them in the URL.
  */
 export function ViewerToolbar({
   state,
+  zoom,
   viewports,
   variants,
   revisions,
@@ -41,6 +49,8 @@ export function ViewerToolbar({
   onPinMode,
 }: {
   state: ViewerState;
+  /** The scale in effect: what Fit works out to, or the chosen one. */
+  zoom: number;
   viewports: readonly ViewportPreset[];
   variants: readonly number[];
   /** The revisions of the variant in view, newest first. */
@@ -107,6 +117,74 @@ export function ViewerToolbar({
         />
         <span aria-hidden="true">× {state.viewport.height}</span>
       </span>
+
+      <fieldset
+        className="m-0 flex min-w-0 items-center gap-1 border-0 p-0"
+        title="Ctrl/⌘ + wheel, or Ctrl/⌘ + 0 − =, over the stage around the mockup (not over the mockup itself)"
+      >
+        <legend className="sr-only">Zoom</legend>
+        <Button
+          size="sm"
+          icon
+          variant="ghost"
+          aria-label="Zoom out"
+          disabled={zoom <= ZOOM_MIN}
+          onClick={() => onChange({ kind: 'zoom', zoom: stepZoom(zoom, -1) })}
+        >
+          <Minus aria-hidden="true" className="size-4" />
+        </Button>
+        <SegmentedControl size="sm" role="group" aria-label="Zoom level">
+          <SegmentedControlItem
+            active={state.zoom === 'fit'}
+            layoutId="design-zoom"
+          >
+            <button
+              type="button"
+              aria-pressed={state.zoom === 'fit'}
+              className="px-3 py-1 text-xs whitespace-nowrap tabular-nums"
+              onClick={() => onChange({ kind: 'zoom', zoom: 'fit' })}
+            >
+              {state.zoom === 'fit' ? `Fit · ${zoomPercent(zoom)}` : 'Fit'}
+            </button>
+          </SegmentedControlItem>
+          {ZOOM_PRESETS.map((preset) => {
+            const active = state.zoom === preset;
+            return (
+              <SegmentedControlItem
+                key={preset}
+                active={active}
+                layoutId="design-zoom"
+              >
+                <button
+                  type="button"
+                  aria-pressed={active}
+                  className="px-3 py-1 text-xs tabular-nums"
+                  onClick={() => onChange({ kind: 'zoom', zoom: preset })}
+                >
+                  {Math.round(preset * 100)}%
+                </button>
+              </SegmentedControlItem>
+            );
+          })}
+        </SegmentedControl>
+        <Button
+          size="sm"
+          icon
+          variant="ghost"
+          aria-label="Zoom in"
+          disabled={zoom >= ZOOM_MAX}
+          onClick={() => onChange({ kind: 'zoom', zoom: stepZoom(zoom, 1) })}
+        >
+          <Plus aria-hidden="true" className="size-4" />
+        </Button>
+        {/* Off a preset (a step, the wheel): say where it is. */}
+        {state.zoom !== 'fit' &&
+        !(ZOOM_PRESETS as readonly number[]).includes(state.zoom) ? (
+          <span className="text-xs text-ink-2 tabular-nums">
+            {zoomPercent(zoom)}
+          </span>
+        ) : null}
+      </fieldset>
 
       <SegmentedControl size="sm" role="group" aria-label="Theme">
         {DESIGN_THEMES.map((theme) => (

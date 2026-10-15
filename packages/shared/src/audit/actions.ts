@@ -126,6 +126,12 @@ export const AUDIT_ACTIONS = [
   'card.merged',
   /** #273 D16: the runner refused the merge (`after: { pr, reason }`, result error). */
   'card.merge_failed',
+  /** #329 D8: Accept closed the card's PR without merging (`after: { pr, alreadyClosed, branchDeleted, issueClosed }`). */
+  'card.pr_closed',
+  /** #329 D8: the runner refused to close the PR (`after: { pr, reason }`, result error). */
+  'card.pr_close_failed',
+  /** #329 D5: a person's Create pull request (`after: { state, pr? }`, result error when it failed). */
+  'card.collect_requested',
   /** #273 D9: approving the design did not start the worker (`after: { code }`). */
   'card.auto_run_failed',
   /** #309 D7: an upload stored, pending (`after: { name, mime, size }`). */

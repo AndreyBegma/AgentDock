@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 import { defaultChannels, NOTIFICATION_KIND_SPECS } from '../notifications';
-import { CARD_RUN_PROMPT_MAX_BYTES, cardPromptSchema } from '../protocol';
+import {
+  CARD_RUN_PROMPT_MAX_BYTES,
+  cardCollectPrStateSchema,
+  cardPromptSchema,
+} from '../protocol';
 import {
   CARD_ISSUE_BODY_MAX,
   CARD_PR_MARKER,
@@ -21,8 +25,15 @@ import {
 import {
   BOARD_CARD_BODY_MAX,
   BOARD_CARD_TITLE_MAX,
+  CARD_COLLECT_AUTO_ATTEMPTS_MAX,
+  CARD_COLLECT_ERROR_MAX,
+  CARD_COLLECT_RETRY_DELAY_MS,
+  CARD_COLLECT_STATES,
   CARD_FEEDBACK_MAX,
+  CARD_PR_STATES,
   isActiveRoundPhase,
+  isCardCollectState,
+  isCardPrState,
 } from './types';
 import {
   CARD_WORKER_PROMPT_VERSION,
@@ -159,6 +170,35 @@ describe('round phases', () => {
     expect(isActiveRoundPhase('waiting')).toBe(true);
     expect(isActiveRoundPhase('finished')).toBe(false);
     expect(isActiveRoundPhase(null)).toBe(false);
+  });
+});
+
+describe('collect and PR state (#329 D2, D6)', () => {
+  it('mirrors the Prisma enums', () => {
+    expect([...CARD_COLLECT_STATES]).toEqual([
+      'none',
+      'pending',
+      'ok',
+      'no_changes',
+      'failed',
+    ]);
+    expect([...CARD_PR_STATES]).toEqual(['open', 'draft', 'merged', 'closed']);
+    expect(isCardCollectState('no_changes')).toBe(true);
+    expect(isCardCollectState('error')).toBe(false);
+    expect(isCardPrState('draft')).toBe(true);
+    expect(isCardPrState('OPEN')).toBe(false);
+  });
+
+  it('every state a collect reports is a card PR state', () => {
+    for (const state of cardCollectPrStateSchema.options) {
+      expect(isCardPrState(state)).toBe(true);
+    }
+  });
+
+  it('retries a failed collect at most three times, after two minutes', () => {
+    expect(CARD_COLLECT_AUTO_ATTEMPTS_MAX).toBe(3);
+    expect(CARD_COLLECT_RETRY_DELAY_MS).toBe(120_000);
+    expect(CARD_COLLECT_ERROR_MAX).toBe(500);
   });
 });
 

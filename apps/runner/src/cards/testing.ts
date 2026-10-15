@@ -10,7 +10,12 @@ import { skillsWorkspace, withFakeGh } from '../skills/testing';
 export const cardsWorkspace = async () => {
   const f = await skillsWorkspace();
   const gh = withFakeGh(f.git, f.root);
-  const open: { number: number; url: string; head: string }[] = [];
+  const open: {
+    number: number;
+    url: string;
+    head: string;
+    isDraft?: boolean;
+  }[] = [];
   const listCalls: string[][] = [];
   const exec: Exec = async (binary, args, options) => {
     if (binary === 'gh' && args[0] === 'pr' && args[1] === 'list') {
@@ -18,7 +23,11 @@ export const cardsWorkspace = async () => {
       const head = args[args.indexOf('--head') + 1];
       const found = open
         .filter((pr) => pr.head === head)
-        .map(({ number, url }) => ({ number, url }));
+        .map(({ number, url, isDraft }) => ({
+          number,
+          url,
+          isDraft: isDraft ?? false,
+        }));
       const ok: ExecResult = {
         code: 0,
         stdout: JSON.stringify(found),

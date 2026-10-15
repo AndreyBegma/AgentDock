@@ -35,11 +35,15 @@ for example in "$SRC"/env/*.env.example; do
   copy_once "$example" "$STAGING_DIR/env/$(basename "$example" .example)"
 done
 
-# Missing keys a newer example added are appended empty, so they get generated
-# below or reported as missing.
+# Missing keys a newer example added are appended with the example's value:
+# a plain setting (ATTACHMENTS_DIR=/data/attachments) arrives as its default,
+# and a secret — empty in every example — gets generated below or reported as
+# missing. Appending them empty once left ATTACHMENTS_DIR unset, so the API
+# wrote attachments inside the container and lost them on the next deploy.
 add_missing_keys() {
-  grep -E '^[A-Z_]+=' "$1" | cut -d= -f1 | while read -r key; do
-    grep -qE "^$key=" "$2" || echo "$key=" >>"$2"
+  grep -E '^[A-Z_]+=' "$1" | while IFS= read -r line; do
+    key="${line%%=*}"
+    grep -qE "^$key=" "$2" || printf '%s\n' "$line" >>"$2"
   done
 }
 add_missing_keys "$SRC/.env.example" "$STAGING_DIR/.env"

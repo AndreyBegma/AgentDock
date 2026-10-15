@@ -2,14 +2,19 @@ import { randomUUID } from 'node:crypto';
 import {
   type BoardCardKind,
   buildNormalizePrompt,
+  classifyCardKindEnglish,
+  type DeepLError,
+  isDeepLFinal,
   needsNormalizeCall,
   parseNormalizeOutput,
   prepareTextFields,
   type ResolvedTextField,
   RUN_UPDATED_LIVE_EVENT,
   type RunLiveChange,
+  resolveDeepLFields,
   resolveNormalizedFields,
   TEXT_CHANGED_EVENT,
+  TEXT_DEEPL_TIMEOUT_MS,
   TEXT_ERROR_MAX,
   TEXT_MAX_RUNNING_PER_PROJECT,
   TEXT_NORMALIZE_MODEL,
@@ -24,6 +29,7 @@ import {
   textOfflineBackoffMs,
   textSourceHash,
   textViolationError,
+  toDeepLXml,
 } from '@agentdock/shared';
 import type {
   TextNormalizeArgs,
@@ -35,6 +41,11 @@ import { BudgetGate } from '../budgets/budget-gate';
 import { PrismaService } from '../database/prisma.service';
 import { LiveService } from '../live/live.service';
 import { RuntimeProfileResolver } from '../readiness';
+import {
+  DeepLClient,
+  DeepLFailure,
+  type DeepLTranslation,
+} from './deepl-client';
 import {
   lockOwner,
   ownerOfRow,
@@ -64,19 +75,37 @@ export interface TextRequestOptions {
   authorId: string | null;
 }
 
-/** What one job did; the worker turns `deferred` into a delayed job. */
+/** The job data a deferred job carries on with (merged into the old). */
+export type TextJobPatch = Partial<Omit<TextJobData, 'normalizationId'>>;
+
+/**
+ * What one job did; the worker turns `deferred` into a delayed job, with
+ * `data` merged into the job's own.
+ */
 export type NormalizeOutcome =
   | { kind: 'none'; why: string }
+  | { kind: 'translated' }
   | { kind: 'skipped'; reason: TextFailReason }
   | { kind: 'failed'; reason: TextFailReason }
   | {
       kind: 'deferred';
       untilMs: number;
-      why: 'busy' | 'runner_offline';
-      offlineAttempts?: number;
-      offlineSince?: number;
+      why: 'busy' | 'runner_offline' | 'deepl_retry';
+      data?: TextJobPatch;
     }
   | { kind: 'started'; runId: string };
+
+/** One DeepL attempt at a pending request (#324 D1, D2). */
+type DeepLAttempt =
+  | { ok: true; applied: boolean }
+  | { ok: false; error: DeepLError };
+
+/** How a result is applied: what it claims from, and what it records. */
+interface ApplyVia {
+  from: 'pending' | 'running';
+  engine?: 'deepl';
+  billedChars?: number;
+}
 
 const ACTIVE = ['pending', 'running'] as const;
 
@@ -92,6 +121,11 @@ const parseFields = (value: Prisma.JsonValue): TextField[] => {
  * `text_normalize`). One `text_normalizations` row per save keeps the
  * original (D7); a result is applied field by field, only where the column
  * still holds the text it was asked about (D8).
+ *
+ * With `DEEPL_API_KEY` set (issue #324, ADR-0033), DeepL translates inside
+ * the save, within `TEXT_DEEPL_TIMEOUT_MS`, so the save answers with English;
+ * a failure leaves the text as typed and the job tries DeepL again, then the
+ * runner.
  */
 @Injectable()
 export class TextNormalizer {
@@ -104,6 +138,7 @@ export class TextNormalizer {
     private readonly owners: TextOwners,
     private readonly live: LiveService,
     private readonly profiles: RuntimeProfileResolver,
+    private readonly deepl: DeepLClient,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
 
@@ -121,6 +156,9 @@ export class TextNormalizer {
    * owner's service after its write. Never fails the save: an error is
    * logged and the text stays as typed. Returns the request's id, or `null`
    * when nothing was requested.
+   *
+   * #324 D1: with DeepL on, it resolves once DeepL's answer is applied (or
+   * the attempt failed), so the owner's response, read after it, is English.
    */
   async request(
     projectId: string,
@@ -202,8 +240,84 @@ export class TextNormalizer {
         select: { id: true, status: true },
       });
     });
-    if (created?.status === 'pending') await this.queue.add(created.id);
+    if (created?.status === 'pending') {
+      if (this.deepl.enabled) await this.translateNow(created.id);
+      else await this.queue.add(created.id);
+    }
     return created?.id ?? null;
+  }
+
+  /**
+   * #324 D1, D2: DeepL inside the save. A failure leaves the text as typed
+   * and hands the request to the job: DeepL again, or straight to the runner
+   * when the quota is spent or the key rejected.
+   */
+  private async translateNow(id: string): Promise<void> {
+    const attempt = await this.translateWithDeepL(
+      id,
+      AbortSignal.timeout(TEXT_DEEPL_TIMEOUT_MS),
+    );
+    if (attempt.ok) return;
+    if (isDeepLFinal(attempt.error)) {
+      await this.queue.add(id, 0, { runnerOnly: true });
+    } else {
+      await this.queue.add(id, RUN_RETRY_DELAY_MS);
+    }
+  }
+
+  /**
+   * #324 D4–D7: one DeepL call for the request's fields, applied like a
+   * model's answer. With nothing left to translate (D6) no call is made, and
+   * a card's kind is still set by the rule.
+   */
+  private async translateWithDeepL(
+    id: string,
+    signal: AbortSignal,
+  ): Promise<DeepLAttempt> {
+    const row = await this.prisma.textNormalization.findUnique({
+      where: { id },
+    });
+    if (!row || row.status !== 'pending') return { ok: true, applied: false };
+    const prepared = prepareTextFields(
+      parseFields(row.fields)
+        .filter((f) => f.outcome === undefined)
+        .map((f) => ({ field: f.field, text: f.original })),
+    );
+    let translation: DeepLTranslation = { answers: [], billedChars: 0 };
+    if (prepared.length > 0) {
+      try {
+        translation = await this.deepl.translate(
+          prepared.map((f) => toDeepLXml(f.masked)),
+          signal,
+        );
+      } catch (error) {
+        const failure =
+          error instanceof DeepLFailure
+            ? error
+            : new DeepLFailure('unavailable', 'deepl: call failed');
+        await this.prisma.textNormalization.updateMany({
+          where: { id, status: 'pending' },
+          data: { error: failure.message.slice(0, TEXT_ERROR_MAX) },
+        });
+        this.logger.warn(`text ${id}: ${failure.message}`);
+        return { ok: false, error: failure.kind };
+      }
+    }
+    const applied = await this.apply(
+      row,
+      new Map(
+        resolveDeepLFields(prepared, translation.answers).map((r) => [r.id, r]),
+      ),
+      'rule',
+      prepared.length > 0
+        ? {
+            from: 'pending',
+            engine: 'deepl',
+            billedChars: translation.billedChars,
+          }
+        : { from: 'pending' },
+    );
+    return { ok: true, applied };
   }
 
   /** One `text-normalize` job (D4, D11). */
@@ -230,6 +344,31 @@ export class TextNormalizer {
 
     await this.giveUpStale(project.id, now);
 
+    // #324 D2: DeepL again, with the runs' retry delay; a spent quota, a
+    // rejected key or the last retry hands the request to the runner.
+    const leg: TextJobPatch = {};
+    if (this.deepl.enabled && !data.runnerOnly) {
+      const attempt = await this.translateWithDeepL(
+        row.id,
+        AbortSignal.timeout(TEXT_DEEPL_TIMEOUT_MS),
+      );
+      if (attempt.ok) {
+        return attempt.applied
+          ? { kind: 'translated' }
+          : { kind: 'none', why: 'not pending' };
+      }
+      const tried = (data.deeplAttempts ?? 0) + 1;
+      if (!isDeepLFinal(attempt.error) && tried < TEXT_RUN_RETRIES) {
+        return {
+          kind: 'deferred',
+          untilMs: now.getTime() + RUN_RETRY_DELAY_MS,
+          why: 'deepl_retry',
+          data: { deeplAttempts: tried },
+        };
+      }
+      leg.runnerOnly = true;
+    }
+
     const state = this.commands.state(project.runnerId);
     if (state === 'unsupported') {
       await this.end(row.id, 'failed', 'runner_unsupported');
@@ -253,8 +392,7 @@ export class TextNormalizer {
         kind: 'deferred',
         untilMs,
         why: 'runner_offline',
-        offlineAttempts: attempts + 1,
-        offlineSince: since,
+        data: { ...leg, offlineAttempts: attempts + 1, offlineSince: since },
       };
     }
 
@@ -276,17 +414,14 @@ export class TextNormalizer {
       return { kind: 'skipped', reason: 'budget_exceeded' };
     }
 
-    const toSend = parseFields(row.fields).filter(
-      (f) => f.outcome === undefined,
+    const toSend = prepareTextFields(
+      parseFields(row.fields)
+        .filter((f) => f.outcome === undefined)
+        .map((f) => ({ field: f.field, text: f.original })),
     );
     let prompt: string;
     try {
-      prompt = buildNormalizePrompt(
-        prepareTextFields(
-          toSend.map((f) => ({ field: f.field, text: f.original })),
-        ),
-        row.classifyKind,
-      );
+      prompt = buildNormalizePrompt(toSend, row.classifyKind);
     } catch (error) {
       await this.end(row.id, 'failed', 'run_failed', (error as Error).message);
       return { kind: 'failed', reason: 'run_failed' };
@@ -325,6 +460,9 @@ export class TextNormalizer {
             runId: run.id,
             sessionId,
             nextAttemptAt: null,
+            // #324 D8: what the runner was sent.
+            engine: 'runner',
+            billedChars: toSend.reduce((sum, f) => sum + f.masked.length, 0),
           },
         });
         if (count === 0) throw new Superseded();
@@ -340,6 +478,7 @@ export class TextNormalizer {
         kind: 'deferred',
         untilMs: now.getTime() + BUSY_RETRY_MS,
         why: 'busy',
+        data: leg,
       };
     }
     this.publishRun(project.id, runId, 'running');
@@ -420,6 +559,7 @@ export class TextNormalizer {
       row,
       resolvedById(prepared, parsed.output),
       parsed.output.kind,
+      { from: 'running' },
     );
   }
 
@@ -484,17 +624,22 @@ export class TextNormalizer {
     });
   }
 
-  /** D8, D9, D10: the result, field by field, under the owner's row lock. */
+  /**
+   * D8, D9, D10: the result, field by field, under the owner's row lock.
+   * `kind` is the model's answer, or `rule` (#324 D7): the English rule on
+   * the card's text as it now stands. Returns whether it was applied.
+   */
   private async apply(
     row: TextNormalization,
     resolved: ReadonlyMap<string, ResolvedTextField>,
-    kind: BoardCardKind | undefined,
-  ): Promise<void> {
+    kindOf: BoardCardKind | 'rule' | undefined,
+    via: ApplyVia,
+  ): Promise<boolean> {
     const owner = ownerOfRow(row);
     const now = new Date();
     const done = await this.prisma.$transaction(async (tx) => {
       const claimed = await tx.textNormalization.updateMany({
-        where: { id: row.id, status: 'running' },
+        where: { id: row.id, status: via.from },
         data: { status: 'done', finishedAt: now },
       });
       if (claimed.count === 0) return false;
@@ -524,6 +669,14 @@ export class TextNormalizer {
       });
       await writeOwnerText(tx, owner, writes);
       await this.owners.derive(tx, owner.ownerType, owner.ownerId, applied);
+      const textOf = (field: string) =>
+        writes.get(field) ?? current.get(field) ?? '';
+      const kind =
+        kindOf !== 'rule'
+          ? kindOf
+          : row.classifyKind && owner.ownerType === 'board_card'
+            ? classifyCardKindEnglish(textOf('title'), textOf('body'))
+            : undefined;
       if (kind !== undefined && row.classifyKind && row.cardId !== null) {
         // D9: never over a person's kind, nor once a Run fixed the branch.
         await tx.boardCard.updateMany({
@@ -536,6 +689,9 @@ export class TextNormalizer {
         data: {
           fields: textFieldsSchema.parse(fields),
           ...(kind !== undefined ? { kind } : {}),
+          ...(via.engine !== undefined
+            ? { engine: via.engine, billedChars: via.billedChars ?? null }
+            : {}),
         },
       });
       if (row.runId) {
@@ -548,9 +704,10 @@ export class TextNormalizer {
       }
       return true;
     });
-    if (!done) return;
+    if (!done) return false;
     if (row.runId) this.publishRun(row.projectId, row.runId, 'succeeded');
     await this.changed(row.projectId, owner);
+    return true;
   }
 
   /**
@@ -585,7 +742,8 @@ export class TextNormalizer {
     if (!ended) return;
     if (ended.runId) this.publishRun(ended.projectId, ended.runId, 'failed');
     if (ended.again) {
-      await this.queue.add(id, RUN_RETRY_DELAY_MS);
+      // #324 D2: a run's retry stays on the runner.
+      await this.queue.add(id, RUN_RETRY_DELAY_MS, { runnerOnly: true });
       return;
     }
     await this.changedById(id);

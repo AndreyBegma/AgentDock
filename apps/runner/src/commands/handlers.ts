@@ -5,8 +5,9 @@ import type {
   TerminalAttachResult,
   WatchedProject,
 } from '@agentdock/shared/protocol';
+import type { AssessHandlers } from '../assess';
 import type { CaptureHandlers } from '../capture';
-import { type CardHandlers, mergeCard } from '../cards';
+import { type CardHandlers, closeCardPr, mergeCard } from '../cards';
 import { type Clock, isoNow } from '../clock';
 import type { ConfigProfile } from '../config';
 import {
@@ -73,7 +74,13 @@ export interface HandlerContext {
   capture?: CaptureHandlers;
   /** Text normalization (#271); absent means this runner does not translate text. */
   normalize?: NormalizeHandlers;
+  /** Card model assessment (#322); absent means this runner does not assess cards. */
+  assess?: AssessHandlers;
 }
+
+const noAssess = (): never => {
+  throw new CommandFailure('unsupported', 'this runner does not assess cards');
+};
 
 const noNormalize = (): never => {
   throw new CommandFailure(
@@ -215,9 +222,18 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
             watchedProjects: context.watchedProjects,
           })
         : noCards(),
+    'card.prClose': (args) =>
+      context.cards
+        ? closeCardPr(args, {
+            exec: context.exec,
+            watchedProjects: context.watchedProjects,
+          })
+        : noCards(),
     'cards.extract': (args) =>
       context.capture?.['cards.extract'](args) ?? noCapture(),
     'text.normalize': (args) =>
       context.normalize?.['text.normalize'](args) ?? noNormalize(),
+    'card.assess': (args) =>
+      context.assess?.['card.assess'](args) ?? noAssess(),
   };
 };
