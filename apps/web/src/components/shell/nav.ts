@@ -3,6 +3,7 @@ import {
   Activity,
   BarChart3,
   CalendarClock,
+  ChartColumn,
   FolderGit2,
   GitMerge,
   History,
@@ -142,6 +143,17 @@ export const NAV: NavSection[] = [
     title: 'Project',
     projectScoped: true,
     entries: [
+      // The project's home (card C-6): its figures, then the orchestrator.
+      {
+        id: 'project-home',
+        wide: true,
+        href: '/projects/:projectId',
+        label: 'Project',
+        icon: ChartColumn,
+        minRole: 'viewer',
+        enabled: true,
+        exact: true,
+      },
       {
         id: 'fleet',
         wide: true,
@@ -360,12 +372,12 @@ export function visibleNav(role: Role, pathname: string): VisibleSection[] {
 
 /**
  * The phone's tab bar (#163): five places, the rest behind More. Outside a
- * project the workspace's five; inside one, the project's working pages —
- * Planner among them, the project's Activity behind More (#213).
+ * project the workspace's five; inside one, the project's home and its
+ * working pages — Planner and the project's Activity behind More (#213, C-6).
  */
 const TAB_IDS = {
   workspace: ['overview', 'projects', 'activity', 'sessions', 'usage'],
-  project: ['fleet', 'planner', 'board', 'queue', 'approvals'],
+  project: ['project-home', 'fleet', 'board', 'queue', 'approvals'],
 } as const;
 
 export interface TabBarSplit {
