@@ -1,6 +1,7 @@
 export * from './action-requests';
 export * from './activity';
 export * from './approvals';
+export * from './assess';
 export * from './attachments';
 export * from './audit';
 export * from './auth';
@@ -12,6 +13,7 @@ export * from './fleet';
 export * from './github-app';
 export * from './history';
 export * from './live';
+export * from './models';
 export * from './notifications';
 export * from './planner';
 export * from './projects';

@@ -1,4 +1,5 @@
 import {
+  type CardDesignLaunchRequest,
   DESIGN_COMMENT_KINDS,
   DESIGN_COMMENT_MAX,
   DESIGN_SELECTOR_MAX,
@@ -55,6 +56,31 @@ const SKILL_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/;
 const SKILL_MAX_LENGTH = 128;
 /** A pin's point, as the helper reports it (`mockupMessageSchema`). */
 const COORDINATE_MAX = 1_000_000;
+/** `orchestratorModelSchema`: never a flag. */
+const MODEL_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:[\]-]*$/;
+const MODEL_MAX_LENGTH = 100;
+/** `profileKeySchema`. */
+const PROFILE_KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+const PROFILE_KEY_MAX_LENGTH = 64;
+
+/**
+ * `POST …/board/cards/:number/design/generate` and `…/revise` (#322 D1).
+ * Both optional; the resolver refuses an unknown or non-Claude key (D9).
+ */
+export class CardDesignLaunchDto implements CardDesignLaunchRequest {
+  @IsOptional()
+  @IsString()
+  @MaxLength(PROFILE_KEY_MAX_LENGTH)
+  @Matches(PROFILE_KEY_PATTERN, { message: 'profileKey must be a profile id' })
+  profileKey?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(MODEL_MAX_LENGTH)
+  @Matches(MODEL_PATTERN, { message: 'model is not a model name' })
+  model?: string;
+}
 
 /** `PATCH …/tasks/:key/design`. */
 export class TaskDesignPatchDto implements TaskDesignPatchRequest {

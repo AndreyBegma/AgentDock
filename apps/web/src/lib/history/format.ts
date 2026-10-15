@@ -48,6 +48,7 @@ export const RUN_KIND_LABEL: Record<RunKind, string> = {
   card: 'Board card round',
   card_capture: 'Card capture',
   text_normalize: 'Text translation',
+  card_assess: 'Card model assessment',
 };
 
 export const isRunKind = (value: string): value is RunKind =>
