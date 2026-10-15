@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { cardLabel, DESIGN_ERROR, PLANNER_ERROR } from '@agentdock/shared';
 import {
-  ORCHESTRATOR_DEFAULTS,
+  type CardDesignLaunchRequest,
+  cardLabel,
+  cardRecommendationOf,
+  DESIGN_ERROR,
+  PLANNER_ERROR,
+} from '@agentdock/shared';
+import {
   PLAN_TURN_DEFAULT_TIMEOUT_SEC,
   type PlanTurnArgs,
   type PlanTurnSession,
@@ -11,12 +16,14 @@ import { Injectable, Logger, Optional } from '@nestjs/common';
 import type { BoardCard, Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { SYSTEM_ACTOR, systemActorFor } from '../audit/audit.types';
+import { defaultCardModel, rememberedChoice } from '../board/launch-choice';
 import { BudgetGate } from '../budgets/budget-gate';
 import { PrismaService } from '../database/prisma.service';
 import { designError } from '../design/design-error';
 import { cardDesignPrompt } from '../design/design-prompt';
 import type { DesignTurnPlan } from '../design/design-rules';
 import { cardDesignTaskKey, loadDesignPrompt } from '../design/design-store';
+import { type NoProfileFailure, RuntimeProfileResolver } from '../readiness';
 import { PlanStore } from './plan-store';
 import type { PlanCaller } from './plan-turn.service';
 import {
@@ -28,6 +35,9 @@ import { PlannerFailure, plannerError } from './planner-error';
 import { PlannerInstructionsService } from './planner-instructions.service';
 
 const ACTIVE = ['queued', 'running'] as const;
+
+const noProfile: NoProfileFailure = (details, message) =>
+  designError(422, DESIGN_ERROR.noProfile, message, details);
 
 /** A turn whose session exists on the runner: it produced output, or succeeded. */
 const sessionStarted: Prisma.PlanTurnWhereInput = {
@@ -52,6 +62,7 @@ export class CardDesignTurnService {
     private readonly store: PlanStore,
     private readonly commands: PlannerCommands,
     private readonly instructions: PlannerInstructionsService,
+    private readonly profiles: RuntimeProfileResolver,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
 
@@ -62,11 +73,25 @@ export class CardDesignTurnService {
     caller: PlanCaller,
   ): Promise<string> {
     const project = await this.store.project(card.projectId);
+    // #322 D2: what the card remembers and recommends, as it is now — a
+    // launch may have just stored it.
+    const choice = await this.prisma.boardCard.findUniqueOrThrow({
+      where: { id: card.id },
+      select: {
+        profileKey: true,
+        designModel: true,
+        recommendedModel: true,
+        recommendedReason: true,
+        recommendedDesignModel: true,
+        recommendedDesignReason: true,
+        assessedAt: true,
+      },
+    });
+    // The card's profile, shared with its work; else #272 D1.
     const profile = await this.store.profile(
       project,
-      undefined,
-      (details, message) =>
-        designError(422, DESIGN_ERROR.noProfile, message, details),
+      choice.profileKey ?? undefined,
+      noProfile,
     );
     this.commands.assertReady(project.runnerId, 'plan.turn');
     await this.budgets?.assertAllowed({
@@ -99,7 +124,13 @@ export class CardDesignTurnService {
       taskKey: cardDesignTaskKey(card.number),
       design: context,
     });
-    const model = card.model ?? settings?.model ?? ORCHESTRATOR_DEFAULTS.model;
+    // #322 D2: the card's design model, else the design recommendation.
+    const model =
+      choice.designModel ??
+      defaultCardModel(
+        cardRecommendationOf(choice).design?.model,
+        settings?.model,
+      );
     const draft = {
       planId: card.id,
       projectId: card.projectId,
@@ -205,6 +236,45 @@ export class CardDesignTurnService {
       }
       throw error;
     }
+  }
+
+  /**
+   * #322 D3, D9: a design launch's profile and model, stored on the card —
+   * `profileKey` shared with its work, `designModel` — only when they differ
+   * from the default. A key that is not a Claude profile of the project's
+   * runner is 422 `no_profile`, before anything is stored.
+   */
+  async rememberLaunch(
+    card: BoardCard,
+    launch: CardDesignLaunchRequest,
+  ): Promise<void> {
+    if (launch.profileKey === undefined && launch.model === undefined) return;
+    const project = await this.store.project(card.projectId);
+    let defaultKey: string | null = null;
+    if (launch.profileKey !== undefined) {
+      await this.store.profile(project, launch.profileKey, noProfile);
+      const pick = await this.profiles.resolve(project);
+      defaultKey = pick.ok ? pick.profile.key : null;
+    }
+    const settings = await this.prisma.projectOrchestratorSettings.findUnique({
+      where: { projectId: card.projectId },
+      select: { model: true },
+    });
+    const profileKey = rememberedChoice(launch.profileKey, defaultKey);
+    const designModel = rememberedChoice(
+      launch.model,
+      defaultCardModel(
+        cardRecommendationOf(card).design?.model,
+        settings?.model,
+      ),
+    );
+    await this.prisma.boardCard.update({
+      where: { id: card.id },
+      data: {
+        ...(profileKey !== undefined ? { profileKey } : {}),
+        ...(designModel !== undefined ? { designModel } : {}),
+      },
+    });
   }
 
   /**

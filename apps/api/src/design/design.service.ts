@@ -1,6 +1,7 @@
 import {
   type CardAutoRun,
   type CardAutoRunFailure,
+  type CardDesignLaunchRequest,
   DESIGN_COMMENTS_PER_TURN_MAX,
   DESIGN_ERROR,
   type DesignCommentRequest,
@@ -12,6 +13,7 @@ import {
 import { RUNNER_FEATURE_COMMANDS } from '@agentdock/shared/protocol';
 import { HttpException, Injectable, type OnModuleInit } from '@nestjs/common';
 import type { BoardCard, Plan, PlanTask, TaskDesign } from '@prisma/client';
+import { CardAssessor } from '../assess/card-assessor';
 import { AuditService } from '../audit/audit.service';
 import { cardNotFound } from '../board/board-error';
 import { BoardRoundsService } from '../board/board-rounds.service';
@@ -106,6 +108,7 @@ export class DesignService implements OnModuleInit {
     private readonly commands: DesignCommands,
     private readonly text: TextNormalizer,
     private readonly textOwners: TextOwners,
+    private readonly assessor: CardAssessor,
   ) {}
 
   /** #271: a comment's English body lands as its design's live event. */
@@ -230,16 +233,40 @@ export class DesignService implements OnModuleInit {
     projectId: string,
     number: number,
     actor: PlanActor,
+    launch: CardDesignLaunchRequest = {},
   ): Promise<void> {
-    await this.generateOf(await this.cardOwner(projectId, number), actor);
+    const owner = await this.cardOwner(projectId, number);
+    await this.rememberLaunch(owner, projectId, number, launch);
+    await this.generateOf(owner, actor);
   }
 
   async cardRevise(
     projectId: string,
     number: number,
     actor: PlanActor,
+    launch: CardDesignLaunchRequest = {},
   ): Promise<void> {
-    await this.reviseOf(await this.cardOwner(projectId, number), actor);
+    const owner = await this.cardOwner(projectId, number);
+    await this.rememberLaunch(owner, projectId, number, launch);
+    await this.reviseOf(owner, actor);
+  }
+
+  /**
+   * #322 D3: the launch popover's choice, stored once the design takes a
+   * Generate or a Revise, so the batch's chained turns read it too.
+   */
+  private async rememberLaunch(
+    owner: DesignOwner,
+    projectId: string,
+    number: number,
+    launch: CardDesignLaunchRequest,
+  ): Promise<void> {
+    await this.drawable(owner);
+    await owner.assertIdle();
+    await this.cardTurns.rememberLaunch(
+      await this.card(projectId, number),
+      launch,
+    );
   }
 
   async cardComment(
@@ -785,6 +812,8 @@ export class DesignService implements OnModuleInit {
       runTurn: (batch, caller) => this.cardTurns.start(card, batch, caller),
       onApproved: async (_design, actor) => {
         await this.cardTurns.close(card, actor);
+        // #322 D6: an approved design is in the card's assessed input.
+        await this.assessor.request(card.id);
         const fresh = await this.prisma.boardCard.findUnique({
           where: { id: card.id },
           select: { continueAfterDesign: true },

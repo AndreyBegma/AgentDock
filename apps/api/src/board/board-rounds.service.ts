@@ -14,6 +14,7 @@ import {
   cardIssueBody,
   cardLabel,
   cardNextRoundPrompt,
+  cardRecommendationOf,
   cardSpecPath,
   cardWorkerPrompt,
   isActiveRoundPhase,
@@ -53,9 +54,11 @@ import {
   ACTIVE_PHASES,
   BOARD_SYSTEM_ACTOR,
   type BoardActor,
+  type BoardProject,
   BoardWork,
 } from './board-work';
 import type { CardFeedbackDto, RunBoardCardDto } from './dto';
+import { defaultCardModel, rememberedChoice } from './launch-choice';
 
 type Tx = Prisma.TransactionClient;
 
@@ -204,10 +207,11 @@ export class BoardRoundsService {
       where: { projectId: project.id },
       select: { model: true, permissionMode: true },
     });
-    // #272 D1: the orchestrator's profile, else the project default.
+    // #322 D2, D9: the launch's profile, else the card's; else #272 D1 — the
+    // orchestrator's profile, else the project default.
     const profile = await this.profiles.require(
       project,
-      {},
+      { key: dto.profileKey ?? card.profileKey },
       (details, message) =>
         boardError(422, BOARD_ERROR.noProfile, message, details),
     );
@@ -220,8 +224,22 @@ export class BoardRoundsService {
         '`bypassPermissions` needs the admin role on the project',
       );
     }
-    const model =
-      dto.model ?? card.model ?? settings?.model ?? ORCHESTRATOR_DEFAULTS.model;
+    // #322 D2: the launch's model, else the card's, else the recommendation.
+    const defaultModel = defaultCardModel(
+      cardRecommendationOf(card).work?.model,
+      settings?.model,
+    );
+    const model = dto.model ?? card.model ?? defaultModel;
+    // #322 D3: a choice is remembered only when it differs from the default.
+    const remembered = {
+      model: rememberedChoice(dto.model, defaultModel),
+      profileKey: rememberedChoice(
+        dto.profileKey,
+        dto.profileKey === undefined
+          ? null
+          : await this.defaultProfileKey(project),
+      ),
+    };
 
     // A session is resumed once Claude has run in it (D5); a round 1 that
     // never started is started again.
@@ -431,7 +449,12 @@ export class BoardRoundsService {
           sessionId,
           branch,
           specPath,
-          ...(dto.model !== undefined ? { model: dto.model } : {}),
+          ...(remembered.model !== undefined
+            ? { model: remembered.model }
+            : {}),
+          ...(remembered.profileKey !== undefined
+            ? { profileKey: remembered.profileKey }
+            : {}),
           // #273 D9: a round started; an earlier auto-run failure is history.
           autoRunError: null,
           autoRunMessage: null,
@@ -586,6 +609,14 @@ export class BoardRoundsService {
       select: { body: true },
     });
     return { ...approved, comments: comments.map((c) => c.body) };
+  }
+
+  /** #322 D3: the profile #272 D1 picks without a card or launch key. */
+  private async defaultProfileKey(
+    project: BoardProject,
+  ): Promise<string | null> {
+    const pick = await this.profiles.resolve(project);
+    return pick.ok ? pick.profile.key : null;
   }
 
   /** Serializes round starts of one project, so `maxRunning` holds. */
