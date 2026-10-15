@@ -42,15 +42,24 @@ export type BoardMoveEffect =
  *   event cannot pull back a card the person accepted;
  * - `invalid_move` — into or out of Inbox other than a person's Inbox → To Do
  *   (#244 D9): a suggestion enters To Do only by Accept, and nothing else
- *   enters the Inbox.
+ *   enters the Inbox;
+ * - `plan_task_derived` — the item is a plan task projected onto the board
+ *   (#270 D5, ADR-0028): its column follows its plan and its issue, so no
+ *   move, reorder or column change of it is ever allowed.
  */
 export type BoardMoveRefusal =
   | 'card_running'
   | 'automatic_to_completed'
   | 'card_completed'
-  | 'invalid_move';
+  | 'invalid_move'
+  | 'plan_task_derived';
+
+/** #270 D5: what is being moved. A plan task is on the board read-only. */
+export type BoardMoveItem = 'card' | 'plan_task';
 
 export interface BoardMoveInput {
+  /** Default `card`. */
+  item?: BoardMoveItem;
   from: BoardColumn;
   to: BoardColumn;
   /** The phase of the card's latest round; `null` before its first Run. */
@@ -79,6 +88,7 @@ const refuse = (error: BoardMoveRefusal): BoardMoveDecision => ({
 
 export const boardMoveRule = (move: BoardMoveInput): BoardMoveDecision => {
   const { from, to, roundPhase, source } = move;
+  if (move.item === 'plan_task') return refuse('plan_task_derived');
   if (source === 'automatic' && to === 'completed') {
     return refuse('automatic_to_completed');
   }
