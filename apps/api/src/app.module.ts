@@ -3,7 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ActivityModule } from './activity';
 import { AdminModule } from './admin/admin.module';
 import { ApprovalsModule } from './approvals';
-import { AttachmentsModule } from './attachments';
+import { AttachmentsModule } from './attachments/attachments.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { BoardModule } from './board';
@@ -79,14 +79,15 @@ import { WorkflowsModule } from './workflows';
     DesignModule,
     // Issue #242: the project Board and its card workers.
     BoardModule,
-    // Issue #309: attachments on board cards, delivered to the card worker.
-    AttachmentsModule,
     // Issue #244: candidate cards from manual sessions, into the Inbox.
     CaptureModule,
     // Issue #270: one Work surface — the List and the Board's plan tasks.
     WorkModule,
     // Issue #271: saved text normalized to English on the runner.
     TextModule,
+    // Issue #309: attachments on board cards. Global, and `forRoot()` here:
+    // its conditional queue must not be registered while the graph loads.
+    AttachmentsModule.forRoot(),
     SchedulesModule,
     BudgetsModule,
     // Before WebhooksModule: its `POST /hooks/:publicId` would otherwise
