@@ -8,6 +8,18 @@ export type Runtime = z.infer<typeof runtimeSchema>;
 const portSchema = z.number().int().min(1).max(65_535);
 
 /**
+ * The agentdock plugin in a Claude profile (#281 D1). `plugin` is the installed
+ * version of `agentdock@*` from `installed_plugins.json`, user scope first, or
+ * null; `telemetry` is whether `settings.json` → `env.OTEL_EXPORTER_OTLP_ENDPOINT`
+ * points at this runner's OTLP http port.
+ */
+export const profileAgentdockSchema = z.object({
+  plugin: z.string().min(1).nullable(),
+  telemetry: z.boolean(),
+});
+export type ProfileAgentdock = z.infer<typeof profileAgentdockSchema>;
+
+/**
  * A runtime profile: runtime + binary + environment + extra args (ADR-0006).
  * Defined in the runner config; the server mirrors it, never edits it.
  */
@@ -19,6 +31,11 @@ export const runtimeProfileSchema = z.object({
   env: z.record(z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/), z.string()),
   args: z.array(z.string()),
   authenticated: z.boolean(),
+  /**
+   * Claude profiles only (#281 D1). Absent means unknown — a runner older than
+   * the field, or a Codex profile — never "not installed".
+   */
+  agentdock: profileAgentdockSchema.optional(),
 });
 export type RuntimeProfile = z.infer<typeof runtimeProfileSchema>;
 

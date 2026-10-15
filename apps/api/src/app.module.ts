@@ -31,6 +31,7 @@ import { SessionsModule } from './sessions/sessions.module';
 import { SkillsModule } from './skills';
 import { TelegramModule } from './telegram';
 import { TerminalModule } from './terminal';
+import { TerminalSetupModule } from './terminal-setup';
 import { TextModule } from './text';
 import { UsageModule } from './usage/usage.module';
 import { WebhooksModule } from './webhooks';
@@ -66,6 +67,8 @@ import { WorkflowsModule } from './workflows';
     LocalModule,
     TelegramModule,
     TerminalModule,
+    // Issue #281: the Terminal → Board setup checklist.
+    TerminalSetupModule,
     SkillsModule,
     PlannerModule,
     // Issue #272: the one runtime-profile rule and project readiness.

@@ -1,18 +1,32 @@
 'use client';
 
+import { textAnswerField } from '@agentdock/shared';
 import { formatDate } from '../../lib/format';
 import {
   answerText,
   type PastRound as Round,
   tookRecommendation,
 } from '../../lib/planner/rounds';
+import type { TextNotes } from '../../lib/text/use-text-notes';
+import { NormalizedNote } from '../text/normalized-note';
 import { AnsweredQuestionCard } from './question-card';
 
 /**
  * An earlier round of question cards, read-only (#184): what the planner
  * asked and what came back. Only the open round below it is interactive.
  */
-export function PastRound({ round, number }: { round: Round; number: number }) {
+export function PastRound({
+  round,
+  number,
+  notes,
+  canOperate,
+}: {
+  round: Round;
+  number: number;
+  /** The answers' translation notes (#271). */
+  notes: TextNotes;
+  canOperate: boolean;
+}) {
   const { answeredBy } = round;
   const headingId = `round-${round.openedBy.id}-${number}`;
   return (
@@ -41,15 +55,27 @@ export function PastRound({ round, number }: { round: Round; number: number }) {
       {round.questions.map((q, i) => {
         const answer = round.answers[q.id];
         return (
-          <AnsweredQuestionCard
-            key={q.id}
-            question={q}
-            index={i + 1}
-            idPrefix={headingId}
-            answer={answerText(q, answer)}
-            recommended={tookRecommendation(q, answer)}
-            answered={answeredBy !== null}
-          />
+          <div key={q.id} className="flex min-w-0 flex-col gap-1">
+            <AnsweredQuestionCard
+              question={q}
+              index={i + 1}
+              idPrefix={headingId}
+              answer={answerText(q, answer)}
+              recommended={tookRecommendation(q, answer)}
+              answered={answeredBy !== null}
+            />
+            {answeredBy ? (
+              <NormalizedNote
+                view={notes.view(
+                  'plan_turn',
+                  answeredBy.id,
+                  textAnswerField(q.id),
+                )}
+                canOperate={canOperate}
+                onRetry={notes.retry}
+              />
+            ) : null}
+          </div>
         );
       })}
     </section>

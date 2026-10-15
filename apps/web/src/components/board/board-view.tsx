@@ -7,6 +7,7 @@ import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { MenuItem, MenuSeparator } from '@andrewbehma/glass-ui/menu';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import { useRouter } from 'next/navigation';
 import { type CSSProperties, useState } from 'react';
 import { moveCard, runCard } from '../../lib/board/actions';
 import {
@@ -17,6 +18,7 @@ import {
   moveRequest,
 } from '../../lib/board/board-state';
 import {
+  approveRunOffer,
   type BoardItem,
   COLUMN_HINT,
   COLUMN_TITLE,
@@ -31,6 +33,7 @@ import {
   isSuggestion,
   toItem,
 } from '../../lib/board/format';
+import { cardDesignHref } from '../../lib/design/href';
 import { boardColumnWidth, usePhone, visibleColumns } from './board-layout';
 import { CardFace } from './card-face';
 import type { CardActions } from './use-card-actions';
@@ -64,6 +67,7 @@ export function BoardColumns({
   onOpenTerminal: (card: BoardCardView) => void;
   onReload: () => void;
 }) {
+  const router = useRouter();
   // The drop shown before the server answers.
   const [optimistic, setOptimistic] = useState<BoardView>();
   const [asking, setAsking] = useState<Asking>();
@@ -167,7 +171,14 @@ export function BoardColumns({
           aria-label="Project board"
           columns={columns}
           onMove={onMove}
-          renderCard={(item) => <CardFace card={item.card} onOpen={onOpen} />}
+          renderCard={(item) => (
+            <CardFace
+              projectId={projectId}
+              card={item.card}
+              canOperate={canOperate}
+              onOpen={onOpen}
+            />
+          )}
           renderCardMenu={(item) => {
             const card = item.card;
             if (isSuggestion(card)) {
@@ -208,6 +219,16 @@ export function BoardColumns({
                     onSelect={() => actions.run(card)}
                   >
                     {canRetry(card) ? 'Run again' : 'Run'}
+                  </MenuItem>
+                ) : null}
+                {canOperate && approveRunOffer(card) ? (
+                  <MenuItem
+                    disabled={!approveRunOffer(card)?.enabled}
+                    onSelect={() =>
+                      router.push(cardDesignHref(projectId, card.number))
+                    }
+                  >
+                    Approve & run
                   </MenuItem>
                 ) : null}
                 {canOperate && canMarkFinished(card) ? (

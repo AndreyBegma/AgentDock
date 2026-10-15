@@ -16,7 +16,9 @@ import {
 } from '../../lib/planner/format';
 import { briefBeyondTitle } from '../../lib/planner/header';
 import { plannerHref } from '../../lib/planner/href';
+import { useTextNotes } from '../../lib/text/use-text-notes';
 import { PageHeader } from '../page-header/page-header';
+import { NormalizedNote } from '../text/normalized-note';
 
 export function VisibilityChip({
   plan,
@@ -77,6 +79,8 @@ export function PlanHeader({
   const closed = plan.status === 'sent' || plan.status === 'archived';
   const pill = planPill(plan);
   const description = briefBeyondTitle(plan);
+  const notes = useTextNotes(projectId, { planId: plan.id }, plan.version);
+  const briefNote = notes.view('plan', plan.id, 'brief');
 
   return (
     <PageHeader
@@ -107,10 +111,19 @@ export function PlanHeader({
         </>
       }
       description={
-        description ? (
-          <span className="line-clamp-2 whitespace-pre-line">
-            {description}
-          </span>
+        description || briefNote ? (
+          <>
+            {description ? (
+              <span className="line-clamp-2 whitespace-pre-line">
+                {description}
+              </span>
+            ) : null}
+            <NormalizedNote
+              view={briefNote}
+              canOperate={canWrite}
+              onRetry={notes.retry}
+            />
+          </>
         ) : undefined
       }
       actions={

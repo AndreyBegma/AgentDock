@@ -1,7 +1,10 @@
 import { describe, expect, test } from 'bun:test';
+import type { BoardCardView, TaskDesignStatus } from '@agentdock/shared';
 import { ApiError } from '../api';
 import { boardView, card, round } from './fixtures';
 import {
+  approveRunOffer,
+  autoRunReason,
   canAccept,
   canGiveFeedback,
   canMarkFinished,
@@ -11,6 +14,7 @@ import {
   cardByNumber,
   columnsOf,
   describeBoardError,
+  designBlocksRun,
   parseCardParam,
   parseMaxRunning,
   roundPill,
@@ -60,6 +64,134 @@ describe('what a card offers', () => {
     expect(canAccept(c)).toBe(true);
     expect(canGiveFeedback(c)).toBe(true);
     expect(canRun(c)).toBe(true);
+  });
+});
+
+const withDesign = (
+  status: TaskDesignStatus,
+  needed = true,
+): BoardCardView['design'] => ({
+  needed,
+  suggested: false,
+  suggestionWhy: null,
+  variantCount: 1,
+  status,
+  approvedRevisionId: status === 'approved' ? 'rev-1' : null,
+  busySince: null,
+});
+
+describe('the design gate (#273 D7)', () => {
+  const unapproved: TaskDesignStatus[] = [
+    'idle',
+    'generating',
+    'reviewing',
+    'revising',
+  ];
+
+  test('a needed design in any status but approved blocks Run and Run again', () => {
+    for (const status of unapproved) {
+      const todo = card(1, 'todo', { design: withDesign(status) });
+      const failed = card(2, 'in_progress', {
+        design: withDesign(status),
+        round: round('failed'),
+      });
+      expect(designBlocksRun(todo)).toBe(true);
+      expect(canRun(todo)).toBe(false);
+      expect(canRetry(failed)).toBe(false);
+    }
+  });
+
+  test('an approved design, a design that is off, or none does not block', () => {
+    expect(canRun(card(1, 'todo', { design: withDesign('approved') }))).toBe(
+      true,
+    );
+    expect(canRun(card(1, 'todo', { design: withDesign('idle', false) }))).toBe(
+      true,
+    );
+    expect(canRun(card(1, 'todo'))).toBe(true);
+    expect(
+      canRetry(
+        card(1, 'in_progress', {
+          design: withDesign('approved'),
+          round: round('failed'),
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  test('Approve & run is offered in Run’s place, enabled only in review', () => {
+    expect(
+      approveRunOffer(card(1, 'todo', { design: withDesign('reviewing') })),
+    ).toEqual({ enabled: true, reason: null });
+    for (const status of ['idle', 'generating', 'revising'] as const) {
+      expect(
+        approveRunOffer(card(1, 'todo', { design: withDesign(status) })),
+      ).toEqual({ enabled: false, reason: 'The design is being drawn' });
+    }
+    expect(approveRunOffer(card(1, 'todo'))).toBeNull();
+    expect(
+      approveRunOffer(card(1, 'todo', { design: withDesign('approved') })),
+    ).toBeNull();
+  });
+
+  test('no offer where Run would not be there anyway', () => {
+    expect(
+      approveRunOffer(
+        card(1, 'in_progress', {
+          design: withDesign('reviewing'),
+          round: round('running'),
+        }),
+      ),
+    ).toBeNull();
+    expect(
+      approveRunOffer(
+        card(1, 'completed', { design: withDesign('reviewing') }),
+      ),
+    ).toBeNull();
+  });
+});
+
+describe('merge and auto-run copy (#273)', () => {
+  const refused = (reason: string, message = 'x') =>
+    new ApiError(409, 'merge_failed' as never, message, undefined, {
+      error: 'merge_failed',
+      reason,
+      message,
+    });
+
+  test('each merge refusal has its own sentence', () => {
+    expect(describeBoardError(refused('head_changed'))).toMatch(
+      /branch changed/,
+    );
+    expect(describeBoardError(refused('not_mergeable'))).toMatch(
+      /checks or branch protection/,
+    );
+    expect(describeBoardError(refused('closed'))).toMatch(/closed/);
+    expect(describeBoardError(refused('gh_failed', 'boom'))).toBe(
+      'gh failed: boom',
+    );
+  });
+
+  test('no_pull_request says so', () => {
+    const err = new ApiError(409, 'no_pull_request' as never, 'x');
+    expect(describeBoardError(err)).toMatch(/no pull request/);
+  });
+
+  test('the auto-run failure reads like the same refusal on Run, without the full stop', () => {
+    expect(
+      autoRunReason({
+        code: 'max_running',
+        message: 'x',
+        at: '2026-10-15T10:00:00.000Z',
+      }),
+    ).toMatch(/limit of workers[^.]*\.[^.]*$/);
+    expect(
+      autoRunReason({
+        code: 'unknown',
+        message: 'Runner exploded.',
+        at: '2026-10-15T10:00:00.000Z',
+      }),
+    ).toBe('Runner exploded');
   });
 });
 

@@ -2,25 +2,18 @@
 
 import {
   BOARD_CARD_BODY_MAX,
-  BOARD_CARD_KINDS,
   BOARD_CARD_TITLE_MAX,
-  type BoardCardKind,
   type BoardSettingsView,
   type CreateBoardCardRequest,
 } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
-import { Field, Input, Select, Textarea } from '@andrewbehma/glass-ui/field';
+import { Field, Input, Textarea } from '@andrewbehma/glass-ui/field';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { useEffect, useState } from 'react';
 import { createCard } from '../../lib/board/actions';
 import { describeBoardError } from '../../lib/board/format';
 import { CardOptionToggles } from './card-options';
-
-const KIND_LABEL: Record<BoardCardKind, string> = {
-  feature: 'Feature',
-  bug: 'Bug',
-};
 
 export function NewCardDialog({
   projectId,
@@ -38,7 +31,6 @@ export function NewCardDialog({
 }) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [kind, setKind] = useState<BoardCardKind>('feature');
   const [issueOnRun, setIssueOnRun] = useState(false);
   const [specOnRun, setSpecOnRun] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -58,7 +50,6 @@ export function NewCardDialog({
     const request: CreateBoardCardRequest = {
       title: title.trim(),
       body,
-      kind,
       issueOnRun,
       specOnRun,
     };
@@ -67,7 +58,6 @@ export function NewCardDialog({
       toast.success(`${card.label} created.`);
       setTitle('');
       setBody('');
-      setKind('feature');
       onOpenChange(false);
       onCreated(card.number);
     } catch (err) {
@@ -120,7 +110,7 @@ export function NewCardDialog({
           <Field
             label="What to do"
             htmlFor="board-new-body"
-            hint="Markdown. The worker reads this as its task."
+            hint="Markdown. The worker reads this as its task. Any language: it is stored in English, and the kind is set automatically."
           >
             <Textarea
               id="board-new-body"
@@ -129,23 +119,6 @@ export function NewCardDialog({
               maxLength={BOARD_CARD_BODY_MAX}
               onChange={(e) => setBody(e.target.value)}
             />
-          </Field>
-          <Field label="Kind" htmlFor="board-new-kind">
-            <Select
-              id="board-new-kind"
-              value={kind}
-              onChange={(e) =>
-                setKind(
-                  BOARD_CARD_KINDS.find((k) => k === e.target.value) ?? kind,
-                )
-              }
-            >
-              {BOARD_CARD_KINDS.map((k) => (
-                <option key={k} value={k}>
-                  {KIND_LABEL[k]}
-                </option>
-              ))}
-            </Select>
           </Field>
           <CardOptionToggles
             projectId={projectId}

@@ -5,6 +5,8 @@ import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import NextLink from 'next/link';
 import {
+  approveRunOffer,
+  autoRunReason,
   confidenceLabel,
   hooksHint,
   isSuggestion,
@@ -13,16 +15,21 @@ import {
 } from '../../lib/board/format';
 import { formatCost } from '../../lib/format';
 import { safeHttpsUrl } from '../../lib/queue/format';
-import { CardFaceDesign } from './card-design';
+import { ApproveRunLink, CardFaceDesign } from './card-design';
 
 /** What a card shows on the board: label, title, kind, round state, PR and issue, cost. */
 export function CardFace({
+  projectId,
   card,
+  canOperate,
   onOpen,
 }: {
+  projectId: string;
   card: BoardCardView;
+  canOperate: boolean;
   onOpen: (card: BoardCardView) => void;
 }) {
+  const offer = approveRunOffer(card);
   const pill = roundPill(card.round);
   const cost = formatCost(card.costUsd);
   const prHref = card.prUrl ? safeHttpsUrl(card.prUrl) : null;
@@ -46,6 +53,29 @@ export function CardFace({
         {card.title}
       </button>
       <CardFaceDesign card={card} />
+      {card.autoRunFailure ? (
+        <div>
+          <Tooltip content={autoRunReason(card.autoRunFailure)}>
+            <span>
+              <Badge tone="warn" size="md" label="Didn’t start" />
+            </span>
+          </Tooltip>
+        </div>
+      ) : null}
+      {offer && canOperate ? (
+        <div>
+          <ApproveRunLink
+            projectId={projectId}
+            card={card}
+            offer={offer}
+            variant="glass"
+            size="sm"
+          />
+          {offer.reason ? (
+            <p className="mt-1 text-xs text-ink-3">{offer.reason}</p>
+          ) : null}
+        </div>
+      ) : null}
       {isSuggestion(card) ? <SuggestionFace card={card} /> : null}
       {pill || card.round?.hooksMissing ? (
         <div className="flex flex-wrap items-center gap-1.5">

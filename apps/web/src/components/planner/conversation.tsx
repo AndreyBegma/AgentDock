@@ -9,6 +9,8 @@ import { formatDate, pluralize } from '../../lib/format';
 import { roundKey } from '../../lib/planner/answers';
 import { isActiveTurn, turnBody } from '../../lib/planner/format';
 import type { PastRound as PastRoundData } from '../../lib/planner/rounds';
+import { useTextNotes } from '../../lib/text/use-text-notes';
+import { NormalizedNote } from '../text/normalized-note';
 import { FailedTurn } from './failed-turn';
 import { PastRound } from './past-round';
 import { QuestionRound } from './question-round';
@@ -69,6 +71,12 @@ export function Conversation({
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const earlier = turns.filter((t) => !isActiveTurn(t) && t.id !== failed?.id);
+  const planId = turns[0]?.planId ?? active?.planId ?? failed?.planId;
+  const notes = useTextNotes(
+    projectId,
+    planId === undefined ? null : { planId },
+    turns.length,
+  );
 
   const send = async (text: string) => {
     const message = text.trim();
@@ -101,9 +109,16 @@ export function Conversation({
               body: turnBody(t),
             }))}
             renderBody={(m) => (
-              <p className="text-sm whitespace-pre-line break-words">
-                {m.body}
-              </p>
+              <>
+                <p className="text-sm whitespace-pre-line break-words">
+                  {m.body}
+                </p>
+                <NormalizedNote
+                  view={notes.view('plan_turn', m.id, 'message')}
+                  canOperate={canWrite}
+                  onRetry={notes.retry}
+                />
+              </>
             )}
           />
         </Disclosure>
@@ -111,7 +126,13 @@ export function Conversation({
 
       {/* A turn opens at most one round per scope, so it keys the round. */}
       {rounds.map((round, i) => (
-        <PastRound key={round.openedBy.id} round={round} number={i + 1} />
+        <PastRound
+          key={round.openedBy.id}
+          round={round}
+          number={i + 1}
+          notes={notes}
+          canOperate={canWrite}
+        />
       ))}
 
       {active ? (

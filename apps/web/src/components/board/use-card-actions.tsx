@@ -4,6 +4,7 @@ import type { AcceptSuggestionRequest, BoardCardView } from '@agentdock/shared';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { type ReactNode, useCallback, useState } from 'react';
+import { acceptedMessage } from '../../lib/board/accept';
 import {
   acceptCard,
   acceptSuggestion,
@@ -15,6 +16,7 @@ import {
   stopCard,
 } from '../../lib/board/actions';
 import { describeBoardError } from '../../lib/board/format';
+import { AcceptDialog } from './accept-dialog';
 
 /** The card's own buttons, shared by the board's menu and the card sheet. */
 export interface CardActions {
@@ -56,6 +58,8 @@ export function useCardActions({
 }): CardActions {
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<Pending>();
+  const [accepting, setAccepting] = useState<BoardCardView>();
+  const [acceptVersion, setAcceptVersion] = useState(0);
 
   const perform = useCallback(
     async (job: () => Promise<unknown>, done: string): Promise<boolean> => {
@@ -74,6 +78,29 @@ export function useCardActions({
     },
     [runnerName, onChanged],
   );
+
+  // #273 D10: Accept asks first; `headSha` also merges the pull request.
+  const accept = async (card: BoardCardView, headSha?: string) => {
+    setBusy(true);
+    try {
+      const done = await acceptCard(
+        projectId,
+        card.number,
+        headSha ? { merge: { headSha } } : {},
+      );
+      const message = acceptedMessage(card.label, done.merge);
+      if (message.warn) toast.warning(message.text);
+      else toast.success(message.text);
+      setAccepting(undefined);
+    } catch (err) {
+      toast.error(describeBoardError(err, runnerName));
+      // A refused merge usually means the PR moved: show it again.
+      setAcceptVersion((v) => v + 1);
+    } finally {
+      setBusy(false);
+      onChanged();
+    }
+  };
 
   const confirm = async () => {
     if (!pending) return;
@@ -136,11 +163,7 @@ export function useCardActions({
         () => finishCard(projectId, card.number),
         `${card.label} marked finished.`,
       ),
-    accept: (card) =>
-      void perform(
-        () => acceptCard(projectId, card.number),
-        `${card.label} accepted.`,
-      ),
+    accept: (card) => setAccepting(card),
     acceptSuggestion: (card, edits) =>
       perform(
         () => acceptSuggestion(projectId, card.number, edits),
@@ -156,18 +179,28 @@ export function useCardActions({
     askDelete: (card) => setPending({ kind: 'delete', card }),
     busy,
     dialogs: (
-      <ConfirmDialog
-        open={pending !== undefined}
-        onOpenChange={(open) => {
-          if (!open && !busy) setPending(undefined);
-        }}
-        title={dialogTitle()}
-        consequence={dialogConsequence()}
-        verb={verb()}
-        tone="danger"
-        busy={busy}
-        onConfirm={() => void confirm()}
-      />
+      <>
+        <AcceptDialog
+          projectId={projectId}
+          card={accepting}
+          busy={busy}
+          version={acceptVersion}
+          onAccept={(card, headSha) => void accept(card, headSha)}
+          onClose={() => setAccepting(undefined)}
+        />
+        <ConfirmDialog
+          open={pending !== undefined}
+          onOpenChange={(open) => {
+            if (!open && !busy) setPending(undefined);
+          }}
+          title={dialogTitle()}
+          consequence={dialogConsequence()}
+          verb={verb()}
+          tone="danger"
+          busy={busy}
+          onConfirm={() => void confirm()}
+        />
+      </>
     ),
   };
 }
