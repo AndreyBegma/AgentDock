@@ -9,6 +9,7 @@ import type {
   CardCapturePage,
   CardFeedbackRequest,
   CardPullRequestView,
+  ClaimAttachmentsRequest,
   CreateBoardCardRequest,
   DismissAllResult,
   MoveBoardCardRequest,
@@ -63,6 +64,17 @@ export const sendFeedback = (
   number: number,
   body: CardFeedbackRequest,
 ) => api(`${cardPath(projectId, number)}/feedback`, { method: 'POST', body });
+
+/** #309: claims finished uploads onto an existing card (operator). */
+export const claimCardAttachments = (
+  projectId: string,
+  number: number,
+  body: ClaimAttachmentsRequest,
+) =>
+  api(`${cardPath(projectId, number)}/attachments`, {
+    method: 'POST',
+    body,
+  });
 
 export const finishCard = (projectId: string, number: number) =>
   api(`${cardPath(projectId, number)}/finish`, { method: 'POST' });

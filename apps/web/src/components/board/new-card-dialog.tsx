@@ -11,8 +11,12 @@ import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { Field, Input, Textarea } from '@andrewbehma/glass-ui/field';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { useEffect, useState } from 'react';
+import { ApiError } from '../../lib/api';
+import { describeUploadFailure } from '../../lib/attachments/format';
+import { useAttachmentUploads } from '../../lib/attachments/use-attachment-uploads';
 import { createCard } from '../../lib/board/actions';
 import { describeBoardError } from '../../lib/board/format';
+import { AttachmentDropzone } from '../attachments/attachment-dropzone';
 import { CardOptionToggles } from './card-options';
 
 export function NewCardDialog({
@@ -42,7 +46,9 @@ export function NewCardDialog({
     setSpecOnRun(settings?.specOnRun ?? false);
   }, [open, settings?.issueOnRun, settings?.specOnRun]);
 
-  const valid = title.trim() !== '';
+  const uploads = useAttachmentUploads(projectId);
+  // Create waits for every upload (#309 UI), so no file is left behind.
+  const valid = title.trim() !== '' && !uploads.busy;
 
   const submit = async () => {
     setBusy(true);
@@ -52,16 +58,24 @@ export function NewCardDialog({
       body,
       issueOnRun,
       specOnRun,
+      ...(uploads.done.length > 0
+        ? { attachmentIds: uploads.done.map((d) => d.view.id) }
+        : {}),
     };
     try {
       const card = await createCard(projectId, request);
       toast.success(`${card.label} created.`);
       setTitle('');
       setBody('');
+      uploads.forget(uploads.done.map((d) => d.item));
       onOpenChange(false);
       onCreated(card.number);
     } catch (err) {
-      setError(describeBoardError(err));
+      setError(
+        err instanceof ApiError && err.body?.error === 'attachment_error'
+          ? describeUploadFailure(err.status, err.body)
+          : describeBoardError(err),
+      );
     } finally {
       setBusy(false);
     }
@@ -120,6 +134,13 @@ export function NewCardDialog({
               onChange={(e) => setBody(e.target.value)}
             />
           </Field>
+          <section aria-label="Attachments" className="flex flex-col gap-1.5">
+            <span className="text-sm font-medium">Attachments</span>
+            <AttachmentDropzone
+              uploads={uploads}
+              label="Attach files to the new card"
+            />
+          </section>
           <CardOptionToggles
             projectId={projectId}
             idPrefix="board-new"
