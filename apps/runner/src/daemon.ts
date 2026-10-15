@@ -282,6 +282,7 @@ export const runDaemon = async (
       emit: (event) => connection?.emit(event),
       log,
       otlpPort: () => otlp?.port ?? null,
+      attachmentSource: { server: config.server, token: config.token },
     });
     const uiProfiles = new UiProfileBuildExecutor({
       deps: skillsDeps,
