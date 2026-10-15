@@ -94,6 +94,24 @@ describe('card capture scheduling (e2e)', () => {
       });
     });
 
+    it('turning content off turns capture off, and it stays off after', async () => {
+      const off = await w.admin.send('patch', w.path(), {
+        shipSessionContent: false,
+      });
+      expect(off.status).toBe(200);
+      const settings = await w.admin.get(`${w.path()}/board-settings`);
+      expect(settings.body.captureEnabled).toBe(false);
+
+      // Content back on does not bring capture back by itself.
+      await w.admin.send('patch', w.path(), { shipSessionContent: true });
+      expect(
+        (await w.admin.get(`${w.path()}/board-settings`)).body.captureEnabled,
+      ).toBe(false);
+      const id = await w.manualSession();
+      await w.stopped('m1');
+      expect(await jobOf(id)).toBeUndefined();
+    });
+
     it('refuses a model outside the allowed ones', async () => {
       const response = await w.admin.send('put', `${w.path()}/board-settings`, {
         ...SETTINGS,

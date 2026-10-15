@@ -37,6 +37,9 @@ export const EMPTY_USAGE: RunUsage = {
  * - a board card round (issue #242 D4): the card's Claude session, by its id
  *   on the project's runner. Every round resumes the same session, so the
  *   run's window is what splits its requests between rounds.
+ * - a card capture extraction (issue #244 D4): the Claude session the API
+ *   assigned it (`card_captures.extractSessionId`), by its id on the
+ *   project's runner; it runs in a run directory outside every root.
  * Skill runs record no session id, so they have no usage yet.
  */
 const RUN_SESSIONS = Prisma.sql`
@@ -60,7 +63,15 @@ const RUN_SESSIONS = Prisma.sql`
   JOIN projects pr ON pr.id = c."projectId"
   JOIN sessions se2 ON se2."runnerId" = pr."runnerId"
     AND se2.runtime = 'claude'
-    AND se2."externalId" = c."sessionId"::text`;
+    AND se2."externalId" = c."sessionId"::text
+  UNION ALL
+  SELECT cc."runId", se2.id
+  FROM card_captures cc
+  JOIN projects pr ON pr.id = cc."projectId"
+  JOIN sessions se2 ON se2."runnerId" = pr."runnerId"
+    AND se2.runtime = 'claude'
+    AND se2."externalId" = cc."extractSessionId"::text
+  WHERE cc."runId" IS NOT NULL`;
 
 /**
  * The requests of a run (spec 21 D8): of its sessions, the `llm_requests`
