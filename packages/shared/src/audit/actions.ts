@@ -130,6 +130,8 @@ export const AUDIT_ACTIONS = [
   'card.auto_run_failed',
   /** Also records the capture fields (#244 D12). */
   'board.settings_updated',
+  /** #271 D13: the per-project "Store text in English" switch (`after: { normalizeEnabled }`). */
+  'text.settings_updated',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 

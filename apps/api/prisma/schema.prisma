@@ -79,6 +79,8 @@ model User {
   boardCardRounds             BoardCardRound[]
   boardSettingsUpdated        BoardSettings[]
   cardDismissals              CardDismissal[]
+  textNormalizations          TextNormalization[]
+  textSettingsUpdated         TextSettings[]
 
   @@map("users")
 }
@@ -383,6 +385,8 @@ model Project {
   boardSettings        BoardSettings?
   cardCaptures         CardCapture[]
   cardDismissals       CardDismissal[]
+  textNormalizations   TextNormalization[]
+  textSettings         TextSettings?
 
   @@unique([runnerId, rootPath])
   @@map("projects")
@@ -1507,6 +1511,8 @@ enum RunKind {
   card
   /// A card capture extraction (issue #244 D4).
   card_capture
+  /// A text normalization (issue #271 D4, ADR-0027).
+  text_normalize
 }
 
 enum RunStatus {
@@ -1563,14 +1569,15 @@ model Run {
   /// same slot is identical.
   updatedAt       DateTime
 
-  project           Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  slot              Slot?             @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  project           Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  slot              Slot?              @relation(fields: [slotId], references: [id], onDelete: Cascade)
   skillRun          SkillRun?
   planTurn          PlanTurn?
   uiProfiles        UiProfile[]
   firings           ScheduleFiring[]
   cardRound         BoardCardRound?
   cardCapture       CardCapture?
+  textNormalization TextNormalization?
   inboundDeliveries InboundDelivery[]
 
   @@index([projectId, startedAt])
@@ -2305,12 +2312,13 @@ model Plan {
   updatedAt       DateTime       @updatedAt
   sentAt          DateTime?
 
-  project      Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  author       User?               @relation(fields: [authorId], references: [id], onDelete: SetNull)
-  instructions PlannerInstructions @relation(fields: [instructionsId], references: [id], onDelete: Restrict)
-  tasks        PlanTask[]
-  turns        PlanTurn[]
-  designs      TaskDesign[]
+  project            Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author             User?               @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  instructions       PlannerInstructions @relation(fields: [instructionsId], references: [id], onDelete: Restrict)
+  tasks              PlanTask[]
+  turns              PlanTurn[]
+  designs            TaskDesign[]
+  textNormalizations TextNormalization[]
 
   @@index([projectId, updatedAt])
   @@index([authorId])
@@ -2344,8 +2352,9 @@ model PlanTask {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  plan  Plan       @relation(fields: [planId], references: [id], onDelete: Cascade)
-  turns PlanTurn[]
+  plan               Plan                @relation(fields: [planId], references: [id], onDelete: Cascade)
+  turns              PlanTurn[]
+  textNormalizations TextNormalization[]
 
   @@unique([planId, key, planVersion])
   @@index([planId, planVersion])
@@ -2377,12 +2386,13 @@ model PlanTurn {
   createdAt  DateTime       @default(now())
   finishedAt DateTime?
 
-  plan            Plan?            @relation(fields: [planId], references: [id], onDelete: Cascade)
-  card            BoardCard?       @relation(fields: [cardId], references: [id], onDelete: Cascade)
-  task            PlanTask?        @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  run             Run              @relation(fields: [runId], references: [id], onDelete: Cascade)
-  author          User?            @relation(fields: [authorId], references: [id], onDelete: SetNull)
-  designRevisions DesignRevision[]
+  plan               Plan?               @relation(fields: [planId], references: [id], onDelete: Cascade)
+  card               BoardCard?          @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  task               PlanTask?           @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  run                Run                 @relation(fields: [runId], references: [id], onDelete: Cascade)
+  author             User?               @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  designRevisions    DesignRevision[]
+  textNormalizations TextNormalization[]
 
   @@index([planId, createdAt])
   @@index([cardId, createdAt])
@@ -2566,6 +2576,8 @@ model DesignComment {
   author      User?           @relation(fields: [authorId], references: [id], onDelete: SetNull)
   addressedIn DesignRevision? @relation("DesignCommentAddressedIn", fields: [addressedInRevisionId], references: [id], onDelete: SetNull)
 
+  textNormalizations TextNormalization[]
+
   @@index([designId, createdAt])
   @@index([revisionId])
   @@map("design_comments")
@@ -2586,6 +2598,12 @@ enum BoardColumn {
 enum BoardCardKind {
   feature
   bug
+}
+
+/// Shared `CARD_KIND_SOURCES` (#271 D9).
+enum CardKindSource {
+  auto
+  person
 }
 
 /// Shared `BOARD_CARD_SOURCES`.
@@ -2634,6 +2652,9 @@ model BoardCard {
   /// Markdown, at most 20 000 characters.
   body                String          @default("")
   kind                BoardCardKind   @default(feature)
+  /// #271 D9: `auto` lets the normalization classify `kind` until the first
+  /// Run fixes the branch; a person setting kind makes it `person`.
+  kindSource          CardKindSource  @default(auto)
   column              BoardColumn     @default(todo)
   /// Fractional index inside the column (D3).
   position            Float
@@ -2685,15 +2706,16 @@ model BoardCard {
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
 
-  project       Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdBy     User?            @relation("BoardCardCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  movedBy       User?            @relation("BoardCardMovedBy", fields: [movedById], references: [id], onDelete: SetNull)
-  completedBy   User?            @relation("BoardCardCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
-  capture       CardCapture?     @relation(fields: [captureId], references: [id], onDelete: SetNull)
-  sourceSession AgentSession?    @relation("BoardCardSourceSession", fields: [sourceSessionId], references: [id], onDelete: SetNull)
-  rounds        BoardCardRound[]
-  design        TaskDesign?
-  designTurns   PlanTurn[]
+  project            Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy          User?               @relation("BoardCardCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  movedBy            User?               @relation("BoardCardMovedBy", fields: [movedById], references: [id], onDelete: SetNull)
+  completedBy        User?               @relation("BoardCardCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+  capture            CardCapture?        @relation(fields: [captureId], references: [id], onDelete: SetNull)
+  sourceSession      AgentSession?       @relation("BoardCardSourceSession", fields: [sourceSessionId], references: [id], onDelete: SetNull)
+  rounds             BoardCardRound[]
+  design             TaskDesign?
+  designTurns        PlanTurn[]
+  textNormalizations TextNormalization[]
 
   @@unique([projectId, number])
   @@index([projectId, column, position])
@@ -2733,6 +2755,8 @@ model BoardCardRound {
   card   BoardCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
   run    Run       @relation(fields: [runId], references: [id], onDelete: Cascade)
   author User?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  textNormalizations TextNormalization[]
 
   @@unique([cardId, round])
   @@index([phase])
@@ -2839,4 +2863,105 @@ model CardDismissal {
   @@index([projectId, fingerprint])
   @@index([createdAt])
   @@map("card_dismissals")
+}
+
+// ─── Text normalization (issue #271, ADR-0027) ──────────────────────────────
+
+/// Shared `TEXT_OWNER_TYPES` (D1).
+enum TextOwnerType {
+  board_card
+  board_card_round
+  design_comment
+  plan
+  plan_task
+  plan_turn
+}
+
+/// Shared `TEXT_NORMALIZATION_STATUSES`.
+enum TextNormalizationStatus {
+  pending
+  running
+  done
+  skipped
+  failed
+  superseded
+}
+
+/// Shared `TEXT_FAIL_REASONS` (D11), for `failed` and `skipped`.
+enum TextFailReason {
+  runner_offline
+  runner_unsupported
+  no_profile
+  run_failed
+  contract_violation
+  budget_exceeded
+  off
+}
+
+/// One save's request to normalize an owner's changed fields (D4, D7). The
+/// owner's column holds the English text once applied; `fields` keeps the
+/// original. Exactly one owner key is set (CHECK
+/// `text_normalizations_owner_check`, the ADR-0025 precedent).
+model TextNormalization {
+  id            String                  @id @default(cuid())
+  projectId     String
+  ownerType     TextOwnerType
+  cardId        String?
+  roundId       String?
+  commentId     String?
+  planId        String?
+  taskId        String?
+  turnId        String?
+  /// `[{field, original, sourceHash, english?, outcome?}]` (shared `textFieldsSchema`).
+  fields        Json
+  /// D9: the request also asks for the card's kind.
+  classifyKind  Boolean                 @default(false)
+  /// The classified kind, when asked and answered.
+  kind          BoardCardKind?
+  status        TextNormalizationStatus @default(pending)
+  failReason    TextFailReason?
+  /// At most 2000 characters; never the text.
+  error         String?
+  attempts      Int                     @default(0)
+  nextAttemptAt DateTime?
+  /// The `text_normalize` run; null until sent, or for a request with no call.
+  runId         String?                 @unique
+  /// The Claude session the API assigns (`--session-id`): how the run is priced (ADR-0009).
+  sessionId     String?                 @db.Uuid
+  /// Nullable so deleting the author keeps the record.
+  authorId      String?
+  createdAt     DateTime                @default(now())
+  finishedAt    DateTime?
+
+  project Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  card    BoardCard?      @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  round   BoardCardRound? @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  comment DesignComment?  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  plan    Plan?           @relation(fields: [planId], references: [id], onDelete: Cascade)
+  task    PlanTask?       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  turn    PlanTurn?       @relation(fields: [turnId], references: [id], onDelete: Cascade)
+  run     Run?            @relation(fields: [runId], references: [id], onDelete: SetNull)
+  author  User?           @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([cardId, createdAt])
+  @@index([roundId, createdAt])
+  @@index([commentId, createdAt])
+  @@index([planId, createdAt])
+  @@index([taskId, createdAt])
+  @@index([turnId, createdAt])
+  @@index([projectId, status])
+  @@map("text_normalizations")
+}
+
+/// A project's text settings (D13). No row: on.
+model TextSettings {
+  projectId        String   @id
+  normalizeEnabled Boolean  @default(true)
+  updatedById      String?
+  updatedAt        DateTime @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  updatedBy User?   @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@map("text_settings")
 }
