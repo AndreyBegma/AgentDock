@@ -1,3 +1,4 @@
+import type { NoProfileReason, ProfileSource } from '../readiness';
 import type {
   DesignBatchMode,
   DesignFailureReason,
@@ -315,6 +316,8 @@ export const DESIGN_ERROR = {
   runnerOutdated: 'runner_outdated',
   /** #275 D5: Stop with no build or design turn of this design running. */
   designNotRunning: 'design_not_running',
+  /** 422 (#272 D2): no usable runtime profile; `reason`, `source`, `profileKey`. */
+  noProfile: 'no_profile',
 } as const;
 export type DesignErrorCode = (typeof DESIGN_ERROR)[keyof typeof DESIGN_ERROR];
 
@@ -322,4 +325,10 @@ export interface DesignErrorBody {
   statusCode: number;
   error: DesignErrorCode;
   message: string;
+  /** `no_profile` (#272 D2): why no profile can run it. */
+  reason?: NoProfileReason;
+  /** `no_profile`: the setting that named the profile. */
+  source?: ProfileSource | null;
+  /** `no_profile`: the unusable profile's key. */
+  profileKey?: string;
 }

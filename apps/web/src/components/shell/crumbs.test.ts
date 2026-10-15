@@ -15,6 +15,15 @@ const labels = (path: string, names = new Map<string, string>()) =>
   crumbsFor(path, names).map((crumb) => crumb.label);
 
 describe('crumbsFor', () => {
+  test('the design page’s cards crumbs have no page, so no link', () => {
+    const crumbs = crumbsFor(`/projects/${PROJECT}/board/cards/1/design`);
+    const byId = (suffix: string) =>
+      crumbs.find((crumb) => crumb.id.endsWith(suffix));
+    expect(byId('/board')?.href).toBe(`/projects/${PROJECT}/board`);
+    expect(byId('/board/cards')?.href).toBeUndefined();
+    expect(byId('/board/cards/1')?.href).toBeUndefined();
+  });
+
   test('the overview is one crumb', () => {
     expect(labels('/')).toEqual(['Overview']);
   });
