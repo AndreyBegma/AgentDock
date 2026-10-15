@@ -420,8 +420,8 @@ export const CARD_PR_CLOSE_COMMENT_MAX_BYTES = CARD_MERGE_COMMENT_MAX_BYTES;
  * A merged PR is refused (`merged`); an already closed one is a success with
  * `alreadyClosed`, and the branch and issue steps still run.
  *
- * Exported here but not yet entered in the `commands` allowlist: the entry
- * lands with its runner handler (the capture and text precedent).
+ * Its own group, outside `cardCommands`: the `commands` allowlist enters it
+ * beside them, with its runner handler (the capture and text precedent).
  */
 export const cardPrCloseArgsSchema = z.strictObject({
   ...cardTarget,
@@ -474,8 +474,8 @@ export const cardPrCloseResultSchema = z.discriminatedUnion('closed', [
 export type CardPrCloseResult = z.infer<typeof cardPrCloseResultSchema>;
 
 /**
- * #329 D8: `card.prClose`, an operator command. Kept out of `cardCommands`
- * until i329-runner enters it in the `commands` allowlist with its handler.
+ * #329 D8: `card.prClose`, an operator command, in the `commands` allowlist
+ * next to `cardCommands` (served by the runner's `closeCardPr`).
  */
 export const cardPrCloseCommands = {
   'card.prClose': {

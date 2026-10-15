@@ -11,6 +11,7 @@ import { dirname, join, sep } from 'node:path';
 import { cardWipCommitMessage } from '@agentdock/shared';
 import type {
   CardCollectArgs,
+  CardCollectPrState,
   CardCollectResult,
   CardRunFile,
 } from '@agentdock/shared/protocol';
@@ -178,15 +179,25 @@ export const commitFiles = async (
 };
 
 const openPrSchema = z.array(
-  z.object({ number: z.number().int().positive(), url: z.string().min(1) }),
+  z.object({
+    number: z.number().int().positive(),
+    url: z.string().min(1),
+    isDraft: z.boolean().optional(),
+  }),
 );
+
+interface OpenPr {
+  number: number;
+  url: string;
+  state: CardCollectPrState;
+}
 
 /** The open PR of `branch`, or null; throws when `gh` cannot answer. */
 const openPullRequest = async (
   deps: GitDeps,
   github: string,
   branch: string,
-): Promise<{ number: number; url: string } | null> => {
+): Promise<OpenPr | null> => {
   const listed = await deps.exec(
     'gh',
     [
@@ -199,7 +210,7 @@ const openPullRequest = async (
       '--state',
       'open',
       '--json',
-      'number,url',
+      'number,url,isDraft',
       '--limit',
       '1',
     ],
@@ -210,7 +221,13 @@ const openPullRequest = async (
   }
   const parsed = openPrSchema.safeParse(JSON.parse(listed.stdout || '[]'));
   if (!parsed.success) throw new Error('gh pr list printed no PR list');
-  return parsed.data[0] ?? null;
+  const pr = parsed.data[0];
+  if (!pr) return null;
+  return {
+    number: pr.number,
+    url: pr.url,
+    state: pr.isDraft ? 'draft' : 'open',
+  };
 };
 
 /**
@@ -274,16 +291,25 @@ export const collectCard = async (
     root: record.root,
   });
   await pushBranch(deps, wt, record.branch);
-  const pr =
-    (await openPullRequest(deps, github, record.branch)) ??
-    (await createPullRequest(deps, {
+  // #329 D3: an open PR is reported whether this collect opened it or not,
+  // so the API fills a link it lost.
+  const pr: OpenPr = (await openPullRequest(deps, github, record.branch)) ?? {
+    ...(await createPullRequest(deps, {
       github,
       base: args.base,
       branch: record.branch,
       title: args.title,
       body: args.body,
-    }));
-  return { ahead, pushed: true, prNumber: pr.number, prUrl: pr.url };
+    })),
+    state: 'open',
+  };
+  return {
+    ahead,
+    pushed: true,
+    prNumber: pr.number,
+    prUrl: pr.url,
+    prState: pr.state,
+  };
 };
 
 /**
