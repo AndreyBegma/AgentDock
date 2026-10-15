@@ -5,7 +5,8 @@ import type {
 } from '@agentdock/shared';
 import { api } from '../api';
 
-const base = (projectId: string) => `/projects/${projectId}/text-normalizations`;
+const base = (projectId: string) =>
+  `/projects/${projectId}/text-normalizations`;
 
 /** Exactly one of `cardId` / `planId` (else 400). */
 export const fetchTextNotes = (

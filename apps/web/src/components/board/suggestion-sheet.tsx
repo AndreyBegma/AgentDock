@@ -45,7 +45,7 @@ export function SuggestionSheetBody({
   const [title, setTitle] = useState(card.title);
   const [body, setBody] = useState(card.body);
   const [kind, setKind] = useState(card.kind);
-  const notes = useTextNotes(projectId,{ cardId: card.id });
+  const notes = useTextNotes(projectId, { cardId: card.id });
   const confidence = confidenceLabel(card.captureConfidence);
   const session = sessionHref(card.sourceSessionId);
 

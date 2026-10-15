@@ -45,9 +45,9 @@ import { useReadiness } from '../../lib/readiness/use-readiness';
 import { type TextNotes, useTextNotes } from '../../lib/text/use-text-notes';
 import { Markdown } from '../markdown/markdown';
 import { ReadinessNotice } from '../readiness/readiness-notice';
+import { NormalizedNote } from '../text/normalized-note';
 import { ApproveRunLink, CardDesignSection } from './card-design';
 import { CardOptionToggles } from './card-options';
-import { NormalizedNote } from '../text/normalized-note';
 import { SuggestionSheetBody } from './suggestion-sheet';
 import type { CardActions } from './use-card-actions';
 
