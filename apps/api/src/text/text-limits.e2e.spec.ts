@@ -25,8 +25,7 @@ describe('text normalization limits and failures (e2e)', () => {
       kind: 'deferred',
       why: 'runner_offline',
       untilMs: now.getTime() + 60_000,
-      offlineAttempts: 1,
-      offlineSince: now.getTime(),
+      data: { offlineAttempts: 1, offlineSince: now.getTime() },
     });
     const third = await w.normalizer.process(
       {

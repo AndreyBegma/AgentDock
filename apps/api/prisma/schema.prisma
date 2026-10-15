@@ -2970,6 +2970,13 @@ enum TextFailReason {
   off
 }
 
+/// #324 D8: what translated a request — DeepL in the API, or `text.normalize`
+/// on the runner (ADR-0033).
+enum TextEngine {
+  deepl
+  runner
+}
+
 /// One save's request to normalize an owner's changed fields (D4, D7). The
 /// owner's column holds the English text once applied; `fields` keeps the
 /// original. Exactly one owner key is set (CHECK
@@ -3000,6 +3007,10 @@ model TextNormalization {
   runId         String?                 @unique
   /// The Claude session the API assigns (`--session-id`): how the run is priced (ADR-0009).
   sessionId     String?                 @db.Uuid
+  /// #324 D8: null until DeepL answered or a run was sent.
+  engine        TextEngine?
+  /// #324 D8: DeepL's `billed_characters`, else the characters sent to the runner.
+  billedChars   Int?
   /// Nullable so deleting the author keeps the record.
   authorId      String?
   createdAt     DateTime                @default(now())
