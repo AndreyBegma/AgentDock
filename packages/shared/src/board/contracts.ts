@@ -5,6 +5,7 @@ import type {
   PrChecks,
   PrInspectState,
 } from '../protocol';
+import type { ProfileSource } from '../readiness';
 import type {
   CaptureModel,
   CaptureSkipReason,
@@ -292,7 +293,10 @@ export const BOARD_ERROR = {
   wrongColumn: 'wrong_column',
   /** 422: `specOnRun` and the project has no `specDir` (D2). */
   noSpecDir: 'no_spec_dir',
-  /** 422: the profile is Codex (D12). */
+  /**
+   * 422: the runner refused a non-Claude profile. Profile selection itself
+   * answers `no_profile` (#272 D2).
+   */
   unsupportedRuntime: 'unsupported_runtime',
   /** 503: the runner is offline or does not serve `card.*`. */
   commandUnavailable: 'command_unavailable',
@@ -304,6 +308,8 @@ export const BOARD_ERROR = {
   invalidMove: 'invalid_move',
   /** 422 (#244 D10): `captureEnabled: true` while the project ships no session content. */
   captureNeedsContent: 'capture_needs_content',
+  /** 422 (#272 D2): no usable runtime profile; `reason`, `source`, `profileKey`. */
+  noProfile: 'no_profile',
   /** 409 (#273 D13): the runner refused the merge, with `reason` (`CardMergeFailReason`). */
   mergeFailed: 'merge_failed',
   /** 409 / 404 (#273 D13): the card has no pull request. */
@@ -315,8 +321,15 @@ export interface BoardErrorBody {
   statusCode: number;
   error: BoardErrorCode;
   message: string;
-  /** `move_refused`: the `BoardMoveRefusal`; `merge_failed`: the `CardMergeFailReason`. */
+  /**
+   * `move_refused`: the `BoardMoveRefusal`; `no_profile`: the
+   * `NoProfileReason`; `merge_failed`: the `CardMergeFailReason`.
+   */
   reason?: string;
+  /** `no_profile`: the setting that named the profile (#272 D2). */
+  source?: ProfileSource | null;
+  /** `no_profile`: the unusable profile's key. */
+  profileKey?: string;
 }
 
 /** #273 D9: why approving the design did not start round 1. */

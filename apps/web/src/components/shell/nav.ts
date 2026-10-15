@@ -366,7 +366,7 @@ export function visibleNav(role: Role, pathname: string): VisibleSection[] {
  */
 const TAB_IDS = {
   workspace: ['overview', 'projects', 'activity', 'sessions', 'usage'],
-  project: ['fleet', 'planner', 'queue', 'approvals', 'history'],
+  project: ['fleet', 'planner', 'board', 'queue', 'approvals'],
 } as const;
 
 export interface TabBarSplit {

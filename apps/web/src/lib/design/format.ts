@@ -192,6 +192,7 @@ const ERROR_TEXT: Record<DesignErrorCode, string> = {
   runner_timeout: 'The runner did not answer in time. Try again.',
   runner_outdated: 'The runner is too old for this. Update the runner.',
   design_not_running: 'Nothing of this design is running.',
+  no_profile: 'No runtime profile. An admin sets it in Settings › General.',
 };
 
 /** A sentence for the person, and where the fix is when it is elsewhere. */

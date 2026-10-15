@@ -183,6 +183,7 @@ export const CAPTURE_SKIP_TEXT: Record<CaptureSkipReason, string> = {
   budget_exceeded: 'Budget hard stop',
   runner_offline: 'Runner was offline',
   capture_off: 'Capture was turned off',
+  no_profile: 'No runtime profile',
 };
 
 /** What a capture row says about its outcome: the skip reason, the error, or the count. */
