@@ -11,6 +11,7 @@ import {
   planTurnPhaseChangedDataSchema,
   type UnsequencedEvent,
 } from '@agentdock/shared/protocol';
+import { type AttachmentSource, syncAttachments } from '../cards/attachments';
 import { type Cancel, isoNow } from '../clock';
 import { CommandFailure } from '../commands/failure';
 import { watchedProject } from '../control/target';
@@ -60,6 +61,12 @@ export interface PlanExecutorOptions {
   log: Logger;
   /** The OTLP receiver's bound port, null when it is off (#24 D9). */
   otlpPort?: () => number | null;
+  /**
+   * #337 D10: where `plan.turn` downloads attachments from — the API and the
+   * runner token, as for `card.run`. Without it a turn that lists an
+   * attachment fails with `attachments_unavailable`.
+   */
+  attachmentSource?: AttachmentSource;
   tickMs?: number;
   cleanupMs?: number;
   idleMs?: number;
@@ -442,6 +449,14 @@ export class PlanTurnExecutor {
         if (this.closing.has(turn.planId)) this.store.removePlan(turn.planId);
         return;
       }
+      // #337 D10: the files the person attached, in the worktree before the
+      // session starts; one that cannot be had fails the turn.
+      await syncAttachments(
+        deps,
+        plan.worktree,
+        turn.attachments ?? [],
+        this.options.attachmentSource,
+      );
       const profile = profileOf(deps, turn.profileKey);
       writeJsonAtomic(
         this.store.file(turn, 'launch'),

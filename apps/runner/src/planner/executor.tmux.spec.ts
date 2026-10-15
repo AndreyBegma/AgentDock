@@ -1,10 +1,17 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from 'bun:test';
+import { createHash } from 'node:crypto';
 import { chmodSync, existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import {
+  ATTACHMENTS_WORKTREE_DIR,
+  type AttachmentRef,
+  attachmentFileName,
+} from '@agentdock/shared';
 import {
   PLAN_TURN_RESULT_MAX_BYTES,
   type PlanTurnArgs,
   type PlanTurnFinishedData,
+  planTurnArgsSchema,
   type UnsequencedEvent,
 } from '@agentdock/shared/protocol';
 import { CommandFailure } from '../commands/failure';
@@ -47,6 +54,7 @@ mkdir -p "$d"
 printf '%s\\n' "$@" > "$d/argv"
 cat > "$d/stdin"
 pwd > "$d/cwd"
+ls .agentdock/attachments > "$d/attachments" 2>/dev/null
 git rev-parse HEAD > "$d/head"
 sid=""
 prev=""
@@ -113,6 +121,22 @@ const setup = async (options: { cap?: number } = {}) => {
     profiles: () => profiles,
     shortId: () => `pln${String(next++).padStart(5, '0')}`,
   });
+  const downloads: { url: string; authorization: string | null }[] = [];
+  const bodies = new Map<string, Uint8Array>();
+  const fakeFetch = (async (
+    input: string | URL | Request,
+    init?: RequestInit,
+  ) => {
+    const url = String(input);
+    downloads.push({
+      url,
+      authorization: new Headers(init?.headers).get('authorization'),
+    });
+    const body = bodies.get(url.slice(url.lastIndexOf('/') + 1));
+    return body
+      ? new Response(body, { status: 200 })
+      : new Response('nope', { status: 404 });
+  }) as typeof fetch;
   const slots = new SharedRunSlots(options.cap ?? 2);
   const log = memoryLogger().log;
   // Timers far apart: the test ticks and cleans up by hand.
@@ -125,6 +149,11 @@ const setup = async (options: { cap?: number } = {}) => {
     slots,
     emit: (event) => events.push(event),
     log,
+    attachmentSource: {
+      server: 'https://agentdock.example.test',
+      token: 'runner-token',
+      fetch: fakeFetch,
+    },
     tickMs: never,
     cleanupMs: never,
   });
@@ -179,6 +208,7 @@ const setup = async (options: { cap?: number } = {}) => {
       stdin: read('stdin'),
       cwd: read('cwd').trim(),
       head: read('head').trim(),
+      attachments: read('attachments').split('\n').filter(Boolean),
     };
   };
   const calls = () =>
@@ -216,8 +246,21 @@ const setup = async (options: { cap?: number } = {}) => {
     calls,
     sessions,
     worktree,
+    downloads,
+    bodies,
   };
 };
+
+const shaOf = (bytes: Uint8Array): string =>
+  createHash('sha256').update(bytes).digest('hex');
+
+const refOf = (id: string, name: string, bytes: Uint8Array): AttachmentRef => ({
+  id,
+  name,
+  mime: 'text/plain',
+  size: bytes.byteLength,
+  sha256: shaOf(bytes),
+});
 
 const codeOf = async (work: Promise<unknown>) => {
   const error = await work.then(
@@ -292,6 +335,108 @@ describe.skipIf(!tmuxInstalled)('plan turns (real tmux, fake claude)', () => {
     // The worktree stays for the plan's life: `--resume` needs its directory.
     expect(existsSync(t.worktree)).toBe(true);
     expect(await t.sessions()).toEqual([]);
+  });
+
+  it('#337 D10: places the attachments in the plan worktree before the session starts, and drops the unlisted ones on the next turn', async () => {
+    const t = await setup();
+    const shot = new TextEncoder().encode('png-ish bytes');
+    t.bodies.set('att1', shot);
+    const ref = refOf('att1', 'shot one.png', shot);
+
+    await t.executor.run(t.args({ attachments: [ref] }));
+    expect(await t.until('turn_1', ['succeeded', 'failed'])).toBe('succeeded');
+
+    // The CLI saw the file when it started, under the name card.run uses.
+    expect(t.call(0).attachments).toEqual([
+      attachmentFileName('att1', 'shot one.png'),
+    ]);
+    expect(
+      readFileSync(
+        join(t.worktree, ATTACHMENTS_WORKTREE_DIR, 'att1-shot_one.png'),
+        'utf8',
+      ),
+    ).toBe('png-ish bytes');
+    expect(t.downloads).toEqual([
+      {
+        url: 'https://agentdock.example.test/runner/attachments/att1',
+        authorization: 'Bearer runner-token',
+      },
+    ]);
+    // `.agentdock/` never shows in the plan worktree's git status.
+    expect((await t.f.run(t.worktree, 'status', '--porcelain')).trim()).toBe(
+      '',
+    );
+
+    // A turn that lists the same file downloads nothing again; one that lists
+    // nothing leaves the directory empty.
+    await t.executor.run(
+      t.args({
+        turnId: 'turn_2',
+        runId: 'run_t2',
+        session: { id: S1, resume: true },
+        attachments: [ref],
+      }),
+    );
+    expect(await t.until('turn_2', ['succeeded', 'failed'])).toBe('succeeded');
+    expect(t.downloads).toHaveLength(1);
+    await t.executor.run(
+      t.args({
+        turnId: 'turn_3',
+        runId: 'run_t3',
+        session: { id: S1, resume: true },
+      }),
+    );
+    expect(await t.until('turn_3', ['succeeded', 'failed'])).toBe('succeeded');
+    expect(t.call(2).attachments).toEqual([]);
+  });
+
+  it('#337 D10: a file that cannot be had fails the turn before the session starts', async () => {
+    const t = await setup();
+    const missing = refOf('gone', 'gone.png', new TextEncoder().encode('x'));
+    const wrong = new TextEncoder().encode('tampered');
+    t.bodies.set('bad', wrong);
+    const mismatch = refOf(
+      'bad',
+      'bad.png',
+      new TextEncoder().encode('original'),
+    );
+
+    await t.executor.run(t.args({ attachments: [missing] }));
+    expect(await t.until('turn_1', ['succeeded', 'failed'])).toBe('failed');
+    expect(t.calls()).toBe(0);
+    expect(t.finished('turn_1')?.error).toContain('attachment gone');
+
+    await t.executor.run(
+      t.args({ turnId: 'turn_2', runId: 'run_t2', attachments: [mismatch] }),
+    );
+    expect(await t.until('turn_2', ['succeeded', 'failed'])).toBe('failed');
+    expect(t.calls()).toBe(0);
+    expect(t.finished('turn_2')?.error).toContain('SHA-256');
+  });
+
+  it('#337 D10: plan.turn refuses a repeated attachment id', () => {
+    const ref = refOf('att1', 'a.png', new TextEncoder().encode('x'));
+    const base = {
+      planId: 'plan_1',
+      turnId: 'turn_1',
+      runId: 'run_t1',
+      projectId: 'prj_widget',
+      root: '/srv/widget',
+      base: 'main',
+      session: { id: S1, resume: false },
+      prompt: 'p',
+      profileKey: 'claude-work',
+      model: 'opus',
+      timeoutSec: 600,
+    };
+    expect(
+      planTurnArgsSchema.safeParse({ ...base, attachments: [ref] }).success,
+    ).toBe(true);
+    expect(planTurnArgsSchema.safeParse(base).success).toBe(true);
+    expect(
+      planTurnArgsSchema.safeParse({ ...base, attachments: [ref, ref] })
+        .success,
+    ).toBe(false);
   });
 
   it('resumes later turns, fast-forwards the worktree first, and forks a task with its own id', async () => {
