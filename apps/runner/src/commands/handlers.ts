@@ -17,6 +17,7 @@ import {
 } from '../control/orchestrator';
 import { messageSlot, stopSlot } from '../control/slot';
 import type { Exec } from '../detect/exec';
+import type { NormalizeHandlers } from '../normalize';
 import type { PlannerHandlers } from '../planner';
 import type { ProjectFs } from '../projects/fs';
 import { inspectProject, refreshProject } from '../projects/inspect';
@@ -70,7 +71,16 @@ export interface HandlerContext {
   cards?: CardHandlers;
   /** Card capture (#244); absent means this runner does not extract cards. */
   capture?: CaptureHandlers;
+  /** Text normalization (#271); absent means this runner does not translate text. */
+  normalize?: NormalizeHandlers;
 }
+
+const noNormalize = (): never => {
+  throw new CommandFailure(
+    'unsupported',
+    'this runner does not normalize text',
+  );
+};
 
 const noCards = (): never => {
   throw new CommandFailure(
@@ -207,5 +217,7 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
         : noCards(),
     'cards.extract': (args) =>
       context.capture?.['cards.extract'](args) ?? noCapture(),
+    'text.normalize': (args) =>
+      context.normalize?.['text.normalize'](args) ?? noNormalize(),
   };
 };

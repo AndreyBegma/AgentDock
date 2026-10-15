@@ -9,6 +9,7 @@ import { plannerCommands } from './commands/planner';
 import { queueCommands } from './commands/queue';
 import { skillCommands } from './commands/skills';
 import { terminalCommands } from './commands/terminal';
+import { textCommands } from './commands/text';
 import { uiprofileCommands } from './commands/uiprofile';
 import { worktreeCommands } from './commands/worktree';
 import {
@@ -141,6 +142,7 @@ export const commands = {
   ...worktreeCommands,
   ...cardCommands,
   ...captureCommands,
+  ...textCommands,
 } as const satisfies Record<string, CommandDefinition>;
 
 export type CommandName = keyof typeof commands;
