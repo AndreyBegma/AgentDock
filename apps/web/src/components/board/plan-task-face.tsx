@@ -25,9 +25,9 @@ export function PlanTaskFace({
   const prHref = task.issue?.prUrl ? safeHttpsUrl(task.issue.prUrl) : null;
   return (
     <div className="flex min-w-0 flex-col gap-1.5 text-sm">
-      <div className="flex items-center gap-2 text-xs text-ink-2">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-2">
         <Badge size="sm" label="Plan" />
-        <span className="min-w-0 truncate font-mono">
+        <span className="min-w-0 break-words font-mono">
           {planTaskBoardLabel(task.key, task.planTitle)}
         </span>
         {task.kind === 'bug' ? (
