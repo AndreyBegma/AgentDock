@@ -2,6 +2,9 @@
 
 **One place to see, steer, approve and pay for every AI coding agent you run.**
 
+**[agentdock.luna-realm.com](https://agentdock.luna-realm.com/)**: what AgentDock is, at a glance.
+
+[![Website](https://img.shields.io/badge/website-agentdock.luna--realm.com-black)](https://agentdock.luna-realm.com/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![agentdock-runner on npm](https://img.shields.io/npm/v/agentdock-runner?label=agentdock-runner)](https://www.npmjs.com/package/agentdock-runner)
 [![@andrewbehma/glass-ui on npm](https://img.shields.io/npm/v/@andrewbehma/glass-ui?label=%40andrewbehma%2Fglass-ui)](https://www.npmjs.com/package/@andrewbehma/glass-ui)
@@ -274,6 +277,11 @@ CI runs on Woodpecker. A pull request runs `check` and `build`, and tests only
 the packages it changed plus their dependents
 ([ADR-0018](docs/adr/0018-pull-requests-test-what-changed.md)). Pull requests
 target `develop`; a push to `develop` deploys staging.
+
+New `@andrewbehma/glass-ui` releases arrive as pull requests into `develop`
+from Renovate ([`renovate.json`](renovate.json)). Renovate watches only that
+package, pinned exactly, and a person merges its pull requests. Every other
+dependency is updated by hand.
 
 ## Documentation
 

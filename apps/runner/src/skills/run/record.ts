@@ -6,7 +6,7 @@ import {
   renameSync,
   writeFileSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import {
   skillRunArgsSchema,
   skillRunIdSchema,
@@ -66,6 +66,16 @@ export const launchSpecSchema = z.object({
   args: z.array(z.string()),
   env: z.record(z.string(), z.string()),
   cwd: z.string().min(1),
+  /** A file fed to the binary on stdin (a plan turn's `prompt.md`); absent means none. */
+  stdin: z
+    .string()
+    .refine((p) => isAbsolute(p), { message: 'must be an absolute path' })
+    .optional(),
+  /**
+   * A board card's worker (#242 D5): the binary inherits the tmux pane as its
+   * terminal instead of writing to `stream.jsonl` and `stderr.log`.
+   */
+  interactive: z.boolean().optional(),
 });
 export type LaunchSpec = z.infer<typeof launchSpecSchema>;
 

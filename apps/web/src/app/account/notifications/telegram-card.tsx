@@ -3,7 +3,9 @@
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
+import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { useState } from 'react';
+import { formatDate } from '../../../lib/format';
 import type { useTelegramLink } from '../../../lib/notifications/use-telegram-link';
 
 type Link = ReturnType<typeof useTelegramLink>;
@@ -21,10 +23,11 @@ export function TelegramCard({ link }: { link: Link }) {
 
   return (
     <Card pad="lg" id="telegram">
-      <h2 className="mb-1 text-lg font-bold">Telegram</h2>
-      <p className="text-ink-2 mb-4 text-sm">
-        Get the notifications you pick below in a private chat with the bot.
-      </p>
+      <SectionHeader
+        className="mb-4"
+        title="Telegram"
+        description="Get the notifications you pick below in a private chat with the bot."
+      />
       {view.status === 'loading' ? (
         <p className="text-ink-2 text-sm">Loading…</p>
       ) : view.status === 'error' ? (
@@ -32,7 +35,7 @@ export function TelegramCard({ link }: { link: Link }) {
           tone="warn"
           title="Telegram is not answering"
           action={
-            <Button size="sm" onClick={() => void reload()}>
+            <Button variant="glass" size="sm" onClick={() => void reload()}>
               Try again
             </Button>
           }
@@ -45,7 +48,7 @@ export function TelegramCard({ link }: { link: Link }) {
             Linked
             {view.state.username ? ` as @${view.state.username}` : ''}
             {view.state.linkedAt
-              ? ` · since ${new Date(view.state.linkedAt).toLocaleDateString()}`
+              ? ` · since ${formatDate(view.state.linkedAt, 'date')}`
               : ''}
           </span>
           <Button
@@ -80,15 +83,14 @@ export function TelegramCard({ link }: { link: Link }) {
                 href={pending.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="underline"
+                className="text-accent-ink underline"
               >
                 open the link
               </a>{' '}
-              (valid until {new Date(pending.expiresAt).toLocaleTimeString()}),
-              then{' '}
+              (valid until {formatDate(pending.expiresAt, 'time')}), then{' '}
               <button
                 type="button"
-                className="underline"
+                className="text-accent-ink underline"
                 onClick={() => void reload()}
               >
                 check again

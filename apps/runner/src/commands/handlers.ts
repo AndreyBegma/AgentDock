@@ -5,18 +5,25 @@ import type {
   TerminalAttachResult,
   WatchedProject,
 } from '@agentdock/shared/protocol';
+import type { AssessHandlers } from '../assess';
+import type { CaptureHandlers } from '../capture';
+import { type CardHandlers, closeCardPr, mergeCard } from '../cards';
 import { type Clock, isoNow } from '../clock';
 import type { ConfigProfile } from '../config';
 import {
+  messageOrchestrator,
   orchestratorStatus,
   startOrchestrator,
   stopOrchestrator,
 } from '../control/orchestrator';
 import { messageSlot, stopSlot } from '../control/slot';
 import type { Exec } from '../detect/exec';
+import type { NormalizeHandlers } from '../normalize';
+import type { PlannerHandlers } from '../planner';
 import type { ProjectFs } from '../projects/fs';
 import { inspectProject, refreshProject } from '../projects/inspect';
 import type { SkillHandlers } from '../skills';
+import type { UiProfileHandlers } from '../uiprofile';
 import {
   prApprove,
   prRequestChanges,
@@ -32,6 +39,7 @@ import {
   type SessionBackfillContext,
   sessionBackfill,
 } from './session-backfill';
+import { worktreeStatus } from './worktree/status';
 
 export interface HandlerContext {
   clock: Clock;
@@ -56,10 +64,58 @@ export interface HandlerContext {
   };
   /** Skills (spec 24); absent means this runner does not serve them. */
   skills?: SkillHandlers;
+  /** The planner (spec 172); absent means this runner does not serve plans. */
+  planner?: PlannerHandlers;
+  /** UI profiles (spec 223); absent means this runner does not build them. */
+  uiprofile?: UiProfileHandlers;
+  /** Board card workers (#242); absent means this runner does not run them. */
+  cards?: CardHandlers;
+  /** Card capture (#244); absent means this runner does not extract cards. */
+  capture?: CaptureHandlers;
+  /** Text normalization (#271); absent means this runner does not translate text. */
+  normalize?: NormalizeHandlers;
+  /** Card model assessment (#322); absent means this runner does not assess cards. */
+  assess?: AssessHandlers;
 }
+
+const noAssess = (): never => {
+  throw new CommandFailure('unsupported', 'this runner does not assess cards');
+};
+
+const noNormalize = (): never => {
+  throw new CommandFailure(
+    'unsupported',
+    'this runner does not normalize text',
+  );
+};
+
+const noCards = (): never => {
+  throw new CommandFailure(
+    'unsupported',
+    'this runner does not run board card workers',
+  );
+};
+
+const noCapture = (): never => {
+  throw new CommandFailure(
+    'unsupported',
+    'this runner does not run card capture',
+  );
+};
 
 const noSkills = (): never => {
   throw new CommandFailure('unsupported', 'this runner does not serve skills');
+};
+
+const noPlanner = (): never => {
+  throw new CommandFailure('unsupported', 'this runner does not serve plans');
+};
+
+const noUiProfile = (): never => {
+  throw new CommandFailure(
+    'unsupported',
+    'this runner does not serve UI profiles',
+  );
 };
 
 /** One handler per allowlisted command; each later command adds its own here. */
@@ -94,6 +150,7 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
     'orchestrator.start': (args) => startOrchestrator(args, control),
     'orchestrator.stop': (args) => stopOrchestrator(args, control),
     'orchestrator.status': (args) => orchestratorStatus(args, control),
+    'orchestrator.message': (args) => messageOrchestrator(args, control),
     'slot.stop': (args) => stopSlot(args, control),
     'slot.message': (args) => messageSlot(args, control),
     'issue.create': (args) =>
@@ -133,5 +190,50 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
     'skill.run': (args) => context.skills?.['skill.run'](args) ?? noSkills(),
     'skill.cancel': (args) =>
       context.skills?.['skill.cancel'](args) ?? noSkills(),
+    'plan.turn': (args) => context.planner?.['plan.turn'](args) ?? noPlanner(),
+    'plan.cancel': (args) =>
+      context.planner?.['plan.cancel'](args) ?? noPlanner(),
+    'plan.close': (args) =>
+      context.planner?.['plan.close'](args) ?? noPlanner(),
+    'plan.publish_specs': (args) =>
+      context.planner?.['plan.publish_specs'](args) ?? noPlanner(),
+    'plan.queue_issues': (args) =>
+      context.planner?.['plan.queue_issues'](args) ?? noPlanner(),
+    'uiprofile.build': (args) =>
+      context.uiprofile?.['uiprofile.build'](args) ?? noUiProfile(),
+    'uiprofile.fingerprint': (args) =>
+      context.uiprofile?.['uiprofile.fingerprint'](args) ?? noUiProfile(),
+    'uiprofile.cancel': (args) =>
+      context.uiprofile?.['uiprofile.cancel'](args) ?? noUiProfile(),
+    'worktree.status': (args) =>
+      worktreeStatus(args, {
+        exec: context.exec,
+        watchedProjects: context.watchedProjects,
+      }),
+    'card.run': (args) => context.cards?.['card.run'](args) ?? noCards(),
+    'card.stop': (args) => context.cards?.['card.stop'](args) ?? noCards(),
+    'card.collect': (args) =>
+      context.cards?.['card.collect'](args) ?? noCards(),
+    'card.close': (args) => context.cards?.['card.close'](args) ?? noCards(),
+    'card.merge': (args) =>
+      context.cards
+        ? mergeCard(args, {
+            exec: context.exec,
+            watchedProjects: context.watchedProjects,
+          })
+        : noCards(),
+    'card.prClose': (args) =>
+      context.cards
+        ? closeCardPr(args, {
+            exec: context.exec,
+            watchedProjects: context.watchedProjects,
+          })
+        : noCards(),
+    'cards.extract': (args) =>
+      context.capture?.['cards.extract'](args) ?? noCapture(),
+    'text.normalize': (args) =>
+      context.normalize?.['text.normalize'](args) ?? noNormalize(),
+    'card.assess': (args) =>
+      context.assess?.['card.assess'](args) ?? noAssess(),
   };
 };

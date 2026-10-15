@@ -15,14 +15,22 @@ import {
   TableHead,
   TableRow,
 } from '@andrewbehma/glass-ui/table';
+import { Tab, TabGroup, TabList, TabPanel } from '@andrewbehma/glass-ui/tabs';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { ActionRequestsPanel } from '../../../../../components/approvals/action-requests-panel';
+import { PageHeader } from '../../../../../components/page-header/page-header';
 import { AsyncSection } from '../../../../../components/prerequisites/async-section';
 import { RunnerOfflineBanner } from '../../../../../components/prerequisites/prerequisite-banner';
 import { LiveStatusBadge } from '../../../../../components/shell/live-status-badge';
 import { api } from '../../../../../lib/api';
+import {
+  APPROVAL_TABS,
+  type ApprovalTab,
+  pendingRequests,
+} from '../../../../../lib/approvals/action-requests';
 import {
   approvalSettingsHref,
   deciderLabel,
@@ -34,12 +42,11 @@ import {
   STATUS_LABEL,
   STATUS_TONE,
 } from '../../../../../lib/approvals/format';
-import {
-  CHECKS_LABEL,
-  CHECKS_TONE,
-  formatAgo,
-} from '../../../../../lib/fleet/format';
+import { useActionRequests } from '../../../../../lib/approvals/use-action-requests';
+import { CHECKS_LABEL, CHECKS_TONE } from '../../../../../lib/fleet/format';
+import { Time } from '../../../../../lib/format/time';
 import { useLive } from '../../../../../lib/live/use-live';
+import { useTabParam } from '../../../../../lib/projects/use-tab-param';
 import { safeHttpsUrl } from '../../../../../lib/queue/format';
 import { useSection } from '../../../../../lib/section/use-section';
 import { useProjectDetail } from '../use-project-detail';
@@ -144,13 +151,16 @@ export default function ApprovalsPage() {
     [projectId, version],
   );
 
+  const actionRequests = useActionRequests(projectId);
+  const [tab, setTab] = useTabParam(APPROVAL_TABS);
+
   if (approvals.data === undefined && isNotFound(approvals.error)) {
     return (
       <EmptyState
         title="Project not found"
         description="It was removed, or you are not a member of it."
         action={
-          <Link href="/projects" className="text-sm underline">
+          <Link href="/projects" className="text-sm text-accent-ink underline">
             Open Projects
           </Link>
         }
@@ -158,40 +168,85 @@ export default function ApprovalsPage() {
     );
   }
 
+  const pendingActions = actionRequests.data
+    ? pendingRequests(actionRequests.data).length
+    : 0;
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-semibold">Approvals</h1>
-            <p className="text-sm text-ink-2">
-              Pull requests that wait for a person before the orchestrator
-              merges them. AgentDock never merges itself.
-            </p>
-          </div>
-          <LiveStatusBadge />
-        </div>
+        <PageHeader
+          className="mb-0"
+          title="Approvals"
+          description="Pull requests that wait for a person before the orchestrator merges them, and what Claude Code sessions ask you to decide. AgentDock never merges itself."
+          actions={<LiveStatusBadge />}
+        />
         {project ? <RunnerOfflineBanner project={project} /> : null}
       </div>
 
-      <AsyncSection
-        section={approvals}
-        unavailable={{
-          title: 'Approvals could not be loaded',
-          stillWorks:
-            'Nothing was decided. Fleet and queue are still available.',
-        }}
-        empty={null}
-        isEmpty={() => false}
+      <TabGroup
+        value={tab}
+        onValueChange={(next) => setTab(next as ApprovalTab)}
       >
-        {(view) => (
-          <ApprovalsBody
-            view={view}
-            projectId={projectId}
-            onSelect={setSelected}
-          />
-        )}
-      </AsyncSection>
+        <TabList aria-label="Approvals">
+          <Tab value="pull-requests">Pull requests</Tab>
+          <Tab value="action-requests">
+            <span className="inline-flex items-center gap-2">
+              Action requests
+              {pendingActions > 0 ? (
+                <Badge
+                  tone="warn"
+                  label={String(pendingActions)}
+                  aria-label={`${pendingActions} waiting`}
+                />
+              ) : null}
+            </span>
+          </Tab>
+        </TabList>
+
+        <TabPanel value="pull-requests" className="pt-6">
+          <AsyncSection
+            section={approvals}
+            unavailable={{
+              title: 'Approvals could not be loaded',
+              stillWorks:
+                'Nothing was decided. Fleet and queue are still available.',
+            }}
+            empty={null}
+            isEmpty={() => false}
+          >
+            {(view) => (
+              <ApprovalsBody
+                view={view}
+                projectId={projectId}
+                onSelect={setSelected}
+              />
+            )}
+          </AsyncSection>
+        </TabPanel>
+
+        <TabPanel value="action-requests" className="pt-6">
+          <AsyncSection
+            section={actionRequests}
+            unavailable={{
+              title: 'Action requests could not be loaded',
+              stillWorks:
+                'Nothing was decided. Pull request approvals are still available.',
+            }}
+            empty={null}
+            isEmpty={() => false}
+          >
+            {(rows) => (
+              <ActionRequestsPanel
+                projectId={projectId}
+                rows={rows}
+                canOperate={canOperate}
+                onChanged={actionRequests.retry}
+              />
+            )}
+          </AsyncSection>
+        </TabPanel>
+      </TabGroup>
 
       <ApprovalSheet
         projectId={projectId}
@@ -277,7 +332,9 @@ function ApprovalsBody({
                 <TableCell>
                   <ChecksCell item={item} />
                 </TableCell>
-                <TableCell>{formatAgo(item.waitingSince)}</TableCell>
+                <TableCell>
+                  <Time value={item.waitingSince} />
+                </TableCell>
                 <TableCell>
                   <SourceBadge item={item} />
                 </TableCell>
@@ -290,11 +347,9 @@ function ApprovalsBody({
         </Table>
       )}
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">Recent decisions</h2>
-        {view.recent.length === 0 ? (
-          <p className="text-sm text-ink-2">No decision yet.</p>
-        ) : (
+      {view.recent.length > 0 ? (
+        <section className="flex flex-col gap-3">
+          <h2 className="text-lg font-semibold">Recent decisions</h2>
           <Table scroll>
             <TableHead>
               <TableRow>
@@ -327,7 +382,7 @@ function ApprovalsBody({
                   </TableCell>
                   <TableCell>{deciderLabel(item)}</TableCell>
                   <TableCell>
-                    {formatAgo(item.decidedAt ?? item.updatedAt)}
+                    <Time value={item.decidedAt ?? item.updatedAt} />
                   </TableCell>
                   <TableCell>
                     <span className="line-clamp-2 break-words">
@@ -341,8 +396,8 @@ function ApprovalsBody({
               ))}
             </tbody>
           </Table>
-        )}
-      </section>
+        </section>
+      ) : null}
     </>
   );
 }

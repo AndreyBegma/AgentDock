@@ -9,9 +9,11 @@ import type {
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
+import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Field, Input } from '@andrewbehma/glass-ui/field';
+import { KeyValueList } from '@andrewbehma/glass-ui/key-value-list';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import {
@@ -24,15 +26,19 @@ import { toast } from '@andrewbehma/glass-ui/toast';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { DisabledReason } from '../../../components/prerequisites/disabled-reason';
 import { api } from '../../../lib/api';
+import { Time } from '../../../lib/format/time';
 import {
   capabilityRows,
   describeRunnerError,
-  formatLastSeen,
+  formatLoad,
+  LOAD_LABEL,
   runnerRemedy,
   STATUS_TONE,
   statusLabel,
 } from '../../../lib/runners/format';
 import { PROFILES_DETECT_COMMAND } from '../../../lib/runners/install';
+import { useErrorToast } from '../../../lib/section/use-error-toast';
+import { LocalSettings } from './local-settings';
 
 const POLL_MS = 10_000;
 
@@ -71,15 +77,16 @@ export function RunnerSheet({
   const [dialog, setDialog] = useState<Dialog>();
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
+  const showError = useErrorToast();
 
   const load = useCallback(async () => {
     if (!runnerId) return;
     try {
       setDetail(await api<AdminRunnerDetail>(`/admin/runners/${runnerId}`));
     } catch (err) {
-      toast.error(describeRunnerError(err));
+      showError(describeRunnerError(err));
     }
-  }, [runnerId]);
+  }, [runnerId, showError]);
 
   useEffect(() => {
     setDetail(undefined);
@@ -94,7 +101,7 @@ export function RunnerSheet({
     try {
       return await task();
     } catch (err) {
-      toast.error(describeRunnerError(err));
+      showError(describeRunnerError(err));
       return undefined;
     } finally {
       setBusy(false);
@@ -108,7 +115,7 @@ export function RunnerSheet({
     if (!result) return;
     const { ok, text } = pingMessage(result);
     if (ok) toast.success(text);
-    else toast.error(text);
+    else showError(text);
   };
 
   const newCode = async () => {
@@ -168,6 +175,11 @@ export function RunnerSheet({
         {runnerId ? (
           <SheetContent
             side="right"
+            footer={
+              <Button variant="glass" onClick={onClose}>
+                Close
+              </Button>
+            }
             title={detail?.name ?? 'Runner'}
             description={
               detail
@@ -198,7 +210,8 @@ export function RunnerSheet({
                     )}
                   </span>
                   <span className="text-xs text-ink-3">
-                    last seen {formatLastSeen(detail.lastSeenAt)}
+                    last seen{' '}
+                    <Time value={detail.lastSeenAt} fallback="never" />
                   </span>
                 </div>
                 {remedy && !isRevoked ? (
@@ -240,14 +253,6 @@ export function RunnerSheet({
                   >
                     New pairing code
                   </Button>
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    disabled={busy || isRevoked}
-                    onClick={() => setDialog('revoke')}
-                  >
-                    Revoke
-                  </Button>
                 </div>
                 {isRevoked ? (
                   <DisabledReason>
@@ -261,28 +266,51 @@ export function RunnerSheet({
                   <h3 id="runner-about" className="mb-2 text-sm font-semibold">
                     Runner
                   </h3>
-                  <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-                    <dt className="text-ink-3">Version</dt>
-                    <dd>{detail.version ?? '—'}</dd>
-                    <dt className="text-ink-3">Protocol</dt>
-                    <dd>{detail.protocolVersion ?? '—'}</dd>
-                    <dt className="text-ink-3">Paired</dt>
-                    <dd>
-                      {detail.pairedAt
-                        ? new Date(detail.pairedAt).toLocaleString()
-                        : 'not paired'}
-                    </dd>
-                    <dt className="text-ink-3">Events stored</dt>
-                    <dd>up to #{detail.ackedSeq}</dd>
-                    {detail.heartbeat ? (
-                      <>
-                        <dt className="text-ink-3">Load</dt>
-                        <dd>{detail.heartbeat.load.join(' / ')}</dd>
-                        <dt className="text-ink-3">tmux sessions</dt>
-                        <dd>{detail.heartbeat.tmuxSessions}</dd>
-                      </>
-                    ) : null}
-                  </dl>
+                  <KeyValueList
+                    dense
+                    items={[
+                      {
+                        key: 'version',
+                        label: 'Version',
+                        value: detail.version ?? '—',
+                      },
+                      {
+                        key: 'protocol',
+                        label: 'Protocol',
+                        value: detail.protocolVersion ?? '—',
+                      },
+                      {
+                        key: 'paired',
+                        label: 'Paired',
+                        value: (
+                          <Time value={detail.pairedAt} fallback="not paired" />
+                        ),
+                      },
+                      {
+                        key: 'events',
+                        label: 'Events stored',
+                        value: `up to #${detail.ackedSeq}`,
+                      },
+                      ...(detail.heartbeat
+                        ? [
+                            {
+                              key: 'load',
+                              label: LOAD_LABEL,
+                              value: (
+                                <span className="num">
+                                  {formatLoad(detail.heartbeat.load)}
+                                </span>
+                              ),
+                            },
+                            {
+                              key: 'tmux',
+                              label: 'tmux sessions',
+                              value: detail.heartbeat.tmuxSessions,
+                            },
+                          ]
+                        : []),
+                    ]}
+                  />
                 </section>
 
                 <section aria-labelledby="runner-caps">
@@ -290,20 +318,29 @@ export function RunnerSheet({
                     Capabilities
                   </h3>
                   {detail.capabilities ? (
-                    <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-                      {capabilityRows(detail.capabilities).map((row) => (
-                        <div key={row.label} className="contents">
-                          <dt className="text-ink-3">{row.label}</dt>
-                          <dd>{row.value}</dd>
-                        </div>
-                      ))}
-                    </dl>
+                    <KeyValueList
+                      dense
+                      items={capabilityRows(detail.capabilities).map((row) => ({
+                        key: row.label,
+                        label: row.label,
+                        value: row.value,
+                      }))}
+                    />
                   ) : (
                     <p className="text-sm text-ink-3">
                       Reported when the runner connects.
                     </p>
                   )}
                 </section>
+
+                <LocalSettings
+                  runner={detail}
+                  disabled={isRevoked || busy}
+                  onChanged={() => {
+                    void load();
+                    onChanged();
+                  }}
+                />
 
                 <section aria-labelledby="runner-profiles">
                   <h3
@@ -326,7 +363,7 @@ export function RunnerSheet({
                     <Table scroll>
                       <TableHead>
                         <TableRow>
-                          <TableCell head>Profile</TableCell>
+                          <TableCell head>Profile key</TableCell>
                           <TableCell head>Runtime</TableCell>
                           <TableCell head>Auth</TableCell>
                         </TableRow>
@@ -380,13 +417,39 @@ export function RunnerSheet({
                             <TableCell>{event.type}</TableCell>
                             <TableCell>{event.source}</TableCell>
                             <TableCell>
-                              {new Date(event.ts).toLocaleTimeString()}
+                              <Time value={event.ts} />
                             </TableCell>
                           </TableRow>
                         ))}
                       </tbody>
                     </Table>
                   )}
+                </section>
+
+                <section
+                  aria-labelledby="runner-danger"
+                  className="flex flex-col gap-3 rounded-lg border border-danger/40 p-4"
+                >
+                  <h3
+                    id="runner-danger"
+                    className="text-sm font-semibold text-danger"
+                  >
+                    Danger zone
+                  </h3>
+                  <p className="text-sm text-ink-2">
+                    Revoking disconnects the runner now and refuses it when it
+                    reconnects. Its row and events stay.
+                  </p>
+                  <div>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      disabled={busy || isRevoked}
+                      onClick={() => setDialog('revoke')}
+                    >
+                      Revoke runner
+                    </Button>
+                  </div>
                 </section>
               </div>
             )}
@@ -432,29 +495,18 @@ export function RunnerSheet({
         </DialogContent>
       </DialogRoot>
 
-      <DialogRoot
+      <ConfirmDialog
         open={dialog === 'revoke'}
         onOpenChange={(open) => {
           if (!open) setDialog(undefined);
         }}
-      >
-        <DialogContent
-          title="Revoke runner"
-          description={`${detail?.name ?? 'This runner'} will be disconnected now and refused when it reconnects. Its row and events stay. To use the machine again, pair a new runner.`}
-          footer={
-            <>
-              <Button variant="ghost" onClick={() => setDialog(undefined)}>
-                Cancel
-              </Button>
-              <Button variant="danger" disabled={busy} onClick={revoke}>
-                Revoke
-              </Button>
-            </>
-          }
-        >
-          {null}
-        </DialogContent>
-      </DialogRoot>
+        title={`Revoke ${detail?.name ?? 'this runner'}?`}
+        consequence="It will be disconnected now and refused when it reconnects. Its row and events stay. To use the machine again, pair a new runner."
+        verb="Revoke"
+        tone="danger"
+        busy={busy}
+        onConfirm={() => void revoke()}
+      />
     </>
   );
 }

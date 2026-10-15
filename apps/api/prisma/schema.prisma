@@ -37,7 +37,11 @@ model User {
   approvedUsers               User[]                        @relation("UserApprovals")
   sessions                    UserSession[]
   settingsUpdated             Setting[]
-  runnersCreated              Runner[]
+  runnersCreated              Runner[]                      @relation("RunnerCreatedBy")
+  runnersLocal                Runner[]                      @relation("RunnerLocalUser")
+  sessionsOwned               AgentSession[]                @relation("SessionOwner")
+  actionRequestsRequested     ActionRequest[]               @relation("ActionRequestRequestedBy")
+  actionRequestsDecided       ActionRequest[]               @relation("ActionRequestDecidedBy")
   projectsCreated             Project[]
   memberships                 ProjectMember[]               @relation("ProjectMembership")
   membersAdded                ProjectMember[]               @relation("ProjectMemberAddedBy")
@@ -61,6 +65,23 @@ model User {
   inboundTriggersCreated      InboundTrigger[]
   webhooksCreated             Webhook[]
   githubAppsRegistered        GitHubApp[]
+  plannerInstructions         PlannerInstructions[]
+  plannerSettingsUpdated      PlannerSettings[]
+  plans                       Plan[]
+  planTurns                   PlanTurn[]
+  uiProfilesAuthored          UiProfile[]
+  designSettingsUpdated       DesignSettings[]
+  taskDesignsApproved         TaskDesign[]
+  designComments              DesignComment[]
+  boardCardsCreated           BoardCard[]                   @relation("BoardCardCreatedBy")
+  boardCardsMoved             BoardCard[]                   @relation("BoardCardMovedBy")
+  boardCardsCompleted         BoardCard[]                   @relation("BoardCardCompletedBy")
+  boardCardRounds             BoardCardRound[]
+  boardSettingsUpdated        BoardSettings[]
+  cardDismissals              CardDismissal[]
+  textNormalizations          TextNormalization[]
+  textSettingsUpdated         TextSettings[]
+  attachmentsUploaded         Attachment[]
 
   @@map("users")
 }
@@ -120,10 +141,16 @@ model Runner {
   revokedAt       DateTime?
   /// Nullable so deleting the admin who created it keeps the runner.
   createdById     String?
+  /// The user a local request (hook or MCP) acts as (spec 201 D8); backfilled
+  /// from `createdById`. Null: every local request is `forbidden`.
+  localUserId     String?
+  /// Away mode: permission prompts go to the web app and Telegram (spec 201 D17).
+  awayMode        Boolean   @default(false)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  createdBy            User?                 @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy            User?                 @relation("RunnerCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  localUser            User?                 @relation("RunnerLocalUser", fields: [localUserId], references: [id], onDelete: SetNull)
   pairingCodes         RunnerPairingCode[]
   profiles             RuntimeProfile[]
   events               Event[]
@@ -134,6 +161,7 @@ model Runner {
   incidents            RunnerIncident[]
   installedSkills      InstalledSkill[]
   skillInstallPreviews SkillInstallPreview[]
+  actionRequests       ActionRequest[]
 
   @@map("runners")
 }
@@ -236,25 +264,25 @@ enum AuditResult {
 /// DELETE and TRUNCATE. Actor and project ids are plain columns, not foreign
 /// keys: records outlive users and projects, and a SET NULL would be an UPDATE.
 model AuditRecord {
-  seq           BigInt         @id @default(autoincrement())
-  ts            DateTime       @default(now())
-  actorType     AuditActorType
-  actorUserId   String?
-  actorRunnerId String?
+  seq               BigInt         @id @default(autoincrement())
+  ts                DateTime       @default(now())
+  actorType         AuditActorType
+  actorUserId       String?
+  actorRunnerId     String?
   /// A `system` actor's principal (#102); hashed only when set.
   actorOnBehalfOfId String?
-  action        String
-  targetType    String
-  targetId      String?
-  projectId     String?
-  before        Json?
-  after         Json?
-  result        AuditResult
-  meta          Json?
+  action            String
+  targetType        String
+  targetId          String?
+  projectId         String?
+  before            Json?
+  after             Json?
+  result            AuditResult
+  meta              Json?
   /// `hash` of the previous record by `seq`; 64 zeros for the first.
-  prevHash      String
+  prevHash          String
   /// sha256(prevHash ‖ canonical(record)), hex.
-  hash          String         @unique
+  hash              String         @unique
 
   @@index([ts])
   @@index([action, ts])
@@ -293,29 +321,33 @@ enum DocsRule {
 /// A git repository on a runner (docs/specs/10). `rootPath` is its main
 /// checkout; the same `owner/name` on two runners is two projects (D14).
 model Project {
-  id                 String     @id @default(cuid())
-  runnerId           String
-  rootPath           String
+  id                          String     @id @default(cuid())
+  runnerId                    String
+  rootPath                    String
   /// `owner/name` on GitHub — the only forge a project connects on (ADR-0004).
-  repo               String
-  displayName        String
-  baseBranch         String
-  baseSource         BaseSource
-  baseOverride       String?
-  readyLabelOverride String?
+  repo                        String
+  displayName                 String
+  baseBranch                  String
+  baseSource                  BaseSource
+  baseOverride                String?
+  readyLabelOverride          String?
   /// Must belong to `runnerId`; checked by the API.
-  defaultProfileId   String?
+  defaultProfileId            String?
   /// Stored for M2.5; nothing reads it yet.
-  mergeApproval      Boolean    @default(false)
+  mergeApproval               Boolean    @default(false)
+  /// Store redacted session content from hooks (ADR-0021). Off by default.
+  shipSessionContent          Boolean    @default(false)
+  /// 1–365, validated by the DTO.
+  sessionContentRetentionDays Int        @default(30)
   /// The `orchestrator` block of `.code-analyzer-config.json` and/or its parse error.
-  codeSentinelConfig Json?
-  hasClaudeMd        Boolean
-  hasAgentsMd        Boolean
-  lastInspectedAt    DateTime
+  codeSentinelConfig          Json?
+  hasClaudeMd                 Boolean
+  hasAgentsMd                 Boolean
+  lastInspectedAt             DateTime
   /// Nullable so deleting the admin who connected it keeps the project.
-  createdById        String?
-  createdAt          DateTime   @default(now())
-  updatedAt          DateTime   @updatedAt
+  createdById                 String?
+  createdAt                   DateTime   @default(now())
+  updatedAt                   DateTime   @updatedAt
 
   runner               Runner                       @relation(fields: [runnerId], references: [id], onDelete: Restrict)
   defaultProfile       RuntimeProfile?              @relation(fields: [defaultProfileId], references: [id], onDelete: SetNull)
@@ -326,6 +358,7 @@ model Project {
   slots                Slot[]
   orchestrator         FleetOrchestrator?
   sessions             AgentSession[]
+  workflows            SessionWorkflow[]
   issues               IssueCache[]
   queueStates          QueueStateRow[]
   issueFeed            IssueFeed?
@@ -342,6 +375,20 @@ model Project {
   budgets              Budget[]
   inboundTriggers      InboundTrigger[]
   githubAppHealth      GitHubProjectHealth?
+  plannerInstructions  PlannerInstructions[]
+  plannerSettings      PlannerSettings?
+  plans                Plan[]
+  sessionContents      SessionContent[]
+  actionRequests       ActionRequest[]
+  uiProfiles           UiProfile[]
+  designSettings       DesignSettings?
+  boardCards           BoardCard[]
+  boardSettings        BoardSettings?
+  cardCaptures         CardCapture[]
+  cardDismissals       CardDismissal[]
+  textNormalizations   TextNormalization[]
+  textSettings         TextSettings?
+  attachments          Attachment[]
 
   @@unique([runnerId, rootPath])
   @@map("projects")
@@ -538,7 +585,8 @@ model SlotCheckpoint {
   position Int
   at       DateTime
 
-  slot Slot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  slot   Slot                     @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  notice BlockedCheckpointNotice?
 
   @@unique([slotId, position])
   @@map("slot_checkpoints")
@@ -576,11 +624,13 @@ enum CostSource {
 }
 
 /// An agent session found in a runtime's transcripts (docs/specs/12). Built from
-/// `session.observed`, `turn.*`, `llm.request` and `tool.call` events. No prompt,
-/// response or tool-argument text is stored (D9). A row created by an event that
-/// arrived before its `session.observed` has `cwd = ''` until that event comes.
+/// `session.observed`, `turn.*`, `llm.request` and `tool.call` events, and from
+/// `hook.*` events (spec 201 D14). No prompt, response or tool-argument text is
+/// stored here (D9); hook content lives in `session_contents`, only for projects
+/// that opted in (ADR-0021). A row created by an event that arrived before its
+/// `session.observed` has `cwd = ''` until that event comes.
 model AgentSession {
-  id              String    @id @default(cuid())
+  id              String            @id @default(cuid())
   runnerId        String
   runtime         Runtime
   profileKey      String?
@@ -593,26 +643,50 @@ model AgentSession {
   gitBranch       String?
   title           String?
   /// Distinct models used, in order of first use.
-  models          Json      @default("[]")
+  models          Json              @default("[]")
   /// The session this subagent session belongs to.
   parentSessionId String?
-  parsed          Boolean   @default(true)
+  parsed          Boolean           @default(true)
   startedAt       DateTime
   lastEventAt     DateTime
   endedAt         DateTime?
+  /// A subagent's type (Claude's `agentType`, e.g. `Explore`), from its
+  /// requests' `agentName`; written by the workflows sink (#161).
+  agentType       String?
+  /// worker (slot) / run / manual (hooks seen) / unknown (spec 201 D14).
+  origin          SessionOrigin     @default(unknown)
+  /// The slot's issue, or the number in a `<kind>/<n>-…` branch.
+  issue           Int?
+  /// For a manual session: the runner's local user.
+  ownerId         String?
+  /// Live state from hooks; null for sessions no hook has reported.
+  liveState       SessionLiveState?
+  /// `agentdock-manual-*` tmux session from `agentdock-runner claude` (D23).
+  tmuxSession     String?
 
-  runner      Runner         @relation(fields: [runnerId], references: [id], onDelete: Cascade)
-  project     Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  parent      AgentSession?  @relation("SessionParent", fields: [parentSessionId], references: [id], onDelete: SetNull)
-  children    AgentSession[] @relation("SessionParent")
-  turns       Turn[]
-  llmRequests LlmRequest[]
-  toolCalls   ToolCall[]
-  spawnedBy   ToolCall[]     @relation("ToolCallChild")
+  runner         Runner               @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+  owner          User?                @relation("SessionOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  project        Project?             @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  parent         AgentSession?        @relation("SessionParent", fields: [parentSessionId], references: [id], onDelete: SetNull)
+  children       AgentSession[]       @relation("SessionParent")
+  turns          Turn[]
+  llmRequests    LlmRequest[]
+  toolCalls      ToolCall[]
+  spawnedBy      ToolCall[]           @relation("ToolCallChild")
+  compactions    SessionCompaction[]
+  errors         SessionError[]
+  workflow       SessionWorkflow?
+  workflowMark   SessionWorkflowMark?
+  contents       SessionContent[]
+  actionRequests ActionRequest[]
+  cardCaptures   CardCapture[]
+  capturedCards  BoardCard[]          @relation("BoardCardSourceSession")
+  trackedCard    BoardCard?           @relation("BoardCardTrackedSession")
 
   @@unique([runnerId, runtime, externalId])
   @@index([projectId, startedAt])
   @@index([parentSessionId])
+  @@index([projectId, origin, lastEventAt])
   @@map("sessions")
 }
 
@@ -693,6 +767,199 @@ model ToolCall {
   @@unique([sessionId, toolUseId])
   @@index([childSessionId])
   @@map("tool_calls")
+}
+
+// ─── Workflows analytics (#161) ─────────────────────────────────────────────
+
+enum CompactionTrigger {
+  auto
+  manual
+}
+
+/// A `session.compacted` event: the runtime summarized the conversation.
+model SessionCompaction {
+  id           String            @id @default(cuid())
+  sessionId    String
+  /// The transcript line's id.
+  compactionId String
+  ts           DateTime
+  trigger      CompactionTrigger
+  preTokens    Int?
+
+  session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, compactionId])
+  @@map("session_compactions")
+}
+
+/// A `session.error` event: a request the runtime gave up on. `kind` is an
+/// error code, never a message (spec 12 D9).
+model SessionError {
+  id        String   @id @default(cuid())
+  sessionId String
+  /// The transcript line's id.
+  errorId   String
+  ts        DateTime
+  kind      String
+  status    Int?
+
+  session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, errorId])
+  @@map("session_errors")
+}
+
+/// A root session whose `session_workflows` row must be rebuilt: raised by
+/// the workflows sink each time an event reaches its tree, deleted by the
+/// projector once it built the row from that `seq`. Event times cannot be the
+/// cursor: a runner replaying its spool sends old ones.
+model SessionWorkflowMark {
+  sessionId String @id
+  seq       Int    @default(1)
+
+  session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("session_workflow_marks")
+}
+
+/// One root session's workflow facts, projected from its tree by
+/// `WorkflowsProjector` (#161). Definitions: `packages/shared/src/workflows`.
+model SessionWorkflow {
+  sessionId        String   @id
+  projectId        String?
+  runtime          Runtime
+  profileKey       String?
+  startedAt        DateTime
+  /// The latest `lastEventAt` in the tree.
+  lastEventAt      DateTime
+  depth            Int
+  subagents        Int
+  compactions      Int
+  /// A type name, or `~none` / `~unknown` (shared `WORKFLOW_AGENT_TYPE`).
+  primaryAgentType String
+  /// No LLM request in the tree came after its last `session.error`.
+  errored          Boolean
+  /// The root's last turn never finished.
+  lastTurnOpen     Boolean
+  builtAt          DateTime
+
+  session     AgentSession            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  project     Project?                @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  transitions SessionToolTransition[]
+
+  @@index([startedAt])
+  @@index([projectId, startedAt])
+  @@map("session_workflows")
+}
+
+/// Tool-call transitions inside one root session's tree (#161): `to` was
+/// called right after `from` in the same turn of the same session.
+model SessionToolTransition {
+  sessionId String
+  from      String
+  to        String
+  count     Int
+  /// Transitions whose `to` call failed.
+  errors    Int
+
+  workflow SessionWorkflow @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
+
+  @@id([sessionId, from, to])
+  @@map("session_tool_transitions")
+}
+
+// ─── Claude Code integration (docs/specs/201) ───────────────────────────────
+
+enum SessionOrigin {
+  unknown
+  worker
+  run
+  manual
+}
+
+enum SessionLiveState {
+  idle
+  working
+  waiting
+  ended
+}
+
+enum SessionContentKind {
+  prompt
+  response
+  tool_input
+  tool_output
+}
+
+enum ActionRequestKind {
+  tool_use
+  orchestrator_start
+  orchestrator_stop
+  pr_approve
+}
+
+enum ActionRequestStatus {
+  pending
+  approved
+  denied
+  expired
+  executed
+  failed
+}
+
+/// Redacted session text from hooks (ADR-0021): written only while the
+/// project's `shipSessionContent` is on, deleted after its retention.
+model SessionContent {
+  id        BigInt             @id @default(autoincrement())
+  sessionId String
+  projectId String
+  kind      SessionContentKind
+  toolUseId String?
+  toolName  String?
+  at        DateTime
+  text      String
+  truncated Boolean            @default(false)
+  createdAt DateTime           @default(now())
+
+  session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  project Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, at])
+  @@index([projectId, createdAt])
+  @@map("session_contents")
+}
+
+/// An action a local session asked for and a person decides (spec 201 D18).
+/// `tool_use` only returns the decision; the other kinds are executed as the
+/// approver.
+model ActionRequest {
+  id            String              @id @default(cuid())
+  projectId     String
+  runnerId      String
+  sessionId     String?
+  /// The runner's local user. Nullable so deleting the user keeps the row.
+  requestedById String?
+  kind          ActionRequestKind
+  summary       String
+  args          Json
+  status        ActionRequestStatus @default(pending)
+  /// Nullable so deleting the user keeps the decision.
+  decidedById   String?
+  decidedAt     DateTime?
+  note          String?
+  result        Json?
+  expiresAt     DateTime
+  createdAt     DateTime            @default(now())
+
+  project     Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  runner      Runner        @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+  session     AgentSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  requestedBy User?         @relation("ActionRequestRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+  decidedBy   User?         @relation("ActionRequestDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+
+  @@index([projectId, status, createdAt])
+  @@index([status, expiresAt])
+  @@map("action_requests")
 }
 
 // ─── Tokens and API-equivalent cost (docs/specs/13) ─────────────────────────
@@ -1146,6 +1413,20 @@ model RunnerIncident {
   @@map("runner_incidents")
 }
 
+/// The blocked-checkpoint sweep's memory of one blocked checkpoint (spec 22
+/// note 23): which heading it is about, since when that heading stands, and
+/// whether it notified. A new heading at the same position starts it over.
+model BlockedCheckpointNotice {
+  checkpointId String    @id
+  heading      String
+  since        DateTime
+  notifiedAt   DateTime?
+
+  checkpoint SlotCheckpoint @relation(fields: [checkpointId], references: [id], onDelete: Cascade)
+
+  @@map("blocked_checkpoint_notices")
+}
+
 // ─── Activity feed and execution history (docs/specs/21) ────────────────────
 // Projections of `events`, `audit_records` and `slots`, which are read only
 // here. Rebuildable from their sources within the `events` retention.
@@ -1225,6 +1506,18 @@ enum RunKind {
   orchestrator_slot
   skill
   schedule
+  /// A Planner turn (docs/specs/172 D14).
+  plan
+  /// A UI profile build (docs/specs/223 D13).
+  ui_profile
+  /// A board card round (issue #242 D4).
+  card
+  /// A card capture extraction (issue #244 D4).
+  card_capture
+  /// A text normalization (issue #271 D4, ADR-0027).
+  text_normalize
+  /// A card's model assessment (issue #322 D5, ADR-0032).
+  card_assess
 }
 
 enum RunStatus {
@@ -1246,6 +1539,8 @@ enum RunTrigger {
   user
   schedule
   webhook
+  /// Card capture after a manual session idles or ends (issue #244 D2).
+  capture
 }
 
 /// One unit of agent work (D7, data-model.md). An `orchestrator_slot` run is a
@@ -1279,10 +1574,15 @@ model Run {
   /// same slot is identical.
   updatedAt       DateTime
 
-  project           Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  slot              Slot?             @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  project           Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  slot              Slot?              @relation(fields: [slotId], references: [id], onDelete: Cascade)
   skillRun          SkillRun?
+  planTurn          PlanTurn?
+  uiProfiles        UiProfile[]
   firings           ScheduleFiring[]
+  cardRound         BoardCardRound?
+  cardCapture       CardCapture?
+  textNormalization TextNormalization?
   inboundDeliveries InboundDelivery[]
 
   @@index([projectId, startedAt])
@@ -1879,4 +2179,929 @@ model GitHubProjectHealth {
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@map("github_project_health")
+}
+
+// ─── Planner (spec 172) ─────────────────────────────────────────────────────
+
+/// Shared `PLAN_MODES` (D2).
+enum PlanMode {
+  batch
+  dialogue
+}
+
+/// Shared `PLAN_VISIBILITIES` (D12).
+enum PlanVisibility {
+  private
+  project
+}
+
+/// Shared `PLAN_STATUSES`.
+enum PlanStatus {
+  clarifying
+  drafting
+  reviewing
+  sending
+  sent
+  archived
+}
+
+/// Shared `PLAN_TASK_KINDS` (D4).
+enum PlanTaskKind {
+  bug
+  feature
+}
+
+/// Shared `PLAN_TASK_STATUSES` (D6, D9; `needs_design`: spec 223 D1).
+enum PlanTaskStatus {
+  draft
+  needs_talk
+  needs_design
+  ready
+  approved
+  rejected
+  rewrite_requested
+  issued
+}
+
+/// Shared `PLAN_TURN_ACTIONS` (D16; `design`: spec 223 D7).
+enum PlanTurnAction {
+  decompose
+  clarify
+  grill
+  write
+  revise
+  design
+}
+
+/// Shared `PLAN_TURN_PHASES`.
+enum PlanTurnPhase {
+  queued
+  running
+  succeeded
+  failed
+  cancelled
+}
+
+/// Shared `PLANNER_SPEC_OUTPUTS` (D10).
+enum PlannerSpecOutput {
+  docs_pr
+  issue_body
+}
+
+/// The planner's instructions, one row per saved version (D11, ADR-0019).
+/// `projectId` null is the global default; a project row is that project's
+/// override. Unique `(projectId, version)`, and — Postgres treating NULLs as
+/// distinct — a partial unique index on `version` for the global rows (in the
+/// migration).
+model PlannerInstructions {
+  id        String   @id @default(cuid())
+  projectId String?
+  version   Int
+  body      String
+  /// Null for the seeded version 1, and when the author is deleted.
+  authorId  String?
+  createdAt DateTime @default(now())
+
+  project    Project?          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author     User?             @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  plans      Plan[]
+  overrideOf PlannerSettings[]
+
+  @@unique([projectId, version])
+  @@map("planner_instructions")
+}
+
+/// A project's planner settings (D10). No row: `docs_pr` when the project has
+/// a `specDir`, `issue_body` otherwise.
+model PlannerSettings {
+  projectId              String            @id
+  specOutput             PlannerSpecOutput
+  /// The project's instructions override, a project version; null: the latest
+  /// global version applies. Clearing sets null and keeps every version (D11).
+  overrideInstructionsId String?
+  /// Nullable so deleting the admin keeps the settings.
+  updatedById            String?
+  updatedAt              DateTime          @updatedAt
+
+  project              Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  overrideInstructions PlannerInstructions? @relation(fields: [overrideInstructionsId], references: [id], onDelete: SetNull)
+  updatedBy            User?                @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@map("planner_settings")
+}
+
+/// A plan: a brief and its tasks, across versions (D1, D9). One Claude
+/// session per plan (`sessionId`, D3); its read-only worktree (D15).
+model Plan {
+  id              String         @id @default(cuid())
+  projectId       String
+  /// Nullable so deleting the author keeps a sent plan's record; a private
+  /// plan without an author is readable by nobody (D12).
+  authorId        String?
+  title           String
+  brief           String
+  mode            PlanMode
+  visibility      PlanVisibility @default(private)
+  status          PlanStatus
+  version         Int            @default(1)
+  sessionId       String         @db.Uuid
+  /// The instructions version the plan runs with (D11).
+  instructionsId  String
+  contractVersion Int
+  profileKey      String
+  model           String
+  worktree        String?
+  docsPrNumber    Int?
+  docsPrUrl       String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  sentAt          DateTime?
+
+  project            Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author             User?               @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  instructions       PlannerInstructions @relation(fields: [instructionsId], references: [id], onDelete: Restrict)
+  tasks              PlanTask[]
+  turns              PlanTurn[]
+  designs            TaskDesign[]
+  textNormalizations TextNormalization[]
+
+  @@index([projectId, updatedAt])
+  @@index([authorId])
+  @@map("plans")
+}
+
+/// A task of one plan version (D4, D9). `key` is stable across versions;
+/// approved tasks are carried into the next version `frozen`. After it is
+/// issued, its live status is derived, never stored ("Data / Schema").
+model PlanTask {
+  id             String         @id @default(cuid())
+  planId         String
+  /// Stable within the plan (`t3`); `dependsOn` holds keys.
+  key            String
+  planVersion    Int
+  kind           PlanTaskKind
+  title          String
+  summary        String
+  dependsOn      String[]       @default([])
+  status         PlanTaskStatus @default(draft)
+  /// The current round's `PlanQuestion[]` (shared `planQuestionSchema`).
+  questions      Json           @default("[]")
+  document       String?
+  rewriteComment String?
+  frozen         Boolean        @default(false)
+  /// The fork of the plan session this task's conversation runs in (D3).
+  sessionId      String?        @db.Uuid
+  issueNumber    Int?
+  issueUrl       String?
+  queuedAt       DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  plan               Plan                @relation(fields: [planId], references: [id], onDelete: Cascade)
+  turns              PlanTurn[]
+  textNormalizations TextNormalization[]
+
+  @@unique([planId, key, planVersion])
+  @@index([planId, planVersion])
+  @@index([issueNumber])
+  @@map("plan_tasks")
+}
+
+/// One headless turn (D3, D17): a `runs` row of kind `plan` (D14). A turn
+/// whose output fails the contract keeps `resultText` and applies nothing.
+model PlanTurn {
+  id         String         @id @default(cuid())
+  /// Exactly one of `planId` / `cardId` (CHECK `plan_turns_owner_check`, ADR-0025).
+  planId     String?
+  /// A board card's design turn (#243 D2), sent as `plan.turn` with `planId = card.id`.
+  cardId     String?
+  /// Set for a task's grill or write turn.
+  taskId     String?
+  runId      String         @unique
+  action     PlanTurnAction
+  /// Nullable so deleting the author keeps the turn.
+  authorId   String?
+  /// `{ message?, answers? }` (shared `planTurnInputSchema`).
+  input      Json
+  /// The validated contract output.
+  output     Json?
+  resultText String?
+  phase      PlanTurnPhase  @default(queued)
+  error      String?
+  createdAt  DateTime       @default(now())
+  finishedAt DateTime?
+
+  plan               Plan?               @relation(fields: [planId], references: [id], onDelete: Cascade)
+  card               BoardCard?          @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  task               PlanTask?           @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  run                Run                 @relation(fields: [runId], references: [id], onDelete: Cascade)
+  author             User?               @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  designRevisions    DesignRevision[]
+  textNormalizations TextNormalization[]
+
+  @@index([planId, createdAt])
+  @@index([cardId, createdAt])
+  @@index([taskId, createdAt])
+  @@map("plan_turns")
+}
+
+// ─── Design stage (spec 223) ────────────────────────────────────────────────
+
+/// Shared `UI_PROFILE_SOURCES` (D14).
+enum UiProfileSource {
+  agent
+  manual
+}
+
+/// Shared `TASK_DESIGN_STATUSES`.
+enum TaskDesignStatus {
+  idle
+  generating
+  reviewing
+  revising
+  approved
+}
+
+/// Shared `DESIGN_COMMENT_KINDS` (D9).
+enum DesignCommentKind {
+  general
+  screen
+  pin
+}
+
+/// Shared `DESIGN_THEMES`.
+enum DesignTheme {
+  light
+  dark
+}
+
+/// A project's UI profile, one row per version (D12). An agent version is
+/// built by a `ui_profile` run; a manual one is a person's edit, whose diff
+/// the next build keeps as `obligations` (D14).
+model UiProfile {
+  id               String          @id @default(cuid())
+  projectId        String
+  version          Int
+  source           UiProfileSource
+  hasUi            Boolean
+  /// Markdown: libraries, styling, tokens, components, patterns, themes, icons.
+  summary          String
+  /// The style kit's CSS (at most `UI_PROFILE_KIT_MAX_BYTES`).
+  kit              String
+  /// `[{ name, html }]` (shared `uiProfileSnippetSchema`).
+  snippets         Json            @default("[]")
+  fingerprintGlobs String[]        @default([])
+  /// SHA-256 hex of the files matching `fingerprintGlobs` on `origin/<base>`.
+  fingerprint      String
+  /// The manual edits this build was told to keep (D14).
+  obligations      String?
+  /// The build's run; null for a manual version.
+  runId            String?
+  /// The person behind a manual version; null for an agent build.
+  authorId         String?
+  createdAt        DateTime        @default(now())
+
+  project Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  run     Run?         @relation(fields: [runId], references: [id], onDelete: SetNull)
+  author  User?        @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  designs TaskDesign[]
+
+  @@unique([projectId, version])
+  @@map("ui_profiles")
+}
+
+/// A project's design settings (D11, D15). No row: the default viewports and
+/// no default skills.
+model DesignSettings {
+  projectId     String   @id
+  /// `[{ name, width, height, theme? }]` (shared `viewportPresetsSchema`).
+  viewports     Json
+  defaultSkills String[] @default([])
+  updatedById   String?
+  updatedAt     DateTime @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  updatedBy User?   @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@map("design_settings")
+}
+
+/// A task's design, keyed by `(planId, taskKey)` — not by a `plan_tasks` row,
+/// which is versioned per plan version while the design carries across them.
+/// A design has exactly one owner (ADR-0025): a plan task (`planId` and
+/// `taskKey`) or a board card (`cardId`) — CHECK `task_designs_owner_check`.
+model TaskDesign {
+  id                 String           @id @default(cuid())
+  planId             String?
+  taskKey            String?
+  cardId             String?          @unique
+  /// The person's switch (D2); starts as the planner's suggestion.
+  needed             Boolean
+  /// Whether the planner suggested it, and why (D2).
+  suggested          Boolean          @default(false)
+  suggestionWhy      String?
+  /// 1–3 (D4), checked by the DTO and the contract.
+  variantCount       Int              @default(1)
+  skills             String[]         @default([])
+  /// The profile version the latest revisions were drawn from.
+  profileId          String?
+  status             TaskDesignStatus @default(idle)
+  approvedRevisionId String?          @unique
+  approvedById       String?
+  approvedAt         DateTime?
+  /// #275 D2: when the current Generate or Revise started; null at rest.
+  busySince          DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  plan             Plan?            @relation(fields: [planId], references: [id], onDelete: Cascade)
+  card             BoardCard?       @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  profile          UiProfile?       @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  approvedRevision DesignRevision?  @relation("TaskDesignApprovedRevision", fields: [approvedRevisionId], references: [id], onDelete: SetNull)
+  approvedBy       User?            @relation(fields: [approvedById], references: [id], onDelete: SetNull)
+  revisions        DesignRevision[] @relation("TaskDesignRevisions")
+  comments         DesignComment[]
+
+  @@unique([planId, taskKey])
+  @@map("task_designs")
+}
+
+/// One revision of one variant of a design (D4, D10): the HTML a design turn
+/// drew. A variant not picked on approve is `archived` — readable, never
+/// published.
+model DesignRevision {
+  id        String   @id @default(cuid())
+  designId  String
+  /// 1–3.
+  variant   Int
+  revision  Int
+  title     String
+  rationale String
+  /// The validated mockup (at most `DESIGN_HTML_MAX_BYTES`), without the pin helper.
+  html      String
+  turnId    String
+  archived  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  design            TaskDesign      @relation("TaskDesignRevisions", fields: [designId], references: [id], onDelete: Cascade)
+  turn              PlanTurn        @relation(fields: [turnId], references: [id], onDelete: Cascade)
+  approvedFor       TaskDesign?     @relation("TaskDesignApprovedRevision")
+  comments          DesignComment[] @relation("DesignCommentRevision")
+  addressedComments DesignComment[] @relation("DesignCommentAddressedIn")
+
+  @@unique([designId, variant, revision])
+  @@index([turnId])
+  @@map("design_revisions")
+}
+
+/// A comment on a design (D9): general, on one screen (viewport and theme),
+/// or pinned to a point. It records the revision it was left on and the one
+/// that addressed it (D10).
+model DesignComment {
+  id                    String            @id @default(cuid())
+  designId              String
+  revisionId            String
+  /// Nullable so deleting the author keeps the comment.
+  authorId              String?
+  kind                  DesignCommentKind
+  /// A viewport preset's name; `screen` and `pin`.
+  viewport              String?
+  theme                 DesignTheme?
+  /// Document coordinates of a pin.
+  x                     Float?
+  y                     Float?
+  /// The CSS path of the element under a pin.
+  selector              String?
+  body                  String
+  addressedInRevisionId String?
+  createdAt             DateTime          @default(now())
+
+  design      TaskDesign      @relation(fields: [designId], references: [id], onDelete: Cascade)
+  revision    DesignRevision  @relation("DesignCommentRevision", fields: [revisionId], references: [id], onDelete: Cascade)
+  author      User?           @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  addressedIn DesignRevision? @relation("DesignCommentAddressedIn", fields: [addressedInRevisionId], references: [id], onDelete: SetNull)
+
+  textNormalizations TextNormalization[]
+
+  @@index([designId, createdAt])
+  @@index([revisionId])
+  @@map("design_comments")
+}
+
+// ─── Board (issue #242, ADR-0024) ───────────────────────────────────────────
+
+/// Shared `BOARD_COLUMNS` (D3). `inbox` holds captured suggestions (#244 D8).
+enum BoardColumn {
+  inbox
+  todo
+  in_progress
+  finished
+  completed
+}
+
+/// Shared `BOARD_CARD_KINDS`: the branch prefix and the issue label.
+enum BoardCardKind {
+  feature
+  bug
+}
+
+/// Shared `CARD_KIND_SOURCES` (#271 D9).
+enum CardKindSource {
+  auto
+  person
+}
+
+/// Shared `BOARD_CARD_SOURCES`.
+enum BoardCardSource {
+  manual
+  /// From card capture (#244); kept after Accept.
+  captured
+  /// From `track_card` in a person's own terminal session (#282 D1).
+  terminal
+  /// The mirror of an orchestrator slot or a `cs:ready` issue (#282 D4).
+  fleet
+}
+
+/// Shared `CARD_ROUND_TRIGGERS` (D4).
+enum CardRoundTrigger {
+  run
+  feedback
+}
+
+/// Shared `CARD_ROUND_PHASES` (D4, D6).
+enum CardRoundPhase {
+  queued
+  starting
+  running
+  waiting
+  finished
+  ended
+  failed
+  cancelled
+}
+
+/// Shared `CARD_FINISHED_BY` (D6).
+enum CardFinishedBy {
+  worker
+  session_end
+  person
+}
+
+/// Shared `CARD_COLLECT_STATES` (#329 D2): how the card's last `card.collect` went.
+enum CardCollectState {
+  /// Never collected.
+  none
+  /// A collect is running now.
+  pending
+  /// A PR was opened or is already open (`prUrl` set).
+  ok
+  /// `ahead: 0` — nothing to push.
+  no_changes
+  /// The runner failed it; `collectError` says why.
+  failed
+}
+
+/// Shared `CARD_PR_STATES` (#329 D6): the card's PR as last seen.
+enum CardPrState {
+  open
+  draft
+  merged
+  closed
+}
+
+/// A work item AgentDock owns (ADR-0024), not a GitHub issue. Each Run or
+/// feedback is a round with its own `runs` row (D4).
+model BoardCard {
+  id                      String           @id @default(cuid())
+  projectId               String
+  /// Per project, `C-<number>`: max + 1 under `pg_advisory_xact_lock` (D1).
+  number                  Int
+  /// `^[a-z0-9]{8}$`: the worktree, tmux session and runner record (D5).
+  shortId                 String           @unique
+  /// At most 200 characters, checked by the DTO.
+  title                   String
+  /// Markdown, at most 20 000 characters.
+  body                    String           @default("")
+  kind                    BoardCardKind    @default(feature)
+  /// #271 D9: `auto` lets the normalization classify `kind` until the first
+  /// Run fixes the branch; a person setting kind makes it `person`.
+  kindSource              CardKindSource   @default(auto)
+  column                  BoardColumn      @default(todo)
+  /// Fractional index inside the column (D3).
+  position                Float
+  source                  BoardCardSource  @default(manual)
+  issueOnRun              Boolean
+  specOnRun               Boolean
+  /// Overrides the project's model from the next round (D12). #322 D3: the
+  /// work model override, stored only when it differs from the default.
+  model                   String?
+  /// #322 D3: the Claude profile the person chose, shared by work and design;
+  /// stored only when it differs from the resolver's pick.
+  profileKey              String?
+  /// #322 D3: the design turns' model override; stored only when it differs
+  /// from the design recommendation, else the project's model.
+  designModel             String?
+  /// #322 D6: the recommended work model (`opus | sonnet | haiku`) and its
+  /// one-line reason, from the last applied `card.assess`.
+  recommendedModel        String?
+  recommendedReason       String?
+  /// #322 D6: the recommended design model (`opus | sonnet`) and its reason.
+  recommendedDesignModel  String?
+  recommendedDesignReason String?
+  /// #322 D6: the hash of the assessed input; an answer applies only while
+  /// the card still hashes to it (ADR-0027 D4).
+  assessmentHash          String?
+  /// When the last recommendation was applied.
+  assessedAt              DateTime?
+  /// The `runs` row of the last `card.assess` call.
+  assessRunId             String?
+  /// #243 D5: approving the design starts round 1. Changeable until the design is approved.
+  continueAfterDesign     Boolean          @default(false)
+  /// #243 D2: the design turns' Claude session — `--session-id` first, then `--resume`.
+  designSessionId         String?          @db.Uuid
+  /// The Claude session, fixed at the first Run (D6).
+  sessionId               String?          @db.Uuid
+  branch                  String?
+  /// Display only: the runner owns the path.
+  worktree                String?
+  issueNumber             Int?
+  issueUrl                String?
+  specPath                String?
+  prNumber                Int?
+  prUrl                   String?
+  /// #329 D6: from the PR poll, else the last `card.collect` / `card.merge`;
+  /// `null` while the card has no PR or its state is not known yet.
+  prState                 CardPrState?
+  /// #329 D2: written on every collect attempt, for every source.
+  collectState            CardCollectState @default(none)
+  /// #329 D2: the runner's one-line message of a failed collect, at most 500
+  /// characters; cleared by a collect that does not fail.
+  collectError            String?
+  /// #329 D4: automatic attempts since the last manual collect (at most 3).
+  collectAttempts         Int              @default(0)
+  /// When the last collect attempt ended.
+  collectedAt             DateTime?
+  /// Nullable so deleting a user keeps the card.
+  createdById             String?
+  movedById               String?
+  completedById           String?
+  movedAt                 DateTime
+  completedAt             DateTime?
+  /// #244: the extraction that suggested the card.
+  captureId               String?
+  /// #244: the manual session it was captured from; kept after Accept.
+  sourceSessionId         String?
+  /// #244: why it was suggested, at most 300 characters.
+  captureWhy              String?
+  /// #244: 0–1.
+  captureConfidence       Float?
+  /// #244 D8: `[{contentId, kind, excerpt}]`, excerpts of at most 300
+  /// characters; content-derived, so operators only. Accept clears it.
+  evidence                Json?
+  /// #244 D6: sha256 of the normalized title (shared `captureFingerprint`);
+  /// written on every card, so a suggestion matching it is dropped.
+  fingerprint             String?
+  /// #273 D9: why approving the design did not start the worker — a
+  /// `BoardErrorCode` or `unknown`. Cleared when a round starts or the design reopens.
+  autoRunError            String?
+  /// At most 500 characters.
+  autoRunMessage          String?
+  autoRunFailedAt         DateTime?
+  /// #282 D1: the manual session a `terminal` card tracks; unique, so a
+  /// second `card.track` of the session updates its card.
+  trackedSessionId        String?          @unique
+  /// #282 D3: Automatic work — collect when the tracked session finishes.
+  /// Starts from `board_settings.autoCollectTracked`.
+  autoCollect             Boolean          @default(false)
+  /// #282 D4: a `fleet` card's key is `(projectId, fleetIssue, fleetSlot)`;
+  /// `fleetSlot` is null for a `cs:ready` issue no slot has picked up. Postgres
+  /// treats nulls as distinct, so that row is kept unique by the partial index
+  /// `board_cards_fleet_unslotted_key` in the migration.
+  fleetIssue              Int?
+  fleetSlot               String?
+  /// Shared `FLEET_STAGES`, written by the fleet projector.
+  fleetStage              String?
+  /// The slot left the projection; the card keeps its last column.
+  fleetSlotGone           Boolean          @default(false)
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
+
+  project            Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  trackedSession     AgentSession?       @relation("BoardCardTrackedSession", fields: [trackedSessionId], references: [id], onDelete: SetNull)
+  createdBy          User?               @relation("BoardCardCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  movedBy            User?               @relation("BoardCardMovedBy", fields: [movedById], references: [id], onDelete: SetNull)
+  completedBy        User?               @relation("BoardCardCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+  capture            CardCapture?        @relation(fields: [captureId], references: [id], onDelete: SetNull)
+  sourceSession      AgentSession?       @relation("BoardCardSourceSession", fields: [sourceSessionId], references: [id], onDelete: SetNull)
+  rounds             BoardCardRound[]
+  design             TaskDesign?
+  designTurns        PlanTurn[]
+  textNormalizations TextNormalization[]
+  attachments        Attachment[]
+
+  @@unique([projectId, number])
+  @@unique([projectId, fleetIssue, fleetSlot])
+  @@index([projectId, column, position])
+  @@index([sessionId])
+  @@index([projectId, fingerprint])
+  @@map("board_cards")
+}
+
+/// One Run or feedback of a card (D4), with its `runs` row of kind `card`.
+model BoardCardRound {
+  id              String           @id @default(cuid())
+  cardId          String
+  round           Int
+  runId           String           @unique
+  trigger         CardRoundTrigger
+  /// The person's feedback (D9), at most 8 000 characters.
+  feedback        String?
+  /// #273 D1: the card text this round's prompt was built from.
+  cardTitle       String
+  cardBody        String
+  cardKind        BoardCardKind
+  /// #309 D10: the card's attachments this round's prompt was built from,
+  /// `[{id, name, mime}]` (shared `cardAttachmentSnapshotSchema`).
+  cardAttachments Json             @default("[]")
+  /// Nullable so deleting the author keeps the round.
+  authorId        String?
+  phase           CardRoundPhase   @default(queued)
+  /// `agentdock-card-<shortId>`.
+  tmuxSession     String?
+  finishedBy      CardFinishedBy?
+  /// From `finish_card` (D6), at most 4 000 characters.
+  summary         String?
+  exitCode        Int?
+  error           String?
+  startedAt       DateTime         @default(now())
+  waitingAt       DateTime?
+  finishedAt      DateTime?
+  endedAt         DateTime?
+
+  card   BoardCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  run    Run       @relation(fields: [runId], references: [id], onDelete: Cascade)
+  author User?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  textNormalizations TextNormalization[]
+  attachments        Attachment[]
+
+  @@unique([cardId, round])
+  @@index([phase])
+  @@map("board_card_rounds")
+}
+
+/// #309 (ADR-0031): a file or screenshot on a board card or one round's
+/// feedback. The bytes live in `ATTACHMENTS_DIR` as `<projectId>/<id>`, behind
+/// the `AttachmentStore` port; a cascade deletes rows, never files — the
+/// service removes them after the delete commits, and the sweep catches the rest.
+model Attachment {
+  id         String    @id @default(cuid())
+  projectId  String
+  /// Null while pending (D3): bound to the project and the uploader until a
+  /// card claims it.
+  cardId     String?
+  /// Set for an attachment that came with a round's feedback.
+  roundId    String?
+  /// Nullable so deleting the uploader keeps the attachment.
+  uploaderId String?
+  /// The display name (D6), at most 200 characters.
+  name       String
+  /// Detected from the content (D5), one of the shared `ATTACHMENT_MIMES`.
+  mime       String
+  /// Bytes, at most 25 MiB.
+  size       Int
+  /// Lower-case hex SHA-256 of the bytes.
+  sha256     String
+  /// Set while pending (upload + 24 h), cleared on claim; the sweep deletes
+  /// pending rows past it.
+  expiresAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  project  Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  card     BoardCard?      @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  round    BoardCardRound? @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  uploader User?           @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
+
+  @@index([cardId, createdAt])
+  @@index([projectId])
+  @@index([expiresAt])
+  @@map("attachments")
+}
+
+/// A project's board settings (D2, D13). No row: the defaults.
+model BoardSettings {
+  projectId          String   @id
+  issueOnRun         Boolean  @default(false)
+  specOnRun          Boolean  @default(false)
+  /// 1–10, checked by the DTO.
+  maxRunning         Int      @default(3)
+  /// #244 D10: on only while the project's `shipSessionContent` is on;
+  /// turning content off turns it off.
+  captureEnabled     Boolean  @default(false)
+  /// Shared `CAPTURE_MODELS`: `haiku` or `sonnet`, checked by the DTO.
+  captureModel       String   @default("haiku")
+  /// #282 D3: the `autoCollect` a new `terminal` card starts with.
+  autoCollectTracked Boolean  @default(false)
+  updatedById        String?
+  updatedAt          DateTime @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  updatedBy User?   @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@map("board_settings")
+}
+
+// ─── Card capture (issue #244, ADR-0026) ────────────────────────────────────
+
+/// Shared `CAPTURE_STATUSES`.
+enum CardCaptureStatus {
+  queued
+  running
+  succeeded
+  failed
+  skipped
+}
+
+/// Shared `CAPTURE_SKIP_REASONS`.
+enum CardCaptureSkipReason {
+  too_little
+  rate_limited
+  inbox_full
+  budget_exceeded
+  runner_offline
+  capture_off
+  no_profile
+  /// The session tracks a card (#282 D5).
+  tracked
+}
+
+/// One extraction of a manual session's new content (D3, D4). The newest
+/// row's `contentToId` is the session's watermark: content is never sent
+/// twice. A content purge deletes the project's rows.
+model CardCapture {
+  id               String                 @id @default(cuid())
+  projectId        String
+  /// The manual session it reads.
+  sessionId        String
+  /// The `card_capture` run; null for an extraction skipped before it ran.
+  runId            String?                @unique
+  /// The extraction's own Claude session (`cards.extract` `sessionId`,
+  /// `--session-id`): how the run is priced (ADR-0009).
+  extractSessionId String?                @db.Uuid
+  /// `session_contents.id` range read; `contentToId` is the next watermark.
+  contentFromId    BigInt
+  contentToId      BigInt
+  inputChars       Int
+  status           CardCaptureStatus      @default(queued)
+  skipReason       CardCaptureSkipReason?
+  /// Never content; `contract_violation: …` for an output that broke D5.
+  error            String?
+  /// The model's result, at most 32 KiB; deleted with content retention.
+  resultText       String?
+  /// Cards it put in the Inbox.
+  suggested        Int                    @default(0)
+  createdAt        DateTime               @default(now())
+  finishedAt       DateTime?
+
+  project Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  run     Run?         @relation(fields: [runId], references: [id], onDelete: SetNull)
+  cards   BoardCard[]
+
+  @@index([projectId, createdAt])
+  @@index([sessionId, createdAt])
+  @@map("card_captures")
+}
+
+/// A dismissed suggestion's fingerprint (D9): blocks it for 90 days; a daily
+/// job deletes older rows.
+model CardDismissal {
+  id            String   @id @default(cuid())
+  projectId     String
+  /// sha256 of the normalized title (shared `captureFingerprint`).
+  fingerprint   String
+  /// At most 120 characters: the suggestion's title, for the record.
+  title         String
+  /// Nullable so deleting the user keeps the row.
+  dismissedById String?
+  createdAt     DateTime @default(now())
+
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  dismissedBy User?   @relation(fields: [dismissedById], references: [id], onDelete: SetNull)
+
+  @@index([projectId, fingerprint])
+  @@index([createdAt])
+  @@map("card_dismissals")
+}
+
+// ─── Text normalization (issue #271, ADR-0027) ──────────────────────────────
+
+/// Shared `TEXT_OWNER_TYPES` (D1).
+enum TextOwnerType {
+  board_card
+  board_card_round
+  design_comment
+  plan
+  plan_task
+  plan_turn
+}
+
+/// Shared `TEXT_NORMALIZATION_STATUSES`.
+enum TextNormalizationStatus {
+  pending
+  running
+  done
+  skipped
+  failed
+  superseded
+}
+
+/// Shared `TEXT_FAIL_REASONS` (D11), for `failed` and `skipped`.
+enum TextFailReason {
+  runner_offline
+  runner_unsupported
+  no_profile
+  run_failed
+  contract_violation
+  budget_exceeded
+  off
+}
+
+/// #324 D8: what translated a request — DeepL in the API, or `text.normalize`
+/// on the runner (ADR-0033).
+enum TextEngine {
+  deepl
+  runner
+}
+
+/// One save's request to normalize an owner's changed fields (D4, D7). The
+/// owner's column holds the English text once applied; `fields` keeps the
+/// original. Exactly one owner key is set (CHECK
+/// `text_normalizations_owner_check`, the ADR-0025 precedent).
+model TextNormalization {
+  id            String                  @id @default(cuid())
+  projectId     String
+  ownerType     TextOwnerType
+  cardId        String?
+  roundId       String?
+  commentId     String?
+  planId        String?
+  taskId        String?
+  turnId        String?
+  /// `[{field, original, sourceHash, english?, outcome?}]` (shared `textFieldsSchema`).
+  fields        Json
+  /// D9: the request also asks for the card's kind.
+  classifyKind  Boolean                 @default(false)
+  /// The classified kind, when asked and answered.
+  kind          BoardCardKind?
+  status        TextNormalizationStatus @default(pending)
+  failReason    TextFailReason?
+  /// At most 2000 characters; never the text.
+  error         String?
+  attempts      Int                     @default(0)
+  nextAttemptAt DateTime?
+  /// The `text_normalize` run; null until sent, or for a request with no call.
+  runId         String?                 @unique
+  /// The Claude session the API assigns (`--session-id`): how the run is priced (ADR-0009).
+  sessionId     String?                 @db.Uuid
+  /// #324 D8: null until DeepL answered or a run was sent.
+  engine        TextEngine?
+  /// #324 D8: DeepL's `billed_characters`, else the characters sent to the runner.
+  billedChars   Int?
+  /// Nullable so deleting the author keeps the record.
+  authorId      String?
+  createdAt     DateTime                @default(now())
+  finishedAt    DateTime?
+
+  project Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  card    BoardCard?      @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  round   BoardCardRound? @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  comment DesignComment?  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  plan    Plan?           @relation(fields: [planId], references: [id], onDelete: Cascade)
+  task    PlanTask?       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  turn    PlanTurn?       @relation(fields: [turnId], references: [id], onDelete: Cascade)
+  run     Run?            @relation(fields: [runId], references: [id], onDelete: SetNull)
+  author  User?           @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([cardId, createdAt])
+  @@index([roundId, createdAt])
+  @@index([commentId, createdAt])
+  @@index([planId, createdAt])
+  @@index([taskId, createdAt])
+  @@index([turnId, createdAt])
+  @@index([projectId, status])
+  @@map("text_normalizations")
+}
+
+/// A project's text settings (D13). No row: on.
+model TextSettings {
+  projectId        String   @id
+  normalizeEnabled Boolean  @default(true)
+  updatedById      String?
+  updatedAt        DateTime @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  updatedBy User?   @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@map("text_settings")
 }

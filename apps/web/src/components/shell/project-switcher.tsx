@@ -1,46 +1,107 @@
 'use client';
 
 import type { ProjectSummary } from '@agentdock/shared';
-import { Combobox } from '@andrewbehma/glass-ui/combobox';
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { buttonClassName } from '@andrewbehma/glass-ui/button';
+import {
+  MenuContent,
+  MenuItem,
+  MenuLabel,
+  MenuRoot,
+  MenuSeparator,
+  MenuTrigger,
+} from '@andrewbehma/glass-ui/menu';
+import { ChevronsUpDown, FolderGit2, List } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { api } from '../../lib/api';
+import { RUNNER_STATUS_LABEL, STATUS_TONE } from '../../lib/runners/format';
+
+function RunnerDot({ project }: { project: ProjectSummary }) {
+  return (
+    <Badge
+      dot
+      tone={STATUS_TONE[project.runnerStatus]}
+      aria-hidden="true"
+      className="shrink-0"
+    />
+  );
+}
 
 /**
- * Project switcher (spec 10 D3): the projects the caller may see, from
- * `GET /api/projects`. Renders nothing while the list is empty or unavailable.
+ * Project switcher (spec 10 D3, #159): a button with the current project's
+ * name, its runner's status and a chevron, opening the projects the caller may
+ * see: at the head of the rail, and in More's sheet on a phone (#163).
+ * Renders nothing while there are no projects; the Projects page still works.
  */
-export function ProjectSwitcher({ projectId }: { projectId: string | null }) {
+export function ProjectSwitcher({
+  projects,
+  projectId,
+}: {
+  projects: readonly ProjectSummary[];
+  projectId: string | null;
+}) {
   const router = useRouter();
-  const [projects, setProjects] = useState<ProjectSummary[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    api<ProjectSummary[]>('/projects')
-      .then((list) => {
-        if (!cancelled && Array.isArray(list)) setProjects(list);
-      })
-      .catch(() => {
-        // No switcher; the Projects page still works.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   if (projects.length === 0) return null;
 
+  const current = projects.find((project) => project.id === projectId);
+  const label = current
+    ? `Switch project, current: ${current.displayName}, runner ${RUNNER_STATUS_LABEL[current.runnerStatus]}`
+    : 'Choose a project';
+
+  const trigger = (
+    <button
+      type="button"
+      aria-label={label}
+      className={buttonClassName({
+        variant: 'glass',
+        size: 'md',
+        full: true,
+        className: 'justify-between gap-2 px-3',
+      })}
+    >
+      <span className="flex min-w-0 items-center gap-2">
+        {current ? (
+          <RunnerDot project={current} />
+        ) : (
+          <FolderGit2 size={16} aria-hidden="true" className="text-ink-3" />
+        )}
+        <span className={`truncate ${current ? 'text-ink' : 'text-ink-2'}`}>
+          {current?.displayName ?? 'Choose a project'}
+        </span>
+      </span>
+      <ChevronsUpDown
+        size={14}
+        aria-hidden="true"
+        className="shrink-0 text-ink-3"
+      />
+    </button>
+  );
+
   return (
-    <Combobox
-      options={projects.map((project) => ({
-        value: project.id,
-        label: project.displayName,
-      }))}
-      value={projectId}
-      onValueChange={(id) => {
-        if (id) router.push(`/projects/${id}`);
-      }}
-      placeholder="Project"
-    />
+    <MenuRoot>
+      <MenuTrigger asChild>{trigger}</MenuTrigger>
+      <MenuContent align="start" className="max-h-[60vh] overflow-y-auto">
+        <MenuLabel>Projects</MenuLabel>
+        {projects.map((project) => (
+          <MenuItem
+            key={project.id}
+            onSelect={() => router.push(`/projects/${project.id}`)}
+            aria-current={project.id === projectId ? 'page' : undefined}
+          >
+            <RunnerDot project={project} />
+            <span className="min-w-0 flex-1 truncate">
+              {project.displayName}
+            </span>
+            <span className="sr-only">
+              , runner {RUNNER_STATUS_LABEL[project.runnerStatus]}
+            </span>
+          </MenuItem>
+        ))}
+        <MenuSeparator />
+        <MenuItem onSelect={() => router.push('/projects')}>
+          <List size={16} aria-hidden="true" />
+          All projects
+        </MenuItem>
+      </MenuContent>
+    </MenuRoot>
   );
 }

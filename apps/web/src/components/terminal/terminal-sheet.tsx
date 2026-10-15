@@ -20,6 +20,8 @@ import {
 const PHASE_TONE = {
   requesting: 'neutral',
   connecting: 'warn',
+  reconnecting: 'warn',
+  failed: 'danger',
   attached: 'ok',
   ended: 'neutral',
   refused: 'danger',
@@ -53,7 +55,15 @@ export function TerminalSheet({
 
   const targetKey = target
     ? `${target.kind}:${
-        'slot' in target ? target.slot : 'runId' in target ? target.runId : ''
+        'slot' in target
+          ? target.slot
+          : 'runId' in target
+            ? target.runId
+            : 'sessionId' in target
+              ? target.sessionId
+              : 'cardId' in target
+                ? target.cardId
+                : ''
       }`
     : '';
   // Every target opens read-only, never in the previous target's mode.
@@ -66,6 +76,7 @@ export function TerminalSheet({
   const live =
     status.phase === 'requesting' ||
     status.phase === 'connecting' ||
+    status.phase === 'reconnecting' ||
     status.phase === 'attached';
   const switchMode = (next: TerminalMode) => {
     setMode(next);
@@ -129,12 +140,18 @@ export function TerminalSheet({
               </Banner>
             ) : null}
             {status.message ? (
-              <Banner tone={status.phase === 'refused' ? 'danger' : 'info'}>
+              <Banner
+                tone={
+                  status.phase === 'refused' || status.phase === 'failed'
+                    ? 'danger'
+                    : 'info'
+                }
+              >
                 <span className="flex flex-wrap items-center gap-3">
                   {status.message}
                   {!live ? (
                     <Button variant="glass" size="sm" onClick={reconnect}>
-                      Attach again
+                      {status.phase === 'failed' ? 'Retry' : 'Attach again'}
                     </Button>
                   ) : null}
                 </span>

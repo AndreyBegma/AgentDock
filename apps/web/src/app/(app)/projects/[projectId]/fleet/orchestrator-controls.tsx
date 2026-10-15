@@ -2,25 +2,19 @@
 
 import type {
   OrchestratorSettingsView,
-  OrchestratorStartRequest,
   OrchestratorStatusView,
 } from '@agentdock/shared';
-import type {
-  OrchestratorMode,
-  OrchestratorPermissionMode,
-} from '@agentdock/shared/protocol';
 import { Button } from '@andrewbehma/glass-ui/button';
-import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
-import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
+import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
+import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
+import { RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { DisabledReason } from '../../../../../components/prerequisites/disabled-reason';
 import { api } from '../../../../../lib/api';
 import {
   COMMAND_PENDING_LABEL,
   describeControlErrorHint,
-  MODE_LABEL,
   PERMISSION_MODE_LABEL,
-  permissionModesFor,
 } from '../../../../../lib/control/format';
 import type { ControlReason } from '../../../../../lib/control/reasons';
 import type { useControl } from '../../../../../lib/control/use-control';
@@ -54,7 +48,10 @@ function reasonLinesFor({ start, stop }: ControlReasons) {
   return { lines, ids };
 }
 
-/** Start, Stop and status refresh of the orchestrator (spec 17 D2–D5). */
+/**
+ * Start, Stop and status refresh of the orchestrator (spec 17 D2–D5). Start
+ * opens the page's one Start dialog; Stop asks first, with `ConfirmDialog`.
+ */
 export function OrchestratorControls({
   projectId,
   control,
@@ -62,8 +59,9 @@ export function OrchestratorControls({
   isAdmin,
   settings,
   reasons,
-  startOpen: starting,
-  onStartOpenChange: setStarting,
+  showStop,
+  showStart,
+  onStart,
 }: {
   projectId: string;
   control: Control;
@@ -73,18 +71,19 @@ export function OrchestratorControls({
   settings: OrchestratorSettingsView | undefined;
   /** Why Start and Stop are off, when the reason will not clear by itself. */
   reasons: ControlReasons;
-  startOpen: boolean;
-  onStartOpenChange: (open: boolean) => void;
+  /** False while the orchestrator is known to be absent: nothing to stop. */
+  showStop: boolean;
+  /**
+   * False on an empty fleet, where the first-project checklist holds the one
+   * Start (#213).
+   */
+  showStart: boolean;
+  onStart: () => void;
 }) {
   const [status, setStatus] = useState<OrchestratorStatusView>();
   const [refreshing, setRefreshing] = useState(false);
   const [stopping, setStopping] = useState(false);
   const showError = useErrorToast();
-
-  const [mode, setMode] = useState<OrchestratorMode>('start');
-  const [model, setModel] = useState('');
-  const [permissionMode, setPermissionMode] =
-    useState<OrchestratorPermissionMode>('auto');
 
   const refresh = async () => {
     setRefreshing(true);
@@ -101,36 +100,20 @@ export function OrchestratorControls({
     }
   };
 
-  const openStart = () => {
-    setMode('start');
-    setModel(settings?.model ?? '');
-    setPermissionMode(settings?.permissionMode ?? 'auto');
-    setStarting(true);
-  };
-
-  const start = async () => {
-    // Only what differs from the project's settings is an override.
-    const request: OrchestratorStartRequest = { mode };
-    const trimmed = model.trim();
-    if (trimmed && trimmed !== settings?.model) request.model = trimmed;
-    if (permissionMode !== settings?.permissionMode) {
-      request.permissionMode = permissionMode;
-    }
-    setStarting(false);
-    const run = await control.start(request);
-    if (run) void refresh();
-  };
-
-  const stop = async () => {
-    setStopping(false);
-    const run = await control.stop();
-    if (run) void refresh();
-  };
-
   const startBusy = control.busy('orchestrator.start');
   const stopBusy = control.busy('orchestrator.stop');
-  const modes = permissionModesFor(isAdmin);
-  const { lines: reasonLines, ids: reasonIds } = reasonLinesFor(reasons);
+
+  const stop = async () => {
+    const run = await control.stop();
+    setStopping(false);
+    if (run) void refresh();
+  };
+
+  const { lines: reasonLines, ids: reasonIds } = reasonLinesFor({
+    start: showStart ? reasons.start : null,
+    stop: showStop ? reasons.stop : null,
+    message: reasons.message,
+  });
 
   return (
     <div className="flex flex-col gap-3">
@@ -160,22 +143,27 @@ export function OrchestratorControls({
       <div className="flex flex-wrap items-center gap-2">
         {canOperate ? (
           <>
-            <Button
-              variant="solid"
-              disabled={startBusy || !settings || reasons.start !== null}
-              aria-describedby={reasonIds.start}
-              onClick={openStart}
-            >
-              Start…
-            </Button>
-            <Button
-              variant="glass"
-              disabled={stopBusy || reasons.stop !== null}
-              aria-describedby={reasonIds.stop}
-              onClick={() => setStopping(true)}
-            >
-              Stop
-            </Button>
+            {showStart ? (
+              // Glass: the page's one solid is New issue in its header (#213).
+              <Button
+                variant="glass"
+                disabled={startBusy || !settings || reasons.start !== null}
+                aria-describedby={reasonIds.start}
+                onClick={onStart}
+              >
+                Start…
+              </Button>
+            ) : null}
+            {showStop ? (
+              <Button
+                variant="glass"
+                disabled={stopBusy || reasons.stop !== null}
+                aria-describedby={reasonIds.stop}
+                onClick={() => setStopping(true)}
+              >
+                Stop
+              </Button>
+            ) : null}
             {startBusy ? (
               <PendingLabel
                 label={COMMAND_PENDING_LABEL['orchestrator.start']}
@@ -188,9 +176,20 @@ export function OrchestratorControls({
             ) : null}
           </>
         ) : null}
-        <Button variant="ghost" disabled={refreshing} onClick={refresh}>
-          {refreshing ? 'Checking…' : 'Refresh status'}
-        </Button>
+        <Tooltip content={refreshing ? 'Checking…' : 'Refresh status'}>
+          <Button
+            variant="ghost"
+            icon
+            aria-label="Refresh status"
+            disabled={refreshing}
+            onClick={refresh}
+          >
+            <RefreshCw
+              aria-hidden="true"
+              className={`size-4 ${refreshing ? 'animate-spin' : ''}`}
+            />
+          </Button>
+        </Tooltip>
         {status ? (
           <span className="text-sm text-ink-2" role="status">
             {status.present
@@ -216,104 +215,15 @@ export function OrchestratorControls({
           ))
         : null}
 
-      <DialogRoot open={starting} onOpenChange={setStarting}>
-        <DialogContent
-          title="Start the orchestrator"
-          description="Launches /code-sentinel:orchestrator in a tmux session on the project’s machine, in the project root."
-          footer={
-            <>
-              <Button variant="ghost" onClick={() => setStarting(false)}>
-                Cancel
-              </Button>
-              <Button variant="solid" onClick={start}>
-                Start
-              </Button>
-            </>
-          }
-        >
-          <div className="flex flex-col gap-4">
-            <Field label="Command" htmlFor="orch-mode">
-              <Select
-                id="orch-mode"
-                value={mode}
-                onChange={(e) =>
-                  setMode(e.target.value === 'next' ? 'next' : 'start')
-                }
-              >
-                {(['start', 'next'] as const).map((m) => (
-                  <option key={m} value={m}>
-                    {MODE_LABEL[m]}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field
-              label="Profile"
-              htmlFor="orch-profile"
-              hint="Change it in the project’s Orchestrator settings."
-            >
-              <Input
-                id="orch-profile"
-                readOnly
-                value={settings?.effectiveProfile?.label ?? '(none set)'}
-              />
-            </Field>
-            <Field label="Model" htmlFor="orch-model">
-              <Input
-                id="orch-model"
-                value={model}
-                maxLength={100}
-                onChange={(e) => setModel(e.target.value)}
-              />
-            </Field>
-            <Field label="Permission mode" htmlFor="orch-perm">
-              <Select
-                id="orch-perm"
-                value={permissionMode}
-                onChange={(e) =>
-                  setPermissionMode(
-                    modes.find((m) => m === e.target.value) ?? 'auto',
-                  )
-                }
-              >
-                {settings &&
-                !modes.some((m) => m === settings.permissionMode) ? (
-                  <option value={settings.permissionMode}>
-                    {PERMISSION_MODE_LABEL[settings.permissionMode]}
-                  </option>
-                ) : null}
-                {modes.map((m) => (
-                  <option key={m} value={m}>
-                    {PERMISSION_MODE_LABEL[m]}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-          </div>
-        </DialogContent>
-      </DialogRoot>
-
-      <DialogRoot open={stopping} onOpenChange={setStopping}>
-        <DialogContent
-          title="Stop the orchestrator?"
-          description="Only the orchestrator’s own session is killed. Workers keep running, and no worktree, branch or slot is touched. Start it again later to pick the board up."
-          footer={
-            <>
-              <Button variant="ghost" onClick={() => setStopping(false)}>
-                Cancel
-              </Button>
-              <Button variant="solid" onClick={stop}>
-                Stop the orchestrator
-              </Button>
-            </>
-          }
-        >
-          <p className="text-sm text-ink-2">
-            The session is stopped immediately; any prompt it is in the middle
-            of is lost.
-          </p>
-        </DialogContent>
-      </DialogRoot>
+      <ConfirmDialog
+        open={stopping}
+        onOpenChange={setStopping}
+        title="Stop the orchestrator?"
+        consequence="Only the orchestrator’s own session is killed, and any prompt it is in the middle of is lost. Workers keep running, and no worktree, branch or slot is touched. Start it again later to pick the board up."
+        verb="Stop"
+        busy={stopBusy}
+        onConfirm={stop}
+      />
     </div>
   );
 }

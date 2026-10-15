@@ -1,6 +1,6 @@
 import type { SlotSummary } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
-import { Button } from '@andrewbehma/glass-ui/button';
+import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import {
   Table,
   TableCell,
@@ -8,18 +8,20 @@ import {
   TableRow,
 } from '@andrewbehma/glass-ui/table';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
+import { ScrollX } from '../../../../../components/scroll-x/scroll-x';
 import {
   CHECKS_LABEL,
   CHECKS_TONE,
   checkpointLabel,
-  formatAge,
   formatAheadBehind,
   issueUrl,
   SLOT_STATUS_LABEL,
-  SLOT_STATUS_TONE,
   SLOT_TERM_HINT,
   safeHttpsUrl,
 } from '../../../../../lib/fleet/format';
+import { Time } from '../../../../../lib/format/time';
+import { slotHue } from '../../../../../lib/hue';
+import { SLOT_PILL_STATUS } from '../../../../../lib/status/pill';
 
 function IssueCell({ slot }: { slot: SlotSummary }) {
   if (slot.issue === null) return <>—</>;
@@ -55,7 +57,9 @@ function PrCell({ slot }: { slot: SlotSummary }) {
   if (slot.prNumber === null) return <>—</>;
   const href = safeHttpsUrl(slot.prUrl);
   return (
-    <span className="inline-flex items-center gap-2">
+    // `relative`: the sr-only label is absolutely positioned, and without an
+    // anchor inside the table's scroller it escapes it and widens the page.
+    <span className="relative inline-flex items-center gap-2">
       {href ? (
         <a
           href={href}
@@ -86,71 +90,85 @@ export function SlotsTable({
   onSelect: (slot: SlotSummary) => void;
 }) {
   return (
-    <Table scroll>
-      <TableHead>
-        <TableRow>
-          <TableCell head>Slot</TableCell>
-          <TableCell head>Issue</TableCell>
-          <TableCell head>Runtime / model</TableCell>
-          <TableCell head>Status</TableCell>
-          <TableCell head>Last checkpoint</TableCell>
-          <TableCell head>PR</TableCell>
-          <TableCell head>Ahead / behind</TableCell>
-          <TableCell head>Age</TableCell>
-          <TableCell head>
-            <span className="sr-only">Details</span>
-          </TableCell>
-        </TableRow>
-      </TableHead>
-      <tbody>
-        {slots.map((slot) => (
-          <TableRow key={slot.id}>
-            <TableCell>
-              <span className="font-medium">{slot.name}</span>
-              {slot.lead ? (
-                <Tooltip content={SLOT_TERM_HINT.lead}>
-                  <button
-                    type="button"
-                    className="ml-2 cursor-help text-xs text-ink-3"
-                  >
-                    lead
-                  </button>
-                </Tooltip>
-              ) : null}
-            </TableCell>
-            <TableCell>
-              <IssueCell slot={slot} />
-            </TableCell>
-            <TableCell>
-              <ModelCell slot={slot} />
-            </TableCell>
-            <TableCell>
-              <Badge
-                tone={SLOT_STATUS_TONE[slot.status]}
-                label={SLOT_STATUS_LABEL[slot.status]}
-              />
-            </TableCell>
-            <TableCell>{checkpointLabel(slot.lastCheckpoint)}</TableCell>
-            <TableCell>
-              <PrCell slot={slot} />
-            </TableCell>
-            <TableCell>{formatAheadBehind(slot.ahead, slot.behind)}</TableCell>
-            <TableCell>{formatAge(slot.endedAt ?? slot.startedAt)}</TableCell>
-            <TableCell>
-              <div className="flex justify-end">
-                <Button
-                  variant="glass"
-                  size="sm"
-                  aria-label={`Details for slot ${slot.name}`}
+    <ScrollX label="Slots" edgeClassName="from-surface">
+      <Table>
+        <TableHead>
+          <TableRow>
+            <TableCell head>Slot</TableCell>
+            <TableCell head>Issue</TableCell>
+            <TableCell head>Runtime / model</TableCell>
+            <TableCell head>Status</TableCell>
+            <TableCell head>Last checkpoint</TableCell>
+            <TableCell head>PR</TableCell>
+            <TableCell head>Ahead / behind</TableCell>
+            <TableCell head>Age</TableCell>
+          </TableRow>
+        </TableHead>
+        <tbody>
+          {slots.map((slot) => (
+            <TableRow
+              key={slot.id}
+              className="cursor-pointer hover:bg-hover"
+              onClick={(event) => {
+                // A link or button inside the row keeps its own action.
+                if ((event.target as HTMLElement).closest('a, button')) return;
+                onSelect(slot);
+              }}
+            >
+              <TableCell>
+                {/* The slot's identity colour, the same in every view (#163). */}
+                <Badge
+                  dot
+                  hue={slotHue(slot.name)}
+                  aria-hidden="true"
+                  className="mr-2"
+                />
+                <button
+                  type="button"
+                  className="text-start font-medium underline-offset-2 hover:underline"
+                  aria-label={`Open slot ${slot.name}`}
                   onClick={() => onSelect(slot)}
                 >
-                  Details
-                </Button>
-              </div>
-            </TableCell>
-          </TableRow>
-        ))}
-      </tbody>
-    </Table>
+                  {slot.name}
+                </button>
+                {slot.lead ? (
+                  <Tooltip content={SLOT_TERM_HINT.lead}>
+                    <button
+                      type="button"
+                      className="ml-2 cursor-help text-xs text-ink-3"
+                    >
+                      lead
+                    </button>
+                  </Tooltip>
+                ) : null}
+              </TableCell>
+              <TableCell>
+                <IssueCell slot={slot} />
+              </TableCell>
+              <TableCell>
+                <ModelCell slot={slot} />
+              </TableCell>
+              <TableCell>
+                <StatusPill
+                  size="md"
+                  status={SLOT_PILL_STATUS[slot.status]}
+                  label={SLOT_STATUS_LABEL[slot.status]}
+                />
+              </TableCell>
+              <TableCell>{checkpointLabel(slot.lastCheckpoint)}</TableCell>
+              <TableCell>
+                <PrCell slot={slot} />
+              </TableCell>
+              <TableCell>
+                {formatAheadBehind(slot.ahead, slot.behind)}
+              </TableCell>
+              <TableCell className="whitespace-nowrap">
+                <Time value={slot.endedAt ?? slot.startedAt} />
+              </TableCell>
+            </TableRow>
+          ))}
+        </tbody>
+      </Table>
+    </ScrollX>
   );
 }

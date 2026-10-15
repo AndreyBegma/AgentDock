@@ -5,10 +5,12 @@ import {
   applyRead,
   fromDateInput,
   isFutureDay,
+  KIND_LABEL,
   parseNewLive,
   parseReadLive,
   relativeTime,
   ruleRows,
+  ruleSections,
   ruleUpdate,
   safeLink,
   toDateInput,
@@ -221,6 +223,42 @@ describe('ruleRows', () => {
     expect(row?.telegram).toBe(false);
     expect(row?.telegramDisabled).toBe(true);
     expect(row?.telegramNote).toBe('in-app only');
+  });
+});
+
+describe('ruleSections', () => {
+  const rule = (kind: NotificationRuleView['kind']): NotificationRuleView => ({
+    kind,
+    inApp: true,
+    telegram: false,
+    channels: ['inApp'],
+    isDefault: true,
+  });
+
+  test('groups rules by area in a fixed order and drops empty areas', () => {
+    const rows = ruleRows(
+      [rule('runner.offline'), rule('slot.blocked'), rule('budget.exceeded')],
+      false,
+    );
+    expect(
+      ruleSections(rows).map((s) => [s.label, s.rows.map((r) => r.kind)]),
+    ).toEqual([
+      ['Orchestrator and slots', ['slot.blocked']],
+      ['Runners', ['runner.offline']],
+      ['Budgets', ['budget.exceeded']],
+    ]);
+  });
+
+  test('every kind has a readable label and example, never an event code', () => {
+    const kinds = Object.keys(KIND_LABEL) as NotificationRuleView['kind'][];
+    const rows = ruleRows(kinds.map(rule), false);
+    expect(ruleSections(rows).flatMap((s) => s.rows)).toHaveLength(
+      kinds.length,
+    );
+    for (const row of rows) {
+      expect(row.example).not.toMatch(/\b[a-z]+[._][a-z_]+\b/);
+      expect(row.label).not.toContain('.');
+    }
   });
 });
 

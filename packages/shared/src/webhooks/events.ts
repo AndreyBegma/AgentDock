@@ -176,17 +176,18 @@ const DATA_BUILDERS: Record<WebhookEventType, (raw: Raw) => WebhookEventData> =
       }),
     'pane.prompt': (raw) => compact({ dialog: text(raw, 'dialog') }),
     'pane.quota_hit': () => ({}),
+    // From `ScheduleEventData` (#25, ADR-0014): the envelope keeps D10's names.
     'schedule.failed': (raw) =>
       compact({
         scheduleId: text(raw, 'scheduleId'),
-        name: text(raw, 'name'),
+        name: text(raw, 'scheduleName'),
         reason: text(raw, 'reason'),
       }),
     'schedule.disabled': (raw) =>
       compact({
         scheduleId: text(raw, 'scheduleId'),
-        name: text(raw, 'name'),
-        reason: text(raw, 'reason'),
+        name: text(raw, 'scheduleName'),
+        reason: text(raw, 'disabledReason'),
       }),
     'webhook.test': (raw) => compact({ message: text(raw, 'message') }),
   };

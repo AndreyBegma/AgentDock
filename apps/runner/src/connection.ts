@@ -1,6 +1,8 @@
 import {
   type HeartbeatMessage,
   type HelloMessage,
+  LOCAL_REQUEST_TIMEOUT_MS,
+  type LocalResponseMessage,
   MAX_EVENTS_BATCH_BYTES,
   MAX_EVENTS_PER_BATCH,
   RUNNER_CLOSE_CODES,
@@ -19,6 +21,11 @@ import {
 import type { Backoff } from './backoff';
 import { type Cancel, type Clock, isoNow } from './clock';
 import type { Dispatch } from './commands/dispatcher';
+import {
+  type LocalRelayRequest,
+  type LocalResult,
+  localFail,
+} from './local/types';
 import { errorMessage, type Logger } from './log';
 import { socketUrl } from './server-url';
 import type { Spool } from './spool';
@@ -131,6 +138,12 @@ export class RunnerConnection {
   private cancelHeartbeat: Cancel = () => {};
   private cancelReconnect: Cancel = () => {};
   private resolveDone: (reason: StopReason) => void = () => {};
+  /** Runner-initiated `local.request`s awaiting their `local.response` (spec 201 D6). */
+  private readonly pendingLocal = new Map<
+    string,
+    (result: LocalResult<unknown>) => void
+  >();
+  private localSeq = 0;
   readonly done: Promise<StopReason>;
   private readonly url: string;
   private readonly createSocket: SocketFactory;
@@ -163,6 +176,73 @@ export class RunnerConnection {
     const appended = this.options.spool.append(event);
     if (this.state === 'live') this.flush();
     return appended;
+  }
+
+  /**
+   * Relays a `local.request` (spec 201 D6). Never spooled: with the socket
+   * down it answers `runner_offline` at once, so a write is never replayed
+   * later. Gives up after `LOCAL_REQUEST_TIMEOUT_MS` with `timeout`; a drop
+   * while waiting is `runner_offline`. Always resolves.
+   */
+  request(request: LocalRelayRequest): Promise<LocalResult<unknown>> {
+    if (this.state !== 'live') {
+      return Promise.resolve(
+        localFail('runner_offline', 'the runner is not connected'),
+      );
+    }
+    const id = `lr_${this.options.clock.now().toString(36)}_${(++this.localSeq).toString(36)}`;
+    return new Promise((resolve) => {
+      const cancel = this.options.clock.setTimeout(() => {
+        if (this.pendingLocal.delete(id)) {
+          resolve(localFail('timeout', 'the server did not answer in time'));
+        }
+      }, LOCAL_REQUEST_TIMEOUT_MS);
+      this.pendingLocal.set(id, (result) => {
+        cancel();
+        resolve(result);
+      });
+      if (!this.send({ type: 'local.request', id, ...request })) {
+        this.settleLocal(
+          id,
+          localFail('runner_offline', 'the runner is not connected'),
+        );
+      }
+    });
+  }
+
+  private settleLocal(id: string, result: LocalResult<unknown>): void {
+    const settle = this.pendingLocal.get(id);
+    if (!settle) return;
+    this.pendingLocal.delete(id);
+    settle(result);
+  }
+
+  private localResponse(message: LocalResponseMessage): void {
+    if (!this.pendingLocal.has(message.id)) {
+      this.options.log.debug('ignored a local.response nobody waits for', {
+        id: message.id,
+      });
+      return;
+    }
+    this.settleLocal(
+      message.id,
+      message.ok
+        ? { ok: true, data: message.data }
+        : {
+            ok: false,
+            error: message.error ?? { code: 'internal' },
+          },
+    );
+  }
+
+  /** The socket is gone: nobody will answer what is in flight. */
+  private dropLocal(): void {
+    for (const id of [...this.pendingLocal.keys()]) {
+      this.settleLocal(
+        id,
+        localFail('runner_offline', 'the connection dropped'),
+      );
+    }
   }
 
   private connect(): void {
@@ -286,6 +366,9 @@ export class RunnerConnection {
       case 'terminal.close':
         this.options.terminal?.close(message);
         return;
+      case 'local.response':
+        this.localResponse(message);
+        return;
     }
   }
 
@@ -337,6 +420,7 @@ export class RunnerConnection {
     this.options.pane?.reset();
     this.options.runLog?.reset();
     this.options.terminal?.reset();
+    this.dropLocal();
     if (this.state === 'stopped') return;
     if (TERMINAL_CLOSE_CODES.has(code)) {
       log.error('the server closed the connection for good', { code, reason });
@@ -371,6 +455,7 @@ export class RunnerConnection {
     this.socket = null;
     if (socket && socket.readyState <= WebSocket.OPEN)
       socket.close(1000, 'runner stopping');
+    this.dropLocal();
     this.resolveDone(reason);
   }
 }

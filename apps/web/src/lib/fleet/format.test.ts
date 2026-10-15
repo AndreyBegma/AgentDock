@@ -2,7 +2,10 @@ import { describe, expect, test } from 'bun:test';
 import { SLOT_STATUSES } from '@agentdock/shared';
 import { ApiError } from '../api';
 import {
+  attentionBadge,
   boardErrorHint,
+  boardErrorView,
+  CHANNEL_EXPLANATION,
   channelChip,
   describeFleetError,
   describeFleetErrorHint,
@@ -13,16 +16,42 @@ import {
   formatRound,
   isNotFound,
   issueUrl,
+  needsAttention,
   ORCHESTRATOR_STATUS_HINT,
   ORCHESTRATOR_STATUS_LABEL,
   parseIssueFilter,
   safeHttpsUrl,
+  showStopControl,
   slotStatusOptions,
   slotsQuery,
 } from './format';
 
 const NOW = Date.parse('2026-10-08T12:00:00Z');
 const ago = (seconds: number) => new Date(NOW - seconds * 1000).toISOString();
+
+describe('needsAttention', () => {
+  test('only the statuses that wait on a person', () => {
+    const flagged = SLOT_STATUSES.filter((status) =>
+      needsAttention({ status }),
+    );
+    expect(flagged).toEqual(['prompt', 'quota', 'stale']);
+  });
+});
+
+describe('attentionBadge', () => {
+  test('draws nothing at zero', () => {
+    expect(attentionBadge(0)).toBeUndefined();
+  });
+
+  test('counts the slots in the warn tone, with a sentence for a reader', () => {
+    expect(attentionBadge(1)).toEqual({
+      count: 1,
+      tone: 'warn',
+      label: '1 slot needs attention',
+    });
+    expect(attentionBadge(2)?.label).toBe('2 slots need attention');
+  });
+});
 
 describe('formatAge', () => {
   test('picks the coarsest honest unit', () => {
@@ -50,9 +79,12 @@ describe('formatAheadBehind / formatOccupancy / formatRound', () => {
     expect(formatAheadBehind(3, null)).toBe('↑3 ↓0');
   });
 
-  test('occupancy', () => {
-    expect(formatOccupancy(null)).toBe('—');
-    expect(formatOccupancy({ occupied: 2, max: 4 })).toBe('2 / 4');
+  test('occupancy is the active slots out of the round’s max, not the board’s figure (#213)', () => {
+    expect(formatOccupancy(0, null)).toBe('0');
+    expect(formatOccupancy(2, { max: 4 })).toBe('2 / 4');
+    // The audit: a stale board said 5 of 5 while no slot was active.
+    const staleBoard = { occupied: 5, max: 5 };
+    expect(formatOccupancy(0, staleBoard)).toBe('0 / 5');
   });
 
   test('round label', () => {
@@ -149,6 +181,30 @@ describe('labels', () => {
     });
     expect(text).toContain('BOARD.md:4');
     expect(text).toContain('Fix that file');
+  });
+
+  test('a board error splits into a title, a detail and the path to copy', () => {
+    const view = boardErrorView({
+      reason: 'bad table',
+      file: 'BOARD.md',
+      line: 4,
+    });
+    expect(view.path).toBe('BOARD.md:4');
+    expect(view.detail).toContain('bad table');
+    expect(boardErrorView({ reason: 'x', file: 'A.md' }).path).toBe('A.md');
+  });
+
+  test('Stop is drawn unless the orchestrator is known to be absent', () => {
+    expect(showStopControl('running')).toBe(true);
+    expect(showStopControl('idle')).toBe(true);
+    expect(showStopControl('unknown')).toBe(true);
+    expect(showStopControl('absent')).toBe(false);
+  });
+
+  test('scraped is explained, events needs no explanation', () => {
+    expect(CHANNEL_EXPLANATION.events).toBeNull();
+    expect(CHANNEL_EXPLANATION.scraped).toContain('markdown');
+    expect(CHANNEL_EXPLANATION.both).toContain('plugin events');
   });
 
   test('the channel badge names a mixed channel', () => {

@@ -7,11 +7,11 @@ import {
   type RunLogLine,
   type RunLogMessage,
   type RunLogSubscribeMessage,
+  type SkillRunPhase,
   type SubscribeErrorMessage,
 } from '@agentdock/shared/protocol';
 import type { Cancel, Clock } from '../../clock';
 import { errorMessage, type Logger } from '../../log';
-import type { RunRecord } from './record';
 import { renderStreamLine } from './stream';
 
 /** How often subscribed run logs are tailed. */
@@ -21,10 +21,41 @@ const READ_CHUNK_BYTES = 1024 * 1024;
 
 export type RunLogOutbound = RunLogMessage | SubscribeErrorMessage;
 
+/**
+ * What the log needs of a run: whose it is and whether it is over. A plan
+ * turn's phases are a subset of a skill run's (#183).
+ */
+export interface RunLogRecord {
+  projectId: string;
+  phase: SkillRunPhase;
+}
+
 export interface RunLogSource {
-  record(runId: string): RunRecord | null;
+  record(runId: string): RunLogRecord | null;
   streamFile(runId: string): string;
 }
+
+/**
+ * Skill runs and plan turns as one source (#183): a `runId` is a `runs` row,
+ * so at most one of them knows it.
+ */
+export const runLogSources = (
+  ...sources: readonly RunLogSource[]
+): RunLogSource => {
+  const owner = (runId: string): RunLogSource | undefined =>
+    sources.find((source) => source.record(runId) !== null);
+  return {
+    record: (runId) => {
+      for (const source of sources) {
+        const record = source.record(runId);
+        if (record) return record;
+      }
+      return null;
+    },
+    // Only asked of a run `record` found; an unknown one opens nothing.
+    streamFile: (runId) => owner(runId)?.streamFile(runId) ?? '',
+  };
+};
 
 export interface RunLogOptions {
   runs: RunLogSource;
@@ -52,12 +83,18 @@ export const runLogFrames = (
   id: string,
   lines: readonly RunLogLine[],
   backlog: boolean,
+  lastOutputAt?: string,
 ): RunLogMessage[] => {
   const frames: RunLogMessage[] = [];
   const frame = (batch: RunLogLine[]): RunLogMessage => ({
     type: 'run_log',
     id,
-    frame: { type: 'lines', backlog, lines: batch },
+    frame: {
+      type: 'lines',
+      backlog,
+      lines: batch,
+      ...(lastOutputAt ? { lastOutputAt } : {}),
+    },
   });
   let batch: RunLogLine[] = [];
   let size = Buffer.byteLength(JSON.stringify(frame([])));
@@ -76,7 +113,7 @@ export const runLogFrames = (
 };
 
 /**
- * The live log of skill runs (D13). While the server holds a `run_log`
+ * The live log of skill runs (D13) and plan turns (#183). While the server holds a `run_log`
  * subscription, the runner tails the run's `stream.jsonl` and sends rendered
  * lines — the newest backlog first, then live lines — and an `ended` frame
  * at the run's terminal phase. The stream itself never leaves the runner.
@@ -116,7 +153,7 @@ export class RunLogStreamer {
         backlog.splice(0, backlog.length - RUN_LOG_BACKLOG_LINES);
       }
     }
-    for (const frame of runLogFrames(id, backlog, true))
+    for (const frame of runLogFrames(id, backlog, true, this.outputAt(runId)))
       this.options.send(frame);
     if (isTerminalSkillRunPhase(record.phase)) {
       this.ended(id, record);
@@ -158,7 +195,8 @@ export class RunLogStreamer {
         for (let more = this.read(sub); more !== null; more = this.read(sub)) {
           lines.push(...more);
         }
-        for (const frame of runLogFrames(sub.id, lines, false))
+        const at = lines.length > 0 ? this.outputAt(sub.runId) : undefined;
+        for (const frame of runLogFrames(sub.id, lines, false, at))
           this.options.send(frame);
         if (!record || isTerminalSkillRunPhase(record.phase)) {
           this.subs.delete(sub.id);
@@ -172,6 +210,26 @@ export class RunLogStreamer {
       });
     } finally {
       this.polling = false;
+    }
+  }
+
+  /**
+   * When the stream was last written (#275 D4): the append-only file's mtime
+   * stands for "a new line". Undefined when the file cannot be read.
+   */
+  private outputAt(runId: string): string | undefined {
+    let fd: number;
+    try {
+      fd = openSync(this.options.runs.streamFile(runId), 'r');
+    } catch {
+      return undefined;
+    }
+    try {
+      return fstatSync(fd).mtime.toISOString();
+    } catch {
+      return undefined;
+    } finally {
+      closeSync(fd);
     }
   }
 
@@ -215,7 +273,7 @@ export class RunLogStreamer {
     }
   }
 
-  private ended(id: string, record: RunRecord): void {
+  private ended(id: string, record: RunLogRecord): void {
     if (!isTerminalSkillRunPhase(record.phase)) return;
     this.options.send({
       type: 'run_log',

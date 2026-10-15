@@ -25,6 +25,25 @@ import { deriveSlotStatus } from './slot-status';
 
 export type { SlotPatch } from './slot-patch';
 
+const PULL_PATH = /^\/[^/]+\/[^/]+\/pull\/(\d+)\/?$/;
+
+/**
+ * The number of an `https://<host>/<owner>/<repo>/pull/<n>` URL. A reply's
+ * `pull request open — <url>` carries only the URL, and without the runner's
+ * `gh` poll it is the only word of the PR (#213).
+ */
+const prNumberOf = (url: string | undefined): number | undefined => {
+  if (!url) return undefined;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:') return undefined;
+    const match = PULL_PATH.exec(parsed.pathname);
+    return match ? Number(match[1]) : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 export type SlotEvent = EventOf<
   | 'session.appeared'
   | 'session.vanished'
@@ -36,6 +55,7 @@ export type SlotEvent = EventOf<
   | 'slot.dispatched'
   | 'slot.redispatched'
   | 'slot.checkpoint'
+  | 'slot.message_seen'
   | 'pr.opened'
   | 'pr.checks_changed'
   | 'pr.closed'
@@ -70,6 +90,13 @@ export class SlotProjection {
           : this.dispatched(applied as Applied<typeof event>);
       case 'slot.checkpoint':
         return this.checkpoint(applied as Applied<typeof event>);
+      case 'slot.message_seen': {
+        // No row of its own: the `events` row is the store (spec 160). It
+        // only names the run whose conversation changed, for the live push.
+        const row = await this.covering(this.slotName(event), applied.ts);
+        if (row) this.changed({ kind: 'conversation', id: row.id });
+        return;
+      }
       case 'pr.opened':
       case 'pr.checks_changed':
       case 'pr.closed':
@@ -272,13 +299,14 @@ export class SlotProjection {
       orderBy: { position: 'desc' },
       select: { kind: true },
     });
+    const prNumber = data.prNumber ?? prNumberOf(data.prUrl);
     return this.update(
       row,
       sourceOf(applied),
       {
         lastCheckpoint: last.kind,
         ...(data.prUrl ? { prUrl: data.prUrl } : {}),
-        ...(data.prNumber ? { prNumber: data.prNumber } : {}),
+        ...(prNumber ? { prNumber } : {}),
       },
       extra,
     );

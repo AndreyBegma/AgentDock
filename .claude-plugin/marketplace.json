@@ -1,0 +1,14 @@
+{
+  "name": "agentdock",
+  "owner": {
+    "name": "AgentDock",
+    "url": "https://github.com/AndreyBegma/AgentDock"
+  },
+  "plugins": [
+    {
+      "name": "agentdock",
+      "source": "./plugins/agentdock",
+      "description": "Reports Claude Code sessions to AgentDock through the local runner and gives the model fleet, queue and budget tools."
+    }
+  ]
+}

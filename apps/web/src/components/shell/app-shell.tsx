@@ -1,22 +1,13 @@
 'use client';
 
-import {
-  LIVE_CLOSE_CODES,
-  type ProjectSummary,
-  type PublicUser,
-} from '@agentdock/shared';
+import { LIVE_CLOSE_CODES, type PublicUser } from '@agentdock/shared';
+import { ActionList } from '@andrewbehma/glass-ui/action-list';
 import { Avatar } from '@andrewbehma/glass-ui/avatar';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
-import {
-  Breadcrumb,
-  type BreadcrumbItem,
-} from '@andrewbehma/glass-ui/breadcrumb';
+import { Breadcrumb } from '@andrewbehma/glass-ui/breadcrumb';
 import { Button } from '@andrewbehma/glass-ui/button';
-import {
-  CommandPalette,
-  type CommandPaletteGroup,
-} from '@andrewbehma/glass-ui/command-palette';
+import { CommandPalette } from '@andrewbehma/glass-ui/command-palette';
 import { KeyHint } from '@andrewbehma/glass-ui/key-hint';
 import {
   MenuContent,
@@ -28,10 +19,10 @@ import {
   MenuSeparator,
   MenuTrigger,
 } from '@andrewbehma/glass-ui/menu';
-import { NavRail, type NavRailGroup } from '@andrewbehma/glass-ui/nav-rail';
+import { TabBar, type TabBarProps } from '@andrewbehma/glass-ui/tab-bar';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { useCommandPaletteShortcut } from '@andrewbehma/glass-ui/use-command-palette-shortcut';
-import { FolderGit2, LogOut, Palette, Search, User } from 'lucide-react';
+import { ArrowLeft, LogOut, Search, User } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -43,12 +34,27 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { api, describeError } from '../../lib/api';
-import { navLabel } from '../../lib/approvals/format';
+import { approvalsBadge } from '../../lib/approvals/format';
+import { attentionBadge } from '../../lib/fleet/format';
 import { useLiveStatus } from '../../lib/live/use-live';
-import { liveDotLabel, useLivePaused } from './live-status';
-import { isActive, NAV, projectIdOf, visibleNav } from './nav';
+import { crumbsFor, pageTitleOf } from './crumbs';
+import {
+  liveDotLabel,
+  RESTARTING_BANNER_TEXT,
+  useLivePaused,
+  useServerRestarting,
+} from './live-status';
+import {
+  activeEntryId,
+  isWideEntry,
+  projectIdOf,
+  tabBarSplit,
+  visibleNav,
+} from './nav';
 import { NotificationBell } from './notification-bell';
+import { paletteGroups } from './palette';
 import { ProjectSwitcher } from './project-switcher';
+import { Rail } from './rail';
 import {
   applyTheme,
   isThemeMode,
@@ -58,10 +64,26 @@ import {
   THEME_MODES,
   type ThemeMode,
 } from './theme';
+import { useCrumbNames } from './use-crumb-names';
+import { useDocumentTitle } from './use-document-title';
+import { usePlans, useProjects, useRecent } from './use-shell-data';
+import { useSlotsNeedingAttention } from './use-slots-needing-attention';
 import { useWaitingApprovals } from './use-waiting-approvals';
 import { UserProvider } from './user-context';
 
 const COLLAPSE_QUERY = '(max-width: 1023px)';
+
+/** The tab bar's and More's anchors are Next links. */
+const renderLink: NonNullable<TabBarProps['link']> = ({
+  href,
+  className,
+  children: content,
+  ...rest
+}) => (
+  <Link href={href} className={className} {...rest}>
+    {content}
+  </Link>
+);
 
 function useNarrow(): boolean {
   return useSyncExternalStore(
@@ -96,35 +118,6 @@ function useTheme(): [ThemeMode, (mode: ThemeMode) => void] {
   return [mode, choose];
 }
 
-const titleCase = (segment: string) =>
-  segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, ' ');
-
-/** Breadcrumb of the current route, labelled from the nav registry where it knows the page. */
-function crumbsFor(pathname: string): BreadcrumbItem[] {
-  if (pathname === '/') return [{ id: 'overview', label: 'Overview' }];
-  const known = new Map<string, string>();
-  for (const section of NAV) {
-    for (const entry of section.entries) known.set(entry.href, entry.label);
-  }
-  known.set('/account', 'Account');
-  known.set('/admin', 'Admin');
-  // The nav entry "Integrations" points at its first page.
-  known.set('/admin/integrations', 'Integrations');
-  known.set('/admin/integrations/telegram', 'Telegram');
-
-  const segments = pathname.split('/').filter(Boolean);
-  return segments.map((segment, index) => {
-    const href = `/${segments.slice(0, index + 1).join('/')}`;
-    const last = index === segments.length - 1;
-    return {
-      id: href,
-      label: known.get(href) ?? titleCase(segment),
-      // `/admin` has no page of its own.
-      href: last || href === '/admin' ? undefined : href,
-    };
-  });
-}
-
 function ConnectionDot({ status, paused }: ReturnType<typeof useLivePaused>) {
   const label = liveDotLabel(status, paused);
   const tone = status === 'connected' ? 'ok' : 'warn';
@@ -151,21 +144,17 @@ export function AppShell({
   const [theme, setTheme] = useTheme();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const projectId = projectIdOf(pathname);
-  const [projects, setProjects] = useState<ProjectSummary[]>([]);
-
-  useEffect(() => {
-    api<ProjectSummary[]>('/projects')
-      .then((list) => setProjects(Array.isArray(list) ? list : []))
-      .catch(() => {
-        // No project entries in the palette.
-      });
-  }, []);
+  const projects = useProjects();
+  const recent = useRecent(paletteOpen, projectId);
+  const plans = usePlans(paletteOpen, projectId);
+  const names = useCrumbNames(pathname, projects);
 
   useCommandPaletteShortcut(() => setPaletteOpen(true));
 
   // The bell holds the `user:<id>` subscription that keeps the socket (and the dot) alive.
   const { status, closeCode } = useLiveStatus();
   const live = useLivePaused();
+  const restarting = useServerRestarting();
   useEffect(() => {
     if (status === 'offline' && closeCode === LIVE_CLOSE_CODES.unauthorized) {
       router.replace('/login');
@@ -176,24 +165,29 @@ export function AppShell({
     () => visibleNav(user.role, pathname),
     [user.role, pathname],
   );
+  const activeId = activeEntryId(sections, pathname);
+  const wide = isWideEntry(sections, activeId);
+  const projectName = projects.find(
+    (project) => project.id === projectId,
+  )?.displayName;
 
-  // glass-ui's NavRailItem has no badge prop yet, so the count rides the label.
+  const crumbs = useMemo(() => crumbsFor(pathname, names), [pathname, names]);
+  useDocumentTitle(pageTitleOf(crumbs, projectName));
+  const parent = crumbs.length > 1 ? crumbs.at(-2) : undefined;
+
+  // The rail's and the tab bar's badges on Approvals and Fleet.
   const waitingApprovals = useWaitingApprovals(projectId);
+  const slotsNeedingAttention = useSlotsNeedingAttention(projectId);
+  const tabBadges = {
+    approvals: approvalsBadge(waitingApprovals),
+    fleet: attentionBadge(slotsNeedingAttention),
+  } as const;
 
-  const groups: NavRailGroup[] = sections.map((section) => ({
-    id: section.id,
-    title: section.title,
-    items: section.entries.map((entry) => ({
-      id: entry.id,
-      label:
-        entry.id === 'approvals'
-          ? navLabel(entry.label, waitingApprovals)
-          : entry.label,
-      icon: entry.icon,
-      href: entry.resolvedHref,
-      active: isActive(entry.resolvedHref, pathname),
-    })),
-  }));
+  // Below `lg`: five tabs, the rest in More's sheet, which a navigation closes.
+  const { tabs, more } = useMemo(() => tabBarSplit(sections), [sections]);
+  const [moreOpen, setMoreOpen] = useState(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: pathname is the trigger
+  useEffect(() => setMoreOpen(false), [pathname]);
 
   const logout = useCallback(async () => {
     try {
@@ -210,54 +204,17 @@ export function AppShell({
         'system',
     );
 
-  const search = (query: string): CommandPaletteGroup[] => {
-    const needle = query.trim().toLowerCase();
-    const matches = (label: string) => label.toLowerCase().includes(needle);
-    const result: CommandPaletteGroup[] = [];
-
-    const go = sections.flatMap((section) =>
-      section.entries
-        .filter((entry) => matches(`${section.title} ${entry.label}`))
-        .map((entry) => ({
-          id: `go:${entry.resolvedHref}`,
-          label: entry.label,
-          hint: section.title,
-          icon: entry.icon,
-        })),
-    );
-    if (matches('account')) {
-      go.push({ id: 'go:/account', label: 'Account', hint: 'You', icon: User });
-    }
-    if (go.length > 0) result.push({ id: 'go', title: 'Go to', items: go });
-
-    const jump = projects
-      .filter((project) =>
-        matches(`project ${project.displayName} ${project.repo}`),
-      )
-      .map((project) => ({
-        id: `go:/projects/${project.id}`,
-        label: project.displayName,
-        hint: project.repo,
-        icon: FolderGit2,
-      }));
-    if (jump.length > 0) {
-      result.push({ id: 'projects', title: 'Go to project…', items: jump });
-    }
-
-    const actions = [
-      {
-        id: 'action:theme',
-        label: 'Switch theme',
-        hint: THEME_LABEL[theme],
-        icon: Palette,
-      },
-      { id: 'action:logout', label: 'Log out', icon: LogOut },
-    ].filter((item) => matches(item.label));
-    if (actions.length > 0) {
-      result.push({ id: 'actions', title: 'Actions', items: actions });
-    }
-    return result;
-  };
+  const search = (query: string) =>
+    paletteGroups({
+      query,
+      role: user.role,
+      sections,
+      projects,
+      projectId,
+      recent,
+      plans,
+      themeLabel: THEME_LABEL[theme],
+    });
 
   const onSelect = (item: { id: string }) => {
     setPaletteOpen(false);
@@ -270,55 +227,74 @@ export function AppShell({
 
   return (
     <UserProvider value={user}>
-      <div className="flex min-h-screen gap-3 p-3">
-        <aside className="sticky top-3 h-[calc(100vh-1.5rem)] shrink-0">
-          <NavRail
-            aria-label="Main"
-            groups={groups}
-            collapsed={narrow}
-            className="h-full"
-            head={
-              <div className="flex flex-col gap-2">
-                <span
-                  className={
-                    narrow ? 'text-center font-bold' : 'px-3 pt-1 font-bold'
-                  }
-                >
-                  {narrow ? 'AD' : 'AgentDock'}
-                </span>
-                {narrow ? null : <ProjectSwitcher projectId={projectId} />}
-              </div>
-            }
-            link={({ href, className, children: content, ...rest }) => (
-              <Link href={href} className={className} {...rest}>
-                {content}
-              </Link>
-            )}
-          />
-        </aside>
+      <a
+        href="#main-content"
+        className="glass-strong sr-only z-overlay rounded-control px-3 py-2 text-sm text-ink focus:not-sr-only focus:fixed focus:left-3 focus:top-3"
+      >
+        Skip to content
+      </a>
+      <div
+        // Below `lg` the page sits on a 16 px gutter (#213).
+        className={`flex min-h-screen ${narrow ? 'gap-2 px-4 py-2' : 'gap-3 p-3'}`}
+      >
+        {narrow ? null : (
+          <aside className="sticky top-3 h-[calc(100vh-1.5rem)] shrink-0">
+            <Rail
+              sections={sections}
+              activeId={activeId}
+              projects={projects}
+              projectId={projectId}
+              waitingApprovals={waitingApprovals}
+              slotsNeedingAttention={slotsNeedingAttention}
+            />
+          </aside>
+        )}
 
         <div className="flex min-w-0 flex-1 flex-col gap-3">
-          <header className="glass rounded-surface flex items-center gap-3 px-4 py-2">
-            <Breadcrumb
-              items={crumbsFor(pathname)}
-              aria-label="Breadcrumb"
-              overflowLabel="More"
-              className="flex-1"
-              link={({ href, className, children: content, ...rest }) => (
-                <Link href={href} className={className} {...rest}>
-                  {content}
-                </Link>
-              )}
-            />
-            <ConnectionDot {...live} />
+          <header
+            className={`glass rounded-surface flex min-h-12 items-center py-2 ${narrow ? 'gap-0.5 px-2' : 'gap-3 px-4'}`}
+          >
+            {narrow ? (
+              // A phone has no room for the trail: the page, and a way up.
+              <div className="flex min-w-0 flex-1 items-center gap-1">
+                {parent?.href ? (
+                  <Link
+                    href={parent.href}
+                    aria-label={`Back to ${parent.label}`}
+                    className="flex size-8 shrink-0 items-center justify-center rounded-control text-ink-2 hover:bg-hover hover:text-ink"
+                  >
+                    <ArrowLeft size={16} aria-hidden="true" />
+                  </Link>
+                ) : null}
+                <span className="truncate text-section text-ink">
+                  {crumbs.at(-1)?.label}
+                </span>
+              </div>
+            ) : (
+              <Breadcrumb
+                items={crumbs}
+                aria-label="Breadcrumb"
+                overflowLabel="Show the path"
+                className="min-w-0 flex-1"
+                link={({ href, className, children: content, ...rest }) => (
+                  <Link href={href} className={className} {...rest}>
+                    {content}
+                  </Link>
+                )}
+              />
+            )}
+            <span className={narrow ? 'px-1.5' : undefined}>
+              <ConnectionDot {...live} />
+            </span>
             <Button
               variant="ghost"
               size="sm"
+              icon={narrow}
               onClick={() => setPaletteOpen(true)}
               aria-label="Open command palette"
             >
               <Search size={14} aria-hidden="true" />
-              <KeyHint keys="mod+k" />
+              {narrow ? null : <KeyHint keys="mod+k" />}
             </Button>
             <NotificationBell />
             <MenuRoot>
@@ -362,7 +338,13 @@ export function AppShell({
             </MenuRoot>
           </header>
 
-          {live.paused && closeCode !== LIVE_CLOSE_CODES.unauthorized ? (
+          {restarting ? (
+            <Banner tone="warn">{RESTARTING_BANNER_TEXT}</Banner>
+          ) : null}
+
+          {!restarting &&
+          live.paused &&
+          closeCode !== LIVE_CLOSE_CODES.unauthorized ? (
             <Banner
               tone="warn"
               title="Live updates paused."
@@ -380,9 +362,70 @@ export function AppShell({
             </Banner>
           ) : null}
 
-          <main id="main-content" className="mx-auto w-full max-w-5xl pb-6">
+          <main
+            id="main-content"
+            tabIndex={-1}
+            // A data page (the registry's `wide`) gets the wide column.
+            className={`mx-auto w-full pb-6 focus:outline-none ${wide ? 'max-w-7xl' : 'max-w-5xl'}`}
+          >
             {children}
           </main>
+
+          {narrow ? (
+            // Below `lg` the tab bar replaces the rail; its spacer keeps the
+            // page's end clear of it.
+            <TabBar
+              aria-label="Main"
+              items={tabs.map((entry) => ({
+                id: entry.id,
+                label: entry.label,
+                icon: entry.icon,
+                href: entry.resolvedHref,
+                active: entry.id === activeId,
+                badge:
+                  entry.id === 'approvals' || entry.id === 'fleet'
+                    ? tabBadges[entry.id]
+                    : undefined,
+              }))}
+              link={renderLink}
+              more={
+                more.length > 0
+                  ? {
+                      label: 'More',
+                      title: 'More pages',
+                      open: moreOpen,
+                      onOpenChange: setMoreOpen,
+                      children: (
+                        <div className="flex flex-col gap-4">
+                          <ProjectSwitcher
+                            projects={projects}
+                            projectId={projectId}
+                          />
+                          {more.map((section) => (
+                            <ActionList
+                              key={section.id}
+                              surface="content"
+                              heading={
+                                section.id === 'project' && projectName
+                                  ? projectName
+                                  : section.title
+                              }
+                              link={renderLink}
+                              items={section.entries.map((entry) => ({
+                                id: entry.id,
+                                label: entry.label,
+                                icon: entry.icon,
+                                href: entry.resolvedHref,
+                              }))}
+                            />
+                          ))}
+                        </div>
+                      ),
+                    }
+                  : undefined
+              }
+            />
+          ) : null}
         </div>
       </div>
 
@@ -391,7 +434,7 @@ export function AppShell({
         onOpenChange={setPaletteOpen}
         search={search}
         onSelect={onSelect}
-        placeholder="Go to a page or run a command"
+        placeholder="Go to a page, a project or a recent run"
       />
     </UserProvider>
   );

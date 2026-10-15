@@ -204,9 +204,14 @@ export class NotificationMatcher
       return [];
     }
     const everyone = await this.writer.projectRecipients(tx, projectId);
-    const recipients = NOTIFICATION_KIND_SPECS[draft.kind].adminsOnly
+    const spec = NOTIFICATION_KIND_SPECS[draft.kind];
+    // A content-derived kind never reaches a viewer, whatever their rules say
+    // (ADR-0021 §5, #244 D11).
+    const recipients = spec.adminsOnly
       ? everyone.filter((r) => r.role === 'admin')
-      : everyone;
+      : spec.operatorsOnly
+        ? everyone.filter((r) => r.role !== 'viewer')
+        : everyone;
     return this.writer.write(
       tx,
       this.input(draft, event, projectId),
@@ -227,12 +232,16 @@ export class NotificationMatcher
       issue: draft.issue,
       title: draft.title,
       body: draft.body,
-      link: projectLink(projectId, draft.page),
+      link: projectLink(projectId, draft.page, draft.card),
       eventId: event.id,
       at: event.ts,
       // One item per disable: a second disable after a re-enable is news, not
-      // a repeat of the first (spec 25 D10).
-      fold: draft.kind !== 'schedule.disabled',
+      // a repeat of the first (spec 25 D10). A card's item is per card and
+      // round; folding by slot would merge different cards (issue #242).
+      fold:
+        draft.kind !== 'schedule.disabled' &&
+        draft.kind !== 'card.finished' &&
+        draft.kind !== 'card.waiting',
     };
   }
 

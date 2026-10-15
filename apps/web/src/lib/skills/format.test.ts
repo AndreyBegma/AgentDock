@@ -8,6 +8,7 @@ import { ApiError } from '../api';
 import {
   allowedToolsOf,
   COMMAND_UNAVAILABLE_TEXT,
+  dedupeSkills,
   defaultProfileOptionLabel,
   describeSkillsError,
   EMPTY_RUN_FORM,
@@ -19,11 +20,13 @@ import {
   parseTimeoutMinutes,
   permissionWarning,
   profileOptionLabel,
+  profilesLabel,
   provenanceLabel,
   runFormProblem,
   runProfileReason,
   skillRunProfiles,
   skillRunsHref,
+  skillToRun,
   toRunRequest,
 } from './format';
 
@@ -59,6 +62,77 @@ describe('groupBySkillScope', () => {
     ]);
     expect(groups.map((g) => g.scope)).toEqual(['project', 'plugin']);
     expect(groups[0]?.items.map((i) => i.invocation)).toEqual(['a', 'b']);
+  });
+});
+
+describe('skillToRun', () => {
+  const items = [
+    skill({ id: 'a', invocation: 'cs-review', runnable: true }),
+    skill({ id: 'b', invocation: 'cs-orchestrator', runnable: false }),
+    skill({
+      id: 'c',
+      invocation: 'cs-codex',
+      runtime: 'codex',
+      runnable: true,
+    }),
+  ];
+  test('a ?run= link opens the named runnable Claude skill, slash or not', () => {
+    expect(skillToRun(items, 'cs-review')?.id).toBe('a');
+    expect(skillToRun(items, '/cs-review')?.id).toBe('a');
+  });
+  test('nothing to open for no name, an unknown, unrunnable or Codex skill', () => {
+    expect(skillToRun(items, null)).toBeNull();
+    expect(skillToRun(items, 'nope')).toBeNull();
+    expect(skillToRun(items, 'cs-orchestrator')).toBeNull();
+    expect(skillToRun(items, 'cs-codex')).toBeNull();
+  });
+});
+
+describe('dedupeSkills', () => {
+  const plugin = (profileKey: string, over: Partial<InstalledSkillView> = {}) =>
+    skill({
+      id: `plugin-${profileKey}`,
+      scope: 'plugin',
+      invocation: 'code-sentinel:spec',
+      profileKey,
+      contentHash: 'h1',
+      ...over,
+    });
+
+  test('one plugin skill in five profiles is one row', () => {
+    const rows = dedupeSkills(
+      ['a', 'b', 'c', 'd', 'e'].map((key) => plugin(key)),
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.profiles).toEqual(['a', 'b', 'c', 'd', 'e']);
+  });
+
+  test('a different content or invocation stays a separate row', () => {
+    const rows = dedupeSkills([
+      plugin('a'),
+      plugin('b', { contentHash: 'h2' }),
+      plugin('c', { invocation: 'code-sentinel:test' }),
+    ]);
+    expect(rows).toHaveLength(3);
+  });
+
+  test('a project skill has no profiles', () => {
+    const rows = dedupeSkills([skill({ scope: 'project' })]);
+    expect(rows[0]?.profiles).toEqual([]);
+  });
+
+  test('the same profile twice is counted once', () => {
+    expect(dedupeSkills([plugin('a'), plugin('a')])[0]?.profiles).toEqual([
+      'a',
+    ]);
+  });
+});
+
+describe('profilesLabel', () => {
+  test('reads for none, one and many', () => {
+    expect(profilesLabel([])).toBe('');
+    expect(profilesLabel(['work'])).toBe('profile work');
+    expect(profilesLabel(['a', 'b', 'c'])).toBe('in 3 profiles');
   });
 });
 

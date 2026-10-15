@@ -12,7 +12,7 @@ plugin events with minimal mapping.
   "seq": 18234,
   "ts": "2026-10-07T18:36:02.335Z",
   "type": "slot.checkpoint",
-  "source": "code-sentinel | runner | otel | transcript | github",
+  "source": "code-sentinel | runner | otel | transcript | github | scraped | hook",
   "project": { "repo": "AndreyBegma/denitsa-app", "root": "/home/archi/dev/denitsa-app" },
   "slot": "i42-api",
   "issue": 42,
@@ -58,6 +58,12 @@ This table is what the plugin writes. What the runner forwards is in
 | `pane.quota_hit` | `slot` |
 | `commit.trailer_found` | `slot, sha` |
 | `worktree.changed` | `slot, ahead, behind, dirty` |
+| `card_run.phase_changed` | `cardId, runId, projectId, phase: starting\|running\|ended\|failed, at, tmuxSession?, worktree?, exitCode?, error?` — a board card's worker (issue #242; `events/cards.ts`) |
+
+Board server events (source `api`, ADR-0014, issue #242 D15): `card.finished`
+`{ cardId, number, title, round, finishedBy, prNumber, prUrl }` and
+`card.waiting` `{ cardId, number, title, round }` — never prompt or summary
+text. They drive the `card.finished` and `card.waiting` notifications.
 
 ### Usage (source `otel` / `transcript`)
 
@@ -71,6 +77,8 @@ are in [runner-protocol.md](runner-protocol.md#session-events). The envelope's
 | `llm.request` | `requestId, model, tokens: { input, output, cacheRead, cacheWrite5m, cacheWrite1h, reasoning }, querySource: main\|subagent\|auxiliary, promptId?, durationMs?, durationApprox?, ttftMs?, stopReason?, agentName?, reportedCostUsd?, cacheWriteTtlUnknown?, source?: transcript\|otel, run?` |
 | `tool.call` | `toolUseId, tool, startedAt, promptId?, endedAt?, ok?, durationMs?, decision?, childSessionId?` |
 | `turn.started` / `turn.finished` | `promptId` |
+| `session.compacted` | `compactionId, trigger: auto\|manual, preTokens?` |
+| `session.error` | `errorId, kind (an error code, [a-z_] only), status?, promptId?` |
 | `skill.activated` | `skill` |
 
 None of these carries prompt, response, thinking or tool-argument text
@@ -236,6 +244,33 @@ with the pull request's number when a merged pull request closed it, else
 `specGap`, `parseDependsOn`, `parseGate`, `parseClosingRefs` and
 `parseParallelPlan` in `@agentdock/shared` are the D3 body rules; the runner's
 `issue.create` handler uses the same `specGap`.
+
+### Claude Code hooks (source `hook`, spec 201)
+
+The schemas live in `packages/shared/src/protocol/events/hooks.ts`
+(`hookEventDataSchemas`, `parseHookEvent`). The `agentdock` plugin's hooks
+emit them through the runner's local socket. Each one carries the envelope
+`session: { runtime: "claude", id: <session_id> }`. `project` is present when
+the daemon correlated the cwd. The data schemas are strict.
+
+Hooks never send `llm.request`, `turn.*` or `tool.call`; usage stays with OTel
+and transcripts (ADR-0003). The content fields (`content`, `input`, `output`,
+`response`: `{ text, truncated }`, ≤ 16 KiB) are present only for a project with
+`shipContent` and are redacted on the runner (ADR-0021).
+
+| Type | Hook | `data` |
+|---|---|---|
+| `hook.session_started` | `SessionStart` | `source, cwd, gitBranch?, model?, permissionMode, tmuxSession?` |
+| `hook.prompt_submitted` | `UserPromptSubmit` | `chars, content?` |
+| `hook.tool_finished` | `PostToolUse`, `PostToolUseFailure` | `toolUseId, toolName, ok, durationMs?, input?, output?` |
+| `hook.permission_requested` | `PermissionRequest` | `toolName` |
+| `hook.notification` | `Notification` | `notificationType` (the message text is never sent) |
+| `hook.stopped` | `Stop` | `response?` |
+| `hook.session_ended` | `SessionEnd` | `reason: clear\|resume\|logout\|prompt_input_exit\|other` |
+
+The API derives the session's `origin`, `issue`, `ownerId` and `liveState` from
+these events (`sessionOriginOf`, `issueFromBranch`, `liveStateAfter` in
+`@agentdock/shared`).
 
 ## Correlation
 

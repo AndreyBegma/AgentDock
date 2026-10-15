@@ -20,6 +20,7 @@ import type {
   Emit,
   WatchedProject,
 } from './registry';
+import { MessageWatcher } from './replies/messages';
 import { ReplyWatcher } from './replies/replies';
 import { SlotSessions } from './tmux/sessions';
 import { Tmux } from './tmux/tmux';
@@ -47,6 +48,7 @@ interface Watchers {
   sessions: SlotSessions;
   orchestrator: OrchestratorWatcher;
   replies: ReplyWatcher;
+  messages: MessageWatcher;
   prs: PrWatcher;
 }
 
@@ -98,6 +100,7 @@ export class FleetCollector implements Collector {
         capture,
       }),
       replies: new ReplyWatcher({ book, emit: fleetEmit }),
+      messages: new MessageWatcher({ book, emit: fleetEmit }),
       prs: new PrWatcher({ ...shared, exec, log: this.context.log }),
     };
 
@@ -180,12 +183,13 @@ export class FleetCollector implements Collector {
     this.armFileWatchers();
   }
 
-  /** Boards, briefs and reply files. */
+  /** Boards, briefs, reply and message files. */
   async scanFiles(): Promise<void> {
     const w = this.watchers;
     if (!w) return;
     w.board.scan();
     w.replies.scan();
+    w.messages.scan();
   }
 
   async prs(): Promise<void> {

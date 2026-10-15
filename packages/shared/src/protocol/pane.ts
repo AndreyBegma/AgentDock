@@ -160,6 +160,12 @@ export const runLogLinesFrameSchema = z.object({
   type: z.literal('lines'),
   backlog: z.boolean(),
   lines: z.array(runLogLineSchema),
+  /**
+   * #275 D4: the run's stream file mtime (ISO), on backlog and live frames,
+   * so a client that joins mid-run knows how old the newest output is.
+   * Absent from older runners.
+   */
+  lastOutputAt: z.iso.datetime().optional(),
 });
 
 /** The run is over; nothing further is sent for this subscription. */

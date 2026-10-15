@@ -21,15 +21,22 @@ export class RunnerWatchList {
   ) {}
 
   async configFor(runnerId: string): Promise<RunnerServerConfig> {
-    const projects = await this.prisma.project.findMany({
-      where: { runnerId },
-      orderBy: { createdAt: 'asc' },
-      select: {
-        id: true,
-        rootPath: true,
-        githubAppHealth: { select: { state: true } },
-      },
-    });
+    const [projects, runner] = await Promise.all([
+      this.prisma.project.findMany({
+        where: { runnerId },
+        orderBy: { createdAt: 'asc' },
+        select: {
+          id: true,
+          rootPath: true,
+          shipSessionContent: true,
+          githubAppHealth: { select: { state: true } },
+        },
+      }),
+      this.prisma.runner.findUnique({
+        where: { id: runnerId },
+        select: { awayMode: true },
+      }),
+    ]);
     return {
       projects: projects.map((p) => ({
         id: p.id,
@@ -39,8 +46,12 @@ export class RunnerWatchList {
         ...(p.githubAppHealth?.state === 'healthy'
           ? { githubApp: 'healthy' as const }
           : {}),
+        // Spec 201 D13 / ADR-0021: absent means the runner strips content.
+        ...(p.shipSessionContent ? { shipContent: true } : {}),
       })),
       pollIntervalsMs: {},
+      // Spec 201 D17: absent means off.
+      ...(runner?.awayMode ? { awayMode: true } : {}),
     };
   }
 
@@ -77,6 +88,19 @@ export class RunnerWatchList {
       }
       return sent;
     });
+  }
+
+  /**
+   * `push` to the runner of `projectId` — for a change to one project's
+   * settings, such as `shipSessionContent` (spec 201 D13). False when the
+   * project does not exist or its runner is not connected.
+   */
+  async pushForProject(projectId: string): Promise<boolean> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { runnerId: true },
+    });
+    return project ? this.push(project.runnerId) : false;
   }
 
   private serialize<T>(runnerId: string, task: () => Promise<T>): Promise<T> {

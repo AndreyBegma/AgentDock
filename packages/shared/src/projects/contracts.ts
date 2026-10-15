@@ -6,6 +6,7 @@ import type {
   DocsEvidence,
   DocsRule,
   DocsSourceKind,
+  RunnerCommands,
   Runtime,
 } from '../protocol';
 import type { RunnerStatus } from '../runners';
@@ -126,6 +127,11 @@ export interface ProjectDetail extends ProjectSummary {
   createdAt: string;
   updatedAt: string;
   docsSource: DocsSourceView | null;
+  /** ADR-0021; optional until the API returns them (spec 201). */
+  shipSessionContent?: boolean;
+  sessionContentRetentionDays?: number;
+  /** What the project's runner said it serves in its latest hello (#233); null = unknown. Names only, never paths or versions. */
+  runnerCommands: RunnerCommands | null;
 }
 
 /** A row of `GET /projects/:id/members`. */
@@ -176,6 +182,10 @@ export interface UpdateProjectRequest {
   readyLabelOverride?: string | null;
   defaultProfileId?: string | null;
   mergeApproval?: boolean;
+  /** ADR-0021. */
+  shipSessionContent?: boolean;
+  /** 1–365 (`SESSION_CONTENT_RETENTION_DAYS`). */
+  sessionContentRetentionDays?: number;
 }
 
 /**

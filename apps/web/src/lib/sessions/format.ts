@@ -1,48 +1,41 @@
 import {
   SESSION_ERROR,
   type SessionListQuery,
+  type SessionLiveState,
+  type SessionOrigin,
   type SessionRequestNode,
   type SessionToolNode,
   type SessionTotals,
   type SessionTreeNode,
   type SessionTurnNode,
 } from '@agentdock/shared';
-import type { Runtime } from '@agentdock/shared/protocol';
-import type { TreeItem } from '@andrewbehma/glass-ui/tree';
+import type { QuerySource, Runtime } from '@agentdock/shared/protocol';
+import type { Status } from '@andrewbehma/glass-ui/status-pill';
+import type { TraceNode } from '@andrewbehma/glass-ui/trace-tree';
 import { ApiError, describeError, type ErrorHint } from '../api';
+import {
+  formatCost as formatCostShared,
+  formatDate,
+  formatDuration as formatDurationShared,
+  formatTokens as formatTokensShared,
+} from '../format';
 
 /** `1234` → `1.2k`, `2_500_000` → `2.5M`. */
 export function formatTokens(n: number): string {
-  if (n < 1_000) return String(n);
-  if (n < 1_000_000) return `${trim(n / 1_000)}k`;
-  if (n < 1_000_000_000) return `${trim(n / 1_000_000)}M`;
-  return `${trim(n / 1_000_000_000)}B`;
+  return formatTokensShared(n);
 }
 
-const trim = (value: number): string =>
-  value >= 100 ? value.toFixed(0) : value.toFixed(1).replace(/\.0$/, '');
-
-/** Cost is blank until #13 prices a request. */
+/** Cost is a dash until #13 prices a request. */
 export function formatCost(costUsd: string | null): string {
-  if (costUsd === null) return '—';
-  const value = Number(costUsd);
-  if (!Number.isFinite(value)) return '—';
-  return value > 0 && value < 0.01 ? '<$0.01' : `$${value.toFixed(2)}`;
+  return formatCostShared(costUsd) || '—';
 }
 
+/** "850 ms", "12.4 s", "3 min 05 s"; a dash when unknown. */
 export function formatDuration(ms: number | null): string {
-  if (ms === null) return '—';
-  if (ms < 1_000) return `${Math.round(ms)} ms`;
-  const seconds = Math.round(ms / 1_000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
-  const hours = Math.floor(minutes / 60);
-  return `${hours}h ${minutes % 60}m`;
+  return formatDurationShared(ms) || '—';
 }
 
-export const formatTime = (iso: string): string =>
-  new Date(iso).toLocaleString();
+export const formatTime = (iso: string): string => formatDate(iso, 'datetime');
 
 /** Everything the node read or wrote; `reasoning` is already inside `output`. */
 export const tokenSum = (t: SessionTotals): number =>
@@ -57,6 +50,7 @@ export interface SessionFilterForm {
   runtime: string;
   model: string;
   slot: string;
+  origin: string;
   fromDate: string;
   toDate: string;
   unassigned: boolean;
@@ -67,9 +61,39 @@ export const EMPTY_FILTERS: SessionFilterForm = {
   runtime: '',
   model: '',
   slot: '',
+  origin: '',
   fromDate: '',
   toDate: '',
   unassigned: false,
+};
+
+/** Origins a person filters by; `unknown` is transcript-only and not a choice. */
+export const ORIGIN_FILTERS = ['manual', 'worker', 'run'] as const;
+
+export const ORIGIN_LABEL: Record<SessionOrigin, string> = {
+  unknown: 'Unknown',
+  manual: 'Manual',
+  worker: 'Worker',
+  run: 'Run',
+};
+
+/** Origin as the API may omit it: absent reads as `unknown`. */
+export const originOf = (s: { origin?: SessionOrigin }): SessionOrigin =>
+  s.origin ?? 'unknown';
+
+export const LIVE_STATE_LABEL: Record<SessionLiveState, string> = {
+  idle: 'Idle',
+  working: 'Working',
+  waiting: 'Waiting for you',
+  ended: 'Ended',
+};
+
+/** Live state on glass-ui's status scale; the same colours as slots and runs. */
+export const LIVE_STATE_PILL: Record<SessionLiveState, Status> = {
+  idle: 'idle',
+  working: 'running',
+  waiting: 'waiting',
+  ended: 'done',
 };
 
 /** `yyyy-mm-dd` from a date input as a local-time instant; `to` is exclusive. */
@@ -88,6 +112,7 @@ export function toQuery(form: SessionFilterForm): SessionListQuery {
   if (form.runtime) query.runtime = form.runtime as Runtime;
   if (form.model.trim()) query.model = form.model.trim();
   if (form.slot.trim()) query.slot = form.slot.trim();
+  if (form.origin) query.origin = form.origin as SessionOrigin;
   const from = dayBoundary(form.fromDate, false);
   const to = dayBoundary(form.toDate, true);
   if (from) query.from = from;
@@ -125,79 +150,155 @@ export type TreeNodeInfo =
   | { kind: 'tool'; tool: SessionToolNode }
   | { kind: 'group'; label: string; totals: SessionTotals };
 
-export interface BuiltTree {
-  items: TreeItem[];
+export interface BuiltTrace {
+  nodes: TraceNode[];
   info: Map<string, TreeNodeInfo>;
   /** Ids of the rows open by default: the root session and its turns. */
   defaultExpanded: string[];
 }
 
-const tokenLabel = (t: SessionTotals): string =>
-  `${formatTokens(tokenSum(t))} tok`;
-
-export function sessionLabel(node: SessionTreeNode): string {
-  const s = node.session;
-  return `${s.title ?? s.externalId.slice(0, 8)} · ${tokenLabel(node.totals)}`;
+/** "12.3k tok · $0.42"; the cost is left out until the node is priced. */
+export function totalsLabel(t: SessionTotals): string {
+  const tokens = `${formatTokens(tokenSum(t))} tok`;
+  return t.costUsd === null ? tokens : `${tokens} · ${formatCost(t.costUsd)}`;
 }
 
-/** The tree of one session: turns → requests and tools → child sessions. */
-export function buildTree(root: SessionTreeNode): BuiltTree {
+/** What a session is called: its title, else the start of its runtime id. */
+export const sessionName = (s: SessionTreeNode['session']): string =>
+  s.title ?? `Session ${s.externalId.slice(0, 8)}`;
+
+export const QUERY_SOURCE_LABEL: Record<QuerySource, string> = {
+  main: 'main thread',
+  subagent: 'subagent',
+  auxiliary: 'auxiliary',
+};
+
+const ms = (iso: string | null): number | undefined => {
+  if (!iso) return undefined;
+  const t = Date.parse(iso);
+  return Number.isNaN(t) ? undefined : t;
+};
+
+/**
+ * The session as glass-ui `TraceTree` nodes: a session is an `agent`, a turn a
+ * `turn`, a model request an `llm` span and a tool call a `tool` span — a
+ * turn's requests and tools interleaved in the order they started. A tool that
+ * spawned a subagent holds that session. Work the transcript could not place
+ * in a turn is an `other` group at the end.
+ */
+export function buildTrace(root: SessionTreeNode): BuiltTrace {
   const info = new Map<string, TreeNodeInfo>();
   const defaultExpanded: string[] = [];
 
-  const request = (r: SessionRequestNode): TreeItem => {
+  const request = (r: SessionRequestNode): TraceNode => {
     const id = `request:${r.id}`;
     info.set(id, { kind: 'request', request: r });
+    const end = ms(r.ts) ?? 0;
     return {
       id,
-      label: `${r.model} (${r.querySource}) · ${tokenLabel(r.totals)}`,
+      kind: 'llm',
+      label: r.model,
+      meta: QUERY_SOURCE_LABEL[r.querySource] ?? r.querySource,
+      start: end - (r.durationMs ?? 0),
+      end,
+      totals: totalsLabel(r.totals),
+      status: 'ok',
     };
   };
 
-  const tool = (t: SessionToolNode): TreeItem => {
+  const tool = (t: SessionToolNode, live: boolean): TraceNode => {
     const id = `tool:${t.id}`;
     info.set(id, { kind: 'tool', tool: t });
-    const label = `${t.name}${t.ok === false ? ' ✗' : ''}${
-      t.child ? ` · ${tokenLabel(t.totals)}` : ''
-    }`;
-    return t.child
-      ? { id, label, children: [session(t.child)] }
-      : { id, label };
+    const start = ms(t.startedAt) ?? 0;
+    const end = ms(t.endedAt);
+    const node: TraceNode = {
+      id,
+      kind: 'tool',
+      label: t.name,
+      start,
+      // A tool with no result in a finished session never ran on: it ends where it began.
+      end: end ?? (t.ok === null && live ? undefined : start),
+      status:
+        t.ok === false
+          ? 'error'
+          : t.ok === null
+            ? live
+              ? 'running'
+              : undefined
+            : 'ok',
+      ...(t.child ? { totals: totalsLabel(t.totals) } : {}),
+    };
+    return t.child ? { ...node, children: [session(t.child)] } : node;
   };
 
-  const session = (node: SessionTreeNode): TreeItem => {
-    const id = `session:${node.session.id}`;
+  /** Requests and tools in the order they started; a tie keeps requests first. */
+  const interleave = (
+    requests: SessionRequestNode[],
+    tools: SessionToolNode[],
+    live: boolean,
+  ): TraceNode[] =>
+    [...requests.map(request), ...tools.map((t) => tool(t, live))]
+      .map((node, order) => ({ node, order }))
+      .sort((a, b) => a.node.start - b.node.start || a.order - b.order)
+      .map(({ node }) => node);
+
+  const session = (node: SessionTreeNode): TraceNode => {
+    const s = node.session;
+    const id = `session:${s.id}`;
+    const live = s.endedAt === null;
     info.set(id, { kind: 'session', node });
-    const children: TreeItem[] = node.turns.map((turn, index) => {
+    const children: TraceNode[] = node.turns.map((turn, index) => {
       const turnId = `turn:${turn.id}`;
       info.set(turnId, { kind: 'turn', turn, index });
       defaultExpanded.push(turnId);
       return {
         id: turnId,
-        label: `Turn ${index + 1} · ${tokenLabel(turn.totals)}`,
-        children: [...turn.requests.map(request), ...turn.tools.map(tool)],
+        kind: 'turn',
+        label: `Turn ${index + 1}`,
+        start: ms(turn.startedAt) ?? 0,
+        end: ms(turn.endedAt),
+        totals: totalsLabel(turn.totals),
+        children: interleave(turn.requests, turn.tools, live),
       };
     });
     const { requests, tools } = node.unattributed;
     if (requests.length + tools.length > 0) {
-      const groupId = `unattributed:${node.session.id}`;
+      const groupId = `unattributed:${s.id}`;
+      const loose = interleave(requests, tools, live);
+      const groupTotals = sumTotals(
+        [...requests, ...tools].map((n) => n.totals),
+      );
       info.set(groupId, {
         kind: 'group',
         label: 'No turn known',
-        totals: sumTotals([...requests, ...tools].map((n) => n.totals)),
+        totals: groupTotals,
       });
       children.push({
         id: groupId,
+        kind: 'other',
         label: 'No turn known',
-        children: [...requests.map(request), ...tools.map(tool)],
+        start: Math.min(...loose.map((n) => n.start)),
+        end: Math.max(...loose.map((n) => n.end ?? n.start)),
+        totals: totalsLabel(groupTotals),
+        children: loose,
       });
     }
     for (const sub of node.subagents) children.push(session(sub));
     defaultExpanded.push(id);
-    return { id, label: sessionLabel(node), children };
+    return {
+      id,
+      kind: 'agent',
+      label: sessionName(s),
+      meta: s.models.join(', ') || undefined,
+      start: ms(s.startedAt) ?? 0,
+      end: ms(s.endedAt ?? s.lastEventAt),
+      totals: totalsLabel(node.totals),
+      status: live ? 'running' : undefined,
+      children,
+    };
   };
 
-  return { items: [session(root)], info, defaultExpanded };
+  return { nodes: [session(root)], info, defaultExpanded };
 }
 
 export function sumTotals(list: SessionTotals[]): SessionTotals {
@@ -250,21 +351,6 @@ export function nodeSpan(info: TreeNodeInfo): [number, number] | null {
   }
 }
 
-/** A bar's left offset and width as percentages of `[origin, origin + span]`. */
-export function barGeometry(
-  [start, end]: [number, number],
-  origin: number,
-  span: number,
-): { left: number; width: number } {
-  if (span <= 0) return { left: 0, width: 100 };
-  const left = Math.min(100, Math.max(0, ((start - origin) / span) * 100));
-  const width = Math.min(
-    100 - left,
-    Math.max(0.5, ((end - start) / span) * 100),
-  );
-  return { left, width };
-}
-
 /** The sentence, plus the page that fixes it when there is one. */
 export function describeSessionHint(error: unknown): ErrorHint {
   const text = describeSessionError(error);
@@ -279,12 +365,6 @@ export function describeSessionHint(error: unknown): ErrorHint {
 /** Whether a query narrows the list at all (none: "nothing yet", some: "no matches"). */
 export const hasSessionFilters = (query: SessionListQuery): boolean =>
   Object.values(query).some((value) => value !== undefined && value !== '');
-
-/** Whether the form holds filters that were not applied yet. */
-export const sessionFormChanged = (
-  form: SessionFilterForm,
-  applied: SessionListQuery,
-): boolean => queryString(toQuery(form)) !== queryString(applied);
 
 export function describeSessionError(error: unknown): string {
   if (error instanceof ApiError) {

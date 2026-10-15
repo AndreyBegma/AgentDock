@@ -3,6 +3,7 @@ import {
   EXIT,
   LAUNCH_AGENT_LABEL,
   launchAgentPlist,
+  serviceUnit,
   TERMINAL_CLOSE_AS_SUCCESS,
 } from './service';
 
@@ -50,6 +51,32 @@ describe('launchAgentPlist', () => {
     const odd = launchAgentPlist(['/Users/a&b/<runner>', 'run'], LOG);
     expect(odd).toContain('<string>/Users/a&amp;b/&lt;runner&gt;</string>');
     expect(odd).not.toContain('EnvironmentVariables');
+  });
+});
+
+describe('serviceUnit', () => {
+  const EXEC = ['/home/ada/.local/bin/agentdock-runner', 'run'];
+
+  it("carries the installing shell's PATH", () => {
+    const unit = serviceUnit(EXEC, '/home/ada/.local/bin:/usr/bin:/bin');
+    expect(unit).toContain(
+      'Environment="PATH=/home/ada/.local/bin:/usr/bin:/bin"',
+    );
+    expect(unit.indexOf('Environment=')).toBeLessThan(
+      unit.indexOf('ExecStart='),
+    );
+  });
+
+  it('quotes spaces and escapes %, " and \\ in the PATH', () => {
+    const unit = serviceUnit(EXEC, '/opt/my tools/100%:/a"b:/c\\d');
+    expect(unit).toContain(
+      'Environment="PATH=/opt/my tools/100%%:/a\\"b:/c\\\\d"',
+    );
+  });
+
+  it('leaves Environment out when there is no PATH', () => {
+    expect(serviceUnit(EXEC)).not.toContain('Environment=');
+    expect(serviceUnit(EXEC, '')).not.toContain('Environment=');
   });
 });
 

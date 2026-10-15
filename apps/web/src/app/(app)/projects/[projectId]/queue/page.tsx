@@ -7,6 +7,7 @@ import {
   type QueueRefreshResult,
   type QueueView,
 } from '@agentdock/shared';
+import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { ChipButton } from '@andrewbehma/glass-ui/chip';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
@@ -14,19 +15,25 @@ import {
   SegmentedControl,
   SegmentedControlItem,
 } from '@andrewbehma/glass-ui/segmented-control';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { Toolbar } from '@andrewbehma/glass-ui/toolbar';
+import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
+import { RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { PageHeader } from '../../../../../components/page-header/page-header';
 import { AsyncSection } from '../../../../../components/prerequisites/async-section';
 import {
   PrerequisiteBanner,
   RunnerOfflineBanner,
 } from '../../../../../components/prerequisites/prerequisite-banner';
+import { useLivePaused } from '../../../../../components/shell/live-status';
 import { LiveStatusBadge } from '../../../../../components/shell/live-status-badge';
 import { api } from '../../../../../lib/api';
-import { formatAgo } from '../../../../../lib/fleet/format';
+import { useUrlFilters } from '../../../../../lib/filters/use-url-filters';
+import { Time } from '../../../../../lib/format/time';
 import { useLive } from '../../../../../lib/live/use-live';
 import {
   allowedLabels,
@@ -34,11 +41,13 @@ import {
   describeQueueError,
   filterItems,
   isNotFound,
+  QUEUE_FILTER_CODEC,
+  type QueueFilters,
   queueEmptyDescription,
   queueUnavailableCopy,
   roundFooter,
+  STATE_CHIP_LABEL,
   type StateFilter,
-  stateLabel,
 } from '../../../../../lib/queue/format';
 import { useSection } from '../../../../../lib/section/use-section';
 import { useProjectDetail } from '../use-project-detail';
@@ -53,17 +62,31 @@ const REFETCH_DEBOUNCE_MS = 300;
 /** "Snapshot 3 min ago" is relative to now. */
 const AGE_TICK_MS = 30_000;
 
-type View = 'list' | 'board';
+/** A selected filter chip wears the accent, not solid ink (#213). */
+const SELECTED_CHIP = 'bg-accent-soft text-accent-ink';
 
 export default function QueuePage() {
+  // `useSearchParams` needs a boundary for the static shell.
+  return (
+    <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+      <QueueScreen />
+    </Suspense>
+  );
+}
+
+function QueueScreen() {
   const { projectId } = useParams<{ projectId: string }>();
   /** Bumped by a live push; the queue and the issue sheet depend on it. */
   const [version, setVersion] = useState(0);
   const [, setNow] = useState(0);
 
-  const [view, setView] = useState<View>('list');
-  const [filter, setFilter] = useState<StateFilter>('all');
+  // The state chip and the view live in the URL: reload and a link keep them.
+  const { filters, set } = useUrlFilters(QUEUE_FILTER_CODEC);
+  const { view, state: filter } = filters;
+  const setView = (next: QueueFilters['view']) => set({ view: next });
+  const setFilter = (next: StateFilter) => set({ state: next });
   const [selected, setSelected] = useState<QueueItemView>();
+  const live = useLivePaused();
   const [creating, setCreating] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -121,7 +144,7 @@ export default function QueuePage() {
         title="Project not found"
         description="It was removed, or you are not a member of it."
         action={
-          <Link href="/projects" className="text-sm underline">
+          <Link href="/projects" className="text-sm text-accent-ink underline">
             Open Projects
           </Link>
         }
@@ -132,20 +155,36 @@ export default function QueuePage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-semibold">Queue</h1>
-            {queue.data ? (
-              <p className="text-sm text-ink-2">
+        <PageHeader
+          className="mb-0"
+          title="Queue"
+          description={
+            queue.data ? (
+              <>
                 Open issues labelled <code>{queue.data.readyLabel}</code>
-                {queue.data.snapshotAt
-                  ? ` · snapshot ${formatAgo(queue.data.snapshotAt)}`
-                  : ' · no snapshot yet'}
-              </p>
-            ) : null}
-          </div>
-          <LiveStatusBadge />
-        </div>
+                {queue.data.snapshotAt ? (
+                  <>
+                    {' · snapshot '}
+                    <Time value={queue.data.snapshotAt} />
+                  </>
+                ) : (
+                  ' · no snapshot yet'
+                )}
+              </>
+            ) : undefined
+          }
+          actions={
+            <>
+              {/* The top bar's dot says "live"; the page speaks only when it is not. */}
+              {live.status !== 'connected' ? <LiveStatusBadge /> : null}
+              {canOperate ? (
+                <Button variant="solid" onClick={() => setCreating(true)}>
+                  New issue
+                </Button>
+              ) : null}
+            </>
+          }
+        />
         {project ? <RunnerOfflineBanner project={project} /> : null}
       </div>
 
@@ -187,10 +226,10 @@ export default function QueuePage() {
                         <button
                           type="button"
                           aria-pressed={view === v}
-                          className="w-full px-3 py-1.5 text-sm capitalize"
+                          className="w-full min-w-16 px-3 py-1.5 text-sm whitespace-nowrap"
                           onClick={() => setView(v)}
                         >
-                          {v}
+                          {v === 'list' ? 'List' : 'Board'}
                         </button>
                       </SegmentedControlItem>
                     ))}
@@ -198,42 +237,56 @@ export default function QueuePage() {
                 }
                 actions={
                   canOperate ? (
-                    <>
+                    <Tooltip
+                      content={
+                        refreshing
+                          ? 'Refreshing…'
+                          : 'Refresh: ask the runner to poll GitHub'
+                      }
+                    >
                       <Button
-                        variant="glass"
+                        variant="ghost"
+                        icon
+                        aria-label="Refresh the queue"
                         disabled={refreshing}
                         onClick={refresh}
                       >
-                        {refreshing ? 'Refreshing…' : 'Refresh'}
+                        <RefreshCw
+                          aria-hidden="true"
+                          className={`size-4 ${refreshing ? 'animate-spin' : ''}`}
+                        />
                       </Button>
-                      <Button onClick={() => setCreating(true)}>
-                        New issue
-                      </Button>
-                    </>
+                    </Tooltip>
                   ) : undefined
                 }
               />
 
               {view === 'list' ? (
-                <fieldset className="m-0 grid min-w-0 grid-cols-2 gap-2 border-0 p-0 sm:grid-cols-3 lg:grid-cols-6">
+                <fieldset className="m-0 min-w-0 border-0 p-0">
                   <legend className="sr-only">Filter by state</legend>
-                  <ChipButton
-                    selected={filter === 'all'}
-                    onClick={() => setFilter('all')}
-                  >
-                    All {data.items.length}
-                  </ChipButton>
-                  {QUEUE_STATES.map((state) => (
+                  {/* One row that scrolls on a phone instead of wrapping into three. */}
+                  <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
                     <ChipButton
-                      key={state}
-                      selected={filter === state}
-                      onClick={() =>
-                        setFilter(filter === state ? 'all' : state)
-                      }
+                      selected={filter === 'all'}
+                      className={`shrink-0 ${filter === 'all' ? SELECTED_CHIP : ''}`}
+                      onClick={() => setFilter('all')}
                     >
-                      {stateLabel(state)} {counts[state]}
+                      All <Badge count={data.items.length} className="ml-1" />
                     </ChipButton>
-                  ))}
+                    {QUEUE_STATES.map((state) => (
+                      <ChipButton
+                        key={state}
+                        selected={filter === state}
+                        className={`shrink-0 ${filter === state ? SELECTED_CHIP : ''}`}
+                        onClick={() =>
+                          setFilter(filter === state ? 'all' : state)
+                        }
+                      >
+                        {STATE_CHIP_LABEL[state]}{' '}
+                        <Badge count={counts[state]} className="ml-1" />
+                      </ChipButton>
+                    ))}
+                  </div>
                 </fieldset>
               ) : null}
 
@@ -246,7 +299,7 @@ export default function QueuePage() {
                   )}
                   action={
                     canOperate ? (
-                      <Button onClick={() => setCreating(true)}>
+                      <Button variant="glass" onClick={() => setCreating(true)}>
                         New issue
                       </Button>
                     ) : undefined

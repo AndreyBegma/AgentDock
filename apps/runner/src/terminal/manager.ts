@@ -40,6 +40,10 @@ export interface TerminalManagerOptions {
   tmuxServer?: readonly string[];
   /** Resolves a `skill_run` target (`SkillRunExecutor.runSession`). */
   runSession?: ResolveDeps['runSession'];
+  /** Resolves a `manual` target (`HookSessions.manualOf`). */
+  manualSession?: ResolveDeps['manualSession'];
+  /** Resolves a `card` target (`CardExecutor.cardSession`). */
+  cardSession?: ResolveDeps['cardSession'];
   maxAttaches?: number;
   idleTimeoutMs?: number;
   maxDurationMs?: number;
@@ -228,6 +232,8 @@ export class TerminalManager {
         watchedProjects: this.options.watchedProjects,
         tmuxServer: this.options.tmuxServer,
         runSession: this.options.runSession,
+        manualSession: this.options.manualSession,
+        cardSession: this.options.cardSession,
       });
       if (this.pending.get(args.id) === true) {
         throw new Error(`stream ${args.id} was closed while attaching`);

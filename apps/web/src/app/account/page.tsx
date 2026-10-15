@@ -10,24 +10,29 @@ import {
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
+import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Field, Input } from '@andrewbehma/glass-ui/field';
-import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
+import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
-import {
-  Table,
-  TableCell,
-  TableHead,
-  TableRow,
-} from '@andrewbehma/glass-ui/table';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import { Monitor, Smartphone } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useState } from 'react';
+import { PageHeader } from '../../components/page-header/page-header';
+import { AsyncSection } from '../../components/prerequisites/async-section';
 import { useCurrentUser } from '../../components/shell/user-context';
 import { api, describeError, describeErrorHint } from '../../lib/api';
+import { Time } from '../../lib/format/time';
 import { useErrorToast } from '../../lib/section/use-error-toast';
 import { useSection } from '../../lib/section/use-section';
+import { parseUserAgent } from './user-agent';
 
-const formatTime = (iso: string) => new Date(iso).toLocaleString();
+const ROLE_LABEL: Record<PublicUser['role'], string> = {
+  admin: 'Administrator',
+  operator: 'Operator',
+  viewer: 'Viewer',
+};
 
 function PasswordCard() {
   const [currentPassword, setCurrentPassword] = useState('');
@@ -54,7 +59,7 @@ function PasswordCard() {
 
   return (
     <Card pad="lg">
-      <h2 className="mb-4 text-lg font-bold">Change password</h2>
+      <SectionHeader className="mb-4" title="Change password" />
       <form onSubmit={submit} className="flex max-w-sm flex-col gap-4">
         <Field label="Current password" htmlFor="current-password">
           <Input
@@ -97,91 +102,135 @@ function SessionsCard() {
   const router = useRouter();
   const showError = useErrorToast();
   const devices = useSection(() => api<SessionInfo[]>('/auth/sessions'), []);
-  const sessions = devices.data ?? [];
+  const [revoking, setRevoking] = useState<SessionInfo>();
+  const [busy, setBusy] = useState(false);
 
-  const revoke = async (session: SessionInfo) => {
+  const revoke = async () => {
+    if (!revoking) return;
+    setBusy(true);
     try {
-      await api(`/auth/sessions/${session.id}`, { method: 'DELETE' });
-      if (session.current) router.replace('/login');
+      await api(`/auth/sessions/${revoking.id}`, { method: 'DELETE' });
+      if (revoking.current) router.replace('/login');
       else devices.retry();
+      setRevoking(undefined);
     } catch (err) {
       showError(describeErrorHint(err));
+    } finally {
+      setBusy(false);
     }
   };
 
   return (
     <Card pad="lg">
-      <h2 className="mb-1 text-lg font-bold">Signed-in devices</h2>
-      <p className="mb-4 text-sm text-ink-2">
-        Browsers and devices that are signed in to your account. Revoke one you
-        do not recognise.
-      </p>
-      {devices.data === undefined ? (
-        devices.error !== null && !devices.loading ? (
-          <SectionUnavailable
-            title="Your devices could not be loaded"
-            stillWorks={`${describeError(devices.error)} The rest of your account is unaffected.`}
-            action={
-              <Button variant="glass" size="sm" onClick={devices.retry}>
-                Try again
-              </Button>
-            }
+      <SectionHeader
+        className="mb-4"
+        title="Signed-in devices"
+        description="Browsers and devices that are signed in to your account. Revoke one you do not recognise."
+      />
+      <AsyncSection
+        section={devices}
+        unavailable={{
+          title: 'Your devices could not be loaded',
+          stillWorks: 'The rest of your account is unaffected.',
+        }}
+        empty={
+          <EmptyState
+            title="No signed-in devices"
+            description="Devices appear here when they sign in to your account."
           />
-        ) : (
-          <Skeleton className="h-24 w-full" />
-        )
-      ) : (
-        <Table scroll>
-          <TableHead>
-            <TableRow>
-              <TableCell head>Device</TableCell>
-              <TableCell head>IP</TableCell>
-              <TableCell head>Signed in</TableCell>
-              <TableCell head>Last active</TableCell>
-              <TableCell head>
-                <span className="sr-only">Actions</span>
-              </TableCell>
-            </TableRow>
-          </TableHead>
-          <tbody>
-            {sessions.map((session) => (
-              <TableRow key={session.id}>
-                <TableCell>
-                  <span className="mr-2">{session.userAgent ?? 'Unknown'}</span>
-                  {session.current ? <Badge tone="ok" label="current" /> : null}
-                </TableCell>
-                <TableCell>{session.ip ?? '—'}</TableCell>
-                <TableCell>{formatTime(session.createdAt)}</TableCell>
-                <TableCell>{formatTime(session.lastSeenAt)}</TableCell>
-                <TableCell>
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    onClick={() => revoke(session)}
-                  >
-                    {session.current ? 'Sign out' : 'Revoke'}
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </tbody>
-        </Table>
-      )}
+        }
+        isEmpty={(list) => list.length === 0}
+        skeleton={<Skeleton className="h-24 w-full" />}
+      >
+        {(sessions) => (
+          <SessionList sessions={sessions} onRevoke={setRevoking} />
+        )}
+      </AsyncSection>
+      <ConfirmDialog
+        open={revoking !== undefined}
+        onOpenChange={(open) => !open && setRevoking(undefined)}
+        title={
+          revoking?.current ? 'Sign out of this device?' : 'Revoke this device?'
+        }
+        consequence={
+          revoking?.current
+            ? 'You are signed out here and taken to the sign-in page.'
+            : 'The device is signed out at once and has to sign in again.'
+        }
+        verb={revoking?.current ? 'Sign out' : 'Revoke'}
+        busy={busy}
+        onConfirm={() => void revoke()}
+      />
     </Card>
+  );
+}
+
+function SessionList({
+  sessions,
+  onRevoke,
+}: {
+  sessions: SessionInfo[];
+  onRevoke: (session: SessionInfo) => void;
+}) {
+  return (
+    <ul className="divide-y divide-line">
+      {sessions.map((session) => {
+        const device = parseUserAgent(session.userAgent);
+        const Icon = device.mobile ? Smartphone : Monitor;
+        return (
+          <li
+            key={session.id}
+            className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3"
+          >
+            <Icon
+              size={18}
+              className="shrink-0 text-ink-3"
+              aria-hidden="true"
+            />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2 text-sm text-ink">
+                <span title={session.userAgent ?? undefined}>
+                  {device.label}
+                </span>
+                {session.current ? (
+                  <Badge tone="ok" label="This device" />
+                ) : null}
+              </div>
+              <div className="text-xs text-ink-3">
+                {session.ip ? (
+                  <span className="font-mono">{session.ip}</span>
+                ) : (
+                  'IP unknown'
+                )}{' '}
+                · signed in <Time value={session.createdAt} /> · active{' '}
+                <Time value={session.lastSeenAt} />
+              </div>
+            </div>
+            <Button
+              variant={session.current ? 'glass' : 'danger'}
+              size="sm"
+              onClick={() => onRevoke(session)}
+            >
+              {session.current ? 'Sign out' : 'Revoke'}
+            </Button>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
 function Profile({ user }: { user: PublicUser }) {
   return (
     <Card pad="lg">
-      <h2 className="mb-4 text-lg font-bold">Profile</h2>
+      <SectionHeader className="mb-4" title="Profile" />
       <dl className="grid max-w-sm grid-cols-[6rem_1fr] gap-y-2 text-sm">
         <dt className="text-ink-3">Email</dt>
         <dd>{user.email}</dd>
         <dt className="text-ink-3">Name</dt>
         <dd>{user.name ?? '—'}</dd>
         <dt className="text-ink-3">Role</dt>
-        <dd>{user.role}</dd>
+        <dd>{ROLE_LABEL[user.role] ?? user.role}</dd>
       </dl>
     </Card>
   );
@@ -190,16 +239,16 @@ function Profile({ user }: { user: PublicUser }) {
 export default function AccountPage() {
   const user = useCurrentUser();
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-xl font-semibold">Account</h1>
-        <p className="text-sm text-ink-2">
-          Your profile, password and the devices signed in as you.
-        </p>
+    <div>
+      <PageHeader
+        title="Account"
+        description="Your profile, password and the devices signed in as you."
+      />
+      <div className="flex flex-col gap-6">
+        <Profile user={user} />
+        <PasswordCard />
+        <SessionsCard />
       </div>
-      <Profile user={user} />
-      <PasswordCard />
-      <SessionsCard />
     </div>
   );
 }

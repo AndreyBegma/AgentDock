@@ -70,6 +70,9 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/agentdock?schema=public
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+    # #309, ADR-0031: board card attachments. Back it up with the database.
+    volumes:
+      - attachments:/data/attachments
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -121,6 +124,7 @@ services:
 volumes:
   pgdata:
   redis:
+  attachments:
 
 networks:
   staging:

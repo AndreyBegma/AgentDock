@@ -65,6 +65,95 @@ describe('exec-run', () => {
     });
   });
 
+  const catBinary = (dir: string): string => {
+    const binary = join(dir, 'cat-stdin');
+    writeFileSync(binary, '#!/bin/sh\nprintf "stdin:"\ncat\n');
+    chmodSync(binary, 0o755);
+    return binary;
+  };
+
+  it('feeds the stdin file to the binary when the spec names one', async () => {
+    const dir = runDir();
+    const prompt = join(dir, 'prompt.md');
+    writeFileSync(prompt, '# Plan\n$(not a shell) `x`\n');
+    writeFileSync(
+      join(dir, 'run.json'),
+      JSON.stringify({
+        binary: catBinary(dir),
+        args: [],
+        env: {},
+        cwd: dir,
+        stdin: prompt,
+      }),
+    );
+    const { io: ioDeps } = io();
+    expect(await execRun([dir], ioDeps)).toBe(0);
+    expect(readFileSync(join(dir, 'stream.jsonl'), 'utf8')).toBe(
+      'stdin:# Plan\n$(not a shell) `x`\n',
+    );
+  });
+
+  it('gives the binary no stdin when the spec names none', async () => {
+    const dir = runDir();
+    writeFileSync(
+      join(dir, 'run.json'),
+      JSON.stringify({ binary: catBinary(dir), args: [], env: {}, cwd: dir }),
+    );
+    const { io: ioDeps } = io();
+    expect(await execRun([dir], ioDeps)).toBe(0);
+    expect(readFileSync(join(dir, 'stream.jsonl'), 'utf8')).toBe('stdin:');
+  });
+
+  it('interactive: the binary keeps the terminal, no stream files, exit still recorded (#242 D5)', async () => {
+    const dir = runDir();
+    const binary = join(dir, 'fake-interactive');
+    // Records its argv; whatever it prints goes to the inherited stdout.
+    writeFileSync(
+      binary,
+      '#!/bin/sh\nprintf "%s\\n" "$@" > "$RECORD"\necho on-the-pane\nexit 4\n',
+    );
+    chmodSync(binary, 0o755);
+    const record = join(dir, 'argv.txt');
+    writeFileSync(
+      join(dir, 'run.json'),
+      JSON.stringify({
+        binary,
+        args: ['--resume', 'abc', '--', '-p looks like a flag; $(x)'],
+        env: { RECORD: record },
+        cwd: dir,
+        interactive: true,
+      }),
+    );
+    const { io: ioDeps, out } = io();
+    expect(await execRun([dir], ioDeps)).toBe(4);
+    expect(readFileSync(record, 'utf8')).toBe(
+      '--resume\nabc\n--\n-p looks like a flag; $(x)\n',
+    );
+    expect(existsSync(join(dir, 'stream.jsonl'))).toBe(false);
+    expect(existsSync(join(dir, 'stderr.log'))).toBe(false);
+    expect(JSON.parse(readFileSync(join(dir, 'exit.json'), 'utf8')).code).toBe(
+      4,
+    );
+    expect(out.join('')).toContain('agentdock card');
+  });
+
+  it('refuses a relative stdin path', async () => {
+    const dir = runDir();
+    writeFileSync(
+      join(dir, 'run.json'),
+      JSON.stringify({
+        binary: catBinary(dir),
+        args: [],
+        env: {},
+        cwd: dir,
+        stdin: 'prompt.md',
+      }),
+    );
+    const { io: ioDeps, err } = io();
+    expect(await execRun([dir], ioDeps)).toBe(1);
+    expect(err.join('')).toContain('missing or invalid');
+  });
+
   it('records 127 when the binary is not on PATH', async () => {
     const dir = runDir();
     writeFileSync(

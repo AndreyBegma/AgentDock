@@ -1,0 +1,41 @@
+import type { Schedule, ScheduleFiring } from '@prisma/client';
+import type { BudgetGate, BudgetGateResult } from '../budgets/budget-gate';
+import { BEFORE_FIRE_BUDGET_REASON, BeforeFire } from './before-fire';
+
+const schedule = { id: 's1', projectId: 'p1' } as Schedule;
+const firing = { id: 1n } as ScheduleFiring;
+
+const gate = (result: BudgetGateResult) => {
+  const check = jest.fn().mockResolvedValue(result);
+  return { check, hook: new BeforeFire({ check } as unknown as BudgetGate) };
+};
+
+describe('BeforeFire', () => {
+  it('allows when the budget gate allows, asking it as a schedule (no user)', async () => {
+    const { check, hook } = gate({ allowed: true });
+    await expect(hook.check(schedule, firing)).resolves.toEqual({
+      allow: true,
+    });
+    expect(check).toHaveBeenCalledWith({ projectId: 'p1', userId: null });
+  });
+
+  it('denies with reason budget when the gate refuses', async () => {
+    const { hook } = gate({
+      allowed: false,
+      budgetId: 'b1',
+      scope: 'project',
+      resetsAt: new Date('2026-10-10T00:00:00Z'),
+    });
+    await expect(hook.check(schedule, firing)).resolves.toEqual({
+      allow: false,
+      reason: BEFORE_FIRE_BUDGET_REASON,
+    });
+    expect(BEFORE_FIRE_BUDGET_REASON).toBe('budget');
+  });
+
+  it('allows when there is no budget gate', async () => {
+    await expect(new BeforeFire().check(schedule, firing)).resolves.toEqual({
+      allow: true,
+    });
+  });
+});

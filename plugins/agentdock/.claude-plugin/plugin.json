@@ -1,0 +1,8 @@
+{
+  "name": "agentdock",
+  "version": "0.2.0",
+  "description": "Reports Claude Code sessions to AgentDock through the local runner and gives the model fleet, queue and budget tools.",
+  "author": { "name": "AgentDock" },
+  "repository": "https://github.com/AndreyBegma/AgentDock",
+  "license": "UNLICENSED"
+}

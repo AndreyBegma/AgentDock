@@ -2,26 +2,35 @@
 
 import {
   FLEET_LIVE_EVENT,
+  type FleetGraph,
   type FleetView,
   type OrchestratorSettingsView,
   projectRoleAtLeast,
-  SLOT_STATUSES,
-  type SlotPage,
-  type SlotStatus,
-  type SlotSummary,
+  type QueueView,
 } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
-import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
+import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
-import { Toggle } from '@andrewbehma/glass-ui/toggle';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import {
+  useParams,
+  usePathname,
+  useRouter,
+  useSearchParams,
+} from 'next/navigation';
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { BudgetExceededBanner } from '../../../../../components/budgets/exceeded-banner';
 import { AsyncSection } from '../../../../../components/prerequisites/async-section';
 import { RunnerOfflineBanner } from '../../../../../components/prerequisites/prerequisite-banner';
-import { LiveStatusBadge } from '../../../../../components/shell/live-status-badge';
 import { TerminalSheet } from '../../../../../components/terminal/terminal-sheet';
 import type { TerminalTarget } from '../../../../../components/terminal/terminal-view';
 import { api } from '../../../../../lib/api';
@@ -29,44 +38,99 @@ import { useControl } from '../../../../../lib/control/use-control';
 import {
   EMPTY_FLEET_DESCRIPTION,
   isNotFound,
-  parseIssueFilter,
-  slotStatusOptions,
-  slotsQuery,
 } from '../../../../../lib/fleet/format';
+import { fleetCounts, liveSlots } from '../../../../../lib/fleet/graph';
+import {
+  blur,
+  closeAll,
+  closeSlot,
+  ORCHESTRATOR_KEY,
+  openSlot,
+  parseWorkspace,
+  setView,
+  toSearch,
+  type WorkspaceState,
+} from '../../../../../lib/fleet/workspace-url';
 import { useLive } from '../../../../../lib/live/use-live';
+import { plannerBriefHref } from '../../../../../lib/planner/href';
+import { allowedLabels } from '../../../../../lib/queue/format';
 import { useSection } from '../../../../../lib/section/use-section';
 import { useTerminalAvailable } from '../../../../../lib/terminal/use-terminal-available';
+import { NewIssueDialog } from '../queue/new-issue-dialog';
 import { useProjectDetail } from '../use-project-detail';
+import { AgentCanvas, AgentList } from './agent-canvas';
+import { AgentDock } from './agent-dock';
+import { BoardErrorBanner } from './board-error-banner';
+import { DependenciesPanel } from './dependencies-panel';
+import { FirstProjectChecklist } from './first-project-checklist';
+import { FleetHeader } from './fleet-header';
 import { OrchestratorCard } from './orchestrator-card';
-import { SlotSheet } from './slot-sheet';
-import { SlotsTable } from './slots-table';
+import { QuickActions } from './quick-actions';
+import { SlotPanel } from './slot-panel';
+import { SlotsView } from './slots-view';
+import { StartOrchestratorDialog } from './start-dialog';
 import { useControlReasons } from './use-control-reasons';
 
-const PAGE_SIZE = 50;
 /** Pushes arrive in bursts (one per projected batch); one refetch covers them. */
 const REFETCH_DEBOUNCE_MS = 300;
 /** Ages in the table are relative to now. */
 const AGE_TICK_MS = 30_000;
+/** Where the canvas is drawn; below it a phone gets the list (and the panel a sheet). */
+const DESKTOP_QUERY = '(min-width: 1024px)';
+const DEPENDENCIES_ID = 'fleet-dependencies';
+const NEXT_WAVE_BRIEF = 'Plan the next wave of work for this project.';
+
+function subscribeDesktop(onChange: () => void) {
+  const query = window.matchMedia(DESKTOP_QUERY);
+  query.addEventListener('change', onChange);
+  return () => query.removeEventListener('change', onChange);
+}
+
+/** True at the canvas's width. False on the server: the first paint is the list. */
+function useDesktop(): boolean {
+  return useSyncExternalStore(
+    subscribeDesktop,
+    () => window.matchMedia(DESKTOP_QUERY).matches,
+    () => false,
+  );
+}
 
 export default function FleetPage() {
+  // `useSearchParams` needs a boundary, or the route cannot prerender its shell.
+  return (
+    <Suspense fallback={<Skeleton className="h-96 w-full" />}>
+      <FleetWorkspace />
+    </Suspense>
+  );
+}
+
+function FleetWorkspace() {
   const { projectId } = useParams<{ projectId: string }>();
-  /** Bumped by a live push; the fleet and the slot list depend on it. */
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const workspace = useMemo(() => parseWorkspace(searchParams), [searchParams]);
+  const update = useCallback(
+    (next: (state: WorkspaceState) => WorkspaceState) => {
+      const search = toSearch(next(workspace), searchParams.entries());
+      router.replace(`${pathname}${search}`, { scroll: false });
+    },
+    [workspace, searchParams, router, pathname],
+  );
+
+  /** Bumped by a live push; the fleet and the graph depend on it. */
   const [version, setVersion] = useState(0);
   const [, setNow] = useState(0);
-
-  const [showAll, setShowAll] = useState(false);
-  const [statusFilter, setStatusFilter] = useState('');
-  const [issueText, setIssueText] = useState('');
-  const [loadingMore, setLoadingMore] = useState(false);
-
-  const [selected, setSelected] = useState<string>();
   const [startOpen, setStartOpen] = useState(false);
-
+  const [creating, setCreating] = useState(false);
+  /** Remounting the canvas fits it to view again. */
+  const [fitKey, setFitKey] = useState(0);
   const [attach, setAttach] = useState<{
     target: TerminalTarget;
     title: string;
   }>();
 
+  const desktop = useDesktop();
   const detail = useProjectDetail(projectId);
   const project = detail.data;
   // The effective role only decides which buttons are drawn; the API checks it.
@@ -78,6 +142,7 @@ export default function FleetPage() {
 
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useLive(`project:${projectId}`, (message) => {
+    // Slots, checkpoints and the conversation all arrive on the fleet event.
     if (message.event !== FLEET_LIVE_EVENT) return;
     clearTimeout(timer.current);
     timer.current = setTimeout(
@@ -96,6 +161,10 @@ export default function FleetPage() {
     () => api<FleetView>(`/projects/${projectId}/fleet`),
     [projectId, version],
   );
+  const graph = useSection(
+    () => api<FleetGraph>(`/projects/${projectId}/fleet/graph`),
+    [projectId, version],
+  );
   const settings = useSection(
     () =>
       api<OrchestratorSettingsView>(
@@ -103,52 +172,44 @@ export default function FleetPage() {
       ),
     [projectId],
   );
+  // The new-issue dialog's label choices; asked for only once it opens.
+  const queue = useSection<QueueView | undefined>(
+    () =>
+      creating
+        ? api<QueueView>(`/projects/${projectId}/queue?include=open`)
+        : Promise.resolve(undefined),
+    [projectId, creating],
+  );
+  const orchestratorStatus = fleet.data?.orchestrator.status;
   const reasons = useControlReasons({
     projectId,
     isAdmin,
     project,
     settings,
-    orchestrator: fleet.data?.orchestrator.status,
+    orchestrator: orchestratorStatus,
   });
+  const orchestratorMessageReason = canOperate
+    ? (reasons.message?.text ?? null)
+    : 'Operators and admins can message the orchestrator.';
 
-  const status = SLOT_STATUSES.find((s) => s === statusFilter);
-  const issue = parseIssueFilter(issueText);
-  const filtered = status !== undefined || issue !== undefined;
-
-  // The "all slots" view: first page for the filters, refetched on a push.
-  // Nothing while the view is off, so a toggle shows a skeleton, not an empty list.
-  const history = useSection<SlotPage | undefined>(
-    () =>
-      showAll
-        ? api<SlotPage>(
-            `/projects/${projectId}/slots${slotsQuery({ status, issue, limit: PAGE_SIZE })}`,
-          )
-        : Promise.resolve(undefined),
-    [projectId, showAll, status, issue, version],
+  const counts = useMemo(
+    () => (graph.data ? fleetCounts(graph.data) : undefined),
+    [graph.data],
   );
 
-  const loadMore = async () => {
-    const cursor = history.data?.nextCursor;
-    if (!cursor) return;
-    setLoadingMore(true);
-    try {
-      const page = await api<SlotPage>(
-        `/projects/${projectId}/slots${slotsQuery({ status, issue, cursor, limit: PAGE_SIZE })}`,
-      );
-      history.setData((current) =>
-        current
-          ? {
-              items: [...current.items, ...page.items],
-              nextCursor: page.nextCursor,
-            }
-          : current,
-      );
-    } catch {
-      // The list stays as it is; the button is still there to try again.
-    } finally {
-      setLoadingMore(false);
-    }
-  };
+  const open = (key: string) => update((s) => openSlot(s, key));
+  const onAttach = canAttach
+    ? (key: string) =>
+        setAttach(
+          key === ORCHESTRATOR_KEY
+            ? { target: { kind: 'orchestrator' }, title: 'Orchestrator' }
+            : { target: { kind: 'slot', slot: key }, title: key },
+        )
+    : undefined;
+  const focusedSlot =
+    workspace.focus !== null && workspace.focus !== ORCHESTRATOR_KEY
+      ? workspace.focus
+      : null;
 
   if (fleet.data === undefined && isNotFound(fleet.error)) {
     return (
@@ -156,7 +217,7 @@ export default function FleetPage() {
         title="Project not found"
         description="It was removed, or you are not a member of it."
         action={
-          <Link href="/projects" className="text-sm underline">
+          <Link href="/projects" className="text-sm text-accent-ink underline">
             Open Projects
           </Link>
         }
@@ -164,202 +225,246 @@ export default function FleetPage() {
     );
   }
 
-  const nobodyYet = (
+  /**
+   * Nothing on the board and no orchestrator at work: the first-project
+   * checklist stands in for the canvas, and its Start is the screen's one
+   * solid button (#213).
+   */
+  const emptyFleet =
+    (graph.data?.nodes.length ?? 0) <= 1 &&
+    (fleet.data?.slots.length ?? 0) === 0;
+  const showChecklist =
+    emptyFleet &&
+    orchestratorStatus !== undefined &&
+    orchestratorStatus !== 'running' &&
+    orchestratorStatus !== 'idle';
+
+  const orchestratorCard = (view: FleetView) => (
+    <OrchestratorCard
+      fleet={view}
+      projectId={projectId}
+      control={control}
+      canOperate={canOperate}
+      isAdmin={isAdmin}
+      settings={settings}
+      reasons={reasons}
+      showStart={!showChecklist}
+      onStart={() => setStartOpen(true)}
+      {...(onAttach ? { onAttach: () => onAttach(ORCHESTRATOR_KEY) } : {})}
+    />
+  );
+
+  /** Nothing runs here yet: what is left, in order, then the card's facts. */
+  const notRunning = (view: FleetView) => (
+    <div className="flex flex-col gap-4">
+      <FirstProjectChecklist
+        projectId={projectId}
+        runnerId={project?.runnerId}
+        isAdmin={isAdmin}
+        canOperate={canOperate}
+        settings={settings}
+        startReason={reasons.start}
+        starting={control.busy('orchestrator.start')}
+        onStart={() => setStartOpen(true)}
+      />
+      {orchestratorCard(view)}
+    </div>
+  );
+
+  /** Running, but nothing to run: the queue is empty. */
+  const queueEmpty = (
     <EmptyState
-      title="No active slots"
-      description={EMPTY_FLEET_DESCRIPTION}
+      title="The queue is empty"
+      description={`${EMPTY_FLEET_DESCRIPTION} AgentDock does not create agents itself: queue an issue and the orchestrator dispatches it.`}
       action={
-        canOperate && reasons.start === null ? (
-          <Button variant="solid" onClick={() => setStartOpen(true)}>
-            Start the orchestrator
-          </Button>
-        ) : (
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          {canOperate ? (
+            // Glass: New issue in the header is the screen's solid.
+            <Button variant="glass" onClick={() => setCreating(true)}>
+              New issue
+            </Button>
+          ) : null}
           <Link
-            href={`/projects/${projectId}/queue`}
-            className="text-sm underline"
+            href={plannerBriefHref(projectId, NEXT_WAVE_BRIEF)}
+            className="text-sm text-accent-ink underline"
           >
-            Open Queue
+            Plan the next wave
           </Link>
-        )
+        </div>
       }
     />
   );
 
-  const clearFilters = () => {
-    setStatusFilter('');
-    setIssueText('');
-  };
-
-  const slotsList = (slots: SlotSummary[]) => (
-    <SlotsTable slots={slots} onSelect={(s) => setSelected(s.name)} />
-  );
+  const emptyView = (view: FleetView) =>
+    showChecklist ? notRunning(view) : queueEmpty;
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-xl font-semibold">Fleet</h1>
-          <LiveStatusBadge />
-        </div>
-        {project ? <RunnerOfflineBanner project={project} /> : null}
-      </div>
-
+    <div className="flex flex-col gap-4">
+      <FleetHeader
+        projectId={projectId}
+        title={project?.displayName ?? 'Fleet'}
+        orchestrator={orchestratorStatus}
+        counts={counts}
+        view={workspace.view}
+        canOperate={canOperate}
+        newIssuePrimary={!showChecklist}
+        onNewIssue={() => setCreating(true)}
+        {...(desktop &&
+        workspace.view === 'canvas' &&
+        (graph.data?.nodes.length ?? 0) > 1
+          ? { onFit: () => setFitKey((k) => k + 1) }
+          : {})}
+        onViewChange={(view) => update((s) => setView(s, view))}
+      />
+      {project ? <RunnerOfflineBanner project={project} /> : null}
       <BudgetExceededBanner projectId={projectId} />
+      {fleet.data?.boardError ? (
+        <BoardErrorBanner error={fleet.data.boardError} />
+      ) : null}
 
-      <AsyncSection
-        section={fleet}
-        unavailable={{
-          title: 'The fleet could not be loaded',
-          stillWorks: 'The rest of the project is still available.',
-        }}
-        empty={null}
-        isEmpty={() => false}
-        skeleton={<Skeleton className="h-64 w-full" />}
-      >
-        {(view) => (
-          <>
-            <OrchestratorCard
-              fleet={view}
-              projectId={projectId}
-              control={control}
-              canOperate={canOperate}
-              isAdmin={isAdmin}
-              settings={settings}
-              reasons={reasons}
-              startOpen={startOpen}
-              onStartOpenChange={setStartOpen}
-              onAttach={
-                canAttach
-                  ? () =>
-                      setAttach({
-                        target: { kind: 'orchestrator' },
-                        title: 'Orchestrator',
-                      })
-                  : undefined
-              }
-            />
-
-            <section className="flex flex-col gap-4" aria-label="Slots">
-              <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="flex items-center gap-2 text-sm">
-                  <Toggle
-                    labelledBy="fleet-show-ended"
-                    checked={showAll}
-                    onChange={setShowAll}
-                  />
-                  <span id="fleet-show-ended">Show ended</span>
-                </div>
-                {showAll ? (
-                  <>
-                    <Field label="Status" htmlFor="fleet-status">
-                      <Select
-                        id="fleet-status"
-                        value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value)}
-                      >
-                        <option value="">Any status</option>
-                        {slotStatusOptions().map(
-                          (o: { value: SlotStatus; label: string }) => (
-                            <option key={o.value} value={o.value}>
-                              {o.label}
-                            </option>
-                          ),
-                        )}
-                      </Select>
-                    </Field>
-                    <Field label="Issue" htmlFor="fleet-issue">
-                      <Input
-                        id="fleet-issue"
-                        value={issueText}
-                        inputMode="numeric"
-                        placeholder="e.g. 42"
-                        maxLength={10}
-                        onChange={(e) => setIssueText(e.target.value)}
-                      />
-                    </Field>
-                  </>
-                ) : null}
-              </div>
-
-              {showAll ? (
+      {/* A row: the workspace, then the agent panel as its last child. */}
+      <div className="flex min-w-0 items-start gap-4">
+        <div className="flex min-w-0 flex-1 flex-col gap-4">
+          <AsyncSection
+            section={fleet}
+            unavailable={{
+              title: 'The fleet could not be loaded',
+              stillWorks: 'The rest of the project is still available.',
+            }}
+            empty={null}
+            isEmpty={() => false}
+            skeleton={<Skeleton className="h-96 w-full" />}
+          >
+            {(view) =>
+              workspace.view === 'list' ? (
+                <SlotsView
+                  projectId={projectId}
+                  active={view.slots}
+                  version={version}
+                  nobodyYet={emptyView(view)}
+                  onSelect={open}
+                />
+              ) : (
                 <AsyncSection
-                  section={history}
+                  section={graph}
                   unavailable={{
-                    title: 'Slots could not be loaded',
-                    stillWorks: 'The active slots above are still current.',
+                    title: 'The agent tree could not be loaded',
+                    stillWorks:
+                      'The table view (View → All slots) still lists every slot.',
                   }}
-                  isEmpty={(page) =>
-                    page === undefined || page.items.length === 0
-                  }
-                  empty={
-                    filtered ? (
-                      <EmptyState
-                        title="No matching slots"
-                        description="No slot matches these filters."
-                        action={
-                          <Button variant="glass" onClick={clearFilters}>
-                            Clear filters
-                          </Button>
-                        }
+                  isEmpty={(g) => g.nodes.length <= 1}
+                  empty={emptyView(view)}
+                  skeleton={<Skeleton className="h-96 w-full" />}
+                >
+                  {(g) =>
+                    desktop ? (
+                      <AgentCanvas
+                        key={fitKey}
+                        graph={g}
+                        focus={workspace.focus}
+                        control={control}
+                        canOperate={canOperate}
+                        orchestratorMessageReason={orchestratorMessageReason}
+                        onOpen={open}
+                        {...(onAttach ? { onAttach } : {})}
                       />
                     ) : (
-                      <EmptyState
-                        title="No slots yet"
-                        description={EMPTY_FLEET_DESCRIPTION}
-                        action={
-                          <Link
-                            href={`/projects/${projectId}/queue`}
-                            className="text-sm underline"
-                          >
-                            Open Queue
-                          </Link>
-                        }
+                      <AgentList
+                        graph={g}
+                        focus={workspace.focus}
+                        control={control}
+                        canOperate={canOperate}
+                        orchestratorMessageReason={orchestratorMessageReason}
+                        onOpen={open}
+                        {...(onAttach ? { onAttach } : {})}
                       />
                     )
                   }
-                  skeleton={<Skeleton className="h-40 w-full" />}
-                >
-                  {(page) => (
-                    <>
-                      {slotsList(page?.items ?? [])}
-                      {page?.nextCursor ? (
-                        <div className="flex justify-center">
-                          <Button
-                            variant="glass"
-                            disabled={loadingMore}
-                            onClick={loadMore}
-                          >
-                            {loadingMore ? 'Loading…' : 'Load more'}
-                          </Button>
-                        </div>
-                      ) : null}
-                    </>
-                  )}
                 </AsyncSection>
-              ) : view.slots.length === 0 ? (
-                nobodyYet
-              ) : (
-                slotsList(view.slots)
-              )}
-            </section>
-          </>
-        )}
-      </AsyncSection>
+              )
+            }
+          </AsyncSection>
 
-      <SlotSheet
-        projectId={projectId}
-        name={selected}
-        version={version}
-        control={control}
-        canOperate={canOperate}
-        onClose={() => setSelected(undefined)}
-        onAttach={
-          canAttach
-            ? (name) =>
-                setAttach({ target: { kind: 'slot', slot: name }, title: name })
-            : undefined
-        }
-      />
+          {graph.data && graph.data.nodes.length > 1 ? (
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]">
+              <DependenciesPanel graph={graph.data} id={DEPENDENCIES_ID} />
+              <QuickActions
+                control={control}
+                canOperate={canOperate}
+                orchestrator={orchestratorStatus ?? 'unknown'}
+                reasons={reasons}
+                orchestratorMessageReason={orchestratorMessageReason}
+                liveSlots={liveSlots(graph.data)}
+                focusedSlot={focusedSlot}
+                hasOpen={workspace.open.length > 0}
+                onNewIssue={() => setCreating(true)}
+                {...(onAttach ? { onAttach } : {})}
+                onViewDependencies={() =>
+                  document
+                    .getElementById(DEPENDENCIES_ID)
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                }
+                onCollapseAll={() => update(closeAll)}
+              />
+            </div>
+          ) : null}
+
+          {graph.data && workspace.open.length > 0 ? (
+            <AgentDock
+              graph={graph.data}
+              open={workspace.open}
+              focus={workspace.focus}
+              running={counts?.running ?? 0}
+              onSelect={open}
+              onClose={(slot) => update((s) => closeSlot(s, slot))}
+            />
+          ) : null}
+        </div>
+
+        {/* The focused slot's panel: a column from `lg`, its own sheet below. */}
+        {focusedSlot ? (
+          <SlotPanel
+            projectId={projectId}
+            slot={focusedSlot}
+            control={control}
+            onClose={() => update(blur)}
+            onOpenSlot={open}
+          />
+        ) : null}
+      </div>
+
+      <SheetRoot
+        open={workspace.focus === ORCHESTRATOR_KEY && fleet.data !== undefined}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) update(blur);
+        }}
+      >
+        <SheetContent side={desktop ? 'right' : 'bottom'} title="Orchestrator">
+          {fleet.data ? orchestratorCard(fleet.data) : null}
+        </SheetContent>
+      </SheetRoot>
+
+      {canOperate ? (
+        <StartOrchestratorDialog
+          control={control}
+          isAdmin={isAdmin}
+          settings={settings.data}
+          open={startOpen}
+          onOpenChange={setStartOpen}
+          onStarted={() => setVersion((v) => v + 1)}
+        />
+      ) : null}
+
+      {canOperate ? (
+        <NewIssueDialog
+          projectId={projectId}
+          open={creating}
+          labelChoices={allowedLabels(queue.data)}
+          {...(project ? { runnerName: project.runnerName } : {})}
+          onOpenChange={setCreating}
+          onCreated={() => setVersion((v) => v + 1)}
+        />
+      ) : null}
 
       <TerminalSheet
         projectId={projectId}

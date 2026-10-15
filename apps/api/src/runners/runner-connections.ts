@@ -2,6 +2,7 @@ import type { RunnerHeartbeat } from '@agentdock/shared';
 import {
   type CommandResultMessage,
   RUNNER_CLOSE_CODES,
+  type RunnerCommands,
   type ServerMessage,
 } from '@agentdock/shared/protocol';
 import { Injectable } from '@nestjs/common';
@@ -22,6 +23,8 @@ export class LiveConnection {
     readonly runnerId: string,
     private readonly socket: WebSocket,
     readonly connectedAt: number,
+    /** What its hello advertised (#233); null = unknown, an older runner. */
+    readonly commands: RunnerCommands | null = null,
   ) {
     this.lastBeatAt = connectedAt;
   }

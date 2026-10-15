@@ -1,3 +1,5 @@
+'use client';
+
 import type {
   FleetView,
   OrchestratorSettingsView,
@@ -6,12 +8,13 @@ import type {
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
+import { StatusDot } from '@andrewbehma/glass-ui/status-pill';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import type { ReactNode } from 'react';
 import { PrerequisiteBanner } from '../../../../../components/prerequisites/prerequisite-banner';
 import { orchestratorSettingsHref } from '../../../../../lib/control/reasons';
 import {
-  boardErrorHint,
+  CHANNEL_EXPLANATION,
   channelChip,
   FLEET_FACT_HINT,
   formatAge,
@@ -19,9 +22,10 @@ import {
   formatRoundHeader,
   ORCHESTRATOR_STATUS_HINT,
   ORCHESTRATOR_STATUS_LABEL,
-  ORCHESTRATOR_TONE,
+  showStopControl,
 } from '../../../../../lib/fleet/format';
 import type { Section } from '../../../../../lib/section/use-section';
+import { ORCHESTRATOR_PILL_STATUS } from '../../../../../lib/status/pill';
 import { OrchestratorControls } from './orchestrator-controls';
 import type { ControlReasons } from './use-control-reasons';
 
@@ -57,8 +61,8 @@ export function OrchestratorCard({
   isAdmin,
   settings,
   reasons,
-  startOpen,
-  onStartOpenChange,
+  showStart,
+  onStart,
   onAttach,
 }: {
   fleet: FleetView;
@@ -68,21 +72,24 @@ export function OrchestratorCard({
   isAdmin: boolean;
   settings: Section<OrchestratorSettingsView>;
   reasons: ControlReasons;
-  startOpen: boolean;
-  onStartOpenChange: (open: boolean) => void;
+  /** False on an empty fleet: the first-project checklist holds the Start. */
+  showStart: boolean;
+  onStart: () => void;
   /** Admins on a runner that can attach; absent hides the action. */
   onAttach?: () => void;
 }) {
-  const { orchestrator, latestRound, boardError } = fleet;
+  const { orchestrator, latestRound } = fleet;
   const channel = channelChip(fleet.fleetChannel);
+  const channelNote = CHANNEL_EXPLANATION[fleet.fleetChannel];
   const status: OrchestratorStatus = orchestrator.status;
-  const profileMissing = settings.data?.effectiveProfile === null;
+  // On an empty fleet the checklist's first step says this; not twice.
+  const profileMissing = showStart && settings.data?.effectiveProfile === null;
   return (
     <Card pad="md" className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="text-base font-semibold">Orchestrator</h2>
         <span className="inline-flex items-center gap-2 text-sm">
-          <Badge dot tone={ORCHESTRATOR_TONE[status]} aria-hidden="true" />
+          <StatusDot status={ORCHESTRATOR_PILL_STATUS[status]} />
           <Tooltip content={ORCHESTRATOR_STATUS_HINT[status]}>
             <button type="button" className="cursor-help">
               {ORCHESTRATOR_STATUS_LABEL[status]}
@@ -104,6 +111,9 @@ export function OrchestratorCard({
           </button>
         </Tooltip>
       </div>
+      {channelNote ? (
+        <p className="max-w-prose text-xs text-ink-3">{channelNote}</p>
+      ) : null}
       {profileMissing ? (
         <PrerequisiteBanner
           tone="warn"
@@ -118,7 +128,7 @@ export function OrchestratorCard({
           {fleet.base}
         </Fact>
         <Fact label="Slots" hint={FLEET_FACT_HINT.slots}>
-          {formatOccupancy(latestRound)}
+          {formatOccupancy(fleet.slots.length, latestRound)}
         </Fact>
         <Fact label="Last round" hint={FLEET_FACT_HINT.lastRound}>
           {latestRound
@@ -143,14 +153,11 @@ export function OrchestratorCard({
         isAdmin={isAdmin}
         settings={settings.data}
         reasons={reasons}
-        startOpen={startOpen}
-        onStartOpenChange={onStartOpenChange}
+        showStop={showStopControl(status)}
+        showStart={showStart}
+        onStart={onStart}
       />
-      {boardError ? (
-        <p role="alert" className="text-sm text-warn">
-          {boardErrorHint(boardError)}
-        </p>
-      ) : null}
+      {/* The board's error is the page's one banner (#213); this card does not repeat it. */}
     </Card>
   );
 }

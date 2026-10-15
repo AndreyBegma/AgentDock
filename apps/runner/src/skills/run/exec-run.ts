@@ -17,9 +17,12 @@ export interface ExecRunIo {
 /**
  * `agentdock-runner exec-run <runDir>` (D7) — what a run's tmux session
  * executes. Reads `run.json`, spawns the profile binary as an argv (never a
- * shell string) in the run worktree, sends its stdout to `stream.jsonl` and
- * its stderr to `stderr.log`, and records the exit in `exit.json`. Returns
- * the binary's exit code.
+ * shell string) in the run worktree, feeds it the spec's `stdin` file when
+ * there is one (a plan turn's prompt, spec 172 D16), sends its stdout to `stream.jsonl` and
+ * its stderr to `stderr.log`, and records the exit in `exit.json`. With
+ * `interactive` (a board card's worker, #242 D5) the binary inherits this
+ * process's stdio — the tmux pane — and the exit is recorded all the same.
+ * Returns the binary's exit code.
  */
 export const execRun = async (
   argv: readonly string[],
@@ -58,22 +61,31 @@ export const execRun = async (
     return 127;
   }
 
-  io.stdout(`agentdock skill run · ${spec.binary} in ${spec.cwd}\n`);
-  const child = Bun.spawn([binary, ...spec.args], {
-    cwd: spec.cwd,
-    env,
-    stdin: 'ignore',
-    stdout: Bun.file(join(runDir, RUN_FILES.stream)),
-    stderr: Bun.file(join(runDir, RUN_FILES.stderr)),
-  });
+  const label = spec.interactive ? 'agentdock card' : 'agentdock skill run';
+  io.stdout(`${label} · ${spec.binary} in ${spec.cwd}\n`);
+  const command = [binary, ...spec.args];
+  const child = spec.interactive
+    ? // The tmux pane is the terminal (#242 D5): a person can attach and type.
+      Bun.spawn(command, {
+        cwd: spec.cwd,
+        env,
+        stdin: 'inherit',
+        stdout: 'inherit',
+        stderr: 'inherit',
+      })
+    : Bun.spawn(command, {
+        cwd: spec.cwd,
+        env,
+        stdin: spec.stdin ? Bun.file(spec.stdin) : 'ignore',
+        stdout: Bun.file(join(runDir, RUN_FILES.stream)),
+        stderr: Bun.file(join(runDir, RUN_FILES.stderr)),
+      });
   const code = await child.exited;
   record({
     code: child.signalCode ? null : code,
     signal: child.signalCode ?? null,
     at: io.now().toISOString(),
   });
-  io.stdout(
-    `agentdock skill run · exited with ${child.signalCode ?? `code ${code}`}\n`,
-  );
+  io.stdout(`${label} · exited with ${child.signalCode ?? `code ${code}`}\n`);
   return code;
 };

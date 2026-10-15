@@ -219,6 +219,195 @@ describe('terminal attach (e2e)', () => {
       }
     });
 
+    describe('a manual session (spec 201 D23)', () => {
+      const manualSession = (tmuxSession: string | null, pid = projectId) =>
+        ctx.prisma.agentSession.create({
+          data: {
+            runnerId,
+            runtime: 'claude',
+            externalId: 'claude-sess-1',
+            projectId: pid,
+            cwd: '/srv/dev/widget',
+            origin: 'manual',
+            tmuxSession,
+            startedAt: new Date('2026-10-01T00:00:00Z'),
+            lastEventAt: new Date('2026-10-01T00:00:00Z'),
+          },
+        });
+      const manual = (sessionId: string) => ({
+        kind: 'manual',
+        projectId,
+        sessionId,
+        mode: 'read',
+      });
+
+      it('gives an admin a ticket that resolves to the Claude session id', async () => {
+        const row = await manualSession('agentdock-manual-0a1b2c3d');
+        for (const id of [row.id, row.externalId]) {
+          const value = await issued(admin, manual(id));
+          const socket = connect(value);
+          await socket.frame('attached');
+        }
+        expect(port.attaches.map((a) => a.target)).toEqual([
+          expect.objectContaining({
+            kind: 'manual',
+            sessionId: 'claude-sess-1',
+            root: '/srv/dev/widget',
+          }),
+          expect.objectContaining({ sessionId: 'claude-sess-1' }),
+        ]);
+      });
+
+      it('is 403 for an operator and a viewer', async () => {
+        const row = await manualSession('agentdock-manual-0a1b2c3d');
+        for (const role of ['operator', 'viewer'] as const) {
+          const user = await signIn(`${role}-m@example.com`, role);
+          await ctx.prisma.projectMember.create({
+            data: { projectId, userId: user.id },
+          });
+          expect((await ticket(user.session, manual(row.id))).status).toBe(403);
+        }
+      });
+
+      it('is 404 for a session without a tmux session or unknown', async () => {
+        const row = await manualSession(null);
+        expect((await ticket(admin, manual(row.id))).status).toBe(404);
+        expect((await ticket(admin, manual('nope'))).status).toBe(404);
+      });
+
+      it('is 404 for a session of another project', async () => {
+        const other = await ctx.prisma.project.create({
+          data: {
+            runnerId,
+            rootPath: '/srv/dev/other',
+            repo: 'acme/other',
+            displayName: 'other',
+            baseBranch: 'develop',
+            baseSource: 'config',
+            hasClaudeMd: true,
+            hasAgentsMd: false,
+            lastInspectedAt: new Date('2026-10-01T00:00:00Z'),
+          },
+        });
+        const row = await manualSession('agentdock-manual-0a1b2c3d', other.id);
+        expect((await ticket(admin, manual(row.id))).status).toBe(404);
+      });
+
+      it('is 400 without sessionId, and sessionId on another kind', async () => {
+        const missing = await ticket(admin, {
+          kind: 'manual',
+          projectId,
+          mode: 'read',
+        });
+        expect(missing.status).toBe(400);
+        const stray = await ticket(admin, {
+          kind: 'orchestrator',
+          projectId,
+          sessionId: 'x',
+          mode: 'read',
+        });
+        expect(stray.status).toBe(400);
+      });
+    });
+
+    describe('a board card worker (issue #242)', () => {
+      const boardCard = (pid = projectId) =>
+        ctx.prisma.boardCard.create({
+          data: {
+            projectId: pid,
+            number: 1,
+            shortId: pid === projectId ? 'abcd1234' : 'efgh5678',
+            title: 'Add login',
+            column: 'in_progress',
+            position: 0,
+            issueOnRun: false,
+            specOnRun: false,
+            movedAt: new Date('2026-10-14T00:00:00Z'),
+          },
+        });
+      const card = (cardId: string) => ({
+        kind: 'card',
+        projectId,
+        cardId,
+        mode: 'read',
+      });
+
+      it('gives an admin a ticket that names the card', async () => {
+        const row = await boardCard();
+        const value = await issued(admin, card(row.id));
+        const socket = connect(value);
+        await socket.frame('attached');
+        expect(port.attaches.map((a) => a.target)).toEqual([
+          {
+            kind: 'card',
+            projectId,
+            root: '/srv/dev/widget',
+            cardId: row.id,
+          },
+        ]);
+      });
+
+      it('is 403 for an operator and a viewer', async () => {
+        const row = await boardCard();
+        for (const role of ['operator', 'viewer'] as const) {
+          const user = await signIn(`${role}-c@example.com`, role);
+          await ctx.prisma.projectMember.create({
+            data: { projectId, userId: user.id },
+          });
+          expect((await ticket(user.session, card(row.id))).status).toBe(403);
+        }
+      });
+
+      it('is 404 not_found for a card of another project, or none', async () => {
+        const other = await ctx.prisma.project.create({
+          data: {
+            runnerId,
+            rootPath: '/srv/dev/other',
+            repo: 'acme/other',
+            displayName: 'other',
+            baseBranch: 'develop',
+            baseSource: 'config',
+            hasClaudeMd: true,
+            hasAgentsMd: false,
+            lastInspectedAt: new Date('2026-10-01T00:00:00Z'),
+          },
+        });
+        const row = await boardCard(other.id);
+        const elsewhere = await ticket(admin, card(row.id));
+        expect(elsewhere.status).toBe(404);
+        expect(elsewhere.body.error).toBe('not_found');
+        expect((await ticket(admin, card('nope'))).status).toBe(404);
+        expect(port.attaches).toEqual([]);
+      });
+
+      it('is 400 without cardId, and cardId on another kind', async () => {
+        expect(
+          (await ticket(admin, { kind: 'card', projectId, mode: 'read' }))
+            .status,
+        ).toBe(400);
+        expect(
+          (
+            await ticket(admin, {
+              kind: 'orchestrator',
+              projectId,
+              cardId: 'x',
+              mode: 'read',
+            })
+          ).status,
+        ).toBe(400);
+        expect(
+          (
+            await ticket(admin, {
+              kind: 'card',
+              projectId,
+              cardId: '../x',
+              mode: 'read',
+            })
+          ).status,
+        ).toBe(400);
+      });
+    });
+
     it('is 401 anonymously and 403 without the CSRF header', async () => {
       const anonymous = await ctx
         .http()
@@ -290,7 +479,13 @@ describe('terminal attach (e2e)', () => {
       expect(response.body).toEqual([
         expect.objectContaining({
           mode: 'read',
-          target: { kind: 'slot', projectId, slot: 'i42', runId: null },
+          target: {
+            kind: 'slot',
+            projectId,
+            slot: 'i42',
+            runId: null,
+            cardId: null,
+          },
           user: { id: adminId, email: 'admin@example.com' },
         }),
       ]);

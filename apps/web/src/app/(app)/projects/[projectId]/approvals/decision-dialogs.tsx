@@ -1,45 +1,22 @@
 'use client';
 
 import type { ApproveRequest, RequestChangesRequest } from '@agentdock/shared';
-import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
+import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { Field, Textarea } from '@andrewbehma/glass-ui/field';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { useState } from 'react';
 import { api } from '../../../../../lib/api';
 import {
-  commandUnavailableText,
-  describeApprovalError,
-  isCommandUnavailable,
+  describeApprovalHint,
   movedHead,
   noteBytes,
   noteError,
 } from '../../../../../lib/approvals/format';
+import { useErrorToast } from '../../../../../lib/section/use-error-toast';
 
 const NOTE_MAX_BYTES = 4096;
-
-/** What a failed decision looks like in a dialog: the runner seam gets a Banner. */
-function DecisionError({
-  error,
-  runnerName,
-}: {
-  error: unknown;
-  runnerName?: string | null;
-}) {
-  if (isCommandUnavailable(error)) {
-    return (
-      <Banner tone="warn" title="This runner is too old to take decisions">
-        {commandUnavailableText(runnerName)}
-      </Banner>
-    );
-  }
-  return (
-    <p role="alert" className="text-sm text-danger">
-      {describeApprovalError(error, runnerName)}
-    </p>
-  );
-}
 
 interface DialogProps {
   projectId: string;
@@ -64,11 +41,10 @@ export function ApproveDialog({
   onChanged,
 }: DialogProps) {
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<unknown>();
+  const showError = useErrorToast();
 
   const submit = async () => {
     setBusy(true);
-    setError(undefined);
     const body: ApproveRequest = { headSha };
     try {
       await api(`/projects/${projectId}/approvals/${pr}/approve`, {
@@ -81,52 +57,34 @@ export function ApproveDialog({
       onOpenChange(false);
       onChanged();
     } catch (err) {
-      setError(err);
-      if (movedHead(err)) onChanged();
+      showError(describeApprovalHint(err, runnerName));
+      if (movedHead(err)) {
+        onOpenChange(false);
+        onChanged();
+      }
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <DialogRoot
+    <ConfirmDialog
       open={open}
-      onOpenChange={(next) => {
-        if (busy) return;
-        if (!next) setError(undefined);
-        onOpenChange(next);
-      }}
-    >
-      <DialogContent
-        title={`Approve #${pr}`}
-        description="Lets the orchestrator merge this pull request. AgentDock never merges itself."
-        footer={
-          <>
-            <Button
-              variant="glass"
-              disabled={busy}
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
-            </Button>
-            <Button disabled={busy} onClick={submit}>
-              {busy ? 'Approving…' : 'Approve'}
-            </Button>
-          </>
-        }
-      >
-        <div className="flex flex-col gap-3 text-sm">
-          <p>
-            The approval is bound to commit{' '}
-            <code className="font-mono text-xs">{headSha.slice(0, 12)}</code>. A
-            later push voids it.
-          </p>
-          {error ? (
-            <DecisionError error={error} runnerName={runnerName} />
-          ) : null}
-        </div>
-      </DialogContent>
-    </DialogRoot>
+      onOpenChange={onOpenChange}
+      title={`Approve #${pr}?`}
+      consequence={
+        <>
+          Lets the orchestrator merge this pull request; AgentDock never merges
+          itself. The approval is bound to commit{' '}
+          <code className="font-mono text-xs">{headSha.slice(0, 12)}</code>, and
+          a later push voids it.
+        </>
+      }
+      verb="Approve"
+      tone="default"
+      busy={busy}
+      onConfirm={() => void submit()}
+    />
   );
 }
 
@@ -141,14 +99,13 @@ export function RequestChangesDialog({
 }: DialogProps) {
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<unknown>();
+  const showError = useErrorToast();
 
   const problem = noteError(note);
 
   const submit = async () => {
     if (problem) return;
     setBusy(true);
-    setError(undefined);
     const body: RequestChangesRequest = { headSha, note };
     try {
       await api(`/projects/${projectId}/approvals/${pr}/request-changes`, {
@@ -162,8 +119,11 @@ export function RequestChangesDialog({
       onOpenChange(false);
       onChanged();
     } catch (err) {
-      setError(err);
-      if (movedHead(err)) onChanged();
+      showError(describeApprovalHint(err, runnerName));
+      if (movedHead(err)) {
+        onOpenChange(false);
+        onChanged();
+      }
     } finally {
       setBusy(false);
     }
@@ -174,7 +134,6 @@ export function RequestChangesDialog({
       open={open}
       onOpenChange={(next) => {
         if (busy) return;
-        if (!next) setError(undefined);
         onOpenChange(next);
       }}
     >
@@ -184,7 +143,7 @@ export function RequestChangesDialog({
         footer={
           <>
             <Button
-              variant="glass"
+              variant="ghost"
               disabled={busy}
               onClick={() => onOpenChange(false)}
             >
@@ -216,9 +175,6 @@ export function RequestChangesDialog({
           >
             {noteBytes(note)} / {NOTE_MAX_BYTES} bytes
           </span>
-          {error ? (
-            <DecisionError error={error} runnerName={runnerName} />
-          ) : null}
         </form>
       </DialogContent>
     </DialogRoot>

@@ -1,7 +1,9 @@
 import {
   type BackfillRequest,
   SESSION_LIST_MAX_LIMIT,
+  SESSION_ORIGINS,
   type SessionListQuery,
+  type SessionOrigin,
 } from '@agentdock/shared';
 import {
   type Runtime,
@@ -19,6 +21,7 @@ import {
   IsOptional,
   IsString,
   isISO8601,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -63,6 +66,10 @@ export class ListSessionsQuery implements SessionListQuery {
   runtime?: Runtime;
 
   @IsOptional()
+  @IsIn(SESSION_ORIGINS)
+  origin?: SessionOrigin;
+
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
   @MaxLength(SESSION_NAME_MAX_LENGTH)
@@ -100,4 +107,12 @@ export class ListSessionsQuery implements SessionListQuery {
   @Min(1)
   @Max(SESSION_LIST_MAX_LIMIT)
   limit?: number;
+}
+
+/** `GET projects/:projectId/sessions/:id/content` — `nextCursor` is a content row id. */
+export class SessionContentQuery {
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{1,18}$/, { message: 'cursor must be a content row id' })
+  cursor?: string;
 }

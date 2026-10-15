@@ -19,6 +19,8 @@ export const AUDIT_ACTIONS = [
   'runner.pair',
   'runner.rename',
   'runner.revoke',
+  'runner.update',
+  'local.request',
   'runner.command',
   'runner.command.result',
   'project.connect',
@@ -37,6 +39,7 @@ export const AUDIT_ACTIONS = [
   'orchestrator.start',
   'orchestrator.stop',
   'orchestrator.settings',
+  'orchestrator.message',
   'slot.stop',
   'slot.message',
   'approval.approve',
@@ -84,6 +87,63 @@ export const AUDIT_ACTIONS = [
   'github_app.update_credentials',
   'github_app.resync',
   'github_app.delete',
+  'plan.created',
+  'plan.shared',
+  'plan.revised',
+  'plan.sent',
+  'plan.task_reviewed',
+  'planner.instructions_updated',
+  'planner.settings_updated',
+  'design.toggled',
+  'design.generated',
+  'design.revised',
+  'design.approved',
+  'design.settings_updated',
+  /** #275 D5: `meta` `{stage, runId, turnId?}`. */
+  'design.stopped',
+  'uiprofile.built',
+  'uiprofile.edited',
+  'action_request.created',
+  'action_request.decided',
+  'action_request.executed',
+  'session_content.purged',
+  'card.created',
+  'card.updated',
+  'card.deleted',
+  'card.moved',
+  'card.run_started',
+  'card.feedback',
+  'card.finished',
+  'card.accepted',
+  'card.stopped',
+  /** #243 D10: the card's Continue after design switch. */
+  'card.design_continue_toggled',
+  /** #244 D12: a suggestion landed in the Inbox (system actor, `meta.captureId`). */
+  'card.captured',
+  'card.inbox_accepted',
+  'card.dismissed',
+  /** #273 D16: Accept merged the card's PR (`after: { pr, method, mergeCommit?, issueClosed }`). */
+  'card.merged',
+  /** #273 D16: the runner refused the merge (`after: { pr, reason }`, result error). */
+  'card.merge_failed',
+  /** #329 D8: Accept closed the card's PR without merging (`after: { pr, alreadyClosed, branchDeleted, issueClosed }`). */
+  'card.pr_closed',
+  /** #329 D8: the runner refused to close the PR (`after: { pr, reason }`, result error). */
+  'card.pr_close_failed',
+  /** #329 D5: a person's Create pull request (`after: { state, pr? }`, result error when it failed). */
+  'card.collect_requested',
+  /** #273 D9: approving the design did not start the worker (`after: { code }`). */
+  'card.auto_run_failed',
+  /** #309 D7: an upload stored, pending (`after: { name, mime, size }`). */
+  'attachment.added',
+  /** #309 D7: pending uploads claimed onto a card (`after: { cardId, roundId?, attachmentIds }`). */
+  'attachment.claimed',
+  /** #309 D7: an attachment deleted by its uploader or an admin (`before: { name, cardId }`). */
+  'attachment.removed',
+  /** Also records the capture fields (#244 D12). */
+  'board.settings_updated',
+  /** #271 D13: the per-project "Store text in English" switch (`after: { normalizeEnabled }`). */
+  'text.settings_updated',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 

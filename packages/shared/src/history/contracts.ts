@@ -11,7 +11,22 @@ import type {
  * this item a run is an orchestrator slot; skill and schedule runs (M3) add
  * rows of their own kinds.
  */
-export const RUN_KINDS = ['orchestrator_slot', 'skill', 'schedule'] as const;
+export const RUN_KINDS = [
+  'orchestrator_slot',
+  'skill',
+  'schedule',
+  /** A Planner turn (docs/specs/172-planner.md D14). */
+  'plan',
+  'ui_profile',
+  /** A board card round (issue #242 D4). */
+  'card',
+  /** A card capture extraction (issue #244 D4). */
+  'card_capture',
+  /** A text normalization (issue #271 D4, ADR-0027). */
+  'text_normalize',
+  /** A card's model assessment (issue #322 D5, ADR-0032). */
+  'card_assess',
+] as const;
 export type RunKind = (typeof RUN_KINDS)[number];
 
 /**
@@ -42,6 +57,8 @@ export const RUN_TRIGGERS = [
   'user',
   'schedule',
   'webhook',
+  /** Card capture after a manual session idles or ends (issue #244 D2). */
+  'capture',
 ] as const;
 export type RunTrigger = (typeof RUN_TRIGGERS)[number];
 
@@ -88,6 +105,8 @@ export interface RunSummary {
   prUrl: string | null;
   /** The slot's current PR checks, when it has a PR. */
   prChecks: PrChecks | null;
+  /** The plan a `plan` run is a turn of; null for every other kind. */
+  planId: string | null;
   triggeredByType: RunTrigger;
   triggeredById: string | null;
   startedAt: string;
@@ -101,6 +120,11 @@ export interface RunPage {
   items: RunSummary[];
   /** Pass as `cursor` for the next (older) page; null on the last page. */
   nextCursor: string | null;
+  /**
+   * Runs per status under every filter of the query except `status` and the
+   * cursor — the History status chips (#213).
+   */
+  counts: Record<RunStatus, number>;
 }
 
 /** `GET /projects/:projectId/runs`. `from`/`to` bound `startedAt` (ISO, `to` exclusive). */

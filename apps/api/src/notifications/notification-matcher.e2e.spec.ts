@@ -103,6 +103,69 @@ describe('notification matcher (e2e)', () => {
     expect(await rowsOf(disabled.id)).toHaveLength(0);
   });
 
+  describe('cards.suggested (issue #244 D11)', () => {
+    const suggested = (captureId: string, minute: number) => ({
+      type: 'cards.suggested',
+      source: 'api' as const,
+      slot: null,
+      issue: null,
+      ts: at(minute),
+      data: { captureId, sessionId: 's1', count: 2, cardIds: ['c1', 'c2'] },
+    });
+
+    it('reaches operators and admins, never a viewer — whatever their rule says', async () => {
+      const admin = await seedUser(ctx.prisma, 'ada@example.com', 'admin');
+      const operator = await seedUser(
+        ctx.prisma,
+        'op@example.com',
+        'operator',
+        projectId,
+      );
+      const viewer = await seedUser(
+        ctx.prisma,
+        'vi@example.com',
+        'viewer',
+        projectId,
+      );
+      await ctx.prisma.notificationRule.create({
+        data: {
+          userId: viewer.id,
+          kind: 'cards.suggested',
+          inApp: true,
+          telegram: true,
+        },
+      });
+      await insertEvent(ctx.prisma, runnerId, suggested('cap1', 0));
+      expect(await matcher.tick()).toBe(1);
+
+      for (const user of [admin, operator]) {
+        const rows = await rowsOf(user.id);
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({
+          kind: 'cards.suggested',
+          title: '2 cards were suggested',
+          link: `/projects/${projectId}/board`,
+        });
+      }
+      expect(await rowsOf(viewer.id)).toHaveLength(0);
+    });
+
+    it('folds a second extraction into the same item', async () => {
+      const operator = await seedUser(
+        ctx.prisma,
+        'op@example.com',
+        'operator',
+        projectId,
+      );
+      await insertEvent(ctx.prisma, runnerId, suggested('cap1', 0));
+      await insertEvent(ctx.prisma, runnerId, suggested('cap2', 3));
+      await matcher.tick();
+      const rows = await rowsOf(operator.id);
+      expect(rows).toHaveLength(1);
+      expect(rows[0].count).toBe(2);
+    });
+  });
+
   describe('schedule.disabled (spec 25 D10)', () => {
     const disabledEvent = (firingId: string, minute: number) => ({
       type: 'schedule.disabled',

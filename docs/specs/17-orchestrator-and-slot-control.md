@@ -82,6 +82,7 @@ New file `packages/shared/src/protocol/commands/control.ts`, one registration li
 | `orchestrator.status` | `{ projectId, root }` | viewer | `{ present, state, session?, startedAt? }` |
 | `slot.stop` | `{ projectId, root, slot }` | operator | `{ stopped: boolean }` |
 | `slot.message` | `{ projectId, root, slot, text, from }` | operator | `{ written: true, delivered: boolean }` |
+| `orchestrator.message` | `{ projectId, root, body, from }` | operator | `{ delivered: boolean, reason?: "absent" \| "prompt" }` — added by #189: `POST /projects/:id/orchestrator/message { body }`, audited as `orchestrator.message` with the body hashed; rules in [runner-protocol.md](../architecture/runner-protocol.md) |
 
 `slot` matches `^[a-z0-9-]+$` (same rule as `dispatch.sh`).
 

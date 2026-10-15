@@ -22,3 +22,20 @@ Numbered, never rewritten. A changed decision gets a new ADR that supersedes the
 | [0016](0016-staging-on-the-agent-host-behind-a-cloudflare-tunnel.md) | Staging on the agent host behind a Cloudflare tunnel |
 | [0017](0017-runner-distribution-homebrew-and-npm.md) | The runner ships as prebuilt binaries through Homebrew and npm |
 | [0018](0018-pull-requests-test-what-changed.md) | Pull requests test what changed; develop is not tested twice (amends ADR-0016) |
+| [0019](0019-planner-instructions-live-in-agentdock.md) | The Planner's instructions live in AgentDock, editable, behind a fixed output contract (scopes ADR-0005) |
+| [0020](0020-claude-code-integration-through-the-runner.md) | Claude Code integration — hooks observe, MCP acts, both through the runner (amends ADR-0010) |
+| [0021](0021-session-content-is-opt-in-per-project.md) | Session content is opt-in per project (amends spec 12 D9) |
+| [0022](0022-design-stage-html-mockups-from-a-ui-profile.md) | The design stage draws HTML mockups from a cached UI profile — no external design tool, no dev server |
+| [0023](0023-runners-advertise-their-commands.md) | Runners advertise their commands; features check commands, never versions |
+| [0024](0024-board-cards-and-dedicated-card-workers.md) | Board cards are work items AgentDock owns; each runs a dedicated interactive worker outside the orchestrator (amends ADR-0004, scopes ADR-0005) |
+| [0025](0025-a-design-has-one-owner-a-plan-task-or-a-board-card.md) | A design has exactly one owner — a plan task or a board card (amends ADR-0022 §3) |
+| [0026](0026-card-capture-reads-opt-in-session-content.md) | Card capture reads opt-in session content with a small model on the project's runner (amends ADR-0021) |
+| [0027](0027-stored-text-is-normalized-to-english-on-the-runner.md) | Stored text is normalized to English on the runner (extends ADR-0026) |
+| [0028](0028-one-work-surface-for-cards-and-plan-tasks.md) | One work surface: plan tasks are projected read-only onto the Board, one List replaces Tasks (scopes ADR-0024 §2) |
+| [0029](0029-accepting-a-board-card-may-merge-its-pull-request-through-the-runner.md) | Accepting a board card may merge its pull request through the runner (amends ADR-0024 §6) |
+| [0030](0030-terminal-work-and-fleet-work-appear-on-the-board.md) | Terminal work and fleet work appear on the Board (amends ADR-0024 §1 and §6) |
+| [0031](0031-attachments-are-stored-by-the-api-on-a-local-volume.md) | Attachments are stored by the API on a local volume and reach the card worker through the runner |
+| [0032](0032-a-cards-model-is-recommended-by-a-runner-side-assessment.md) | A card's model is recommended by a runner-side `haiku` assessment; profile and model are picked at launch (extends ADR-0027) |
+| [0033](0033-deepl-translates-stored-text-at-save-time.md) | DeepL translates stored text at save time; the runner `haiku` path is the fallback (amends ADR-0027 §3, §4, §7) |
+| [0034](0034-the-planner-lives-on-the-board-and-makes-cards.md) | The Planner lives on the Board: New Card is an interview, New Plan makes cards (amends ADR-0028) |
+| [0035](0035-a-card-ships-itself.md) | A card ships itself: draft PR while working, CI watched and fixed, auto-merge at Finished, the card stays (amends ADR-0024 §6, ADR-0029) |

@@ -16,6 +16,8 @@ export const TURN_STARTED_EVENT = 'turn.started';
 export const TURN_FINISHED_EVENT = 'turn.finished';
 export const LLM_REQUEST_EVENT = 'llm.request';
 export const TOOL_CALL_EVENT = 'tool.call';
+export const SESSION_COMPACTED_EVENT = 'session.compacted';
+export const SESSION_ERROR_EVENT = 'session.error';
 
 export const SESSION_EVENT_TYPES = [
   SESSION_OBSERVED_EVENT,
@@ -23,6 +25,8 @@ export const SESSION_EVENT_TYPES = [
   TURN_FINISHED_EVENT,
   LLM_REQUEST_EVENT,
   TOOL_CALL_EVENT,
+  SESSION_COMPACTED_EVENT,
+  SESSION_ERROR_EVENT,
 ] as const;
 export type SessionEventType = (typeof SESSION_EVENT_TYPES)[number];
 
@@ -136,6 +140,45 @@ export const toolCallDataSchema = z.object({
 });
 export type ToolCallData = z.infer<typeof toolCallDataSchema>;
 
+/** What started a compaction: the runtime on a full context, or the person. */
+export const compactionTriggerSchema = z.enum(['auto', 'manual']);
+export type CompactionTrigger = z.infer<typeof compactionTriggerSchema>;
+
+/**
+ * `session.compacted` (#161): the runtime summarized the conversation to free
+ * context. The envelope's `ts` is the moment. `compactionId` is the
+ * transcript line's own id, the natural key a resend upserts on.
+ */
+export const sessionCompactedDataSchema = z.object({
+  compactionId: id,
+  trigger: compactionTriggerSchema,
+  /** Context size, in tokens, before the compaction. */
+  preTokens: count.optional(),
+});
+export type SessionCompactedData = z.infer<typeof sessionCompactedDataSchema>;
+
+/** The longest `session.error` `kind`: a runtime error code, never a message. */
+export const SESSION_ERROR_KIND_MAX_LENGTH = 64;
+
+/**
+ * `session.error` (#161): a request failed and the runtime gave up on it
+ * (Claude Code's `isApiErrorMessage` lines). `kind` is the runtime's error
+ * code (`rate_limit`, `server_error`, …): lowercase letters and `_` only, so
+ * no message text can travel in it (D9). `status` is the HTTP status when
+ * known. `errorId` is the transcript line's own id.
+ */
+export const sessionErrorDataSchema = z.object({
+  errorId: id,
+  kind: z
+    .string()
+    .min(1)
+    .max(SESSION_ERROR_KIND_MAX_LENGTH)
+    .regex(/^[a-z_]+$/),
+  status: z.number().int().min(100).max(599).optional(),
+  promptId: id.optional(),
+});
+export type SessionErrorData = z.infer<typeof sessionErrorDataSchema>;
+
 /**
  * `session.backfill` (D11, admin): re-read transcripts modified after `since`
  * from their start, for one project or for every session on the runner.
@@ -165,6 +208,8 @@ export const sessionEventDataSchemas = {
   [TURN_FINISHED_EVENT]: turnDataSchema,
   [LLM_REQUEST_EVENT]: llmRequestDataSchema,
   [TOOL_CALL_EVENT]: toolCallDataSchema,
+  [SESSION_COMPACTED_EVENT]: sessionCompactedDataSchema,
+  [SESSION_ERROR_EVENT]: sessionErrorDataSchema,
 } as const satisfies Record<SessionEventType, z.ZodType>;
 
 interface SessionEventBase {
@@ -188,6 +233,8 @@ export type SessionEvent = SessionEventBase &
     | { type: typeof TURN_FINISHED_EVENT; data: TurnData }
     | { type: typeof LLM_REQUEST_EVENT; data: LlmRequestData }
     | { type: typeof TOOL_CALL_EVENT; data: ToolCallData }
+    | { type: typeof SESSION_COMPACTED_EVENT; data: SessionCompactedData }
+    | { type: typeof SESSION_ERROR_EVENT; data: SessionErrorData }
   );
 
 export const isSessionEventType = (type: string): type is SessionEventType =>

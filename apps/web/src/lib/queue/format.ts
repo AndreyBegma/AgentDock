@@ -13,6 +13,7 @@ import {
 } from '@agentdock/shared';
 import { ApiError, describeError } from '../api';
 import { updateRunnerText } from '../control/format';
+import type { FilterCodec } from '../filters/url-filters';
 
 type Tone = 'ok' | 'warn' | 'danger' | 'neutral';
 
@@ -27,6 +28,15 @@ export const STATE_TONE: Record<QueueState, Tone> = {
 
 export const stateLabel = (state: QueueState): string =>
   QUEUE_STATE_LABELS[state];
+
+/** The filter chips, in sentence case ("BLOCKED — person" is the board's own spelling). */
+export const STATE_CHIP_LABEL: Record<QueueState, string> = {
+  in_flight: 'In flight',
+  ready: 'Ready',
+  blocked_work: 'Blocked by work',
+  blocked_person: 'Blocked by a person',
+  no_spec: 'No spec',
+};
 
 /** The board's five columns, in the order the orchestrator reads them. */
 export const BOARD_STATE_ORDER: readonly QueueState[] = [
@@ -132,6 +142,14 @@ export function queueEmptyDescription(
 export const HELD_FOR_LEAD_HINT =
   'Slots the orchestrator has planned but not dispatched. Each waits on another slot, usually a lead, and goes out when the condition in the last column is met.';
 
+/**
+ * Held slots are slots of the orchestrator's plan, not issues of the queue, so
+ * they never add up with the chips above; say so next to the count.
+ */
+export function heldForLeadSummary(count: number): string {
+  return `${count} ${count === 1 ? 'slot' : 'slots'} held. These are slots from the orchestrator’s plan, counted apart from the issues above — a held slot may belong to an issue that is already in the queue.`;
+}
+
 /** The footer under the list: whose verdict the dots show. */
 export const roundFooter = (round: { date: string; round: string }): string =>
   `A green dot marks the orchestrator’s verdict from round ${round.date} ${round.round}. Without one, AgentDock computes the state from the issues.`;
@@ -145,12 +163,47 @@ export function queueUnavailableCopy(
   const where = runnerName
     ? `The runner ${runnerName}`
     : 'The project’s runner';
+  const machine = runnerName ? `on ${runnerName}` : 'on the runner';
+  // The usual cause is the GitHub CLI on the runner's machine, and the fix is
+  // there, not on the Runners page (#213).
+  if (GH_REASON.test(unavailable.reason)) {
+    return {
+      title: 'The queue could not be refreshed',
+      body: `${where} could not read this project’s issues: ${unavailable.reason}. The list below is the last snapshot. Install the GitHub CLI ${machine} and sign it in with gh auth login, then press Refresh.`,
+      href: '/install#troubleshooting',
+      cta: `Set up gh ${machine}`,
+    };
+  }
   return {
     title: 'The queue could not be refreshed',
     body: `${where} could not read this project’s issues: ${unavailable.reason}. The list below is the last snapshot. Fix the cause on that machine, then press Refresh.`,
     ...(isAdmin ? { href: '/admin/runners', cta: 'Open Runners' } : {}),
   };
 }
+
+/** A reason that names the GitHub CLI ("gh is not available or timed out"). */
+const GH_REASON = /\bgh\b/i;
+
+/** The Queue's filters in the URL (#213): one state chip, and the view. */
+export interface QueueFilters {
+  state: StateFilter;
+  view: 'list' | 'board';
+}
+
+export const QUEUE_FILTER_CODEC: FilterCodec<QueueFilters> = {
+  keys: ['state', 'view'],
+  parse: (params) => ({
+    state: parseStateFilter(params.get('state') ?? ''),
+    view: params.get('view') === 'board' ? 'board' : 'list',
+  }),
+  search: ({ state, view }) => {
+    const params = new URLSearchParams();
+    if (state !== 'all') params.set('state', state);
+    if (view === 'board') params.set('view', view);
+    const text = params.toString();
+    return text ? `?${text}` : '';
+  },
+};
 
 /** Only `https:` links become anchors; the URL came from a GitHub payload. */
 export function safeHttpsUrl(url: string | null): string | null {

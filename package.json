@@ -10,6 +10,7 @@
     "start:dev": "turbo run start:dev",
     "lint": "turbo run lint",
     "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
     "db:up": "docker compose -f docker/docker-compose.yml up -d",
     "db:down": "docker compose -f docker/docker-compose.yml down",
     "db:migrate": "turbo run db:migrate --filter=@agentdock/api",

@@ -7,16 +7,19 @@ import type {
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
-import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { Field, Input } from '@andrewbehma/glass-ui/field';
+import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import Link from 'next/link';
 import { type FormEvent, useState } from 'react';
+import { PageHeader } from '../../../../components/page-header/page-header';
 import { AsyncSection } from '../../../../components/prerequisites/async-section';
 import { DisabledReason } from '../../../../components/prerequisites/disabled-reason';
 import { PrerequisiteBanner } from '../../../../components/prerequisites/prerequisite-banner';
 import { api, errorText } from '../../../../lib/api';
+import { Time } from '../../../../lib/format/time';
 import { ENCRYPTION_KEY_REMEDY } from '../../../../lib/prerequisites/copy';
 import { useErrorToast } from '../../../../lib/section/use-error-toast';
 import { useSection } from '../../../../lib/section/use-section';
@@ -91,13 +94,11 @@ export default function TelegramIntegrationPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-xl font-semibold">Telegram</h1>
-        <p className="max-w-prose text-sm text-ink-2">
-          One bot for this instance. Each person links their own chat under
-          Account › Notifications, then gets the notifications they chose there.
-        </p>
-      </div>
+      <PageHeader
+        className="mb-0"
+        title="Telegram"
+        description="One bot for this instance. Each person links their own chat under Account › Notifications, then gets the notifications they chose there."
+      />
 
       <AsyncSection
         section={section}
@@ -120,7 +121,7 @@ export default function TelegramIntegrationPage() {
             )}
 
             <Card pad="lg">
-              <h2 className="mb-4 text-lg font-bold">Status</h2>
+              <SectionHeader className="mb-4" title="Status" />
               <dl className="grid max-w-xl grid-cols-[10rem_1fr] gap-y-2 text-sm">
                 <dt className="text-ink-3">Bot</dt>
                 <dd>
@@ -137,9 +138,7 @@ export default function TelegramIntegrationPage() {
                 </dd>
                 <dt className="text-ink-3">Last poll</dt>
                 <dd>
-                  {state.lastPollAt
-                    ? new Date(state.lastPollAt).toLocaleString()
-                    : '—'}
+                  <Time value={state.lastPollAt} />
                 </dd>
                 <dt className="text-ink-3">Linked users</dt>
                 <dd>{state.linkedUsers}</dd>
@@ -154,7 +153,11 @@ export default function TelegramIntegrationPage() {
               {state.configured ? (
                 <div className="mt-4 flex flex-col gap-1">
                   <div className="flex gap-3">
-                    <Button disabled={busy} onClick={() => void test()}>
+                    <Button
+                      variant="glass"
+                      disabled={busy}
+                      onClick={() => void test()}
+                    >
                       Send test message
                     </Button>
                     <Button
@@ -169,7 +172,7 @@ export default function TelegramIntegrationPage() {
                     The test goes to your own chat.{' '}
                     <Link
                       href={TELEGRAM_LINK_PAGE}
-                      className="text-ink underline underline-offset-2"
+                      className="text-accent-ink underline underline-offset-2"
                     >
                       Link your Telegram
                     </Link>{' '}
@@ -180,11 +183,14 @@ export default function TelegramIntegrationPage() {
             </Card>
 
             <Card pad="lg">
-              <h2 className="mb-4 text-lg font-bold">
-                {state.configured
-                  ? 'Replace the bot token'
-                  : 'Set the bot token'}
-              </h2>
+              <SectionHeader
+                className="mb-4"
+                title={
+                  state.configured
+                    ? 'Replace the bot token'
+                    : 'Set the bot token'
+                }
+              />
               <form onSubmit={save} className="flex max-w-md flex-col gap-4">
                 <Field
                   label="Bot token"
@@ -237,35 +243,15 @@ export default function TelegramIntegrationPage() {
               </form>
             </Card>
 
-            <DialogRoot
+            <ConfirmDialog
               open={confirmRemove}
-              onOpenChange={(open) => !open && !busy && setConfirmRemove(false)}
-            >
-              <DialogContent
-                title="Remove the Telegram bot?"
-                description={removeBotConsequence(state)}
-                footer={
-                  <>
-                    <Button
-                      variant="glass"
-                      disabled={busy}
-                      onClick={() => setConfirmRemove(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      variant="danger"
-                      disabled={busy}
-                      onClick={() => void clear()}
-                    >
-                      Remove bot
-                    </Button>
-                  </>
-                }
-              >
-                {null}
-              </DialogContent>
-            </DialogRoot>
+              onOpenChange={setConfirmRemove}
+              title="Remove the Telegram bot?"
+              consequence={removeBotConsequence(state)}
+              verb="Remove bot"
+              busy={busy}
+              onConfirm={() => void clear()}
+            />
           </>
         )}
       </AsyncSection>

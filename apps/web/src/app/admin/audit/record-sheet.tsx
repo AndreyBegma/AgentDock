@@ -2,6 +2,7 @@
 
 import type { AuditRecordView } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Button } from '@andrewbehma/glass-ui/button';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import type { ReactNode } from 'react';
 import { actionLabel, RESULT_LABEL } from '../../../lib/audit/actions';
@@ -10,8 +11,8 @@ import {
   formatTime,
   prettyJson,
   RESULT_TONE,
-  targetLabel,
 } from '../../../lib/audit/format';
+import { type NameIndex, targetDisplay } from '../../../lib/audit/targets';
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -34,9 +35,11 @@ function Json({ label, value }: { label: string; value: unknown }) {
 
 export function RecordSheet({
   record,
+  names,
   onClose,
 }: {
   record: AuditRecordView | undefined;
+  names: NameIndex;
   onClose: () => void;
 }) {
   return (
@@ -49,6 +52,11 @@ export function RecordSheet({
       {record ? (
         <SheetContent
           side="right"
+          footer={
+            <Button variant="glass" onClick={onClose}>
+              Close
+            </Button>
+          }
           title={actionLabel(record.action)}
           description={`${record.action} · record #${record.seq} · ${formatTime(record.ts)}`}
         >
@@ -60,14 +68,21 @@ export function RecordSheet({
               />
             </Row>
             <Row label="Actor">
-              {actorLabel(record)}
+              {actorLabel(record, names)}
               {(record.actorUserId ?? record.actorOnBehalfOfId) ? (
                 <span className="block font-mono text-xs text-ink-3">
                   {record.actorUserId ?? record.actorOnBehalfOfId}
                 </span>
               ) : null}
             </Row>
-            <Row label="Target">{targetLabel(record)}</Row>
+            <Row label="Target">
+              {targetDisplay(record, names).text}
+              {record.targetId ? (
+                <span className="block font-mono text-xs text-ink-3">
+                  {record.targetId}
+                </span>
+              ) : null}
+            </Row>
             <Row label="Project">{record.projectId ?? '—'}</Row>
             <Json label="Before" value={record.before} />
             <Json label="After" value={record.after} />

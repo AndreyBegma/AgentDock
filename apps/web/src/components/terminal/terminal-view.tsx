@@ -12,7 +12,11 @@ import type {
 } from '@agentdock/shared/protocol';
 import '@xterm/xterm/css/xterm.css';
 import { useEffect, useRef } from 'react';
-import { api } from '../../lib/api';
+import { ApiUnreachableError, api } from '../../lib/api';
+import {
+  AttachSupervisor,
+  isTransientCloseCode,
+} from '../../lib/terminal/attach';
 import {
   CLOSE_REASON_LABEL,
   clampSize,
@@ -27,7 +31,12 @@ import {
 export type TerminalTarget =
   | { kind: 'slot'; slot: string }
   | { kind: 'orchestrator' }
-  | { kind: 'skill_run'; runId: string };
+  | { kind: 'skill_run'; runId: string }
+  | { kind: 'manual'; sessionId: string }
+  | { kind: 'card'; cardId: string };
+
+/** The ticket body the API accepts for a `manual` target (`sessionId`). */
+type TicketRequest = TerminalTicketRequest & { sessionId?: string };
 
 export interface TerminalStatus {
   phase: TerminalPhase;
@@ -61,6 +70,8 @@ export function TerminalView({
   report.current = onStatus;
   const slot = target.kind === 'slot' ? target.slot : undefined;
   const runId = target.kind === 'skill_run' ? target.runId : undefined;
+  const sessionId = target.kind === 'manual' ? target.sessionId : undefined;
+  const cardId = target.kind === 'card' ? target.cardId : undefined;
   const kind = target.kind;
 
   useEffect(() => {
@@ -121,87 +132,143 @@ export function TerminalView({
         term.dispose();
       };
 
-      status({ phase: 'requesting' });
-      const request: TerminalTicketRequest = {
+      const request: TicketRequest = {
         kind,
         projectId,
         mode,
         ...(slot ? { slot } : {}),
         ...(runId ? { runId } : {}),
-      };
-      let ticket: TerminalTicketResponse;
-      try {
-        ticket = await api<TerminalTicketResponse>('/terminal/tickets', {
-          method: 'POST',
-          body: request,
-        });
-      } catch (error) {
-        status({ phase: 'refused', message: describeTicketError(error) });
-        return;
-      }
-      if (disposed) return;
-
-      status({ phase: 'connecting' });
-      const ws = new WebSocket(terminalSocketUrl(ticket.ticket, size()));
-      ws.binaryType = 'arraybuffer';
-      socket = ws;
-
-      // The last word wins: a `closed` frame explains the close that follows.
-      let outcome: TerminalStatus | undefined;
-
-      ws.onmessage = (event) => {
-        if (typeof event.data !== 'string') {
-          term.write(new Uint8Array(event.data as ArrayBuffer));
-          return;
-        }
-        let frame: unknown;
-        try {
-          frame = JSON.parse(event.data);
-        } catch {
-          return;
-        }
-        const parsed = terminalServerFrameSchema.safeParse(frame);
-        if (!parsed.success) return;
-        const value = parsed.data;
-        if (value.type === 'attached') {
-          status({ phase: 'attached' });
-          if (mode === 'write') term.focus();
-        } else if (value.type === 'error') {
-          outcome = {
-            phase: 'refused',
-            message: describeRefusal(value.code, value.heldBy),
-          };
-        } else {
-          const reason: TerminalCloseReason = value.reason;
-          outcome = { phase: 'ended', message: CLOSE_REASON_LABEL[reason] };
-        }
-      };
-      ws.onclose = (event) => {
-        status(
-          outcome ?? {
-            phase: 'refused',
-            message: describeCloseCode(event.code),
-          },
-        );
+        ...(sessionId ? { sessionId } : {}),
+        ...(cardId ? { cardId } : {}),
       };
 
       if (mode === 'write') {
         term.onData((data) => {
-          if (ws.readyState !== WebSocket.OPEN) return;
-          for (const bytes of inputFrames(data)) ws.send(bytes);
+          if (socket?.readyState !== WebSocket.OPEN) return;
+          for (const bytes of inputFrames(data)) socket.send(bytes);
         });
         term.onBinary((data) => {
-          if (ws.readyState !== WebSocket.OPEN) return;
-          ws.send(Uint8Array.from(data, (c) => c.charCodeAt(0)));
+          if (socket?.readyState !== WebSocket.OPEN) return;
+          socket.send(Uint8Array.from(data, (c) => c.charCodeAt(0)));
         });
       }
+
+      // An attempt that is abandoned (timeout, retry) must not report late.
+      let generation = 0;
+
+      const attempt = async (n: number) => {
+        const mine = generation;
+        const stale = () => disposed || mine !== generation;
+        if (n === 1) status({ phase: 'requesting' });
+        let ticket: TerminalTicketResponse;
+        try {
+          ticket = await api<TerminalTicketResponse>('/terminal/tickets', {
+            method: 'POST',
+            body: request,
+          });
+        } catch (error) {
+          if (stale()) return;
+          if (error instanceof ApiUnreachableError) {
+            supervisor.attemptFailed();
+            return;
+          }
+          supervisor.dispose();
+          status({ phase: 'refused', message: describeTicketError(error) });
+          return;
+        }
+        if (stale()) return;
+
+        if (n === 1) status({ phase: 'connecting' });
+        const ws = new WebSocket(terminalSocketUrl(ticket.ticket, size()));
+        ws.binaryType = 'arraybuffer';
+        socket = ws;
+        let attached = false;
+
+        // The last word wins: a `closed` frame explains the close that follows.
+        let outcome: TerminalStatus | undefined;
+
+        ws.onmessage = (event) => {
+          if (stale()) return;
+          if (typeof event.data !== 'string') {
+            term.write(new Uint8Array(event.data as ArrayBuffer));
+            return;
+          }
+          let frame: unknown;
+          try {
+            frame = JSON.parse(event.data);
+          } catch {
+            return;
+          }
+          const parsed = terminalServerFrameSchema.safeParse(frame);
+          if (!parsed.success) return;
+          const value = parsed.data;
+          if (value.type === 'attached') {
+            attached = true;
+            supervisor.attached();
+            if (mode === 'write') term.focus();
+          } else if (value.type === 'error') {
+            outcome = {
+              phase: 'refused',
+              message: describeRefusal(value.code, value.heldBy),
+            };
+          } else {
+            const reason: TerminalCloseReason = value.reason;
+            outcome = { phase: 'ended', message: CLOSE_REASON_LABEL[reason] };
+          }
+        };
+        ws.onclose = (event) => {
+          if (stale()) return;
+          if (!attached && !outcome && isTransientCloseCode(event.code)) {
+            supervisor.attemptFailed();
+            return;
+          }
+          supervisor.dispose();
+          status(
+            outcome ?? {
+              phase: 'refused',
+              message: describeCloseCode(event.code),
+            },
+          );
+        };
+      };
+
+      const supervisor = new AttachSupervisor({
+        start: (n) => void attempt(n),
+        abort: () => {
+          generation += 1;
+          const old = socket;
+          socket = undefined;
+          if (old) {
+            old.onclose = null;
+            old.close();
+          }
+        },
+        onState: (state) => {
+          if (state.phase === 'attached') status({ phase: 'attached' });
+          else if (state.phase === 'reconnecting') {
+            status({
+              phase: 'reconnecting',
+              message: `Reconnecting… (attempt ${state.attempt})`,
+            });
+          } else if (state.phase === 'failed') {
+            status({ phase: 'failed', message: 'Could not connect' });
+          }
+        },
+      });
+      const stopAttach = cleanup;
+      cleanup = () => {
+        generation += 1;
+        supervisor.dispose();
+        stopAttach();
+      };
+      supervisor.begin();
     })();
 
     return () => {
       disposed = true;
       cleanup();
     };
-  }, [projectId, kind, slot, runId, mode]);
+  }, [projectId, kind, slot, runId, sessionId, cardId, mode]);
 
   return (
     <div

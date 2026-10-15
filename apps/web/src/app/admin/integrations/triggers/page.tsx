@@ -18,9 +18,10 @@ import {
 } from '@andrewbehma/glass-ui/table';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { useEffect, useState } from 'react';
+import { PageHeader } from '../../../../components/page-header/page-header';
 import { AsyncSection } from '../../../../components/prerequisites/async-section';
 import { api } from '../../../../lib/api';
-import { formatAgo } from '../../../../lib/fleet/format';
+import { Time } from '../../../../lib/format/time';
 import { useSection } from '../../../../lib/section/use-section';
 import { triggerUrl } from '../../../../lib/webhooks/events';
 import {
@@ -91,19 +92,20 @@ export default function AdminTriggersPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Triggers</h1>
-          <p className="max-w-prose text-sm text-ink-2">
+      <PageHeader
+        className="mb-0"
+        title="Triggers"
+        description={
+          <>
             Inbound webhooks. A signed{' '}
             <code className="font-mono">POST /hooks/&lt;id&gt;</code> starts a
             skill run or the next orchestrator round on one project. Payload
             values only fill the placeholders you allow, and never reach a
             shell.
-          </p>
-        </div>
-        <Button onClick={() => setEditing('new')}>New trigger</Button>
-      </div>
+          </>
+        }
+        actions={<Button onClick={() => setEditing('new')}>New trigger</Button>}
+      />
 
       <AsyncSection
         section={triggers}
@@ -116,10 +118,7 @@ export default function AdminTriggersPage() {
         empty={
           <EmptyState
             title="URLs that start work from outside"
-            description="Create a trigger to let CI, a deploy hook or another system start a skill run or the next orchestrator round on a project."
-            action={
-              <Button onClick={() => setEditing('new')}>New trigger</Button>
-            }
+            description="Create a trigger to let CI, a deploy hook or another system start a skill run or the next orchestrator round on a project. New trigger is at the top of the page."
           />
         }
       >
@@ -174,7 +173,7 @@ export default function AdminTriggersPage() {
                           }
                         />
                         <span className="text-xs text-ink-3">
-                          {formatAgo(trigger.lastDelivery.receivedAt)}
+                          <Time value={trigger.lastDelivery.receivedAt} />
                         </span>
                       </div>
                     ) : (

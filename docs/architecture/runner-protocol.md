@@ -70,6 +70,8 @@ both sit at the root of that origin.
 | S ↔ R | `terminal.data` | `{ id, b64 }` — PTY bytes of an attach, ≤ 64 KiB decoded; S → R only on a `write` attach |
 | S → R | `terminal.resize` | `{ id, cols, rows }` |
 | S ↔ R | `terminal.close` | `{ id, reason: "client" \| "idle" \| "max_duration" \| "session_ended" \| "socket" }` |
+| R → S | `local.request` | `{ id, method, args, projectId?, session?, via }` — a runner-initiated request from the `agentdock` plugin, see below |
+| S → R | `local.response` | `{ id, ok, data?, error? }` |
 
 ### Sequence numbers
 
@@ -109,7 +111,20 @@ still connects.
     ],
     "codeSentinel": { "version": "1.23.0", "path": "~/.claude-profiles/blacktoorroot/plugins/code-sentinel" },
     "otlp": { "grpc": 4317, "http": 4318 },
-    "terminal": true
+    "terminal": true,
+    "commands": [
+      "collector.poll", "issue.create", "issues.refresh",
+      "orchestrator.message", "orchestrator.start", "orchestrator.status", "orchestrator.stop",
+      "plan.cancel", "plan.close", "plan.turn",
+      "pr.approve", "pr.inspect", "pr.requestChanges", "pr.voidApproval",
+      "project.inspect", "project.refresh",
+      "runner.describe", "runner.ping", "session.backfill",
+      "skill.cancel", "skill.inspect", "skill.install", "skill.list",
+      "skill.run", "skill.search", "skill.uninstall",
+      "slot.message", "slot.stop", "terminal.attach",
+      "uiprofile.build", "uiprofile.fingerprint", "worktree.status"
+    ],
+    "disabledCommands": ["pr.approve"]
   }
 }
 ```
@@ -117,7 +132,19 @@ still connects.
 `terminal` says whether the runner serves `terminal.attach`: it has Bun's PTY
 API (Bun ≥ 1.3.5, POSIX), tmux ≥ 3.2, and the command is not in
 `disabledCommands`. An absent `terminal` means `false`, because a runner older
-than the feature never sends it; read it with `terminalAvailable()`.
+than the feature never sends it; read it with `terminalAvailable()`. It stays
+the machine fact even with `commands` below: `terminal.attach` can be served by
+the build and still have no PTY or tmux to run on.
+
+`commands` lists every command the runner build serves — its handler keys,
+sorted — and `disabledCommands` the subset its config switches off (#233,
+ADR-0023). Both are plain strings, not an enum of the allowlist: a runner newer
+than the API serves names the API does not know, and an enum would fail its
+whole hello. **An absent `commands` means unknown, never none** — a runner
+older than the field. An absent `disabledCommands` means none. Read them with
+`runnerCommandsOf()` and decide per command with `commandSupport()` /
+`commandsSupport()`: a feature checks the commands it needs, never the runner
+version. `protocolVersion` stays `1`; the fields are additive and optional.
 
 A profile is runtime + optional `binary` (the runtime's own name when absent) +
 `env` + `args` + `authenticated` (ADR-0006).
@@ -164,6 +191,14 @@ applied exactly like it; it does not touch the ack cursor. A reconnect's
   }
 }
 ```
+
+Two optional fields belong to the Claude Code integration
+([spec 201](../specs/201-claude-code-integration.md)):
+- `projects[].shipContent` — the project ships hook content (ADR-0021).
+  Absent means false, and the runner strips every content field before the
+  spool.
+- `config.awayMode` — the runner's `PermissionRequest` hook routes permission
+  prompts to action requests (D17). Absent means off.
 
 ### `heartbeat`
 
@@ -271,10 +306,35 @@ does not fit is stored but projects nothing; it never fails the batch.
       "source": "runner",
       "project": { "repo": "AndreyBegma/AgentDock", "root": "/home/archi/dev/AgentDock" },
       "data": { "target": "orchestrator", "polls": 3 }
+    },
+    {
+      "v": 1,
+      "seq": 18243,
+      "ts": "2026-10-08T14:32:00.000Z",
+      "type": "slot.message_seen",
+      "source": "scraped",
+      "project": { "repo": "AndreyBegma/AgentDock", "root": "/home/archi/dev/AgentDock" },
+      "slot": "i11-api",
+      "issue": 11,
+      "data": {
+        "body": "## From the orchestrator (agentdock-fd): plan approved\n\nGo ahead.",
+        "sender": "the orchestrator (agentdock-fd)",
+        "mode": "appended",
+        "fileHash": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+      }
     }
   ]
 }
 ```
+
+`slot.message_seen` (#160, [spec 160](../specs/160-agent-workspace.md)) is the
+orchestrator's side of a slot's conversation: each change of the worktree's
+`.orchestrator-msg.md` is one event. A file that grew by appending yields the
+appended suffix (`mode: appended`), any other change the whole file
+(`replaced`); `body` is at most 16 KB. `fileHash` is the sha256 of the whole
+file after the change: the runner keeps what it read in memory only, so after
+a restart it sends the unchanged file once more and the API keeps the first
+entry per `fileHash` in a slot's run.
 
 ### Session events
 
@@ -289,6 +349,8 @@ token counts only: no prompt, response, thinking or tool-argument text (D9).
 | `turn.started` / `turn.finished` | `promptId` | per user prompt; the envelope `ts` is the moment |
 | `llm.request` | `requestId, model, tokens: { input, output, cacheRead, cacheWrite5m, cacheWrite1h, reasoning }, querySource, promptId?, durationMs?, durationApprox?, ttftMs?, stopReason?, agentName?` | once per `requestId`; re-sent with newer usage, the last wins (D4) |
 | `tool.call` | `toolUseId, tool, startedAt, promptId?, endedAt?, ok?, durationMs?, decision?, childSessionId?` | at the `tool_use`, and again with `endedAt`/`ok` at its result |
+| `session.compacted` | `compactionId, trigger: auto\|manual, preTokens?` | once per compaction of the conversation (Claude `compact_boundary`); `compactionId` is the line's id (#161) |
+| `session.error` | `errorId, kind, status?, promptId?` | once per request the runtime gave up on (Claude `isApiErrorMessage`); `kind` is the error code, `[a-z_]` only, never a message (#161) |
 
 - `projectId` and `slot` are the adapter's correlation (D6). `projectId` comes
   from the watch list; the API stores it only when that project belongs to the
@@ -365,6 +427,33 @@ token counts only: no prompt, response, thinking or tool-argument text (D9).
         "ok": true,
         "durationMs": 5300,
         "childSessionId": "agent-a3f9c2"
+      }
+    },
+    {
+      "v": 1,
+      "seq": 18244,
+      "ts": "2026-10-07T19:12:30.000Z",
+      "type": "session.compacted",
+      "source": "transcript",
+      "session": { "runtime": "claude", "id": "0f6c1e2a-5d1b-4c4e-9a51-7f1d2b8e9c30" },
+      "data": {
+        "compactionId": "edafb60c-3517-4cfd-980d-def95e7646eb",
+        "trigger": "auto",
+        "preTokens": 167000
+      }
+    },
+    {
+      "v": 1,
+      "seq": 18245,
+      "ts": "2026-10-07T19:20:02.000Z",
+      "type": "session.error",
+      "source": "transcript",
+      "session": { "runtime": "claude", "id": "0f6c1e2a-5d1b-4c4e-9a51-7f1d2b8e9c30" },
+      "data": {
+        "errorId": "1ca4b4bf-990b-43e8-8fa6-d599a983ba5a",
+        "kind": "rate_limit",
+        "status": 429,
+        "promptId": "6c0d9a1e-0b47-4f0e-8f6e-2a7d4c1b9e55"
       }
     }
   ]
@@ -607,6 +696,70 @@ therefore capped by the runner.
 { "type": "terminal.close", "id": "term_4c1d", "reason": "idle" }
 ```
 
+### `local.request`, `local.response`
+
+The runner asks, and the server answers
+([ADR-0020](../adr/0020-claude-code-integration-through-the-runner.md),
+[spec 201](../specs/201-claude-code-integration.md) D6–D8). This is the only
+runner-initiated request in the protocol. The `agentdock` Claude Code plugin's
+hook and MCP processes reach the daemon over its local unix socket, and the
+daemon relays their request. Schemas are in `local.ts`.
+
+- **The allowlist.** `method` must be a key of `localMethods`, and `args` must
+  match that method's schema. Otherwise the answer is `unknown_method` or
+  `invalid_args`, audited as `local.request` with result `denied`.
+- **Authority.** The server acts as the runner's **local user** with
+  `min(role on the project, operator)`. With no local user, a non-member, or a
+  role below the method's `minRole`, the answer is `forbidden`.
+- **The project.** The project is never an argument. `projectId` is the daemon's
+  correlation of the session's cwd. The server checks that this runner watches
+  the project. A project method without one is `no_project`.
+- **Not spooled.** When the WSS is down, the daemon answers `runner_offline`
+  itself. A write is never delayed and replayed later. Both sides give up after
+  `LOCAL_REQUEST_TIMEOUT_MS` (15 s).
+
+| Method | Min role | Args | Result |
+|---|---|---|---|
+| `context.sessionStart` | viewer | `gitBranch?` | `{ text }` ≤ 2 000 chars, printed by the `SessionStart` hook |
+| `fleet.status` | viewer | — | orchestrator state and slots |
+| `queue.list` | viewer | `limit` ≤ 50 | open issues with ready / in-flight flags |
+| `budget.remaining` | viewer | — | enabled budgets with `limitUsd`, `spentUsd`, `remainingUsd` |
+| `approvals.list` | viewer | — | PRs awaiting approval and pending action requests |
+| `activity.recent` | viewer | `limit` ≤ 50 | recent activity items |
+| `sessions.recent` | viewer | `limit` ≤ 50 | recent sessions with origin and live state |
+| `action.status` | viewer | `id` | the action request |
+| `issue.create` | operator | `title, body, labels?, queue` | `{ number, url, queued }` |
+| `activity.note` | operator | `text` ≤ 2 000 | records the server event `manual.note` |
+| `handoff.create` | operator | `title, body, branch` | an issue queued for the fleet, plus `manual.handoff` |
+| `action.request` | operator | `kind, args, summary` | a pending action request (spec 201 D18) |
+| `away.set` | operator | `on` | the runner's away mode; needs no project |
+| `card.finish` | operator | `summary` (≤ 4 000) | `{ number, finished: true }`; the card is the one whose session uuid is the request's `session.id`, else `not_a_card_session` (issue #242 D6) |
+
+```json
+{
+  "type": "local.request",
+  "id": "lr_7f3a",
+  "method": "issue.create",
+  "args": { "title": "Flaky pairing test on macOS", "body": "Seen twice today.", "queue": true },
+  "projectId": "prj_agentdock",
+  "session": { "runtime": "claude", "id": "0c9e2f4a-5b1d-4e8a-9c3f-2a7b6d1e8f90" },
+  "via": "mcp"
+}
+```
+
+```json
+{
+  "type": "local.response",
+  "id": "lr_7f3a",
+  "ok": true,
+  "data": { "number": 214, "url": "https://github.com/AndreyBegma/AgentDock/issues/214", "queued": true }
+}
+```
+
+```json
+{ "type": "local.response", "id": "lr_7f40", "ok": false, "error": { "code": "forbidden", "message": "viewer on prj_agentdock" } }
+```
+
 ## Commands (allowlist)
 
 Only commands with status *implemented* exist in the `commands` object of the
@@ -622,6 +775,7 @@ handler.
 | `orchestrator.start` | `projectId, root, profileId, model, permissionMode, mode: start\|next` | operator | implemented (`commands/control.ts`): → `{ session, startedAt }`, timeout 30 s |
 | `orchestrator.stop` | `projectId, root` | operator | implemented: → `{ stopped }`, timeout 10 s |
 | `orchestrator.status` | `projectId, root` | viewer | implemented: → `{ present, state, session?, startedAt? }`, timeout 5 s |
+| `orchestrator.message` | `projectId, root, body, from` | operator | implemented (#189): → `{ delivered, reason?: absent\|prompt }`, timeout 10 s |
 | `slot.stop` | `projectId, root, slot` | operator | implemented: → `{ stopped }`, timeout 10 s |
 | `slot.message` | `projectId, root, slot, text, from` | operator | implemented: → `{ written: true, delivered }`, timeout 10 s |
 | `pr.inspect` | `projectId, root, pr` | viewer | defined (`commands/approvals.ts`): → `PrInspection` (head SHA, diff stats, ≤ 300 files, checks, mergeable), timeout 30 s |
@@ -638,7 +792,8 @@ handler.
 | `skill.run` | `runId, projectId, root, base, skill, args, profileKey, model, permissionMode, output: report\|pr, timeoutSec` | operator | defined, not in the map yet: → `{ phase: queued\|preparing, tmuxSession? }`, timeout 30 s |
 | `skill.cancel` | `runId, projectId` | operator | defined, not in the map yet: → `{ cancelled }`, timeout 15 s |
 | `session.backfill` | `projectId?, since` | admin | implemented: → `{ files, events }`, timeout 600 s |
-| `terminal.attach` | `id, target: { kind: slot\|orchestrator\|skill_run, projectId, root, slot?\|runId? }, mode: read\|write, cols, rows` | admin | implemented: → `{ attached: true, session }`, timeout 10 s; `skill_run` answers `unsupported` until #24's runner lands |
+| `terminal.attach` | `id, target: { kind: slot\|orchestrator\|skill_run\|manual\|card, projectId, root, slot?\|runId?\|sessionId?\|cardId? }, mode: read\|write, cols, rows` | admin | implemented: → `{ attached: true, session }`, timeout 10 s; `skill_run` answers `unsupported` until #24's runner lands |
+| `worktree.status` | `projectId, root, slot, base?` | viewer | implemented (`commands/worktree.ts`): → `{ slot, branch, head, base, ahead, behind, changed, untracked, files (≤ 200), filesTruncated, commits (≤ 5) }`, timeout 10 s |
 
 Arguments are validated by schema on both sides (`parseCommand`). Commands
 without arguments take `{}` and reject any field. Paths are resolved and must
@@ -719,6 +874,17 @@ spreads them in; the runner handlers live in `apps/runner/src/control/`.
   worktree's `.orchestrator-msg.md`, never typed into the pane; `from` is the
   requesting user's email. The file is always written; `delivered` is true
   only when the worker's session was live and the prompt was typed into it.
+- `orchestrator.message` (#189) is `slot.message`'s twin for the orchestrator:
+  the same 16 KB cap on `body`, the same `From:` header, operator role. Its args
+  never name a session or argv — the runner resolves the orchestrator's session
+  from the project, and the strict schema refuses any other field. The body is
+  never typed into the pane: it is written atomically to a file of its own,
+  `<git-common-dir>/cs-orchestrator/agentdock/msg-<time>-<rand>.md` (inside
+  `.git`, never committed, one file per message), then a fixed `Read <file>: …`
+  prompt is typed with `-l` and submitted with `C-m` in a separate call. With
+  no session (`reason: absent`), or with a dialog on its pane (`reason:
+  prompt`, where the submit would answer the dialog), nothing is written or
+  typed and `delivered` is false.
 - Every tmux target the runner sends is exact (`-t =<session>`): a bare name
   falls back to a prefix match, so `cs-i4` would hit `cs-i42`.
 - `orchestrator.status.state` is `running | idle | prompt | quota`, or
@@ -888,6 +1054,51 @@ How the runner serves them:
   then tails `stream.jsonl` every 500 ms. Lines are redacted like pane
   frames, and so is `reportText`.
 
+### Board cards
+
+Schemas in `commands/cards.ts` (`cardCommands`) and `events/cards.ts`; the
+rules are issue [#242](https://github.com/AndreyBegma/AgentDock/issues/242)
+and [ADR-0024](../adr/0024-board-cards-and-dedicated-card-workers.md).
+`cardCommands` is defined but enters the `commands` map only together with
+its runner handlers (`apps/runner/src/cards/`).
+
+A card's worker is an interactive Claude Code session in its own worktree
+`<parent>/.wt-<repo>-card-<shortId>` and tmux session
+`agentdock-card-<shortId>` (`cardSessionName`), outside the orchestrator.
+Every command needs an operator.
+
+| Command | Args | Result |
+|---|---|---|
+| `card.run` | `cardId, runId, projectId, root, base, shortId (^[a-z0-9]{8}$), branch, session { id (uuid), resume }, prompt (≤ 64 KiB, no NUL), files? ([{ path, content }] ≤ 4, repository-relative, each ≤ 192 KiB), profileKey, model, permissionMode` | `{ phase: starting\|running, tmuxSession }`, timeout 60 s |
+| `card.stop` | `cardId, projectId` | `{ stopped }`, timeout 15 s |
+| `card.collect` | `cardId, projectId, root, base, branch, number, title (one line), body (≤ 16 KiB)` | `{ ahead, pushed, prNumber?, prUrl? }`, timeout 180 s |
+| `card.close` | `cardId, projectId, removeWorktree` | `{ stopped, worktreeRemoved, branchDeleted }`, timeout 30 s |
+
+- **Run.** Round 1 (`session.resume: false`) creates the worktree from
+  `origin/<base>` on `branch`, or checks out `origin/<branch>` when it exists,
+  commits `files` as the branch's first commit, writes `launch.json` with
+  `interactive: true` and starts tmux running `agentdock-runner exec-run`.
+  `exec-run` launches `claude --session-id <id>` (later rounds
+  `claude --resume <id>`) with `--model` and `--permission-mode`; the prompt is
+  one argv element, never a shell string. An interactive `exec-run` inherits
+  stdio (the tmux pane is the terminal) and still writes `exit.json`.
+- **Collect.** Commits leftovers as `chore: card C-<number> work in progress`,
+  pushes, and opens a PR into `base` when none is open for `branch` (else
+  pushes only). `ahead: 0` is "No changes".
+- **Close.** Kills tmux; with `removeWorktree`, removes the worktree and
+  deletes the local branch only when it is pushed. Never merges.
+- A card of another project is `not_found`.
+
+A round outlives `card.run`. Its progress is one event type (`source: "runner"`):
+
+| Type | `data` | Sent |
+|---|---|---|
+| `card_run.phase_changed` | `cardId, runId, projectId, phase: starting\|running\|ended\|failed, at, tmuxSession?, worktree?, exitCode?, error?` | on every transition; `ended` when the tmux session is gone (polled every 10 s) |
+
+What Claude does inside the session arrives as `hook.*` events whose
+`session.id` is the card's session uuid; the worker's `finish_card` MCP tool
+is the `card.finish` local method.
+
 ### Terminal
 
 Schemas in `commands/terminal.ts`; the rules are [spec 29](../specs/29-terminal-attach.md)
@@ -905,6 +1116,9 @@ D1–D7 and D10. It is exported as `terminalCommands` and spread into the
   - `skill_run { projectId, root, runId }` → `agentdock-run-<shortid>` of a
     live run of that project. Until #24's runner lands this answers
     `unsupported`.
+  - `card { projectId, root, cardId }` → `agentdock-card-<shortid>` of that
+    project's board card (issue #242). Until the card executor lands this
+    answers `unsupported`.
 - A target that does not resolve, or resolves into another project, is
   `not_found`. When both `cs-<slot>` and `cs-<prefix>--<slot>` are live, the
   runner attaches to the one that sorts first.
@@ -950,6 +1164,71 @@ D1–D7 and D10. It is exported as `terminalCommands` and spread into the
   "id": "cmd_31",
   "ok": true,
   "output": { "attached": true, "session": "cs-i42" }
+}
+```
+
+### Worktree
+
+Schemas in `commands/worktree.ts` (`worktreeCommands`); the rules are
+[spec 160](../specs/160-agent-workspace.md). The runner serves it from
+`apps/runner/src/commands/worktree/`.
+
+- `worktree.status { projectId, root, slot, base? }` is a read for any member
+  (`viewer`). `projectId` and `root` must be an entry of the watch list; the
+  worktree is the `.wt-<repo>-<slot>` one git lists for that root, else
+  `path_not_allowed`. No argument names a path, a ref range or a git flag.
+- `base` is a ref name (`gitRefSchema`). The runner tries `origin/<base>`,
+  then `<base>`, then the project's default branch, each with
+  `rev-parse --verify`; `base` in the result is the one that resolved, or null.
+- `files` are the paths that differ from the merge base with the base —
+  committed, staged and unstaged, with `--numstat` line counts (null for a
+  binary file) — then the untracked ones; at most 200, the rest counted in
+  `filesTruncated`. `commits` are the last 5 of HEAD. `changed` and
+  `untracked` count the working tree's uncommitted paths.
+- Every git call is a fixed argv (`worktree list`, `status --porcelain=v2`,
+  `rev-parse`, `rev-list`, `merge-base`, `diff`, `log`); nothing is written.
+
+```json
+{
+  "type": "command",
+  "id": "cmd_44",
+  "name": "worktree.status",
+  "args": {
+    "projectId": "prj_agentdock",
+    "root": "/home/dev/agentdock",
+    "slot": "i42",
+    "base": "develop"
+  }
+}
+```
+
+```json
+{
+  "type": "command.result",
+  "id": "cmd_44",
+  "ok": true,
+  "output": {
+    "slot": "i42",
+    "branch": "feat/42-api",
+    "head": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+    "base": "origin/develop",
+    "ahead": 3,
+    "behind": 0,
+    "changed": 1,
+    "untracked": 0,
+    "files": [
+      { "path": "apps/api/src/fleet/graph.ts", "status": "added", "additions": 120, "deletions": 0 }
+    ],
+    "filesTruncated": 0,
+    "commits": [
+      {
+        "sha": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+        "subject": "feat(api): fleet graph",
+        "author": "Archi",
+        "at": "2026-10-14T09:12:00+02:00"
+      }
+    ]
+  }
 }
 ```
 

@@ -20,8 +20,26 @@ const quote = (arg: string): string => {
     : `"${escaped.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 };
 
-/** The systemd user unit for `agentdock-runner run` (D11). */
-export const serviceUnit = (execStart: readonly string[]): string =>
+/**
+ * One `Environment=` line with the whole assignment quoted: `\`, `"` and `%`
+ * (a specifier) are escaped, so a PATH with spaces or odd characters survives.
+ */
+const environment = (name: string, value: string): string =>
+  `Environment="${`${name}=${value}`
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/%/g, '%%')
+    .replace(/\n/g, '\\n')}"`;
+
+/**
+ * The systemd user unit for `agentdock-runner run` (D11). `path` is the PATH
+ * the service runs with: a systemd user manager starts it with a minimal one,
+ * so runtimes in `~/.local/bin` would not be found (ADR-0017 §6).
+ */
+export const serviceUnit = (
+  execStart: readonly string[],
+  path?: string,
+): string =>
   [
     '[Unit]',
     'Description=AgentDock runner',
@@ -30,6 +48,7 @@ export const serviceUnit = (execStart: readonly string[]): string =>
     '',
     '[Service]',
     'Type=simple',
+    ...(path ? [environment('PATH', path)] : []),
     `ExecStart=${execStart.map(quote).join(' ')}`,
     'Restart=on-failure',
     'RestartSec=5',

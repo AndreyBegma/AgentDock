@@ -1,31 +1,37 @@
 'use client';
 
-import type { AdminRunner, PairingCodeResponse } from '@agentdock/shared';
+import type {
+  AdminRunner,
+  AdminRunnerDetail,
+  PairingCodeResponse,
+} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
+import { type Column, DataTable } from '@andrewbehma/glass-ui/data-table';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Field, Input } from '@andrewbehma/glass-ui/field';
-import {
-  Table,
-  TableCell,
-  TableHead,
-  TableRow,
-} from '@andrewbehma/glass-ui/table';
-import { toast } from '@andrewbehma/glass-ui/toast';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { type FormEvent, useEffect, useState } from 'react';
+import { PageHeader } from '../../../components/page-header/page-header';
 import { AsyncSection } from '../../../components/prerequisites/async-section';
+import { ScrollX } from '../../../components/scroll-x/scroll-x';
 import { api } from '../../../lib/api';
+import { pluralize } from '../../../lib/format';
+import { Time } from '../../../lib/format/time';
 import {
+  capabilitySummary,
   describeRunnerError,
-  formatLastSeen,
+  formatLoad,
+  LOAD_LABEL,
+  profilesSummary,
   runnerRemedy,
   STATUS_TONE,
   statusLabel,
 } from '../../../lib/runners/format';
 import { ADD_RUNNER_PARAM, INSTALL_PATH } from '../../../lib/runners/install';
+import { useErrorToast } from '../../../lib/section/use-error-toast';
 import { useSection } from '../../../lib/section/use-section';
 import { PairingDialog } from './pairing-dialog';
 import { RunnerSheet } from './runner-sheet';
@@ -44,6 +50,7 @@ function AddRunnerDialog({
 }) {
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
+  const showError = useErrorToast();
 
   useEffect(() => {
     if (open) setName('');
@@ -62,7 +69,7 @@ function AddRunnerDialog({
         }),
       );
     } catch (err) {
-      toast.error(describeRunnerError(err));
+      showError(describeRunnerError(err));
     } finally {
       setBusy(false);
     }
@@ -132,55 +139,128 @@ function StatusCell({ runner }: { runner: AdminRunner }) {
   );
 }
 
+const DETAIL_LIMIT = 20;
+
+/** Profiles, capabilities and load live on the detail; the list has a count. */
+function useRunnerDetails(runners: AdminRunner[] | undefined) {
+  const [details, setDetails] = useState<Record<string, AdminRunnerDetail>>({});
+  const ids = (runners ?? [])
+    .filter((runner) => runner.status !== 'revoked')
+    .slice(0, DETAIL_LIMIT)
+    .map((runner) => runner.id)
+    .join(',');
+  // Each poll that changed something also refreshes what is shown inline.
+  const stamp = (runners ?? []).map((runner) => runner.lastSeenAt).join(',');
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `stamp` re-fetches after a poll that changed something
+  useEffect(() => {
+    if (!ids) return;
+    let current = true;
+    for (const id of ids.split(',')) {
+      api<AdminRunnerDetail>(`/admin/runners/${id}`)
+        .then((detail) => {
+          if (current) setDetails((all) => ({ ...all, [id]: detail }));
+        })
+        .catch(() => undefined);
+    }
+    return () => {
+      current = false;
+    };
+  }, [ids, stamp]);
+
+  return details;
+}
+
 function RunnerRows({
   runners,
+  details,
   onDetails,
 }: {
   runners: AdminRunner[];
+  details: Record<string, AdminRunnerDetail>;
   onDetails: (id: string) => void;
 }) {
+  const columns: Column<AdminRunner>[] = [
+    {
+      id: 'name',
+      header: 'Name',
+      cell: (runner) => (
+        <div className="flex min-w-0 flex-col">
+          <span className="truncate font-medium">{runner.name}</span>
+          <span className="truncate text-xs text-ink-3">
+            {[runner.hostname, runner.version && `v${runner.version}`]
+              .filter(Boolean)
+              .join(' · ') || '—'}
+          </span>
+        </div>
+      ),
+    },
+    {
+      id: 'status',
+      header: 'Status',
+      cell: (runner) => <StatusCell runner={runner} />,
+    },
+    {
+      id: 'profiles',
+      header: 'Profiles',
+      cell: (runner) => {
+        const detail = details[runner.id];
+        const summary = detail ? profilesSummary(detail.profiles) : '';
+        return (
+          <div className="flex min-w-0 flex-col">
+            <span className="truncate">
+              {summary || (runner.profilesCount === 0 ? '—' : '…')}
+            </span>
+            <span className="text-xs text-ink-3">
+              {pluralize(runner.profilesCount, 'profile')}
+            </span>
+          </div>
+        );
+      },
+    },
+    {
+      id: 'capabilities',
+      header: 'Capabilities',
+      cell: (runner) => {
+        const capabilities = details[runner.id]?.capabilities;
+        return (
+          <span className="truncate">
+            {capabilities ? capabilitySummary(capabilities) || '—' : '—'}
+          </span>
+        );
+      },
+    },
+    {
+      id: 'load',
+      header: <span title={LOAD_LABEL}>Load</span>,
+      align: 'end',
+      cell: (runner) => {
+        const heartbeat = details[runner.id]?.heartbeat;
+        return heartbeat ? (
+          <span className="num" title={LOAD_LABEL}>
+            {formatLoad(heartbeat.load)}
+          </span>
+        ) : (
+          '—'
+        );
+      },
+    },
+    {
+      id: 'lastSeen',
+      header: 'Last seen',
+      cell: (runner) => <Time value={runner.lastSeenAt} fallback="never" />,
+    },
+  ];
+
   return (
-    <Table scroll>
-      <TableHead>
-        <TableRow>
-          <TableCell head>Name</TableCell>
-          <TableCell head>Status</TableCell>
-          <TableCell head>Hostname</TableCell>
-          <TableCell head>Version</TableCell>
-          <TableCell head>Profiles</TableCell>
-          <TableCell head>Last seen</TableCell>
-          <TableCell head>
-            <span className="sr-only">Actions</span>
-          </TableCell>
-        </TableRow>
-      </TableHead>
-      <tbody>
-        {runners.map((runner) => (
-          <TableRow key={runner.id}>
-            <TableCell>{runner.name}</TableCell>
-            <TableCell>
-              <StatusCell runner={runner} />
-            </TableCell>
-            <TableCell>{runner.hostname ?? '—'}</TableCell>
-            <TableCell>{runner.version ?? '—'}</TableCell>
-            <TableCell>{runner.profilesCount}</TableCell>
-            <TableCell>{formatLastSeen(runner.lastSeenAt)}</TableCell>
-            <TableCell>
-              <div className="flex justify-end">
-                <Button
-                  variant="glass"
-                  size="sm"
-                  aria-label={`Details for ${runner.name}`}
-                  onClick={() => onDetails(runner.id)}
-                >
-                  Details
-                </Button>
-              </div>
-            </TableCell>
-          </TableRow>
-        ))}
-      </tbody>
-    </Table>
+    <DataTable
+      rows={runners}
+      columns={columns}
+      getRowId={(runner) => runner.id}
+      onRowActivate={(runner) => onDetails(runner.id)}
+      stickyHeader={false}
+      rowHeight={64}
+    />
   );
 }
 
@@ -189,9 +269,11 @@ function RunnersTable() {
   const [adding, setAdding] = useState(false);
   const [pairing, setPairing] = useState<PairingCodeResponse | null>(null);
   const [selected, setSelected] = useState<string>();
+  const showError = useErrorToast();
   const router = useRouter();
   const pathname = usePathname();
 
+  const details = useRunnerDetails(section.data);
   const load = section.retry;
   useEffect(() => {
     const timer = setInterval(load, POLL_MS);
@@ -228,23 +310,21 @@ function RunnersTable() {
         ),
       );
     } catch (err) {
-      toast.error(describeRunnerError(err));
+      showError(describeRunnerError(err));
     }
   };
 
   return (
     <>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-xl font-semibold">Runners</h1>
-          <p className="text-sm text-ink-2">
-            The AgentDock daemon on each machine that holds your repositories.
-          </p>
-        </div>
-        <Button variant="solid" onClick={() => setAdding(true)}>
-          Add runner
-        </Button>
-      </div>
+      <PageHeader
+        title="Runners"
+        description="The AgentDock daemon on each machine that holds your repositories."
+        actions={
+          <Button variant="solid" onClick={() => setAdding(true)}>
+            Add runner
+          </Button>
+        }
+      />
 
       <AsyncSection
         section={section}
@@ -273,7 +353,15 @@ function RunnersTable() {
           />
         }
       >
-        {(runners) => <RunnerRows runners={runners} onDetails={setSelected} />}
+        {(runners) => (
+          <ScrollX>
+            <RunnerRows
+              runners={runners}
+              details={details}
+              onDetails={setSelected}
+            />
+          </ScrollX>
+        )}
       </AsyncSection>
 
       <AddRunnerDialog

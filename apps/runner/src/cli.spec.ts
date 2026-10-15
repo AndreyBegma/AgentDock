@@ -53,7 +53,10 @@ describe('agentdock-runner CLI', () => {
   it('version prints the package version and the target', async () => {
     expect(await runCli(['version'], deps())).toBe(EXIT.ok);
     expect(stdout.join('')).toBe(`${RUNNER_VERSION} linux-x64\n`);
-    expect(RUNNER_VERSION).toBe('0.1.0');
+    const pkg = JSON.parse(
+      readFileSync(join(import.meta.dir, '../package.json'), 'utf8'),
+    ) as { version: string };
+    expect(RUNNER_VERSION).toBe(pkg.version);
   });
 
   it('an unknown or missing command is a usage error', async () => {
@@ -77,7 +80,7 @@ describe('agentdock-runner CLI', () => {
         {
           code: 'ABCD-EFGH',
           hostname: 'test-host',
-          version: '0.1.0',
+          version: RUNNER_VERSION,
           protocolVersion: 1,
         },
       ]);
@@ -362,7 +365,7 @@ describe('agentdock-runner CLI', () => {
       const { clock, controller, exit, live } = start();
       const [hello] = (await server.waitFor('hello')) as HelloMessage[];
       expect(hello).toMatchObject({
-        runnerVersion: '0.1.0',
+        runnerVersion: RUNNER_VERSION,
         protocolVersion: 1,
         hostname: 'test-host',
         os: 'linux',
@@ -531,6 +534,80 @@ describe('agentdock-runner CLI', () => {
       await live();
       server.close(4401, 'revoked');
       expect(await exit).toBe(EXIT.terminalClose);
+    });
+  });
+
+  describe('Claude Code integration subcommands (spec 201)', () => {
+    it('hook exits 0 for an unknown hook and when the daemon is down', async () => {
+      expect(
+        await runCli(
+          ['hook', 'pre-compact'],
+          deps({
+            stdin: () => new Response('{}').body as ReadableStream<Uint8Array>,
+          }),
+        ),
+      ).toBe(EXIT.ok);
+      const started = Date.now();
+      expect(
+        await runCli(
+          ['hook', 'stop'],
+          deps({
+            stdin: () =>
+              new Response('{"session_id":"s","cwd":"/x"}')
+                .body as ReadableStream<Uint8Array>,
+          }),
+        ),
+      ).toBe(EXIT.ok);
+      expect(Date.now() - started).toBeLessThan(1_000);
+      expect(stdout).toEqual([]);
+    });
+
+    it('away needs on or off, and fails when the daemon is down', async () => {
+      expect(await runCli(['away', 'maybe'], deps())).toBe(EXIT.usage);
+      expect(await runCli(['away', 'on'], deps())).toBe(EXIT.failure);
+      expect(stderr.join('')).toContain('daemon_unavailable');
+    });
+
+    it('setup needs the claude target and accepts its flags', async () => {
+      expect(await runCli(['setup'], deps())).toBe(EXIT.usage);
+      expect(await runCli(['setup', 'codex'], deps())).toBe(EXIT.usage);
+      expect(await runCli(['setup', 'claude', 'extra'], deps())).toBe(
+        EXIT.usage,
+      );
+      saveConfig(paths().configFile, {
+        profiles: [
+          {
+            id: 'claude-main',
+            runtime: 'claude',
+            env: { CLAUDE_CONFIG_DIR: '~/.claude-main' },
+            args: [],
+          },
+        ],
+      });
+      expect(
+        await runCli(
+          ['setup', 'claude', '--dry-run', '--profile', 'claude-main'],
+          deps(),
+        ),
+      ).toBe(EXIT.ok);
+      expect(stdout.join('')).toContain(
+        'claude plugin install agentdock@agentdock --scope user',
+      );
+      expect(stdout.join('')).toContain('Dry run');
+    });
+
+    it('lists the new commands in the usage', async () => {
+      await runCli(['help'], deps());
+      const text = stdout.join('');
+      for (const command of [
+        'setup claude',
+        'away on|off',
+        'hook <name>',
+        'mcp',
+        'claude [-- <args>]',
+      ]) {
+        expect(text).toContain(command);
+      }
     });
   });
 });

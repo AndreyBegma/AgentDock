@@ -121,6 +121,14 @@ export class TmuxControl {
     await this.sendKeys(name, ['Enter']);
   }
 
+  /**
+   * Submits what was typed with `C-m`, in a call of its own: `Enter` sent
+   * right behind the text has been seen to leave it in the input box (#189).
+   */
+  async sendSubmit(name: string): Promise<void> {
+    await this.sendKeys(name, ['C-m']);
+  }
+
   private async sendKeys(name: string, keys: readonly string[]) {
     const result = await this.run([
       'send-keys',

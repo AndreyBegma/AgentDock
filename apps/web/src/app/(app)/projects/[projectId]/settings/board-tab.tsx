@@ -1,0 +1,191 @@
+'use client';
+
+import {
+  BOARD_MAX_RUNNING_MAX,
+  BOARD_MAX_RUNNING_MIN,
+  type BoardSettingsView,
+  type CaptureModel,
+} from '@agentdock/shared';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { Card } from '@andrewbehma/glass-ui/card';
+import { Field, Input } from '@andrewbehma/glass-ui/field';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import { toast } from '@andrewbehma/glass-ui/toast';
+import { type FormEvent, useCallback, useEffect, useState } from 'react';
+import {
+  AutoCollectToggle,
+  CardOptionToggles,
+} from '../../../../../components/board/card-options';
+import {
+  fetchBoardSettings,
+  saveBoardSettings,
+} from '../../../../../lib/board/actions';
+import {
+  AUTO_COLLECT_DEFAULT_HINT,
+  AUTO_COLLECT_DEFAULT_LABEL,
+  describeBoardError,
+  parseMaxRunning,
+} from '../../../../../lib/board/format';
+import { Time } from '../../../../../lib/format/time';
+import { useErrorToast } from '../../../../../lib/section/use-error-toast';
+import { CaptureFields, CapturesTable } from './capture-section';
+
+/** Board defaults of the project (issue #242 D2, D13). A project admin edits them. */
+export function BoardTab({
+  projectId,
+  isAdmin,
+  canOperate,
+  contentOn,
+}: {
+  projectId: string;
+  isAdmin: boolean;
+  canOperate: boolean;
+  /** `shipSessionContent` of the project: capture needs it (#244 D10). */
+  contentOn: boolean;
+}) {
+  const [settings, setSettings] = useState<BoardSettingsView>();
+  const [issueOnRun, setIssueOnRun] = useState(false);
+  const [specOnRun, setSpecOnRun] = useState(false);
+  const [autoCollectTracked, setAutoCollectTracked] = useState(false);
+  const [maxRunning, setMaxRunning] = useState('3');
+  const [captureEnabled, setCaptureEnabled] = useState(false);
+  const [captureModel, setCaptureModel] = useState<CaptureModel>('haiku');
+  const [busy, setBusy] = useState(false);
+  const showError = useErrorToast();
+
+  const load = useCallback(async () => {
+    try {
+      const view = await fetchBoardSettings(projectId);
+      setSettings(view);
+      setIssueOnRun(view.issueOnRun);
+      setSpecOnRun(view.specOnRun);
+      setAutoCollectTracked(view.autoCollectTracked);
+      setMaxRunning(String(view.maxRunning));
+      setCaptureEnabled(view.captureEnabled);
+      setCaptureModel(view.captureModel);
+    } catch (err) {
+      showError(describeBoardError(err));
+    }
+  }, [projectId, showError]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (!settings) return <Skeleton className="h-64 w-full" />;
+
+  const limit = parseMaxRunning(maxRunning);
+  const dirty =
+    issueOnRun !== settings.issueOnRun ||
+    specOnRun !== settings.specOnRun ||
+    autoCollectTracked !== settings.autoCollectTracked ||
+    limit !== settings.maxRunning ||
+    captureEnabled !== settings.captureEnabled ||
+    captureModel !== settings.captureModel;
+
+  const save = async (event: FormEvent) => {
+    event.preventDefault();
+    if (limit === null) return;
+    setBusy(true);
+    try {
+      await saveBoardSettings(projectId, {
+        issueOnRun,
+        specOnRun,
+        autoCollectTracked,
+        maxRunning: limit,
+        captureEnabled: captureEnabled && contentOn,
+        captureModel,
+      });
+      toast.success('Board settings saved.');
+      await load();
+    } catch (err) {
+      showError(describeBoardError(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <Card pad="lg">
+        <form className="flex flex-col gap-6" onSubmit={save}>
+          <div className="flex flex-col gap-4">
+            <p className="text-ink-2 text-sm">
+              What a new card starts with, and how many card workers one project
+              runs at once. A card can override the toggles.
+            </p>
+            <CardOptionToggles
+              projectId={projectId}
+              idPrefix="board-set"
+              issueOnRun={issueOnRun}
+              specOnRun={specOnRun}
+              disabled={!isAdmin}
+              onIssueOnRun={setIssueOnRun}
+              onSpecOnRun={setSpecOnRun}
+            />
+            <AutoCollectToggle
+              id="board-set-auto-collect"
+              checked={autoCollectTracked}
+              disabled={!isAdmin}
+              label={AUTO_COLLECT_DEFAULT_LABEL}
+              hint={AUTO_COLLECT_DEFAULT_HINT}
+              onChange={setAutoCollectTracked}
+            />
+            <Field
+              label="Workers at once"
+              htmlFor="board-set-max"
+              hint={`Between ${BOARD_MAX_RUNNING_MIN} and ${BOARD_MAX_RUNNING_MAX}. A further Run is refused until one finishes.`}
+              error={
+                limit === null
+                  ? `Enter a whole number from ${BOARD_MAX_RUNNING_MIN} to ${BOARD_MAX_RUNNING_MAX}.`
+                  : undefined
+              }
+            >
+              <Input
+                id="board-set-max"
+                inputMode="numeric"
+                value={maxRunning}
+                disabled={!isAdmin}
+                onChange={(e) => setMaxRunning(e.target.value)}
+              />
+            </Field>
+          </div>
+          <CaptureFields
+            projectId={projectId}
+            isAdmin={isAdmin}
+            contentOn={contentOn}
+            enabled={captureEnabled}
+            model={captureModel}
+            onEnabled={setCaptureEnabled}
+            onModel={setCaptureModel}
+          />
+          {isAdmin ? (
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-ink-3 text-xs">
+                {settings.updatedAt ? (
+                  <>
+                    Last changed <Time value={settings.updatedAt} />
+                  </>
+                ) : (
+                  'Never changed — built-in defaults.'
+                )}
+              </span>
+              <Button
+                variant="solid"
+                type="submit"
+                disabled={busy || !dirty || limit === null}
+              >
+                Save
+              </Button>
+            </div>
+          ) : (
+            <p className="text-ink-3 text-sm">
+              Only project administrators can change these settings.
+            </p>
+          )}
+        </form>
+      </Card>
+      {canOperate ? <CapturesTable projectId={projectId} /> : null}
+    </div>
+  );
+}

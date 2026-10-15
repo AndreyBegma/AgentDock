@@ -1,11 +1,18 @@
 import { z } from 'zod';
 import { capabilitiesSchema, hostSchema } from './capabilities';
 import { approvalCommands } from './commands/approvals';
+import { assessCommands } from './commands/assess';
+import { captureCommands } from './commands/capture';
+import { cardCommands, cardPrCloseCommands } from './commands/cards';
 import { controlCommands } from './commands/control';
 import { githubCommands } from './commands/github';
+import { plannerCommands } from './commands/planner';
 import { queueCommands } from './commands/queue';
 import { skillCommands } from './commands/skills';
 import { terminalCommands } from './commands/terminal';
+import { textCommands } from './commands/text';
+import { uiprofileCommands } from './commands/uiprofile';
+import { worktreeCommands } from './commands/worktree';
 import {
   SESSION_BACKFILL_TIMEOUT_MS,
   sessionBackfillArgsSchema,
@@ -73,6 +80,11 @@ export const commandErrorCodeSchema = z.enum([
   'too_large',
   /** The catalog or the forge did not answer (spec 24 D1/D2). */
   'upstream_unavailable',
+  /**
+   * `card.run` could not download an attachment, or its size or SHA-256 did
+   * not match (#309 D9); the worker was not started.
+   */
+  'attachments_unavailable',
 ]);
 export type CommandErrorCode = z.infer<typeof commandErrorCodeSchema>;
 
@@ -131,6 +143,14 @@ export const commands = {
   ...githubCommands,
   ...terminalCommands,
   ...skillCommands,
+  ...plannerCommands,
+  ...uiprofileCommands,
+  ...worktreeCommands,
+  ...cardCommands,
+  ...cardPrCloseCommands,
+  ...captureCommands,
+  ...textCommands,
+  ...assessCommands,
 } as const satisfies Record<string, CommandDefinition>;
 
 export type CommandName = keyof typeof commands;

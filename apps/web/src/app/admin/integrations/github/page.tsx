@@ -5,8 +5,9 @@ import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
-import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import {
   Table,
@@ -16,10 +17,11 @@ import {
 } from '@andrewbehma/glass-ui/table';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { useEffect, useState } from 'react';
+import { PageHeader } from '../../../../components/page-header/page-header';
 import { AsyncSection } from '../../../../components/prerequisites/async-section';
 import { PrerequisiteBanner } from '../../../../components/prerequisites/prerequisite-banner';
 import { api } from '../../../../lib/api';
-import { formatAgo } from '../../../../lib/fleet/format';
+import { Time } from '../../../../lib/format/time';
 import {
   describeCallbackError,
   describeGitHubAppError,
@@ -29,12 +31,13 @@ import {
   ENCRYPTION_KEY_REMEDY,
   PUBLIC_URL_REMEDY,
 } from '../../../../lib/prerequisites/copy';
+import { useErrorToast } from '../../../../lib/section/use-error-toast';
 import { useSection } from '../../../../lib/section/use-section';
 import { ManualCard, RegisterCard } from './register-cards';
 
 type Registered = Extract<GitHubAppView, { registered: true }>;
 
-const when = (iso: string | null): string => (iso ? formatAgo(iso) : '—');
+const when = (iso: string | null) => <Time value={iso} />;
 
 /** Rule R4: without a key nothing can be stored, or a stored App opened. */
 function NoKeyBanner({ registered }: { registered: boolean }) {
@@ -58,6 +61,7 @@ export default function GitHubAppPage() {
   const [callbackError, setCallbackError] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const showError = useErrorToast();
 
   // The API’s callback redirects here with `?registered=1` or `?error=<code>`.
   useEffect(() => {
@@ -81,7 +85,7 @@ export default function GitHubAppPage() {
       );
       load();
     } catch (err) {
-      toast.error(describeGitHubAppError(err));
+      showError(describeGitHubAppError(err));
     } finally {
       setBusy(false);
     }
@@ -95,7 +99,7 @@ export default function GitHubAppPage() {
       toast.success('GitHub App removed.');
       load();
     } catch (err) {
-      toast.error(describeGitHubAppError(err));
+      showError(describeGitHubAppError(err));
     } finally {
       setBusy(false);
     }
@@ -103,14 +107,11 @@ export default function GitHubAppPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-xl font-semibold">GitHub App</h1>
-        <p className="max-w-prose text-sm text-ink-2">
-          A read-only App that tells AgentDock the moment an issue, pull request
-          or check changes. Without it everything still works — runners poll
-          GitHub every 60 s.
-        </p>
-      </div>
+      <PageHeader
+        className="mb-0"
+        title="GitHub App"
+        description="A read-only App that tells AgentDock the moment an issue, pull request or check changes. Without it everything still works — runners poll GitHub every 60 s."
+      />
 
       {callbackError ? (
         <Banner tone="danger" title="Registration failed">
@@ -149,33 +150,15 @@ export default function GitHubAppPage() {
         }
       </AsyncSection>
 
-      <DialogRoot
+      <ConfirmDialog
         open={confirmDelete}
-        onOpenChange={(open) => {
-          if (!open) setConfirmDelete(false);
-        }}
-      >
-        <DialogContent
-          title="Remove the GitHub App?"
-          description="AgentDock forgets the App and its stored secrets, and runners go back to polling every 60 s. The App itself stays on GitHub — delete it there too."
-          footer={
-            <>
-              <Button variant="glass" onClick={() => setConfirmDelete(false)}>
-                Cancel
-              </Button>
-              <Button
-                variant="danger"
-                disabled={busy}
-                onClick={() => void remove()}
-              >
-                Remove
-              </Button>
-            </>
-          }
-        >
-          {null}
-        </DialogContent>
-      </DialogRoot>
+        onOpenChange={setConfirmDelete}
+        title="Remove the GitHub App?"
+        consequence="AgentDock forgets the App and its stored secrets, and runners go back to polling every 60 s. The App itself stays on GitHub — delete it there too."
+        verb="Remove"
+        busy={busy}
+        onConfirm={() => void remove()}
+      />
     </div>
   );
 }
@@ -238,9 +221,11 @@ function AppDetails({
       {app.signatureFailures > 0 ? (
         <Banner tone="warn" title="Signature failures">
           {app.signatureFailures} delivery(ies) failed the signature check
-          {app.lastSignatureFailureAt
-            ? `, the last ${formatAgo(app.lastSignatureFailureAt)}`
-            : ''}
+          {app.lastSignatureFailureAt ? (
+            <>
+              , the last <Time value={app.lastSignatureFailureAt} />
+            </>
+          ) : null}
           . The webhook secret here and on GitHub may differ: set a new secret
           on GitHub, then remove the App here and enter its credentials by hand
           with that secret.
@@ -255,11 +240,9 @@ function AppDetails({
               href={app.installUrl}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex"
+              className={buttonClassName({ variant: 'solid' })}
             >
-              <Button variant="solid" tabIndex={-1}>
-                Install on GitHub
-              </Button>
+              Install on GitHub
             </a>
             <Button variant="glass" disabled={busy} onClick={onResync}>
               Resync
@@ -276,7 +259,7 @@ function AppDetails({
               href={app.htmlUrl}
               target="_blank"
               rel="noreferrer"
-              className="underline"
+              className="text-accent-ink underline"
             >
               {app.slug}
             </a>{' '}
@@ -314,7 +297,7 @@ function AppDetails({
         </dl>
       </Card>
 
-      <h2 className="text-lg font-bold">Installations</h2>
+      <SectionHeader title="Installations" />
       {app.installations.length === 0 ? (
         <EmptyState
           title="Not installed anywhere"
@@ -324,7 +307,7 @@ function AppDetails({
               href={app.installUrl}
               target="_blank"
               rel="noreferrer"
-              className={buttonClassName({ variant: 'solid', size: 'sm' })}
+              className={buttonClassName({ variant: 'glass', size: 'sm' })}
             >
               Install on GitHub
             </a>
@@ -379,7 +362,9 @@ function AppDetails({
                     </ul>
                   )}
                 </TableCell>
-                <TableCell>{formatAgo(installation.syncedAt)}</TableCell>
+                <TableCell>
+                  <Time value={installation.syncedAt} />
+                </TableCell>
               </TableRow>
             ))}
           </tbody>

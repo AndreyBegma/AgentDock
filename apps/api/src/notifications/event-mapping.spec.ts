@@ -1,4 +1,5 @@
 import {
+  blockedCheckpointDraft,
   draftFor,
   type MatchableEvent,
   oneLine,
@@ -68,20 +69,58 @@ describe('draftFor (spec 22 D1)', () => {
     });
   });
 
-  it('maps only a blocked checkpoint to slot.blocked, without its summary', () => {
-    const blocked = draftFor(
-      event({
-        type: 'slot.checkpoint',
-        data: { checkpoint: 'blocked', summary: 'secret stack trace' },
-      }),
-    );
-    expect(blocked?.kind).toBe('slot.blocked');
-    expect(JSON.stringify(blocked)).not.toContain('secret stack trace');
+  it('never drafts from a checkpoint event: the sweep decides (note 23)', () => {
+    const checkpoint = (data: object) =>
+      draftFor(event({ type: 'slot.checkpoint', source: 'scraped', data }));
     expect(
-      draftFor(
-        event({ type: 'slot.checkpoint', data: { checkpoint: 'pr_open' } }),
-      ),
+      checkpoint({ checkpoint: 'blocked', heading: 'blocked', position: 1 }),
     ).toBeNull();
+    expect(checkpoint({ checkpoint: 'pr_open' })).toBeNull();
+  });
+
+  it('puts the blocked heading in the body, never the summary', () => {
+    expect(
+      blockedCheckpointDraft(
+        'i42-api',
+        42,
+        'blocked — the docs question only\nsecond line',
+      ),
+    ).toEqual({
+      kind: 'slot.blocked',
+      slot: 'i42-api',
+      issue: 42,
+      title: 'i42-api (#42) is blocked',
+      body: 'blocked — the docs question only',
+      page: 'fleet',
+    });
+  });
+
+  it('falls back to the fixed body when the heading is just "blocked"', () => {
+    for (const heading of ['blocked', 'Blocked:', '  BLOCKED  ']) {
+      expect(blockedCheckpointDraft('719', 719, heading)).toMatchObject({
+        title: 'Issue #719 is blocked',
+        body: 'The worker reported a blocked checkpoint.',
+      });
+    }
+  });
+
+  it('names the issue when a blocked title has no slot name', () => {
+    const blocked = (slot: string | null, issue: number | null) =>
+      draftFor(
+        event({
+          type: 'issue.blocked',
+          slot,
+          issue,
+          data: { kind: 'person' },
+        }),
+      )?.title;
+    expect(blocked(null, 719)).toBe('Issue #719 is blocked on a person');
+    // A slot named by the bare number is the issue, not a name.
+    expect(blocked('719', null)).toBe('Issue #719 is blocked on a person');
+    expect(blocked('719', 719)).toBe('Issue #719 is blocked on a person');
+    expect(blocked('i719-api', 719)).toBe(
+      'i719-api (#719) is blocked on a person',
+    );
   });
 
   it('maps issue.blocked only when a person is needed', () => {
@@ -159,6 +198,107 @@ describe('draftFor (spec 22 D1)', () => {
     expect(
       draftFor(event({ type: 'schedule.disabled', source: 'code-sentinel' })),
     ).toBeNull();
+  });
+
+  describe('board cards (issue #242 D15)', () => {
+    const card = (type: string, data: object, source = 'api') =>
+      event({ type, source, slot: null, issue: null, data });
+
+    it('maps card.finished, naming the card and its PR, linking the card', () => {
+      const draft = draftFor(
+        card('card.finished', {
+          cardId: 'c1',
+          number: 12,
+          title: 'Add login',
+          round: 1,
+          finishedBy: 'worker',
+          prNumber: 77,
+          prUrl: 'https://github.com/acme/widget/pull/77',
+        }),
+      );
+      expect(draft).toEqual({
+        kind: 'card.finished',
+        slot: null,
+        issue: null,
+        title: 'C-12 "Add login" is finished',
+        body: 'PR #77 is ready for review.',
+        page: 'board',
+        card: 12,
+      });
+      expect(projectLink('p1', 'board', 12)).toBe('/projects/p1/board?card=12');
+    });
+
+    it('maps card.finished without a PR', () => {
+      expect(
+        draftFor(
+          card('card.finished', {
+            number: 3,
+            title: 'Fix it',
+            prNumber: null,
+          }),
+        ),
+      ).toMatchObject({
+        title: 'C-3 "Fix it" is finished',
+        body: 'Review it on the board: accept it, or send feedback.',
+      });
+    });
+
+    it('maps card.waiting', () => {
+      expect(
+        draftFor(card('card.waiting', { number: 4, title: 'Add login' })),
+      ).toMatchObject({
+        kind: 'card.waiting',
+        title: 'C-4 "Add login" is waiting for you',
+        page: 'board',
+        card: 4,
+      });
+    });
+
+    it('never copies more than the title, and only the first line of it', () => {
+      const draft = draftFor(
+        card('card.waiting', {
+          number: 4,
+          title: 'Add login\nsecret prompt text',
+          summary: 'secret summary',
+        }),
+      );
+      expect(JSON.stringify(draft)).not.toContain('secret');
+    });
+
+    it('maps cards.suggested with counts only, never a title (#244 D11)', () => {
+      const draft = draftFor(
+        card('cards.suggested', {
+          captureId: 'cap1',
+          sessionId: 's1',
+          count: 3,
+          cardIds: ['c1', 'c2', 'c3'],
+          title: 'secret suggestion',
+        }),
+      );
+      expect(draft).toEqual({
+        kind: 'cards.suggested',
+        slot: null,
+        issue: null,
+        title: '3 cards were suggested',
+        body: 'Capture found follow-up work in a session; review it in the Inbox.',
+        page: 'board',
+      });
+      expect(JSON.stringify(draft)).not.toContain('secret');
+      expect(draftFor(card('cards.suggested', { count: 1 }))?.title).toBe(
+        'A card was suggested',
+      );
+      expect(draftFor(card('cards.suggested', { count: 1 }, 'runner'))).toBe(
+        null,
+      );
+      expect(draftFor(card('cards.suggested', { count: 0 }))).toBeNull();
+    });
+
+    it('does not let a runner forge a card event, and needs a number', () => {
+      for (const type of ['card.finished', 'card.waiting']) {
+        expect(draftFor(card(type, { number: 1 }, 'runner'))).toBeNull();
+        expect(draftFor(card(type, { title: 'x' }))).toBeNull();
+      }
+    });
   });
 
   it.each([

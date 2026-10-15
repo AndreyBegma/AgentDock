@@ -168,14 +168,28 @@ export interface SlotPage {
 /** Live event name on topic `project:<id>` (D9). Clients refetch on it. */
 export const FLEET_LIVE_EVENT = 'fleet';
 
+/**
+ * `conversation`: a new orchestrator message to a slot (`slot.message_seen`);
+ * refetch `/slots/:slot/conversation`. A new worker section arrives as `slot`.
+ */
 export interface FleetLiveChange {
-  kind: 'slot' | 'round' | 'orchestrator';
-  /** The slot or round id; the project id for `orchestrator`. */
+  kind: 'slot' | 'round' | 'orchestrator' | 'conversation';
+  /** The slot or round id (the slot's for `conversation`); the project id for `orchestrator`. */
   id: string;
 }
 
 /** Stable codes in the `error` field of a fleet route's error body. */
 export const FLEET_ERROR = {
   slotNotFound: 'slot_not_found',
+  /** `:slot` is not a slot name (`slotNameSchema`). */
+  invalidSlot: 'invalid_slot',
+  /** `/worktree`: the project's runner is not connected. */
+  runnerOffline: 'runner_offline',
+  /** `/worktree`: the runner did not answer in time. */
+  runnerTimeout: 'runner_timeout',
+  /** `/worktree`: the runner refused or failed; `message` says why. */
+  worktreeUnavailable: 'worktree_unavailable',
+  /** 409 `/worktree`: the runner's advert does not list `worktree.status` (#233). */
+  runnerOutdated: 'runner_outdated',
 } as const;
 export type FleetErrorCode = (typeof FLEET_ERROR)[keyof typeof FLEET_ERROR];

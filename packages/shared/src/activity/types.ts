@@ -1,4 +1,5 @@
 import type { AuditActorType, AuditResult } from '../audit/actions';
+import { API_EVENT_SOURCE } from '../protocol/envelope';
 import type {
   ActivityActorType,
   ActivityCategory,
@@ -181,6 +182,32 @@ const EVENT_RULES: Record<string, EventRule> = {
     severity: fixed('info'),
     title: (ctx) => `Message sent to ${who(ctx)}`,
     keep: [],
+  },
+  // Server events of the `agentdock` plugin (spec 201 D7, D19): only from
+  // source `api`, so a runner can never forge one.
+  'manual.note': {
+    category: 'fleet',
+    sources: [API_EVENT_SOURCE],
+    severity: fixed('info'),
+    title: (ctx) => {
+      const text = str(ctx.data, 'text');
+      return text
+        ? `Note: ${clip(text, TITLE_MAX - 6)}`
+        : 'Note from a session';
+    },
+    keep: ['text', 'sessionId'],
+  },
+  'manual.handoff': {
+    category: 'fleet',
+    sources: [API_EVENT_SOURCE],
+    severity: fixed('info'),
+    title: (ctx) => {
+      const issue = int(ctx.data, 'issue');
+      return issue
+        ? `Session handed off to the fleet as #${issue}`
+        : 'Session handed off to the fleet';
+    },
+    keep: ['issue', 'branch', 'sessionId'],
   },
   'slot.fence_widened': {
     category: 'fleet',
@@ -386,6 +413,7 @@ const AUDIT_TITLES: Record<string, string> = {
   'runner.pair': 'Runner paired',
   'runner.rename': 'Runner renamed',
   'runner.revoke': 'Runner revoked',
+  'runner.update': 'Runner settings changed',
   'project.connect': 'Project connected',
   'project.delete': 'Project deleted',
   'project.update': 'Project settings changed',
@@ -398,8 +426,13 @@ const AUDIT_TITLES: Record<string, string> = {
   'orchestrator.start': 'Orchestrator start requested',
   'orchestrator.stop': 'Orchestrator stop requested',
   'orchestrator.settings': 'Orchestrator settings changed',
+  'orchestrator.message': 'Message sent to the orchestrator',
   'slot.stop': 'Slot stop requested',
   'slot.message': 'Message sent to a slot',
+  'action_request.created': 'Action requested from a session',
+  'action_request.decided': 'Action request decided',
+  'action_request.executed': 'Requested action executed',
+  'session_content.purged': 'Session content purged',
 };
 
 /** Every audit action the feed shows — the projector's `action IN (…)` filter. */

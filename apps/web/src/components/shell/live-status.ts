@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import type { LiveStatus } from '../../lib/live/client';
+import { reachability } from '../../lib/live/reachability';
 import { useLiveStatus } from '../../lib/live/use-live';
 
 /** A first connect or a short blip is not worth a banner. */
@@ -21,6 +22,19 @@ export function liveDotLabel(status: LiveStatus, paused: boolean): string {
   if (status === 'connected') return 'Live updates connected';
   const label = liveStatusLabel(status, paused);
   return label === 'Reconnecting…' ? 'Live updates reconnecting' : label;
+}
+
+/** The words of the restart banner (spec 353 D2). */
+export const RESTARTING_BANNER_TEXT =
+  'Reconnecting to AgentDock… (the server may be restarting)';
+
+/** True once the API has been unreachable for 1.5 s; false on the first success. */
+export function useServerRestarting(): boolean {
+  return useSyncExternalStore(
+    reachability.onChange,
+    () => reachability.getSnapshot().bannerVisible,
+    () => false,
+  );
 }
 
 /** True once the live socket has been down for more than `afterMs`. */

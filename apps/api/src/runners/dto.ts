@@ -2,15 +2,19 @@ import {
   type CreateRunnerRequest,
   type RenameRunnerRequest,
   RUNNER_NAME_MAX_LENGTH,
+  type UpdateRunnerSettingsRequest,
 } from '@agentdock/shared';
 import type { PairingRequest } from '@agentdock/shared/protocol';
 import { Transform } from 'class-transformer';
 import {
+  IsBoolean,
   IsInt,
   IsNotEmpty,
+  IsOptional,
   IsPositive,
   IsString,
   MaxLength,
+  ValidateIf,
 } from 'class-validator';
 
 const trim = ({ value }: { value: unknown }) =>
@@ -24,12 +28,46 @@ export class CreateRunnerDto implements CreateRunnerRequest {
   name!: string;
 }
 
-export class RenameRunnerDto implements RenameRunnerRequest {
+/**
+ * `PATCH /admin/runners/:id`: the name, and spec 201's local user and away
+ * mode. Only the fields sent change.
+ */
+export class UpdateRunnerDto
+  implements Partial<RenameRunnerRequest>, UpdateRunnerSettingsRequest
+{
+  @IsOptional()
   @Transform(trim)
   @IsString()
   @IsNotEmpty()
   @MaxLength(RUNNER_NAME_MAX_LENGTH)
-  name!: string;
+  name?: string;
+
+  /** `null` leaves the runner without a local user: local requests are refused. */
+  @ValidateIf((_, value) => value !== null && value !== undefined)
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(64)
+  localUserId?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  awayMode?: boolean;
+}
+
+/**
+ * `PATCH /runners/:id` (spec 201 "API"): `localUserId` is an admin's, away
+ * mode the admin's or the runner's local user's own.
+ */
+export class RunnerSettingsDto implements UpdateRunnerSettingsRequest {
+  @ValidateIf((_, value) => value !== null && value !== undefined)
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(64)
+  localUserId?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  awayMode?: boolean;
 }
 
 /**

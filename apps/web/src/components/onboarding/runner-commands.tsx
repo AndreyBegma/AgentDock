@@ -20,7 +20,7 @@ export function InstallGuideLink({
     <p>
       <Link
         href={INSTALL_PATH}
-        className="text-ink underline underline-offset-2"
+        className="text-accent-ink underline underline-offset-2"
       >
         {children}
       </Link>
@@ -45,7 +45,7 @@ export function InstallCommands() {
           href={RUNNER_README_URL}
           target="_blank"
           rel="noreferrer"
-          className="text-ink underline underline-offset-2"
+          className="text-accent-ink underline underline-offset-2"
         >
           Build it from source
         </a>

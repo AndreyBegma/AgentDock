@@ -8,10 +8,13 @@ import {
 } from '@agentdock/shared/protocol';
 import { adapters, SessionWatcher } from './adapters';
 import { resolveIngestSince } from './adapters/ingest-since';
+import { AssessExecutor, createAssessHandlers } from './assess';
 import { Backoff } from './backoff';
+import { CaptureExecutor, createCaptureHandlers } from './capture';
+import { CardExecutor, createCardHandlers } from './cards';
 import type { Clock } from './clock';
 import { CollectorRegistry, collectors } from './collectors';
-import { createDispatcher } from './commands/dispatcher';
+import { type CommandHandlers, createDispatcher } from './commands/dispatcher';
 import { createHandlers } from './commands/handlers';
 import { loadConfig, type PairedConfig, saveConfig } from './config';
 import {
@@ -20,7 +23,9 @@ import {
   type SocketFactory,
   type StopReason,
 } from './connection';
+import { TmuxServerGuard } from './control/tmux-server';
 import {
+  commandsCapability,
   detectCapabilities,
   extractVersion,
   ptyAvailable,
@@ -28,30 +33,50 @@ import {
   terminalUnsupported,
 } from './detect/capabilities';
 import type { Exec } from './detect/exec';
+import type { Env } from './env';
+import { GitAuth } from './git-auth';
+import { LocalSocketServer } from './local/server';
+import { LocalService } from './local/service';
+import { HookSessions } from './local/sessions';
 import { acquireLock } from './lock';
 import { errorMessage, type Logger } from './log';
-import { otlpSettings, startOtlpReceiver } from './otlp';
+import { createNormalizeHandlers, NormalizeExecutor } from './normalize';
+import { otlpSettings, ProjectDirectory, startOtlpReceiver } from './otlp';
 import { PaneStreamer } from './pane';
+import {
+  createPlannerHandlers,
+  PlanTurnExecutor,
+  SharedRunSlots,
+} from './planner';
 import { WatchList } from './projects/watch-list';
 import {
   createSkillHandlers,
   RunLogStreamer,
   SkillRunExecutor,
 } from './skills';
+import { runLogSources } from './skills/run/log';
 import { Spool } from './spool';
 import { bunSpawnPty, type SpawnPty, TerminalManager } from './terminal';
+import { createUiProfileHandlers, UiProfileBuildExecutor } from './uiprofile';
 import { RUNNER_VERSION } from './version';
 
 export interface DaemonOptions {
   config: PairedConfig;
   /** Where `config` was read from; the watch list is cached back into it. */
   configFile: string;
+  /**
+   * The local socket for the `agentdock` plugin (spec 201 D5);
+   * `<state>/agentdock/runner.sock` beside the spool by default, null for none.
+   */
+  localSocket?: string | null;
   home: string;
   spoolDir: string;
   /** Transcript read positions (spec 12 D5). */
   offsetsFile: string;
   host: Host;
   exec: Exec;
+  /** The runner's environment; `process.env` by default. */
+  env?: Env;
   clock: Clock;
   log: Logger;
   createSocket?: SocketFactory;
@@ -60,7 +85,19 @@ export interface DaemonOptions {
   spawnPty?: SpawnPty;
   /** Skill runs' directories (spec 24 D7); `<state>/agentdock/runs` beside the spool by default. */
   runsDir?: string;
-  /** The argv that starts this runner; a skill run's session appends `exec-run <runDir>`. */
+  /** Plans' worktree records and turns (spec 172); `<state>/agentdock/plans` beside the runs by default. */
+  plansDir?: string;
+  /** UI profile builds (spec 223); `<state>/agentdock/uiprofile` beside the plans by default. */
+  uiprofileDir?: string;
+  /** Board card workers (#242); `<state>/agentdock/cards` beside the runs by default. */
+  cardsDir?: string;
+  /** Card capture's per-extraction directories (#244); `<state>/agentdock/capture` beside the runs by default. */
+  captureDir?: string;
+  /** Text normalization's per-run directories (#271); `<state>/agentdock/normalize` beside the runs by default. */
+  normalizeDir?: string;
+  /** Card model assessment's per-run directories (#322); `<state>/agentdock/assess` beside the runs by default. */
+  assessDir?: string;
+  /** The argv that starts this runner; a skill run's, plan turn's or card's session appends `exec-run <dir>`. */
   selfCommand?: readonly string[];
   /** The skills.sh catalog is fetched with it; the global `fetch` by default. */
   fetch?: typeof fetch;
@@ -87,7 +124,15 @@ const countTmuxSessions = async (exec: Exec): Promise<number> => {
 export const runDaemon = async (
   options: DaemonOptions,
 ): Promise<StopReason> => {
-  const { config, home, exec, clock, log } = options;
+  const { config, home, clock, log } = options;
+  // #329 D1: every git child of the runner goes through this one wrapper.
+  const gitAuth = new GitAuth(options.exec);
+  // #327: a tmux server the runner starts never lives in the unit's cgroup.
+  const tmuxServer = new TmuxServerGuard({
+    env: options.env ?? process.env,
+    log,
+  });
+  const exec = tmuxServer.wrap(gitAuth.wrap(options.exec));
   mkdirSync(options.spoolDir, { recursive: true, mode: 0o700 });
   const release = acquireLock(join(options.spoolDir, 'runner.lock'));
   try {
@@ -99,12 +144,16 @@ export const runDaemon = async (
     log.info('spool opened', { ...spool.stats() });
 
     const redetect = async (): Promise<Capabilities> => {
-      const capabilities = await detectCapabilities({
-        exec,
-        home,
-        // The receiver's port as bound, not as configured (spec 13).
-        config: { profiles: config.profiles, otlp: otlpCapability() },
-      });
+      const [capabilities, github] = await Promise.all([
+        detectCapabilities({
+          exec,
+          home,
+          // The receiver's port as bound, not as configured (spec 13).
+          config: { profiles: config.profiles, otlp: otlpCapability() },
+        }),
+        // Each (re)connect re-checks, so a later `gh auth login` takes effect.
+        gitAuth.probe(),
+      ]);
       const terminal = terminalCapability({
         tmux: capabilities.tmux,
         disabledCommands: config.disabledCommands,
@@ -115,8 +164,22 @@ export const runDaemon = async (
         codex: capabilities.runtimes.codex?.version ?? null,
         profiles: capabilities.profiles.length,
         terminal,
+        gitAuth: github,
       });
-      return { ...capabilities, terminal };
+      return {
+        ...capabilities,
+        terminal,
+        gitAuth: { github },
+        ...commandsCapability(handlers(), config.disabledCommands),
+      };
+    };
+
+    // The handlers need `redetect` (runner.describe), `redetect` needs their
+    // keys: built once below, read lazily here.
+    let builtHandlers: CommandHandlers | null = null;
+    const handlers = (): CommandHandlers => {
+      if (!builtHandlers) throw new Error('handlers are not built yet');
+      return builtHandlers;
     };
 
     // Collectors emit through the connection, which exists only below.
@@ -174,6 +237,10 @@ export const runDaemon = async (
       // The executor is built below; it exists by the time a command arrives.
       runSession: (projectId, root, runId) =>
         runs.runSession(projectId, root, runId),
+      // `hookSessions` is built below too; commands arrive after both exist.
+      manualSession: (sessionId) => hookSessions.manualOf(sessionId),
+      cardSession: (projectId, root, cardId) =>
+        cards.cardSession(projectId, root, cardId),
       unsupported: async () => {
         const tmux = await exec('tmux', ['-V']);
         return terminalUnsupported(
@@ -193,40 +260,110 @@ export const runDaemon = async (
       watchedProjects: () => watchList.current,
       fetch: options.fetch ?? fetch,
     };
+    // Skill runs and plan turns share the cap (spec 172 "Concurrency").
+    const slots = new SharedRunSlots(config.skills.maxConcurrentRuns);
+    const selfCommand = options.selfCommand ?? defaultSelfCommand();
     const runs = new SkillRunExecutor({
       deps: skillsDeps,
       runsDir: options.runsDir ?? join(dirname(options.spoolDir), 'runs'),
-      selfCommand: options.selfCommand ?? defaultSelfCommand(),
+      selfCommand,
       maxConcurrentRuns: config.skills.maxConcurrentRuns,
+      slots,
       maxTimeoutSec: config.skills.maxTimeoutSec,
       emit: (event) => connection?.emit(event),
       log,
       otlpPort: () => otlp?.port ?? null,
     });
+    const plans = new PlanTurnExecutor({
+      deps: skillsDeps,
+      plansDir: options.plansDir ?? join(dirname(options.spoolDir), 'plans'),
+      selfCommand,
+      slots,
+      emit: (event) => connection?.emit(event),
+      log,
+      otlpPort: () => otlp?.port ?? null,
+    });
+    const uiProfiles = new UiProfileBuildExecutor({
+      deps: skillsDeps,
+      buildsDir:
+        options.uiprofileDir ?? join(dirname(options.spoolDir), 'uiprofile'),
+      selfCommand,
+      slots,
+      emit: (event) => connection?.emit(event),
+      log,
+      otlpPort: () => otlp?.port ?? null,
+    });
+    // Board card workers (#242): interactive, outside the shared run cap —
+    // the API limits running cards per project.
+    const cards = new CardExecutor({
+      deps: skillsDeps,
+      cardsDir: options.cardsDir ?? join(dirname(options.spoolDir), 'cards'),
+      selfCommand,
+      attachmentSource: { server: config.server, token: config.token },
+      emit: (event) => connection?.emit(event),
+      log,
+      otlpPort: () => otlp?.port ?? null,
+    });
+    // Card capture (#244): headless, one per project; the API limits the rest.
+    const capture = new CaptureExecutor({
+      deps: skillsDeps,
+      capturesDir:
+        options.captureDir ?? join(dirname(options.spoolDir), 'capture'),
+      env: process.env,
+      emit: (event) => connection?.emit(event),
+      log,
+      otlpPort: () => otlp?.port ?? null,
+    });
+    // Text normalization (#271): headless; the API limits concurrency.
+    const normalize = new NormalizeExecutor({
+      deps: skillsDeps,
+      normalizeDir:
+        options.normalizeDir ?? join(dirname(options.spoolDir), 'normalize'),
+      env: process.env,
+      emit: (event) => connection?.emit(event),
+      log,
+      otlpPort: () => otlp?.port ?? null,
+    });
+    // Card model assessment (#322): headless; the API limits concurrency.
+    const assess = new AssessExecutor({
+      deps: skillsDeps,
+      assessDir: options.assessDir ?? join(dirname(options.spoolDir), 'assess'),
+      env: process.env,
+      emit: (event) => connection?.emit(event),
+      log,
+      otlpPort: () => otlp?.port ?? null,
+    });
     const runLog = new RunLogStreamer({
-      runs,
+      runs: runLogSources(runs, plans, uiProfiles),
       send: (message) => connection?.sendMessage(message) ?? false,
       clock,
       log,
     });
 
+    builtHandlers = createHandlers({
+      clock,
+      runnerVersion: RUNNER_VERSION,
+      host: options.host,
+      detectCapabilities: redetect,
+      exec,
+      watchedProjects: () => watchList.current,
+      pollCollectors: (projectId, targets) =>
+        registry.pollNow(projectId, targets),
+      profiles: () => config.profiles,
+      backfillSessions: sessions
+        ? (scope) => sessions.backfill(scope)
+        : undefined,
+      terminal,
+      skills: createSkillHandlers(skillsDeps, runs),
+      planner: createPlannerHandlers({ ...skillsDeps, log }, plans),
+      uiprofile: createUiProfileHandlers(skillsDeps, uiProfiles),
+      cards: createCardHandlers(cards),
+      capture: createCaptureHandlers(capture),
+      normalize: createNormalizeHandlers(normalize),
+      assess: createAssessHandlers(assess),
+    });
     const dispatch = createDispatcher({
-      handlers: createHandlers({
-        clock,
-        runnerVersion: RUNNER_VERSION,
-        host: options.host,
-        detectCapabilities: redetect,
-        exec,
-        watchedProjects: () => watchList.current,
-        pollCollectors: (projectId, targets) =>
-          registry.pollNow(projectId, targets),
-        profiles: () => config.profiles,
-        backfillSessions: sessions
-          ? (scope) => sessions.backfill(scope)
-          : undefined,
-        terminal,
-        skills: createSkillHandlers(skillsDeps, runs),
-      }),
+      handlers: builtHandlers,
       disabledCommands: config.disabledCommands,
       clock,
       log,
@@ -251,6 +388,14 @@ export const runDaemon = async (
       };
     };
 
+    // Away mode (spec 201 D17) comes with every `welcome` and `config`.
+    let awayMode = false;
+    const hookSessions = new HookSessions();
+    const directory = new ProjectDirectory({
+      projects: () => watchList.current,
+      exec,
+    });
+
     const live = new RunnerConnection({
       server: config.server,
       token: config.token,
@@ -271,6 +416,7 @@ export const runDaemon = async (
       terminal,
       runLog,
       onConfig: (server) => {
+        awayMode = server.awayMode === true;
         sessions?.setProjects(server.projects).catch(() => {});
         watchList.apply(server.projects).catch((error) => {
           log.error('cannot apply the watch list', {
@@ -289,6 +435,8 @@ export const runDaemon = async (
       settings: otlpSettings(config.otlp),
       emit: (event) => live.emit(event),
       projects: () => watchList.current,
+      sessionProject: (id) => hookSessions.projectOf(id, watchList.current),
+      directory,
       exec,
       clock,
       log,
@@ -296,13 +444,69 @@ export const runDaemon = async (
     const otlpCapability = (): Capabilities['otlp'] =>
       otlp?.port ? { grpc: null, http: otlp.port } : null;
 
+    // The plugin's hook and MCP processes (spec 201 D5): bound after
+    // `runner.lock` is held, so a socket file left there is a dead daemon's.
+    const localService = new LocalService({
+      projects: () => watchList.current,
+      awayMode: () => awayMode,
+      online: () => live.isLive,
+      emit: (event) => {
+        live.emit(event);
+      },
+      relay: (request) => live.request(request),
+      envelope: async (projectId) =>
+        (await directory.resolve([projectId])).get(projectId),
+      sessions: hookSessions,
+      now: () => new Date(clock.now()).toISOString(),
+      log,
+    });
+    const socketPath =
+      options.localSocket === undefined
+        ? join(dirname(options.spoolDir), 'runner.sock')
+        : options.localSocket;
+    let local: LocalSocketServer | null = null;
+    if (socketPath) {
+      const server = new LocalSocketServer({
+        path: socketPath,
+        handle: (op, args) => localService.handle(op, args),
+        log,
+      });
+      try {
+        server.start();
+        local = server;
+        log.info('local: socket listening', { path: socketPath });
+      } catch (error) {
+        log.error('local: cannot open the socket', {
+          path: socketPath,
+          error: errorMessage(error),
+        });
+      }
+    }
+
     const onAbort = () => live.stop();
     if (options.signal?.aborted) live.stop();
     options.signal?.addEventListener('abort', onAbort, { once: true });
+    // Before any resumed run or card can fetch or push.
+    await gitAuth.probe();
     await watchList.start();
     // Runs a previous runner left are picked up; their events go to the spool.
     await runs.start().catch((error) => {
       log.error('skills: cannot resume runs', { error: errorMessage(error) });
+    });
+    await plans.start().catch((error) => {
+      log.error('planner: cannot resume turns', {
+        error: errorMessage(error),
+      });
+    });
+    await uiProfiles.start().catch((error) => {
+      log.error('uiprofile: cannot resume builds', {
+        error: errorMessage(error),
+      });
+    });
+    await cards.start().catch((error) => {
+      log.error('cards: cannot resume watching workers', {
+        error: errorMessage(error),
+      });
     });
     // Not awaited: a first scan of a large profile must not delay connecting.
     sessions?.start(watchList.current).catch((error) => {
@@ -316,10 +520,17 @@ export const runDaemon = async (
     runLog.stop();
     // Sessions run on in tmux; the next start resumes watching them.
     runs.stop();
+    plans.stop();
+    uiProfiles.stop();
+    cards.stop();
+    capture.stop();
+    normalize.stop();
+    assess.stop();
     terminal.stop();
     await registry.stop();
     await sessions?.stop();
     await otlp?.stop();
+    local?.stop();
     return reason;
   } finally {
     release();

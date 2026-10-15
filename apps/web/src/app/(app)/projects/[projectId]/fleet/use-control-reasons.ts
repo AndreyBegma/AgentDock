@@ -8,6 +8,7 @@ import type {
 import { useMemo } from 'react';
 import {
   type ControlReason,
+  messageDisabledReason,
   startDisabledReason,
   stopDisabledReason,
 } from '../../../../../lib/control/reasons';
@@ -17,9 +18,11 @@ import type { Section } from '../../../../../lib/section/use-section';
 export interface ControlReasons {
   start: ControlReason | null;
   stop: ControlReason | null;
+  /** Messaging the orchestrator (#189). */
+  message: ControlReason | null;
 }
 
-/** Why Start and Stop are off right now (rule R1), from what the page already loaded. */
+/** Why Start, Stop and messaging are off right now (rule R1), from what the page already loaded. */
 export function useControlReasons({
   projectId,
   isAdmin,
@@ -47,6 +50,7 @@ export function useControlReasons({
     return {
       start: startDisabledReason(facts),
       stop: stopDisabledReason(facts),
+      message: messageDisabledReason(facts),
     };
   }, [projectId, isAdmin, project, data, error, orchestrator]);
 }

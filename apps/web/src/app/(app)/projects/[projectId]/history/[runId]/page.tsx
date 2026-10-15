@@ -6,9 +6,13 @@ import {
   type RunSession,
 } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Banner } from '@andrewbehma/glass-ui/banner';
+import { buttonClassName } from '@andrewbehma/glass-ui/button';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { KeyValueList } from '@andrewbehma/glass-ui/key-value-list';
+import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import {
   Table,
   TableCell,
@@ -16,37 +20,43 @@ import {
   TableRow,
 } from '@andrewbehma/glass-ui/table';
 import { Timeline } from '@andrewbehma/glass-ui/timeline';
-import { toast } from '@andrewbehma/glass-ui/toast';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Markdown } from '../../../../../../components/markdown/markdown';
+import { PageHeader } from '../../../../../../components/page-header/page-header';
 import {
   isNotFound,
   toTimelineItem,
 } from '../../../../../../lib/activity/format';
-import { api, describeError } from '../../../../../../lib/api';
+import { api, describeErrorHint } from '../../../../../../lib/api';
 import {
   CHECKPOINT_LABEL,
   CHECKPOINT_TONE,
   safeHttpsUrl,
 } from '../../../../../../lib/fleet/format';
+import { formatNumber } from '../../../../../../lib/format';
+import { Time } from '../../../../../../lib/format/time';
 import {
   costLabel,
+  latestSession,
   parseRunUpdate,
   prLabel,
   RUN_KIND_LABEL,
   RUN_STATUS_LABEL,
-  RUN_STATUS_TONE,
-  runLabel,
+  retryHref,
+  runFailure,
+  runTitle,
   runtimeLabel,
   tokensLabel,
 } from '../../../../../../lib/history/format';
 import { useLive } from '../../../../../../lib/live/use-live';
-import {
-  formatDuration,
-  formatTime,
-} from '../../../../../../lib/sessions/format';
+import { planHref } from '../../../../../../lib/planner/href';
+import { useErrorToast } from '../../../../../../lib/section/use-error-toast';
+import { formatDuration } from '../../../../../../lib/sessions/format';
+import { RUN_PILL_STATUS } from '../../../../../../lib/status/pill';
 import { ProjectRunnerBanner } from '../../project-runner-banner';
+import { ActorIcon } from './actor-icon';
 
 const REFETCH_DEBOUNCE_MS = 300;
 
@@ -85,14 +95,69 @@ function SessionsTable({ sessions }: { sessions: RunSession[] }) {
             <TableCell>
               <Badge tone="neutral" label={session.runtime} />
             </TableCell>
-            <TableCell>{formatTime(session.startedAt)}</TableCell>
-            <TableCell>{session.usage.requests}</TableCell>
-            <TableCell>{tokensLabel(session.usage)}</TableCell>
-            <TableCell>{costLabel(session.usage)}</TableCell>
+            <TableCell>
+              <Time value={session.startedAt} />
+            </TableCell>
+            <TableCell className="num">
+              {formatNumber(session.usage.requests)}
+            </TableCell>
+            <TableCell className="num">{tokensLabel(session.usage)}</TableCell>
+            <TableCell className="num">{costLabel(session.usage)}</TableCell>
           </TableRow>
         ))}
       </tbody>
     </Table>
+  );
+}
+
+/**
+ * A run that did not get where it was going leads with why, and with what to
+ * do next (#213): try again, look at the session, or update the runner when
+ * it does not know the command.
+ */
+function FailureBanner({
+  projectId,
+  run,
+}: {
+  projectId: string;
+  run: RunDetail;
+}) {
+  const failure = runFailure(run);
+  if (!failure) return null;
+  const retry = retryHref(projectId, run);
+  const session = latestSession(run.sessions);
+  const link = (variant: 'solid' | 'glass') =>
+    buttonClassName({ variant, size: 'sm' });
+  return (
+    <Banner
+      tone={failure.tone}
+      title={failure.title}
+      className="mb-6"
+      action={
+        <div className="flex flex-wrap gap-2">
+          {failure.updateRunner ? (
+            <Link href="/install" className={link('solid')}>
+              Update the runner
+            </Link>
+          ) : null}
+          {retry ? (
+            <Link
+              href={retry}
+              className={link(failure.updateRunner ? 'glass' : 'solid')}
+            >
+              Retry
+            </Link>
+          ) : null}
+          {session ? (
+            <Link href={`/sessions/${session.id}`} className={link('glass')}>
+              Open session
+            </Link>
+          ) : null}
+        </div>
+      }
+    >
+      <Markdown compact>{failure.cause}</Markdown>
+    </Banner>
   );
 }
 
@@ -104,15 +169,16 @@ export default function RunDetailPage() {
   const [run, setRun] = useState<RunDetail>();
   const [missing, setMissing] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const showError = useErrorToast();
 
   const load = useCallback(async () => {
     try {
       setRun(await api<RunDetail>(`/projects/${projectId}/runs/${runId}`));
     } catch (err) {
       if (isNotFound(err)) setMissing(true);
-      else toast.error(describeError(err));
+      else showError(describeErrorHint(err));
     }
-  }, [projectId, runId]);
+  }, [projectId, runId, showError]);
 
   useEffect(() => {
     load();
@@ -144,105 +210,148 @@ export default function RunDetailPage() {
   }
 
   const prUrl = safeHttpsUrl(run.prUrl);
+  // Checkpoints, sessions and the feed are a worker slot's; other runs have none.
+  const isSlot = run.kind === 'orchestrator_slot';
   return (
     <>
-      <div className="mb-1 text-sm text-ink-3">
-        <Link
-          href={`/projects/${projectId}/history`}
-          className="underline-offset-2 hover:underline"
-        >
-          History
-        </Link>
-      </div>
-      <h1 className="mb-4 flex items-center gap-3 text-xl font-semibold">
-        {runLabel(run)}
-        <Badge
-          tone={RUN_STATUS_TONE[run.status]}
-          label={RUN_STATUS_LABEL[run.status]}
-        />
-      </h1>
+      <PageHeader
+        eyebrow={RUN_KIND_LABEL[run.kind]}
+        title={runTitle(run)}
+        status={
+          <StatusPill
+            size="md"
+            status={RUN_PILL_STATUS[run.status]}
+            label={RUN_STATUS_LABEL[run.status]}
+          />
+        }
+      />
+      <FailureBanner projectId={projectId} run={run} />
       <div className="mb-4">
         <ProjectRunnerBanner projectId={projectId} />
       </div>
 
       <section className="mb-8">
-        <h2 className="mb-2 text-sm font-semibold">Summary</h2>
+        <SectionHeader title="Summary" className="mb-2" />
         <KeyValueList
           items={[
-            { key: 'title', label: 'Title', value: run.title ?? '—' },
+            { key: 'title', label: 'Title', value: runTitle(run) },
             { key: 'kind', label: 'Kind', value: RUN_KIND_LABEL[run.kind] },
+            ...(run.planId
+              ? [
+                  {
+                    key: 'plan',
+                    label: 'Plan',
+                    value: (
+                      <Link
+                        href={planHref(projectId, run.planId)}
+                        className="underline-offset-2 hover:underline"
+                      >
+                        Open the plan
+                      </Link>
+                    ),
+                  },
+                ]
+              : []),
             {
               key: 'runtime',
               label: 'Runtime / model',
               value: runtimeLabel(run),
             },
+            ...(isSlot || run.prNumber !== null
+              ? [
+                  {
+                    key: 'pr',
+                    label: 'Pull request',
+                    value: prUrl ? (
+                      <a
+                        href={prUrl}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="underline-offset-2 hover:underline"
+                      >
+                        {prLabel(run)}
+                      </a>
+                    ) : (
+                      prLabel(run)
+                    ),
+                  },
+                ]
+              : []),
             {
-              key: 'pr',
-              label: 'Pull request',
-              value: prUrl ? (
-                <a
-                  href={prUrl}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className="underline-offset-2 hover:underline"
-                >
-                  {prLabel(run)}
-                </a>
+              key: 'outcome',
+              label: 'Outcome',
+              value: run.outcome ? (
+                <Markdown compact>{run.outcome}</Markdown>
               ) : (
-                prLabel(run)
+                '—'
               ),
             },
-            { key: 'outcome', label: 'Outcome', value: run.outcome ?? '—' },
             {
               key: 'started',
               label: 'Started',
-              value: formatTime(run.startedAt),
+              value: <Time value={run.startedAt} format="datetime" />,
             },
             {
               key: 'ended',
               label: 'Ended',
-              value: run.endedAt ? formatTime(run.endedAt) : '—',
+              value: <Time value={run.endedAt} format="datetime" />,
             },
             {
               key: 'duration',
               label: 'Duration',
               value: formatDuration(run.durationMs),
             },
-            { key: 'requests', label: 'Requests', value: run.usage.requests },
+            {
+              key: 'requests',
+              label: 'Requests',
+              value: formatNumber(run.usage.requests),
+            },
             { key: 'tokens', label: 'Tokens', value: tokensLabel(run.usage) },
             { key: 'cost', label: 'Cost', value: costLabel(run.usage) },
           ]}
         />
       </section>
 
-      <section className="mb-8">
-        <h2 className="mb-2 text-sm font-semibold">Checkpoints</h2>
-        <Timeline
-          items={run.checkpoints.map((checkpoint) => ({
-            id: `${checkpoint.position}`,
-            at: checkpoint.at,
-            tone: CHECKPOINT_TONE[checkpoint.kind],
-            title: checkpoint.heading || CHECKPOINT_LABEL[checkpoint.kind],
-            meta: checkpoint.summary || CHECKPOINT_LABEL[checkpoint.kind],
-          }))}
-          dayHeadingLevel={3}
-          empty={<EmptyState title="No checkpoints" />}
-        />
-      </section>
+      {isSlot ? (
+        <>
+          <section className="mb-8">
+            <SectionHeader title="Checkpoints" className="mb-2" />
+            <Timeline
+              items={run.checkpoints.map((checkpoint) => ({
+                id: `${checkpoint.position}`,
+                at: checkpoint.at,
+                tone: CHECKPOINT_TONE[checkpoint.kind],
+                title: checkpoint.heading || CHECKPOINT_LABEL[checkpoint.kind],
+                meta: checkpoint.summary ? (
+                  <Markdown compact>{checkpoint.summary}</Markdown>
+                ) : (
+                  CHECKPOINT_LABEL[checkpoint.kind]
+                ),
+              }))}
+              dayHeadingLevel={3}
+              empty={<EmptyState title="No checkpoints" />}
+            />
+          </section>
 
-      <section className="mb-8">
-        <h2 className="mb-2 text-sm font-semibold">Sessions</h2>
-        <SessionsTable sessions={run.sessions} />
-      </section>
+          <section className="mb-8">
+            <SectionHeader title="Sessions" className="mb-2" />
+            <SessionsTable sessions={run.sessions} />
+          </section>
 
-      <section>
-        <h2 className="mb-2 text-sm font-semibold">Related activity</h2>
-        <Timeline
-          items={run.activity.map((item) => toTimelineItem(item))}
-          dayHeadingLevel={3}
-          empty={<EmptyState title="No related activity" />}
-        />
-      </section>
+          <section>
+            <SectionHeader title="Related activity" className="mb-2" />
+            <Timeline
+              items={run.activity.map((item) => ({
+                ...toTimelineItem(item),
+                actor: undefined,
+                icon: <ActorIcon type={item.actorType} />,
+              }))}
+              dayHeadingLevel={3}
+              empty={<EmptyState title="No related activity" />}
+            />
+          </section>
+        </>
+      ) : null}
     </>
   );
 }

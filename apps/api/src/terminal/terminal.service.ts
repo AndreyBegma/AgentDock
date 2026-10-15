@@ -29,7 +29,11 @@ const terminalError = (
 };
 
 /** The target the runner resolves (D2): kind and ids, plus the project's root. */
-const targetOf = (dto: TerminalTicketDto, root: string): TerminalTarget => {
+const targetOf = (
+  dto: TerminalTicketDto,
+  root: string,
+  sessionId?: string,
+): TerminalTarget => {
   const base = { projectId: dto.projectId, root };
   if (dto.kind !== 'slot' && dto.slot !== undefined) {
     throw new BadRequestException(`slot is only allowed with kind slot`);
@@ -37,13 +41,23 @@ const targetOf = (dto: TerminalTicketDto, root: string): TerminalTarget => {
   if (dto.kind !== 'skill_run' && dto.runId !== undefined) {
     throw new BadRequestException(`runId is only allowed with kind skill_run`);
   }
+  if (dto.kind !== 'manual' && dto.sessionId !== undefined) {
+    throw new BadRequestException(`sessionId is only allowed with kind manual`);
+  }
+  if (dto.kind !== 'card' && dto.cardId !== undefined) {
+    throw new BadRequestException(`cardId is only allowed with kind card`);
+  }
   switch (dto.kind) {
+    case 'manual':
+      return { kind: 'manual', ...base, sessionId: sessionId ?? '' };
     case 'slot':
       return { kind: 'slot', ...base, slot: dto.slot ?? '' };
     case 'orchestrator':
       return { kind: 'orchestrator', ...base };
     case 'skill_run':
       return { kind: 'skill_run', ...base, runId: dto.runId ?? '' };
+    case 'card':
+      return { kind: 'card', ...base, cardId: dto.cardId ?? '' };
   }
 };
 
@@ -78,7 +92,12 @@ export class TerminalService {
       },
     });
     if (!project) throw projectNotFound();
-    const target = targetOf(dto, project.rootPath);
+    await this.assertCard(dto);
+    const target = targetOf(
+      dto,
+      project.rootPath,
+      await this.manualSessionId(dto),
+    );
 
     const capabilities = capabilitiesSchema.safeParse(
       project.runner.capabilities,
@@ -110,6 +129,54 @@ export class TerminalService {
       mode: dto.mode,
     });
     return { ticket: issued.ticket, expiresAt: issued.expiresAt.toISOString() };
+  }
+
+  /**
+   * Spec 201 D23: a `manual` target names a session of this project that the
+   * runner's hook placed in a tmux session. The id may be the API's or Claude
+   * Code's own; the runner knows Claude Code's. Anything else is 404.
+   */
+  private async manualSessionId(
+    dto: TerminalTicketDto,
+  ): Promise<string | undefined> {
+    if (dto.kind !== 'manual') return undefined;
+    const requested = dto.sessionId ?? '';
+    const session = await this.prisma.agentSession.findFirst({
+      where: {
+        projectId: dto.projectId,
+        tmuxSession: { not: null },
+        OR: [{ id: requested }, { externalId: requested }],
+      },
+      select: { externalId: true },
+    });
+    if (!session) {
+      throw terminalError(
+        404,
+        TERMINAL_ERROR.notFound,
+        'No attachable session with that id in this project',
+      );
+    }
+    return session.externalId;
+  }
+
+  /**
+   * Issue #242: a `card` target names a card of this project; another
+   * project's card, or none, is 404 before a ticket exists. The runner checks
+   * again and attaches only that card's `agentdock-card-*` session.
+   */
+  private async assertCard(dto: TerminalTicketDto): Promise<void> {
+    if (dto.kind !== 'card') return;
+    const card = await this.prisma.boardCard.findFirst({
+      where: { id: dto.cardId ?? '', projectId: dto.projectId },
+      select: { id: true },
+    });
+    if (!card) {
+      throw terminalError(
+        404,
+        TERMINAL_ERROR.notFound,
+        'No card with that id in this project',
+      );
+    }
   }
 
   async active(

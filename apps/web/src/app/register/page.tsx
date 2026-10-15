@@ -115,7 +115,7 @@ export default function RegisterPage() {
       </form>
       <p className="text-sm text-ink-2">
         Already have an account?{' '}
-        <Link href="/login" className="text-ink underline">
+        <Link href="/login" className="text-accent-ink underline">
           Sign in
         </Link>
       </p>

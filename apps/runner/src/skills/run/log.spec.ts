@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { appendFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   RUN_LOG_BACKLOG_LINES,
@@ -9,7 +9,12 @@ import {
 } from '@agentdock/shared/protocol';
 import { FakeClock } from '../../testing/fake-clock';
 import { memoryLogger, tempDir } from '../../testing/fixtures';
-import { type RunLogOutbound, RunLogStreamer, runLogFrames } from './log';
+import {
+  type RunLogOutbound,
+  RunLogStreamer,
+  runLogFrames,
+  runLogSources,
+} from './log';
 import type { RunRecord } from './record';
 
 let cleanup = () => {};
@@ -70,6 +75,7 @@ describe('RunLogStreamer', () => {
             { kind: 'assistant', text: 'one' },
             { kind: 'assistant', text: 'two' },
           ],
+          lastOutputAt: expect.any(String),
         },
       },
     ]);
@@ -102,6 +108,7 @@ describe('RunLogStreamer', () => {
           type: 'lines',
           backlog: false,
           lines: [{ kind: 'result', text: 'Done.' }],
+          lastOutputAt: expect.any(String),
         },
       },
       {
@@ -112,6 +119,31 @@ describe('RunLogStreamer', () => {
     ]);
     expect(t.streamer.subscriptionCount).toBe(0);
     expect(t.clock.pending()).toEqual([]);
+  });
+
+  it('stamps backlog and live frames with the stream file mtime as lastOutputAt', () => {
+    const t = setup();
+    appendFileSync(t.stream, text('one'));
+    utimesSync(
+      t.stream,
+      new Date('2026-10-15T10:00:00Z'),
+      new Date('2026-10-15T10:00:00Z'),
+    );
+    t.streamer.subscribe(subscribe);
+    const at = (m: RunLogOutbound | undefined) =>
+      m?.type === 'run_log' && m.frame.type === 'lines'
+        ? m.frame.lastOutputAt
+        : 'no frame';
+    expect(at(t.sent[0])).toBe('2026-10-15T10:00:00.000Z');
+
+    appendFileSync(t.stream, text('two'));
+    utimesSync(
+      t.stream,
+      new Date('2026-10-15T10:05:00Z'),
+      new Date('2026-10-15T10:05:00Z'),
+    );
+    t.clock.advance(500);
+    expect(at(t.sent[1])).toBe('2026-10-15T10:05:00.000Z');
   });
 
   it('keeps only the newest backlog lines', () => {
@@ -155,6 +187,48 @@ describe('RunLogStreamer', () => {
     appendFileSync(t.stream, text('late'));
     t.clock.advance(5000);
     expect(t.sent.flatMap(t.lines)).toEqual([]);
+  });
+});
+
+describe('runLogSources', () => {
+  it('answers from the source that knows the run, and opens nothing for an unknown one', () => {
+    const skill = { projectId: 'prj_1', phase: 'running' as const };
+    const turn = { projectId: 'prj_1', phase: 'succeeded' as const };
+    const source = runLogSources(
+      {
+        record: (id) => (id === 'run_skill' ? skill : null),
+        streamFile: (id) => `/runs/${id}/stream.jsonl`,
+      },
+      {
+        record: (id) => (id === 'run_turn' ? turn : null),
+        streamFile: (id) => `/plans/p/turns/${id}/stream.jsonl`,
+      },
+    );
+    expect(source.record('run_skill')).toBe(skill);
+    expect(source.streamFile('run_skill')).toBe('/runs/run_skill/stream.jsonl');
+    expect(source.record('run_turn')).toBe(turn);
+    expect(source.streamFile('run_turn')).toBe(
+      '/plans/p/turns/run_turn/stream.jsonl',
+    );
+    expect(source.record('run_none')).toBeNull();
+    expect(source.streamFile('run_none')).toBe('');
+  });
+
+  it('a subscription to a run no source knows is refused', () => {
+    const sent: RunLogOutbound[] = [];
+    const streamer = new RunLogStreamer({
+      runs: runLogSources(),
+      send: (m) => {
+        sent.push(m);
+        return true;
+      },
+      clock: new FakeClock(),
+      log: memoryLogger().log,
+    });
+    streamer.subscribe(subscribe);
+    expect(sent).toEqual([
+      { type: 'subscribe.error', id: 's1', code: 'not_found' },
+    ]);
   });
 });
 

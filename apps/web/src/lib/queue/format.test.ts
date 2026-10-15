@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'bun:test';
-import type { QueueItemView, QueueState, QueueView } from '@agentdock/shared';
+import {
+  QUEUE_STATES,
+  type QueueItemView,
+  type QueueState,
+  type QueueView,
+} from '@agentdock/shared';
 import { ApiError } from '../api';
 import {
   allowedLabels,
@@ -9,12 +14,15 @@ import {
   describeQueueError,
   filterItems,
   gapSentence,
+  heldForLeadSummary,
   parseStateFilter,
+  QUEUE_FILTER_CODEC,
   queueEmptyDescription,
   queueHint,
   queueUnavailableCopy,
   refusedLabels,
   roundFooter,
+  STATE_CHIP_LABEL,
   safeHttpsUrl,
   stateLabel,
 } from './format';
@@ -59,6 +67,24 @@ const apiError = (
   code: string,
   body: Record<string, unknown> = {},
 ) => new ApiError(status, code as never, 'raw', undefined, body);
+
+describe('chip labels and the held-for-lead count', () => {
+  test('every state has a sentence-case chip label', () => {
+    for (const label of Object.values(STATE_CHIP_LABEL)) {
+      expect(label).not.toBe(label.toUpperCase());
+      expect(label).not.toContain('—');
+    }
+    expect(Object.keys(STATE_CHIP_LABEL).sort()).toEqual(
+      [...QUEUE_STATES].sort(),
+    );
+  });
+
+  test('the held summary counts slots and says they are not issues', () => {
+    expect(heldForLeadSummary(1)).toStartWith('1 slot held.');
+    expect(heldForLeadSummary(3)).toStartWith('3 slots held.');
+    expect(heldForLeadSummary(3)).toContain('apart from the issues');
+  });
+});
 
 describe('state filter', () => {
   const items = [item(1, 'ready'), item(2, 'blocked_work'), item(3, 'ready')];
@@ -244,6 +270,40 @@ describe('misc', () => {
     expect(
       queueUnavailableCopy({ reason: 'x' }, null, false).href,
     ).toBeUndefined();
+  });
+
+  test('a gh failure names gh on the runner, not the Runners page (#213)', () => {
+    const copy = queueUnavailableCopy(
+      { reason: 'gh is not available or timed out' },
+      'i185-screens',
+      true,
+    );
+    expect(copy.cta).toBe('Set up gh on i185-screens');
+    expect(copy.href).toBe('/install#troubleshooting');
+    expect(copy.body).toContain('gh auth login');
+    // A member who is not an admin gets the fix too: it is on the machine.
+    expect(
+      queueUnavailableCopy({ reason: 'gh timed out' }, null, false).cta,
+    ).toBe('Set up gh on the runner');
+    // A word that merely contains "gh" is not the GitHub CLI.
+    expect(queueUnavailableCopy({ reason: 'high load' }, null, true).cta).toBe(
+      'Open Runners',
+    );
+  });
+
+  test('the state chip and the view round-trip through the URL', () => {
+    const parse = (s: string) =>
+      QUEUE_FILTER_CODEC.parse(new URLSearchParams(s));
+    expect(parse('')).toEqual({ state: 'all', view: 'list' });
+    expect(parse('state=ready&view=board')).toEqual({
+      state: 'ready',
+      view: 'board',
+    });
+    expect(parse('state=bogus').state).toBe('all');
+    expect(QUEUE_FILTER_CODEC.search({ state: 'all', view: 'list' })).toBe('');
+    expect(
+      QUEUE_FILTER_CODEC.search({ state: 'blocked_person', view: 'list' }),
+    ).toBe('?state=blocked_person');
   });
 
   test('the round footer explains the dot', () => {

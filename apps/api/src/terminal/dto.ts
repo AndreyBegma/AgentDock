@@ -18,8 +18,11 @@ const TARGET_KINDS: TerminalTargetKind[] = [
   'slot',
   'orchestrator',
   'skill_run',
+  'manual',
+  'card',
 ];
 const ID_MAX_LENGTH = 64;
+const SESSION_ID_MAX_LENGTH = 200;
 
 /**
  * `POST /terminal/tickets` (spec 29 D5). A target is named by kind and ids
@@ -56,6 +59,26 @@ export class TerminalTicketDto implements TerminalTicketRequest {
     message: 'runId must match ^[A-Za-z0-9_-]{1,64}$',
   })
   runId?: string;
+
+  /** Required for `manual`: the Claude session of `agentdock-runner claude` (spec 201 D23). Another kind with it is 400. */
+  @ValidateIf(
+    (dto: TerminalTicketDto) =>
+      dto.kind === 'manual' || dto.sessionId !== undefined,
+  )
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(SESSION_ID_MAX_LENGTH)
+  sessionId?: string;
+
+  /** Required for `card`: the board card's id — `cardIdSchema`'s rule (issue #242). Another kind with it is 400. */
+  @ValidateIf(
+    (dto: TerminalTicketDto) => dto.kind === 'card' || dto.cardId !== undefined,
+  )
+  @IsString()
+  @Matches(/^[A-Za-z0-9_-]{1,64}$/, {
+    message: 'cardId must match ^[A-Za-z0-9_-]{1,64}$',
+  })
+  cardId?: string;
 
   @IsIn(terminalModeSchema.options)
   mode!: TerminalMode;

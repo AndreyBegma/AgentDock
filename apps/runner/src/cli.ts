@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { parseArgs } from 'node:util';
 import type { Host } from '@agentdock/shared/protocol';
+import { runClaude } from './claude';
 import type { Clock } from './clock';
 import { ConfigError, isPaired, loadConfig, saveConfig } from './config';
 import type { RunnerConnection, SocketFactory } from './connection';
@@ -9,11 +10,18 @@ import { runDaemon } from './daemon';
 import { createExec, type Exec } from './detect/exec';
 import { detectProfiles, withAuthentication } from './detect/profiles';
 import { type Env, type Paths, resolvePaths } from './env';
+import { runHook } from './hooks/run';
+import { runAway } from './local/away';
+import { localSocketPath } from './local/paths';
+import { type LocalCommandDeps, NotImplementedError } from './local/subcommand';
 import { LockError } from './lock';
 import { createLogger, errorMessage, type Logger, parseLogLevel } from './log';
+import { runMcp } from './mcp';
+import { otlpSettings } from './otlp';
 import { PairingError, pair } from './pairing';
 import { normalizeServer, ServerUrlError } from './server-url';
 import { EXIT, launchAgentPlist, serviceUnit } from './service';
+import { setupClaude } from './setup/claude';
 import { Spool } from './spool';
 import { RUNNER_VERSION } from './version';
 
@@ -31,6 +39,12 @@ export interface CliDeps {
   random?: () => number;
   signal?: AbortSignal;
   onStart?: (connection: RunnerConnection) => void;
+  /** The process's stdin, for `hook` and `mcp`; Bun's by default. */
+  stdin?: () => ReadableStream<Uint8Array>;
+  /** The working directory; `process.cwd()` by default. */
+  cwd?: string;
+  /** The parent pid; `process.ppid` by default. */
+  ppid?: number;
 }
 
 const USAGE = `Usage: agentdock-runner <command>
@@ -44,7 +58,18 @@ Commands:
   profiles [--detect [--write]]            list runtime profiles, or detect them
   install-service                          write the systemd user unit (Linux)
                                            or the launchd agent (macOS)
+  setup claude [--profile <key>] [--no-telemetry] [--dry-run] [--uninstall]
+                                           install the agentdock Claude Code plugin
+                                           and point telemetry at this runner
+  away on|off                              route permission prompts to AgentDock
+                                           while you are away
   version                                  print the version and the target
+
+Used by the agentdock Claude Code plugin:
+  hook <name>                              report a Claude Code hook (JSON on stdin)
+  mcp                                      the agentdock MCP server (stdio)
+  claude [-- <args>]                       run claude in a tmux session AgentDock
+                                           can attach to
 `;
 
 class UsageError extends Error {}
@@ -58,16 +83,30 @@ interface Context {
 
 const out = (deps: CliDeps, line: string) => deps.stdout(`${line}\n`);
 
-const flags = <T extends Record<string, { type: 'string' | 'boolean' }>>(
+type FlagOptions = Record<string, { type: 'string' | 'boolean' }>;
+
+const flags = <T extends FlagOptions>(args: string[], options: T) =>
+  withPositionals(args, options, 0).values;
+
+/** Strict flags plus up to `max` positionals; more is a usage error. */
+const withPositionals = <T extends FlagOptions>(
   args: string[],
   options: T,
+  max: number,
 ) => {
-  try {
-    return parseArgs({ args, options, strict: true, allowPositionals: false })
-      .values;
-  } catch (error) {
-    throw new UsageError(errorMessage(error));
+  const parsed = (() => {
+    try {
+      return parseArgs({ args, options, strict: true, allowPositionals: true });
+    } catch (error) {
+      throw new UsageError(errorMessage(error));
+    }
+  })();
+  if (parsed.positionals.length > max) {
+    throw new UsageError(
+      `unexpected argument: ${parsed.positionals[max] ?? ''}`,
+    );
   }
+  return parsed;
 };
 
 const pairCommand = async ({
@@ -160,11 +199,13 @@ const runCommand = async ({
   const reason = await runDaemon({
     config,
     configFile: paths.configFile,
+    localSocket: socketPathOf(deps, paths),
     home: paths.home,
     spoolDir: paths.spoolDir,
     offsetsFile: paths.offsetsFile,
     host: deps.host,
     exec: deps.exec ?? createExec(deps.env),
+    env: deps.env,
     clock: deps.clock,
     log,
     createSocket: deps.createSocket,
@@ -267,7 +308,7 @@ const installServiceCommand = async ({
     return EXIT.ok;
   }
   mkdirSync(dirname(paths.serviceFile), { recursive: true });
-  writeFileSync(paths.serviceFile, serviceUnit(deps.execStart), {
+  writeFileSync(paths.serviceFile, serviceUnit(deps.execStart, deps.env.PATH), {
     mode: 0o644,
   });
   out(deps, `Wrote ${paths.serviceFile}`);
@@ -278,12 +319,68 @@ const installServiceCommand = async ({
   return EXIT.ok;
 };
 
+/** The daemon's socket, derived exactly as the daemon derives it (spec 201 D5). */
+const socketPathOf = (deps: CliDeps, paths: Paths): string =>
+  localSocketPath(deps.env, deps.host.os, dirname(paths.spoolDir));
+
+const localDeps = (deps: CliDeps, paths: Paths): LocalCommandDeps => ({
+  env: deps.env,
+  os: deps.host.os,
+  socketPath: socketPathOf(deps, paths),
+  cwd: deps.cwd ?? process.cwd(),
+  ppid: deps.ppid ?? process.ppid,
+  stdin: deps.stdin ?? (() => Bun.stdin.stream()),
+  stdout: deps.stdout,
+  stderr: deps.stderr,
+  exec: deps.exec ?? createExec(deps.env),
+});
+
+const setupCommand = async ({
+  deps,
+  paths,
+  args,
+}: Context): Promise<number> => {
+  const { values, positionals } = withPositionals(
+    args,
+    {
+      profile: { type: 'string' },
+      'no-telemetry': { type: 'boolean' },
+      'dry-run': { type: 'boolean' },
+      uninstall: { type: 'boolean' },
+    },
+    1,
+  );
+  if (positionals[0] !== 'claude') {
+    throw new UsageError('setup needs a target: setup claude');
+  }
+  const config = loadConfig(paths.configFile);
+  const otlp = otlpSettings(config.otlp);
+  return setupClaude({
+    profiles: config.profiles,
+    profile: values.profile,
+    telemetry: !values['no-telemetry'],
+    dryRun: values['dry-run'] === true,
+    uninstall: values.uninstall === true,
+    otlpPort: otlp.enabled ? otlp.httpPort : null,
+    home: paths.home,
+    env: deps.env,
+    exec: (env) => createExec(env),
+    stdout: deps.stdout,
+    stderr: deps.stderr,
+  });
+};
+
 const COMMANDS: Record<string, (context: Context) => Promise<number>> = {
   pair: pairCommand,
   run: runCommand,
   status: statusCommand,
   profiles: profilesCommand,
   'install-service': installServiceCommand,
+  setup: setupCommand,
+  away: ({ deps, paths, args }) => runAway(args, localDeps(deps, paths)),
+  // `mcp` and `claude` take their arguments raw: the wave-3 slots own them.
+  mcp: ({ deps, paths, args }) => runMcp(args, localDeps(deps, paths)),
+  claude: ({ deps, paths, args }) => runClaude(args, localDeps(deps, paths)),
 };
 
 /** The whole CLI, with every side effect injected. Returns the exit code. */
@@ -299,6 +396,15 @@ export const runCli = async (
   if (command === 'help' || command === '--help' || command === '-h') {
     deps.stdout(USAGE);
     return EXIT.ok;
+  }
+  // A hook must never fail the session it reports: exit 0 whatever happens,
+  // and log nothing (spec 201 D12).
+  if (command === 'hook') {
+    try {
+      return await runHook(args, localDeps(deps, resolvePaths(deps.env)));
+    } catch {
+      return EXIT.ok;
+    }
   }
   const handler = command ? COMMANDS[command] : undefined;
   if (!handler) {
@@ -317,6 +423,10 @@ export const runCli = async (
     if (error instanceof UsageError) {
       deps.stderr(`${error.message}\n\n${USAGE}`);
       return EXIT.usage;
+    }
+    if (error instanceof NotImplementedError) {
+      deps.stderr(`${error.message}\n`);
+      return EXIT.failure;
     }
     if (
       error instanceof PairingError ||

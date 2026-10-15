@@ -2,15 +2,16 @@ import { describe, expect, test } from 'bun:test';
 import { ApiError } from '../api';
 import {
   approvalSettingsHref,
+  approvalsBadge,
   COMMAND_UNAVAILABLE_TEXT,
   decisionDisabledReason,
   describeApprovalError,
+  describeApprovalHint,
   emptyWaitingCopy,
   formatDiffStat,
   isCommandUnavailable,
   mismatchSentence,
   movedHead,
-  navLabel,
   noteBytes,
   noteError,
   SOURCE_LABEL,
@@ -28,10 +29,18 @@ const apiError = (
     ...body,
   });
 
-describe('navLabel', () => {
-  test('shows the count only while PRs wait', () => {
-    expect(navLabel('Approvals', 0)).toBe('Approvals');
-    expect(navLabel('Approvals', 3)).toBe('Approvals · 3');
+describe('approvalsBadge', () => {
+  test('draws nothing while no PR waits', () => {
+    expect(approvalsBadge(0)).toBeUndefined();
+  });
+
+  test('counts the waiting PRs and says what the number is', () => {
+    expect(approvalsBadge(1)).toEqual({
+      count: 1,
+      tone: 'warn',
+      label: '1 waiting approval',
+    });
+    expect(approvalsBadge(3)?.label).toBe('3 waiting approvals');
   });
 });
 
@@ -129,6 +138,15 @@ describe('error mapping', () => {
     const error = apiError(503, 'command_unavailable');
     expect(isCommandUnavailable(error)).toBe(true);
     expect(describeApprovalError(error)).toBe(COMMAND_UNAVAILABLE_TEXT);
+  });
+
+  test('a too-old runner points at Runners; other errors carry no link', () => {
+    expect(
+      describeApprovalHint(apiError(503, 'command_unavailable'), 'build-box'),
+    ).toMatchObject({ href: '/admin/runners', cta: 'Open Runners' });
+    expect(describeApprovalHint(apiError(409, 'not_waiting'))).toEqual({
+      text: describeApprovalError(apiError(409, 'not_waiting')),
+    });
   });
 
   test('an old runner is named and told to update, with no "yet"', () => {

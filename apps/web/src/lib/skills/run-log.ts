@@ -17,6 +17,8 @@ export interface RunLogState {
   trimmed: boolean;
   /** The next backlog frame starts a new replay and replaces `rows`; the ones after it append. */
   awaitingBacklog: boolean;
+  /** #275 D4: the runner's newest `lastOutputAt` (ISO); null from an older runner. */
+  lastOutputAt: string | null;
 }
 
 export const EMPTY_RUN_LOG: RunLogState = {
@@ -25,6 +27,7 @@ export const EMPTY_RUN_LOG: RunLogState = {
   endedPhase: null,
   trimmed: false,
   awaitingBacklog: true,
+  lastOutputAt: null,
 };
 
 const append = (state: RunLogState, lines: RunLogLine[]): RunLogState => {
@@ -50,11 +53,19 @@ export function applyRunLogFrame(
   frame: RunLogFrame,
 ): RunLogState {
   if (frame.type === 'ended') return { ...state, endedPhase: frame.phase };
+  const lastOutputAt = frame.lastOutputAt ?? state.lastOutputAt;
   if (frame.backlog) {
     const base = state.awaitingBacklog ? EMPTY_RUN_LOG : state;
-    return { ...append(base, frame.lines), awaitingBacklog: false };
+    return {
+      ...append(base, frame.lines),
+      awaitingBacklog: false,
+      lastOutputAt,
+    };
   }
-  return append({ ...state, awaitingBacklog: false }, frame.lines);
+  return append(
+    { ...state, awaitingBacklog: false, lastOutputAt },
+    frame.lines,
+  );
 }
 
 /** Called on a reconnect: the next backlog frame starts the log over. */

@@ -4,35 +4,136 @@ import type { ProjectDetail } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
-import { Tabs, TabsItem } from '@andrewbehma/glass-ui/tabs';
-import { toast } from '@andrewbehma/glass-ui/toast';
+import { Tab, TabGroup, TabList, TabPanel } from '@andrewbehma/glass-ui/tabs';
 import { useParams } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useState } from 'react';
+import { PageHeader } from '../../../../../components/page-header/page-header';
+import { ScrollX } from '../../../../../components/scroll-x/scroll-x';
 import { ApiError, api } from '../../../../../lib/api';
 import { useLive } from '../../../../../lib/live/use-live';
 import { describeProjectError } from '../../../../../lib/projects/format';
+import { useTabParam } from '../../../../../lib/projects/use-tab-param';
 import { STATUS_TONE } from '../../../../../lib/runners/format';
+import { useErrorToast } from '../../../../../lib/section/use-error-toast';
+import { BoardTab } from './board-tab';
 import { BudgetTab } from './budget/budget-tab';
+import { DesignTab } from './design/design-tab';
 import { DocsTab } from './docs-tab';
 import { GeneralTab } from './general-tab';
 import { GitHubAppRow } from './github-app-row';
 import { MembersTab } from './members-tab';
 import { OrchestratorTab } from './orchestrator-tab';
+import { PlannerTab } from './planner-tab';
+import { SessionsTab } from './sessions-tab';
 
-const TABS = [
-  { id: 'general', label: 'General' },
-  { id: 'docs', label: 'Docs source' },
-  { id: 'orchestrator', label: 'Orchestrator' },
-  { id: 'members', label: 'Members' },
-  { id: 'budget', label: 'Budget' },
-] as const;
-type TabId = (typeof TABS)[number]['id'];
+/** What a tab's panel needs from the page. */
+interface TabContext {
+  project: ProjectDetail;
+  isAdmin: boolean;
+  canOperate: boolean;
+  reload: () => void;
+}
+
+/** One entry per tab: a new tab is one line here. */
+const TABS: readonly {
+  id: string;
+  label: string;
+  render: (ctx: TabContext) => ReactNode;
+}[] = [
+  {
+    id: 'general',
+    label: 'General',
+    render: ({ project, isAdmin, reload }) => (
+      <div className="flex flex-col gap-4">
+        <GeneralTab project={project} isAdmin={isAdmin} onChanged={reload} />
+        <GitHubAppRow projectId={project.id} />
+      </div>
+    ),
+  },
+  {
+    id: 'docs',
+    label: 'Docs source',
+    render: ({ project, isAdmin, canOperate, reload }) => (
+      <DocsTab
+        project={project}
+        isAdmin={isAdmin}
+        canRefresh={canOperate}
+        onChanged={reload}
+      />
+    ),
+  },
+  {
+    id: 'orchestrator',
+    label: 'Orchestrator',
+    render: ({ project, isAdmin, canOperate }) => (
+      <OrchestratorTab
+        project={project}
+        isAdmin={isAdmin}
+        canOperate={canOperate}
+      />
+    ),
+  },
+  {
+    id: 'members',
+    label: 'Members',
+    render: ({ project, isAdmin }) => (
+      <MembersTab projectId={project.id} isAdmin={isAdmin} />
+    ),
+  },
+  {
+    id: 'budget',
+    label: 'Budget',
+    render: ({ project, isAdmin }) => (
+      <BudgetTab projectId={project.id} isAdmin={isAdmin} />
+    ),
+  },
+  {
+    id: 'planner',
+    label: 'Planner',
+    render: ({ project, isAdmin }) => (
+      <PlannerTab projectId={project.id} isAdmin={isAdmin} />
+    ),
+  },
+  {
+    id: 'design',
+    label: 'Design',
+    render: ({ project, isAdmin, canOperate }) => (
+      <DesignTab
+        projectId={project.id}
+        isAdmin={isAdmin}
+        canOperate={canOperate}
+      />
+    ),
+  },
+  {
+    id: 'board',
+    label: 'Board',
+    render: ({ project, isAdmin, canOperate }) => (
+      <BoardTab
+        projectId={project.id}
+        isAdmin={isAdmin}
+        canOperate={canOperate}
+        contentOn={project.shipSessionContent ?? false}
+      />
+    ),
+  },
+  {
+    id: 'sessions',
+    label: 'Sessions',
+    render: ({ project, isAdmin, reload }) => (
+      <SessionsTab project={project} isAdmin={isAdmin} onChanged={reload} />
+    ),
+  },
+];
+const TAB_IDS = TABS.map(({ id }) => id);
 
 export default function ProjectSettingsPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const [project, setProject] = useState<ProjectDetail>();
   const [missing, setMissing] = useState(false);
-  const [tab, setTab] = useState<TabId>('general');
+  // `?tab=` carries the tab (links from the usage and fleet pages use it).
+  const [tab, setTab] = useTabParam(TAB_IDS);
+  const showError = useErrorToast();
 
   const load = useCallback(async () => {
     try {
@@ -40,21 +141,14 @@ export default function ProjectSettingsPage() {
       setMissing(false);
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) setMissing(true);
-      else toast.error(describeProjectError(err));
+      else showError(describeProjectError(err));
     }
-  }, [projectId]);
+  }, [projectId, showError]);
 
   useEffect(() => {
     setProject(undefined);
     load();
   }, [load]);
-
-  // A link may carry the tab (`?tab=budget`, from the usage and fleet pages).
-  useEffect(() => {
-    const wanted = new URLSearchParams(window.location.search).get('tab');
-    const found = TABS.find(({ id }) => id === wanted);
-    if (found) setTab(found.id);
-  }, []);
 
   // The API publishes no project events yet; any that arrive reload the page.
   useLive(`project:${projectId}`, () => {
@@ -76,11 +170,13 @@ export default function ProjectSettingsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">{project.displayName}</h1>
-          <p className="text-ink-2 flex flex-wrap items-center gap-2 text-sm">
-            {project.repo}
+      <PageHeader
+        className="mb-0"
+        title="Settings"
+        description={
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="font-medium text-ink">{project.displayName}</span>
+            <span>· {project.repo}</span>
             <span className="inline-flex items-center gap-1">
               <Badge
                 dot
@@ -90,52 +186,28 @@ export default function ProjectSettingsPage() {
               {project.runnerName} ({project.runnerStatus})
             </span>
             <span>· your role: {project.role}</span>
-          </p>
-        </div>
-      </div>
+          </span>
+        }
+      />
 
-      <Tabs aria-label="Project settings" className="max-w-xl">
-        {TABS.map(({ id, label }) => (
-          <TabsItem key={id} current={tab === id} layoutId="project-tab">
-            <button
-              type="button"
-              onClick={() => setTab(id)}
-              aria-pressed={tab === id}
-              className="relative flex w-full items-center justify-center px-3 py-2 text-sm font-medium"
-            >
-              {label}
-            </button>
-          </TabsItem>
+      <TabGroup value={tab} onValueChange={setTab}>
+        {/* Nine tabs do not fit a phone: the strip scrolls inside its box. */}
+        <ScrollX>
+          <TabList aria-label="Project settings" className="min-w-max">
+            {TABS.map(({ id, label }) => (
+              <Tab key={id} value={id} className="whitespace-nowrap">
+                {label}
+              </Tab>
+            ))}
+          </TabList>
+        </ScrollX>
+
+        {TABS.map(({ id, render }) => (
+          <TabPanel key={id} value={id} className="pt-4">
+            {render({ project, isAdmin, canOperate, reload: load })}
+          </TabPanel>
         ))}
-      </Tabs>
-
-      {tab === 'general' ? (
-        <div className="flex flex-col gap-4">
-          <GeneralTab project={project} isAdmin={isAdmin} onChanged={load} />
-          <GitHubAppRow projectId={project.id} />
-        </div>
-      ) : null}
-      {tab === 'docs' ? (
-        <DocsTab
-          project={project}
-          isAdmin={isAdmin}
-          canRefresh={canOperate}
-          onChanged={load}
-        />
-      ) : null}
-      {tab === 'orchestrator' ? (
-        <OrchestratorTab
-          project={project}
-          isAdmin={isAdmin}
-          canOperate={canOperate}
-        />
-      ) : null}
-      {tab === 'members' ? (
-        <MembersTab projectId={project.id} isAdmin={isAdmin} />
-      ) : null}
-      {tab === 'budget' ? (
-        <BudgetTab projectId={project.id} isAdmin={isAdmin} />
-      ) : null}
+      </TabGroup>
     </div>
   );
 }

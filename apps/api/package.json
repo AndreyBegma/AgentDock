@@ -7,9 +7,9 @@
     "start": "node dist/src/main",
     "start:dev": "nest start --watch",
     "lint": "biome lint src",
-    "test": "jest --runInBand",
+    "test": "tsc --noEmit -p tsconfig.json && jest --maxWorkers=2",
     "test:unit": "jest --selectProjects unit",
-    "test:e2e": "jest --runInBand --selectProjects e2e",
+    "test:e2e": "jest --maxWorkers=2 --selectProjects e2e",
     "test:watch": "jest --watch --selectProjects unit",
     "test:cov": "jest --runInBand --coverage",
     "admin:create": "ts-node src/cli/admin-create.ts",
@@ -17,7 +17,8 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:generate": "prisma generate",
     "db:seed": "prisma db seed",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@agentdock/shared": "workspace:*",
@@ -86,7 +87,12 @@
           "\\.e2e\\.spec\\.ts$"
         ],
         "transform": {
-          "^.+\\.ts$": "ts-jest"
+          "^.+\\.ts$": [
+            "ts-jest",
+            {
+              "tsconfig": "<rootDir>/../tsconfig.spec.json"
+            }
+          ]
         },
         "testEnvironment": "node"
       },
@@ -100,7 +106,12 @@
         "rootDir": "src",
         "testRegex": ".*\\.e2e\\.spec\\.ts$",
         "transform": {
-          "^.+\\.ts$": "ts-jest"
+          "^.+\\.ts$": [
+            "ts-jest",
+            {
+              "tsconfig": "<rootDir>/../tsconfig.spec.json"
+            }
+          ]
         },
         "globalSetup": "<rootDir>/test/global-setup.ts",
         "setupFiles": [

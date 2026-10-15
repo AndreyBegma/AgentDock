@@ -4,12 +4,15 @@ import type {
   CurrentPricesResponse,
   ModelPriceInput,
   PriceVersionListResponse,
+  UsageBreakdownResponse,
 } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
+import { Disclosure } from '@andrewbehma/glass-ui/disclosure';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Field, Input } from '@andrewbehma/glass-ui/field';
+import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import {
@@ -21,21 +24,19 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { PageHeader } from '../../../components/page-header/page-header';
 import { DisabledReason } from '../../../components/prerequisites/disabled-reason';
 import { ApiError, api } from '../../../lib/api';
+import { Time } from '../../../lib/format/time';
 import {
   NO_VERSION_REASON,
   PRICES_SEED_COMMAND,
   SOURCE_LABEL,
 } from '../../../lib/prices/format';
-import {
-  defaultTier,
-  describeConditions,
-  describeUsageError,
-  formatPerMillion,
-  formatTime,
-} from '../../../lib/usage/format';
+import { groupModels } from '../../../lib/prices/group';
+import { describeUsageError } from '../../../lib/usage/format';
 import { ModelEditor } from './model-editor';
+import { ModelTable } from './model-table';
 import { RecomputeDialog } from './recompute-dialog';
 import { type Draft, emptyDraft, SaveDialog } from './save-dialog';
 import { TestCalculator } from './test-calculator';
@@ -96,9 +97,50 @@ export default function AdminPricesPage() {
       : merged;
   }, [current, draft, filter]);
 
-  const savedByName = useMemo(
-    () => new Map((current?.models ?? []).map((m) => [m.modelName, m])),
+  const savedNames = useMemo(
+    () => new Set((current?.models ?? []).map((m) => m.modelName)),
     [current],
+  );
+
+  // Models the account has used lately sit on top; the rest fold by provider.
+  const [usedModels, setUsedModels] = useState<string[]>([]);
+  useEffect(() => {
+    const to = new Date();
+    const from = new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const query = new URLSearchParams({
+      dimension: 'model',
+      limit: '200',
+      from: from.toISOString(),
+      to: to.toISOString(),
+    });
+    api<UsageBreakdownResponse>(`/usage/breakdown?${query}`)
+      .then((result) =>
+        setUsedModels(result.rows.flatMap((row) => (row.key ? [row.key] : []))),
+      )
+      .catch(() => undefined);
+  }, []);
+
+  const grouped = useMemo(
+    () => groupModels(models, usedModels),
+    [models, usedModels],
+  );
+  const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(new Set());
+  const toggleGroup = (provider: string, open: boolean) =>
+    setOpenGroups((groups) => {
+      const next = new Set(groups);
+      if (open) next.add(provider);
+      else next.delete(provider);
+      return next;
+    });
+
+  const modelTable = (list: ModelPriceInput[]) => (
+    <ModelTable
+      models={list}
+      draft={draft}
+      savedNames={savedNames}
+      onEdit={(model) => setEditing({ model })}
+      onToggleRemove={toggleRemove}
+    />
   );
 
   const changes = draft.upsert.size + draft.remove.size;
@@ -130,57 +172,57 @@ export default function AdminPricesPage() {
 
   return (
     <>
-      <div className="mb-2 flex flex-wrap items-start justify-between gap-3">
-        <h1 className="text-xl font-semibold">Prices</h1>
-        <div className="flex flex-col items-end gap-1">
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="glass"
-              onClick={() => setEditing({})}
-              disabled={!version}
-              aria-describedby={versionReason ? 'prices-reason' : undefined}
-            >
-              Add model
-            </Button>
-            <Button
-              variant="glass"
-              onClick={() => setRecomputing(true)}
-              disabled={!version}
-              aria-describedby={versionReason ? 'prices-reason' : undefined}
-            >
-              Re-price requests…
-            </Button>
-            <Button
-              variant="solid"
-              disabled={changes === 0}
-              aria-describedby={
-                changes === 0 ? 'prices-save-reason' : undefined
-              }
-              onClick={() => setSaving(true)}
-            >
-              Save new version{changes > 0 ? ` (${changes})` : ''}
-            </Button>
+      <PageHeader
+        title="Prices"
+        description="Prices are versions: editing creates a new one cloned from the current version. Requests keep the cost they were priced with until you re-price a range."
+        actions={
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="glass"
+                onClick={() => setEditing({})}
+                disabled={!version}
+                aria-describedby={versionReason ? 'prices-reason' : undefined}
+              >
+                Add model
+              </Button>
+              <Button
+                variant="glass"
+                onClick={() => setRecomputing(true)}
+                disabled={!version}
+                aria-describedby={versionReason ? 'prices-reason' : undefined}
+              >
+                Re-price requests…
+              </Button>
+              <Button
+                variant="solid"
+                disabled={changes === 0}
+                aria-describedby={
+                  changes === 0 ? 'prices-save-reason' : undefined
+                }
+                onClick={() => setSaving(true)}
+              >
+                Save new version{changes > 0 ? ` (${changes})` : ''}
+              </Button>
+            </div>
+            {versionReason ? (
+              <DisabledReason id="prices-reason">
+                {versionReason}
+              </DisabledReason>
+            ) : version && changes === 0 ? (
+              <DisabledReason id="prices-save-reason">
+                Add, edit or remove a model to save a new version.
+              </DisabledReason>
+            ) : null}
           </div>
-          {versionReason ? (
-            <DisabledReason id="prices-reason">{versionReason}</DisabledReason>
-          ) : version && changes === 0 ? (
-            <DisabledReason id="prices-save-reason">
-              Add, edit or remove a model to save a new version.
-            </DisabledReason>
-          ) : null}
-        </div>
-      </div>
-      <p className="mb-1 text-sm text-ink-3">
-        Prices are versions: editing creates a new one cloned from the current
-        version. Requests keep the cost they were priced with until you re-price
-        a range.
-      </p>
+        }
+      />
       <p className="mb-4 text-xs text-ink-3">
         Re-price requests changes stored costs. Budgets add those costs up
         separately: after re-pricing, run{' '}
         <Link
           href="/admin/budgets"
-          className="text-ink underline underline-offset-2"
+          className="text-accent-ink underline underline-offset-2"
         >
           Recompute budget totals under Budgets
         </Link>
@@ -229,8 +271,8 @@ export default function AdminPricesPage() {
           <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
             <Badge tone="ok" label={`Current: v${version.number}`} />
             <span className="text-ink-2">
-              {SOURCE_LABEL[version.source]} · {formatTime(version.createdAt)} ·{' '}
-              {version.models} models
+              {SOURCE_LABEL[version.source]} ·{' '}
+              <Time value={version.createdAt} /> · {version.models} models
               {version.note ? ` · ${version.note}` : ''}
             </span>
           </div>
@@ -271,97 +313,42 @@ export default function AdminPricesPage() {
                 />
               )
             ) : (
-              <Table scroll>
-                <TableHead>
-                  <TableRow>
-                    <TableCell head>Model</TableCell>
-                    <TableCell head>Pattern</TableCell>
-                    <TableCell head>Priority</TableCell>
-                    <TableCell head>Input / 1M</TableCell>
-                    <TableCell head>Output / 1M</TableCell>
-                    <TableCell head>Cache read / 1M</TableCell>
-                    <TableCell head>Tiers</TableCell>
-                    <TableCell head>
-                      <span className="sr-only">Actions</span>
-                    </TableCell>
-                  </TableRow>
-                </TableHead>
-                <tbody>
-                  {models.map((model) => {
-                    const prices = defaultTier(model)?.prices;
-                    const removed = draft.remove.has(model.modelName);
-                    const changed = draft.upsert.has(model.modelName);
-                    return (
-                      <TableRow key={model.modelName}>
-                        <TableCell>
-                          <span
-                            className={removed ? 'line-through' : undefined}
-                          >
-                            {model.modelName}
-                          </span>{' '}
-                          {removed ? (
-                            <Badge tone="danger" label="removed" />
-                          ) : null}
-                          {changed ? (
-                            <Badge
-                              tone="warn"
-                              label={
-                                savedByName.has(model.modelName)
-                                  ? 'edited'
-                                  : 'new'
-                              }
-                            />
-                          ) : null}
-                        </TableCell>
-                        <TableCell>
-                          <code className="font-mono text-xs">
-                            {model.matchPattern}
-                          </code>
-                        </TableCell>
-                        <TableCell>{model.priority}</TableCell>
-                        <TableCell>{formatPerMillion(prices?.input)}</TableCell>
-                        <TableCell>
-                          {formatPerMillion(prices?.output)}
-                        </TableCell>
-                        <TableCell>
-                          {formatPerMillion(prices?.cacheRead)}
-                        </TableCell>
-                        <TableCell>
-                          {model.tiers.length > 1
-                            ? model.tiers
-                                .filter((t) => !t.isDefault)
-                                .map(
-                                  (t) => `${t.name}: ${describeConditions(t)}`,
-                                )
-                                .join('; ')
-                            : '—'}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="glass"
-                              size="sm"
-                              aria-label={`Edit ${model.modelName}`}
-                              disabled={removed}
-                              onClick={() => setEditing({ model })}
-                            >
-                              Edit
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              aria-label={`${removed ? 'Keep' : 'Remove'} ${model.modelName}`}
-                              onClick={() => toggleRemove(model.modelName)}
-                            >
-                              {removed ? 'Keep' : 'Remove'}
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </tbody>
-              </Table>
+              <div className="flex flex-col gap-4">
+                {grouped.used.length > 0 ? (
+                  <section aria-labelledby="prices-used">
+                    <SectionHeader
+                      className="mb-2"
+                      headingId="prices-used"
+                      title="Models you used"
+                      description={`Last 30 days · ${grouped.used.length}`}
+                    />
+                    {modelTable(grouped.used)}
+                  </section>
+                ) : null}
+                {grouped.rest.map((group) => {
+                  const isOpen =
+                    filter.trim() !== '' || openGroups.has(group.provider);
+                  return (
+                    <Disclosure
+                      key={group.provider}
+                      open={isOpen}
+                      onOpenChange={(open) => toggleGroup(group.provider, open)}
+                      trigger={
+                        <span className="text-sm font-semibold">
+                          {group.provider}
+                          <span className="ml-2 font-normal text-ink-3 num">
+                            {group.models.length}
+                          </span>
+                        </span>
+                      }
+                    >
+                      {isOpen ? (
+                        <div className="pt-2">{modelTable(group.models)}</div>
+                      ) : null}
+                    </Disclosure>
+                  );
+                })}
+              </div>
             )}
             {changes > 0 ? (
               <div className="mt-3 flex items-center gap-3 text-sm text-ink-2">
@@ -380,9 +367,11 @@ export default function AdminPricesPage() {
           <TestCalculator hasVersion />
 
           <section aria-labelledby="prices-history">
-            <h2 id="prices-history" className="mb-2 text-sm font-medium">
-              Version history
-            </h2>
+            <SectionHeader
+              className="mb-2"
+              headingId="prices-history"
+              title="Version history"
+            />
             {versions ? (
               <Table scroll>
                 <TableHead>
@@ -405,7 +394,9 @@ export default function AdminPricesPage() {
                         ) : null}
                       </TableCell>
                       <TableCell>{SOURCE_LABEL[v.source]}</TableCell>
-                      <TableCell>{formatTime(v.createdAt)}</TableCell>
+                      <TableCell>
+                        <Time value={v.createdAt} />
+                      </TableCell>
                       <TableCell>{v.createdBy?.email ?? '—'}</TableCell>
                       <TableCell>{v.models}</TableCell>
                       <TableCell>{v.note ?? '—'}</TableCell>

@@ -5,14 +5,17 @@ import {
   RUNNER_CLOSE_CODES,
   RUNNER_SOCKET_PATH,
   type RunnerMessage,
+  runnerCommandsOf,
   runnerMessageSchema,
 } from '@agentdock/shared/protocol';
 import { Inject, Logger } from '@nestjs/common';
 import { type OnGatewayConnection, WebSocketGateway } from '@nestjs/websockets';
 import type { RawData, WebSocket } from 'ws';
 import { bearerToken } from './credentials';
+import { RunnerConnectHooks } from './runner-connect-hooks';
 import { LiveConnection, RunnerConnections } from './runner-connections';
 import { RunnerIngestService } from './runner-ingest.service';
+import { RunnerLocalRequests } from './runner-local-requests';
 import { RUNNER_OPTIONS, type RunnerOptions } from './runner-options';
 import { RunnerStreams } from './runner-streams';
 import { RunnerWatchList } from './runner-watch-list';
@@ -26,6 +29,8 @@ interface Deps {
   connections: RunnerConnections;
   watchList: RunnerWatchList;
   streams: RunnerStreams;
+  localRequests: RunnerLocalRequests;
+  connectHooks: RunnerConnectHooks;
   options: RunnerOptions;
   logger: Logger;
 }
@@ -163,7 +168,29 @@ class RunnerSocket {
       case 'terminal.close':
         this.deps.streams.deliverTerminal(runnerId, message);
         return;
+      case 'local.request':
+        this.local(runnerId, live, message);
+        return;
     }
+  }
+
+  /**
+   * Answered off the frame queue (spec 201 D6): a handler may send the runner
+   * a command — `issue.create` for `create_issue` — whose `command.result`
+   * arrives on this same queue, so awaiting it here would deadlock.
+   */
+  private local(
+    runnerId: string,
+    live: LiveConnection,
+    request: Extract<RunnerMessage, { type: 'local.request' }>,
+  ): void {
+    void this.deps.localRequests.answer(runnerId, request).then((response) => {
+      if (!live.send(response)) {
+        this.deps.logger.debug(
+          `runner ${runnerId}: local.response ${request.id} not sent, socket gone`,
+        );
+      }
+    });
   }
 
   private async hello(
@@ -176,7 +203,12 @@ class RunnerSocket {
       return;
     }
     clearTimeout(this.helloTimer);
-    const live = new LiveConnection(runnerId, this.socket, Date.now());
+    const live = new LiveConnection(
+      runnerId,
+      this.socket,
+      Date.now(),
+      runnerCommandsOf(hello.capabilities),
+    );
     this.live = live;
     // Attached and welcomed in one step, queued with the watch-list pushes:
     // a project connected meanwhile is either in this list or pushed as
@@ -190,6 +222,9 @@ class RunnerSocket {
     // After the welcome: a `subscribe` sent from here is the runner's first.
     this.deps.streams.connected(live);
     this.deps.logger.log(`runner ${runnerId} connected`);
+    // Off the frame queue (#329 D4): a hook may send a command, whose result
+    // arrives on this same queue.
+    void this.deps.connectHooks.connected(runnerId);
   }
 
   private close(code: number, reason: string): void {
@@ -236,6 +271,8 @@ export class RunnerGateway implements OnGatewayConnection {
     private readonly connections: RunnerConnections,
     private readonly watchList: RunnerWatchList,
     private readonly streams: RunnerStreams,
+    private readonly localRequests: RunnerLocalRequests,
+    private readonly connectHooks: RunnerConnectHooks,
     @Inject(RUNNER_OPTIONS) private readonly options: RunnerOptions,
   ) {}
 
@@ -245,6 +282,8 @@ export class RunnerGateway implements OnGatewayConnection {
       connections: this.connections,
       watchList: this.watchList,
       streams: this.streams,
+      localRequests: this.localRequests,
+      connectHooks: this.connectHooks,
       options: this.options,
       logger: this.logger,
     });

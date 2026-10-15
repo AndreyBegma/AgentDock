@@ -30,3 +30,23 @@ export async function requireUser(): Promise<PublicUser> {
   if (response.status === 401 || response.status === 403) redirect('/login');
   throw new Error(`GET /auth/me failed with ${response.status}`);
 }
+
+/**
+ * The signed-in user, or null — for a page that works signed out (`/login`).
+ * Anything but a 200 is null: a stale cookie, a pending account or an API
+ * that is down all leave the visitor on the page, never in a redirect loop
+ * with `requireUser`.
+ */
+export async function currentUser(): Promise<PublicUser | null> {
+  const session = (await cookies()).get(SESSION_COOKIE);
+  if (!session) return null;
+  try {
+    const response = await fetch(`${API_URL}/auth/me`, {
+      headers: { cookie: `${SESSION_COOKIE}=${session.value}` },
+      cache: 'no-store',
+    });
+    return response.ok ? ((await response.json()) as PublicUser) : null;
+  } catch {
+    return null;
+  }
+}

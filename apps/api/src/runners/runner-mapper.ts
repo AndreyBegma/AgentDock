@@ -26,6 +26,9 @@ export const toAdminRunner = (
   lastSeenAt: runner.lastSeenAt?.toISOString() ?? null,
   revokedAt: runner.revokedAt?.toISOString() ?? null,
   createdAt: runner.createdAt.toISOString(),
+  // Spec 201 D8, D17.
+  localUserId: runner.localUserId,
+  awayMode: runner.awayMode,
 });
 
 export const toAdminProfile = (

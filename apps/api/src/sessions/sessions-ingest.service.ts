@@ -1,10 +1,19 @@
 import {
+  issueFromBranch,
   type LiveTopic,
+  liveStateAfter,
   SESSIONS_CHANGED_LIVE_EVENT,
+  type SessionOrigin,
   type SessionsChangedLiveData,
+  sessionOriginOf,
 } from '@agentdock/shared';
 import {
+  HOOK_SESSION_ENDED_EVENT,
+  HOOK_SESSION_STARTED_EVENT,
+  type HookEvent,
+  hookEventHasContent,
   type LlmRequestData,
+  parseHookEvent,
   parseSessionEvent,
   type RunnerEvent,
   type Runtime,
@@ -23,6 +32,7 @@ import {
   RunnerEventSinks,
 } from '../runners/runner-event-sinks';
 import { hourOf, RollupService } from '../usage/rollup.service';
+import { contentDraftsOf, stripHookContent } from './session-hook-content';
 import { modelList } from './session-tree';
 
 type Tx = Prisma.TransactionClient;
@@ -34,7 +44,28 @@ interface SessionRef {
   id: string;
   projectId: string | null;
   slotName: string | null;
+  cwd: string;
+  gitBranch: string | null;
+  origin: SessionOrigin;
+  issue: number | null;
+  ownerId: string | null;
 }
+
+const sessionRefSelect = {
+  id: true,
+  projectId: true,
+  slotName: true,
+  cwd: true,
+  gitBranch: true,
+  origin: true,
+  issue: true,
+  ownerId: true,
+} as const satisfies Prisma.AgentSessionSelect;
+
+/** One event of a batch, in arrival order: a transcript/OTel one or a hook one. */
+type Entry =
+  | { kind: 'session'; event: SessionEvent }
+  | { kind: 'hook'; event: HookEvent; slot: string | undefined };
 
 /** State shared by the events of one batch, inside its transaction. */
 class BatchContext {
@@ -48,12 +79,41 @@ class BatchContext {
   readonly rollupHours = new Set<number>();
   /** Sessions whose project or slot changed: their subtrees' hours are rebuilt too. */
   readonly reattributed = new Set<string>();
+  /** projectId → whether it keeps hook content (ADR-0021), read once per batch. */
+  private readonly ships = new Map<string, boolean>();
+  private local: { userId: string | null } | undefined;
 
   constructor(
     readonly tx: Tx,
     readonly runnerId: string,
     readonly pricer: Pricer,
   ) {}
+
+  /** The runner's local user: the owner of its manual sessions (D8, D14). */
+  async localUserId(): Promise<string | null> {
+    if (!this.local) {
+      const runner = await this.tx.runner.findUnique({
+        where: { id: this.runnerId },
+        select: { localUserId: true },
+      });
+      this.local = { userId: runner?.localUserId ?? null };
+    }
+    return this.local.userId;
+  }
+
+  /** Whether the project keeps session content right now (ADR-0021 §2). */
+  async shipsContent(projectId: string | null): Promise<boolean> {
+    if (projectId === null) return false;
+    const known = this.ships.get(projectId);
+    if (known !== undefined) return known;
+    const project = await this.tx.project.findUnique({
+      where: { id: projectId },
+      select: { shipSessionContent: true },
+    });
+    const ships = project?.shipSessionContent ?? false;
+    this.ships.set(projectId, ships);
+    return ships;
+  }
 
   touch(sessionId: string, at: Date): void {
     const seen = this.lastEventAt.get(sessionId);
@@ -86,8 +146,28 @@ export class SessionsIngestService implements RunnerEventSink, OnModuleInit {
   }
 
   async handle(runnerId: string, events: RunnerEvent[]): Promise<void> {
-    const parsed: SessionEvent[] = [];
+    const parsed: Entry[] = [];
     for (const event of events) {
+      const hook = parseHookEvent(event);
+      if (hook !== null) {
+        // After parsing: the parsed copy keeps the content, the raw event
+        // (stored later in `events`) must not.
+        stripHookContent(event);
+        if (!hook.ok) {
+          this.logger.warn(
+            `runner ${runnerId}: skipped ${event.type} seq ${event.seq}: ${hook.error}`,
+          );
+          continue;
+        }
+        if (!runtimeSchema.safeParse(hook.event.session.runtime).success) {
+          this.logger.warn(
+            `runner ${runnerId}: skipped ${event.type} seq ${event.seq}: unknown runtime`,
+          );
+          continue;
+        }
+        parsed.push({ kind: 'hook', event: hook.event, slot: event.slot });
+        continue;
+      }
       const result = parseSessionEvent(event);
       if (result === null) continue;
       if (!result.ok) {
@@ -102,14 +182,20 @@ export class SessionsIngestService implements RunnerEventSink, OnModuleInit {
         );
         continue;
       }
-      parsed.push(result.event);
+      parsed.push({ kind: 'session', event: result.event });
     }
     if (parsed.length === 0) return;
 
     const touched = await this.prisma.$transaction(
       async (tx) => {
         const ctx = new BatchContext(tx, runnerId, await this.cost.current(tx));
-        for (const event of parsed) await this.apply(ctx, event);
+        for (const entry of parsed) {
+          if (entry.kind === 'hook') {
+            await this.hook(ctx, entry.event, entry.slot);
+          } else {
+            await this.apply(ctx, entry.event);
+          }
+        }
         for (const [id, at] of ctx.lastEventAt) {
           await tx.agentSession.updateMany({
             where: { id, lastEventAt: { lt: at } },
@@ -170,11 +256,11 @@ export class SessionsIngestService implements RunnerEventSink, OnModuleInit {
     runtime: Runtime,
     externalId: string,
     at: Date,
+    parsed = true,
   ): Promise<SessionRef> {
     const key = `${runtime}:${externalId}`;
     const cached = ctx.sessions.get(key);
     if (cached) return cached;
-    const select = { id: true, projectId: true, slotName: true } as const;
     const row = await ctx.tx.agentSession.upsert({
       where: {
         runnerId_runtime_externalId: {
@@ -188,11 +274,12 @@ export class SessionsIngestService implements RunnerEventSink, OnModuleInit {
         runtime,
         externalId,
         cwd: '',
+        parsed,
         startedAt: at,
         lastEventAt: at,
       },
       update: {},
-      select,
+      select: sessionRefSelect,
     });
     ctx.sessions.set(key, row);
     return row;
@@ -259,10 +346,13 @@ export class SessionsIngestService implements RunnerEventSink, OnModuleInit {
     });
     session.projectId = projectId;
     session.slotName = slotName;
+    session.cwd = data.cwd;
+    session.gitBranch = data.gitBranch ?? null;
     if (before.projectId !== projectId || before.slotName !== slotName) {
       ctx.reattributed.add(session.id);
     }
     await this.propagateProject(ctx, session);
+    await this.refreshAttribution(ctx, session, false);
   }
 
   /**
@@ -275,7 +365,7 @@ export class SessionsIngestService implements RunnerEventSink, OnModuleInit {
   private async attributeFromEnvelope(
     ctx: BatchContext,
     session: SessionRef,
-    event: SessionEvent,
+    event: { project?: { root: string }; slot?: string },
   ): Promise<void> {
     if (session.projectId !== null || !event.project) return;
     const project = await ctx.tx.project.findFirst({
@@ -292,6 +382,134 @@ export class SessionsIngestService implements RunnerEventSink, OnModuleInit {
     session.slotName = slotName;
     ctx.reattributed.add(session.id);
     await this.propagateProject(ctx, session);
+    await this.refreshAttribution(ctx, session, false);
+  }
+
+  /**
+   * D14: origin, issue and owner follow what is known now. A slot always
+   * wins, so a worker that fires hooks stays `worker`; `manual` is sticky once
+   * a hook event was seen. Runs again when a transcript event later brings the
+   * slot or the branch.
+   */
+  private async refreshAttribution(
+    ctx: BatchContext,
+    session: SessionRef,
+    sawHookEvent: boolean,
+  ): Promise<void> {
+    const origin = sessionOriginOf({
+      slotName: session.slotName,
+      claimedByRun: session.origin === 'run',
+      sawHookEvent: sawHookEvent || session.origin === 'manual',
+    });
+    let issue = session.issue;
+    const slot =
+      session.slotName !== null && session.projectId !== null
+        ? await ctx.tx.slot.findFirst({
+            where: { projectId: session.projectId, name: session.slotName },
+            select: { issue: true },
+          })
+        : null;
+    const derived = slot?.issue ?? issueFromBranch(session.gitBranch);
+    if (derived !== null) issue = derived;
+    const ownerId =
+      origin === 'manual' && session.ownerId === null
+        ? await ctx.localUserId()
+        : session.ownerId;
+    if (
+      origin === session.origin &&
+      issue === session.issue &&
+      ownerId === session.ownerId
+    ) {
+      return;
+    }
+    await ctx.tx.agentSession.update({
+      where: { id: session.id },
+      data: { origin, issue, ownerId },
+    });
+    session.origin = origin;
+    session.issue = issue;
+    session.ownerId = ownerId;
+  }
+
+  /**
+   * A `hook.*` event (D11, D14): upserts the session — `parsed: false` when
+   * the transcript has not arrived, which later fills the rest — and moves its
+   * live state. Content becomes rows only when the project keeps it now
+   * (ADR-0021 §2); otherwise it is dropped and the metadata stays.
+   */
+  private async hook(
+    ctx: BatchContext,
+    event: HookEvent,
+    slot: string | undefined,
+  ): Promise<void> {
+    const at = new Date(event.ts);
+    const session = await this.session(
+      ctx,
+      event.session.runtime as Runtime,
+      event.session.id,
+      at,
+      false,
+    );
+    ctx.touch(session.id, at);
+    await this.attributeFromEnvelope(ctx, session, {
+      project: event.project,
+      slot,
+    });
+
+    const data: Prisma.AgentSessionUncheckedUpdateInput = {};
+    const liveState = liveStateAfter(event.type);
+    if (liveState !== null) data.liveState = liveState;
+    if (event.type === HOOK_SESSION_STARTED_EVENT) {
+      const started = event.data;
+      if (session.cwd === '') {
+        data.cwd = started.cwd;
+        session.cwd = started.cwd;
+      }
+      if (started.gitBranch) {
+        data.gitBranch = started.gitBranch;
+        session.gitBranch = started.gitBranch;
+      }
+      if (started.tmuxSession) data.tmuxSession = started.tmuxSession;
+      data.endedAt = null;
+    }
+    if (event.type === HOOK_SESSION_ENDED_EVENT) data.endedAt = at;
+    if (Object.keys(data).length > 0) {
+      await ctx.tx.agentSession.update({ where: { id: session.id }, data });
+    }
+    await this.refreshAttribution(ctx, session, true);
+
+    if (
+      hookEventHasContent(event) &&
+      (await ctx.shipsContent(session.projectId)) &&
+      session.projectId !== null
+    ) {
+      await this.storeContent(ctx, session.id, session.projectId, event, at);
+    }
+  }
+
+  /** Idempotent: a resent batch finds its rows by (session, kind, time, tool use). */
+  private async storeContent(
+    ctx: BatchContext,
+    sessionId: string,
+    projectId: string,
+    event: HookEvent,
+    at: Date,
+  ): Promise<void> {
+    for (const draft of contentDraftsOf(event)) {
+      const existing = await ctx.tx.sessionContent.findFirst({
+        where: {
+          sessionId,
+          kind: draft.kind,
+          at,
+          toolUseId: draft.toolUseId,
+        },
+        select: { id: true },
+      });
+      if (existing) continue;
+      await ctx.tx.sessionContent.create({
+        data: { sessionId, projectId, at, ...draft },
+      });
+    }
   }
 
   /** Every session below `session` takes its project and slot (D10). */
@@ -305,7 +523,8 @@ export class SessionsIngestService implements RunnerEventSink, OnModuleInit {
         UNION
         SELECT s.id FROM sessions s JOIN below b ON s."parentSessionId" = b.id
       )
-      UPDATE sessions SET "projectId" = ${session.projectId}, "slotName" = ${session.slotName}
+      UPDATE sessions SET "projectId" = ${session.projectId}, "slotName" = ${session.slotName},
+        "origin" = CASE WHEN ${session.slotName}::text IS NOT NULL THEN 'worker'::"SessionOrigin" ELSE "origin" END
       WHERE id IN (SELECT id FROM below) AND id <> ${session.id}`;
     // Cached refs of descendants are now stale: drop them, they reload on use.
     ctx.sessions.forEach((ref, key) => {

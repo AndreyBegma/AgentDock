@@ -78,6 +78,9 @@ Nothing is published on the host. The stack runs on its own compose network
 - **Secrets** live only in `/home/archi/stacks/agentdock-staging/.env` and
   `env/*.env`, all mode 600. `refresh.sh` never overwrites them. When an
   example gains a key, `refresh.sh` appends it empty.
+- **Attachments** of board cards (ADR-0031) live in the `attachments`
+  volume, not in the database. Back the volume up together with `pgdata`:
+  the database alone no longer restores everything.
 - **Migrations and the seed** run in the API's entrypoint, so a failed
   migration keeps the API unhealthy. The deploy fails after 240 s and prints
   the API log.

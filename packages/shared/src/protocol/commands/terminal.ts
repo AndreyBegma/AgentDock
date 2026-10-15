@@ -7,6 +7,7 @@ import {
   terminalModeSchema,
   terminalRowsSchema,
 } from '../terminal';
+import { cardIdSchema } from './cards';
 import { slotNameSchema } from './control';
 
 /**
@@ -30,10 +31,37 @@ const projectTarget = {
 };
 
 /**
+ * A session started by `agentdock-runner claude` (spec 201 D23): `sessionId`
+ * is Claude Code's session id. The runner resolves it to the
+ * `agentdock-manual-<hex>` tmux session its hook reported and refuses any it
+ * did not record.
+ */
+export const manualTerminalTargetSchema = z.strictObject({
+  kind: z.literal('manual'),
+  ...projectTarget,
+  sessionId: z.string().min(1).max(200),
+});
+export type ManualTerminalTarget = z.infer<typeof manualTerminalTargetSchema>;
+
+/**
+ * A board card's worker (issue #242): the runner resolves `cardId` to the
+ * `agentdock-card-<shortid>` session it started for that card, and refuses a
+ * card of another project.
+ */
+export const cardTerminalTargetSchema = z.strictObject({
+  kind: z.literal('card'),
+  ...projectTarget,
+  cardId: cardIdSchema,
+});
+export type CardTerminalTarget = z.infer<typeof cardTerminalTargetSchema>;
+
+/**
  * What to attach to (D2). The runner resolves the tmux session name itself:
  * `slot` → `cs-<slot>` when the slot's worktree belongs to `root`,
  * `orchestrator` → the project's orchestrator session, `skill_run` →
- * `agentdock-run-<shortid>` of a live run of that project. There is no field
+ * `agentdock-run-<shortid>` of a live run of that project, `manual` → the
+ * `agentdock-manual-*` session of a Claude session it recorded, `card` →
+ * the `agentdock-card-*` session of that project's card. There is no field
  * for a session name or a command, and an unknown field fails to parse.
  */
 export const terminalTargetSchema = z.discriminatedUnion('kind', [
@@ -48,8 +76,11 @@ export const terminalTargetSchema = z.discriminatedUnion('kind', [
     ...projectTarget,
     runId: terminalRunIdSchema,
   }),
+  manualTerminalTargetSchema,
+  cardTerminalTargetSchema,
 ]);
 export type TerminalTarget = z.infer<typeof terminalTargetSchema>;
+
 export type TerminalTargetKind = TerminalTarget['kind'];
 
 /**

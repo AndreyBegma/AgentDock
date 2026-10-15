@@ -2,6 +2,7 @@
 
 import type {
   AdminRunnerDetail,
+  InstalledSkillsView,
   ProjectSummary,
   SkillCatalogView,
   SkillInspectView,
@@ -11,6 +12,7 @@ import type { SkillCatalogItem } from '@agentdock/shared/protocol';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
+import { ChipButton } from '@andrewbehma/glass-ui/chip';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Field, SearchField, Select } from '@andrewbehma/glass-ui/field';
 import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
@@ -18,10 +20,12 @@ import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { Spinner } from '@andrewbehma/glass-ui/spinner';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
+import { PageHeader } from '../../../components/page-header/page-header';
 import { RunnerOfflineBanner } from '../../../components/prerequisites/prerequisite-banner';
 import { useCurrentUser } from '../../../components/shell/user-context';
 import { api, describeError } from '../../../lib/api';
+import { pluralize } from '../../../lib/format';
 import { isRunnerOnline } from '../../../lib/prerequisites/facts';
 import { useSection } from '../../../lib/section/use-section';
 import {
@@ -30,8 +34,103 @@ import {
   isCommandUnavailable,
 } from '../../../lib/skills/format';
 import { InspectSheet } from './inspect-sheet';
+import {
+  installedEntries,
+  SUGGESTED_SEARCHES,
+  whereInstalled,
+} from './installed';
 
 const SEARCH_DEBOUNCE_MS = 400;
+
+/**
+ * What the catalog shows before the person types: searches to start from,
+ * and the skills this project already has, each once.
+ */
+function BeforeSearch({
+  projectId,
+  onSuggest,
+}: {
+  projectId: string;
+  onSuggest: (term: string) => void;
+}) {
+  const installed = useSection(
+    () => api<InstalledSkillsView>(`/projects/${projectId}/skills`),
+    [projectId],
+  );
+  const entries = installed.data ? installedEntries(installed.data.items) : [];
+
+  return (
+    <div className="flex flex-col gap-6">
+      <section aria-labelledby="skills-suggested">
+        <h2
+          id="skills-suggested"
+          className="mb-2 text-sm font-semibold text-ink"
+        >
+          Suggested searches
+        </h2>
+        <div className="flex flex-wrap gap-2">
+          {SUGGESTED_SEARCHES.map((term) => (
+            <ChipButton key={term} size="md" onClick={() => onSuggest(term)}>
+              {term}
+            </ChipButton>
+          ))}
+        </div>
+      </section>
+
+      <section aria-labelledby="skills-installed">
+        <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id="skills-installed" className="text-sm font-semibold text-ink">
+            Installed in this project
+          </h2>
+          <Link
+            href={`/projects/${projectId}/skills`}
+            className="text-xs text-ink-2 underline underline-offset-2"
+          >
+            Manage and run
+          </Link>
+        </div>
+        {installed.data === undefined ? (
+          installed.error !== null && !installed.loading ? (
+            <SectionUnavailable
+              title="Installed skills could not be loaded"
+              stillWorks={`${describeError(installed.error)} Searching the catalog still works.`}
+              action={
+                <Button variant="glass" size="sm" onClick={installed.retry}>
+                  Try again
+                </Button>
+              }
+            />
+          ) : (
+            <Skeleton className="h-24 w-full" />
+          )
+        ) : entries.length === 0 ? (
+          <p className="text-sm text-ink-2">
+            Nothing yet. Search above to find one to install.
+          </p>
+        ) : (
+          <ul className="divide-y divide-line">
+            {entries.map((entry) => (
+              <li
+                key={entry.invocation}
+                className="flex flex-col gap-0.5 py-2.5 sm:flex-row sm:items-baseline sm:gap-3"
+              >
+                <span className="font-mono text-sm break-words text-ink sm:w-56 sm:shrink-0">
+                  /{entry.invocation}
+                </span>
+                <span className="min-w-0 flex-1 text-sm text-ink-2">
+                  {entry.description ?? ''}
+                </span>
+                <span className="text-xs whitespace-nowrap text-ink-3">
+                  {whereInstalled(entry)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
 
 /** A runner's state as the project option shows it; online needs no note. */
 const runnerNote = (project: ProjectSummary): string =>
@@ -46,6 +145,20 @@ interface Loaded {
   all: number;
   /** Where they may install or run skills: operator or admin. */
   operable: ProjectSummary[];
+}
+
+/** The page header over every state, the empty and failed ones included. */
+function CatalogPage({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        className="mb-0!"
+        title="Skills"
+        description="Search the public skills.sh catalog. The runner looks it up and clones the repository; nothing is installed until you confirm."
+      />
+      {children}
+    </div>
+  );
 }
 
 export default function SkillsCatalogPage() {
@@ -159,59 +272,61 @@ export default function SkillsCatalogPage() {
   if (!projects) {
     if (section.error !== null && !section.loading) {
       return (
-        <SectionUnavailable
-          title="Your projects could not be loaded"
-          stillWorks={`${describeError(section.error)} Skills need a project's runner, so the catalog waits for this.`}
-          action={
-            <Button variant="glass" size="sm" onClick={section.retry}>
-              Try again
-            </Button>
-          }
-        />
+        <CatalogPage>
+          <SectionUnavailable
+            title="Your projects could not be loaded"
+            stillWorks={`${describeError(section.error)} Skills need a project's runner, so the catalog waits for this.`}
+            action={
+              <Button variant="glass" size="sm" onClick={section.retry}>
+                Try again
+              </Button>
+            }
+          />
+        </CatalogPage>
       );
     }
-    return <Skeleton className="h-64 w-full" />;
+    return (
+      <CatalogPage>
+        <Skeleton className="h-64 w-full" />
+      </CatalogPage>
+    );
   }
   if (projects.length === 0 || !project) {
     const noProjects = section.data?.all === 0;
     if (noProjects && isGlobalAdmin) {
       return (
-        <EmptyState
-          title="Connect a project first"
-          description="Skills are installed and run through a project's runner, so the catalog needs at least one project."
-          action={
-            <Link
-              href="/projects"
-              className={buttonClassName({ variant: 'solid' })}
-            >
-              Connect project
-            </Link>
-          }
-        />
+        <CatalogPage>
+          <EmptyState
+            title="Connect a project first"
+            description="Skills are installed and run through a project's runner, so the catalog needs at least one project."
+            action={
+              <Link
+                href="/projects"
+                className={buttonClassName({ variant: 'solid' })}
+              >
+                Connect project
+              </Link>
+            }
+          />
+        </CatalogPage>
       );
     }
     return (
-      <EmptyState
-        title={noProjects ? 'No project yet' : 'No project to install into'}
-        description={
-          noProjects
-            ? 'Ask an administrator to add you to a project. Skills are installed and run through a project.'
-            : 'Installing and running skills needs the operator role on a project. Ask an administrator for access.'
-        }
-      />
+      <CatalogPage>
+        <EmptyState
+          title={noProjects ? 'No project yet' : 'No project to install into'}
+          description={
+            noProjects
+              ? 'Ask an administrator to add you to a project. Skills are installed and run through a project.'
+              : 'Installing and running skills needs the operator role on a project. Ask an administrator for access.'
+          }
+        />
+      </CatalogPage>
     );
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-xl font-semibold">Skills</h1>
-        <p className="text-sm text-ink-2">
-          Search the public skills.sh catalog. The runner looks it up and clones
-          the repository; nothing is installed until you confirm.
-        </p>
-      </div>
-
+    <CatalogPage>
       <RunnerOfflineBanner project={project} />
 
       <div className="flex flex-wrap items-end gap-4">
@@ -256,9 +371,9 @@ export default function SkillsCatalogPage() {
 
       {items === undefined ? (
         query.trim() === '' ? (
-          <EmptyState
-            title="Search for a skill"
-            description="Type a word above. Results come from skills.sh through the runner of the selected project."
+          <BeforeSearch
+            projectId={project.id}
+            onSuggest={(term) => setQuery(term)}
           />
         ) : null
       ) : items.length === 0 ? (
@@ -284,7 +399,7 @@ export default function SkillsCatalogPage() {
                   <span className="text-xs text-ink-3">
                     {inspecting === item.id
                       ? 'Opening…'
-                      : `${item.installs.toLocaleString('en')} installs`}
+                      : pluralize(item.installs, 'install')}
                   </span>
                 </Card>
               </button>
@@ -300,6 +415,6 @@ export default function SkillsCatalogPage() {
         isAdmin={isAdmin}
         onClose={() => setPreview(null)}
       />
-    </div>
+    </CatalogPage>
   );
 }

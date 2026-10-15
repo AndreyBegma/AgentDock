@@ -1,4 +1,7 @@
-import { RUNNER_OFFLINE_AFTER_MS } from '@agentdock/shared';
+import {
+  BLOCKED_CHECKPOINT_DELAY_MS,
+  RUNNER_OFFLINE_AFTER_MS,
+} from '@agentdock/shared';
 
 /** Timings of the notification loops; e2e tests override the provider. */
 export interface NotificationOptions {
@@ -18,6 +21,10 @@ export interface NotificationOptions {
   watcherIntervalMs: number;
   /** D5: a runner away this long opens an incident. */
   offlineAfterMs: number;
+  /** Note 23: how often the blocked-checkpoint sweep looks. */
+  blockedSweepIntervalMs: number;
+  /** Note 23: a blocked checkpoint standing this long notifies. */
+  blockedDelayMs: number;
 }
 
 export const NOTIFICATION_OPTIONS = Symbol('NOTIFICATION_OPTIONS');
@@ -29,4 +36,6 @@ export const defaultNotificationOptions: NotificationOptions = {
   holeWaitMs: 10_000,
   watcherIntervalMs: 60_000,
   offlineAfterMs: RUNNER_OFFLINE_AFTER_MS,
+  blockedSweepIntervalMs: 60_000,
+  blockedDelayMs: BLOCKED_CHECKPOINT_DELAY_MS,
 };

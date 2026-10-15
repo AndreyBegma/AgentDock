@@ -22,6 +22,12 @@ export interface MapContext {
    * runner's watch list; otherwise undefined and no project is set (D14).
    */
   project: (id: string) => EnvelopeProject | undefined;
+  /**
+   * The project id of a session the runner did not launch (spec 201 D22):
+   * its hook-reported cwd, correlated now. Consulted only for a record
+   * without `agentdock.project`.
+   */
+  sessionProject?: (sessionId: string) => string | undefined;
   /** Map Codex records too; their attribute names are [Unknown] (D13). */
   codexExperimental: boolean;
   /** Used only when a record carries no time of its own. */
@@ -113,12 +119,26 @@ export const claudeQuerySource = (
   return 'auxiliary';
 };
 
+/**
+ * `agentdock.project`, else the project of the session's hook-reported cwd
+ * (spec 201 D22). Exported so the receiver resolves the same ids it maps.
+ */
+export const recordProjectId = (
+  record: OtlpLogRecord,
+  context: Pick<MapContext, 'sessionProject'>,
+): string | undefined => {
+  const attribute = str(record, 'agentdock.project');
+  if (attribute) return attribute;
+  const sessionId = str(record, 'session.id');
+  return sessionId ? context.sessionProject?.(sessionId) : undefined;
+};
+
 /** Envelope `slot` and `issue`, and the watched project, from `agentdock.*` (D14). */
 const correlation = (
   record: OtlpLogRecord,
   context: MapContext,
 ): Pick<UnsequencedEvent, 'project' | 'slot' | 'issue'> & { run?: string } => {
-  const projectId = str(record, 'agentdock.project');
+  const projectId = recordProjectId(record, context);
   const project = projectId ? context.project(projectId) : undefined;
   const slot = str(record, 'agentdock.slot')?.slice(0, MAX_ID);
   const issueText = str(record, 'agentdock.issue');

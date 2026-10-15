@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import {
   capabilitiesSchema,
   commandErrorCodeSchema,
+  commandNames,
   commands,
   type HelloMessage,
   isSessionEventType,
@@ -18,6 +19,7 @@ import {
   projectInspectionSchema,
   type RunnerEvent,
   roleAtLeast,
+  runnerCommandsOf,
   runnerMessageSchema,
   runnerMessageTypes,
   SESSION_BACKFILL_TIMEOUT_MS,
@@ -148,6 +150,87 @@ describe('messageSchema', () => {
       capabilitiesSchema.safeParse({ ...capabilities, terminal: 'yes' })
         .success,
     ).toBe(false);
+  });
+
+  it('#329 D1: gitAuth is optional, next to the git version', () => {
+    const { capabilities } = hello();
+    const { gitAuth: _, ...older } = capabilities;
+    expect(capabilitiesSchema.parse(older).gitAuth).toBeUndefined();
+    for (const github of ['gh', 'native'] as const) {
+      expect(
+        capabilitiesSchema.parse({ ...capabilities, gitAuth: { github } })
+          .gitAuth,
+      ).toEqual({ github });
+    }
+    expect(
+      capabilitiesSchema.safeParse({
+        ...capabilities,
+        gitAuth: { github: 'ssh' },
+      }).success,
+    ).toBe(false);
+  });
+
+  describe('advertised commands (#233)', () => {
+    it('documents a commands list of real command names', () => {
+      const { capabilities } = hello();
+      expect(capabilities.commands).toBeDefined();
+      for (const name of capabilities.commands ?? []) {
+        expect(commandNames as string[]).toContain(name);
+      }
+      expect(runnerCommandsOf(capabilities)?.disabled).toEqual(['pr.approve']);
+    });
+
+    it('parses a hello without commands or disabledCommands', () => {
+      const message = hello();
+      const {
+        commands: _,
+        disabledCommands: __,
+        ...older
+      } = message.capabilities;
+      const parsed = runnerMessageSchema.parse({
+        ...message,
+        capabilities: older,
+      });
+      if (parsed.type !== 'hello') throw new Error('not a hello');
+      expect(parsed.capabilities.commands).toBeUndefined();
+      expect(runnerCommandsOf(parsed.capabilities)).toBeNull();
+    });
+
+    it('accepts a command name the API does not know', () => {
+      const message = hello();
+      const parsed = runnerMessageSchema.parse({
+        ...message,
+        capabilities: {
+          ...message.capabilities,
+          commands: ['plan.turn', 'future.command'],
+          disabledCommands: ['future.command'],
+        },
+      });
+      if (parsed.type !== 'hello') throw new Error('not a hello');
+      expect(parsed.capabilities.commands).toEqual([
+        'plan.turn',
+        'future.command',
+      ]);
+    });
+
+    it('drops an unknown capability key instead of rejecting the hello', () => {
+      const message = hello();
+      const parsed = runnerMessageSchema.parse({
+        ...message,
+        capabilities: { ...message.capabilities, futureCapability: true },
+      });
+      if (parsed.type !== 'hello') throw new Error('not a hello');
+      expect(parsed.capabilities).not.toHaveProperty('futureCapability');
+    });
+
+    it('rejects an empty command name and a list that is not strings', () => {
+      const { capabilities } = hello();
+      for (const commands of [[''], [1], 'plan.turn']) {
+        expect(
+          capabilitiesSchema.safeParse({ ...capabilities, commands }).success,
+        ).toBe(false);
+      }
+    });
   });
 
   it('rejects a negative seq cursor and a zero event seq', () => {

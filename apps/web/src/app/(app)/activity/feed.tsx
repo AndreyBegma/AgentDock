@@ -1,24 +1,20 @@
 'use client';
 
-import {
-  ACTIVITY_CATEGORIES,
-  ACTIVITY_ITEM_LIVE_EVENT,
-  type ActivityItem,
-  type ActivityPage,
-  type ActivityQuery,
-  type LiveTopic,
-  type ProjectSummary,
+import type {
+  ActivityItem,
+  ActivityPage,
+  ActivityQuery,
+  ProjectSummary,
 } from '@agentdock/shared';
-import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
-import { DateInput } from '@andrewbehma/glass-ui/date-input';
+import { Button } from '@andrewbehma/glass-ui/button';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
-import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
 import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { Timeline } from '@andrewbehma/glass-ui/timeline';
 import Link from 'next/link';
 import {
-  type FormEvent,
+  type ComponentProps,
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -26,193 +22,82 @@ import {
   useState,
 } from 'react';
 import {
-  type ActivityFilterForm,
-  activityFormChanged,
-  CATEGORY_LABEL,
+  ACTIVITY_FILTER_CODEC,
   EMPTY_ACTIVITY_FILTERS,
+  groupRows,
   hasActivityFilters,
   isNotFound,
   matchesQuery,
   mergeItems,
   PAGE_SIZE,
   POLL_MS,
-  parseLiveItem,
+  PROJECT_ACTIVITY_FILTER_CODEC,
   planLive,
   queryString,
   SCROLLED_PX,
   toActivityQuery,
-  toTimelineItem,
 } from '../../../lib/activity/format';
 import { api, describeError, describeErrorHint } from '../../../lib/api';
-import { useLive } from '../../../lib/live/use-live';
+import { useUrlFilters } from '../../../lib/filters/use-url-filters';
 import { useErrorToast } from '../../../lib/section/use-error-toast';
+import { type Names, TopicListener, toEntries } from './feed-entries';
+import { FeedToolbar } from './feed-toolbar';
 
-/** `useLive` takes one topic; a feed may follow several, so one invisible subscriber each. */
-function TopicListener({
-  topic,
-  onItem,
-}: {
-  topic: LiveTopic;
-  onItem: (item: ActivityItem) => void;
-}) {
-  useLive(topic, (message) => {
-    if (message.event !== ACTIVITY_ITEM_LIVE_EVENT) return;
-    const item = parseLiveItem(message.data);
-    if (item) onItem(item);
-  });
-  return null;
-}
+/** The empty state's action keeps client-side navigation. */
+const NextLink: NonNullable<ComponentProps<typeof EmptyState>['link']> = ({
+  href,
+  className,
+  children,
+  ...rest
+}) => (
+  <Link href={href} className={className} {...rest}>
+    {children}
+  </Link>
+);
 
-function Filters({
-  form,
-  projects,
-  showProject,
-  changed,
-  onChange,
-  onApply,
-  onReset,
-}: {
-  form: ActivityFilterForm;
-  projects: ProjectSummary[];
-  showProject: boolean;
-  /** The form holds filters that were not applied yet. */
-  changed: boolean;
-  onChange: (patch: Partial<ActivityFilterForm>) => void;
-  onApply: () => void;
-  onReset: () => void;
-}) {
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    onApply();
-  };
+type FeedProps = {
+  projectId?: string;
+  isAdmin: boolean;
+};
+
+/**
+ * The activity feed (spec 21 UI): a filter toolbar whose state is the URL, a
+ * day-grouped timeline with runs about one slot or PR folded, load more, and
+ * live insertion. `projectId` fixes it to one project; without it the feed is
+ * the caller's whole feed, with a project filter.
+ */
+export function ActivityFeed(props: FeedProps) {
   return (
-    <form
-      onSubmit={submit}
-      className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-4"
-    >
-      {showProject ? (
-        <Field label="Project" htmlFor="activity-project">
-          <Select
-            id="activity-project"
-            value={form.projectId}
-            onChange={(e) => onChange({ projectId: e.target.value })}
-          >
-            <option value="">All my projects</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.displayName}
-              </option>
-            ))}
-          </Select>
-        </Field>
-      ) : null}
-      <Field label="Category" htmlFor="activity-category">
-        <Select
-          id="activity-category"
-          value={form.category}
-          onChange={(e) => onChange({ category: e.target.value })}
-        >
-          <option value="">Any category</option>
-          {ACTIVITY_CATEGORIES.map((category) => (
-            <option key={category} value={category}>
-              {CATEGORY_LABEL[category]}
-            </option>
-          ))}
-        </Select>
-      </Field>
-      <Field
-        label="Type"
-        htmlFor="activity-type"
-        hint="The event code shown on an item, e.g. pr.merged."
-      >
-        <Input
-          id="activity-type"
-          value={form.type}
-          maxLength={200}
-          placeholder="e.g. pr.merged"
-          onChange={(e) => onChange({ type: e.target.value })}
-        />
-      </Field>
-      <Field
-        label="Actor"
-        htmlFor="activity-actor"
-        hint="Who caused it: a user's id, a runner's id, or “orchestrator”."
-      >
-        <Input
-          id="activity-actor"
-          value={form.actor}
-          maxLength={200}
-          placeholder="user or runner id"
-          onChange={(e) => onChange({ actor: e.target.value })}
-        />
-      </Field>
-      <Field
-        label="Slot"
-        htmlFor="activity-slot"
-        hint="The name of an orchestrator slot."
-      >
-        <Input
-          id="activity-slot"
-          value={form.slot}
-          maxLength={200}
-          placeholder="e.g. i42"
-          onChange={(e) => onChange({ slot: e.target.value })}
-        />
-      </Field>
-      <Field label="From" htmlFor="activity-from">
-        <DateInput
-          id="activity-from"
-          value={form.fromDate}
-          max={form.toDate || undefined}
-          onChange={(e) => onChange({ fromDate: e.target.value })}
-        />
-      </Field>
-      <Field label="To" htmlFor="activity-to">
-        <DateInput
-          id="activity-to"
-          value={form.toDate}
-          min={form.fromDate || undefined}
-          onChange={(e) => onChange({ toDate: e.target.value })}
-        />
-      </Field>
-      <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-4">
-        <Button variant="solid" type="submit">
-          Apply
-        </Button>
-        <Button variant="ghost" type="button" onClick={onReset}>
-          Reset
-        </Button>
-        {changed ? (
-          <p className="text-xs text-ink-2" role="status">
-            Filters changed. Press Apply to update the feed.
-          </p>
-        ) : null}
-      </div>
-    </form>
+    <Suspense fallback={<FeedSkeleton />}>
+      <Feed {...props} />
+    </Suspense>
   );
 }
 
-/**
- * The activity feed (spec 21 UI): filters, a day-grouped timeline, load more,
- * and live insertion. `projectId` fixes it to one project; without it the feed
- * is the caller's whole feed, with a project filter.
- */
-export function ActivityFeed({
-  projectId,
-  isAdmin,
-}: {
-  projectId?: string;
-  isAdmin: boolean;
-}) {
+function FeedSkeleton() {
+  return (
+    <div className="flex flex-col gap-3" aria-busy="true">
+      <Skeleton className="h-10 w-full" />
+      <Skeleton className="h-40 w-full" />
+    </div>
+  );
+}
+
+function Feed({ projectId, isAdmin }: FeedProps) {
   const fixed = projectId !== undefined;
-  const [form, setForm] = useState<ActivityFilterForm>(EMPTY_ACTIVITY_FILTERS);
-  const [applied, setApplied] = useState<ActivityQuery>({});
+  const url = useUrlFilters(
+    fixed ? PROJECT_ACTIVITY_FILTER_CODEC : ACTIVITY_FILTER_CODEC,
+  );
+  const form = url.filters;
+  const applied = useMemo(() => toActivityQuery(form), [form]);
+
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [items, setItems] = useState<ActivityItem[]>();
   const [pending, setPending] = useState<ActivityItem[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [missing, setMissing] = useState(false);
+  const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   // A failed load is never "no activity": keep what is on screen and say so.
   const [failure, setFailure] = useState<unknown>(null);
   const showError = useErrorToast();
@@ -227,6 +112,7 @@ export function ActivityFeed({
   appliedRef.current = applied;
 
   const base = fixed ? `/projects/${projectId}/activity` : '/activity';
+  const reset = () => url.replace(EMPTY_ACTIVITY_FILTERS);
 
   /** Reads refs only, so it is stable and never sees stale filters. */
   const receive = useCallback((incoming: ActivityItem[]) => {
@@ -284,16 +170,16 @@ export function ActivityFeed({
     loadFirst(applied, true);
   }, [applied, loadFirst]);
 
+  // The project filter, and the runners' names for actors.
   useEffect(() => {
-    if (fixed) return;
     api<ProjectSummary[]>('/projects')
       .then((list) => {
         if (Array.isArray(list)) setProjects(list);
       })
       .catch(() => {
-        // The project filter stays empty; the feed still works.
+        // The project filter stays empty and runners read "runner"; the feed still works.
       });
-  }, [fixed]);
+  }, []);
 
   const plan = useMemo(
     () =>
@@ -327,18 +213,35 @@ export function ActivityFeed({
     }
   };
 
-  const reset = () => {
-    setForm(EMPTY_ACTIVITY_FILTERS);
-    setApplied({});
-  };
-
-  const projectNames = useMemo(
-    () => new Map(projects.map((p) => [p.id, p.displayName])),
+  const names = useMemo<Names>(
+    () => ({
+      projects: new Map(projects.map((p) => [p.id, p.displayName])),
+      runners: new Map(projects.map((p) => [p.runnerId, p.runnerName])),
+    }),
     [projects],
   );
-  const timelineItems = useMemo(
-    () => (items ?? []).map((item) => toTimelineItem(item, projectNames)),
-    [items, projectNames],
+  const actors = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const item of items ?? []) {
+      if (item.actorType === 'user' && item.actorId && item.actorEmail) {
+        seen.set(item.actorId, item.actorEmail);
+      }
+    }
+    for (const [id, name] of names.runners) seen.set(id, `${name} (runner)`);
+    return seen;
+  }, [items, names]);
+
+  const toggle = useCallback((id: string) => {
+    setOpen((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+  const entries = useMemo(
+    () => toEntries(groupRows(items ?? []), open, toggle, names, fixed),
+    [items, open, toggle, names, fixed],
   );
 
   if (missing) {
@@ -356,15 +259,12 @@ export function ActivityFeed({
         <TopicListener key={topic} topic={topic} onItem={(i) => receive([i])} />
       ))}
 
-      <div className="mb-6">
-        <Filters
-          form={form}
+      <div className="mb-4">
+        <FeedToolbar
+          url={url}
           projects={projects}
           showProject={!fixed}
-          changed={activityFormChanged(form, applied)}
-          onChange={(patch) => setForm((c) => ({ ...c, ...patch }))}
-          onApply={() => setApplied(toActivityQuery(form))}
-          onReset={reset}
+          actors={actors}
         />
       </div>
 
@@ -388,52 +288,39 @@ export function ActivityFeed({
       ) : null}
       {items === undefined ? (
         failure !== null ? null : (
-          <div className="flex flex-col gap-3" aria-busy="true">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-40 w-full" />
-          </div>
+          <FeedSkeleton />
         )
       ) : (
         <Timeline
-          items={timelineItems}
+          items={entries}
           hasMore={nextCursor !== null}
           loadingMore={loadingMore}
           onLoadMore={loadMore}
           newCount={pending.length}
           onShowNew={showNew}
           dayHeadingLevel={2}
+          className="[&_li]:rounded-none [&_li]:bg-transparent [&_ol]:divide-y [&_ol]:divide-line"
           empty={
             hasActivityFilters(applied) ? (
               <EmptyState
                 title="No activity matches these filters"
                 description="Widen the date range or clear a filter to see more."
-                action={
-                  <Button variant="glass" onClick={reset}>
-                    Clear filters
-                  </Button>
-                }
+                action={{ label: 'Clear filters', onClick: reset }}
               />
             ) : (
               <EmptyState
                 title="No activity yet"
                 description="Events appear here as the orchestrator opens pull requests, hits blockers and finishes work."
+                link={NextLink}
                 action={
-                  <Link
-                    href={
-                      fixed
-                        ? `/projects/${projectId}/fleet`
-                        : isAdmin
-                          ? '/admin/runners'
-                          : '/projects'
-                    }
-                    className={buttonClassName({ variant: 'glass' })}
-                  >
-                    {fixed
-                      ? 'Open Fleet'
-                      : isAdmin
-                        ? 'Open Runners'
-                        : 'Open Projects'}
-                  </Link>
+                  fixed
+                    ? {
+                        label: 'Open Fleet',
+                        href: `/projects/${projectId}/fleet`,
+                      }
+                    : isAdmin
+                      ? { label: 'Open Runners', href: '/admin/runners' }
+                      : { label: 'Open Projects', href: '/projects' }
                 }
               />
             )

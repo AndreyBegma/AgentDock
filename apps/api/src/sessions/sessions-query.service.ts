@@ -1,4 +1,5 @@
 import {
+  projectRoleAtLeast,
   SESSION_LIST_DEFAULT_LIMIT,
   type SessionDetail,
   type SessionListResponse,
@@ -32,6 +33,11 @@ const sessionSelect = {
   startedAt: true,
   lastEventAt: true,
   endedAt: true,
+  origin: true,
+  issue: true,
+  ownerId: true,
+  liveState: true,
+  tmuxSession: true,
   project: { select: { displayName: true } },
 } as const satisfies Prisma.AgentSessionSelect;
 
@@ -39,9 +45,13 @@ type SelectedSession = Prisma.AgentSessionGetPayload<{
   select: typeof sessionSelect;
 }>;
 
-const toRow = ({ project, ...row }: SelectedSession): SessionRow => ({
+const toRow = (
+  { project, ...row }: SelectedSession,
+  withContent: ReadonlySet<string>,
+): SessionRow => ({
   ...row,
   projectName: project?.displayName ?? null,
+  hasContent: withContent.has(row.id),
 });
 
 interface SubtreeTotalsRow {
@@ -113,6 +123,7 @@ export class SessionsQueryService {
                 ? {}
                 : { project: { is: this.access.visibleWhere(user) } }),
             }),
+      ...(query.origin ? { origin: query.origin } : {}),
       ...(query.runtime ? { runtime: query.runtime } : {}),
       ...(query.slot ? { slotName: query.slot } : {}),
       ...(query.model ? { models: { array_contains: [query.model] } } : {}),
@@ -138,12 +149,13 @@ export class SessionsQueryService {
     });
     const page = rows.slice(0, limit);
     const totals = await this.subtreeTotals(page.map((r) => r.id));
+    const withContent = await this.readableContent(user, page);
 
     return {
       items: page.map(({ _count, ...row }) => {
         const sum = totals.get(row.id);
         return summaryOf(
-          toRow(row),
+          toRow(row, withContent),
           {
             turns: _count.turns,
             toolCalls: _count.toolCalls,
@@ -175,14 +187,48 @@ export class SessionsQueryService {
       this.prisma.llmRequest.findMany({ where }),
       this.prisma.toolCall.findMany({ where }),
     ]);
+    const withContent = await this.readableContent(user, sessions);
     const tree = buildSessionTree(id, {
-      sessions: sessions.map(toRow),
+      sessions: sessions.map((row) => toRow(row, withContent)),
       turns,
       requests,
       tools,
     });
     if (!tree) throw sessionNotFound();
     return tree;
+  }
+
+  /**
+   * ADR-0021: the ids among `rows` that have stored content and whose project
+   * the caller is operator or admin on. A viewer never learns content exists.
+   */
+  private async readableContent(
+    user: Caller,
+    rows: { id: string; projectId: string | null }[],
+  ): Promise<Set<string>> {
+    const withProject = rows.filter(
+      (row): row is { id: string; projectId: string } => row.projectId !== null,
+    );
+    if (withProject.length === 0) return new Set();
+    const stored = await this.prisma.sessionContent.findMany({
+      where: { sessionId: { in: withProject.map((row) => row.id) } },
+      distinct: ['sessionId'],
+      select: { sessionId: true },
+    });
+    const have = new Set(stored.map((row) => row.sessionId));
+    const allowed = new Map<string, boolean>();
+    const result = new Set<string>();
+    for (const row of withProject) {
+      if (!have.has(row.id)) continue;
+      let ok = allowed.get(row.projectId);
+      if (ok === undefined) {
+        const access = await this.access.resolve(user, row.projectId);
+        ok = access !== null && projectRoleAtLeast(access.role, 'operator');
+        allowed.set(row.projectId, ok);
+      }
+      if (ok) result.add(row.id);
+    }
+    return result;
   }
 
   /** D10: a project's sessions to its members; unassigned ones to admins. */

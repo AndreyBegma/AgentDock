@@ -15,6 +15,7 @@ import {
   describeProjectError,
   docsOverrideRequest,
 } from '../../../../../lib/projects/format';
+import { useErrorToast } from '../../../../../lib/section/use-error-toast';
 import { DocsDetails } from '../../docs-details';
 
 const KINDS = Object.keys(DOCS_KIND_LABEL) as DocsSourceKind[];
@@ -166,6 +167,7 @@ export function DocsTab({
 }) {
   const [busy, setBusy] = useState<'refresh' | 'reset'>();
   const [overriding, setOverriding] = useState(false);
+  const showError = useErrorToast();
   const docs = project.docsSource;
 
   const run = async (
@@ -179,7 +181,7 @@ export function DocsTab({
       toast.success(done);
       onChanged();
     } catch (err) {
-      toast.error(describeProjectError(err));
+      showError(describeProjectError(err));
     } finally {
       setBusy(undefined);
     }

@@ -13,6 +13,7 @@ import {
   type OnApplicationBootstrap,
   type OnModuleDestroy,
 } from '@nestjs/common';
+import { SchedulerRegistry } from '@nestjs/schedule';
 import type { WebhookDelivery } from '@prisma/client';
 import { Client } from 'pg';
 import { PrismaService } from '../../database/prisma.service';
@@ -29,6 +30,7 @@ import {
 import { circuitAfterAttempt, deliveryAfterAttempt } from './delivery-policy';
 import { WebhookLive } from './webhook-live';
 
+const JOB_NAME = 'webhook-delivery-worker';
 /** D12: the session-level advisory lock only the delivering instance holds. */
 const LEADER_LOCK = 'agentdock.webhooks.worker';
 /** A follower retries the lock this often. */
@@ -85,6 +87,7 @@ export class WebhookDeliveryWorker
     private readonly secrets: WebhookSecrets,
     private readonly settings: WebhookSettingsService,
     private readonly live: WebhookLive,
+    private readonly scheduler: SchedulerRegistry,
     @Inject(WEBHOOKS_OPTIONS) private readonly options: WebhooksOptions,
   ) {}
 
@@ -97,10 +100,14 @@ export class WebhookDeliveryWorker
       });
     }, WEBHOOK_WORKER_INTERVAL_MS);
     this.timer.unref();
+    this.scheduler.addInterval(JOB_NAME, this.timer);
   }
 
   async onModuleDestroy(): Promise<void> {
     clearInterval(this.timer);
+    if (this.scheduler.doesExist('interval', JOB_NAME)) {
+      this.scheduler.deleteInterval(JOB_NAME);
+    }
     const client = this.lock;
     this.lock = null;
     await client?.end().catch(() => undefined);

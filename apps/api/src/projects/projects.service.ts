@@ -29,7 +29,9 @@ import {
 } from './project-mapper';
 
 const withRelations = {
-  runner: { select: { id: true, name: true, revokedAt: true } },
+  runner: {
+    select: { id: true, name: true, revokedAt: true, capabilities: true },
+  },
   docsSource: true,
 } as const;
 
@@ -254,6 +256,8 @@ export class ProjectsService {
       'readyLabelOverride',
       'defaultProfileId',
       'mergeApproval',
+      'shipSessionContent',
+      'sessionContentRetentionDays',
     ] as const;
     const before: Record<string, unknown> = {};
     const after: Record<string, unknown> = {};
@@ -267,10 +271,20 @@ export class ProjectsService {
     }
     if (Object.keys(after).length === 0) return this.toDetail(project, 'admin');
 
-    const updated = await this.prisma.project.update({
-      where: { id: projectId },
-      data,
-      include: withRelations,
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.project.update({
+        where: { id: projectId },
+        data,
+        include: withRelations,
+      });
+      // #244 D10: capture reads content, so turning content off turns it off.
+      if (after.shipSessionContent === false) {
+        await tx.boardSettings.updateMany({
+          where: { projectId, captureEnabled: true },
+          data: { captureEnabled: false },
+        });
+      }
+      return row;
     });
     await this.audit.record({
       ...ctx,
@@ -281,6 +295,10 @@ export class ProjectsService {
       after,
       result: 'ok',
     });
+    // ADR-0021: the runner attaches content only for projects that ship it.
+    if ('shipSessionContent' in after) {
+      await this.watchList.push(project.runnerId);
+    }
     return this.toDetail(updated, 'admin');
   }
 
