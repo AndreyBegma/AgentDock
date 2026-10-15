@@ -257,6 +257,19 @@ describe('describeDesignError', () => {
     }
   });
 
+  test('an offline runner is not called an old one (#275)', () => {
+    const offline = new ApiError(
+      503,
+      undefined,
+      'The runner is not connected',
+      undefined,
+      { error: 'command_unavailable' },
+    );
+    expect(describeDesignError(offline, 'p1')).toBe(
+      'The project’s runner is offline. Start it, then try again.',
+    );
+  });
+
   test('status codes without a body, and the network', () => {
     expect(describeDesignError(refused(404))).toMatch(/does not exist/);
     expect(describeDesignError(refused(403))).toMatch(/role/);
