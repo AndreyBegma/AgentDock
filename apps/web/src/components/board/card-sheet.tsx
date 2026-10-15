@@ -9,6 +9,7 @@ import {
   CARD_FEEDBACK_MAX,
   type CardRoundView,
 } from '@agentdock/shared';
+import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Field, Input, Select, Textarea } from '@andrewbehma/glass-ui/field';
@@ -19,7 +20,7 @@ import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Timeline, type TimelineItem } from '@andrewbehma/glass-ui/timeline';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import NextLink from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { fetchCard, sendFeedback, updateCard } from '../../lib/board/actions';
 import {
   approveRunOffer,
@@ -41,10 +42,12 @@ import { formatCost } from '../../lib/format';
 import { Time } from '../../lib/format/time';
 import { safeHttpsUrl } from '../../lib/queue/format';
 import { useReadiness } from '../../lib/readiness/use-readiness';
+import { type TextNotes, useTextNotes } from '../../lib/text/use-text-notes';
 import { Markdown } from '../markdown/markdown';
 import { ReadinessNotice } from '../readiness/readiness-notice';
 import { ApproveRunLink, CardDesignSection } from './card-design';
 import { CardOptionToggles } from './card-options';
+import { NormalizedNote } from '../text/normalized-note';
 import { SuggestionSheetBody } from './suggestion-sheet';
 import type { CardActions } from './use-card-actions';
 
@@ -65,7 +68,11 @@ function roundTone(round: CardRoundView): TimelineItem['tone'] {
   return 'neutral';
 }
 
-function roundItems(rounds: CardRoundView[]): TimelineItem[] {
+function roundItems(
+  rounds: CardRoundView[],
+  notes: TextNotes,
+  canOperate: boolean,
+): TimelineItem[] {
   return rounds.map((round) => {
     const cost = formatCost(round.costUsd);
     return {
@@ -86,6 +93,13 @@ function roundItems(rounds: CardRoundView[]): TimelineItem[] {
             <span className="whitespace-pre-wrap break-words">
               “{round.feedback}”
             </span>
+          ) : null}
+          {round.feedback ? (
+            <NormalizedNote
+              view={notes.view('board_card_round', round.id, 'feedback')}
+              canOperate={canOperate}
+              onRetry={notes.retry}
+            />
           ) : null}
           {round.summary ? (
             <span className="whitespace-pre-wrap break-words">
@@ -167,6 +181,20 @@ function CardDetailBody({
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [sending, setSending] = useState(false);
+  const notes = useTextNotes(
+    projectId,
+    { cardId: card.id },
+    `${card.title}\n${card.body}\n${card.rounds.length}`,
+  );
+
+  // The English text lands after the save (#271): a field the person has not
+  // touched since follows the card; a field they are typing in stays.
+  const shown = useRef({ title: card.title, body: card.body });
+  useEffect(() => {
+    setTitle((t) => (t === shown.current.title ? card.title : t));
+    setBody((b) => (b === shown.current.body ? card.body : b));
+    shown.current = { title: card.title, body: card.body };
+  }, [card.title, card.body]);
 
   // A newer card (a live push) replaces the form unless the person is typing.
   const dirty =
@@ -210,6 +238,9 @@ function CardDetailBody({
       setSending(false);
     }
   };
+
+  // Auto until a person changes it (saving a different kind pins it).
+  const autoKind = card.kindSource === 'auto' && kind === card.kind;
 
   const pill = roundPill(card.round);
   const total = formatCost(card.costUsd);
@@ -405,7 +436,7 @@ function CardDetailBody({
         <section aria-label="Rounds" className="flex flex-col gap-2">
           <SectionHeader title="Rounds" headingLevel={3} />
           <Timeline
-            items={roundItems(card.rounds)}
+            items={roundItems(card.rounds, notes, canOperate)}
             empty={<p className="text-sm text-ink-3">No worker has run yet.</p>}
           />
         </section>
@@ -433,6 +464,11 @@ function CardDetailBody({
               disabled={!canOperate}
               onChange={(e) => setTitle(e.target.value)}
             />
+            <NormalizedNote
+              view={notes.view('board_card', card.id, 'title')}
+              canOperate={canOperate}
+              onRetry={notes.retry}
+            />
           </Field>
           <Field label="What to do" htmlFor="board-card-body">
             {preview ? (
@@ -459,8 +495,21 @@ function CardDetailBody({
                 {preview ? 'Edit' : 'Preview'}
               </Button>
             </div>
+            <NormalizedNote
+              view={notes.view('board_card', card.id, 'body')}
+              canOperate={canOperate}
+              onRetry={notes.retry}
+            />
           </Field>
-          <Field label="Kind" htmlFor="board-card-kind">
+          <Field
+            label="Kind"
+            htmlFor="board-card-kind"
+            hint={
+              autoKind
+                ? 'Set automatically from the text. Change it to pin it.'
+                : undefined
+            }
+          >
             <Select
               id="board-card-kind"
               value={kind}
@@ -477,6 +526,11 @@ function CardDetailBody({
                 </option>
               ))}
             </Select>
+            {autoKind ? (
+              <div className="mt-2">
+                <Badge tone="neutral" label="Auto" />
+              </div>
+            ) : null}
           </Field>
           <Field
             label="Model"
@@ -599,6 +653,7 @@ export function CardSheet({
             ) : card && card.number === number ? (
               <SuggestionSheetBody
                 key={card.id}
+                projectId={projectId}
                 card={card}
                 canOperate={canOperate}
                 actions={actions}

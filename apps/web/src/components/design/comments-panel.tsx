@@ -4,6 +4,7 @@ import {
   DESIGN_COMMENT_MAX,
   type DesignCommentRequest,
   type DesignCommentView,
+  type DesignOwnerView,
 } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Checkbox } from '@andrewbehma/glass-ui/checkbox';
@@ -17,13 +18,19 @@ import {
   pinNumbers,
 } from '../../lib/design/comments';
 import { Time } from '../../lib/format/time';
+import { type TextNotes, useTextNotes } from '../../lib/text/use-text-notes';
+import { NormalizedNote } from '../text/normalized-note';
 
 function CommentItem({
   comment,
   pinNumber,
+  notes,
+  canOperate,
 }: {
   comment: DesignCommentView;
   pinNumber?: number;
+  notes: TextNotes;
+  canOperate: boolean;
 }) {
   const anchor = anchorLabel(comment, pinNumber);
   return (
@@ -36,6 +43,11 @@ function CommentItem({
         {anchor ? <span>· {anchor}</span> : null}
       </div>
       <p className="text-sm whitespace-pre-wrap break-words">{comment.body}</p>
+      <NormalizedNote
+        view={notes.view('design_comment', comment.id, 'body')}
+        canOperate={canOperate}
+        onRetry={notes.retry}
+      />
     </li>
   );
 }
@@ -46,6 +58,9 @@ function CommentItem({
  * the screen in view. Pins are left from the frame, not here.
  */
 export function CommentsPanel({
+  projectId,
+  owner,
+  canOperate = false,
   comments,
   revisionId,
   screen,
@@ -53,6 +68,11 @@ export function CommentsPanel({
   busy,
   onComment,
 }: {
+  /** With `owner`: where the translation notes under each comment come from (#271). */
+  projectId?: string;
+  owner?: DesignOwnerView;
+  /** Retry on a failed translation is for operators. */
+  canOperate?: boolean;
   comments: readonly DesignCommentView[];
   /** The revision in view; null before the first one exists. */
   revisionId: string | null;
@@ -67,6 +87,15 @@ export function CommentsPanel({
   const [showAddressed, setShowAddressed] = useState(false);
   const [body, setBody] = useState('');
   const [onScreen, setOnScreen] = useState(false);
+  const notes = useTextNotes(
+    projectId ?? '',
+    projectId === undefined || owner === undefined
+      ? null
+      : owner.kind === 'card'
+        ? { cardId: owner.cardId }
+        : { planId: owner.planId },
+    comments.length,
+  );
   const { open, addressed } = groupComments(comments, revisionId, allRevisions);
   const numbers = pinNumbers(comments, revisionId);
   const text = body.trim();
@@ -105,7 +134,13 @@ export function CommentsPanel({
       {open.length > 0 ? (
         <ul className="flex flex-col gap-2">
           {open.map((c) => (
-            <CommentItem key={c.id} comment={c} pinNumber={numbers.get(c.id)} />
+            <CommentItem
+              key={c.id}
+              comment={c}
+              pinNumber={numbers.get(c.id)}
+              notes={notes}
+              canOperate={canOperate}
+            />
           ))}
         </ul>
       ) : null}
@@ -122,6 +157,8 @@ export function CommentsPanel({
                 key={c.id}
                 comment={c}
                 pinNumber={numbers.get(c.id)}
+                notes={notes}
+                canOperate={canOperate}
               />
             ))}
           </ul>
