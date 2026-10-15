@@ -27,7 +27,8 @@ export type DesignBusy =
   | 'generate'
   | 'comment'
   | 'revise'
-  | 'approve';
+  | 'approve'
+  | 'stop';
 
 /**
  * Whether a push concerns this task's design: a `design` push for the task
@@ -149,6 +150,8 @@ export function useDesignAt(
       run('revise', () => api(`${base}/revise`, { method: 'POST' })),
     approve: (body: DesignApproveRequest) =>
       run('approve', () => api(`${base}/approve`, { method: 'POST', body })),
+    /** #275 D5: stops the running stage; the design settles at rest. */
+    stop: () => run('stop', () => api(`${base}/stop`, { method: 'POST' })),
   };
 
   return { ...section, busy, actions };

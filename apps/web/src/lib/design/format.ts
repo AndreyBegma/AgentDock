@@ -15,6 +15,7 @@ import {
   type RunnerGate,
   runnerGate,
 } from '../planner/runner-support';
+import { elapsedSince, formatClock } from './progress';
 
 /**
  * The design stage's words and colours (spec 223 "UI"), on glass-ui's status
@@ -117,6 +118,21 @@ export const CARD_DESIGN_CHIP_LABEL: Record<CardDesignChipState, string> = {
   reviewing: 'Design in review',
   approved: 'Design approved',
 };
+
+/**
+ * #275 D8: the chip's text. While the design is being drawn it carries the
+ * whole job's clock from `busySince` ("Drawing design · 3:12"); a design
+ * without one (busy at deploy) keeps the plain label.
+ */
+export function cardDesignChipText(
+  design: TaskDesignSummary | null,
+  now: number,
+): string {
+  const state = cardDesignChipState(design);
+  const label = CARD_DESIGN_CHIP_LABEL[state];
+  if (state !== 'generating' || !design?.busySince) return label;
+  return `${label} · ${formatClock(elapsedSince(design.busySince, now))}`;
+}
 
 /**
  * Whether the card's design can still be switched or the continue switch

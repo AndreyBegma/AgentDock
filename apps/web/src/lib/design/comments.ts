@@ -93,11 +93,12 @@ export function designWriteBlock(
   if (!canOperate) return 'Viewers can read a design; an operator reviews it.';
   if (!design.needed) return 'The design is off for this task.';
   if (design.status === 'approved') return 'This design is approved.';
-  if (design.activeTurnId !== null || design.status === 'generating') {
-    return 'The planner is drawing the mockup.';
-  }
-  if (design.status === 'revising') {
-    return 'The planner is revising the mockup.';
+  if (
+    design.activeTurnId !== null ||
+    design.status === 'generating' ||
+    design.status === 'revising'
+  ) {
+    return 'A design run is under way; wait for it or stop it.';
   }
   return null;
 }

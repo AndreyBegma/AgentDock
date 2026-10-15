@@ -91,6 +91,18 @@ describe('crumbsFor', () => {
     ]);
     expect(crumbsFor('/admin/users')[0]?.href).toBeUndefined();
   });
+
+  test('a card design has no link on cards or the card number (#275 D9)', () => {
+    const crumbs = crumbsFor(`/projects/${PROJECT}/board/cards/3/design`);
+    expect(crumbs.map((crumb) => crumb.href)).toEqual([
+      '/projects',
+      `/projects/${PROJECT}`,
+      `/projects/${PROJECT}/board`,
+      undefined,
+      undefined,
+      undefined,
+    ]);
+  });
 });
 
 describe('a plan in the trail', () => {

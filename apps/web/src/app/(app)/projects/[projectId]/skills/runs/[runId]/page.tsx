@@ -24,6 +24,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PageHeader } from '../../../../../../../components/page-header/page-header';
+import { RunLogPanel } from '../../../../../../../components/runs/run-log-panel';
 import { TerminalSheet } from '../../../../../../../components/terminal/terminal-sheet';
 import { api } from '../../../../../../../lib/api';
 import { safeHttpsUrl } from '../../../../../../../lib/fleet/format';
@@ -43,7 +44,6 @@ import {
 import { SKILL_PILL_STATUS } from '../../../../../../../lib/status/pill';
 import { useTerminalAvailable } from '../../../../../../../lib/terminal/use-terminal-available';
 import { ProjectRunnerBanner } from '../../../project-runner-banner';
-import { RunLogPanel } from './log-panel';
 
 const REFETCH_DEBOUNCE_MS = 300;
 

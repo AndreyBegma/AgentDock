@@ -4,13 +4,14 @@ import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Chip } from '@andrewbehma/glass-ui/chip';
 import { type LogLine, LogViewer } from '@andrewbehma/glass-ui/log-viewer';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { rowText } from '../../../../../../../lib/skills/run-log';
-import { useRunLog } from '../../../../../../../lib/skills/use-run-log';
+import { rowText } from '../../lib/skills/run-log';
+import { useRunLog } from '../../lib/skills/use-run-log';
 
 /**
  * The run’s rendered log, read-only. Mounted only while the run is active, so
  * a finished run never subscribes. The lines live in memory only; the stream
- * stays on the runner (spec 24 D13).
+ * stays on the runner (spec 24 D13). Shared by the skill run page and the
+ * design page's Show log (#275 D3).
  */
 export function RunLogPanel({
   projectId,
@@ -20,7 +21,7 @@ export function RunLogPanel({
   projectId: string;
   runId: string;
   /** The runner sent the `ended` frame; the page re-reads the run. */
-  onEnded: () => void;
+  onEnded?: () => void;
 }) {
   const { log, connected, error } = useRunLog(projectId, runId, true);
   const [follow, setFollow] = useState(true);
@@ -30,7 +31,7 @@ export function RunLogPanel({
   useEffect(() => {
     if (log.endedPhase && !notified.current) {
       notified.current = true;
-      onEnded();
+      onEnded?.();
     }
   }, [log.endedPhase, onEnded]);
 

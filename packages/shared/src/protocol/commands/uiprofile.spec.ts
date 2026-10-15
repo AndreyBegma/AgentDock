@@ -36,6 +36,8 @@ describe('uiprofile commands', () => {
     expect(uiprofileCommands['uiprofile.fingerprint'].minRole).toBe('operator');
     expect(Object.hasOwn(commands, 'uiprofile.build')).toBe(true);
     expect(Object.hasOwn(commands, 'uiprofile.fingerprint')).toBe(true);
+    expect(Object.hasOwn(commands, 'uiprofile.cancel')).toBe(true);
+    expect(uiprofileCommands['uiprofile.cancel'].minRole).toBe('operator');
   });
 
   it('uiprofile.build takes the prompt as a field, never empty', () => {

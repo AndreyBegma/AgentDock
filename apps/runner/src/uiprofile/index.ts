@@ -13,7 +13,7 @@ export {
   type UiProfileExecutorOptions,
 } from './executor';
 
-/** The two `uiprofile.*` handlers (docs/specs/223-design-stage.md "Protocol"). */
+/** The `uiprofile.*` handlers (docs/specs/223-design-stage.md "Protocol"). */
 export type UiProfileHandlers = {
   [N in UiProfileCommandName]: (
     args: CommandArgs<N>,
@@ -26,4 +26,5 @@ export const createUiProfileHandlers = (
 ): UiProfileHandlers => ({
   'uiprofile.build': (args) => executor.run(args),
   'uiprofile.fingerprint': (args) => fingerprint(args, deps),
+  'uiprofile.cancel': (args) => executor.cancel(args),
 });
