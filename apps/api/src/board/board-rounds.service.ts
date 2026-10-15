@@ -36,7 +36,7 @@ import { BudgetGate } from '../budgets/budget-gate';
 import { PrismaService } from '../database/prisma.service';
 import { specDirOf } from '../planner/planner-instructions.service';
 import { RuntimeProfileResolver } from '../readiness';
-import { TextNormalizer } from '../text';
+import { TextNormalizer } from '../text/text-normalizer';
 import { BoardService } from './board.service';
 import { BoardCommands, boardOutput } from './board-commands';
 import { BoardFailure, boardError } from './board-error';

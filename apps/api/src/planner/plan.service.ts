@@ -24,7 +24,8 @@ import { BudgetGate } from '../budgets/budget-gate';
 import { PrismaService } from '../database/prisma.service';
 import { designBlocks } from '../design/design-rules';
 import { designSummaries } from '../design/design-store';
-import { TextNormalizer, TextOwners } from '../text';
+import { TextNormalizer } from '../text/text-normalizer';
+import { TextOwners } from '../text/text-owners';
 import { readablePlanWhere } from './plan-access';
 import {
   blockingOpen,

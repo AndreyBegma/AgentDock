@@ -3,7 +3,6 @@ import { LiveModule } from '../live/live.module';
 import { ProjectsModule } from '../projects';
 import { ReadinessModule } from '../readiness';
 import { RunnersModule } from '../runners/runners.module';
-import { TextModule } from '../text';
 import { CardDesignTurnService } from './card-design-turn.service';
 import { PlanService } from './plan.service';
 import { PlanDocsSink } from './plan-docs-sink';
@@ -27,13 +26,7 @@ import { TasksQueryService } from './tasks-query.service';
  * request's merge queues the features (`PlanDocsSink`).
  */
 @Module({
-  imports: [
-    LiveModule,
-    ProjectsModule,
-    ReadinessModule,
-    RunnersModule,
-    TextModule,
-  ],
+  imports: [LiveModule, ProjectsModule, ReadinessModule, RunnersModule],
   controllers: [PlansController, PlannerAdminController, TasksController],
   providers: [
     CardDesignTurnService,

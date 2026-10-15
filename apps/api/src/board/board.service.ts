@@ -22,7 +22,8 @@ import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
 import { usageByRun } from '../history/run-usage';
 import { mergeMethodOf } from '../planner/planner-instructions.service';
-import { TextNormalizer, TextOwners } from '../text';
+import { TextNormalizer } from '../text/text-normalizer';
+import { TextOwners } from '../text/text-owners';
 import { BoardCommands, boardOutput } from './board-commands';
 import { boardError } from './board-error';
 import {

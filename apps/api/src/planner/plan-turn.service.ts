@@ -22,7 +22,7 @@ import { SYSTEM_ACTOR, systemActorFor } from '../audit/audit.types';
 import { BudgetGate } from '../budgets/budget-gate';
 import { PrismaService } from '../database/prisma.service';
 import type { DesignTurnPlan } from '../design/design-rules';
-import { TextNormalizer } from '../text';
+import { TextNormalizer } from '../text/text-normalizer';
 import { TALKABLE_STATUSES } from './plan-apply';
 import { questionsOf } from './plan-mapper';
 import { assemblePrompt } from './plan-prompt';
