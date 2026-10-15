@@ -24,23 +24,37 @@ import NextLink from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { fetchCard, sendFeedback, updateCard } from '../../lib/board/actions';
 import {
+  AUTO_COLLECT_HINT,
+  AUTO_COLLECT_LABEL,
+  AUTO_COLLECT_PENDING_TEXT,
   approveRunOffer,
+  autoCollectPending,
   autoRunReason,
   COLUMN_TITLE,
   canAccept,
+  canDelete,
   canGiveFeedback,
   canMarkFinished,
   canRetry,
   canRun,
   canStop,
   describeBoardError,
+  FLEET_EDIT_HINT,
+  fleetHref,
+  fleetSummary,
   HOOKS_COMMANDS,
   HOOKS_GUIDE_LABEL,
   hooksGuideHref,
   hooksHint,
+  isFleetCard,
+  isTerminalCard,
   phaseLabel,
   roundPill,
+  SLOT_GONE_TEXT,
   sessionHref,
+  TRACKED_TEXT,
+  trackedSessionHref,
+  trackedStatusText,
 } from '../../lib/board/format';
 import { formatCost } from '../../lib/format';
 import { Time } from '../../lib/format/time';
@@ -51,7 +65,7 @@ import { Markdown } from '../markdown/markdown';
 import { ReadinessNotice } from '../readiness/readiness-notice';
 import { NormalizedNote } from '../text/normalized-note';
 import { ApproveRunLink, CardDesignSection } from './card-design';
-import { CardOptionToggles } from './card-options';
+import { AutoCollectToggle, CardOptionToggles } from './card-options';
 import { SuggestionSheetBody } from './suggestion-sheet';
 import type { CardActions } from './use-card-actions';
 
@@ -192,7 +206,10 @@ function CardDetailBody({
   const [issueOnRun, setIssueOnRun] = useState(card.issueOnRun);
   const [specOnRun, setSpecOnRun] = useState(card.specOnRun);
   const [model, setModel] = useState(card.model ?? '');
+  const [autoCollect, setAutoCollect] = useState(card.autoCollect);
   const [preview, setPreview] = useState(false);
+  const fleet = isFleetCard(card);
+  const terminalCard = isTerminalCard(card);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [sending, setSending] = useState(false);
@@ -218,20 +235,34 @@ function CardDetailBody({
     kind !== card.kind ||
     issueOnRun !== card.issueOnRun ||
     specOnRun !== card.specOnRun ||
-    model !== (card.model ?? '');
+    model !== (card.model ?? '') ||
+    autoCollect !== card.autoCollect;
 
   const save = async () => {
     setSaving(true);
     try {
-      await updateCard(projectId, card.number, {
-        title: title.trim(),
-        body,
-        kind,
-        issueOnRun,
-        specOnRun,
-        model: model.trim() === '' ? null : model.trim(),
-      });
-      toast.success(`${card.label} saved. It applies from the next round.`);
+      // #282 D4: a fleet card edits title and text only. D3: `autoCollect`
+      // belongs to a terminal card; any other card is refused `not_tracked`.
+      await updateCard(
+        projectId,
+        card.number,
+        fleet
+          ? { title: title.trim(), body }
+          : {
+              title: title.trim(),
+              body,
+              kind,
+              issueOnRun,
+              specOnRun,
+              model: model.trim() === '' ? null : model.trim(),
+              ...(terminalCard ? { autoCollect } : {}),
+            },
+      );
+      toast.success(
+        fleet
+          ? `${card.label} saved. A running slot gets the change.`
+          : `${card.label} saved. It applies from the next round.`,
+      );
       onSaved();
     } catch (err) {
       toast.error(describeBoardError(err));
@@ -271,14 +302,16 @@ function CardDetailBody({
       footer={
         canOperate ? (
           <div className="flex items-center justify-end gap-2">
-            <Button
-              variant="ghost"
-              type="button"
-              disabled={actions.busy}
-              onClick={() => actions.askDelete(card)}
-            >
-              Delete
-            </Button>
+            {canDelete(card) ? (
+              <Button
+                variant="ghost"
+                type="button"
+                disabled={actions.busy}
+                onClick={() => actions.askDelete(card)}
+              >
+                Delete
+              </Button>
+            ) : null}
             <Button
               variant="solid"
               type="submit"
@@ -315,6 +348,49 @@ function CardDetailBody({
               </NextLink>
               .
             </p>
+          ) : null}
+          {card.tracking ? (
+            <div className="flex flex-col gap-1 text-xs text-ink-2">
+              <p>
+                {TRACKED_TEXT}
+                {trackedSessionHref(card) ? (
+                  <>
+                    {' · '}
+                    <NextLink
+                      href={trackedSessionHref(card) ?? '#'}
+                      className="text-accent-ink underline-offset-2 hover:underline"
+                    >
+                      Open the session
+                    </NextLink>
+                  </>
+                ) : null}
+              </p>
+              <p>{trackedStatusText(card)}</p>
+            </div>
+          ) : null}
+          {card.fleet ? (
+            <div className="flex flex-col gap-1 text-xs text-ink-2">
+              <p>
+                Fleet · issue #{card.fleet.issue} · {fleetSummary(card.fleet)}
+                {fleetHref(projectId, card) ? (
+                  <>
+                    {' · '}
+                    <NextLink
+                      href={fleetHref(projectId, card) ?? '#'}
+                      className="text-accent-ink underline-offset-2 hover:underline"
+                    >
+                      Open in Fleet
+                    </NextLink>
+                  </>
+                ) : null}
+              </p>
+              {card.fleet.slotGone ? (
+                <Badge tone="warn" label={SLOT_GONE_TEXT} />
+              ) : null}
+            </div>
+          ) : null}
+          {autoCollectPending(card) ? (
+            <Banner tone="warn">{AUTO_COLLECT_PENDING_TEXT}</Banner>
           ) : null}
           {card.branch ? (
             <p className="break-all font-mono text-xs text-ink-2">
@@ -455,12 +531,14 @@ function CardDetailBody({
           ) : null}
         </section>
 
-        <CardDesignSection
-          projectId={projectId}
-          card={card}
-          canOperate={canOperate}
-          onChanged={onSaved}
-        />
+        {fleet ? null : (
+          <CardDesignSection
+            projectId={projectId}
+            card={card}
+            canOperate={canOperate}
+            onChanged={onSaved}
+          />
+        )}
 
         <section aria-label="Rounds" className="flex flex-col gap-2">
           <SectionHeader title="Rounds" headingLevel={3} />
@@ -480,7 +558,9 @@ function CardDetailBody({
           }}
         >
           <SectionHeader title="Card" headingLevel={3} />
-          {card.sessionId ? (
+          {fleet ? (
+            <p className="-mt-2 text-xs text-ink-3">{FLEET_EDIT_HINT}</p>
+          ) : card.sessionId ? (
             <p className="-mt-2 text-xs text-ink-3">
               Changes go to the worker with the next round.
             </p>
@@ -542,7 +622,7 @@ function CardDetailBody({
             <Select
               id="board-card-kind"
               value={kind}
-              disabled={!canOperate}
+              disabled={!canOperate || fleet}
               onChange={(e) =>
                 setKind(
                   BOARD_CARD_KINDS.find((k) => k === e.target.value) ?? kind,
@@ -570,19 +650,31 @@ function CardDetailBody({
               id="board-card-model"
               value={model}
               maxLength={100}
-              disabled={!canOperate}
+              disabled={!canOperate || fleet}
               onChange={(e) => setModel(e.target.value)}
             />
           </Field>
-          <CardOptionToggles
-            projectId={projectId}
-            idPrefix="board-card"
-            issueOnRun={issueOnRun}
-            specOnRun={specOnRun}
-            disabled={!canOperate || card.round !== null}
-            onIssueOnRun={setIssueOnRun}
-            onSpecOnRun={setSpecOnRun}
-          />
+          {fleet ? null : (
+            <CardOptionToggles
+              projectId={projectId}
+              idPrefix="board-card"
+              issueOnRun={issueOnRun}
+              specOnRun={specOnRun}
+              disabled={!canOperate || card.round !== null}
+              onIssueOnRun={setIssueOnRun}
+              onSpecOnRun={setSpecOnRun}
+            />
+          )}
+          {terminalCard ? (
+            <AutoCollectToggle
+              id="board-card-auto-collect"
+              checked={autoCollect}
+              disabled={!canOperate}
+              label={AUTO_COLLECT_LABEL}
+              hint={AUTO_COLLECT_HINT}
+              onChange={setAutoCollect}
+            />
+          ) : null}
           {card.specPath ? (
             <p className="break-all font-mono text-xs text-ink-2">
               Spec: {card.specPath}

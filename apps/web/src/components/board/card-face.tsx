@@ -8,12 +8,18 @@ import {
   approveRunOffer,
   autoRunReason,
   confidenceLabel,
+  fleetHref,
+  fleetSummary,
   HOOKS_GUIDE_LABEL,
   hooksGuideHref,
   hooksHint,
+  isSessionAlive,
   isSuggestion,
   roundPill,
+  SLOT_GONE_TEXT,
   sessionHref,
+  TRACKED_TEXT,
+  trackedSessionHref,
 } from '../../lib/board/format';
 import { formatCost } from '../../lib/format';
 import { safeHttpsUrl } from '../../lib/queue/format';
@@ -55,6 +61,8 @@ export function CardFace({
         {card.title}
       </button>
       <CardFaceDesign card={card} />
+      {card.tracking ? <TerminalFace card={card} /> : null}
+      {card.fleet ? <FleetFace projectId={projectId} card={card} /> : null}
       {card.autoRunFailure ? (
         <div>
           <Tooltip content={autoRunReason(card.autoRunFailure)}>
@@ -105,6 +113,68 @@ export function CardFace({
             <Link href={issueHref}>Issue #{card.issueNumber}</Link>
           ) : null}
         </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** #282 D1: a card tracked from a terminal session: the badge, the state, the session link. */
+function TerminalFace({ card }: { card: BoardCardView }) {
+  const session = trackedSessionHref(card);
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <Tooltip content={TRACKED_TEXT}>
+        <span>
+          <Badge tone="neutral" size="sm" label="Terminal" />
+        </span>
+      </Tooltip>
+      {isSessionAlive(card) ? (
+        <StatusPill size="sm" status="running" label="Session running" />
+      ) : null}
+      {card.autoCollect ? <Chip size="sm">Automatic work</Chip> : null}
+      {session ? (
+        <NextLink
+          href={session}
+          className="text-xs text-accent-ink underline-offset-2 hover:underline"
+        >
+          Session
+        </NextLink>
+      ) : null}
+    </div>
+  );
+}
+
+/** #282 D4: a mirrored fleet slot: the badge, slot and stage, "Slot gone", the Fleet link. */
+function FleetFace({
+  projectId,
+  card,
+}: {
+  projectId: string;
+  card: BoardCardView;
+}) {
+  const fleet = card.fleet;
+  if (!fleet) return null;
+  const href = fleetHref(projectId, card);
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Badge tone="neutral" size="sm" label="Fleet" />
+        {fleet.slotGone ? (
+          <Tooltip content="The slot left the fleet; the card keeps its last column.">
+            <span>
+              <Badge tone="warn" size="sm" label={SLOT_GONE_TEXT} />
+            </span>
+          </Tooltip>
+        ) : null}
+      </div>
+      <p className="break-words text-xs text-ink-2">{fleetSummary(fleet)}</p>
+      {href ? (
+        <NextLink
+          href={href}
+          className="text-xs text-accent-ink underline-offset-2 hover:underline"
+        >
+          Open in Fleet
+        </NextLink>
       ) : null}
     </div>
   );
