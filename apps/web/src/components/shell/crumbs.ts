@@ -21,7 +21,12 @@ const STATIC: Record<string, string> = {
 };
 
 /** Paths in the trail that have no page of their own. */
-const NO_PAGE = [/^\/admin$/, /^\/projects\/[^/]+\/skills\/runs$/];
+const NO_PAGE = [
+  /^\/admin$/,
+  /^\/projects\/[^/]+\/skills\/runs$/,
+  /^\/projects\/[^/]+\/board\/cards$/,
+  /^\/projects\/[^/]+\/board\/cards\/[^/]+$/,
+];
 
 const KNOWN: ReadonlyMap<string, string> = new Map([
   ...NAV.filter((section) => !section.projectScoped).flatMap((section) =>

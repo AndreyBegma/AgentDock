@@ -7,7 +7,7 @@ import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { MenuItem, MenuSeparator } from '@andrewbehma/glass-ui/menu';
 import { toast } from '@andrewbehma/glass-ui/toast';
-import { useState } from 'react';
+import { type CSSProperties, useState } from 'react';
 import { moveCard, runCard } from '../../lib/board/actions';
 import {
   applyDrop,
@@ -31,6 +31,7 @@ import {
   isSuggestion,
   toItem,
 } from '../../lib/board/format';
+import { boardColumnWidth, usePhone, visibleColumns } from './board-layout';
 import { CardFace } from './card-face';
 import type { CardActions } from './use-card-actions';
 
@@ -69,7 +70,9 @@ export function BoardColumns({
   const [busy, setBusy] = useState(false);
   const shown = optimistic ?? view;
 
-  const columns: BoardColumn<BoardItem>[] = columnsOf(shown).map((c) => ({
+  const phone = usePhone();
+
+  const allColumns: BoardColumn<BoardItem>[] = columnsOf(shown).map((c) => ({
     id: c.column,
     title: COLUMN_TITLE[c.column],
     cards: c.cards.map(toItem),
@@ -87,6 +90,8 @@ export function BoardColumns({
         </Button>
       ) : undefined,
   }));
+
+  const columns = visibleColumns(allColumns, phone);
 
   const send = async (
     move: DropMove,
@@ -149,88 +154,101 @@ export function BoardColumns({
 
   return (
     <>
-      <Board<BoardItem>
-        aria-label="Project board"
-        columns={columns}
-        onMove={onMove}
-        renderCard={(item) => <CardFace card={item.card} onOpen={onOpen} />}
-        renderCardMenu={(item) => {
-          const card = item.card;
-          if (isSuggestion(card)) {
+      {/* `contents`: no box of its own, it only carries the column width glass-ui reads. */}
+      <div
+        className="contents"
+        style={
+          {
+            '--board-column': boardColumnWidth(columns.length),
+          } as CSSProperties
+        }
+      >
+        <Board<BoardItem>
+          aria-label="Project board"
+          columns={columns}
+          onMove={onMove}
+          renderCard={(item) => <CardFace card={item.card} onOpen={onOpen} />}
+          renderCardMenu={(item) => {
+            const card = item.card;
+            if (isSuggestion(card)) {
+              return (
+                <>
+                  <MenuSeparator />
+                  <MenuItem onSelect={() => onOpen(card)}>Open</MenuItem>
+                  {canOperate ? (
+                    <>
+                      <MenuItem
+                        disabled={actions.busy || busy}
+                        onSelect={() => void actions.acceptSuggestion(card)}
+                      >
+                        Accept
+                      </MenuItem>
+                      <MenuItem onSelect={() => onOpen(card)}>
+                        Edit & accept…
+                      </MenuItem>
+                      <MenuItem
+                        tone="danger"
+                        disabled={actions.busy || busy}
+                        onSelect={() => void actions.dismiss(card)}
+                      >
+                        Dismiss
+                      </MenuItem>
+                    </>
+                  ) : null}
+                </>
+              );
+            }
             return (
               <>
                 <MenuSeparator />
                 <MenuItem onSelect={() => onOpen(card)}>Open</MenuItem>
+                {canOperate && (canRun(card) || canRetry(card)) ? (
+                  <MenuItem
+                    disabled={actions.busy || busy}
+                    onSelect={() => actions.run(card)}
+                  >
+                    {canRetry(card) ? 'Run again' : 'Run'}
+                  </MenuItem>
+                ) : null}
+                {canOperate && canMarkFinished(card) ? (
+                  <MenuItem onSelect={() => actions.markFinished(card)}>
+                    Mark finished
+                  </MenuItem>
+                ) : null}
+                {canOperate && canGiveFeedback(card) ? (
+                  <MenuItem onSelect={() => onOpen(card)}>Feedback…</MenuItem>
+                ) : null}
+                {canOperate && canAccept(card) ? (
+                  <MenuItem onSelect={() => actions.accept(card)}>
+                    Accept
+                  </MenuItem>
+                ) : null}
+                {canTerminal && card.round !== null ? (
+                  <MenuItem onSelect={() => onOpenTerminal(card)}>
+                    Open terminal
+                  </MenuItem>
+                ) : null}
+                {canOperate && canStop(card) ? (
+                  <MenuItem
+                    tone="danger"
+                    onSelect={() => actions.askStop(card)}
+                  >
+                    Stop worker
+                  </MenuItem>
+                ) : null}
                 {canOperate ? (
-                  <>
-                    <MenuItem
-                      disabled={actions.busy || busy}
-                      onSelect={() => void actions.acceptSuggestion(card)}
-                    >
-                      Accept
-                    </MenuItem>
-                    <MenuItem onSelect={() => onOpen(card)}>
-                      Edit & accept…
-                    </MenuItem>
-                    <MenuItem
-                      tone="danger"
-                      disabled={actions.busy || busy}
-                      onSelect={() => void actions.dismiss(card)}
-                    >
-                      Dismiss
-                    </MenuItem>
-                  </>
+                  <MenuItem
+                    tone="danger"
+                    onSelect={() => actions.askDelete(card)}
+                  >
+                    Delete
+                  </MenuItem>
                 ) : null}
               </>
             );
-          }
-          return (
-            <>
-              <MenuSeparator />
-              <MenuItem onSelect={() => onOpen(card)}>Open</MenuItem>
-              {canOperate && (canRun(card) || canRetry(card)) ? (
-                <MenuItem
-                  disabled={actions.busy || busy}
-                  onSelect={() => actions.run(card)}
-                >
-                  {canRetry(card) ? 'Run again' : 'Run'}
-                </MenuItem>
-              ) : null}
-              {canOperate && canMarkFinished(card) ? (
-                <MenuItem onSelect={() => actions.markFinished(card)}>
-                  Mark finished
-                </MenuItem>
-              ) : null}
-              {canOperate && canGiveFeedback(card) ? (
-                <MenuItem onSelect={() => onOpen(card)}>Feedback…</MenuItem>
-              ) : null}
-              {canOperate && canAccept(card) ? (
-                <MenuItem onSelect={() => actions.accept(card)}>
-                  Accept
-                </MenuItem>
-              ) : null}
-              {canTerminal && card.round !== null ? (
-                <MenuItem onSelect={() => onOpenTerminal(card)}>
-                  Open terminal
-                </MenuItem>
-              ) : null}
-              {canOperate && canStop(card) ? (
-                <MenuItem tone="danger" onSelect={() => actions.askStop(card)}>
-                  Stop worker
-                </MenuItem>
-              ) : null}
-              {canOperate ? (
-                <MenuItem
-                  tone="danger"
-                  onSelect={() => actions.askDelete(card)}
-                >
-                  Delete
-                </MenuItem>
-              ) : null}
-            </>
-          );
-        }}
-      />
+          }}
+        />
+      </div>
 
       <DialogRoot
         open={asking?.kind === 'offer-run'}

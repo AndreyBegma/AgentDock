@@ -107,6 +107,26 @@ export default function PlannerPage() {
     }
   };
 
+  const [retrying, setRetrying] = useState<string | null>(null);
+  const retry = async (plan: PlanSummary) => {
+    const turnId = plan.attention?.turnId;
+    if (!turnId) return;
+    setRetrying(plan.id);
+    try {
+      await api(
+        `/projects/${projectId}/plans/${plan.id}/turns/${turnId}/retry`,
+        {
+          method: 'POST',
+        },
+      );
+    } catch (error) {
+      showError(describePlannerError(error));
+    } finally {
+      setRetrying(null);
+      setVersion((v) => v + 1);
+    }
+  };
+
   return (
     <div className="flex min-w-0 flex-col gap-6">
       <div className="flex flex-col gap-3">
@@ -166,7 +186,12 @@ export default function PlannerPage() {
             />
           }
         >
-          {(view) => <PlanList plans={view.items} />}
+          {(view) => (
+            <PlanList
+              plans={view.items}
+              retry={{ allowed: canOperate, retrying, onRetry: retry }}
+            />
+          )}
         </AsyncSection>
       </section>
     </div>
