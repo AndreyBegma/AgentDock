@@ -21,6 +21,7 @@ export * from './schedules';
 export * from './sessions';
 export * from './skills';
 export * from './terminal';
+export * from './text';
 export * from './usage';
 export * from './webhooks';
 export * from './workflows';
