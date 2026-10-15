@@ -46,7 +46,7 @@ describe('planProfileReason', () => {
   test('no profile at all links to the project settings', () => {
     expect(planProfileReason('', [], 'p1')).toEqual({
       text: 'The project’s runner has no Claude runtime profile to plan with.',
-      href: '/projects/p1/settings?tab=orchestrator',
+      href: '/projects/p1/settings?tab=general',
       cta: 'Open project settings',
     });
   });

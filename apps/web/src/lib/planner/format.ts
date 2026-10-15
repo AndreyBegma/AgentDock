@@ -18,6 +18,7 @@ import type { Hue } from '@andrewbehma/glass-ui/hue';
 import type { Status } from '@andrewbehma/glass-ui/status-pill';
 import { ApiError } from '../api';
 import { pluralize } from '../format';
+import { describeNoProfile } from '../readiness/copy';
 
 /**
  * The Planner's words and colours (spec 172 "UI"). Statuses map onto
@@ -416,8 +417,9 @@ const ERROR_TEXT: Partial<Record<PlannerErrorCode, string>> = {
   contract_violation:
     'The planner’s answer did not follow the output contract. Nothing was changed.',
   unsupported_runtime:
-    'The planner runs on Claude only; this profile is Codex.',
-  no_profile: 'The project has no runtime profile to plan with.',
+    'The runner refused: the planner runs on Claude profiles only.',
+  no_profile:
+    'The project has no runtime profile to plan with. An admin sets the default in Settings › General.',
   unknown_profile: 'That runtime profile no longer exists on the runner.',
   budget_exceeded: 'A budget refuses new runs in this project.',
   command_unavailable: 'The runner is too old to run the planner. Update it.',
@@ -443,6 +445,7 @@ export function describePlannerError(error: unknown): string {
     ) {
       return 'The project’s runner is offline. Start it, then try again.';
     }
+    if (code === PLANNER_ERROR.noProfile) return describeNoProfile(error);
     if (known) return known;
     if (error.status === 404) return ERROR_TEXT.not_found ?? error.message;
     if (error.status === 403) return ERROR_TEXT.forbidden ?? error.message;

@@ -36,7 +36,9 @@ import {
 import { formatCost } from '../../lib/format';
 import { Time } from '../../lib/format/time';
 import { safeHttpsUrl } from '../../lib/queue/format';
+import { useReadiness } from '../../lib/readiness/use-readiness';
 import { Markdown } from '../markdown/markdown';
+import { ReadinessNotice } from '../readiness/readiness-notice';
 import { CardDesignSection } from './card-design';
 import { CardOptionToggles } from './card-options';
 import { SuggestionSheetBody } from './suggestion-sheet';
@@ -144,6 +146,8 @@ function CardDetailBody({
   terminal: TerminalAccess;
   onSaved: () => void;
 }) {
+  const readiness = useReadiness(projectId);
+  const runBlocked = readiness.blockers('run').length > 0;
   const [title, setTitle] = useState(card.title);
   const [body, setBody] = useState(card.body);
   const [kind, setKind] = useState(card.kind);
@@ -246,7 +250,8 @@ function CardDetailBody({
           {canRun(card) || canRetry(card) ? (
             <Button
               variant={card.column === 'todo' ? 'solid' : 'glass'}
-              disabled={actions.busy}
+              disabled={actions.busy || runBlocked}
+              aria-describedby={runBlocked ? 'board-run-reason' : undefined}
               onClick={() => actions.run(card)}
             >
               {canRetry(card) ? 'Run again' : 'Run'}
@@ -281,6 +286,16 @@ function CardDetailBody({
               </Button>
             )
           ) : null}
+        </div>
+      ) : null}
+      {canOperate && (canRun(card) || canRetry(card)) ? (
+        <div className="-mt-3">
+          <ReadinessNotice
+            id="board-run-reason"
+            projectId={projectId}
+            action="run"
+            readiness={readiness}
+          />
         </div>
       ) : null}
       {canOperate && card.sessionId && terminal.state === 'disabled' ? (
@@ -402,6 +417,7 @@ function CardDetailBody({
           />
         </Field>
         <CardOptionToggles
+          projectId={projectId}
           idPrefix="board-card"
           issueOnRun={issueOnRun}
           specOnRun={specOnRun}

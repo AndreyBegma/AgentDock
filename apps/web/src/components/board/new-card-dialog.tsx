@@ -148,6 +148,7 @@ export function NewCardDialog({
             </Select>
           </Field>
           <CardOptionToggles
+            projectId={projectId}
             idPrefix="board-new"
             issueOnRun={issueOnRun}
             specOnRun={specOnRun}

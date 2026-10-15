@@ -17,6 +17,7 @@ import {
 } from '@agentdock/shared';
 import type { Status } from '@andrewbehma/glass-ui/status-pill';
 import { ApiError, describeError } from '../api';
+import { describeNoProfile } from '../readiness/copy';
 
 export const COLUMN_TITLE: Record<BoardColumn, string> = {
   inbox: 'Inbox',
@@ -240,7 +241,9 @@ export function describeBoardError(
     case BOARD_ERROR.noSpecDir:
       return 'This project has no spec directory, so a spec cannot be written. Turn the spec off, or set the docs source in the project settings.';
     case BOARD_ERROR.unsupportedRuntime:
-      return 'Card workers run on Claude profiles only; this project’s profile is Codex.';
+      return 'The runner refused: card workers run on Claude profiles only.';
+    case BOARD_ERROR.noProfile:
+      return describeNoProfile(error);
     case BOARD_ERROR.designNotApproved:
       return 'This card’s design is on and not approved yet. Open the design and approve it, or approve and run from there.';
     case BOARD_ERROR.designApproved:

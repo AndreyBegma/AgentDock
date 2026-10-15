@@ -15,6 +15,7 @@ import {
   type RunnerGate,
   runnerGate,
 } from '../planner/runner-support';
+import { describeNoProfile } from '../readiness/copy';
 import { elapsedSince, formatClock } from './progress';
 
 /**
@@ -229,6 +230,16 @@ export function describeDesignError(
           ? DESIGN_ERROR.forbidden
           : null;
   if (code === null) return error.message;
+  if (code === DESIGN_ERROR.noProfile) {
+    const text = describeNoProfile(error);
+    return projectId
+      ? {
+          text,
+          href: `/projects/${projectId}/settings?tab=${error.body?.source === 'orchestrator' ? 'orchestrator' : 'general'}`,
+          cta: 'Open project settings',
+        }
+      : text;
+  }
   const text = ERROR_TEXT[code];
   if (projectId && code === DESIGN_ERROR.budgetExceeded) {
     return {

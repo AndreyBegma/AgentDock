@@ -21,8 +21,10 @@ import { api } from '../../lib/api';
 import { generateRunnerGate } from '../../lib/design/format';
 import { installedSkillsApi } from '../../lib/design/href';
 import { runnerGateCopy } from '../../lib/planner/runner-support';
+import { useReadiness } from '../../lib/readiness/use-readiness';
 import { useSection } from '../../lib/section/use-section';
 import { DisabledReason } from '../prerequisites/disabled-reason';
+import { ReadinessNotice } from '../readiness/readiness-notice';
 
 const VARIANT_COUNTS = Array.from(
   { length: DESIGN_VARIANTS_MAX - DESIGN_VARIANTS_MIN + 1 },
@@ -76,6 +78,11 @@ export function GeneratePanel({
   );
   const gate = generateRunnerGate(project.data);
   const runnerCopy = gate ? runnerGateCopy('design', gate) : null;
+  // #272: no usable profile (or an offline runner) is said before Generate.
+  const readiness = useReadiness(projectId);
+  const notReady = readiness
+    .blockers('design')
+    .some((blocker) => blocker.code !== 'runner_outdated');
 
   const changed =
     count !== design.variantCount ||
@@ -162,11 +169,28 @@ export function GeneratePanel({
           {runnerCopy.reason}
         </DisabledReason>
       ) : null}
+      {writeBlock === null ? (
+        <ReadinessNotice
+          id="design-readiness-reason"
+          projectId={projectId}
+          action="design"
+          readiness={readiness}
+          exclude={['runner_outdated']}
+        />
+      ) : null}
       <Button
         variant="solid"
-        disabled={writeBlock !== null || runnerCopy !== null || busy}
+        disabled={
+          writeBlock !== null || runnerCopy !== null || notReady || busy
+        }
         aria-describedby={
-          writeBlock === null && runnerCopy ? 'design-runner-reason' : undefined
+          writeBlock !== null
+            ? undefined
+            : runnerCopy
+              ? 'design-runner-reason'
+              : notReady
+                ? 'design-readiness-reason'
+                : undefined
         }
         onClick={() => void generate()}
       >
