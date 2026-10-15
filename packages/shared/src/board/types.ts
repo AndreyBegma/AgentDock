@@ -1,4 +1,9 @@
-import { LOCAL_CARD_SUMMARY_MAX } from '../protocol/local';
+import {
+  LOCAL_CARD_BODY_MAX,
+  LOCAL_CARD_KINDS,
+  LOCAL_CARD_SUMMARY_MAX,
+  LOCAL_CARD_TITLE_MAX,
+} from '../protocol/local';
 
 /**
  * The project Board (issue #242, ADR-0024): cards AgentDock owns, each worked
@@ -23,12 +28,41 @@ export const isBoardColumn = (value: string): value is BoardColumn =>
   (BOARD_COLUMNS as readonly string[]).includes(value);
 
 /** Decides the branch prefix (`feat` / `fix`) and the issue label. */
-export const BOARD_CARD_KINDS = ['feature', 'bug'] as const;
+export const BOARD_CARD_KINDS = LOCAL_CARD_KINDS;
 export type BoardCardKind = (typeof BOARD_CARD_KINDS)[number];
 
-/** Where a card came from: a person, or capture (#244) — kept after Accept. */
-export const BOARD_CARD_SOURCES = ['manual', 'captured'] as const;
+/**
+ * Where a card came from (#282 D6):
+ * - `manual` — a person on the site;
+ * - `captured` — capture (#244), kept after Accept;
+ * - `terminal` — `track_card` from a person's own terminal session
+ *   (ADR-0030 §1): no worker, it finishes with its session;
+ * - `fleet` — the mirror of an orchestrator slot or a `cs:ready` issue
+ *   (ADR-0030 §4): its column follows the slot.
+ */
+export const BOARD_CARD_SOURCES = [
+  'manual',
+  'captured',
+  'terminal',
+  'fleet',
+] as const;
 export type BoardCardSource = (typeof BOARD_CARD_SOURCES)[number];
+
+/**
+ * ADR-0030: cards whose work runs outside a card worker — a terminal session
+ * or a fleet slot. The Board shows no Run, Stop or feedback for them while
+ * that work lives.
+ */
+export const MIRRORED_CARD_SOURCES = [
+  'terminal',
+  'fleet',
+] as const satisfies readonly BoardCardSource[];
+export type MirroredCardSource = (typeof MIRRORED_CARD_SOURCES)[number];
+
+export const isMirroredCardSource = (
+  source: BoardCardSource,
+): source is MirroredCardSource =>
+  (MIRRORED_CARD_SOURCES as readonly BoardCardSource[]).includes(source);
 
 /** D4: what started a round. */
 export const CARD_ROUND_TRIGGERS = ['run', 'feedback'] as const;
@@ -70,9 +104,9 @@ export const isActiveRoundPhase = (
 export const CARD_FINISHED_BY = ['worker', 'session_end', 'person'] as const;
 export type CardFinishedBy = (typeof CARD_FINISHED_BY)[number];
 
-export const BOARD_CARD_TITLE_MAX = 200;
+export const BOARD_CARD_TITLE_MAX = LOCAL_CARD_TITLE_MAX;
 /** Markdown. */
-export const BOARD_CARD_BODY_MAX = 20_000;
+export const BOARD_CARD_BODY_MAX = LOCAL_CARD_BODY_MAX;
 export const CARD_FEEDBACK_MAX = 8_000;
 /** The `finish_card` summary (D6), as the `card.finish` local method bounds it. */
 export const CARD_SUMMARY_MAX = LOCAL_CARD_SUMMARY_MAX;

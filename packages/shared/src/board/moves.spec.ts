@@ -327,4 +327,128 @@ describe('boardMoveRule', () => {
       }
     });
   });
+
+  describe('terminal and fleet cards (#282, ADR-0030)', () => {
+    const WORK_COLUMNS = ['todo', 'in_progress', 'finished'] as const;
+
+    it('never lets automation complete a terminal or fleet card', () => {
+      for (const cardSource of ['terminal', 'fleet'] as const) {
+        for (const from of WORK_COLUMNS) {
+          expect(
+            boardMoveRule(
+              move({ from, to: 'completed', source: 'automatic', cardSource }),
+            ),
+          ).toEqual({ allowed: false, error: 'automatic_to_completed' });
+        }
+      }
+    });
+
+    it('lets a person accept a finished terminal or fleet card', () => {
+      for (const cardSource of ['terminal', 'fleet'] as const) {
+        expect(
+          boardMoveRule(
+            move({ from: 'finished', to: 'completed', cardSource }),
+          ),
+        ).toEqual({ allowed: true, effects: ['accept'], offerRun: false });
+      }
+    });
+
+    it('refuses every other move a person makes of a fleet card', () => {
+      for (const from of BOARD_COLUMNS) {
+        for (const to of BOARD_COLUMNS) {
+          if (from === to) continue;
+          if (from === 'finished' && to === 'completed') continue;
+          expect([
+            from,
+            to,
+            boardMoveRule(move({ from, to, cardSource: 'fleet' })),
+          ]).toEqual([from, to, { allowed: false, error: 'fleet_slot' }]);
+        }
+      }
+    });
+
+    it('lets a person reorder a fleet card inside its column', () => {
+      expect(
+        boardMoveRule(
+          move({ from: 'in_progress', to: 'in_progress', cardSource: 'fleet' }),
+        ),
+      ).toEqual({ allowed: true, effects: [], offerRun: false });
+    });
+
+    it('lets the projector move a fleet card with the slot, never collecting', () => {
+      const automatic = { source: 'automatic', cardSource: 'fleet' } as const;
+      expect(
+        boardMoveRule(move({ ...automatic, from: 'todo', to: 'in_progress' })),
+      ).toEqual({ allowed: true, effects: [], offerRun: false });
+      expect(
+        boardMoveRule(
+          move({ ...automatic, from: 'in_progress', to: 'finished' }),
+        ),
+      ).toEqual({ allowed: true, effects: [], offerRun: false });
+      expect(
+        boardMoveRule(
+          move({ ...automatic, from: 'completed', to: 'in_progress' }),
+        ),
+      ).toEqual({ allowed: false, error: 'card_completed' });
+    });
+
+    it('collects a finished terminal card only with Automatic work on', () => {
+      for (const source of ['person', 'automatic'] as const) {
+        const finish = move({
+          from: 'in_progress',
+          to: 'finished',
+          source,
+          cardSource: 'terminal',
+        });
+        expect(boardMoveRule(finish)).toEqual({
+          allowed: true,
+          effects: [],
+          offerRun: false,
+        });
+        expect(boardMoveRule({ ...finish, autoCollect: true })).toEqual({
+          allowed: true,
+          effects: ['collect'],
+          offerRun: false,
+        });
+      }
+    });
+
+    it('offers no Run for a terminal card while its session lives', () => {
+      const back = move({
+        from: 'finished',
+        to: 'in_progress',
+        cardSource: 'terminal',
+      });
+      expect(boardMoveRule({ ...back, trackingAlive: true })).toEqual({
+        allowed: true,
+        effects: [],
+        offerRun: false,
+      });
+      expect(boardMoveRule(back)).toEqual({
+        allowed: true,
+        effects: [],
+        offerRun: true,
+      });
+    });
+
+    it('decides a manual card exactly as before, whatever the new fields say', () => {
+      for (const from of BOARD_COLUMNS) {
+        for (const to of BOARD_COLUMNS) {
+          for (const roundPhase of [null, 'running', 'finished'] as const) {
+            const input = move({ from, to, roundPhase });
+            for (const cardSource of ['manual', 'captured'] as const) {
+              expect(
+                boardMoveRule({
+                  ...input,
+                  cardSource,
+                  autoCollect: true,
+                  trackingAlive: true,
+                }),
+              ).toEqual(boardMoveRule(input));
+            }
+          }
+        }
+      }
+    });
+  });
 });

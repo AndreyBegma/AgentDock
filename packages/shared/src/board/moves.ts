@@ -1,4 +1,5 @@
 import {
+  type BoardCardSource,
   type BoardColumn,
   type CardRoundPhase,
   isActiveRoundPhase,
@@ -20,7 +21,9 @@ export type BoardMoveSource = 'person' | 'automatic';
  * What the API does besides writing the new column, in this order:
  * - `stop` — kill the worker (`card.stop`), the active round becomes `cancelled`;
  * - `finish` — the active round becomes `finished` (by the person for a drag);
- * - `collect` — send `card.collect`: entering Finished with work to collect (D8);
+ * - `collect` — send `card.collect`: entering Finished with work to collect
+ *   (D8) — a card worker's round, or a `terminal` card with `autoCollect`
+ *   on (#282 D3), collected in its session's cwd;
  * - `accept` — set `completedAt`/`completedById`, send `card.close` (D10);
  * - `reopen` — clear `completedAt`/`completedById`: leaving Completed;
  * - `accept_suggestion` — a person dragged an Inbox card to To Do: what
@@ -45,14 +48,18 @@ export type BoardMoveEffect =
  *   enters the Inbox;
  * - `plan_task_derived` — the item is a plan task projected onto the board
  *   (#270 D5, ADR-0028): its column follows its plan and its issue, so no
- *   move, reorder or column change of it is ever allowed.
+ *   move, reorder or column change of it is ever allowed;
+ * - `fleet_slot` — a person moved a `fleet` card (#282 D4, ADR-0030 §4):
+ *   its column follows the slot, so the one move a person makes is Finished
+ *   → Completed (Accept). A reorder inside a column is not a move.
  */
 export type BoardMoveRefusal =
   | 'card_running'
   | 'automatic_to_completed'
   | 'card_completed'
   | 'invalid_move'
-  | 'plan_task_derived';
+  | 'plan_task_derived'
+  | 'fleet_slot';
 
 /** #270 D5: what is being moved. A plan task is on the board read-only. */
 export type BoardMoveItem = 'card' | 'plan_task';
@@ -67,6 +74,15 @@ export interface BoardMoveInput {
   source: BoardMoveSource;
   /** The person confirmed stopping the worker (`ConfirmDialog`). */
   stopWorker?: boolean;
+  /** #282 D6: the card's `source`. Default `manual`. */
+  cardSource?: BoardCardSource;
+  /** #282 D3: a `terminal` card's Automatic work. Default `false`. */
+  autoCollect?: boolean;
+  /**
+   * #282 D1: a `terminal` card's tracked session is alive — it is the
+   * worker, so no Run is offered. Default `false`.
+   */
+  trackingAlive?: boolean;
 }
 
 export type BoardMoveDecision =
@@ -86,6 +102,23 @@ const refuse = (error: BoardMoveRefusal): BoardMoveDecision => ({
   error,
 });
 
+/**
+ * D8 / #282 D3: a card worker's work is always collected; a terminal
+ * session's only with Automatic work on; a fleet slot's never — the
+ * orchestrator owns its pull request.
+ */
+const collects = (
+  cardSource: BoardCardSource,
+  roundPhase: CardRoundPhase | null,
+  autoCollect: boolean | undefined,
+): boolean => {
+  if (cardSource === 'fleet') return false;
+  if (cardSource === 'terminal' && roundPhase === null) {
+    return autoCollect === true;
+  }
+  return roundPhase !== null;
+};
+
 export const boardMoveRule = (move: BoardMoveInput): BoardMoveDecision => {
   const { from, to, roundPhase, source } = move;
   if (move.item === 'plan_task') return refuse('plan_task_derived');
@@ -96,6 +129,14 @@ export const boardMoveRule = (move: BoardMoveInput): BoardMoveDecision => {
     return refuse('card_completed');
   }
   if (from === to) return { allowed: true, effects: [], offerRun: false };
+  const cardSource = move.cardSource ?? 'manual';
+  if (
+    cardSource === 'fleet' &&
+    source === 'person' &&
+    !(from === 'finished' && to === 'completed')
+  ) {
+    return refuse('fleet_slot');
+  }
   if (from === 'inbox' || to === 'inbox') {
     return from === 'inbox' && to === 'todo' && source === 'person'
       ? { allowed: true, effects: ['accept_suggestion'], offerRun: false }
@@ -110,12 +151,16 @@ export const boardMoveRule = (move: BoardMoveInput): BoardMoveDecision => {
     else if (move.stopWorker === true) effects.push('stop');
     else return refuse('card_running');
   }
-  if (to === 'finished' && roundPhase !== null) effects.push('collect');
+  if (to === 'finished' && collects(cardSource, roundPhase, move.autoCollect)) {
+    effects.push('collect');
+  }
   if (to === 'completed') effects.push('accept');
   if (from === 'completed') effects.push('reopen');
 
   const offerRun =
     source === 'person' &&
+    cardSource !== 'fleet' &&
+    !(cardSource === 'terminal' && move.trackingAlive === true) &&
     to === 'in_progress' &&
     (from === 'todo' || from === 'finished') &&
     !active;

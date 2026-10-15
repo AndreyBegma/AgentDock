@@ -679,6 +679,7 @@ model AgentSession {
   actionRequests ActionRequest[]
   cardCaptures   CardCapture[]
   capturedCards  BoardCard[]          @relation("BoardCardSourceSession")
+  trackedCard    BoardCard?           @relation("BoardCardTrackedSession")
 
   @@unique([runnerId, runtime, externalId])
   @@index([projectId, startedAt])
@@ -2611,6 +2612,10 @@ enum BoardCardSource {
   manual
   /// From card capture (#244); kept after Accept.
   captured
+  /// From `track_card` in a person's own terminal session (#282 D1).
+  terminal
+  /// The mirror of an orchestrator slot or a `cs:ready` issue (#282 D4).
+  fleet
 }
 
 /// Shared `CARD_ROUND_TRIGGERS` (D4).
@@ -2703,10 +2708,27 @@ model BoardCard {
   /// At most 500 characters.
   autoRunMessage      String?
   autoRunFailedAt     DateTime?
+  /// #282 D1: the manual session a `terminal` card tracks; unique, so a
+  /// second `card.track` of the session updates its card.
+  trackedSessionId    String?         @unique
+  /// #282 D3: Automatic work — collect when the tracked session finishes.
+  /// Starts from `board_settings.autoCollectTracked`.
+  autoCollect         Boolean         @default(false)
+  /// #282 D4: a `fleet` card's key is `(projectId, fleetIssue, fleetSlot)`;
+  /// `fleetSlot` is null for a `cs:ready` issue no slot has picked up. Postgres
+  /// treats nulls as distinct, so that row is kept unique by the partial index
+  /// `board_cards_fleet_unslotted_key` in the migration.
+  fleetIssue          Int?
+  fleetSlot           String?
+  /// Shared `FLEET_STAGES`, written by the fleet projector.
+  fleetStage          String?
+  /// The slot left the projection; the card keeps its last column.
+  fleetSlotGone       Boolean         @default(false)
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
 
   project            Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  trackedSession     AgentSession?       @relation("BoardCardTrackedSession", fields: [trackedSessionId], references: [id], onDelete: SetNull)
   createdBy          User?               @relation("BoardCardCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   movedBy            User?               @relation("BoardCardMovedBy", fields: [movedById], references: [id], onDelete: SetNull)
   completedBy        User?               @relation("BoardCardCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
@@ -2718,6 +2740,7 @@ model BoardCard {
   textNormalizations TextNormalization[]
 
   @@unique([projectId, number])
+  @@unique([projectId, fleetIssue, fleetSlot])
   @@index([projectId, column, position])
   @@index([sessionId])
   @@index([projectId, fingerprint])
@@ -2765,18 +2788,20 @@ model BoardCardRound {
 
 /// A project's board settings (D2, D13). No row: the defaults.
 model BoardSettings {
-  projectId      String   @id
-  issueOnRun     Boolean  @default(false)
-  specOnRun      Boolean  @default(false)
+  projectId          String   @id
+  issueOnRun         Boolean  @default(false)
+  specOnRun          Boolean  @default(false)
   /// 1–10, checked by the DTO.
-  maxRunning     Int      @default(3)
+  maxRunning         Int      @default(3)
   /// #244 D10: on only while the project's `shipSessionContent` is on;
   /// turning content off turns it off.
-  captureEnabled Boolean  @default(false)
+  captureEnabled     Boolean  @default(false)
   /// Shared `CAPTURE_MODELS`: `haiku` or `sonnet`, checked by the DTO.
-  captureModel   String   @default("haiku")
-  updatedById    String?
-  updatedAt      DateTime @updatedAt
+  captureModel       String   @default("haiku")
+  /// #282 D3: the `autoCollect` a new `terminal` card starts with.
+  autoCollectTracked Boolean  @default(false)
+  updatedById        String?
+  updatedAt          DateTime @updatedAt
 
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   updatedBy User?   @relation(fields: [updatedById], references: [id], onDelete: SetNull)
@@ -2804,6 +2829,8 @@ enum CardCaptureSkipReason {
   runner_offline
   capture_off
   no_profile
+  /// The session tracks a card (#282 D5).
+  tracked
 }
 
 /// One extraction of a manual session's new content (D3, D4). The newest
