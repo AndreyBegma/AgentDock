@@ -1,3 +1,7 @@
+import type {
+  CardDesignRecommendableModel,
+  CardRecommendableModel,
+} from '../assess/limits';
 import type { AttachmentRefusal, AttachmentView } from '../attachments';
 import type { TaskDesignSummary, TaskDesignView } from '../design';
 import type { FleetStage } from '../fleet';
@@ -193,14 +197,48 @@ export interface CardRoundView {
   endedAt: string | null;
 }
 
+/** #322 D6: one recommended model, with its one-line reason. */
+export interface CardModelRecommendation<
+  M extends CardRecommendableModel = CardRecommendableModel,
+> {
+  model: M;
+  reason: string;
+}
+
+/**
+ * #322 D6, D7: a card's recommendations for its work and its design. Each is
+ * `null` until an assessment applied — runner offline or too old, no Claude
+ * profile, a budget stop, an answer out of contract: the popover shows "No
+ * recommendation yet" and launch does not wait.
+ */
+export interface CardRecommendationView {
+  work: CardModelRecommendation | null;
+  design: CardModelRecommendation<CardDesignRecommendableModel> | null;
+  /** When the last assessment applied (ISO); `null` before the first. */
+  assessedAt: string | null;
+}
+
 /** `GET /board/cards/:number`. */
 export interface BoardCardDetail extends BoardCardView {
   /** Markdown. */
   body: string;
   issueOnRun: boolean;
   specOnRun: boolean;
-  /** Overrides the project's model from the next round (D12). */
+  /**
+   * Overrides the project's model from the next round (D12). #322 D3: the
+   * work model the person chose, kept only when it differed from the default.
+   */
   model: string | null;
+  /**
+   * #322 D3: the Claude profile the person chose for the card's work and
+   * design, kept only when it differed from the resolver's pick; `null`
+   * follows the resolver.
+   */
+  profileKey: string | null;
+  /** #322 D3: the design turns' model override; `null` follows the default. */
+  designModel: string | null;
+  /** #322 D6: the last applied assessment; its parts are `null` without one (D7). */
+  recommendation: CardRecommendationView;
   /** Fixed at the first Run (D5). */
   branch: string | null;
   /** Display only: the runner owns the path. */
@@ -259,7 +297,11 @@ export interface CreateBoardCardRequest {
   attachmentIds?: string[];
 }
 
-/** `PATCH /board/cards/:number`: applies from the next round. `model: null` clears it. */
+/**
+ * `PATCH /board/cards/:number`: applies from the next round. `null` clears an
+ * override — `model`, `designModel`, `profileKey` — which is what choosing the
+ * default option in the card form sends (#322 D3).
+ */
 export interface UpdateBoardCardRequest {
   title?: string;
   body?: string;
@@ -267,6 +309,10 @@ export interface UpdateBoardCardRequest {
   issueOnRun?: boolean;
   specOnRun?: boolean;
   model?: string | null;
+  /** #322 D3: the design turns' model override. */
+  designModel?: string | null;
+  /** #322 D3, D9: a Claude profile of the project's runner. */
+  profileKey?: string | null;
   /** #243 D5: refused with `design_approved` once the design is approved. */
   continueAfterDesign?: boolean;
   /** #282 D3: a `terminal` card only; any other card is refused `not_tracked`. */
@@ -280,9 +326,19 @@ export interface MoveBoardCardRequest {
   stopWorker?: boolean;
 }
 
-/** `POST /board/cards/:number/run`: round 1, or a retry; `model` overrides for this card (D12). */
+/**
+ * `POST /board/cards/:number/run`: round 1, or a retry; `model` overrides for
+ * this card (D12). #322 D3: the popover sends `profileKey` and `model`; each is
+ * stored on the card only when it differs from what the default would have
+ * picked without the card's override.
+ */
 export interface RunBoardCardRequest {
   model?: string;
+  /**
+   * #322 D9: a Claude profile of the project's runner (`profileKeySchema`); an
+   * unknown or non-Claude key is 422 `no_profile`.
+   */
+  profileKey?: string;
   permissionMode?: OrchestratorPermissionMode;
 }
 

@@ -24,6 +24,8 @@ export const RUN_KINDS = [
   'card_capture',
   /** A text normalization (issue #271 D4, ADR-0027). */
   'text_normalize',
+  /** A card's model assessment (issue #322 D5, ADR-0032). */
+  'card_assess',
 ] as const;
 export type RunKind = (typeof RUN_KINDS)[number];
 

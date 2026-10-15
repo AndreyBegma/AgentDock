@@ -486,6 +486,13 @@ export class BoardService implements OnModuleInit {
         ? { specOnRun: fields.specOnRun }
         : {}),
       ...(fields.model !== undefined ? { model: fields.model } : {}),
+      // #322 D3: the card form's overrides; `null` follows the default again.
+      ...(fields.designModel !== undefined
+        ? { designModel: fields.designModel }
+        : {}),
+      ...(fields.profileKey !== undefined
+        ? { profileKey: fields.profileKey }
+        : {}),
     };
     await this.prisma.boardCard.update({
       where: { id: card.id },
