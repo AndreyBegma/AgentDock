@@ -7,7 +7,7 @@ export const PHONE_MAX_WIDTH_PX = 768;
 const COLUMN_GAP = '0.75rem';
 
 /** Narrowest a column gets before the board scrolls sideways instead. */
-const MIN_COLUMN = '15rem';
+const MIN_COLUMN = '13.5rem';
 
 /**
  * The `--board-column` width glass-ui's `Board` reads: `count` columns share

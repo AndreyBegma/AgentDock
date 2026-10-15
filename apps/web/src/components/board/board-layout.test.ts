@@ -30,7 +30,7 @@ describe('visibleColumns', () => {
 describe('boardColumnWidth', () => {
   test('five columns share the scroller, with a floor', () => {
     expect(boardColumnWidth(5)).toBe(
-      'max(15rem, calc((100% - 4 * 0.75rem) / 5))',
+      'max(13.5rem, calc((100% - 4 * 0.75rem) / 5))',
     );
   });
 
