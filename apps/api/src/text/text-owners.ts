@@ -14,7 +14,10 @@ export interface AppliedTextField {
  * #271 D10, "API"):
  * - `publish` — the owner's own live event, once a result lands;
  * - `derive` — the values that follow an applied field (a card's fingerprint,
- *   a plan's title), in the transaction that applied it.
+ *   a plan's title), in the transaction that applied it;
+ * - `settled` — once a request ended for good (applied, skipped, or failed
+ *   past its retries), after the owner's live event: what waits on the
+ *   English text (a card's assessment, #322 D6) starts there.
  *
  * The owner modules depend on `TextModule` to request normalization, so the
  * text module reaches back through this registry rather than importing them.
@@ -26,6 +29,7 @@ export interface TextOwnerHooks {
     ownerId: string,
     applied: readonly AppliedTextField[],
   ): Promise<void>;
+  settled?(projectId: string, ownerId: string): void | Promise<void>;
 }
 
 @Injectable()
@@ -58,6 +62,21 @@ export class TextOwners {
     } catch (error) {
       this.logger.warn(
         `${ownerType} ${ownerId}: live event not published: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  /** Best effort: what follows a settled request never fails the request. */
+  async settled(
+    ownerType: TextOwnerType,
+    projectId: string,
+    ownerId: string,
+  ): Promise<void> {
+    try {
+      await this.hooks.get(ownerType)?.settled?.(projectId, ownerId);
+    } catch (error) {
+      this.logger.warn(
+        `${ownerType} ${ownerId}: settled hook failed: ${(error as Error).message}`,
       );
     }
   }

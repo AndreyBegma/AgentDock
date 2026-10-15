@@ -25,7 +25,12 @@ import {
 } from '../projects';
 import { DesignService } from './design.service';
 import { DesignStopService } from './design-stop.service';
-import { DesignApproveDto, DesignCommentDto, TaskDesignPatchDto } from './dto';
+import {
+  CardDesignLaunchDto,
+  DesignApproveDto,
+  DesignCommentDto,
+  TaskDesignPatchDto,
+} from './dto';
 
 const actorOf = (
   access: ResolvedProjectAccess,
@@ -36,7 +41,8 @@ const actorOf = (
 /**
  * A board card's design (#243 "API", D8; ADR-0025): any project viewer
  * reads it; the switch, Generate, comments, Revise, Stop and Approve need an
- * operator. A project the caller cannot see is 404 on every route. Writes
+ * operator. Generate and Revise take the launch popover's profile and model
+ * (#322 D1). A project the caller cannot see is 404 on every route. Writes
  * answer the design as it now is.
  */
 @Controller('projects/:projectId/board/cards/:number/design')
@@ -81,12 +87,14 @@ export class CardDesignController {
     @CurrentUser() user: AuthUser,
     @AuditCtx() ctx: AuditContext,
     @Param('number') number: string,
+    @Body() dto: CardDesignLaunchDto,
   ): Promise<TaskDesignView> {
     const n = cardNumber(number);
     await this.designs.cardGenerate(
       access.projectId,
       n,
       actorOf(access, user, ctx),
+      dto,
     );
     return this.designs.cardView(access.projectId, n);
   }
@@ -117,12 +125,14 @@ export class CardDesignController {
     @CurrentUser() user: AuthUser,
     @AuditCtx() ctx: AuditContext,
     @Param('number') number: string,
+    @Body() dto: CardDesignLaunchDto,
   ): Promise<TaskDesignView> {
     const n = cardNumber(number);
     await this.designs.cardRevise(
       access.projectId,
       n,
       actorOf(access, user, ctx),
+      dto,
     );
     return this.designs.cardView(access.projectId, n);
   }

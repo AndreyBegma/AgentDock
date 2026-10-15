@@ -28,11 +28,13 @@ import {
   type OnModuleInit,
 } from '@nestjs/common';
 import type { BoardCard } from '@prisma/client';
+import { CardAssessor } from '../assess/card-assessor';
 import { AttachmentsService } from '../attachments/attachments.service';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
 import { usageByRun } from '../history/run-usage';
 import { mergeMethodOf } from '../planner/planner-instructions.service';
+import { RuntimeProfileResolver } from '../readiness';
 import { TextNormalizer } from '../text/text-normalizer';
 import { TextOwners } from '../text/text-owners';
 import { BoardCommands, boardOutput } from './board-commands';
@@ -109,12 +111,19 @@ export class BoardService implements OnModuleInit {
     private readonly textOwners: TextOwners,
     private readonly fleetEdits: FleetCardEditsRef,
     private readonly attachments: AttachmentsService,
+    private readonly assessor: CardAssessor,
+    private readonly profiles: RuntimeProfileResolver,
   ) {}
 
-  /** #271 D10: a card's English title carries its own fingerprint (#244 D6). */
+  /**
+   * #271 D10: a card's English title carries its own fingerprint (#244 D6).
+   * #322 D6: a settled normalization of the card or of a round's feedback
+   * asks for the card's assessment.
+   */
   onModuleInit(): void {
     this.textOwners.register('board_card', {
       publish: (projectId, cardId) => this.work.publish(projectId, cardId),
+      settled: (_projectId, cardId) => this.assessor.request(cardId),
       derive: async (tx, cardId, applied) => {
         const title = applied.find((f) => f.field === 'title');
         if (!title) return;
@@ -131,6 +140,13 @@ export class BoardService implements OnModuleInit {
           select: { cardId: true },
         });
         if (round) this.work.publish(projectId, round.cardId);
+      },
+      settled: async (_projectId, roundId) => {
+        const round = await this.prisma.boardCardRound.findUnique({
+          where: { id: roundId },
+          select: { cardId: true },
+        });
+        if (round) await this.assessor.request(round.cardId);
       },
     });
   }
@@ -162,6 +178,9 @@ export class BoardService implements OnModuleInit {
         authorId: actor.userId,
       },
     );
+    // #322 D6: asked now when the text is already final (English, DeepL);
+    // else the job waits for the `settled` hook.
+    await this.assessor.request(card.id);
   }
 
   /**
@@ -431,6 +450,8 @@ export class BoardService implements OnModuleInit {
       actor,
     );
     this.work.publish(projectId, card.id);
+    // #322 D6: the attachments' names are in the assessed input.
+    await this.assessor.request(card.id);
     return this.detail(projectId, number);
   }
 
@@ -457,6 +478,15 @@ export class BoardService implements OnModuleInit {
         422,
         BOARD_ERROR.notTracked,
         'Automatic work is set on a card tracked from a terminal session only',
+      );
+    }
+    // #322 D9: a remembered profile is a Claude profile of the project's runner.
+    if (fields.profileKey) {
+      await this.profiles.require(
+        await this.work.project(projectId),
+        { key: fields.profileKey },
+        (details, message) =>
+          boardError(422, BOARD_ERROR.noProfile, message, details),
       );
     }
     if (continueAfterDesign !== undefined) {
@@ -535,6 +565,9 @@ export class BoardService implements OnModuleInit {
         changed,
         actor,
       );
+    } else if (data.kind !== undefined) {
+      // #322 D6: the kind is in the assessed input.
+      await this.assessor.request(card.id);
     }
     if (card.source === 'fleet') await this.fleetEdited(card, data, actor);
     return this.detail(projectId, number);

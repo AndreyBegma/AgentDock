@@ -706,7 +706,7 @@ export class TextNormalizer {
     });
     if (!done) return false;
     if (row.runId) this.publishRun(row.projectId, row.runId, 'succeeded');
-    await this.changed(row.projectId, owner);
+    await this.changed(row.projectId, owner, { settled: true });
     return true;
   }
 
@@ -842,16 +842,29 @@ export class TextNormalizer {
     }
   }
 
+  /** A request that ended for good: failed past its retries, or skipped. */
   private async changedById(id: string): Promise<void> {
     const row = await this.prisma.textNormalization.findUnique({
       where: { id },
     });
-    if (row) await this.changed(row.projectId, ownerOfRow(row));
+    if (row) {
+      await this.changed(row.projectId, ownerOfRow(row), { settled: true });
+    }
   }
 
-  /** The owner's own live event, and `text.changed` (API section). */
-  private async changed(projectId: string, owner: TextOwnerRef) {
+  /**
+   * The owner's own live event, and `text.changed` (API section). `settled`:
+   * the request ended for good, and the owner's `settled` hook runs too.
+   */
+  private async changed(
+    projectId: string,
+    owner: TextOwnerRef,
+    { settled = false }: { settled?: boolean } = {},
+  ) {
     await this.owners.publish(owner.ownerType, projectId, owner.ownerId);
+    if (settled) {
+      await this.owners.settled(owner.ownerType, projectId, owner.ownerId);
+    }
     const data: TextChangedData = { ...owner };
     try {
       this.live.publish(`project:${projectId}`, TEXT_CHANGED_EVENT, data);
