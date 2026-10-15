@@ -156,7 +156,7 @@ describe('messageSchema', () => {
     const { capabilities } = hello();
     const { gitAuth: _, ...older } = capabilities;
     expect(capabilitiesSchema.parse(older).gitAuth).toBeUndefined();
-    for (const github of ['gh', 'native']) {
+    for (const github of ['gh', 'native'] as const) {
       expect(
         capabilitiesSchema.parse({ ...capabilities, gitAuth: { github } })
           .gitAuth,
