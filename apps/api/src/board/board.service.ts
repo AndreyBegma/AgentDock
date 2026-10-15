@@ -16,11 +16,14 @@ import {
   type Role,
 } from '@agentdock/shared';
 import { roleAtLeast } from '@agentdock/shared/protocol';
-import { Injectable } from '@nestjs/common';
+import { Injectable, type OnModuleInit } from '@nestjs/common';
+import type { BoardCard } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
 import { usageByRun } from '../history/run-usage';
 import { mergeMethodOf } from '../planner/planner-instructions.service';
+import { TextNormalizer } from '../text/text-normalizer';
+import { TextOwners } from '../text/text-owners';
 import { BoardCommands, boardOutput } from './board-commands';
 import { boardError } from './board-error';
 import {
@@ -65,13 +68,68 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * are `BoardSink`.
  */
 @Injectable()
-export class BoardService {
+export class BoardService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly work: BoardWork,
     private readonly audit: AuditService,
     private readonly commands: BoardCommands,
+    private readonly text: TextNormalizer,
+    private readonly textOwners: TextOwners,
   ) {}
+
+  /** #271 D10: a card's English title carries its own fingerprint (#244 D6). */
+  onModuleInit(): void {
+    this.textOwners.register('board_card', {
+      publish: (projectId, cardId) => this.work.publish(projectId, cardId),
+      derive: async (tx, cardId, applied) => {
+        const title = applied.find((f) => f.field === 'title');
+        if (!title) return;
+        await tx.boardCard.update({
+          where: { id: cardId },
+          data: { fingerprint: captureFingerprint(title.english) },
+        });
+      },
+    });
+    this.textOwners.register('board_card_round', {
+      publish: async (projectId, roundId) => {
+        const round = await this.prisma.boardCardRound.findUnique({
+          where: { id: roundId },
+          select: { cardId: true },
+        });
+        if (round) this.work.publish(projectId, round.cardId);
+      },
+    });
+  }
+
+  /**
+   * #271 D4, D9: normalizes a card's changed title and body, asking for its
+   * kind while the model may still set it — `auto`, no Run yet, and not a
+   * captured card, whose kind a model already chose.
+   */
+  async normalizeCard(
+    card: Pick<
+      BoardCard,
+      'id' | 'projectId' | 'kindSource' | 'branch' | 'source'
+    >,
+    fields: { title?: string; body?: string },
+    actor: Pick<BoardActor, 'userId'>,
+  ): Promise<void> {
+    await this.text.request(
+      card.projectId,
+      { ownerType: 'board_card', ownerId: card.id },
+      Object.entries(fields).flatMap(([field, text]) =>
+        text === undefined ? [] : [{ field, text }],
+      ),
+      {
+        classifyKind:
+          card.kindSource === 'auto' &&
+          card.branch === null &&
+          card.source !== 'captured',
+        authorId: actor.userId,
+      },
+    );
+  }
 
   /**
    * `GET /board`: Completed holds the newest page, before `completedBefore`.
@@ -229,7 +287,9 @@ export class BoardService {
           title,
           fingerprint: captureFingerprint(title),
           body: dto.body ?? '',
+          // #271 D9: without a kind the model classifies it.
           kind: dto.kind ?? 'feature',
+          kindSource: dto.kind === undefined ? 'auto' : 'person',
           column: 'todo',
           position,
           issueOnRun: dto.issueOnRun ?? settings.issueOnRun,
@@ -255,6 +315,11 @@ export class BoardService {
       result: 'ok',
     });
     this.work.publish(projectId, card.id);
+    await this.normalizeCard(
+      card,
+      { title: card.title, body: card.body },
+      actor,
+    );
     return this.detail(projectId, card.number);
   }
 
@@ -279,6 +344,8 @@ export class BoardService {
       ...(fields.title !== undefined ? { title: fields.title.trim() } : {}),
       ...(fields.body !== undefined ? { body: fields.body } : {}),
       ...(fields.kind !== undefined ? { kind: fields.kind } : {}),
+      // #271 D9: a kind the person sets is theirs from now on.
+      ...(fields.kind !== undefined ? { kindSource: 'person' as const } : {}),
       ...(fields.issueOnRun !== undefined
         ? { issueOnRun: fields.issueOnRun }
         : {}),
@@ -310,6 +377,25 @@ export class BoardService {
       result: 'ok',
     });
     this.work.publish(projectId, card.id);
+    // #271 D8: only what changed; editing the English text is a save too.
+    const changed = {
+      ...(data.title !== undefined && data.title !== card.title
+        ? { title: data.title }
+        : {}),
+      ...(data.body !== undefined && data.body !== card.body
+        ? { body: data.body }
+        : {}),
+    };
+    if (Object.keys(changed).length > 0) {
+      await this.normalizeCard(
+        {
+          ...card,
+          kindSource: data.kindSource ?? card.kindSource,
+        },
+        changed,
+        actor,
+      );
+    }
     return this.detail(projectId, number);
   }
 

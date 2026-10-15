@@ -32,6 +32,7 @@ import { SkillsModule } from './skills';
 import { TelegramModule } from './telegram';
 import { TerminalModule } from './terminal';
 import { TerminalSetupModule } from './terminal-setup';
+import { TextModule } from './text';
 import { UsageModule } from './usage/usage.module';
 import { WebhooksModule } from './webhooks';
 import { WorkModule } from './work';
@@ -81,6 +82,8 @@ import { WorkflowsModule } from './workflows';
     CaptureModule,
     // Issue #270: one Work surface — the List and the Board's plan tasks.
     WorkModule,
+    // Issue #271: saved text normalized to English on the runner.
+    TextModule,
     SchedulesModule,
     BudgetsModule,
     // Before WebhooksModule: its `POST /hooks/:publicId` would otherwise

@@ -10,7 +10,7 @@ import {
   type TaskDesignView,
 } from '@agentdock/shared';
 import { RUNNER_FEATURE_COMMANDS } from '@agentdock/shared/protocol';
-import { HttpException, Injectable } from '@nestjs/common';
+import { HttpException, Injectable, type OnModuleInit } from '@nestjs/common';
 import type { BoardCard, Plan, PlanTask, TaskDesign } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { cardNotFound } from '../board/board-error';
@@ -22,6 +22,8 @@ import { blockingOpen, questionsOf } from '../planner/plan-mapper';
 import { PlanStore } from '../planner/plan-store';
 import { type PlanCaller, PlanTurnService } from '../planner/plan-turn.service';
 import { plannerError } from '../planner/planner-error';
+import { TextNormalizer } from '../text/text-normalizer';
+import { TextOwners } from '../text/text-owners';
 import { settleDesign } from './design-apply';
 import { DesignCommands } from './design-commands';
 import { designError } from './design-error';
@@ -92,7 +94,7 @@ type TaskCheck = 'change' | 'comment';
  * checked and built first (`UiProfileService`, D13).
  */
 @Injectable()
-export class DesignService {
+export class DesignService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly store: PlanStore,
@@ -102,7 +104,29 @@ export class DesignService {
     private readonly profiles: UiProfileService,
     private readonly audit: AuditService,
     private readonly commands: DesignCommands,
+    private readonly text: TextNormalizer,
+    private readonly textOwners: TextOwners,
   ) {}
+
+  /** #271: a comment's English body lands as its design's live event. */
+  onModuleInit(): void {
+    this.textOwners.register('design_comment', {
+      publish: async (projectId, commentId) => {
+        const comment = await this.prisma.designComment.findUnique({
+          where: { id: commentId },
+          select: {
+            design: { select: { planId: true, taskKey: true, cardId: true } },
+          },
+        });
+        const design = comment?.design;
+        if (design?.cardId) {
+          this.store.publishCardDesign(projectId, design.cardId);
+        } else if (design?.planId) {
+          this.store.publishDesign(projectId, design.planId, design.taskKey);
+        }
+      },
+    });
+  }
 
   // ─── Plan task ─────────────────────────────────────────────────────────────
 
@@ -380,7 +404,7 @@ export class DesignService {
     if (typeof anchor === 'string') {
       throw designError(400, DESIGN_ERROR.invalidArgs, anchor);
     }
-    await this.prisma.designComment.create({
+    const comment = await this.prisma.designComment.create({
       data: {
         designId: design.id,
         revisionId: revision.id,
@@ -389,8 +413,16 @@ export class DesignService {
         ...anchor,
         body: request.body,
       },
+      select: { id: true },
     });
     owner.publish();
+    // #271 D1: a comment on a card's design or a task's.
+    await this.text.request(
+      owner.projectId,
+      { ownerType: 'design_comment', ownerId: comment.id },
+      [{ field: 'body', text: request.body }],
+      { authorId: actor.userId },
+    );
   }
 
   /** Approve (D1, D4): picks one revision; the other variants are archived. */
