@@ -531,12 +531,14 @@ function CardDetailBody({
           ) : null}
         </section>
 
-        <CardDesignSection
-          projectId={projectId}
-          card={card}
-          canOperate={canOperate}
-          onChanged={onSaved}
-        />
+        {fleet ? null : (
+          <CardDesignSection
+            projectId={projectId}
+            card={card}
+            canOperate={canOperate}
+            onChanged={onSaved}
+          />
+        )}
 
         <section aria-label="Rounds" className="flex flex-col gap-2">
           <SectionHeader title="Rounds" headingLevel={3} />
