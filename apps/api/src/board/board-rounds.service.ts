@@ -36,6 +36,7 @@ import { BudgetGate } from '../budgets/budget-gate';
 import { PrismaService } from '../database/prisma.service';
 import { specDirOf } from '../planner/planner-instructions.service';
 import { RuntimeProfileResolver } from '../readiness';
+import { TextNormalizer } from '../text';
 import { BoardService } from './board.service';
 import { BoardCommands, boardOutput } from './board-commands';
 import { BoardFailure, boardError } from './board-error';
@@ -98,6 +99,7 @@ export class BoardRoundsService {
     private readonly commands: BoardCommands,
     private readonly audit: AuditService,
     private readonly profiles: RuntimeProfileResolver,
+    private readonly text: TextNormalizer,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
 
@@ -388,6 +390,15 @@ export class BoardRoundsService {
       return created;
     });
     this.work.publishRun(project.id, round.runId, 'running');
+    // #271 D3: this round reads the feedback as typed; later reads get English.
+    if (feedback !== null) {
+      await this.text.request(
+        project.id,
+        { ownerType: 'board_card_round', ownerId: round.id },
+        [{ field: 'feedback', text: feedback }],
+        { authorId: actor.userId },
+      );
+    }
 
     // The work moves the card (D7: Run → In progress is automatic).
     const moved = await this.work.card(project.id, card.number);

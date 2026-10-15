@@ -40,6 +40,8 @@ export const EMPTY_USAGE: RunUsage = {
  * - a card capture extraction (issue #244 D4): the Claude session the API
  *   assigned it (`card_captures.extractSessionId`), by its id on the
  *   project's runner; it runs in a run directory outside every root.
+ * - a text normalization (issue #271): the Claude session the API assigned
+ *   it (`text_normalizations.sessionId`), the same way.
  * Skill runs record no session id, so they have no usage yet.
  */
 const RUN_SESSIONS = Prisma.sql`
@@ -71,7 +73,15 @@ const RUN_SESSIONS = Prisma.sql`
   JOIN sessions se2 ON se2."runnerId" = pr."runnerId"
     AND se2.runtime = 'claude'
     AND se2."externalId" = cc."extractSessionId"::text
-  WHERE cc."runId" IS NOT NULL`;
+  WHERE cc."runId" IS NOT NULL
+  UNION ALL
+  SELECT tn."runId", se2.id
+  FROM text_normalizations tn
+  JOIN projects pr ON pr.id = tn."projectId"
+  JOIN sessions se2 ON se2."runnerId" = pr."runnerId"
+    AND se2.runtime = 'claude'
+    AND se2."externalId" = tn."sessionId"::text
+  WHERE tn."runId" IS NOT NULL`;
 
 /**
  * The requests of a run (spec 21 D8): of its sessions, the `llm_requests`

@@ -11,7 +11,12 @@ import {
   type PlanVisibility,
   type Role,
 } from '@agentdock/shared';
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  type OnModuleInit,
+  Optional,
+} from '@nestjs/common';
 import type { Plan, PlanTaskStatus } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuditContext } from '../audit/audit.types';
@@ -19,6 +24,7 @@ import { BudgetGate } from '../budgets/budget-gate';
 import { PrismaService } from '../database/prisma.service';
 import { designBlocks } from '../design/design-rules';
 import { designSummaries } from '../design/design-store';
+import { TextNormalizer, TextOwners } from '../text';
 import { readablePlanWhere } from './plan-access';
 import {
   blockingOpen,
@@ -77,7 +83,7 @@ const REVIEW_STATUS: Record<PlanReviewDecision, PlanTaskStatus> = {
 
 /** Plans: create, read, review, share, archive (spec 172 "API", D1, D6, D12). */
 @Injectable()
-export class PlanService {
+export class PlanService implements OnModuleInit {
   private readonly logger = new Logger(PlanService.name);
 
   constructor(
@@ -87,8 +93,51 @@ export class PlanService {
     private readonly commands: PlannerCommands,
     private readonly instructions: PlannerInstructionsService,
     private readonly audit: AuditService,
+    private readonly text: TextNormalizer,
+    private readonly textOwners: TextOwners,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
+
+  /**
+   * #271: the plan, its tasks' review comments and its turns' messages land
+   * as the plan's live event; an English brief retitles a plan whose title
+   * is still the brief's first line (D10).
+   */
+  onModuleInit(): void {
+    this.textOwners.register('plan', {
+      publish: (projectId, planId) => this.store.publish(projectId, planId),
+      derive: async (tx, planId, applied) => {
+        const brief = applied.find((f) => f.field === 'brief');
+        if (!brief) return;
+        await tx.plan.updateMany({
+          where: { id: planId, title: titleOf(brief.original) },
+          data: { title: titleOf(brief.english) },
+        });
+      },
+    });
+    const viaPlan =
+      (find: (id: string) => Promise<{ planId: string | null } | null>) =>
+      async (projectId: string, id: string) => {
+        const row = await find(id);
+        if (row?.planId) this.store.publish(projectId, row.planId);
+      };
+    this.textOwners.register('plan_task', {
+      publish: viaPlan((id) =>
+        this.prisma.planTask.findUnique({
+          where: { id },
+          select: { planId: true },
+        }),
+      ),
+    });
+    this.textOwners.register('plan_turn', {
+      publish: viaPlan((id) =>
+        this.prisma.planTurn.findUnique({
+          where: { id },
+          select: { planId: true },
+        }),
+      ),
+    });
+  }
 
   /**
    * A private plan and its first turn: `clarify` in dialogue mode,
@@ -136,6 +185,13 @@ export class PlanService {
       },
       result: 'ok',
     });
+    // #271 D3: the first turn reads the brief as typed.
+    await this.text.request(
+      projectId,
+      { ownerType: 'plan', ownerId: plan.id },
+      [{ field: 'brief', text: plan.brief }],
+      { authorId: actor.userId },
+    );
     try {
       await this.turns.planTurn(plan, {}, callerOf(actor));
     } catch (error) {
@@ -372,6 +428,14 @@ export class PlanService {
     await this.touch(plan.id);
     await record('ok');
     this.store.publish(plan.projectId, plan.id);
+    if (decision === 'rewrite') {
+      await this.text.request(
+        plan.projectId,
+        { ownerType: 'plan_task', ownerId: task.id },
+        [{ field: 'rewriteComment', text }],
+        { authorId: actor.userId },
+      );
+    }
   }
 
   /** D12: only the author shares a plan, or takes it back while nothing was sent. */

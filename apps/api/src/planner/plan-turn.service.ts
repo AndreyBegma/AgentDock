@@ -5,6 +5,7 @@ import {
   type PlanTurnAction,
   type PlanTurnInput,
   type Role,
+  textAnswerField,
 } from '@agentdock/shared';
 import {
   PLAN_TURN_DEFAULT_TIMEOUT_SEC,
@@ -21,6 +22,7 @@ import { SYSTEM_ACTOR, systemActorFor } from '../audit/audit.types';
 import { BudgetGate } from '../budgets/budget-gate';
 import { PrismaService } from '../database/prisma.service';
 import type { DesignTurnPlan } from '../design/design-rules';
+import { TextNormalizer } from '../text';
 import { TALKABLE_STATUSES } from './plan-apply';
 import { questionsOf } from './plan-mapper';
 import { assemblePrompt } from './plan-prompt';
@@ -43,6 +45,8 @@ interface TurnSpec {
   input: PlanTurnInput;
   /** Spec 223: what a design turn draws; kept in `runs.args.design`. */
   design?: DesignTurnPlan;
+  /** #271: the input is the person's new words (not a retry's copy). */
+  normalize?: boolean;
 }
 
 const turnInProgress = () =>
@@ -74,6 +78,7 @@ export class PlanTurnService {
     private readonly store: PlanStore,
     private readonly commands: PlannerCommands,
     private readonly audit: AuditService,
+    private readonly text: TextNormalizer,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
 
@@ -99,7 +104,11 @@ export class PlanTurnService {
         'The plan is decomposed: talk a task through, or revise the plan',
       );
     }
-    return this.run(plan, { action, task: null, input }, caller);
+    return this.run(
+      plan,
+      { action, task: null, input, normalize: true },
+      caller,
+    );
   }
 
   /** `POST …/tasks/:key/turns`: a grill round of one task (D7). */
@@ -118,7 +127,11 @@ export class PlanTurnService {
         `Task ${key} is ${task.status}; ask for a rewrite to talk it through again`,
       );
     }
-    return this.run(plan, { action: 'grill', task, input }, caller);
+    return this.run(
+      plan,
+      { action: 'grill', task, input, normalize: true },
+      caller,
+    );
   }
 
   /** D9: one plan-level turn with every rewrite comment. */
@@ -431,6 +444,29 @@ export class PlanTurnService {
       return { turnId: turn.id, runId: run.id };
     });
     this.store.publish(plan.projectId, plan.id);
+    // #271 D3: this turn reads the person's words as typed.
+    if (spec.normalize) {
+      await this.text.request(
+        plan.projectId,
+        { ownerType: 'plan_turn', ownerId: turnId },
+        [
+          ...(spec.input.message
+            ? [{ field: 'message', text: spec.input.message }]
+            : []),
+          ...(spec.input.answers ?? []).flatMap((answer) =>
+            answer.text
+              ? [
+                  {
+                    field: textAnswerField(answer.questionId),
+                    text: answer.text,
+                  },
+                ]
+              : [],
+          ),
+        ],
+        { authorId: caller.userId },
+      );
+    }
 
     const args: PlanTurnArgs = { ...valid.data, turnId, runId };
     try {

@@ -3,6 +3,7 @@ import { BoardModule } from '../board/board.module';
 import { PlannerModule } from '../planner/planner.module';
 import { ProjectsModule } from '../projects';
 import { RunnersModule } from '../runners/runners.module';
+import { TextModule } from '../text';
 import { CardDesignController } from './card-design.controller';
 import { DesignController } from './design.controller';
 import { DesignService } from './design.service';
@@ -22,7 +23,13 @@ import { UiProfileProjector } from './ui-profile-projector';
  * round 1 (`BoardModule`). Stop (#275) cancels the turn or leaves the build.
  */
 @Module({
-  imports: [BoardModule, PlannerModule, ProjectsModule, RunnersModule],
+  imports: [
+    BoardModule,
+    PlannerModule,
+    ProjectsModule,
+    RunnersModule,
+    TextModule,
+  ],
   controllers: [CardDesignController, DesignController, DesignMockupController],
   providers: [
     DesignCommands,

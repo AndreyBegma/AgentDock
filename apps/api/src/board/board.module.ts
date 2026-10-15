@@ -3,6 +3,7 @@ import { LiveModule } from '../live/live.module';
 import { ProjectsModule } from '../projects';
 import { ReadinessModule } from '../readiness';
 import { RunnersModule } from '../runners/runners.module';
+import { TextModule } from '../text';
 import { BoardController } from './board.controller';
 import { BoardService } from './board.service';
 import { BoardCommands } from './board-commands';
@@ -17,7 +18,13 @@ import { BoardWork } from './board-work';
  * `BoardService` is exported for the local `card.finish` method (D6).
  */
 @Module({
-  imports: [LiveModule, ProjectsModule, ReadinessModule, RunnersModule],
+  imports: [
+    LiveModule,
+    ProjectsModule,
+    ReadinessModule,
+    RunnersModule,
+    TextModule,
+  ],
   controllers: [BoardController],
   providers: [
     BoardCommands,

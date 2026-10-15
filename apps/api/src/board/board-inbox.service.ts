@@ -52,6 +52,10 @@ export class BoardInboxService {
         where: { id: card.id, column: 'inbox' },
         data: {
           ...edits,
+          // #271 D9: a kind the person sets is theirs from now on.
+          ...(edits.kind !== undefined
+            ? { kindSource: 'person' as const }
+            : {}),
           ...(edits.title !== undefined
             ? { fingerprint: captureFingerprint(edits.title) }
             : {}),
@@ -62,6 +66,12 @@ export class BoardInboxService {
       project,
       card,
       { to: 'todo', index: 0, source: 'person', edits },
+      actor,
+    );
+    // #271 D1: accepted, the suggestion's text is the person's.
+    await this.board.normalizeCard(
+      card,
+      { title: edits.title ?? card.title, body: edits.body ?? card.body },
       actor,
     );
     return this.board.detail(projectId, number);

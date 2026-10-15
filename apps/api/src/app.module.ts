@@ -31,6 +31,7 @@ import { SessionsModule } from './sessions/sessions.module';
 import { SkillsModule } from './skills';
 import { TelegramModule } from './telegram';
 import { TerminalModule } from './terminal';
+import { TextModule } from './text';
 import { UsageModule } from './usage/usage.module';
 import { WebhooksModule } from './webhooks';
 import { WorkflowsModule } from './workflows';
@@ -75,6 +76,8 @@ import { WorkflowsModule } from './workflows';
     BoardModule,
     // Issue #244: candidate cards from manual sessions, into the Inbox.
     CaptureModule,
+    // Issue #271: saved text normalized to English on the runner.
+    TextModule,
     SchedulesModule,
     BudgetsModule,
     // Before WebhooksModule: its `POST /hooks/:publicId` would otherwise
