@@ -110,13 +110,14 @@ export function Rail({
       collapsed={collapsed}
       head={
         <div className="flex flex-col gap-3">
+          {/* The logo row is as tall as the top bar's inner row (rail p-2 + h-10 = header h-14), so the two line up. */}
           <div
             className={`flex gap-1 ${collapsed ? 'flex-col items-stretch' : 'items-center'}`}
           >
             <Link
               href="/"
               aria-label="AgentDock, overview"
-              className={`flex min-w-0 items-center rounded-control text-ink ${collapsed ? 'h-8 justify-center' : 'flex-1 px-3'}`}
+              className={`flex min-w-0 items-center rounded-control text-ink h-10 ${collapsed ? 'justify-center' : 'flex-1 px-3'}`}
             >
               {collapsed ? (
                 <Logomark size={22} accent />
