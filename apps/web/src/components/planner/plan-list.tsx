@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Time } from '../../lib/format/time';
 import {
+  PLAN_MODE_LABEL,
   planAttentionReason,
   planPill,
   taskCountsText,
@@ -45,8 +46,7 @@ export function planColumns(retry?: PlanRetry): Column<PlanSummary>[] {
               <VisibilityChip plan={plan} />
             </span>
             <span className="text-xs text-ink-3">
-              {plan.author.name} ·{' '}
-              {plan.mode === 'dialogue' ? 'Dialogue' : 'Batch'} · v
+              {plan.author.name} · {PLAN_MODE_LABEL[plan.mode]} · v
               {plan.version}
             </span>
             {reason ? (

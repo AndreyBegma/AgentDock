@@ -13,7 +13,7 @@ import { MenuItem, MenuSeparator } from '@andrewbehma/glass-ui/menu';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { useRouter } from 'next/navigation';
 import { type CSSProperties, useState } from 'react';
-import { moveCard, runCard } from '../../lib/board/actions';
+import { moveCard } from '../../lib/board/actions';
 import {
   applyDrop,
   clampDropIndex,
@@ -138,11 +138,12 @@ export function BoardColumns({
 
   const columns = visibleColumns(allColumns, phone);
 
+  /** Resolves `true` when the move landed. */
   const send = async (
     move: DropMove,
     number: number,
-    options: { stopWorker?: boolean; run?: boolean } = {},
-  ) => {
+    options: { stopWorker?: boolean } = {},
+  ): Promise<boolean> => {
     setOptimistic(applyDrop(view, move));
     setBusy(true);
     try {
@@ -151,9 +152,10 @@ export function BoardColumns({
         number,
         moveRequest(move, options.stopWorker === true),
       );
-      if (options.run) await runCard(projectId, number);
+      return true;
     } catch (err) {
       toast.error(describeBoardError(err, runnerName));
+      return false;
     } finally {
       // Server truth either way: on a refusal this is the rollback.
       setOptimistic(undefined);
@@ -203,7 +205,10 @@ export function BoardColumns({
     if (asking?.kind !== 'offer-run') return;
     const { move, card } = asking;
     setAsking(undefined);
-    void send(move, card.number, { run });
+    // Run goes through the card actions, so an open dependency asks first (#337 D8).
+    void send(move, card.number).then((moved) => {
+      if (moved && run) void actions.run(card);
+    });
   };
 
   const confirmStop = () => {

@@ -33,6 +33,7 @@ import { RunnerOfflineBanner } from '../../../../../components/prerequisites/pre
 import { TerminalSheet } from '../../../../../components/terminal/terminal-sheet';
 import type { TerminalTarget } from '../../../../../components/terminal/terminal-view';
 import { api } from '../../../../../lib/api';
+import { boardNewPlanHref } from '../../../../../lib/board/href';
 import { useControl } from '../../../../../lib/control/use-control';
 import {
   EMPTY_FLEET_DESCRIPTION,
@@ -51,7 +52,6 @@ import {
   type WorkspaceState,
 } from '../../../../../lib/fleet/workspace-url';
 import { useLive } from '../../../../../lib/live/use-live';
-import { plannerBriefHref } from '../../../../../lib/planner/href';
 import { allowedLabels } from '../../../../../lib/queue/format';
 import { useSection } from '../../../../../lib/section/use-section';
 import { useTerminalAvailable } from '../../../../../lib/terminal/use-terminal-available';
@@ -268,7 +268,7 @@ function FleetWorkspace() {
             </Button>
           ) : null}
           <Link
-            href={plannerBriefHref(projectId, NEXT_WAVE_BRIEF)}
+            href={boardNewPlanHref(projectId, NEXT_WAVE_BRIEF)}
             className="text-sm text-accent-ink underline"
           >
             Plan the next wave

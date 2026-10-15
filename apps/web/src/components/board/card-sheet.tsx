@@ -89,6 +89,7 @@ import { Markdown } from '../markdown/markdown';
 import { ReadinessNotice } from '../readiness/readiness-notice';
 import { useCurrentUser } from '../shell/user-context';
 import { NormalizedNote } from '../text/normalized-note';
+import { CardDependenciesSection } from './card-dependencies';
 import { ApproveRunLink, CardDesignSection } from './card-design';
 import { AutoCollectToggle, CardOptionToggles } from './card-options';
 import { LaunchPopover } from './launch-popover';
@@ -630,6 +631,13 @@ function CardDetailBody({
             onChanged={onSaved}
           />
         )}
+
+        <CardDependenciesSection
+          projectId={projectId}
+          card={card}
+          canOperate={canOperate}
+          onChanged={onSaved}
+        />
 
         <section aria-label="Rounds" className="flex flex-col gap-2">
           <SectionHeader title="Rounds" headingLevel={3} />

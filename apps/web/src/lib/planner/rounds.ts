@@ -1,4 +1,9 @@
-import type { PlanAnswer, PlanQuestion, PlanTurnView } from '@agentdock/shared';
+import {
+  answerOptionIds,
+  type PlanAnswer,
+  type PlanQuestion,
+  type PlanTurnView,
+} from '@agentdock/shared';
 
 /**
  * Earlier rounds of a conversation (#184), as read-only cards. A round is
@@ -61,8 +66,11 @@ export function answerText(
   answer: PlanAnswer | undefined,
 ): string | null {
   if (!answer) return null;
-  const option = question.options.find((o) => o.id === answer.optionId);
-  const parts = [option?.label ?? answer.optionId, answer.text].filter(
+  // #337 D3: a multiple-choice answer names each pick.
+  const picks = answerOptionIds(answer).map(
+    (id) => question.options.find((o) => o.id === id)?.label ?? id,
+  );
+  const parts = [picks.join(', '), answer.text].filter(
     (p): p is string => p !== undefined && p !== '',
   );
   return parts.length > 0 ? parts.join(' — ') : null;
@@ -75,7 +83,10 @@ export function tookRecommendation(
 ): boolean {
   if (!answer) return false;
   const rec = question.recommendation;
+  const picks = answerOptionIds(answer);
   return rec.optionId !== undefined
-    ? answer.optionId === rec.optionId && answer.text === undefined
-    : answer.optionId === undefined && answer.text === rec.text;
+    ? picks.length === 1 &&
+        picks[0] === rec.optionId &&
+        answer.text === undefined
+    : picks.length === 0 && answer.text === rec.text;
 }

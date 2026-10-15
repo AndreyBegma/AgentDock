@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  type CreatePlanCardsResponse,
   DESIGN_LIVE_EVENT,
   PLANNER_LIVE_EVENT,
   type PlanDetail,
@@ -29,6 +30,7 @@ export type PlanBusy =
   | { kind: 'revise' }
   | { kind: 'visibility' }
   | { kind: 'send' }
+  | { kind: 'cards' }
   | { kind: 'archive' };
 
 const isPlannerChange = (data: unknown, planId: string): boolean =>
@@ -135,6 +137,11 @@ export function usePlan(projectId: string, planId: string) {
       ),
     send: () =>
       run({ kind: 'send' }, () => api(`${base}/send`, { method: 'POST' })),
+    /** #337 D7: one Todo card per task, once per plan. */
+    createCards: () =>
+      run({ kind: 'cards' }, () =>
+        api<CreatePlanCardsResponse>(`${base}/cards`, { method: 'POST' }),
+      ),
     archive: () =>
       run({ kind: 'archive' }, () =>
         api(`${base}/archive`, { method: 'POST' }),

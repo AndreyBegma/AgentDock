@@ -79,7 +79,6 @@ describe('visibleNav', () => {
     for (const page of [
       'Project',
       'Fleet',
-      'Planner',
       'Work',
       'Queue',
       'Approvals',
@@ -159,11 +158,17 @@ describe('activeEntryId: one active item', () => {
     expect(entry?.resolvedHref).toBe('/projects/p1/board');
   });
 
-  test('Work, the project Planner and the admin Planner each light one entry', () => {
+  test('Work and the admin Planner each light one entry', () => {
     expect(activeAt('viewer', '/work')).toBe('work');
-    expect(activeAt('viewer', '/projects/p1/planner')).toBe('planner');
-    expect(activeAt('viewer', '/projects/p1/planner/plan1')).toBe('planner');
     expect(activeAt('admin', '/admin/planner')).toBe('admin-planner');
+  });
+
+  test('the Planner left the project navigation; its old pages light nothing (#337 D11)', () => {
+    expect(labels('admin', '/projects/p1/board')).not.toContain(
+      'project/Planner',
+    );
+    expect(activeAt('viewer', '/projects/p1/planner')).toBeNull();
+    expect(activeAt('viewer', '/projects/p1/planner/plan1')).toBeNull();
   });
 
   test('Workflows lights its own entry, never Usage', () => {
@@ -208,11 +213,11 @@ describe('tabBarSplit', () => {
     });
   });
 
-  test('inside a project: its home and working pages, Planner first in More', () => {
+  test('inside a project: its home and working pages, the project first in More', () => {
     expect(split('admin', '/projects/p1/queue')).toEqual({
       tabs: ['Project', 'Fleet', 'Work', 'Queue', 'Approvals'],
       more: [
-        'project: Planner, Activity, History, Skills, Schedules, Settings',
+        'project: Activity, History, Skills, Schedules, Settings',
         'workspace: Overview, Projects, Activity, Work, Sessions, Usage, Workflows, Skills',
         'admin: Runners, Users, Schedules, Budgets, Planner instructions, Audit, Prices, Integrations, Settings',
       ],

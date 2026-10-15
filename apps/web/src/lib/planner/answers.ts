@@ -1,4 +1,5 @@
 import {
+  checkRoundAnswers,
   PLANNER_QUESTION_MAX,
   type PlanAnswer,
   type PlanQuestion,
@@ -8,11 +9,15 @@ import {
  * A round of question cards (D7) as the person fills it in. For each card:
  * accept the recommendation, pick another option, or answer in their own
  * words — an option and words together are allowed, as the contract allows.
- * The whole round goes back as one turn.
+ * A `multiple` question (#337 D3) takes several options as checkboxes, and
+ * every question takes words. The whole round goes back as one turn.
  */
 
 export interface CardAnswer {
+  /** The pick of a single-choice question. */
   optionId?: string;
+  /** #337 D3: the picks of a `multiple` question, in the question's order. */
+  optionIds?: readonly string[];
   text: string;
 }
 
@@ -32,6 +37,29 @@ export const pickOption = (
   [questionId]: { ...entry(round, questionId), optionId },
 });
 
+/**
+ * #337 D3: checks or unchecks one option of a `multiple` question. The picks
+ * keep the question's option order; unchecking the last one leaves none.
+ */
+export function toggleOption(
+  round: RoundAnswers,
+  question: PlanQuestion,
+  optionId: string,
+  checked: boolean,
+): RoundAnswers {
+  const current = new Set(entry(round, question.id).optionIds ?? []);
+  if (checked) current.add(optionId);
+  else current.delete(optionId);
+  const optionIds = question.options
+    .map((o) => o.id)
+    .filter((id) => current.has(id));
+  const { text } = entry(round, question.id);
+  return {
+    ...round,
+    [question.id]: optionIds.length > 0 ? { optionIds, text } : { text },
+  };
+}
+
 export const setAnswerText = (
   round: RoundAnswers,
   questionId: string,
@@ -47,10 +75,13 @@ export function acceptRecommendation(
   question: PlanQuestion,
 ): RoundAnswers {
   const { optionId, text } = question.recommendation;
-  return {
-    ...round,
-    [question.id]: optionId !== undefined ? { optionId, text: '' } : { text },
-  };
+  const answer: CardAnswer =
+    optionId === undefined
+      ? { text }
+      : question.multiple === true
+        ? { optionIds: [optionId], text: '' }
+        : { optionId, text: '' };
+  return { ...round, [question.id]: answer };
 }
 
 /** **Accept all recommendations**: every card, whatever it held. */
@@ -59,9 +90,12 @@ export const acceptAllRecommendations = (
   questions: readonly PlanQuestion[],
 ): RoundAnswers => questions.reduce(acceptRecommendation, round);
 
+const pickedCount = (answer: CardAnswer): number =>
+  answer.optionIds?.length ?? (answer.optionId !== undefined ? 1 : 0);
+
 export const isAnswered = (answer: CardAnswer | undefined): boolean =>
   answer !== undefined &&
-  (answer.optionId !== undefined || answer.text.trim() !== '');
+  (pickedCount(answer) > 0 || answer.text.trim() !== '');
 
 /** Whether the card's answer is exactly the planner's recommendation. */
 export function isRecommended(
@@ -71,12 +105,22 @@ export function isRecommended(
   if (!isAnswered(answer) || answer === undefined) return false;
   const rec = question.recommendation;
   if (rec.optionId !== undefined) {
-    return answer.optionId === rec.optionId && answer.text.trim() === '';
+    const picked =
+      answer.optionIds ?? (answer.optionId ? [answer.optionId] : []);
+    return (
+      picked.length === 1 &&
+      picked[0] === rec.optionId &&
+      answer.text.trim() === ''
+    );
   }
-  return answer.optionId === undefined && answer.text.trim() === rec.text;
+  return pickedCount(answer) === 0 && answer.text.trim() === rec.text;
 }
 
-/** The round as a turn's `answers`: answered cards only, in question order. */
+/**
+ * The round as a turn's `answers`: answered cards only, in question order.
+ * A `multiple` question's picks go as `optionIds` (#337 D3), a single
+ * choice as `optionId`.
+ */
 export function toAnswers(
   round: RoundAnswers,
   questions: readonly PlanQuestion[],
@@ -85,28 +129,38 @@ export function toAnswers(
     const a = round[q.id];
     if (!isAnswered(a) || a === undefined) return [];
     const text = a.text.trim();
+    const picks =
+      q.multiple === true
+        ? a.optionIds && a.optionIds.length > 0
+          ? { optionIds: [...a.optionIds] }
+          : {}
+        : a.optionId !== undefined
+          ? { optionId: a.optionId }
+          : {};
     return [
       {
         questionId: q.id,
-        ...(a.optionId !== undefined ? { optionId: a.optionId } : {}),
+        ...picks,
         ...(text !== '' ? { text } : {}),
       },
     ];
   });
 }
 
-export type RoundProblem = 'empty' | 'blocking' | 'too_long';
+export type RoundProblem = 'empty' | 'blocking' | 'too_long' | 'invalid';
 
 export const ROUND_PROBLEM_TEXT: Record<RoundProblem, string> = {
   empty: 'Answer at least one question, or accept the recommendations.',
   blocking: 'Answer every blocking question: it has no safe default.',
   too_long: `An answer is longer than ${PLANNER_QUESTION_MAX} characters.`,
+  invalid: 'An answer does not fit its question. Pick again.',
 };
 
 /**
  * Why the round cannot be sent yet, or null. A non-blocking card may stay
  * empty — the planner takes its recommendation as the default (D6); a
- * blocking one may not.
+ * blocking one may not. The picks are checked as the API checks them
+ * (`checkRoundAnswers`).
  */
 export function roundProblem(
   round: RoundAnswers,
@@ -121,6 +175,7 @@ export function roundProblem(
   if (questions.some((q) => q.blocking && !answered.has(q.id))) {
     return 'blocking';
   }
+  if (!checkRoundAnswers(questions, answers).ok) return 'invalid';
   return null;
 }
 
