@@ -11,6 +11,7 @@ import {
   type BoardMoveSource,
   boardMoveRule,
   CARD_FINISHED_EVENT,
+  type CardAutoRunFailure,
   type CardFinishedBy,
   type CardFinishedEventData,
   cardLabel,
@@ -73,9 +74,13 @@ const newShortId = (): string =>
     () => SHORT_ID_ALPHABET[randomInt(SHORT_ID_ALPHABET.length)],
   ).join('');
 
-/** #282 D3: why a `terminal` card with Automatic work got no pull request. */
-export const TERMINAL_COLLECT_UNSUPPORTED =
-  'Automatic work is not supported yet for terminal cards: nothing was pushed and no pull request was opened';
+/** #282 D3: a `terminal` card whose session reported no cwd or branch. */
+export const TERMINAL_NO_BRANCH =
+  'The tracked session reported no working directory or branch: nothing was pushed and no pull request was opened';
+
+/** #282 D3: a `terminal` card whose session works on the project's base. */
+export const terminalOnBase = (base: string): string =>
+  `The session works on the base branch ${base}: nothing was pushed and no pull request was opened`;
 
 /** The `runs.status` a round's end gives its run. */
 const RUN_STATUS_OF: Record<'finished' | 'failed' | 'cancelled', RunStatus> = {
@@ -605,14 +610,30 @@ export class BoardWork {
   private async collectNow(cardId: string): Promise<void> {
     const card = await this.prisma.boardCard.findUnique({
       where: { id: cardId },
-      include: { rounds: { orderBy: { round: 'desc' } } },
+      include: {
+        rounds: { orderBy: { round: 'desc' } },
+        trackedSession: { select: { cwd: true, gitBranch: true } },
+      },
     });
-    if (card?.source === 'terminal') {
-      await this.terminalCollectUnsupported(card);
+    if (!card) return;
+    const terminal = card.source === 'terminal';
+    // #282 D3: a terminal card collects in its tracked session's checkout.
+    const target = terminal
+      ? {
+          branch: card.trackedSession?.gitBranch ?? null,
+          cwd: card.trackedSession?.cwd || null,
+        }
+      : { branch: card.branch, cwd: null };
+    if (target.branch === null || (terminal && target.cwd === null)) {
+      if (terminal) await this.terminalCollectFailed(card, TERMINAL_NO_BRANCH);
       return;
     }
-    if (!card || card.branch === null) return;
     const project = await this.project(card.projectId);
+    if (terminal && target.branch === project.base) {
+      // The base is never committed to or pushed by the board.
+      await this.terminalCollectFailed(card, terminalOnBase(project.base));
+      return;
+    }
     const round = card.rounds[0] ?? null;
     let pr = { prNumber: card.prNumber, prUrl: card.prUrl };
     try {
@@ -628,7 +649,8 @@ export class BoardWork {
             projectId: project.id,
             root: project.rootPath,
             base: project.base,
-            branch: card.branch,
+            branch: target.branch,
+            ...(target.cwd === null ? {} : { cwd: target.cwd }),
             number: card.number,
             title: `${cardLabel(card.number)}: ${card.title}`.slice(0, 256),
             body: cardPullRequestBody({
@@ -640,18 +662,39 @@ export class BoardWork {
           { role: 'operator', ctx: { actor: SYSTEM_ACTOR } },
         ),
       );
-      if (output.prNumber !== undefined && output.prUrl !== undefined) {
-        pr = { prNumber: output.prNumber, prUrl: output.prUrl };
+      const { prNumber, prUrl } = output;
+      const opened = prNumber !== undefined && prUrl !== undefined;
+      if (opened) pr = { prNumber, prUrl };
+      // A terminal card's earlier failure no longer holds once one succeeds.
+      const cleared = terminal && card.autoRunError !== null;
+      if (opened || cleared) {
         await this.prisma.boardCard.update({
           where: { id: card.id },
-          data: pr,
+          data: {
+            ...(opened ? pr : {}),
+            ...(cleared
+              ? {
+                  autoRunError: null,
+                  autoRunMessage: null,
+                  autoRunFailedAt: null,
+                }
+              : {}),
+          },
         });
         this.publish(project.id, card.id);
       }
     } catch (error) {
+      const message = (error as Error).message;
       this.logger.warn(
-        `card.collect of ${cardLabel(card.number)} failed: ${(error as Error).message}`,
+        `card.collect of ${cardLabel(card.number)} failed: ${message}`,
       );
+      if (terminal) {
+        await this.terminalCollectFailed(
+          card,
+          `Collecting the session's work failed: ${message}`,
+          error instanceof BoardFailure ? error.code : 'unknown',
+        );
+      }
     }
     if (!round || round.finishedBy === null) return;
     const data: CardFinishedEventData = {
@@ -671,17 +714,20 @@ export class BoardWork {
   }
 
   /**
-   * #282 D3: Automatic work on a `terminal` card collects in its session's
-   * own cwd and branch. The runner's `card.collect` serves only a card
-   * worktree today, so nothing is sent: the card says why, and has no PR.
-   * TODO(i282-collect): send the session-cwd mode of `card.collect` here.
+   * #282 D3: Automatic work on a `terminal` card that collected nothing —
+   * the session has no checkout to collect, or the runner refused or failed.
+   * The card says why (`autoRunFailure`) and has no new PR.
    */
-  private async terminalCollectUnsupported(card: BoardCard): Promise<void> {
+  private async terminalCollectFailed(
+    card: BoardCard,
+    message: string,
+    code: CardAutoRunFailure['code'] = 'unknown',
+  ): Promise<void> {
     await this.prisma.boardCard.update({
       where: { id: card.id },
       data: {
-        autoRunError: 'unknown',
-        autoRunMessage: TERMINAL_COLLECT_UNSUPPORTED,
+        autoRunError: code,
+        autoRunMessage: message.slice(0, 500),
         autoRunFailedAt: new Date(),
       },
     });
@@ -690,7 +736,12 @@ export class BoardWork {
       action: 'card.auto_run_failed',
       target: { type: 'board_card', id: card.id },
       projectId: card.projectId,
-      after: { number: card.number, reason: 'terminal_collect_unsupported' },
+      // `error`, not `code`: the audit redacts every `code` key.
+      after: {
+        number: card.number,
+        reason: 'terminal_collect_failed',
+        error: code,
+      },
       result: 'ok',
     });
     this.publish(card.projectId, card.id);

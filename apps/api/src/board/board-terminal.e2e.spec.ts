@@ -8,7 +8,11 @@ import type { LocalCall } from '../local/local-call';
 import { LocalError } from '../local/local-error';
 import { LocalHandlers } from '../local/local-handlers';
 import { FleetCardEditsRef } from './board.service';
-import { BOARD_SYSTEM_ACTOR, TERMINAL_COLLECT_UNSUPPORTED } from './board-work';
+import {
+  BOARD_SYSTEM_ACTOR,
+  TERMINAL_NO_BRANCH,
+  terminalOnBase,
+} from './board-work';
 import { BoardWorld, ROOT_A, ROOT_B } from './testing/board-e2e';
 
 /** A person's own Claude Code session (ids are uuids, as Claude's are). */
@@ -294,9 +298,8 @@ describe('terminal cards (e2e)', () => {
       expect((await w.card(1)).column).toBe('todo');
     });
 
-    // TODO(i282-collect): with the runner's session-cwd `card.collect`,
-    // this sends one `card.collect` in the session's cwd and stores the PR.
-    it('with Automatic work on, sends nothing yet and says why on the card', async () => {
+    /** A tracked card with Automatic work on. */
+    const autoCollected = async () => {
       await manualSession();
       await track({ title: 'Fix the pairing flake' });
       const patch = await w.operator.send(
@@ -306,16 +309,92 @@ describe('terminal cards (e2e)', () => {
       );
       expect(patch.status).toBe(200);
       expect(patch.body).toMatchObject({ autoCollect: true });
+    };
 
+    it("with Automatic work on, collects in the session's cwd and branch and stores the PR", async () => {
+      await autoCollected();
+      await endSession();
+      await w.work.settled();
+      const card = await w.card(1);
+      expect(card.column).toBe('finished');
+      expect(w.sent('card.collect')).toEqual([
+        expect.objectContaining({
+          cardId: card.id,
+          projectId: w.a,
+          root: ROOT_A,
+          base: (await w.work.project(w.a)).base,
+          branch: 'fix/12-pairing',
+          cwd: ROOT_A,
+          number: 1,
+          title: 'C-1: Fix the pairing flake',
+        }),
+      ]);
+      expect(card).toMatchObject({
+        prNumber: 77,
+        prUrl: 'https://github.com/acme/widget/pull/77',
+        autoRunError: null,
+      });
+      expect((await boardCard(1)).autoRunFailure).toBeNull();
+    });
+
+    it('with Automatic work on, a runner refusal is shown on the card and no PR is stored', async () => {
+      w.handlers['card.collect'] = () => ({
+        status: 'error',
+        error: {
+          code: 'path_not_allowed',
+          message: `${ROOT_A} is not in a checkout of ${ROOT_A}`,
+        },
+      });
+      await autoCollected();
       await endSession();
       await w.work.settled();
       const card = await w.card(1);
       expect(card.column).toBe('finished');
       expect(card.prNumber).toBeNull();
+      expect(w.sent('card.collect')).toHaveLength(1);
+      expect((await boardCard(1)).autoRunFailure).toMatchObject({
+        code: 'command_unavailable',
+        message: expect.stringContaining('path_not_allowed'),
+      });
+      expect(
+        (await w.audit('card.auto_run_failed')).map((a) => a.after),
+      ).toEqual([
+        {
+          number: 1,
+          reason: 'terminal_collect_failed',
+          error: 'command_unavailable',
+        },
+      ]);
+    });
+
+    it('with Automatic work on, a session on the base branch is never collected', async () => {
+      await autoCollected();
+      const base = (await w.work.project(w.a)).base;
+      await w.ctx.prisma.agentSession.updateMany({
+        where: { externalId: MANUAL },
+        data: { gitBranch: base },
+      });
+      await endSession();
+      await w.work.settled();
       expect(w.sent('card.collect')).toEqual([]);
       expect((await boardCard(1)).autoRunFailure).toMatchObject({
         code: 'unknown',
-        message: TERMINAL_COLLECT_UNSUPPORTED,
+        message: terminalOnBase(base),
+      });
+    });
+
+    it('with Automatic work on, a session with no branch says why and sends nothing', async () => {
+      await autoCollected();
+      await w.ctx.prisma.agentSession.updateMany({
+        where: { externalId: MANUAL },
+        data: { gitBranch: null },
+      });
+      await endSession();
+      await w.work.settled();
+      expect(w.sent('card.collect')).toEqual([]);
+      expect((await boardCard(1)).autoRunFailure).toMatchObject({
+        code: 'unknown',
+        message: TERMINAL_NO_BRANCH,
       });
     });
   });

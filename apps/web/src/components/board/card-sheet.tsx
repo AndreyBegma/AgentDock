@@ -26,9 +26,7 @@ import { fetchCard, sendFeedback, updateCard } from '../../lib/board/actions';
 import {
   AUTO_COLLECT_HINT,
   AUTO_COLLECT_LABEL,
-  AUTO_COLLECT_PENDING_TEXT,
   approveRunOffer,
-  autoCollectPending,
   autoRunReason,
   COLUMN_TITLE,
   canAccept,
@@ -388,9 +386,6 @@ function CardDetailBody({
                 <Badge tone="warn" label={SLOT_GONE_TEXT} />
               ) : null}
             </div>
-          ) : null}
-          {autoCollectPending(card) ? (
-            <Banner tone="warn">{AUTO_COLLECT_PENDING_TEXT}</Banner>
           ) : null}
           {card.branch ? (
             <p className="break-all font-mono text-xs text-ink-2">

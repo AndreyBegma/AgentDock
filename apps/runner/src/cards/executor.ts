@@ -15,7 +15,7 @@ import {
 } from '@agentdock/shared/protocol';
 import { type Cancel, isoNow } from '../clock';
 import { CommandFailure } from '../commands/failure';
-import { watchedProject } from '../control/target';
+import { projectCheckout, watchedProject } from '../control/target';
 import { TmuxControl } from '../control/tmux';
 import { resolveFleetProject } from '../fleet/project';
 import { errorMessage, type Logger } from '../log';
@@ -207,7 +207,26 @@ export class CardExecutor {
 
   /** `card.collect` (D8). The session may still be open: its work so far is collected. */
   async collect(args: CardCollectArgs): Promise<CardCollectResult> {
-    watchedProject(args, this.options.deps.watchedProjects());
+    const project = watchedProject(args, this.options.deps.watchedProjects());
+    const { cwd } = args;
+    if (cwd !== undefined) {
+      // #282 D3: a terminal card has no worktree here — its session's
+      // checkout is collected, once `cwd` is proven to be the project's.
+      return this.serial(args.cardId, async () => {
+        const { deps } = this.options;
+        const worktree = await projectCheckout(deps.exec, project, cwd);
+        return collectCard(
+          deps,
+          {
+            projectId: args.projectId,
+            root: project.root,
+            worktree,
+            branch: args.branch,
+          },
+          args,
+        );
+      });
+    }
     return this.serial(args.cardId, async () => {
       const record = this.store.load(args.cardId);
       if (
