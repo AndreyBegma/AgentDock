@@ -102,6 +102,13 @@ export class BoardWorld {
         worktreeRemoved: true,
         branchDeleted: true,
       },
+      'card.merge': {
+        merged: true,
+        alreadyMerged: false,
+        method: 'merge',
+        mergeCommit: null,
+        issueClosed: true,
+      },
       'issue.create': {
         number: 41,
         url: 'https://github.com/acme/widget/issues/41',

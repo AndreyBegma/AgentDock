@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { CommandDefinition } from '../commands';
 import { absolutePathSchema } from '../projects';
+import { headShaSchema } from './approvals';
 import {
   orchestratorModelSchema,
   orchestratorPermissionModeSchema,
@@ -33,6 +34,8 @@ export const CARD_TIMEOUTS_MS = {
   stop: 15_000,
   collect: 180_000,
   close: 30_000,
+  /** #273: `gh pr view`, `gh pr merge`, then the issue. */
+  merge: 90_000,
 } as const;
 
 /** `card.run` prompt: one argv element read from `launch.json`, never a shell string (D5). */
@@ -210,7 +213,81 @@ export const cardCloseResultSchema = z.object({
 });
 export type CardCloseResult = z.infer<typeof cardCloseResultSchema>;
 
-/** The four card commands; every one needs an operator (D11). */
+// card.merge
+
+/** #273 D13: the issue comment `card.merge` closes the issue with, in UTF-8 bytes. */
+export const CARD_MERGE_COMMENT_MAX_BYTES = 1024;
+
+/** #273 D12: `gh pr merge --<method>`. */
+export const cardMergeMethodSchema = z.enum(['merge', 'squash', 'rebase']);
+export type CardMergeMethod = z.infer<typeof cardMergeMethodSchema>;
+
+/**
+ * #273 D11, D13 (ADR-0029): a person's Accept merges the card's PR through
+ * the runner's `gh`, in the project root — `gh pr merge <pr> --<method>
+ * --match-head-commit <headSha>`, never a command text — then closes `issue`
+ * with `comment` when it is still open (`Closes #n` does nothing on a
+ * non-default base). `method: null` takes the repository's first allowed
+ * method, merge → squash → rebase. Never deletes the branch (D15).
+ */
+export const cardMergeArgsSchema = z.strictObject({
+  ...cardTarget,
+  root: absolutePathSchema,
+  pr: z.number().int().positive(),
+  /** The head the person saw; the merge is refused for any other. */
+  headSha: headShaSchema,
+  method: cardMergeMethodSchema.nullable(),
+  issue: z.number().int().positive().nullable(),
+  comment: z
+    .string()
+    .min(1)
+    .refine(noNul, { message: 'must not contain NUL' })
+    .refine((t) => utf8Bytes(t) <= CARD_MERGE_COMMENT_MAX_BYTES, {
+      message: `must be at most ${CARD_MERGE_COMMENT_MAX_BYTES} bytes`,
+    }),
+});
+export type CardMergeArgs = z.infer<typeof cardMergeArgsSchema>;
+
+/** The PR is merged — now, or before (`alreadyMerged`). */
+export const cardMergeSuccessSchema = z.object({
+  merged: z.literal(true),
+  alreadyMerged: z.boolean(),
+  /** The method used; for an already merged PR, the one asked or resolved. */
+  method: cardMergeMethodSchema,
+  mergeCommit: headShaSchema.nullable(),
+  issueClosed: z.boolean(),
+  /** One line: why closing the issue failed. */
+  issueError: z.string().max(500).optional(),
+});
+export type CardMergeSuccess = z.infer<typeof cardMergeSuccessSchema>;
+
+/** #273 D13: why the merge was refused; the API answers 409 `merge_failed` with it as `reason`. */
+export const cardMergeFailReasonSchema = z.enum([
+  'head_changed',
+  'not_mergeable',
+  'closed',
+  'gh_failed',
+]);
+export type CardMergeFailReason = z.infer<typeof cardMergeFailReasonSchema>;
+
+/**
+ * A refused merge is a result, not a command error: nothing was merged and
+ * the API keeps the card in Finished. `message` is the runner's one line.
+ */
+export const cardMergeFailureSchema = z.object({
+  merged: z.literal(false),
+  error: cardMergeFailReasonSchema,
+  message: z.string().max(500),
+});
+export type CardMergeFailure = z.infer<typeof cardMergeFailureSchema>;
+
+export const cardMergeResultSchema = z.discriminatedUnion('merged', [
+  cardMergeSuccessSchema,
+  cardMergeFailureSchema,
+]);
+export type CardMergeResult = z.infer<typeof cardMergeResultSchema>;
+
+/** The card commands; every one needs an operator (D11). */
 export const cardCommands = {
   'card.run': {
     args: cardRunArgsSchema,
@@ -235,6 +312,12 @@ export const cardCommands = {
     result: cardCloseResultSchema,
     minRole: 'operator',
     timeoutMs: CARD_TIMEOUTS_MS.close,
+  },
+  'card.merge': {
+    args: cardMergeArgsSchema,
+    result: cardMergeResultSchema,
+    minRole: 'operator',
+    timeoutMs: CARD_TIMEOUTS_MS.merge,
   },
 } as const satisfies Record<string, CommandDefinition>;
 

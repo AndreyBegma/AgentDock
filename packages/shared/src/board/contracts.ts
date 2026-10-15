@@ -1,5 +1,10 @@
-import type { TaskDesignSummary } from '../design';
-import type { OrchestratorPermissionMode } from '../protocol';
+import type { TaskDesignSummary, TaskDesignView } from '../design';
+import type {
+  CardMergeMethod,
+  OrchestratorPermissionMode,
+  PrChecks,
+  PrInspectState,
+} from '../protocol';
 import type {
   CaptureModel,
   CaptureSkipReason,
@@ -69,6 +74,8 @@ export interface BoardCardView {
    * session is gone.
    */
   sourceSessionId: string | null;
+  /** #273 D9: approving the design did not start the worker; `null` otherwise. */
+  autoRunFailure: CardAutoRunFailure | null;
   movedAt: string;
   completedAt: string | null;
   updatedAt: string;
@@ -297,6 +304,10 @@ export const BOARD_ERROR = {
   invalidMove: 'invalid_move',
   /** 422 (#244 D10): `captureEnabled: true` while the project ships no session content. */
   captureNeedsContent: 'capture_needs_content',
+  /** 409 (#273 D13): the runner refused the merge, with `reason` (`CardMergeFailReason`). */
+  mergeFailed: 'merge_failed',
+  /** 409 / 404 (#273 D13): the card has no pull request. */
+  noPullRequest: 'no_pull_request',
 } as const;
 export type BoardErrorCode = (typeof BOARD_ERROR)[keyof typeof BOARD_ERROR];
 
@@ -304,9 +315,89 @@ export interface BoardErrorBody {
   statusCode: number;
   error: BoardErrorCode;
   message: string;
-  /** `move_refused`: the `BoardMoveRefusal`. */
+  /** `move_refused`: the `BoardMoveRefusal`; `merge_failed`: the `CardMergeFailReason`. */
   reason?: string;
 }
+
+/** #273 D9: why approving the design did not start round 1. */
+export interface CardAutoRunFailure {
+  /** The refusal's `BoardErrorCode`, or `unknown` for any other exception. */
+  code: BoardErrorCode | 'unknown';
+  /** At most 500 characters. */
+  message: string;
+  at: string;
+}
+
+const BOARD_ERROR_CODES: ReadonlySet<string> = new Set(
+  Object.values(BOARD_ERROR),
+);
+
+/** #273 D9: a stored `board_cards.autoRunError` that is a code this build knows. */
+export const isCardAutoRunCode = (
+  value: string,
+): value is CardAutoRunFailure['code'] =>
+  value === 'unknown' || BOARD_ERROR_CODES.has(value);
+
+/** #273 D8: what Continue after design did when the design was approved. */
+export type CardAutoRun =
+  | { status: 'started'; round: number }
+  | {
+      status: 'run_failed';
+      code: CardAutoRunFailure['code'];
+      message: string;
+    };
+
+/**
+ * `POST /board/cards/:number/design/approve` (#273 D8): never fails because
+ * the worker could not start. `run` is `null` when Continue after design is off.
+ */
+export type CardDesignApproveResponse = TaskDesignView & {
+  run: CardAutoRun | null;
+};
+
+/**
+ * `GET /board/cards/:number/pull-request` (#273 D10, operator): the card's
+ * PR as `pr.inspect` reads it, and how Accept would merge it.
+ */
+export interface CardPullRequestView {
+  number: number;
+  url: string;
+  state: PrInspectState;
+  /** What `AcceptBoardCardRequest.merge.headSha` binds to. */
+  headSha: string;
+  mergeable: string;
+  mergeStateStatus: string;
+  checks: PrChecks;
+  /** The project's `orchestrator.mergeMethod`; `null` is the repository default (D12). */
+  method: CardMergeMethod | null;
+  /** The PR is open and the runner serves `card.merge`. */
+  canMerge: boolean;
+}
+
+/** `POST /board/cards/:number/accept` (#273 D13). No `merge`: move only (D14). */
+export interface AcceptBoardCardRequest {
+  merge?: {
+    /** The head the person saw in the dialog, 40 lower-case hex. */
+    headSha: string;
+  };
+}
+
+/** #273 D13: how the merge on Accept went. */
+export interface CardMergeOutcome {
+  merged: true;
+  /** The PR was merged before Accept; nothing was merged now. */
+  alreadyMerged: boolean;
+  method: CardMergeMethod;
+  mergeCommit: string | null;
+  issueClosed: boolean;
+  /** Why closing the issue failed; the card is accepted anyway. */
+  issueError?: string;
+}
+
+/** `merge` is `null` for an Accept without merging. */
+export type AcceptBoardCardResponse = BoardCardDetail & {
+  merge: CardMergeOutcome | null;
+};
 
 /** Live: on `project:<id>` whenever a card, its round or its design changes. */
 export const BOARD_CHANGED_EVENT = 'board.changed';

@@ -117,6 +117,9 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   'card.captured': 'Suggested a card from a session',
   'card.inbox_accepted': 'Accepted a suggested card',
   'card.dismissed': 'Dismissed a suggested card',
+  'card.merged': "Merged a card's pull request",
+  'card.merge_failed': "Failed to merge a card's pull request",
+  'card.auto_run_failed': "A card's worker did not start after design approval",
   'board.settings_updated': 'Changed board settings',
 };
 

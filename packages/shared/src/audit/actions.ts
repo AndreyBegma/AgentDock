@@ -120,6 +120,12 @@ export const AUDIT_ACTIONS = [
   'card.captured',
   'card.inbox_accepted',
   'card.dismissed',
+  /** #273 D16: Accept merged the card's PR (`after: { pr, method, mergeCommit?, issueClosed }`). */
+  'card.merged',
+  /** #273 D16: the runner refused the merge (`after: { pr, reason }`, result error). */
+  'card.merge_failed',
+  /** #273 D9: approving the design did not start the worker (`after: { code }`). */
+  'card.auto_run_failed',
   /** Also records the capture fields (#244 D12). */
   'board.settings_updated',
 ] as const;

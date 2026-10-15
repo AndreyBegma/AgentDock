@@ -2674,6 +2674,12 @@ model BoardCard {
   /// #244 D6: sha256 of the normalized title (shared `captureFingerprint`);
   /// written on every card, so a suggestion matching it is dropped.
   fingerprint         String?
+  /// #273 D9: why approving the design did not start the worker — a
+  /// `BoardErrorCode` or `unknown`. Cleared when a round starts or the design reopens.
+  autoRunError        String?
+  /// At most 500 characters.
+  autoRunMessage      String?
+  autoRunFailedAt     DateTime?
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
 
@@ -2703,6 +2709,10 @@ model BoardCardRound {
   trigger     CardRoundTrigger
   /// The person's feedback (D9), at most 8 000 characters.
   feedback    String?
+  /// #273 D1: the card text this round's prompt was built from.
+  cardTitle   String
+  cardBody    String
+  cardKind    BoardCardKind
   /// Nullable so deleting the author keeps the round.
   authorId    String?
   phase       CardRoundPhase   @default(queued)

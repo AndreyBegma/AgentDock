@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { localMethods, parseLocalRequest } from '../local';
 import {
+  CARD_MERGE_COMMENT_MAX_BYTES,
   CARD_RUN_FILE_MAX_BYTES,
   CARD_RUN_PROMPT_MAX_BYTES,
   CARD_TIMEOUTS_MS,
@@ -8,6 +9,8 @@ import {
   cardCollectArgsSchema,
   cardCollectResultSchema,
   cardCommands,
+  cardMergeArgsSchema,
+  cardMergeResultSchema,
   cardRunArgsSchema,
   cardRunResultSchema,
   cardSessionName,
@@ -210,14 +213,104 @@ describe('card.stop, card.collect, card.close', () => {
   });
 });
 
+describe('card.merge (#273 D11, D13)', () => {
+  const mergeArgs = {
+    cardId: runArgs.cardId,
+    projectId: 'p1',
+    root: '/home/me/app',
+    pr: 41,
+    headSha: 'a'.repeat(40),
+    method: 'squash',
+    issue: 12,
+    comment: 'Completed as C-12 on the AgentDock board; merged in #41.',
+  };
+
+  it('accepts a merge, with or without a method and an issue', () => {
+    expect(cardMergeArgsSchema.safeParse(mergeArgs).success).toBe(true);
+    expect(
+      cardMergeArgsSchema.safeParse({ ...mergeArgs, method: null, issue: null })
+        .success,
+    ).toBe(true);
+  });
+
+  it('rejects an extra key — no command text, no branch deletion', () => {
+    for (const extra of [
+      { command: 'gh pr merge 41 --admin' },
+      { deleteBranch: true },
+      { args: ['--admin'] },
+    ]) {
+      expect(
+        cardMergeArgsSchema.safeParse({ ...mergeArgs, ...extra }).success,
+      ).toBe(false);
+    }
+  });
+
+  it('rejects a headSha that is not 40 lower-case hex', () => {
+    for (const headSha of [
+      'a'.repeat(39),
+      'A'.repeat(40),
+      'g'.repeat(40),
+      'abc1234',
+      `${'a'.repeat(40)}\n`,
+    ]) {
+      expect(
+        cardMergeArgsSchema.safeParse({ ...mergeArgs, headSha }).success,
+      ).toBe(false);
+    }
+  });
+
+  it('rejects a relative root, an unknown method and an oversized comment', () => {
+    for (const bad of [
+      { root: 'app' },
+      { root: '../app' },
+      { method: 'fast-forward' },
+      { comment: '' },
+      { comment: 'x'.repeat(CARD_MERGE_COMMENT_MAX_BYTES + 1) },
+    ]) {
+      expect(
+        cardMergeArgsSchema.safeParse({ ...mergeArgs, ...bad }).success,
+      ).toBe(false);
+    }
+  });
+
+  it('a result is a merge or a refusal with its reason', () => {
+    expect(
+      cardMergeResultSchema.safeParse({
+        merged: true,
+        alreadyMerged: false,
+        method: 'squash',
+        mergeCommit: 'b'.repeat(40),
+        issueClosed: false,
+        issueError: 'gh issue close failed',
+      }).success,
+    ).toBe(true);
+    expect(
+      cardMergeResultSchema.safeParse({
+        merged: false,
+        error: 'head_changed',
+        message: 'the head moved',
+      }).success,
+    ).toBe(true);
+    expect(
+      cardMergeResultSchema.safeParse({
+        merged: false,
+        error: 'nope',
+        message: 'x',
+      }).success,
+    ).toBe(false);
+  });
+});
+
 describe('cardCommands', () => {
-  it('defines the four commands, each for an operator, with the D8 collect timeout', () => {
+  it('defines the five commands, each for an operator, with the D8 collect timeout', () => {
     expect(Object.keys(cardCommands).sort()).toEqual([
       'card.close',
       'card.collect',
+      'card.merge',
       'card.run',
       'card.stop',
     ]);
+    expect(cardCommands['card.merge'].timeoutMs).toBe(90_000);
     for (const def of Object.values(cardCommands)) {
       expect(def.minRole).toBe('operator');
     }
