@@ -114,7 +114,7 @@ export function PlannerTab({
             </p>
           </section>
 
-          <p className="-mb-4 max-w-prose text-xs text-ink-3">
+          <p className="max-w-prose text-sm text-ink-2">
             Write instructions in English. They are read by the model as typed
             and are not translated.
           </p>
