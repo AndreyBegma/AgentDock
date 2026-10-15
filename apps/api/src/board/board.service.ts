@@ -21,6 +21,7 @@ import {
 import { roleAtLeast } from '@agentdock/shared/protocol';
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import type { BoardCard } from '@prisma/client';
+import { AttachmentsService } from '../attachments/attachments.service';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
 import { usageByRun } from '../history/run-usage';
@@ -100,6 +101,7 @@ export class BoardService implements OnModuleInit {
     private readonly text: TextNormalizer,
     private readonly textOwners: TextOwners,
     private readonly fleetEdits: FleetCardEditsRef,
+    private readonly attachments: AttachmentsService,
   ) {}
 
   /** #271 D10: a card's English title carries its own fingerprint (#244 D6). */
@@ -241,7 +243,11 @@ export class BoardService implements OnModuleInit {
     if (!card || (card.column === 'inbox' && !seesInbox(role))) {
       throw boardError(404, BOARD_ERROR.notFound, 'Card not found');
     }
-    return toCardDetail(card, await this.facts([card]));
+    const [facts, attachments] = await Promise.all([
+      this.facts([card]),
+      this.attachments.views(card.id),
+    ]);
+    return toCardDetail(card, facts, attachments);
   }
 
   /** Active rounds of the project now (D13). */
@@ -260,7 +266,7 @@ export class BoardService implements OnModuleInit {
     const trackedIds = cards
       .map((c) => c.trackedSessionId)
       .filter((id): id is string => id !== null);
-    const [usage, hooked, alive] = await Promise.all([
+    const [usage, hooked, alive, attachmentCounts] = await Promise.all([
       usageByRun(this.prisma, runIds),
       sessionIds.length === 0
         ? Promise.resolve([])
@@ -279,6 +285,7 @@ export class BoardService implements OnModuleInit {
             where: { id: { in: trackedIds }, endedAt: null },
             select: { id: true },
           }),
+      this.attachments.counts(cards.map((c) => c.id)),
     ]);
     const costs = new Map<string, string>();
     for (const [runId, u] of usage) {
@@ -288,6 +295,7 @@ export class BoardService implements OnModuleInit {
       costs,
       hooked: new Set(hooked.map((s) => s.externalId)),
       alive: new Set(alive.map((s) => s.id)),
+      attachmentCounts,
       now: new Date(),
     };
   }
@@ -307,6 +315,14 @@ export class BoardService implements OnModuleInit {
     );
     const now = new Date();
     const title = dto.title.trim();
+    const attachmentIds = dto.attachmentIds ?? [];
+    // #309 D3: refused before the card exists.
+    await this.attachments.assertClaimable(
+      projectId,
+      null,
+      attachmentIds,
+      actor,
+    );
     const card = await this.prisma.$transaction(async (tx) => {
       const next = await this.work.nextCard(tx, projectId);
       const position = await this.work.place(
@@ -315,7 +331,7 @@ export class BoardService implements OnModuleInit {
         'todo',
         0,
       );
-      return tx.boardCard.create({
+      const created = await tx.boardCard.create({
         data: {
           projectId,
           ...next,
@@ -334,6 +350,13 @@ export class BoardService implements OnModuleInit {
           movedAt: now,
         },
       });
+      await this.attachments.claim(
+        tx,
+        { projectId, cardId: created.id },
+        attachmentIds,
+        actor,
+      );
+      return created;
     });
     await this.audit.record({
       ...actor.ctx,
@@ -349,6 +372,12 @@ export class BoardService implements OnModuleInit {
       },
       result: 'ok',
     });
+    await this.attachments.recordClaim(
+      projectId,
+      { cardId: card.id },
+      attachmentIds,
+      actor,
+    );
     this.work.publish(projectId, card.id);
     await this.normalizeCard(
       card,
@@ -356,6 +385,54 @@ export class BoardService implements OnModuleInit {
       actor,
     );
     return this.detail(projectId, card.number);
+  }
+
+  /**
+   * #309 D3: `POST …/attachments` — pending uploads onto an existing card.
+   * An Inbox card takes none until accepted (ADR-0031 §2); a Completed card's
+   * attachments do not change.
+   */
+  async claimAttachments(
+    projectId: string,
+    number: number,
+    attachmentIds: readonly string[],
+    actor: BoardActor,
+  ): Promise<BoardCardDetail> {
+    const card = await this.work.card(projectId, number);
+    if (card.column === 'inbox') throw this.attachments.notClaimable();
+    if (card.column === 'completed') throw this.completedAttachments();
+    await this.attachments.assertClaimable(
+      projectId,
+      card.id,
+      attachmentIds,
+      actor,
+    );
+    await this.prisma.$transaction(async (tx) => {
+      const fresh = await this.work.lock(tx, card.id);
+      if (fresh.column === 'completed') throw this.completedAttachments();
+      await this.attachments.claim(
+        tx,
+        { projectId, cardId: card.id },
+        attachmentIds,
+        actor,
+      );
+    });
+    await this.attachments.recordClaim(
+      projectId,
+      { cardId: card.id },
+      attachmentIds,
+      actor,
+    );
+    this.work.publish(projectId, card.id);
+    return this.detail(projectId, number);
+  }
+
+  private completedAttachments() {
+    return boardError(
+      409,
+      BOARD_ERROR.cardCompleted,
+      'Attachments of a completed card do not change',
+    );
   }
 
   /** `PATCH /board/cards/:number`: applies from the next round. */
@@ -563,20 +640,25 @@ export class BoardService implements OnModuleInit {
         'The worker is running: stop it before deleting the card',
       );
     }
-    const designed = await this.prisma.$transaction(async (tx) => {
-      const fresh = await this.work.lock(tx, card.id);
-      if (isActiveRoundPhase(fresh.rounds[0]?.phase)) {
-        throw boardError(
-          409,
-          BOARD_ERROR.cardRunning,
-          'The worker is running: stop it before deleting the card',
-        );
-      }
-      // #243 D2: whether the runner holds a design worktree for the card.
-      const turns = await tx.planTurn.count({ where: { cardId: card.id } });
-      await tx.boardCard.delete({ where: { id: card.id } });
-      return turns > 0;
-    });
+    const { designed, attachmentIds } = await this.prisma.$transaction(
+      async (tx) => {
+        const fresh = await this.work.lock(tx, card.id);
+        if (isActiveRoundPhase(fresh.rounds[0]?.phase)) {
+          throw boardError(
+            409,
+            BOARD_ERROR.cardRunning,
+            'The worker is running: stop it before deleting the card',
+          );
+        }
+        // #243 D2: whether the runner holds a design worktree for the card.
+        const turns = await tx.planTurn.count({ where: { cardId: card.id } });
+        // #309 D11: the cascade deletes the rows; the files go after commit.
+        const attachmentIds = await this.attachments.idsOfCard(tx, card.id);
+        await tx.boardCard.delete({ where: { id: card.id } });
+        return { designed: turns > 0, attachmentIds };
+      },
+    );
+    await this.attachments.removeFiles(projectId, attachmentIds);
     await this.audit.record({
       ...actor.ctx,
       action: 'card.deleted',

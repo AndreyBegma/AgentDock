@@ -39,6 +39,7 @@ import {
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
+import { AttachmentIds } from '../attachments/dto';
 
 /** `orchestratorModelSchema`: never a flag. */
 const MODEL_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:[\]-]*$/;
@@ -75,6 +76,11 @@ export class CreateBoardCardDto implements CreateBoardCardRequest {
   @IsOptional()
   @IsBoolean()
   specOnRun?: boolean;
+
+  /** #309 D3: pending uploads claimed onto the new card. */
+  @IsOptional()
+  @AttachmentIds()
+  attachmentIds?: string[];
 }
 
 /** `PATCH /board/cards/:number`. `model: null` clears the override. */
@@ -155,6 +161,11 @@ export class CardFeedbackDto implements CardFeedbackRequest {
   @Matches(/\S/, { message: 'text must not be blank' })
   @MaxLength(CARD_FEEDBACK_MAX)
   text!: string;
+
+  /** #309 D3: pending uploads claimed onto the card and the new round. */
+  @IsOptional()
+  @AttachmentIds()
+  attachmentIds?: string[];
 }
 
 /** `PUT /board-settings`. */

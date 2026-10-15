@@ -205,6 +205,13 @@ export const boardFailureOf = (
         BOARD_ERROR.notFound,
         `${name}: not found on the runner${detail}`,
       );
+    // #309 D9: the runner could not download or verify an attachment.
+    case 'attachments_unavailable':
+      return new BoardFailure(
+        502,
+        BOARD_ERROR.attachmentsUnavailable,
+        `${name}: the attachments could not be delivered to the runner${detail}`,
+      );
     case 'unsupported_runtime':
     case 'unknown_profile':
       return new BoardFailure(
