@@ -61,24 +61,14 @@ import {
   trackedStatusText,
 } from '../../lib/board/format';
 import {
-  cardFormModelOptions,
-  NO_RECOMMENDATION_TEXT,
-  profileKeysWith,
-} from '../../lib/board/launch';
-import {
   canCreatePr,
   noPrText,
   prChipText,
 } from '../../lib/board/pull-request';
-import { useLaunchProfiles } from '../../lib/board/use-launch-profiles';
 import { formatCost } from '../../lib/format';
 import { Time } from '../../lib/format/time';
 import { safeHttpsUrl } from '../../lib/queue/format';
 import { useReadiness } from '../../lib/readiness/use-readiness';
-import {
-  defaultProfileOptionLabel,
-  profileOptionLabel,
-} from '../../lib/skills/format';
 import { type TextNotes, useTextNotes } from '../../lib/text/use-text-notes';
 import { AttachmentDropzone } from '../attachments/attachment-dropzone';
 import { AttachmentList } from '../attachments/attachment-list';
@@ -240,10 +230,6 @@ function CardDetailBody({
   const [kind, setKind] = useState(card.kind);
   const [issueOnRun, setIssueOnRun] = useState(card.issueOnRun);
   const [specOnRun, setSpecOnRun] = useState(card.specOnRun);
-  const [model, setModel] = useState(card.model ?? '');
-  const [profileKey, setProfileKey] = useState(card.profileKey ?? '');
-  const profiles = useLaunchProfiles(projectId, canOperate);
-  const profileList = profiles.data ?? [];
   const [autoCollect, setAutoCollect] = useState(card.autoCollect);
   const [preview, setPreview] = useState(false);
   const fleet = isFleetCard(card);
@@ -278,8 +264,6 @@ function CardDetailBody({
     kind !== card.kind ||
     issueOnRun !== card.issueOnRun ||
     specOnRun !== card.specOnRun ||
-    model !== (card.model ?? '') ||
-    profileKey !== (card.profileKey ?? '') ||
     autoCollect !== card.autoCollect;
 
   const save = async () => {
@@ -298,8 +282,6 @@ function CardDetailBody({
               kind,
               issueOnRun,
               specOnRun,
-              model: model === '' ? null : model,
-              profileKey: profileKey === '' ? null : profileKey,
               ...(terminalCard ? { autoCollect } : {}),
             },
       );
@@ -755,53 +737,6 @@ function CardDetailBody({
                 <Badge tone="neutral" label="Auto" />
               </div>
             ) : null}
-          </Field>
-          <Field
-            label="Claude profile"
-            htmlFor="board-card-profile"
-            hint="Runs the card’s work and its design. The first option follows the project."
-          >
-            <Select
-              id="board-card-profile"
-              value={profileKey}
-              disabled={!canOperate || fleet}
-              onChange={(e) => setProfileKey(e.target.value)}
-            >
-              <option value="">{defaultProfileOptionLabel(profileList)}</option>
-              {profileKeysWith(profileList, profileKey).map((key) => {
-                const profile = profileList.find((p) => p.key === key);
-                return (
-                  <option key={key} value={key}>
-                    {profile ? profileOptionLabel(profile) : key}
-                  </option>
-                );
-              })}
-            </Select>
-          </Field>
-          <Field
-            label="Model"
-            htmlFor="board-card-model"
-            hint={
-              card.recommendation.work
-                ? card.recommendation.work.reason
-                : NO_RECOMMENDATION_TEXT
-            }
-          >
-            <Select
-              id="board-card-model"
-              value={model}
-              disabled={!canOperate || fleet}
-              onChange={(e) => setModel(e.target.value)}
-            >
-              {cardFormModelOptions({
-                model: card.model,
-                recommendation: card.recommendation,
-              }).map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
           </Field>
           {fleet ? null : (
             <CardOptionToggles
