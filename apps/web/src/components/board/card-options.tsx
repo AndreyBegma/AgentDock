@@ -48,6 +48,34 @@ function OptionToggle({
   );
 }
 
+/** #282 D3: Automatic work — a switch with its label and what off means. */
+export function AutoCollectToggle({
+  id,
+  checked,
+  disabled,
+  label,
+  hint,
+  onChange,
+}: {
+  id: string;
+  checked: boolean;
+  disabled?: boolean;
+  label: string;
+  hint: string;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <OptionToggle
+      id={id}
+      checked={checked}
+      disabled={disabled}
+      label={label}
+      hint={hint}
+      onChange={onChange}
+    />
+  );
+}
+
 /** D2: the two things starting work can also do. Both default to off. */
 export function CardOptionToggles({
   projectId,

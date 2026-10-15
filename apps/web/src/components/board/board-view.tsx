@@ -27,6 +27,7 @@ import {
   COLUMN_HINT,
   COLUMN_TITLE,
   canAccept,
+  canDelete,
   canGiveFeedback,
   canMarkFinished,
   canRetry,
@@ -298,7 +299,7 @@ export function BoardColumns({
                     Stop worker
                   </MenuItem>
                 ) : null}
-                {canOperate ? (
+                {canOperate && canDelete(card) ? (
                   <MenuItem
                     tone="danger"
                     onSelect={() => actions.askDelete(card)}

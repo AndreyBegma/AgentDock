@@ -18,6 +18,7 @@ import {
 } from '@agentdock/shared';
 import type { Status } from '@andrewbehma/glass-ui/status-pill';
 import { ApiError, describeError } from '../api';
+import { STAGE_LABEL } from '../fleet/graph';
 import { describeNoProfile } from '../readiness/copy';
 import {
   PROFILES_LIST_COMMAND,
@@ -144,23 +145,109 @@ export const MOVE_REFUSAL_TEXT: Record<BoardMoveRefusal, string> = {
 export const designBlocksRun = (card: BoardCardView): boolean =>
   card.design?.needed === true && card.design.status !== 'approved';
 
+export const isTerminalCard = (card: BoardCardView): boolean =>
+  card.source === 'terminal';
+
+export const isFleetCard = (card: BoardCardView): boolean =>
+  card.source === 'fleet';
+
+/** #282 D1: the tracked terminal session is alive — it is the worker. */
+export const isSessionAlive = (card: BoardCardView): boolean =>
+  card.tracking?.alive === true;
+
+/**
+ * #282 D1/D4: the board starts, stops and answers a worker only for a card
+ * that owns one. A `fleet` card's worker is the orchestrator's; a `terminal`
+ * card's is the person's own session while it lives.
+ */
+export const ownsWorker = (card: BoardCardView): boolean =>
+  !isFleetCard(card) && !isSessionAlive(card);
+
 export const canRun = (card: BoardCardView): boolean =>
+  ownsWorker(card) &&
   (card.column === 'todo' || card.column === 'finished') &&
   !isRoundActive(card.round) &&
   !designBlocksRun(card);
 
 export const canGiveFeedback = (card: BoardCardView): boolean =>
-  card.column === 'finished' && !isRoundActive(card.round);
+  ownsWorker(card) && card.column === 'finished' && !isRoundActive(card.round);
 
 export const canAccept = (card: BoardCardView): boolean =>
   card.column === 'finished' && !isRoundActive(card.round);
 
 /** A retry after a failed, ended or stopped round resumes the same session. */
 export const canRetry = (card: BoardCardView): boolean =>
+  ownsWorker(card) &&
   card.column === 'in_progress' &&
   card.round !== null &&
   !isRoundActive(card.round) &&
   !designBlocksRun(card);
+
+/** #282 D4: a `fleet` card follows its slot, so a person cannot delete it. */
+export const canDelete = (card: BoardCardView): boolean => !isFleetCard(card);
+
+/** #282 D1: the card's session page; `null` when it is not a terminal card. */
+export const trackedSessionHref = (card: BoardCardView): string | null =>
+  card.tracking ? sessionHref(card.tracking.sessionId) : null;
+
+export const TRACKED_TEXT = 'Tracked from a terminal session';
+
+export const trackedStatusText = (card: BoardCardView): string =>
+  isSessionAlive(card)
+    ? 'The session is running; the card finishes when it ends.'
+    : 'The session has ended.';
+
+export const AUTO_COLLECT_LABEL =
+  'Automatic work: push and open a pull request when it finishes';
+
+export const AUTO_COLLECT_HINT =
+  'Off, nothing is pushed: the card only records the branch and the session.';
+
+/** The project default for a new terminal card (#282 D3). */
+export const AUTO_COLLECT_DEFAULT_LABEL =
+  'Automatic work for terminal sessions';
+
+export const AUTO_COLLECT_DEFAULT_HINT =
+  'What a card tracked from a terminal session starts with: push and open a pull request when its session ends. A card can override it. Off by default.';
+
+/**
+ * Orchestrator note on #282: collecting a terminal session's work is a
+ * follow-up. A Finished terminal card with Automatic work on and no pull
+ * request says so, rather than looking forgotten.
+ */
+export const autoCollectPending = (card: BoardCardView): boolean =>
+  isTerminalCard(card) &&
+  card.autoCollect &&
+  card.column === 'finished' &&
+  card.prNumber === null;
+
+export const AUTO_COLLECT_PENDING_TEXT =
+  'Automatic work is on, but no pull request was opened: collecting a terminal session’s work is not available yet.';
+
+/** The Fleet page with the card's slot open; none for an issue no slot picked up. */
+export const fleetHref = (
+  projectId: string,
+  card: BoardCardView,
+): string | null =>
+  card.fleet?.slot
+    ? `/projects/${projectId}/fleet?open=${encodeURIComponent(card.fleet.slot)}&focus=${encodeURIComponent(card.fleet.slot)}`
+    : null;
+
+/** One line for a fleet card: the slot (or "Waiting for a slot") and its stage. */
+export function fleetSummary(
+  fleet: NonNullable<BoardCardView['fleet']>,
+): string {
+  const slot = fleet.slot ?? 'Waiting for a slot';
+  return fleet.stage ? `${slot} · ${STAGE_LABEL[fleet.stage]}` : slot;
+}
+
+export const SLOT_GONE_TEXT = 'Slot gone';
+
+export const FLEET_EDIT_HINT =
+  'Title and text only. An edit reaches the running slot; the GitHub issue is not changed.';
+
+export const FLEET_ACCEPT_REASON =
+  'A fleet card is not merged here: the orchestrator merges its pull request.';
 
 /** #273 D7: **Approve & run** takes Run's place while the design blocks it. */
 export interface ApproveRunOffer {
@@ -174,7 +261,7 @@ export interface ApproveRunOffer {
  * to the viewer, enabled only once there is a design to approve (`reviewing`).
  */
 export function approveRunOffer(card: BoardCardView): ApproveRunOffer | null {
-  if (!designBlocksRun(card)) return null;
+  if (!designBlocksRun(card) || !ownsWorker(card)) return null;
   const startable =
     (card.column === 'todo' ||
       card.column === 'finished' ||
@@ -187,10 +274,12 @@ export function approveRunOffer(card: BoardCardView): ApproveRunOffer | null {
 }
 
 export const canStop = (card: BoardCardView): boolean =>
-  isRoundActive(card.round);
+  ownsWorker(card) && isRoundActive(card.round);
 
 export const canMarkFinished = (card: BoardCardView): boolean =>
-  card.column === 'in_progress' && isRoundActive(card.round);
+  ownsWorker(card) &&
+  card.column === 'in_progress' &&
+  isRoundActive(card.round);
 
 /** #244 D9: an Inbox card is accepted or dismissed, never run. */
 export const isSuggestion = (card: BoardCardView): boolean =>
@@ -347,6 +436,8 @@ export function describeBoardError(
     }
     case BOARD_ERROR.noPullRequest:
       return 'This card has no pull request to merge.';
+    case BOARD_ERROR.notTracked:
+      return 'Automatic work belongs to cards tracked from a terminal session.';
     default:
       break;
   }

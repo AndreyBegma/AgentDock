@@ -74,6 +74,9 @@ export function decideDrop(
     roundPhase: card.round?.phase ?? null,
     source: 'person',
     stopWorker: options.stopWorker,
+    cardSource: card.source,
+    autoCollect: card.autoCollect,
+    trackingAlive: card.tracking?.alive === true,
   });
   if (!decision.allowed) {
     if (decision.error === 'card_running') {
