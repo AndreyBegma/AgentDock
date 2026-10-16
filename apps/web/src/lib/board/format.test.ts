@@ -16,6 +16,7 @@ import {
   columnsOf,
   describeBoardError,
   designBlocksRun,
+  finishRefusedText,
   HOOKS_GUIDE_LABEL,
   hooksGuideHref,
   hooksNotice,
@@ -76,6 +77,15 @@ describe('roundPill', () => {
     });
     expect(roundPill(round('failed'))?.status).toBe('error');
     expect(roundPill(round('cancelled'))?.label).toBe('Stopped');
+  });
+
+  test('a refused finish_card of an active round needs attention (#482)', () => {
+    expect(
+      roundPill({ ...round('waiting'), finishRefused: 'not_a_card_session' }),
+    ).toEqual({ status: 'error', label: 'Needs attention' });
+    expect(
+      roundPill({ ...round('finished'), finishRefused: 'not_a_card_session' }),
+    ).toBeNull();
   });
 
   test('a worker waiting on its own background task is running, not waiting (#390)', () => {
@@ -449,5 +459,20 @@ describe('hooksNotice (#281 D6, #367 D3/D4)', () => {
   test('links the Settings › Sessions checklist of the project', () => {
     expect(HOOKS_GUIDE_LABEL).toBe('See the exact command for each profile');
     expect(hooksGuideHref('p1')).toBe('/projects/p1/settings?tab=sessions');
+  });
+});
+
+describe('finishRefusedText (#482)', () => {
+  test('says why, and what to do, in words', () => {
+    const text = finishRefusedText('not_a_card_session');
+    expect(text).toContain('the runner may have restarted');
+    expect(text).toContain('Ask the worker to call it again');
+    expect(text).not.toContain('not_a_card_session');
+  });
+
+  test('a code without its own words is spelled out', () => {
+    expect(finishRefusedText('internal')).toBe(
+      'finish_card was refused: internal. Ask the worker to call it again, or finish the card yourself.',
+    );
   });
 });

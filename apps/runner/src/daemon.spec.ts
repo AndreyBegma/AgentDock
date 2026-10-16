@@ -6,12 +6,14 @@ import type {
   HelloMessage,
   RunnerEvent,
 } from '@agentdock/shared/protocol';
+import { CardStore } from './cards/record';
 import type { PairedConfig } from './config';
 import type { RunnerConnection } from './connection';
 import { runDaemon } from './daemon';
 import type { Exec } from './detect/exec';
 import { FILTER_RUN_FILE, FILTER_STATS_FILE } from './filter/env';
 import { type HookDeps, runHook } from './hooks/run';
+import { localRequest } from './local/client';
 import { FORBIDDEN, fixtureProtobuf, PROTOBUF_SESSION } from './otlp/testing';
 import { FakeClock } from './testing/fake-clock';
 import {
@@ -415,6 +417,81 @@ describe('daemon — local socket (spec 201)', () => {
     controller.abort();
     await done;
     expect(existsSync(join(dir, 'runner.sock'))).toBe(false);
+  });
+
+  it('knows a card round started before a restart: finish_card from its session goes out with it (#482)', async () => {
+    const root = join(dir, 'fixture');
+    const worktree = join(dir, '.wt-fixture-card-abc12345');
+    mkdirSync(root, { recursive: true });
+    mkdirSync(worktree, { recursive: true });
+    server.welcome = () => ({
+      type: 'welcome',
+      runnerId: 'rn_1',
+      config: {
+        projects: [{ id: 'prj_fixture', root, shipContent: true }],
+        pollIntervalsMs: {},
+        awayMode: true,
+      },
+      ackedSeq: 0,
+    });
+    const session = '0b0f6f2e-8f5e-4c1e-9a43-3d6f3b1f2c11';
+    const socket = join(dir, 'runner.sock');
+
+    // The first daemon started the round: its record is on disk, and its
+    // session's hooks reached the daemon.
+    const first = start();
+    await first.live();
+    new CardStore(join(dir, 'cards')).save({
+      cardId: 'card_1',
+      projectId: 'prj_fixture',
+      root,
+      repo: 'fixture',
+      shortId: 'abc12345',
+      worktree,
+      branch: 'fix/1-x',
+      base: 'develop',
+      tmuxSession: 'agentdock-card-abc12345',
+      runId: 'run_1',
+      phase: 'running',
+      sessionId: session,
+      startedAt: '2026-10-16T18:00:00.000Z',
+    });
+    await runHook(['user-prompt-submit'], {
+      ...hookDeps({ session_id: session, cwd: worktree, prompt: 'go' }, []),
+      cwd: worktree,
+    });
+    first.controller.abort();
+    await first.done;
+
+    // A new process on the same state dir: no hook of the session yet.
+    const second = start();
+    await second.live();
+    const pending = localRequest(
+      socket,
+      'card.finish',
+      { summary: 'Changed the thing. Tested it.' },
+      { via: 'mcp', cwd: worktree, ppid: 4242 },
+    );
+    const [request] = await server.waitFor('local.request');
+    expect(request).toMatchObject({
+      method: 'card.finish',
+      projectId: 'prj_fixture',
+      session: { runtime: 'claude', id: session },
+      via: 'mcp',
+    });
+    server.send({
+      type: 'local.response',
+      id: request?.id ?? '',
+      ok: true,
+      data: { number: 205, finished: true },
+    });
+    expect(await pending).toEqual({
+      ok: true,
+      data: { number: 205, finished: true },
+    });
+
+    second.controller.abort();
+    await second.done;
   });
 });
 

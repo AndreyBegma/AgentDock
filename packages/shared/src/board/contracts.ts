@@ -10,6 +10,7 @@ import type {
   CardMergeMethod,
   CardRunWiring,
   CardRunWiringReason,
+  LocalErrorCode,
   OrchestratorPermissionMode,
   PrChecks,
   PrInspectState,
@@ -95,6 +96,12 @@ export interface CardRoundBrief {
    * Optional so older fixtures stay valid.
    */
   autoRunAfter?: number | null;
+  /**
+   * #482: the local error the round's last refused `finish_card` got, while
+   * the round is active — it needs attention; `null` otherwise. Optional so
+   * older fixtures stay valid.
+   */
+  finishRefused?: LocalErrorCode | null;
 }
 
 /**
@@ -354,6 +361,12 @@ export interface CardRoundView {
    * number was accepted; `null` otherwise. Optional so older fixtures stay valid.
    */
   autoRunAfter?: number | null;
+  /**
+   * #482: the local error the round's last refused `finish_card` got, while
+   * the round is active — it needs attention; `null` otherwise. Optional so
+   * older fixtures stay valid.
+   */
+  finishRefused?: LocalErrorCode | null;
   /** The person's text, for a `feedback` round. */
   feedback: string | null;
   author: BoardUserRef | null;

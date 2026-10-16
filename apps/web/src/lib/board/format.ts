@@ -19,7 +19,10 @@ import {
   isMirroredCardSource,
   PLAN_TASK_MOVE_REFUSAL_TEXT,
 } from '@agentdock/shared';
-import type { CardRunWiringReason } from '@agentdock/shared/protocol';
+import type {
+  CardRunWiringReason,
+  LocalErrorCode,
+} from '@agentdock/shared/protocol';
 import type { Status } from '@andrewbehma/glass-ui/status-pill';
 import { ApiError, describeError } from '../api';
 import { STAGE_LABEL } from '../fleet/graph';
@@ -74,8 +77,29 @@ export const phaseLabel = (phase: CardRoundPhase): string =>
  */
 export function roundPill(round: CardRoundBrief | null): RoundPill | null {
   if (!round || round.phase === 'finished') return null;
+  // #482: a refused finish_card leaves the round active, not done.
+  if (round.finishRefused && isActiveRoundPhase(round.phase)) {
+    return { status: 'error', label: 'Needs attention' };
+  }
   return PHASE_PILL[round.phase];
 }
+
+const FINISH_REFUSED_REASON: Partial<Record<LocalErrorCode, string>> = {
+  not_a_card_session:
+    'AgentDock did not recognise the worker’s session as this card’s — the runner may have restarted.',
+  runner_offline: 'the runner could not reach AgentDock.',
+  daemon_unavailable: 'the runner was not running.',
+  timeout: 'AgentDock did not answer in time.',
+  forbidden: 'the runner’s user may not finish cards in this project.',
+  no_project: 'the worker’s folder is in no watched project.',
+};
+
+/**
+ * #482: why the round needs attention — the worker's `finish_card` was
+ * refused. Ask the worker to call it again, or finish the card yourself.
+ */
+export const finishRefusedText = (code: LocalErrorCode): string =>
+  `finish_card was refused: ${FINISH_REFUSED_REASON[code] ?? `${code.replaceAll('_', ' ')}.`} Ask the worker to call it again, or finish the card yourself.`;
 
 export const isRoundActive = (round: CardRoundBrief | null): boolean =>
   isActiveRoundPhase(round?.phase);

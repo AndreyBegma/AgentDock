@@ -5,6 +5,7 @@ import {
   type UnsequencedEvent,
   type WatchedProject,
 } from '@agentdock/shared/protocol';
+import type { CardRecord } from '../cards/record';
 import { memoryLogger } from '../testing/fixtures';
 import { LocalService } from './service';
 import { HookSessions } from './sessions';
@@ -14,7 +15,16 @@ const ROOT = '/home/person/dev/app';
 const GHP = `ghp_${'b'.repeat(36)}`;
 const KEY = '-----BEGIN PRIVATE KEY-----\nMIIsecret\n-----END PRIVATE KEY-----';
 
-const setup = (shipContent: boolean, online = true) => {
+interface SetupOptions {
+  liveRound?: (cwd: string) => CardRecord | null;
+  reply?: LocalResult<unknown>;
+}
+
+const setup = (
+  shipContent: boolean,
+  online = true,
+  options: SetupOptions = {},
+) => {
   const emitted: UnsequencedEvent[] = [];
   const relayed: LocalRelayRequest[] = [];
   const sessions = new HookSessions();
@@ -28,11 +38,12 @@ const setup = (shipContent: boolean, online = true) => {
     emit: (event) => emitted.push(event),
     relay: async (request): Promise<LocalResult<unknown>> => {
       relayed.push(request);
-      return { ok: true, data: { echoed: true } };
+      return options.reply ?? { ok: true, data: { echoed: true } };
     },
     envelope: async (id) =>
       id === 'prj_app' ? { repo: 'acme/app', root: ROOT } : undefined,
     sessions,
+    ...(options.liveRound ? { liveRound: options.liveRound } : {}),
     now: () => '2026-10-14T10:00:00.000Z',
     log: memoryLogger().log,
   });
@@ -241,5 +252,106 @@ describe('LocalService — requests (spec 201 D6, D9, D17)', () => {
       ok: true,
       data: { pong: true, online: false, awayMode: true, projectId: 'prj_app' },
     });
+  });
+});
+
+describe('LocalService — card rounds after a restart (#482)', () => {
+  const WORKTREE = '/home/person/dev/.wt-app-card-abc12345';
+  const SESSION = '0b0f6f2e-8f5e-4c1e-9a43-3d6f3b1f2c11';
+  const round: CardRecord = {
+    cardId: 'card_1',
+    projectId: 'prj_app',
+    root: ROOT,
+    repo: 'acme/app',
+    shortId: 'abc12345',
+    worktree: WORKTREE,
+    branch: 'fix/1-x',
+    base: 'develop',
+    tmuxSession: 'agentdock-card-abc12345',
+    runId: 'run_1',
+    phase: 'running',
+    sessionId: SESSION,
+    startedAt: '2026-10-14T09:00:00.000Z',
+  };
+  const liveRound = (cwd: string) => (cwd.startsWith(WORKTREE) ? round : null);
+  const finish = {
+    method: 'card.finish',
+    args: { summary: 'Done. Tested.' },
+    via: 'mcp',
+    cwd: WORKTREE,
+    ppid: 4242,
+  };
+
+  it('relays a finish_card with the session of the round whose worktree it runs in', async () => {
+    const { service, relayed } = setup(false, true, { liveRound });
+    const result = await service.handle('request', finish);
+    expect(result.ok).toBe(true);
+    expect(relayed[0]).toEqual({
+      method: 'card.finish',
+      args: { summary: 'Done. Tested.' },
+      projectId: 'prj_app',
+      session: { runtime: 'claude', id: SESSION },
+      via: 'mcp',
+    });
+  });
+
+  it('prefers the session a SessionStart reported for the parent pid', async () => {
+    const { service, relayed, sessions } = setup(false, true, { liveRound });
+    sessions.started('s-own', WORKTREE, [{ pid: 4242, comm: 'claude' }]);
+    await service.handle('request', finish);
+    expect(relayed[0]?.session).toEqual({ runtime: 'claude', id: 's-own' });
+  });
+
+  it('reports a refused finish_card of a live round as card_run.finish_refused', async () => {
+    const { service, emitted } = setup(false, true, {
+      liveRound,
+      reply: {
+        ok: false,
+        error: {
+          code: 'not_a_card_session',
+          message: 'not a board card session',
+        },
+      },
+    });
+    const result = await service.handle('request', finish);
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: 'not_a_card_session',
+        message: 'not a board card session',
+      },
+    });
+    expect(emitted).toEqual([
+      {
+        v: 1,
+        ts: '2026-10-14T10:00:00.000Z',
+        type: 'card_run.finish_refused',
+        source: 'runner',
+        project: { repo: 'acme/app', root: ROOT },
+        data: {
+          cardId: 'card_1',
+          runId: 'run_1',
+          projectId: 'prj_app',
+          at: '2026-10-14T10:00:00.000Z',
+          code: 'not_a_card_session',
+        },
+      },
+    ]);
+  });
+
+  it('reports nothing for a refused finish_card outside every card worktree, or another refused method', async () => {
+    const reply: LocalResult<unknown> = {
+      ok: false,
+      error: { code: 'not_a_card_session' },
+    };
+    const { service, emitted } = setup(false, true, { liveRound, reply });
+    await service.handle('request', { ...finish, cwd: ROOT });
+    await service.handle('request', {
+      method: 'queue.list',
+      args: {},
+      via: 'mcp',
+      cwd: WORKTREE,
+    });
+    expect(emitted).toEqual([]);
   });
 });

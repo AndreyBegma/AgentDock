@@ -44,6 +44,20 @@ const git = async (
   return out || null;
 };
 
+/** The card whose worktree holds `cwd`, by real path; null for none. */
+export const cardAtWorktree = (
+  records: readonly CardRecord[],
+  cwd: string,
+): CardRecord | null => {
+  const here = real(cwd);
+  if (!here) return null;
+  for (const record of records) {
+    const worktree = real(record.worktree);
+    if (worktree && within(here, worktree)) return record;
+  }
+  return null;
+};
+
 /**
  * The card of a session at `cwd`: the one whose worktree holds it, else the
  * one whose branch the checkout at `cwd` has checked out in the same
@@ -55,12 +69,9 @@ export const cardOfSession = async (
   exec: Exec,
   branch?: string,
 ): Promise<CardRecord | null> => {
-  const here = real(cwd);
-  if (!here) return null;
-  for (const record of records) {
-    const worktree = real(record.worktree);
-    if (worktree && within(here, worktree)) return record;
-  }
+  if (!real(cwd)) return null;
+  const inWorktree = cardAtWorktree(records, cwd);
+  if (inWorktree) return inWorktree;
   const head =
     branch ?? (await git(exec, cwd, ['rev-parse', '--abbrev-ref', 'HEAD']));
   if (!head || head === 'HEAD') return null;
