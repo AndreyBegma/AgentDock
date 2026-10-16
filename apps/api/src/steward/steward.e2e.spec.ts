@@ -42,6 +42,7 @@ describe('Steward (e2e)', () => {
             outcome: 'resumed',
             tmuxSession: 'agentdock-card-abcd1234',
           },
+          'digest.compose': { prose: 'Nothing happened.' },
         };
         return { status: 'ok', output: defaults[name], rttMs: 1 } as never;
       });

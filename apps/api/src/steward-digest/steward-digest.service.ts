@@ -10,7 +10,8 @@ import {
   type DigestContent,
   StewardDigestComposer,
 } from './steward-digest-composer';
-import { boundedProse, digestView } from './steward-digest-format';
+import { digestView } from './steward-digest-format';
+import { StewardDigestProse } from './steward-digest-prose';
 import { StewardDigestTelegram } from './steward-digest-telegram';
 import { dailyDueAt, dailyIsDue } from './steward-digest-time';
 
@@ -44,9 +45,10 @@ const notFound = (): HttpException =>
  * when away mode is switched off. It composes the content from rows, stores it
  * in `steward_digests`, and sends it to Telegram when configured.
  *
- * No runner command writes digest prose (the protocol is closed to a new one),
- * so every digest is the template — `prose` stays null until one exists. A
- * project with Steward switched off gets no digest.
+ * Once stored, haiku writes its prose on the project's runner (#491,
+ * `digest.compose`) and the row gets it before the digest is sent; with the
+ * runner offline, or any failure, `prose` stays null and the digest is the
+ * template. A project with Steward switched off gets no digest.
  */
 @Injectable()
 export class StewardDigestService {
@@ -55,6 +57,7 @@ export class StewardDigestService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly composer: StewardDigestComposer,
+    private readonly prose: StewardDigestProse,
     private readonly telegram: StewardDigestTelegram,
   ) {}
 
@@ -206,6 +209,8 @@ export class StewardDigestService {
    * Composes and stores one digest under a per-project lock, so two instances
    * ticking together make one. `guard` says what makes it a repeat: a digest
    * of the same trigger since a time, or one that ends at the same instant.
+   * The prose is asked after the lock is released — the runner call takes
+   * seconds — and written onto the stored row.
    */
   private async create(args: {
     projectId: string;
@@ -214,6 +219,28 @@ export class StewardDigestService {
     to: Date;
     guard: { since: Date } | { sameTo: Date };
   }): Promise<CreatedDigest | null> {
+    const stored = await this.store(args);
+    if (!stored) return null;
+    const prose = await this.prose.write(
+      args.projectId,
+      args.trigger,
+      stored.content,
+    );
+    if (prose === null) return stored.created;
+    const row = await this.prisma.stewardDigest.update({
+      where: { id: stored.created.view.id },
+      data: { prose },
+    });
+    return { ...stored.created, view: digestView(row) };
+  }
+
+  private async store(args: {
+    projectId: string;
+    trigger: StewardDigestTrigger;
+    from?: Date;
+    to: Date;
+    guard: { since: Date } | { sameTo: Date };
+  }): Promise<{ created: CreatedDigest; content: DigestContent } | null> {
     const { projectId, trigger, to, guard } = args;
     return this.prisma.$transaction(
       async (tx) => {
@@ -258,7 +285,7 @@ export class StewardDigestService {
             to,
             // Plain strings and arrays of them: JSON by construction.
             content: content as unknown as Prisma.InputJsonValue,
-            prose: boundedProse(null),
+            prose: null,
           },
         });
         const project = await tx.project.findUnique({
@@ -266,8 +293,11 @@ export class StewardDigestService {
           select: { displayName: true },
         });
         return {
-          view: digestView(row),
-          projectName: project?.displayName ?? 'Project',
+          created: {
+            view: digestView(row),
+            projectName: project?.displayName ?? 'Project',
+          },
+          content,
         };
       },
       { timeout: 30_000 },

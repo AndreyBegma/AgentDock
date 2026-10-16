@@ -1,11 +1,14 @@
 import type { StewardDigestView } from '@agentdock/shared';
+import { digestComposeArgsSchema } from '@agentdock/shared/protocol';
 import { SYSTEM_ACTOR, userActor } from '../audit/audit.types';
+import { BudgetGate } from '../budgets/budget-gate';
 import { BotTokenStore } from '../notifications';
 import {
   seedRunnerProject,
   seedUser,
 } from '../notifications/testing/notifications-e2e';
 import { RunnerSettingsService } from '../runners/runner-settings.service';
+import { StewardCommands } from '../steward/steward-commands';
 import { BOT_TOKEN, forbidden } from '../telegram/testing/fake-telegram';
 import {
   createTelegramApp,
@@ -502,6 +505,176 @@ describe('Steward digest (e2e, #447 D14)', () => {
 
     it('is 401 without a session', async () => {
       expect((await ctx.http().get(latestPath(projectId))).status).toBe(401);
+    });
+  });
+
+  describe('the prose (#491)', () => {
+    let commands: StewardCommands;
+    let served: boolean;
+    let answer: () => unknown;
+
+    const stewardRuns = () =>
+      ctx.prisma.run.findMany({ where: { projectId, kind: 'steward' } });
+
+    beforeEach(async () => {
+      commands = ctx.app.get(StewardCommands);
+      served = true;
+      answer = () => ({
+        status: 'ok',
+        output: { prose: 'One card merged; C-2 is stuck on its tests.' },
+        rttMs: 1,
+      });
+      jest.spyOn(commands, 'available').mockImplementation(async () => served);
+      jest
+        .spyOn(commands, 'send')
+        .mockImplementation(async () => answer() as never);
+      const profile = await ctx.prisma.runtimeProfile.create({
+        data: {
+          runnerId,
+          key: 'claude-main',
+          runtime: 'claude',
+          label: 'Claude',
+          env: {},
+          args: [],
+          authenticated: true,
+        },
+      });
+      await ctx.prisma.project.update({
+        where: { id: projectId },
+        data: { defaultProfileId: profile.id },
+      });
+      await settings('00:00');
+    });
+    afterEach(() => jest.restoreAllMocks());
+
+    it('with a runner online, haiku writes the stored prose on a steward run', async () => {
+      const now = new Date();
+      await card('Add login', {
+        mergedAt: new Date(now.getTime() - HOUR),
+        prUrl: 'https://github.com/acme/widget/pull/9',
+      });
+      const stuck = await card('Slow job', { round: { phase: 'running' } });
+      await ctx.prisma.stewardIncident.create({
+        data: {
+          projectId,
+          subjectKind: 'card_round',
+          subjectId: stuck.round?.id ?? '',
+          kind: 'api_error',
+          reason: 'API Error: Connection lost',
+          status: 'escalated',
+        },
+      });
+      await spend('1.25', new Date(now.getTime() - HOUR));
+
+      expect(await digests.runDaily(now)).toBe(1);
+
+      const [row] = await rows();
+      expect(row.prose).toBe('One card merged; C-2 is stuck on its tests.');
+      const view = (await adminSession.get(latestPath(projectId)))
+        .body as StewardDigestView;
+      expect(view.prose).toBe(row.prose);
+      expect(telegramText()).toContain(
+        'One card merged; C\\-2 is stuck on its tests\\.',
+      );
+
+      expect(commands.available).toHaveBeenCalledWith(
+        runnerId,
+        'digest.compose',
+      );
+      const [call] = jest.mocked(commands.send).mock.calls;
+      expect(call[0]).toBe(runnerId);
+      expect(call[1]).toBe('digest.compose');
+      // DA-12: the stored, bounded lines only — no url, no pane text.
+      const args = digestComposeArgsSchema.parse(call[2]);
+      expect(args).toMatchObject({
+        projectId,
+        model: 'haiku',
+        profileKey: 'claude-main',
+        trigger: 'daily',
+        projectName: 'widget',
+        spendUsd: '1.25',
+        done: {
+          total: 1,
+          items: [{ label: 'C-1', title: 'Add login', reason: 'merged' }],
+        },
+        stuck: {
+          total: 1,
+          items: [
+            {
+              label: 'C-2',
+              title: 'Slow job',
+              reason: 'API Error: Connection lost',
+            },
+          ],
+        },
+        waiting: { total: 0, items: [] },
+      });
+      expect(JSON.stringify(call[3].auditArgs)).not.toContain('Add login');
+
+      // D16: counted against the project budget as a `steward` run.
+      const [run] = await stewardRuns();
+      expect(run).toMatchObject({
+        id: args.runId,
+        status: 'succeeded',
+        model: 'haiku',
+        profileKey: 'claude-main',
+      });
+      expect(run.endedAt).not.toBeNull();
+    });
+
+    it('with the runner offline, the digest is the template and no run starts', async () => {
+      served = false;
+      expect(await digests.runDaily(new Date())).toBe(1);
+      const [row] = await rows();
+      expect(row.prose).toBeNull();
+      expect(commands.send).not.toHaveBeenCalled();
+      expect(await stewardRuns()).toHaveLength(0);
+      expect(ctx.fake.sent()).toHaveLength(1);
+    });
+
+    it('a runner error or no answer keeps the template and fails the run', async () => {
+      answer = () => ({
+        status: 'error',
+        error: { code: 'internal', message: 'haiku wrote no summary' },
+      });
+      expect(await digests.runDaily(new Date())).toBe(1);
+      const [row] = await rows();
+      expect(row.prose).toBeNull();
+      const [run] = await stewardRuns();
+      expect(run.status).toBe('failed');
+      expect(run.outcome).toContain('haiku wrote no summary');
+      expect(ctx.fake.sent()).toHaveLength(1);
+
+      answer = () => ({ status: 'unknown' });
+      const later = new Date(Date.now() + 25 * HOUR);
+      expect(await digests.runDaily(later)).toBe(1);
+      const [, second] = await rows();
+      expect(second.prose).toBeNull();
+    });
+
+    it('asks nothing over the project budget', async () => {
+      jest.spyOn(ctx.app.get(BudgetGate), 'check').mockResolvedValue({
+        allowed: false,
+        budgetId: 'b1',
+        scope: 'project',
+        resetsAt: new Date(),
+      });
+      expect(await digests.runDaily(new Date())).toBe(1);
+      expect((await rows())[0].prose).toBeNull();
+      expect(commands.send).not.toHaveBeenCalled();
+    });
+
+    it('stores an answer as one bounded line, whatever the runner sent (DA-13)', async () => {
+      answer = () => ({
+        status: 'ok',
+        output: { prose: `first\nsecond\u001b[31m ${'x'.repeat(2000)}` },
+        rttMs: 1,
+      });
+      await digests.runDaily(new Date());
+      const prose = (await rows())[0].prose ?? '';
+      expect(prose.startsWith('first second')).toBe(true);
+      expect(Array.from(prose).some((c) => c.charCodeAt(0) < 32)).toBe(false);
+      expect(Array.from(prose)).toHaveLength(600);
     });
   });
 
