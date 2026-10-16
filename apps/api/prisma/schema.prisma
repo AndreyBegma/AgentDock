@@ -2561,8 +2561,10 @@ model DesignRevision {
   revision  Int
   title     String
   rationale String
-  /// The validated mockup (at most `DESIGN_HTML_MAX_BYTES`), without the pin helper.
-  html      String
+  /// The one validated mockup of a revision stored before #441, without the
+  /// pin helper; it reads as a single frame named `Mockup`. Null on a revision
+  /// with frames (`design_frames`).
+  html      String?
   turnId    String
   archived  Boolean  @default(false)
   createdAt DateTime @default(now())
@@ -2570,12 +2572,32 @@ model DesignRevision {
   design            TaskDesign      @relation("TaskDesignRevisions", fields: [designId], references: [id], onDelete: Cascade)
   turn              PlanTurn        @relation(fields: [turnId], references: [id], onDelete: Cascade)
   approvedFor       TaskDesign?     @relation("TaskDesignApprovedRevision")
+  frames            DesignFrame[]
   comments          DesignComment[] @relation("DesignCommentRevision")
   addressedComments DesignComment[] @relation("DesignCommentAddressedIn")
 
   @@unique([designId, variant, revision])
   @@index([turnId])
   @@map("design_revisions")
+}
+
+/// #441: one named, separately rendered mockup of a revision. A revision's
+/// frames keep the order the turn drew them in; together at most
+/// `DESIGN_HTML_MAX_BYTES`, without the pin helper.
+model DesignFrame {
+  id         String @id @default(cuid())
+  revisionId String
+  /// 0-based.
+  position   Int
+  name       String
+  /// The published file's stem, distinct within the revision.
+  slug       String
+  html       String
+
+  revision DesignRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+
+  @@unique([revisionId, position])
+  @@map("design_frames")
 }
 
 /// A comment on a design (D9): general, on one screen (viewport and theme),
@@ -2585,6 +2607,9 @@ model DesignComment {
   id                    String            @id @default(cuid())
   designId              String
   revisionId            String
+  /// #441: the position of the frame it was left on; 0 for a comment made
+  /// before frames, on the revision's one mockup.
+  frame                 Int               @default(0)
   /// Nullable so deleting the author keeps the comment.
   authorId              String?
   kind                  DesignCommentKind
@@ -2819,6 +2844,13 @@ model BoardCard {
   /// At most 500 characters.
   autoRunMessage          String?
   autoRunFailedAt         DateTime?
+  /// #443: the accepted dependency whose acceptance tried the failed auto-run;
+  /// `null` when the failure came from approving the design (#273).
+  autoRunAfter            Int?
+  /// #443: Auto-run when ready — accepting the last open dependency starts
+  /// the Run. Off by default; it turns itself off when it fires, so it starts
+  /// the card at most once.
+  autoRunWhenReady        Boolean          @default(false)
   /// #282 D1: the manual session a `terminal` card tracks; unique, so a
   /// second `card.track` of the session updates its card.
   trackedSessionId        String?          @unique
@@ -2915,6 +2947,9 @@ model BoardCardRound {
   round               Int
   runId               String           @unique
   trigger             CardRoundTrigger
+  /// #443: started by Auto-run when ready, after this dependency (`C-<n>`)
+  /// was accepted; `null` for a round a person or AgentDock started.
+  autoRunAfter        Int?
   /// The person's feedback (D9), at most 8 000 characters.
   feedback            String?
   /// #273 D1: the card text this round's prompt was built from.

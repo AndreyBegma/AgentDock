@@ -3,6 +3,7 @@ import {
   DESIGN_THEMES,
   DESIGN_VIEWPORT_MAX_PX,
   DESIGN_VIEWPORT_MIN_PX,
+  type DesignFrameView,
   type DesignRevisionView,
   type DesignTheme,
   type ViewportPreset,
@@ -11,13 +12,18 @@ import { clampZoom, type Zoom } from './zoom';
 
 /**
  * The viewer's state (spec 223 D11), all of it in the URL so a link opens
- * the same screen: `?variant=2&rev=<revisionId>&vp=Mobile&theme=dark&w=412`.
+ * the same screen: `?variant=2&rev=<revisionId>&frame=1&vp=Mobile&theme=dark&w=412`.
  * Anything missing or wrong falls back to a default rather than failing.
  */
 export interface ViewerState {
   variant: number;
   /** The revision in view; null while the design has none. */
   revision: DesignRevisionView | null;
+  /**
+   * #441: the frame in view, by position — `frame`, clamped to the
+   * revision's frames, else the first.
+   */
+  frame: number;
   /** The preset in view; its name is `vp`. */
   viewport: ViewportPreset;
   theme: DesignTheme;
@@ -33,6 +39,7 @@ export interface ViewerState {
 export const VIEWER_PARAM = {
   variant: 'variant',
   revision: 'rev',
+  frame: 'frame',
   viewport: 'vp',
   theme: 'theme',
   width: 'w',
@@ -81,6 +88,10 @@ const positiveInt = (raw: string | null): number | null => {
   return Number.isSafeInteger(n) && n > 0 ? n : null;
 };
 
+/** #441: the frame in view of a state, or null with no revision. */
+export const frameOf = (state: ViewerState): DesignFrameView | null =>
+  state.revision?.frames[state.frame] ?? null;
+
 export function resolveViewerState(
   params: URLSearchParams,
   revisions: readonly DesignRevisionView[],
@@ -99,6 +110,11 @@ export function resolveViewerState(
     (asked !== null && variants.includes(asked) ? asked : variants[0]) ??
     1;
   const revision = named ?? revisionsOf(revisions, variant)[0] ?? null;
+  // `frame` is 0-based: `?frame=0` is the first, as is anything out of range.
+  const rawFrame = params.get(VIEWER_PARAM.frame);
+  const asFrame = rawFrame === '0' ? 0 : positiveInt(rawFrame);
+  const frame =
+    asFrame !== null && asFrame < (revision?.frames.length ?? 0) ? asFrame : 0;
 
   const viewport =
     presets.find((p) => p.name === params.get(VIEWER_PARAM.viewport)) ??
@@ -112,6 +128,7 @@ export function resolveViewerState(
   return {
     variant,
     revision,
+    frame,
     viewport,
     theme,
     width,
@@ -124,6 +141,7 @@ export function resolveViewerState(
 export type ViewerChange =
   | { kind: 'variant'; variant: number }
   | { kind: 'revision'; revisionId: string }
+  | { kind: 'frame'; frame: number }
   | { kind: 'viewport'; viewport: ViewportPreset }
   | { kind: 'theme'; theme: DesignTheme }
   | { kind: 'width'; width: number }
@@ -132,7 +150,8 @@ export type ViewerChange =
 /**
  * The next query string. Choosing a variant or a preset drops what it
  * replaces: a variant shows its latest revision, a preset its own width and
- * theme.
+ * theme. The frame stays: the revisions of a variant usually share frames,
+ * and one past the end reads as the first.
  */
 export function applyViewerChange(
   params: URLSearchParams,
@@ -147,6 +166,11 @@ export function applyViewerChange(
     case 'revision':
       next.set(VIEWER_PARAM.revision, change.revisionId);
       next.delete(VIEWER_PARAM.variant);
+      break;
+    case 'frame':
+      // The first frame is the default: it leaves the URL clean.
+      if (change.frame <= 0) next.delete(VIEWER_PARAM.frame);
+      else next.set(VIEWER_PARAM.frame, String(Math.floor(change.frame)));
       break;
     case 'viewport':
       next.set(VIEWER_PARAM.viewport, change.viewport.name);

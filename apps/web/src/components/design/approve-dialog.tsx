@@ -40,6 +40,9 @@ export function ApproveDialog({
   onApproveAndRun?: (revisionId: string) => void;
 }) {
   const [picked, setPicked] = useState<string | null>(null);
+  // #441: approving a variant approves every one of its frames.
+  const framesOf = (r: DesignRevisionView | null | undefined): string =>
+    r && r.frames.length > 1 ? ` (${r.frames.length} frames)` : '';
   useEffect(() => {
     if (open) {
       setPicked(
@@ -55,7 +58,11 @@ export function ApproveDialog({
         open={open}
         onOpenChange={onOpenChange}
         title="Approve this design?"
-        consequence={consequence}
+        consequence={
+          only && only.frames.length > 1
+            ? `Approves all ${only.frames.length} frames of variant ${only.variant}. ${consequence ?? ''}`.trim()
+            : consequence
+        }
         verb="Approve"
         busy={busy}
         onConfirm={() => {
@@ -116,7 +123,7 @@ export function ApproveDialog({
                 value={c.id}
                 checked={picked === c.id}
                 onChange={() => setPicked(c.id)}
-                label={`${revisionLabel(c.variant, c.revision)} — ${c.title}`}
+                label={`${revisionLabel(c.variant, c.revision)} — ${c.title}${framesOf(c)}`}
                 hint={c.rationale}
               />
             ))}
@@ -124,7 +131,7 @@ export function ApproveDialog({
         ) : (
           <p className="text-sm text-ink-2">
             {inView
-              ? `${revisionLabel(inView.variant, inView.revision)} — ${inView.title}`
+              ? `${revisionLabel(inView.variant, inView.revision)} — ${inView.title}${framesOf(inView)}`
               : 'The design in view.'}
           </p>
         )}

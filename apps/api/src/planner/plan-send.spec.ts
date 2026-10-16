@@ -1,5 +1,6 @@
 import {
   dependencyOrder,
+  designDirPath,
   designFilePath,
   docsPrIssueBody,
   fallbackDocument,
@@ -12,29 +13,50 @@ import {
   withDesignPath,
 } from './plan-send';
 
-describe('design files (spec 223 D16)', () => {
-  it('sit under the spec directory, or docs/design without one', () => {
-    expect(designFilePath('docs/specs', 12, 'Export CSV', 2)).toBe(
-      'docs/specs/12-export-csv/design/2.html',
+describe('design files (spec 223 D16, #441)', () => {
+  it('sit one per frame under the spec directory, or docs/design without one', () => {
+    expect(designFilePath('docs/specs', 12, 'Export CSV', 2, 'board')).toBe(
+      'docs/specs/12-export-csv/design/2/board.html',
     );
-    expect(designFilePath(null, 12, 'Export CSV', 1)).toBe(
-      'docs/design/12-export-csv/1.html',
+    expect(designFilePath(null, 12, 'Export CSV', 1, 'mockup')).toBe(
+      'docs/design/12-export-csv/1/mockup.html',
     );
   });
 
-  it('fills the issue number into the path the write turn named, or adds a Design section', () => {
-    const template = designFilePath('docs/specs', ISSUE_PLACEHOLDER, 'X', 1);
-    const path = designFilePath('docs/specs', 7, 'X', 1);
+  const one = [{ name: 'Mockup', slug: 'mockup' }];
+  const two = [
+    { name: 'Board page', slug: 'board-page' },
+    { name: 'Card tile', slug: 'card-tile' },
+  ];
+
+  it('fills the issue number into the paths the write turn named, or adds a Design section', () => {
+    const template = designDirPath('docs/specs', ISSUE_PLACEHOLDER, 'X', 1);
+    const dir = designDirPath('docs/specs', 7, 'X', 1);
     expect(
-      withDesignPath(`## Design\n\nSee \`${template}\`.\n`, template, path),
-    ).toBe(`## Design\n\nSee \`${path}\`.\n`);
+      withDesignPath(
+        `## Design\n\nSee \`${template}/mockup.html\`.\n`,
+        template,
+        dir,
+        one,
+      ),
+    ).toBe(`## Design\n\nSee \`${dir}/mockup.html\`.\n`);
     const added = withDesignPath(
       '## Summary\n\nNo design named.\n',
       template,
-      path,
+      dir,
+      one,
     );
     expect(added).toContain('## Design');
-    expect(added).toContain(`\`${path}\``);
+    expect(added).toContain(`\`${dir}/mockup.html\``);
+  });
+
+  it('lists every frame when the document names none', () => {
+    const template = designDirPath('docs/specs', ISSUE_PLACEHOLDER, 'X', 2);
+    const dir = designDirPath('docs/specs', 7, 'X', 2);
+    const added = withDesignPath('## Summary\n', template, dir, two);
+    expect(added).toContain('The approved design has 2 frames');
+    expect(added).toContain(`- \`${dir}/board-page.html\` — Board page`);
+    expect(added).toContain(`- \`${dir}/card-tile.html\` — Card tile`);
   });
 });
 

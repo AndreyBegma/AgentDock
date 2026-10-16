@@ -5,6 +5,7 @@ import {
   CARD_MERGE_COMMENT_MAX_BYTES,
   CARD_PR_CLOSE_COMMENT_MAX_BYTES,
   CARD_RUN_FILE_MAX_BYTES,
+  CARD_RUN_FILES_MAX,
   CARD_RUN_PROMPT_MAX_BYTES,
   CARD_TIMEOUTS_MS,
   cardCloseArgsSchema,
@@ -121,14 +122,14 @@ describe('card.run args', () => {
     ).toBe(false);
   });
 
-  it('takes at most four repository-relative files of bounded size', () => {
+  it('takes a spec and every design frame (#441) as repository-relative files of bounded size', () => {
     const file = (path: string, content = '') => ({ path, content });
     const parse = (files: unknown) =>
       cardRunArgsSchema.safeParse({ ...runArgs, files }).success;
-    expect(parse(['a', 'b', 'c', 'd'].map((p) => file(`${p}.md`)))).toBe(true);
-    expect(parse(['a', 'b', 'c', 'd', 'e'].map((p) => file(`${p}.md`)))).toBe(
-      false,
-    );
+    const many = (n: number) =>
+      Array.from({ length: n }, (_, i) => file(`design/1/f${i}.html`));
+    expect(parse(many(CARD_RUN_FILES_MAX))).toBe(true);
+    expect(parse(many(CARD_RUN_FILES_MAX + 1))).toBe(false);
     expect(parse([file('/etc/passwd')])).toBe(false);
     expect(parse([file('docs/../../x.md')])).toBe(false);
     expect(parse([file('a.md'), file('a.md')])).toBe(false);

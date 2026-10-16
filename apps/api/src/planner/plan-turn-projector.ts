@@ -304,8 +304,8 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
       }
       if (
         parsed.output.action === 'design' &&
-        'html' in parsed &&
-        typeof parsed.html === 'string' &&
+        'frames' in parsed &&
+        Array.isArray(parsed.frames) &&
         turn.task &&
         designPlan
       ) {
@@ -328,7 +328,7 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
           },
           designPlan,
           parsed.output,
-          parsed.html,
+          parsed.frames,
         );
         chain = next
           ? { action: 'design', taskId: turn.task.id, design: next }
@@ -465,7 +465,7 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
           `contract_violation: ${parsed.error.reason}: ${parsed.error.message}`,
         );
       }
-      if (!('html' in parsed) || typeof parsed.html !== 'string') {
+      if (!('frames' in parsed) || parsed.frames.length === 0) {
         return fail(
           'failed',
           'contract_violation: invalid_shape: the design turn drew no mockup',
@@ -487,7 +487,7 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
         { id: turn.id, owner },
         designPlan,
         parsed.output,
-        parsed.html,
+        parsed.frames,
       );
       return true;
     });

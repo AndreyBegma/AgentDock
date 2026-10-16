@@ -90,21 +90,23 @@ const cardSpecStem = (card: CardSpecPathInput): string => {
 export const CARD_DESIGN_FALLBACK_DIR = 'docs/design/cards';
 
 /**
- * #243 D7: the approved variant's file in the card's branch, repository-
- * relative. With a `specDir`, beside the card's spec:
- * `<specDir>/<issue|card-n>-<slug>/design/<variant>.html`; without one,
- * `docs/design/cards/C-<n>-<slug>/<variant>.html`.
+ * #243 D7, #441: one frame of the approved variant in the card's branch,
+ * repository-relative. With a `specDir`, beside the card's spec:
+ * `<specDir>/<issue|card-n>-<slug>/design/<variant>/<frame>.html`; without
+ * one, `docs/design/cards/C-<n>-<slug>/<variant>/<frame>.html`. `frame` is
+ * the frame's slug.
  */
 export const cardDesignPath = (
   specDir: string | null,
   card: CardSpecPathInput,
   variant: number,
+  frame: string,
 ): string => {
   const dir = specDir?.replace(/\/+$/, '') ?? '';
   if (dir === '') {
-    return `${CARD_DESIGN_FALLBACK_DIR}/${cardLabel(card.number)}-${cardSlug(card.title)}/${variant}.html`;
+    return `${CARD_DESIGN_FALLBACK_DIR}/${cardLabel(card.number)}-${cardSlug(card.title)}/${variant}/${frame}.html`;
   }
-  return `${dir}/${cardSpecStem(card)}/design/${variant}.html`;
+  return `${dir}/${cardSpecStem(card)}/design/${variant}/${frame}.html`;
 };
 
 /** The largest issue body `issue.create` takes. */

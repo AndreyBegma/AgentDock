@@ -19,6 +19,7 @@ import {
   cardAutoMergeDefault,
   cardCiChecksOf,
   cardLabel,
+  cardReadiness,
   cardRecommendationOf,
   FLEET_STAGES,
   type FleetStage,
@@ -223,6 +224,7 @@ const brief = (
         hooksMissing: hooksMissing(card, round, facts),
         ...hooksCauseOf(card, round, facts),
         ...wiringOf(round),
+        autoRunAfter: round.autoRunAfter,
       }
     : null;
 
@@ -280,8 +282,11 @@ export const toCardView = (
             : 'unknown',
           message: card.autoRunMessage ?? '',
           at: card.autoRunFailedAt.toISOString(),
+          after: card.autoRunAfter,
         }
       : null,
+  autoRunWhenReady: card.autoRunWhenReady,
+  readiness: cardReadiness(card.column, facts.dependencies.get(card.id) ?? []),
   tracking: trackingOf(card, facts),
   fleet: fleetOf(card),
   autoCollect: card.autoCollect,
@@ -333,6 +338,7 @@ const toRoundView = (
   hooksMissing: hooksMissing(card, round, facts),
   ...hooksCauseOf(card, round, facts),
   ...wiringOf(round),
+  autoRunAfter: round.autoRunAfter,
   costUsd: facts.costs.get(round.runId) ?? null,
   startedAt: round.startedAt.toISOString(),
   waitingAt: iso(round.waitingAt),

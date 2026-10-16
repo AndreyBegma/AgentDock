@@ -1,4 +1,4 @@
-# ADR-0041: Context handoff — a kept note, and the runner restarts the cheapest way
+# ADR-0042: Context handoff — a kept note, and the runner restarts the cheapest way
 
 Status: accepted · Date: 2026-10-16 ·
 Issue: [#449](https://github.com/AndreyBegma/AgentDock/issues/449) ·

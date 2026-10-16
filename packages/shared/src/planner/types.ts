@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { attachmentIdSchema } from '../attachments/contracts';
 import { ATTACHMENTS_PER_CARD_MAX } from '../attachments/limits';
+import { DESIGN_FRAME_NAME_MAX } from '../design/frames';
 import { DESIGN_RATIONALE_MAX, DESIGN_TITLE_MAX } from '../design/limits';
 import { designSuggestionSchema, designVariantSchema } from '../design/types';
 import { LOCAL_CARD_BODY_MAX } from '../protocol/local';
@@ -395,10 +396,12 @@ export const reviseOutputSchema = reviseOf(plannedTaskSchema);
 export type ReviseOutput = z.infer<typeof reviseOutputSchema>;
 
 /**
- * Spec 223 D7: a design turn's plan block; the HTML travels in the one
- * `agentdock-design` block beside it. `addressed` lists the ids of the open
- * comments this revision answers (D10). The same shape under every contract
- * version: a v1 plan's design is switched on by hand.
+ * Spec 223 D7: a design turn's plan block; the HTML travels in the
+ * `agentdock-design` blocks beside it. `addressed` lists the ids of the open
+ * comments this revision answers (D10). #441: `frames` names the frames, one
+ * per design block in order — no upper limit but the HTML's byte cap;
+ * without it the one block is a frame named `Mockup`. The same shape under
+ * every contract version: a v1 plan's design is switched on by hand.
  */
 export const designOutputSchema = z.strictObject({
   action: z.literal('design'),
@@ -407,6 +410,7 @@ export const designOutputSchema = z.strictObject({
   title: text(DESIGN_TITLE_MAX),
   rationale: text(DESIGN_RATIONALE_MAX),
   addressed: z.array(z.string().min(1).max(64)).max(100),
+  frames: z.array(text(DESIGN_FRAME_NAME_MAX)).min(1).optional(),
 });
 export type DesignOutput = z.infer<typeof designOutputSchema>;
 

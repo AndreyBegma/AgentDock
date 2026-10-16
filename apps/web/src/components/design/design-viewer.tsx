@@ -5,24 +5,30 @@ import {
   DESIGN_VIEWPORT_MAX_PX,
   DESIGN_VIEWPORT_MIN_PX,
   type DesignCommentRequest,
+  type DesignCommentView,
   type MockupPinMarker,
   type TaskDesignPatchRequest,
   type TaskDesignView,
 } from '@agentdock/shared';
+import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { ResizableFrame } from '@andrewbehma/glass-ui/resizable-frame';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import { SidePanel } from '@andrewbehma/glass-ui/side-panel';
+import { TabGroup, TabPanel } from '@andrewbehma/glass-ui/tabs';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { LaunchCard } from '../../lib/board/launch';
 import {
   approveBlock,
   designWriteBlock,
+  framesWithOpenPins,
   isOpen,
+  openCommentsByFrame,
   pinMarkers,
   pinNumbers,
   reviseBlock,
 } from '../../lib/design/comments';
+import { framePath } from '../../lib/design/frames';
 import type { DesignBusy } from '../../lib/design/use-design';
 import { useElementWidth } from '../../lib/design/use-element-width';
 import {
@@ -46,6 +52,7 @@ import { ApproveDialog } from './approve-dialog';
 import { CommentsPanel } from './comments-panel';
 import { DesignFailure } from './design-failure';
 import { DesignProgress } from './design-progress';
+import { FrameStrip, frameKey } from './frame-strip';
 import { GeneratePanel } from './generate-panel';
 import { MockupBanner } from './mockup-banner';
 import { type FramePin, MockupFrame } from './mockup-frame';
@@ -147,13 +154,26 @@ export function DesignViewer({
   }, [hasMockup, zoomByWheel]);
 
   const onStageKeyDown = (event: React.KeyboardEvent) => {
-    const key = zoomKey(event);
-    if (!key || !hasMockup) return;
+    if (!hasMockup) return;
     // A field keeps its own keys (the typed width, a pin's comment).
     const target = event.target as HTMLElement;
     if (target.closest('input, textarea, select, [contenteditable="true"]')) {
       return;
     }
+    // #441: `[` and `]` step through the frames.
+    const nextFrame = frameKey(
+      event,
+      state.frame,
+      state.revision?.frames.length ?? 0,
+    );
+    if (nextFrame !== null) {
+      event.preventDefault();
+      setDraft(null);
+      onChange({ kind: 'frame', frame: nextFrame });
+      return;
+    }
+    const key = zoomKey(event);
+    if (!key) return;
     event.preventDefault();
     onChange({
       kind: 'zoom',
@@ -165,7 +185,22 @@ export function DesignViewer({
   const reviseReason = reviseBlock(design, canOperate);
   const approveReason = approveBlock(design, canOperate);
   const revisionId = state.revision?.id ?? null;
+  const frames = state.revision?.frames ?? [];
   const screen = { viewport: state.viewport.name, theme: state.theme };
+  // #441: a comment's frame is named in its own revision.
+  const frameNames = useMemo(
+    () =>
+      new Map(design.revisions.map((r) => [r.id, r.frames.map((f) => f.name)])),
+    [design.revisions],
+  );
+  const frameNameOf = (c: DesignCommentView): string | null =>
+    frameNames.get(c.revisionId)?.[c.frame] ?? null;
+  const selectFrame = (next: number) => {
+    if (next === state.frame) return;
+    // A pin draft belongs to the frame it was placed on.
+    setDraft(null);
+    onChange({ kind: 'frame', frame: next });
+  };
   const variants = variantsOf(design.revisions);
   const openCount = design.comments.filter(isOpen).length;
 
@@ -176,6 +211,7 @@ export function DesignViewer({
       revisionId,
       state.viewport.name,
       state.theme,
+      state.frame,
     );
     return draft
       ? [...saved, { n: draftNumber, x: draft.x, y: draft.y }]
@@ -185,6 +221,7 @@ export function DesignViewer({
     revisionId,
     state.viewport.name,
     state.theme,
+    state.frame,
     draft,
     draftNumber,
   ]);
@@ -233,6 +270,10 @@ export function DesignViewer({
       {reviseReason && writeBlock === null ? (
         <p className="text-xs text-ink-3">{reviseReason}</p>
       ) : null}
+      <p className="text-xs text-ink-3">
+        Revise redraws the whole revision and passes every open comment with its
+        frame's name. Approve covers every frame of the variant.
+      </p>
       {state.revision ? (
         <div className="flex flex-col gap-1">
           <h2 className="text-sm font-semibold">{state.revision.title}</h2>
@@ -241,18 +282,51 @@ export function DesignViewer({
           </p>
         </div>
       ) : null}
+      {state.revision ? (
+        <section
+          aria-label="Publishes on approve"
+          className="flex flex-col gap-2 rounded-md border border-line p-3"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-xs font-semibold">Publishes on approve</h3>
+            <Badge
+              label={`${frames.length} file${frames.length === 1 ? '' : 's'}`}
+            />
+          </div>
+          <ul className="flex flex-col gap-1">
+            {frames.map((f) => (
+              <li
+                key={f.position}
+                className="flex items-baseline justify-between gap-2 text-xs"
+              >
+                <span className="truncate font-mono">
+                  {framePath(state.variant, f)}
+                </span>
+                <span className="shrink-0 text-ink-3">{f.name}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-ink-3">
+            Committed with the work, and listed under{' '}
+            <span className="font-mono">## Design</span> in its prompt.
+          </p>
+        </section>
+      ) : null}
       <CommentsPanel
         projectId={projectId}
         owner={design.owner}
         canOperate={canOperate}
         comments={design.comments}
         revisionId={revisionId}
+        frames={frames}
+        frame={state.frame}
+        frameNameOf={frameNameOf}
         screen={screen}
         writeBlock={writeBlock}
         busy={busy === 'comment'}
         onComment={async (body) => {
           if (!revisionId) return;
-          await actions.comment({ ...body, revisionId });
+          await actions.comment({ ...body, revisionId, frame: state.frame });
         }}
       />
     </div>
@@ -293,7 +367,10 @@ export function DesignViewer({
           />
         ) : null}
         {state.revision ? (
-          <>
+          <TabGroup
+            value={String(state.frame)}
+            onValueChange={(value) => selectFrame(Number(value))}
+          >
             <ViewerToolbar
               state={view}
               zoom={zoom}
@@ -308,6 +385,14 @@ export function DesignViewer({
                 if (!on) setDraft(null);
               }}
             />
+            <FrameStrip
+              frames={frames}
+              frame={state.frame}
+              variant={state.variant}
+              comments={openCommentsByFrame(design.comments, revisionId)}
+              pinned={framesWithOpenPins(design.comments, revisionId)}
+              onFrame={selectFrame}
+            />
             {/* Below `lg` the panel is a sheet; its way in sits above the frame. */}
             <Button
               variant="glass"
@@ -316,50 +401,55 @@ export function DesignViewer({
             >
               Comments and review ({openCount} open)
             </Button>
-            {/* D1: the box is the scaled size, the mockup inside keeps its layout size. */}
-            <div ref={measure} className="w-full min-w-0 shrink-0">
-              <ResizableFrame
-                className="shrink-0"
-                width={boxSize(view.width, zoom)}
-                height={boxSize(state.viewport.height, zoom)}
-                min={boxSize(DESIGN_VIEWPORT_MIN_PX, zoom)}
-                max={boxSize(DESIGN_VIEWPORT_MAX_PX, zoom)}
-                labels={{ resize: 'Resize the mockup' }}
-                // D5: the box reports scaled px; the width is the layout width.
-                onWidthChange={(box) =>
-                  setDrag((current) => dragStep(current, box, zoom))
-                }
-                onWidthCommit={(box) => {
-                  setDrag(null);
-                  onChange({
-                    kind: 'width',
-                    width: dragStep(drag, box, zoom).width,
-                  });
-                }}
-              >
-                <div
-                  className="origin-top-left"
-                  style={{
-                    width: view.width,
-                    height: state.viewport.height,
-                    transform: `scale(${zoom})`,
-                  }}
-                >
-                  <MockupFrame
-                    src={state.revision.htmlUrl}
-                    title={`Mockup: ${state.revision.title}`}
-                    theme={state.theme}
-                    pinMode={pinMode && writeBlock === null}
-                    pins={markers}
-                    onWheel={zoomByWheel}
-                    onPin={(pin) => {
-                      if (writeBlock === null) setDraft({ ...pin, zoom });
+            {/* #441: one panel per frame; only the one in view renders its mockup. */}
+            {frames.map((f) => (
+              <TabPanel key={f.position} value={String(f.position)}>
+                {/* D1: the box is the scaled size, the mockup inside keeps its layout size. */}
+                <div ref={measure} className="w-full min-w-0 shrink-0">
+                  <ResizableFrame
+                    className="shrink-0"
+                    width={boxSize(view.width, zoom)}
+                    height={boxSize(state.viewport.height, zoom)}
+                    min={boxSize(DESIGN_VIEWPORT_MIN_PX, zoom)}
+                    max={boxSize(DESIGN_VIEWPORT_MAX_PX, zoom)}
+                    labels={{ resize: 'Resize the mockup' }}
+                    // D5: the box reports scaled px; the width is the layout width.
+                    onWidthChange={(box) =>
+                      setDrag((current) => dragStep(current, box, zoom))
+                    }
+                    onWidthCommit={(box) => {
+                      setDrag(null);
+                      onChange({
+                        kind: 'width',
+                        width: dragStep(drag, box, zoom).width,
+                      });
                     }}
-                  />
+                  >
+                    <div
+                      className="origin-top-left"
+                      style={{
+                        width: view.width,
+                        height: state.viewport.height,
+                        transform: `scale(${zoom})`,
+                      }}
+                    >
+                      <MockupFrame
+                        src={f.htmlUrl}
+                        title={`Mockup: ${state.revision?.title} · ${f.name}`}
+                        theme={state.theme}
+                        pinMode={pinMode && writeBlock === null}
+                        pins={markers}
+                        onWheel={zoomByWheel}
+                        onPin={(pin) => {
+                          if (writeBlock === null) setDraft({ ...pin, zoom });
+                        }}
+                      />
+                    </div>
+                  </ResizableFrame>
                 </div>
-              </ResizableFrame>
-            </div>
-          </>
+              </TabPanel>
+            ))}
+          </TabGroup>
         ) : design.progress ? null : (
           <GeneratePanel
             projectId={projectId}
@@ -409,6 +499,7 @@ export function DesignViewer({
           if (!draft || !revisionId) return;
           await actions.comment({
             revisionId,
+            frame: state.frame,
             kind: 'pin',
             ...screen,
             x: draft.x,
