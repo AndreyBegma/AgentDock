@@ -151,6 +151,11 @@ handoff notes, picks how each round starts, sends `handoff.updated`,
 `handoff` means `false`; read it with `handoffAvailable()`. See
 [Context handoff](#context-handoff).
 
+`sessionMessage` (#489) says whether the runner handles `session.message` and
+reports a card round's question selector as `card_run.pending_question`. An
+absent `sessionMessage` means `false`; read it with
+`sessionMessageAvailable()`. See [Session messages](#session-messages).
+
 `commands` lists every command the runner build serves — its handler keys,
 sorted — and `disabledCommands` the subset its config switches off (#233,
 ADR-0023). Both are plain strings, not an enum of the allowlist: a runner newer
@@ -1620,6 +1625,42 @@ updatedBy, updatedAt }`, or `{ found: false, reason }` with
 `not_a_card_session` or `no_note` (`resumeContextResultSchema`). The plugin's
 `SessionStart` hook and `track_card` hand the same note to a session in a
 card's worktree or branch.
+
+### Session messages
+
+#489, ADR-0044: a person's text to a running session, or the answer to the
+question selector it shows. It is sent only to a runner whose capabilities say
+`sessionMessage: true`, and it needs `operator`.
+
+| Command | Args | Result |
+|---|---|---|
+| `session.message` | `projectId`, `target` — `{ kind: "card_round", cardId, runId }` or `{ kind: "fleet_slot", root, slot }` — and `message` — `{ kind: "text", text }`, `{ kind: "option", questionKey, index }` or `{ kind: "other", questionKey, text }` | `{ outcome }`: `sent` · `answered` · `no_session` · `question` · `question_changed` · `not_at_input` · `no_option` |
+
+- **The session is resolved, never named.** For a card round it is the
+  runner's record of that round, and the round must be the card's current one,
+  else `not_found`. For a slot it is the live `cs-*` session of the slot's
+  worktree; a slot of another project is `path_not_allowed`.
+- **Text is clean.** `text` must equal `cleanSessionMessage(text)`: no escape
+  sequences, no control characters or line breaks, at most 4 000 characters.
+  The args schema refuses anything else before a handler runs.
+- **Delivery.** The runner reads the pane first. Text is typed with
+  `send-keys -l` and submitted with `C-m` in a separate call, at an idle
+  prompt or while the agent works (Claude Code queues it). A question
+  selector is `question`; a dialog or a permission prompt is `not_at_input`.
+  Nothing is typed in either case.
+- **Answers.** An answer is sent only while the pane shows the screen
+  `questionKey` names (`question_changed` otherwise). The keys are `Up` or
+  `Down` from the cursor to the option, then `Enter`. "Other" moves to
+  "Type something.", types the text and presses `Enter`. An option the
+  screen does not list is `no_option`.
+- **Fleet slots.** A delivered message is also appended to
+  `<git-common-dir>/cs-orchestrator/events.jsonl` as `slot.message_sent`
+  with `data.by: "person"`, so the orchestrator learns what its worker was
+  told. `slot.message` appends the same line once it has typed its prompt.
+- **Question screens.** For a project that ships content, the card poll
+  sends `card_run.pending_question` whenever the selector's screen changes,
+  and `question: null` once it is gone (see
+  [event schema](event-schema.md)).
 
 ## Delivery guarantees
 
