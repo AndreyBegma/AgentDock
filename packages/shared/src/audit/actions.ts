@@ -147,6 +147,14 @@ export const AUDIT_ACTIONS = [
   'card.ci_retriggered',
   /** #443: the card's Auto-run when ready switch (`after: { autoRunWhenReady }`). */
   'card.auto_run_toggled',
+  /**
+   * #489 M1: a person's message to a running session, or an answer to its
+   * question selector (`after: { target, kind, index?, textSha256?, textChars?, via, outcome? }`;
+   * the text itself never). `card.message` for a card round, `slot.session_message`
+   * for a fleet slot.
+   */
+  'card.message',
+  'slot.session_message',
   /** #309 D7: an upload stored, pending (`after: { name, mime, size }`). */
   'attachment.added',
   /** #309 D7: pending uploads claimed onto a card (`after: { cardId, roundId?, attachmentIds }`). */

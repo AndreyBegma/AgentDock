@@ -135,6 +135,35 @@ export type SessionMessageRequest = SessionMessageInput;
 
 export interface SessionMessageView {
   outcome: SessionMessageOutcome;
-  /** The audit row of this message. */
-  auditId: string;
 }
+
+/** Where a message came from, as its audit row records it. */
+export type SessionMessageVia = 'web' | 'telegram';
+
+/** Stable codes in the `error` field of a message route's error body. */
+export const SESSION_MESSAGE_ERROR = {
+  /** Nothing is left once the text is cleaned, or the input is malformed. */
+  invalidMessage: 'invalid_message',
+  /** The card has no running round, or the slot is unknown here. */
+  notRunning: 'not_running',
+  /** The runner is offline, or does not serve `session.message`; nothing was sent. */
+  commandUnavailable: 'command_unavailable',
+  /** The runner refused the command. */
+  runnerError: 'runner_error',
+  /** No result came back in time; the message may or may not have arrived. */
+  runnerTimeout: 'runner_timeout',
+} as const;
+export type SessionMessageErrorCode =
+  (typeof SESSION_MESSAGE_ERROR)[keyof typeof SESSION_MESSAGE_ERROR];
+
+/**
+ * The input as the API takes it: text is cleaned (`cleanSessionMessage`)
+ * first, and an input with nothing left is null.
+ */
+export const cleanSessionMessageInput = (
+  input: SessionMessageInput,
+): SessionMessageInput | null => {
+  if (input.kind === 'option') return input;
+  const text = cleanSessionMessage(input.text);
+  return text.length > 0 ? { ...input, text } : null;
+};

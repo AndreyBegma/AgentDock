@@ -3008,6 +3008,10 @@ model BoardCardRound {
   backgroundCommand   String?
   /// #390: when this stall raised `card.background_stalled` — once per stall.
   backgroundStalledAt DateTime?
+  /// #489 M4: the question selector the round's session shows now — shared
+  /// `pendingQuestionSchema` — from `card_run.pending_question`; only for a
+  /// project that ships content (ADR-0021). Cleared once it is gone.
+  pendingQuestion     Json?
   finishedAt          DateTime?
   endedAt             DateTime?
   /// #449 D3: how the round's session started, from `round.restart`; `null`

@@ -4,6 +4,7 @@ import { LiveModule } from '../live/live.module';
 import { ProjectsModule } from '../projects';
 import { ReadinessModule } from '../readiness';
 import { RunnersModule } from '../runners/runners.module';
+import { SessionMessageModule } from '../session-message/session-message.module';
 import { BoardController } from './board.controller';
 import { BoardService, FleetCardEditsRef } from './board.service';
 import { BoardAutoRun } from './board-auto-run';
@@ -14,6 +15,7 @@ import { BoardDependencies } from './board-dependencies.service';
 import { BoardInboxService } from './board-inbox.service';
 import { BoardPlanCards } from './board-plan-cards';
 import { BoardRoundsService } from './board-rounds.service';
+import { BoardSessionMessages } from './board-session-message.service';
 import { BoardShipping } from './board-shipping';
 import { BoardSink } from './board-sink';
 import { BoardTerminalService } from './board-terminal.service';
@@ -29,7 +31,13 @@ import { CollectRetryTimer } from './collect-retry-timer';
  */
 @Module({
   // #309: `AttachmentsService` comes from the global `AttachmentsModule`.
-  imports: [LiveModule, ProjectsModule, ReadinessModule, RunnersModule],
+  imports: [
+    LiveModule,
+    ProjectsModule,
+    ReadinessModule,
+    RunnersModule,
+    SessionMessageModule,
+  ],
   // #309: claiming attachments onto a card is a card route.
   controllers: [BoardController, BoardAttachmentsController],
   providers: [
@@ -45,6 +53,8 @@ import { CollectRetryTimer } from './collect-retry-timer';
     BoardPlanCards,
     BoardRoundsService,
     BoardService,
+    // #489: a person's message to a card's running session.
+    BoardSessionMessages,
     // #359: a card ships itself — CI watched, fixed, merged.
     BoardShipping,
     BoardSink,
@@ -56,9 +66,11 @@ import { CollectRetryTimer } from './collect-retry-timer';
   // `BoardRoundsService` too: approving a card's design may start round 1 (#243 D6).
   // `BoardWork`: card capture puts suggestions in the Inbox (#244).
   // `BoardPlanCards`: a card intake and Create cards make cards (#337 D6, D7).
+  // `BoardSessionMessages`: Telegram answers a card's question (#489).
   exports: [
     BoardPlanCards,
     BoardRoundsService,
+    BoardSessionMessages,
     BoardService,
     BoardTerminalService,
     BoardWork,

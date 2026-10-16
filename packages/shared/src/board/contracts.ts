@@ -15,6 +15,7 @@ import type {
   PrInspectState,
 } from '../protocol';
 import type { ProfileSource } from '../readiness';
+import type { PendingQuestion } from '../session-message/contracts';
 import type { StewardCardChip } from '../steward/contracts';
 import type { CardKindSource } from '../text/limits';
 import type {
@@ -94,6 +95,13 @@ export interface CardRoundBrief {
    * Optional so older fixtures stay valid.
    */
   autoRunAfter?: number | null;
+  /**
+   * #489 M4: the question selector the running round's session shows —
+   * its text and options, to answer from the Board. `null` when none is up,
+   * the round is not active, or the project does not ship content.
+   * Optional so older fixtures stay valid.
+   */
+  pendingQuestion?: PendingQuestion | null;
 }
 
 /**

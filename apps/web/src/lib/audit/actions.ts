@@ -128,6 +128,8 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   'card.ci_retriggered':
     "Reopened a card's pull request because CI reported no checks",
   'card.auto_run_toggled': 'Switched Auto-run when ready on a card',
+  'card.message': 'Messaged a card session',
+  'slot.session_message': 'Messaged a worker session',
   'attachment.added': 'Uploaded an attachment',
   'attachment.claimed': 'Attached files to a card',
   'attachment.removed': 'Removed an attachment',
