@@ -13,7 +13,7 @@ import { Button } from '@andrewbehma/glass-ui/button';
 import { ResizableFrame } from '@andrewbehma/glass-ui/resizable-frame';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import { SidePanel } from '@andrewbehma/glass-ui/side-panel';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { LaunchCard } from '../../lib/board/launch';
 import {
   approveBlock,
@@ -33,9 +33,10 @@ import {
 } from '../../lib/design/viewer-state';
 import {
   boxSize,
-  effectiveZoom,
+  dragStep,
   FRAME_GUTTER_PX,
-  layoutWidth,
+  type FrameDrag,
+  frameZoom,
   stepZoom,
   wheelZoom,
   zoomKey,
@@ -105,16 +106,17 @@ export function DesignViewer({
   const [sheetOpen, setSheetOpen] = useState(false);
   // While the frame's edge is dragged the width lives here; the URL takes it
   // once, on release.
-  const [dragWidth, setDragWidth] = useState<number | null>(null);
-  const view = dragWidth === null ? state : { ...state, width: dragWidth };
+  const [drag, setDrag] = useState<FrameDrag | null>(null);
+  const view = drag === null ? state : { ...state, width: drag.width };
 
   // Zoom (spec 335): Fit is worked out from the room the stage has; the
-  // frame's gutter is not room for the mockup.
+  // frame's gutter is not room for the mockup. A drag holds its zoom (#394).
   const [measure, stageWidth] = useElementWidth();
-  const zoom = effectiveZoom(
+  const zoom = frameZoom(
     state.zoom,
     stageWidth - FRAME_GUTTER_PX * 2,
     view.width,
+    drag,
   );
   const stage = useRef<HTMLElement>(null);
   const hasMockup = state.revision !== null;
@@ -127,19 +129,22 @@ export function DesignViewer({
 
   // Not React's `onWheel`: that listener is passive, and the browser's own
   // page zoom can only be stopped from an active one (D6).
+  const zoomByWheel = useCallback((deltaY: number) => {
+    const next = wheelZoom(live.current.zoom, deltaY);
+    live.current.zoom = next;
+    live.current.onChange({ kind: 'zoom', zoom: next });
+  }, []);
   useEffect(() => {
     const element = stage.current;
     if (!element || !hasMockup) return;
     const onWheel = (event: WheelEvent) => {
       if (!(event.ctrlKey || event.metaKey)) return;
       event.preventDefault();
-      const next = wheelZoom(live.current.zoom, event.deltaY);
-      live.current.zoom = next;
-      live.current.onChange({ kind: 'zoom', zoom: next });
+      zoomByWheel(event.deltaY);
     };
     element.addEventListener('wheel', onWheel, { passive: false });
     return () => element.removeEventListener('wheel', onWheel);
-  }, [hasMockup]);
+  }, [hasMockup, zoomByWheel]);
 
   const onStageKeyDown = (event: React.KeyboardEvent) => {
     const key = zoomKey(event);
@@ -321,10 +326,15 @@ export function DesignViewer({
                 max={boxSize(DESIGN_VIEWPORT_MAX_PX, zoom)}
                 labels={{ resize: 'Resize the mockup' }}
                 // D5: the box reports scaled px; the width is the layout width.
-                onWidthChange={(box) => setDragWidth(layoutWidth(box, zoom))}
+                onWidthChange={(box) =>
+                  setDrag((current) => dragStep(current, box, zoom))
+                }
                 onWidthCommit={(box) => {
-                  setDragWidth(null);
-                  onChange({ kind: 'width', width: layoutWidth(box, zoom) });
+                  setDrag(null);
+                  onChange({
+                    kind: 'width',
+                    width: dragStep(drag, box, zoom).width,
+                  });
                 }}
               >
                 <div
@@ -341,6 +351,7 @@ export function DesignViewer({
                     theme={state.theme}
                     pinMode={pinMode && writeBlock === null}
                     pins={markers}
+                    onWheel={zoomByWheel}
                     onPin={(pin) => {
                       if (writeBlock === null) setDraft({ ...pin, zoom });
                     }}

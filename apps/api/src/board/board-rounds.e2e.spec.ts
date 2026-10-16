@@ -361,12 +361,14 @@ describe('board rounds (e2e)', () => {
       expect(w.sent('card.run')[0].prompt).toContain('#41');
     });
 
-    it('specOnRun without a specDir → 422 no_spec_dir', async () => {
+    it('#359 D4: without a specDir the card runs with no spec file and no issue', async () => {
       await w.createCard({ specOnRun: true });
       const response = await w.runCard(1);
-      expect(response.status).toBe(422);
-      expect(response.body.error).toBe('no_spec_dir');
-      expect(w.sent('card.run')).toEqual([]);
+      expect(response.status).toBe(200);
+      const [sent] = w.sent('card.run');
+      expect(sent).not.toHaveProperty('files');
+      expect(w.issues()).toEqual([]);
+      expect((await w.card(1)).specPath).toBeNull();
     });
 
     it('specOnRun with a specDir commits the spec first', async () => {

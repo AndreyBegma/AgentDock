@@ -69,6 +69,37 @@ export const boxSize = (layout: number, zoom: number): number =>
   Math.round(layout * zoom);
 
 /**
+ * A drag of the frame's edge, until it is committed: the layout width it has
+ * reached and the zoom it is read at.
+ */
+export interface FrameDrag {
+  width: number;
+  zoom: number;
+}
+
+/**
+ * #394: the zoom the frame is drawn at. A drag holds the zoom it started at —
+ * Fit worked out from the width being dragged would shrink the scale as the
+ * width grows, so the box would stay put while the layout width ran away.
+ */
+export const frameZoom = (
+  zoom: Zoom,
+  available: number,
+  width: number,
+  drag: FrameDrag | null,
+): number => drag?.zoom ?? effectiveZoom(zoom, available, width);
+
+/** #394: a box width the frame reports during a drag, as the drag's layout width. */
+export const dragStep = (
+  drag: FrameDrag | null,
+  box: number,
+  zoom: number,
+): FrameDrag => {
+  const held = drag?.zoom ?? zoom;
+  return { width: layoutWidth(box, held), zoom: held };
+};
+
+/**
  * D5: where a click was, in the page's viewport. `frame` is the scaled
  * bounding box; the click's place inside the mockup is in unscaled CSS px, so
  * it is scaled before it is added. A helper that sends no position (one

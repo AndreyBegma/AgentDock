@@ -79,6 +79,16 @@ export const mockupMessageSchema = z.discriminatedUnion('type', [
     clientY: coordinate.optional(),
     selector: z.string().min(1).max(DESIGN_SELECTOR_MAX),
   }),
+  /**
+   * Ctrl/⌘ + wheel over the mockup: wheel events never leave the frame, so
+   * the helper forwards the travel and the viewer zooms. A plain wheel is
+   * not sent — the mockup scrolls itself.
+   */
+  z.strictObject({
+    source: z.literal(MOCKUP_MESSAGE_SOURCE),
+    type: z.literal('wheel'),
+    deltaY: z.number().finite().min(-1_000_000).max(1_000_000),
+  }),
 ]);
 export type MockupMessage = z.infer<typeof mockupMessageSchema>;
 
@@ -128,6 +138,11 @@ export const MOCKUP_PIN_HELPER_SCRIPT = `(function () {
     var target = e.target && e.target.nodeType === 1 ? e.target : document.body;
     send({ type: 'pin', x: Math.max(0, e.pageX), y: Math.max(0, e.pageY), clientX: Math.max(0, e.clientX), clientY: Math.max(0, e.clientY), selector: cssPath(target) });
   }, true);
+  document.addEventListener('wheel', function (e) {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    e.preventDefault();
+    send({ type: 'wheel', deltaY: e.deltaY });
+  }, { passive: false });
   window.addEventListener('message', function (e) {
     if (e.source !== window.parent) return;
     var d = e.data;

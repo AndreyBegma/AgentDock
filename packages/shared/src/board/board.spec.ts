@@ -36,6 +36,8 @@ import {
   isCardPrState,
 } from './types';
 import {
+  CARD_ENV_ID,
+  CARD_ENV_PORT,
   CARD_WORKER_PROMPT_VERSION,
   cardFeedbackPrompt,
   cardWorkerPrompt,
@@ -216,7 +218,7 @@ describe('worker prompt', () => {
   };
 
   it('is versioned', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(6);
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(7);
   });
 
   it('names the card, branch, base and spec, and how to finish', () => {
@@ -242,6 +244,24 @@ describe('worker prompt', () => {
       'Specification:',
     );
     expect(cardWorkerPrompt({ ...card, issueNumber: 41 })).toContain('#41');
+  });
+
+  // #389: cards wiped each other's test database, and a `pgrep -f` wait
+  // matched its own command line for 7.5 h.
+  it('#389: names the env of its own database and port, and forbids pgrep -f waits', () => {
+    const prompt = cardWorkerPrompt(card);
+    const work = prompt.slice(
+      prompt.indexOf('## How to work'),
+      prompt.indexOf('## When you are done'),
+    );
+    expect(work).toContain(`\`${CARD_ENV_ID}\``);
+    expect(work).toContain(`\`$${CARD_ENV_PORT}\``);
+    expect(work).toContain('Never use, reset or wait for a database or port');
+    expect(work).toContain('Never wait for another process with `pgrep -f');
+    expect(work).toContain('lock file');
+    expect(work).toContain("pgrep -f '[j]est'");
+    expect(CARD_ENV_ID).toBe('AGENTDOCK_CARD');
+    expect(CARD_ENV_PORT).toBe('AGENTDOCK_CARD_PORT');
   });
 
   it('fits card.run at the largest title and body', () => {

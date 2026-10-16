@@ -25,6 +25,7 @@ export type CardHandler = (args: Record<string, unknown>) => unknown;
 
 type WorldCommand =
   | CardCommandName
+  | 'card.checks'
   | 'card.prClose'
   | 'issue.create'
   | 'pr.inspect';
@@ -57,6 +58,15 @@ export const prInspection = (extra: Record<string, unknown> = {}) => ({
   mergeable: 'MERGEABLE',
   mergeStateStatus: 'CLEAN',
   fetchedAt: '2026-10-15T12:00:00.000Z',
+  ...extra,
+});
+
+/** #359 D5: a `card.checks` answer — PR open at `HEAD_SHA`, one passing check. */
+export const cardChecks = (extra: Record<string, unknown> = {}) => ({
+  state: 'open',
+  headSha: HEAD_SHA,
+  mergeable: 'MERGEABLE',
+  checks: [{ name: 'ci/check', bucket: 'pass', link: 'https://ci.example/1' }],
   ...extra,
 });
 
@@ -94,6 +104,11 @@ export class BoardWorld {
   offline = false;
   /** #329 D9: whether the runner advertises `card.prClose`. */
   prCloseAdvertised = true;
+  /**
+   * #359: whether the runner advertises `card.checks` — a card then ships
+   * itself. Off by default: the suites before #359 run as they did.
+   */
+  checksServed = false;
   /** #329 D4: the delayed collect retries scheduled so far, oldest first. */
   retries: ScheduledRetry[] = [];
   connectHooks!: RunnerConnectHooks;
@@ -125,6 +140,15 @@ export class BoardWorld {
     jest
       .spyOn(this.commands, 'advertisesPrClose')
       .mockImplementation(() => this.prCloseAdvertised);
+    jest
+      .spyOn(this.commands, 'servesChecks')
+      .mockImplementation(() => this.checksServed);
+    jest
+      .spyOn(this.commands, 'checks')
+      .mockImplementation(async (runnerId, args) => {
+        this.commands.assertReady(runnerId, 'card.checks');
+        return this.answer('card.checks', { ...args });
+      });
     this.connectHooks = this.ctx.app.get(RunnerConnectHooks);
     const timer = this.ctx.app.get(CollectRetryTimer);
     jest.spyOn(timer, 'schedule').mockImplementation((cardId, delayMs, run) => {
@@ -151,6 +175,7 @@ export class BoardWorld {
     if (handler) return handler(args) as BoardSendResult<never>;
     const defaults: Record<WorldCommand, unknown> = {
       'pr.inspect': prInspection(),
+      'card.checks': cardChecks(),
       'card.run': {
         phase: 'starting',
         tmuxSession: `agentdock-card-${String(args.shortId)}`,
@@ -196,9 +221,11 @@ export class BoardWorld {
     jest.mocked(this.commands.createIssue).mockClear();
     jest.mocked(this.commands.inspectPr).mockClear();
     jest.mocked(this.commands.closePr).mockClear();
+    jest.mocked(this.commands.checks).mockClear();
     this.handlers = {};
     this.offline = false;
     this.prCloseAdvertised = true;
+    this.checksServed = false;
     this.retries = [];
     await resetDatabase(this.ctx.prisma);
     ({ runnerId: this.runnerId, projectId: this.a } = await seedProject(

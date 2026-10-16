@@ -3,7 +3,11 @@ import { capabilitiesSchema, hostSchema } from './capabilities';
 import { approvalCommands } from './commands/approvals';
 import { assessCommands } from './commands/assess';
 import { captureCommands } from './commands/capture';
-import { cardCommands, cardPrCloseCommands } from './commands/cards';
+import {
+  cardChecksCommands,
+  cardCommands,
+  cardPrCloseCommands,
+} from './commands/cards';
 import { controlCommands } from './commands/control';
 import { githubCommands } from './commands/github';
 import { plannerCommands } from './commands/planner';
@@ -148,6 +152,7 @@ export const commands = {
   ...worktreeCommands,
   ...cardCommands,
   ...cardPrCloseCommands,
+  ...cardChecksCommands,
   ...captureCommands,
   ...textCommands,
   ...assessCommands,

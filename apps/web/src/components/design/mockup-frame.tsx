@@ -28,6 +28,7 @@ export function MockupFrame({
   pinMode,
   pins,
   onPin,
+  onWheel,
 }: {
   src: string;
   title: string;
@@ -35,15 +36,17 @@ export function MockupFrame({
   pinMode: boolean;
   pins: MockupPinMarker[];
   onPin: (pin: FramePin) => void;
+  /** Ctrl/⌘ + wheel over the mockup, forwarded by the helper (it cannot bubble out). */
+  onWheel: (deltaY: number) => void;
 }) {
   const frame = useRef<HTMLIFrameElement>(null);
   // Which document said `ready`: a new `src` loads a new one.
   const [readySrc, setReadySrc] = useState<string | null>(null);
   const ready = readySrc === src;
 
-  const latest = useRef({ theme, pinMode, pins, onPin });
+  const latest = useRef({ theme, pinMode, pins, onPin, onWheel });
   useEffect(() => {
-    latest.current = { theme, pinMode, pins, onPin };
+    latest.current = { theme, pinMode, pins, onPin, onWheel };
   });
 
   useEffect(() => {
@@ -58,6 +61,10 @@ export function MockupFrame({
         for (const out of frameSync(t, p, m)) {
           element.contentWindow?.postMessage(out, '*');
         }
+        return;
+      }
+      if (message.type === 'wheel') {
+        latest.current.onWheel(message.deltaY);
         return;
       }
       latest.current.onPin({
