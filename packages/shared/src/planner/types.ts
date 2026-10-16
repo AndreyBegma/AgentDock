@@ -70,6 +70,17 @@ export const INTAKE_SPLIT_MAX = 8;
 /** #409: a split card's one-line summary, and the proposal's reason. */
 export const INTAKE_SPLIT_SUMMARY_MAX = 300;
 export const INTAKE_SPLIT_REASON_MAX = 1000;
+/**
+ * #480 (ADR-0043): a stack proposal's stages — at least two (one stage is a
+ * split), at most one per card. Its cards together keep the split's limits.
+ */
+export const INTAKE_STACK_STAGES_MIN = 2;
+export const INTAKE_STACK_STAGES_MAX = INTAKE_SPLIT_MAX;
+/** #480: a stack's title, as a card's; a stage's title. */
+export const STACK_TITLE_MAX = CARD_DRAFT_TITLE_MAX;
+export const STACK_STAGE_TITLE_MAX = 80;
+/** #480: a stack's description, as a card body. */
+export const STACK_BODY_MAX = LOCAL_CARD_BODY_MAX;
 /** #337 D6: the `##` sections a generated card's body carries, in order. */
 export const CARD_DRAFT_SECTIONS = [
   'What to do',
@@ -465,15 +476,56 @@ export const intakeSplitOutputSchema = z.strictObject({
       .max(INTAKE_SPLIT_MAX),
   }),
 });
+/**
+ * #480 (ADR-0043): one stage of a stack proposal — its cards may run in
+ * parallel, and each waits on every card of the stage before it.
+ */
+export const stackStageDraftSchema = z.strictObject({
+  title: text(STACK_STAGE_TITLE_MAX),
+  cards: z.array(splitCardDraftSchema).min(1).max(INTAKE_SPLIT_MAX),
+});
+export type StackStageDraft = z.infer<typeof stackStageDraftSchema>;
+
+/**
+ * #480 (ADR-0043): the intake proposes a stack — one larger piece of work
+ * whose parts must happen in order and share one look. `design` suggests a
+ * shared design of the whole result, drawn and approved before any card runs.
+ * 2–8 cards in all, in 2 or more stages.
+ */
+export const intakeStackOutputSchema = z.strictObject({
+  action: z.literal('intake'),
+  stack: z
+    .strictObject({
+      reason: text(INTAKE_SPLIT_REASON_MAX),
+      title: text(STACK_TITLE_MAX),
+      body: text(STACK_BODY_MAX),
+      design: z.boolean(),
+      stages: z
+        .array(stackStageDraftSchema)
+        .min(INTAKE_STACK_STAGES_MIN)
+        .max(INTAKE_STACK_STAGES_MAX),
+    })
+    .refine(
+      (stack) => {
+        const cards = stack.stages.reduce((n, s) => n + s.cards.length, 0);
+        return cards >= INTAKE_SPLIT_MIN && cards <= INTAKE_SPLIT_MAX;
+      },
+      {
+        message: `a stack holds ${INTAKE_SPLIT_MIN}–${INTAKE_SPLIT_MAX} cards in all`,
+      },
+    ),
+});
 export const intakeOutputSchema = z.union([
   intakeRoundOutputSchema,
   intakeCardOutputSchema,
   intakeSplitOutputSchema,
+  intakeStackOutputSchema,
 ]);
 export type IntakeOutput = z.infer<typeof intakeOutputSchema>;
 export type IntakeRoundOutput = z.infer<typeof intakeRoundOutputSchema>;
 export type IntakeCardOutput = z.infer<typeof intakeCardOutputSchema>;
 export type IntakeSplitOutput = z.infer<typeof intakeSplitOutputSchema>;
+export type IntakeStackOutput = z.infer<typeof intakeStackOutputSchema>;
 
 /** An intake output that wrote the card. */
 export const isIntakeCard = (
@@ -484,6 +536,11 @@ export const isIntakeCard = (
 export const isIntakeSplit = (
   output: IntakeOutput,
 ): output is IntakeSplitOutput => 'split' in output;
+
+/** #480: an intake output that proposed a stack. */
+export const isIntakeStack = (
+  output: IntakeOutput,
+): output is IntakeStackOutput => 'stack' in output;
 
 /** An intake output that opened a question round. */
 export const isIntakeRound = (

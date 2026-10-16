@@ -1,3 +1,4 @@
+import type { BoardStackView, CardStackRef } from './stacks';
 import type {
   CardDesignRecommendableModel,
   CardRecommendableModel,
@@ -212,6 +213,11 @@ export interface BoardCardView {
    * any other card. Optional like `dependsOn`; absent reads as null.
    */
   readiness?: CardReadiness | null;
+  /**
+   * #480 (ADR-0043): the stack and stage the card belongs to, with the gate
+   * its stack's design sets. Optional like `readiness`; absent reads as null.
+   */
+  stack?: CardStackRef | null;
   /** #282 D1: set for a `terminal` card, `null` for any other source. */
   tracking: CardTrackingView | null;
   /** #282 D4: set for a `fleet` card, `null` for any other source. */
@@ -330,6 +336,11 @@ export interface BoardView {
   /** Active rounds now, against `settings.maxRunning`. */
   running: number;
   settings: BoardSettingsView;
+  /**
+   * #480 (ADR-0043): the project's stacks, each with the column its collapsed
+   * face sits in. Optional so older fixtures stay valid; absent reads as none.
+   */
+  stacks?: BoardStackView[];
 }
 
 /** One round (D4) of a card. */
@@ -751,6 +762,13 @@ export const BOARD_ERROR = {
   dependencyCycle: 'dependency_cycle',
   /** 400 (#337 D8): the card itself, or a number that is no card of this project. */
   invalidDependency: 'invalid_dependency',
+  /**
+   * 409 (#480, ADR-0043): Run on a card of a stack whose design is needed and
+   * not approved — nothing writes project code before it is.
+   */
+  stackDesignNotApproved: 'stack_design_not_approved',
+  /** 409 (#480): the stack change is not allowed — `message` says why. */
+  stackRefused: 'stack_refused',
 } as const;
 export type BoardErrorCode = (typeof BOARD_ERROR)[keyof typeof BOARD_ERROR];
 
@@ -963,8 +981,10 @@ export interface FleetCardEdits {
 
 /** Live: on `project:<id>` whenever a card, its round or its design changes. */
 export const BOARD_CHANGED_EVENT = 'board.changed';
+/** One of `cardId` and `stackId` (#480): the card, or the stack, that changed. */
 export interface BoardChangedData {
-  cardId: string;
+  cardId?: string;
+  stackId?: string;
 }
 
 /**

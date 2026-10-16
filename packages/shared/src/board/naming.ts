@@ -109,6 +109,24 @@ export const cardDesignPath = (
   return `${dir}/${cardSpecStem(card)}/design/${variant}/${frame}.html`;
 };
 
+/**
+ * #480 (ADR-0043): one frame of a stack's approved design in a stack card's
+ * branch, as reference, repository-relative:
+ * `<specDir>/stacks/S-<n>-<slug>/design/<variant>/<frame>.html`; without a
+ * `specDir`, `docs/design/stacks/S-<n>-<slug>/<variant>/<frame>.html`.
+ */
+export const stackDesignPath = (
+  specDir: string | null,
+  stack: { number: number; title: string },
+  variant: number,
+  frame: string,
+): string => {
+  const dir = specDir?.replace(/\/+$/, '') ?? '';
+  const stem = `S-${stack.number}-${cardSlug(stack.title)}`;
+  if (dir === '') return `docs/design/stacks/${stem}/${variant}/${frame}.html`;
+  return `${dir}/stacks/${stem}/design/${variant}/${frame}.html`;
+};
+
 /** The largest issue body `issue.create` takes. */
 export const CARD_ISSUE_BODY_MAX = 20_000;
 

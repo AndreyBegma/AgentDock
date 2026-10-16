@@ -181,11 +181,14 @@ export interface TaskDesignSummary {
 
 /**
  * ADR-0025: a design has exactly one owner — a plan task or a board card
- * (#243). `number` is the card's per-project number (`C-<number>`).
+ * (#243), or — ADR-0043 — a stack (#480). `number` is the card's or the
+ * stack's per-project number (`C-<number>`, `S-<number>`).
  */
 export type DesignOwnerView =
   | { kind: 'task'; planId: string; taskKey: string }
-  | { kind: 'card'; cardId: string; number: number };
+  | { kind: 'card'; cardId: string; number: number }
+  /** #480 (ADR-0043): a stack's shared design; `number` is `S-<number>`'s. */
+  | { kind: 'stack'; stackId: string; number: number };
 export type DesignOwnerKind = DesignOwnerView['kind'];
 
 /**
@@ -319,6 +322,8 @@ export interface DesignLiveChange {
   taskKey: string | null;
   /** Set for a card's design (#243). */
   cardId?: string;
+  /** Set for a stack's design (#480). */
+  stackId?: string;
 }
 
 // Errors
