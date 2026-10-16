@@ -48,6 +48,17 @@ both sit at the root of that origin.
 | `4401` | missing, unknown or revoked token |
 | `4409` | a newer connection of the same runner replaced this one |
 
+Every close above is terminal: the runner exits 78 and its service unit does not
+restart it. Before exiting it logs why and writes
+`~/.local/state/agentdock/stopped.json`, which `agentdock-runner status` prints
+(`replaced by another connection at <time>, re-pair if this was not you` for
+`4409`); the next `run` clears it. A `4409` that takes over a socket that was
+still open is audited as `runner.connection_replaced` with both peers' IP and
+user agent, and every active admin gets a `runner.connection_replaced`
+notification (C-108: the token is readable by any process of the runner's user,
+so a takeover may be an impostor). A reconnect after the old socket had already
+closed is not reported.
+
 ## Messages
 
 | Direction | Type | Payload |

@@ -15,11 +15,13 @@ import { NotificationRulesService } from './notification-rules.service';
 import { NotificationWriter } from './notification-writer';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
+import { RunnerReplacedNotifier } from './runner-replaced-notifier';
 import { RunnerWatcher } from './runner-watcher';
 import { TelegramDeliveryLedger } from './telegram-delivery-ledger';
 
 /**
  * Notifications (docs/specs/22): the event matcher, the runner watcher, the
+ * replaced-connection alert (C-108), the
  * blocked-checkpoint sweep, the
  * in-app centre with its rules and mutes, and the bookkeeping the Telegram
  * module sends from. Exports what `apps/api/src/telegram/**` builds on, and
@@ -48,6 +50,7 @@ import { TelegramDeliveryLedger } from './telegram-delivery-ledger';
     NotificationRulesService,
     NotificationMatcher,
     RunnerWatcher,
+    RunnerReplacedNotifier,
     BlockedCheckpointSweep,
     TelegramDeliveryLedger,
     BotTokenStore,
