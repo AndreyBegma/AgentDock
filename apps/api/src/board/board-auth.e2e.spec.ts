@@ -63,6 +63,27 @@ describe('board authorization (e2e)', () => {
     expect((await w.operatorOfB.get(`${w.path()}/board`)).status).toBe(404);
   });
 
+  it("a card's hooks profile is not served to another project (#348)", async () => {
+    expect((await w.runCard(1)).status).toBe(200);
+    await w.ctx.prisma.boardCardRound.updateMany({
+      data: { startedAt: new Date(Date.now() - 3 * 60 * 1000) },
+    });
+    const own = await w.operator.get(`${w.path()}/board/cards/1`);
+    expect(own.body.rounds[0]).toMatchObject({
+      hooksMissing: true,
+      hooksProfile: 'claude-main',
+    });
+    for (const path of ['/board', '/board/cards/1']) {
+      const response = await w.operatorOfB.get(`${w.path()}${path}`);
+      expect(response.status).toBe(404);
+      expect(JSON.stringify(response.body)).not.toContain('hooksProfile');
+      expect(JSON.stringify(response.body)).not.toContain('claude-main');
+    }
+    // Project B's own board does not show A's card.
+    const b = await w.operatorOfB.get(`${w.path(w.b)}/board`);
+    expect(JSON.stringify(b.body)).not.toContain('claude-main');
+  });
+
   it('only a project admin puts the settings', async () => {
     const operator = await w.operator.send(
       'put',

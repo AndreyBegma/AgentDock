@@ -142,7 +142,7 @@ class RunnerSocket {
           tmuxSessions: message.tmuxSessions,
           collectors: message.collectors,
         };
-        await this.deps.ingest.heartbeat(runnerId);
+        await this.deps.ingest.heartbeat(runnerId, message.profiles);
         return;
       case 'events': {
         const acked = await this.deps.ingest.events(runnerId, message.events);

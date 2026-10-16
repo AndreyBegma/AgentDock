@@ -18,6 +18,7 @@ import {
   cardLabel,
   type FleetCardEdits,
   isActiveRoundPhase,
+  profileAgentdockOf,
   type Role,
 } from '@agentdock/shared';
 import { roleAtLeast } from '@agentdock/shared/protocol';
@@ -302,28 +303,59 @@ export class BoardService implements OnModuleInit {
     const trackedIds = cards
       .map((c) => c.trackedSessionId)
       .filter((id): id is string => id !== null);
-    const [usage, hooked, alive, attachmentCounts, deps] = await Promise.all([
-      usageByRun(this.prisma, runIds),
-      sessionIds.length === 0
-        ? Promise.resolve([])
-        : this.prisma.agentSession.findMany({
-            where: {
-              runtime: 'claude',
-              origin: 'run',
-              externalId: { in: sessionIds },
-            },
-            select: { externalId: true },
-          }),
-      // #282 D2: alive = not ended (no stale detection for manual sessions).
-      trackedIds.length === 0
-        ? Promise.resolve([])
-        : this.prisma.agentSession.findMany({
-            where: { id: { in: trackedIds }, endedAt: null },
-            select: { id: true },
-          }),
-      this.attachments.counts(cards.map((c) => c.id)),
-      this.dependencies.refsOf(cards.map((c) => c.id)),
-    ]);
+    // #348 D1: only a round that is running can show the hooks hint.
+    const activeRuns = cards.flatMap((c) =>
+      c.rounds.filter((r) => isActiveRoundPhase(r.phase)).map((r) => r.runId),
+    );
+    const projectIds = [
+      ...new Set(
+        cards
+          .filter((c) => c.rounds.some((r) => isActiveRoundPhase(r.phase)))
+          .map((c) => c.projectId),
+      ),
+    ];
+    const [usage, hooked, alive, attachmentCounts, deps, runs, projects] =
+      await Promise.all([
+        usageByRun(this.prisma, runIds),
+        sessionIds.length === 0
+          ? Promise.resolve([])
+          : this.prisma.agentSession.findMany({
+              where: {
+                runtime: 'claude',
+                origin: 'run',
+                externalId: { in: sessionIds },
+              },
+              select: { externalId: true },
+            }),
+        // #282 D2: alive = not ended (no stale detection for manual sessions).
+        trackedIds.length === 0
+          ? Promise.resolve([])
+          : this.prisma.agentSession.findMany({
+              where: { id: { in: trackedIds }, endedAt: null },
+              select: { id: true },
+            }),
+        this.attachments.counts(cards.map((c) => c.id)),
+        this.dependencies.refsOf(cards.map((c) => c.id)),
+        activeRuns.length === 0
+          ? Promise.resolve([])
+          : this.prisma.run.findMany({
+              where: { id: { in: activeRuns }, profileKey: { not: null } },
+              select: { id: true, profileKey: true },
+            }),
+        projectIds.length === 0
+          ? Promise.resolve([])
+          : this.prisma.project.findMany({
+              where: { id: { in: projectIds } },
+              select: { id: true, runner: { select: { capabilities: true } } },
+            }),
+      ]);
+    const runProfileKeys = new Map<string, string>();
+    for (const run of runs) {
+      if (run.profileKey !== null) runProfileKeys.set(run.id, run.profileKey);
+    }
+    const profileAgentdock = new Map(
+      projects.map((p) => [p.id, profileAgentdockOf(p.runner.capabilities)]),
+    );
     const costs = new Map<string, string>();
     for (const [runId, u] of usage) {
       if (u.costUsd !== null) costs.set(runId, u.costUsd);
@@ -332,6 +364,8 @@ export class BoardService implements OnModuleInit {
       costs,
       hooked: new Set(hooked.map((s) => s.externalId)),
       alive: new Set(alive.map((s) => s.id)),
+      runProfileKeys,
+      profileAgentdock,
       attachmentCounts,
       dependencies: deps,
       now: new Date(),
