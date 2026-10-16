@@ -126,7 +126,14 @@ still connects.
       "slot.message", "slot.stop", "terminal.attach",
       "uiprofile.build", "uiprofile.fingerprint", "worktree.status"
     ],
-    "disabledCommands": ["pr.approve"]
+    "disabledCommands": ["pr.approve"],
+    "policy": {
+      "allowedRoots": ["/home/archi/dev"],
+      "maxPermissionMode": "auto",
+      "terminal": { "write": false },
+      "skills": { "profileInstall": false },
+      "commands": { "orchestrator.message": false, "slot.message": false, "session.message": false }
+    }
   }
 }
 ```
@@ -171,17 +178,7 @@ version. `protocolVersion` stays `1`; the fields are additive and optional.
 
 `policy` is the runner's local security policy as it is now
 ([Runner-local policy](#runner-local-policy)) — values only, no path beyond
-`allowedRoots`:
-
-```json
-"policy": {
-  "allowedRoots": ["/home/archi/dev"],
-  "maxPermissionMode": "auto",
-  "terminal": { "write": false },
-  "skills": { "profileInstall": false },
-  "commands": { "orchestrator.message": false, "slot.message": false, "session.message": false }
-}
-```
+`allowedRoots` (see the `hello` example above).
 
 Read it with `runnerPolicyOf()`. `commands` has plain string keys, so a runner
 that gates a command the API does not know keeps a valid hello. **Absent means
