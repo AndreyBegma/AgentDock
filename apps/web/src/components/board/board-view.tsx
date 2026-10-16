@@ -7,12 +7,13 @@ import type {
 } from '@agentdock/shared';
 import { Board, type BoardColumn } from '@andrewbehma/glass-ui/board';
 import { Button } from '@andrewbehma/glass-ui/button';
+import { Checkbox } from '@andrewbehma/glass-ui/checkbox';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { MenuItem, MenuSeparator } from '@andrewbehma/glass-ui/menu';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { useRouter } from 'next/navigation';
-import { type CSSProperties, useState } from 'react';
+import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { moveCard } from '../../lib/board/actions';
 import {
   applyDrop,
@@ -48,11 +49,25 @@ import {
   isPlanItem,
   type WorkBoardItem,
 } from '../../lib/board/plan-tasks';
+import {
+  type CardSelection,
+  columnSelection,
+  NO_SELECTION,
+  pruned,
+  selectableNumbers,
+  toggled,
+  toggledColumn,
+  withAll,
+  withRange,
+} from '../../lib/board/selection';
 import { cardDesignHref } from '../../lib/design/href';
 import { planHref } from '../../lib/planner/href';
 import { boardColumnWidth, usePhone, visibleColumns } from './board-layout';
+import { BulkActionBar } from './bulk-action-bar';
 import { CardFace } from './card-face';
 import { PlanTaskFace } from './plan-task-face';
+import { SelectionBar } from './selection-bar';
+import { useBulkActions } from './use-bulk-actions';
 import type { CardActions } from './use-card-actions';
 
 type Asking = Extract<DropDecision, { kind: 'confirm-stop' | 'offer-run' }>;
@@ -117,6 +132,101 @@ export function BoardColumns({
 
   const phone = usePhone();
 
+  // #452: cards selected for a bulk action, across columns.
+  const [selection, setSelection] = useState<CardSelection>(NO_SELECTION);
+  const anchor = useRef<{ number: number; column: string } | undefined>(
+    undefined,
+  );
+  const pointerColumn = useRef<string | undefined>(undefined);
+  const bulk = useBulkActions({
+    projectId,
+    runnerName,
+    onSettled: (results) => {
+      // What is left selected: the cards that were not done.
+      const left = new Set(
+        results.filter((r) => r.status !== 'done').map((r) => r.number),
+      );
+      setSelection(
+        (current) => new Set([...current].filter((n) => left.has(n))),
+      );
+      onReload();
+    },
+  });
+  const selectedCards = view.columns.flatMap((c) =>
+    c.cards.filter((card) => selection.has(card.number)),
+  );
+
+  // A selected card that leaves the board drops out of the selection.
+  useEffect(() => {
+    const onBoard = new Set(
+      view.columns.flatMap((c) => c.cards.map((x) => x.number)),
+    );
+    setSelection((current) => pruned(current, onBoard));
+  }, [view]);
+
+  const clearSelection = () => {
+    setSelection(NO_SELECTION);
+    anchor.current = undefined;
+  };
+
+  // Esc clears the selection; ⌘/Ctrl+A selects the column under the pointer or
+  // focus, unless the person is typing.
+  const hasSelection = selection.size > 0;
+  useEffect(() => {
+    if (!canOperate) return;
+    const typing = (target: EventTarget | null) =>
+      target instanceof HTMLElement &&
+      (target.isContentEditable ||
+        ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
+    const overlay = () =>
+      document.querySelector(
+        '[role="dialog"], [role="alertdialog"], [role="menu"]',
+      ) !== null;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && hasSelection) {
+        if (overlay() || event.defaultPrevented) return;
+        clearSelection();
+        return;
+      }
+      if (
+        (event.key === 'a' || event.key === 'A') &&
+        (event.metaKey || event.ctrlKey) &&
+        !event.shiftKey &&
+        !event.altKey
+      ) {
+        if (typing(event.target) || overlay()) return;
+        const focused =
+          document.activeElement instanceof HTMLElement
+            ? document.activeElement.closest<HTMLElement>(
+                '[data-select-column]',
+              )?.dataset.selectColumn
+            : undefined;
+        const id = pointerColumn.current ?? focused;
+        const column = allColumns.find((c) => c.id === id);
+        if (!column) return;
+        event.preventDefault();
+        setSelection((current) =>
+          withAll(current, selectableNumbers(column.cards)),
+        );
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  });
+
+  const toggleCard = (card: BoardCardView, range: boolean) => {
+    const order = selectableNumbers(
+      allColumns.find((c) => c.id === card.column)?.cards ?? [],
+    );
+    const from = anchor.current;
+    setSelection((current) =>
+      range && from?.column === card.column
+        ? withRange(current, order, from.number, card.number)
+        : toggled(current, card.number),
+    );
+    anchor.current = { number: card.number, column: card.column };
+  };
+
   const items = boardItems(shown, planTasks);
   const filtering = isFiltering(filter);
   const allColumns: BoardColumn<WorkBoardItem>[] = columnsOf(shown).map((c) => {
@@ -130,6 +240,15 @@ export function BoardColumns({
       title: COLUMN_TITLE[c.column],
       // `shown/total` while a filter hides some of the column.
       count: filtering ? `${cards.length}/${all.length}` : undefined,
+      header: canOperate ? (
+        <ColumnSelectAll
+          column={c.column}
+          title={COLUMN_TITLE[c.column]}
+          order={selectableNumbers(cards)}
+          selection={selection}
+          onToggle={(order) => setSelection((cur) => toggledColumn(cur, order))}
+        />
+      ) : undefined,
       cards,
       footer:
         cards.length === 0 || older ? (
@@ -256,6 +375,14 @@ export function BoardColumns({
        */}
       <div
         className="flex min-h-0 flex-1 flex-col [&_[data-board-card]]:shrink-0"
+        onPointerOver={(event) => {
+          pointerColumn.current = (
+            event.target as HTMLElement
+          ).closest<HTMLElement>('[data-select-column]')?.dataset.selectColumn;
+        }}
+        onPointerLeave={() => {
+          pointerColumn.current = undefined;
+        }}
         style={
           {
             '--board-column': boardColumnWidth(columns.length - folded, folded),
@@ -278,6 +405,7 @@ export function BoardColumns({
               <PlanTaskFace
                 task={item.planTask}
                 menu={menu}
+                selecting={canOperate && selection.size > 0}
                 onOpen={onOpenPlanTask}
               />
             ) : (
@@ -287,6 +415,15 @@ export function BoardColumns({
                 canOperate={canOperate}
                 compact={compact}
                 menu={menu}
+                selection={
+                  canOperate
+                    ? {
+                        selected: selection.has(item.card.number),
+                        selecting: selection.size > 0,
+                        onToggle: (range) => toggleCard(item.card, range),
+                      }
+                    : undefined
+                }
                 onOpen={onOpen}
               />
             )
@@ -401,6 +538,19 @@ export function BoardColumns({
         />
       </div>
 
+      {bulk.dialogs}
+      <SelectionBar
+        open={canOperate && selectedCards.length > 0}
+        aria-label="Bulk actions"
+      >
+        <BulkActionBar
+          selected={selectedCards}
+          busy={bulk.busy || busy}
+          onClear={clearSelection}
+          onAction={(action) => bulk.run(action, selectedCards)}
+        />
+      </SelectionBar>
+
       <DialogRoot
         open={asking?.kind === 'offer-run'}
         onOpenChange={(open) => {
@@ -441,5 +591,42 @@ export function BoardColumns({
         onConfirm={confirmStop}
       />
     </>
+  );
+}
+
+/**
+ * #452: a column header's "Select all". It takes only the cards the filter
+ * shows and reads "n of m" while the column is partly selected.
+ */
+function ColumnSelectAll({
+  column,
+  title,
+  order,
+  selection,
+  onToggle,
+}: {
+  column: string;
+  title: string;
+  /** The selectable cards the column shows, in order. */
+  order: readonly number[];
+  selection: CardSelection;
+  onToggle: (order: readonly number[]) => void;
+}) {
+  if (order.length === 0) return null;
+  const { selected, total, state } = columnSelection(order, selection);
+  return (
+    <span
+      data-select-column={column}
+      className="ms-auto flex items-center text-xs text-ink-3"
+      title={`Selects the ${total} selectable card${total === 1 ? '' : 's'} shown in ${title}`}
+    >
+      <Checkbox
+        aria-label={`Select all in ${title}`}
+        label={state === 'some' ? `${selected} of ${total}` : 'Select all'}
+        checked={state === 'all'}
+        indeterminate={state === 'some'}
+        onChange={() => onToggle(order)}
+      />
+    </span>
   );
 }

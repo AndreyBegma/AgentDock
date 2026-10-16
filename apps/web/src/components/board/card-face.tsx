@@ -30,6 +30,14 @@ import { ciDot, shippingBadge } from '../../lib/board/shipping';
 import { formatCost } from '../../lib/format';
 import { safeHttpsUrl } from '../../lib/queue/format';
 import { ApproveRunLink, CardFaceDesign } from './card-design';
+import {
+  type FaceSelection,
+  SelectedTint,
+  SelectionBox,
+  SelectionFrame,
+  toggleOnClick,
+  UnselectableMark,
+} from './selection-box';
 
 /** A chip on the header's 16 px line (C-35). */
 const HEAD_CHIP = 'h-4 shrink-0';
@@ -49,6 +57,7 @@ export function CardFace({
   canOperate,
   compact = false,
   menu,
+  selection,
   onOpen,
 }: {
   projectId: string;
@@ -58,6 +67,8 @@ export function CardFace({
   compact?: boolean;
   /** The Board's card menu (`slots.menu`), placed at the end of the header. */
   menu?: ReactNode;
+  /** #452: set for an operator; a suggestion shows why it has no box instead. */
+  selection?: FaceSelection;
   onOpen: (card: BoardCardView) => void;
 }) {
   const offer = approveRunOffer(card);
@@ -71,143 +82,157 @@ export function CardFace({
   const suggestion = isSuggestion(card);
   const note = `break-words text-xs text-ink-2${compact ? ' line-clamp-1' : ''}`;
   return (
-    <div
-      className={`flex min-w-0 flex-col text-sm ${compact ? 'gap-1' : 'gap-1.5'}`}
-    >
+    <SelectionFrame>
+      {selection?.selected ? <SelectedTint /> : null}
+      {selection && !suggestion ? (
+        <SelectionBox label={card.label} selection={selection} />
+      ) : null}
+      {selection?.selecting && suggestion ? (
+        <UnselectableMark text="Suggestions are accepted or dismissed one by one" />
+      ) : null}
       <div
-        data-card-row="header"
-        className="flex h-4 min-w-0 items-center gap-1.5 whitespace-nowrap text-xs leading-4 text-ink-2"
+        data-card-number={card.number}
+        data-select-column={card.column}
+        data-selected={selection ? selection.selected : undefined}
+        onClickCapture={(event) => toggleOnClick(event, selection)}
+        className={`relative flex min-w-0 flex-col text-sm ${compact ? 'gap-1' : 'gap-1.5'}`}
       >
-        <span className="shrink-0 font-mono">{card.label}</span>
-        {card.kind === 'bug' ? (
-          <Chip size="sm" tone="danger" className={HEAD_CHIP}>
-            Bug
-          </Chip>
-        ) : null}
-        {card.attachmentCount > 0 ? (
-          <span
-            className="flex shrink-0 items-center gap-0.5 tabular-nums"
-            role="img"
-            aria-label={attachmentCountLabel(card.attachmentCount)}
-            title={attachmentCountLabel(card.attachmentCount)}
-          >
-            <Paperclip aria-hidden="true" className="size-3" />
-            {card.attachmentCount}
-          </span>
-        ) : null}
-        {after ? (
-          // The one header item that gives way: it truncates first.
-          <Chip
-            size="sm"
-            tone={after.open ? 'warn' : 'neutral'}
-            title={after.title}
-            className="h-4 min-w-0 shrink"
-          >
-            <span className="truncate">{after.text}</span>
-          </Chip>
-        ) : null}
-        {cost || menu ? (
-          <span className="ms-auto flex shrink-0 items-center gap-1">
-            {cost ? <span className="tabular-nums">{cost}</span> : null}
-            {menu}
-          </span>
-        ) : null}
-      </div>
-      <button
-        type="button"
-        className={`break-words text-left font-medium underline-offset-2 hover:underline${compact ? ' text-[13px] leading-[18px]' : ''}`}
-        onClick={() => onOpen(card)}
-      >
-        <span className={compact ? 'line-clamp-2' : undefined}>
-          {card.title}
-        </span>
-      </button>
-      <div
-        data-card-row="status"
-        className="flex flex-wrap items-center gap-x-1.5 gap-y-1 empty:hidden"
-      >
-        {ready ? (
-          <Chip
-            size="sm"
-            tone={ready.tone}
-            title={ready.title}
-            className="gap-1"
-          >
-            {ready.tone === 'ok' ? (
-              <Check aria-hidden="true" className="size-3" />
-            ) : (
-              <Clock aria-hidden="true" className="size-3" />
-            )}
-            {ready.text}
-          </Chip>
-        ) : null}
-        {card.autoRunWhenReady ? (
-          <Chip size="sm" title="Auto-run when ready is on" className="gap-1">
-            <Zap aria-hidden="true" className="size-3" />
-            Auto-run
-          </Chip>
-        ) : null}
-        {ready?.waitsFor ? (
-          <span className="text-xs text-ink-3">{ready.waitsFor}</span>
-        ) : null}
-        {card.tracking ? <TerminalBadges card={card} /> : null}
-        {card.fleet ? <FleetBadges card={card} /> : null}
-        {suggestion ? <SuggestionBadges card={card} /> : null}
-        <CardFaceDesign card={card} />
-        {pill ? (
-          <StatusPill size="sm" status={pill.status} label={pill.label} />
-        ) : null}
-        {card.round?.phase === 'background' && card.round.backgroundCommand ? (
-          <span
-            className="min-w-0 max-w-full truncate font-mono text-xs text-ink-2"
-            title={card.round.backgroundCommand}
-          >
-            {card.round.backgroundCommand}
-          </span>
-        ) : null}
-        {card.round?.hooksMissing ? (
-          <HooksChip projectId={projectId} card={card} round={card.round} />
-        ) : null}
-        {card.autoRunFailure ? (
-          <Tooltip content={autoRunFailureText(card.autoRunFailure)}>
-            <span>
-              <Badge tone="warn" size="md" label="Didn’t start" />
-            </span>
-          </Tooltip>
-        ) : null}
-        {badge ? (
-          <Tooltip content={badge.label}>
-            <span>
-              <Badge tone={badge.tone} size="md" label={badge.label} />
-            </span>
-          </Tooltip>
-        ) : null}
-      </div>
-      {offer && canOperate ? (
-        <>
-          <div>
-            <ApproveRunLink
-              projectId={projectId}
-              card={card}
-              offer={offer}
-              variant="glass"
-              size="sm"
-            />
-          </div>
-          {offer.reason ? (
-            <p className="text-xs text-ink-3">{offer.reason}</p>
+        <div
+          data-card-row="header"
+          className="flex h-4 min-w-0 items-center gap-1.5 whitespace-nowrap text-xs leading-4 text-ink-2"
+        >
+          <span className="shrink-0 font-mono">{card.label}</span>
+          {card.kind === 'bug' ? (
+            <Chip size="sm" tone="danger" className={HEAD_CHIP}>
+              Bug
+            </Chip>
           ) : null}
-        </>
-      ) : null}
-      {card.fleet ? <p className={note}>{fleetSummary(card.fleet)}</p> : null}
-      {suggestion && card.captureWhy ? (
-        <p className={note}>{card.captureWhy}</p>
-      ) : null}
-      <FaceLinks projectId={projectId} card={card} suggestion={suggestion} />
-      {!compact && (card.prNumber !== null || card.issueNumber !== null) ? (
-        <CardFooter card={card} />
-      ) : null}
-    </div>
+          {card.attachmentCount > 0 ? (
+            <span
+              className="flex shrink-0 items-center gap-0.5 tabular-nums"
+              role="img"
+              aria-label={attachmentCountLabel(card.attachmentCount)}
+              title={attachmentCountLabel(card.attachmentCount)}
+            >
+              <Paperclip aria-hidden="true" className="size-3" />
+              {card.attachmentCount}
+            </span>
+          ) : null}
+          {after ? (
+            // The one header item that gives way: it truncates first.
+            <Chip
+              size="sm"
+              tone={after.open ? 'warn' : 'neutral'}
+              title={after.title}
+              className="h-4 min-w-0 shrink"
+            >
+              <span className="truncate">{after.text}</span>
+            </Chip>
+          ) : null}
+          {cost || menu ? (
+            <span className="ms-auto flex shrink-0 items-center gap-1">
+              {cost ? <span className="tabular-nums">{cost}</span> : null}
+              {menu}
+            </span>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          className={`break-words text-left font-medium underline-offset-2 hover:underline${compact ? ' text-[13px] leading-[18px]' : ''}`}
+          onClick={() => onOpen(card)}
+        >
+          <span className={compact ? 'line-clamp-2' : undefined}>
+            {card.title}
+          </span>
+        </button>
+        <div
+          data-card-row="status"
+          className="flex flex-wrap items-center gap-x-1.5 gap-y-1 empty:hidden"
+        >
+          {ready ? (
+            <Chip
+              size="sm"
+              tone={ready.tone}
+              title={ready.title}
+              className="gap-1"
+            >
+              {ready.tone === 'ok' ? (
+                <Check aria-hidden="true" className="size-3" />
+              ) : (
+                <Clock aria-hidden="true" className="size-3" />
+              )}
+              {ready.text}
+            </Chip>
+          ) : null}
+          {card.autoRunWhenReady ? (
+            <Chip size="sm" title="Auto-run when ready is on" className="gap-1">
+              <Zap aria-hidden="true" className="size-3" />
+              Auto-run
+            </Chip>
+          ) : null}
+          {ready?.waitsFor ? (
+            <span className="text-xs text-ink-3">{ready.waitsFor}</span>
+          ) : null}
+          {card.tracking ? <TerminalBadges card={card} /> : null}
+          {card.fleet ? <FleetBadges card={card} /> : null}
+          {suggestion ? <SuggestionBadges card={card} /> : null}
+          <CardFaceDesign card={card} />
+          {pill ? (
+            <StatusPill size="sm" status={pill.status} label={pill.label} />
+          ) : null}
+          {card.round?.phase === 'background' &&
+          card.round.backgroundCommand ? (
+            <span
+              className="min-w-0 max-w-full truncate font-mono text-xs text-ink-2"
+              title={card.round.backgroundCommand}
+            >
+              {card.round.backgroundCommand}
+            </span>
+          ) : null}
+          {card.round?.hooksMissing ? (
+            <HooksChip projectId={projectId} card={card} round={card.round} />
+          ) : null}
+          {card.autoRunFailure ? (
+            <Tooltip content={autoRunFailureText(card.autoRunFailure)}>
+              <span>
+                <Badge tone="warn" size="md" label="Didn’t start" />
+              </span>
+            </Tooltip>
+          ) : null}
+          {badge ? (
+            <Tooltip content={badge.label}>
+              <span>
+                <Badge tone={badge.tone} size="md" label={badge.label} />
+              </span>
+            </Tooltip>
+          ) : null}
+        </div>
+        {offer && canOperate ? (
+          <>
+            <div>
+              <ApproveRunLink
+                projectId={projectId}
+                card={card}
+                offer={offer}
+                variant="glass"
+                size="sm"
+              />
+            </div>
+            {offer.reason ? (
+              <p className="text-xs text-ink-3">{offer.reason}</p>
+            ) : null}
+          </>
+        ) : null}
+        {card.fleet ? <p className={note}>{fleetSummary(card.fleet)}</p> : null}
+        {suggestion && card.captureWhy ? (
+          <p className={note}>{card.captureWhy}</p>
+        ) : null}
+        <FaceLinks projectId={projectId} card={card} suggestion={suggestion} />
+        {!compact && (card.prNumber !== null || card.issueNumber !== null) ? (
+          <CardFooter card={card} />
+        ) : null}
+      </div>
+    </SelectionFrame>
   );
 }
 
