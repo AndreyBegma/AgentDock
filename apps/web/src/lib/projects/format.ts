@@ -8,6 +8,7 @@ import type {
   DocsSourceKind,
   ProjectInspection,
 } from '@agentdock/shared/protocol';
+import { describePolicyRefusal } from '@/lib/runners/policy';
 import { ApiError, describeError } from '../api';
 import { type PrerequisiteCopy, RUNNERS_PAGE } from '../prerequisites/copy';
 import type { RunnersFact } from '../prerequisites/facts';
@@ -88,6 +89,8 @@ export function describeProjectError(error: unknown): string {
         return 'That path is not inside a git repository.';
       case PROJECT_ERROR.pathNotAllowed:
         return pathNotAllowedText(error.message);
+      case PROJECT_ERROR.policyRefused:
+        return describePolicyRefusal(error.message);
       case PROJECT_ERROR.notMainCheckout:
         return 'That is a linked worktree or a subdirectory, not the main checkout.';
       case PROJECT_ERROR.unsupportedForge:

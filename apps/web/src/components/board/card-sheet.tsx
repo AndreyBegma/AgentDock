@@ -26,6 +26,7 @@ import { toast } from '@andrewbehma/glass-ui/toast';
 import { ExternalLink, Zap } from 'lucide-react';
 import NextLink from 'next/link';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { PolicyRefusalText } from '@/components/runners/policy-refusal';
 import { ApiError } from '../../lib/api';
 import {
   describeUploadFailure,
@@ -188,9 +189,7 @@ function roundItems(
               {round.summary}
             </span>
           ) : null}
-          {round.error ? (
-            <span className="text-danger">{round.error}</span>
-          ) : null}
+          {round.error ? <PolicyRefusalText text={round.error} /> : null}
           {round.finishRefused ? (
             <span className="text-danger">
               {finishRefusedText(round.finishRefused)}

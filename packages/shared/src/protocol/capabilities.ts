@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { mcpServerNameSchema } from '../token-saver/contracts';
-import { type RunnerPolicy, runnerPolicySchema } from './policy';
 // Type-only: `./commands` imports this module's schemas.
 import type { CommandName } from './commands';
+import { type RunnerPolicy, runnerPolicySchema } from './policy';
 
 /** At most this many MCP server names on one runtime profile (#445). */
 export const PROFILE_MCP_SERVERS_MAX = 64;
