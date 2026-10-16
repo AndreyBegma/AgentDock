@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { ActivityItem } from '@agentdock/shared';
+import { type ActivityItem, STEWARD_ACTIVITY_TYPES } from '@agentdock/shared';
 import {
   ACTIVITY_FILTER_CODEC,
   activityChipDefs,
@@ -21,6 +21,7 @@ import {
   planLive,
   prLink,
   queryString,
+  STEWARD_TYPE_OPTIONS,
   safeLink,
   TYPE_OPTIONS,
   toActivityQuery,
@@ -417,6 +418,17 @@ describe('typeLabel', () => {
     const values = TYPE_OPTIONS.map((o) => o.value);
     expect(new Set(values).size).toBe(values.length);
     expect(TYPE_OPTIONS.every((o) => o.label !== '')).toBe(true);
+  });
+
+  test('the Steward group holds every incident type, once, and only there (#447 D15)', () => {
+    expect(STEWARD_TYPE_OPTIONS.map((o) => o.value)).toEqual([
+      ...STEWARD_ACTIVITY_TYPES,
+    ]);
+    expect(STEWARD_TYPE_OPTIONS.every((o) => o.label !== '')).toBe(true);
+    const others = new Set(TYPE_OPTIONS.map((o) => o.value));
+    for (const type of STEWARD_ACTIVITY_TYPES) {
+      expect(others.has(type)).toBe(false);
+    }
   });
 });
 

@@ -29,6 +29,7 @@ import { prChipText } from '../../lib/board/pull-request';
 import { ciDot, shippingBadge } from '../../lib/board/shipping';
 import { formatCost } from '../../lib/format';
 import { safeHttpsUrl } from '../../lib/queue/format';
+import { StewardChip } from '../steward/steward-chip';
 import { SavedBadge } from '../token-saver/saved-badge';
 import { ApproveRunLink, CardFaceDesign } from './card-design';
 import {
@@ -194,6 +195,7 @@ export function CardFace({
           {card.round?.hooksMissing ? (
             <HooksChip projectId={projectId} card={card} round={card.round} />
           ) : null}
+          {card.steward ? <StewardChip chip={card.steward} /> : null}
           {card.autoRunFailure ? (
             <Tooltip content={autoRunFailureText(card.autoRunFailure)}>
               <span>
