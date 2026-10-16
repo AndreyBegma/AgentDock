@@ -45,6 +45,7 @@ export function StackFace({
   canOperate,
   actions,
   menu,
+  defaultOpen = false,
   onOpenCard,
 }: {
   projectId: string;
@@ -53,10 +54,12 @@ export function StackFace({
   actions: CardActions;
   /** The Board's item menu (`slots.menu`), placed at the end of the header. */
   menu?: ReactNode;
+  /** Opens expanded; the face starts collapsed. */
+  defaultOpen?: boolean;
   onOpenCard: (card: BoardCardView) => void;
 }) {
   const { stack } = item;
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const bodyId = useId();
   const cost = stackCost(stack);
   const designChip = stackDesignChip(stack);
