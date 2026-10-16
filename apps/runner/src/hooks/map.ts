@@ -2,6 +2,7 @@ import {
   HOOK_BACKGROUND_TASKS_MAX,
   HOOK_CLI_EVENT,
   type HookCliName,
+  hookCompactTriggerSchema,
   hookEndReasonSchema,
   hookStartSourceSchema,
   manualTmuxSessionSchema,
@@ -18,6 +19,7 @@ import {
   permissionRequestInputSchema,
   postToolUseFailureInputSchema,
   postToolUseInputSchema,
+  preCompactInputSchema,
   sessionEndInputSchema,
   sessionStartInputSchema,
   stopInputSchema,
@@ -231,6 +233,16 @@ const buildData = (
           ],
           cap,
         ),
+      };
+    }
+    case 'pre-compact': {
+      const i = parse(preCompactInputSchema, input);
+      if (!i) return null;
+      // Idle compaction and any trigger Claude Code adds later are not a person's.
+      const trigger = hookCompactTriggerSchema.safeParse(i.trigger);
+      return {
+        input: i,
+        data: { trigger: trigger.success ? trigger.data : 'auto' },
       };
     }
     case 'session-end': {

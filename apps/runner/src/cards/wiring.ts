@@ -45,6 +45,7 @@ const HOOKS: readonly HookEntry[] = [
   },
   { event: 'Notification', subcommand: 'notification', async: true },
   { event: 'Stop', subcommand: 'stop', async: true },
+  { event: 'PreCompact', subcommand: 'pre-compact', async: true },
   { event: 'SessionEnd', subcommand: 'session-end', async: true },
 ];
 

@@ -297,6 +297,25 @@ export const runDaemon = async (
       log,
       otlpPort: () => otlp?.port ?? null,
     });
+    // #449 D2: haiku writes the notes of dead sessions and interrupted runs.
+    const handoffDir = join(dirname(options.spoolDir), 'handoff');
+    const handoffWriter = new HandoffWriter({
+      dir: join(handoffDir, 'haiku'),
+      env: process.env,
+      clock,
+      log,
+      otlpPort: () => otlp?.port ?? null,
+    });
+    // Design builds and plan turns (#494): keyed by work, so one store serves both.
+    const runNotes = new RunNotes({
+      dir: join(handoffDir, 'runs'),
+      writer: handoffWriter,
+      profiles: () => config.profiles,
+      watchedProjects: () => watchList.current,
+      emit: (event) => connection?.emit(event),
+      clock,
+      log,
+    });
     const plans = new PlanTurnExecutor({
       deps: skillsDeps,
       plansDir: options.plansDir ?? join(dirname(options.spoolDir), 'plans'),
@@ -306,15 +325,7 @@ export const runDaemon = async (
       log,
       otlpPort: () => otlp?.port ?? null,
       attachmentSource: { server: config.server, token: config.token },
-    });
-    // #449 D2: haiku writes the notes of dead sessions and interrupted runs.
-    const handoffDir = join(dirname(options.spoolDir), 'handoff');
-    const handoffWriter = new HandoffWriter({
-      dir: join(handoffDir, 'haiku'),
-      env: process.env,
-      clock,
-      log,
-      otlpPort: () => otlp?.port ?? null,
+      runNotes,
     });
     const uiProfiles = new UiProfileBuildExecutor({
       deps: skillsDeps,
@@ -325,15 +336,7 @@ export const runDaemon = async (
       emit: (event) => connection?.emit(event),
       log,
       otlpPort: () => otlp?.port ?? null,
-      runNotes: new RunNotes({
-        dir: join(handoffDir, 'runs'),
-        writer: handoffWriter,
-        profiles: () => config.profiles,
-        watchedProjects: () => watchList.current,
-        emit: (event) => connection?.emit(event),
-        clock,
-        log,
-      }),
+      runNotes,
     });
     // Context handoff (#449): the card notes, the restart decision and the
     // warm-up. `cards` is built right below; nothing here runs before it.

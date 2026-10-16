@@ -159,6 +159,21 @@ const setup = async (
     });
     await service.settled();
   };
+  const hook = async (type: string, data: Record<string, unknown>) => {
+    service.hookSeen({
+      type,
+      session: { runtime: 'claude', id: card.sessionId ?? '' },
+      data,
+    });
+    await service.settled();
+  };
+  const preCompact = () => hook('hook.pre_compact', { trigger: 'auto' });
+  const compacted = () =>
+    hook('hook.session_started', {
+      source: 'compact',
+      cwd: root,
+      permissionMode: 'default',
+    });
   const round1 = () =>
     service.prepareRound(
       { ...card, runId: 'run_1' },
@@ -198,6 +213,8 @@ const setup = async (
     commit,
     ofType,
     stop,
+    preCompact,
+    compacted,
     round1,
     nextRound,
   };
@@ -321,6 +338,44 @@ describe('HandoffService — the note (#449 D2, D5, D7, D8)', () => {
     await t.stop();
     await t.stop();
     expect(t.typed).toEqual([HANDOFF_REFRESH_TEXT]);
+  });
+
+  it('#494: before a compaction a stale note gets exactly one request, owed to the start after it', async () => {
+    const t = await setup();
+    await t.prepareActive();
+    t.writeNote(validNote(), 10 * 60_000);
+    await t.commit('form.ts');
+    await t.preCompact();
+    // Nothing is typed at a prompt that is busy compacting.
+    expect(t.typed).toEqual([]);
+    expect(t.state.load(t.card.cardId)).toMatchObject({
+      asked: ['run_2'],
+      compactAsk: 'run_2',
+    });
+    // The SessionStart after the compaction carried it (the hook prints it).
+    await t.compacted();
+    expect(t.state.load(t.card.cardId).compactAsk).toBeUndefined();
+    // A second compaction and the stop of the same round ask no more.
+    await t.preCompact();
+    await t.stop();
+    expect(t.typed).toEqual([]);
+    expect(t.state.load(t.card.cardId)).toMatchObject({ asked: ['run_2'] });
+    expect(t.state.load(t.card.cardId).compactAsk).toBeUndefined();
+  });
+
+  it('#494: a fresh note, or a round asked at a stop, owes nothing at a compaction', async () => {
+    const t = await setup();
+    await t.prepareActive();
+    await t.commit('form.ts');
+    t.writeNote(validNote());
+    await t.preCompact();
+    expect(t.state.load(t.card.cardId).compactAsk).toBeUndefined();
+
+    t.writeNote(validNote(), 10 * 60_000);
+    await t.stop();
+    expect(t.typed).toEqual([HANDOFF_REFRESH_TEXT]);
+    await t.preCompact();
+    expect(t.state.load(t.card.cardId).compactAsk).toBeUndefined();
   });
 
   it('does not ask a round that made no commit, or whose note is newer', async () => {

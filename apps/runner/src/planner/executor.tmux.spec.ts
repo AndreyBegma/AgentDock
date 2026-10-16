@@ -16,6 +16,8 @@ import {
 } from '@agentdock/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import type { ConfigProfile } from '../config';
+import { HandoffWriter, RunNotes } from '../handoff';
+import { validNote } from '../handoff/testing';
 import { SkillRunExecutor } from '../skills/run/executor';
 import {
   type RunLogOutbound,
@@ -67,6 +69,9 @@ done
 echo "{\\"type\\":\\"system\\",\\"subtype\\":\\"init\\",\\"session_id\\":\\"$sid\\",\\"model\\":\\"claude-opus-5-5\\"}"
 case "$FAKE_MODE" in
   sleep) sleep 60 ;;
+  talksleep)
+    echo '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Slot B owns the exporter."}]}}'
+    sleep 60 ;;
   fail) echo 'Error: No conversation found with session ID' >&2; exit 2 ;;
   big) printf '{"type":"result","subtype":"success","is_error":false,"result":"%s"}\\n' "$(head -c 200000 /dev/zero | tr '\\0' a)"; exit 0 ;;
 esac
@@ -105,6 +110,7 @@ const setup = async (options: { cap?: number } = {}) => {
     profile('claude-slow', 'sleep'),
     profile('claude-fail', 'fail'),
     profile('claude-big', 'big'),
+    profile('claude-talkslow', 'talksleep'),
     { id: 'codex-default', runtime: 'codex', env: {}, args: [] },
   ];
   // The skill a skill run invokes, for the shared-cap case.
@@ -138,6 +144,34 @@ const setup = async (options: { cap?: number } = {}) => {
       ? new Response(body, { status: 200 })
       : new Response('nope', { status: 404 });
   }) as typeof fetch;
+  // #494: haiku's note of an interrupted turn, from a fake `claude -p`.
+  const haikuPrompts: string[] = [];
+  const notesDir = join(f.ws, 'state', 'handoff', 'runs');
+  const runNotes = new RunNotes({
+    dir: notesDir,
+    writer: new HandoffWriter({
+      dir: join(f.ws, 'state', 'handoff', 'haiku'),
+      env: {},
+      clock: new FakeClock(),
+      log: memoryLogger().log,
+      spawn: ({ stdinFile }) => {
+        haikuPrompts.push(readFileSync(stdinFile, 'utf8'));
+        return {
+          exited: Promise.resolve(0),
+          stdout: Promise.resolve(
+            `${JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: validNote('Decompose the export work.', '1. Split slot B.') })}\n`,
+          ),
+          stderr: Promise.resolve(''),
+          kill: () => {},
+        };
+      },
+    }),
+    profiles: () => profiles,
+    watchedProjects: () => [f.project],
+    emit: () => {},
+    clock: new FakeClock(),
+    log: memoryLogger().log,
+  });
   const slots = new SharedRunSlots(options.cap ?? 2);
   const log = memoryLogger().log;
   // Timers far apart: the test ticks and cleans up by hand.
@@ -157,6 +191,7 @@ const setup = async (options: { cap?: number } = {}) => {
     },
     tickMs: never,
     cleanupMs: never,
+    runNotes,
   });
   await executor.start();
   teardown.push(() => executor.stop());
@@ -249,6 +284,8 @@ const setup = async (options: { cap?: number } = {}) => {
     worktree,
     downloads,
     bodies,
+    haikuPrompts,
+    notesDir,
   };
 };
 
@@ -560,6 +597,69 @@ describe.skipIf(!tmuxInstalled)('plan turns (real tmux, fake claude)', () => {
       ),
     ).toEqual({ phase: 'running' });
     expect(await t.until('turn_2', ['succeeded', 'failed'])).toBe('succeeded');
+  });
+
+  it('#494: a killed turn leaves a note, and the next new session for the same task starts with it (Token saver on)', async () => {
+    const t = await setup();
+    const tokenSaver = { enabled: true, mcpAllow: [] };
+    await t.executor.run(t.args({ profileKey: 'claude-talkslow', tokenSaver }));
+    for (let i = 0; i < 200 && t.calls() === 0; i++) await Bun.sleep(25);
+    await Bun.sleep(100);
+    expect(
+      await t.executor.cancel({ planId: 'plan_1', turnId: 'turn_1' }),
+    ).toEqual({ cancelled: true });
+    const note = join(
+      t.f.ws,
+      'state',
+      'plans',
+      'plan_1',
+      'turns',
+      'turn_1',
+      'handoff.md',
+    );
+    for (let i = 0; i < 200 && !existsSync(note); i++) await Bun.sleep(25);
+    expect(readFileSync(note, 'utf8')).toContain('1. Split slot B.');
+    expect(t.haikuPrompts[0]).toContain('Slot B owns the exporter.');
+
+    // A resumed session has the context: its prompt is not seeded. It fails
+    // with nothing said, so the note stays as it was.
+    await t.executor.run(
+      t.args({
+        turnId: 'turn_2',
+        runId: 'run_t2',
+        session: { id: S1, resume: true },
+        profileKey: 'claude-fail',
+        tokenSaver,
+      }),
+    );
+    expect(await t.until('turn_2', ['succeeded', 'failed'])).toBe('failed');
+    expect(t.call(1).stdin).toBe(t.args().prompt);
+
+    // A new session for the same task starts from the note, then clears it.
+    await t.executor.run(
+      t.args({
+        turnId: 'turn_3',
+        runId: 'run_t3',
+        session: { id: S2, resume: false },
+        tokenSaver,
+      }),
+    );
+    expect(await t.until('turn_3', ['succeeded', 'failed'])).toBe('succeeded');
+    const third = t.call(2).stdin;
+    expect(third.startsWith(t.args().prompt.trimEnd())).toBe(true);
+    expect(third).toContain('## Handoff from an interrupted attempt');
+    expect(third).toContain('1. Split slot B.');
+    expect(readdirSync(t.notesDir)).toEqual([]);
+  });
+
+  it('#494: without Token saver a killed turn leaves no note', async () => {
+    const t = await setup();
+    await t.executor.run(t.args({ profileKey: 'claude-talkslow' }));
+    for (let i = 0; i < 200 && t.calls() === 0; i++) await Bun.sleep(25);
+    await t.executor.cancel({ planId: 'plan_1', turnId: 'turn_1' });
+    await Bun.sleep(50);
+    expect(t.haikuPrompts).toEqual([]);
+    expect(existsSync(t.notesDir)).toBe(false);
   });
 
   it('fails a turn over its timeout, a turn the CLI refuses, and cuts an oversized result', async () => {

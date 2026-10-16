@@ -124,6 +124,25 @@ export const noteOfCard = (cardsDir: string, record: CardRecord): CardNote => {
   return { record, number, note: state.note };
 };
 
+/**
+ * #494, D8: whether the round was found stale before a compaction and its
+ * refresh request still waits for the session's start after it.
+ */
+export const compactRefreshOwed = (
+  cardsDir: string,
+  record: CardRecord,
+): boolean => {
+  const store = new CardStore(cardsDir);
+  const state = new HandoffStateStore((id) => store.dir(id)).load(
+    record.cardId,
+  );
+  return state.compactAsk !== undefined && state.compactAsk === record.runId;
+};
+
+/** D8: what a round that committed and stopped with a stale note is told, once. */
+export const HANDOFF_REFRESH_TEXT =
+  'Your handoff note is older than your last commit. Update .agentdock/handoff.md now — Done, Next, Decisions and why, Dead ends, Files touched, Checklist status — keeping every line that ends with <!-- person --> word for word. Then carry on.';
+
 /** The card note of a session, or null when it is no card's. */
 export const sessionCardNote = async (
   cardsDir: string,

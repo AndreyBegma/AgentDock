@@ -16,6 +16,8 @@ import {
   type CardHandoffSetArgs,
   type CardHandoffSetResult,
   type CardRunArgs,
+  HOOK_PRE_COMPACT_EVENT,
+  HOOK_SESSION_STARTED_EVENT,
   HOOK_STOPPED_EVENT,
   HOOK_TOOL_FINISHED_EVENT,
   type UnsequencedEvent,
@@ -26,6 +28,7 @@ import type { ConfigProfile } from '../config';
 import { claudeConfigDir } from '../detect/profiles';
 import { errorMessage, type Logger } from '../log';
 import type { SkillsDeps } from '../skills/deps';
+import { HANDOFF_REFRESH_TEXT } from './context';
 import type { HandoffWriter } from './haiku';
 import {
   judgeNote,
@@ -52,9 +55,7 @@ import {
   warmupTokens,
 } from './transcript';
 
-/** D8: what a round that committed and stopped with a stale note is told, once. */
-export const HANDOFF_REFRESH_TEXT =
-  'Your handoff note is older than your last commit. Update .agentdock/handoff.md now — Done, Next, Decisions and why, Dead ends, Files touched, Checklist status — keeping every line that ends with <!-- person --> word for word. Then carry on.';
+export { HANDOFF_REFRESH_TEXT };
 
 /** How often a message is tried at the prompt before it waits for the next stop. */
 const PROMPT_TRIES = 3;
@@ -191,7 +192,8 @@ export class HandoffService {
 
   /**
    * The daemon's hook tap: a stop of a running round's session checks its
-   * note (D5, D8); its first file edit ends the warm-up (D9).
+   * note (D5, D8), and so does a compaction about to start (#494); its first
+   * file edit ends the warm-up (D9).
    */
   hookSeen(event: Pick<UnsequencedEvent, 'type' | 'session' | 'data'>): void {
     const sessionId = event.session?.id;
@@ -199,6 +201,18 @@ export class HandoffService {
     if (event.type === HOOK_STOPPED_EVENT) {
       const card = this.runningRound(sessionId);
       if (card) void this.serial(card.cardId, () => this.checkNote(card, true));
+      return;
+    }
+    if (event.type === HOOK_PRE_COMPACT_EVENT) {
+      const card = this.runningRound(sessionId);
+      if (card) void this.serial(card.cardId, () => this.beforeCompact(card));
+      return;
+    }
+    if (event.type === HOOK_SESSION_STARTED_EVENT) {
+      const data = event.data as { source?: unknown } | undefined;
+      if (data?.source !== 'compact') return;
+      const card = this.runningRound(sessionId);
+      if (card) void this.serial(card.cardId, () => this.afterCompact(card));
       return;
     }
     if (event.type === HOOK_TOOL_FINISHED_EVENT) {
@@ -370,6 +384,43 @@ export class HandoffService {
     } catch (error) {
       this.warn('checking the note failed', card, error);
       return 'stale';
+    }
+  }
+
+  /**
+   * #494, D8: before a compaction. Claude Code's `PreCompact` cannot reach
+   * the model and its prompt is busy compacting, so a stale note's one
+   * request of the round is owed to the `SessionStart` after it (the hook
+   * prints it with the note); the stop never asks again.
+   */
+  private async beforeCompact(card: HandoffCard): Promise<void> {
+    const { state } = this.options;
+    try {
+      const before = state.load(card.cardId);
+      if (before.asked.includes(card.runId)) return;
+      const reading = readNote(handoffNotePath(card.worktree), before.note);
+      if (reading.kind === 'accepted') this.store(card, reading, 'agent');
+      // A refused note is told at the stop, with its reason.
+      if (reading.kind === 'refused') return;
+      if (!(await this.isStale(card, reading))) return;
+      state.update(card.cardId, (s) => {
+        s.asked.push(card.runId);
+        s.compactAsk = card.runId;
+      });
+    } catch (error) {
+      this.warn('checking the note before a compaction failed', card, error);
+    }
+  }
+
+  /** #494: the session started after its compaction; the owed request went with it. */
+  private async afterCompact(card: HandoffCard): Promise<void> {
+    try {
+      if (this.options.state.load(card.cardId).compactAsk === undefined) return;
+      this.options.state.update(card.cardId, (s) => {
+        s.compactAsk = undefined;
+      });
+    } catch (error) {
+      this.warn('clearing the compaction request failed', card, error);
     }
   }
 

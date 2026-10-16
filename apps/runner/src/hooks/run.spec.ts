@@ -253,6 +253,44 @@ describe('agentdock-runner hook (spec 201 D11–D17)', () => {
         }),
       );
       expect(context()).toContain('Ship the login page.');
+      expect(context()).not.toContain('older than the last commit');
+    });
+
+    it('#494: the worker’s start after a compaction carries the request owed before it', async () => {
+      const c = cardSetup();
+      const env = { AGENTDOCK_CARD: 'ab12cd34' };
+      const state = new HandoffStateStore((id) =>
+        new CardStore(c.cardsDir).dir(id),
+      );
+      state.update('cmcard01', (s) => {
+        s.compactAsk = 'run_1';
+      });
+      await runHook(
+        ['session-start'],
+        deps(c.input('compact'), {
+          env,
+          cwd: c.worktree,
+          cardsDir: c.cardsDir,
+        }),
+      );
+      expect(context()).toContain(
+        'The note is older than the last commit: update it first',
+      );
+      expect(context()).toContain('Ship the login page.');
+      // Owed to an older round: not this one's request.
+      stdout = [];
+      state.update('cmcard01', (s) => {
+        s.compactAsk = 'run_0';
+      });
+      await runHook(
+        ['session-start'],
+        deps(c.input('compact'), {
+          env,
+          cwd: c.worktree,
+          cardsDir: c.cardsDir,
+        }),
+      );
+      expect(context()).not.toContain('older than the last commit');
     });
   });
 

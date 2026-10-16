@@ -53,6 +53,12 @@ export const stopInputSchema = z.looseObject({
   transcript_path: z.string().optional(),
 });
 
+/** #494: `custom_instructions` is a person's text and is never read. */
+export const preCompactInputSchema = z.looseObject({
+  ...common,
+  trigger: z.string().optional(),
+});
+
 export const sessionEndInputSchema = z.looseObject({
   ...common,
   reason: z.string().optional(),

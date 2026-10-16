@@ -7,6 +7,8 @@ import {
 } from '@agentdock/shared/protocol';
 import {
   cardsDirOf,
+  compactRefreshOwed,
+  HANDOFF_REFRESH_TEXT,
   noteIsStale,
   sessionCardNote,
   sessionNoteContext,
@@ -50,8 +52,10 @@ export interface HookDeps extends LocalCommandDeps {
  * #449 D6, D8: the card's handoff note for a session that starts in a card's
  * worktree or on its branch — a person's own session at every start, the
  * card's worker only after a compaction (its round prompt carries the rest),
- * with one line asking to refresh a note older than the last commit. Read
- * from the machine, never from the API; '' for any other session.
+ * with one line asking to refresh a note older than the last commit. For the
+ * worker that line is the round's one request, owed when the daemon found the
+ * note stale before the compaction (#494). Read from the machine, never from
+ * the API; '' for any other session.
  */
 const sessionNote = async (
   input: unknown,
@@ -62,13 +66,15 @@ const sessionNote = async (
     const start = sessionStartInputSchema.safeParse(input);
     const compact = start.success && start.data.source === 'compact';
     if (deps.env[CARD_ENV_ID] && !compact) return '';
-    const found = await sessionCardNote(
-      deps.cardsDir ?? cardsDirOf(deps.env),
-      cwd,
-      deps.exec,
-    );
-    if (!found?.note) return '';
-    const stale = compact && (await noteIsStale(found.record, deps.exec));
+    const cardsDir = deps.cardsDir ?? cardsDirOf(deps.env);
+    const found = await sessionCardNote(cardsDir, cwd, deps.exec);
+    if (!found) return '';
+    const worker = Boolean(deps.env[CARD_ENV_ID]);
+    const owed = worker && compactRefreshOwed(cardsDir, found.record);
+    if (!found.note) return owed ? HANDOFF_REFRESH_TEXT : '';
+    const stale = worker
+      ? owed
+      : compact && (await noteIsStale(found.record, deps.exec));
     return sessionNoteContext(found, { stale });
   } catch {
     return '';

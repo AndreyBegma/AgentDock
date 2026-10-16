@@ -268,6 +268,7 @@ and transcripts (ADR-0003). The content fields (`content`, `input`, `output`,
 | `hook.permission_requested` | `PermissionRequest` | `toolName` |
 | `hook.notification` | `Notification` | `notificationType` (the message text is never sent) |
 | `hook.stopped` | `Stop` | `response?` |
+| `hook.pre_compact` | `PreCompact` | `trigger: manual\|auto` (`custom_instructions` is never sent) — the runner checks the card's handoff note before compaction (#494) |
 | `hook.session_ended` | `SessionEnd` | `reason: clear\|resume\|logout\|prompt_input_exit\|other` |
 
 The API derives the session's `origin`, `issue`, `ownerId` and `liveState` from
