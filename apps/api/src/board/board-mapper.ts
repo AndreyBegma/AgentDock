@@ -27,6 +27,8 @@ import {
   isActiveRoundPhase,
   isCaptureModel,
   isCardAutoRunCode,
+  type PendingQuestion,
+  pendingQuestionSchema,
   type RestartEstimate,
   restartEstimateSchema,
   type StewardCardChip,
@@ -291,9 +293,21 @@ const brief = (
         ...hooksCauseOf(card, round, facts),
         ...wiringOf(round),
         autoRunAfter: round.autoRunAfter,
+        pendingQuestion: pendingQuestionOf(round),
         finishRefused: finishRefusedOf(round),
       }
     : null;
+
+/** #489 M4: an active round's question screen, as the runner reported it. */
+export const pendingQuestionOf = (
+  round: BoardCardRound,
+): PendingQuestion | null => {
+  if (!isActiveRoundPhase(round.phase) || round.pendingQuestion === null) {
+    return null;
+  }
+  const parsed = pendingQuestionSchema.safeParse(round.pendingQuestion);
+  return parsed.success ? parsed.data : null;
+};
 
 /** The sum of the rounds' priced costs; `null` when none is priced. */
 const cardCost = (

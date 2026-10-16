@@ -302,5 +302,7 @@ export const detectCapabilities = async (
     steward: true,
     // #449: this runner keeps handoff notes and takes `card.handoff.set`.
     handoff: true,
+    // #489: this runner takes `session.message` and reports question screens.
+    sessionMessage: true,
   };
 };

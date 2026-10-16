@@ -8,6 +8,7 @@ import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { useEffect, useMemo, useReducer, useState } from 'react';
 import { Markdown } from '../../../../../../components/markdown/markdown';
 import { AsyncSection } from '../../../../../../components/prerequisites/async-section';
+import { SessionMessageLine } from '../../../../../../components/session/session-message-line';
 import {
   MESSAGE_MAX_BYTES,
   messageProblem,
@@ -16,6 +17,7 @@ import type { useControl } from '../../../../../../lib/control/use-control';
 import { CHECKPOINT_TONE } from '../../../../../../lib/fleet/format';
 import { pluralize } from '../../../../../../lib/format';
 import type { Section } from '../../../../../../lib/section/use-section';
+import type { SendSessionMessage } from '../../../../../../lib/session-message/actions';
 import {
   chatMessages,
   messageOutcome,
@@ -37,12 +39,15 @@ export function ChatTab({
   conversation,
   control,
   writeReason,
+  sessionSend,
 }: {
   slot: string;
   conversation: Section<SlotConversation>;
   control: ReturnType<typeof useControl>;
   /** Why this person cannot message the worker now; undefined when they can. */
   writeReason: string | undefined;
+  /** #489 M5: types into the worker's own session; absent for a viewer. */
+  sessionSend?: SendSessionMessage;
 }) {
   const [outbox, dispatch] = useReducer(outboxReducer, []);
   const [draft, setDraft] = useState('');
@@ -197,9 +202,24 @@ export function ChatTab({
           ) : null}
           <p className="text-xs text-ink-3">
             The orchestrator normally speaks to workers. A message sent from
-            here bypasses it, so it will not know what was said until it reads
-            the board.
+            here bypasses it; it is recorded in the orchestrator’s event log as
+            a person’s message, so the orchestrator still learns what was said.
           </p>
+          {sessionSend ? (
+            <section
+              aria-label={`Type into ${slot}’s session`}
+              className="flex flex-col gap-1.5 border-t border-line pt-3"
+            >
+              <p className="text-xs text-ink-2">
+                Or type straight into its session — no message file. A busy
+                worker reads it at its next step.
+              </p>
+              <SessionMessageLine
+                send={sessionSend}
+                label={`Type into ${slot}`}
+              />
+            </section>
+          ) : null}
         </div>
       )}
     </AsyncSection>

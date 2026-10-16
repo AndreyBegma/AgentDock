@@ -7,10 +7,12 @@ import {
 } from '@agentdock/shared';
 import {
   type CardRunFinishRefusedData,
+  type CardRunPendingQuestionData,
   type CardRunPhaseChangedData,
   type CardRunPushedData,
   type CardRunQuestionData,
   cardFinishRefusedEventDataSchemas,
+  cardPendingQuestionEventDataSchemas,
   cardPushEventDataSchemas,
   cardQuestionEventDataSchemas,
   cardRunEventDataSchemas,
@@ -20,6 +22,7 @@ import {
   HOOK_TOOL_FINISHED_EVENT,
   type HookEvent,
   isCardFinishRefusedEventType,
+  isCardPendingQuestionEventType,
   isCardPushEventType,
   isCardQuestionEventType,
   isCardRunEventType,
@@ -122,6 +125,19 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
           continue;
         }
         await this.question(runnerId, event.seq, parsed.data);
+        continue;
+      }
+      if (isCardPendingQuestionEventType(event.type)) {
+        const parsed = cardPendingQuestionEventDataSchemas[
+          event.type
+        ].safeParse(event.data);
+        if (!parsed.success) {
+          this.logger.warn(
+            `runner ${runnerId}: malformed ${event.type} (seq ${event.seq}), skipped`,
+          );
+          continue;
+        }
+        await this.pendingQuestion(runnerId, parsed.data);
         continue;
       }
       if (isCardFinishRefusedEventType(event.type)) {
@@ -245,6 +261,32 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
     if (await this.toWaiting(runnerId, seq, card, round, 'question')) {
       this.work.publish(card.projectId, card.id);
     }
+  }
+
+  /**
+   * #489 M4: what the round's question selector shows now, or null once it
+   * is gone. Kept on an active round of the card's current run only; the
+   * Board offers its options and Telegram its buttons.
+   */
+  private async pendingQuestion(
+    runnerId: string,
+    data: CardRunPendingQuestionData,
+  ): Promise<void> {
+    const round = await this.roundOf(runnerId, data);
+    if (!round) {
+      this.logger.warn(
+        `runner ${runnerId}: question screen for unknown card round ${data.runId}, skipped`,
+      );
+      return;
+    }
+    const { count } = await this.prisma.boardCardRound.updateMany({
+      where: {
+        id: round.id,
+        phase: { in: [...ACTIVE_PHASES] },
+      },
+      data: { pendingQuestion: data.question ?? Prisma.DbNull },
+    });
+    if (count > 0) this.work.publish(data.projectId, round.cardId);
   }
 
   /**

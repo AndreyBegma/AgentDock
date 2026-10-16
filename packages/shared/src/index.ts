@@ -22,6 +22,7 @@ export * from './queue';
 export * from './readiness';
 export * from './runners';
 export * from './schedules';
+export * from './session-message';
 export * from './sessions';
 export * from './settings';
 export * from './setup';

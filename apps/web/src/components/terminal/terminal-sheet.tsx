@@ -1,5 +1,6 @@
 'use client';
 
+import type { PendingQuestion } from '@agentdock/shared';
 import type { TerminalMode } from '@agentdock/shared/protocol';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
@@ -7,10 +8,12 @@ import { Button } from '@andrewbehma/glass-ui/button';
 import { Chip } from '@andrewbehma/glass-ui/chip';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import { useEffect, useState } from 'react';
+import type { SendSessionMessage } from '../../lib/session-message/actions';
 import {
   TERMINAL_PHASE_LABEL,
   type TerminalPhase,
 } from '../../lib/terminal/format';
+import { SessionMessageLine } from '../session/session-message-line';
 import {
   type TerminalStatus,
   type TerminalTarget,
@@ -33,19 +36,26 @@ const PHASE_TONE = {
 /**
  * The full-screen terminal of spec 29 UI. It opens read-only; **Take control**
  * is a separate, explicit second attach. Closing the sheet detaches and the
- * session keeps running.
+ * session keeps running. With `message` (#489 M2), the read-only view has a
+ * line under it to write to the session without taking control.
  */
 export function TerminalSheet({
   projectId,
   target,
   title,
   onClose,
+  message,
 }: {
   projectId: string;
   /** `undefined` keeps the sheet closed. */
   target: TerminalTarget | undefined;
   title: string;
   onClose: () => void;
+  /** #489: how to message this session; absent where the person cannot. */
+  message?: {
+    send: SendSessionMessage;
+    question?: PendingQuestion | null;
+  };
 }) {
   const [mode, setMode] = useState<TerminalMode>('read');
   const [attempt, setAttempt] = useState(0);
@@ -166,6 +176,14 @@ export function TerminalSheet({
                 onStatus={setStatus}
               />
             </div>
+            {message && mode === 'read' ? (
+              <SessionMessageLine
+                send={message.send}
+                question={message.question}
+                label={`Message ${title}`}
+                tone="on-glass"
+              />
+            ) : null}
           </div>
         </SheetContent>
       ) : null}

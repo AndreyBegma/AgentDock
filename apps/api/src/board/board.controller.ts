@@ -10,6 +10,7 @@ import {
   type CardPullRequestView,
   type CollectBoardCardResponse,
   type DismissAllResult,
+  type SessionMessageView,
 } from '@agentdock/shared';
 import {
   Body,
@@ -33,12 +34,14 @@ import {
   ProjectRole,
   type ResolvedProjectAccess,
 } from '../projects';
+import { SessionMessageDto, sessionMessageInput } from '../session-message/dto';
 import { BoardService } from './board.service';
 import { BoardBulk } from './board-bulk';
 import { BoardDependencies } from './board-dependencies.service';
 import { boardError, cardNotFound } from './board-error';
 import { BoardInboxService } from './board-inbox.service';
 import { BoardRoundsService } from './board-rounds.service';
+import { BoardSessionMessages } from './board-session-message.service';
 import { BoardStacks } from './board-stacks';
 import type { BoardActor } from './board-work';
 import {
@@ -92,6 +95,7 @@ export class BoardController {
     private readonly inbox: BoardInboxService,
     private readonly deps: BoardDependencies,
     private readonly bulk: BoardBulk,
+    private readonly messages: BoardSessionMessages,
     private readonly stacks: BoardStacks,
   ) {}
 
@@ -329,6 +333,25 @@ export class BoardController {
       access.projectId,
       cardNumber(number),
       dto,
+      actorOf(access, user, ctx),
+    );
+  }
+
+  /** #489: text or an answer to the card's running session. */
+  @Post('board/cards/:number/message')
+  @HttpCode(200)
+  @ProjectRole('operator')
+  message(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Param('number') number: string,
+    @Body() dto: SessionMessageDto,
+  ): Promise<SessionMessageView> {
+    return this.messages.message(
+      access.projectId,
+      cardNumber(number),
+      sessionMessageInput(dto),
       actorOf(access, user, ctx),
     );
   }

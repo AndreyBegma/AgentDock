@@ -62,6 +62,7 @@ import {
   SharedRunSlots,
 } from './planner';
 import { WatchList } from './projects/watch-list';
+import { SessionMessenger } from './session';
 import {
   createSkillHandlers,
   RunLogStreamer,
@@ -500,6 +501,17 @@ export const runDaemon = async (
       assess: createAssessHandlers(assess),
       steward: { ...stewardActions.handlers(), ...stewardDigest.handlers() },
       handoff: createHandoffHandlers(handoff),
+      sessionMessage: new SessionMessenger({
+        cards: {
+          record: (cardId) => cards.store.load(cardId),
+          liveSession: (projectId, cardId, runId) =>
+            cards.liveSession(projectId, cardId, runId),
+        },
+        exec,
+        clock,
+        watchedProjects: () => watchList.current,
+        log,
+      }),
     });
     const dispatch = createDispatcher({
       handlers: builtHandlers,

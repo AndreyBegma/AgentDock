@@ -14,6 +14,7 @@ import { githubCommands } from './commands/github';
 import { handoffCommands } from './commands/handoff';
 import { plannerCommands } from './commands/planner';
 import { queueCommands } from './commands/queue';
+import { sessionMessageCommands } from './commands/session-message';
 import { skillCommands } from './commands/skills';
 import { stewardCommands } from './commands/steward';
 import { terminalCommands } from './commands/terminal';
@@ -162,6 +163,7 @@ export const commands = {
   ...assessCommands,
   ...stewardCommands,
   ...handoffCommands,
+  ...sessionMessageCommands,
 } as const satisfies Record<string, CommandDefinition>;
 
 export type CommandName = keyof typeof commands;

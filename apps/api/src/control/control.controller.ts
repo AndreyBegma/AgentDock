@@ -3,11 +3,13 @@ import type {
   CommandRunView,
   OrchestratorSettingsView,
   OrchestratorStatusView,
+  SessionMessageView,
 } from '@agentdock/shared';
 import {
   Body,
   Controller,
   Get,
+  HttpCode,
   Param,
   Post,
   Put,
@@ -23,6 +25,7 @@ import {
   ProjectRole,
   type ResolvedProjectAccess,
 } from '../projects';
+import { SessionMessageDto, sessionMessageInput } from '../session-message/dto';
 import { CommandRunsService } from './command-runs.service';
 import { type ControlCaller, ControlService } from './control.service';
 import {
@@ -33,6 +36,7 @@ import {
   SlotMessageDto,
 } from './dto';
 import { OrchestratorSettingsService } from './orchestrator-settings.service';
+import { SlotSessionMessages } from './slot-session-message.service';
 
 const callerOf = (
   access: ResolvedProjectAccess,
@@ -56,6 +60,7 @@ export class ControlController {
     private readonly control: ControlService,
     private readonly settings: OrchestratorSettingsService,
     private readonly runs: CommandRunsService,
+    private readonly sessionMessages: SlotSessionMessages,
   ) {}
 
   @Post('orchestrator/start')
@@ -147,6 +152,24 @@ export class ControlController {
       callerOf(access, user, ctx),
       this.control.parseSlot(slot),
       dto.text,
+    );
+  }
+
+  /** #489 M5: text or an answer typed into the worker's own session. */
+  @Post('slots/:slot/session-message')
+  @HttpCode(200)
+  @ProjectRole('operator')
+  sessionMessageSlot(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Param('slot') slot: string,
+    @Body() dto: SessionMessageDto,
+  ): Promise<SessionMessageView> {
+    return this.sessionMessages.message(
+      callerOf(access, user, ctx),
+      this.control.parseSlot(slot),
+      sessionMessageInput(dto),
     );
   }
 
