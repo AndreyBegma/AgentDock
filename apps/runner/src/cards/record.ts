@@ -45,6 +45,13 @@ export const cardRecordSchema = z.object({
   /** The round the session runs for. */
   runId: skillRunIdSchema,
   phase: cardRecordPhaseSchema,
+  /**
+   * #447: the round's Claude session — Steward matches hook events to the
+   * round by it — and the profile it runs on, for the local classifier.
+   * Absent on a record from before Steward.
+   */
+  sessionId: z.uuid().optional(),
+  profileKey: z.string().min(1).optional(),
   startedAt: z.iso.datetime(),
   endedAt: z.iso.datetime().optional(),
   /**

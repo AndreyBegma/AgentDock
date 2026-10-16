@@ -11,17 +11,21 @@ import {
   openPullRequest,
 } from './git';
 import type { CardRecord } from './record';
+import { commitsWithTrailer, type TrailerCommit } from './trailer-guard';
 
 /**
  * #359 D1: what one push step did. `pushed` is a new head on origin; `pr` the
  * open PR of the branch, or null when finding or opening it failed (`prError`)
  * — the head stays pushed and the PR is tried again on a later poll.
+ * #447 D7: `held` — the trailer guard found these commits and nothing was
+ * pushed or opened (`pushed: false`, `pr: null`).
  */
 export interface PushStep {
   headSha: string;
   pushed: boolean;
   pr: (OpenPr & { opened: boolean }) | null;
   prError?: string;
+  held?: TrailerCommit[];
 }
 
 type PushRecord = Pick<
@@ -133,10 +137,23 @@ const oneLine = (error: unknown): string =>
 export const pushCardHead = async (
   deps: GitDeps,
   record: PushRecord,
+  options: { trailerGuard?: boolean } = {},
 ): Promise<PushStep | null> => {
   const pending = await pendingPush(deps, record);
   const draft = record.pullRequest;
   if (!pending || !draft) return null;
+  // #447 D7: nothing is pushed while a commit to push carries a trailer.
+  if (pending.push && options.trailerGuard) {
+    const held = await commitsWithTrailer(
+      deps,
+      record.worktree,
+      record.branch,
+      record.base,
+    );
+    if (held.length > 0) {
+      return { headSha: pending.headSha, pushed: false, pr: null, held };
+    }
+  }
   const github = await githubOf(deps, {
     id: record.projectId,
     root: record.root,

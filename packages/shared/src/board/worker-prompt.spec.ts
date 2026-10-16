@@ -213,6 +213,20 @@ describe('worker prompt v9 — Token saver (#445 D7, D9, D10, D14)', () => {
     expect(on).toContain('`AGENTDOCK_RAW=1 <command>`');
   });
 
+  it('forbids a Claude attribution trailer in the stable part (#447 D7)', () => {
+    const prompt = cardWorkerPrompt(card);
+    const rule = prompt.indexOf('Never add a Claude attribution trailer');
+    expect(rule).toBeGreaterThan(prompt.indexOf('## How to work'));
+    expect(rule).toBeLessThan(prompt.indexOf('## Card C-12'));
+    for (const trailer of [
+      'Co-Authored-By: Claude',
+      'Claude-Session:',
+      'Generated with Claude Code',
+    ]) {
+      expect(prompt).toContain(trailer);
+    }
+  });
+
   it('puts every stable section before the card’s own', () => {
     const prompt = cardWorkerPrompt(card);
     const theCard = prompt.indexOf('## Card C-12');
@@ -304,8 +318,8 @@ describe('next round prompt — card edits reach the worker (#273 D1–D4)', () 
     kind: 'feature',
   };
 
-  it('is version 9', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(9);
+  it('is version 10', () => {
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(10);
   });
 
   it('cardChange is null for identical text, whitespace around it aside', () => {

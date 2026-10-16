@@ -30,6 +30,11 @@ const facts = (
   profileAgentdock: new Map([['p1', over.reports ?? {}]]),
   attachmentCounts: new Map(),
   dependencies: new Map(),
+  tokenSaver: {
+    tokenSaved: new Map(),
+    tokenSaverFilters: new Map(),
+    artifactIncomplete: new Set(),
+  },
   now,
 });
 

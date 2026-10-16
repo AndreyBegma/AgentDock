@@ -24,6 +24,7 @@ import { cardDesignPrompt } from '../design/design-prompt';
 import type { DesignTurnPlan } from '../design/design-rules';
 import { cardDesignTaskKey, loadDesignPrompt } from '../design/design-store';
 import { type NoProfileFailure, RuntimeProfileResolver } from '../readiness';
+import { TokenSaverService } from '../token-saver/token-saver.service';
 import { PlanStore } from './plan-store';
 import type { PlanCaller } from './plan-turn.service';
 import {
@@ -63,6 +64,7 @@ export class CardDesignTurnService {
     private readonly commands: PlannerCommands,
     private readonly instructions: PlannerInstructionsService,
     private readonly profiles: RuntimeProfileResolver,
+    private readonly tokenSaver: TokenSaverService,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
 
@@ -131,6 +133,8 @@ export class CardDesignTurnService {
         cardRecommendationOf(choice).design?.model,
         settings?.model,
       );
+    // #445 D11: only a runner that advertises the token saver gets the field.
+    const saver = await this.tokenSaver.launch(card.projectId);
     const draft = {
       planId: card.id,
       projectId: card.projectId,
@@ -141,6 +145,7 @@ export class CardDesignTurnService {
       profileKey: profile.key,
       model,
       timeoutSec: PLAN_TURN_DEFAULT_TIMEOUT_SEC,
+      ...saver.args,
     };
     const valid = planTurnArgsSchema.safeParse({
       ...draft,
@@ -185,6 +190,7 @@ export class CardDesignTurnService {
           model,
           profileKey: profile.key,
           args: { cardId: card.id, action: 'design', design: batch },
+          tokenSaver: saver.on,
           status: 'running',
           triggeredByType: 'user',
           triggeredById: caller.userId,

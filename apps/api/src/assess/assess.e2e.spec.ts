@@ -25,6 +25,26 @@ describe('card model assessment (e2e, #322 D5–D8)', () => {
     return response.body;
   };
 
+  it('#445: sends the token saver only to a runner that advertises it', async () => {
+    await w.createCard({ kind: 'feature' });
+    const off = await startOne();
+    expect(w.assessed()[0]).not.toHaveProperty('tokenSaver');
+    expect(
+      (await w.ctx.prisma.run.findUniqueOrThrow({ where: { id: off } }))
+        .tokenSaver,
+    ).toBe(false);
+    await w.finishAssess(off, assessAnswer('sonnet', 'opus'));
+
+    await w.advertiseTokenSaver();
+    await w.createCard({ kind: 'feature', title: 'Add logout' });
+    const on = await startOne();
+    expect(w.assessed()[1].tokenSaver).toEqual({ enabled: true, mcpAllow: [] });
+    expect(
+      (await w.ctx.prisma.run.findUniqueOrThrow({ where: { id: on } }))
+        .tokenSaver,
+    ).toBe(true);
+  });
+
   it('assesses a new card with haiku on the project profile and stores the answer', async () => {
     const { id, number } = await w.createCard({ kind: 'feature' });
     const runId = await startOne();

@@ -146,3 +146,68 @@ export const usageBySession = async (
     GROUP BY se.id`;
   return new Map(rows.map((row) => [row.key, toUsage(row)]));
 };
+
+/**
+ * #445: the model each run's session actually ran on — the one with the most
+ * input tokens among its requests; a run with no request is absent.
+ */
+export const sessionModelByRun = async (
+  prisma: PrismaService,
+  runIds: string[],
+): Promise<Map<string, string>> => {
+  if (runIds.length === 0) return new Map();
+  const rows = await prisma.$queryRaw<{ key: string; model: string }[]>`
+    SELECT DISTINCT ON (r.id) r.id AS key, l.model
+    ${RUN_REQUESTS}
+    WHERE r.id IN (${Prisma.join(runIds)})
+    GROUP BY r.id, l.model
+    ORDER BY r.id, SUM(l.input) DESC, l.model`;
+  return new Map(rows.map((row) => [row.key, row.model]));
+};
+
+/** #445 D12: runs of one kind on one side of the token saver. */
+export interface RunCostGroup {
+  kind: string;
+  tokenSaver: boolean;
+  runs: number;
+  /** Average over the priced runs, a decimal string; null when none is priced. */
+  avgUsd: string | null;
+}
+
+/**
+ * #445 D12: the ended runs of a project started in `[from, to)`, grouped by
+ * kind and by `runs.tokenSaver` — the before/after is these two sides, never
+ * a date.
+ */
+export const runCostsByKind = async (
+  prisma: PrismaService,
+  projectId: string,
+  kinds: readonly string[],
+  from: Date,
+  to: Date,
+): Promise<RunCostGroup[]> => {
+  if (kinds.length === 0) return [];
+  const rows = await prisma.$queryRaw<
+    { kind: string; tokenSaver: boolean; runs: number; avgUsd: string | null }[]
+  >`
+    SELECT r.kind::text AS kind, r."tokenSaver" AS "tokenSaver",
+      COUNT(*)::int AS runs, AVG(c.cost)::text AS "avgUsd"
+    FROM runs r
+    LEFT JOIN (
+      SELECT r.id, SUM(l."costUsd") AS cost
+      ${RUN_REQUESTS}
+      WHERE r."projectId" = ${projectId}
+        AND r."startedAt" >= ${from} AND r."startedAt" < ${to}
+      GROUP BY r.id
+    ) c ON c.id = r.id
+    WHERE r."projectId" = ${projectId}
+      AND r."startedAt" >= ${from} AND r."startedAt" < ${to}
+      AND r."endedAt" IS NOT NULL
+      AND r.kind::text IN (${Prisma.join([...kinds])})
+    GROUP BY r.kind, r."tokenSaver"`;
+  return rows.map((row) => ({
+    ...row,
+    avgUsd:
+      row.avgUsd === null ? null : new Prisma.Decimal(row.avgUsd).toFixed(6),
+  }));
+};

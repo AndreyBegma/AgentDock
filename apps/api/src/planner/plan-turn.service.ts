@@ -30,6 +30,7 @@ import { BudgetGate } from '../budgets/budget-gate';
 import { PrismaService } from '../database/prisma.service';
 import type { DesignTurnPlan } from '../design/design-rules';
 import { TextNormalizer } from '../text/text-normalizer';
+import { TokenSaverService } from '../token-saver/token-saver.service';
 import { TALKABLE_STATUSES } from './plan-apply';
 import {
   intakeRound,
@@ -124,6 +125,7 @@ export class PlanTurnService {
     private readonly audit: AuditService,
     private readonly text: TextNormalizer,
     private readonly attachments: AttachmentsService,
+    private readonly tokenSaver: TokenSaverService,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
 
@@ -538,6 +540,8 @@ export class PlanTurnService {
               : [],
       input: spec.input,
     });
+    // #445 D11: only a runner that advertises the token saver gets the field.
+    const saver = await this.tokenSaver.launch(plan.projectId);
     const draft = {
       planId: plan.id,
       projectId: plan.projectId,
@@ -549,6 +553,7 @@ export class PlanTurnService {
       profileKey: profile.key,
       model: plan.model,
       timeoutSec: PLAN_TURN_DEFAULT_TIMEOUT_SEC,
+      ...saver.args,
     };
     // The ids are not known yet; any valid id checks the rest.
     const valid = planTurnArgsSchema.safeParse({
@@ -610,6 +615,7 @@ export class PlanTurnService {
             ...(spec.task ? { taskKey: spec.task.key } : {}),
             ...(spec.design ? { design: spec.design } : {}),
           },
+          tokenSaver: saver.on,
           status: 'running',
           triggeredByType: 'user',
           triggeredById: caller.userId,

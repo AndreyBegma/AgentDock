@@ -59,6 +59,12 @@ import {
 } from './skills';
 import { runLogSources } from './skills/run/log';
 import { Spool } from './spool';
+import {
+  StewardActions,
+  StewardClassifier,
+  StewardObserver,
+  type StewardRun,
+} from './steward';
 import { bunSpawnPty, type SpawnPty, TerminalManager } from './terminal';
 import { createUiProfileHandlers, UiProfileBuildExecutor } from './uiprofile';
 import { RUNNER_VERSION } from './version';
@@ -309,6 +315,72 @@ export const runDaemon = async (
       emit: (event) => connection?.emit(event),
       log,
       otlpPort: () => otlp?.port ?? null,
+      // `steward` is built right below; a poll runs only after `start`.
+      onSessionEnded: (record, exitCode) =>
+        steward.sessionEnded(record, exitCode),
+    });
+    // Steward (#447): the runner observes card rounds and skill runs and
+    // executes the API's nudge / dismiss / resume. Running skill runs are
+    // kept from the executor's phase changes.
+    const runningRuns = new Map<string, StewardRun>();
+    runs.onChange((record) => {
+      if (record.phase === 'running') {
+        runningRuns.set(record.runId, {
+          runId: record.runId,
+          projectId: record.projectId,
+          repo: record.repo,
+          root: record.root,
+          startedAt: record.startedAt,
+          streamFile: runs.streamFile(record.runId),
+        });
+      } else {
+        runningRuns.delete(record.runId);
+      }
+    });
+    const steward = new StewardObserver({
+      cards: {
+        records: () => cards.store.all(),
+        capture: (session) => cards.capture(session),
+      },
+      runs: { running: () => [...runningRuns.values()] },
+      watchedProjects: () => watchList.current,
+      profiles: () => config.profiles,
+      classifier: new StewardClassifier({
+        dir: join(dirname(options.spoolDir), 'steward'),
+        env: process.env,
+        clock,
+        log,
+        otlpPort: () => otlp?.port ?? null,
+      }),
+      emit: (event) => connection?.emit(event),
+      clock,
+      log,
+    });
+    const stewardActions = new StewardActions({
+      cards: {
+        record: (cardId) => cards.store.load(cardId),
+        liveSession: (projectId, cardId, runId) =>
+          cards.liveSession(projectId, cardId, runId),
+        typeAtPrompt: (session, text) => cards.typeAtPrompt(session, text),
+        dismissDialog: (session, dialogId) =>
+          cards.dismissDialog(session, dialogId),
+        resume: (args) => cards.resume(args),
+      },
+      runs: {
+        run: (projectId, runId) => {
+          const record = runs.record(runId);
+          if (!record || record.projectId !== projectId) return null;
+          return {
+            session: runs.runSession(projectId, record.root, runId),
+            envelope: { repo: record.repo, root: record.root },
+          };
+        },
+      },
+      watchedProjects: () => watchList.current,
+      emit: (event) => connection?.emit(event),
+      clock,
+      log,
+      onResumed: (subject) => steward.forget(subject),
     });
     // Card capture (#244): headless, one per project; the API limits the rest.
     const capture = new CaptureExecutor({
@@ -367,6 +439,7 @@ export const runDaemon = async (
       capture: createCaptureHandlers(capture),
       normalize: createNormalizeHandlers(normalize),
       assess: createAssessHandlers(assess),
+      steward: stewardActions.handlers(),
     });
     const dispatch = createDispatcher({
       handlers: builtHandlers,
@@ -486,6 +559,8 @@ export const runDaemon = async (
       awayMode: () => awayMode,
       online: () => live.isLive,
       emit: (event) => {
+        // #447 D6: a hook event is the session's activity, for silence.
+        steward.hookSeen(event);
         live.emit(event);
       },
       relay: (request) => live.request(request),
@@ -547,6 +622,7 @@ export const runDaemon = async (
     sessions?.start(watchList.current).catch((error) => {
       log.error('sessions: cannot start', { error: errorMessage(error) });
     });
+    steward.start();
     live.start();
     filterStats.start();
     options.onStart?.(live);
@@ -562,6 +638,7 @@ export const runDaemon = async (
     plans.stop();
     uiProfiles.stop();
     cards.stop();
+    steward.stop();
     capture.stop();
     normalize.stop();
     assess.stop();

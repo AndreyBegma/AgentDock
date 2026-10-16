@@ -108,10 +108,10 @@ describe('stewardCommands', () => {
     }
   });
 
-  it('is not allowlisted until the runner serves it', () => {
+  it("is allowlisted, with the runner's handlers", () => {
     // Entered together with the runner's handlers (the card/text precedent).
     for (const name of STEWARD_COMMAND_NAMES) {
-      expect(isCommandName(name)).toBe(false);
+      expect(isCommandName(name)).toBe(true);
     }
   });
 });

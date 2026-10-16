@@ -25,6 +25,7 @@ import { BudgetGate } from '../budgets/budget-gate';
 import { PrismaService } from '../database/prisma.service';
 import { RunsQueryService } from '../history/runs-query.service';
 import { LiveService } from '../live/live.service';
+import { TokenSaverService } from '../token-saver/token-saver.service';
 import { SkillCommands, skillOutput } from './skill-commands';
 import {
   SkillInventoryService,
@@ -70,6 +71,7 @@ export class SkillRunService {
     private readonly runs: RunsQueryService,
     private readonly live: LiveService,
     private readonly audit: AuditService,
+    private readonly tokenSaver: TokenSaverService,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
 
@@ -114,6 +116,8 @@ export class SkillRunService {
         '`bypassPermissions` needs the admin role on the project',
       );
     }
+    // #445 D11: only a runner that advertises the token saver gets the field.
+    const saver = await this.tokenSaver.launch(projectId);
     const draft = {
       projectId,
       root: project.rootPath,
@@ -125,6 +129,7 @@ export class SkillRunService {
       permissionMode,
       output: spec.output,
       timeoutSec: spec.timeoutSec ?? SKILL_RUN_DEFAULT_TIMEOUT_SEC,
+      ...saver.args,
     };
     // The run id is not known yet; any valid id checks the rest.
     const valid = skillRunArgsSchema.safeParse({ ...draft, runId: 'pending' });
@@ -154,6 +159,7 @@ export class SkillRunService {
         profileKey: profile.key,
         args: { skill: spec.skill, args: spec.args },
         output: spec.output,
+        tokenSaver: saver.on,
         status: 'running',
         triggeredByType: trigger.type,
         triggeredById: trigger.id,

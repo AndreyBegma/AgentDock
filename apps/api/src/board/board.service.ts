@@ -38,6 +38,7 @@ import { mergeMethodOf } from '../planner/planner-instructions.service';
 import { RuntimeProfileResolver } from '../readiness';
 import { TextNormalizer } from '../text/text-normalizer';
 import { TextOwners } from '../text/text-owners';
+import { tokenSaverFactsOf } from '../token-saver/token-saver-facts';
 import { BoardCommands, boardOutput } from './board-commands';
 import { BoardDependencies } from './board-dependencies.service';
 import { boardError, cardNotFound } from './board-error';
@@ -368,6 +369,8 @@ export class BoardService implements OnModuleInit {
       profileAgentdock,
       attachmentCounts,
       dependencies: deps,
+      // #445: each round run's savings and artifact-guard flag.
+      tokenSaver: await tokenSaverFactsOf(this.prisma, runIds),
       now: new Date(),
     };
   }
