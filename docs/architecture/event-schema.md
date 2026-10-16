@@ -60,6 +60,7 @@ This table is what the plugin writes. What the runner forwards is in
 | `worktree.changed` | `slot, ahead, behind, dirty` |
 | `card_run.phase_changed` | `cardId, runId, projectId, phase: starting\|running\|ended\|failed, at, tmuxSession?, worktree?, exitCode?, error?` — a board card's worker (issue #242; `events/cards.ts`) |
 | `card_run.question` | `cardId, runId, projectId, at` — the round's pane shows Claude Code's question selector (`AskUserQuestion`); once per question, never the question text. The round goes to `waiting` until the answer's `hook.tool_finished` (#473) |
+| `card_run.finish_refused` | `cardId, runId, projectId, at, code` — the API refused the round's `finish_card`; `code` is the local error it answered (`localErrorCodeSchema`). Sent by the runner's local socket for a refused `card.finish` from a session in the worktree of a live round. The round needs attention, with the reason, while it is active; never the summary (#482) |
 
 Board server events (source `api`, ADR-0014, issue #242 D15): `card.finished`
 `{ cardId, number, title, round, finishedBy, prNumber, prUrl }` and

@@ -47,6 +47,7 @@ import {
   canStop,
   describeBoardError,
   FLEET_EDIT_HINT,
+  finishRefusedText,
   fleetHref,
   fleetSummary,
   HOOKS_GUIDE_LABEL,
@@ -186,6 +187,11 @@ function roundItems(
           ) : null}
           {round.error ? (
             <span className="text-danger">{round.error}</span>
+          ) : null}
+          {round.finishRefused ? (
+            <span className="text-danger">
+              {finishRefusedText(round.finishRefused)}
+            </span>
           ) : null}
           {round.phase === 'background' && round.backgroundCommand ? (
             <span className="break-words font-mono">
