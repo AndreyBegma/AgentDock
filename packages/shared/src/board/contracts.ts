@@ -26,6 +26,7 @@ import type {
   CaptureSkipReason,
   CaptureStatus,
 } from './capture-limits';
+import type { BoardMoveRefusal } from './moves';
 import type { CardCiCheck } from './shipping';
 import type {
   BoardCardKind,
@@ -539,6 +540,60 @@ export interface MoveBoardCardRequest {
   column: BoardColumn;
   index: number;
   stopWorker?: boolean;
+}
+
+/** #452: the actions of the bulk endpoint, in the order the action bar shows them. */
+export const BULK_CARD_ACTIONS = [
+  'complete',
+  'todo',
+  'finished',
+  'delete',
+] as const;
+export type BulkCardAction = (typeof BULK_CARD_ACTIONS)[number];
+
+/** #452: the most cards one bulk request carries. */
+export const BULK_CARDS_MAX = 100;
+
+/**
+ * `POST /board/cards/bulk` (#452): one action for several cards. `complete`
+ * is Accept with neither `merge` nor `closePr` — the PRs are left as they
+ * are; `todo` is the person's move; `finished` is Mark finished; `delete`
+ * never stops a worker.
+ */
+export interface BulkBoardCardsRequest {
+  /** 1 to `BULK_CARDS_MAX` distinct card numbers. */
+  numbers: number[];
+  action: BulkCardAction;
+}
+
+/**
+ * Why a card was left alone: the `boardMoveRule` refusal, or `already_in_column`,
+ * `wrong_column` (Completed takes only a Finished card), `not_running` (Mark
+ * finished takes only a card with a worker), `not_found` (deleted meanwhile).
+ */
+export type BulkCardSkipReason =
+  | BoardMoveRefusal
+  | 'already_in_column'
+  | 'wrong_column'
+  | 'not_running'
+  | 'not_found';
+
+/** One card's outcome. A skip is not a failure; an `error` is a refusal at the moment of the call. */
+export type BulkCardOutcome =
+  | { number: number; status: 'done' }
+  | { number: number; status: 'skipped'; reason: BulkCardSkipReason }
+  | {
+      number: number;
+      status: 'error';
+      /** The board error code, or `unknown`. */
+      code: BoardErrorCode | 'unknown';
+      message: string;
+    };
+
+/** The outcomes in the order of the request. */
+export interface BulkBoardCardsResponse {
+  action: BulkCardAction;
+  results: BulkCardOutcome[];
 }
 
 /**
