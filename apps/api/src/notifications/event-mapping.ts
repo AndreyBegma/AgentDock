@@ -1,7 +1,9 @@
 import {
+  CARD_BACKGROUND_STALLED_EVENT,
   CARD_FINISHED_EVENT,
   CARD_WAITING_EVENT,
   CARDS_SUGGESTED_EVENT,
+  cardBackgroundStalledTitle,
   cardLabel,
   type NotificationKind,
   SCHEDULE_DISABLED_LIVE_EVENT,
@@ -273,6 +275,22 @@ export const draftFor = (event: MatchableEvent): NotificationDraft | null => {
         body: pr
           ? `PR #${pr} is ready for review.`
           : 'Review it on the board: accept it, or send feedback.',
+        page: 'board',
+        card: number,
+      };
+    }
+    // #390: only the API records it; it names the card, never the command.
+    case CARD_BACKGROUND_STALLED_EVENT: {
+      if (event.source !== API_EVENT_SOURCE) return null;
+      const number = positiveInt(data.number);
+      const minutes = positiveInt(data.minutes);
+      if (!number || !minutes) return null;
+      return {
+        kind: 'card.background_stalled',
+        slot: null,
+        issue: null,
+        title: cardBackgroundStalledTitle(number, minutes),
+        body: 'Its worker ended its turn waiting on a background task that has not finished. Check the task in its session.',
         page: 'board',
         card: number,
       };

@@ -6,6 +6,7 @@ import { ReadinessModule } from '../readiness';
 import { RunnersModule } from '../runners/runners.module';
 import { BoardController } from './board.controller';
 import { BoardService, FleetCardEditsRef } from './board.service';
+import { BoardBackgroundStall } from './board-background-stall';
 import { BoardCommands } from './board-commands';
 import { BoardDependencies } from './board-dependencies.service';
 import { BoardInboxService } from './board-inbox.service';
@@ -30,6 +31,8 @@ import { CollectRetryTimer } from './collect-retry-timer';
   // #309: claiming attachments onto a card is a card route.
   controllers: [BoardController, BoardAttachmentsController],
   providers: [
+    // #390: a round stuck on its own background task raises one warning.
+    BoardBackgroundStall,
     BoardCommands,
     BoardDependencies,
     BoardInboxService,

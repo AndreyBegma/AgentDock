@@ -40,3 +40,4 @@ Numbered, never rewritten. A changed decision gets a new ADR that supersedes the
 | [0034](0034-the-planner-lives-on-the-board-and-makes-cards.md) | The Planner lives on the Board: New Card is an interview, New Plan makes cards (amends ADR-0028) |
 | [0035](0035-a-card-ships-itself.md) | A card ships itself: draft PR while working, CI watched and fixed, auto-merge at Finished, the card stays (amends ADR-0024 §6, ADR-0029) |
 | [0037](0037-new-work-is-one-intake-that-can-split.md) | New work is one intake that can split: one button replaces New Card and New Plan, a confirmed split makes independent cards (amends ADR-0034 §1, §2) |
+| [0038](0038-a-round-waiting-on-its-own-background-tasks-is-not-waiting-for-the-person.md) | A round waiting on its own background tasks is not waiting for the person: a `background` phase from the transcript, activity is running, one stall warning (amends ADR-0024) |

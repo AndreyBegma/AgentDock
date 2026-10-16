@@ -10,6 +10,15 @@ import type { BoardCardKind } from './types';
 /** D1: the per-project number as people see it. */
 export const cardLabel = (number: number): string => `C-${number}`;
 
+/** #390: "C-39 has been waiting on its own background task for 30 min". */
+export const cardBackgroundStalledTitle = (
+  number: number,
+  minutes: number,
+): string =>
+  `${cardLabel(number)} has been waiting on its own background task for ${
+    minutes % 60 === 0 && minutes >= 60 ? `${minutes / 60} h` : `${minutes} min`
+  }`;
+
 /** D8: the line every card PR body carries, so a PR is traced back to its card. */
 export const CARD_PR_MARKER = 'AgentDock-Card';
 

@@ -6,6 +6,7 @@ import {
   type BoardSettingsView,
   type BoardUserRef,
   CAPTURE_MODEL_DEFAULT,
+  CARD_BACKGROUND_STALL_MINUTES_DEFAULT,
   CARD_HOOKS_GRACE_MS,
   type CardDependencyRef,
   type CardEvidenceView,
@@ -217,6 +218,8 @@ const brief = (
         phase: round.phase,
         finishedBy: round.finishedBy,
         waitingAt: iso(round.waitingAt),
+        backgroundAt: iso(round.backgroundAt),
+        backgroundCommand: round.backgroundCommand,
         hooksMissing: hooksMissing(card, round, facts),
         ...hooksCauseOf(card, round, facts),
         ...wiringOf(round),
@@ -333,6 +336,8 @@ const toRoundView = (
   costUsd: facts.costs.get(round.runId) ?? null,
   startedAt: round.startedAt.toISOString(),
   waitingAt: iso(round.waitingAt),
+  backgroundAt: iso(round.backgroundAt),
+  backgroundCommand: round.backgroundCommand,
   finishedAt: iso(round.finishedAt),
   endedAt: iso(round.endedAt),
 });
@@ -394,6 +399,7 @@ export const toSettingsView = (
         autoCollectTracked: row.autoCollectTracked,
         autoMergeCards: row.autoMergeCards,
         autoMergeCardsDefault,
+        backgroundStallMinutes: row.backgroundStallMinutes,
         isDefault: false,
         updatedAt: row.updatedAt.toISOString(),
       }
@@ -407,6 +413,7 @@ export const toSettingsView = (
         autoCollectTracked: false,
         autoMergeCards: null,
         autoMergeCardsDefault,
+        backgroundStallMinutes: CARD_BACKGROUND_STALL_MINUTES_DEFAULT,
         isDefault: true,
         updatedAt: null,
       };

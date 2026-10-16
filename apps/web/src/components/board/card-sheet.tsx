@@ -158,6 +158,11 @@ function roundItems(
           {round.error ? (
             <span className="text-danger">{round.error}</span>
           ) : null}
+          {round.phase === 'background' && round.backgroundCommand ? (
+            <span className="break-words font-mono">
+              In the background: {round.backgroundCommand}
+            </span>
+          ) : null}
           {round.hooksMissing ? (
             // A round is a runner launch, whatever the card's source.
             <span>{hooksNotice({ source: 'manual' }, round).text}</span>

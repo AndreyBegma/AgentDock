@@ -52,7 +52,7 @@ const CONTENT_OF: Record<HookEventType, readonly ContentField[]> = {
   'hook.tool_finished': ['input', 'output'],
   'hook.permission_requested': [],
   'hook.notification': [],
-  'hook.stopped': ['response'],
+  'hook.stopped': ['response', 'background'],
   'hook.session_ended': [],
 };
 

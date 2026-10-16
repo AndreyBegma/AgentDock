@@ -241,7 +241,8 @@ export class NotificationMatcher
       fold:
         draft.kind !== 'schedule.disabled' &&
         draft.kind !== 'card.finished' &&
-        draft.kind !== 'card.waiting',
+        draft.kind !== 'card.waiting' &&
+        draft.kind !== 'card.background_stalled',
     };
   }
 

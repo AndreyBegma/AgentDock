@@ -254,6 +254,33 @@ describe('draftFor (spec 22 D1)', () => {
       });
     });
 
+    it('maps card.background_stalled without the title or the command (#390)', () => {
+      const draft = draftFor(
+        card('card.background_stalled', {
+          number: 39,
+          title: 'secret title',
+          round: 1,
+          minutes: 30,
+        }),
+      );
+      expect(draft).toMatchObject({
+        kind: 'card.background_stalled',
+        title: 'C-39 has been waiting on its own background task for 30 min',
+        page: 'board',
+        card: 39,
+      });
+      expect(JSON.stringify(draft)).not.toContain('secret');
+      expect(
+        draftFor(
+          card(
+            'card.background_stalled',
+            { number: 39, minutes: 30 },
+            'runner',
+          ),
+        ),
+      ).toBeNull();
+    });
+
     it('never copies more than the title, and only the first line of it', () => {
       const draft = draftFor(
         card('card.waiting', {

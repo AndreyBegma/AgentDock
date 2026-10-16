@@ -11,6 +11,7 @@ import {
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
+import { stripHookContent } from '../sessions/session-hook-content';
 import { advanceCursor, type SeqRange } from './ack-cursor';
 import { tokenPrefix, verifyRunnerToken } from './credentials';
 import { RunnerEventSinks } from './runner-event-sinks';
@@ -177,7 +178,8 @@ export class RunnerIngestService {
   }
 
   /**
-   * Hands a batch to the registered sinks, then stores it — a `(runnerId, seq)`
+   * Hands a batch to the registered sinks, then stores it without hook
+   * content — a `(runnerId, seq)`
    * already stored is skipped, so a resend after a reconnect changes nothing
    * (D6) — and returns the new ack cursor. A throwing sink fails the batch
    * before anything is stored: the ack holds and the runner resends it.
@@ -185,6 +187,8 @@ export class RunnerIngestService {
   async events(runnerId: string, events: RunnerEvent[]): Promise<bigint> {
     const { fresh, duplicate } = await this.splitPluginDuplicates(events);
     if (fresh.length > 0) await this.sinks.dispatch(runnerId, fresh);
+    // ADR-0021: the sinks read hook content; `events.data` never holds it.
+    for (const event of fresh) stripHookContent(event);
     const row = (event: RunnerEvent) => ({
       runnerId,
       seq: BigInt(event.seq),

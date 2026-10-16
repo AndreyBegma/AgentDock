@@ -86,6 +86,30 @@ describe('LocalService — hook events (spec 201 D11, D13)', () => {
     });
   });
 
+  it('gates the background command of a stop like any content (#390)', async () => {
+    const stop = {
+      type: 'hook.stopped',
+      sessionId: 's-1',
+      cwd: ROOT,
+      data: { backgroundTasks: 2 },
+      content: {
+        background: { text: `bun test --token ${GHP}`, truncated: false },
+      },
+    };
+    const off = setup(false);
+    await off.service.handle('event', stop);
+    expect(off.emitted[0]?.data).toEqual({ backgroundTasks: 2 });
+    const on = setup(true);
+    await on.service.handle('event', stop);
+    const data = on.emitted[0]?.data as {
+      backgroundTasks: number;
+      background: { text: string };
+    };
+    expect(data.backgroundTasks).toBe(2);
+    expect(data.background.text).toContain('bun test');
+    expect(data.background.text).not.toContain('ghp_');
+  });
+
   it('never ships content for a cwd outside every watched root', async () => {
     const { service, emitted } = setup(true);
     await service.handle('event', prompt(`secret ${GHP}`, '/tmp/elsewhere'));

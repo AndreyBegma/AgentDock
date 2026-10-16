@@ -1,4 +1,6 @@
 import type { AuditActorType, AuditResult } from '../audit/actions';
+import { CARD_BACKGROUND_STALLED_EVENT } from '../board/contracts';
+import { cardBackgroundStalledTitle } from '../board/naming';
 import { API_EVENT_SOURCE } from '../protocol/envelope';
 import type {
   ActivityActorType,
@@ -323,6 +325,27 @@ const EVENT_RULES: Record<string, EventRule> = {
   },
   // Recorded by the API itself (ADR-0014).
   ...SCHEDULE_EVENT_RULES,
+  // #390: a card round waits on its own background task too long.
+  [CARD_BACKGROUND_STALLED_EVENT]: {
+    category: 'fleet',
+    severity: fixed('warn'),
+    title: (ctx) => {
+      const number = int(ctx.data, 'number');
+      const minutes = int(ctx.data, 'minutes');
+      return number !== null && minutes !== null
+        ? cardBackgroundStalledTitle(number, minutes)
+        : 'A card has been waiting on its own background task';
+    },
+    keep: ['cardId', 'number', 'round', 'minutes'],
+    bySystem: true,
+    sources: [API_EVENT_SOURCE],
+    link: (ctx) => {
+      const number = int(ctx.data, 'number');
+      return ctx.projectId
+        ? `/projects/${ctx.projectId}/board${number !== null ? `?card=${number}` : ''}`
+        : null;
+    },
+  },
 };
 
 /** Every event type the feed shows — the projector's `type IN (…)` filter. */

@@ -86,6 +86,7 @@ export const CONTENT_FIELDS = [
   'input',
   'output',
   'response',
+  'background',
 ] as const;
 export type ContentField = (typeof CONTENT_FIELDS)[number];
 

@@ -8,7 +8,9 @@ import type { Role } from '../auth';
  * budgets (spec 28 D6) and have no project for a user budget.
  * `schedule.disabled` comes from an automatic schedule disable (spec 25 D10)
  * and goes to project admins and active admins only. `card.finished` and
- * `card.waiting` come from board card workers (issue #242 D15).
+ * `card.waiting` come from board card workers (issue #242 D15);
+ * `card.background_stalled` from a card round waiting on its own background
+ * task too long (#390).
  * `cards.suggested` comes from card capture (issue #244 D11): suggestions are
  * content-derived, so it goes to operators and admins only, and never quotes
  * content.
@@ -28,6 +30,7 @@ export const NOTIFICATION_KINDS = [
   'action.requested',
   'card.finished',
   'card.waiting',
+  'card.background_stalled',
   'cards.suggested',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
@@ -159,6 +162,12 @@ export const NOTIFICATION_KIND_SPECS: Record<
   'card.waiting': {
     scope: 'project',
     source: 'card.waiting (issue #242 D15)',
+    channels: BOTH,
+    defaults: ON_OFF,
+  },
+  'card.background_stalled': {
+    scope: 'project',
+    source: 'card.background_stalled (#390)',
     channels: BOTH,
     defaults: ON_OFF,
   },

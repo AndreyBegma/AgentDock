@@ -2660,6 +2660,8 @@ enum CardRoundPhase {
   starting
   running
   waiting
+  /// #390 (ADR-0038): the turn stopped with its own background tasks running.
+  background
   finished
   ended
   failed
@@ -2839,25 +2841,25 @@ model BoardCard {
   createdAt               DateTime         @default(now())
   updatedAt               DateTime         @updatedAt
 
-  project            Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  plan               Plan?                 @relation(fields: [planId], references: [id], onDelete: SetNull)
-  trackedSession     AgentSession?         @relation("BoardCardTrackedSession", fields: [trackedSessionId], references: [id], onDelete: SetNull)
-  createdBy          User?                 @relation("BoardCardCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  movedBy            User?                 @relation("BoardCardMovedBy", fields: [movedById], references: [id], onDelete: SetNull)
-  completedBy        User?                 @relation("BoardCardCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
-  capture            CardCapture?          @relation(fields: [captureId], references: [id], onDelete: SetNull)
-  sourceSession      AgentSession?         @relation("BoardCardSourceSession", fields: [sourceSessionId], references: [id], onDelete: SetNull)
+  project            Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  plan               Plan?                  @relation(fields: [planId], references: [id], onDelete: SetNull)
+  trackedSession     AgentSession?          @relation("BoardCardTrackedSession", fields: [trackedSessionId], references: [id], onDelete: SetNull)
+  createdBy          User?                  @relation("BoardCardCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  movedBy            User?                  @relation("BoardCardMovedBy", fields: [movedById], references: [id], onDelete: SetNull)
+  completedBy        User?                  @relation("BoardCardCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+  capture            CardCapture?           @relation(fields: [captureId], references: [id], onDelete: SetNull)
+  sourceSession      AgentSession?          @relation("BoardCardSourceSession", fields: [sourceSessionId], references: [id], onDelete: SetNull)
   rounds             BoardCardRound[]
   design             TaskDesign?
   designTurns        PlanTurn[]
   textNormalizations TextNormalization[]
   attachments        Attachment[]
   /// #337 D7: the plan task Create cards made this card from.
-  planTasks          PlanTask[]            @relation("PlanTaskCard")
+  planTasks          PlanTask[]             @relation("PlanTaskCard")
   /// #337 D8: the cards this one runs after.
-  dependsOn          BoardCardDependency[] @relation("BoardCardDependsOn")
+  dependsOn          BoardCardDependency[]  @relation("BoardCardDependsOn")
   /// #337 D8: the cards that run after this one.
-  dependants         BoardCardDependency[] @relation("BoardCardDependant")
+  dependants         BoardCardDependency[]  @relation("BoardCardDependant")
   /// #359 D8: every PR the card opened; `prUrl` is the latest.
   pullRequests       BoardCardPullRequest[]
 
@@ -2908,39 +2910,48 @@ model BoardCardPullRequest {
 
 /// One Run or feedback of a card (D4), with its `runs` row of kind `card`.
 model BoardCardRound {
-  id              String           @id @default(cuid())
-  cardId          String
-  round           Int
-  runId           String           @unique
-  trigger         CardRoundTrigger
+  id                  String           @id @default(cuid())
+  cardId              String
+  round               Int
+  runId               String           @unique
+  trigger             CardRoundTrigger
   /// The person's feedback (D9), at most 8 000 characters.
-  feedback        String?
+  feedback            String?
   /// #273 D1: the card text this round's prompt was built from.
-  cardTitle       String
-  cardBody        String
-  cardKind        BoardCardKind
+  cardTitle           String
+  cardBody            String
+  cardKind            BoardCardKind
   /// #309 D10: the card's attachments this round's prompt was built from,
   /// `[{id, name, mime}]` (shared `cardAttachmentSnapshotSchema`).
-  cardAttachments Json             @default("[]")
+  cardAttachments     Json             @default("[]")
   /// Nullable so deleting the author keeps the round.
-  authorId        String?
-  phase           CardRoundPhase   @default(queued)
+  authorId            String?
+  phase               CardRoundPhase   @default(queued)
   /// `agentdock-card-<shortId>`.
-  tmuxSession     String?
+  tmuxSession         String?
   /// #367 D3: how the round's session reports (`plugin` | `injected` | `none`),
   /// from `card_run.started`; `null` until that event arrives.
-  wiring          String?
+  wiring              String?
   /// #367 D3: with `wiring = none`, why (shared `cardRunWiringReasonSchema`).
-  wiringReason    String?
-  finishedBy      CardFinishedBy?
+  wiringReason        String?
+  finishedBy          CardFinishedBy?
   /// From `finish_card` (D6), at most 4 000 characters.
-  summary         String?
-  exitCode        Int?
-  error           String?
-  startedAt       DateTime         @default(now())
-  waitingAt       DateTime?
-  finishedAt      DateTime?
-  endedAt         DateTime?
+  summary             String?
+  exitCode            Int?
+  error               String?
+  startedAt           DateTime         @default(now())
+  waitingAt           DateTime?
+  /// #390: when the round entered `background`; cleared when it leaves.
+  backgroundAt        DateTime?
+  /// #390: background tasks running at that stop.
+  backgroundTasks     Int?
+  /// #390: the newest running command, redacted and shortened; only for a
+  /// project that ships content (ADR-0021).
+  backgroundCommand   String?
+  /// #390: when this stall raised `card.background_stalled` — once per stall.
+  backgroundStalledAt DateTime?
+  finishedAt          DateTime?
+  endedAt             DateTime?
 
   card   BoardCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
   run    Run       @relation(fields: [runId], references: [id], onDelete: Cascade)
@@ -2999,23 +3010,26 @@ model Attachment {
 
 /// A project's board settings (D2, D13). No row: the defaults.
 model BoardSettings {
-  projectId          String   @id
-  issueOnRun         Boolean  @default(false)
-  specOnRun          Boolean  @default(false)
+  projectId              String   @id
+  issueOnRun             Boolean  @default(false)
+  specOnRun              Boolean  @default(false)
   /// 1–10, checked by the DTO.
-  maxRunning         Int      @default(3)
+  maxRunning             Int      @default(3)
   /// #244 D10: on only while the project's `shipSessionContent` is on;
   /// turning content off turns it off.
-  captureEnabled     Boolean  @default(false)
+  captureEnabled         Boolean  @default(false)
   /// Shared `CAPTURE_MODELS`: `haiku` or `sonnet`, checked by the DTO.
-  captureModel       String   @default("haiku")
+  captureModel           String   @default("haiku")
   /// #282 D3: the `autoCollect` a new `terminal` card starts with.
-  autoCollectTracked Boolean  @default(false)
+  autoCollectTracked     Boolean  @default(false)
   /// #359 D7: merge a card's PR on entering Finished. `null` is the default:
   /// on for a base other than the default branch (shared `cardAutoMergeDefault`).
-  autoMergeCards     Boolean?
-  updatedById        String?
-  updatedAt          DateTime @updatedAt
+  autoMergeCards         Boolean?
+  /// #390: minutes in `background` before `card.background_stalled`; 5–1440,
+  /// checked by the DTO.
+  backgroundStallMinutes Int      @default(30)
+  updatedById            String?
+  updatedAt              DateTime @updatedAt
 
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   updatedBy User?   @relation(fields: [updatedById], references: [id], onDelete: SetNull)
