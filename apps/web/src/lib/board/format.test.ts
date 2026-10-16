@@ -19,11 +19,49 @@ import {
   HOOKS_GUIDE_LABEL,
   hooksGuideHref,
   hooksNotice,
+  isWorktreeGoneError,
+  noPrBanner,
   parseCardParam,
   parseMaxRunning,
   roundPill,
   toItem,
+  WORKTREE_GONE_TEXT,
 } from './format';
+
+describe('noPrBanner (#395)', () => {
+  const RAW =
+    'card.collect: not found on the runner — card cmv992gb5007u01octdbcbbg9 has no worktree in cmv6o6qkn01h201o9tlib0our';
+
+  test('a vanished worktree gets a plain sentence, no ids, and no Create button', () => {
+    const banner = noPrBanner({ collectState: 'failed', collectError: RAW });
+    expect(banner.text).toBe(`No pull request: ${WORKTREE_GONE_TEXT}`);
+    expect(banner.text).not.toContain('cmv');
+    expect(banner.text).not.toContain('card.collect');
+    expect(banner.tone).toBe('warn');
+    expect(banner.canCreate).toBe(false);
+  });
+
+  test('any other failure keeps its text and the Create button', () => {
+    expect(
+      noPrBanner({ collectState: 'failed', collectError: 'push rejected' }),
+    ).toEqual({
+      tone: 'warn',
+      text: 'No pull request: push rejected',
+      canCreate: true,
+    });
+    expect(
+      noPrBanner({ collectState: 'none', collectError: null }).canCreate,
+    ).toBe(true);
+  });
+
+  test('only the runner not_found for a missing worktree matches', () => {
+    expect(isWorktreeGoneError(RAW)).toBe(true);
+    expect(isWorktreeGoneError(null)).toBe(false);
+    expect(isWorktreeGoneError('card.collect failed on the runner')).toBe(
+      false,
+    );
+  });
+});
 
 describe('roundPill', () => {
   test('none before the first Run and for a finished round', () => {
