@@ -957,8 +957,10 @@ describe.skipIf(!tmuxInstalled)('Steward on card rounds (#447)', () => {
     expect(await t.executor.dismissDialog(session, 'teach-auto-mode')).toBe(
       true,
     );
-    for (let i = 0; i < 400 && !existsSync(keyFile); i++) await Bun.sleep(25);
-    expect(readFileSync(keyFile, 'utf8').trim()).toBe('1b');
+    const keyRead = () =>
+      existsSync(keyFile) ? readFileSync(keyFile, 'utf8').trim() : '';
+    for (let i = 0; i < 400 && keyRead() === ''; i++) await Bun.sleep(25);
+    expect(keyRead()).toBe('1b');
   });
 
   it('D7: a trailer commit is not pushed, is reported, and the worker at its prompt gets the list', async () => {

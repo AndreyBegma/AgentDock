@@ -12,7 +12,11 @@ import { leakedSockets, socketDir } from './tmux';
 afterAll(() => {
   const leaked = leakedSockets(process.pid);
   for (const name of leaked) {
-    Bun.spawnSync(['tmux', '-L', name, 'kill-server']);
+    try {
+      Bun.spawnSync(['tmux', '-L', name, 'kill-server']);
+    } catch {
+      // tmux is not installed: only the socket file is left to remove.
+    }
     rmSync(join(socketDir(), name), { force: true });
   }
   if (leaked.length > 0) {

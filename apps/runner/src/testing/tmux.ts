@@ -9,11 +9,15 @@ export const socketDir = () =>
 export const TEST_SERVER = /^agentdock-(?:[a-z]+-)*test-(\d+)-/;
 
 const killServer = async (name: string) => {
-  const proc = Bun.spawn(['tmux', '-L', name, 'kill-server'], {
-    stdout: 'ignore',
-    stderr: 'ignore',
-  });
-  await proc.exited;
+  try {
+    const proc = Bun.spawn(['tmux', '-L', name, 'kill-server'], {
+      stdout: 'ignore',
+      stderr: 'ignore',
+    });
+    await proc.exited;
+  } catch {
+    // tmux is not installed (CI): there is no server to stop.
+  }
 };
 
 /**
