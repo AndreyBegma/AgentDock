@@ -608,6 +608,9 @@ export class BoardRoundsService {
           authorId: actor.userId,
           phase: 'queued',
           startedAt: now,
+          // #449 D3: the session it launches with; a `fresh` start replaces
+          // it (`round.restart`), and the earlier rounds keep theirs.
+          sessionId,
         },
       });
       await this.attachments.claim(

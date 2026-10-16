@@ -11,6 +11,7 @@ import {
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
+import { stripHandoffContent } from '../handoff/handoff-content';
 import { stripHookContent } from '../sessions/session-hook-content';
 import { advanceCursor, type SeqRange } from './ack-cursor';
 import { tokenPrefix, verifyRunnerToken } from './credentials';
@@ -188,7 +189,11 @@ export class RunnerIngestService {
     const { fresh, duplicate } = await this.splitPluginDuplicates(events);
     if (fresh.length > 0) await this.sinks.dispatch(runnerId, fresh);
     // ADR-0021: the sinks read hook content; `events.data` never holds it.
-    for (const event of fresh) stripHookContent(event);
+    // #449 DA-12: nor a handoff note's text.
+    for (const event of fresh) {
+      stripHookContent(event);
+      stripHandoffContent(event);
+    }
     const row = (event: RunnerEvent) => ({
       runnerId,
       seq: BigInt(event.seq),
