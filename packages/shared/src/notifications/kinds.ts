@@ -17,6 +17,8 @@ import type { Role } from '../auth';
  * `steward.incident` comes from Steward escalating an incident (issue #447
  * D13): once per incident and again on a changed reason. Its reason can be
  * haiku's reading of the pane, so it goes to operators and admins only.
+ * `account.throttled` comes from sign-in throttling (C-109): an account's
+ * failed password checks from one source crossed the threshold.
  */
 export const NOTIFICATION_KINDS = [
   'person.needed',
@@ -36,6 +38,7 @@ export const NOTIFICATION_KINDS = [
   'card.background_stalled',
   'cards.suggested',
   'steward.incident',
+  'account.throttled',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -190,6 +193,12 @@ export const NOTIFICATION_KIND_SPECS: Record<
     defaults: ON_ON,
     viewerDefaults: { inApp: false, telegram: false },
     operatorsOnly: true,
+  },
+  'account.throttled': {
+    scope: 'admin',
+    source: 'sign-in throttling (C-109)',
+    channels: BOTH,
+    defaults: ON_ON,
   },
 };
 

@@ -31,6 +31,7 @@ export const KIND_LABEL: Record<NotificationKind, string> = {
   'card.background_stalled': 'Card worker stuck on its own background task',
   'cards.suggested': 'Cards suggested from your sessions',
   'steward.incident': 'Steward needs you on stuck work',
+  'account.throttled': 'Sign-in attempts throttled',
 };
 
 /** What a notification of the kind reads like, under the rule's name. */
@@ -54,15 +55,22 @@ export const KIND_EXAMPLE: Record<NotificationKind, string> = {
   'cards.suggested': '3 cards suggested in the luna-watch Inbox',
   'steward.incident':
     'C-12 needs you: API error persisted after 2 nudges — open the terminal',
+  'account.throttled': 'admin@example.com: 5 wrong passwords from 203.0.113.7',
 };
 
-export type RuleGroup = 'fleet' | 'runners' | 'budgets' | 'schedules';
+export type RuleGroup =
+  | 'fleet'
+  | 'runners'
+  | 'budgets'
+  | 'schedules'
+  | 'security';
 
 export const RULE_GROUP_LABEL: Record<RuleGroup, string> = {
   fleet: 'Orchestrator and slots',
   runners: 'Runners',
   budgets: 'Budgets',
   schedules: 'Schedules',
+  security: 'Security',
 };
 
 const KIND_GROUP: Record<NotificationKind, RuleGroup> = {
@@ -83,6 +91,7 @@ const KIND_GROUP: Record<NotificationKind, RuleGroup> = {
   'card.background_stalled': 'fleet',
   'cards.suggested': 'fleet',
   'steward.incident': 'fleet',
+  'account.throttled': 'security',
 };
 
 export type KindTone = 'ok' | 'warn' | 'danger' | 'neutral';
@@ -105,6 +114,7 @@ export const KIND_TONE: Record<NotificationKind, KindTone> = {
   'card.background_stalled': 'warn',
   'cards.suggested': 'neutral',
   'steward.incident': 'warn',
+  'account.throttled': 'danger',
 };
 
 export interface FeedState {

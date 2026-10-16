@@ -18,7 +18,7 @@ assets are those machines. The main threats:
 | **Agent credentials** | Claude / Codex / `gh` credentials stay on the runner. The control plane never stores or transmits them. Runtime profiles reference config dirs by path only |
 | **Runner auth** | one-time pairing code → 256-bit token, stored as argon2id hash; WSS only; revocable; token never logged |
 | **Runner commands** | typed allowlist (runner-protocol.md); no shell strings; paths confined to registered project roots and their worktree parent; runner-side policy can disable commands per machine |
-| **User auth** | email + password (argon2id); httpOnly, Secure, SameSite=Lax cookie session stored server-side; CSRF token on state-changing requests; login rate limit and lockout; session revoke on password change |
+| **User auth** | email + password (argon2id); httpOnly, Secure, SameSite=Lax cookie session stored server-side; CSRF token on state-changing requests; login rate limit and a per-(email, IP) exponential wait, no account lock (ADR-0047); session revoke on password change |
 | **Registration** | first admin via `bun run admin:create` (CLI, interactive or env); public registration off by default, toggled by admin; new users `pending` until an admin approves and assigns a role in one action |
 | **Authorization** | global role × project membership, checked in the API on every request and every runner command |
 | **Audit** | append-only `AuditRecord`, each row hashes the previous (`hash = sha256(prevHash ‖ canonical(row))`); a verification job reports breaks; a database trigger rejects UPDATE, DELETE and TRUNCATE; secrets are redacted before hashing; in production the app's DB role should also have no UPDATE/DELETE on the table ([spec 8](../specs/8-audit-log.md)) |

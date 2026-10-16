@@ -31,7 +31,7 @@ the two never share a name.
 
 | Entity | Key fields |
 |---|---|
-| `User` | email, passwordHash (argon2id), name, `status: pending\|active\|rejected\|disabled`, `role: admin\|operator\|viewer`, approvedBy, approvedAt, failedLoginCount, lockedUntil — the Telegram chat is a `TelegramLink` row |
+| `User` | email, passwordHash (argon2id), name, `status: pending\|active\|rejected\|disabled`, `role: admin\|operator\|viewer`, approvedBy, approvedAt (failed logins live in `LoginThrottle`, per email and IP — ADR-0047) — the Telegram chat is a `TelegramLink` row |
 | `UserSession` | userId, tokenHash (sha256 of the cookie token), createdAt, lastSeenAt, expiresAt, ip, userAgent — table `user_sessions` |
 | `Setting` | key (primary key), value (json), updatedBy — table `settings` |
 | `ProjectMember` | userId (cascade), projectId (cascade), roleOverride? — effective role is `min(global role, override)`, so an override only lowers it; admins need no row — addedBy? (`SET NULL` when that user is deleted), createdAt; unique `(projectId, userId)` — table `project_members` ([spec 10](../specs/10-projects.md)) |

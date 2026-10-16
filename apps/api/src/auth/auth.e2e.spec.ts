@@ -5,6 +5,11 @@ import {
   SESSION_COOKIE,
 } from '@agentdock/shared';
 import {
+  ThrottlerStorage,
+  type ThrottlerStorageService,
+} from '@nestjs/throttler';
+import { AuditService } from '../audit/audit.service';
+import {
   createE2eApp,
   createUser,
   type E2eContext,
@@ -156,39 +161,179 @@ describe('auth (e2e)', () => {
       expect(response.body.error).toBe(AUTH_ERROR.invalidCredentials);
     });
 
-    it('locks the account for 15 minutes after 10 failures; the correct password then fails', async () => {
-      await createUser(ctx.prisma, 'op@example.com', 'operator');
+    describe('throttling failed passwords per (account, IP) (C-109)', () => {
+      const WRONG = 'wrong password!!';
 
-      for (let i = 0; i < 10; i += 1) {
-        const failed = await attempt('op@example.com', 'wrong password!!');
-        expect(failed.status).toBe(401);
-      }
-      const locked = await attempt('op@example.com', PASSWORD);
-      expect(locked.status).toBe(401);
-      expect(locked.body.error).toBe(AUTH_ERROR.invalidCredentials);
+      /** Forgets the per-IP request limit, so a test can send more than 10 a minute. */
+      const resetRequestLimit = () =>
+        ctx.app.get<ThrottlerStorageService>(ThrottlerStorage).storage.clear();
 
-      const user = await ctx.prisma.user.findUniqueOrThrow({
-        where: { email: 'op@example.com' },
+      /** Ends the wait of every source now, as if its delay had passed. */
+      const endWaits = () =>
+        ctx.prisma.loginThrottle.updateMany({
+          data: { blockedUntil: new Date(Date.now() - 1000) },
+        });
+
+      /**
+       * Makes `count` wrong-password failures count from `ip`, waiting out
+       * each delay. Returns the `Retry-After` of every 429 on the way.
+       */
+      const failFrom = async (ip: string, count: number) => {
+        const waits: number[] = [];
+        let failures = 0;
+        while (failures < count) {
+          resetRequestLimit();
+          const response = await attempt('op@example.com', WRONG, ip);
+          if (response.status === 429) {
+            expect(response.body.error).toBe(AUTH_ERROR.throttled);
+            waits.push(Number(response.headers['retry-after']));
+            await endWaits();
+            continue;
+          }
+          expect(response.status).toBe(401);
+          failures += 1;
+        }
+        return waits;
+      };
+
+      it('never delays the owner from another address: 20 failures from A, then B signs in at once', async () => {
+        await createUser(ctx.prisma, 'op@example.com', 'operator');
+        const a = nextIp();
+
+        await failFrom(a, 20);
+
+        const started = Date.now();
+        const fromB = await attempt('op@example.com', PASSWORD);
+        expect(fromB.status).toBe(200);
+        expect(Date.now() - started).toBeLessThan(1000);
+        const user = await ctx.prisma.user.findUniqueOrThrow({
+          where: { email: 'op@example.com' },
+        });
+        expect(user.status).toBe('active');
       });
-      const minutes =
-        ((user.lockedUntil?.getTime() ?? 0) - Date.now()) / 60_000;
-      expect(minutes).toBeGreaterThan(14);
-      expect(minutes).toBeLessThanOrEqual(15);
 
-      // Once the lock has run out, the right password works again.
-      await ctx.prisma.user.update({
-        where: { id: user.id },
-        data: { lockedUntil: new Date(Date.now() - 1000) },
+      it('makes A wait after 5 failures, doubling from 1 s to a 60 s ceiling', async () => {
+        await createUser(ctx.prisma, 'op@example.com', 'operator');
+        const a = nextIp();
+
+        const waits = await failFrom(a, 20);
+
+        // Failures 5…19 each set a wait; the 20th's is still running.
+        expect(waits).toEqual([
+          1, 2, 4, 8, 16, 32, 60, 60, 60, 60, 60, 60, 60, 60, 60,
+        ]);
+        resetRequestLimit();
+        const waiting = await attempt('op@example.com', PASSWORD, a);
+        expect(waiting.status).toBe(429);
+        expect(Number(waiting.headers['retry-after'])).toBe(60);
+
+        // Once the wait is over, the right password works and clears A.
+        await endWaits();
+        expect((await attempt('op@example.com', PASSWORD, a)).status).toBe(200);
+        expect(await ctx.prisma.loginThrottle.count()).toBe(0);
       });
-      expect((await attempt('op@example.com', PASSWORD)).status).toBe(200);
+
+      it('throttles an unknown email exactly like a real one', async () => {
+        const ip = nextIp();
+        const statuses: number[] = [];
+        for (let i = 0; i < 6; i += 1) {
+          statuses.push(
+            (await attempt('nobody@example.com', WRONG, ip)).status,
+          );
+        }
+        expect(statuses).toEqual([401, 401, 401, 401, 401, 429]);
+      });
+
+      it('notifies every active admin once when an account becomes throttled', async () => {
+        const admin = await createUser(
+          ctx.prisma,
+          'admin@example.com',
+          'admin',
+        );
+        await createUser(ctx.prisma, 'op@example.com', 'operator');
+
+        await failFrom(nextIp(), 4);
+        expect(
+          await ctx.prisma.notification.count({
+            where: { kind: 'account.throttled' },
+          }),
+        ).toBe(0);
+
+        await failFrom(nextIp(), 5);
+        const [notification] = await ctx.prisma.notification.findMany({
+          where: { kind: 'account.throttled' },
+        });
+        expect(notification).toMatchObject({
+          userId: admin.id,
+          title: 'Sign-in attempts throttled for op@example.com',
+          link: '/admin/users',
+        });
+
+        // A second source crossing within the window is the same episode.
+        await failFrom(nextIp(), 6);
+        expect(
+          await ctx.prisma.notification.count({
+            where: { kind: 'account.throttled' },
+          }),
+        ).toBe(1);
+      });
+
+      it('folds 100 refused logins from one (email, IP) into at most 2 audit records', async () => {
+        await createUser(ctx.prisma, 'op@example.com', 'operator');
+        const audit = ctx.app.get(AuditService);
+        // Away from a minute boundary, so the burst stays in one minute.
+        const intoMinute = Date.now() % 60_000;
+        if (intoMinute > 40_000) {
+          await new Promise((r) => setTimeout(r, 60_500 - intoMinute));
+        }
+        const ip = nextIp();
+        const records = () =>
+          ctx.prisma.auditRecord.count({
+            where: { action: 'auth.login', targetId: 'op@example.com' },
+          });
+
+        const statuses = new Set<number>();
+        for (let i = 0; i < 100; i += 1) {
+          resetRequestLimit();
+          statuses.add((await attempt('op@example.com', WRONG, ip)).status);
+        }
+        expect([...statuses].sort()).toEqual([401, 429]);
+        expect(await records()).toBe(1);
+
+        // The minute is over: the 99 repeats become one record.
+        expect(await audit.flushFolds(new Date(Date.now() + 60_000))).toBe(1);
+        const rows = await ctx.prisma.auditRecord.findMany({
+          where: { action: 'auth.login', targetId: 'op@example.com' },
+          orderBy: { seq: 'asc' },
+        });
+        expect(rows).toHaveLength(2);
+        expect(rows[0].meta).toMatchObject({
+          reason: 'invalid_credentials',
+          count: 1,
+        });
+        const folded = rows[1].meta as {
+          folded: boolean;
+          count: number;
+          reasons: Record<string, number>;
+        };
+        expect(folded).toMatchObject({ folded: true, count: 99 });
+        // Wrong passwords until the source waits, then mostly 429s.
+        expect(folded.reasons.invalid_credentials).toBeGreaterThanOrEqual(4);
+        expect(folded.reasons.throttled).toBeGreaterThan(0);
+        expect(
+          folded.reasons.invalid_credentials + folded.reasons.throttled,
+        ).toBe(99);
+        expect(await ctx.prisma.auditFold.count()).toBe(0);
+      });
     });
 
     it('throttles more than 10 login requests a minute from one IP with 429', async () => {
       const ip = nextIp();
       const statuses: number[] = [];
       for (let i = 0; i < 11; i += 1) {
+        // A new email each time: the per-(account, IP) wait stays out of it.
         statuses.push(
-          (await attempt('a@example.com', 'whatever!!', ip)).status,
+          (await attempt(`a${i}@example.com`, 'whatever!!', ip)).status,
         );
       }
       expect(statuses.slice(0, 10)).toEqual(Array(10).fill(401));
@@ -313,6 +458,49 @@ describe('auth (e2e)', () => {
       expect((await other.get('/auth/me')).status).toBe(401);
       expect((await attempt('op@example.com', PASSWORD)).status).toBe(401);
       expect((await attempt('op@example.com', newPassword)).status).toBe(200);
+    });
+
+    it('throttles wrong current passwords: the 11th call in a minute gets 429', async () => {
+      await createUser(ctx.prisma, 'op@example.com', 'operator');
+      const session = await login(ctx, 'op@example.com');
+      const ip = nextIp();
+      const change = () =>
+        session
+          .send('patch', '/auth/me/password', {
+            currentPassword: 'not my password',
+            newPassword: 'another long passphrase',
+          })
+          .set('X-Forwarded-For', ip);
+
+      // The per-IP request limit alone, with the failure counter held off.
+      const statuses: number[] = [];
+      for (let i = 0; i < 11; i += 1) {
+        statuses.push((await change()).status);
+        await ctx.prisma.loginThrottle.deleteMany();
+      }
+      expect(statuses).toEqual([...Array(10).fill(403), 429]);
+    });
+
+    it('counts wrong current passwords like failed logins: the 6th waits', async () => {
+      await createUser(ctx.prisma, 'op@example.com', 'operator');
+      const session = await login(ctx, 'op@example.com');
+      const ip = nextIp();
+      const statuses: number[] = [];
+      let retryAfter = '';
+      for (let i = 0; i < 6; i += 1) {
+        const response = await session
+          .send('patch', '/auth/me/password', {
+            currentPassword: 'not my password',
+            newPassword: 'another long passphrase',
+          })
+          .set('X-Forwarded-For', ip);
+        statuses.push(response.status);
+        retryAfter = response.headers['retry-after'] ?? '';
+      }
+      expect(statuses).toEqual([403, 403, 403, 403, 403, 429]);
+      expect(retryAfter).toBe('1');
+      // The same counter: a login from that address waits too.
+      expect((await attempt('op@example.com', PASSWORD, ip)).status).toBe(429);
     });
 
     it('drops a session that is past its idle or absolute expiry', async () => {
