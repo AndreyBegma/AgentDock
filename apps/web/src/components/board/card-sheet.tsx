@@ -79,6 +79,7 @@ import { useRemoveAttachment } from '../attachments/use-remove-attachment';
 import { PageHeader } from '../page-header/page-header';
 import { ReadinessNotice } from '../readiness/readiness-notice';
 import { useCurrentUser } from '../shell/user-context';
+import { CardStewardSection } from '../steward/card-steward-section';
 import { NormalizedNote } from '../text/normalized-note';
 import { DescriptionIncompleteBadge } from '../token-saver/description-incomplete-badge';
 import { FilterBreakdown } from '../token-saver/filter-breakdown';
@@ -749,6 +750,15 @@ export function CardDetailBody({
       />
     </section>
   );
+  // #447 D15: fleet cards are observed, not run by the board — no Issue link there.
+  const stewardSection = fleet ? null : (
+    <CardStewardSection
+      projectId={projectId}
+      card={card}
+      canOperate={canOperate}
+      onChanged={onSaved}
+    />
+  );
   const attachmentsSection = (
     <CardAttachmentsSection
       projectId={projectId}
@@ -941,6 +951,7 @@ export function CardDetailBody({
             {panel(designSection)}
             {panel(dependenciesSection)}
             {panel(autoRunSection)}
+            {panel(stewardSection)}
             {panel(attachmentsSection)}
           </aside>
         </div>
@@ -977,6 +988,7 @@ export function CardDetailBody({
         {dependenciesSection}
         {autoRunSection}
         {roundsSection}
+        {stewardSection}
         {attachmentsSection}
         {cardForm}
       </div>

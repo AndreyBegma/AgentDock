@@ -51,6 +51,7 @@ import {
 } from '../../lib/setup/format';
 import { ORCHESTRATOR_PILL_STATUS } from '../../lib/status/pill';
 import { costOrBlank, sparkValues } from '../../lib/usage/format';
+import { DigestPanel } from '../steward/digest-panel';
 import type { ProjectFacts } from './use-dashboard';
 import { useDashboard } from './use-dashboard';
 
@@ -521,6 +522,8 @@ export function Dashboard({ projects }: { projects: ProjectSummary[] }) {
           )}
         </Panel>
       </div>
+
+      <DigestPanel projects={projects} />
     </div>
   );
 }
