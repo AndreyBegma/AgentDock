@@ -10,6 +10,7 @@ import { Client } from 'pg';
 import { PrismaService } from '../database/prisma.service';
 import { BotTokenStore } from '../notifications';
 import { isActionRequestCallback } from './action-request-actions';
+import { isSessionOptionCallback } from './session-message-actions';
 import { TelegramActionRequestService } from './telegram-action-request.service';
 import {
   type ApprovalAnswer,
@@ -27,6 +28,7 @@ import {
   TelegramLinkingService,
 } from './telegram-linking.service';
 import { TELEGRAM_OPTIONS, type TelegramOptions } from './telegram-options';
+import { TelegramSessionMessageService } from './telegram-session-message.service';
 
 /** Session advisory lock: held by the one API instance that talks to Telegram. */
 const LOCK_KEY = 'telegram:poller';
@@ -117,6 +119,7 @@ export class TelegramPoller implements OnApplicationBootstrap, OnModuleDestroy {
     private readonly linking: TelegramLinkingService,
     private readonly approvals: TelegramApprovalService,
     private readonly actionRequests: TelegramActionRequestService,
+    private readonly sessions: TelegramSessionMessageService,
     private readonly delivery: TelegramDeliveryService,
     private readonly scheduler: SchedulerRegistry,
     @Inject(TELEGRAM_OPTIONS) private readonly options: TelegramOptions,
@@ -248,17 +251,24 @@ export class TelegramPoller implements OnApplicationBootstrap, OnModuleDestroy {
     };
     if (update.callback_query) {
       // Spec 201 D18: `x:`/`y:` are the action-request buttons.
-      const answer = isActionRequestCallback(update.callback_query.data)
+      // #489: `q:` are a card question's option buttons.
+      const { data } = update.callback_query;
+      const answer = isActionRequestCallback(data)
         ? await this.actionRequests.handleCallback(update.callback_query)
-        : await this.approvals.handleCallback(update.callback_query);
+        : isSessionOptionCallback(data)
+          ? await this.sessions.handleCallback(update.callback_query)
+          : await this.approvals.handleCallback(update.callback_query);
       await this.sendApprovalAnswer(token, answer).catch(warn);
       return;
     }
     if (update.message) {
-      const answer = await this.approvals.handleNoteReply(
-        update.message,
-        botIdOf(token),
-      );
+      const answer =
+        (await this.approvals.handleNoteReply(
+          update.message,
+          botIdOf(token),
+        )) ??
+        // #489: a reply to a waiting card's message goes to its session.
+        (await this.sessions.handleReply(update.message, botIdOf(token)));
       if (answer) {
         await this.sendApprovalAnswer(token, answer).catch(warn);
         return;
