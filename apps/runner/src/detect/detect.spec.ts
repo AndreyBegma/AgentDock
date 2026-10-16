@@ -158,6 +158,7 @@ describe('capability detection', () => {
       codeSentinel: null,
       otlp: null,
       tokenSaver: true,
+      steward: true,
     });
   });
 

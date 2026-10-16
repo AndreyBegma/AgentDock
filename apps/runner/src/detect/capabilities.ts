@@ -298,5 +298,7 @@ export const detectCapabilities = async (
     otlp: config.otlp,
     // #445 Amendment 4: this runner takes `tokenSaver` on launch commands.
     tokenSaver: true,
+    // #447: this runner observes for Steward and takes its commands.
+    steward: true,
   };
 };

@@ -3,12 +3,15 @@ import {
   AGENTDOCK_WORKTREE_DIR,
   CARD_PUSH_MIN_INTERVAL_MS,
   CARD_SESSION_POLL_MS,
+  STEWARD_RESUME_TEXT,
 } from '@agentdock/shared';
 import {
   type CardCloseArgs,
   type CardCloseResult,
   type CardCollectArgs,
   type CardCollectResult,
+  type CardResumeArgs,
+  type CardResumeResult,
   type CardRunArgs,
   type CardRunPhase,
   type CardRunPhaseChangedData,
@@ -28,8 +31,11 @@ import { resolveFleetProject } from '../fleet/project';
 import { errorMessage, type Logger } from '../log';
 import { profileOf, type SkillsDeps } from '../skills/deps';
 import { RUN_FILES, writeJsonAtomic } from '../skills/run/record';
+import { type StewardProjectConfig, stewardConfigOf } from '../steward/config';
+import { emitActed, emitObserved } from '../steward/emit';
+import { readPane } from '../steward/pane-rules';
 import { type AttachmentSource, syncAttachments } from './attachments';
-import { answerDialog, matchKnownDialog } from './dialogs';
+import { answerDialog, KNOWN_DIALOGS, matchKnownDialog } from './dialogs';
 import {
   collectBranch,
   collectCard,
@@ -42,6 +48,12 @@ import {
 import { cardLaunchSpec, cardTokenSaver, cardWorktreePath } from './launch';
 import { type PushStep, pushCardHead } from './push';
 import { type CardRecord, CardStore } from './record';
+import {
+  heldDetail,
+  type TrailerCommit,
+  TrailerHeld,
+  trailerMessage,
+} from './trailer-guard';
 import { type CardWiring, wireCardRound } from './wiring';
 
 export interface CardExecutorOptions {
@@ -65,6 +77,8 @@ export interface CardExecutorOptions {
    * with `attachments_unavailable`.
    */
   attachmentSource: AttachmentSource;
+  /** #447 D10: a running round's session was found gone (Steward observes it). */
+  onSessionEnded?: (record: CardRecord, exitCode: number | null) => void;
 }
 
 /**
@@ -133,6 +147,10 @@ export class CardExecutor {
   private cancelPoll: Cancel = () => {};
   /** #359 D1: when a card's last push step reached the network, per card. */
   private readonly lastPushAt = new Map<string, number>();
+  /** #447 D7: the held head (`runId:sha`) last reported, per card. */
+  private readonly heldReported = new Map<string, string>();
+  /** #447 D7: the held head the worker was last told of, per card. */
+  private readonly heldTold = new Map<string, string>();
 
   constructor(private readonly options: CardExecutorOptions) {
     this.store = new CardStore(options.cardsDir);
@@ -204,6 +222,8 @@ export class CardExecutor {
         tmuxSession,
         runId: args.runId,
         phase: 'starting',
+        sessionId: args.session.id,
+        profileKey: args.profileKey,
         startedAt: isoNow(deps.clock),
         // #359 D3: the spec (and design) the PR links; only round 1 sends them.
         specFiles: args.files?.length
@@ -312,6 +332,10 @@ export class CardExecutor {
   /** `card.collect` (D8). The session may still be open: its work so far is collected. */
   async collect(args: CardCollectArgs): Promise<CardCollectResult> {
     const project = watchedProject(args, this.options.deps.watchedProjects());
+    // #447 D7: the trailer guard holds the push and the PR.
+    const guard = {
+      trailerGuard: this.steward(args.projectId)?.trailerGuard === true,
+    };
     const { cwd } = args;
     if (cwd !== undefined) {
       // #282 D3: a terminal card has no worktree here — its session's
@@ -328,6 +352,7 @@ export class CardExecutor {
             branch: args.branch,
           },
           args,
+          guard,
         );
       });
     }
@@ -354,6 +379,7 @@ export class CardExecutor {
             branch: args.branch,
           },
           args,
+          guard,
         );
       }
       if (record.branch !== args.branch) {
@@ -362,7 +388,15 @@ export class CardExecutor {
           `card ${args.cardId} works on ${record.branch}, not ${args.branch}`,
         );
       }
-      return collectCard(deps, record, args);
+      try {
+        return await collectCard(deps, record, args, guard);
+      } catch (error) {
+        if (error instanceof TrailerHeld) {
+          const head = error.commits.at(-1)?.sha ?? 'collect';
+          await this.holdPush(record, head, error.commits);
+        }
+        throw error;
+      }
     });
   }
 
@@ -404,7 +438,11 @@ export class CardExecutor {
       if (record.phase !== 'running' || this.chains.has(record.cardId))
         continue;
       if (await this.tmux.find(record.tmuxSession)) {
-        await this.dismissKnownDialog(record);
+        // #447 D11: with Steward on, a dialog is the API's to dismiss (its
+        // `autoDismiss` switch); Steward observes it.
+        if (!this.steward(record.projectId)) {
+          await this.dismissKnownDialog(record);
+        }
         this.queuePush(record);
         continue;
       }
@@ -422,6 +460,226 @@ export class CardExecutor {
           ? { exitCode: exit.code }
           : {},
       );
+      this.options.onSessionEnded?.(current, exit?.code ?? null);
+    }
+  }
+
+  /** #447: the project's Steward config, when Steward is on there. */
+  private steward(projectId: string): StewardProjectConfig | null {
+    return stewardConfigOf(this.options.deps.watchedProjects(), projectId);
+  }
+
+  /**
+   * #447 D10: `card.resume`. The round's dead session restarts in its own
+   * worktree with `claude --resume <sessionId>` and the fixed resume prompt,
+   * on the launch facts the API sent — never a new worktree, never a round
+   * the runner stopped (a person's stop, or replaced by a later round).
+   */
+  async resume(args: CardResumeArgs): Promise<CardResumeResult> {
+    const profile = profileOf(this.options.deps, args.profileKey);
+    if (profile.runtime !== 'claude') {
+      throw new CommandFailure(
+        'unsupported_runtime',
+        `card workers need a claude profile; ${profile.id} is ${profile.runtime}`,
+      );
+    }
+    const project = watchedProject(args, this.options.deps.watchedProjects());
+    this.ownedOrAbsent(args.cardId, args.projectId);
+    return this.serial(args.cardId, async () => {
+      const { deps } = this.options;
+      const record = this.store.load(args.cardId);
+      if (
+        !record ||
+        record.runId !== args.runId ||
+        record.root !== project.root ||
+        record.shortId !== args.shortId ||
+        record.branch !== args.branch
+      ) {
+        throw new CommandFailure(
+          'not_found',
+          `round ${args.runId} of card ${args.cardId} is not on this runner`,
+        );
+      }
+      if (record.phase !== 'ended' && record.phase !== 'running') {
+        throw new CommandFailure(
+          'not_found',
+          `round ${args.runId} is ${record.phase}; only a dead session is resumed`,
+        );
+      }
+      if (await this.tmux.find(record.tmuxSession)) {
+        return { outcome: 'alive', tmuxSession: record.tmuxSession };
+      }
+      if (!existsSync(record.worktree)) return { outcome: 'no_worktree' };
+      const launch = {
+        ...args,
+        session: { id: args.sessionId, resume: true },
+        prompt: STEWARD_RESUME_TEXT,
+      };
+      try {
+        const roundDir = this.store.createRound(record.cardId, record.runId);
+        const wiring = wireCardRound(
+          profile,
+          deps.home,
+          roundDir,
+          this.options.selfCommand,
+        );
+        const tokenSaver = cardTokenSaver(
+          profile,
+          launch,
+          deps.home,
+          roundDir,
+          this.options.selfCommand,
+          wiring,
+        );
+        writeJsonAtomic(
+          `${roundDir}/${RUN_FILES.launch}`,
+          cardLaunchSpec(
+            profile,
+            launch,
+            record.worktree,
+            this.options.otlpPort?.() ?? null,
+            wiring.files,
+            tokenSaver,
+          ),
+        );
+        const created = await this.tmux.newSession(
+          record.tmuxSession,
+          record.worktree,
+          {},
+          [...this.options.selfCommand, 'exec-run', roundDir],
+        );
+        if (!created.ok) {
+          throw new Error(`tmux new-session failed: ${created.stderr}`);
+        }
+        record.sessionId = args.sessionId;
+        record.profileKey = args.profileKey;
+        if (args.pullRequest) record.pullRequest = args.pullRequest;
+        delete record.endedAt;
+        this.setPhase(record, 'running', {
+          wiring: wiring.wiring,
+          ...(wiring.wiringReason ? { wiringReason: wiring.wiringReason } : {}),
+        });
+      } catch (error) {
+        this.options.log.warn('cards: a round could not be resumed', {
+          cardId: record.cardId,
+          runId: record.runId,
+          error: errorMessage(error),
+        });
+        if (error instanceof CommandFailure) throw error;
+        throw new Error(eventError(error));
+      }
+      return { outcome: 'resumed', tmuxSession: record.tmuxSession };
+    });
+  }
+
+  /**
+   * The round's live tmux session, when `cardId`'s current round is `runId`
+   * of `projectId` and runs — what a Steward command acts on (#447).
+   */
+  liveSession(projectId: string, cardId: string, runId: string): string | null {
+    const record = this.store.load(cardId);
+    return record &&
+      record.projectId === projectId &&
+      record.runId === runId &&
+      record.phase === 'running'
+      ? record.tmuxSession
+      : null;
+  }
+
+  /** The visible pane of a card session; null when it is gone (#447). */
+  capture(session: string): Promise<string | null> {
+    return this.tmux.capture(session);
+  }
+
+  /**
+   * Types one line into the round's session and submits it — only when the
+   * pane shows an empty, idle prompt (#447 D7, D9). False when it does not,
+   * or the session is gone: nothing was typed.
+   */
+  async typeAtPrompt(session: string, text: string): Promise<boolean> {
+    const pane = await this.tmux.capture(session);
+    if (pane === null || readPane(pane).state !== 'idle') return false;
+    await this.tmux.sendLiteral(session, text);
+    await this.tmux.sendSubmit(session);
+    return true;
+  }
+
+  /**
+   * #447 D11: sends the listed dialog's key — only when the pane shows that
+   * very dialog and no permission prompt. False otherwise: nothing was sent.
+   */
+  async dismissDialog(session: string, dialogId: string): Promise<boolean> {
+    const pane = await this.tmux.capture(session);
+    if (pane === null) return false;
+    const reading = readPane(pane);
+    if (
+      reading.signal?.kind !== 'dialog' ||
+      reading.signal.dialogId !== dialogId
+    ) {
+      return false;
+    }
+    const dialog = KNOWN_DIALOGS.find((d) => d.name === dialogId);
+    if (!dialog) return false;
+    return answerDialog(
+      this.options.deps.exec,
+      this.options.tmuxServer ?? [],
+      session,
+      dialog,
+    );
+  }
+
+  /**
+   * #447 D7: the trailer guard held a push of `record`'s round. Reported
+   * once per held head — `steward.observed trailer` and `steward.acted
+   * hold_push` — and the worker is told which commits, at its prompt, once
+   * per head (tried again on later polls until it is at the prompt).
+   */
+  private async holdPush(
+    record: CardRecord,
+    headSha: string,
+    held: readonly TrailerCommit[],
+  ): Promise<void> {
+    const { emit, deps } = this.options;
+    const envelope = { repo: record.repo, root: record.root };
+    const subject = {
+      kind: 'card_round' as const,
+      cardId: record.cardId,
+      runId: record.runId,
+    };
+    const heldKey = `${record.runId}:${headSha}`;
+    if (this.heldReported.get(record.cardId) !== heldKey) {
+      this.heldReported.set(record.cardId, heldKey);
+      try {
+        emitObserved(emit, deps.clock, envelope, {
+          projectId: record.projectId,
+          subject,
+          kind: 'trailer',
+          reason: `the push is held: ${heldDetail(held)} with a Claude trailer`,
+        });
+        emitActed(emit, deps.clock, envelope, {
+          projectId: record.projectId,
+          subject,
+          action: 'hold_push',
+          result: 'ok',
+          detail: heldDetail(held),
+        });
+      } catch (error) {
+        this.options.log.warn('cards: reporting a held push failed', {
+          cardId: record.cardId,
+          error: errorMessage(error),
+        });
+      }
+    }
+    if (this.heldTold.get(record.cardId) === heldKey) return;
+    try {
+      if (await this.typeAtPrompt(record.tmuxSession, trailerMessage(held))) {
+        this.heldTold.set(record.cardId, heldKey);
+      }
+    } catch (error) {
+      this.options.log.warn('cards: telling the worker of a held push failed', {
+        cardId: record.cardId,
+        error: errorMessage(error),
+      });
     }
   }
 
@@ -488,7 +746,9 @@ export class CardExecutor {
       }
       let step: PushStep | null;
       try {
-        step = await pushCardHead(this.options.deps, fresh);
+        step = await pushCardHead(this.options.deps, fresh, {
+          trailerGuard: this.steward(fresh.projectId)?.trailerGuard === true,
+        });
       } catch (error) {
         this.lastPushAt.set(fresh.cardId, clock.now());
         this.options.log.warn('cards: pushing the round failed', {
@@ -500,6 +760,10 @@ export class CardExecutor {
       }
       if (!step) return;
       this.lastPushAt.set(fresh.cardId, clock.now());
+      if (step.held) {
+        await this.holdPush(fresh, step.headSha, step.held);
+        return;
+      }
       if (step.prError) {
         this.options.log.warn('cards: opening the draft PR failed', {
           cardId: fresh.cardId,

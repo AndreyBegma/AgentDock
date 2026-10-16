@@ -36,6 +36,7 @@ import {
 } from '../skills/deps';
 import { createPullRequest, githubOf, pushBranch } from '../skills/run/collect';
 import type { CardRecord } from './record';
+import { commitsWithTrailer, TrailerHeld } from './trailer-guard';
 
 export type GitDeps = Pick<SkillsDeps, 'exec' | 'tempRoot'>;
 
@@ -444,6 +445,7 @@ export const collectCard = async (
   record: Pick<CardRecord, 'projectId' | 'root' | 'worktree' | 'branch'> &
     Partial<Pick<CardRecord, 'specFiles' | 'pushPr'>>,
   args: CardCollectArgs,
+  options: { trailerGuard?: boolean } = {},
 ): Promise<CardCollectResult> => {
   const wt = record.worktree;
   const head = await deps.exec('git', [
@@ -492,6 +494,11 @@ export const collectCard = async (
     ).trim(),
   );
   if (!(ahead > 0)) return { ahead: 0, pushed: false };
+  // #447 D7: a commit with a Claude trailer holds the push and the PR.
+  if (options.trailerGuard) {
+    const held = await commitsWithTrailer(deps, wt, record.branch, args.base);
+    if (held.length > 0) throw new TrailerHeld(held);
+  }
   const github = await githubOf(deps, {
     id: record.projectId,
     root: record.root,
@@ -557,6 +564,7 @@ export const collectBranch = async (
   deps: GitDeps,
   card: Pick<CardRecord, 'projectId' | 'root' | 'branch'>,
   args: CardCollectArgs,
+  options: { trailerGuard?: boolean } = {},
 ): Promise<CardCollectResult> => {
   const { root, branch } = card;
   await fetchRef(deps, root, branch);
@@ -586,7 +594,7 @@ export const collectBranch = async (
         : ['--no-track', '-b', branch, worktree, `origin/${branch}`]),
     ]);
     try {
-      return await collectCard(deps, { ...card, worktree }, args);
+      return await collectCard(deps, { ...card, worktree }, args, options);
     } finally {
       await removeCardWorktree(deps, { root, worktree, branch });
     }
