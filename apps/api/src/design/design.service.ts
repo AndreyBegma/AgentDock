@@ -1,21 +1,19 @@
 import {
   type CardAutoRun,
-  type CardAutoRunFailure,
   type CardDesignLaunchRequest,
   DESIGN_COMMENTS_PER_TURN_MAX,
   DESIGN_ERROR,
   type DesignCommentRequest,
-  isCardAutoRunCode,
   PLANNER_ERROR,
   type TaskDesignPatchRequest,
   type TaskDesignView,
 } from '@agentdock/shared';
 import { RUNNER_FEATURE_COMMANDS } from '@agentdock/shared/protocol';
-import { HttpException, Injectable, type OnModuleInit } from '@nestjs/common';
+import { Injectable, type OnModuleInit } from '@nestjs/common';
 import type { BoardCard, Plan, PlanTask, TaskDesign } from '@prisma/client';
 import { CardAssessor } from '../assess/card-assessor';
 import { AuditService } from '../audit/audit.service';
-import { cardNotFound } from '../board/board-error';
+import { autoRunFailureOf, cardNotFound } from '../board/board-error';
 import { BoardRoundsService } from '../board/board-rounds.service';
 import { PrismaService } from '../database/prisma.service';
 import { CardDesignTurnService } from '../planner/card-design-turn.service';
@@ -59,30 +57,6 @@ const busy = () =>
 
 const approvedAlready = (what = 'The design is approved') =>
   designError(409, DESIGN_ERROR.designApproved, what);
-
-/** #273 D8: `CardAutoRun.message` is at most this many characters. */
-const AUTO_RUN_MESSAGE_MAX = 500;
-
-/**
- * #273 D8: why a start was refused — the refusal's `error` when it is a
- * board code (`max_running`, `budget_exceeded`, `command_unavailable`, …),
- * else `unknown`, with its message.
- */
-const autoRunFailureOf = (
-  error: unknown,
-): { code: CardAutoRunFailure['code']; message: string } => {
-  const body = error instanceof HttpException ? error.getResponse() : null;
-  const code =
-    body !== null &&
-    typeof body === 'object' &&
-    'error' in body &&
-    typeof body.error === 'string' &&
-    isCardAutoRunCode(body.error)
-      ? body.error
-      : 'unknown';
-  const message = error instanceof Error ? error.message : String(error);
-  return { code, message: message.slice(0, AUTO_RUN_MESSAGE_MAX) };
-};
 
 /** How strictly a task owner is checked: any change, or only a comment. */
 type TaskCheck = 'change' | 'comment';
@@ -852,6 +826,8 @@ export class DesignService implements OnModuleInit {
           autoRunError: code,
           autoRunMessage: message,
           autoRunFailedAt: at,
+          // #443: this failure is the design's, not Auto-run when ready's.
+          autoRunAfter: null,
         },
       });
       await this.audit.record({

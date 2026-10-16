@@ -134,12 +134,17 @@ export class BoardRoundsService {
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
 
-  /** `POST …/run`: round 1, or a retry after failed / ended / cancelled. */
+  /**
+   * `POST …/run`: round 1, or a retry after failed / ended / cancelled.
+   * #443: Auto-run when ready calls it too, as the person who accepted the
+   * last open dependency, with `autoRunAfter` that dependency's number.
+   */
   async run(
     projectId: string,
     number: number,
     dto: RunBoardCardDto,
     actor: BoardActor,
+    autoRunAfter: number | null = null,
   ): Promise<BoardCardDetail> {
     const card = await this.work.card(projectId, number);
     if (card.column === 'completed') {
@@ -161,7 +166,7 @@ export class BoardRoundsService {
       card.id,
       dto.ignoreDependencies === true,
     );
-    await this.start(card, 'run', dto, null, actor);
+    await this.start(card, 'run', dto, null, actor, [], null, autoRunAfter);
     return this.board.detail(projectId, number);
   }
 
@@ -234,6 +239,8 @@ export class BoardRoundsService {
     claimIds: readonly string[] = [],
     /** #359 D6: why a `ci_fix` round starts. */
     ciFix: CardCiFixInput | null = null,
+    /** #443: the accepted dependency an Auto-run when ready round starts after. */
+    autoRunAfter: number | null = null,
   ): Promise<void> {
     const project = await this.work.project(card.projectId);
     if (isActiveRoundPhase(card.rounds[0]?.phase)) throw this.running();
@@ -485,6 +492,7 @@ export class BoardRoundsService {
           round: next,
           runId: run.id,
           trigger,
+          autoRunAfter,
           feedback,
           cardTitle: card.title,
           cardBody: card.body,
@@ -574,6 +582,7 @@ export class BoardRoundsService {
       runId: round.runId,
       trigger,
       ...(ciFix ? { ciFix: ciFix.reason } : {}),
+      ...(autoRunAfter !== null ? { autoRunAfter } : {}),
       branch,
       ...(followUp ? { newBranch: true } : {}),
       resume,

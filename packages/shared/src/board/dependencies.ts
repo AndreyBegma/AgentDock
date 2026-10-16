@@ -1,4 +1,5 @@
-import type { CardDependencyRef } from './contracts';
+import type { CardDependencyRef, CardReadiness } from './contracts';
+import type { BoardColumn } from './types';
 
 /**
  * Card dependencies (#337 D8): `cardId` runs after `dependsOnId`. The graph
@@ -57,3 +58,21 @@ export const findDependencyCycle = (
 export const openDependencies = <T extends Pick<CardDependencyRef, 'column'>>(
   dependencies: readonly T[],
 ): T[] => dependencies.filter((d) => d.column !== 'completed');
+
+/**
+ * #443: Ready / Waiting — only a card in To Do with at least one dependency
+ * has it; accepted means in Completed, however many PRs the card had.
+ */
+export const cardReadiness = (
+  column: BoardColumn,
+  dependencies: readonly CardDependencyRef[],
+): CardReadiness | null => {
+  if (column !== 'todo' || dependencies.length === 0) return null;
+  const open = openDependencies(dependencies);
+  return {
+    state: open.length === 0 ? 'ready' : 'waiting',
+    accepted: dependencies.length - open.length,
+    total: dependencies.length,
+    open,
+  };
+};
