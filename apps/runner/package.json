@@ -7,7 +7,7 @@
     "agentdock-runner": "./dist/agentdock-runner"
   },
   "scripts": {
-    "build": "tsc --noEmit && bun build --compile src/main.ts --outfile dist/agentdock-runner",
+    "build": "tsc --noEmit && bun build --compile --splitting --format=esm src/main.ts --outfile dist/agentdock-runner",
     "lint": "biome lint src",
     "test": "tsc --noEmit && bun test"
   },

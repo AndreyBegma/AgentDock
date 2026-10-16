@@ -610,4 +610,37 @@ describe('agentdock-runner CLI', () => {
       }
     });
   });
+
+  describe('Token saver subcommands (#445 D3)', () => {
+    it('filter runs the command after `--` and returns its exit code', async () => {
+      const code = await runCli(
+        ['filter', '--', 'sh', '-c', 'echo hi; echo oops >&2; exit 3'],
+        deps({ env: { HOME: home, PATH: process.env.PATH } }),
+      );
+      expect(code).toBe(3);
+      expect(stdout.join('')).toBe('hi\n');
+      expect(stderr.join('')).toBe('oops\n');
+    });
+
+    it('filter-hook fails open: no decision, exit 0', async () => {
+      for (const input of ['', 'not json', '{"tool_name":"Bash"}']) {
+        expect(
+          await runCli(
+            ['filter-hook'],
+            deps({
+              stdin: () =>
+                new Response(input).body as ReadableStream<Uint8Array>,
+            }),
+          ),
+        ).toBe(EXIT.ok);
+      }
+      expect(stdout).toEqual([]);
+    });
+
+    it('lists both in the usage', async () => {
+      await runCli(['help'], deps());
+      expect(stdout.join('')).toContain('filter -- <command>');
+      expect(stdout.join('')).toContain('filter-hook');
+    });
+  });
 });

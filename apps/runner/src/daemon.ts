@@ -35,6 +35,8 @@ import {
 } from './detect/capabilities';
 import type { Exec } from './detect/exec';
 import type { Env } from './env';
+import { FILTER_ORCHESTRATOR_DIR } from './filter/env';
+import { FilterStatsReader } from './filter/stats-reader';
 import { GitAuth } from './git-auth';
 import { LocalSocketServer } from './local/server';
 import { LocalService } from './local/service';
@@ -104,6 +106,8 @@ export interface DaemonOptions {
   fetch?: typeof fetch;
   /** Aborting it stops the daemon cleanly. */
   signal?: AbortSignal;
+  /** How often filter stats are collected (#445); `FILTER_STATS_POLL_MS` by default. */
+  filterStatsPollMs?: number;
   /** Called once the connection exists — tests reach it to emit events. */
   onStart?: (connection: RunnerConnection) => void;
 }
@@ -452,6 +456,29 @@ export const runDaemon = async (
     const otlpCapability = (): Capabilities['otlp'] =>
       otlp?.port ? { grpc: null, http: otlp.port } : null;
 
+    // Token saver (#445 amendment 5): the `filter` processes of every launch
+    // write rows into their run dir; they go out as `filter.stats` events.
+    const stateDir = dirname(options.spoolDir);
+    const filterStats = new FilterStatsReader({
+      roots: () => [
+        options.runsDir ?? join(stateDir, 'runs'),
+        options.plansDir ?? join(stateDir, 'plans'),
+        options.uiprofileDir ?? join(stateDir, 'uiprofile'),
+        options.cardsDir ?? join(stateDir, 'cards'),
+        options.captureDir ?? join(stateDir, 'capture'),
+        options.normalizeDir ?? join(stateDir, 'normalize'),
+        options.assessDir ?? join(stateDir, 'assess'),
+        join(stateDir, FILTER_ORCHESTRATOR_DIR),
+      ],
+      resolve: (ids) => directory.resolve(ids),
+      emit: (event) => {
+        live.emit(event);
+      },
+      log,
+      now: () => new Date(clock.now()),
+      pollMs: options.filterStatsPollMs,
+    });
+
     // The plugin's hook and MCP processes (spec 201 D5): bound after
     // `runner.lock` is held, so a socket file left there is a dead daemon's.
     const localService = new LocalService({
@@ -521,9 +548,13 @@ export const runDaemon = async (
       log.error('sessions: cannot start', { error: errorMessage(error) });
     });
     live.start();
+    filterStats.start();
     options.onStart?.(live);
     const reason = await live.done;
     options.signal?.removeEventListener('abort', onAbort);
+    filterStats.stop();
+    // What the last commands wrote goes to the spool, sent on the next start.
+    await filterStats.poll();
     pane.stop();
     runLog.stop();
     // Sessions run on in tmux; the next start resumes watching them.
