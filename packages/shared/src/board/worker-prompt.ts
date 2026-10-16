@@ -37,7 +37,7 @@ export const CARD_ENV_PORT = 'AGENTDOCK_CARD_PORT';
 /**
  * #389: two cards' e2e runs wiped one shared test database, and a worker
  * waited 7.5 h on a `pgrep -f` loop that matched itself. Every card worktree
- * #487: three cards' e2e runs at once — one of them the whole project —
+ * keeps to a database and a port of its own, so no card waits on another.
  */
 const LOCAL_ENVIRONMENT_LINES = [
   `- This session has \`${CARD_ENV_ID}\` (this card's id) and \`${CARD_ENV_PORT}\` set. Tests and servers keep to a database and a port of their own: name a test database after \`$${CARD_ENV_ID}\` (a project's test setup may already do it — check before you create one), and start a server on \`$${CARD_ENV_PORT}\`. Never use, reset or wait for a database or port another worktree may use.`,
