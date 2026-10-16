@@ -5,6 +5,7 @@ import {
   type StewardIncidentKind,
 } from '@agentdock/shared';
 import { matchKnownDialog } from '../cards/dialogs';
+import { matchQuestion } from '../cards/question';
 import { DIALOG_PATTERNS, QUOTA_MARKER } from '../collectors/tmux/classify';
 import { redactText } from '../local/redact';
 
@@ -25,10 +26,11 @@ export type PaneSignal =
 export interface StewardPaneReading {
   /**
    * `busy`: Claude Code is working (`esc to interrupt`). `idle`: the input
-   * box is empty and nothing works — a nudge may be typed. `other`: neither,
-   * such as a dialog or a half-typed input.
+   * box is empty and nothing works — a nudge may be typed. `question`
+   * (#473): the worker asks the person a question and waits for the answer.
+   * `other`: none of these, such as a dialog or a half-typed input.
    */
-  state: 'busy' | 'idle' | 'other';
+  state: 'busy' | 'idle' | 'question' | 'other';
   signal: PaneSignal | null;
 }
 
@@ -111,8 +113,8 @@ const promptLine = (lines: readonly string[]): number => {
 };
 
 /**
- * Reads one captured pane (D6), in a fixed order: a permission prompt, a
- * listed dialog, an unlisted one, the quota banner, then — only at an
+ * Reads one captured pane (D6), in a fixed order: a permission prompt, the
+ * question selector (#473, no signal), a listed dialog, an unlisted one, the quota banner, then — only at an
  * empty, idle input box — an API error right above it.
  */
 export const readPane = (text: string): StewardPaneReading => {
@@ -129,6 +131,9 @@ export const readPane = (text: string): StewardPaneReading => {
       },
     };
   }
+  // #473: a question the worker asks is the Board's — the round waits for
+  // the person and `card.waiting` tells them — never a dialog to escalate.
+  if (matchQuestion(text)) return { state: 'question', signal: null };
   const known = matchKnownDialog(text);
   if (known && isDialogId(known.name)) {
     return {

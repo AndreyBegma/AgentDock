@@ -72,6 +72,9 @@ describe('board sink (e2e)', () => {
   const serverEvents = (type: string) =>
     w.ctx.prisma.event.findMany({ where: { type }, orderBy: { id: 'asc' } });
 
+  const runStatus = async (runId: string) =>
+    (await w.ctx.prisma.run.findUniqueOrThrow({ where: { id: runId } })).status;
+
   describe('card_run.phase_changed', () => {
     it('moves a round forward and never back', async () => {
       const { card, round } = await running();
@@ -138,6 +141,78 @@ describe('board sink (e2e)', () => {
     });
   });
 
+  describe('card_run.question (#473)', () => {
+    const question = (card: { id: string }, runId: string, projectId = w.a) =>
+      w.deliver('card_run.question', {
+        cardId: card.id,
+        runId,
+        projectId,
+        at: new Date().toISOString(),
+      });
+    const answered = (sessionId: string) =>
+      w.hook('hook.tool_finished', sessionId, {
+        toolUseId: 'tu_q',
+        toolName: 'AskUserQuestion',
+        ok: true,
+      });
+
+    it('a question waits for the person, notified once; the answer runs again', async () => {
+      const { card, round, sessionId } = await running({ title: 'Add login' });
+      await phase(card, round.runId, { phase: 'running' });
+      await question(card, round.runId);
+      let after = await w.card(1);
+      expect(after.rounds[0].phase).toBe('waiting');
+      expect(after.rounds[0].waitingAt).not.toBeNull();
+      expect(await runStatus(round.runId)).toBe('waiting_person');
+      const [waiting] = await serverEvents('card.waiting');
+      expect(waiting).toMatchObject({ source: 'api' });
+      expect(waiting.data).toEqual({
+        cardId: card.id,
+        number: 1,
+        title: 'Add login',
+        round: 1,
+        reason: 'question',
+      });
+
+      // The same question again, or a stop meanwhile: no second notification.
+      await question(card, round.runId);
+      await w.hook('hook.stopped', sessionId);
+      expect(await serverEvents('card.waiting')).toHaveLength(1);
+
+      await answered(sessionId);
+      after = await w.card(1);
+      expect(after.rounds[0].phase).toBe('running');
+      expect(await runStatus(round.runId)).toBe('running');
+
+      // The next question is told again.
+      await question(card, round.runId);
+      expect((await w.card(1)).rounds[0].phase).toBe('waiting');
+      expect(await serverEvents('card.waiting')).toHaveLength(2);
+    });
+
+    it('a question while background tasks run waits for the person', async () => {
+      const { card, round, sessionId } = await running();
+      await w.hook('hook.stopped', sessionId, { backgroundTasks: 1 });
+      await question(card, round.runId);
+      const after = (await w.card(1)).rounds[0];
+      expect(after.phase).toBe('waiting');
+      expect(after.backgroundAt).toBeNull();
+      expect(await serverEvents('card.waiting')).toHaveLength(1);
+    });
+
+    it('ignores a question of an old run, another project or an ended round', async () => {
+      const { card, round } = await running();
+      await question(card, 'cm1run00000000000000000999');
+      await question(card, round.runId, w.b);
+      expect((await w.card(1)).rounds[0].phase).toBe('starting');
+
+      await phase(card, round.runId, { phase: 'failed', error: 'gone' });
+      await question(card, round.runId);
+      expect((await w.card(1)).rounds[0].phase).toBe('failed');
+      expect(await serverEvents('card.waiting')).toEqual([]);
+    });
+  });
+
   describe('hooks of the card session (D6, D14)', () => {
     it('hook.stopped → waiting and card.waiting; hook.prompt_submitted → running', async () => {
       const { round, sessionId } = await running({ title: 'Add login' });
@@ -160,6 +235,7 @@ describe('board sink (e2e)', () => {
         number: 1,
         title: 'Add login',
         round: 1,
+        reason: 'stopped',
       });
 
       // Again while waiting: no second notification.
@@ -172,9 +248,6 @@ describe('board sink (e2e)', () => {
     });
 
     describe('a turn that stops with its own background tasks running (#390)', () => {
-      const runStatus = async (runId: string) =>
-        (await w.ctx.prisma.run.findUniqueOrThrow({ where: { id: runId } }))
-          .status;
       const stall = () => w.ctx.app.get(BoardBackgroundStall);
       const minutesAfter = (at: Date | null, minutes: number) =>
         new Date((at as Date).getTime() + minutes * 60_000);

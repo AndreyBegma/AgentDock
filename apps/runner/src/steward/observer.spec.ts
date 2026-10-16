@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   STEWARD_OBSERVED_EVENT,
   type StewardObservedData,
@@ -227,6 +229,27 @@ describe('StewardObserver — silence (#447 D3, D6)', () => {
     t.clock.advance(10 * MIN);
     await t.observer.poll();
     expect(t.observed().map((o) => o.kind)).toEqual(['silent']);
+  });
+
+  it('a question the worker asks is no incident and goes to no classifier (#473)', async () => {
+    const t = setup();
+    t.setPane(
+      readFileSync(
+        join(
+          import.meta.dir,
+          '..',
+          'cards',
+          '__fixtures__',
+          'ask-user-question.txt',
+        ),
+        'utf8',
+      ),
+    );
+    t.clock.advance(90 * MIN);
+    await t.observer.poll();
+    await t.settle();
+    expect(t.observed()).toEqual([]);
+    expect(t.classified).toEqual([]);
   });
 
   it('an unexplained silent stall goes to haiku once, and its one line is the reason', async () => {

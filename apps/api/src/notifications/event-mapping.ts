@@ -265,7 +265,11 @@ export const draftFor = (event: MatchableEvent): NotificationDraft | null => {
           slot: null,
           issue: null,
           title: `${card} is waiting for you`,
-          body: 'Its worker stopped and waits for a reply in its session.',
+          // #473: a question the worker asks, or a stop.
+          body:
+            data.reason === 'question'
+              ? 'Its worker asks you a question in its session.'
+              : 'Its worker stopped and waits for a reply in its session.',
           page: 'board',
           card: number,
         };

@@ -984,11 +984,19 @@ export interface CardFinishedEventData {
   prUrl: string | null;
 }
 
+/**
+ * Why a round waits for the person: its turn ended (`stopped`), or it asks
+ * a question in the session (`question`, #473). Absent from events recorded
+ * before #473 — a stop.
+ */
+export type CardWaitingReason = 'stopped' | 'question';
+
 export interface CardWaitingEventData {
   cardId: string;
   number: number;
   title: string;
   round: number;
+  reason?: CardWaitingReason;
 }
 
 /**
