@@ -157,11 +157,21 @@ describe('projects (e2e)', () => {
 
       // Pushed to the connected runner, and listed in every later welcome.
       const pushed = await runner.socket.next('config');
-      expect(pushed.config.projects).toEqual([{ id: project.id, root: ROOT }]);
+      expect(pushed.config.projects).toEqual([
+        {
+          id: project.id,
+          root: ROOT,
+          steward: { enabled: true, silenceMinutes: 10, trailerGuard: true },
+        },
+      ]);
       const fresh = new TestRunnerSocket(ctx.origin, token);
       sockets.push(fresh);
       expect((await fresh.connect()).config.projects).toEqual([
-        { id: project.id, root: ROOT },
+        {
+          id: project.id,
+          root: ROOT,
+          steward: { enabled: true, silenceMinutes: 10, trailerGuard: true },
+        },
       ]);
 
       const list = await admin.get('/projects');
@@ -585,7 +595,11 @@ describe('projects (e2e)', () => {
       expect(refused.status).toBe(403);
       expect(refused.body.error).toBe('path_not_allowed');
       expect((await runner.socket.next('config')).config.projects).toEqual([
-        { id: project.id, root: ROOT },
+        {
+          id: project.id,
+          root: ROOT,
+          steward: { enabled: true, silenceMinutes: 10, trailerGuard: true },
+        },
       ]);
     });
 

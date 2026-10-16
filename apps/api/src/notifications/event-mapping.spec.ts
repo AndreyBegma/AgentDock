@@ -328,6 +328,80 @@ describe('draftFor (spec 22 D1)', () => {
     });
   });
 
+  describe('Steward incidents (#447 D13)', () => {
+    const incident = (
+      type: string,
+      data: object = {},
+      source = 'api',
+    ): MatchableEvent =>
+      event({
+        type,
+        source,
+        slot: null,
+        issue: null,
+        data: {
+          incidentId: 'inc1',
+          subjectKind: 'card_round',
+          subjectId: 'round1',
+          subjectLabel: 'C-12',
+          cardNumber: 12,
+          kind: 'api_error',
+          reason: 'API Error: Connection lost mid-response',
+          ...data,
+        },
+      });
+
+    it('maps an escalation to one steward.incident naming the card and the reason', () => {
+      expect(draftFor(incident('steward_incident.escalated'))).toEqual({
+        kind: 'steward.incident',
+        slot: null,
+        issue: null,
+        title: 'C-12 needs you: API error',
+        body: 'API Error: Connection lost mid-response',
+        page: 'board',
+        card: 12,
+      });
+    });
+
+    it('sends a fleet slot to the Fleet page', () => {
+      expect(
+        draftFor(
+          incident('steward_incident.escalated', {
+            subjectKind: 'fleet_slot',
+            subjectId: 'i447-api',
+            subjectLabel: 'i447-api',
+            cardNumber: undefined,
+            kind: 'silent',
+            reason: 'no hook event for 10+ min',
+          }),
+        ),
+      ).toMatchObject({
+        slot: 'i447-api',
+        title: 'i447-api needs you: silent',
+        page: 'fleet',
+      });
+    });
+
+    it('notifies nobody of an opening, an action or a recovery', () => {
+      for (const type of [
+        'steward_incident.opened',
+        'steward_incident.acted',
+        'steward_incident.resolved',
+      ]) {
+        expect(draftFor(incident(type))).toBeNull();
+      }
+    });
+
+    it('never takes one a runner forged, or one that does not parse', () => {
+      expect(
+        draftFor(incident('steward_incident.escalated', {}, 'runner')),
+      ).toBeNull();
+      expect(
+        draftFor(incident('steward_incident.escalated', { reason: 'a\nb' })),
+      ).toBeNull();
+    });
+  });
+
   it.each([
     'events.duplicate',
     'events.unparsed',

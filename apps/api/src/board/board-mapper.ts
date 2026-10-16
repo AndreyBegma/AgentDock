@@ -26,6 +26,7 @@ import {
   isActiveRoundPhase,
   isCaptureModel,
   isCardAutoRunCode,
+  type StewardCardChip,
   type TaskDesignSummary,
   type TokenSavedView,
 } from '@agentdock/shared';
@@ -119,8 +120,22 @@ export interface CardFacts {
   dependencies: ReadonlyMap<string, CardDependencyRef[]>;
   /** #445: each round run's savings estimate and artifact-guard flag. */
   tokenSaver: TokenSaverCardFacts;
+  /**
+   * #447 D15: the live Steward incident of each round, by round id
+   * (`StewardChips.forRounds`); absent is none.
+   */
+  steward?: ReadonlyMap<string, StewardCardChip>;
   now: Date;
 }
+
+/** #447 D15: the chip of the card's latest round's live incident. */
+export const stewardChipOf = (
+  card: CardWithRounds,
+  facts: Pick<CardFacts, 'steward'>,
+): StewardCardChip | null => {
+  const latest = card.rounds[0];
+  return latest ? (facts.steward?.get(latest.id) ?? null) : null;
+};
 
 /** #282 D1: a `terminal` card's session; `null` once the session row is gone. */
 const trackingOf = (
@@ -318,6 +333,7 @@ export const toCardView = (
   attachmentCount: facts.attachmentCounts.get(card.id) ?? 0,
   dependsOn: facts.dependencies.get(card.id) ?? [],
   planId: card.planId,
+  steward: stewardChipOf(card, facts),
 });
 
 const isEvidence = (value: Prisma.JsonValue): value is Prisma.JsonObject =>

@@ -36,6 +36,8 @@ import { PrismaService } from '../database/prisma.service';
 import { usageByRun } from '../history/run-usage';
 import { mergeMethodOf } from '../planner/planner-instructions.service';
 import { RuntimeProfileResolver } from '../readiness';
+import { assertIssueLinkable } from '../steward/issue-link';
+import { stewardChipsFor } from '../steward/steward-chips';
 import { TextNormalizer } from '../text/text-normalizer';
 import { TextOwners } from '../text/text-owners';
 import { tokenSaverFactsOf } from '../token-saver/token-saver-facts';
@@ -371,6 +373,11 @@ export class BoardService implements OnModuleInit {
       dependencies: deps,
       // #445: each round run's savings and artifact-guard flag.
       tokenSaver: await tokenSaverFactsOf(this.prisma, runIds),
+      // #447 D15: the live Steward incident of each card's latest round.
+      steward: await stewardChipsFor(
+        this.prisma,
+        cards.flatMap((c) => (c.rounds[0] ? [c.rounds[0].id] : [])),
+      ),
       now: new Date(),
     };
   }
@@ -549,6 +556,20 @@ export class BoardService implements OnModuleInit {
           boardError(422, BOARD_ERROR.noProfile, message, details),
       );
     }
+    // #447 D8: only an open issue of the project's repository; null unlinks.
+    const issueLink =
+      fields.issueNumber === undefined
+        ? undefined
+        : fields.issueNumber === null
+          ? { issueNumber: null, issueUrl: null }
+          : await assertIssueLinkable(
+              this.prisma,
+              projectId,
+              fields.issueNumber,
+            ).then((link) => ({
+              issueNumber: link.number,
+              issueUrl: link.url,
+            }));
     if (continueAfterDesign !== undefined) {
       await this.toggleContinue(card, continueAfterDesign, actor);
     }
@@ -591,6 +612,7 @@ export class BoardService implements OnModuleInit {
       ...(fields.profileKey !== undefined
         ? { profileKey: fields.profileKey }
         : {}),
+      ...(issueLink ?? {}),
     };
     await this.prisma.boardCard.update({
       where: { id: card.id },
