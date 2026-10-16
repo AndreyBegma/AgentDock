@@ -10,7 +10,7 @@ import type { PairedConfig } from './config';
 import type { RunnerConnection } from './connection';
 import { runDaemon } from './daemon';
 import type { Exec } from './detect/exec';
-import { FILTER_STATS_FILE } from './filter/env';
+import { FILTER_RUN_FILE, FILTER_STATS_FILE } from './filter/env';
 import { type HookDeps, runHook } from './hooks/run';
 import { FORBIDDEN, fixtureProtobuf, PROTOBUF_SESSION } from './otlp/testing';
 import { FakeClock } from './testing/fake-clock';
@@ -444,6 +444,14 @@ describe('daemon — filter stats (#445 amendment 5)', () => {
   it('sends the rows a card launch wrote as filter.stats events', async () => {
     const runDir = join(dir, 'cards', 'card_1');
     mkdirSync(runDir, { recursive: true });
+    writeFileSync(
+      join(runDir, FILTER_RUN_FILE),
+      JSON.stringify({
+        projectId: 'prj_fixture',
+        runId: 'run_1',
+        runKind: 'card',
+      }),
+    );
     const row = {
       id: 'f_1',
       runId: 'run_1',

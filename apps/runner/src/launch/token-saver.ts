@@ -3,22 +3,24 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { TokenSaverConfig, TokenSaverRunKind } from '@agentdock/shared';
 import type { ConfigProfile } from '../config';
-import { writeJsonAtomic } from '../skills/run/record';
 import {
-  FILTER_RAW_DIR_ENV,
-  FILTER_RUN_ID_ENV,
-  FILTER_RUN_KIND_ENV,
-  FILTER_STATS_ENV,
+  FILTER_RAW_DIR,
+  FILTER_RUN_FILE,
+  FILTER_STATS_FILE,
+  type FilterLaunch,
+  filterEnv,
   LAUNCH_SETTINGS_ENV,
-} from './filter-env';
+} from '../filter/env';
+import { writeJsonAtomic } from '../skills/run/record';
 import { readProfileMcpServers } from './profile-mcp';
 
 /** #445: the launch's own files, in its run dir. */
 export const TOKEN_SAVER_FILES = {
   settings: 'token-saver-settings.json',
   mcp: 'token-saver-mcp.json',
-  stats: 'filter-stats.jsonl',
-  raw: 'raw',
+  stats: FILTER_STATS_FILE,
+  run: FILTER_RUN_FILE,
+  raw: FILTER_RAW_DIR,
 } as const;
 
 /** The MCP server's name — the plugin's, so `finish_card` reads the same. */
@@ -83,7 +85,7 @@ export interface TextCallLaunchOptions {
 export const textCallTokenSaver = (
   options: TextCallLaunchOptions,
   profile: ConfigProfile,
-  args: { tokenSaver?: TokenSaverConfig; runId: string },
+  args: { tokenSaver?: TokenSaverConfig; runId: string; projectId: string },
   dir: string,
   runKind: TokenSaverRunKind,
 ): TokenSaverLaunch | null =>
@@ -94,6 +96,7 @@ export const textCallTokenSaver = (
     dir,
     selfCommand: options.selfCommand ?? defaultSelfCommand(),
     runKind,
+    projectId: args.projectId,
     runId: args.runId,
     agentdock: false,
     scout: false,
@@ -146,6 +149,8 @@ export interface TokenSaverLaunchInput {
   dir: string;
   selfCommand: readonly string[];
   runKind: TokenSaverRunKind;
+  /** The project the launch runs for: the stats rows' envelope. */
+  projectId: string;
   /** `null` for the orchestrator session only. */
   runId: string | null;
   /**
@@ -208,6 +213,12 @@ export const tokenSaverLaunch = (
   const settingsFile = join(input.dir, TOKEN_SAVER_FILES.settings);
   const mcpFile = join(input.dir, TOKEN_SAVER_FILES.mcp);
   const rawDir = join(input.dir, TOKEN_SAVER_FILES.raw);
+  const run: FilterLaunch = {
+    runDir: input.dir,
+    projectId: input.projectId,
+    runId: input.runId,
+    runKind: input.runKind,
+  };
   try {
     mkdirSync(rawDir, { recursive: true, mode: 0o700 });
     writeJsonAtomic(
@@ -216,6 +227,12 @@ export const tokenSaverLaunch = (
     );
     // 0600 (writeJsonAtomic): the copied definitions may hold secrets.
     writeJsonAtomic(mcpFile, { mcpServers: servers });
+    // DR-05: the stats reader's identity for this dir — not the rows'.
+    writeJsonAtomic(join(input.dir, TOKEN_SAVER_FILES.run), {
+      projectId: run.projectId,
+      runId: run.runId,
+      runKind: run.runKind,
+    });
   } catch {
     return null;
   }
@@ -232,10 +249,7 @@ export const tokenSaverLaunch = (
     env: {
       [AUTOCOMPACT_ENV]: String(AUTOCOMPACT_PCT),
       [LAUNCH_SETTINGS_ENV]: settingsFile,
-      [FILTER_STATS_ENV]: join(input.dir, TOKEN_SAVER_FILES.stats),
-      [FILTER_RAW_DIR_ENV]: rawDir,
-      [FILTER_RUN_KIND_ENV]: input.runKind,
-      ...(input.runId === null ? {} : { [FILTER_RUN_ID_ENV]: input.runId }),
+      ...filterEnv(run),
     },
     settingsFile,
     mcpFile,

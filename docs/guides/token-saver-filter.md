@@ -15,9 +15,21 @@ the bypass, the raw files and the MCP allowlist.
    session's environment (`filter/env.ts`).
 2. The hook reads Claude Code's PreToolUse JSON. It rewrites `tool_input.command`
    to `<runner> filter -- <command>` only when **all** of these hold:
+   - the session's `permission_mode` is `bypassPermissions` (spec amendment 9);
    - the command is a **single simple command**: `[NAME=value …] program args…`.
-     It must have no `|`, `&&`, `||`, `;`, `&`, redirect, heredoc, subshell,
-     `$(…)`, backticks or compound keyword;
+     `filter/shell.ts` is a whitelist, not a shell. Anything it does not
+     understand exactly makes the command not simple:
+     - an unquoted `|`, `&`, `;`, `<`, `>`, `(` or `)`: lists, pipes, redirects,
+       heredocs, subshells, process substitution;
+     - `$`, a backtick, `#` or `!` anywhere, quoted or not. That covers every
+       expansion and substitution, `$'…'` and `$"…"` quoting, comments and
+       history expansion;
+     - an unquoted `*`, `?`, `[`, `]`, `{`, `}` or `~`: globs, braces, tilde;
+     - a newline, a carriage return, any other control character or any
+       non-ASCII character, lookalikes included;
+     - a quoted program name, a quoted `NAME=` (it is not an assignment), and
+       the words `exec`, `eval`, `source`, `.`, `command`, `builtin`, `env`,
+       `sudo`, `nohup`, `xargs` and the compound keywords as the program;
    - the call is not `run_in_background: true`;
    - a filter in the registry matches the program;
    - the command is not a dev server or a watch mode. These count as one:
@@ -27,7 +39,11 @@ the bypass, the raw files and the MCP allowlist.
 
    Every other Bash call is left as written. It is counted `passedThrough` with
    0 bytes, because the hook never sees its output.
-3. `filter -- <argv…>` runs the command, keeps its raw output, and prints either
+3. The rewrite is built from the parsed words, each re-quoted
+   (`wrappedCommand` in `filter/hook.ts`), never from the original text. Bash
+   therefore runs exactly the argv the parser saw. `shell.spec.ts` checks this
+   against a real `bash`, for the original and for the rewrite.
+4. `filter -- <argv…>` runs the command, keeps its raw output, and prints either
    the compressed output or the original.
 
 The hook **fails open**: on any error it prints nothing and exits 0. Claude Code
@@ -39,21 +55,33 @@ saver is off.
 
 Claude Code matches its permission rules against the command a hook *returns*.
 A rewritten `agentdock-runner filter -- git push` would therefore slip past
-`Bash(git push:*)`, and an allow rule such as `Bash(bun run test:*)` would stop
-matching. This amends spec #445, settled by the orchestrator: the hook
-(`permissionFor` in `filter/permissions.ts`) applies these rules in order.
+`Bash(git push:*)`. The hook (`permissionFor` in `filter/permissions.ts`)
+applies these rules in order (spec #445 amendment 9):
 
 | Situation | Result |
 |---|---|
-| A `deny` or `ask` `Bash(…)` rule matches the **original** command, or the command without its leading `NAME=value` words | no rewrite (`passedThrough`) |
-| The session is `bypassPermissions`, or an `allow` rule already matches the original command | rewrite, with `permissionDecision: "allow"` |
-| Anything else | no rewrite |
+| The session is not `bypassPermissions` (`default`, `acceptEdits`, `auto`, `plan`, …) | no rewrite, whatever the allow rules say |
+| A `deny` or `ask` `Bash(…)` rule matches the command, at any word | no rewrite (`passedThrough`) |
 | A settings file that exists but does not parse, or a `Bash(…)` rule this parser does not understand | no rewrite |
+| Anything else | rewrite, with `permissionDecision: "allow"` |
+
+Outside bypass mode Claude Code decides: its prompt, its auto-mode classifier
+and plan mode's read-only rule. A hook `allow` would skip all three, so the hook
+never gives one there.
 
 Deny and ask rules are matched generously. A prefix rule matches without a word
 boundary, an exact rule also matches longer commands, and `Bash(x *)` also
-matches a bare `x`. Allow rules are matched strictly. Every mismatch therefore
-leaves the command alone.
+matches a bare `x`. Each rule is tried against these texts, with runs of
+whitespace collapsed to one space:
+
+- the original command;
+- the parsed words, with quotes removed;
+- the same with the program's directory dropped (`/usr/bin/git` becomes `git`);
+- the same with the leading `NAME=value` words.
+
+Each text is also tried from every word on, so the rule matches wherever the
+command sits in the line. Every mismatch therefore leaves the command alone.
+`git  push`, with two spaces, gets no rewrite under `Bash(git push:*)`.
 
 The rules come from the files Claude Code loads:
 
@@ -88,6 +116,16 @@ The rules come from the files Claude Code loads:
   ```
 
   When the raw file was cut, the footer says `full output (first 10 MB, truncated)`.
+- **Raw files are bounded and go with the run.** All raw files of one run dir
+  stay under 200 MB together. Before a new file, the oldest `<n>.log` files are
+  deleted until there is room for one more at its 10 MB cap. A card deletes its
+  earlier rounds' `raw/` when a new round starts, and all of them with the card.
+  Stopping the orchestrator deletes its session's `raw/`.
+- **What the agent reads is redacted.** The compressed output goes through the
+  pane redactor (`pane/redact.ts`): GitHub, OpenAI, Slack and AWS token shapes,
+  and private-key blocks. The raw file keeps every byte. The fuller hook-content
+  redactor (`local/redact.ts`) is not used here, because it loads the protocol
+  schemas, which costs about 140 ms per command.
 - **Bypass.** With `AGENTDOCK_RAW=1 <cmd>`, the output streams through unchanged
   and the command is counted `bypassed`.
 - **Big outputs.** Output over 10 MB is not filtered. Whatever arrived so far is
@@ -97,8 +135,11 @@ The rules come from the files Claude Code loads:
 
 ## The environment a launch sets
 
-`filter/env.ts` exports the names. A launch spreads
-`filterEnv({ runDir, projectId, runId, runKind })` into the session's env.
+`filter/env.ts` is the only source of the names. `tokenSaverLaunch`
+(`launch/token-saver.ts`) spreads `filterEnv({ runDir, projectId, runId, runKind })`
+into the session's env. It also writes `<run dir>/filter-run.json`,
+`{ projectId, runId, runKind }` at mode 0600: the run dir's identity, for the
+stats reader.
 
 | Variable | Value |
 |---|---|
@@ -108,20 +149,25 @@ The rules come from the files Claude Code loads:
 | `AGENTDOCK_FILTER_RUN_KIND` | a `TokenSaverRunKind` |
 | `AGENTDOCK_LAUNCH_SETTINGS` | the `--settings` file the launch passed |
 
-The orchestrator session has no run dir. It uses
-`orchestratorFilterDir(<state>/agentdock, repo)`, which is
-`<state>/agentdock/orchestrator/<owner>__<name>/`.
+The orchestrator session has no run dir. It uses a directory of its own,
+`<state>/agentdock/orchestrator/<session>/`.
 
 ## Stats
 
 Each command appends one JSONL line, `{ "projectId", "row" }`, to
 `$AGENTDOCK_FILTER_STATS`. `row` is a `FilterStatRow`. The daemon
 (`FilterStatsReader`) scans the executors' base dirs and the orchestrator dir
-every 5 s, at most two levels deep. It reads complete lines from the offset kept
+every 5 s, at most three levels deep (a card's round is
+`<cards>/<card>/rounds/<run>`). It reads complete lines from the offset kept
 in `filter-stats.offset` beside each file, and sends `filter.stats` events of at
-most 200 rows per project through the events spool. A malformed row, or one for
-a project the runner no longer watches, is skipped. A resend after a crash is
-harmless, because the API skips row ids it already has.
+most 200 rows through the events spool.
+
+The project and run come from the run dir's `filter-run.json`, never from the
+row. A row whose `projectId`, `runId` or `runKind` differs from that identity is
+counted as rejected and never sent, so a session cannot report rows for another
+project or run. A stats file without a valid identity is not read. A malformed
+row, or one for a project the runner no longer watches, is skipped. A resend
+after a crash is harmless, because the API skips row ids it already has.
 
 ## Adding a filter
 

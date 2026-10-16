@@ -140,7 +140,10 @@ export const cardLaunchSpec = (
  */
 export const cardTokenSaver = (
   profile: ConfigProfile,
-  args: Pick<CardRunArgs, 'tokenSaver' | 'runId' | 'pullRequest' | 'prompt'>,
+  args: Pick<
+    CardRunArgs,
+    'tokenSaver' | 'runId' | 'projectId' | 'pullRequest' | 'prompt'
+  >,
   home: string,
   roundDir: string,
   selfCommand: readonly string[],
@@ -153,6 +156,7 @@ export const cardTokenSaver = (
     dir: roundDir,
     selfCommand,
     runKind: 'card',
+    projectId: args.projectId,
     runId: args.runId,
     agentdock: finishGuardArgs(cardIssueNumber(args)),
     scout: true,

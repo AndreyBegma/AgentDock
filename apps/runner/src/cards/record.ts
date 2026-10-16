@@ -8,6 +8,7 @@ import {
   skillRunIdSchema,
 } from '@agentdock/shared/protocol';
 import { z } from 'zod';
+import { removeRawDir } from '../filter/raw-store';
 import {
   type ExitRecord,
   exitRecordSchema,
@@ -93,6 +94,14 @@ export const cardRecordSchema = z.object({
 });
 export type CardRecord = z.infer<typeof cardRecordSchema>;
 
+const safeReaddir = (dir: string): string[] => {
+  try {
+    return readdirSync(dir);
+  } catch {
+    return [];
+  }
+};
+
 /**
  * Card state on disk, so a runner restart keeps watching the sessions that
  * run on in tmux. Each round has its own directory for `run.json` and
@@ -109,10 +118,19 @@ export class CardStore {
     return join(this.dir(cardId), 'rounds', skillRunIdSchema.parse(runId));
   }
 
-  /** Creates the round directory; an existing one is reused. */
+  /**
+   * Creates the round directory; an existing one is reused. #445 DR-07: the
+   * earlier rounds are over, so their raw outputs go now, not with the card.
+   */
   createRound(cardId: string, runId: string): string {
     const dir = this.roundDir(cardId, runId);
     mkdirSync(this.cardsDir, { recursive: true, mode: 0o700 });
+    const rounds = join(this.dir(cardId), 'rounds');
+    for (const name of safeReaddir(rounds)) {
+      if (name !== skillRunIdSchema.parse(runId)) {
+        removeRawDir(join(rounds, name));
+      }
+    }
     mkdirSync(dir, { recursive: true, mode: 0o700 });
     return dir;
   }

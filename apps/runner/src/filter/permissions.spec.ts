@@ -10,6 +10,7 @@ import {
   readRules,
   settingsFiles,
 } from './permissions';
+import { parseSimpleCommand } from './shell';
 
 const rules = (r: Partial<PermissionRules>): PermissionRules => ({
   allow: [],
@@ -26,51 +27,54 @@ interface Row {
   rewrite: boolean;
 }
 
+const BYPASS = 'bypassPermissions';
+
 // biome-ignore format: one row per line reads as the table it is
 const table: Row[] = [
-  // deny: a matching rule always wins, even in bypass mode
-  { name: 'deny prefix', rules: { deny: ['Bash(git push:*)'] }, mode: 'bypassPermissions', command: 'git push origin main', rewrite: false },
-  { name: 'deny prefix, generous: no word boundary needed', rules: { deny: ['Bash(git pus:*)'] }, mode: 'bypassPermissions', command: 'git push', rewrite: false },
-  { name: 'deny exact also covers longer commands', rules: { deny: ['Bash(git push)'] }, mode: 'bypassPermissions', command: 'git push --force', rewrite: false },
-  { name: 'deny glob', rules: { deny: ['Bash(kubectl * delete *)'] }, mode: 'bypassPermissions', command: 'kubectl -n prod delete pod x', rewrite: false },
-  { name: 'deny bare Bash', rules: { deny: ['Bash'] }, mode: 'bypassPermissions', command: 'bun test', rewrite: false },
-  { name: 'deny on the command behind assignments', rules: { deny: ['Bash(git push:*)'] }, mode: 'bypassPermissions', command: 'GIT_TRACE=1 git push', rewrite: false },
-  { name: 'unrelated deny', rules: { deny: ['Bash(git push:*)', 'Read(./.env)'] }, mode: 'bypassPermissions', command: 'bun test', rewrite: true },
+  // deny: a matching rule always wins
+  { name: 'deny prefix', rules: { deny: ['Bash(git push:*)'] }, mode: BYPASS, command: 'git push origin main', rewrite: false },
+  { name: 'deny prefix, generous: no word boundary needed', rules: { deny: ['Bash(git pus:*)'] }, mode: BYPASS, command: 'git push', rewrite: false },
+  { name: 'deny exact also covers longer commands', rules: { deny: ['Bash(git push)'] }, mode: BYPASS, command: 'git push --force', rewrite: false },
+  { name: 'deny glob', rules: { deny: ['Bash(kubectl * delete *)'] }, mode: BYPASS, command: 'kubectl -n prod delete pod x', rewrite: false },
+  { name: 'deny bare Bash', rules: { deny: ['Bash'] }, mode: BYPASS, command: 'bun test', rewrite: false },
+  { name: 'deny on the command behind assignments', rules: { deny: ['Bash(git push:*)'] }, mode: BYPASS, command: 'GIT_TRACE=1 git push', rewrite: false },
+  { name: 'deny on an assignment itself', rules: { deny: ['Bash(GIT_TRACE=1 git:*)'] }, mode: BYPASS, command: 'GIT_TRACE=1 git status', rewrite: false },
+  { name: 'unrelated deny', rules: { deny: ['Bash(git push:*)', 'Read(./.env)'] }, mode: BYPASS, command: 'bun test', rewrite: true },
+  // DR-04: whitespace, quotes, directories and position never hide a deny
+  { name: 'deny with two spaces in the command', rules: { deny: ['Bash(git push:*)'] }, mode: BYPASS, command: 'git  push', rewrite: false },
+  { name: 'deny with a tab in the command', rules: { deny: ['Bash(git push:*)'] }, mode: BYPASS, command: 'git\tpush', rewrite: false },
+  { name: 'deny with two spaces in the rule', rules: { deny: ['Bash(git  push:*)'] }, mode: BYPASS, command: 'git push', rewrite: false },
+  { name: 'deny with a quoted word', rules: { deny: ['Bash(git push:*)'] }, mode: BYPASS, command: 'git "push"', rewrite: false },
+  { name: 'deny with the program by path', rules: { deny: ['Bash(git push:*)'] }, mode: BYPASS, command: '/usr/bin/git push', rewrite: false },
+  { name: 'deny later in the command', rules: { deny: ['Bash(rm:*)'] }, mode: BYPASS, command: 'git log rm -rf x', rewrite: false },
+  { name: 'deny exact later in the command', rules: { deny: ['Bash(git push)'] }, mode: BYPASS, command: 'make git push', rewrite: false },
   // ask: same as deny — the rewrite must not skip a question
-  { name: 'ask prefix', rules: { ask: ['Bash(bun run deploy:*)'], allow: ['Bash(bun run:*)'] }, command: 'bun run deploy', rewrite: false },
-  { name: 'ask glob trailing space-star covers the bare command', rules: { ask: ['Bash(terraform apply *)'] }, mode: 'bypassPermissions', command: 'terraform apply', rewrite: false },
-  // allow: strict
-  { name: 'allow prefix', rules: { allow: ['Bash(bun run test:*)'] }, command: 'bun run test', rewrite: true },
-  { name: 'allow prefix with args', rules: { allow: ['Bash(bun run test:*)'] }, command: 'bun run test --coverage', rewrite: true },
-  { name: 'allow prefix, strict: needs a word boundary', rules: { allow: ['Bash(bun run test:*)'] }, command: 'bun run testing', rewrite: false },
-  { name: 'allow exact', rules: { allow: ['Bash(bun test)'] }, command: 'bun test', rewrite: true },
-  { name: 'allow exact, strict: not a longer command', rules: { allow: ['Bash(bun test)'] }, command: 'bun test a.spec.ts', rewrite: false },
-  { name: 'allow glob', rules: { allow: ['Bash(git log *)'] }, command: 'git log --oneline', rewrite: true },
-  { name: 'allow glob does not cover the bare command', rules: { allow: ['Bash(git log *)'] }, command: 'git log', rewrite: false },
-  { name: 'allow bare Bash', rules: { allow: ['Bash'] }, command: 'bun test', rewrite: true },
-  { name: 'allow star', rules: { allow: ['Bash(*)'] }, command: 'bun test', rewrite: true },
-  { name: 'allow is matched on the command as sent', rules: { allow: ['Bash(bun test:*)'] }, command: 'CI=1 bun test', rewrite: false },
-  // bypass mode
-  { name: 'bypass with no rules', rules: {}, mode: 'bypassPermissions', command: 'bun test', rewrite: true },
-  { name: 'default mode with no rules', rules: {}, mode: 'default', command: 'bun test', rewrite: false },
-  { name: 'acceptEdits is not bypass', rules: {}, mode: 'acceptEdits', command: 'bun test', rewrite: false },
-  { name: 'no mode given', rules: {}, command: 'bun test', rewrite: false },
+  { name: 'ask prefix', rules: { ask: ['Bash(bun run deploy:*)'] }, mode: BYPASS, command: 'bun run deploy', rewrite: false },
+  { name: 'ask glob trailing space-star covers the bare command', rules: { ask: ['Bash(terraform apply *)'] }, mode: BYPASS, command: 'terraform apply', rewrite: false },
+  { name: 'ask with extra spaces', rules: { ask: ['Bash(terraform apply *)'] }, mode: BYPASS, command: 'terraform   apply  -auto-approve', rewrite: false },
+  // DR-03 (amendment 9): only bypass mode rewrites, whatever allow says
+  { name: 'bypass with no rules', rules: {}, mode: BYPASS, command: 'bun test', rewrite: true },
+  { name: 'default mode with an allow rule', rules: { allow: ['Bash(bun test:*)'] }, mode: 'default', command: 'bun test', rewrite: false },
+  { name: 'acceptEdits with an allow rule', rules: { allow: ['Bash'] }, mode: 'acceptEdits', command: 'bun test', rewrite: false },
+  { name: 'auto mode with an allow rule', rules: { allow: ['Bash(git:*)'] }, mode: 'auto', command: 'git log', rewrite: false },
+  { name: 'plan mode with an allow rule', rules: { allow: ['Bash(*)'] }, mode: 'plan', command: 'bun test', rewrite: false },
+  { name: 'no mode given', rules: { allow: ['Bash'] }, command: 'bun test', rewrite: false },
   // unknown syntax: doubt means no rewrite
-  { name: 'unknown deny syntax', rules: { deny: ['Bash(git push'] }, mode: 'bypassPermissions', command: 'bun test', rewrite: false },
-  { name: 'unknown ask syntax', rules: { ask: ['Bash(a:*b:*)'] }, mode: 'bypassPermissions', command: 'bun test', rewrite: false },
-  { name: 'non-string rule', rules: { deny: [42] }, mode: 'bypassPermissions', command: 'bun test', rewrite: false },
-  { name: 'unknown allow syntax', rules: { allow: ['Bash(bun *test:*)'] }, command: 'bun test', rewrite: false },
-  { name: 'other tools are ignored', rules: { allow: ['Read', 'Bash(bun test:*)'], deny: ['WebFetch'] }, command: 'bun test', rewrite: true },
+  { name: 'unknown deny syntax', rules: { deny: ['Bash(git push'] }, mode: BYPASS, command: 'bun test', rewrite: false },
+  { name: 'unknown ask syntax', rules: { ask: ['Bash(a:*b:*)'] }, mode: BYPASS, command: 'bun test', rewrite: false },
+  { name: 'non-string rule', rules: { deny: [42] }, mode: BYPASS, command: 'bun test', rewrite: false },
+  { name: 'other tools are ignored', rules: { deny: ['WebFetch', 'Read(./.env)'] }, mode: BYPASS, command: 'bun test', rewrite: true },
 ];
 
-describe('permissionFor (#445 hook decision (a))', () => {
+describe('permissionFor (#445 hook decision (a), amendment 9)', () => {
   it.each(table)('$name', (row) => {
-    const bare = row.command.replace(/^([A-Za-z_][A-Za-z0-9_]*=\S*\s+)+/, '');
+    const parsed = parseSimpleCommand(row.command);
+    if (!parsed) throw new Error(`not simple: ${row.command}`);
     const verdict = permissionFor(
       rules(row.rules),
       row.mode,
       row.command,
-      bare,
+      parsed,
     );
     expect(verdict.rewrite).toBe(row.rewrite);
   });

@@ -174,14 +174,59 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
     expect(stats()[0]?.row.passedThrough).toBe(true);
   });
 
-  it('rewrites outside bypass mode only when an allow rule covers the original', () => {
-    const input = JSON.stringify(preToolUse('bun run test', {}, 'default'));
-    expect(runFilterHook(input, deps)).toBe('');
-    const allowed = runFilterHook(input, {
+  it.each([
+    'default',
+    'acceptEdits',
+    'auto',
+    'plan',
+    'dontAsk',
+  ])('never rewrites in %s mode, whatever the allow rules say (amendment 9)', (mode) => {
+    const input = JSON.stringify(preToolUse('bun run test', {}, mode));
+    const out = runFilterHook(input, {
       ...deps,
-      rules: () => ({ ...NO_RULES, allow: ['Bash(bun run test:*)'] }),
+      rules: () => ({ ...NO_RULES, allow: ['Bash', 'Bash(bun run test:*)'] }),
     });
-    expect(allowed).toContain('filter -- bun run test');
+    expect(out).toBe('');
+    expect(stats()[0]?.row.passedThrough).toBe(true);
+  });
+
+  it('builds the rewrite from the words, never from the text (DR-01)', () => {
+    const out = runFilterHook(
+      JSON.stringify(preToolUse(`FOO='a b'  bun   test "x y" \\;`)),
+      deps,
+    );
+    expect(
+      (JSON.parse(out) as HookOutput).hookSpecificOutput.updatedInput.command,
+    ).toBe(
+      `FOO='a b' /opt/agentdock/agentdock-runner filter -- bun test 'x y' ';'`,
+    );
+  });
+
+  it.each([
+    `bun test $'\\'; touch /tmp/pwned; \\''`,
+    'bun test # x\ntouch /tmp/pwned',
+    'bun test\ntouch /tmp/pwned',
+  ])('leaves %p alone (DR-01, DR-09)', (command) => {
+    expect(runFilterHook(JSON.stringify(preToolUse(command)), deps)).toBe('');
+    expect(stats()[0]?.row).toMatchObject({
+      filter: 'none',
+      passedThrough: true,
+    });
+  });
+
+  it('gives no rewrite for `git  push` against `Bash(git push:*)` (DR-04)', () => {
+    const git: Filter = {
+      id: 'ops/git',
+      matches: (argv) => argv[0] === 'git',
+      apply: () => null,
+    };
+    const out = runFilterHook(JSON.stringify(preToolUse('git  push')), {
+      ...deps,
+      filters: [git],
+      rules: () => ({ ...NO_RULES, deny: ['Bash(git push:*)'] }),
+    });
+    expect(out).toBe('');
+    expect(stats()[0]?.row.filter).toBe('ops/git');
   });
 
   it('leaves the command alone when the settings cannot be read', () => {
