@@ -270,15 +270,23 @@ export function BoardColumns({
           collapsed={collapsed}
           onCollapsedChange={setCollapsed}
           onMove={onMove}
-          renderCard={(item) =>
+          // C-35: the menu trigger sits at the end of the face's header row
+          // instead of taking a column; every face must place `menu`.
+          menuPlacement="inline"
+          renderCard={(item, _column, { menu }) =>
             isPlanItem(item) ? (
-              <PlanTaskFace task={item.planTask} onOpen={onOpenPlanTask} />
+              <PlanTaskFace
+                task={item.planTask}
+                menu={menu}
+                onOpen={onOpenPlanTask}
+              />
             ) : (
               <CardFace
                 projectId={projectId}
                 card={item.card}
                 canOperate={canOperate}
                 compact={compact}
+                menu={menu}
                 onOpen={onOpen}
               />
             )
