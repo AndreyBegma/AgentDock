@@ -178,11 +178,13 @@ const buildSelect = {
 export const designTurnWhere = (owner: DesignKey): Prisma.PlanTurnWhereInput =>
   'cardId' in owner
     ? { cardId: owner.cardId, action: 'design' }
-    : {
-        planId: owner.planId,
-        task: { key: owner.taskKey },
-        action: 'design',
-      };
+    : 'stackId' in owner
+      ? { stackId: owner.stackId, action: 'design' }
+      : {
+          planId: owner.planId,
+          task: { key: owner.taskKey },
+          action: 'design',
+        };
 
 /** `ui_profile` runs of the project whose `args.waiting` holds the design. */
 export const buildsHoldingWhere = (

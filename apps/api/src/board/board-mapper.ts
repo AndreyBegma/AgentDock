@@ -15,6 +15,7 @@ import {
   type CardPullRequestRef,
   type CardRoundBrief,
   type CardRoundView,
+  type CardStackRef,
   type CardTrackingView,
   cardAutoMergeDefault,
   cardCiChecksOf,
@@ -134,6 +135,8 @@ export interface CardFacts {
    * round id (`restartSavingsFor`); absent is none.
    */
   restartSavings?: ReadonlyMap<string, string>;
+  /** #480: each card's stack, by card id; absent is none. */
+  stacks?: ReadonlyMap<string, CardStackRef>;
   now: Date;
 }
 
@@ -369,6 +372,7 @@ export const toCardView = (
       : null,
   autoRunWhenReady: card.autoRunWhenReady,
   readiness: cardReadiness(card.column, facts.dependencies.get(card.id) ?? []),
+  stack: facts.stacks?.get(card.id) ?? null,
   tracking: trackingOf(card, facts),
   fleet: fleetOf(card),
   autoCollect: card.autoCollect,

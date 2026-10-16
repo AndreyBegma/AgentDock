@@ -74,6 +74,7 @@ model User {
   taskDesignsApproved         TaskDesign[]
   designComments              DesignComment[]
   boardCardsCreated           BoardCard[]                   @relation("BoardCardCreatedBy")
+  boardStacksCreated          BoardStack[]                  @relation("BoardStackCreatedBy")
   boardCardsMoved             BoardCard[]                   @relation("BoardCardMovedBy")
   boardCardsCompleted         BoardCard[]                   @relation("BoardCardCompletedBy")
   boardCardRounds             BoardCardRound[]
@@ -399,6 +400,7 @@ model Project {
   uiProfiles           UiProfile[]
   designSettings       DesignSettings?
   boardCards           BoardCard[]
+  boardStacks          BoardStack[]
   boardSettings        BoardSettings?
   cardCaptures         CardCapture[]
   cardDismissals       CardDismissal[]
@@ -1572,38 +1574,38 @@ enum RunTrigger {
 /// pure function of its slot, rebuilt whenever the slot's `lastSeq` passes
 /// `slotSeq`. Tokens and cost are computed on read (D8).
 model Run {
-  id              String     @id @default(cuid())
-  kind            RunKind
-  projectId       String
-  slotId          String?    @unique
-  issue           Int?
-  title           String?
-  runtime         Runtime?
-  model           String?
-  profileKey      String?
-  args            Json?
-  output          RunOutput?
-  status          RunStatus
+  id                 String     @id @default(cuid())
+  kind               RunKind
+  projectId          String
+  slotId             String?    @unique
+  issue              Int?
+  title              String?
+  runtime            Runtime?
+  model              String?
+  profileKey         String?
+  args               Json?
+  output             RunOutput?
+  status             RunStatus
   /// The last checkpoint's summary.
-  outcome         String?
-  prNumber        Int?
-  prUrl           String?
-  triggeredByType RunTrigger
-  triggeredById   String?
-  startedAt       DateTime
-  endedAt         DateTime?
-  durationMs      Int?
+  outcome            String?
+  prNumber           Int?
+  prUrl              String?
+  triggeredByType    RunTrigger
+  triggeredById      String?
+  startedAt          DateTime
+  endedAt            DateTime?
+  durationMs         Int?
   /// The slot's `lastSeq` this row was built from; null for other kinds.
-  slotSeq         BigInt?
+  slotSeq            BigInt?
   /// The slot's `updatedAt` (event time) for a slot run, so a rebuild from the
   /// same slot is identical.
-  updatedAt       DateTime
+  updatedAt          DateTime
   /// #445 D8: the finish was accepted after the artifact guard's 2 rejections —
   /// the card shows "Description incomplete".
-  artifactIncomplete Boolean @default(false)
+  artifactIncomplete Boolean    @default(false)
   /// #445 D12: the launch carried `tokenSaver.enabled`. The before/after
   /// compares runs with `false` against runs with `true`, by kind.
-  tokenSaver         Boolean @default(false)
+  tokenSaver         Boolean    @default(false)
 
   project           Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
   slot              Slot?              @relation(fields: [slotId], references: [id], onDelete: Cascade)
@@ -2363,6 +2365,8 @@ model Plan {
   cards              BoardCard[]
   /// #337 D6, D10: an intake's attachments, held until its card claims them.
   attachments        Attachment[]
+  /// #480: the stacks a confirmed intake made.
+  stacks             BoardStack[]
 
   @@index([projectId, updatedAt])
   @@index([authorId])
@@ -2413,10 +2417,12 @@ model PlanTask {
 /// whose output fails the contract keeps `resultText` and applies nothing.
 model PlanTurn {
   id         String         @id @default(cuid())
-  /// Exactly one of `planId` / `cardId` (CHECK `plan_turns_owner_check`, ADR-0025).
+  /// Exactly one of `planId` / `cardId` / `stackId` (CHECK `plan_turns_owner_check`, ADR-0025, ADR-0044).
   planId     String?
   /// A board card's design turn (#243 D2), sent as `plan.turn` with `planId = card.id`.
   cardId     String?
+  /// #480: a stack's design turn, sent as `plan.turn` with `planId = stack.id`.
+  stackId    String?
   /// Set for a task's grill or write turn.
   taskId     String?
   runId      String         @unique
@@ -2435,6 +2441,7 @@ model PlanTurn {
 
   plan               Plan?               @relation(fields: [planId], references: [id], onDelete: Cascade)
   card               BoardCard?          @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  stack              BoardStack?         @relation(fields: [stackId], references: [id], onDelete: Cascade)
   task               PlanTask?           @relation(fields: [taskId], references: [id], onDelete: Cascade)
   run                Run                 @relation(fields: [runId], references: [id], onDelete: Cascade)
   author             User?               @relation(fields: [authorId], references: [id], onDelete: SetNull)
@@ -2443,6 +2450,7 @@ model PlanTurn {
 
   @@index([planId, createdAt])
   @@index([cardId, createdAt])
+  @@index([stackId, createdAt])
   @@index([taskId, createdAt])
   @@map("plan_turns")
 }
@@ -2537,6 +2545,8 @@ model TaskDesign {
   planId             String?
   taskKey            String?
   cardId             String?          @unique
+  /// #480 (ADR-0044): a stack's shared design, drawn for the whole result.
+  stackId            String?          @unique
   /// The person's switch (D2); starts as the planner's suggestion.
   needed             Boolean
   /// Whether the planner suggested it, and why (D2).
@@ -2558,6 +2568,7 @@ model TaskDesign {
 
   plan             Plan?            @relation(fields: [planId], references: [id], onDelete: Cascade)
   card             BoardCard?       @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  stack            BoardStack?      @relation(fields: [stackId], references: [id], onDelete: Cascade)
   profile          UiProfile?       @relation(fields: [profileId], references: [id], onDelete: SetNull)
   approvedRevision DesignRevision?  @relation("TaskDesignApprovedRevision", fields: [approvedRevisionId], references: [id], onDelete: SetNull)
   approvedBy       User?            @relation(fields: [approvedById], references: [id], onDelete: SetNull)
@@ -2893,11 +2904,14 @@ model BoardCard {
   /// #337 D6, D7: the plan the card came from — a New Card intake or a New
   /// Plan's Create cards; kept as its origin.
   planId                  String?
+  /// #480 (ADR-0044): the stage of the stack the card belongs to; at most one.
+  stageId                 String?
   createdAt               DateTime         @default(now())
   updatedAt               DateTime         @updatedAt
 
   project            Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
   plan               Plan?                  @relation(fields: [planId], references: [id], onDelete: SetNull)
+  stage              BoardStackStage?       @relation(fields: [stageId], references: [id], onDelete: SetNull)
   trackedSession     AgentSession?          @relation("BoardCardTrackedSession", fields: [trackedSessionId], references: [id], onDelete: SetNull)
   createdBy          User?                  @relation("BoardCardCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   movedBy            User?                  @relation("BoardCardMovedBy", fields: [movedById], references: [id], onDelete: SetNull)
@@ -2924,6 +2938,7 @@ model BoardCard {
   @@index([sessionId])
   @@index([projectId, fingerprint])
   @@index([planId])
+  @@index([stageId])
   @@map("board_cards")
 }
 
@@ -2941,6 +2956,55 @@ model BoardCardDependency {
   @@id([cardId, dependsOnId])
   @@index([dependsOnId])
   @@map("board_card_dependencies")
+}
+
+/// #480 (ADR-0044): a group of cards that make one larger piece of work,
+/// ordered in stages, under one optional shared design. Every card of stage
+/// N+1 has an ordinary `BoardCardDependency` on every card of stage N.
+model BoardStack {
+  id              String   @id @default(cuid())
+  projectId       String
+  /// Per project, `S-<number>`: max + 1 under `pg_advisory_xact_lock`.
+  number          Int
+  /// English, at most 200 characters.
+  title           String
+  /// Markdown, at most 20 000 characters.
+  body            String   @default("")
+  /// The intake that proposed it; kept as its origin.
+  planId          String?
+  /// The stack design turns' Claude session — `--session-id` first, then `--resume`.
+  designSessionId String?  @db.Uuid
+  /// Nullable so deleting a user keeps the stack.
+  createdById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  project     Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  plan        Plan?             @relation(fields: [planId], references: [id], onDelete: SetNull)
+  createdBy   User?             @relation("BoardStackCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  stages      BoardStackStage[]
+  design      TaskDesign?
+  designTurns PlanTurn[]
+
+  @@unique([projectId, number])
+  @@map("board_stacks")
+}
+
+/// #480: one stage of a stack. Its cards may run in parallel; they wait on
+/// every card of the stage before it.
+model BoardStackStage {
+  id       String @id @default(cuid())
+  stackId  String
+  /// 0-based, dense.
+  position Int
+  /// English, at most 80 characters; may be empty.
+  title    String @default("")
+
+  stack BoardStack  @relation(fields: [stackId], references: [id], onDelete: Cascade)
+  cards BoardCard[]
+
+  @@unique([stackId, position])
+  @@map("board_stack_stages")
 }
 
 /// #359 D8: one PR of a card. A follow-up after a merge opens a new branch

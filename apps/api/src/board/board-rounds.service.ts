@@ -22,6 +22,8 @@ import {
   cardSpecPath,
   cardWorkerPrompt,
   isActiveRoundPhase,
+  stackDesignPath,
+  stackLabel,
 } from '@agentdock/shared';
 import {
   type CardRunArgs,
@@ -62,6 +64,7 @@ import { BoardDependencies } from './board-dependencies.service';
 import { BoardFailure, boardError } from './board-error';
 import type { CardWithRounds } from './board-mapper';
 import { toSettingsView } from './board-mapper';
+import { BoardStacks } from './board-stacks';
 import {
   ACTIVE_PHASES,
   BOARD_SYSTEM_ACTOR,
@@ -138,6 +141,7 @@ export class BoardRoundsService {
     private readonly text: TextNormalizer,
     private readonly attachments: AttachmentsService,
     private readonly dependencies: BoardDependencies,
+    private readonly stacks: BoardStacks,
     private readonly tokenSaver: TokenSaverService,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
@@ -169,6 +173,8 @@ export class BoardRoundsService {
         'A suggestion runs once it is accepted',
       );
     }
+    // #480 (ADR-0044): no card of a stack runs before its design is approved.
+    await this.stacks.assertRunnable(card.id);
     // #337 D8: an open dependency warns; the person may run anyway.
     await this.dependencies.assertRunnable(
       card.id,
@@ -397,6 +403,8 @@ export class BoardRoundsService {
     const firstStart = !resume;
     // #243 D6: a needed design is approved before the worker starts.
     const design = trigger === 'run' ? await this.approvedDesign(card) : null;
+    // #480: the card's stack — its place, and its approved design as reference.
+    const stack = firstStart ? await this.stacks.contextOf(card.id) : null;
 
     this.commands.assertReady(project.runnerId, 'card.run');
     await this.assertRoom(project.id);
@@ -482,6 +490,19 @@ export class BoardRoundsService {
             content: f.html,
           }))
         : [];
+    // #480: round 1 commits the stack's approved design beside the card's own.
+    const stackFrames: (CardRunFile & { name: string })[] = stack?.design
+      ? stack.design.frames.map((f) => ({
+          name: f.name,
+          path: stackDesignPath(
+            specDir,
+            stack,
+            stack.design?.variant ?? 1,
+            f.slug,
+          ),
+          content: f.html,
+        }))
+      : [];
     const sessionId = card.sessionId ?? randomUUID();
     // #309 D9, D10: what the card holds once this round's claim is made.
     const attached = await this.attachments.withClaim(card.id, claimIds);
@@ -515,6 +536,25 @@ export class BoardRoundsService {
                     comments: design.comments,
                   }
                 : null,
+            stack: stack
+              ? {
+                  label: stackLabel(stack.number),
+                  title: stack.title,
+                  stage: stack.stage,
+                  stageTitle: stack.stageTitle,
+                  stageCount: stack.stageCount,
+                  design:
+                    stack.design && stackFrames.length > 0
+                      ? {
+                          frames: stackFrames.map((f) => ({
+                            name: f.name,
+                            path: f.path,
+                          })),
+                          rationale: stack.design.rationale,
+                        }
+                      : null,
+                }
+              : null,
             attachments: attachmentBriefs,
           });
     const files: CardRunFile[] = [
@@ -522,6 +562,7 @@ export class BoardRoundsService {
         ? [{ path: specPath, content: specContent(card, issue.number) }]
         : []),
       ...designFrames.map((f) => ({ path: f.path, content: f.content })),
+      ...stackFrames.map((f) => ({ path: f.path, content: f.content })),
     ];
     // #445 D11: only a runner that advertises the token saver gets the field.
     const saver = await this.tokenSaver.launch(project.id);

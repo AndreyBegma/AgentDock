@@ -24,3 +24,7 @@ export const boardNewWorkHref = (projectId: string, brief?: string): string =>
  * it opens New work.
  */
 export const boardNewPlanHref = boardNewWorkHref;
+
+/** #480: one stack on its own page. */
+export const boardStackPageHref = (projectId: string, number: number): string =>
+  `${boardHref(projectId)}/stacks/${number}`;

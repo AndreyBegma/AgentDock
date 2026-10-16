@@ -19,11 +19,14 @@ import {
   type CardDraft,
   INTAKE_SPLIT_MAX,
   INTAKE_SPLIT_MIN,
+  INTAKE_STACK_STAGES_MIN,
   intakeCardOutputSchema,
   intakeRoundOutputSchema,
   intakeSplitOutputSchema,
+  intakeStackOutputSchema,
   isIntakeCard,
   isIntakeSplit,
+  isIntakeStack,
   isPlannedTask,
   PLANNER_BLOCK_TAG,
   PLANNER_CONTRACT_VERSION,
@@ -399,6 +402,7 @@ const intakeBranchSchema = (json: unknown) => {
   if (typeof json === 'object' && json !== null) {
     if ('cardDraft' in json) return intakeCardOutputSchema;
     if ('split' in json) return intakeSplitOutputSchema;
+    if ('stack' in json) return intakeStackOutputSchema;
   }
   return intakeRoundOutputSchema;
 };
@@ -633,6 +637,38 @@ export function parsePlannerOutput(
     }
     case 'intake': {
       const ctx = context as PlannerParseContexts['intake'];
+      if (isIntakeStack(output)) {
+        if (ctx.keepOne === true) {
+          return violation(
+            'split_declined',
+            'the person chose to keep one card: write one card for the whole request',
+          );
+        }
+        if (
+          ctx.acceptNonEnglish !== true &&
+          !isReliablyEnglish(
+            [
+              output.stack.title,
+              output.stack.body,
+              ...output.stack.stages.map((st) => st.title),
+            ].join('\n'),
+          )
+        ) {
+          return violation(
+            'not_english',
+            "the stack's title and body must be written in English",
+          );
+        }
+        let n = 0;
+        for (const stage of output.stack.stages) {
+          for (const card of stage.cards) {
+            n += 1;
+            const bad = checkCardDraft(card, ctx, `stack card ${n}`);
+            if (bad) return bad;
+          }
+        }
+        return { ok: true, output };
+      }
       if (isIntakeSplit(output)) {
         if (ctx.keepOne === true) {
           return violation(
@@ -846,6 +882,17 @@ Split = {
   "reason": string,          // why several cards, in the person's language
   "cards": [ SplitCard ]     // ${INTAKE_SPLIT_MIN}–${INTAKE_SPLIT_MAX}, independent of each other
 }
+StackStage = {
+  "title": string,           // short English name of the stage, e.g. "Components"
+  "cards": [ SplitCard ]     // may run in parallel; each waits on every card of the stage before
+}
+Stack = {
+  "reason": string,          // why one stack in stages, in the person's language
+  "title": string,           // English, the whole piece of work, at most ${CARD_DRAFT_TITLE_MAX} characters
+  "body": markdown,          // English: what the whole piece of work is and when it is done
+  "design": boolean,         // true when the result is UI: one shared design is drawn and approved first
+  "stages": [ StackStage ]   // ${INTAKE_STACK_STAGES_MIN} or more, in order; ${INTAKE_SPLIT_MIN}–${INTAKE_SPLIT_MAX} cards in all
+}
 \`\`\`
 
 Every intake turn answers with one of:
@@ -853,19 +900,21 @@ Every intake turn answers with one of:
 \`\`\`
 intake → { "action": "intake", "questions": [ Question ] }   // a round: 1–${PLANNER_MAX_QUESTIONS} questions
 intake → { "action": "intake", "cardDraft": CardDraft }      // the card
-intake → { "action": "intake", "split": Split }              // a proposal of several cards
+intake → { "action": "intake", "split": Split }              // a proposal of several independent cards
+intake → { "action": "intake", "stack": Stack }              // a proposal of cards in ordered stages
 \`\`\`
 
 Rules:
 
 - \`action\` is \`intake\`.
 - Ask a round only while something material is unknown; write the card as soon as nothing is.
-- At most ${PLANNER_INTAKE_MAX_ROUNDS} rounds. After the ${PLANNER_INTAKE_MAX_ROUNDS}th, or when the turn says the person asked to generate, write the card or the split — a round then fails the turn.
+- At most ${PLANNER_INTAKE_MAX_ROUNDS} rounds. After the ${PLANNER_INTAKE_MAX_ROUNDS}th, or when the turn says the person asked to generate, write the card, the split or the stack — a round then fails the turn.
 - Propose a \`split\` only when the request is several independent tasks, or one task too big for a single agent. Each card stands alone: no card depends on another. One clear task is one \`cardDraft\`.
-- When the turn says the person chose to keep one card, write one \`cardDraft\` covering the whole request — a round or a split then fails the turn.
+- Propose a \`stack\` instead when the request is one larger piece of work whose parts must happen in order and share one look — for example a page redesign: its components first, then the page built from them. Group the cards into stages in that order. Set \`design\` to true when the result is UI.
+- When the turn says the person chose to keep one card, write one \`cardDraft\` covering the whole request — a round, a split or a stack then fails the turn.
 - Questions, options and anything you say outside the block are in the language of the person's latest text.
-- Every card — \`title\`, \`summary\`, \`body\` — is in English, whatever language the person wrote in.
-- Every \`body\` has exactly these \`##\` sections: ${CARD_DRAFT_SECTIONS.map((s) => `\`## ${s}\``).join(', ')}. Acceptance criteria are checkable bullets; each open question names the default taken.
+- Every card — \`title\`, \`summary\`, \`body\` — and a stack's \`title\`, \`body\` and stage titles are in English, whatever language the person wrote in.
+- Every card's \`body\` has exactly these \`##\` sections: ${CARD_DRAFT_SECTIONS.map((s) => `\`## ${s}\``).join(', ')}. Acceptance criteria are checkable bullets; each open question names the default taken.
 - \`recommendation.optionId\`, when present, is the id of one of that question's options.
 ${MULTIPLE_RULE}
 - The \`body\` is a JSON string: newlines are \`\\n\`.

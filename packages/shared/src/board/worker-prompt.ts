@@ -93,6 +93,23 @@ export interface CardWorkerDesign {
   comments: string[];
 }
 
+/**
+ * #480 (ADR-0044): the stack the card is part of. Its approved design shows
+ * the whole result and is committed on the card's branch as reference; the
+ * card's own design, if any, stays its own.
+ */
+export interface CardWorkerStack {
+  /** `S-<number>`. */
+  label: string;
+  title: string;
+  /** 0-based. */
+  stage: number;
+  stageTitle: string;
+  stageCount: number;
+  /** The approved stack design's frames, repository-relative; null without one. */
+  design: { frames: CardWorkerDesignFrame[]; rationale: string } | null;
+}
+
 export interface CardWorkerPromptInput {
   number: number;
   title: string;
@@ -106,6 +123,8 @@ export interface CardWorkerPromptInput {
   issueNumber: number | null;
   /** #243: the approved design; `null` when the card has none. */
   design: CardWorkerDesign | null;
+  /** #480: the card's stack; absent or `null` when it is in none. */
+  stack?: CardWorkerStack | null;
   /**
    * #309 D10: the card's and its rounds' attachments, in upload order — the
    * same list `card.run` carries. Absent is none.
@@ -194,6 +213,34 @@ const designSection = (
   return lines;
 };
 
+/**
+ * #480: the card's place in its stack and — with one — the stack's approved
+ * design, the whole result this card builds a part of.
+ */
+const stackSection = (stack: CardWorkerStack, rationale: string): string[] => {
+  const stage = `stage ${stack.stage + 1} of ${stack.stageCount}${stack.stageTitle.trim() ? ` (${oneLine(stack.stageTitle)})` : ''}`;
+  const lines = [
+    '## Stack',
+    '',
+    `This card is part of stack ${stack.label} "${oneLine(stack.title)}", ${stage}. Other cards of the stack build the rest: build only what this card asks for, consistent with the whole.`,
+  ];
+  const frames = stack.design?.frames ?? [];
+  if (frames.length > 0) {
+    lines.push(
+      '',
+      frames.length === 1
+        ? `The stack's approved design shows the whole result: ${frames[0].path} (already committed on this branch, as reference).`
+        : `The stack's approved design shows the whole result, in ${frames.length} frames (already committed on this branch, as reference):`,
+      ...(frames.length === 1
+        ? []
+        : ['', ...frames.map((f) => `- ${f.path} — ${oneLine(f.name)}`), '']),
+      "It is reference for this card's part, not code to copy. Where this card has its own design (## Design), that one binds this card.",
+    );
+    if (rationale) lines.push('', `Why the stack design: ${rationale}`);
+  }
+  return lines;
+};
+
 /** A display name on one line of the prompt. */
 const oneLine = (text: string): string => text.replace(/\s+/g, ' ').trim();
 
@@ -241,8 +288,10 @@ const attachmentsSection = (
  */
 export const cardWorkerPrompt = (card: CardWorkerPromptInput): string => {
   const { design } = card;
+  const stack = card.stack ?? null;
   const attachments = card.attachments ?? [];
   let rationale = design?.rationale.trim() ?? '';
+  let stackRationale = stack?.design?.rationale.trim() ?? '';
   let commentBudget = design ? CARD_DESIGN_COMMENTS_MAX_BYTES : 0;
   let withNames = attachments.length > 0;
   let body = card.body.trim();
@@ -262,10 +311,16 @@ export const cardWorkerPrompt = (card: CardWorkerPromptInput): string => {
       attachments.length > 0
         ? attachmentsSection(attachments, withNames)
         : null,
+      stack ? stackSection(stack, stackRationale) : null,
     );
     const over = utf8Bytes(prompt) - CARD_RUN_PROMPT_MAX_BYTES;
     if (over <= 0) return prompt;
-    if (commentBudget > 0) {
+    if (stackRationale) {
+      stackRationale = cutToBytes(
+        stackRationale,
+        utf8Bytes(stackRationale) - over,
+      );
+    } else if (commentBudget > 0) {
       commentBudget = Math.max(0, commentBudget - over);
     } else if (rationale) {
       rationale = cutToBytes(rationale, utf8Bytes(rationale) - over);
@@ -379,6 +434,7 @@ const assemblePrompt = (
   body: string,
   design: string[] | null,
   attachments: string[] | null,
+  stack: string[] | null = null,
 ): string => {
   const label = cardLabel(card.number);
   const lines = [
@@ -422,6 +478,7 @@ const assemblePrompt = (
   }
   lines.push('', '## The card', '', body || '(no description)', '');
   if (design !== null) lines.push(...design, '');
+  if (stack !== null) lines.push(...stack, '');
   if (attachments !== null) lines.push(...attachments, '');
   lines.push(...pullRequestSection(card));
   return lines.join('\n');

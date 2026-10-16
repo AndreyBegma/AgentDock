@@ -2,6 +2,7 @@ import {
   type AcceptBoardCardRequest,
   type AcceptSuggestionRequest,
   type AddCardDependencyRequest,
+  type AddStackCardRequest,
   BOARD_CARD_BODY_MAX,
   BOARD_CARD_KINDS,
   BOARD_CARD_TITLE_MAX,
@@ -21,10 +22,14 @@ import {
   type CaptureModel,
   type CardFeedbackRequest,
   type CreateBoardCardRequest,
+  INTAKE_SPLIT_MAX,
   type MoveBoardCardRequest,
   type RunBoardCardRequest,
+  STACK_BODY_MAX,
+  STACK_TITLE_MAX,
   type UpdateBoardCardRequest,
   type UpdateBoardSettingsRequest,
+  type UpdateBoardStackRequest,
 } from '@agentdock/shared';
 import {
   type OrchestratorPermissionMode,
@@ -233,6 +238,34 @@ export class AddCardDependencyDto implements AddCardDependencyRequest {
   @Min(1)
   @Max(999_999_999)
   dependsOn!: number;
+}
+
+/** `PATCH /board/stacks/:number` (#480). */
+export class UpdateBoardStackDto implements UpdateBoardStackRequest {
+  @IsOptional()
+  @IsString()
+  @Matches(/\S/, { message: 'title must not be blank' })
+  @MaxLength(STACK_TITLE_MAX)
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(STACK_BODY_MAX)
+  body?: string;
+}
+
+/** `POST /board/stacks/:number/cards` (#480). */
+export class AddStackCardDto implements AddStackCardRequest {
+  @IsInt()
+  @Min(1)
+  @Max(999_999_999)
+  card!: number;
+
+  /** 0-based; the number of stages adds a new last stage. */
+  @IsInt()
+  @Min(0)
+  @Max(INTAKE_SPLIT_MAX)
+  stage!: number;
 }
 
 /** `POST /board/cards/:number/feedback` (D9). */

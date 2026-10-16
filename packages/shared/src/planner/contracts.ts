@@ -272,6 +272,23 @@ export interface PlanIntakeSplitView {
   reason: string;
   /** In the proposal's order; `index` is what Confirm refers to. */
   cards: PlanIntakeSplitCard[];
+  /**
+   * #480 (ADR-0044): set when the intake proposed a stack — `cards` then
+   * lists every card of it in stage order, and the stages name them by
+   * `index`. Null (or absent) for a plain split.
+   */
+  stack?: PlanIntakeStackView | null;
+}
+
+/** #480: a stack proposal's shape as the person reviews it. */
+export interface PlanIntakeStackView {
+  title: string;
+  /** Markdown, English. */
+  body: string;
+  /** The intake suggests a shared design of the whole result. */
+  design: boolean;
+  /** In order; each names its cards by `PlanIntakeSplitCard.index`. */
+  stages: { title: string; cards: number[] }[];
 }
 
 export interface PlanIntakeSplitCard {
@@ -291,6 +308,25 @@ export interface PlanIntakeSplitCard {
 export interface ConfirmSplitRequest {
   turnId: string;
   cards: ConfirmSplitCard[];
+  /**
+   * #480 (ADR-0044): confirm the cards as a stack instead of independent
+   * cards — whichever the intake proposed. Every kept card is in exactly one
+   * stage; every card of a stage gets a dependency on every card of the stage
+   * before it. Absent: independent cards, as before.
+   */
+  stack?: ConfirmStackRequest;
+}
+
+/** #480: the stack the person confirms. */
+export interface ConfirmStackRequest {
+  /** English, at most `STACK_TITLE_MAX` characters. */
+  title: string;
+  /** Markdown, at most `STACK_BODY_MAX` characters; may be empty. */
+  body: string;
+  /** Draw a stack design first: no card of the stack runs until it is approved. */
+  design: boolean;
+  /** In order, at least one, none empty; cards by `ConfirmSplitCard.index`. */
+  stages: { title: string; cards: number[] }[];
 }
 
 export interface ConfirmSplitCard {
@@ -304,6 +340,8 @@ export interface ConfirmSplitCard {
 export interface ConfirmSplitResponse {
   /** In the confirmed order. */
   cards: { number: number; label: string }[];
+  /** #480: the stack made, when the request named one. */
+  stack?: { number: number; label: string } | null;
 }
 
 /** `GET /tasks` query. */

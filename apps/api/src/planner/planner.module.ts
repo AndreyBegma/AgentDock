@@ -20,6 +20,7 @@ import {
 import { PlannerCommands } from './planner-commands';
 import { PlannerInstructionsService } from './planner-instructions.service';
 import { PlansController } from './plans.controller';
+import { StackDesignTurnService } from './stack-design-turn.service';
 import { TasksQueryService } from './tasks-query.service';
 
 /**
@@ -51,10 +52,18 @@ import { TasksQueryService } from './tasks-query.service';
     PlanTurnService,
     PlannerCommands,
     PlannerInstructionsService,
+    // #480: a stack's design turns.
+    StackDesignTurnService,
     TasksQueryService,
   ],
   // The design stage (spec 223) runs its turns through the planner's — a
   // board card's as well (#243).
-  exports: [CardDesignTurnService, PlanStore, PlanTurnService, PlannerCommands],
+  exports: [
+    CardDesignTurnService,
+    PlanStore,
+    PlanTurnService,
+    PlannerCommands,
+    StackDesignTurnService,
+  ],
 })
 export class PlannerModule {}

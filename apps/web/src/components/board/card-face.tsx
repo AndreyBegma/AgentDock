@@ -3,7 +3,7 @@ import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Chip } from '@andrewbehma/glass-ui/chip';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
-import { Check, Clock, GitMerge, Paperclip, Zap } from 'lucide-react';
+import { Check, Clock, GitMerge, Layers, Paperclip, Zap } from 'lucide-react';
 import NextLink from 'next/link';
 import type { ReactNode } from 'react';
 import { attachmentCountLabel } from '../../lib/attachments/format';
@@ -106,6 +106,17 @@ export function CardFace({
           className="flex h-4 min-w-0 items-center gap-1.5 whitespace-nowrap text-xs leading-4 text-ink-2"
         >
           <span className="shrink-0 font-mono">{card.label}</span>
+          {card.stack ? (
+            // #480: the card's stack, wherever the card sits.
+            <Chip
+              size="sm"
+              title={`Part of ${card.stack.label} ${card.stack.title}`}
+              className={`${HEAD_CHIP} gap-1 font-mono`}
+            >
+              <Layers aria-hidden="true" className="size-3" />
+              {card.stack.label}
+            </Chip>
+          ) : null}
           {card.kind === 'bug' ? (
             <Chip size="sm" tone="danger" className={HEAD_CHIP}>
               Bug
@@ -237,6 +248,7 @@ export function CardFace({
             ) : null}
           </>
         ) : null}
+        {card.stack ? <p className={note}>part of {card.stack.title}</p> : null}
         {card.fleet ? <p className={note}>{fleetSummary(card.fleet)}</p> : null}
         {suggestion && card.captureWhy ? (
           <p className={note}>{card.captureWhy}</p>
