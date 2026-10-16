@@ -205,6 +205,15 @@ Two optional fields belong to the Claude Code integration
 `load` is the 1, 5 and 15 minute load average; `collectors` is keyed by
 collector name.
 
+`profiles` is optional: each Claude profile id mapped to its `agentdock` state
+(`{ plugin, telemetry }`, the same shape as `capabilities.profiles[].agentdock`
+in `hello`). The runner sends it on every heartbeat, not only on change, so a
+lost heartbeat heals on the next one. Codex profiles are never listed. The
+server merges it into the stored capabilities by profile id and ignores an id
+it does not know, since `hello` owns the profile list. A heartbeat without
+`profiles` (an older runner) leaves the stored value untouched, and an older
+server strips the unknown field. Added in #348 within protocol v1.
+
 ```json
 {
   "type": "heartbeat",
@@ -214,6 +223,10 @@ collector name.
   "collectors": {
     "tmux": { "ok": true },
     "transcripts": { "ok": false, "error": "permission denied" }
+  },
+  "profiles": {
+    "work": { "plugin": "0.9.0", "telemetry": true },
+    "personal": { "plugin": null, "telemetry": false }
   }
 }
 ```

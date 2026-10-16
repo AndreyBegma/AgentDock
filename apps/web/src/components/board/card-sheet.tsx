@@ -52,6 +52,7 @@ import {
   hooksNotice,
   isFleetCard,
   isTerminalCard,
+  noPrBanner,
   phaseLabel,
   roundPill,
   SLOT_GONE_TEXT,
@@ -60,11 +61,7 @@ import {
   trackedSessionHref,
   trackedStatusText,
 } from '../../lib/board/format';
-import {
-  canCreatePr,
-  noPrText,
-  prChipText,
-} from '../../lib/board/pull-request';
+import { canCreatePr, prChipText } from '../../lib/board/pull-request';
 import { ciBanner, pullRequestRows } from '../../lib/board/shipping';
 import { formatCost } from '../../lib/format';
 import { Time } from '../../lib/format/time';
@@ -267,6 +264,31 @@ function CiStoppedBanner({ card }: { card: BoardCardDetail }) {
   );
 }
 
+/**
+ * #397: Radix focuses the first tabbable element of a sheet, which here is an
+ * action (Accept, Create pull request) — Enter right after opening fired it.
+ * The sheet's title is made focusable and takes focus instead. Radix leaves
+ * focus alone when it is already inside the sheet.
+ */
+export function focusSheetTitle(anchor: Element | null): boolean {
+  const dialog = anchor?.closest('[role="dialog"]');
+  const titleId = dialog?.getAttribute('aria-labelledby');
+  const title = titleId ? anchor?.ownerDocument.getElementById(titleId) : null;
+  if (!title) return false;
+  title.tabIndex = -1;
+  title.focus({ preventScroll: true });
+  return true;
+}
+
+/** Rendered inside a `SheetContent`: moves the initial focus to the title. */
+function InitialFocus() {
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    focusSheetTitle(ref.current);
+  }, []);
+  return <span ref={ref} hidden />;
+}
+
 const FORM_ID = 'board-card-form';
 
 /** The sheet of one card (#273 D17): Run, Design, Rounds, then the Card form with Save pinned. */
@@ -394,6 +416,7 @@ function CardDetailBody({
 
   const offer = approveRunOffer(card);
   const failure = card.autoRunFailure;
+  const noPr = noPrBanner(card);
 
   return (
     <SheetContent
@@ -425,6 +448,7 @@ function CardDetailBody({
         ) : undefined
       }
     >
+      <InitialFocus />
       <div className="flex flex-col gap-6">
         <section aria-label="Run" className="flex flex-col gap-4">
           <SectionHeader title="Run" headingLevel={3} />
@@ -442,8 +466,8 @@ function CardDetailBody({
           <CiStoppedBanner card={card} />
           {canCreatePr(card) ? (
             <div className="flex flex-col gap-2">
-              <Banner tone={noPrText(card).tone}>{noPrText(card).text}</Banner>
-              {canOperate ? (
+              <Banner tone={noPr.tone}>{noPr.text}</Banner>
+              {canOperate && noPr.canCreate ? (
                 <div>
                   <Button
                     variant="glass"
@@ -922,14 +946,17 @@ export function CardSheet({
                 {error}
               </p>
             ) : card && card.number === number ? (
-              <SuggestionSheetBody
-                key={card.id}
-                projectId={projectId}
-                card={card}
-                canOperate={canOperate}
-                actions={actions}
-                onDone={close}
-              />
+              <>
+                <InitialFocus key={`focus:${card.id}`} />
+                <SuggestionSheetBody
+                  key={card.id}
+                  projectId={projectId}
+                  card={card}
+                  canOperate={canOperate}
+                  actions={actions}
+                  onDone={close}
+                />
+              </>
             ) : (
               <Skeleton className="h-64 w-full" />
             )}
