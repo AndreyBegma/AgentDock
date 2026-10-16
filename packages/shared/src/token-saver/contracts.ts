@@ -12,8 +12,9 @@ export const TOKEN_SAVER_RAW_ENV = 'AGENTDOCK_RAW';
 
 /**
  * Mirrors the Prisma enum `TokenSaverRunKind`: the launch a filtered command
- * ran under (D1). `orchestrator` is the project's orchestrator session, which
- * has no run; every other kind matches the run's `RunKind`.
+ * ran under (D1). `orchestrator` is the project's orchestrator session and
+ * `manual` a session the runner did not launch — a `/cs-eco` session (#475);
+ * neither has a run. Every other kind matches the run's `RunKind`.
  */
 export const TOKEN_SAVER_RUN_KINDS = [
   'card',
@@ -24,9 +25,18 @@ export const TOKEN_SAVER_RUN_KINDS = [
   'ui_profile',
   'text_normalize',
   'orchestrator',
+  'manual',
 ] as const;
 export type TokenSaverRunKind = (typeof TOKEN_SAVER_RUN_KINDS)[number];
 export const tokenSaverRunKindSchema = z.enum(TOKEN_SAVER_RUN_KINDS);
+
+/** The kinds of a session without a run: their rows carry `runId: null`. */
+export const TOKEN_SAVER_RUNLESS_KINDS = [
+  'orchestrator',
+  'manual',
+] as const satisfies readonly TokenSaverRunKind[];
+export const isRunlessKind = (kind: TokenSaverRunKind): boolean =>
+  (TOKEN_SAVER_RUNLESS_KINDS as readonly TokenSaverRunKind[]).includes(kind);
 
 // The setting (D6, D11)
 
@@ -109,7 +119,7 @@ export const filterStatRowSchema = z
       .min(1)
       .max(64)
       .regex(/^[A-Za-z0-9_-]+$/),
-    /** The launch's run; `null` for the orchestrator session. */
+    /** The launch's run; `null` for the orchestrator and manual sessions. */
     runId: z.string().min(1).max(64).nullable(),
     runKind: tokenSaverRunKindSchema,
     filter: filterIdSchema,
@@ -133,8 +143,8 @@ export const filterStatRowSchema = z
       path: ['keptBytes'],
     },
   )
-  .refine((r) => (r.runKind === 'orchestrator') === (r.runId === null), {
-    message: 'runId is null exactly for the orchestrator session',
+  .refine((r) => isRunlessKind(r.runKind) === (r.runId === null), {
+    message: 'runId is null exactly for the orchestrator and manual sessions',
     path: ['runId'],
   });
 export type FilterStatRow = z.infer<typeof filterStatRowSchema>;

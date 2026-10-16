@@ -3302,7 +3302,8 @@ model TextSettings {
 /// Token saver (#445, ADR-0039).
 
 /// The launch a filtered command ran under (shared `TOKEN_SAVER_RUN_KINDS`).
-/// `orchestrator` is the project's orchestrator session, which has no run.
+/// `orchestrator` is the project's orchestrator session and `manual` a session
+/// the runner did not launch (`/cs-eco`, #475); neither has a run.
 enum TokenSaverRunKind {
   card
   skill
@@ -3312,6 +3313,7 @@ enum TokenSaverRunKind {
   ui_profile
   text_normalize
   orchestrator
+  manual
 }
 
 /// A project's Token saver setting (D11). No row: on, with an empty allowlist.
@@ -3334,7 +3336,7 @@ model TokenSaverSettings {
 model TokenSaverStat {
   id            String            @id
   projectId     String
-  /// Null for the orchestrator session, or a run the API does not know.
+  /// Null for the orchestrator and manual sessions, or a run the API does not know.
   runId         String?
   runKind       TokenSaverRunKind
   /// `<family>/<command>`, e.g. `js/jest`; `none` when no filter matched.

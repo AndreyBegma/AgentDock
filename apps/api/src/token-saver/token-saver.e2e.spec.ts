@@ -340,6 +340,25 @@ describe('token saver (e2e)', () => {
   });
 
   describe('the summary', () => {
+    it('shows manual (/cs-eco) sessions as their own run kind (#475)', async () => {
+      await stats([
+        row({ runId: null, runKind: 'manual' }),
+        row({ runId: null, runKind: 'orchestrator' }),
+      ]);
+      const stored = await w.ctx.prisma.tokenSaverStat.findMany({
+        where: { runKind: 'manual' },
+      });
+      expect(stored).toHaveLength(1);
+      expect(stored[0]).toMatchObject({ projectId: w.a, runId: null });
+      const body = (await w.viewer.get(summary())).body as TokenSaverSummary;
+      expect(body.byRunKind.map((k) => k.runKind).sort()).toEqual([
+        'manual',
+        'orchestrator',
+      ]);
+      // A session without a run has no before/after.
+      expect(body.beforeAfter).toEqual([]);
+    });
+
     it('totals, rates, before/after by runs.tokenSaver, and the breakdowns', async () => {
       await price();
       const on = await ranCard();

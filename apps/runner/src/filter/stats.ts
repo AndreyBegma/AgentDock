@@ -27,6 +27,7 @@ export const RUN_KINDS: readonly TokenSaverRunKind[] = [
   'ui_profile',
   'text_normalize',
   'orchestrator',
+  'manual',
 ];
 
 export interface StatsTarget extends Omit<FilterLaunch, 'runDir'> {
@@ -47,7 +48,10 @@ export const statsTarget = (
   const runKind = RUN_KINDS.find((k) => k === env[FILTER_RUN_KIND_ENV]);
   const runId = env[FILTER_RUN_ENV] || null;
   if (!file?.startsWith('/') || !projectId || !runKind) return null;
-  if ((runKind === 'orchestrator') !== (runId === null)) return null;
+  // A manual (`/cs-eco`, #475) session names itself or nothing; the daemon
+  // sends its rows with `runId: null` either way.
+  if (runKind !== 'manual' && (runKind === 'orchestrator') !== (runId === null))
+    return null;
   return { file, projectId, runId, runKind };
 };
 
