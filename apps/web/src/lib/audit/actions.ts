@@ -51,6 +51,7 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   'telegram.link': 'Linked a Telegram chat',
   'telegram.unlink': 'Unlinked a Telegram chat',
   'telegram.approval': 'Answered an approval in Telegram',
+  'telegram.project': 'Chose a project in Telegram',
   'terminal.attached': 'Opened a terminal',
   'terminal.detached': 'Closed a terminal',
   'skill.installed': 'Installed a skill',

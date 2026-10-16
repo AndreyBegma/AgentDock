@@ -52,6 +52,7 @@ export const AUDIT_ACTIONS = [
   'telegram.link',
   'telegram.unlink',
   'telegram.approval',
+  'telegram.project',
   'terminal.attached',
   'terminal.detached',
   'skill.installed',
