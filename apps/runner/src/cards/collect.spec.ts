@@ -463,6 +463,27 @@ describe('card.collect — the PR description (#359 D3)', () => {
     );
   });
 
+  it('without the file: links every frame of the design (#441)', async () => {
+    const { f, record, deps, args } = await setup();
+    await work(f, record.worktree);
+    await collectCard(
+      deps,
+      {
+        ...record,
+        specFiles: [
+          'docs/specs/42-export-csv.md',
+          'docs/specs/42-export-csv/design/1/page.html',
+          'docs/specs/42-export-csv/design/1/tile.html',
+        ],
+      },
+      args,
+    );
+    const blob = 'https://github.com/acme/widget/blob/feat/42-export-csv';
+    expect(f.prCreates()[0]?.body).toContain(
+      `approved design: [docs/specs/42-export-csv/design/1/page.html](${blob}/docs/specs/42-export-csv/design/1/page.html), [docs/specs/42-export-csv/design/1/tile.html](${blob}/docs/specs/42-export-csv/design/1/tile.html)`,
+    );
+  });
+
   it("without the file or spec files: the API's body as it is", async () => {
     const { f, record, deps, args } = await setup();
     await work(f, record.worktree);

@@ -1,6 +1,15 @@
 import type { z } from 'zod';
 import { DESIGN_CDN_ALLOWLIST } from '../design/cdn';
-import { DESIGN_HTML_MAX_BYTES, DESIGN_VARIANTS_MAX } from '../design/limits';
+import {
+  DESIGN_FRAME_NAME_MAX,
+  DESIGN_LEGACY_FRAME_NAME,
+  type DesignFrameDraft,
+} from '../design/frames';
+import {
+  DESIGN_HTML_MAX_BYTES,
+  DESIGN_VARIANTS_MAX,
+  designBytes,
+} from '../design/limits';
 import { validateMockup } from '../design/validate';
 import { isReliablyEnglish } from '../text/english';
 import type { PlanTurnView } from './contracts';
@@ -73,9 +82,14 @@ export const PLANNER_VIOLATION_REASONS = [
   'missing_reproduction',
   /** Design: no `agentdock-design` block, or one that is never closed. */
   'no_design_block',
-  /** Design: two or more `agentdock-design` blocks. */
+  /** Design: two or more `agentdock-design` blocks and no `frames`. */
   'multiple_design_blocks',
-  /** Design: the HTML is over `DESIGN_HTML_MAX_BYTES`. */
+  /**
+   * Design (#441): `frames` names a different number of frames than there
+   * are design blocks, or names one frame twice.
+   */
+  'frame_mismatch',
+  /** Design: the HTML of every frame together is over `DESIGN_HTML_MAX_BYTES`. */
   'design_too_large',
   /** Design: a resource from a host that is not on the CDN allowlist. */
   'design_host_not_allowed',
@@ -107,10 +121,13 @@ export interface PlannerContractViolation {
   message: string;
 }
 
-/** A design turn's result also carries the validated HTML, kept out of `output`. */
+/**
+ * A design turn's result also carries its frames' validated HTML (#441), in
+ * order, kept out of `output`.
+ */
 export type PlannerParseResult<A extends PlanTurnAction> =
   | ({ ok: true; output: PlannerOutput<A> } & (A extends 'design'
-      ? { html: string }
+      ? { frames: DesignFrameDraft[] }
       : unknown))
   | { ok: false; error: PlannerContractViolation };
 
@@ -386,31 +403,69 @@ const intakeBranchSchema = (json: unknown) => {
   return intakeRoundOutputSchema;
 };
 
-/** Spec 223 D7: the one design block, its HTML validated against D6. */
-const parseDesignBlock = (
+/**
+ * Spec 223 D7, #441: the design blocks, one per frame `names` lists — or the
+ * one block of a turn that names no frames — each validated against D6, and
+ * together at most `DESIGN_HTML_MAX_BYTES`.
+ */
+const parseDesignBlocks = (
   text: string,
+  names: readonly string[] | undefined,
 ):
-  | { ok: true; html: string }
+  | { ok: true; frames: DesignFrameDraft[] }
   | { ok: false; error: PlannerContractViolation } => {
   const blocks = extractFencedBlocks(text, PLANNER_DESIGN_BLOCK_TAG);
-  if (blocks.length > 1) {
-    return violation(
-      'multiple_design_blocks',
-      `expected one ${PLANNER_DESIGN_BLOCK_TAG} block, found ${blocks.length}`,
-    );
-  }
-  const html = blocks[0];
-  if (html === undefined || html === null) {
+  if (blocks.includes(null)) {
     return violation(
       'no_design_block',
-      html === null
-        ? `the ${PLANNER_DESIGN_BLOCK_TAG} block is never closed`
-        : `no ${PLANNER_DESIGN_BLOCK_TAG} block`,
+      `the ${PLANNER_DESIGN_BLOCK_TAG} block is never closed`,
     );
   }
-  const check = validateMockup(html);
-  if (!check.ok) return violation(check.reason, check.message);
-  return { ok: true, html };
+  if (blocks.length === 0) {
+    return violation('no_design_block', `no ${PLANNER_DESIGN_BLOCK_TAG} block`);
+  }
+  if (names === undefined && blocks.length > 1) {
+    return violation(
+      'multiple_design_blocks',
+      `expected one ${PLANNER_DESIGN_BLOCK_TAG} block, found ${blocks.length} — name each frame in "frames"`,
+    );
+  }
+  const frameNames = names ?? [DESIGN_LEGACY_FRAME_NAME];
+  if (frameNames.length !== blocks.length) {
+    return violation(
+      'frame_mismatch',
+      `"frames" names ${frameNames.length} frame${frameNames.length === 1 ? '' : 's'}, but there ${blocks.length === 1 ? 'is 1' : `are ${blocks.length}`} ${PLANNER_DESIGN_BLOCK_TAG} block${blocks.length === 1 ? '' : 's'}`,
+    );
+  }
+  const seen = new Set<string>();
+  for (const name of frameNames) {
+    const key = name.toLowerCase();
+    if (seen.has(key)) {
+      return violation('frame_mismatch', `"frames" names ${name} twice`);
+    }
+    seen.add(key);
+  }
+  const frames: DesignFrameDraft[] = [];
+  let total = 0;
+  for (const [i, html] of (blocks as string[]).entries()) {
+    const name = frameNames[i];
+    const check = validateMockup(html);
+    if (!check.ok) {
+      return violation(
+        check.reason,
+        blocks.length > 1 ? `frame "${name}": ${check.message}` : check.message,
+      );
+    }
+    total += designBytes(html);
+    frames.push({ name, html });
+  }
+  if (total > DESIGN_HTML_MAX_BYTES) {
+    return violation(
+      'design_too_large',
+      `the frames are ${total} bytes together; at most ${DESIGN_HTML_MAX_BYTES} — draw fewer frames or move styling to an allowlisted CDN`,
+    );
+  }
+  return { ok: true, frames };
 };
 
 /**
@@ -567,12 +622,12 @@ export function parsePlannerOutput(
           `addressed names ${unknown}, which is not an open comment of this design`,
         );
       }
-      const design = parseDesignBlock(text);
+      const design = parseDesignBlocks(text, output.frames);
       if (!design.ok) return design;
       const parsedDesign: PlannerParseResult<'design'> = {
         ok: true,
         output,
-        html: design.html,
+        frames: design.frames,
       };
       return parsedDesign;
     }
@@ -625,10 +680,11 @@ const CDN_HOSTS = DESIGN_CDN_ALLOWLIST.map(
  */
 export const PLANNER_DESIGN_CONTRACT = `## The design action
 
-A \`design\` turn draws one variant of the task's mockup. Its final message
-holds the usual \`${PLANNER_BLOCK_TAG}\` block **and** exactly one fenced block
-tagged \`${PLANNER_DESIGN_BLOCK_TAG}\`, fenced with four backticks, holding
-one self-contained HTML document:
+A \`design\` turn draws one variant of the task's mockup as one or more
+**frames**: each frame is a named, separately rendered HTML document. Its
+final message holds the usual \`${PLANNER_BLOCK_TAG}\` block **and** one fenced
+block tagged \`${PLANNER_DESIGN_BLOCK_TAG}\` per frame, fenced with four
+backticks, each holding one self-contained HTML document:
 
 ~~~text
 \`\`\`\`${PLANNER_DESIGN_BLOCK_TAG}
@@ -637,9 +693,14 @@ one self-contained HTML document:
 \`\`\`\`
 ~~~
 
-The mockup's rules — a mockup that breaks one fails the turn:
+Frames:
 
-- At most ${DESIGN_HTML_MAX_BYTES / 1024} KiB of HTML. Inline CSS and JS are allowed.
+- Draw one frame unless the task touches several pages or several standalone components. Then draw one frame per page, plus one per component that matters on its own (its states side by side).
+- \`"frames"\` lists a short name per frame (at most ${DESIGN_FRAME_NAME_MAX} characters, distinct), in the order of the design blocks: \`"frames": ["Board page", "Card tile"]\`. With one frame it may be left out; the frame is then named "${DESIGN_LEGACY_FRAME_NAME}".
+
+The mockup's rules — a frame that breaks one fails the turn:
+
+- At most ${DESIGN_HTML_MAX_BYTES / 1024} KiB of HTML, all frames together. Inline CSS and JS are allowed.
 - External scripts, styles, fonts and images only from ${CDN_HOSTS}, over HTTPS. No other host, and no relative URL: inline it or use a \`data:\` URL (images and fonts only).
 - Every script or package URL names an exact version: \`react@18.3.1\`, never \`react@18\` or \`latest\`.
 - No network calls (\`fetch\`, \`XMLHttpRequest\`, \`WebSocket\`, \`EventSource\`, \`sendBeacon\`), no form that submits, no navigation of the top or parent window, no \`window.open\`, no \`<iframe>\`, \`<object>\`, \`<embed>\` or \`<base>\`, no link to another site.
@@ -720,7 +781,7 @@ write     → { "action": "write", "taskKey": key, "document": markdown, "assump
 revise    → { "action": "revise", "tasks": [ Task | { "key": key } ] }${
     v2
       ? `
-design    → { "action": "design", "taskKey": key, "variant": 1 | 2 | 3, "title": string, "rationale": string, "addressed": [ commentId ] }`
+design    → { "action": "design", "taskKey": key, "variant": 1 | 2 | 3, "title": string, "rationale": string, "addressed": [ commentId ], "frames"?: [ string ] }`
       : ''
   }
 \`\`\`

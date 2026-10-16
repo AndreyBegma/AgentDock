@@ -4,13 +4,20 @@ import {
   DESIGN_COMMENT_MAX,
   type DesignCommentRequest,
   type DesignCommentView,
+  type DesignFrameView,
   type DesignOwnerView,
 } from '@agentdock/shared';
+import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Checkbox } from '@andrewbehma/glass-ui/checkbox';
 import { Disclosure } from '@andrewbehma/glass-ui/disclosure';
 import { Textarea } from '@andrewbehma/glass-ui/field';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
+import {
+  SegmentedControl,
+  SegmentedControlItem,
+} from '@andrewbehma/glass-ui/segmented-control';
+import { PanelTop } from 'lucide-react';
 import { useState } from 'react';
 import {
   anchorLabel,
@@ -24,11 +31,14 @@ import { NormalizedNote } from '../text/normalized-note';
 function CommentItem({
   comment,
   pinNumber,
+  frameName,
   notes,
   canOperate,
 }: {
   comment: DesignCommentView;
   pinNumber?: number;
+  /** #441: the name of the frame it was left on. */
+  frameName: string | null;
   notes: TextNotes;
   canOperate: boolean;
 }) {
@@ -41,6 +51,9 @@ function CommentItem({
         </span>
         <Time value={comment.createdAt} />
         {anchor ? <span>· {anchor}</span> : null}
+        {frameName ? (
+          <Badge label={frameName} aria-label={`Frame: ${frameName}`} />
+        ) : null}
       </div>
       <p className="text-sm whitespace-pre-wrap break-words">{comment.body}</p>
       <NormalizedNote
@@ -52,10 +65,14 @@ function CommentItem({
   );
 }
 
+type FrameScope = 'frame' | 'all';
+
 /**
  * The viewer's right panel, comments half (spec 223 "UI", D9, D10): open and
  * addressed, the revision in view by default; a general comment, or one on
- * the screen in view. Pins are left from the frame, not here.
+ * the screen in view. Pins are left from the frame, not here. #441: the
+ * comments of the frame in view, or of all frames, each with its frame's
+ * name; a new comment is written to the frame in view.
  */
 export function CommentsPanel({
   projectId,
@@ -63,6 +80,9 @@ export function CommentsPanel({
   canOperate = false,
   comments,
   revisionId,
+  frames = [],
+  frame = 0,
+  frameNameOf = () => null,
   screen,
   writeBlock,
   busy,
@@ -76,14 +96,22 @@ export function CommentsPanel({
   comments: readonly DesignCommentView[];
   /** The revision in view; null before the first one exists. */
   revisionId: string | null;
+  /** #441: the frames of the revision in view, and the one in view. */
+  frames?: readonly DesignFrameView[];
+  frame?: number;
+  /** #441: the name of the frame a comment was left on, in its revision. */
+  frameNameOf?: (comment: DesignCommentView) => string | null;
   /** The screen in view, for a `screen` comment. */
   screen: { viewport: string; theme: 'light' | 'dark' };
   /** Why the person cannot comment now, or null. */
   writeBlock: string | null;
   busy: boolean;
-  onComment: (body: Omit<DesignCommentRequest, 'revisionId'>) => Promise<void>;
+  onComment: (
+    body: Omit<DesignCommentRequest, 'revisionId' | 'frame'>,
+  ) => Promise<void>;
 }) {
   const [allRevisions, setAllRevisions] = useState(false);
+  const [scope, setScope] = useState<FrameScope>('frame');
   const [showAddressed, setShowAddressed] = useState(false);
   const [body, setBody] = useState('');
   const [onScreen, setOnScreen] = useState(false);
@@ -96,7 +124,16 @@ export function CommentsPanel({
         : { planId: owner.planId },
     comments.length,
   );
-  const { open, addressed } = groupComments(comments, revisionId, allRevisions);
+  // The frame filter reads positions of the revision in view only.
+  const byFrame = scope === 'frame' && !allRevisions ? frame : null;
+  const { open, addressed } = groupComments(
+    comments,
+    revisionId,
+    allRevisions,
+    byFrame,
+  );
+  const allOpen = groupComments(comments, revisionId, allRevisions).open;
+  const frameName = frames[frame]?.name ?? null;
   const numbers = pinNumbers(comments, revisionId);
   const text = body.trim();
   const screenLabel = `${screen.viewport} · ${screen.theme}`;
@@ -125,6 +162,28 @@ export function CommentsPanel({
             : `${open.length} open — Revise design sends them all.`
         }
       />
+      {frames.length > 0 ? (
+        <SegmentedControl size="sm" role="group" aria-label="Comment scope">
+          {(['frame', 'all'] as const).map((s) => (
+            <SegmentedControlItem
+              key={s}
+              active={scope === s}
+              layoutId="design-comment-scope"
+            >
+              <button
+                type="button"
+                aria-pressed={scope === s}
+                className="px-2 py-1 text-xs whitespace-nowrap"
+                onClick={() => setScope(s)}
+              >
+                {s === 'frame'
+                  ? 'This frame'
+                  : `All frames (${allOpen.length})`}
+              </button>
+            </SegmentedControlItem>
+          ))}
+        </SegmentedControl>
+      ) : null}
       <Checkbox
         label="Comments of every revision"
         checked={allRevisions}
@@ -138,6 +197,7 @@ export function CommentsPanel({
               key={c.id}
               comment={c}
               pinNumber={numbers.get(c.id)}
+              frameName={frameNameOf(c)}
               notes={notes}
               canOperate={canOperate}
             />
@@ -157,6 +217,7 @@ export function CommentsPanel({
                 key={c.id}
                 comment={c}
                 pinNumber={numbers.get(c.id)}
+                frameName={frameNameOf(c)}
                 notes={notes}
                 canOperate={canOperate}
               />
@@ -169,12 +230,23 @@ export function CommentsPanel({
         <p className="text-xs text-ink-3">{writeBlock}</p>
       ) : (
         <div className="flex flex-col gap-2">
+          {frameName ? (
+            <p className="flex items-center gap-1 text-xs text-ink-3">
+              <PanelTop aria-hidden="true" className="size-3.5" />
+              Commenting on{' '}
+              <span className="font-semibold text-ink">{frameName}</span>
+            </p>
+          ) : null}
           <Textarea
             aria-label="New comment"
             rows={3}
             maxLength={DESIGN_COMMENT_MAX}
             value={body}
-            placeholder="A comment on the whole design. Use Pin for a point."
+            placeholder={
+              frames.length > 1
+                ? 'What should change in this frame? Use Pin for a point.'
+                : 'A comment on the whole design. Use Pin for a point.'
+            }
             onChange={(e) => setBody(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void submit();

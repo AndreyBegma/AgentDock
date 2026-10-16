@@ -38,7 +38,9 @@ const path = cardDesignPath(
   'docs/specs',
   { number: 12, title: 'Add login', issueNumber: null },
   2,
+  'login-form',
 );
+const frames = [{ name: 'Login form', path }];
 
 const card: CardWorkerPromptInput = {
   number: 12,
@@ -50,7 +52,7 @@ const card: CardWorkerPromptInput = {
   specPath: 'docs/specs/card-12-add-login.md',
   issueNumber: null,
   design: {
-    path,
+    frames,
     rationale: 'One column keeps the form readable on a phone.',
     comments: ['Make the button full width.', 'Say "Sign in",\nnot "Log in".'],
   },
@@ -72,7 +74,7 @@ describe('worker prompt — ## Design (#243 D7)', () => {
     const prompt = cardWorkerPrompt(card);
     const section = sectionOf(prompt);
     expect(section).toContain(
-      'docs/specs/card-12-add-login/design/2.html (already committed on this branch',
+      'docs/specs/card-12-add-login/design/2/login-form.html (already committed on this branch',
     );
     expect(section).toContain('binds the layout, the states and the copy');
     expect(section).toContain('not code to copy');
@@ -91,7 +93,7 @@ describe('worker prompt — ## Design (#243 D7)', () => {
     const section = sectionOf(
       cardWorkerPrompt({
         ...card,
-        design: { path, rationale: '  ', comments: [] },
+        design: { frames, rationale: '  ', comments: [] },
       }),
     );
     expect(section).not.toContain('Why this design');
@@ -103,7 +105,7 @@ describe('worker prompt — ## Design (#243 D7)', () => {
     const section = sectionOf(
       cardWorkerPrompt({
         ...card,
-        design: { path, rationale: '', comments: Array(6).fill(comment) },
+        design: { frames, rationale: '', comments: Array(6).fill(comment) },
       }),
     );
     const shown = section.split('\n').filter((l) => l === `- ${comment}`);
@@ -123,7 +125,12 @@ describe('worker prompt — ## Design (#243 D7)', () => {
       branch: `card/c999999-${'a'.repeat(40)}`,
       specPath: `${'d/'.repeat(100)}card-999999-${'a'.repeat(40)}.md`,
       design: {
-        path: `${'d/'.repeat(100)}card-999999-${'a'.repeat(40)}/design/3.html`,
+        frames: [
+          {
+            name: 'Mockup',
+            path: `${'d/'.repeat(100)}card-999999-${'a'.repeat(40)}/design/3/mockup.html`,
+          },
+        ],
         rationale: '語'.repeat(DESIGN_RATIONALE_MAX),
         comments: Array(20).fill('語'.repeat(500)),
       },
@@ -131,7 +138,7 @@ describe('worker prompt — ## Design (#243 D7)', () => {
     expect(bytes(prompt)).toBeLessThanOrEqual(CARD_RUN_PROMPT_MAX_BYTES);
     expect(cardPromptSchema.safeParse(prompt).success).toBe(true);
     expect(prompt).toContain(body);
-    expect(prompt).toContain('/design/3.html');
+    expect(prompt).toContain('/design/3/mockup.html');
     expect(prompt).toContain('more not shown');
   });
 
@@ -139,9 +146,27 @@ describe('worker prompt — ## Design (#243 D7)', () => {
     const rationale = '語'.repeat(DESIGN_RATIONALE_MAX);
     const prompt = cardWorkerPrompt({
       ...card,
-      design: { path, rationale, comments: [] },
+      design: { frames, rationale, comments: [] },
     });
     expect(prompt).toContain(`Why this design: ${rationale}`);
+  });
+
+  it('lists every frame of the approved variant with its name (#441)', () => {
+    const many = ['Board page', 'Card page', 'Frame tabs'].map((name, i) => ({
+      name,
+      path: `docs/specs/card-12-add-login/design/2/f${i}.html`,
+    }));
+    const prompt = cardWorkerPrompt({
+      ...card,
+      design: { frames: many, rationale: '', comments: [] },
+    });
+    const section = sectionOf(prompt);
+    expect(section).toContain('The approved design has 3 frames');
+    expect(section).toContain('open them first');
+    for (const f of many) expect(section).toContain(`- ${f.path} — ${f.name}`);
+    expect(prompt).toContain(
+      'Design: https://github.com/<owner>/<repo>/tree/card/c12-add-login/docs/specs/card-12-add-login/design/2`',
+    );
   });
 
   it('leaves room in card.run for the spec and the approved mockup', () => {
@@ -195,8 +220,8 @@ describe('next round prompt — card edits reach the worker (#273 D1–D4)', () 
     kind: 'feature',
   };
 
-  it('is version 7', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(7);
+  it('is version 8', () => {
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(8);
   });
 
   it('cardChange is null for identical text, whitespace around it aside', () => {

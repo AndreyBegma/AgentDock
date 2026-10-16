@@ -190,8 +190,9 @@ describe('board × design (e2e, #243)', () => {
       null,
       { number: card.number, title: card.title, issueNumber: null },
       1,
+      'mockup',
     );
-    expect(path).toBe('docs/design/cards/C-1-add-login/1.html');
+    expect(path).toBe('docs/design/cards/C-1-add-login/1/mockup.html');
     const files = args.files as CardRunFile[];
     expect(files).toEqual([{ path, content: PICKED }]);
     expect(files[0].content).not.toContain(MOCKUP_PIN_HELPER_ATTRIBUTE);
@@ -219,8 +220,46 @@ describe('board × design (e2e, #243)', () => {
     const files = h.cardSentOf('card.run')[0].files as CardRunFile[];
     expect(files.map((f) => f.path)).toEqual([
       'docs/specs/card-1-add-login.md',
-      'docs/specs/card-1-add-login/design/1.html',
+      'docs/specs/card-1-add-login/design/1/mockup.html',
     ]);
+  });
+
+  it('round 1 commits every frame of the approved variant and lists them under ## Design (#441)', async () => {
+    await h.seedProfile();
+    const card = await h.designedCard(1);
+    const base = h.cardDesignBase(card.number);
+    await h.author.send('post', `${base}/generate`);
+    const frames = [
+      { name: 'Board page', html: MOCKUP.replace('Export', 'Board') },
+      { name: 'Card page', html: MOCKUP.replace('Export', 'Card') },
+      { name: 'Frame tabs', html: MOCKUP.replace('Export', 'Tabs') },
+    ];
+    await h.finishCard(
+      card.id,
+      designResult({ taskKey: KEY, variant: 1 }, frames),
+    );
+    const [revision] = (await h.cardDesign(card.number)).revisions;
+    const commented = await h.author.send('post', `${base}/comments`, {
+      revisionId: revision.id,
+      frame: 1,
+      kind: 'general',
+      body: 'Keep the sidebar.',
+    });
+    expect(commented.status).toBe(201);
+    expect((await approve(card.number, revision.id)).status).toBe(200);
+    expect((await run(card.number)).status).toBe(200);
+    const [args] = h.cardSentOf('card.run');
+    const dir = 'docs/design/cards/C-1-add-login/1';
+    expect(args.files as CardRunFile[]).toEqual([
+      { path: `${dir}/board-page.html`, content: frames[0].html },
+      { path: `${dir}/card-page.html`, content: frames[1].html },
+      { path: `${dir}/frame-tabs.html`, content: frames[2].html },
+    ]);
+    const prompt = String(args.prompt);
+    expect(prompt).toContain('The approved design has 3 frames');
+    expect(prompt).toContain(`- ${dir}/board-page.html — Board page`);
+    expect(prompt).toContain(`- ${dir}/card-page.html — Card page`);
+    expect(prompt).toContain(`- ${dir}/frame-tabs.html — Frame tabs`);
   });
 
   it('deleting a card that had design turns closes its design plan on the runner', async () => {

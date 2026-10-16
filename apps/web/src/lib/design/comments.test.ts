@@ -3,7 +3,9 @@ import {
   anchorLabel,
   approveBlock,
   designWriteBlock,
+  framesWithOpenPins,
   groupComments,
+  openCommentsByFrame,
   pinMarkers,
   pinNumbers,
   reviseBlock,
@@ -41,6 +43,24 @@ describe('groupComments', () => {
     expect(groups.addressed.map((c) => c.id)).toEqual(['done']);
   });
 
+  test('one frame of the revision on request, and counts per frame (#441)', () => {
+    const framed = [
+      comment({ id: 'f0' }),
+      comment({ id: 'f1', frame: 1 }),
+      comment({ id: 'f1-done', frame: 1, addressedInRevisionId: 'rev-1-2' }),
+    ];
+    expect(
+      groupComments(framed, 'rev-1-1', false, 1).open.map((c) => c.id),
+    ).toEqual(['f1']);
+    expect(
+      groupComments(framed, 'rev-1-1', false).open.map((c) => c.id),
+    ).toEqual(['f0', 'f1']);
+    expect([...openCommentsByFrame(framed, 'rev-1-1')]).toEqual([
+      [0, 1],
+      [1, 1],
+    ]);
+  });
+
   test('all revisions on request', () => {
     expect(
       groupComments(list, 'rev-1-1', true).open.map((c) => c.id),
@@ -73,6 +93,20 @@ describe('pins', () => {
       { n: 3, x: 10, y: 20 },
     ]);
     expect(pinMarkers(list, 'rev-other', 'Mobile', 'dark')).toEqual([]);
+  });
+
+  test('a pin shows only on the frame it was made on (#441)', () => {
+    const framed = [
+      { ...pin('f0', '2026-10-14T10:01:00.000Z', 'Mobile', 'dark'), frame: 0 },
+      { ...pin('f2', '2026-10-14T10:02:00.000Z', 'Mobile', 'dark'), frame: 2 },
+    ];
+    expect(pinMarkers(framed, 'rev-1-1', 'Mobile', 'dark', 2)).toEqual([
+      { n: 2, x: 10, y: 20 },
+    ]);
+    expect(pinMarkers(framed, 'rev-1-1', 'Mobile', 'dark')).toEqual([
+      { n: 1, x: 10, y: 20 },
+    ]);
+    expect([...framesWithOpenPins(framed, 'rev-1-1')]).toEqual([0, 2]);
   });
 
   test('anchor labels', () => {

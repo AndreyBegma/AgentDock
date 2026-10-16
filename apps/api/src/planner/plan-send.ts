@@ -132,33 +132,52 @@ export const ISSUE_PLACEHOLDER = '<issue>';
 /** How an issue body names a path holding its own number, which it cannot know (Q3). */
 export const THIS_ISSUE = '<this issue>';
 
+type IssueRef = number | typeof ISSUE_PLACEHOLDER | typeof THIS_ISSUE;
+
 /**
- * Spec 223 D16: `<specDir>/<issue>-<slug>/design/<variant>.html`, or
- * `docs/design/<issue>-<slug>/<variant>.html` without a `specDir`.
+ * Spec 223 D16, #441: the folder of an approved variant's frames —
+ * `<specDir>/<issue>-<slug>/design/<variant>`, or
+ * `docs/design/<issue>-<slug>/<variant>` without a `specDir`.
  */
-export const designFilePath = (
+export const designDirPath = (
   specDir: string | null,
-  issue: number | typeof ISSUE_PLACEHOLDER | typeof THIS_ISSUE,
+  issue: IssueRef,
   title: string,
   variant: number,
 ): string =>
   specDir
-    ? `${specDir}/${issue}-${slugOf(title)}/design/${variant}.html`
-    : `${DESIGN_FALLBACK_DIR}/design/${issue}-${slugOf(title)}/${variant}.html`;
+    ? `${specDir}/${issue}-${slugOf(title)}/design/${variant}`
+    : `${DESIGN_FALLBACK_DIR}/design/${issue}-${slugOf(title)}/${variant}`;
+
+/** #441: one frame's file, `<designDirPath>/<frame slug>.html`. */
+export const designFilePath = (
+  specDir: string | null,
+  issue: IssueRef,
+  title: string,
+  variant: number,
+  frame: string,
+): string => `${designDirPath(specDir, issue, title, variant)}/${frame}.html`;
 
 /**
- * Spec 223 D16: the document names its design file with the real issue
- * number. The write turn wrote the path with `<issue>`; a document that does
- * not name the file at all gets a `## Design` section that does.
+ * Spec 223 D16, #441: the document names its design's frames with the real
+ * issue number. The write turn wrote the paths with `<issue>` — the folder
+ * `template` with it — and send replaces it by `dir`; a document that names
+ * none of the frames gets a `## Design` section that lists them all.
  */
 export const withDesignPath = (
   document: string,
   template: string,
-  path: string,
+  dir: string,
+  frames: readonly { name: string; slug: string }[],
 ): string => {
-  const filled = document.split(template).join(path);
-  if (filled.includes(path)) return filled;
-  return `${filled.trimEnd()}\n\n## Design\n\nThe approved mockup is \`${path}\`. It fixes the layout, the states and the copy; it is not code to copy — build it with the project's real components.\n`;
+  const filled = document.split(template).join(dir);
+  if (filled.includes(dir)) return filled;
+  const path = (slug: string) => `${dir}/${slug}.html`;
+  const section =
+    frames.length === 1
+      ? `The approved mockup is \`${path(frames[0].slug)}\`. It fixes the layout, the states and the copy; it is not code to copy — build it with the project's real components.`
+      : `The approved design has ${frames.length} frames:\n\n${frames.map((f) => `- \`${path(f.slug)}\` — ${f.name}`).join('\n')}\n\nThey fix the layout, the states and the copy; they are not code to copy — build them with the project's real components.`;
+  return `${filled.trimEnd()}\n\n## Design\n\n${section}\n`;
 };
 
 /**
@@ -206,7 +225,7 @@ export const docsPrIssueBody = (
     ...(designVariant !== null
       ? [
           '',
-          `Its approved design is \`${designFilePath(specDir, THIS_ISSUE, task.title, designVariant)}\`, in the same pull request.`,
+          `Its approved design is in \`${designDirPath(specDir, THIS_ISSUE, task.title, designVariant)}/\`, in the same pull request.`,
         ]
       : []),
     '',

@@ -35,11 +35,12 @@ export const PLAN_TURN_MAX_TIMEOUT_SEC = 7200;
 /** `plan.queue_issues`: issues labelled in one command. */
 export const PLAN_QUEUE_ISSUES_MAX = 50;
 /**
- * `plan.publish_specs`: one spec per feature task and one design per task
- * with an approved design (spec 223 D16) — a plan has at most 12 tasks.
+ * `plan.publish_specs`: one spec per feature task and, per task with an
+ * approved design (spec 223 D16), one file per frame (#441) — a plan has at
+ * most 12 tasks, and a design's frames share one `DESIGN_HTML_MAX_BYTES`.
  */
 export const PLAN_PUBLISH_SPECS_MAX = 12;
-export const PLAN_PUBLISH_DESIGNS_MAX = 12;
+export const PLAN_PUBLISH_DESIGNS_MAX = 256;
 export const PLAN_PUBLISH_FILES_MAX =
   PLAN_PUBLISH_SPECS_MAX + PLAN_PUBLISH_DESIGNS_MAX;
 export const PLAN_SPEC_FILE_MAX_BYTES = 256 * 1024;
@@ -118,9 +119,9 @@ export const repoRelativeDirSchema = z
 
 /**
  * D10: `<specDir>/<issue>-<slug>.md`, as the runner writes it; and spec 223
- * D16: a design, `<specDir>/<issue>-<slug>/design/<variant>.html` — or
- * `docs/design/<issue>-<slug>/<variant>.html` for a project without a
- * `specDir`, published with `specDir: "docs"`.
+ * D16, #441: a design frame, `<specDir>/<issue>-<slug>/design/<variant>/<frame>.html`
+ * — or `docs/design/<issue>-<slug>/<variant>/<frame>.html` for a project
+ * without a `specDir`, published with `specDir: "docs"`.
  */
 export const planSpecFilePathSchema = z
   .string()

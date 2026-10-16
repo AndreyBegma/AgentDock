@@ -1,4 +1,8 @@
-import type { DesignOutput } from '@agentdock/shared';
+import {
+  type DesignFrameDraft,
+  type DesignOutput,
+  designFrameSlugs,
+} from '@agentdock/shared';
 import type { Prisma } from '@prisma/client';
 import {
   type DesignTurnPlan,
@@ -10,7 +14,8 @@ import { type Db, type DesignKey, designWhere } from './design-store';
 /**
  * Applies a design turn (docs/specs/223-design-stage.md D4, D7, D10) inside
  * the turn's settle transaction: the next revision of its variant, the
- * comments it addressed, and the design's status. Returns the next turn of
+ * comments it addressed, and the design's status. #441: the revision's
+ * frames are stored in the order the turn drew them. Returns the next turn of
  * the batch, if any — the projector starts it once the transaction commits.
  * The design is the turn's owner's: a plan task's or a card's (ADR-0025).
  */
@@ -19,7 +24,7 @@ export const applyDesignOutput = async (
   turn: { id: string; owner: DesignKey },
   plan: DesignTurnPlan,
   output: DesignOutput,
-  html: string,
+  frames: readonly DesignFrameDraft[],
 ): Promise<DesignTurnPlan | null> => {
   const design = await tx.taskDesign.findUnique({
     where: designWhere(turn.owner),
@@ -38,8 +43,17 @@ export const applyDesignOutput = async (
       revision: (last?.revision ?? 0) + 1,
       title: output.title,
       rationale: output.rationale,
-      html,
       turnId: turn.id,
+      frames: {
+        create: designFrameSlugs(frames.map((f) => f.name)).map(
+          (slug, position) => ({
+            position,
+            name: frames[position].name,
+            slug,
+            html: frames[position].html,
+          }),
+        ),
+      },
     },
     select: { id: true },
   });

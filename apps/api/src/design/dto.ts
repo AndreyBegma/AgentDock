@@ -113,6 +113,12 @@ export class DesignCommentDto implements DesignCommentRequest {
   @MaxLength(ID_MAX_LENGTH)
   revisionId!: string;
 
+  /** #441: the frame's position in the revision. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  frame?: number;
+
   @IsIn(DESIGN_COMMENT_KINDS)
   kind!: DesignCommentKind;
 

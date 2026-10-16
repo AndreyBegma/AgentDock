@@ -106,17 +106,17 @@ describe('naming', () => {
 
   it('places the approved design beside the spec, or under docs/design/cards (#243 D7)', () => {
     const card = { number: 12, title: 'Add login', issueNumber: null };
-    expect(cardDesignPath('docs/specs/', card, 2)).toBe(
-      'docs/specs/card-12-add-login/design/2.html',
+    expect(cardDesignPath('docs/specs/', card, 2, 'board-page')).toBe(
+      'docs/specs/card-12-add-login/design/2/board-page.html',
     );
-    expect(cardDesignPath('docs/specs', { ...card, issueNumber: 41 }, 1)).toBe(
-      'docs/specs/41-add-login/design/1.html',
-    );
-    expect(cardDesignPath(null, { ...card, issueNumber: 41 }, 1)).toBe(
-      'docs/design/cards/C-12-add-login/1.html',
-    );
-    expect(cardDesignPath('', card, 3)).toBe(
-      'docs/design/cards/C-12-add-login/3.html',
+    expect(
+      cardDesignPath('docs/specs', { ...card, issueNumber: 41 }, 1, 'mockup'),
+    ).toBe('docs/specs/41-add-login/design/1/mockup.html');
+    expect(
+      cardDesignPath(null, { ...card, issueNumber: 41 }, 1, 'mockup'),
+    ).toBe('docs/design/cards/C-12-add-login/1/mockup.html');
+    expect(cardDesignPath('', card, 3, 'card-tile')).toBe(
+      'docs/design/cards/C-12-add-login/3/card-tile.html',
     );
   });
 
@@ -218,7 +218,7 @@ describe('worker prompt', () => {
   };
 
   it('is versioned', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(7);
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(8);
   });
 
   it('names the card, branch, base and spec, and how to finish', () => {
