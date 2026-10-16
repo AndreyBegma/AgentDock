@@ -31,7 +31,6 @@ import {
   useEffect,
   useMemo,
   useState,
-  useSyncExternalStore,
 } from 'react';
 import { api, describeError } from '../../lib/api';
 import { approvalsBadge } from '../../lib/approvals/format';
@@ -44,6 +43,7 @@ import {
   useLivePaused,
   useServerRestarting,
 } from './live-status';
+import { useNarrow } from './narrow';
 import {
   activeEntryId,
   isFillEntry,
@@ -73,8 +73,6 @@ import { useSlotsNeedingAttention } from './use-slots-needing-attention';
 import { useWaitingApprovals } from './use-waiting-approvals';
 import { UserProvider } from './user-context';
 
-const COLLAPSE_QUERY = '(max-width: 1023px)';
-
 /** The tab bar's and More's anchors are Next links. */
 const renderLink: NonNullable<TabBarProps['link']> = ({
   href,
@@ -86,18 +84,6 @@ const renderLink: NonNullable<TabBarProps['link']> = ({
     {content}
   </Link>
 );
-
-function useNarrow(): boolean {
-  return useSyncExternalStore(
-    (listener) => {
-      const query = window.matchMedia(COLLAPSE_QUERY);
-      query.addEventListener('change', listener);
-      return () => query.removeEventListener('change', listener);
-    },
-    () => window.matchMedia(COLLAPSE_QUERY).matches,
-    () => false,
-  );
-}
 
 function useTheme(): [ThemeMode, (mode: ThemeMode) => void] {
   const [mode, setMode] = useState<ThemeMode>('system');

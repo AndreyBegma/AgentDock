@@ -27,6 +27,7 @@ import {
   stackStages,
 } from '../../lib/board/stacks';
 import { formatCost } from '../../lib/format';
+import { TAP, TAP_ROW } from './tap';
 import type { CardActions } from './use-card-actions';
 
 /** A chip on the header's 16 px line, as on a card face (C-35). */
@@ -69,7 +70,10 @@ export function StackFace({
       data-stack-number={stack.number}
       className="relative flex min-w-0 flex-col gap-1.5 text-sm"
     >
-      <div className="flex h-4 min-w-0 items-center gap-1.5 whitespace-nowrap text-xs leading-4 text-ink-2">
+      <div
+        // #497: the menu trigger's 44 px touch target stays inside the row.
+        className={`flex h-4 min-w-0 items-center gap-1.5 whitespace-nowrap text-xs leading-4 text-ink-2${menu ? ' pointer-coarse:h-(--size-tap)' : ''}`}
+      >
         <Chip size="sm" className={`${HEAD_CHIP} gap-1 font-mono`}>
           <Layers aria-hidden="true" className="size-3" />
           {stack.label}
@@ -82,7 +86,7 @@ export function StackFace({
       </div>
       <NextLink
         href={href}
-        className="break-words font-medium underline-offset-2 hover:underline"
+        className={`${TAP} break-words font-medium underline-offset-2 hover:underline`}
       >
         {stack.title}
       </NextLink>
@@ -101,7 +105,7 @@ export function StackFace({
           </Chip>
         ) : null}
       </div>
-      <div className="flex items-center gap-1.5">
+      <div className={`flex items-center gap-1.5 ${TAP_ROW}`}>
         <Button
           size="sm"
           variant="ghost"
@@ -206,12 +210,14 @@ function StackCard({
       </div>
       <button
         type="button"
-        className="break-words text-left font-medium underline-offset-2 hover:underline"
+        className={`${TAP} break-words text-left font-medium underline-offset-2 hover:underline`}
         onClick={() => onOpen(card)}
       >
         {card.title}
       </button>
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div
+        className={`flex flex-wrap items-center gap-1.5${runnable ? ` ${TAP_ROW}` : ''}`}
+      >
         <Chip size="sm">{COLUMN_TITLE[card.column]}</Chip>
         {card.column === 'completed' ? (
           <StatusPill size="sm" status="done" label="Accepted" />

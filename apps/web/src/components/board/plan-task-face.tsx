@@ -7,6 +7,7 @@ import { planTaskDesignChip, planTaskPill } from '../../lib/board/plan-tasks';
 import { safeHttpsUrl } from '../../lib/queue/format';
 import { TASK_KIND_LABEL } from '../../lib/tasks/format';
 import { SelectionFrame, UnselectableMark } from './selection-box';
+import { TAP } from './tap';
 
 /**
  * What a plan task shows on the board (#270 D6): the Plan badge, `key · plan
@@ -50,12 +51,14 @@ export function PlanTaskFace({
             ) : null}
           </div>
           {menu ? (
-            <span className="flex h-5 shrink-0 items-center">{menu}</span>
+            <span className="flex h-5 shrink-0 items-center pointer-coarse:h-(--size-tap)">
+              {menu}
+            </span>
           ) : null}
         </div>
         <button
           type="button"
-          className="break-words text-left font-medium underline-offset-2 hover:underline"
+          className={`${TAP} break-words text-left font-medium underline-offset-2 hover:underline`}
           onClick={() => onOpen(task)}
         >
           {task.title}
@@ -100,9 +103,12 @@ function ExternalLink({
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="rounded-full bg-hover px-2 py-0.5 text-ink-2 underline-offset-2 hover:underline"
+      // #497: the anchor is the touch target; the pill inside is what is drawn.
+      className={`group/link ${TAP}`}
     >
-      {children}
+      <span className="rounded-full bg-hover px-2 py-0.5 text-ink-2 underline-offset-2 group-hover/link:underline">
+        {children}
+      </span>
     </a>
   );
 }

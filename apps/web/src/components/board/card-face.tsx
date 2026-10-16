@@ -42,11 +42,12 @@ import {
   toggleOnClick,
   UnselectableMark,
 } from './selection-box';
+import { TAP, TAP_ROW } from './tap';
 
 /** A chip on the header's 16 px line (C-35). */
 const HEAD_CHIP = 'h-4 shrink-0';
 
-const TEXT_LINK = 'text-xs text-accent-ink underline-offset-2 hover:underline';
+const TEXT_LINK = `${TAP} text-xs text-accent-ink underline-offset-2 hover:underline`;
 
 /**
  * What a card shows on the board (C-35, #423): four rows in one column at the
@@ -103,7 +104,8 @@ export function CardFace({
       >
         <div
           data-card-row="header"
-          className="flex h-4 min-w-0 items-center gap-1.5 whitespace-nowrap text-xs leading-4 text-ink-2"
+          // #497: the menu trigger's 44 px touch target stays inside the row.
+          className={`flex h-4 min-w-0 items-center gap-1.5 whitespace-nowrap text-xs leading-4 text-ink-2${menu ? ' pointer-coarse:h-(--size-tap)' : ''}`}
         >
           <span className="shrink-0 font-mono">{card.label}</span>
           {card.stack ? (
@@ -154,7 +156,7 @@ export function CardFace({
         </div>
         <button
           type="button"
-          className={`break-words text-left font-medium underline-offset-2 hover:underline${compact ? ' text-[13px] leading-[18px]' : ''}`}
+          className={`${TAP} break-words text-left font-medium underline-offset-2 hover:underline${compact ? ' text-[13px] leading-[18px]' : ''}`}
           onClick={() => onOpen(card)}
         >
           <span className={compact ? 'line-clamp-2' : undefined}>
@@ -234,7 +236,9 @@ export function CardFace({
         </div>
         {offer && canOperate ? (
           <>
-            <div>
+            <div
+              className={`pointer-coarse:flex pointer-coarse:items-center ${TAP_ROW}`}
+            >
               <ApproveRunLink
                 projectId={projectId}
                 card={card}
@@ -278,6 +282,7 @@ function HooksChip({
       {notice.guide ? (
         <NextLink
           href={hooksGuideHref(projectId)}
+          className={TAP}
           aria-label={`${notice.chip}. ${HOOKS_GUIDE_LABEL}`}
         >
           <Chip size="sm">{notice.chip}</Chip>
@@ -382,7 +387,7 @@ function CardFooter({ card }: { card: BoardCardView }) {
   return (
     <div
       data-card-row="footer"
-      className="mt-0.5 flex flex-wrap items-center gap-1.5 border-line border-t pt-1.5 text-xs"
+      className="mt-0.5 flex flex-wrap items-center gap-1.5 border-line border-t pt-1.5 text-xs pointer-coarse:gap-y-0 pointer-coarse:pt-0"
     >
       {card.prNumber !== null ? (
         <Link href={prHref}>
@@ -422,9 +427,12 @@ function Link({
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="inline-flex h-5 items-center gap-1 rounded-full bg-hover px-2 text-ink-2 tabular-nums underline-offset-2 hover:text-ink hover:underline"
+      // #497: the anchor is the touch target; the pill inside is what is drawn.
+      className={`group/link inline-flex items-center ${TAP}`}
     >
-      {children}
+      <span className="inline-flex h-5 items-center gap-1 rounded-full bg-hover px-2 text-ink-2 tabular-nums underline-offset-2 group-hover/link:text-ink group-hover/link:underline">
+        {children}
+      </span>
     </a>
   );
 }
