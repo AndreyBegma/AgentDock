@@ -205,19 +205,96 @@ describe('board fleet mirror (e2e, #282 D4)', () => {
     expect(cards[1]).toMatchObject({ fleetSlot: 'i42b' });
   });
 
-  it('keeps the column and marks the slot gone when its run ends unmerged', async () => {
-    await dispatch(dispatched(), appeared());
-    await dispatch(
-      vanished(),
+  describe('a slot that ends without a PR of its own (#424)', () => {
+    const ended = (slot = 'i42') => [
+      vanished(slot),
       stream.next(
         'worktree.changed',
-        { path: '/srv/dev/.wt-widget-i42', exists: false },
-        { slot: 'i42' },
+        { path: `/srv/dev/.wt-widget-${slot}`, exists: false },
+        { slot },
       ),
-    );
+    ];
+    const closedIssue = (number = 42) =>
+      w.ctx.prisma.issueCache.create({
+        data: {
+          projectId: w.a,
+          number,
+          title: 'Widget export',
+          state: 'closed',
+          labels: [],
+          assignees: [],
+          body: '',
+          url: `https://github.com/acme/widget/issues/${number}`,
+          ghUpdatedAt: new Date('2026-10-08T09:00:00Z'),
+          snapshotAt: new Date('2026-10-08T09:00:00Z'),
+          lastSeq: 0n,
+        },
+      });
 
-    const [card] = await fleetCards();
-    expect(card).toMatchObject({ column: 'in_progress', fleetSlotGone: true });
+    it('sends the card back to To Do and marks the slot gone while the issue is open', async () => {
+      await dispatch(dispatched(), appeared());
+      await dispatch(...ended());
+
+      const [card] = await fleetCards();
+      expect(card).toMatchObject({ column: 'todo', fleetSlotGone: true });
+    });
+
+    it('puts the card in Finished when the issue is closed', async () => {
+      await closedIssue();
+      await dispatch(dispatched(), appeared());
+      await dispatch(...ended());
+
+      const [card] = await fleetCards();
+      expect(card).toMatchObject({
+        column: 'finished',
+        fleetSlotGone: true,
+        prNumber: null,
+      });
+    });
+
+    it('puts a resumed slot’s card in Finished once its predecessor’s PR merged (C-8)', async () => {
+      await dispatch(dispatched('i42'), appeared('i42'), prOpened('i42'));
+      await dispatch(
+        dispatched('i42-resume', 42, false),
+        appeared('i42-resume'),
+      );
+      await dispatch(
+        stream.next(
+          'pr.closed',
+          { number: 7, branch: 'feat/42-widget', merged: true },
+          { slot: 'i42' },
+        ),
+      );
+      await dispatch(...ended('i42-resume'));
+
+      const resumed = (await fleetCards()).find(
+        (c) => c.fleetSlot === 'i42-resume',
+      );
+      expect(resumed).toMatchObject({
+        column: 'finished',
+        fleetSlotGone: true,
+        prNumber: null,
+      });
+    });
+
+    it('lets a person move the gone card, and the mirror leaves it where they put it', async () => {
+      await dispatch(dispatched(), appeared());
+      await dispatch(...ended());
+      const [card] = await fleetCards();
+
+      const finished = await move(card.number, 'finished');
+      expect(finished.status).toBe(200);
+      await fleet.mirror(w.a);
+      expect((await fleetCards())[0].column).toBe('finished');
+
+      const back = await move(card.number, 'todo');
+      expect(back.status).toBe(200);
+      expect((await fleetCards())[0].column).toBe('todo');
+
+      const running = await move(card.number, 'in_progress');
+      expect(running.status).toBe(409);
+      expect(running.body).toMatchObject({ reason: 'fleet_slot' });
+    });
   });
 
   it('never makes a card for a slot run that already ended', async () => {
