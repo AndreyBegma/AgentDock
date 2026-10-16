@@ -1,6 +1,12 @@
 import { execFileSync } from 'node:child_process';
-import { Client } from 'pg';
 import { assertRedisReachable } from '../bullmq/bullmq-testing';
+import { withoutPoolParams } from '../database/pool-config';
+import {
+  connectionShortage,
+  connectionsNeeded,
+  connectOrExplain,
+  readConnectionStats,
+} from './connection-budget';
 import {
   databaseName,
   quoteIdent,
@@ -22,6 +28,9 @@ import { testRedisUrl } from './test-redis';
  * The migrated database is then the template of one database per Jest worker
  * (`workerDatabaseUrl`), recreated on every run, so files in parallel workers
  * never share rows. `--runInBand` makes `maxWorkers` 1: one clone.
+ *
+ * #487: first, the server must have room for every worker's pool; a full
+ * server fails the run at once, with a message that says so.
  */
 export default async function globalSetup(globalConfig: {
   maxWorkers: number;
@@ -37,6 +46,16 @@ export default async function globalSetup(globalConfig: {
 
   const url = new URL(testDatabaseUrl());
   const name = databaseName(url);
+  const admin = await connectOrExplain(withoutParams(serverUrl(url)));
+  try {
+    const shortage = connectionShortage(
+      await readConnectionStats(admin),
+      connectionsNeeded(workerDatabaseUrl(1), globalConfig.maxWorkers),
+    );
+    if (shortage) throw new Error(shortage);
+  } finally {
+    await admin.end();
+  }
   await resetTestDatabase(url);
 
   execFileSync(
@@ -44,7 +63,7 @@ export default async function globalSetup(globalConfig: {
     [require.resolve('prisma/build/index.js'), 'migrate', 'deploy'],
     {
       cwd: API_ROOT,
-      env: { ...process.env, DATABASE_URL: url.toString() },
+      env: { ...process.env, DATABASE_URL: withoutPoolParams(url.toString()) },
       stdio: 'pipe',
     },
   );
@@ -52,10 +71,7 @@ export default async function globalSetup(globalConfig: {
   // CREATE DATABASE … TEMPLATE needs the template free of connections: every
   // client above is closed and `migrate deploy` has exited; anything else
   // still on it is ended first.
-  const cloner = new Client({
-    connectionString: withoutParams(serverUrl(url)),
-  });
-  await cloner.connect();
+  const cloner = await connectOrExplain(withoutParams(serverUrl(url)));
   try {
     await terminateOtherBackends(cloner, name);
     for (let id = 1; id <= Math.max(1, globalConfig.maxWorkers); id += 1) {

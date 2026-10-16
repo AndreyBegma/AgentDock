@@ -343,8 +343,8 @@ describe('next round prompt — card edits reach the worker (#273 D1–D4)', () 
     kind: 'feature',
   };
 
-  it('is version 12', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(12);
+  it('is version 13', () => {
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(13);
   });
 
   it('cardChange is null for identical text, whitespace around it aside', () => {
@@ -649,6 +649,23 @@ describe('worker prompt v4 — attachments (#309 D10)', () => {
     expect(prompt).toContain(feedback);
     for (const a of attachments) {
       expect(prompt).toContain(attachmentWorktreePath(a.id, a.name));
+    }
+  });
+});
+
+// #487: three card workers ran api e2e suites at once — one of them the whole
+// project — and the shared dev Postgres refused every new connection.
+describe('worker prompt v13 — only the e2e suites the card touched (#487)', () => {
+  it('forbids a whole e2e run locally in the stable section, with or without Token saver', () => {
+    for (const tokenSaver of [false, true]) {
+      const prompt = cardWorkerPrompt({ ...card, tokenSaver });
+      const work = prompt.slice(
+        prompt.indexOf('## How to work'),
+        prompt.indexOf('## Card C-'),
+      );
+      expect(work).toContain(
+        'only the e2e suites you touched (`--testPathPatterns`); CI runs the rest.',
+      );
     }
   });
 });
