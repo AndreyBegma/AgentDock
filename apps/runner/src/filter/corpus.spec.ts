@@ -5,6 +5,7 @@ import {
   loadCorpus,
   runCorpusCase,
   SAVINGS_CEILING,
+  SAVINGS_CEILINGS,
   savingsMedian,
 } from './corpus';
 import { ALL_FILTERS, FAMILIES } from './families';
@@ -41,11 +42,17 @@ describe.each(Object.keys(FAMILIES))('corpus: %s family', (family) => {
     }
   });
 
-  // Test runners and type checkers only (`savingsMedian`).
-  it.each(['failing', 'passing'] as const)('median kept/raw, %s', (outcome) => {
-    const value = savingsMedian(results, outcome);
+  // Test runners and type checkers, each against its own ceiling.
+  it.each(
+    (['test', 'typecheck'] as const).flatMap((category) =>
+      (['failing', 'passing'] as const).map(
+        (outcome) => [category, outcome] as const,
+      ),
+    ),
+  )('median kept/raw, %s %s', (category, outcome) => {
+    const value = savingsMedian(results, outcome, category);
     if (value !== null) {
-      expect(value).toBeLessThanOrEqual(SAVINGS_CEILING[outcome]);
+      expect(value).toBeLessThanOrEqual(SAVINGS_CEILINGS[category][outcome]);
     }
   });
 });
@@ -114,5 +121,7 @@ describe('the corpus harness itself', () => {
       );
     }
     expect(savingsMedian([], 'failing')).toBeNull();
+    expect(savingsMedian(results, 'failing', 'typecheck')).toBeNull();
+    expect(savingsMedian(results, 'failing', 'test')).toBeGreaterThan(0);
   });
 });

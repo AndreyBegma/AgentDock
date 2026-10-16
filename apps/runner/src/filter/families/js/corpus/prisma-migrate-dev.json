@@ -1,0 +1,7 @@
+{
+  "argv": ["bunx", "prisma", "migrate", "dev", "--name", "filter_stat_rows"],
+  "exitCode": 0,
+  "category": "other",
+  "outcome": "passing",
+  "expect": "filtered"
+}

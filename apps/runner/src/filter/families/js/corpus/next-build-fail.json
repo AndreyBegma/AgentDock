@@ -1,0 +1,7 @@
+{
+  "argv": ["bunx", "next", "build"],
+  "exitCode": 1,
+  "category": "other",
+  "outcome": "failing",
+  "expect": "any"
+}

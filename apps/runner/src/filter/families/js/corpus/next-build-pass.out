@@ -1,0 +1,72 @@
+▲ Next.js 16.2.3 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 12.7s
+  Running TypeScript ...
+  Finished TypeScript in 13.1s ...
+  Collecting page data using 15 workers ...
+  Generating static pages using 15 workers (0/33) ...
+  Generating static pages using 15 workers (8/33)
+  Generating static pages using 15 workers (16/33)
+  Generating static pages using 15 workers (24/33)
+✓ Generating static pages using 15 workers (33/33) in 481ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ○ /_not-found
+├ ƒ /account
+├ ƒ /account/notifications
+├ ƒ /activity
+├ ƒ /admin/audit
+├ ƒ /admin/budgets
+├ ƒ /admin/integrations
+├ ƒ /admin/integrations/github
+├ ƒ /admin/integrations/github/callback
+├ ƒ /admin/integrations/telegram
+├ ƒ /admin/integrations/triggers
+├ ƒ /admin/integrations/webhooks
+├ ƒ /admin/planner
+├ ƒ /admin/prices
+├ ƒ /admin/runners
+├ ƒ /admin/schedules
+├ ƒ /admin/settings
+├ ƒ /admin/users
+├ ○ /apple-icon
+├ ○ /icon.svg
+├ ○ /install
+├ ƒ /login
+├ ○ /pending
+├ ƒ /projects
+├ ƒ /projects/[projectId]
+├ ƒ /projects/[projectId]/activity
+├ ƒ /projects/[projectId]/approvals
+├ ƒ /projects/[projectId]/board
+├ ƒ /projects/[projectId]/board/cards/[number]
+├ ƒ /projects/[projectId]/board/cards/[number]/design
+├ ƒ /projects/[projectId]/fleet
+├ ƒ /projects/[projectId]/history
+├ ƒ /projects/[projectId]/history/[runId]
+├ ƒ /projects/[projectId]/planner
+├ ƒ /projects/[projectId]/planner/[planId]
+├ ƒ /projects/[projectId]/planner/[planId]/tasks/[taskKey]/design
+├ ƒ /projects/[projectId]/queue
+├ ƒ /projects/[projectId]/schedules
+├ ƒ /projects/[projectId]/settings
+├ ƒ /projects/[projectId]/skills
+├ ƒ /projects/[projectId]/skills/runs/[runId]
+├ ○ /register
+├ ƒ /sessions
+├ ƒ /sessions/[id]
+├ ƒ /skills
+├ ƒ /tasks
+├ ƒ /usage
+├ ƒ /work
+└ ƒ /workflows
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
