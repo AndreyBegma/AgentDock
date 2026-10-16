@@ -216,14 +216,12 @@ describe('filter.stats rows (#445 D12)', () => {
     ).toBe(true);
   });
 
-  it('accepts the orchestrator session without a run', () => {
-    expect(
-      filterStatRowSchema.safeParse({
-        ...row,
-        runId: null,
-        runKind: 'orchestrator',
-      }).success,
-    ).toBe(true);
+  it('accepts the orchestrator and manual sessions without a run', () => {
+    for (const runKind of ['orchestrator', 'manual']) {
+      expect(
+        filterStatRowSchema.safeParse({ ...row, runId: null, runKind }).success,
+      ).toBe(true);
+    }
   });
 
   it('rejects impossible byte counts', () => {
@@ -242,14 +240,15 @@ describe('filter.stats rows (#445 D12)', () => {
     ).toBe(false);
   });
 
-  it('ties a null runId to the orchestrator session', () => {
+  it('ties a null runId to the orchestrator and manual sessions', () => {
     expect(filterStatRowSchema.safeParse({ ...row, runId: null }).success).toBe(
       false,
     );
-    expect(
-      filterStatRowSchema.safeParse({ ...row, runKind: 'orchestrator' })
-        .success,
-    ).toBe(false);
+    for (const runKind of ['orchestrator', 'manual']) {
+      expect(filterStatRowSchema.safeParse({ ...row, runKind }).success).toBe(
+        false,
+      );
+    }
   });
 
   it('rejects a malformed filter id, an unknown run kind and a projectId', () => {

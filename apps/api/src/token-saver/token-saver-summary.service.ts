@@ -1,4 +1,5 @@
 import {
+  isRunlessKind,
   TOKEN_SAVER_RUN_KINDS,
   TOKEN_SAVER_SUMMARY_MAX_DAYS,
   type TokenSaverBeforeAfter,
@@ -18,8 +19,8 @@ import {
 
 const DAY_MS = 86_400_000;
 
-/** The kinds that have runs; the orchestrator session has none (D12). */
-const RUN_KINDS = TOKEN_SAVER_RUN_KINDS.filter((k) => k !== 'orchestrator');
+/** The kinds that have runs; the orchestrator and manual sessions have none (D12, #475). */
+const RUN_KINDS = TOKEN_SAVER_RUN_KINDS.filter((k) => !isRunlessKind(k));
 
 const groupBy = <K>(
   groups: readonly StatGroup[],

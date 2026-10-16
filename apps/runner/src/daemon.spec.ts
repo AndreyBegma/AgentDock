@@ -513,4 +513,76 @@ describe('daemon — filter stats (#445 amendment 5)', () => {
     await done;
     expect(stats()).toHaveLength(1);
   });
+
+  it('sends a /cs-eco session in a watched project as manual rows (#475)', async () => {
+    const sid = '0f9a3c2e-1b2c-4d5e-8f90-123456789abc';
+    // Claude Code's transcript names the session's cwd.
+    const transcripts = join(dir, '.claude', 'projects', '-fixture');
+    mkdirSync(transcripts, { recursive: true });
+    writeFileSync(
+      join(transcripts, `${sid}.jsonl`),
+      `${JSON.stringify({ type: 'user', cwd: join(ROOT, 'apps') })}\n`,
+    );
+    const sessionDir = join(dir, '.local', 'state', 'cs-eco', 'sessions', sid);
+    mkdirSync(sessionDir, { recursive: true });
+    const row = {
+      id: 'c_1',
+      runId: sid,
+      runKind: 'skill',
+      filter: 'js/jest',
+      rawBytes: 4000,
+      keptBytes: 300,
+      bypassed: false,
+      passedThrough: false,
+      at: '2026-10-16T12:00:00.000Z',
+    };
+    writeFileSync(
+      join(sessionDir, FILTER_STATS_FILE),
+      `${JSON.stringify({ projectId: 'fixture', row })}\n`,
+    );
+
+    const controller = new AbortController();
+    const done = runDaemon({
+      config: {
+        server: server.origin,
+        runnerId: 'rn_1',
+        token: TOKEN,
+        profiles: [],
+        projects: [{ id: 'prj_fixture', root: ROOT }],
+        disabledCommands: [],
+        otlp: { enabled: false, grpc: null, http: null },
+        fleet: { pollSeconds: 15, prPollSeconds: 60, eventsPollSeconds: 5 },
+        queue: { pollSeconds: 60 },
+        sessions: { enabled: false },
+        skills: { maxConcurrentRuns: 2, maxTimeoutSec: 21_600 },
+      },
+      configFile: join(dir, 'runner.json'),
+      localSocket: null,
+      home: dir,
+      spoolDir: join(dir, 'spool'),
+      offsetsFile: join(dir, 'offsets.json'),
+      host,
+      exec: machineWithoutCodex(),
+      env: {},
+      clock: new FakeClock(),
+      log: memoryLogger().log,
+      signal: controller.signal,
+      filterStatsPollMs: 20,
+    });
+
+    const stats = () =>
+      server
+        .of('events')
+        .flatMap((m) => m.events)
+        .filter((e) => e.type === 'filter.stats');
+    await until(() => stats().length > 0);
+    expect(stats()[0]).toMatchObject({
+      source: 'runner',
+      project: { repo: 'fixture', root: ROOT },
+      data: { rows: [{ ...row, runId: null, runKind: 'manual' }] },
+    });
+
+    controller.abort();
+    await done;
+  });
 });

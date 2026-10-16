@@ -34,7 +34,9 @@ import {
   terminalUnsupported,
 } from './detect/capabilities';
 import type { Exec } from './detect/exec';
+import { claudeConfigDir } from './detect/profiles';
 import type { Env } from './env';
+import { ecoSessionsDir, TranscriptCwds } from './filter/eco';
 import { FILTER_ORCHESTRATOR_DIR } from './filter/env';
 import { FilterStatsReader } from './filter/stats-reader';
 import { GitAuth } from './git-auth';
@@ -121,6 +123,8 @@ export interface DaemonOptions {
   signal?: AbortSignal;
   /** How often filter stats are collected (#445); `FILTER_STATS_POLL_MS` by default. */
   filterStatsPollMs?: number;
+  /** `/cs-eco`'s sessions (#475); `${XDG_STATE_HOME:-~/.local/state}/cs-eco/sessions` by default. */
+  ecoSessionsDir?: string;
   /** Called once the connection exists — tests reach it to emit events. */
   onStart?: (connection: RunnerConnection) => void;
 }
@@ -572,7 +576,18 @@ export const runDaemon = async (
 
     // Token saver (#445 amendment 5): the `filter` processes of every launch
     // write rows into their run dir; they go out as `filter.stats` events.
+    // `/cs-eco` sessions the runner did not launch keep theirs in the
+    // plugin's state dir, and count for the watched root of their cwd (#475).
     const stateDir = dirname(options.spoolDir);
+    const transcriptCwds = new TranscriptCwds({
+      dirs: () => [
+        join(home, '.claude', 'projects'),
+        ...config.profiles
+          .filter((p) => p.runtime === 'claude')
+          .map((p) => join(claudeConfigDir(p, home), 'projects')),
+      ],
+      now: () => clock.now(),
+    });
     const filterStats = new FilterStatsReader({
       roots: () => [
         options.runsDir ?? join(stateDir, 'runs'),
@@ -584,6 +599,13 @@ export const runDaemon = async (
         options.assessDir ?? join(stateDir, 'assess'),
         join(stateDir, FILTER_ORCHESTRATOR_DIR),
       ],
+      eco: {
+        dir:
+          options.ecoSessionsDir ??
+          ecoSessionsDir(options.env ?? process.env, home),
+        projects: () => watchList.current,
+        sessionCwd: (id) => hookSessions.cwdOf(id) ?? transcriptCwds.cwdOf(id),
+      },
       resolve: (ids) => directory.resolve(ids),
       emit: (event) => {
         live.emit(event);

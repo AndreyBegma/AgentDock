@@ -178,6 +178,30 @@ project or run. A stats file without a valid identity is not read. A malformed
 row, or one for a project the runner no longer watches, is skipped. A resend
 after a crash is harmless, because the API skips row ids it already has.
 
+### Manual sessions (`/cs-eco`, #475)
+
+The code-sentinel plugin's `/cs-eco` runs `agentdock-runner filter-hook` in
+sessions the runner did not launch: manual terminals, the orchestrator's own
+session and fleet workers. It keeps one directory per Claude session,
+`${XDG_STATE_HOME:-~/.local/state}/cs-eco/sessions/<session id>/`, and appends
+rows in the same `{ "projectId", "row" }` shape to its `filter-stats.jsonl`.
+The daemon reads these files in the same pass (`filter/eco.ts`):
+
+- **The project comes from a watched root, never from the row** (DA-04/DR-05).
+  The session's cwd is taken from the plugin hooks' `SessionStart` when the
+  daemon saw it, else from the session's Claude Code transcript,
+  `<CLAUDE_CONFIG_DIR>/projects/*/<session id>.jsonl`, in `~/.claude` and every
+  Claude profile. The cwd is matched to a project like a transcript's
+  (`correlateCwd`): the deepest watched root holding it, or a fleet worktree
+  `.wt-<repo>-<slot>` beside it.
+- A session whose cwd is outside every watched root, or not known yet, is not
+  read and nothing of it is sent. Its offset stays where it was.
+- A row is sent only when its `projectId` names that project — the project's
+  id, its `owner/name` or its root's directory name, in any case — and its
+  `runId` is `null` or the session's id. Any other row is counted as rejected.
+- Rows go out as `runKind: manual` with `runId: null`, whatever kind the row
+  carries; the dashboard shows them as **Manual session**.
+
 ## Adding a filter
 
 A family slot edits only `filter/families/<family>/`. The registry

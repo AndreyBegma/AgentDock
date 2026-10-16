@@ -91,6 +91,7 @@ import {
   AutoRunSection,
   CardOptionToggles,
 } from './card-options';
+import { CardHandoffSection } from './handoff/card-handoff-section';
 import { LaunchPopover } from './launch-popover';
 import { SuggestionSheetBody } from './suggestion-sheet';
 import type { CardActions } from './use-card-actions';
@@ -759,6 +760,14 @@ export function CardDetailBody({
       onChanged={onSaved}
     />
   );
+  const handoffSection = fleet ? null : (
+    <CardHandoffSection
+      projectId={projectId}
+      number={card.number}
+      canOperate={canOperate}
+      version={card.updatedAt}
+    />
+  );
   const attachmentsSection = (
     <CardAttachmentsSection
       projectId={projectId}
@@ -952,6 +961,7 @@ export function CardDetailBody({
             {panel(dependenciesSection)}
             {panel(autoRunSection)}
             {panel(stewardSection)}
+            {panel(handoffSection)}
             {panel(attachmentsSection)}
           </aside>
         </div>
@@ -989,6 +999,7 @@ export function CardDetailBody({
         {autoRunSection}
         {roundsSection}
         {stewardSection}
+        {handoffSection}
         {attachmentsSection}
         {cardForm}
       </div>
