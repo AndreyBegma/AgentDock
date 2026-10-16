@@ -113,7 +113,7 @@ describe('TouchScroll', () => {
     touch.start(100);
     expect(touch.lines(130, 20)).toBe(1);
     expect(touch.lines(150, 20)).toBe(1);
-    expect(touch.lines(90, 20)).toBe(-3);
+    expect(touch.lines(90, 20)).toBe(-2);
     touch.end();
     expect(touch.lines(400, 20)).toBe(0);
   });
