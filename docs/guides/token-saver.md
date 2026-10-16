@@ -42,8 +42,9 @@ the session is allowed to run. Claude Code checks permission rules against the
 command a hook *returns*, so a rewrite could hide `git push` from a
 `Bash(git push:*)` rule. The runner therefore rewrites only when:
 
-- the session runs in `bypassPermissions`, or an `allow` rule already covers
-  the command; **and**
+- the session runs in `bypassPermissions`, or in `auto` (Board card sessions
+  do). In `auto` the hook makes no decision, and Claude Code's classifier
+  still judges the wrapped command; **and**
 - no `deny` or `ask` rule matches it; **and**
 - the call is a single simple command — no pipe, `&&`, redirect or subshell —
   that is not in the background, a dev server or a watch mode.

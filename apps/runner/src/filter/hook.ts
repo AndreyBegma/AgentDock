@@ -18,11 +18,16 @@ import type { Filter } from './types';
 /**
  * `agentdock-runner filter-hook` (#445 D3): Claude Code's PreToolUse hook for
  * Bash. It turns `bun run test` into `<runner> filter -- bun run test` when —
- * and only when — the session is in `bypassPermissions` (amendment 9), the
- * call is a single simple command a filter covers, not a background call or a
- * dev/watch mode, and the rewrite changes nothing about what the session
- * asks or denies (see `permissions.ts`). Every other Bash call is left alone
- * and counted `passedThrough`.
+ * and only when — the session is in `bypassPermissions` (amendment 9) or
+ * `auto` (amendment 10), the call is a single simple command a filter covers,
+ * not a background call or a dev/watch mode, and the rewrite changes nothing
+ * about what the session asks or denies (see `permissions.ts`). Every other
+ * Bash call is left alone and counted `passedThrough`.
+ *
+ * In bypass mode the rewrite carries `permissionDecision: "allow"`. In auto
+ * mode it carries no decision at all: Claude Code's own permission rules and
+ * auto-mode classifier judge the wrapped command, so the hook never skips
+ * them.
  *
  * It fails open: any error prints nothing and exits 0, which Claude Code
  * reads as "no decision" — the command runs as written.
@@ -39,8 +44,9 @@ interface HookInput {
 export interface HookOutput {
   hookSpecificOutput: {
     hookEventName: 'PreToolUse';
-    permissionDecision: 'allow';
-    permissionDecisionReason: string;
+    /** Bypass mode only; in auto mode Claude Code decides (amendment 10). */
+    permissionDecision?: 'allow';
+    permissionDecisionReason?: string;
     updatedInput: Record<string, unknown>;
   };
 }
@@ -116,8 +122,10 @@ export const decideHook = (
     typeof input.permission_mode === 'string'
       ? input.permission_mode
       : undefined;
-  // Amendment 9: outside bypass mode Claude Code decides, never the hook.
-  if (mode !== 'bypassPermissions') return leave('not bypassPermissions');
+  // Amendments 9 and 10: only bypass and auto rewrite; elsewhere, never.
+  if (mode !== 'bypassPermissions' && mode !== 'auto') {
+    return leave('not bypassPermissions or auto');
+  }
 
   const cwd = typeof input.cwd === 'string' ? input.cwd : process.cwd();
   const sources: SettingsSources = {
@@ -131,6 +139,19 @@ export const decideHook = (
   const verdict = permissionFor(rules, mode, command, parsed);
   if (!verdict.rewrite) return leave(verdict.reason);
 
+  const updatedInput = {
+    ...toolInput,
+    command: wrappedCommand(parsed, deps.selfCommand),
+  };
+  // Amendment 10: in auto mode no decision, so the classifier and the rules
+  // judge the wrapped command exactly as they would any other.
+  if (mode === 'auto') {
+    return {
+      rewrite: {
+        hookSpecificOutput: { hookEventName: 'PreToolUse', updatedInput },
+      },
+    };
+  }
   return {
     rewrite: {
       hookSpecificOutput: {
@@ -138,10 +159,7 @@ export const decideHook = (
         permissionDecision: 'allow',
         permissionDecisionReason:
           'AgentDock token saver: the output is filtered; AGENTDOCK_RAW=1 runs it unfiltered',
-        updatedInput: {
-          ...toolInput,
-          command: wrappedCommand(parsed, deps.selfCommand),
-        },
+        updatedInput,
       },
     },
   };

@@ -174,20 +174,100 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
     expect(stats()[0]?.row.passedThrough).toBe(true);
   });
 
-  it.each([
-    'default',
-    'acceptEdits',
-    'auto',
-    'plan',
-    'dontAsk',
-  ])('never rewrites in %s mode, whatever the allow rules say (amendment 9)', (mode) => {
-    const input = JSON.stringify(preToolUse('bun run test', {}, mode));
-    const out = runFilterHook(input, {
-      ...deps,
-      rules: () => ({ ...NO_RULES, allow: ['Bash', 'Bash(bun run test:*)'] }),
+  describe('by permission mode (amendments 9 and 10)', () => {
+    const wrapped = (command: string) => ({
+      command: `/opt/agentdock/agentdock-runner filter -- ${command}`,
+      description: 'Run the tests',
+      timeout: 120000,
     });
-    expect(out).toBe('');
-    expect(stats()[0]?.row.passedThrough).toBe(true);
+    /** Bypass: the rewrite, approved by the hook — unchanged since amendment 9. */
+    const allowed = (command: string) =>
+      JSON.stringify({
+        hookSpecificOutput: {
+          hookEventName: 'PreToolUse',
+          permissionDecision: 'allow',
+          permissionDecisionReason:
+            'AgentDock token saver: the output is filtered; AGENTDOCK_RAW=1 runs it unfiltered',
+          updatedInput: wrapped(command),
+        },
+      });
+    /** Auto: the rewrite alone, no decision — the classifier judges it. */
+    const undecided = (command: string) =>
+      JSON.stringify({
+        hookSpecificOutput: {
+          hookEventName: 'PreToolUse',
+          updatedInput: wrapped(command),
+        },
+      });
+    // Allow rules everywhere: they never widen what the hook does.
+    const modeRules: PermissionRules = {
+      allow: ['Bash', 'Bash(bun run test:*)', 'Bash(bun test:*)'],
+      deny: ['Bash(bun test:*)'],
+      ask: ['Bash(bun run test --ci:*)'],
+    };
+    const covered = 'bun run test';
+    const denied = 'bun test';
+    const asked = 'bun run test --ci';
+    const compound = 'bun run test && echo ok';
+
+    // biome-ignore format: one row per line reads as the table it is
+    const table: [string | undefined, string, string | null][] = [
+      ['bypassPermissions', covered, allowed(covered)],
+      ['bypassPermissions', denied, null],
+      ['bypassPermissions', asked, null],
+      ['bypassPermissions', compound, null],
+      ['auto', covered, undecided(covered)],
+      ['auto', denied, null],
+      ['auto', asked, null],
+      ['auto', compound, null],
+      ['default', covered, null],
+      ['default', denied, null],
+      ['default', compound, null],
+      ['acceptEdits', covered, null],
+      ['acceptEdits', denied, null],
+      ['acceptEdits', compound, null],
+      ['plan', covered, null],
+      ['plan', denied, null],
+      ['plan', compound, null],
+      ['dontAsk', covered, null],
+      ['some-later-mode', covered, null],
+      ['Auto', covered, null],
+      [undefined, covered, null],
+    ];
+
+    it.each(table)('%s · %p → %s', (mode, command, expected) => {
+      const input = preToolUse(command);
+      if (mode === undefined) {
+        delete (input as { permission_mode?: string }).permission_mode;
+      } else {
+        input.permission_mode = mode;
+      }
+      const out = runFilterHook(JSON.stringify(input), {
+        ...deps,
+        rules: () => modeRules,
+      });
+      if (expected === null) {
+        expect(out).toBe('');
+        expect(stats()).toHaveLength(1);
+        expect(stats()[0]?.row.passedThrough).toBe(true);
+      } else {
+        // Exact bytes: in auto there is no `permissionDecision` key at all.
+        expect(out).toBe(expected);
+        expect(stats()).toEqual([]);
+      }
+    });
+
+    it('never puts a decision on an auto-mode rewrite', () => {
+      const out = runFilterHook(
+        JSON.stringify(preToolUse('bun run test', {}, 'auto')),
+        deps,
+      );
+      const parsed = JSON.parse(out) as HookOutput;
+      expect(Object.keys(parsed.hookSpecificOutput).sort()).toEqual([
+        'hookEventName',
+        'updatedInput',
+      ]);
+    });
   });
 
   it('builds the rewrite from the words, never from the text (DR-01)', () => {

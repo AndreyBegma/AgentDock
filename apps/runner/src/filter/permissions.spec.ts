@@ -52,12 +52,17 @@ const table: Row[] = [
   { name: 'ask prefix', rules: { ask: ['Bash(bun run deploy:*)'] }, mode: BYPASS, command: 'bun run deploy', rewrite: false },
   { name: 'ask glob trailing space-star covers the bare command', rules: { ask: ['Bash(terraform apply *)'] }, mode: BYPASS, command: 'terraform apply', rewrite: false },
   { name: 'ask with extra spaces', rules: { ask: ['Bash(terraform apply *)'] }, mode: BYPASS, command: 'terraform   apply  -auto-approve', rewrite: false },
-  // DR-03 (amendment 9): only bypass mode rewrites, whatever allow says
+  // DR-03 (amendments 9, 10): only bypass and auto rewrite, whatever allow says
   { name: 'bypass with no rules', rules: {}, mode: BYPASS, command: 'bun test', rewrite: true },
+  { name: 'auto with no rules', rules: {}, mode: 'auto', command: 'bun test', rewrite: true },
+  { name: 'auto with a deny', rules: { deny: ['Bash(git push:*)'] }, mode: 'auto', command: 'git  push', rewrite: false },
+  { name: 'auto with an ask', rules: { ask: ['Bash(bun run deploy:*)'] }, mode: 'auto', command: 'bun run deploy', rewrite: false },
+  { name: 'auto with an unknown deny syntax', rules: { deny: ['Bash(git push'] }, mode: 'auto', command: 'bun test', rewrite: false },
   { name: 'default mode with an allow rule', rules: { allow: ['Bash(bun test:*)'] }, mode: 'default', command: 'bun test', rewrite: false },
   { name: 'acceptEdits with an allow rule', rules: { allow: ['Bash'] }, mode: 'acceptEdits', command: 'bun test', rewrite: false },
-  { name: 'auto mode with an allow rule', rules: { allow: ['Bash(git:*)'] }, mode: 'auto', command: 'git log', rewrite: false },
   { name: 'plan mode with an allow rule', rules: { allow: ['Bash(*)'] }, mode: 'plan', command: 'bun test', rewrite: false },
+  { name: 'dontAsk mode with an allow rule', rules: { allow: ['Bash'] }, mode: 'dontAsk', command: 'bun test', rewrite: false },
+  { name: 'an unknown mode', rules: {}, mode: 'Auto', command: 'bun test', rewrite: false },
   { name: 'no mode given', rules: { allow: ['Bash'] }, command: 'bun test', rewrite: false },
   // unknown syntax: doubt means no rewrite
   { name: 'unknown deny syntax', rules: { deny: ['Bash(git push'] }, mode: BYPASS, command: 'bun test', rewrite: false },
@@ -66,7 +71,7 @@ const table: Row[] = [
   { name: 'other tools are ignored', rules: { deny: ['WebFetch', 'Read(./.env)'] }, mode: BYPASS, command: 'bun test', rewrite: true },
 ];
 
-describe('permissionFor (#445 hook decision (a), amendment 9)', () => {
+describe('permissionFor (#445 hook decision (a), amendments 9 and 10)', () => {
   it.each(table)('$name', (row) => {
     const parsed = parseSimpleCommand(row.command);
     if (!parsed) throw new Error(`not simple: ${row.command}`);

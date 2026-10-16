@@ -15,7 +15,8 @@ the bypass, the raw files and the MCP allowlist.
    session's environment (`filter/env.ts`).
 2. The hook reads Claude Code's PreToolUse JSON. It rewrites `tool_input.command`
    to `<runner> filter -- <command>` only when **all** of these hold:
-   - the session's `permission_mode` is `bypassPermissions` (spec amendment 9);
+   - the session's `permission_mode` is `bypassPermissions` (spec amendment 9)
+     or `auto` (amendment 10);
    - the command is a **single simple command**: `[NAME=value …] program args…`.
      `filter/shell.ts` is a whitelist, not a shell. Anything it does not
      understand exactly makes the command not simple:
@@ -56,18 +57,26 @@ saver is off.
 Claude Code matches its permission rules against the command a hook *returns*.
 A rewritten `agentdock-runner filter -- git push` would therefore slip past
 `Bash(git push:*)`. The hook (`permissionFor` in `filter/permissions.ts`)
-applies these rules in order (spec #445 amendment 9):
+applies these rules in order (spec #445 amendments 9 and 10):
 
 | Situation | Result |
 |---|---|
-| The session is not `bypassPermissions` (`default`, `acceptEdits`, `auto`, `plan`, …) | no rewrite, whatever the allow rules say |
+| The session is neither `bypassPermissions` nor `auto` (`default`, `acceptEdits`, `plan`, `dontAsk`, missing, …) | no rewrite, whatever the allow rules say |
 | A `deny` or `ask` `Bash(…)` rule matches the command, at any word | no rewrite (`passedThrough`) |
 | A settings file that exists but does not parse, or a `Bash(…)` rule this parser does not understand | no rewrite |
-| Anything else | rewrite, with `permissionDecision: "allow"` |
+| Anything else, in `bypassPermissions` | rewrite, with `permissionDecision: "allow"` |
+| Anything else, in `auto` | rewrite, with **no** `permissionDecision`: only `updatedInput` |
 
-Outside bypass mode Claude Code decides: its prompt, its auto-mode classifier
-and plan mode's read-only rule. A hook `allow` would skip all three, so the hook
-never gives one there.
+In auto mode the hook returns no decision, so Claude Code's own permission rules
+and auto-mode classifier judge the wrapped `agentdock-runner filter -- <argv>`,
+just as they would judge any other command. Nothing is approved by the hook. An
+`allow` rule written for the original command does not match the wrapped form,
+so for that call the classifier decides. This was verified on Claude Code
+2.1.301: an `updatedInput` without a decision is applied in auto mode, and a
+`deny` rule that matches only the rewritten command denies it.
+
+In `default`, `acceptEdits` and `plan`, Claude Code decides through its prompt
+or plan mode's read-only rule, and the hook leaves the command as written.
 
 Deny and ask rules are matched generously. A prefix rule matches without a word
 boundary, an exact rule also matches longer commands, and `Bash(x *)` also
