@@ -705,6 +705,13 @@ describe('Steward (e2e)', () => {
         status: 'open',
         actions: [{ action: 'nudge', result: 'ok' }],
       });
+      // D15: the card the board serves carries the chip.
+      const card = await w.viewer.get(`${w.path()}/board/cards/1`);
+      expect(card.body.steward).toMatchObject({
+        kind: 'api_error',
+        status: 'open',
+        actions: [{ action: 'nudge', result: 'ok' }],
+      });
     });
   });
 
@@ -744,6 +751,41 @@ describe('Steward (e2e)', () => {
       await expect(validator.assertLinkable(w.b, 12)).rejects.toThrow(
         UnprocessableEntityException,
       );
+    });
+
+    it('PATCH links a card to an open issue, refuses a closed one, and unlinks', async () => {
+      await issue(12);
+      await issue(13, { state: 'closed' });
+      await w.createCard();
+      const card = `${w.path()}/board/cards/1`;
+      expect(
+        (await w.viewer.send('patch', card, { issueNumber: 12 })).status,
+      ).toBe(403);
+      const linked = await w.operator.send('patch', card, { issueNumber: 12 });
+      expect(linked.status).toBe(200);
+      expect(linked.body).toMatchObject({
+        issueNumber: 12,
+        issueUrl: 'https://github.com/acme/widget/issues/12',
+      });
+      for (const issueNumber of [13, 99]) {
+        const refused = await w.operator.send('patch', card, { issueNumber });
+        expect(refused.status).toBe(422);
+      }
+      expect(
+        (await w.operator.send('patch', card, { issueNumber: 0 })).status,
+      ).toBe(400);
+      expect((await w.card(1)).issueNumber).toBe(12);
+      const unlinked = await w.operator.send('patch', card, {
+        issueNumber: null,
+      });
+      expect(unlinked.body).toMatchObject({
+        issueNumber: null,
+        issueUrl: null,
+      });
+      // A linked card's Run creates no issue.
+      await w.operator.send('patch', card, { issueNumber: 12 });
+      expect((await w.runCard(1)).status).toBe(200);
+      expect(w.issues()).toHaveLength(0);
     });
 
     it('a card with an issue runs without creating one, and its PR closes it', async () => {

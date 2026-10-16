@@ -122,6 +122,16 @@ export class UpdateBoardCardDto implements UpdateBoardCardRequest {
   @IsBoolean()
   specOnRun?: boolean;
 
+  /**
+   * #447 D8: links the card to an open issue of the project's repository —
+   * its Run then creates none; `null` unlinks.
+   */
+  @ValidateIf((dto: UpdateBoardCardDto) => dto.issueNumber !== null)
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  issueNumber?: number | null;
+
   @ValidateIf((dto: UpdateBoardCardDto) => dto.model !== null)
   @IsOptional()
   @IsString()
