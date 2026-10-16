@@ -241,11 +241,17 @@ export class BoardService implements OnModuleInit {
             hasMore: false,
           },
     );
+    const project = await this.work.project(projectId);
     return {
       projectId,
       columns,
       running,
-      settings: toSettingsView(projectId, settings),
+      settings: toSettingsView(
+        projectId,
+        settings,
+        project.base,
+        project.defaultBranch,
+      ),
     };
   }
 
@@ -266,6 +272,8 @@ export class BoardService implements OnModuleInit {
           include: { author: USER_REF },
         },
         design: cardDesignSelect,
+        // #359 D8: every PR the card opened.
+        pullRequests: true,
       },
     });
     if (!card || (card.column === 'inbox' && !seesInbox(role))) {
@@ -373,7 +381,9 @@ export class BoardService implements OnModuleInit {
           kindSource: dto.kind === undefined ? 'auto' : 'person',
           column: 'todo',
           position,
-          issueOnRun: dto.issueOnRun ?? settings.issueOnRun,
+          // #359 D4: a bug gets an issue at Run, a feature none — unless the
+          // person says otherwise.
+          issueOnRun: dto.issueOnRun ?? dto.kind === 'bug',
           specOnRun: dto.specOnRun ?? settings.specOnRun,
           createdById: actor.userId,
           movedById: actor.userId,
@@ -513,9 +523,12 @@ export class BoardService implements OnModuleInit {
       ...(fields.kind !== undefined ? { kind: fields.kind } : {}),
       // #271 D9: a kind the person sets is theirs from now on.
       ...(fields.kind !== undefined ? { kindSource: 'person' as const } : {}),
+      // #359 D4: the issue follows the kind, unless the person sets it too.
       ...(fields.issueOnRun !== undefined
         ? { issueOnRun: fields.issueOnRun }
-        : {}),
+        : fields.kind !== undefined
+          ? { issueOnRun: fields.kind === 'bug' }
+          : {}),
       ...(fields.specOnRun !== undefined
         ? { specOnRun: fields.specOnRun }
         : {}),
@@ -1002,103 +1015,14 @@ export class BoardService implements OnModuleInit {
   }
 
   /** #273 D13: `card.merge`, audited; a refusal is 409 `merge_failed`. */
-  private async merge(
+  private merge(
     project: BoardProject,
     card: CardWithRounds,
     headSha: string,
     deleteBranch: boolean,
     actor: BoardActor,
   ): Promise<CardMergeOutcome> {
-    if (isActiveRoundPhase(card.rounds[0]?.phase)) {
-      throw boardError(
-        409,
-        BOARD_ERROR.cardRunning,
-        'A worker is running on this card',
-      );
-    }
-    const pr = card.prNumber;
-    if (pr === null) {
-      throw boardError(
-        409,
-        BOARD_ERROR.noPullRequest,
-        `${cardLabel(card.number)} has no pull request to merge`,
-      );
-    }
-    const output = boardOutput(
-      'card.merge',
-      await this.commands.send(
-        project.runnerId,
-        'card.merge',
-        {
-          cardId: card.id,
-          projectId: project.id,
-          root: project.rootPath,
-          pr,
-          headSha,
-          method: mergeMethodOf(project.codeSentinelConfig),
-          issue: card.issueNumber,
-          comment: `Completed as ${cardLabel(card.number)} on the AgentDock board; merged in #${pr}.`,
-          // #329 D9: an older runner refuses the arg; it is sent only when asked.
-          ...(deleteBranch ? { deleteBranch } : {}),
-        },
-        { role: actor.role, ctx: actor.ctx },
-      ),
-    );
-    const target = { type: 'board_card', id: card.id } as const;
-    if (!output.merged) {
-      await this.audit.record({
-        ...actor.ctx,
-        action: 'card.merge_failed',
-        target,
-        projectId: project.id,
-        after: { number: card.number, pr, reason: output.error },
-        result: 'error',
-        meta: { message: output.message },
-      });
-      throw boardError(
-        409,
-        BOARD_ERROR.mergeFailed,
-        output.message || `The merge of #${pr} was refused`,
-        { reason: output.error },
-      );
-    }
-    await this.audit.record({
-      ...actor.ctx,
-      action: 'card.merged',
-      target,
-      projectId: project.id,
-      after: {
-        number: card.number,
-        pr,
-        method: output.method,
-        ...(output.mergeCommit !== null
-          ? { mergeCommit: output.mergeCommit }
-          : {}),
-        alreadyMerged: output.alreadyMerged,
-        issueClosed: output.issueClosed,
-        branchDeleted: output.branchDeleted,
-      },
-      result: 'ok',
-    });
-    // #329 D6: the card's PR state from the merge result.
-    await this.prisma.boardCard.update({
-      where: { id: card.id },
-      data: { prState: 'merged' },
-    });
-    return {
-      merged: true,
-      alreadyMerged: output.alreadyMerged,
-      method: output.method,
-      mergeCommit: output.mergeCommit,
-      issueClosed: output.issueClosed,
-      ...(output.issueError !== undefined
-        ? { issueError: output.issueError }
-        : {}),
-      branchDeleted: output.branchDeleted,
-      ...(output.branchError !== undefined
-        ? { branchError: output.branchError }
-        : {}),
-    };
+    return this.work.mergePr(project, card, headSha, deleteBranch, actor);
   }
 
   /**
@@ -1194,9 +1118,12 @@ export class BoardService implements OnModuleInit {
   }
 
   async settings(projectId: string): Promise<BoardSettingsView> {
+    const project = await this.work.project(projectId);
     return toSettingsView(
       projectId,
       await this.prisma.boardSettings.findUnique({ where: { projectId } }),
+      project.base,
+      project.defaultBranch,
     );
   }
 
@@ -1234,6 +1161,10 @@ export class BoardService implements OnModuleInit {
       ...(dto.autoCollectTracked !== undefined
         ? { autoCollectTracked: dto.autoCollectTracked }
         : {}),
+      // #359 D7: `null` returns to the default.
+      ...(dto.autoMergeCards !== undefined
+        ? { autoMergeCards: dto.autoMergeCards }
+        : {}),
       updatedById: actor.userId,
     };
     const row = await this.prisma.boardSettings.upsert({
@@ -1253,6 +1184,7 @@ export class BoardService implements OnModuleInit {
         captureEnabled: before.captureEnabled,
         captureModel: before.captureModel,
         autoCollectTracked: before.autoCollectTracked,
+        autoMergeCards: before.autoMergeCards,
       },
       after: {
         issueOnRun: row.issueOnRun,
@@ -1261,9 +1193,11 @@ export class BoardService implements OnModuleInit {
         captureEnabled: row.captureEnabled,
         captureModel: row.captureModel,
         autoCollectTracked: row.autoCollectTracked,
+        autoMergeCards: row.autoMergeCards,
       },
       result: 'ok',
     });
-    return toSettingsView(projectId, row);
+    const project = await this.work.project(projectId);
+    return toSettingsView(projectId, row, project.base, project.defaultBranch);
   }
 }
