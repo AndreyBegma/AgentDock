@@ -1,7 +1,8 @@
 # Releases agentdock-runner (ADR-0017).
 #
-# Pushing the tag runner-v<version> builds the four binaries, creates the
-# GitHub Release with the tarballs and SHA256SUMS, publishes the npm packages
+# Pushing the tag runner-v<version> builds the four binaries, signs SHA256SUMS
+# (ADR-0046), creates the GitHub Release with the tarballs, SHA256SUMS and
+# SHA256SUMS.sig, publishes the npm packages
 # (the four platform packages before the wrapper) and pushes the Homebrew
 # formula to AndreyBegma/homebrew-tap. The tag must equal the version in
 # apps/runner/package.json; build-release.sh refuses anything else.
@@ -18,9 +19,13 @@
 # RUNNER_RELEASE_DRY_RUN=1 also stops a tag run before it publishes. It is read
 # by the step shells, where variables do arrive.
 #
-# Pull requests never run this workflow. The secrets github_release_token and
-# npm_token must be restricted to the tag and manual events in Woodpecker;
-# deploy/README.md lists them.
+# Pull requests never run this workflow. The gating in this file is not the
+# security boundary: whoever pushes a commit can edit it. The boundary is in
+# settings a pusher cannot change (deploy/README.md): the secrets
+# github_release_token, npm_token and runner_signing_key are restricted to the
+# tag event only, never manual, and runner-v* tags are protected by a GitHub
+# ruleset and cut from main. A manual run therefore gets no secret: it builds
+# and signs with a throwaway key.
 
 when:
   - event: tag
@@ -66,11 +71,23 @@ steps:
     commands:
       - bunx turbo run test --filter=@agentdock/runner
 
+  # A tag run signs with the release key; build-release.sh fails without it.
   - name: build-release
     image: *ci_image
+    when: *publish_when
+    environment:
+      RUNNER_SIGNING_KEY:
+        from_secret: runner_signing_key
     commands:
-      # Empty on a manual run, which has no tag to check.
-      - RUNNER_TAG="$${CI_COMMIT_TAG:-}" sh apps/runner/scripts/build-release.sh
+      - RUNNER_TAG="$${CI_COMMIT_TAG}" sh apps/runner/scripts/build-release.sh
+
+  # A manual run has no tag and no secret: it signs with a throwaway key.
+  - name: build-release-dry-run
+    image: *ci_image
+    when:
+      - event: manual
+    commands:
+      - sh apps/runner/scripts/build-release.sh
 
   - name: github-release
     image: *ci_image
@@ -88,9 +105,9 @@ steps:
         if ! gh release view "$${CI_COMMIT_TAG}" --repo AndreyBegma/AgentDock >/dev/null 2>&1; then
           gh release create "$${CI_COMMIT_TAG}" --repo AndreyBegma/AgentDock --verify-tag \
             --title "agentdock-runner $${version}" \
-            --notes "Install: brew install andreybegma/tap/agentdock-runner, or npm i -g agentdock-runner. Checksums: SHA256SUMS."
+            --notes "Install: brew install andreybegma/tap/agentdock-runner, or npm i -g agentdock-runner. Checksums: SHA256SUMS, signed by apps/runner/release-key.pub (SHA256SUMS.sig, Ed25519): openssl pkeyutl -verify -pubin -inkey release-key.pub -rawin -in SHA256SUMS -sigfile SHA256SUMS.sig, then sha256sum -c --ignore-missing SHA256SUMS."
         fi
-      - gh release upload "$${CI_COMMIT_TAG}" --repo AndreyBegma/AgentDock --clobber agentdock-runner-*.tar.gz SHA256SUMS
+      - gh release upload "$${CI_COMMIT_TAG}" --repo AndreyBegma/AgentDock --clobber agentdock-runner-*.tar.gz SHA256SUMS SHA256SUMS.sig
 
   - name: npm-publish
     image: *ci_image

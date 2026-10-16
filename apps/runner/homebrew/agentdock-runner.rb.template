@@ -1,6 +1,9 @@
 # Rendered from AgentDock's apps/runner/homebrew/agentdock-runner.rb.template
 # by apps/runner/scripts/render-formula.sh on every runner release (ADR-0017).
 # Change the template there, not this file.
+require "digest"
+require "openssl"
+
 class AgentdockRunner < Formula
   desc "Per-machine daemon of AgentDock, a control plane for agent fleets"
   homepage "https://agentdock.luna-realm.com/"
@@ -29,7 +32,50 @@ class AgentdockRunner < Formula
     end
   end
 
+  # SHA256SUMS of the release and its Ed25519 signature (ADR-0046).
+  resource "SHA256SUMS" do
+    url "https://github.com/AndreyBegma/AgentDock/releases/download/runner-v@VERSION@/SHA256SUMS"
+    sha256 "@SHA256_SUMS@"
+  end
+
+  resource "SHA256SUMS.sig" do
+    url "https://github.com/AndreyBegma/AgentDock/releases/download/runner-v@VERSION@/SHA256SUMS.sig"
+    sha256 "@SHA256_SUMS_SIG@"
+  end
+
+  # apps/runner/release-key.pub of AgentDock.
+  RELEASE_KEY = <<~PEM.freeze
+    -----BEGIN PUBLIC KEY-----
+    MCowBQYDK2VwAyEAUZTyf8lH2FdBavFF1oadsbBAOQD9kXfGp4YHCNFB3r8=
+    -----END PUBLIC KEY-----
+  PEM
+
+  # Raises unless `sums` is signed by `key` and lists `digest` for `name`.
+  def self.verify_release!(sums, signature, name, digest, key = RELEASE_KEY)
+    signed = begin
+      OpenSSL::PKey.read(key).verify(nil, signature, sums)
+    rescue OpenSSL::PKey::PKeyError
+      false
+    end
+    raise "agentdock-runner: SHA256SUMS is not signed by the AgentDock release key" unless signed
+
+    listed = sums.each_line.filter_map do |line|
+      sha, file = line.split
+      sha if file&.delete_prefix("*") == name
+    end
+    raise "agentdock-runner: SHA256SUMS lists no checksum for #{name}" if listed.empty?
+    return if listed.include?(digest)
+
+    raise "agentdock-runner: #{name} does not match its checksum in SHA256SUMS"
+  end
+
   def install
+    self.class.verify_release!(
+      File.binread(resource("SHA256SUMS").tap(&:fetch).cached_download),
+      File.binread(resource("SHA256SUMS.sig").tap(&:fetch).cached_download),
+      File.basename(stable.url),
+      Digest::SHA256.file(cached_download).hexdigest,
+    )
     bin.install "agentdock-runner"
   end
 
