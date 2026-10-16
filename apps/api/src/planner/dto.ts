@@ -3,6 +3,7 @@ import {
   CARD_DRAFT_TITLE_MAX,
   type ConfirmSplitCard,
   type ConfirmSplitRequest,
+  type ConfirmStackRequest,
   type CreatePlanRequest,
   INTAKE_SPLIT_MAX,
   PLAN_MODES,
@@ -27,6 +28,9 @@ import {
   type PlanTaskStatus,
   type PlanVisibility,
   type PlanVisibilityRequest,
+  STACK_BODY_MAX,
+  STACK_STAGE_TITLE_MAX,
+  STACK_TITLE_MAX,
   type TasksQuery,
 } from '@agentdock/shared';
 import { Type } from 'class-transformer';
@@ -182,6 +186,43 @@ export class ConfirmSplitCardDto implements ConfirmSplitCard {
   kind!: PlanTaskKind;
 }
 
+/** #480: one stage of a confirmed stack — its cards by proposal index. */
+export class ConfirmStackStageDto {
+  @IsString()
+  @MaxLength(STACK_STAGE_TITLE_MAX)
+  title!: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(INTAKE_SPLIT_MAX)
+  @IsInt({ each: true })
+  @Min(0, { each: true })
+  @Max(INTAKE_SPLIT_MAX - 1, { each: true })
+  cards!: number[];
+}
+
+/** #480 (ADR-0043): Confirm the cards as a stack. */
+export class ConfirmStackDto implements ConfirmStackRequest {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(STACK_TITLE_MAX)
+  title!: string;
+
+  @IsString()
+  @MaxLength(STACK_BODY_MAX)
+  body!: string;
+
+  @IsBoolean()
+  design!: boolean;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(INTAKE_SPLIT_MAX)
+  @ValidateNested({ each: true })
+  @Type(() => ConfirmStackStageDto)
+  stages!: ConfirmStackStageDto[];
+}
+
 /** `POST …/plans/:planId/split` (#409): Confirm a split. */
 export class ConfirmSplitDto implements ConfirmSplitRequest {
   @IsString()
@@ -195,6 +236,12 @@ export class ConfirmSplitDto implements ConfirmSplitRequest {
   @ValidateNested({ each: true })
   @Type(() => ConfirmSplitCardDto)
   cards!: ConfirmSplitCardDto[];
+
+  /** #480: confirm them as a stack. */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ConfirmStackDto)
+  stack?: ConfirmStackDto;
 }
 
 /** `POST …/tasks/:key/review`. */

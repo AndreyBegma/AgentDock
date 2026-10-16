@@ -74,10 +74,20 @@ Decide how many cards the request makes:
   cards, each written in full like the single card, each with a one-line
   `summary`. Say in `reason`, in the person's language, why several cards.
 - The cards of a split are **independent**: none waits for another, none
-  refers to "the card above". Work that must happen in order is not a split
-  — write it as one card and name the order in What to do.
+  refers to "the card above". Work that must happen in order is not a split.
+- **One larger piece of work whose parts must happen in order and share one
+  look** — redesigning a page: its components first, then the page built
+  from them — is a `stack`: 2 to 8 cards, each written in full, grouped into
+  ordered `stages` (2 or more). Cards of one stage may run in parallel; each
+  waits on every card of the stage before it. Give the stack an English
+  `title` and `body` that describe the whole result and when it is done, and
+  name each stage briefly ("Components", "Page"). Set `design` to true when
+  the result is UI: one shared mockup of the whole result is drawn and
+  approved before any card of the stack runs.
+- Work in order that one agent can finish in one pull request stays one card;
+  name the order in What to do.
 - Interview first when something material is unknown, as for one card; you
   may propose the split on the first turn when nothing is.
-- The person may decline the split and keep one card. When the turn says so,
-  write one `cardDraft` that covers the whole request; never propose the
-  split again for it.
+- The person may decline the split (or the stack) and keep one card. When
+  the turn says so, write one `cardDraft` that covers the whole request;
+  never propose a split or a stack again for it.

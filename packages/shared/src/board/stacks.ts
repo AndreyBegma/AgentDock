@@ -144,9 +144,7 @@ export const currentStage = (
  * Empty stages are skipped, so the next non-empty stage waits on the last
  * non-empty one.
  */
-export const stageLinks = <T>(
-  stages: readonly (readonly T[])[],
-): [T, T][] => {
+export const stageLinks = <T>(stages: readonly (readonly T[])[]): [T, T][] => {
   const filled = stages.filter((s) => s.length > 0);
   const links: [T, T][] = [];
   for (let i = 1; i < filled.length; i += 1) {
@@ -168,7 +166,7 @@ export const stackStageText = (stack: BoardStackView): string => {
 /** A stack's design is needed and not approved: its cards do not run. */
 export const isStackGated = (
   design: Pick<TaskDesignSummary, 'needed' | 'status'> | null,
-): boolean => design !== null && design.needed && design.status !== 'approved';
+): boolean => design?.needed === true && design.status !== 'approved';
 
 /** The cards of a stack the board shows inside its collapsed face: those in its column. */
 export const foldedIntoStack = (

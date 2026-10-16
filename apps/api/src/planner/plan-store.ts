@@ -303,6 +303,29 @@ export class PlanStore {
     }
   }
 
+  /**
+   * #480: a stack's design changed — `design` with the stack's id, and
+   * `board.changed`, since the stack's face shows the design. Best effort.
+   */
+  publishStackDesign(projectId: string, stackId: string): void {
+    try {
+      this.live.publish(`project:${projectId}`, DESIGN_LIVE_EVENT, {
+        kind: 'design',
+        projectId,
+        planId: null,
+        taskKey: null,
+        stackId,
+      } satisfies DesignLiveChange);
+      this.live.publish(`project:${projectId}`, BOARD_CHANGED_EVENT, {
+        stackId,
+      } satisfies BoardChangedData);
+    } catch (error) {
+      this.logger.warn(
+        `stack design ${stackId} update not published: ${(error as Error).message}`,
+      );
+    }
+  }
+
   /** Ids only: a client refetches, and the refetch is authorized. Best effort. */
   publish(projectId: string, planId: string): void {
     try {

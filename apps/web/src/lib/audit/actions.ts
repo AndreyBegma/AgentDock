@@ -106,6 +106,8 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   'action_request.executed': 'Executed a requested action',
   'session_content.purged': 'Purged session content',
   'card.created': 'Created a board card',
+  'stack.created': 'Created a card stack',
+  'stack.updated': 'Changed a card stack',
   'card.updated': 'Edited a board card',
   'card.deleted': 'Deleted a board card',
   'card.moved': 'Moved a board card',

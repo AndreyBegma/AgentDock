@@ -22,7 +22,11 @@ import { PrismaService } from '../database/prisma.service';
 import { designError } from '../design/design-error';
 import { cardDesignPrompt } from '../design/design-prompt';
 import type { DesignTurnPlan } from '../design/design-rules';
-import { cardDesignTaskKey, loadDesignPrompt } from '../design/design-store';
+import {
+  cardDesignTaskKey,
+  loadDesignPrompt,
+  loadStackReference,
+} from '../design/design-store';
 import { type NoProfileFailure, RuntimeProfileResolver } from '../readiness';
 import { TokenSaverService } from '../token-saver/token-saver.service';
 import { PlanStore } from './plan-store';
@@ -111,20 +115,24 @@ export class CardDesignTurnService {
         'A design turn needs the card design',
       );
     }
-    const [context, instructions, settings, session] = await Promise.all([
-      loadDesignPrompt(this.prisma, project, design, batch),
-      this.instructions.effective(card.projectId),
-      this.prisma.projectOrchestratorSettings.findUnique({
-        where: { projectId: card.projectId },
-        select: { model: true },
-      }),
-      this.session(card),
-    ]);
+    const [context, instructions, settings, session, stackDesign] =
+      await Promise.all([
+        loadDesignPrompt(this.prisma, project, design, batch),
+        this.instructions.effective(card.projectId),
+        this.prisma.projectOrchestratorSettings.findUnique({
+          where: { projectId: card.projectId },
+          select: { model: true },
+        }),
+        this.session(card),
+        // #480: the stack's approved design, as reference.
+        loadStackReference(this.prisma, card.id),
+      ]);
     const prompt = cardDesignPrompt({
       instructions: instructions.body,
       card: { number: card.number, title: card.title, body: card.body },
       taskKey: cardDesignTaskKey(card.number),
       design: context,
+      stackDesign,
     });
     // #322 D2: the card's design model, else the design recommendation.
     const model =

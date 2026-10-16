@@ -10,6 +10,7 @@ import { DesignCommands } from './design-commands';
 import { DesignMockupController } from './design-mockup.controller';
 import { DesignSettingsService } from './design-settings.service';
 import { DesignStopService } from './design-stop.service';
+import { StackDesignController } from './stack-design.controller';
 import { UiProfileService } from './ui-profile.service';
 import { UiProfileProjector } from './ui-profile-projector';
 
@@ -23,7 +24,13 @@ import { UiProfileProjector } from './ui-profile-projector';
  */
 @Module({
   imports: [BoardModule, PlannerModule, ProjectsModule, RunnersModule],
-  controllers: [CardDesignController, DesignController, DesignMockupController],
+  controllers: [
+    CardDesignController,
+    DesignController,
+    DesignMockupController,
+    // #480: a stack's shared design (ADR-0043).
+    StackDesignController,
+  ],
   providers: [
     DesignCommands,
     DesignService,

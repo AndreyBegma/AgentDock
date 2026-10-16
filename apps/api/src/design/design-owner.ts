@@ -6,21 +6,22 @@ import type { DesignTurnPlan } from './design-rules';
 import type { DesignKey } from './design-store';
 
 /**
- * ADR-0025 / #243 D3: a design's owner — a plan task or a board card — as
+ * ADR-0025 / #243 D3: a design's owner — a plan task, a board card or
+ * (#480, ADR-0043) a stack — as
  * `DesignService` drives it. One module, two hosts: the stage's rules
  * (switch, Generate, comments, Revise, Approve) are the service's; what
  * differs by host is here. An owner is built only once its host is known
  * open for the operation (`assertOpen`), so holding one is the proof.
  */
 export interface DesignOwner {
-  kind: 'task' | 'card';
+  kind: 'task' | 'card' | 'stack';
   /** The `task_designs` row's owner key. */
   key: DesignKey;
   projectId: string;
   /** The audit target of `design.*` (D10). */
-  target: { type: 'plan' | 'board_card'; id: string };
+  target: { type: 'plan' | 'board_card' | 'board_stack'; id: string };
   /** What names the owner in an audit record's `before` / `after`. */
-  label: { key: string } | { number: number };
+  label: { key: string } | { number: number } | { stack: number };
   /** D1 for a task: its status follows its design. A card has none. */
   gate(design: Pick<TaskDesign, 'needed' | 'status'>): Promise<void>;
   /** 409 when a turn of the owner's host is queued or running. */

@@ -53,6 +53,7 @@ export class DesignMockupController {
           select: {
             plan: { select: { id: true, projectId: true } },
             card: { select: { projectId: true } },
+            stack: { select: { projectId: true } },
           },
         },
       },
@@ -69,6 +70,10 @@ export class DesignMockupController {
       // #243 D8: a card's design is the project's — every member reads it.
       readable =
         (await this.access.resolve(user, owner.card.projectId)) !== null;
+    } else if (owner?.stack) {
+      // #480: a stack's design is the project's, like a card's.
+      readable =
+        (await this.access.resolve(user, owner.stack.projectId)) !== null;
     }
     const frame =
       revision && readable

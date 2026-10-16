@@ -1,4 +1,3 @@
-import type { BoardStackView, CardStackRef } from './stacks';
 import type {
   CardDesignRecommendableModel,
   CardRecommendableModel,
@@ -29,6 +28,7 @@ import type {
 } from './capture-limits';
 import type { BoardMoveRefusal } from './moves';
 import type { CardCiCheck } from './shipping';
+import type { BoardStackView, CardStackRef } from './stacks';
 import type {
   BoardCardKind,
   BoardCardSource,

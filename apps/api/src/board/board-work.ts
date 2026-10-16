@@ -1265,6 +1265,18 @@ export class BoardWork implements OnModuleInit {
     }
   }
 
+  /** #480: `board.changed` for a stack — its face, its page and its design. */
+  publishStack(projectId: string, stackId: string): void {
+    const data: BoardChangedData = { stackId };
+    try {
+      this.live.publish(`project:${projectId}`, BOARD_CHANGED_EVENT, data);
+    } catch (error) {
+      this.logger.warn(
+        `board.changed stack ${stackId} not published: ${(error as Error).message}`,
+      );
+    }
+  }
+
   /** #443: `board.changed` for every card that depends on `cardId`. */
   async publishDependants(projectId: string, cardId: string): Promise<void> {
     const rows = await this.prisma.boardCardDependency.findMany({
