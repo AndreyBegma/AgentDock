@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'bun:test';
-import { boardColumnWidth, visibleColumns } from './board-layout';
+import { NARROW_MAX_WIDTH_PX } from '../shell/narrow';
+import {
+  boardColumnWidth,
+  PHONE_MAX_WIDTH_PX,
+  visibleColumns,
+} from './board-layout';
 
 const column = (id: string, cards: number) => ({
   id,
@@ -42,5 +47,12 @@ describe('boardColumnWidth', () => {
 
   test('never divides by zero', () => {
     expect(boardColumnWidth(0)).toContain('/ 1))');
+  });
+});
+
+describe('PHONE_MAX_WIDTH_PX (#497)', () => {
+  test('is the shell breakpoint the tab bar shows below, `lg`', () => {
+    expect(PHONE_MAX_WIDTH_PX).toBe(NARROW_MAX_WIDTH_PX);
+    expect(PHONE_MAX_WIDTH_PX).toBe(1024);
   });
 });

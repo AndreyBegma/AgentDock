@@ -19,6 +19,7 @@ import {
 import { approvableDrafts } from '../../lib/planner/header';
 import { pastRounds } from '../../lib/planner/rounds';
 import type { usePlan } from '../../lib/planner/use-plan';
+import { NARROW_QUERY } from '../shell/narrow';
 import { Conversation } from './conversation';
 import { PlanGraph } from './plan-graph';
 import { PlanHeader } from './plan-header';
@@ -93,10 +94,7 @@ export function PlanWorkspace({
 
   // On a phone the panel stacks below the cards: bring it into view.
   useEffect(() => {
-    if (
-      selectedKey &&
-      (compact || window.matchMedia('(max-width: 1023px)').matches)
-    ) {
+    if (selectedKey && (compact || window.matchMedia(NARROW_QUERY).matches)) {
       panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }, [selectedKey, compact]);

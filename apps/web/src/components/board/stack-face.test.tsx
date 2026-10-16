@@ -6,6 +6,7 @@ import { boardItems } from '../../lib/board/plan-tasks';
 import { foldStacks, isStackItem } from '../../lib/board/stacks';
 import { CardFace } from './card-face';
 import { StackFace } from './stack-face';
+import { TAP, TAP_ROW } from './tap';
 import type { CardActions } from './use-card-actions';
 
 const ref = (stage: number) => ({
@@ -110,5 +111,13 @@ describe('StackFace (#480)', () => {
     );
     expect(html).toContain('S-3');
     expect(html).toContain('part of Redesign the Settings page');
+  });
+
+  test('#497: the title, the stack-card titles and their control rows are touch targets', () => {
+    const html = render(true);
+    // The stack title link and the title buttons of its three cards.
+    expect(html.split(TAP).length - 1).toBe(4);
+    // Expand / Open stack, and the Run row of each runnable stack card.
+    expect(html).toContain(TAP_ROW);
   });
 });

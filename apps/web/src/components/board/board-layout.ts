@@ -1,7 +1,10 @@
-import { useSyncExternalStore } from 'react';
+import { NARROW_MAX_WIDTH_PX, useNarrow } from '../shell/narrow';
 
-/** The shell's phone breakpoint (the tab bar shows below it). */
-export const PHONE_MAX_WIDTH_PX = 768;
+/**
+ * The Board's phone breakpoint is the shell's narrow one, 1024 px (`lg`): the
+ * bottom tab bar shows below it, and so does the phone layout (#497).
+ */
+export const PHONE_MAX_WIDTH_PX = NARROW_MAX_WIDTH_PX;
 
 /** glass-ui's gap between columns (`gap-3`). */
 const COLUMN_GAP = '0.75rem';
@@ -34,19 +37,5 @@ export function visibleColumns<
   );
 }
 
-const QUERY = `(max-width: ${PHONE_MAX_WIDTH_PX - 1}px)`;
-
-function subscribe(onChange: () => void): () => void {
-  const list = window.matchMedia(QUERY);
-  list.addEventListener('change', onChange);
-  return () => list.removeEventListener('change', onChange);
-}
-
 /** True below the phone breakpoint; false on the server. */
-export function usePhone(): boolean {
-  return useSyncExternalStore(
-    subscribe,
-    () => window.matchMedia(QUERY).matches,
-    () => false,
-  );
-}
+export const usePhone = useNarrow;

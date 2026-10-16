@@ -8,6 +8,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { card as fixtureCard, round } from '../../lib/board/fixtures';
 import { CardFace } from './card-face';
 import { PlanTaskFace } from './plan-task-face';
+import { TAP } from './tap';
 
 const COLUMNS: BoardColumn[] = ['todo', 'in_progress', 'finished', 'completed'];
 
@@ -298,5 +299,24 @@ describe('CardFace readiness and Auto-run (#443)', () => {
       },
     });
     expect(row(html, 'status')).toContain('Didn’t start');
+  });
+});
+
+describe('CardFace touch targets (#497)', () => {
+  test('the title and the footer links are touch targets', () => {
+    const html = render('in_progress', {
+      issueNumber: 3,
+      issueUrl: 'https://github.com/o/r/issues/3',
+    });
+    expect(html.split(TAP).length - 1).toBe(3);
+    expect(row(html, 'footer')?.split(TAP).length).toBe(3);
+  });
+
+  test('the header grows to the touch target only when it holds the menu', () => {
+    const coarse = 'pointer-coarse:h-(--size-tap)';
+    expect(row(render('todo'), 'header')).toContain(coarse);
+    expect(row(render('todo', {}, { menu: false }), 'header')).not.toContain(
+      coarse,
+    );
   });
 });

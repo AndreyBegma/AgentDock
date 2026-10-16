@@ -111,7 +111,12 @@ Until then AgentDock does without it rather than drawing it here (ADR-0011).
 |---|---|
 | `Board` has no `canDrop(card, column)` | The Board page checks `boardMoveRule` in `onMove` and declines there; a refused card snaps back, and the menu's "Move to" items still list every column. |
 | `Board`'s card `li` sets `min-h-(--size-row)` without `shrink-0` | In a height-bounded column the cards squash to one row instead of scrolling; `components/board/board-view.tsx` adds `[&_[data-board-card]]:shrink-0` on the board's wrapper (#384, glass-ui#147). |
+| `Button`'s coarse-pointer touch target is as wide as the button | An icon button narrower than 44 px stays narrower to a finger; on the Board, the inline card-menu trigger is 20 × 44 px on a phone while every other face control is at least 44 × 44 (#497, glass-ui#160). |
 | `Toggle` has no `disabled` | `components/board/card-options.tsx` makes a locked toggle inert and dimmed and drops its change handler. |
 
 `Board` was checked at 390 px for #242: its columns scroll sideways inside the
-board and the page does not, so it needs no release for the phone.
+board and the page does not, so it needs no release for the phone. Below
+`lg` the Board lays out for a phone, at the same breakpoint as the tab bar
+(`components/shell/narrow.ts`, #497), and on a coarse pointer each control on a
+card, stack or plan-task face is a 44 px touch target (`components/board/tap.ts`)
+while a fine pointer sees the face unchanged.
