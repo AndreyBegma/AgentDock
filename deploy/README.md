@@ -1,7 +1,8 @@
 # Deployment
 
 Decisions: [ADR-0016](../docs/adr/0016-staging-on-the-agent-host-behind-a-cloudflare-tunnel.md),
-[ADR-0018](../docs/adr/0018-pull-requests-test-what-changed.md).
+[ADR-0018](../docs/adr/0018-pull-requests-test-what-changed.md),
+[ADR-0046](../docs/adr/0046-pull-request-pipelines-are-untrusted.md).
 
 ## CI — what each pipeline runs
 
@@ -19,6 +20,35 @@ Which tests run depends on the event:
 The `test` step prints the mode it took (`test mode: affected (…)` or
 `test mode: full (<reason>)`). When it cannot find the merge base, it runs the
 full suite. To test everything on a branch, run the pipeline by hand.
+
+### Trust levels
+
+A pull request is **untrusted** (ADR-0046). Its pipeline runs the pipeline file
+and build scripts of its own branch, and anyone who can push a branch, a card
+worker included, can open one. So a step that can run on a pull request gets:
+
+- **no Docker socket**: `ci-image`, `build-staging` and `deploy-staging` run on
+  push and manual events only. A pull request runs on the
+  `agentdock-ci:node-bun` image the last push built, so a change to
+  `deploy/ci-image/` reaches CI once it is merged;
+- **no host volume**: no step of any pipeline mounts a host cache. bun's
+  install cache lives in the step's container and turbo's in the pipeline's
+  workspace; both die with the pipeline;
+- **no secret** and no privileged container.
+
+A push to `develop` or `main`, a tag and a manual run are **trusted**: the code
+was merged, or a person started the run. The runner release
+(`release-runner.yml`) still starts clean: no cache, `bun install
+--frozen-lockfile`, and `build-release` ignores turbo's cache. The Node base
+image is pinned by digest in `apps/api`, `apps/web` and `deploy/ci-image`, and
+every `docker build` runs with `--pull`.
+
+`bun run check` runs `scripts/check-ci.ts`, which fails when a pull-request
+step mounts a volume, is privileged or reads a secret, when a tag step mounts
+anything but the Docker socket, or when `bun install` lacks
+`--frozen-lockfile`. A pull request can edit the check along with the
+pipeline, so it stops mistakes, not an attacker: the boundary is the
+Woodpecker settings below, which only a person can change (P-01).
 
 The CI PostgreSQL is throwaway. Its data directory is on tmpfs, and it runs
 with `fsync`, `synchronous_commit` and `full_page_writes` off. The `test` step
@@ -47,9 +77,14 @@ Nothing is published on the host. The stack runs on its own compose network
    Save the token as `~/.agentdock/cloudflared-staging.env`, mode 600, with one
    line: `TUNNEL_TOKEN=...`.
 2. **Woodpecker.** Activate `AndreyBegma/AgentDock` and apply these settings:
-   - *Trusted → volumes*: on. The steps mount the Docker socket, the stack
-     directory and the caches, and the postgres service mounts a tmpfs.
-   - *Require approval*: forks. The repository is public.
+   - *Trusted → volumes*: on. The trusted steps mount the Docker socket and
+     the stack directory, and the postgres service mounts a tmpfs.
+   - *Require approval*: **pull requests** (all of them, not only forks).
+     Same-repository pull requests, card workers' included, run their own
+     pipeline file; on this agent, with trusted volumes on, an edited step
+     could mount the Docker socket. Keep it until pull requests run on a
+     separate Woodpecker agent without the Docker socket and without trusted
+     volumes (ADR-0046 §7); then pull requests may go back to *forks*.
    - *Cancel previous pipelines*: push, pull_request.
    - Timeout: 60 min.
    - Run the Woodpecker server on PostgreSQL
@@ -57,16 +92,19 @@ Nothing is published on the host. The stack runs on its own compose network
      busy fleet SQLite answers GitHub's webhooks with HTTP 500
      `database is locked`, and GitHub never redelivers them: the pull request
      gets no pipeline (#484, ADR-0043).
-3. **The first run.** Push to `develop`, or run the pipeline by hand on
+3. **Delete the old CI caches** once, on an existing host:
+   `rm -rf /home/archi/ci-cache/agentdock`. No pipeline reads them any more
+   (ADR-0046), and pull requests could write to them before.
+4. **The first run.** Push to `develop`, or run the pipeline by hand on
    `develop`. `refresh.sh` creates the stack directory, copies the examples in
    and generates `POSTGRES_PASSWORD`, `REDIS_PASSWORD` and
    `APP_ENCRYPTION_KEY`. It then stops, because the tunnel token is missing.
-4. **Add the token and start the stack:**
+5. **Add the token and start the stack:**
    ```sh
    cp ~/.agentdock/cloudflared-staging.env /home/archi/stacks/agentdock-staging/env/cloudflared.env
    /home/archi/stacks/agentdock-staging/up.sh
    ```
-5. **Create the first admin.** The seed creates no users.
+6. **Create the first admin.** The seed creates no users.
    ```sh
    docker exec -it agentdock-staging-api node dist/src/cli/admin-create.js
    ```
