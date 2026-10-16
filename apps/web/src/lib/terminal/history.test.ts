@@ -6,6 +6,8 @@ import {
   type HistoryView,
   historyText,
   Swipe,
+  TouchScroll,
+  wheelLines,
 } from './history';
 
 const controller = () => {
@@ -87,5 +89,32 @@ describe('Swipe', () => {
     expect(swipe.swipe(100 - HISTORY_SWIPE_PX)).toBe('up');
     swipe.end();
     expect(swipe.swipe(500)).toBeNull();
+  });
+});
+
+describe('wheelLines', () => {
+  test('counts pixels by the cell, lines as lines and pages by rows', () => {
+    expect(wheelLines(-100, 0, 20, 30)).toBe(-5);
+    expect(wheelLines(3, 1, 20, 30)).toBe(3);
+    expect(wheelLines(1, 2, 20, 30)).toBe(30);
+  });
+
+  test('a small step still moves one line, and none moves none', () => {
+    expect(wheelLines(4, 0, 20, 30)).toBe(1);
+    expect(wheelLines(-4, 0, 20, 30)).toBe(-1);
+    expect(wheelLines(0, 0, 20, 30)).toBe(0);
+  });
+});
+
+describe('TouchScroll', () => {
+  test('turns finger travel into whole lines and keeps the remainder', () => {
+    const touch = new TouchScroll();
+    expect(touch.lines(50, 20)).toBe(0);
+    touch.start(100);
+    expect(touch.lines(130, 20)).toBe(1);
+    expect(touch.lines(150, 20)).toBe(1);
+    expect(touch.lines(90, 20)).toBe(-3);
+    touch.end();
+    expect(touch.lines(400, 20)).toBe(0);
   });
 });

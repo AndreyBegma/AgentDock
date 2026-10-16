@@ -36,6 +36,8 @@ import {
   type HistoryView,
   historyText,
   Swipe,
+  TouchScroll,
+  wheelLines,
 } from '../../lib/terminal/history';
 
 export type TerminalTarget =
@@ -185,9 +187,6 @@ export function TerminalView({
           if (past?.term !== view) return;
           // One step up, so the scroll that asked shows earlier output.
           view.scrollLines(-Math.max(1, Math.floor(view.rows / 2)));
-          view.onScroll(() => {
-            if (atBottom(view)) closePast();
-          });
         });
       };
 
@@ -210,38 +209,49 @@ export function TerminalView({
         }
       };
       const onLiveTouchEnd = () => liveSwipe.end();
-      // History view: xterm scrolls it; past the bottom goes back to live.
-      const pastSwipe = new Swipe();
+      // History view: scrolled here, not by xterm; down to the bottom goes
+      // back to live.
+      const cellPx = () =>
+        past ? historyElement.clientHeight / Math.max(1, past.term.rows) : 1;
+      /** Scrolls `lines` (positive: towards the live end); at the bottom, returns. */
+      const scrollPast = (lines: number) => {
+        if (!past || lines === 0) return;
+        if (lines > 0 && atBottom(past.term)) return closePast();
+        past.term.scrollLines(lines);
+        if (lines > 0 && atBottom(past.term)) closePast();
+      };
+      const pastTouch = new TouchScroll();
       const onPastWheel = (event: WheelEvent) => {
-        if (past && event.deltaY > 0 && atBottom(past.term)) closePast();
+        event.preventDefault();
+        event.stopPropagation();
+        scrollPast(
+          wheelLines(
+            event.deltaY,
+            event.deltaMode,
+            cellPx(),
+            past?.term.rows ?? 1,
+          ),
+        );
       };
       const onPastTouchStart = (event: TouchEvent) => {
-        pastSwipe.start(event.touches[0]?.clientY ?? 0);
+        pastTouch.start(event.touches[0]?.clientY ?? 0);
       };
       const onPastTouchMove = (event: TouchEvent) => {
-        if (
-          past &&
-          atBottom(past.term) &&
-          pastSwipe.swipe(event.touches[0]?.clientY ?? 0) === 'up'
-        ) {
-          pastSwipe.end();
-          closePast();
-        }
+        event.preventDefault();
+        event.stopPropagation();
+        // A finger moving down brings earlier output: scroll up.
+        scrollPast(-pastTouch.lines(event.touches[0]?.clientY ?? 0, cellPx()));
       };
-      const onPastTouchEnd = () => pastSwipe.end();
+      const onPastTouchEnd = () => pastTouch.end();
       const capture = { capture: true, passive: false } as const;
       element.addEventListener('wheel', onLiveWheel, capture);
       element.addEventListener('touchstart', onLiveTouchStart, capture);
       element.addEventListener('touchmove', onLiveTouchMove, capture);
       element.addEventListener('touchend', onLiveTouchEnd, capture);
-      historyElement.addEventListener('wheel', onPastWheel, { passive: true });
-      historyElement.addEventListener('touchstart', onPastTouchStart, {
-        passive: true,
-      });
-      historyElement.addEventListener('touchmove', onPastTouchMove, {
-        passive: true,
-      });
-      historyElement.addEventListener('touchend', onPastTouchEnd);
+      historyElement.addEventListener('wheel', onPastWheel, capture);
+      historyElement.addEventListener('touchstart', onPastTouchStart, capture);
+      historyElement.addEventListener('touchmove', onPastTouchMove, capture);
+      historyElement.addEventListener('touchend', onPastTouchEnd, capture);
 
       const observer = new ResizeObserver(() => {
         fit.fit();
@@ -258,10 +268,18 @@ export function TerminalView({
         element.removeEventListener('touchstart', onLiveTouchStart, capture);
         element.removeEventListener('touchmove', onLiveTouchMove, capture);
         element.removeEventListener('touchend', onLiveTouchEnd, capture);
-        historyElement.removeEventListener('wheel', onPastWheel);
-        historyElement.removeEventListener('touchstart', onPastTouchStart);
-        historyElement.removeEventListener('touchmove', onPastTouchMove);
-        historyElement.removeEventListener('touchend', onPastTouchEnd);
+        historyElement.removeEventListener('wheel', onPastWheel, capture);
+        historyElement.removeEventListener(
+          'touchstart',
+          onPastTouchStart,
+          capture,
+        );
+        historyElement.removeEventListener(
+          'touchmove',
+          onPastTouchMove,
+          capture,
+        );
+        historyElement.removeEventListener('touchend', onPastTouchEnd, capture);
         backToLive.current = () => {};
         clearTimeout(waiting);
         past?.term.dispose();
@@ -453,7 +471,7 @@ export function TerminalView({
           ref={historyHost}
           role="log"
           aria-label="Terminal history, read-only"
-          className="min-h-0 flex-1 overflow-hidden p-2"
+          className="min-h-0 flex-1 touch-none overflow-hidden p-2"
         />
       </div>
       {history === 'loading' ? (

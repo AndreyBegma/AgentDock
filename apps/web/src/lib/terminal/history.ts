@@ -102,3 +102,50 @@ export class Swipe {
     this.from = null;
   }
 }
+
+/**
+ * Lines one wheel event scrolls the history view: positive is down, towards
+ * the live end. `deltaMode` 1 counts lines and 2 pages; 0 counts pixels.
+ * Never 0 for a non-zero delta, so a small trackpad step still moves.
+ */
+export const wheelLines = (
+  deltaY: number,
+  deltaMode: number,
+  cellPx: number,
+  rows: number,
+): number => {
+  if (deltaY === 0) return 0;
+  const lines =
+    deltaMode === 1
+      ? deltaY
+      : deltaMode === 2
+        ? deltaY * rows
+        : deltaY / Math.max(1, cellPx);
+  const whole = Math.trunc(lines);
+  return whole === 0 ? Math.sign(deltaY) : whole;
+};
+
+/**
+ * A finger dragging the history view, in whole lines: `lines` answers how
+ * many lines to scroll since the last call — positive when the finger moved
+ * down, which brings earlier output into view — and keeps the remainder.
+ */
+export class TouchScroll {
+  private y: number | null = null;
+
+  start(y: number): void {
+    this.y = y;
+  }
+
+  lines(y: number, cellPx: number): number {
+    if (this.y === null) return 0;
+    const step = Math.max(1, cellPx);
+    const whole = Math.trunc((y - this.y) / step);
+    this.y += whole * step;
+    return whole;
+  }
+
+  end(): void {
+    this.y = null;
+  }
+}
