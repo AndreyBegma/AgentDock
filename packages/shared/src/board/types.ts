@@ -73,14 +73,17 @@ export type CardRoundTrigger = (typeof CARD_ROUND_TRIGGERS)[number];
 
 /**
  * D4/D6: a round's phase. `waiting` is Claude waiting for the person
- * (`hook.stopped`); `finished` is done (worker, session end or the person);
- * `ended` is a session that exited without being finished first.
+ * (`hook.stopped`); `background` (#390, ADR-0038) is a turn that stopped with
+ * the session's own background tasks still running — the worker waits on
+ * them, not on the person; `finished` is done (worker, session end or the
+ * person); `ended` is a session that exited without being finished first.
  */
 export const CARD_ROUND_PHASES = [
   'queued',
   'starting',
   'running',
   'waiting',
+  'background',
   'finished',
   'ended',
   'failed',
@@ -94,6 +97,7 @@ export const ACTIVE_CARD_ROUND_PHASES = [
   'starting',
   'running',
   'waiting',
+  'background',
 ] as const satisfies readonly CardRoundPhase[];
 export type ActiveCardRoundPhase = (typeof ACTIVE_CARD_ROUND_PHASES)[number];
 
@@ -180,6 +184,20 @@ export const CARD_SUMMARY_MAX = LOCAL_CARD_SUMMARY_MAX;
 export const BOARD_MAX_RUNNING_DEFAULT = 3;
 export const BOARD_MAX_RUNNING_MIN = 1;
 export const BOARD_MAX_RUNNING_MAX = 10;
+
+/**
+ * #390: a round in `background` this many minutes raises one
+ * `card.background_stalled` — a board setting.
+ */
+export const CARD_BACKGROUND_STALL_MINUTES_DEFAULT = 30;
+export const CARD_BACKGROUND_STALL_MINUTES_MIN = 5;
+export const CARD_BACKGROUND_STALL_MINUTES_MAX = 24 * 60;
+
+/** #390: how often the API looks for rounds stalled on their background tasks. */
+export const CARD_BACKGROUND_SWEEP_MS = 60_000;
+
+/** #390: the running background command a card shows, at most this long. */
+export const CARD_BACKGROUND_COMMAND_MAX = 160;
 
 /** `GET /board` lists the newest Completed cards in pages of this size. */
 export const BOARD_COMPLETED_PAGE_SIZE = 50;

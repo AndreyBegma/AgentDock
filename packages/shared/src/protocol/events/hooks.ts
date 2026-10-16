@@ -143,9 +143,25 @@ export const hookNotificationDataSchema = z.strictObject({
     .regex(/^[a-z_]+$/),
 });
 
+/** #390: background tasks one stop reports, at most. */
+export const HOOK_BACKGROUND_TASKS_MAX = 1000;
+
 export const hookStoppedDataSchema = z.strictObject({
   /** `last_assistant_message`, only with content. */
   response: hookContentSchema.optional(),
+  /**
+   * #390: the session's background tasks still running when the turn
+   * stopped, as the runner read them from the transcript. Absent from a
+   * runner that does not read them.
+   */
+  backgroundTasks: z
+    .number()
+    .int()
+    .nonnegative()
+    .max(HOOK_BACKGROUND_TASKS_MAX)
+    .optional(),
+  /** #390: the newest running background command, shortened; only with content. */
+  background: hookContentSchema.optional(),
 });
 
 /** Claude Code's `SessionEnd.reason`; unknown reasons arrive as `other`. */
@@ -249,7 +265,7 @@ export const parseHookEvent = (event: RunnerEvent): ParsedHookEvent | null => {
 /** Whether an event carries any content field (ADR-0021 gate, checked by ingest). */
 export const hookEventHasContent = (event: HookEvent): boolean => {
   const data = event.data as Record<string, unknown>;
-  return ['content', 'input', 'output', 'response'].some(
+  return ['content', 'input', 'output', 'response', 'background'].some(
     (key) => data[key] !== undefined,
   );
 };

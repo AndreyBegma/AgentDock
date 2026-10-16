@@ -8,6 +8,8 @@ import {
   BOARD_COLUMNS,
   BOARD_MAX_RUNNING_MAX,
   BOARD_MAX_RUNNING_MIN,
+  CARD_BACKGROUND_STALL_MINUTES_MAX,
+  CARD_BACKGROUND_STALL_MINUTES_MIN,
   type BoardCardKind,
   type BoardColumn,
   CAPTURE_MODELS,
@@ -240,6 +242,13 @@ export class UpdateBoardSettingsDto implements UpdateBoardSettingsRequest {
   @IsOptional()
   @IsBoolean()
   autoMergeCards?: boolean | null;
+
+  /** #390: minutes in `background` before `card.background_stalled`. */
+  @IsOptional()
+  @IsInt()
+  @Min(CARD_BACKGROUND_STALL_MINUTES_MIN)
+  @Max(CARD_BACKGROUND_STALL_MINUTES_MAX)
+  backgroundStallMinutes?: number;
 }
 
 /** #273 D13: the head the person saw in the accept dialog. */

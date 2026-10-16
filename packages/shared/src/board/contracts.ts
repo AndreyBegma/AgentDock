@@ -55,6 +55,16 @@ export interface CardRoundBrief {
   finishedBy: CardFinishedBy | null;
   /** When Claude stopped and is waiting for the person (`hook.stopped`). */
   waitingAt: string | null;
+  /**
+   * #390: when the turn stopped with background tasks running (`background`);
+   * `null` otherwise. Optional so older fixtures stay valid.
+   */
+  backgroundAt?: string | null;
+  /**
+   * #390: what runs in the background, shortened — only for a project that
+   * ships content; `null` when unknown.
+   */
+  backgroundCommand?: string | null;
   /** D6: no hook event within `CARD_HOOKS_GRACE_MS` of the start. */
   hooksMissing: boolean;
   /**
@@ -279,6 +289,9 @@ export interface CardRoundView {
   costUsd: string | null;
   startedAt: string;
   waitingAt: string | null;
+  /** #390: as on `CardRoundBrief`. */
+  backgroundAt: string | null;
+  backgroundCommand: string | null;
   finishedAt: string | null;
   endedAt: string | null;
 }
@@ -385,6 +398,11 @@ export interface BoardSettingsView {
   autoMergeCards: boolean | null;
   /** #359 D7: `cardAutoMergeDefault` of the project's base — on for develop, off for main. */
   autoMergeCardsDefault: boolean;
+  /**
+   * #390: minutes a round may wait on its own background tasks before it
+   * raises `card.background_stalled`.
+   */
+  backgroundStallMinutes: number;
   isDefault: boolean;
   updatedAt: string | null;
 }
@@ -477,6 +495,8 @@ export interface UpdateBoardSettingsRequest {
   autoCollectTracked?: boolean;
   /** #359 D7. Absent keeps the stored value; `null` returns to the default. */
   autoMergeCards?: boolean | null;
+  /** #390. Absent keeps the stored value. */
+  backgroundStallMinutes?: number;
 }
 
 /**
@@ -815,6 +835,20 @@ export interface CardWaitingEventData {
   number: number;
   title: string;
   round: number;
+}
+
+/**
+ * #390: a round has waited on its own background tasks for `minutes` — once
+ * per stall. Never carries the command: it is content.
+ */
+export const CARD_BACKGROUND_STALLED_EVENT = 'card.background_stalled';
+
+export interface CardBackgroundStalledEventData {
+  cardId: string;
+  number: number;
+  title: string;
+  round: number;
+  minutes: number;
 }
 
 /**

@@ -1,3 +1,5 @@
+import { readFileSync, statSync } from 'node:fs';
+import { CARD_BACKGROUND_COMMAND_MAX } from '@agentdock/shared';
 import {
   type HookCliName,
   hookCliNameSchema,
@@ -7,7 +9,16 @@ import { connectLocal, type LocalClient } from '../local/client';
 import type { LocalCommandDeps } from '../local/subcommand';
 import { LOCAL_LINE_MAX_BYTES, type LocalEventArgs } from '../local/types';
 import { readAncestors } from './ancestors';
-import { commonInputSchema, permissionRequestInputSchema } from './input';
+import {
+  runningBackgroundTasks,
+  shortenCommand,
+  TRANSCRIPT_MAX_BYTES,
+} from './background';
+import {
+  commonInputSchema,
+  permissionRequestInputSchema,
+  stopInputSchema,
+} from './input';
 import {
   buildHookEvent,
   HOOK_RAW_CONTENT_CHARS,
@@ -43,6 +54,34 @@ const gitBranch = async (
   return branch && branch !== 'HEAD' && branch.length <= 255
     ? branch
     : undefined;
+};
+
+/**
+ * #390: the background tasks still running at a stop, from the session's
+ * transcript; undefined when it cannot be read — the API then treats the
+ * stop as it always did.
+ */
+const readBackground = (
+  input: unknown,
+  deps: HookDeps,
+): HookExtras['background'] => {
+  const stop = stopInputSchema.safeParse(input);
+  const path = stop.success ? stop.data.transcript_path : undefined;
+  if (!path?.startsWith('/')) return undefined;
+  try {
+    if (statSync(path).size > TRANSCRIPT_MAX_BYTES) return undefined;
+    const read = deps.readFile ?? ((p: string) => readFileSync(p, 'utf8'));
+    const running = runningBackgroundTasks(read(path));
+    const newest = running.at(-1)?.command;
+    return {
+      tasks: running.length,
+      command: newest
+        ? shortenCommand(newest, CARD_BACKGROUND_COMMAND_MAX)
+        : null,
+    };
+  } catch {
+    return undefined;
+  }
 };
 
 /**
@@ -123,6 +162,10 @@ const handle = async (
     extras.ancestors = ancestors;
     const tmux = deps.env.AGENTDOCK_TMUX_SESSION;
     if (tmux) extras.tmuxSession = tmux;
+  }
+  if (name === 'stop') {
+    const background = readBackground(input, deps);
+    if (background) extras.background = background;
   }
 
   const event = fitEvent(name, input, extras);

@@ -1199,6 +1199,9 @@ export class BoardService implements OnModuleInit {
       ...(dto.autoMergeCards !== undefined
         ? { autoMergeCards: dto.autoMergeCards }
         : {}),
+      ...(dto.backgroundStallMinutes !== undefined
+        ? { backgroundStallMinutes: dto.backgroundStallMinutes }
+        : {}),
       updatedById: actor.userId,
     };
     const row = await this.prisma.boardSettings.upsert({
@@ -1219,6 +1222,7 @@ export class BoardService implements OnModuleInit {
         captureModel: before.captureModel,
         autoCollectTracked: before.autoCollectTracked,
         autoMergeCards: before.autoMergeCards,
+        backgroundStallMinutes: before.backgroundStallMinutes,
       },
       after: {
         issueOnRun: row.issueOnRun,
@@ -1228,6 +1232,7 @@ export class BoardService implements OnModuleInit {
         captureModel: row.captureModel,
         autoCollectTracked: row.autoCollectTracked,
         autoMergeCards: row.autoMergeCards,
+        backgroundStallMinutes: row.backgroundStallMinutes,
       },
       result: 'ok',
     });

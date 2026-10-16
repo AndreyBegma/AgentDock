@@ -32,7 +32,7 @@ import {
   RunnerEventSinks,
 } from '../runners/runner-event-sinks';
 import { hourOf, RollupService } from '../usage/rollup.service';
-import { contentDraftsOf, stripHookContent } from './session-hook-content';
+import { contentDraftsOf } from './session-hook-content';
 import { modelList } from './session-tree';
 
 type Tx = Prisma.TransactionClient;
@@ -150,9 +150,6 @@ export class SessionsIngestService implements RunnerEventSink, OnModuleInit {
     for (const event of events) {
       const hook = parseHookEvent(event);
       if (hook !== null) {
-        // After parsing: the parsed copy keeps the content, the raw event
-        // (stored later in `events`) must not.
-        stripHookContent(event);
         if (!hook.ok) {
           this.logger.warn(
             `runner ${runnerId}: skipped ${event.type} seq ${event.seq}: ${hook.error}`,
