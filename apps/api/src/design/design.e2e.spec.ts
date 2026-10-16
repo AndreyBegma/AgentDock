@@ -105,7 +105,7 @@ describe('design stage (e2e)', () => {
     expect(writes).toHaveLength(1);
     const writePrompt = h.turnPrompts().at(-1) ?? '';
     expect(writePrompt).toContain('## Approved design');
-    expect(writePrompt).toContain('docs/design/<issue>-task-t1/1.html');
+    expect(writePrompt).toContain('docs/design/<issue>-task-t1/1/mockup.html');
 
     const detail = await h.detail(plan.id);
     expect(detail.tasks.find((t) => t.key === 't1')?.status).toBe('ready');
@@ -340,10 +340,12 @@ describe('design stage (e2e)', () => {
     // A task with no design row: 404, not an empty design.
     expect((await h.author.get(h.designBase(plan.id, 't2'))).status).toBe(404);
     expect(preview.text).toContain('<div class="card">Card</div>');
-    const stored = await h.ctx.prisma.designRevision.findUniqueOrThrow({
-      where: { id: revision.id },
+    const stored = await h.ctx.prisma.designFrame.findMany({
+      where: { revisionId: revision.id },
     });
-    expect(stored.html).toBe(MOCKUP);
+    expect(stored.map((f) => [f.position, f.name, f.html])).toEqual([
+      [0, 'Mockup', MOCKUP],
+    ]);
     expect(
       (
         await h.viewer.get(
@@ -539,7 +541,7 @@ describe('design stage (e2e)', () => {
       block({
         action: 'write',
         taskKey: 't1',
-        document: `${FEATURE_DOC}\n## Design\n\nThe mockup is \`docs/specs/<issue>-task-t1/design/1.html\`.\n`,
+        document: `${FEATURE_DOC}\n## Design\n\nThe mockup is \`docs/specs/<issue>-task-t1/design/1/mockup.html\`.\n`,
         assumptions: [],
       }),
     );
@@ -554,10 +556,10 @@ describe('design stage (e2e)', () => {
     const files = publish.files as { path: string; content: string }[];
     expect(files.map((f) => f.path)).toEqual([
       'docs/specs/101-task-t1.md',
-      'docs/specs/101-task-t1/design/1.html',
+      'docs/specs/101-task-t1/design/1/mockup.html',
     ]);
     expect(files[0].content).toContain(
-      '`docs/specs/101-task-t1/design/1.html`',
+      '`docs/specs/101-task-t1/design/1/mockup.html`',
     );
     expect(files[1].content).toBe(MOCKUP);
     expect(files[1].content).not.toContain(MOCKUP_PIN_HELPER_ATTRIBUTE);
@@ -574,6 +576,246 @@ describe('design stage (e2e)', () => {
     ]);
     expect(h.sentOf('plan.queue_issues')[1]).toEqual(
       expect.objectContaining({ numbers: [101] }),
+    );
+  });
+
+  // #441: a design of several named frames.
+  const FRAMES = [
+    { name: 'Board page', html: MOCKUP.replace('Export', 'Board') },
+    { name: 'Card tile', html: MOCKUP.replace('Export', 'Tile') },
+    { name: 'Card tile!', html: MOCKUP.replace('Export', 'Tile 2') },
+  ];
+
+  it('stores the frames of a turn in order, serves each, and keeps a comment on its frame into the next Revise (#441)', async () => {
+    await h.seedProfile();
+    const plan = await uiPlan(1);
+    expect((await generate(plan.id)).status).toBe(201);
+    await h.finish(
+      plan.id,
+      designResult({ taskKey: 't1', variant: 1 }, FRAMES),
+    );
+    const [revision] = (await design(plan.id)).revisions;
+    expect(revision.frames).toEqual([
+      {
+        position: 0,
+        name: 'Board page',
+        slug: 'board-page',
+        htmlUrl: `/api/design-revisions/${revision.id}/frames/0/html`,
+      },
+      {
+        position: 1,
+        name: 'Card tile',
+        slug: 'card-tile',
+        htmlUrl: `/api/design-revisions/${revision.id}/frames/1/html`,
+      },
+      {
+        position: 2,
+        name: 'Card tile!',
+        slug: 'card-tile-2',
+        htmlUrl: `/api/design-revisions/${revision.id}/frames/2/html`,
+      },
+    ]);
+    const tile = await h.author.get(
+      `/design-revisions/${revision.id}/frames/1/html`,
+    );
+    expect(tile.status).toBe(200);
+    expect(tile.text).toContain('<button>Tile</button>');
+    expect(tile.text).toContain(MOCKUP_PIN_HELPER_ATTRIBUTE);
+    expect(String(tile.headers['content-security-policy'])).toContain(
+      'sandbox allow-scripts',
+    );
+    expect(
+      (await h.author.get(`/design-revisions/${revision.id}/html`)).text,
+    ).toContain('<button>Board</button>');
+    expect(
+      (await h.author.get(`/design-revisions/${revision.id}/frames/3/html`))
+        .status,
+    ).toBe(404);
+    expect(
+      (await h.other.get(`/design-revisions/${revision.id}/frames/1/html`))
+        .status,
+    ).toBe(404);
+
+    const base = h.designBase(plan.id, 't1');
+    const pinned = await h.author.send('post', `${base}/comments`, {
+      revisionId: revision.id,
+      frame: 1,
+      kind: 'pin',
+      viewport: 'Desktop',
+      theme: 'light',
+      x: 10,
+      y: 20,
+      selector: '#app > button',
+      body: 'Round the corners.',
+    });
+    expect(pinned.status).toBe(201);
+    const outside = await h.author.send('post', `${base}/comments`, {
+      revisionId: revision.id,
+      frame: 3,
+      kind: 'general',
+      body: 'Nowhere.',
+    });
+    expect(outside.status).toBe(400);
+    // After a reload the pin is still on its frame.
+    const [pin] = (await design(plan.id)).comments;
+    expect(pin).toMatchObject({ frame: 1, kind: 'pin', x: 10, y: 20 });
+
+    expect((await h.author.send('post', `${base}/revise`)).status).toBe(201);
+    const prompt = h.turnPrompts().at(-1) ?? '';
+    expect(prompt).toContain(
+      'Its frames, in order: "Board page", "Card tile", "Card tile!".',
+    );
+    expect(prompt).toContain('"frame": "Card tile"');
+    expect(prompt).toContain(pin.id);
+  });
+
+  it('reads a revision stored before frames as one frame named Mockup (#441)', async () => {
+    const plan = await drawn(1);
+    const [drawnRevision] = (await design(plan.id)).revisions;
+    const stored = await h.ctx.prisma.designRevision.findUniqueOrThrow({
+      where: { id: drawnRevision.id },
+    });
+    // As a revision stored before #441: the HTML on the row, no frames.
+    const legacy = await h.ctx.prisma.designRevision.create({
+      data: {
+        designId: stored.designId,
+        variant: 1,
+        revision: 2,
+        title: 'Legacy',
+        rationale: 'One mockup.',
+        html: MOCKUP.replace('Export', 'Legacy'),
+        turnId: stored.turnId,
+      },
+    });
+    const view = await design(plan.id);
+    const read = view.revisions.find((r) => r.id === legacy.id);
+    expect(read?.frames).toEqual([
+      {
+        position: 0,
+        name: 'Mockup',
+        slug: 'mockup',
+        htmlUrl: `/api/design-revisions/${legacy.id}/frames/0/html`,
+      },
+    ]);
+    for (const url of [
+      `/design-revisions/${legacy.id}/html`,
+      `/design-revisions/${legacy.id}/frames/0/html`,
+    ]) {
+      const res = await h.author.get(url);
+      expect(res.status).toBe(200);
+      expect(res.text).toContain('<button>Legacy</button>');
+    }
+    expect(
+      (await h.author.get(`/design-revisions/${legacy.id}/frames/1/html`))
+        .status,
+    ).toBe(404);
+
+    const base = h.designBase(plan.id, 't1');
+    const commented = await h.author.send('post', `${base}/comments`, {
+      revisionId: legacy.id,
+      kind: 'general',
+      body: 'Bigger title.',
+    });
+    expect(commented.status).toBe(201);
+    expect((commented.body as TaskDesignView).comments[0].frame).toBe(0);
+    expect(
+      (
+        await h.author.send('post', `${base}/comments`, {
+          revisionId: legacy.id,
+          frame: 1,
+          kind: 'general',
+          body: 'No such frame.',
+        })
+      ).status,
+    ).toBe(400);
+    expect((await h.author.send('post', `${base}/revise`)).status).toBe(201);
+    const prompt = h.turnPrompts().at(-1) ?? '';
+    expect(prompt).toContain('Its frames, in order: "Mockup".');
+    expect(prompt).toContain('"frame": "Mockup"');
+
+    // Approved, the legacy revision publishes as its one frame.
+    await h.finish(plan.id, designResult({ taskKey: 't1', variant: 1 }));
+    await h.ctx.prisma.taskDesign.update({
+      where: { id: stored.designId },
+      data: { status: 'reviewing' },
+    });
+    expect(
+      (
+        await h.author.send('post', `${base}/approve`, {
+          revisionId: legacy.id,
+        })
+      ).status,
+    ).toBe(200);
+    expect(h.turnPrompts().at(-1)).toContain(
+      'docs/design/<issue>-task-t1/1/mockup.html',
+    );
+  });
+
+  it('publishes every frame of the approved variant into the docs pull request (#441)', async () => {
+    await h.ctx.prisma.project.update({
+      where: { id: h.projectId },
+      data: {
+        codeSentinelConfig: { orchestrator: { specDir: 'docs/specs' } },
+      },
+    });
+    await h.seedProfile();
+    const plan = await uiPlan(1);
+    expect((await generate(plan.id)).status).toBe(201);
+    await h.finish(
+      plan.id,
+      designResult({ taskKey: 't1', variant: 1 }, FRAMES),
+    );
+    const [revision] = (await design(plan.id)).revisions;
+    await h.author.send('post', `${h.designBase(plan.id, 't1')}/approve`, {
+      revisionId: revision.id,
+    });
+    const writePrompt = h.turnPrompts().at(-1) ?? '';
+    expect(writePrompt).toContain('in 3 frames published under');
+    expect(writePrompt).toContain(
+      '- `docs/specs/<issue>-task-t1/design/1/card-tile.html` — Card tile',
+    );
+    // The document names no frame: send adds a Design section listing them.
+    await h.finish(
+      plan.id,
+      block({
+        action: 'write',
+        taskKey: 't1',
+        document: FEATURE_DOC,
+        assumptions: [],
+      }),
+    );
+    for (const key of ['t1', 't2']) {
+      await h.author.send('post', `${h.base(plan.id)}/tasks/${key}/review`, {
+        decision: 'approve',
+      });
+    }
+    expect(
+      (await h.author.send('post', `${h.base(plan.id)}/send`)).status,
+    ).toBe(200);
+    const [publish] = h.sentOf('plan.publish_specs');
+    const files = publish.files as { path: string; content: string }[];
+    const spec = files.find((f) => f.path.endsWith('.md'));
+    const designs = files.filter((f) => f.path.endsWith('.html'));
+    expect(designs).toEqual([
+      {
+        path: 'docs/specs/101-task-t1/design/1/board-page.html',
+        content: FRAMES[0].html,
+      },
+      {
+        path: 'docs/specs/101-task-t1/design/1/card-tile.html',
+        content: FRAMES[1].html,
+      },
+      {
+        path: 'docs/specs/101-task-t1/design/1/card-tile-2.html',
+        content: FRAMES[2].html,
+      },
+    ]);
+    expect(spec?.content).toContain('The approved design has 3 frames');
+    expect(spec?.content).toContain(
+      '- `docs/specs/101-task-t1/design/1/card-tile-2.html` — Card tile!',
+    );
+    expect(String(publish.body)).toContain(
+      'design `docs/specs/101-task-t1/design/1/` (3 frames)',
     );
   });
 

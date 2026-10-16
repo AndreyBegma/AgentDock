@@ -77,50 +77,54 @@ export function ViewerToolbar({
     <div
       role="toolbar"
       aria-label="Mockup view"
-      className="flex shrink-0 flex-wrap items-center gap-2"
+      className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2"
     >
-      <SegmentedControl size="sm" role="group" aria-label="Viewport">
-        {viewports.map((vp) => {
-          const active = vp.name === state.viewport.name;
-          return (
-            <SegmentedControlItem
-              key={vp.name}
-              active={active}
-              layoutId="design-viewport"
-            >
-              <button
-                type="button"
-                aria-pressed={active}
-                title={`${vp.width} × ${vp.height}`}
-                className="px-3 py-1 text-xs whitespace-nowrap"
-                onClick={() => onChange({ kind: 'viewport', viewport: vp })}
+      {/* Three groups: when the row runs out of room a whole group wraps, never a lone Pin (#399). */}
+      <div data-toolbar-group="view" className="flex items-center gap-2">
+        <SegmentedControl size="sm" role="group" aria-label="Viewport">
+          {viewports.map((vp) => {
+            const active = vp.name === state.viewport.name;
+            return (
+              <SegmentedControlItem
+                key={vp.name}
+                active={active}
+                layoutId="design-viewport"
               >
-                {vp.name}
-              </button>
-            </SegmentedControlItem>
-          );
-        })}
-      </SegmentedControl>
+                <button
+                  type="button"
+                  aria-pressed={active}
+                  title={`${vp.width} × ${vp.height}`}
+                  className="px-2 py-1 text-xs whitespace-nowrap"
+                  onClick={() => onChange({ kind: 'viewport', viewport: vp })}
+                >
+                  {vp.name}
+                </button>
+              </SegmentedControlItem>
+            );
+          })}
+        </SegmentedControl>
 
-      <span className="flex items-center gap-1 text-xs text-ink-2">
-        <NumberInput
-          aria-label="Width in pixels"
-          className="h-8 w-20 text-xs"
-          min={DESIGN_VIEWPORT_MIN_PX}
-          max={DESIGN_VIEWPORT_MAX_PX}
-          value={width}
-          onChange={(e) => setWidth(e.target.value)}
-          onBlur={commitWidth}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') commitWidth();
-          }}
-        />
-        <span aria-hidden="true">× {state.viewport.height}</span>
-      </span>
+        <span className="flex items-center gap-1 text-xs text-ink-2">
+          <NumberInput
+            aria-label="Width in pixels"
+            className="h-8 w-20 text-xs"
+            min={DESIGN_VIEWPORT_MIN_PX}
+            max={DESIGN_VIEWPORT_MAX_PX}
+            value={width}
+            onChange={(e) => setWidth(e.target.value)}
+            onBlur={commitWidth}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitWidth();
+            }}
+          />
+          <span aria-hidden="true">× {state.viewport.height}</span>
+        </span>
+      </div>
 
       <fieldset
-        className="m-0 flex min-w-0 items-center gap-1 border-0 p-0"
-        title="Ctrl/⌘ + wheel, or Ctrl/⌘ + 0 − =, over the stage around the mockup (not over the mockup itself)"
+        data-toolbar-group="zoom"
+        className="m-0 flex items-center gap-1 border-0 p-0"
+        title="Ctrl/⌘ + wheel, or Ctrl/⌘ + 0 − =, over the stage or the mockup"
       >
         <legend className="sr-only">Zoom</legend>
         <Button
@@ -141,7 +145,7 @@ export function ViewerToolbar({
             <button
               type="button"
               aria-pressed={state.zoom === 'fit'}
-              className="px-3 py-1 text-xs whitespace-nowrap tabular-nums"
+              className="px-2 py-1 text-xs whitespace-nowrap tabular-nums"
               onClick={() => onChange({ kind: 'zoom', zoom: 'fit' })}
             >
               {state.zoom === 'fit' ? `Fit · ${zoomPercent(zoom)}` : 'Fit'}
@@ -158,7 +162,7 @@ export function ViewerToolbar({
                 <button
                   type="button"
                   aria-pressed={active}
-                  className="px-3 py-1 text-xs tabular-nums"
+                  className="px-2 py-1 text-xs tabular-nums"
                   onClick={() => onChange({ kind: 'zoom', zoom: preset })}
                 >
                   {Math.round(preset * 100)}%
@@ -186,80 +190,82 @@ export function ViewerToolbar({
         ) : null}
       </fieldset>
 
-      <SegmentedControl size="sm" role="group" aria-label="Theme">
-        {DESIGN_THEMES.map((theme) => (
-          <SegmentedControlItem
-            key={theme}
-            active={state.theme === theme}
-            layoutId="design-theme"
-          >
-            <button
-              type="button"
-              aria-pressed={state.theme === theme}
-              className="px-3 py-1 text-xs"
-              onClick={() => onChange({ kind: 'theme', theme })}
+      <div data-toolbar-group="review" className="flex items-center gap-2">
+        <SegmentedControl size="sm" role="group" aria-label="Theme">
+          {DESIGN_THEMES.map((theme) => (
+            <SegmentedControlItem
+              key={theme}
+              active={state.theme === theme}
+              layoutId="design-theme"
             >
-              {THEME_LABEL[theme]}
-            </button>
-          </SegmentedControlItem>
-        ))}
-      </SegmentedControl>
-
-      {variants.length > 1 ? (
-        <Select
-          aria-label="Variant"
-          className="h-8 w-auto text-xs"
-          value={state.variant}
-          onChange={(e) =>
-            onChange({ kind: 'variant', variant: Number(e.target.value) })
-          }
-        >
-          {variants.map((v) => (
-            <option key={v} value={v}>
-              Variant {v}
-            </option>
+              <button
+                type="button"
+                aria-pressed={state.theme === theme}
+                className="px-2 py-1 text-xs"
+                onClick={() => onChange({ kind: 'theme', theme })}
+              >
+                {THEME_LABEL[theme]}
+              </button>
+            </SegmentedControlItem>
           ))}
-        </Select>
-      ) : null}
+        </SegmentedControl>
 
-      {revisions.length > 0 ? (
-        <Select
-          aria-label="Revision"
-          className="h-8 w-auto text-xs"
-          value={state.revision?.id ?? ''}
-          onChange={(e) =>
-            onChange({ kind: 'revision', revisionId: e.target.value })
+        {variants.length > 1 ? (
+          <Select
+            aria-label="Variant"
+            className="h-8 w-auto text-xs"
+            value={state.variant}
+            onChange={(e) =>
+              onChange({ kind: 'variant', variant: Number(e.target.value) })
+            }
+          >
+            {variants.map((v) => (
+              <option key={v} value={v}>
+                Variant {v}
+              </option>
+            ))}
+          </Select>
+        ) : null}
+
+        {revisions.length > 0 ? (
+          <Select
+            aria-label="Revision"
+            className="h-8 w-auto text-xs"
+            value={state.revision?.id ?? ''}
+            onChange={(e) =>
+              onChange({ kind: 'revision', revisionId: e.target.value })
+            }
+          >
+            {revisions.map((r, i) => (
+              <option key={r.id} value={r.id}>
+                {revisionLabel(r.variant, r.revision)}
+                {i === 0 ? ' (latest)' : ''}
+              </option>
+            ))}
+          </Select>
+        ) : null}
+
+        <Button
+          size="sm"
+          // Glass either way: the screen's one solid is Approve.
+          variant="glass"
+          // An outline, not a ring: glass draws its own box-shadow.
+          className={
+            pinMode ? 'outline-2 outline-offset-1 outline-accent' : undefined
           }
+          aria-pressed={pinMode}
+          disabled={!canPin}
+          title={
+            canPin
+              ? 'Click the mockup to pin a comment to a point'
+              : 'Pins need an operator and a drawn mockup.'
+          }
+          onClick={() => onPinMode(!pinMode)}
         >
-          {revisions.map((r, i) => (
-            <option key={r.id} value={r.id}>
-              {revisionLabel(r.variant, r.revision)}
-              {i === 0 ? ' (latest)' : ''}
-            </option>
-          ))}
-        </Select>
-      ) : null}
-
-      <Button
-        size="sm"
-        // Glass either way: the screen's one solid is Approve.
-        variant="glass"
-        // An outline, not a ring: glass draws its own box-shadow.
-        className={
-          pinMode ? 'outline-2 outline-offset-1 outline-accent' : undefined
-        }
-        aria-pressed={pinMode}
-        disabled={!canPin}
-        title={
-          canPin
-            ? 'Click the mockup to pin a comment to a point'
-            : 'Pins need an operator and a drawn mockup.'
-        }
-        onClick={() => onPinMode(!pinMode)}
-      >
-        <Crosshair aria-hidden="true" className="size-4" />
-        Pin
-      </Button>
+          <Crosshair aria-hidden="true" className="size-4" />
+          Pin
+        </Button>
+      </div>
     </div>
   );
 }

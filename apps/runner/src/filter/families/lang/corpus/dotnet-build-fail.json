@@ -1,0 +1,7 @@
+{
+  "argv": ["dotnet", "build"],
+  "exitCode": 1,
+  "category": "typecheck",
+  "outcome": "failing",
+  "expect": "filtered"
+}

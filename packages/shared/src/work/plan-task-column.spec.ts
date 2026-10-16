@@ -101,9 +101,20 @@ describe('boardColumnOfPlanTask (D3)', () => {
     }
   });
 
+  it('drops the tasks of a done plan: they became cards (#337 D7)', () => {
+    for (const status of PLAN_TASK_STATUSES) {
+      if (status === 'issued') continue;
+      for (const liveStatus of LIVE) {
+        expect(
+          boardColumnOfPlanTask({ planStatus: 'done', status, liveStatus }),
+        ).toBeNull();
+      }
+    }
+  });
+
   it('is planTaskBoardColumn for every other plan status', () => {
     for (const planStatus of PLAN_STATUSES) {
-      if (planStatus === 'archived') continue;
+      if (planStatus === 'archived' || planStatus === 'done') continue;
       for (const status of PLAN_TASK_STATUSES) {
         for (const liveStatus of LIVE) {
           expect(

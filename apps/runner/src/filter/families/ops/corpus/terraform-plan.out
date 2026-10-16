@@ -1,0 +1,72 @@
+Acquiring state lock. This may take a few moments...
+aws_vpc.main: Refreshing state... [id=vpc-0a1b2c3d4e5f60718]
+aws_subnet.private[0]: Refreshing state... [id=subnet-0a1b2c3d4e5f60001]
+aws_subnet.private[1]: Refreshing state... [id=subnet-0a1b2c3d4e5f60002]
+aws_subnet.public[0]: Refreshing state... [id=subnet-0a1b2c3d4e5f60003]
+aws_subnet.public[1]: Refreshing state... [id=subnet-0a1b2c3d4e5f60004]
+aws_internet_gateway.main: Refreshing state... [id=igw-0a1b2c3d4e5f60005]
+aws_route_table.public: Refreshing state... [id=rtb-0a1b2c3d4e5f60006]
+aws_security_group.api: Refreshing state... [id=sg-0a1b2c3d4e5f60007]
+aws_security_group.db: Refreshing state... [id=sg-0a1b2c3d4e5f60008]
+aws_db_subnet_group.main: Refreshing state... [id=agentdock-main]
+aws_db_instance.main: Refreshing state... [id=agentdock-db]
+aws_ecs_cluster.main: Refreshing state... [id=arn:aws:ecs:eu-central-1:123456789012:cluster/agentdock]
+aws_ecs_task_definition.api: Refreshing state... [id=agentdock-api]
+aws_ecs_service.api: Refreshing state... [id=arn:aws:ecs:eu-central-1:123456789012:service/agentdock/api]
+
+Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
+  + create
+  ~ update in-place
+
+Terraform will perform the following actions:
+
+  # aws_ecs_service.api will be updated in-place
+  ~ resource "aws_ecs_service" "api" {
+        id                                 = "arn:aws:ecs:eu-central-1:123456789012:service/agentdock/api"
+        name                               = "api"
+      ~ desired_count                      = 2 -> 3
+      ~ task_definition                    = "arn:aws:ecs:eu-central-1:123456789012:task-definition/agentdock-api:41" -> (known after apply)
+        # (14 unchanged attributes hidden)
+
+        # (2 unchanged blocks hidden)
+    }
+
+  # aws_ecs_task_definition.api must be replaced
+-/+ resource "aws_ecs_task_definition" "api" {
+      ~ arn                      = "arn:aws:ecs:eu-central-1:123456789012:task-definition/agentdock-api:41" -> (known after apply)
+      ~ container_definitions    = jsonencode(
+          ~ [
+              ~ {
+                  ~ image = "123456789012.dkr.ecr.eu-central-1.amazonaws.com/agentdock-api:1.8.2" -> "123456789012.dkr.ecr.eu-central-1.amazonaws.com/agentdock-api:1.9.0"
+                    name  = "api"
+                    # (7 unchanged attributes hidden)
+                },
+            ]
+        ) # forces replacement
+      ~ id                       = "agentdock-api" -> (known after apply)
+      ~ revision                 = 41 -> (known after apply)
+        # (9 unchanged attributes hidden)
+    }
+
+  # aws_cloudwatch_log_group.worker will be created
+  + resource "aws_cloudwatch_log_group" "worker" {
+      + arn               = (known after apply)
+      + id                = (known after apply)
+      + name              = "/ecs/agentdock-worker"
+      + name_prefix       = (known after apply)
+      + retention_in_days = 14
+      + skip_destroy      = false
+      + tags_all          = (known after apply)
+    }
+
+Plan: 2 to add, 1 to change, 1 to destroy.
+
+Changes to Outputs:
+  ~ api_image = "agentdock-api:1.8.2" -> "agentdock-api:1.9.0"
+
+─────────────────────────────────────────────────────────────────────────────
+
+Note: You didn't use the -out option to save this plan, so Terraform can't
+guarantee to take exactly these actions if you run "terraform apply" now.
+Releasing state lock. This may take a few moments...

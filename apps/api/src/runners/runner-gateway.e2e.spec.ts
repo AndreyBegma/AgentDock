@@ -274,6 +274,84 @@ describe('/runner gateway (e2e)', () => {
     });
   });
 
+  describe('heartbeat profiles (#348)', () => {
+    const beat = (extra: Record<string, unknown> = {}) => ({
+      type: 'heartbeat' as const,
+      ts: new Date().toISOString(),
+      load: [0.1, 0.2, 0.3] as [number, number, number],
+      tmuxSessions: 0,
+      collectors: {},
+      ...extra,
+    });
+
+    const storedAgentdock = async (runnerId: string) => {
+      const row = await ctx.prisma.runner.findUniqueOrThrow({
+        where: { id: runnerId },
+        select: { capabilities: true },
+      });
+      const profiles = (
+        row.capabilities as { profiles: { id: string; agentdock?: unknown }[] }
+      ).profiles;
+      return profiles.map((p) => [p.id, p.agentdock]);
+    };
+
+    let seq = 0;
+    const settled = async (socket: TestRunnerSocket) => {
+      // The gateway handles messages in order: the ack of a following event
+      // means the beat before it is stored.
+      seq += 1;
+      socket.send({ type: 'events', events: [event(seq)] });
+      await socket.next('ack');
+    };
+
+    it('merges reported agentdock into the stored profile, ignores unknown ids, and leaves capabilities alone without profiles', async () => {
+      const { runnerId, token } = await pairedRunner(ctx, admin);
+      const socket = open(token);
+      await socket.connect(
+        hello({
+          capabilities: {
+            ...capabilities,
+            profiles: [
+              {
+                ...capabilities.profiles[0],
+                agentdock: { plugin: null, telemetry: false },
+              },
+            ],
+          },
+        }),
+      );
+
+      socket.send(
+        beat({
+          profiles: {
+            'claude-main': { plugin: '0.4.2', telemetry: true },
+            'claude-ghost': { plugin: '9.9.9', telemetry: true },
+          },
+        }),
+      );
+      await settled(socket);
+      expect(await storedAgentdock(runnerId)).toEqual([
+        ['claude-main', { plugin: '0.4.2', telemetry: true }],
+      ]);
+
+      socket.send(beat());
+      await settled(socket);
+      expect(await storedAgentdock(runnerId)).toEqual([
+        ['claude-main', { plugin: '0.4.2', telemetry: true }],
+      ]);
+
+      socket.send(
+        beat({
+          profiles: { 'claude-main': { plugin: null, telemetry: false } },
+        }),
+      );
+      await settled(socket);
+      expect(await storedAgentdock(runnerId)).toEqual([
+        ['claude-main', { plugin: null, telemetry: false }],
+      ]);
+    });
+  });
+
   describe('events and ack', () => {
     it('stores each event once across a resend after reconnect; ack is the highest contiguous seq', async () => {
       const { runnerId, token } = await pairedRunner(ctx, admin);

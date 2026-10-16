@@ -36,7 +36,9 @@ for target in $targets; do
   dir="$out/bin/$target"
   mkdir -p "$dir"
   echo "build-release: $version $target"
-  bun build --compile --target="bun-$target" src/main.ts --outfile "$dir/agentdock-runner"
+  # --splitting keeps `filter` / `filter-hook` from parsing the whole runner
+  # at start-up (#445 D3: p95 <= 50 ms per command); still one binary.
+  bun build --compile --splitting --format=esm --target="bun-$target" src/main.ts --outfile "$dir/agentdock-runner"
   tar -C "$dir" -czf "$out/agentdock-runner-$version-$target.tar.gz" agentdock-runner
 done
 

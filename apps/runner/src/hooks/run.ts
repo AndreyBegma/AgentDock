@@ -1,13 +1,33 @@
+import { readFileSync, statSync } from 'node:fs';
+import { CARD_BACKGROUND_COMMAND_MAX, CARD_ENV_ID } from '@agentdock/shared';
 import {
   type HookCliName,
   hookCliNameSchema,
   hooksDisabled,
 } from '@agentdock/shared/protocol';
+import {
+  cardsDirOf,
+  compactRefreshOwed,
+  HANDOFF_REFRESH_TEXT,
+  noteIsStale,
+  sessionCardNote,
+  sessionNoteContext,
+} from '../handoff/context';
 import { connectLocal, type LocalClient } from '../local/client';
 import type { LocalCommandDeps } from '../local/subcommand';
 import { LOCAL_LINE_MAX_BYTES, type LocalEventArgs } from '../local/types';
 import { readAncestors } from './ancestors';
-import { commonInputSchema, permissionRequestInputSchema } from './input';
+import {
+  runningBackgroundTasks,
+  shortenCommand,
+  TRANSCRIPT_MAX_BYTES,
+} from './background';
+import {
+  commonInputSchema,
+  permissionRequestInputSchema,
+  sessionStartInputSchema,
+  stopInputSchema,
+} from './input';
 import {
   buildHookEvent,
   HOOK_RAW_CONTENT_CHARS,
@@ -24,7 +44,53 @@ export interface HookDeps extends LocalCommandDeps {
   now?: () => number;
   /** Tests point it at a fake `/proc`. */
   readFile?: (path: string) => string;
+  /** The daemon's card store (#449 D6); `cardsDirOf(env)` by default. */
+  cardsDir?: string;
 }
+
+/**
+ * #449 D6, D8: the card's handoff note for a session that starts in a card's
+ * worktree or on its branch — a person's own session at every start, the
+ * card's worker only after a compaction (its round prompt carries the rest),
+ * with one line asking to refresh a note older than the last commit. For the
+ * worker that line is the round's one request, owed when the daemon found the
+ * note stale before the compaction (#494). Read from the machine, never from
+ * the API; '' for any other session.
+ */
+const sessionNote = async (
+  input: unknown,
+  cwd: string,
+  deps: HookDeps,
+): Promise<string> => {
+  try {
+    const start = sessionStartInputSchema.safeParse(input);
+    const compact = start.success && start.data.source === 'compact';
+    if (deps.env[CARD_ENV_ID] && !compact) return '';
+    const cardsDir = deps.cardsDir ?? cardsDirOf(deps.env);
+    const found = await sessionCardNote(cardsDir, cwd, deps.exec);
+    if (!found) return '';
+    const worker = Boolean(deps.env[CARD_ENV_ID]);
+    const owed = worker && compactRefreshOwed(cardsDir, found.record);
+    if (!found.note) return owed ? HANDOFF_REFRESH_TEXT : '';
+    const stale = worker
+      ? owed
+      : compact && (await noteIsStale(found.record, deps.exec));
+    return sessionNoteContext(found, { stale });
+  } catch {
+    return '';
+  }
+};
+
+const printSessionContext = (deps: HookDeps, text: string): void => {
+  deps.stdout(
+    `${JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: 'SessionStart',
+        additionalContext: text,
+      },
+    })}\n`,
+  );
+};
 
 const readStdin = async (stream: ReadableStream<Uint8Array>): Promise<string> =>
   new Response(stream).text();
@@ -43,6 +109,34 @@ const gitBranch = async (
   return branch && branch !== 'HEAD' && branch.length <= 255
     ? branch
     : undefined;
+};
+
+/**
+ * #390: the background tasks still running at a stop, from the session's
+ * transcript; undefined when it cannot be read — the API then treats the
+ * stop as it always did.
+ */
+const readBackground = (
+  input: unknown,
+  deps: HookDeps,
+): HookExtras['background'] => {
+  const stop = stopInputSchema.safeParse(input);
+  const path = stop.success ? stop.data.transcript_path : undefined;
+  if (!path?.startsWith('/')) return undefined;
+  try {
+    if (statSync(path).size > TRANSCRIPT_MAX_BYTES) return undefined;
+    const read = deps.readFile ?? ((p: string) => readFileSync(p, 'utf8'));
+    const running = runningBackgroundTasks(read(path));
+    const newest = running.at(-1)?.command;
+    return {
+      tasks: running.length,
+      command: newest
+        ? shortenCommand(newest, CARD_BACKGROUND_COMMAND_MAX)
+        : null,
+    };
+  } catch {
+    return undefined;
+  }
 };
 
 /**
@@ -92,10 +186,19 @@ export const runHook = async (
   const common = commonInputSchema.safeParse(input);
   if (!common.success) return 0;
 
+  // #449 D6: the note is on this machine; it reaches the session with the
+  // daemon down too.
+  const note =
+    name.data === 'session-start'
+      ? await sessionNote(input, common.data.cwd, deps)
+      : '';
   const client = await connectLocal(deps.socketPath);
-  if (!client) return 0;
+  if (!client) {
+    if (note) printSessionContext(deps, note);
+    return 0;
+  }
   try {
-    await handle(name.data, input, common.data, client, deps);
+    await handle(name.data, input, common.data, client, deps, note);
   } finally {
     client.close();
   }
@@ -108,6 +211,7 @@ const handle = async (
   common: { session_id: string; cwd: string },
   client: LocalClient,
   deps: HookDeps,
+  note: string,
 ): Promise<void> => {
   const extras: HookExtras = {};
   if (name === 'session-start') {
@@ -124,6 +228,10 @@ const handle = async (
     const tmux = deps.env.AGENTDOCK_TMUX_SESSION;
     if (tmux) extras.tmuxSession = tmux;
   }
+  if (name === 'stop') {
+    const background = readBackground(input, deps);
+    if (background) extras.background = background;
+  }
 
   const event = fitEvent(name, input, extras);
   if (event) await client.event(event);
@@ -134,16 +242,10 @@ const handle = async (
       extras.gitBranch ? { gitBranch: extras.gitBranch } : {},
       { via: 'hook', cwd: common.cwd, sessionId: common.session_id },
     );
-    if (context.ok && context.data.text.trim().length > 0) {
-      deps.stdout(
-        `${JSON.stringify({
-          hookSpecificOutput: {
-            hookEventName: 'SessionStart',
-            additionalContext: context.data.text,
-          },
-        })}\n`,
-      );
-    }
+    const text = [context.ok ? context.data.text.trim() : '', note]
+      .filter((part) => part.length > 0)
+      .join('\n\n');
+    if (text) printSessionContext(deps, text);
     return;
   }
 

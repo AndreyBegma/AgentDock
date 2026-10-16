@@ -36,6 +36,8 @@ import {
   isCardPrState,
 } from './types';
 import {
+  CARD_ENV_ID,
+  CARD_ENV_PORT,
   CARD_WORKER_PROMPT_VERSION,
   cardFeedbackPrompt,
   cardWorkerPrompt,
@@ -104,17 +106,17 @@ describe('naming', () => {
 
   it('places the approved design beside the spec, or under docs/design/cards (#243 D7)', () => {
     const card = { number: 12, title: 'Add login', issueNumber: null };
-    expect(cardDesignPath('docs/specs/', card, 2)).toBe(
-      'docs/specs/card-12-add-login/design/2.html',
+    expect(cardDesignPath('docs/specs/', card, 2, 'board-page')).toBe(
+      'docs/specs/card-12-add-login/design/2/board-page.html',
     );
-    expect(cardDesignPath('docs/specs', { ...card, issueNumber: 41 }, 1)).toBe(
-      'docs/specs/41-add-login/design/1.html',
-    );
-    expect(cardDesignPath(null, { ...card, issueNumber: 41 }, 1)).toBe(
-      'docs/design/cards/C-12-add-login/1.html',
-    );
-    expect(cardDesignPath('', card, 3)).toBe(
-      'docs/design/cards/C-12-add-login/3.html',
+    expect(
+      cardDesignPath('docs/specs', { ...card, issueNumber: 41 }, 1, 'mockup'),
+    ).toBe('docs/specs/41-add-login/design/1/mockup.html');
+    expect(
+      cardDesignPath(null, { ...card, issueNumber: 41 }, 1, 'mockup'),
+    ).toBe('docs/design/cards/C-12-add-login/1/mockup.html');
+    expect(cardDesignPath('', card, 3, 'card-tile')).toBe(
+      'docs/design/cards/C-12-add-login/3/card-tile.html',
     );
   });
 
@@ -216,7 +218,7 @@ describe('worker prompt', () => {
   };
 
   it('is versioned', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(4);
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(13);
   });
 
   it('names the card, branch, base and spec, and how to finish', () => {
@@ -242,6 +244,24 @@ describe('worker prompt', () => {
       'Specification:',
     );
     expect(cardWorkerPrompt({ ...card, issueNumber: 41 })).toContain('#41');
+  });
+
+  // #389: cards wiped each other's test database, and a `pgrep -f` wait
+  // matched its own command line for 7.5 h.
+  it('#389: names the env of its own database and port, and forbids pgrep -f waits', () => {
+    const prompt = cardWorkerPrompt(card);
+    const work = prompt.slice(
+      prompt.indexOf('## How to work'),
+      prompt.indexOf('## When you are done'),
+    );
+    expect(work).toContain(`\`${CARD_ENV_ID}\``);
+    expect(work).toContain(`\`$${CARD_ENV_PORT}\``);
+    expect(work).toContain('Never use, reset or wait for a database or port');
+    expect(work).toContain('Never wait for another process with `pgrep -f');
+    expect(work).toContain('lock file');
+    expect(work).toContain("pgrep -f '[j]est'");
+    expect(CARD_ENV_ID).toBe('AGENTDOCK_CARD');
+    expect(CARD_ENV_PORT).toBe('AGENTDOCK_CARD_PORT');
   });
 
   it('fits card.run at the largest title and body', () => {

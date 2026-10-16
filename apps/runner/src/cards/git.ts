@@ -11,7 +11,12 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, sep } from 'node:path';
-import { cardWipCommitMessage } from '@agentdock/shared';
+import {
+  AGENTDOCK_WORKTREE_DIR,
+  CARD_PR_DESCRIPTION_FILE,
+  CARD_PR_MARKER,
+  cardWipCommitMessage,
+} from '@agentdock/shared';
 import type {
   CardCollectArgs,
   CardCollectPrState,
@@ -31,6 +36,7 @@ import {
 } from '../skills/deps';
 import { createPullRequest, githubOf, pushBranch } from '../skills/run/collect';
 import type { CardRecord } from './record';
+import { commitsWithTrailer, TrailerHeld } from './trailer-guard';
 
 export type GitDeps = Pick<SkillsDeps, 'exec' | 'tempRoot'>;
 
@@ -62,7 +68,7 @@ export const excludeFromGit = async (
 };
 
 /** The commit of a ref, or null when it does not exist. */
-const commitOf = async (
+export const commitOf = async (
   deps: GitDeps,
   root: string,
   ref: string,
@@ -79,7 +85,7 @@ const commitOf = async (
 };
 
 /** Best effort: an unreachable origin still works from what it last fetched. */
-const fetchRef = (deps: GitDeps, root: string, ref: string) =>
+export const fetchRef = (deps: GitDeps, root: string, ref: string) =>
   deps.exec('git', ['-C', root, 'fetch', '--quiet', 'origin', ref], {
     timeoutMs: NETWORK_TIMEOUT_MS,
   });
@@ -127,6 +133,86 @@ export const ensureWorktree = async (
     start,
   ]);
   return 'created';
+};
+
+/** Whether origin has `refs/heads/<branch>` — asked, not read from a stale ref. */
+const onOrigin = async (
+  deps: GitDeps,
+  root: string,
+  branch: string,
+): Promise<boolean> => {
+  const listed = await deps.exec(
+    'git',
+    ['-C', root, 'ls-remote', '--heads', 'origin', `refs/heads/${branch}`],
+    { timeoutMs: NETWORK_TIMEOUT_MS },
+  );
+  if (!listed || listed.code !== 0) {
+    throw new Error(`git ls-remote failed: ${stderrLine(listed)}`);
+  }
+  return listed.stdout.trim().length > 0;
+};
+
+/**
+ * #359 D8: the follow-up of a merged card — `branch`, new, from the updated
+ * `origin/<base>`, in the card's existing worktree (a missing one is then
+ * created on it by `ensureWorktree`). A branch that exists already, here or
+ * on origin, is `already_exists`, unless the worktree is on it with nothing
+ * pushed — a `card.run` retried after a timeout. Uncommitted changes are
+ * never carried to the new branch: such a worktree is `invalid_args`.
+ */
+export const startFollowUpBranch = async (
+  deps: GitDeps,
+  record: Pick<CardRecord, 'root' | 'worktree' | 'branch' | 'base'>,
+): Promise<void> => {
+  const { root, worktree, branch, base } = record;
+  const fetched = await fetchRef(deps, root, base);
+  if (!fetched || fetched.code !== 0) {
+    throw new Error(`git fetch origin ${base} failed: ${stderrLine(fetched)}`);
+  }
+  const remote = await onOrigin(deps, root, branch);
+  const local = await commitOf(deps, root, `refs/heads/${branch}`);
+  const exists = existsSync(worktree);
+  if (exists && local && !remote) {
+    const head = await deps.exec('git', [
+      '-C',
+      worktree,
+      'symbolic-ref',
+      '--quiet',
+      '--short',
+      'HEAD',
+    ]);
+    if (head?.code === 0 && head.stdout.trim() === branch) return;
+  }
+  if (local || remote) {
+    throw new CommandFailure(
+      'already_exists',
+      `branch ${branch} exists ${local ? 'on the runner' : 'on origin'}`,
+    );
+  }
+  if (!exists) return;
+  const status = await gitOk(deps.exec, [
+    '-C',
+    worktree,
+    'status',
+    '--porcelain',
+    '--untracked-files=normal',
+  ]);
+  if (status.trim() !== '') {
+    throw new CommandFailure(
+      'invalid_args',
+      `${worktree} has uncommitted changes; a follow-up branch starts clean`,
+    );
+  }
+  await gitOk(deps.exec, [
+    '-C',
+    worktree,
+    'switch',
+    '--quiet',
+    '--no-track',
+    '-c',
+    branch,
+    `refs/remotes/origin/${base}`,
+  ]);
 };
 
 const isWithin = (path: string, dir: string): boolean =>
@@ -189,14 +275,14 @@ const openPrSchema = z.array(
   }),
 );
 
-interface OpenPr {
+export interface OpenPr {
   number: number;
   url: string;
   state: CardCollectPrState;
 }
 
 /** The open PR of `branch`, or null; throws when `gh` cannot answer. */
-const openPullRequest = async (
+export const openPullRequest = async (
   deps: GitDeps,
   github: string,
   branch: string,
@@ -233,6 +319,120 @@ const openPullRequest = async (
   };
 };
 
+/** GitHub refuses a PR body over 65 536 characters; room is left for the marker. */
+const PR_DESCRIPTION_MAX_CHARS = 60_000;
+
+/**
+ * #359 D3: the worker's `.agentdock/pull-request.md`, or null when it is
+ * missing, empty, not a regular file, or reached through a symlink — a link
+ * could put any file the runner can read into a public PR.
+ */
+export const readPullRequestDescription = (worktree: string): string | null => {
+  const path = join(worktree, CARD_PR_DESCRIPTION_FILE);
+  try {
+    if (!lstatSync(path).isFile()) return null;
+    // `.agentdock` itself may not be a link either.
+    const real = join(realpathSync(worktree), CARD_PR_DESCRIPTION_FILE);
+    if (realpathSync(path) !== real) return null;
+    const text = readFileSync(path, 'utf8').trim();
+    if (!text) return null;
+    return text.length > PR_DESCRIPTION_MAX_CHARS
+      ? `${text.slice(0, PR_DESCRIPTION_MAX_CHARS - 1)}…`
+      : text;
+  } catch {
+    return null;
+  }
+};
+
+const isMarkerLine = (line: string): boolean =>
+  line.trimStart().startsWith(`${CARD_PR_MARKER}:`);
+
+/**
+ * #359 D3: the worker's description, with the API's `AgentDock-Card:` line —
+ * the one the API traces the PR by — as its only marker. A marker the worker
+ * wrote is dropped, so a PR never names another card.
+ */
+export const pullRequestBodyOf = (
+  description: string,
+  apiBody: string,
+): string => {
+  const marker = apiBody.split('\n').find(isMarkerLine)?.trim();
+  const text = description
+    .split('\n')
+    .filter((line) => !isMarkerLine(line))
+    .join('\n')
+    .trim();
+  return marker ? `${text}\n\n${marker}\n` : `${text}\n`;
+};
+
+/**
+ * #359 D3: without the worker's file, the API's body led by the links to the
+ * spec (`.md`) and the design `card.run` committed on the branch — every
+ * frame of it (`.html`, #441).
+ */
+export const fallbackPullRequestBody = (
+  apiBody: string,
+  github: string,
+  branch: string,
+  specFiles: readonly string[],
+): string => {
+  const url = (path: string) =>
+    `https://github.com/${github}/blob/${branch.split('/').map(encodeURIComponent).join('/')}/${path
+      .split('/')
+      .map(encodeURIComponent)
+      .join('/')}`;
+  const link = (path: string) => `[${path}](${url(path)})`;
+  const spec = specFiles.find((p) => p.endsWith('.md'));
+  const design = specFiles.filter((p) => p.endsWith('.html'));
+  const parts = [
+    ...(spec ? [`Spec: ${link(spec)}`] : []),
+    ...(design.length > 0
+      ? [`approved design: ${design.map(link).join(', ')}`]
+      : []),
+  ];
+  return parts.length > 0 ? `${parts.join(' · ')}\n\n${apiBody}` : apiBody;
+};
+
+/** `gh pr edit <n> --body-file`, the body in a private temporary file. */
+export const editPullRequestBody = async (
+  deps: GitDeps,
+  github: string,
+  number: number,
+  body: string,
+): Promise<void> => {
+  const dir = mkdtempSync(join(deps.tempRoot ?? tmpdir(), 'agentdock-pr-'));
+  try {
+    const file = join(dir, 'body.md');
+    writeFileSync(file, body, { mode: 0o600 });
+    const edited = await deps.exec(
+      'gh',
+      ['pr', 'edit', String(number), '--repo', github, '--body-file', file],
+      { timeoutMs: GH_TIMEOUT_MS },
+    );
+    if (!edited || edited.code !== 0) {
+      throw new Error(`gh pr edit failed: ${stderrLine(edited)}`);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+};
+
+/** #359 D3: `gh pr ready <n>` — the draft leaves draft at collect. */
+const markPullRequestReady = async (
+  deps: GitDeps,
+  github: string,
+  number: number,
+): Promise<void> => {
+  const ready = await deps.exec(
+    'gh',
+    ['pr', 'ready', String(number), '--repo', github],
+    { timeoutMs: GH_TIMEOUT_MS },
+  );
+  if (!ready || ready.code !== 0) {
+    throw new Error(`gh pr ready failed: ${stderrLine(ready)}`);
+  }
+};
+
 /**
  * D8: commit the leftovers, push, and open a PR into the base unless one is
  * open for the branch already — then it is only pushed. Nothing ahead of
@@ -242,8 +442,10 @@ const openPullRequest = async (
  */
 export const collectCard = async (
   deps: GitDeps,
-  record: Pick<CardRecord, 'projectId' | 'root' | 'worktree' | 'branch'>,
+  record: Pick<CardRecord, 'projectId' | 'root' | 'worktree' | 'branch'> &
+    Partial<Pick<CardRecord, 'specFiles' | 'pushPr'>>,
   args: CardCollectArgs,
+  options: { trailerGuard?: boolean } = {},
 ): Promise<CardCollectResult> => {
   const wt = record.worktree;
   const head = await deps.exec('git', [
@@ -261,6 +463,9 @@ export const collectCard = async (
       `${wt} is on ${current ?? 'a detached HEAD'}, not ${record.branch}`,
     );
   }
+  // #359 D3: the description is the PR's body, never a commit — also in a
+  // worktree from before `card.run` excluded `.agentdock/` on every round.
+  await excludeFromGit(deps, wt, `${AGENTDOCK_WORKTREE_DIR}/`);
   await gitOk(deps.exec, ['-C', wt, 'add', '-A']);
   if (
     !(await gitSucceeds(deps.exec, ['-C', wt, 'diff', '--cached', '--quiet']))
@@ -289,20 +494,53 @@ export const collectCard = async (
     ).trim(),
   );
   if (!(ahead > 0)) return { ahead: 0, pushed: false };
+  // #447 D7: a commit with a Claude trailer holds the push and the PR.
+  if (options.trailerGuard) {
+    const held = await commitsWithTrailer(deps, wt, record.branch, args.base);
+    if (held.length > 0) throw new TrailerHeld(held);
+  }
   const github = await githubOf(deps, {
     id: record.projectId,
     root: record.root,
   });
   await pushBranch(deps, wt, record.branch);
+  // #359 D3: the worker's description is the body — of a new PR, and of an
+  // open one, edited. Without it, a new PR gets the API's body with the spec
+  // link, and an open one keeps its body.
+  const description = readPullRequestDescription(wt);
+  const body =
+    description !== null
+      ? pullRequestBodyOf(description, args.body)
+      : fallbackPullRequestBody(
+          args.body,
+          github,
+          record.branch,
+          record.specFiles ?? [],
+        );
   // #329 D3: an open PR is reported whether this collect opened it or not,
   // so the API fills a link it lost.
-  const pr: OpenPr = (await openPullRequest(deps, github, record.branch)) ?? {
+  const open = await openPullRequest(deps, github, record.branch);
+  // #359 D1/D3: the draft this runner opened during the round leaves draft,
+  // and its placeholder body is replaced even without the worker's file. A
+  // draft somebody else opened is left as it is.
+  const ours =
+    open !== null &&
+    record.pushPr?.opened === true &&
+    record.pushPr.number === open.number;
+  if (open && (description !== null || ours)) {
+    await editPullRequestBody(deps, github, open.number, body);
+  }
+  if (open && ours && open.state === 'draft') {
+    await markPullRequestReady(deps, github, open.number);
+    open.state = 'open';
+  }
+  const pr: OpenPr = open ?? {
     ...(await createPullRequest(deps, {
       github,
       base: args.base,
       branch: record.branch,
       title: args.title,
-      body: args.body,
+      body,
     })),
     state: 'open',
   };
@@ -326,6 +564,7 @@ export const collectBranch = async (
   deps: GitDeps,
   card: Pick<CardRecord, 'projectId' | 'root' | 'branch'>,
   args: CardCollectArgs,
+  options: { trailerGuard?: boolean } = {},
 ): Promise<CardCollectResult> => {
   const { root, branch } = card;
   await fetchRef(deps, root, branch);
@@ -355,7 +594,7 @@ export const collectBranch = async (
         : ['--no-track', '-b', branch, worktree, `origin/${branch}`]),
     ]);
     try {
-      return await collectCard(deps, { ...card, worktree }, args);
+      return await collectCard(deps, { ...card, worktree }, args, options);
     } finally {
       await removeCardWorktree(deps, { root, worktree, branch });
     }
@@ -365,12 +604,41 @@ export const collectBranch = async (
 };
 
 /**
+ * Whether every commit of the local `branch` is pushed: it is contained in
+ * `origin/<branch>`, or — the remote branch deleted after an auto-merge
+ * (#359 D7) — its tip is the head this runner pushed (`pushedHead`).
+ */
+const branchIsPushed = async (
+  deps: GitDeps,
+  root: string,
+  branch: string,
+  local: string,
+  pushedHead: string | undefined,
+): Promise<boolean> => {
+  if (pushedHead !== undefined && local === pushedHead) return true;
+  await fetchRef(deps, root, branch);
+  const remote = await commitOf(deps, root, `refs/remotes/origin/${branch}`);
+  if (!remote) return false;
+  return gitSucceeds(deps.exec, [
+    '-C',
+    root,
+    'merge-base',
+    '--is-ancestor',
+    local,
+    remote,
+  ]);
+};
+
+/**
  * D10: removes the card's worktree, and its local branch only when every
- * commit of it is on `origin/<branch>` — unpushed work is never deleted.
+ * commit of it is pushed (`branchIsPushed`) — unpushed work is never
+ * deleted. #359 D8: the card's earlier branches, a follow-up ago, go by the
+ * same rule, best effort: `branchDeleted` speaks of the current one.
  */
 export const removeCardWorktree = async (
   deps: GitDeps,
-  record: Pick<CardRecord, 'root' | 'worktree' | 'branch'>,
+  record: Pick<CardRecord, 'root' | 'worktree' | 'branch'> &
+    Partial<Pick<CardRecord, 'pushedHead' | 'previousBranches'>>,
 ): Promise<{ worktreeRemoved: boolean; branchDeleted: boolean }> => {
   const { root, worktree, branch } = record;
   let worktreeRemoved = false;
@@ -385,19 +653,36 @@ export const removeCardWorktree = async (
     ]);
     worktreeRemoved = true;
   }
-  await fetchRef(deps, root, branch);
+  for (const earlier of record.previousBranches ?? []) {
+    if (earlier.branch === branch) continue;
+    const local = await commitOf(deps, root, `refs/heads/${earlier.branch}`);
+    if (
+      local &&
+      (await branchIsPushed(
+        deps,
+        root,
+        earlier.branch,
+        local,
+        earlier.pushedHead,
+      ))
+    ) {
+      await deps.exec('git', [
+        '-C',
+        root,
+        'branch',
+        '--quiet',
+        '-D',
+        earlier.branch,
+      ]);
+    }
+  }
   const local = await commitOf(deps, root, `refs/heads/${branch}`);
-  const remote = await commitOf(deps, root, `refs/remotes/origin/${branch}`);
-  if (!local || !remote) return { worktreeRemoved, branchDeleted: false };
-  const pushed = await gitSucceeds(deps.exec, [
-    '-C',
-    root,
-    'merge-base',
-    '--is-ancestor',
-    local,
-    remote,
-  ]);
-  if (!pushed) return { worktreeRemoved, branchDeleted: false };
+  if (
+    !local ||
+    !(await branchIsPushed(deps, root, branch, local, record.pushedHead))
+  ) {
+    return { worktreeRemoved, branchDeleted: false };
+  }
   await gitOk(deps.exec, ['-C', root, 'branch', '--quiet', '-D', branch]);
   return { worktreeRemoved, branchDeleted: true };
 };

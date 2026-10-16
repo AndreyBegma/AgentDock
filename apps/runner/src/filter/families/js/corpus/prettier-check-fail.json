@@ -1,0 +1,7 @@
+{
+  "argv": ["prettier", "--check", "."],
+  "exitCode": 1,
+  "category": "other",
+  "outcome": "failing",
+  "expect": "any"
+}

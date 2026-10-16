@@ -1,0 +1,47 @@
+    Checking proc-macro2 v1.0.86
+    Checking unicode-ident v1.0.12
+    Checking quote v1.0.36
+    Checking syn v2.0.72
+    Checking serde_derive v1.0.204
+    Checking serde v1.0.204
+    Checking tokio v1.39.2
+    Checking relay-core v0.4.0 (/home/dev/relay/crates/core)
+warning: unused variable: `limit`
+  --> crates/core/src/queue.rs:41:27
+   |
+41 |     pub fn drain(&mut self, limit: usize) -> Vec<Job> {
+   |                             ^^^^^ help: if this is intentional, prefix it with an underscore: `_limit`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: this `if` has identical blocks
+  --> crates/core/src/scheduler.rs:118:21
+   |
+118|           if job.due <= now {
+   |  _____________________^
+119| |             self.ready.push(job);
+120| |         } else {
+   | |_________^
+   |
+note: same as this
+  --> crates/core/src/scheduler.rs:120:16
+   |
+120|           } else {
+   |  ________________^
+121| |             self.ready.push(job);
+122| |         }
+   | |_________^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#if_same_then_else
+   = note: `#[warn(clippy::if_same_then_else)]` on by default
+
+error: this expression creates a reference which is immediately dereferenced by the compiler
+  --> crates/core/src/store.rs:77:30
+   |
+77 |         let name = String::from(&*path.to_string_lossy());
+   |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `path.to_string_lossy()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#explicit_auto_deref
+   = note: `-D clippy::explicit-auto-deref` implied by `-D warnings`
+
+warning: `relay-core` (lib) generated 2 warnings
+error: could not compile `relay-core` (lib) due to 1 previous error; 2 warnings emitted

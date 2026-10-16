@@ -9,7 +9,13 @@ import {
 } from '@agentdock/shared/protocol';
 
 /** The `data` keys of a hook event that carry content (ADR-0021). */
-const CONTENT_KEYS = ['content', 'input', 'output', 'response'] as const;
+const CONTENT_KEYS = [
+  'content',
+  'input',
+  'output',
+  'response',
+  'background',
+] as const;
 
 /** One `session_contents` row, before it has a session and a time. */
 export interface ContentDraft {
@@ -63,10 +69,11 @@ export const contentDraftsOf = (event: HookEvent): ContentDraft[] => {
 
 /**
  * ADR-0021: content never reaches `events.data`. The runner events service
- * stores the batch's event objects after every sink ran, so the sessions sink
- * removes the content keys from them in place, once it has read what it needs.
- * Done for every hook-typed event, valid or not, so a malformed one cannot
- * carry content into the table either.
+ * removes the content keys from the batch's event objects in place after
+ * every sink ran — the sessions sink stores the content, the board sink the
+ * running background command (#390) — and before it stores them. Done for
+ * every hook-typed event, valid or not, so a malformed one cannot carry
+ * content into the table either.
  */
 export const stripHookContent = (event: RunnerEvent): void => {
   if (!isHookEventType(event.type)) return;

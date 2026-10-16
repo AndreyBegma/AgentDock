@@ -10,13 +10,14 @@ import type { Plan, PlanTask } from '@prisma/client';
 import { z } from 'zod';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
+import { type FrameFile, revisionFrames } from '../design/design-store';
 import { readyLabelOf } from '../queue/queue-inputs';
 import { callerOf, type PlanActor, PlanService } from './plan.service';
 import { questionsOf } from './plan-mapper';
 import {
   DESIGN_FALLBACK_DIR,
   dependencyOrder,
-  designFilePath,
+  designDirPath,
   docsPrIssueBody,
   documentOf,
   findCycle,
@@ -42,10 +43,10 @@ const asSendTask = (t: PlanTask): SendTask => ({
   document: t.document,
 });
 
-/** Spec 223 D16: what a task's approved design publishes. */
+/** Spec 223 D16, #441: what a task's approved design publishes — every frame. */
 interface ApprovedDesignFile {
   variant: number;
-  html: string;
+  frames: FrameFile[];
 }
 
 /** The cuid's tail: `docs/plan-<shortid>` (D10). */
@@ -179,18 +180,19 @@ export class PlanSendService {
             : design
               ? withDesignPath(
                   documentOf(send),
-                  designFilePath(
+                  designDirPath(
                     specDir,
                     ISSUE_PLACEHOLDER,
                     task.title,
                     design.variant,
                   ),
-                  designFilePath(
+                  designDirPath(
                     specDir,
                     THIS_ISSUE,
                     task.title,
                     design.variant,
                   ),
+                  design.frames,
                 )
               : documentOf(send),
           task.dependsOn,
@@ -345,7 +347,7 @@ export class PlanSendService {
 
   /**
    * Spec 223 D16: the approved design of each task whose design is on — the
-   * stored HTML, which never holds the pin helper.
+   * stored HTML of every frame (#441), which never holds the pin helper.
    */
   private async approvedDesigns(
     planId: string,
@@ -359,16 +361,18 @@ export class PlanSendService {
       },
       select: {
         taskKey: true,
-        approvedRevision: { select: { variant: true, html: true } },
+        approvedRevision: { select: { id: true, variant: true } },
       },
     });
-    return new Map(
-      rows.flatMap((r) =>
-        r.approvedRevision && r.taskKey !== null
-          ? [[r.taskKey, r.approvedRevision] as const]
-          : [],
-      ),
-    );
+    const designs = new Map<string, ApprovedDesignFile>();
+    for (const r of rows) {
+      if (!r.approvedRevision || r.taskKey === null) continue;
+      designs.set(r.taskKey, {
+        variant: r.approvedRevision.variant,
+        frames: await revisionFrames(this.prisma, r.approvedRevision.id),
+      });
+    }
+    return designs;
   }
 
   /**
@@ -391,8 +395,8 @@ export class PlanSendService {
         .map((t) => [t.key, t.issueNumber as number]),
     );
     const issued = tasks.filter((t) => t.issueNumber !== null);
-    const designPath = (t: PlanTask, variant: number) =>
-      designFilePath(target.specDir, t.issueNumber as number, t.title, variant);
+    const designDir = (t: PlanTask, variant: number) =>
+      designDirPath(target.specDir, t.issueNumber as number, t.title, variant);
     const entries = issued.map((t) => {
       const design = designs.get(t.key) ?? null;
       const spec = target.specDir
@@ -406,13 +410,14 @@ export class PlanSendService {
               design
                 ? withDesignPath(
                     documentOf(asSendTask(t)),
-                    designFilePath(
+                    designDirPath(
                       target.specDir,
                       ISSUE_PLACEHOLDER,
                       t.title,
                       design.variant,
                     ),
-                    designPath(t, design.variant),
+                    designDir(t, design.variant),
+                    design.frames,
                   )
                 : documentOf(asSendTask(t)),
               t.dependsOn,
@@ -420,22 +425,33 @@ export class PlanSendService {
             ),
           }
         : null;
-      const file = design
-        ? { path: designPath(t, design.variant), content: design.html }
-        : null;
-      return { task: t, spec, design: file };
+      const frames = design
+        ? design.frames.map((f) => ({
+            path: `${designDir(t, design.variant)}/${f.slug}.html`,
+            content: f.html,
+          }))
+        : [];
+      return {
+        task: t,
+        spec,
+        design: design ? designDir(t, design.variant) : null,
+        frames,
+      };
     });
-    const files = entries.flatMap((e) =>
-      [e.spec, e.design].filter((f) => f !== null),
-    );
+    const files = entries.flatMap((e) => [
+      ...(e.spec ? [e.spec] : []),
+      ...e.frames,
+    ]);
     const body = [
       `Specifications of the plan "${plan.title}" (version ${plan.version}).`,
       '',
-      ...entries.map(({ task: t, spec, design }) =>
+      ...entries.map(({ task: t, spec, design, frames }) =>
         [
           `- #${t.issueNumber} — ${t.title}`,
           spec ? `: \`${spec.path}\`` : '',
-          design ? ` · design \`${design.path}\`` : '',
+          design
+            ? ` · design \`${design}/\` (${frames.length} frame${frames.length === 1 ? '' : 's'})`
+            : '',
         ].join(''),
       ),
       '',

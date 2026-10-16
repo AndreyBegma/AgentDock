@@ -136,6 +136,27 @@ than the feature never sends it; read it with `terminalAvailable()`. It stays
 the machine fact even with `commands` below: `terminal.attach` can be served by
 the build and still have no PTY or tmux to run on.
 
+`tokenSaver` (#445) says whether the runner accepts `tokenSaver` on its launch
+commands. An absent `tokenSaver` means `false`; read it with
+`tokenSaverAvailable()`. See [Token saver](#token-saver).
+
+`steward` (#447) says whether the runner serves Steward: it reads
+`projects[].steward`, sends `steward.observed` and `steward.acted`, and handles
+`session.nudge`, `session.dismiss`, `card.resume` and `digest.compose` (#491;
+the API also checks it is in `commands`). An absent `steward` means
+`false`; read it with `stewardAvailable()`. See [Steward](#steward).
+
+`handoff` (#449) says whether the runner serves Context handoff: it keeps the
+handoff notes, picks how each round starts, sends `handoff.updated`,
+`round.restart` and `round.warmup`, and handles `card.handoff.set`. An absent
+`handoff` means `false`; read it with `handoffAvailable()`. See
+[Context handoff](#context-handoff).
+
+`sessionMessage` (#489) says whether the runner handles `session.message` and
+reports a card round's question selector as `card_run.pending_question`. An
+absent `sessionMessage` means `false`; read it with
+`sessionMessageAvailable()`. See [Session messages](#session-messages).
+
 `commands` lists every command the runner build serves — its handler keys,
 sorted — and `disabledCommands` the subset its config switches off (#233,
 ADR-0023). Both are plain strings, not an enum of the allowlist: a runner newer
@@ -200,10 +221,24 @@ Two optional fields belong to the Claude Code integration
 - `config.awayMode` — the runner's `PermissionRequest` hook routes permission
   prompts to action requests (D17). Absent means off.
 
+One optional field belongs to [Steward](#steward) (#447):
+- `projects[].steward` — `{ enabled, silenceMinutes, trailerGuard }`, the part
+  of the project's Steward setting the runner applies itself. Absent means
+  Steward is off on the runner: it observes nothing and guards no push.
+
 ### `heartbeat`
 
 `load` is the 1, 5 and 15 minute load average; `collectors` is keyed by
 collector name.
+
+`profiles` is optional: each Claude profile id mapped to its `agentdock` state
+(`{ plugin, telemetry }`, the same shape as `capabilities.profiles[].agentdock`
+in `hello`). The runner sends it on every heartbeat, not only on change, so a
+lost heartbeat heals on the next one. Codex profiles are never listed. The
+server merges it into the stored capabilities by profile id and ignores an id
+it does not know, since `hello` owns the profile list. A heartbeat without
+`profiles` (an older runner) leaves the stored value untouched, and an older
+server strips the unknown field. Added in #348 within protocol v1.
 
 ```json
 {
@@ -214,6 +249,10 @@ collector name.
   "collectors": {
     "tmux": { "ok": true },
     "transcripts": { "ok": false, "error": "permission denied" }
+  },
+  "profiles": {
+    "work": { "plugin": "0.9.0", "telemetry": true },
+    "personal": { "plugin": null, "telemetry": false }
   }
 }
 ```
@@ -733,7 +772,7 @@ daemon relays their request. Schemas are in `local.ts`.
 | `handoff.create` | operator | `title, body, branch` | an issue queued for the fleet, plus `manual.handoff` |
 | `action.request` | operator | `kind, args, summary` | a pending action request (spec 201 D18) |
 | `away.set` | operator | `on` | the runner's away mode; needs no project |
-| `card.finish` | operator | `summary` (≤ 4 000) | `{ number, finished: true }`; the card is the one whose session uuid is the request's `session.id`, else `not_a_card_session` (issue #242 D6) |
+| `card.finish` | operator | `summary` (≤ 4 000), `artifactIncomplete?` (#445 D8, set by the runner's artifact guard) | `{ number, finished: true }`; the card is the one whose session uuid is the request's `session.id`, else `not_a_card_session` (issue #242 D6). An MCP caller's session is the one whose `claude` pid a `SessionStart` reported, else (#482) the session of the live card round whose worktree holds the caller's cwd — read from the card store on disk, so it survives a daemon restart — else the one live session in that cwd. A refused `card.finish` from a live round's worktree is also sent as `card_run.finish_refused` |
 
 ```json
 {
@@ -1231,6 +1270,409 @@ Schemas in `commands/worktree.ts` (`worktreeCommands`); the rules are
   }
 }
 ```
+
+### Token saver
+
+Schemas in `packages/shared/src/token-saver/contracts.ts`; the rules are
+[spec 445](../specs/445-token-saver.md) and
+[ADR-0039](../adr/0039-token-saver.md). The runner compresses what agents
+read, never what people read.
+
+**On the launch commands.** Each of the eight commands that start a Claude
+session takes an optional `tokenSaver: { enabled, mcpAllow }`. The eight are
+`card.run`, `skill.run`, `plan.turn`, `card.assess`, `cards.extract`,
+`uiprofile.build`, `text.normalize` and `orchestrator.start`.
+
+- `mcpAllow` lists the MCP servers, by name, that the launch loads besides
+  `agentdock`. There are at most 32, with no duplicates, each matching
+  `^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$`. The runner takes each server's
+  definition from the launch profile's own config (D6).
+- An absent `tokenSaver`, or `enabled: false`, launches exactly as before #445.
+- Every launch args schema is strict, so a runner older than the field
+  refuses it as `invalid_args`. The runner advertises the field with the
+  capability `tokenSaver: true` in `hello`; read it with
+  `tokenSaverAvailable()`. The API sends `tokenSaver` only to a runner that
+  advertises it, as with `terminal`. An absent capability means `false`.
+- The API fills the field from `token_saver_settings`. A project with no row
+  gets `TOKEN_SAVER_DEFAULT` (`{ enabled: true, mcpAllow: [] }`).
+- The API records on the run whether the launch carried
+  `tokenSaver.enabled: true` (`runs.tokenSaver`). The before/after of D12
+  compares runs with `false` against runs with `true`, by run kind.
+
+**MCP servers per profile.** Each Claude profile in `capabilities.profiles`
+may carry `mcpServers`: the names of the MCP servers in that profile's own
+Claude config. It holds names only, never a command, env or secret. There are
+at most 64 (`PROFILE_MCP_SERVERS_MAX`), each matching the server-name pattern
+above. An absent `mcpServers` means unknown: a runner older than the field, or
+a Codex profile. The project's **Token saver** tab offers these names as the
+allowlist's checkboxes.
+
+**The hook's scope.** The PreToolUse hook rewrites only a single simple
+command of a covered family. These pass through unchanged and are counted
+`passedThrough`:
+
+- a command with `|`, `&&`, `||`, `;`, a redirect, a heredoc, a subshell or a
+  command substitution;
+- a Bash call with `run_in_background: true`;
+- a dev server or a watch mode.
+
+**Inside the runner.** These are not part of the wire protocol; they are
+listed so the slots agree:
+
+- The `filter` subprocess appends one JSONL row per command to the file named
+  by `$AGENTDOCK_FILTER_STATS`, in the run dir. The launch sets the variable.
+  The daemon reads the file in batches and sends `filter.stats`.
+- `/cs-eco` sessions (#475) keep their rows in the plugin's state dir,
+  `${XDG_STATE_HOME:-~/.local/state}/cs-eco/sessions/<session id>/filter-stats.jsonl`.
+  The daemon sends them as `runKind: manual`, `runId: null`, for the watched
+  project whose root holds the session's cwd. See the Token saver guide.
+- The raw output of command `n` goes to `<run dir>/raw/<n>.log`. It is removed
+  with the run dir. One file is capped at 10 MB with a truncation marker, and
+  the compressed output says it was truncated.
+
+**The `filter.stats` event.** The runner reports filtered commands in the
+ordinary `events` stream, so stats are spooled, resent and acked like every
+other event. Each event has `source: "runner"` and type `filter.stats`
+(`FILTER_STATS_EVENT`). The envelope's `project` names the project. The rows
+carry no `projectId`: the API resolves the project.
+
+| Field of each row | Meaning |
+|---|---|
+| `id` | the runner's id for the row (`^[A-Za-z0-9_-]{1,64}$`). The API inserts it as the `token_saver_stats` primary key and skips duplicates, so a resent batch counts once |
+| `runId` | the launch's run; `null` exactly when `runKind` is `orchestrator` or `manual` |
+| `runKind` | `card`, `skill`, `plan`, `card_assess`, `card_capture`, `ui_profile`, `text_normalize`, `orchestrator` or `manual` — a `/cs-eco` session the runner did not launch (#475) |
+| `filter` | `<family>/<command>` (e.g. `js/jest`), or `none` when no filter matched |
+| `rawBytes`, `keptBytes` | the output before and after the filter; `keptBytes ≤ rawBytes` |
+| `bypassed` | ran with `AGENTDOCK_RAW=1`; `keptBytes = rawBytes` |
+| `passedThrough` | the filter returned the original output; `keptBytes = rawBytes` |
+| `at` | when the command finished (ISO); stored as `createdAt` |
+
+```json
+{
+  "type": "events",
+  "events": [
+    {
+      "v": 1, "seq": 18412, "ts": "2026-12-02T10:14:03.000Z",
+      "type": "filter.stats", "source": "runner",
+      "project": { "repo": "AndreyBegma/AgentDock", "root": "/home/archi/dev/AgentDock" },
+      "data": {
+        "rows": [
+          { "id": "f_9c2e1a", "runId": "cmrun0001", "runKind": "card", "filter": "js/jest",
+            "rawBytes": 48211, "keptBytes": 3920, "bypassed": false, "passedThrough": false,
+            "at": "2026-12-02T10:14:02.000Z" }
+        ]
+      }
+    }
+  ]
+}
+```
+
+- A batch holds 1 to 200 rows (`FILTER_STATS_MAX_ROWS`).
+- An event whose `data` fails `filterStatsDataSchema` is logged and skipped,
+  like any bad sink input.
+- The savings estimate is `(rawBytes − keptBytes) / 4` tokens
+  (`estimateTokensSaved`), priced at the session model's input price
+  (ADR-0009). It is always shown with "≈".
+
+**On `card.finish`.** The runner's artifact guard (D8) may send
+`artifactIncomplete: true` when it accepts a finish after 2 rejections in the
+round. The API stores it as `runs.artifactIncomplete`, and the card shows
+**Description incomplete**.
+
+### Steward
+
+Schemas in `packages/shared/src/steward/` (the vocabulary, the setting, the
+events) and `packages/shared/src/protocol/commands/steward.ts` (the commands);
+the rules are [spec 447](../specs/447-steward.md) and
+[ADR-0040](../adr/0040-steward.md). **The runner observes and acts; the API
+decides and reports** (D2). Steward acts on card rounds and runner runs; a
+fleet slot is observe-only (D5, ADR-0005), and no command schema can name one.
+
+**The subject.** Every event and command names what it is about:
+
+| `subject.kind` | Fields | Acted on |
+|---|---|---|
+| `card_round` | `cardId`, `runId` (the round's run) | yes |
+| `run` | `runId` (a skill, design, planner, assess, capture or normalize run) | yes |
+| `fleet_slot` | `slot` | never — events only |
+
+The runner resolves the tmux session from the subject; no field is a session
+name or a path.
+
+**What the runner applies itself.** From `projects[].steward`
+(`stewardRunnerConfigOf` of the project's `steward_settings`, defaults when it
+has no row):
+
+- `enabled: false` — no observation, no `steward.*` event, no guard.
+- `silenceMinutes` — a round or run in `running` or `waiting` with no hook
+  event and no live background task (#390) for this long is `silent` (D6). A
+  pane signal — an API error or an interrupted response, a modal dialog, a
+  permission prompt, the quota banner — is reported at the next pane poll,
+  without waiting for the threshold.
+- `trailerGuard` — before a card's push (#359 draft push and collect), the
+  runner checks every new commit message with `hasClaudeTrailer`
+  (`Co-Authored-By: Claude`, `Claude-Session:`, `Generated with Claude Code`).
+  On a hit it does not push, tells the worker the commits to rewrite (no
+  automatic rebase), and reports `steward.acted` with `action: "hold_push"`
+  (D7).
+
+Nudge, dismiss and resume are API decisions — the switches, the per-round
+limits, a person-stopped round — so their switches stay on the API.
+
+**The `steward.observed` event.** In the ordinary `events` stream,
+`source: "runner"`. Sent once per change of `kind` or `reason` for a subject,
+not on every poll.
+
+| Field | Meaning |
+|---|---|
+| `projectId` | the project, repeated from the envelope |
+| `at` | when it was seen (ISO) |
+| `subject` | see above |
+| `kind` | `api_error`, `dialog`, `permission_prompt`, `quota`, `silent`, `dead_session`, `trailer` or `unknown` |
+| `reason` | one line, ≤ 200 characters: the rule's, or for `unknown` the one line from haiku, run locally through the launch profile (D3) |
+| `dialogId` | with `kind: "dialog"` only, when the dialog is on the #435 list (`STEWARD_DIALOG_IDS`) |
+| `paneTail` | the pane's last lines, ≤ 4 KiB — **only** when `projects[].shipContent` is true (D12) |
+| `classifierSessionId` | with `kind: "unknown"` only: the Claude session of haiku's classification. The API records it as a run of kind `steward`, so the spend counts against the project budget (D16, ADR-0009) |
+
+With `shipContent` off, no pane or transcript text reaches the API: the
+reason is the only text, and a rule's reason quotes no pane content.
+
+**The `steward.acted` event.** Every Steward action the runner performs, the
+commanded ones and `hold_push`: `projectId`, `at`, `subject` (never a fleet
+slot), `action` (`nudge`, `dismiss`, `resume`, `hold_push`), `result` (`ok`,
+`failed`) and an optional one-line `detail` (never pane text). The API appends
+it to the subject's open incident; this event, not the command's result, is
+the record.
+
+```json
+{
+  "type": "events",
+  "events": [
+    {
+      "v": 1, "seq": 20117, "ts": "2026-12-03T09:41:07.000Z",
+      "type": "steward.observed", "source": "runner",
+      "project": { "repo": "AndreyBegma/AgentDock", "root": "/home/archi/dev/AgentDock" },
+      "data": {
+        "projectId": "prj_agentdock", "at": "2026-12-03T09:41:06.000Z",
+        "subject": { "kind": "card_round", "cardId": "cmcard0001", "runId": "cmrun0001" },
+        "kind": "api_error", "reason": "API Error: Connection lost mid-response"
+      }
+    },
+    {
+      "v": 1, "seq": 20118, "ts": "2026-12-03T09:41:09.000Z",
+      "type": "steward.acted", "source": "runner",
+      "project": { "repo": "AndreyBegma/AgentDock", "root": "/home/archi/dev/AgentDock" },
+      "data": {
+        "projectId": "prj_agentdock", "at": "2026-12-03T09:41:09.000Z",
+        "subject": { "kind": "card_round", "cardId": "cmcard0001", "runId": "cmrun0001" },
+        "action": "nudge", "result": "ok"
+      }
+    }
+  ]
+}
+```
+
+An event whose `data` fails its schema (`stewardEventDataSchemas`) is logged
+and skipped, like any bad sink input.
+
+**The commands.** Each is sent only to a runner whose capabilities say
+`steward: true`, needs `operator`, and is entered in the allowlist together
+with its runner handler.
+
+| Command | Args | Result |
+|---|---|---|
+| `session.nudge` | `projectId`, `subject` (card round or run), `text` — exactly `STEWARD_NUDGE_TEXT` | `{ sent }`; `false` when the pane shows no idle prompt or the session is gone — nothing is typed |
+| `session.dismiss` | `projectId`, `subject`, `dialogId` from `STEWARD_DIALOG_IDS` | `{ dismissed }`; `false` when the pane no longer shows that dialog |
+| `card.resume` | `cardId`, `projectId`, `runId`, `root`, `base`, `shortId`, `branch`, `sessionId`, `profileKey`, `model`, `permissionMode`, `pullRequest?`, `tokenSaver?` — the round's `card.run` facts | `{ outcome: "resumed" \| "alive" \| "no_worktree", tmuxSession? }` |
+| `digest.compose` | `runId` (the API's `steward` run), `projectId`, `sessionId`, `profileKey`, `model` — always `haiku`, `trigger`, `projectName`, `done` / `stuck` / `waiting` — each `{ total, items }` with at most `DIGEST_COMPOSE_ITEMS_MAX` (20) items of `{ label, title, reason }`, `spendUsd` | `{ prose }` — one line, at most `DIGEST_PROSE_MAX` (600) characters |
+
+- **Nudge (D9).** The text is "The previous response was cut off by an
+  API/network error. Continue from where you stopped." At most 2 per round
+  (`STEWARD_NUDGE_MAX_PER_ROUND`), the first at once and the second 2 minutes
+  later (`STEWARD_NUDGE_REPEAT_DELAY_MS`); a third error escalates.
+- **Dismiss (D11).** Only the dialogs on the #435 list, with the key that
+  changes nothing. An unlisted dialog or a permission prompt is never
+  answered: it escalates at once with "open the terminal".
+- **Digest prose (#491, D3, D14).** haiku writes the digest's one-paragraph
+  summary as one headless `claude -p --tools "" --permission-mode plan` on
+  `profileKey`, in a directory of its own with `AGENTDOCK_HOOKS=off`; the
+  call's telemetry carries `runId`, so its spend counts against the project
+  budget (D16). The args are the digest's stored content only: every string
+  is one line within the digest bounds (`isOneLine`), the schema is strict,
+  and nothing names a pane, a transcript or a path (DA-12). The runner cuts
+  the answer to one bounded line (DA-13), and the API stores it through the
+  same bound again. Any failure is a command error, and the API keeps the
+  template digest; it times out after `DIGEST_COMPOSE_COMMAND_TIMEOUT_MS`.
+- **Resume (D10).** `claude --resume <sessionId>` in the card's existing
+  worktree (`<parent>/.wt-<repo>-card-<shortId>`) with the prompt "The session
+  was restarted after a crash. Continue from where you stopped."
+  (`STEWARD_RESUME_TEXT`). It never creates a worktree: with none the outcome
+  is `no_worktree` and nothing starts. A session still alive is `alive`, left
+  alone. At most 2 per round (`STEWARD_RESUME_MAX_PER_ROUND`); the API never
+  sends it for a round a person stopped.
+
+**What the API records.** Incidents live in `steward_incidents` (one per stall
+of a subject; `actions` holds `{ action, at, result, detail? }`). As one moves
+the API records `steward_incident.opened`, `.acted`, `.escalated` and
+`.resolved` itself (`source: "api"`, ADR-0014); those are what Activity shows,
+under the **Steward** filter (`STEWARD_ACTIVITY_TYPES`). An escalation sends
+one `steward.incident` notification; a changed reason sends another
+(`notifiedReason`); recovery writes `.resolved` and pushes nothing (D13).
+
+### Context handoff
+
+Schemas in `packages/shared/src/handoff/` (the note, person lines, the events,
+the `resume_context` tool) and `packages/shared/src/protocol/commands/handoff.ts`
+(the command); the rules are [spec 449](../specs/449-context-handoff.md) and
+[ADR-0042](../adr/0042-context-handoff.md). Every card and every design or
+planner run keeps a short **handoff note**; the runner starts the next round or
+session from `--resume` or from the note, whichever costs less on its first
+turn. **Context handoff is on with Token saver**: a launch command's
+`tokenSaver.enabled` is the switch — no field of its own.
+
+**The note (D5).** Markdown with these `## ` sections, each once, in this
+order: Goal; Done; Next; Decisions and why; Dead ends; Files touched; How to
+verify; Checklist status; Open questions. Headings match case-insensitively; a
+`# ` title above them is allowed; only the Goal must have text. At most
+`HANDOFF_NOTE_MAX_TOKENS` (3 000, estimated at 4 characters a token —
+`HANDOFF_NOTE_MAX_CHARS`). `validateHandoffNote` returns every reason at once;
+the runner sends a refused note back to the agent with `handoffRejectionText`.
+
+The note lives on the machine always — `.agentdock/handoff.md` in the card's
+worktree (git-excluded), `<run dir>/handoff.md` for a run (D4). Its content
+reaches the API only when `projects[].shipContent` is true (ADR-0021).
+
+**Person lines (D7).** The lines a person wrote are instructions: the agent
+never rewrites them. They travel as `personLines`, sorted 1-based inclusive
+`{ from, to }` ranges of `content.split('\n')` that never touch, never covering
+a blank line. On disk each carries the suffix ` <!-- person -->`
+(`markPersonLines` / `splitPersonMarks`). The runner refuses an agent rewrite
+that drops or changes one (`personLinesKept`); the API marks a person's edit
+with `markPersonEdit` against the note it holds.
+
+**The `handoff.updated` event.** In the ordinary `events` stream,
+`source: "runner"`, sent **only** when the project ships content. The whole
+note, not a diff:
+
+| Field | Meaning |
+|---|---|
+| `projectId` | the project, repeated from the envelope |
+| `at` | when the note changed (ISO) |
+| `subject` | `{ kind: "card", cardId }` or `{ kind: "run", runId }` (a design or planner run) |
+| `updatedBy` | `agent` (the session), `haiku` (from a dead session's transcript, run locally) or `person` (applied from `card.handoff.set`) |
+| `content`, `personLines` | the note, valid as above |
+
+**The `round.restart` event (D3).** Sent once when a card round's session
+launches:
+
+| Field | Meaning |
+|---|---|
+| `projectId`, `cardId`, `runId` | the round, resolved from its run |
+| `at` | the launch (ISO) |
+| `mode` | `resume` (`--resume`), `fresh` (a new session seeded with the note, the diff summary and the checklist status), `first` (the card's first round) |
+| `estimate` | `{ resumeTokens, freshTokens, cacheWarm }` — the estimated first-turn input of each; `null` exactly for `first` |
+| `sessionId` | the session the round runs in |
+| `previousSessionId` | with `fresh` only: the session not resumed |
+
+A fresh start never discards the old session. The API records `sessionId` on
+the round and moves the card to it, so `finish_card`, the hooks and the next
+`--resume` follow the new session; the earlier round keeps the old one, which
+can still be resumed.
+
+**The `round.warmup` event (D9).** Sent once, at a round's first file edit:
+`projectId`, `cardId`, `runId`, `at`, `tokens` (input tokens since the round
+started) and `ms`. A round that never edits sends none.
+
+```json
+{
+  "type": "events",
+  "events": [
+    {
+      "v": 1, "seq": 31002, "ts": "2026-12-04T08:02:11.000Z",
+      "type": "round.restart", "source": "runner",
+      "project": { "repo": "AndreyBegma/AgentDock", "root": "/home/archi/dev/AgentDock" },
+      "data": {
+        "projectId": "prj_agentdock", "cardId": "cmcard0001", "runId": "cmrun0002",
+        "at": "2026-12-04T08:02:10.000Z", "mode": "fresh",
+        "estimate": { "resumeTokens": 182000, "freshTokens": 6400, "cacheWarm": false },
+        "sessionId": "22222222-2222-4222-8222-222222222222",
+        "previousSessionId": "11111111-1111-4111-8111-111111111111"
+      }
+    },
+    {
+      "v": 1, "seq": 31007, "ts": "2026-12-04T08:03:40.000Z",
+      "type": "round.warmup", "source": "runner",
+      "project": { "repo": "AndreyBegma/AgentDock", "root": "/home/archi/dev/AgentDock" },
+      "data": {
+        "projectId": "prj_agentdock", "cardId": "cmcard0001", "runId": "cmrun0002",
+        "at": "2026-12-04T08:03:39.000Z", "tokens": 9100, "ms": 89000
+      }
+    }
+  ]
+}
+```
+
+An event whose `data` fails its schema (`handoffEventDataSchemas`) is logged
+and skipped, like any bad sink input.
+
+**The command.** Sent only to a runner whose capabilities say
+`handoff: true`, needs `operator`, and is entered in the allowlist together
+with its runner handler.
+
+| Command | Args | Result |
+|---|---|---|
+| `card.handoff.set` | `projectId`, `cardId`, `shortId`, `content`, `personLines` | `{ outcome: "applied" \| "no_worktree" }` |
+
+The runner writes the note, person lines marked, to the worktree resolved from
+`shortId` and reports it as `handoff.updated` with `updatedBy: "person"`. With
+no worktree on the machine nothing is written.
+
+**The `resume_context` MCP tool (D6).** A tool of the agentdock MCP server for
+a person's own terminal session; the runner answers it from the note on the
+machine, without asking the API, so it works with session content off. The
+card is resolved from the session — its worktree, or a checkout on the card's
+branch — and the tool takes no argument (`resumeContextArgsSchema`). It
+returns `{ found: true, card: { number, label }, content, personLines,
+updatedBy, updatedAt }`, or `{ found: false, reason }` with
+`not_a_card_session` or `no_note` (`resumeContextResultSchema`). The plugin's
+`SessionStart` hook and `track_card` hand the same note to a session in a
+card's worktree or branch.
+
+### Session messages
+
+#489, ADR-0045: a person's text to a running session, or the answer to the
+question selector it shows. It is sent only to a runner whose capabilities say
+`sessionMessage: true`, and it needs `operator`.
+
+| Command | Args | Result |
+|---|---|---|
+| `session.message` | `projectId`, `target` — `{ kind: "card_round", cardId, runId }` or `{ kind: "fleet_slot", root, slot }` — and `message` — `{ kind: "text", text }`, `{ kind: "option", questionKey, index }` or `{ kind: "other", questionKey, text }` | `{ outcome }`: `sent` · `answered` · `no_session` · `question` · `question_changed` · `not_at_input` · `no_option` |
+
+- **The session is resolved, never named.** For a card round it is the
+  runner's record of that round, and the round must be the card's current one,
+  else `not_found`. For a slot it is the live `cs-*` session of the slot's
+  worktree; a slot of another project is `path_not_allowed`.
+- **Text is clean.** `text` must equal `cleanSessionMessage(text)`: no escape
+  sequences, no control characters or line breaks, at most 4 000 characters.
+  The args schema refuses anything else before a handler runs.
+- **Delivery.** The runner reads the pane first. Text is typed with
+  `send-keys -l` and submitted with `C-m` in a separate call, at an idle
+  prompt or while the agent works (Claude Code queues it). A question
+  selector is `question`; a dialog or a permission prompt is `not_at_input`.
+  Nothing is typed in either case.
+- **Answers.** An answer is sent only while the pane shows the screen
+  `questionKey` names (`question_changed` otherwise). The keys are `Up` or
+  `Down` from the cursor to the option, then `Enter`. "Other" moves to
+  "Type something.", types the text and presses `Enter`. An option the
+  screen does not list is `no_option`.
+- **Fleet slots.** A delivered message is also appended to
+  `<git-common-dir>/cs-orchestrator/events.jsonl` as `slot.message_sent`
+  with `data.by: "person"`, so the orchestrator learns what its worker was
+  told. `slot.message` appends the same line once it has typed its prompt.
+- **Question screens.** For a project that ships content, the card poll
+  sends `card_run.pending_question` whenever the selector's screen changes,
+  and `question: null` once it is gone (see
+  [event schema](event-schema.md)).
 
 ## Delivery guarantees
 

@@ -20,6 +20,7 @@ import { PrismaService } from '../database/prisma.service';
 import { QueueService } from '../queue/queue.service';
 import { RunnerSettingsService } from '../runners/runner-settings.service';
 import { recordServerEvent } from '../server-events/server-events';
+import { TokenSaverService } from '../token-saver/token-saver.service';
 import { ActionRequestsService } from './action-requests.service';
 import {
   type LocalCall,
@@ -84,6 +85,7 @@ export class LocalHandlers {
     private readonly runnerSettings: RunnerSettingsService,
     private readonly board: BoardService,
     private readonly terminal: BoardTerminalService,
+    private readonly tokenSaver: TokenSaverService,
   ) {}
 
   readonly table: LocalHandlerTable = {
@@ -101,7 +103,8 @@ export class LocalHandlers {
     'handoff.create': (args, call) => this.handoff(args, call),
     'action.request': (args, call) => this.actionRequest(args, call),
     'away.set': (args, call) => this.awaySet(args.on, call),
-    'card.finish': (args, call) => this.cardFinish(args.summary, call),
+    'card.finish': (args, call) =>
+      this.cardFinish(args.summary, args.artifactIncomplete === true, call),
     'card.track': (args, call) => this.cardTrack(args, call),
   };
 
@@ -109,14 +112,20 @@ export class LocalHandlers {
    * Issue #242 D6: the card worker's `finish_card`. The card is the one whose
    * Claude session asks, in the asking runner's project — never an argument.
    * #282 D2: a person's session that tracks a card finishes that card.
+   * #445 D8: a finish the runner's artifact guard accepted incomplete marks
+   * the round's run first, while the round is still active.
    */
   private async cardFinish(
     summary: string,
+    artifactIncomplete: boolean,
     call: LocalCall,
   ): Promise<LocalMethodResult<'card.finish'>> {
     const project = projectOf(call);
     const session = call.session;
     const target = { id: project.id, runnerId: call.runnerId };
+    if (artifactIncomplete && session && session.runtime === 'claude') {
+      await this.tokenSaver.markArtifactIncomplete(target, session.id);
+    }
     const finished =
       session && session.runtime === 'claude'
         ? ((await this.board.finishByWorker(target, session.id, summary)) ??

@@ -7,7 +7,13 @@ import type {
 } from '@agentdock/shared/protocol';
 import type { AssessHandlers } from '../assess';
 import type { CaptureHandlers } from '../capture';
-import { type CardHandlers, closeCardPr, mergeCard } from '../cards';
+import {
+  type CardHandlers,
+  cardChecks,
+  closeCardPr,
+  mergeCard,
+  retriggerCardCi,
+} from '../cards';
 import { type Clock, isoNow } from '../clock';
 import type { ConfigProfile } from '../config';
 import {
@@ -18,11 +24,14 @@ import {
 } from '../control/orchestrator';
 import { messageSlot, stopSlot } from '../control/slot';
 import type { Exec } from '../detect/exec';
+import type { HandoffHandlers } from '../handoff';
 import type { NormalizeHandlers } from '../normalize';
 import type { PlannerHandlers } from '../planner';
 import type { ProjectFs } from '../projects/fs';
 import { inspectProject, refreshProject } from '../projects/inspect';
+import type { SessionMessenger } from '../session';
 import type { SkillHandlers } from '../skills';
+import type { StewardHandlers } from '../steward';
 import type { UiProfileHandlers } from '../uiprofile';
 import {
   prApprove,
@@ -76,7 +85,24 @@ export interface HandlerContext {
   normalize?: NormalizeHandlers;
   /** Card model assessment (#322); absent means this runner does not assess cards. */
   assess?: AssessHandlers;
+  /** Steward's actions (#447); absent means this runner does not serve them. */
+  steward?: StewardHandlers;
+  /** Context handoff (#449); absent means this runner does not serve it. */
+  handoff?: HandoffHandlers;
+  /** A person's messages to sessions (#489); absent means this runner does not serve them. */
+  sessionMessage?: SessionMessenger;
 }
+
+const noHandoff = (): never => {
+  throw new CommandFailure(
+    'unsupported',
+    'this runner does not serve Context handoff',
+  );
+};
+
+const noSteward = (): never => {
+  throw new CommandFailure('unsupported', 'this runner does not serve Steward');
+};
 
 const noAssess = (): never => {
   throw new CommandFailure('unsupported', 'this runner does not assess cards');
@@ -229,11 +255,44 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
             watchedProjects: context.watchedProjects,
           })
         : noCards(),
+    'card.checks': (args) =>
+      context.cards
+        ? cardChecks(args, {
+            exec: context.exec,
+            watchedProjects: context.watchedProjects,
+          })
+        : noCards(),
+    'card.ciRetrigger': (args) =>
+      context.cards
+        ? retriggerCardCi(args, {
+            exec: context.exec,
+            watchedProjects: context.watchedProjects,
+          })
+        : noCards(),
     'cards.extract': (args) =>
       context.capture?.['cards.extract'](args) ?? noCapture(),
     'text.normalize': (args) =>
       context.normalize?.['text.normalize'](args) ?? noNormalize(),
     'card.assess': (args) =>
       context.assess?.['card.assess'](args) ?? noAssess(),
+    'session.nudge': (args) =>
+      context.steward?.['session.nudge'](args) ?? noSteward(),
+    'session.dismiss': (args) =>
+      context.steward?.['session.dismiss'](args) ?? noSteward(),
+    'card.resume': (args) =>
+      context.steward?.['card.resume'](args) ?? noSteward(),
+    'digest.compose': (args) =>
+      context.steward?.['digest.compose'](args) ?? noSteward(),
+    'card.handoff.set': (args) =>
+      context.handoff?.['card.handoff.set'](args) ?? noHandoff(),
+    'session.message': (args) => {
+      if (!context.sessionMessage) {
+        throw new CommandFailure(
+          'unsupported',
+          'this runner does not serve session messages',
+        );
+      }
+      return context.sessionMessage.message(args);
+    },
   };
 };

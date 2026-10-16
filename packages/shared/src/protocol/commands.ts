@@ -3,12 +3,20 @@ import { capabilitiesSchema, hostSchema } from './capabilities';
 import { approvalCommands } from './commands/approvals';
 import { assessCommands } from './commands/assess';
 import { captureCommands } from './commands/capture';
-import { cardCommands, cardPrCloseCommands } from './commands/cards';
+import {
+  cardChecksCommands,
+  cardCiRetriggerCommands,
+  cardCommands,
+  cardPrCloseCommands,
+} from './commands/cards';
 import { controlCommands } from './commands/control';
 import { githubCommands } from './commands/github';
+import { handoffCommands } from './commands/handoff';
 import { plannerCommands } from './commands/planner';
 import { queueCommands } from './commands/queue';
+import { sessionMessageCommands } from './commands/session-message';
 import { skillCommands } from './commands/skills';
+import { stewardCommands } from './commands/steward';
 import { terminalCommands } from './commands/terminal';
 import { textCommands } from './commands/text';
 import { uiprofileCommands } from './commands/uiprofile';
@@ -148,9 +156,14 @@ export const commands = {
   ...worktreeCommands,
   ...cardCommands,
   ...cardPrCloseCommands,
+  ...cardChecksCommands,
+  ...cardCiRetriggerCommands,
   ...captureCommands,
   ...textCommands,
   ...assessCommands,
+  ...stewardCommands,
+  ...handoffCommands,
+  ...sessionMessageCommands,
 } as const satisfies Record<string, CommandDefinition>;
 
 export type CommandName = keyof typeof commands;

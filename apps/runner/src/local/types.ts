@@ -16,6 +16,27 @@ export const LOCAL_LINE_MAX_BYTES = 256 * 1024;
 /** How long a hook or MCP process waits to connect before it gives up (D12). */
 export const LOCAL_CONNECT_TIMEOUT_MS = 300;
 
+/**
+ * Local methods that are idempotent on the server (`card.finish`: a round
+ * already finished stays finished), so the daemon may wait for the connection
+ * and send them again instead of answering `runner_offline` at once (#434).
+ * Every other method keeps failing fast: a write is never replayed.
+ */
+export const LOCAL_RETRY_METHODS: ReadonlySet<string> = new Set([
+  'card.finish',
+]);
+
+/** How long the daemon keeps waiting for the connection for such a method. */
+export const LOCAL_RETRY_WINDOW_MS = 120_000;
+
+/** First and longest pause between two attempts inside that window. */
+export const LOCAL_RETRY_FIRST_DELAY_MS = 1_000;
+export const LOCAL_RETRY_MAX_DELAY_MS = 10_000;
+
+/** Said to the worker when the window ran out: the tool call is safe to repeat. */
+export const LOCAL_RETRY_EXHAUSTED_MESSAGE =
+  'the runner could not reach AgentDock within 2 minutes; nothing was lost — call this tool again in a minute';
+
 export const localOpSchema = z.enum(['event', 'request', 'ping']);
 export type LocalOp = z.infer<typeof localOpSchema>;
 
@@ -86,6 +107,7 @@ export const CONTENT_FIELDS = [
   'input',
   'output',
   'response',
+  'background',
 ] as const;
 export type ContentField = (typeof CONTENT_FIELDS)[number];
 

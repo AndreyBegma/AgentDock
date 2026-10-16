@@ -109,6 +109,10 @@ export const AUDIT_ACTIONS = [
   'session_content.purged',
   'card.created',
   'card.updated',
+  /** #480: a stack made from a confirmed intake (`after: { number, title, stages, cards, design }`). */
+  'stack.created',
+  /** #480: a stack's title or body, or the cards of its stages, changed. */
+  'stack.updated',
   'card.deleted',
   'card.moved',
   'card.run_started',
@@ -122,7 +126,10 @@ export const AUDIT_ACTIONS = [
   'card.captured',
   'card.inbox_accepted',
   'card.dismissed',
-  /** #273 D16: Accept merged the card's PR (`after: { pr, method, mergeCommit?, issueClosed }`). */
+  /**
+   * #273 D16: Accept merged the card's PR (`after: { pr, method, mergeCommit?, issueClosed }`).
+   * #359 D7: also the auto-merge, by the system actor.
+   */
   'card.merged',
   /** #273 D16: the runner refused the merge (`after: { pr, reason }`, result error). */
   'card.merge_failed',
@@ -132,8 +139,26 @@ export const AUDIT_ACTIONS = [
   'card.pr_close_failed',
   /** #329 D5: a person's Create pull request (`after: { state, pr? }`, result error when it failed). */
   'card.collect_requested',
-  /** #273 D9: approving the design did not start the worker (`after: { code }`). */
+  /**
+   * #273 D9: approving the design did not start the worker (`after: { code }`).
+   * #443: nor did Auto-run when ready (`after: { code, after }`).
+   */
   'card.auto_run_failed',
+  /**
+   * #484: a card PR's head got no checks, and its pull-request event was sent
+   * again — closed and reopened (`after: { number, pr, headSha, error? }`).
+   */
+  'card.ci_retriggered',
+  /** #443: the card's Auto-run when ready switch (`after: { autoRunWhenReady }`). */
+  'card.auto_run_toggled',
+  /**
+   * #489 M1: a person's message to a running session, or an answer to its
+   * question selector (`after: { target, kind, index?, textSha256?, textChars?, via, outcome? }`;
+   * the text itself never). `card.message` for a card round, `slot.session_message`
+   * for a fleet slot.
+   */
+  'card.message',
+  'slot.session_message',
   /** #309 D7: an upload stored, pending (`after: { name, mime, size }`). */
   'attachment.added',
   /** #309 D7: pending uploads claimed onto a card (`after: { cardId, roundId?, attachmentIds }`). */

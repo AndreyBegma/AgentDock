@@ -249,9 +249,54 @@ describe('draftFor (spec 22 D1)', () => {
       ).toMatchObject({
         kind: 'card.waiting',
         title: 'C-4 "Add login" is waiting for you',
+        body: 'Its worker stopped and waits for a reply in its session.',
         page: 'board',
         card: 4,
       });
+    });
+
+    it('maps card.waiting on a question the worker asks (#473)', () => {
+      expect(
+        draftFor(
+          card('card.waiting', {
+            number: 4,
+            title: 'Add login',
+            reason: 'question',
+          }),
+        ),
+      ).toMatchObject({
+        kind: 'card.waiting',
+        title: 'C-4 "Add login" is waiting for you',
+        body: 'Its worker asks you a question in its session.',
+        card: 4,
+      });
+    });
+
+    it('maps card.background_stalled without the title or the command (#390)', () => {
+      const draft = draftFor(
+        card('card.background_stalled', {
+          number: 39,
+          title: 'secret title',
+          round: 1,
+          minutes: 30,
+        }),
+      );
+      expect(draft).toMatchObject({
+        kind: 'card.background_stalled',
+        title: 'C-39 has been waiting on its own background task for 30 min',
+        page: 'board',
+        card: 39,
+      });
+      expect(JSON.stringify(draft)).not.toContain('secret');
+      expect(
+        draftFor(
+          card(
+            'card.background_stalled',
+            { number: 39, minutes: 30 },
+            'runner',
+          ),
+        ),
+      ).toBeNull();
     });
 
     it('never copies more than the title, and only the first line of it', () => {
@@ -298,6 +343,80 @@ describe('draftFor (spec 22 D1)', () => {
         expect(draftFor(card(type, { number: 1 }, 'runner'))).toBeNull();
         expect(draftFor(card(type, { title: 'x' }))).toBeNull();
       }
+    });
+  });
+
+  describe('Steward incidents (#447 D13)', () => {
+    const incident = (
+      type: string,
+      data: object = {},
+      source = 'api',
+    ): MatchableEvent =>
+      event({
+        type,
+        source,
+        slot: null,
+        issue: null,
+        data: {
+          incidentId: 'inc1',
+          subjectKind: 'card_round',
+          subjectId: 'round1',
+          subjectLabel: 'C-12',
+          cardNumber: 12,
+          kind: 'api_error',
+          reason: 'API Error: Connection lost mid-response',
+          ...data,
+        },
+      });
+
+    it('maps an escalation to one steward.incident naming the card and the reason', () => {
+      expect(draftFor(incident('steward_incident.escalated'))).toEqual({
+        kind: 'steward.incident',
+        slot: null,
+        issue: null,
+        title: 'C-12 needs you: API error',
+        body: 'API Error: Connection lost mid-response',
+        page: 'board',
+        card: 12,
+      });
+    });
+
+    it('sends a fleet slot to the Fleet page', () => {
+      expect(
+        draftFor(
+          incident('steward_incident.escalated', {
+            subjectKind: 'fleet_slot',
+            subjectId: 'i447-api',
+            subjectLabel: 'i447-api',
+            cardNumber: undefined,
+            kind: 'silent',
+            reason: 'no hook event for 10+ min',
+          }),
+        ),
+      ).toMatchObject({
+        slot: 'i447-api',
+        title: 'i447-api needs you: silent',
+        page: 'fleet',
+      });
+    });
+
+    it('notifies nobody of an opening, an action or a recovery', () => {
+      for (const type of [
+        'steward_incident.opened',
+        'steward_incident.acted',
+        'steward_incident.resolved',
+      ]) {
+        expect(draftFor(incident(type))).toBeNull();
+      }
+    });
+
+    it('never takes one a runner forged, or one that does not parse', () => {
+      expect(
+        draftFor(incident('steward_incident.escalated', {}, 'runner')),
+      ).toBeNull();
+      expect(
+        draftFor(incident('steward_incident.escalated', { reason: 'a\nb' })),
+      ).toBeNull();
     });
   });
 

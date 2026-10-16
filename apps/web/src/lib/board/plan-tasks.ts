@@ -26,6 +26,8 @@ const PLAN_ITEM_PREFIX = 'plan:';
 export interface PlanItem {
   id: string;
   label: string;
+  /** Always `false`: the plan decides the column (ADR-0028), so no drag and no move entries. */
+  movable: false;
   planTask: BoardPlanTaskView;
 }
 
@@ -41,6 +43,7 @@ export const isPlanTaskItemId = (id: string): boolean =>
 export const toPlanItem = (planTask: BoardPlanTaskView): PlanItem => ({
   id: `${PLAN_ITEM_PREFIX}${planTask.taskId}`,
   label: `${planTaskBoardLabel(planTask.key, planTask.planTitle)} ${planTask.title}`,
+  movable: false,
   planTask,
 });
 

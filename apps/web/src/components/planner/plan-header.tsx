@@ -14,7 +14,7 @@ import {
   SEND_BLOCK_TEXT,
   sendBlock,
 } from '../../lib/planner/format';
-import { briefBeyondTitle } from '../../lib/planner/header';
+import { briefBeyondTitle, createCardsBlock } from '../../lib/planner/header';
 import { plannerHref } from '../../lib/planner/href';
 import { useTextNotes } from '../../lib/text/use-text-notes';
 import { PageHeader } from '../page-header/page-header';
@@ -58,6 +58,8 @@ export function PlanHeader({
   onRevise,
   onSend,
   onArchive,
+  onCreateCards = null,
+  readOnly = false,
 }: {
   plan: PlanDetail;
   projectId: string;
@@ -72,11 +74,25 @@ export function PlanHeader({
   onRevise: () => void;
   onSend: () => void;
   onArchive: (() => void) | null;
+  /**
+   * #337 D7: **Create cards**, on the Board's plan panel. It is then the
+   * one solid action and Send to fleet the alternative beside it.
+   */
+  onCreateCards?: (() => void) | null;
+  /**
+   * #337 D11: the retired Planner page — the plan is read, not worked: only
+   * Archive (closing an old plan ends its Board projection) stays.
+   */
+  readOnly?: boolean;
 }) {
   const block = sendBlock(plan);
+  const cardsBlock = createCardsBlock(plan);
   const idle = plan.activeTurnId === null;
   const revisable = canRevise(plan) && idle;
-  const closed = plan.status === 'sent' || plan.status === 'archived';
+  const closed =
+    plan.status === 'sent' ||
+    plan.status === 'archived' ||
+    plan.status === 'done';
   const pill = planPill(plan);
   const description = briefBeyondTitle(plan);
   const notes = useTextNotes(projectId, { planId: plan.id }, plan.version);
@@ -138,6 +154,12 @@ export function PlanHeader({
               Docs pull request #{plan.docsPrNumber}
             </a>
           ) : undefined
+        ) : readOnly ? (
+          onArchive ? (
+            <Button variant="ghost" disabled={busy} onClick={onArchive}>
+              Archive
+            </Button>
+          ) : undefined
         ) : (
           <>
             {isAuthor && plan.visibility === 'private' ? (
@@ -186,11 +208,32 @@ export function PlanHeader({
                   }
                 >
                   <span>
-                    <Button disabled={busy || block !== null} onClick={onSend}>
+                    <Button
+                      variant={onCreateCards ? 'glass' : undefined}
+                      disabled={busy || block !== null}
+                      onClick={onSend}
+                    >
                       Send to fleet
                     </Button>
                   </span>
                 </Tooltip>
+                {onCreateCards ? (
+                  <Tooltip
+                    content={
+                      cardsBlock ??
+                      'One Todo card per task, with Depends on links like the graph.'
+                    }
+                  >
+                    <span>
+                      <Button
+                        disabled={busy || cardsBlock !== null}
+                        onClick={onCreateCards}
+                      >
+                        Create cards
+                      </Button>
+                    </span>
+                  </Tooltip>
+                ) : null}
               </>
             ) : null}
           </>

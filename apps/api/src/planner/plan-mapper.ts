@@ -1,8 +1,12 @@
 import {
   type FrozenTaskRef,
+  intakeRoundsAsked,
+  isIntakeRound,
   isPlannedTask,
+  PLANNER_INTAKE_MAX_ROUNDS,
   type PlanDetail,
   type PlanGraphView,
+  type PlanIntakeSplitView,
   type PlannedTask,
   type PlannerInstructionsVersion,
   type PlanQuestion,
@@ -97,6 +101,11 @@ export const roundsOf = (
     case 'write':
     case 'design':
       return [];
+    case 'intake':
+      // #337 D4: a round; the card and a split (#409) open none.
+      return isIntakeRound(out)
+        ? [{ taskKey: null, questions: out.questions }]
+        : [];
   }
 };
 
@@ -154,6 +163,7 @@ export const toTaskView = (
     issue,
     queuedAt: row.queuedAt?.toISOString() ?? null,
     design,
+    cardId: row.cardId,
   };
 };
 
@@ -216,6 +226,8 @@ export interface DetailParts {
   latestTurn: PlanStatusTurn | null;
   /** The current plan-level round (dialogue mode, before decomposition). */
   questions: PlanQuestion[];
+  /** #409: an intake's open split proposal. */
+  split?: PlanIntakeSplitView | null;
 }
 
 export const toDetail = ({
@@ -224,6 +236,7 @@ export const toDetail = ({
   turns,
   latestTurn,
   questions,
+  split,
 }: DetailParts): PlanDetail => ({
   ...toSummary(plan, tasks, latestTurn),
   brief: plan.brief,
@@ -240,4 +253,12 @@ export const toDetail = ({
   activeTurnId:
     turns.find((t) => t.phase === 'queued' || t.phase === 'running')?.id ??
     null,
+  intake:
+    plan.mode === 'card'
+      ? {
+          roundsAsked: intakeRoundsAsked(turns),
+          maxRounds: PLANNER_INTAKE_MAX_ROUNDS,
+          split: split ?? null,
+        }
+      : null,
 });

@@ -1,6 +1,8 @@
 import {
+  HOOK_BACKGROUND_TASKS_MAX,
   HOOK_CLI_EVENT,
   type HookCliName,
+  hookCompactTriggerSchema,
   hookEndReasonSchema,
   hookStartSourceSchema,
   manualTmuxSessionSchema,
@@ -17,6 +19,7 @@ import {
   permissionRequestInputSchema,
   postToolUseFailureInputSchema,
   postToolUseInputSchema,
+  preCompactInputSchema,
   sessionEndInputSchema,
   sessionStartInputSchema,
   stopInputSchema,
@@ -29,6 +32,8 @@ export interface HookExtras {
   /** `AGENTDOCK_TMUX_SESSION`, set by `agentdock-runner claude`. */
   tmuxSession?: string;
   ancestors?: Ancestor[];
+  /** `stop` (#390): what still runs in the background, from the transcript. */
+  background?: { tasks: number; command: string | null };
 }
 
 /**
@@ -210,10 +215,34 @@ const buildData = (
     case 'stop': {
       const i = parse(stopInputSchema, input);
       if (!i) return null;
+      const background = extras.background;
       return {
         input: i,
-        data: {},
-        content: contentOf([['response', i.last_assistant_message]], cap),
+        data: background
+          ? {
+              backgroundTasks: Math.min(
+                background.tasks,
+                HOOK_BACKGROUND_TASKS_MAX,
+              ),
+            }
+          : {},
+        content: contentOf(
+          [
+            ['response', i.last_assistant_message],
+            ['background', background?.command ?? undefined],
+          ],
+          cap,
+        ),
+      };
+    }
+    case 'pre-compact': {
+      const i = parse(preCompactInputSchema, input);
+      if (!i) return null;
+      // Idle compaction and any trigger Claude Code adds later are not a person's.
+      const trigger = hookCompactTriggerSchema.safeParse(i.trigger);
+      return {
+        input: i,
+        data: { trigger: trigger.success ? trigger.data : 'auto' },
       };
     }
     case 'session-end': {

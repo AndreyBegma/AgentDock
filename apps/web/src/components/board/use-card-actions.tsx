@@ -4,6 +4,7 @@ import type {
   AcceptBoardCardRequest,
   AcceptSuggestionRequest,
   BoardCardView,
+  CardDependencyRef,
   RunBoardCardRequest,
 } from '@agentdock/shared';
 import type { RunnerCommands } from '@agentdock/shared/protocol';
@@ -22,6 +23,10 @@ import {
   runCard,
   stopCard,
 } from '../../lib/board/actions';
+import {
+  openDependenciesOf,
+  openDependencyText,
+} from '../../lib/board/dependencies';
 import { describeBoardError } from '../../lib/board/format';
 import { collectMessage } from '../../lib/board/pull-request';
 import { AcceptDialog } from './accept-dialog';
@@ -31,7 +36,8 @@ export interface CardActions {
   /**
    * Run / Run again. #322: the launch popover sends its profile and model;
    * without a request the API follows the card's overrides, then the defaults.
-   * Resolves `true` when the worker started.
+   * A dependency not completed asks "Run anyway?" first (#337 D8). Resolves
+   * `true` when the worker started.
    */
   run: (card: BoardCardView, request?: RunBoardCardRequest) => Promise<boolean>;
   markFinished: (card: BoardCardView) => void;
@@ -59,6 +65,14 @@ type Pending =
   | { kind: 'stop' | 'delete'; card: BoardCardView }
   | { kind: 'dismiss-all'; count: number };
 
+/** #337 D8: a Run the API refused with `dependency_open`, waiting on the person. */
+interface BlockedRun {
+  card: BoardCardView;
+  request: RunBoardCardRequest | undefined;
+  open: CardDependencyRef[];
+  resolve: (started: boolean) => void;
+}
+
 export function useCardActions({
   projectId,
   runnerName,
@@ -78,6 +92,7 @@ export function useCardActions({
   const [pending, setPending] = useState<Pending>();
   const [accepting, setAccepting] = useState<BoardCardView>();
   const [acceptVersion, setAcceptVersion] = useState(0);
+  const [blocked, setBlocked] = useState<BlockedRun>();
 
   const perform = useCallback(
     async (job: () => Promise<unknown>, done: string): Promise<boolean> => {
@@ -170,12 +185,53 @@ export function useCardActions({
     return pending?.kind === 'stop' ? 'Stop worker' : 'Delete';
   };
 
-  return {
-    run: (card, request) =>
-      perform(
-        () => runCard(projectId, card.number, request),
-        `Started a worker on ${card.label}.`,
+  // #337 D8: a Run refused for an open dependency asks "Run anyway?"; the
+  // promise the caller awaits settles with that answer.
+  const run = async (
+    card: BoardCardView,
+    request?: RunBoardCardRequest,
+  ): Promise<boolean> => {
+    setBusy(true);
+    try {
+      await runCard(projectId, card.number, request);
+      toast.success(`Started a worker on ${card.label}.`);
+      return true;
+    } catch (err) {
+      const open = openDependenciesOf(err);
+      if (open) {
+        return new Promise<boolean>((resolve) =>
+          setBlocked({ card, request, open, resolve }),
+        );
+      }
+      toast.error(describeBoardError(err, runnerName));
+      return false;
+    } finally {
+      setBusy(false);
+      onChanged();
+    }
+  };
+
+  const answerBlocked = async (runAnyway: boolean) => {
+    if (!blocked) return;
+    setBlocked(undefined);
+    if (!runAnyway) {
+      blocked.resolve(false);
+      return;
+    }
+    blocked.resolve(
+      await perform(
+        () =>
+          runCard(projectId, blocked.card.number, {
+            ...blocked.request,
+            ignoreDependencies: true,
+          }),
+        `Started a worker on ${blocked.card.label}.`,
       ),
+    );
+  };
+
+  return {
+    run,
     markFinished: (card) =>
       void perform(
         () => finishCard(projectId, card.number),
@@ -234,6 +290,17 @@ export function useCardActions({
           tone="danger"
           busy={busy}
           onConfirm={() => void confirm()}
+        />
+        <ConfirmDialog
+          open={blocked !== undefined}
+          onOpenChange={(open) => {
+            if (!open) void answerBlocked(false);
+          }}
+          title={`Run ${blocked?.card.label ?? 'the card'} anyway?`}
+          consequence={`${openDependencyText(blocked?.open ?? [])} ${blocked?.card.label ?? 'This card'} was meant to run after it, so its worker may miss that work.`}
+          verb="Run anyway"
+          busy={busy}
+          onConfirm={() => void answerBlocked(true)}
         />
       </>
     ),

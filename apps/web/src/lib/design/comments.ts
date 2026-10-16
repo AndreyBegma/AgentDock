@@ -14,15 +14,18 @@ const byCreated = (a: DesignCommentView, b: DesignCommentView): number =>
 
 /**
  * The right panel's groups (spec 223 "UI"): open and addressed, oldest
- * first, limited to the revision in view unless `allRevisions`.
+ * first, limited to the revision in view unless `allRevisions` — and, with a
+ * `frame` (#441), to that frame of it.
  */
 export function groupComments(
   comments: readonly DesignCommentView[],
   revisionId: string | null,
   allRevisions: boolean,
+  frame: number | null = null,
 ): { open: DesignCommentView[]; addressed: DesignCommentView[] } {
   const shown = comments
     .filter((c) => allRevisions || c.revisionId === revisionId)
+    .filter((c) => frame === null || c.frame === frame)
     .sort(byCreated);
   return {
     open: shown.filter(isOpen),
@@ -32,8 +35,8 @@ export function groupComments(
 
 /**
  * The number a pin wears, in the panel and on its marker: its place among
- * the revision's pins by age, across every viewport and theme, so it does
- * not change when the person switches screens.
+ * the revision's pins by age, across every viewport, theme and frame, so it
+ * does not change when the person switches screens or frames.
  */
 export function pinNumbers(
   comments: readonly DesignCommentView[],
@@ -45,18 +48,23 @@ export function pinNumbers(
   return new Map(pins.map((c, i) => [c.id, i + 1]));
 }
 
-/** The markers the helper draws: the revision's pins at this viewport and theme. */
+/**
+ * The markers the helper draws: the revision's pins at this viewport and
+ * theme, on the frame in view (#441) — a pin shows only where it was made.
+ */
 export function pinMarkers(
   comments: readonly DesignCommentView[],
   revisionId: string | null,
   viewport: string,
   theme: DesignTheme,
+  frame = 0,
 ): MockupPinMarker[] {
   const numbers = pinNumbers(comments, revisionId);
   return comments.flatMap((c) => {
     const n = numbers.get(c.id);
     if (
       n === undefined ||
+      c.frame !== frame ||
       c.viewport !== viewport ||
       c.theme !== theme ||
       c.x === null ||
@@ -80,6 +88,36 @@ export function anchorLabel(
   }
   if (comment.kind === 'screen') return screen || null;
   return null;
+}
+
+/**
+ * #441: the frames of a revision that hold an open pin, by position — the
+ * tab strip marks them.
+ */
+export function framesWithOpenPins(
+  comments: readonly DesignCommentView[],
+  revisionId: string | null,
+): Set<number> {
+  return new Set(
+    comments
+      .filter(
+        (c) => c.kind === 'pin' && c.revisionId === revisionId && isOpen(c),
+      )
+      .map((c) => c.frame),
+  );
+}
+
+/** #441: open comments of a revision per frame, by position. */
+export function openCommentsByFrame(
+  comments: readonly DesignCommentView[],
+  revisionId: string | null,
+): Map<number, number> {
+  const counts = new Map<number, number>();
+  for (const c of comments) {
+    if (c.revisionId !== revisionId || !isOpen(c)) continue;
+    counts.set(c.frame, (counts.get(c.frame) ?? 0) + 1);
+  }
+  return counts;
 }
 
 /**

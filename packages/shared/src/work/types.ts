@@ -6,8 +6,8 @@ import { BOARD_COLUMNS } from '../board/types';
  * List across projects. The data models stay separate (ADR-0024, ADR-0025).
  */
 
-/** D10: where a List row comes from. `inbox` is a captured suggestion (#244). */
-export const WORK_SOURCES = ['card', 'plan', 'inbox'] as const;
+/** D10: where a List row comes from. `inbox` is a captured suggestion (#244); `fleet` a mirrored fleet slot (#388). */
+export const WORK_SOURCES = ['card', 'plan', 'inbox', 'fleet'] as const;
 export type WorkSource = (typeof WORK_SOURCES)[number];
 
 export const isWorkSource = (value: string): value is WorkSource =>

@@ -19,6 +19,7 @@ import { type PlanProject, PlanStore } from '../planner/plan-store';
 import type { PlanCaller } from '../planner/plan-turn.service';
 import { plannerOutput } from '../planner/planner-commands';
 import { PlannerFailure } from '../planner/planner-error';
+import { TokenSaverService } from '../token-saver/token-saver.service';
 import { DesignCommands } from './design-commands';
 import { designError } from './design-error';
 import { currentProfile, type Db, snippetsOf } from './design-store';
@@ -95,6 +96,7 @@ export class UiProfileService {
     private readonly store: PlanStore,
     private readonly commands: DesignCommands,
     private readonly audit: AuditService,
+    private readonly tokenSaver: TokenSaverService,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
 
@@ -372,6 +374,8 @@ export class UiProfileService {
       })),
     );
     const prompt = buildPrompt(obligations);
+    // #445 D11: only a runner that advertises the token saver gets the field.
+    const saver = await this.tokenSaver.launch(project.id);
     const draft = {
       projectId: project.id,
       root: project.rootPath,
@@ -380,6 +384,7 @@ export class UiProfileService {
       profileKey: profile.key,
       model: BUILD_MODEL,
       timeoutSec: UIPROFILE_BUILD_TIMEOUT_SEC,
+      ...saver.args,
     };
     const valid = uiProfileBuildArgsSchema.safeParse({
       ...draft,
@@ -408,6 +413,7 @@ export class UiProfileService {
         model: BUILD_MODEL,
         profileKey: profile.key,
         args: args as Prisma.InputJsonValue,
+        tokenSaver: saver.on,
         status: 'running',
         triggeredByType: 'user',
         triggeredById: caller.userId,

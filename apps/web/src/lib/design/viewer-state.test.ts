@@ -4,10 +4,11 @@ import {
   DESIGN_VIEWPORT_MAX_PX,
   DESIGN_VIEWPORT_MIN_PX,
 } from '@agentdock/shared';
-import { design, revision } from './fixtures';
+import { design, framesOf, revision } from './fixtures';
 import {
   applyViewerChange,
   clampWidth,
+  frameOf,
   resolveViewerState,
   revisionsOf,
   variantsOf,
@@ -66,6 +67,46 @@ describe('resolveViewerState', () => {
     const state = resolveViewerState(new URLSearchParams(''), [], viewports);
     expect(state.revision).toBeNull();
     expect(state.variant).toBe(1);
+  });
+});
+
+describe('frames (#441)', () => {
+  const framed = [
+    revision({
+      id: 'f',
+      frames: framesOf('f', ['Board page', 'Card page', 'Frame tabs']),
+    }),
+  ];
+  const at = (query: string) =>
+    resolveViewerState(new URLSearchParams(query), framed, viewports);
+
+  test('the first frame by default, the named one from ?frame=', () => {
+    expect(at('').frame).toBe(0);
+    expect(frameOf(at(''))?.name).toBe('Board page');
+    expect(at('frame=2').frame).toBe(2);
+    expect(frameOf(at('frame=2'))?.name).toBe('Frame tabs');
+  });
+
+  test('a frame past the end or not a number is the first', () => {
+    expect(at('frame=3').frame).toBe(0);
+    expect(at('frame=-1').frame).toBe(0);
+    expect(at('frame=x').frame).toBe(0);
+    // A legacy revision has one frame.
+    expect(resolve('frame=1').frame).toBe(0);
+    expect(frameOf(resolve(''))?.name).toBe('Mockup');
+  });
+
+  test('the first frame leaves the URL, any other is kept beside the rest', () => {
+    const params = new URLSearchParams('variant=1&frame=2');
+    expect(applyViewerChange(params, { kind: 'frame', frame: 0 })).toBe(
+      '?variant=1',
+    );
+    expect(applyViewerChange(params, { kind: 'frame', frame: 1 })).toBe(
+      '?variant=1&frame=1',
+    );
+    expect(applyViewerChange(params, { kind: 'variant', variant: 2 })).toBe(
+      '?variant=2&frame=2',
+    );
   });
 });
 

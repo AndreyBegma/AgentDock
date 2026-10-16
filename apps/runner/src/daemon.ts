@@ -29,12 +29,25 @@ import {
   detectCapabilities,
   extractVersion,
   ptyAvailable,
+  readClaudeProfilesAgentdock,
   terminalCapability,
   terminalUnsupported,
 } from './detect/capabilities';
 import type { Exec } from './detect/exec';
+import { claudeConfigDir } from './detect/profiles';
 import type { Env } from './env';
+import { ecoSessionsDir, TranscriptCwds } from './filter/eco';
+import { FILTER_ORCHESTRATOR_DIR } from './filter/env';
+import { FilterStatsReader } from './filter/stats-reader';
 import { GitAuth } from './git-auth';
+import {
+  createHandoffHandlers,
+  HandoffService,
+  HandoffStateStore,
+  HandoffWriter,
+  RunNotes,
+} from './handoff';
+import { cardAtWorktree } from './handoff/context';
 import { LocalSocketServer } from './local/server';
 import { LocalService } from './local/service';
 import { HookSessions } from './local/sessions';
@@ -49,6 +62,7 @@ import {
   SharedRunSlots,
 } from './planner';
 import { WatchList } from './projects/watch-list';
+import { SessionMessenger } from './session';
 import {
   createSkillHandlers,
   RunLogStreamer,
@@ -56,6 +70,13 @@ import {
 } from './skills';
 import { runLogSources } from './skills/run/log';
 import { Spool } from './spool';
+import {
+  StewardActions,
+  StewardClassifier,
+  StewardDigestWriter,
+  StewardObserver,
+  type StewardRun,
+} from './steward';
 import { bunSpawnPty, type SpawnPty, TerminalManager } from './terminal';
 import { createUiProfileHandlers, UiProfileBuildExecutor } from './uiprofile';
 import { RUNNER_VERSION } from './version';
@@ -103,6 +124,10 @@ export interface DaemonOptions {
   fetch?: typeof fetch;
   /** Aborting it stops the daemon cleanly. */
   signal?: AbortSignal;
+  /** How often filter stats are collected (#445); `FILTER_STATS_POLL_MS` by default. */
+  filterStatsPollMs?: number;
+  /** `/cs-eco`'s sessions (#475); `${XDG_STATE_HOME:-~/.local/state}/cs-eco/sessions` by default. */
+  ecoSessionsDir?: string;
   /** Called once the connection exists — tests reach it to emit events. */
   onStart?: (connection: RunnerConnection) => void;
 }
@@ -274,6 +299,25 @@ export const runDaemon = async (
       log,
       otlpPort: () => otlp?.port ?? null,
     });
+    // #449 D2: haiku writes the notes of dead sessions and interrupted runs.
+    const handoffDir = join(dirname(options.spoolDir), 'handoff');
+    const handoffWriter = new HandoffWriter({
+      dir: join(handoffDir, 'haiku'),
+      env: process.env,
+      clock,
+      log,
+      otlpPort: () => otlp?.port ?? null,
+    });
+    // Design builds and plan turns (#494): keyed by work, so one store serves both.
+    const runNotes = new RunNotes({
+      dir: join(handoffDir, 'runs'),
+      writer: handoffWriter,
+      profiles: () => config.profiles,
+      watchedProjects: () => watchList.current,
+      emit: (event) => connection?.emit(event),
+      clock,
+      log,
+    });
     const plans = new PlanTurnExecutor({
       deps: skillsDeps,
       plansDir: options.plansDir ?? join(dirname(options.spoolDir), 'plans'),
@@ -282,6 +326,8 @@ export const runDaemon = async (
       emit: (event) => connection?.emit(event),
       log,
       otlpPort: () => otlp?.port ?? null,
+      attachmentSource: { server: config.server, token: config.token },
+      runNotes,
     });
     const uiProfiles = new UiProfileBuildExecutor({
       deps: skillsDeps,
@@ -292,16 +338,108 @@ export const runDaemon = async (
       emit: (event) => connection?.emit(event),
       log,
       otlpPort: () => otlp?.port ?? null,
+      runNotes,
+    });
+    // Context handoff (#449): the card notes, the restart decision and the
+    // warm-up. `cards` is built right below; nothing here runs before it.
+    const cardsDir =
+      options.cardsDir ?? join(dirname(options.spoolDir), 'cards');
+    const handoff: HandoffService = new HandoffService({
+      deps: skillsDeps,
+      state: new HandoffStateStore((cardId) => join(cardsDir, cardId)),
+      record: (cardId) => cards.store.load(cardId),
+      records: () => cards.store.all(),
+      typeAtPrompt: (session, text) => cards.typeAtPrompt(session, text),
+      writer: handoffWriter,
+      emit: (event) => connection?.emit(event),
+      log,
     });
     // Board card workers (#242): interactive, outside the shared run cap —
     // the API limits running cards per project.
-    const cards = new CardExecutor({
+    const cards: CardExecutor = new CardExecutor({
+      handoff,
       deps: skillsDeps,
-      cardsDir: options.cardsDir ?? join(dirname(options.spoolDir), 'cards'),
+      cardsDir,
       selfCommand,
       attachmentSource: { server: config.server, token: config.token },
       emit: (event) => connection?.emit(event),
       log,
+      otlpPort: () => otlp?.port ?? null,
+      // `steward` is built right below; a poll runs only after `start`.
+      onSessionEnded: (record, exitCode) =>
+        steward.sessionEnded(record, exitCode),
+    });
+    // Steward (#447): the runner observes card rounds and skill runs and
+    // executes the API's nudge / dismiss / resume. Running skill runs are
+    // kept from the executor's phase changes.
+    const runningRuns = new Map<string, StewardRun>();
+    runs.onChange((record) => {
+      if (record.phase === 'running') {
+        runningRuns.set(record.runId, {
+          runId: record.runId,
+          projectId: record.projectId,
+          repo: record.repo,
+          root: record.root,
+          startedAt: record.startedAt,
+          streamFile: runs.streamFile(record.runId),
+        });
+      } else {
+        runningRuns.delete(record.runId);
+      }
+    });
+    const steward = new StewardObserver({
+      cards: {
+        records: () => cards.store.all(),
+        capture: (session) => cards.capture(session),
+      },
+      runs: { running: () => [...runningRuns.values()] },
+      watchedProjects: () => watchList.current,
+      profiles: () => config.profiles,
+      classifier: new StewardClassifier({
+        dir: join(dirname(options.spoolDir), 'steward'),
+        env: process.env,
+        clock,
+        log,
+        otlpPort: () => otlp?.port ?? null,
+      }),
+      emit: (event) => connection?.emit(event),
+      clock,
+      log,
+    });
+    const stewardActions = new StewardActions({
+      cards: {
+        record: (cardId) => cards.store.load(cardId),
+        liveSession: (projectId, cardId, runId) =>
+          cards.liveSession(projectId, cardId, runId),
+        typeAtPrompt: (session, text) => cards.typeAtPrompt(session, text),
+        dismissDialog: (session, dialogId) =>
+          cards.dismissDialog(session, dialogId),
+        resume: (args) => cards.resume(args),
+      },
+      runs: {
+        run: (projectId, runId) => {
+          const record = runs.record(runId);
+          if (!record || record.projectId !== projectId) return null;
+          return {
+            session: runs.runSession(projectId, record.root, runId),
+            envelope: { repo: record.repo, root: record.root },
+          };
+        },
+      },
+      watchedProjects: () => watchList.current,
+      emit: (event) => connection?.emit(event),
+      clock,
+      log,
+      onResumed: (subject) => steward.forget(subject),
+    });
+    // #491: haiku writes the digest prose; the API books it as a `steward` run.
+    const stewardDigest = new StewardDigestWriter({
+      dir: join(dirname(options.spoolDir), 'steward'),
+      env: process.env,
+      clock,
+      log,
+      profiles: () => config.profiles,
+      watchedProjects: () => watchList.current,
       otlpPort: () => otlp?.port ?? null,
     });
     // Card capture (#244): headless, one per project; the API limits the rest.
@@ -361,6 +499,19 @@ export const runDaemon = async (
       capture: createCaptureHandlers(capture),
       normalize: createNormalizeHandlers(normalize),
       assess: createAssessHandlers(assess),
+      steward: { ...stewardActions.handlers(), ...stewardDigest.handlers() },
+      handoff: createHandoffHandlers(handoff),
+      sessionMessage: new SessionMessenger({
+        cards: {
+          record: (cardId) => cards.store.load(cardId),
+          liveSession: (projectId, cardId, runId) =>
+            cards.liveSession(projectId, cardId, runId),
+        },
+        exec,
+        clock,
+        watchedProjects: () => watchList.current,
+        log,
+      }),
     });
     const dispatch = createDispatcher({
       handlers: builtHandlers,
@@ -385,6 +536,12 @@ export const runDaemon = async (
         load: [one, five, fifteen],
         tmuxSessions: await countTmuxSessions(exec),
         collectors: {},
+        // #348 D4: sent every time, so a lost heartbeat heals on the next one.
+        profiles: readClaudeProfilesAgentdock(
+          config.profiles,
+          home,
+          otlpCapability()?.http ?? null,
+        ),
       };
     };
 
@@ -444,6 +601,47 @@ export const runDaemon = async (
     const otlpCapability = (): Capabilities['otlp'] =>
       otlp?.port ? { grpc: null, http: otlp.port } : null;
 
+    // Token saver (#445 amendment 5): the `filter` processes of every launch
+    // write rows into their run dir; they go out as `filter.stats` events.
+    // `/cs-eco` sessions the runner did not launch keep theirs in the
+    // plugin's state dir, and count for the watched root of their cwd (#475).
+    const stateDir = dirname(options.spoolDir);
+    const transcriptCwds = new TranscriptCwds({
+      dirs: () => [
+        join(home, '.claude', 'projects'),
+        ...config.profiles
+          .filter((p) => p.runtime === 'claude')
+          .map((p) => join(claudeConfigDir(p, home), 'projects')),
+      ],
+      now: () => clock.now(),
+    });
+    const filterStats = new FilterStatsReader({
+      roots: () => [
+        options.runsDir ?? join(stateDir, 'runs'),
+        options.plansDir ?? join(stateDir, 'plans'),
+        options.uiprofileDir ?? join(stateDir, 'uiprofile'),
+        options.cardsDir ?? join(stateDir, 'cards'),
+        options.captureDir ?? join(stateDir, 'capture'),
+        options.normalizeDir ?? join(stateDir, 'normalize'),
+        options.assessDir ?? join(stateDir, 'assess'),
+        join(stateDir, FILTER_ORCHESTRATOR_DIR),
+      ],
+      eco: {
+        dir:
+          options.ecoSessionsDir ??
+          ecoSessionsDir(options.env ?? process.env, home),
+        projects: () => watchList.current,
+        sessionCwd: (id) => hookSessions.cwdOf(id) ?? transcriptCwds.cwdOf(id),
+      },
+      resolve: (ids) => directory.resolve(ids),
+      emit: (event) => {
+        live.emit(event);
+      },
+      log,
+      now: () => new Date(clock.now()),
+      pollMs: options.filterStatsPollMs,
+    });
+
     // The plugin's hook and MCP processes (spec 201 D5): bound after
     // `runner.lock` is held, so a socket file left there is a dead daemon's.
     const localService = new LocalService({
@@ -451,12 +649,24 @@ export const runDaemon = async (
       awayMode: () => awayMode,
       online: () => live.isLive,
       emit: (event) => {
+        // #447 D6: a hook event is the session's activity, for silence.
+        steward.hookSeen(event);
+        // #449 D8, D9: a stop checks the round's note; a first edit ends its warm-up.
+        handoff.hookSeen(event);
         live.emit(event);
       },
       relay: (request) => live.request(request),
       envelope: async (projectId) =>
         (await directory.resolve([projectId])).get(projectId),
       sessions: hookSessions,
+      // #482: a round's session is known from its record after a restart.
+      liveRound: (cwd) =>
+        cardAtWorktree(
+          cards.store
+            .all()
+            .filter((r) => r.phase === 'starting' || r.phase === 'running'),
+          cwd,
+        ),
       now: () => new Date(clock.now()).toISOString(),
       log,
     });
@@ -512,10 +722,15 @@ export const runDaemon = async (
     sessions?.start(watchList.current).catch((error) => {
       log.error('sessions: cannot start', { error: errorMessage(error) });
     });
+    steward.start();
     live.start();
+    filterStats.start();
     options.onStart?.(live);
     const reason = await live.done;
     options.signal?.removeEventListener('abort', onAbort);
+    filterStats.stop();
+    // What the last commands wrote goes to the spool, sent on the next start.
+    await filterStats.poll();
     pane.stop();
     runLog.stop();
     // Sessions run on in tmux; the next start resumes watching them.
@@ -523,6 +738,7 @@ export const runDaemon = async (
     plans.stop();
     uiProfiles.stop();
     cards.stop();
+    steward.stop();
     capture.stop();
     normalize.stop();
     assess.stop();

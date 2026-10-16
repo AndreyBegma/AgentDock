@@ -1,11 +1,18 @@
 import {
+  ATTACHMENTS_PER_CARD_MAX,
+  CARD_DRAFT_TITLE_MAX,
+  type ConfirmSplitCard,
+  type ConfirmSplitRequest,
+  type ConfirmStackRequest,
   type CreatePlanRequest,
+  INTAKE_SPLIT_MAX,
   PLAN_MODES,
   PLAN_REVIEW_DECISIONS,
   PLAN_TASK_KINDS,
   PLAN_TASK_LIVE_STATUSES,
   PLAN_TASK_STATUSES,
   PLAN_VISIBILITIES,
+  PLANNER_MAX_OPTIONS,
   PLANNER_MAX_QUESTIONS,
   PLANNER_QUESTION_MAX,
   PLANNER_SPEC_OUTPUTS,
@@ -21,18 +28,26 @@ import {
   type PlanTaskStatus,
   type PlanVisibility,
   type PlanVisibilityRequest,
+  STACK_BODY_MAX,
+  STACK_STAGE_TITLE_MAX,
+  STACK_TITLE_MAX,
   type TasksQuery,
 } from '@agentdock/shared';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
+  ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsIn,
+  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
   Matches,
+  Max,
   MaxLength,
+  Min,
   ValidateNested,
 } from 'class-validator';
 
@@ -52,6 +67,8 @@ const MODEL_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:[\]-]*$/;
 const PROFILE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 /** The planner's short ids (questions, options). */
 const SHORT_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$/;
+/** `attachmentIdSchema`. */
+const ATTACHMENT_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
 /** `POST /projects/:projectId/plans`. */
 export class CreatePlanDto implements CreatePlanRequest {
@@ -74,6 +91,17 @@ export class CreatePlanDto implements CreatePlanRequest {
   @MaxLength(64)
   @Matches(PROFILE_PATTERN, { message: 'profileKey must be a profile id' })
   profileKey?: string;
+
+  /** #337 D10: pending uploads the intake claims. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(ATTACHMENTS_PER_CARD_MAX)
+  @IsString({ each: true })
+  @Matches(ATTACHMENT_ID, {
+    each: true,
+    message: 'attachmentIds must be attachment ids',
+  })
+  attachmentIds?: string[];
 }
 
 export class PlanAnswerDto {
@@ -85,6 +113,18 @@ export class PlanAnswerDto {
   @IsString()
   @Matches(SHORT_ID, { message: 'optionId must be an option id' })
   optionId?: string;
+
+  /** #337 D3: the picks of a `multiple` question. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(PLANNER_MAX_OPTIONS)
+  @IsString({ each: true })
+  @Matches(SHORT_ID, {
+    each: true,
+    message: 'optionIds must be option ids',
+  })
+  optionIds?: string[];
 
   @IsOptional()
   @IsString()
@@ -107,6 +147,101 @@ export class PlanTurnDto {
   @ValidateNested({ each: true })
   @Type(() => PlanAnswerDto)
   answers?: PlanAnswerDto[];
+
+  /** #337 D3: Enough — generate. */
+  @IsOptional()
+  @IsBoolean()
+  generate?: boolean;
+
+  /** #409: Keep one card — the person declined the split. */
+  @IsOptional()
+  @IsBoolean()
+  keepOne?: boolean;
+
+  /** #337 D10: files that came with the answer. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(ATTACHMENTS_PER_CARD_MAX)
+  @IsString({ each: true })
+  @Matches(ATTACHMENT_ID, {
+    each: true,
+    message: 'attachmentIds must be attachment ids',
+  })
+  attachmentIds?: string[];
+}
+
+/** One kept card of a confirmed split (#409). */
+export class ConfirmSplitCardDto implements ConfirmSplitCard {
+  @IsInt()
+  @Min(0)
+  @Max(INTAKE_SPLIT_MAX - 1)
+  index!: number;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(CARD_DRAFT_TITLE_MAX)
+  title!: string;
+
+  @IsIn(PLAN_TASK_KINDS)
+  kind!: PlanTaskKind;
+}
+
+/** #480: one stage of a confirmed stack — its cards by proposal index. */
+export class ConfirmStackStageDto {
+  @IsString()
+  @MaxLength(STACK_STAGE_TITLE_MAX)
+  title!: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(INTAKE_SPLIT_MAX)
+  @IsInt({ each: true })
+  @Min(0, { each: true })
+  @Max(INTAKE_SPLIT_MAX - 1, { each: true })
+  cards!: number[];
+}
+
+/** #480 (ADR-0044): Confirm the cards as a stack. */
+export class ConfirmStackDto implements ConfirmStackRequest {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(STACK_TITLE_MAX)
+  title!: string;
+
+  @IsString()
+  @MaxLength(STACK_BODY_MAX)
+  body!: string;
+
+  @IsBoolean()
+  design!: boolean;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(INTAKE_SPLIT_MAX)
+  @ValidateNested({ each: true })
+  @Type(() => ConfirmStackStageDto)
+  stages!: ConfirmStackStageDto[];
+}
+
+/** `POST …/plans/:planId/split` (#409): Confirm a split. */
+export class ConfirmSplitDto implements ConfirmSplitRequest {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(ID_MAX_LENGTH)
+  turnId!: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(INTAKE_SPLIT_MAX)
+  @ValidateNested({ each: true })
+  @Type(() => ConfirmSplitCardDto)
+  cards!: ConfirmSplitCardDto[];
+
+  /** #480: confirm them as a stack. */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ConfirmStackDto)
+  stack?: ConfirmStackDto;
 }
 
 /** `POST …/tasks/:key/review`. */

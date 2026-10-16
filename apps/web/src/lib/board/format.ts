@@ -7,6 +7,8 @@ import {
   type BoardColumn,
   type BoardMoveRefusal,
   type BoardView,
+  CARD_BACKGROUND_STALL_MINUTES_MAX,
+  CARD_BACKGROUND_STALL_MINUTES_MIN,
   type CaptureModel,
   type CaptureSkipReason,
   type CaptureStatus,
@@ -14,16 +16,23 @@ import {
   type CardRoundBrief,
   type CardRoundPhase,
   isActiveRoundPhase,
+  isMirroredCardSource,
   PLAN_TASK_MOVE_REFUSAL_TEXT,
 } from '@agentdock/shared';
+import type {
+  CardRunWiringReason,
+  LocalErrorCode,
+} from '@agentdock/shared/protocol';
 import type { Status } from '@andrewbehma/glass-ui/status-pill';
 import { ApiError, describeError } from '../api';
 import { STAGE_LABEL } from '../fleet/graph';
 import { describeNoProfile } from '../readiness/copy';
 import {
   PROFILES_LIST_COMMAND,
+  RUNNER_STATUS_COMMAND,
   SETUP_CLAUDE_COMMAND,
 } from '../runners/install';
+import { noPrText } from './pull-request';
 
 export const COLUMN_TITLE: Record<BoardColumn, string> = {
   inbox: 'Inbox',
@@ -51,6 +60,8 @@ const PHASE_PILL: Record<CardRoundPhase, RoundPill> = {
   starting: { status: 'running', label: 'Starting' },
   running: { status: 'running', label: 'Running' },
   waiting: { status: 'waiting', label: 'Waiting for you' },
+  // #390: the worker waits on its own background task, not on the person.
+  background: { status: 'running', label: 'Running in background' },
   finished: { status: 'done', label: 'Finished' },
   ended: { status: 'blocked', label: 'Ended' },
   failed: { status: 'error', label: 'Failed' },
@@ -66,8 +77,29 @@ export const phaseLabel = (phase: CardRoundPhase): string =>
  */
 export function roundPill(round: CardRoundBrief | null): RoundPill | null {
   if (!round || round.phase === 'finished') return null;
+  // #482: a refused finish_card leaves the round active, not done.
+  if (round.finishRefused && isActiveRoundPhase(round.phase)) {
+    return { status: 'error', label: 'Needs attention' };
+  }
   return PHASE_PILL[round.phase];
 }
+
+const FINISH_REFUSED_REASON: Partial<Record<LocalErrorCode, string>> = {
+  not_a_card_session:
+    'AgentDock did not recognise the worker’s session as this card’s — the runner may have restarted.',
+  runner_offline: 'the runner could not reach AgentDock.',
+  daemon_unavailable: 'the runner was not running.',
+  timeout: 'AgentDock did not answer in time.',
+  forbidden: 'the runner’s user may not finish cards in this project.',
+  no_project: 'the worker’s folder is in no watched project.',
+};
+
+/**
+ * #482: why the round needs attention — the worker's `finish_card` was
+ * refused. Ask the worker to call it again, or finish the card yourself.
+ */
+export const finishRefusedText = (code: LocalErrorCode): string =>
+  `finish_card was refused: ${FINISH_REFUSED_REASON[code] ?? `${code.replaceAll('_', ' ')}.`} Ask the worker to call it again, or finish the card yourself.`;
 
 export const isRoundActive = (round: CardRoundBrief | null): boolean =>
   isActiveRoundPhase(round?.phase);
@@ -391,6 +423,19 @@ export function autoRunReason(
   }
 }
 
+/**
+ * #273 D9, #443: what the face's "Didn’t start" says — the design approval's
+ * start, or Auto-run when ready's after a dependency was accepted.
+ */
+export function autoRunFailureText(
+  failure: NonNullable<BoardCardView['autoRunFailure']>,
+): string {
+  const reason = autoRunReason(failure);
+  return failure.after != null
+    ? `Auto-run after C-${failure.after} was accepted could not start: ${reason}`
+    : `Design approved — the worker did not start: ${reason}`;
+}
+
 /** Every board error as a sentence for the person; the server's text last. */
 export function describeBoardError(
   error: unknown,
@@ -445,6 +490,12 @@ export function describeBoardError(
       return 'This card has no pull request to merge.';
     case BOARD_ERROR.notTracked:
       return 'Automatic work belongs to cards tracked from a terminal session.';
+    case BOARD_ERROR.dependencyCycle:
+      return 'That would make the cards wait for each other in a circle.';
+    case BOARD_ERROR.invalidDependency:
+      return 'A card cannot depend on itself, or on a number that is no card of this project.';
+    case BOARD_ERROR.dependencyOpen:
+      return 'A card it depends on is not completed yet.';
     default:
       break;
   }
@@ -464,22 +515,158 @@ export function parseMaxRunning(raw: string): number | null {
   return n >= BOARD_MAX_RUNNING_MIN && n <= BOARD_MAX_RUNNING_MAX ? n : null;
 }
 
-/**
- * #281 D6: shown when no hook event arrived after the start. Names the cause,
- * the profile key and the command; the card does not know its profile, so the
- * key is the one `agentdock-runner profiles` lists.
- */
-export const hooksHint =
-  "No hook events from this card's session: the agentdock plugin is not set up for its runtime profile, so the card moves only when the session ends or you mark it finished.";
+/** #390: the background stall threshold field, in minutes; null when out of range. */
+export function parseStallMinutes(raw: string): number | null {
+  if (!/^\d{1,4}$/.test(raw.trim())) return null;
+  const n = Number(raw.trim());
+  return n >= CARD_BACKGROUND_STALL_MINUTES_MIN &&
+    n <= CARD_BACKGROUND_STALL_MINUTES_MAX
+    ? n
+    : null;
+}
 
-/** The commands behind the hint, shown as code blocks next to it. */
-export const HOOKS_COMMANDS = [
-  { label: 'Find the profile key (first column)', code: PROFILES_LIST_COMMAND },
-  {
-    label: 'Set up that profile, then restart its sessions',
-    code: SETUP_CLAUDE_COMMAND,
-  },
-] as const;
+const HOOKS_CONSEQUENCE =
+  'the card moves only when the session ends or you mark it finished.';
+
+/** #367 D3: why a round launched by the runner reports no hooks. */
+const WIRING_REASON_TEXT: Record<CardRunWiringReason, string> = {
+  runner_outdated: `The runner that started this round is older than 0.10.0, so it did not add AgentDock hooks to the session; ${HOOKS_CONSEQUENCE} Update the runner, then run the card again.`,
+  settings_write_failed: `The runner could not write this round's hook settings, so the session started without AgentDock hooks; ${HOOKS_CONSEQUENCE} Check the runner's log and the disk it writes to, then run the card again.`,
+  claude_too_old: `The Claude Code on this runner does not accept --settings, so the session started without AgentDock hooks; ${HOOKS_CONSEQUENCE} Update Claude Code, then run the card again.`,
+};
+
+/** The profile placeholder of `SETUP_CLAUDE_COMMAND`. */
+const PROFILE_PLACEHOLDER = '<key>';
+
+/** The setup commands of a terminal or fleet card, naming its profile if known. */
+const setupCommands = (profileKey: string | null) =>
+  profileKey
+    ? ([
+        {
+          label: `Set up profile ${profileKey}, then restart its sessions`,
+          code: SETUP_CLAUDE_COMMAND.replace(PROFILE_PLACEHOLDER, profileKey),
+        },
+      ] as const)
+    : ([
+        {
+          label: 'Find the profile key (first column)',
+          code: PROFILES_LIST_COMMAND,
+        },
+        {
+          label: 'Set up that profile, then restart its sessions',
+          code: SETUP_CLAUDE_COMMAND,
+        },
+      ] as const);
+
+export interface HooksNotice {
+  /** The hint, in prose with no markdown. */
+  text: string;
+  /** The chip on the card's face. */
+  chip: string;
+  /** Commands shown as code blocks next to the hint. */
+  commands: readonly { label: string; code: string }[];
+  /** Whether the Settings › Sessions checklist is the way out. */
+  guide: boolean;
+}
+
+/**
+ * #281 D6, #367 D3/D4: what a card says when no hook event arrived after the
+ * start. A card the runner launches is wired by the runner, so it names the
+ * round's launch facts, never "set up the plugin"; a terminal or fleet card
+ * runs outside the runner and keeps the plugin's setup commands, for its own
+ * profile when the card knows it.
+ */
+export const hooksNotice = (
+  card: Pick<BoardCardView, 'source'> & { profileKey?: string | null },
+  round: Pick<CardRoundBrief, 'wiring' | 'wiringReason'> &
+    Pick<Partial<CardRoundBrief>, 'hooksCause' | 'hooksProfile'>,
+): HooksNotice => {
+  const { wiring = null, wiringReason = null, hooksCause = null } = round;
+  // #348 D1/D2: the plugin state of the round's profile. Launch facts the
+  // runner reported (no hooks, or its own injected settings) outrank it.
+  const profile = round.hooksProfile ?? card.profileKey ?? null;
+  if (profile && wiring !== 'none' && wiring !== 'injected') {
+    if (hooksCause === 'no_plugin') {
+      return {
+        text: `No hook events from this card's session: the agentdock plugin is not set up for the profile ${profile}, so ${HOOKS_CONSEQUENCE}`,
+        chip: 'hooks not set up',
+        commands: [
+          {
+            label: 'Set up the profile, then restart its sessions',
+            code: SETUP_CLAUDE_COMMAND.replace(PROFILE_PLACEHOLDER, profile),
+          },
+        ],
+        guide: true,
+      };
+    }
+    if (hooksCause === 'session_predates') {
+      return {
+        text: `The agentdock plugin is set up for ${profile}, but this session sent no hook events — it started before the setup. Stop the card and run it again to get live status.`,
+        chip: 'restart session',
+        commands: [],
+        guide: false,
+      };
+    }
+  }
+  if (isMirroredCardSource(card.source)) {
+    return {
+      text: `No hook events from this card's session: the agentdock plugin is not set up for the profile it runs in, so ${HOOKS_CONSEQUENCE}`,
+      chip: 'hooks not set up',
+      commands: setupCommands(card.profileKey ?? null),
+      guide: true,
+    };
+  }
+  if (wiring === 'none') {
+    return {
+      text: wiringReason
+        ? WIRING_REASON_TEXT[wiringReason]
+        : `The runner started this round without AgentDock hooks; ${HOOKS_CONSEQUENCE}`,
+      chip: 'no hooks',
+      commands: [],
+      guide: false,
+    };
+  }
+  const via =
+    wiring === 'plugin'
+      ? "the profile's agentdock plugin"
+      : wiring === 'injected'
+        ? "the runner's own hook settings"
+        : 'AgentDock hooks';
+  return {
+    text: `The session started with ${via}, but no hook event reached AgentDock within 2 minutes; ${HOOKS_CONSEQUENCE} Check that the runner is online and can reach the API.`,
+    chip: 'no hook events',
+    commands: [{ label: 'Check the runner', code: RUNNER_STATUS_COMMAND }],
+    guide: false,
+  };
+};
+
+/** #395: the plain sentence for a collect that found no worktree on the runner. */
+export const WORKTREE_GONE_TEXT =
+  "The card's worktree no longer exists on the runner, so a pull request cannot be created from it.";
+
+/** #395: the runner's `not_found` for a card whose worktree is gone (it names internal ids). */
+export const isWorktreeGoneError = (error: string | null): boolean =>
+  /not found on the runner.*has no worktree/.test(error ?? '');
+
+/**
+ * #395: the line above Create pull request. A vanished worktree gets a plain
+ * sentence and no button; every other failure keeps `noPrText`'s wording.
+ */
+export function noPrBanner(
+  card: Pick<BoardCardView, 'collectState' | 'collectError'>,
+): { tone: 'warn' | 'info'; text: string; canCreate: boolean } {
+  if (
+    card.collectState === 'failed' &&
+    isWorktreeGoneError(card.collectError)
+  ) {
+    return {
+      tone: 'warn',
+      text: `No pull request: ${WORKTREE_GONE_TEXT}`,
+      canCreate: false,
+    };
+  }
+  return { ...noPrText(card), canCreate: true };
+}
 
 /** The link text after the hint: what the checklist holds. */
 export const HOOKS_GUIDE_LABEL = 'See the exact command for each profile';

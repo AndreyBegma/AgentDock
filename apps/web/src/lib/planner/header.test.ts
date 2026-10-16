@@ -1,6 +1,38 @@
 import { describe, expect, test } from 'bun:test';
 import { plan, task } from './fixtures';
-import { approvableDrafts, briefBeyondTitle } from './header';
+import { approvableDrafts, briefBeyondTitle, createCardsBlock } from './header';
+
+describe('createCardsBlock (#337 D7)', () => {
+  test('a plan with tasks and no turn running can make its cards', () => {
+    expect(
+      createCardsBlock(plan({ tasks: [task(), task({ id: 'b', key: 't2' })] })),
+    ).toBeNull();
+  });
+
+  test('once only: a task with a card means the cards exist', () => {
+    expect(
+      createCardsBlock(plan({ tasks: [task({ cardId: 'card-1' })] })),
+    ).toBe('This plan already made its cards.');
+    expect(createCardsBlock(plan({ status: 'done' }))).toBe(
+      'This plan was sent, archived or made its cards.',
+    );
+  });
+
+  test('an intake, a running turn, no tasks or a blocking question wait', () => {
+    expect(createCardsBlock(plan({ mode: 'card' }))).toBe(
+      'An intake makes its own card.',
+    );
+    expect(createCardsBlock(plan({ tasks: [task()], activeTurnId: 'x' }))).toBe(
+      'Wait for the running turn to finish.',
+    );
+    expect(createCardsBlock(plan({ tasks: [] }))).toBe(
+      'The planner has no tasks yet.',
+    );
+    expect(
+      createCardsBlock(plan({ tasks: [task({ status: 'needs_talk' })] })),
+    ).toBe('A task still has a blocking question.');
+  });
+});
 
 describe('briefBeyondTitle', () => {
   test('a one-line brief that is the title is not shown twice', () => {

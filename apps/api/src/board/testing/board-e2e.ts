@@ -6,6 +6,7 @@ import type {
 import { seedProject } from '../../fleet/testing/fleet-e2e';
 import { RunnerConnectHooks } from '../../runners/runner-connect-hooks';
 import { RunnerEventSinks } from '../../runners/runner-event-sinks';
+import { capabilities } from '../../runners/testing/runner-e2e';
 import {
   createE2eApp,
   createUser,
@@ -25,6 +26,8 @@ export type CardHandler = (args: Record<string, unknown>) => unknown;
 
 type WorldCommand =
   | CardCommandName
+  | 'card.checks'
+  | 'card.ciRetrigger'
   | 'card.prClose'
   | 'issue.create'
   | 'pr.inspect';
@@ -57,6 +60,15 @@ export const prInspection = (extra: Record<string, unknown> = {}) => ({
   mergeable: 'MERGEABLE',
   mergeStateStatus: 'CLEAN',
   fetchedAt: '2026-10-15T12:00:00.000Z',
+  ...extra,
+});
+
+/** #359 D5: a `card.checks` answer — PR open at `HEAD_SHA`, one passing check. */
+export const cardChecks = (extra: Record<string, unknown> = {}) => ({
+  state: 'open',
+  headSha: HEAD_SHA,
+  mergeable: 'MERGEABLE',
+  checks: [{ name: 'ci/check', bucket: 'pass', link: 'https://ci.example/1' }],
   ...extra,
 });
 
@@ -94,6 +106,13 @@ export class BoardWorld {
   offline = false;
   /** #329 D9: whether the runner advertises `card.prClose`. */
   prCloseAdvertised = true;
+  /**
+   * #359: whether the runner advertises `card.checks` — a card then ships
+   * itself. Off by default: the suites before #359 run as they did.
+   */
+  checksServed = false;
+  /** #484: whether the runner advertises `card.ciRetrigger`. */
+  ciRetriggerServed = true;
   /** #329 D4: the delayed collect retries scheduled so far, oldest first. */
   retries: ScheduledRetry[] = [];
   connectHooks!: RunnerConnectHooks;
@@ -125,6 +144,24 @@ export class BoardWorld {
     jest
       .spyOn(this.commands, 'advertisesPrClose')
       .mockImplementation(() => this.prCloseAdvertised);
+    jest
+      .spyOn(this.commands, 'servesChecks')
+      .mockImplementation(() => this.checksServed);
+    jest
+      .spyOn(this.commands, 'checks')
+      .mockImplementation(async (runnerId, args) => {
+        this.commands.assertReady(runnerId, 'card.checks');
+        return this.answer('card.checks', { ...args });
+      });
+    jest
+      .spyOn(this.commands, 'servesCiRetrigger')
+      .mockImplementation(() => this.ciRetriggerServed);
+    jest
+      .spyOn(this.commands, 'ciRetrigger')
+      .mockImplementation(async (runnerId, args) => {
+        this.commands.assertReady(runnerId, 'card.ciRetrigger');
+        return this.answer('card.ciRetrigger', { ...args });
+      });
     this.connectHooks = this.ctx.app.get(RunnerConnectHooks);
     const timer = this.ctx.app.get(CollectRetryTimer);
     jest.spyOn(timer, 'schedule').mockImplementation((cardId, delayMs, run) => {
@@ -151,6 +188,8 @@ export class BoardWorld {
     if (handler) return handler(args) as BoardSendResult<never>;
     const defaults: Record<WorldCommand, unknown> = {
       'pr.inspect': prInspection(),
+      'card.checks': cardChecks(),
+      'card.ciRetrigger': { retriggered: true },
       'card.run': {
         phase: 'starting',
         tmuxSession: `agentdock-card-${String(args.shortId)}`,
@@ -196,9 +235,13 @@ export class BoardWorld {
     jest.mocked(this.commands.createIssue).mockClear();
     jest.mocked(this.commands.inspectPr).mockClear();
     jest.mocked(this.commands.closePr).mockClear();
+    jest.mocked(this.commands.checks).mockClear();
+    jest.mocked(this.commands.ciRetrigger).mockClear();
     this.handlers = {};
     this.offline = false;
     this.prCloseAdvertised = true;
+    this.checksServed = false;
+    this.ciRetriggerServed = true;
     this.retries = [];
     await resetDatabase(this.ctx.prisma);
     ({ runnerId: this.runnerId, projectId: this.a } = await seedProject(
@@ -269,6 +312,13 @@ export class BoardWorld {
       .map(([, , args]) => args as Record<string, unknown>);
   }
 
+  /** #484: the `card.ciRetrigger` commands sent, oldest first. */
+  ciRetriggers(): Record<string, unknown>[] {
+    return jest
+      .mocked(this.commands.ciRetrigger)
+      .mock.calls.map(([, args]) => args as unknown as Record<string, unknown>);
+  }
+
   /** #329 D8: the `card.prClose` commands sent, oldest first. */
   prCloses(): Record<string, unknown>[] {
     return jest
@@ -314,6 +364,17 @@ export class BoardWorld {
       `${this.path()}/board/cards/${number}/run`,
       body,
     );
+  }
+
+  /**
+   * #445: the runner advertises `tokenSaver` in its capabilities; without a
+   * call it stores none, as a runner older than the feature.
+   */
+  async advertiseTokenSaver(tokenSaver = true): Promise<void> {
+    await this.ctx.prisma.runner.update({
+      where: { id: this.runnerId },
+      data: { capabilities: { ...capabilities, tokenSaver } },
+    });
   }
 
   /** Delivers runner events to the sinks, as ingest does. */

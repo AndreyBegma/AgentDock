@@ -3,7 +3,9 @@ import {
   Activity,
   BarChart3,
   CalendarClock,
+  ChartColumn,
   FolderGit2,
+  Gauge,
   GitMerge,
   History,
   KanbanSquare,
@@ -46,6 +48,11 @@ export interface NavEntry {
    * so every page below it (a run under History, a session under Sessions).
    */
   wide?: boolean;
+  /**
+   * A page that fills the screen (C-29): the shell locks to the viewport, the
+   * page drops the width cap and scrolls its own regions, not the window.
+   */
+  fill?: boolean;
 }
 
 export interface NavSection {
@@ -142,6 +149,17 @@ export const NAV: NavSection[] = [
     title: 'Project',
     projectScoped: true,
     entries: [
+      // The project's home (card C-6): its figures, then the orchestrator.
+      {
+        id: 'project-home',
+        wide: true,
+        href: '/projects/:projectId',
+        label: 'Project',
+        icon: ChartColumn,
+        minRole: 'viewer',
+        enabled: true,
+        exact: true,
+      },
       {
         id: 'fleet',
         wide: true,
@@ -151,17 +169,12 @@ export const NAV: NavSection[] = [
         minRole: 'viewer',
         enabled: true,
       },
-      {
-        id: 'planner',
-        href: '/projects/:projectId/planner',
-        label: 'Planner',
-        icon: Lightbulb,
-        minRole: 'viewer',
-        enabled: true,
-      },
+      // #337 D11: no Planner entry — New Card and New Plan live on the Board;
+      // `/projects/:id/planner` stays reachable, read-only, off the nav.
       {
         id: 'board',
         wide: true,
+        fill: true,
         href: '/projects/:projectId/board',
         label: 'Work',
         icon: KanbanSquare,
@@ -201,6 +214,16 @@ export const NAV: NavSection[] = [
         href: '/projects/:projectId/history',
         label: 'History',
         icon: History,
+        minRole: 'viewer',
+        enabled: true,
+      },
+      // #445 D13: what Token saver kept out of what this project's agents read.
+      {
+        id: 'project-token-saver',
+        wide: true,
+        href: '/projects/:projectId/token-saver',
+        label: 'Token saver',
+        icon: Gauge,
         minRole: 'viewer',
         enabled: true,
       },
@@ -360,12 +383,12 @@ export function visibleNav(role: Role, pathname: string): VisibleSection[] {
 
 /**
  * The phone's tab bar (#163): five places, the rest behind More. Outside a
- * project the workspace's five; inside one, the project's working pages —
- * Planner among them, the project's Activity behind More (#213).
+ * project the workspace's five; inside one, the project's home and its
+ * working pages — the project's Activity behind More (#213, C-6).
  */
 const TAB_IDS = {
   workspace: ['overview', 'projects', 'activity', 'sessions', 'usage'],
-  project: ['fleet', 'planner', 'board', 'queue', 'approvals'],
+  project: ['project-home', 'fleet', 'board', 'queue', 'approvals'],
 } as const;
 
 export interface TabBarSplit {
@@ -428,5 +451,24 @@ export function isWideEntry(
   if (!activeId) return false;
   return sections.some((section) =>
     section.entries.some((entry) => entry.id === activeId && entry.wide),
+  );
+}
+
+/**
+ * Whether the page itself — not a page below it, a card's design under Board —
+ * is the active entry and fills the screen; false off the nav.
+ */
+export function isFillEntry(
+  sections: readonly VisibleSection[],
+  activeId: string | null,
+  pathname: string,
+): boolean {
+  if (!activeId) return false;
+  const path = pathname.replace(/\/+$/, '');
+  return sections.some((section) =>
+    section.entries.some(
+      (entry) =>
+        entry.id === activeId && entry.fill && entry.resolvedHref === path,
+    ),
   );
 }

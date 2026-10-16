@@ -1,0 +1,20 @@
+namespace/agentdock unchanged
+serviceaccount/agentdock-api unchanged
+configmap/agentdock-api-config configured
+secret/agentdock-api-env unchanged
+service/agentdock-api unchanged
+service/agentdock-web unchanged
+service/agentdock-redis unchanged
+persistentvolumeclaim/agentdock-pg-data unchanged
+deployment.apps/agentdock-api configured
+deployment.apps/agentdock-web unchanged
+deployment.apps/agentdock-redis unchanged
+statefulset.apps/agentdock-pg unchanged
+ingress.networking.k8s.io/agentdock unchanged
+horizontalpodautoscaler.autoscaling/agentdock-api unchanged
+Error from server (Invalid): error when applying patch:
+{"spec":{"selector":{"matchLabels":{"app":"agentdock-worker"}}}}
+to:
+Resource: "apps/v1, Resource=deployments", GroupVersionKind: "apps/v1, Kind=Deployment"
+Name: "agentdock-worker", Namespace: "agentdock"
+for: "k8s/worker.yaml": error when patching "k8s/worker.yaml": Deployment.apps "agentdock-worker" is invalid: spec.selector: Invalid value: v1.LabelSelector{MatchLabels:map[string]string{"app":"agentdock-worker"}, MatchExpressions:[]v1.LabelSelectorRequirement(nil)}: field is immutable

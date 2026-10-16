@@ -10,7 +10,12 @@ const context = (
   variant: 2,
   variantCount: 3,
   mode: 'revise',
-  previous: { revision: 1, title: 'Two columns', rationale: 'Dense.' },
+  previous: {
+    revision: 1,
+    title: 'Two columns',
+    rationale: 'Dense.',
+    frames: ['Board page', 'Card tile'],
+  },
   profile: {
     version: 4,
     hasUi: true,
@@ -25,6 +30,7 @@ const context = (
       kind: 'pin',
       variant: 2,
       revision: 1,
+      frame: 'Card tile',
       viewport: 'Mobile',
       theme: 'dark',
       x: 10,
@@ -57,6 +63,20 @@ describe('design turn prompt (D8)', () => {
     expect(text).toContain('`frontend-design`');
     expect(text).toContain('"selector": "main > button"');
     expect(text).toContain('"id": "c1"');
+  });
+
+  it('asks for named frames, and passes each comment with its frame (#441)', () => {
+    const text = designSections(context()).join('\n\n');
+    expect(text).toContain(
+      'Use one frame unless the task touches several pages',
+    );
+    expect(text).toContain('one `agentdock-design` block per frame');
+    expect(text).toContain('Its frames, in order: "Board page", "Card tile".');
+    expect(text).toContain('"frame": "Card tile"');
+    const generate = designSections(
+      context({ mode: 'generate', previous: null, comments: [] }),
+    ).join('\n\n');
+    expect(generate).not.toContain('Its frames, in order');
   });
 
   it('trims snippets from the end to keep the prompt under its cap, and says so', () => {

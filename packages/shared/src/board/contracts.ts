@@ -5,23 +5,37 @@ import type {
 import type { AttachmentRefusal, AttachmentView } from '../attachments';
 import type { TaskDesignSummary, TaskDesignView } from '../design';
 import type { FleetStage } from '../fleet';
+import type { CardRestartMode, RestartEstimate } from '../handoff/contracts';
 import type {
   CardMergeMethod,
+  CardRunWiring,
+  CardRunWiringReason,
+  LocalErrorCode,
   OrchestratorPermissionMode,
   PrChecks,
   PrInspectState,
 } from '../protocol';
 import type { ProfileSource } from '../readiness';
+import type { PendingQuestion } from '../session-message/contracts';
+import type { StewardCardChip } from '../steward/contracts';
 import type { CardKindSource } from '../text/limits';
+import type {
+  TokenSavedView,
+  TokenSaverFilterSavings,
+} from '../token-saver/contracts';
 import type {
   CaptureModel,
   CaptureSkipReason,
   CaptureStatus,
 } from './capture-limits';
+import type { BoardMoveRefusal } from './moves';
+import type { CardCiCheck } from './shipping';
+import type { BoardStackView, CardStackRef } from './stacks';
 import type {
   BoardCardKind,
   BoardCardSource,
   BoardColumn,
+  CardCiState,
   CardCollectState,
   CardFinishedBy,
   CardPrState,
@@ -41,6 +55,9 @@ export interface BoardUserRef {
   email: string;
 }
 
+/** #348 D1: why a round's session sent no hook events. */
+export type CardHooksCause = 'no_plugin' | 'session_predates' | 'unknown';
+
 /** The latest round as a card on the board shows it. */
 export interface CardRoundBrief {
   round: number;
@@ -48,8 +65,51 @@ export interface CardRoundBrief {
   finishedBy: CardFinishedBy | null;
   /** When Claude stopped and is waiting for the person (`hook.stopped`). */
   waitingAt: string | null;
+  /**
+   * #390: when the turn stopped with background tasks running (`background`);
+   * `null` otherwise. Optional so older fixtures stay valid.
+   */
+  backgroundAt?: string | null;
+  /**
+   * #390: what runs in the background, shortened — only for a project that
+   * ships content; `null` when unknown.
+   */
+  backgroundCommand?: string | null;
   /** D6: no hook event within `CARD_HOOKS_GRACE_MS` of the start. */
   hooksMissing: boolean;
+  /**
+   * #348 D1: why hooks are missing; `null` when `hooksMissing` is false. The
+   * API always sends both; optional so older fixtures stay valid.
+   */
+  hooksCause?: CardHooksCause | null;
+  /** #348 D1: the round's profile key, when known. */
+  hooksProfile?: string | null;
+  /**
+   * #367 D3: how the round's session reports; `null` before it started. The
+   * API always sends both; optional so older fixtures stay valid.
+   */
+  wiring?: CardRunWiring | null;
+  /** #367 D3: with `wiring: 'none'`, why. */
+  wiringReason?: CardRunWiringReason | null;
+  /**
+   * #443: Auto-run when ready started the round, after this dependency's
+   * number was accepted; `null` for a round a person or AgentDock started.
+   * Optional so older fixtures stay valid.
+   */
+  autoRunAfter?: number | null;
+  /**
+   * #489 M4: the question selector the running round's session shows —
+   * its text and options, to answer from the Board. `null` when none is up,
+   * the round is not active, or the project does not ship content.
+   * Optional so older fixtures stay valid.
+   */
+  pendingQuestion?: PendingQuestion | null;
+  /**
+   * #482: the local error the round's last refused `finish_card` got, while
+   * the round is active — it needs attention; `null` otherwise. Optional so
+   * older fixtures stay valid.
+   */
+  finishRefused?: LocalErrorCode | null;
 }
 
 /**
@@ -107,6 +167,22 @@ export interface BoardCardView {
    * sheet's "No pull request: <error>"; `null` otherwise.
    */
   collectError: string | null;
+  /** #359 D5: the checks on the PR's head — the CI dot beside the PR chip. */
+  ciState: CardCiState;
+  /** #359 D5: the failed checks while `ciState` is `red`; empty otherwise. */
+  ciChecks: CardCiCheck[];
+  /**
+   * #359 D6: `ci_fix` rounds on the current PR, of `CARD_CI_FIX_ATTEMPTS_MAX`
+   * — "Fixing CI (2/3)".
+   */
+  ciFixAttempts: number;
+  /**
+   * #359 D6: CI still failing after the budget — "CI still failing after 3
+   * fixes"; nothing is automated until a person acts.
+   */
+  needsPerson: boolean;
+  /** #359 D8: the latest PR merged (ISO) — the Merged badge; `null` otherwise. */
+  mergedAt: string | null;
   /** The latest round; `null` before the first Run. */
   round: CardRoundBrief | null;
   /** #243: the Design chip; `null` when the card has no design (off). */
@@ -115,6 +191,18 @@ export interface BoardCardView {
   continueAfterDesign: boolean;
   /** Sum over every round's run, a decimal string; `null` when nothing is priced. */
   costUsd: string | null;
+  /**
+   * #445 D13: the Token saver estimate summed over every round's run, as
+   * `costUsd` — "saved ≈ $x" beside the cost; `null` when nothing was
+   * filtered. The API always sends it; optional so older fixtures stay valid.
+   */
+  tokenSaved?: TokenSavedView | null;
+  /**
+   * #445 D8: the latest round's finish was accepted after the artifact
+   * guard's 2 rejections — the **Description incomplete** badge. Optional
+   * like `tokenSaved`; absent reads as `false`.
+   */
+  artifactIncomplete?: boolean;
   /** #244: why capture suggested the card; `null` for a manual card. */
   captureWhy: string | null;
   /** #244: 0–1; `null` for a manual card. */
@@ -125,8 +213,26 @@ export interface BoardCardView {
    * session is gone.
    */
   sourceSessionId: string | null;
-  /** #273 D9: approving the design did not start the worker; `null` otherwise. */
+  /**
+   * #273 D9: approving the design did not start the worker; #443: or
+   * Auto-run when ready did not (`after` set). `null` otherwise.
+   */
   autoRunFailure: CardAutoRunFailure | null;
+  /**
+   * #443: Auto-run when ready — accepting the last open dependency starts
+   * the Run. Off by default; it turns itself off when it fires.
+   */
+  autoRunWhenReady: boolean;
+  /**
+   * #443: Ready / Waiting of a card in To Do with a dependency; `null` for
+   * any other card. Optional like `dependsOn`; absent reads as null.
+   */
+  readiness?: CardReadiness | null;
+  /**
+   * #480 (ADR-0044): the stack and stage the card belongs to, with the gate
+   * its stack's design sets. Optional like `readiness`; absent reads as null.
+   */
+  stack?: CardStackRef | null;
   /** #282 D1: set for a `terminal` card, `null` for any other source. */
   tracking: CardTrackingView | null;
   /** #282 D4: set for a `fleet` card, `null` for any other source. */
@@ -138,9 +244,84 @@ export interface BoardCardView {
   autoCollect: boolean;
   /** #309: attachments of the card and its rounds — the paperclip on the face when above 0. */
   attachmentCount: number;
+  /**
+   * #337 D8: the cards this one runs after — "after C-12" on the face.
+   * Optional until every route that answers a card fills it; absent reads as
+   * none.
+   */
+  dependsOn?: CardDependencyRef[];
+  /**
+   * #337 D6, D7: the plan the card came from (a New work intake — one card,
+   * or each card of a confirmed split, #409 — or Create cards). Optional
+   * like `dependsOn`; absent reads as null.
+   */
+  planId?: string | null;
   movedAt: string;
   completedAt: string | null;
   updatedAt: string;
+  /**
+   * #447 D15: the latest round's open or escalated Steward incident — the
+   * `Stuck: API error · nudged 1/2` chip (`stewardChipLabel`). Optional so
+   * no route must fill it yet; absent reads as null.
+   */
+  steward?: StewardCardChip | null;
+  // #449 Context handoff — optional so no route must fill them yet.
+  /**
+   * #449 D9: how the latest round's session started — the
+   * `resumed from handoff · saved ≈ $x` / `resumed session` chip
+   * (`restartChipLabel`). Absent reads as null.
+   */
+  restartMode?: CardRestartMode | null;
+  /**
+   * #449 D9: the latest `fresh` round's first-turn saving — its resume
+   * estimate's cost less its fresh estimate's, a decimal string like
+   * `costUsd`. Null for any other round. Absent reads as null.
+   */
+  warmupSavedUsd?: string | null;
+}
+
+/** #337 D8: a card another one depends on, as the face and Run's warning name it. */
+export interface CardDependencyRef {
+  number: number;
+  /** `C-<number>`. */
+  label: string;
+  /** Open while not `completed`. */
+  column: BoardColumn;
+}
+
+/**
+ * #443: a To Do card with dependencies is `ready` once every one is accepted
+ * (in Completed, whatever PRs it had), `waiting` while one is open.
+ */
+export interface CardReadiness {
+  state: 'ready' | 'waiting';
+  /** Dependencies in Completed. */
+  accepted: number;
+  total: number;
+  /** The open ones, in number order: "Waits for C-84". */
+  open: CardDependencyRef[];
+}
+
+/** #337 D8: one dependency as the card sheet lists it. */
+export interface CardDependencyView extends CardDependencyRef {
+  title: string;
+}
+
+/** `GET /board/cards/:number/dependencies` (#337 D8): number order. */
+export interface CardDependenciesView {
+  dependsOn: CardDependencyView[];
+}
+
+/**
+ * `POST /board/cards/:number/dependencies` (#337 D8, operator): the card runs
+ * after card `dependsOn` of the same project. Itself, a number that names no
+ * card of the project, or a link that closes a cycle is refused —
+ * `invalid_dependency` (400) or `dependency_cycle` (409). An existing link is
+ * kept as it is. Answers with `CardDependenciesView`; `DELETE
+ * …/dependencies/:dependsOn` removes one the same way.
+ */
+export interface AddCardDependencyRequest {
+  dependsOn: number;
 }
 
 /** #244 D8: one evidence excerpt of an Inbox card, at most `CAPTURE_EVIDENCE_EXCERPT_MAX` characters. */
@@ -170,6 +351,11 @@ export interface BoardView {
   /** Active rounds now, against `settings.maxRunning`. */
   running: number;
   settings: BoardSettingsView;
+  /**
+   * #480 (ADR-0044): the project's stacks, each with the column its collapsed
+   * face sits in. Optional so older fixtures stay valid; absent reads as none.
+   */
+  stacks?: BoardStackView[];
 }
 
 /** One round (D4) of a card. */
@@ -178,6 +364,17 @@ export interface CardRoundView {
   round: number;
   runId: string;
   trigger: CardRoundTrigger;
+  /**
+   * #443: Auto-run when ready started the round, after this dependency's
+   * number was accepted; `null` otherwise. Optional so older fixtures stay valid.
+   */
+  autoRunAfter?: number | null;
+  /**
+   * #482: the local error the round's last refused `finish_card` got, while
+   * the round is active — it needs attention; `null` otherwise. Optional so
+   * older fixtures stay valid.
+   */
+  finishRefused?: LocalErrorCode | null;
   /** The person's text, for a `feedback` round. */
   feedback: string | null;
   author: BoardUserRef | null;
@@ -189,12 +386,35 @@ export interface CardRoundView {
   exitCode: number | null;
   error: string | null;
   hooksMissing: boolean;
+  /** #348 D1: as on `CardRoundBrief`. */
+  hooksCause: CardHooksCause | null;
+  hooksProfile: string | null;
+  /** #367 D3: as on `CardRoundBrief`. */
+  wiring: CardRunWiring | null;
+  wiringReason: CardRunWiringReason | null;
   /** This round's run, a decimal string. */
   costUsd: string | null;
+  /** #445: this round's run, as on `BoardCardView`. */
+  tokenSaved?: TokenSavedView | null;
+  /** #445 D13: the sheet's per-filter breakdown of this round, most saved first. */
+  tokenSaverFilters?: TokenSaverFilterSavings[];
+  /** #445 D8: this round's finish, as on `BoardCardView`. */
+  artifactIncomplete?: boolean;
   startedAt: string;
   waitingAt: string | null;
+  /** #390: as on `CardRoundBrief`. */
+  backgroundAt: string | null;
+  backgroundCommand: string | null;
   finishedAt: string | null;
   endedAt: string | null;
+  // #449 Context handoff — optional so no route must fill them yet.
+  /** #449 D3: from `round.restart`; null until it arrives. */
+  restartMode?: CardRestartMode | null;
+  /** #449 D3: both estimates; null for a `first` round. */
+  restartEstimate?: RestartEstimate | null;
+  /** #449 D9: from `round.warmup`; null until the round's first edit. */
+  warmupTokens?: number | null;
+  warmupMs?: number | null;
 }
 
 /** #322 D6: one recommended model, with its one-line reason. */
@@ -252,6 +472,8 @@ export interface BoardCardDetail extends BoardCardView {
   createdAt: string;
   /** Oldest first. */
   rounds: CardRoundView[];
+  /** #359 D8: every PR the card opened, oldest first; the last is `prUrl`'s. */
+  pullRequests: CardPullRequestRef[];
   /**
    * #244 D8: an Inbox card's evidence, operators only (the card sheet).
    * `null` once accepted — Accept strips it — and for a manual card.
@@ -262,6 +484,18 @@ export interface BoardCardDetail extends BoardCardView {
    * own carry its `roundId`.
    */
   attachments: AttachmentView[];
+}
+
+/** #359 D8: one PR of a card, as the card sheet lists it. */
+export interface CardPullRequestRef {
+  number: number;
+  url: string;
+  /** Its head branch: the card's, then `<branch>-<k>` for a follow-up. */
+  branch: string;
+  state: CardPrState;
+  /** The round that opened it. */
+  round: number;
+  createdAt: string;
 }
 
 /** `GET /board-settings`; with no row, the defaults and `isDefault: true`. */
@@ -278,6 +512,18 @@ export interface BoardSettingsView {
   captureModel: CaptureModel;
   /** #282 D3: the `autoCollect` a new `terminal` card starts with; off by default. */
   autoCollectTracked: boolean;
+  /**
+   * #359 D7: merge a card's PR when it enters Finished green; `null` follows
+   * `autoMergeCardsDefault`.
+   */
+  autoMergeCards: boolean | null;
+  /** #359 D7: `cardAutoMergeDefault` of the project's base — on for develop, off for main. */
+  autoMergeCardsDefault: boolean;
+  /**
+   * #390: minutes a round may wait on its own background tasks before it
+   * raises `card.background_stalled`.
+   */
+  backgroundStallMinutes: number;
   isDefault: boolean;
   updatedAt: string | null;
 }
@@ -317,6 +563,8 @@ export interface UpdateBoardCardRequest {
   continueAfterDesign?: boolean;
   /** #282 D3: a `terminal` card only; any other card is refused `not_tracked`. */
   autoCollect?: boolean;
+  /** #443: Auto-run when ready; a card that is not in To Do is refused `wrong_column`. */
+  autoRunWhenReady?: boolean;
 }
 
 /** `POST /board/cards/:number/move` (D7). `index` is the drop index in `column`. */
@@ -324,6 +572,60 @@ export interface MoveBoardCardRequest {
   column: BoardColumn;
   index: number;
   stopWorker?: boolean;
+}
+
+/** #452: the actions of the bulk endpoint, in the order the action bar shows them. */
+export const BULK_CARD_ACTIONS = [
+  'complete',
+  'todo',
+  'finished',
+  'delete',
+] as const;
+export type BulkCardAction = (typeof BULK_CARD_ACTIONS)[number];
+
+/** #452: the most cards one bulk request carries. */
+export const BULK_CARDS_MAX = 100;
+
+/**
+ * `POST /board/cards/bulk` (#452): one action for several cards. `complete`
+ * is Accept with neither `merge` nor `closePr` — the PRs are left as they
+ * are; `todo` is the person's move; `finished` is Mark finished; `delete`
+ * never stops a worker.
+ */
+export interface BulkBoardCardsRequest {
+  /** 1 to `BULK_CARDS_MAX` distinct card numbers. */
+  numbers: number[];
+  action: BulkCardAction;
+}
+
+/**
+ * Why a card was left alone: the `boardMoveRule` refusal, or `already_in_column`,
+ * `wrong_column` (Completed takes only a Finished card), `not_running` (Mark
+ * finished takes only a card with a worker), `not_found` (deleted meanwhile).
+ */
+export type BulkCardSkipReason =
+  | BoardMoveRefusal
+  | 'already_in_column'
+  | 'wrong_column'
+  | 'not_running'
+  | 'not_found';
+
+/** One card's outcome. A skip is not a failure; an `error` is a refusal at the moment of the call. */
+export type BulkCardOutcome =
+  | { number: number; status: 'done' }
+  | { number: number; status: 'skipped'; reason: BulkCardSkipReason }
+  | {
+      number: number;
+      status: 'error';
+      /** The board error code, or `unknown`. */
+      code: BoardErrorCode | 'unknown';
+      message: string;
+    };
+
+/** The outcomes in the order of the request. */
+export interface BulkBoardCardsResponse {
+  action: BulkCardAction;
+  results: BulkCardOutcome[];
 }
 
 /**
@@ -340,6 +642,11 @@ export interface RunBoardCardRequest {
    */
   profileKey?: string;
   permissionMode?: OrchestratorPermissionMode;
+  /**
+   * #337 D8: run although a dependency is not in Completed. Without it, such
+   * a Run is 409 `dependency_open` naming the open ones.
+   */
+  ignoreDependencies?: boolean;
 }
 
 /** `POST /board/cards/:number/feedback` (D9). */
@@ -363,6 +670,10 @@ export interface UpdateBoardSettingsRequest {
   captureModel?: CaptureModel;
   /** #282 D3. Absent keeps the stored value. */
   autoCollectTracked?: boolean;
+  /** #359 D7. Absent keeps the stored value; `null` returns to the default. */
+  autoMergeCards?: boolean | null;
+  /** #390. Absent keeps the stored value. */
+  backgroundStallMinutes?: number;
 }
 
 /**
@@ -463,6 +774,22 @@ export const BOARD_ERROR = {
   prCloseFailed: 'pr_close_failed',
   /** 422 (#329 D7/D8): `deleteBranch: true` on a `terminal` card. */
   branchDeleteRefused: 'branch_delete_refused',
+  /**
+   * 409 (#337 D8): Run on a card with a dependency not in Completed, without
+   * `ignoreDependencies`; `dependencies` names the open ones.
+   */
+  dependencyOpen: 'dependency_open',
+  /** 409 (#337 D8): the dependency would close a cycle. */
+  dependencyCycle: 'dependency_cycle',
+  /** 400 (#337 D8): the card itself, or a number that is no card of this project. */
+  invalidDependency: 'invalid_dependency',
+  /**
+   * 409 (#480, ADR-0044): Run on a card of a stack whose design is needed and
+   * not approved — nothing writes project code before it is.
+   */
+  stackDesignNotApproved: 'stack_design_not_approved',
+  /** 409 (#480): the stack change is not allowed — `message` says why. */
+  stackRefused: 'stack_refused',
 } as const;
 export type BoardErrorCode = (typeof BOARD_ERROR)[keyof typeof BOARD_ERROR];
 
@@ -482,15 +809,26 @@ export interface BoardErrorBody {
   profileKey?: string;
   /** `attachment_error`: why the attachment was refused (#309). */
   code?: AttachmentRefusal;
+  /** `dependency_open` (#337 D8): the open dependencies — "C-12 is not completed yet". */
+  dependencies?: CardDependencyRef[];
 }
 
-/** #273 D9: why approving the design did not start round 1. */
+/**
+ * #273 D9: why approving the design did not start round 1; #443: or why
+ * Auto-run when ready did not start the Run — the reason a manual Run gets.
+ */
 export interface CardAutoRunFailure {
   /** The refusal's `BoardErrorCode`, or `unknown` for any other exception. */
   code: BoardErrorCode | 'unknown';
   /** At most 500 characters. */
   message: string;
   at: string;
+  /**
+   * #443: the accepted dependency's number when Auto-run when ready tried
+   * the start; `null` when approving the design did. Optional so older
+   * fixtures stay valid.
+   */
+  after?: number | null;
 }
 
 const BOARD_ERROR_CODES: ReadonlySet<string> = new Set(
@@ -664,8 +1002,10 @@ export interface FleetCardEdits {
 
 /** Live: on `project:<id>` whenever a card, its round or its design changes. */
 export const BOARD_CHANGED_EVENT = 'board.changed';
+/** One of `cardId` and `stackId` (#480): the card, or the stack, that changed. */
 export interface BoardChangedData {
-  cardId: string;
+  cardId?: string;
+  stackId?: string;
 }
 
 /**
@@ -685,11 +1025,33 @@ export interface CardFinishedEventData {
   prUrl: string | null;
 }
 
+/**
+ * Why a round waits for the person: its turn ended (`stopped`), or it asks
+ * a question in the session (`question`, #473). Absent from events recorded
+ * before #473 — a stop.
+ */
+export type CardWaitingReason = 'stopped' | 'question';
+
 export interface CardWaitingEventData {
   cardId: string;
   number: number;
   title: string;
   round: number;
+  reason?: CardWaitingReason;
+}
+
+/**
+ * #390: a round has waited on its own background tasks for `minutes` — once
+ * per stall. Never carries the command: it is content.
+ */
+export const CARD_BACKGROUND_STALLED_EVENT = 'card.background_stalled';
+
+export interface CardBackgroundStalledEventData {
+  cardId: string;
+  number: number;
+  title: string;
+  round: number;
+  minutes: number;
 }
 
 /**

@@ -2,11 +2,17 @@ import type {
   AcceptBoardCardRequest,
   AcceptBoardCardResponse,
   AcceptSuggestionRequest,
+  AddCardDependencyRequest,
+  AddStackCardRequest,
   BoardCardDetail,
   BoardCardView,
   BoardSettingsView,
+  BoardStackDetail,
   BoardView,
+  BulkBoardCardsRequest,
+  BulkBoardCardsResponse,
   CardCapturePage,
+  CardDependenciesView,
   CardFeedbackRequest,
   CardPullRequestView,
   ClaimAttachmentsRequest,
@@ -17,6 +23,7 @@ import type {
   RunBoardCardRequest,
   UpdateBoardCardRequest,
   UpdateBoardSettingsRequest,
+  UpdateBoardStackRequest,
 } from '@agentdock/shared';
 import { api } from '../api';
 
@@ -54,11 +61,42 @@ export const moveCard = (
   body: MoveBoardCardRequest,
 ) => api(`${cardPath(projectId, number)}/move`, { method: 'POST', body });
 
+/** #452: one action for up to `BULK_CARDS_MAX` cards; each card's outcome is in the answer. */
+export const bulkCards = (projectId: string, body: BulkBoardCardsRequest) =>
+  api<BulkBoardCardsResponse>(`${base(projectId)}/cards/bulk`, {
+    method: 'POST',
+    body,
+  });
+
 export const runCard = (
   projectId: string,
   number: number,
   body: RunBoardCardRequest = {},
 ) => api(`${cardPath(projectId, number)}/run`, { method: 'POST', body });
+
+/** #337 D8: the cards this one runs after, with their columns. */
+export const fetchDependencies = (projectId: string, number: number) =>
+  api<CardDependenciesView>(`${cardPath(projectId, number)}/dependencies`);
+
+export const addDependency = (
+  projectId: string,
+  number: number,
+  body: AddCardDependencyRequest,
+) =>
+  api<CardDependenciesView>(`${cardPath(projectId, number)}/dependencies`, {
+    method: 'POST',
+    body,
+  });
+
+export const removeDependency = (
+  projectId: string,
+  number: number,
+  dependsOn: number,
+) =>
+  api<CardDependenciesView>(
+    `${cardPath(projectId, number)}/dependencies/${dependsOn}`,
+    { method: 'DELETE' },
+  );
 
 export const sendFeedback = (
   projectId: string,
@@ -141,4 +179,42 @@ export const saveBoardSettings = (
   api<BoardSettingsView>(`/projects/${projectId}/board-settings`, {
     method: 'PUT',
     body,
+  });
+
+// ─── Stacks (#480, ADR-0044) ─────────────────────────────────────────────────
+
+const stackPath = (projectId: string, number: number) =>
+  `${base(projectId)}/stacks/${number}`;
+
+export const fetchStack = (projectId: string, number: number) =>
+  api<BoardStackDetail>(stackPath(projectId, number));
+
+export const updateStack = (
+  projectId: string,
+  number: number,
+  body: UpdateBoardStackRequest,
+) =>
+  api<BoardStackDetail>(stackPath(projectId, number), {
+    method: 'PATCH',
+    body,
+  });
+
+/** A card of the project joins a stage; `stage` = the stage count adds one. */
+export const addStackCard = (
+  projectId: string,
+  number: number,
+  body: AddStackCardRequest,
+) =>
+  api<BoardStackDetail>(`${stackPath(projectId, number)}/cards`, {
+    method: 'POST',
+    body,
+  });
+
+export const removeStackCard = (
+  projectId: string,
+  number: number,
+  card: number,
+) =>
+  api<BoardStackDetail>(`${stackPath(projectId, number)}/cards/${card}`, {
+    method: 'DELETE',
   });

@@ -52,6 +52,11 @@ Nothing is published on the host. The stack runs on its own compose network
    - *Require approval*: forks. The repository is public.
    - *Cancel previous pipelines*: push, pull_request.
    - Timeout: 60 min.
+   - Run the Woodpecker server on PostgreSQL
+     (`WOODPECKER_DATABASE_DRIVER=postgres`), not the default SQLite. Under a
+     busy fleet SQLite answers GitHub's webhooks with HTTP 500
+     `database is locked`, and GitHub never redelivers them: the pull request
+     gets no pipeline (#484, ADR-0043).
 3. **The first run.** Push to `develop`, or run the pipeline by hand on
    `develop`. `refresh.sh` creates the stack directory, copies the examples in
    and generates `POSTGRES_PASSWORD`, `REDIS_PASSWORD` and
@@ -84,8 +89,21 @@ Nothing is published on the host. The stack runs on its own compose network
 - **Migrations and the seed** run in the API's entrypoint, so a failed
   migration keeps the API unhealthy. The deploy fails after 240 s and prints
   the API log.
+- **A deploy does not drop requests** (#368). `refresh.sh` restarts `api` and
+  waits for it to be healthy before it touches `web`, so the two are never
+  down together. Caddy holds a request or WebSocket upgrade that arrives
+  meanwhile and retries it for up to 60 s (`lb_try_duration`) instead of
+  answering 502; the API also has an active `/health` check. A socket open at
+  the moment the old container stops still closes: the runner and the browser
+  reconnect, and the reconnect succeeds on the first try. It is not
+  blue/green: one request may be slow by up to the API's boot time.
 - **A runner** pairs against the API through the proxy:
   `agentdock-runner pair --server https://staging-agentdock.luna-realm.com/api --code XXXX-XXXX`.
+- **A pull request with no pipeline** (#484): open the repository's
+  *Settings → Webhooks → Recent Deliveries* and look for the PR's delivery.
+  A 500, 502, 530 or a timeout there is a delivery Woodpecker never
+  processed; *Redeliver* it, or close and reopen the PR. AgentDock does the
+  close/reopen by itself for a board card's PR after 5 minutes (ADR-0043).
 - **`530` / error 1033** from the public URL means the hostname exists but no
   cloudflared connector is running. Check that `TUNNEL_TOKEN` is set and look
   at `docker logs agentdock-staging-cloudflared`.

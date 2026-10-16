@@ -1,7 +1,8 @@
-import type { BoardCardDetail } from '@agentdock/shared';
+import type { BoardCardDetail, BoardView } from '@agentdock/shared';
 import type { LocalCall } from '../local/local-call';
 import { LocalError } from '../local/local-error';
 import { LocalHandlers } from '../local/local-handlers';
+import { BoardBackgroundStall } from './board-background-stall';
 import { BoardWorld, ROOT_A } from './testing/board-e2e';
 
 describe('board sink (e2e)', () => {
@@ -71,6 +72,9 @@ describe('board sink (e2e)', () => {
   const serverEvents = (type: string) =>
     w.ctx.prisma.event.findMany({ where: { type }, orderBy: { id: 'asc' } });
 
+  const runStatus = async (runId: string) =>
+    (await w.ctx.prisma.run.findUniqueOrThrow({ where: { id: runId } })).status;
+
   describe('card_run.phase_changed', () => {
     it('moves a round forward and never back', async () => {
       const { card, round } = await running();
@@ -137,6 +141,78 @@ describe('board sink (e2e)', () => {
     });
   });
 
+  describe('card_run.question (#473)', () => {
+    const question = (card: { id: string }, runId: string, projectId = w.a) =>
+      w.deliver('card_run.question', {
+        cardId: card.id,
+        runId,
+        projectId,
+        at: new Date().toISOString(),
+      });
+    const answered = (sessionId: string) =>
+      w.hook('hook.tool_finished', sessionId, {
+        toolUseId: 'tu_q',
+        toolName: 'AskUserQuestion',
+        ok: true,
+      });
+
+    it('a question waits for the person, notified once; the answer runs again', async () => {
+      const { card, round, sessionId } = await running({ title: 'Add login' });
+      await phase(card, round.runId, { phase: 'running' });
+      await question(card, round.runId);
+      let after = await w.card(1);
+      expect(after.rounds[0].phase).toBe('waiting');
+      expect(after.rounds[0].waitingAt).not.toBeNull();
+      expect(await runStatus(round.runId)).toBe('waiting_person');
+      const [waiting] = await serverEvents('card.waiting');
+      expect(waiting).toMatchObject({ source: 'api' });
+      expect(waiting.data).toEqual({
+        cardId: card.id,
+        number: 1,
+        title: 'Add login',
+        round: 1,
+        reason: 'question',
+      });
+
+      // The same question again, or a stop meanwhile: no second notification.
+      await question(card, round.runId);
+      await w.hook('hook.stopped', sessionId);
+      expect(await serverEvents('card.waiting')).toHaveLength(1);
+
+      await answered(sessionId);
+      after = await w.card(1);
+      expect(after.rounds[0].phase).toBe('running');
+      expect(await runStatus(round.runId)).toBe('running');
+
+      // The next question is told again.
+      await question(card, round.runId);
+      expect((await w.card(1)).rounds[0].phase).toBe('waiting');
+      expect(await serverEvents('card.waiting')).toHaveLength(2);
+    });
+
+    it('a question while background tasks run waits for the person', async () => {
+      const { card, round, sessionId } = await running();
+      await w.hook('hook.stopped', sessionId, { backgroundTasks: 1 });
+      await question(card, round.runId);
+      const after = (await w.card(1)).rounds[0];
+      expect(after.phase).toBe('waiting');
+      expect(after.backgroundAt).toBeNull();
+      expect(await serverEvents('card.waiting')).toHaveLength(1);
+    });
+
+    it('ignores a question of an old run, another project or an ended round', async () => {
+      const { card, round } = await running();
+      await question(card, 'cm1run00000000000000000999');
+      await question(card, round.runId, w.b);
+      expect((await w.card(1)).rounds[0].phase).toBe('starting');
+
+      await phase(card, round.runId, { phase: 'failed', error: 'gone' });
+      await question(card, round.runId);
+      expect((await w.card(1)).rounds[0].phase).toBe('failed');
+      expect(await serverEvents('card.waiting')).toEqual([]);
+    });
+  });
+
   describe('hooks of the card session (D6, D14)', () => {
     it('hook.stopped → waiting and card.waiting; hook.prompt_submitted → running', async () => {
       const { round, sessionId } = await running({ title: 'Add login' });
@@ -159,6 +235,7 @@ describe('board sink (e2e)', () => {
         number: 1,
         title: 'Add login',
         round: 1,
+        reason: 'stopped',
       });
 
       // Again while waiting: no second notification.
@@ -168,6 +245,142 @@ describe('board sink (e2e)', () => {
       await w.hook('hook.prompt_submitted', sessionId, { chars: 12 });
       after = await w.card(1);
       expect(after.rounds[0].phase).toBe('running');
+    });
+
+    describe('a turn that stops with its own background tasks running (#390)', () => {
+      const stall = () => w.ctx.app.get(BoardBackgroundStall);
+      const minutesAfter = (at: Date | null, minutes: number) =>
+        new Date((at as Date).getTime() + minutes * 60_000);
+
+      it('is background, not waiting, and raises no card.waiting', async () => {
+        const { round, sessionId } = await running();
+        await w.hook('hook.stopped', sessionId, { backgroundTasks: 2 });
+        const after = (await w.card(1)).rounds[0];
+        expect(after.phase).toBe('background');
+        expect(after.backgroundAt).not.toBeNull();
+        expect(after.backgroundTasks).toBe(2);
+        expect(after.waitingAt).toBeNull();
+        expect(await runStatus(round.runId)).toBe('running');
+        expect(await serverEvents('card.waiting')).toEqual([]);
+      });
+
+      it('keeps the command only for a project that ships content', async () => {
+        const { sessionId } = await running();
+        const background = {
+          text: 'bunx jest --selectProjects e2e',
+          truncated: false,
+        };
+        await w.hook('hook.stopped', sessionId, {
+          backgroundTasks: 1,
+          background,
+        });
+        expect((await w.card(1)).rounds[0].backgroundCommand).toBeNull();
+
+        await w.ctx.prisma.project.update({
+          where: { id: w.a },
+          data: { shipSessionContent: true },
+        });
+        await w.hook('hook.stopped', sessionId, {
+          backgroundTasks: 1,
+          background,
+        });
+        expect((await w.card(1)).rounds[0].backgroundCommand).toBe(
+          'bunx jest --selectProjects e2e',
+        );
+      });
+
+      it('a stop with no background work still waits for the person', async () => {
+        const { sessionId } = await running();
+        await w.hook('hook.stopped', sessionId, { backgroundTasks: 0 });
+        expect((await w.card(1)).rounds[0].phase).toBe('waiting');
+        expect(await serverEvents('card.waiting')).toHaveLength(1);
+      });
+
+      it('tool activity after a stop is running again, without a prompt', async () => {
+        const { round, sessionId } = await running();
+        const tool = { toolUseId: 'tu_1', toolName: 'Bash', ok: true };
+        await w.hook('hook.stopped', sessionId, { backgroundTasks: 1 });
+        await w.hook('hook.tool_finished', sessionId, tool);
+        let after = (await w.card(1)).rounds[0];
+        expect(after.phase).toBe('running');
+        expect(after.backgroundAt).toBeNull();
+        expect(after.backgroundTasks).toBeNull();
+
+        // From Waiting for you too: a task notification woke the worker.
+        await w.hook('hook.stopped', sessionId);
+        expect(await runStatus(round.runId)).toBe('waiting_person');
+        await w.hook('hook.tool_finished', sessionId, tool);
+        after = (await w.card(1)).rounds[0];
+        expect(after.phase).toBe('running');
+        expect(await runStatus(round.runId)).toBe('running');
+      });
+
+      it('the background work done, the next stop waits for the person', async () => {
+        const { sessionId } = await running();
+        await w.hook('hook.stopped', sessionId, { backgroundTasks: 1 });
+        await w.hook('hook.stopped', sessionId, { backgroundTasks: 0 });
+        const after = (await w.card(1)).rounds[0];
+        expect(after.phase).toBe('waiting');
+        expect(after.backgroundAt).toBeNull();
+        expect(await serverEvents('card.waiting')).toHaveLength(1);
+      });
+
+      it('a stall past the threshold warns once, and again after a resume', async () => {
+        const { card, sessionId } = await running({ title: 'Add login' });
+        await w.hook('hook.stopped', sessionId, { backgroundTasks: 1 });
+        const first = (await w.card(1)).rounds[0];
+
+        expect(await stall().tick(minutesAfter(first.backgroundAt, 29))).toBe(
+          0,
+        );
+        expect(await stall().tick(minutesAfter(first.backgroundAt, 30))).toBe(
+          1,
+        );
+        expect(await stall().tick(minutesAfter(first.backgroundAt, 31))).toBe(
+          0,
+        );
+        // Another stop while still in the background is the same stall.
+        await w.hook('hook.stopped', sessionId, { backgroundTasks: 2 });
+        expect(await stall().tick(minutesAfter(first.backgroundAt, 90))).toBe(
+          0,
+        );
+
+        const [stalled] = await serverEvents('card.background_stalled');
+        expect(stalled).toMatchObject({ source: 'api' });
+        expect(stalled.data).toEqual({
+          cardId: card.id,
+          number: 1,
+          title: 'Add login',
+          round: 1,
+          minutes: 30,
+        });
+
+        await w.hook('hook.tool_finished', sessionId, {
+          toolUseId: 'tu_2',
+          toolName: 'Bash',
+          ok: true,
+        });
+        await w.hook('hook.stopped', sessionId, { backgroundTasks: 1 });
+        const second = (await w.card(1)).rounds[0];
+        expect(second.backgroundStalledAt).toBeNull();
+        expect(await stall().tick(minutesAfter(second.backgroundAt, 30))).toBe(
+          1,
+        );
+        expect(await serverEvents('card.background_stalled')).toHaveLength(2);
+      });
+
+      it('follows the board setting', async () => {
+        const { sessionId } = await running();
+        await w.ctx.prisma.boardSettings.create({
+          data: { projectId: w.a, backgroundStallMinutes: 10 },
+        });
+        await w.hook('hook.stopped', sessionId, { backgroundTasks: 1 });
+        const { backgroundAt } = (await w.card(1)).rounds[0];
+        expect(await stall().tick(minutesAfter(backgroundAt, 9))).toBe(0);
+        expect(await stall().tick(minutesAfter(backgroundAt, 10))).toBe(1);
+        const [stalled] = await serverEvents('card.background_stalled');
+        expect(stalled.data).toMatchObject({ minutes: 10 });
+      });
     });
 
     it('claims the card session as origin run, and keeps it', async () => {
@@ -203,6 +416,116 @@ describe('board sink (e2e)', () => {
       expect((await detail()).round?.hooksMissing).toBe(true);
       await w.hook('hook.prompt_submitted', sessionId, { chars: 3 });
       expect((await detail()).round?.hooksMissing).toBe(false);
+    });
+
+    it('says why hooks are missing from what the runner reports (#348 D1)', async () => {
+      const { round } = await running();
+      await w.ctx.prisma.boardCardRound.update({
+        where: { id: round.id },
+        data: { startedAt: new Date(Date.now() - 3 * 60 * 1000) },
+      });
+      const report = async (agentdock?: { plugin: string | null }) =>
+        w.ctx.prisma.runner.update({
+          where: { id: w.runnerId },
+          data: {
+            capabilities: {
+              profiles: [
+                {
+                  id: 'claude-main',
+                  runtime: 'claude',
+                  env: {},
+                  args: [],
+                  ...(agentdock && {
+                    agentdock: { ...agentdock, telemetry: false },
+                  }),
+                },
+              ],
+            },
+          },
+        });
+      const detail = async () =>
+        (
+          (await w.operator.get(`${w.path()}/board/cards/1`))
+            .body as BoardCardDetail
+        ).rounds[0];
+
+      await report({ plugin: null });
+      expect(await detail()).toMatchObject({
+        hooksMissing: true,
+        hooksCause: 'no_plugin',
+        hooksProfile: 'claude-main',
+      });
+      await report({ plugin: '0.4.2' });
+      expect((await detail()).hooksCause).toBe('session_predates');
+      await report();
+      expect((await detail()).hooksCause).toBe('unknown');
+    });
+  });
+
+  describe('card_run.finish_refused (#482)', () => {
+    const refused = (
+      card: { id: string },
+      runId: string,
+      code = 'not_a_card_session',
+      projectId = w.a,
+    ) =>
+      w.deliver('card_run.finish_refused', {
+        cardId: card.id,
+        runId,
+        projectId,
+        at: new Date().toISOString(),
+        code,
+      });
+    const views = async () => {
+      const board = (await w.viewer.get(`${w.path()}/board`)).body as BoardView;
+      const brief = board.columns.flatMap((c) => c.cards)[0]?.round;
+      const detail = (await w.operator.get(`${w.path()}/board/cards/1`))
+        .body as BoardCardDetail;
+      return { brief, round: detail.rounds[detail.rounds.length - 1] };
+    };
+
+    it('the round needs attention with the reason until a finish is taken', async () => {
+      const { card, round, sessionId } = await running();
+      await phase(card, round.runId, { phase: 'running' });
+      await w.hook('hook.stopped', sessionId);
+      await refused(card, round.runId);
+
+      let after = (await w.card(1)).rounds[0];
+      expect(after.phase).toBe('waiting');
+      expect(after.finishRefusedCode).toBe('not_a_card_session');
+      expect(after.finishRefusedAt).not.toBeNull();
+      let view = await views();
+      expect(view.brief?.finishRefused).toBe('not_a_card_session');
+      expect(view.round?.finishRefused).toBe('not_a_card_session');
+
+      // A later refusal replaces the reason.
+      await refused(card, round.runId, 'runner_offline');
+      expect((await views()).brief?.finishRefused).toBe('runner_offline');
+
+      await finishCard(sessionId, 'Done. Tested.');
+      await w.work.settled();
+      after = (await w.card(1)).rounds[0];
+      expect(after.phase).toBe('finished');
+      view = await views();
+      expect(view.brief?.finishRefused ?? null).toBeNull();
+      expect(view.round?.finishRefused).toBeNull();
+    });
+
+    it('ignores a refusal of an old run, another project or an ended round', async () => {
+      const { card, round } = await running();
+      await refused(card, 'cm1run00000000000000000999');
+      await refused(card, round.runId, 'not_a_card_session', w.b);
+      expect((await w.card(1)).rounds[0].finishRefusedCode).toBeNull();
+
+      await phase(card, round.runId, { phase: 'failed', error: 'gone' });
+      await refused(card, round.runId);
+      expect((await w.card(1)).rounds[0].finishRefusedCode).toBeNull();
+    });
+
+    it('skips a malformed refusal', async () => {
+      const { card, round } = await running();
+      await refused(card, round.runId, 'no_such_code');
+      expect((await w.card(1)).rounds[0].finishRefusedCode).toBeNull();
     });
   });
 

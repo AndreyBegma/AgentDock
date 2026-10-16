@@ -146,35 +146,6 @@ export const launchRequest = (
 });
 
 /**
- * The card form's model select (D4): "Recommended — Opus 5.5" while a
- * recommendation exists, else "Project default". Choosing it clears the
- * override (`null`).
- */
-export function cardFormDefaultLabel(
-  recommendation: CardRecommendationView,
-): string {
-  return recommendation.work
-    ? `Recommended — ${claudeModelLabel(recommendation.work.model)}`
-    : 'Project default';
-}
-
-/** The card form's model options: the default first, then the catalog. */
-export function cardFormModelOptions(
-  card: Pick<LaunchCard, 'model' | 'recommendation'>,
-): { value: string; label: string }[] {
-  return [
-    {
-      value: DEFAULT_VALUE,
-      label: cardFormDefaultLabel(card.recommendation),
-    },
-    ...claudeModelOptions({
-      selected: card.model,
-      recommended: card.recommendation.work?.model,
-    }).map(({ value, label }) => ({ value, label })),
-  ];
-}
-
-/**
  * The profile select's options. A key the runner no longer lists stays as its
  * own option, so nothing is silently changed (the model rule, D4).
  */

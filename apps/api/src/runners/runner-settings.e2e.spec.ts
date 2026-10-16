@@ -107,7 +107,14 @@ describe('runner settings (e2e)', () => {
     });
     const { socket, welcome } = await connect();
     expect(welcome.config).toEqual({
-      projects: [{ id: projectId, root: '/srv/dev/widget', shipContent: true }],
+      projects: [
+        {
+          id: projectId,
+          root: '/srv/dev/widget',
+          shipContent: true,
+          steward: { enabled: true, silenceMinutes: 10, trailerGuard: true },
+        },
+      ],
       pollIntervalsMs: {},
     });
 

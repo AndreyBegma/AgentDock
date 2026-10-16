@@ -1,0 +1,35 @@
+F401 [*] `json` imported but unused
+ --> app/serializers.py:2:8
+  |
+1 | import datetime
+2 | import json
+  |        ^^^^
+3 | from dataclasses import asdict
+  |
+help: Remove unused import: `json`
+
+B006 Do not use mutable data structures for argument defaults
+  --> app/serializers.py:21:29
+   |
+19 |         return value
+20 |
+21 | def merge(base, extra, seen=[]):
+   |                             ^^
+22 |     for key in extra:
+23 |         seen.append(key)
+   |
+help: Replace with `None`; initialize within function
+
+UP006 [*] Use `list` instead of `List` for type annotation
+  --> app/serializers.py:40:19
+   |
+38 | from typing import List
+39 |
+40 | def names(items: List[str]) -> List[str]:
+   |                  ^^^^
+41 |     return [i.strip() for i in items]
+   |
+help: Replace with `list`
+
+Found 3 errors.
+[*] 2 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).

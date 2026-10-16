@@ -1,7 +1,19 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from 'bun:test';
-import { chmodSync, readdirSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { cardPullRequestBody } from '@agentdock/shared';
+import {
+  CARD_PR_DESCRIPTION_FILE,
+  cardPullRequestBody,
+} from '@agentdock/shared';
 import type { CardCollectArgs } from '@agentdock/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import type { Exec, ExecOptions } from '../detect/exec';
@@ -11,6 +23,9 @@ import {
   collectBranch,
   collectCard,
   ensureWorktree,
+  fallbackPullRequestBody,
+  pullRequestBodyOf,
+  readPullRequestDescription,
   removeCardWorktree,
 } from './git';
 import { cardWorktreePath } from './launch';
@@ -360,5 +375,163 @@ describe('card.close worktree removal (#242 D10)', () => {
       worktreeRemoved: true,
       branchDeleted: false,
     });
+  });
+});
+
+describe('card.collect — the PR description (#359 D3)', () => {
+  const DESCRIPTION = [
+    'Spec: https://github.com/acme/widget/blob/feat/42-export-csv/docs/specs/42-export-csv.md',
+    'Closes #42',
+    '',
+    '## What changed and why',
+    '- **export** — the report as CSV.',
+    '',
+    '## Acceptance criteria',
+    '- [x] CSV download — unit test.',
+    'AgentDock-Card: C-99',
+  ].join('\n');
+
+  const work = async (
+    f: Awaited<ReturnType<typeof setup>>['f'],
+    wt: string,
+  ) => {
+    f.write(wt, { 'src/export.ts': 'export const csv = 1;\n' });
+    await f.commitAll(wt, 'feat: export as CSV');
+  };
+
+  it("opens the PR with the worker's file as its body, the API's marker its only one, the file never committed", async () => {
+    const { f, record, deps, args } = await setup();
+    await work(f, record.worktree);
+    f.write(record.worktree, { [CARD_PR_DESCRIPTION_FILE]: DESCRIPTION });
+
+    expect((await collectCard(deps, record, args)).pushed).toBe(true);
+    const body = f.prCreates()[0]?.body ?? '';
+    expect(body).toContain('## What changed and why');
+    expect(body).toContain('- [x] CSV download — unit test.');
+    expect(body).not.toContain('Added the CSV export.');
+    expect(body.match(/AgentDock-Card:/g)).toHaveLength(1);
+    expect(body.trimEnd().endsWith('AgentDock-Card: C-12')).toBe(true);
+    expect(
+      await f.run(record.worktree, 'ls-tree', '-r', '--name-only', 'HEAD'),
+    ).not.toContain('.agentdock');
+    expect(f.edits).toEqual([]);
+  });
+
+  it('edits the body of a PR already open when the file exists, and only then', async () => {
+    const { f, record, deps, args } = await setup();
+    await work(f, record.worktree);
+    await collectCard(deps, record, args);
+    expect(f.prCreates()).toHaveLength(1);
+
+    f.write(record.worktree, { 'src/export.ts': 'export const csv = 2;\n' });
+    await collectCard(deps, record, args);
+    expect(f.edits).toEqual([]);
+
+    f.write(record.worktree, { [CARD_PR_DESCRIPTION_FILE]: DESCRIPTION });
+    await collectCard(deps, record, args);
+    expect(f.prCreates()).toHaveLength(1);
+    expect(f.edits).toHaveLength(1);
+    expect(f.edits[0]?.args.slice(0, 5)).toEqual([
+      'pr',
+      'edit',
+      '7',
+      '--repo',
+      'acme/widget',
+    ]);
+    expect(f.edits[0]?.body).toContain('## Acceptance criteria');
+    expect(f.edits[0]?.body).toContain('AgentDock-Card: C-12');
+    expect(f.edits[0]?.body).not.toContain('C-99');
+  });
+
+  it("without the file: the API's body, led by the links to the spec and the design", async () => {
+    const { f, record, deps, args } = await setup();
+    await work(f, record.worktree);
+    await collectCard(
+      deps,
+      {
+        ...record,
+        specFiles: [
+          'docs/specs/42-export-csv.md',
+          'docs/specs/42-export-csv/design/1.html',
+        ],
+      },
+      args,
+    );
+    const blob = 'https://github.com/acme/widget/blob/feat/42-export-csv';
+    expect(f.prCreates()[0]?.body).toBe(
+      `Spec: [docs/specs/42-export-csv.md](${blob}/docs/specs/42-export-csv.md) · approved design: [docs/specs/42-export-csv/design/1.html](${blob}/docs/specs/42-export-csv/design/1.html)\n\n${args.body}`,
+    );
+  });
+
+  it('without the file: links every frame of the design (#441)', async () => {
+    const { f, record, deps, args } = await setup();
+    await work(f, record.worktree);
+    await collectCard(
+      deps,
+      {
+        ...record,
+        specFiles: [
+          'docs/specs/42-export-csv.md',
+          'docs/specs/42-export-csv/design/1/page.html',
+          'docs/specs/42-export-csv/design/1/tile.html',
+        ],
+      },
+      args,
+    );
+    const blob = 'https://github.com/acme/widget/blob/feat/42-export-csv';
+    expect(f.prCreates()[0]?.body).toContain(
+      `approved design: [docs/specs/42-export-csv/design/1/page.html](${blob}/docs/specs/42-export-csv/design/1/page.html), [docs/specs/42-export-csv/design/1/tile.html](${blob}/docs/specs/42-export-csv/design/1/tile.html)`,
+    );
+  });
+
+  it("without the file or spec files: the API's body as it is", async () => {
+    const { f, record, deps, args } = await setup();
+    await work(f, record.worktree);
+    await collectCard(deps, record, args);
+    expect(f.prCreates()[0]?.body).toBe(args.body);
+  });
+
+  it('ignores a description reached through a symlink, so no other file reaches the PR', async () => {
+    const { f, record, deps, args } = await setup();
+    await work(f, record.worktree);
+    const secret = join(f.ws, 'secret.txt');
+    writeFileSync(secret, 'TOKEN=hunter2\n');
+    mkdirSync(join(record.worktree, '.agentdock'), { recursive: true });
+    symlinkSync(secret, join(record.worktree, CARD_PR_DESCRIPTION_FILE));
+    expect(readPullRequestDescription(record.worktree)).toBeNull();
+    await collectCard(deps, record, args);
+    expect(f.prCreates()[0]?.body).not.toContain('hunter2');
+  });
+
+  it('ignores a .agentdock directory that is a symlink', () => {
+    const outside = mkdtempSync(join(tmpdir(), 'agentdock-desc-'));
+    const wt = mkdtempSync(join(tmpdir(), 'agentdock-wt-'));
+    try {
+      writeFileSync(join(outside, 'pull-request.md'), 'leaked\n');
+      symlinkSync(outside, join(wt, '.agentdock'));
+      expect(readPullRequestDescription(wt)).toBeNull();
+      rmSync(join(wt, '.agentdock'));
+      mkdirSync(join(wt, '.agentdock'));
+      writeFileSync(join(wt, CARD_PR_DESCRIPTION_FILE), '  \n');
+      expect(readPullRequestDescription(wt)).toBeNull();
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+      rmSync(wt, { recursive: true, force: true });
+    }
+  });
+
+  it('pullRequestBodyOf appends the marker when the API body has one', () => {
+    expect(pullRequestBodyOf('Body', 'x\n\nAgentDock-Card: C-3')).toBe(
+      'Body\n\nAgentDock-Card: C-3\n',
+    );
+    expect(pullRequestBodyOf('Body\nAgentDock-Card: C-9', 'no marker')).toBe(
+      'Body\n',
+    );
+  });
+
+  it('fallbackPullRequestBody leaves the body alone without spec files', () => {
+    expect(fallbackPullRequestBody('B', 'acme/widget', 'card/c1-x', [])).toBe(
+      'B',
+    );
   });
 });

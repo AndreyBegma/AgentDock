@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-pointer="fine">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C-35 · Board card face, menu in the header</title>
+<style>
+:root, :root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-ground: #0a1022; --color-surface: #111a33; --color-raised: #18223f;
+  --color-paper: #1b2647; --color-content: rgb(27 38 71 / 0.96);
+  --color-ink: #f2f2f6; --color-ink-2: rgb(242 242 246 / 0.62); --color-ink-3: rgb(242 242 246 / 0.53); --color-ink-4: rgb(242 242 246 / 0.38);
+  --color-line: rgb(255 255 255 / 0.1); --color-line-strong: rgb(255 255 255 / 0.18); --color-hover: rgb(255 255 255 / 0.06);
+  --color-accent: #5b5bf6; --color-on-accent: #ffffff; --color-accent-soft: rgb(91 91 246 / 0.2); --color-accent-ink: #b4b2ff; --color-focus: #b4b2ff;
+  --color-ok: #5fd3a0; --color-warn: #e3b341; --color-danger: #ff6b60; --color-info: #5fb4f0;
+  --color-hue-1: #5b9cf6; --color-hue-1-soft: rgb(91 156 246 / 0.18); --color-hue-1-ink: #a4c8ff;
+  --color-hue-2: #2fbf94; --color-hue-2-soft: rgb(47 191 148 / 0.18); --color-hue-2-ink: #7ee0c0;
+  --color-hue-3: #7cc95a; --color-hue-3-soft: rgb(124 201 90 / 0.18); --color-hue-3-ink: #ade58f;
+  --color-hue-4: #e69f00; --color-hue-4-soft: rgb(230 159 0 / 0.18); --color-hue-4-ink: #f5c25c;
+  --color-hue-5: #e8743b; --color-hue-5-soft: rgb(232 116 59 / 0.18); --color-hue-5-ink: #f9a77c;
+  --color-hue-6: #f0606e; --color-hue-6-soft: rgb(240 96 110 / 0.18); --color-hue-6-ink: #ff9da5;
+  --color-hue-7: #a68bfa;
+  --canvas-glow: 18%;
+  --glass-sheen: rgb(255 255 255 / 0.06); --glass-scrim-strong: rgb(9 9 12 / 0.64);
+  --glass-brightness-strong: 0.7; --glass-edge: rgb(255 255 255 / 0.14); --glass-spec: rgb(255 255 255 / 0.2);
+  --glass-rim-shade: rgb(9 9 12 / 0.5); --glass-refract: rgb(242 242 246 / 0.35);
+  --glass-shadow-strong: rgb(0 0 0 / 0.45); --glass-shadow-clear: rgb(0 0 0 / 0.15);
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --color-ground: #ffffff; --color-surface: #f8faff; --color-raised: #f0f4fb;
+  --color-paper: #ffffff; --color-content: rgb(255 255 255 / 0.96);
+  --color-ink: #18181b; --color-ink-2: rgb(24 24 27 / 0.72); --color-ink-3: rgb(24 24 27 / 0.64); --color-ink-4: rgb(24 24 27 / 0.48);
+  --color-line: rgb(0 0 0 / 0.1); --color-line-strong: rgb(0 0 0 / 0.23); --color-hover: rgb(0 0 0 / 0.06);
+  --color-accent: #4f46e5; --color-on-accent: #ffffff; --color-accent-soft: rgb(79 70 229 / 0.12); --color-accent-ink: #4338ca; --color-focus: #4f46e5;
+  --color-ok: #0a8156; --color-warn: #b45309; --color-danger: #dc2626; --color-info: #03629a;
+  --color-hue-1: #1f64d6; --color-hue-1-soft: rgb(31 100 214 / 0.12); --color-hue-1-ink: #1550b0;
+  --color-hue-2: #00805e; --color-hue-2-soft: rgb(0 128 94 / 0.12); --color-hue-2-ink: #006a4e;
+  --color-hue-3: #3a7d1c; --color-hue-3-soft: rgb(58 125 28 / 0.12); --color-hue-3-ink: #2f6617;
+  --color-hue-4: #b36b00; --color-hue-4-soft: rgb(179 107 0 / 0.12); --color-hue-4-ink: #8a5200;
+  --color-hue-5: #c24e00; --color-hue-5-soft: rgb(194 78 0 / 0.12); --color-hue-5-ink: #9c3d00;
+  --color-hue-6: #d02a3e; --color-hue-6-soft: rgb(208 42 62 / 0.12); --color-hue-6-ink: #ad1f31;
+  --color-hue-7: #7244e0;
+  --canvas-glow: 10%;
+  --glass-sheen: rgb(0 0 0 / 0.06); --glass-scrim-strong: rgb(255 255 255 / 0.64);
+  --glass-brightness-strong: 1.3; --glass-edge: rgb(0 0 0 / 0.18); --glass-spec: rgb(0 0 0 / 0.2);
+  --glass-rim-shade: rgb(24 24 27 / 0.18); --glass-refract: rgb(255 255 255 / 0.5);
+  --glass-shadow-strong: rgb(0 0 0 / 0.16); --glass-shadow-clear: rgb(0 0 0 / 0.08);
+}
+:root {
+  --color-status-running: var(--color-hue-2); --color-status-running-soft: var(--color-hue-2-soft); --color-status-running-ink: var(--color-hue-2-ink);
+  --color-status-waiting: var(--color-hue-1); --color-status-waiting-soft: var(--color-hue-1-soft); --color-status-waiting-ink: var(--color-hue-1-ink);
+  --color-status-blocked: var(--color-hue-5); --color-status-blocked-soft: var(--color-hue-5-soft); --color-status-blocked-ink: var(--color-hue-5-ink);
+  --color-status-done: var(--color-hue-3); --color-status-done-soft: var(--color-hue-3-soft); --color-status-done-ink: var(--color-hue-3-ink);
+  --color-status-error: var(--color-hue-6); --color-status-error-soft: var(--color-hue-6-soft); --color-status-error-ink: var(--color-hue-6-ink);
+  --glass-filter-strong: blur(40px) saturate(180%) brightness(var(--glass-brightness-strong));
+  --radius-control: 6px; --radius-surface: 8px; --radius-sheet: 12px;
+  --size-control: 28px; --size-row: 32px;
+  --dur-fast: 100ms; --dur-base: 150ms;
+  --font-sans: "SF Pro Text", "SF Pro Display", Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { background: var(--color-ground); color: var(--color-ink); }
+body { margin: 0; min-height: 100vh; font-family: var(--font-sans); font-size: 14px; line-height: 20px; -webkit-font-smoothing: antialiased; }
+h1, h2, h3, p { margin: 0; }
+:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 4px; }
+.icon { width: 16px; height: 16px; flex-shrink: 0; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.canvas { position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(60vmax 50vmax at 10% 0%, color-mix(in oklab, var(--color-hue-1) var(--canvas-glow), transparent), transparent 70%),
+    radial-gradient(50vmax 45vmax at 95% 35%, color-mix(in oklab, var(--color-hue-7) var(--canvas-glow), transparent), transparent 70%); }
+.glass-strong { border: 1px solid var(--glass-edge); background: linear-gradient(var(--glass-sheen), var(--glass-sheen)), var(--glass-scrim-strong); backdrop-filter: var(--glass-filter-strong); -webkit-backdrop-filter: var(--glass-filter-strong);
+  box-shadow: inset 0 1px 0 var(--glass-spec), inset -1px -1px 0 var(--glass-rim-shade), inset 0 0 18px -4px var(--glass-refract), 0 20px 48px var(--glass-shadow-strong); }
+
+/* Page */
+.page { max-width: 80rem; margin: 0 auto; padding: 24px 16px 48px; display: flex; flex-direction: column; gap: 32px; }
+.page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+.eyebrow { font-size: 12px; font-weight: 500; color: var(--color-ink-3); }
+.page-header h1 { font-size: 28px; line-height: 32px; letter-spacing: -0.02em; font-weight: 600; }
+.desc { max-width: 70ch; color: var(--color-ink-2); }
+.section { display: flex; flex-direction: column; gap: 12px; }
+.section-header h2 { font-size: 16px; line-height: 24px; font-weight: 600; }
+.section-header p { font-size: 13px; color: var(--color-ink-2); max-width: 80ch; }
+.controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.control-label { font-size: 12px; color: var(--color-ink-3); margin-right: 4px; }
+.segmented { display: inline-flex; gap: 4px; padding: 2px; height: var(--size-control); border: 1px solid var(--color-line); border-radius: var(--radius-control); align-items: stretch; vertical-align: middle; }
+.segmented button { font: inherit; font-size: 13px; font-weight: 500; border: 0; background: transparent; color: var(--color-ink-3); padding: 0 10px; border-radius: 4px; cursor: pointer; }
+.segmented button:hover { color: var(--color-ink-2); }
+.segmented button[aria-pressed="true"] { background: var(--color-accent-soft); color: var(--color-accent-ink); }
+
+/* Board */
+.board { display: flex; gap: 12px; overflow-x: auto; align-items: flex-start; padding-bottom: 4px; }
+.col { width: 280px; flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; padding: 8px; border-radius: var(--radius-surface); background: var(--color-hover); }
+.col-head { display: flex; align-items: center; gap: 8px; padding: 4px 4px 0; font-size: 13px; font-weight: 600; }
+.count { display: inline-flex; align-items: center; justify-content: center; height: 18px; min-width: 18px; padding: 0 4px; border-radius: 999px; font-size: 10px; font-weight: 600; background: var(--color-hover); color: var(--color-ink-2); font-variant-numeric: tabular-nums; }
+.board[data-density="compact"] .col { gap: 6px; }
+
+/* The card: one column, full width. Board owns the shell; CardFace owns the four rows. */
+.card { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: var(--radius-surface);
+  background: var(--color-content); border: 1px solid var(--color-line); box-shadow: 0 1px 2px var(--glass-shadow-clear); cursor: grab; font-size: 14px; }
+.card:hover { border-color: var(--color-line-strong); }
+.board[data-density="compact"] .card { gap: 4px; padding: 8px 10px; }
+
+/* Row 1 - header. 16 px line; the trigger is 16 px tall and sits at its end. */
+.head { display: flex; align-items: center; gap: 6px; height: 16px; font-size: 12px; line-height: 16px; color: var(--color-ink-2); min-width: 0; white-space: nowrap; }
+.head .lbl { font-family: var(--font-mono); font-size: 12px; flex-shrink: 0; }
+.head .clip { display: inline-flex; align-items: center; gap: 2px; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.head .clip .icon { width: 12px; height: 12px; }
+.head .chip.dep { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; display: inline-block; line-height: 16px; }
+.head .end { margin-left: auto; display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.head .cost { font-variant-numeric: tabular-nums; }
+
+/* The trigger: ghost, 20x16 drawn, larger hit area via ::before so it adds no height. */
+.trig { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 16px; margin: 0 -4px 0 0; padding: 0;
+  border: 0; border-radius: 4px; background: transparent; color: var(--color-ink-3); cursor: pointer; flex-shrink: 0;
+  opacity: 0; transition: opacity var(--dur-fast), background-color var(--dur-fast), color var(--dur-fast); }
+.trig::before { content: ""; position: absolute; inset: -4px -2px; }
+.trig .icon { width: 14px; height: 14px; }
+.trig:hover, .trig[aria-expanded="true"] { background: var(--color-hover); color: var(--color-ink); }
+.trig:focus-visible { outline-offset: 1px; outline-width: 2px; }
+/* RowActions rule, unchanged: hover / focus-within / open -> visible; coarse pointer -> always. */
+.card:hover .trig, .card:focus-within .trig, .trig[aria-expanded="true"] { opacity: 1; }
+@media (pointer: coarse) { .trig { opacity: 1; } .trig::before { inset: -14px -12px; } }
+:root[data-pointer="coarse"] .trig { opacity: 1; }
+:root[data-pointer="coarse"] .trig::before { inset: -14px -12px; }
+
+/* Row 2 - title */
+.title { all: unset; display: block; font-weight: 500; font-size: 14px; line-height: 20px; overflow-wrap: anywhere; cursor: pointer; }
+.title:hover { text-decoration: underline; text-underline-offset: 2px; }
+.title:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; border-radius: 2px; }
+.board[data-density="compact"] .title { font-size: 13px; line-height: 18px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* Row 3 - status: one wrapping line of state; detail text below when there is any */
+.status { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.note { font-size: 12px; line-height: 16px; color: var(--color-ink-2); overflow-wrap: anywhere; }
+.note.dim { color: var(--color-ink-3); }
+.board[data-density="compact"] .note { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.link { font-size: 12px; line-height: 16px; color: var(--color-accent-ink); text-decoration: none; }
+.link:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+/* Row 4 - footer: PR and Issue. Hairline above it; left to the sheet in compact. */
+.foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-top: 6px; margin-top: 2px; border-top: 1px solid var(--color-line); }
+.board[data-density="compact"] .foot { display: none; }
+.ref { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px; border-radius: 999px; background: var(--color-hover); color: var(--color-ink-2); font-size: 12px; text-decoration: none; font-variant-numeric: tabular-nums; }
+.ref .icon { width: 12px; height: 12px; }
+.ref:hover { color: var(--color-ink); text-decoration: underline; text-underline-offset: 2px; }
+.ref.merged .icon { color: var(--color-status-done); }
+
+/* glass-ui Chip sm / Badge / StatusPill sm */
+.chip { display: inline-flex; align-items: center; height: 16px; padding: 0 6px; border-radius: 999px; font-size: 11px; font-weight: 500; line-height: 1; white-space: nowrap; background: var(--color-hover); color: var(--color-ink-2); flex-shrink: 0; }
+.chip.danger { background: color-mix(in oklab, var(--color-danger) 14%, transparent); color: var(--color-danger); }
+.chip.warn { background: color-mix(in oklab, var(--color-warn) 14%, transparent); color: var(--color-warn); }
+.badge { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 500; line-height: 1; white-space: nowrap; background: var(--color-hover); color: var(--color-ink-2); }
+.badge.sm { height: 18px; padding: 0 6px; font-size: 11px; }
+.badge.ok { background: color-mix(in oklab, var(--color-ok) 14%, transparent); color: var(--color-ok); }
+.badge.warn { background: color-mix(in oklab, var(--color-warn) 14%, transparent); color: var(--color-warn); }
+.badge.info { background: color-mix(in oklab, var(--color-info) 14%, transparent); color: var(--color-info); }
+.pill { display: inline-flex; align-items: center; gap: 6px; height: 20px; padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 500; line-height: 1; white-space: nowrap; }
+.dot { width: 6px; height: 6px; border-radius: 999px; flex-shrink: 0; }
+.pill.running { background: var(--color-status-running-soft); color: var(--color-status-running-ink); } .pill.running .dot { background: var(--color-status-running); animation: pulse 1.6s ease-in-out infinite; }
+.pill.waiting { background: var(--color-status-waiting-soft); color: var(--color-status-waiting-ink); } .pill.waiting .dot { background: var(--color-status-waiting); }
+.pill.done { background: var(--color-status-done-soft); color: var(--color-status-done-ink); } .pill.done .dot { background: var(--color-status-done); }
+.pill.error { background: var(--color-status-error-soft); color: var(--color-status-error-ink); } .pill.error .dot { background: var(--color-status-error); }
+@keyframes pulse { 50% { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) { .dot { animation: none !important; } }
+.btn { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border-radius: 4px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+  background: var(--color-raised); color: var(--color-ink); border: 1px solid var(--color-line-strong); }
+.btn:hover { background: linear-gradient(var(--color-hover), var(--color-hover)), var(--color-raised); }
+.btn .icon { width: 14px; height: 14px; }
+
+/* Menu */
+.menu { position: absolute; z-index: 5; right: 6px; top: 30px; min-width: 12rem; padding: 4px; border-radius: var(--radius-surface); display: flex; flex-direction: column; cursor: default; }
+.menu [role="menuitem"] { display: flex; align-items: center; gap: 8px; height: var(--size-row); padding: 0 10px; border-radius: var(--radius-control); font-size: 13px; color: var(--color-ink); cursor: pointer; }
+.menu [role="menuitem"]:hover, .menu [role="menuitem"].active { background: var(--color-hover); }
+.menu [role="menuitem"][aria-disabled="true"] { color: var(--color-ink-4); pointer-events: none; }
+.menu .danger { color: var(--color-danger); }
+.menu .sub { margin-left: auto; color: var(--color-ink-3); }
+.menu hr { border: 0; border-top: 1px solid var(--color-line); margin: 4px 0; }
+
+/* Before / after + annotations */
+.compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; align-items: start; }
+.frame { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: var(--radius-surface); background: var(--color-hover); }
+.frame > .card { width: 280px; max-width: 100%; }
+.frame-title { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--color-ink-2); }
+.frame-title .badge { margin-left: auto; }
+.legacy { display: flex; gap: 4px; }
+.legacy .body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.legacy .rail { width: 32px; flex-shrink: 0; margin: -4px -4px 0 0; }
+.legacy .rail .ghost { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; color: var(--color-ink-3); outline: 1px dashed color-mix(in oklab, var(--color-danger) 60%, transparent); outline-offset: -1px; }
+.legacy .head .cost { margin-left: auto; font-variant-numeric: tabular-nums; }
+.measure { font-size: 12px; color: var(--color-ink-3); font-variant-numeric: tabular-nums; }
+.anatomy { display: grid; grid-template-columns: 320px 1fr; gap: 24px; align-items: start; }
+@media (max-width: 760px) { .anatomy { grid-template-columns: 1fr; } }
+.rows { position: relative; padding-left: 28px; }
+.rows .card { cursor: default; }
+.tag { outline: 1px dashed color-mix(in oklab, var(--color-accent-ink) 55%, transparent); outline-offset: 2px; border-radius: 2px; position: relative; }
+.tag[data-n]::after { content: attr(data-n); position: absolute; left: -38px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; border-radius: 999px;
+  display: grid; place-items: center; font-size: 10px; font-weight: 600; background: var(--color-accent-soft); color: var(--color-accent-ink); }
+.spec { margin: 0; padding: 0 0 0 20px; display: flex; flex-direction: column; gap: 8px; color: var(--color-ink-2); font-size: 13px; }
+.spec strong { color: var(--color-ink); font-weight: 600; }
+.code { margin: 0; padding: 12px 14px; border-radius: var(--radius-surface); background: var(--color-surface); border: 1px solid var(--color-line); font-family: var(--font-mono); font-size: 12px; line-height: 18px; color: var(--color-ink); overflow-x: auto; white-space: pre; }
+code { font-family: var(--font-mono); font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="canvas"></div>
+<main class="page">
+
+<header class="page-header">
+  <div style="display:flex;flex-direction:column;gap:4px">
+    <span class="eyebrow">C-35 · Design · variant 1</span>
+    <h1>Board card, menu in the header</h1>
+    <p class="desc">One column of content, four rows: <strong>header</strong> (with the “…” trigger at its end), <strong>title</strong>, <strong>status</strong>, <strong>footer</strong>. The trigger no longer owns a 32&nbsp;px column, so the title and the cost use the card’s full width.</p>
+  </div>
+  <div class="controls">
+    <span><span class="control-label">Theme</span>
+      <span class="segmented" role="group" aria-label="Theme"><button type="button" data-set="theme" data-val="dark" aria-pressed="true">Dark</button><button type="button" data-set="theme" data-val="light" aria-pressed="false">Light</button></span></span>
+    <span><span class="control-label">Pointer</span>
+      <span class="segmented" role="group" aria-label="Pointer"><button type="button" data-set="pointer" data-val="fine" aria-pressed="true">Fine</button><button type="button" data-set="pointer" data-val="coarse" aria-pressed="false">Coarse</button></span></span>
+  </div>
+</header>
+
+<section class="section">
+  <div class="section-header"><h2>C-29, before and after</h2>
+    <p>Same 280&nbsp;px column, same data. Before: <code>RowActions</code> sits beside <code>renderCard</code> as a 32×32 flex column. The title loses about 36&nbsp;px and wraps to three lines, and the cost moves left. After: the trigger is 20×16 on the header’s 16&nbsp;px line, and the title takes two lines.</p></div>
+  <div class="compare">
+    <div class="frame">
+      <div class="frame-title">Before · glass-ui 0.31.0<span class="badge sm warn">menu column</span></div>
+      <article class="card" style="cursor:default">
+        <div class="legacy">
+          <div class="body">
+            <div class="head"><span class="lbl">C-29</span><span class="clip"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"/></svg>2</span><span class="cost">$4.81</span></div>
+            <span class="title" style="cursor:default">Compact density for the board, with the issue and PR links left to the sheet</span>
+            <div class="status"><span class="pill done"><span class="dot"></span>Finished</span></div>
+            <div class="status"><span class="ref">PR #352 · merged</span><span class="ref">Issue #349</span></div>
+          </div>
+          <div class="rail"><span class="ghost"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></span></div>
+        </div>
+      </article>
+      <span class="measure">Title: 3 lines · content width ≈ 218&nbsp;px</span>
+    </div>
+    <div class="frame">
+      <div class="frame-title">After · menu open (Tab → Enter)<span class="badge sm ok">no column</span></div>
+      <article class="card" style="cursor:default" aria-label="C-29 Compact density for the board">
+        <div class="head"><span class="lbl">C-29</span><span class="clip" role="img" aria-label="2 attachments"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"/></svg>2</span>
+          <span class="end"><span class="cost">$4.81</span><button type="button" class="trig" aria-label="Actions for C-29 Compact density for the board" aria-haspopup="menu" aria-expanded="true"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button></span></div>
+        <button type="button" class="title">Compact density for the board, with the issue and PR links left to the sheet</button>
+        <div class="status"><span class="pill done"><span class="dot"></span>Finished</span></div>
+        <div class="foot"><a class="ref merged" href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>PR #352 · merged</a><a class="ref" href="#">Issue #349</a></div>
+        <div class="menu glass-strong" role="menu" aria-label="C-29 actions">
+          <div role="menuitem" aria-disabled="true">Move up</div>
+          <div role="menuitem">Move down</div>
+          <div role="menuitem" aria-disabled="true">Move to top</div>
+          <div role="menuitem">Move to bottom</div>
+          <div role="menuitem">Move to<span class="sub">›</span></div>
+          <hr>
+          <div role="menuitem" class="active">Open</div>
+          <div role="menuitem">Feedback…</div>
+          <div role="menuitem">Accept</div>
+          <div role="menuitem">Open terminal</div>
+          <div role="menuitem" class="danger">Delete</div>
+        </div>
+      </article>
+      <div style="height:280px" aria-hidden="true"></div>
+      <span class="measure">Title: 2 lines · content width ≈ 254&nbsp;px · cost stays beside the trigger</span>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-header"><h2>Board · normal density</h2>
+    <p>Hover a card (fine pointer) to reveal its trigger; Tab reaches it before the title, in reading order. Switch the pointer to Coarse to see the always-visible rule.</p></div>
+  <div class="board" data-density="normal" id="board-normal"></div>
+</section>
+
+<section class="section">
+  <div class="section-header"><h2>Board · compact density</h2>
+    <p>The same four rows, tighter: 8/10&nbsp;px padding, a 4&nbsp;px row gap, the title at 13/18 clamped to two lines, detail text to one. The footer is left to the sheet, as C-29 decided.</p></div>
+  <div class="board" data-density="compact" id="board-compact"></div>
+</section>
+
+<section class="section">
+  <div class="section-header"><h2>Anatomy and the glass-ui slot</h2>
+    <p>Board keeps the shell: drag, the drop slot, the menu content, the move items and focus return after a move. It hands the trigger to the consumer as a node, and CardFace places it.</p></div>
+  <div class="anatomy">
+    <div class="rows">
+      <article class="card">
+        <div class="head tag" data-n="1"><span class="lbl">C-41</span><span class="chip danger">Bug</span><span class="chip warn dep">after C-38</span>
+          <span class="end"><span class="cost">$1.20</span><button type="button" class="trig" style="opacity:1" aria-label="Actions for C-41"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button></span></div>
+        <button type="button" class="title tag" data-n="2">Run button stays disabled after a failed round</button>
+        <div class="status tag" data-n="3"><span class="pill waiting"><span class="dot"></span>Waiting for you</span><span class="chip">No hook events</span></div>
+        <div class="foot tag" data-n="4" style="outline-offset:0"><a class="ref" href="#">PR #388 · open</a><a class="ref" href="#">Issue #386</a></div>
+      </article>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <ol class="spec">
+        <li><strong>Header</strong>: label, Bug, attachments and dependency, then <em>the cost and the trigger grouped at the end</em>. A 16&nbsp;px line that does not wrap; on overflow the dependency chip truncates first, while the cost and the trigger never do.</li>
+        <li><strong>Title</strong>: the open button, at full width.</li>
+        <li><strong>Status</strong>: design state, round pill, hooks chip, “Didn’t start” and the approve offer, then the face’s detail line. Terminal, Fleet and Suggestion add their badge here, not a new block.</li>
+        <li><strong>Footer</strong>: the PR and Issue links above a hairline; hidden in compact.</li>
+      </ol>
+      <pre class="code">// glass-ui: patterns/board.tsx (minor release)
+renderCard: (card: T, column: BoardColumn&lt;T&gt;,
+             slots: { menu: ReactNode }) =&gt; ReactNode;
+menuPlacement?: 'column' | 'inline';   // default 'column': no break
+
+// 'inline': Board renders no RowActions column. slots.menu is the
+// MenuRoot + a 20×16 ghost trigger (Button size="xs" icon) with the
+// same aria-label, the same reveal rule and the same MenuContent
+// (the move items + renderCardMenu).
+
+// apps/web: board-view.tsx
+&lt;Board menuPlacement="inline"
+  renderCard={(item, _col, { menu }) =&gt; &lt;CardFace … menu={menu} /&gt;} /&gt;</pre>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script>
+(function () {
+  var I = {
+    clip: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"/></svg>',
+    dots: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>',
+    merge: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>',
+    check: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>'
+  };
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function pill(st, label) { return '<span class="pill ' + st + '"><span class="dot"></span>' + esc(label) + '</span>'; }
+
+  var columns = [
+    { title: 'Inbox', cards: [
+      { label: 'C-44', title: 'Retry the DeepL call once on a 429 before failing the translation',
+        status: ['<span class="badge sm warn">Suggested</span>', '<span class="note" style="font-variant-numeric:tabular-nums">82% sure</span>'],
+        notes: ['The session hit three 429s in a row and gave up on the card description.'],
+        links: [['Source session', '#']] }
+    ]},
+    { title: 'Backlog', cards: [
+      { label: 'C-42', title: 'Show the runner version on the Fleet page' },
+      { label: 'C-41', bug: true, clips: 3, after: { text: 'after C-38', open: true }, title: 'Run button stays disabled after a failed round', issue: 386 },
+      { label: 'C-39', cost: '$0.62', title: 'Redesign the card sheet header',
+        status: ['<span class="badge info">Design in review</span>', '<span class="badge">Runs after design</span>', '<span class="badge warn">Didn\u2019t start</span>'],
+        approve: true }
+    ]},
+    { title: 'In progress', cards: [
+      { label: 'C-37', cost: '$2.14', clips: 1, title: 'Model picker on the card form',
+        status: ['<span class="badge ok">Design approved</span>', pill('running', 'Running'), '<span class="chip">No hook events</span>'],
+        pr: { text: 'PR #391 · draft' }, issue: 389 },
+      { label: 'C-36', cost: '$0.88', title: 'Fix the flaky board drag test in CI',
+        status: ['<span class="badge sm">Terminal</span>', pill('running', 'Session running'), '<span class="chip">Automatic work</span>'],
+        links: [['Session', '#']] },
+      { label: 'C-34', cost: '$3.47', title: 'Staging deploy holds requests during migrate',
+        status: ['<span class="badge sm">Fleet</span>', '<span class="badge sm warn">Slot gone</span>'],
+        notes: ['i371 · review · round 2'], links: [['Open in Fleet', '#']], pr: { text: 'PR #371 · open' }, issue: 368 }
+    ]},
+    { title: 'Done', cards: [
+      { label: 'C-29', cost: '$4.81', clips: 2, title: 'Compact density for the board, with the issue and PR links left to the sheet',
+        status: [pill('done', 'Finished')], pr: { text: 'PR #352 · merged', merged: true }, issue: 349 },
+      { label: 'C-31', cost: '$1.05', after: { text: 'after C-29', open: false }, title: 'Remember the density per person',
+        status: [pill('error', 'Failed')], issue: 355 }
+    ]}
+  ];
+
+  function card(c) {
+    var name = esc(c.label + ' ' + c.title);
+    var h = '<article class="card" aria-label="' + name + '">';
+    h += '<div class="head"><span class="lbl">' + esc(c.label) + '</span>';
+    if (c.bug) h += '<span class="chip danger">Bug</span>';
+    if (c.clips) h += '<span class="clip" role="img" aria-label="' + c.clips + ' attachments" title="' + c.clips + ' attachments">' + I.clip + c.clips + '</span>';
+    if (c.after) h += '<span class="chip dep' + (c.after.open ? ' warn' : '') + '" title="' + (c.after.open ? 'Not completed yet' : 'Completed') + '">' + esc(c.after.text) + '</span>';
+    h += '<span class="end">' + (c.cost ? '<span class="cost">' + esc(c.cost) + '</span>' : '') +
+         '<button type="button" class="trig" aria-label="Actions for ' + name + '" aria-haspopup="menu" aria-expanded="false">' + I.dots + '</button></span></div>';
+    h += '<button type="button" class="title">' + esc(c.title) + '</button>';
+    if (c.status) h += '<div class="status">' + c.status.join('') + '</div>';
+    if (c.approve) h += '<div class="status"><button type="button" class="btn">' + I.check + 'Approve &amp; run</button></div><span class="note dim">The design is in review; approving it starts the round.</span>';
+    (c.notes || []).forEach(function (n) { h += '<span class="note">' + esc(n) + '</span>'; });
+    if (c.links) h += '<div class="status">' + c.links.map(function (l) { return '<a class="link" href="' + l[1] + '">' + esc(l[0]) + '</a>'; }).join('') + '</div>';
+    if (c.pr || c.issue) {
+      h += '<div class="foot">';
+      if (c.pr) h += '<a class="ref' + (c.pr.merged ? ' merged' : '') + '" href="#">' + (c.pr.merged ? I.merge : '') + esc(c.pr.text) + '</a>';
+      if (c.issue) h += '<a class="ref" href="#">Issue #' + c.issue + '</a>';
+      h += '</div>';
+    }
+    return h + '</article>';
+  }
+  function board(el) {
+    el.innerHTML = columns.map(function (col) {
+      return '<section class="col" aria-label="' + col.title + '"><div class="col-head">' + col.title + '<span class="count">' + col.cards.length + '</span></div>' +
+        col.cards.map(card).join('') + '</section>';
+    }).join('');
+  }
+  board(document.getElementById('board-normal'));
+  board(document.getElementById('board-compact'));
+
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-set]');
+    if (b) {
+      document.documentElement.setAttribute('data-' + b.dataset.set, b.dataset.val);
+      b.parentElement.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+      return;
+    }
+    if (e.target.closest('a[href="#"]')) e.preventDefault();
+  });
+})();
+</script>
+<script data-agentdock-pin-helper>(function () {
+  var FROM = "agentdock-viewer";
+  var TO = "agentdock-mockup";
+  var MAX = 1000;
+  var pinMode = false;
+  var layer = null;
+  function send(msg) { msg.source = TO; window.parent.postMessage(msg, '*'); }
+  function cssPath(el) {
+    var parts = [];
+    while (el && el.nodeType === 1 && el !== document.documentElement) {
+      if (el.id) { parts.unshift('#' + CSS.escape(el.id)); break; }
+      var tag = el.tagName.toLowerCase();
+      var i = 1, sib = el;
+      while ((sib = sib.previousElementSibling)) if (sib.tagName === el.tagName) i++;
+      parts.unshift(tag + ':nth-of-type(' + i + ')');
+      el = el.parentElement;
+    }
+    var path = parts.join(' > ') || 'html';
+    return path.length > MAX ? path.slice(path.length - MAX) : path;
+  }
+  function drawPins(pins) {
+    if (layer) layer.remove();
+    layer = document.createElement('div');
+    layer.setAttribute('data-agentdock-pins', '');
+    layer.style.cssText = 'position:absolute;left:0;top:0;width:0;height:0;z-index:2147483647;pointer-events:none';
+    pins.forEach(function (p) {
+      var m = document.createElement('div');
+      m.textContent = String(p.n);
+      m.style.cssText = 'position:absolute;transform:translate(-50%,-50%);min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:#e5484d;color:#fff;font:600 12px/22px system-ui,sans-serif;text-align:center;box-shadow:0 0 0 2px #fff';
+      m.style.left = p.x + 'px';
+      m.style.top = p.y + 'px';
+      layer.appendChild(m);
+    });
+    document.body.appendChild(layer);
+  }
+  document.addEventListener('click', function (e) {
+    if (!pinMode) return;
+    e.preventDefault();
+    e.stopPropagation();
+    var target = e.target && e.target.nodeType === 1 ? e.target : document.body;
+    send({ type: 'pin', x: Math.max(0, e.pageX), y: Math.max(0, e.pageY), clientX: Math.max(0, e.clientX), clientY: Math.max(0, e.clientY), selector: cssPath(target) });
+  }, true);
+  document.addEventListener('wheel', function (e) {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    e.preventDefault();
+    send({ type: 'wheel', deltaY: e.deltaY });
+  }, { passive: false });
+  window.addEventListener('message', function (e) {
+    if (e.source !== window.parent) return;
+    var d = e.data;
+    if (!d || d.source !== FROM) return;
+    if (d.type === 'theme' && (d.theme === 'light' || d.theme === 'dark')) {
+      document.documentElement.setAttribute('data-theme', d.theme);
+    } else if (d.type === 'pin-mode') {
+      pinMode = d.on === true;
+      document.documentElement.style.cursor = pinMode ? 'crosshair' : '';
+    } else if (d.type === 'pins' && Array.isArray(d.pins)) {
+      drawPins(d.pins);
+    }
+  });
+  send({ type: 'ready' });
+})();</script></body>
+</html>

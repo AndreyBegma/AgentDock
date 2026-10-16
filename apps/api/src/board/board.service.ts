@@ -18,6 +18,7 @@ import {
   cardLabel,
   type FleetCardEdits,
   isActiveRoundPhase,
+  profileAgentdockOf,
   type Role,
 } from '@agentdock/shared';
 import { roleAtLeast } from '@agentdock/shared/protocol';
@@ -35,9 +36,13 @@ import { PrismaService } from '../database/prisma.service';
 import { usageByRun } from '../history/run-usage';
 import { mergeMethodOf } from '../planner/planner-instructions.service';
 import { RuntimeProfileResolver } from '../readiness';
+import { assertIssueLinkable } from '../steward/issue-link';
+import { stewardChipsFor } from '../steward/steward-chips';
 import { TextNormalizer } from '../text/text-normalizer';
 import { TextOwners } from '../text/text-owners';
+import { tokenSaverFactsOf } from '../token-saver/token-saver-facts';
 import { BoardCommands, boardOutput } from './board-commands';
+import { BoardDependencies } from './board-dependencies.service';
 import { boardError, cardNotFound } from './board-error';
 import {
   type CardFacts,
@@ -47,6 +52,7 @@ import {
   toCardView,
   toSettingsView,
 } from './board-mapper';
+import { BoardStacks } from './board-stacks';
 import {
   ACTIVE_PHASES,
   BOARD_SYSTEM_ACTOR,
@@ -113,6 +119,8 @@ export class BoardService implements OnModuleInit {
     private readonly attachments: AttachmentsService,
     private readonly assessor: CardAssessor,
     private readonly profiles: RuntimeProfileResolver,
+    private readonly dependencies: BoardDependencies,
+    private readonly stacks: BoardStacks,
   ) {}
 
   /**
@@ -239,11 +247,21 @@ export class BoardService implements OnModuleInit {
             hasMore: false,
           },
     );
+    const [project, stacks] = await Promise.all([
+      this.work.project(projectId),
+      this.stacks.views(projectId),
+    ]);
     return {
       projectId,
       columns,
+      stacks,
       running,
-      settings: toSettingsView(projectId, settings),
+      settings: toSettingsView(
+        projectId,
+        settings,
+        project.base,
+        project.defaultBranch,
+      ),
     };
   }
 
@@ -264,6 +282,8 @@ export class BoardService implements OnModuleInit {
           include: { author: USER_REF },
         },
         design: cardDesignSelect,
+        // #359 D8: every PR the card opened.
+        pullRequests: true,
       },
     });
     if (!card || (card.column === 'inbox' && !seesInbox(role))) {
@@ -292,7 +312,27 @@ export class BoardService implements OnModuleInit {
     const trackedIds = cards
       .map((c) => c.trackedSessionId)
       .filter((id): id is string => id !== null);
-    const [usage, hooked, alive, attachmentCounts] = await Promise.all([
+    // #348 D1: only a round that is running can show the hooks hint.
+    const activeRuns = cards.flatMap((c) =>
+      c.rounds.filter((r) => isActiveRoundPhase(r.phase)).map((r) => r.runId),
+    );
+    const projectIds = [
+      ...new Set(
+        cards
+          .filter((c) => c.rounds.some((r) => isActiveRoundPhase(r.phase)))
+          .map((c) => c.projectId),
+      ),
+    ];
+    const [
+      usage,
+      hooked,
+      alive,
+      attachmentCounts,
+      deps,
+      runs,
+      projects,
+      stacks,
+    ] = await Promise.all([
       usageByRun(this.prisma, runIds),
       sessionIds.length === 0
         ? Promise.resolve([])
@@ -312,7 +352,28 @@ export class BoardService implements OnModuleInit {
             select: { id: true },
           }),
       this.attachments.counts(cards.map((c) => c.id)),
+      this.dependencies.refsOf(cards.map((c) => c.id)),
+      activeRuns.length === 0
+        ? Promise.resolve([])
+        : this.prisma.run.findMany({
+            where: { id: { in: activeRuns }, profileKey: { not: null } },
+            select: { id: true, profileKey: true },
+          }),
+      projectIds.length === 0
+        ? Promise.resolve([])
+        : this.prisma.project.findMany({
+            where: { id: { in: projectIds } },
+            select: { id: true, runner: { select: { capabilities: true } } },
+          }),
+      this.stacks.refsOf(cards.map((c) => c.id)),
     ]);
+    const runProfileKeys = new Map<string, string>();
+    for (const run of runs) {
+      if (run.profileKey !== null) runProfileKeys.set(run.id, run.profileKey);
+    }
+    const profileAgentdock = new Map(
+      projects.map((p) => [p.id, profileAgentdockOf(p.runner.capabilities)]),
+    );
     const costs = new Map<string, string>();
     for (const [runId, u] of usage) {
       if (u.costUsd !== null) costs.set(runId, u.costUsd);
@@ -321,7 +382,18 @@ export class BoardService implements OnModuleInit {
       costs,
       hooked: new Set(hooked.map((s) => s.externalId)),
       alive: new Set(alive.map((s) => s.id)),
+      runProfileKeys,
+      profileAgentdock,
       attachmentCounts,
+      dependencies: deps,
+      stacks,
+      // #445: each round run's savings and artifact-guard flag.
+      tokenSaver: await tokenSaverFactsOf(this.prisma, runIds),
+      // #447 D15: the live Steward incident of each card's latest round.
+      steward: await stewardChipsFor(
+        this.prisma,
+        cards.flatMap((c) => (c.rounds[0] ? [c.rounds[0].id] : [])),
+      ),
       now: new Date(),
     };
   }
@@ -369,7 +441,9 @@ export class BoardService implements OnModuleInit {
           kindSource: dto.kind === undefined ? 'auto' : 'person',
           column: 'todo',
           position,
-          issueOnRun: dto.issueOnRun ?? settings.issueOnRun,
+          // #359 D4: a bug gets an issue at Run, a feature none — unless the
+          // person says otherwise.
+          issueOnRun: dto.issueOnRun ?? dto.kind === 'bug',
           specOnRun: dto.specOnRun ?? settings.specOnRun,
           createdById: actor.userId,
           movedById: actor.userId,
@@ -471,13 +545,22 @@ export class BoardService implements OnModuleInit {
     actor: BoardActor,
   ): Promise<BoardCardDetail> {
     const card = await this.work.card(projectId, number);
-    const { continueAfterDesign, autoCollect, ...fields } = dto;
+    const { continueAfterDesign, autoCollect, autoRunWhenReady, ...fields } =
+      dto;
     // #282 D3: Automatic work is a terminal card's; refused before anything is written.
     if (autoCollect !== undefined && card.source !== 'terminal') {
       throw boardError(
         422,
         BOARD_ERROR.notTracked,
         'Automatic work is set on a card tracked from a terminal session only',
+      );
+    }
+    // #443: a card waits for its dependencies in To Do; off is always allowed.
+    if (autoRunWhenReady === true && card.column !== 'todo') {
+      throw boardError(
+        409,
+        BOARD_ERROR.wrongColumn,
+        'Auto-run when ready is set on a card in To Do only',
       );
     }
     // #322 D9: a remembered profile is a Claude profile of the project's runner.
@@ -489,15 +572,34 @@ export class BoardService implements OnModuleInit {
           boardError(422, BOARD_ERROR.noProfile, message, details),
       );
     }
+    // #447 D8: only an open issue of the project's repository; null unlinks.
+    const issueLink =
+      fields.issueNumber === undefined
+        ? undefined
+        : fields.issueNumber === null
+          ? { issueNumber: null, issueUrl: null }
+          : await assertIssueLinkable(
+              this.prisma,
+              projectId,
+              fields.issueNumber,
+            ).then((link) => ({
+              issueNumber: link.number,
+              issueUrl: link.url,
+            }));
     if (continueAfterDesign !== undefined) {
       await this.toggleContinue(card, continueAfterDesign, actor);
     }
     if (autoCollect !== undefined) {
       await this.toggleAutoCollect(card, autoCollect, actor);
     }
+    if (autoRunWhenReady !== undefined) {
+      await this.toggleAutoRun(card, autoRunWhenReady, actor);
+    }
     // A switch alone is its own audit record, not a card edit.
     if (
-      (continueAfterDesign !== undefined || autoCollect !== undefined) &&
+      (continueAfterDesign !== undefined ||
+        autoCollect !== undefined ||
+        autoRunWhenReady !== undefined) &&
       Object.values(fields).every((v) => v === undefined)
     ) {
       this.work.publish(projectId, card.id);
@@ -509,9 +611,12 @@ export class BoardService implements OnModuleInit {
       ...(fields.kind !== undefined ? { kind: fields.kind } : {}),
       // #271 D9: a kind the person sets is theirs from now on.
       ...(fields.kind !== undefined ? { kindSource: 'person' as const } : {}),
+      // #359 D4: the issue follows the kind, unless the person sets it too.
       ...(fields.issueOnRun !== undefined
         ? { issueOnRun: fields.issueOnRun }
-        : {}),
+        : fields.kind !== undefined
+          ? { issueOnRun: fields.kind === 'bug' }
+          : {}),
       ...(fields.specOnRun !== undefined
         ? { specOnRun: fields.specOnRun }
         : {}),
@@ -523,6 +628,7 @@ export class BoardService implements OnModuleInit {
       ...(fields.profileKey !== undefined
         ? { profileKey: fields.profileKey }
         : {}),
+      ...(issueLink ?? {}),
     };
     await this.prisma.boardCard.update({
       where: { id: card.id },
@@ -632,6 +738,32 @@ export class BoardService implements OnModuleInit {
       projectId: card.projectId,
       before: { number: card.number, autoCollect: !on },
       after: { number: card.number, autoCollect: on },
+      result: 'ok',
+    });
+  }
+
+  /**
+   * #443: Auto-run when ready — accepting the last open dependency starts the
+   * Run (`BoardAutoRun`). Turning it on does not start a card that is
+   * already ready; that one is run by hand.
+   */
+  private async toggleAutoRun(
+    card: CardWithRounds,
+    on: boolean,
+    actor: BoardActor,
+  ): Promise<void> {
+    if (card.autoRunWhenReady === on) return;
+    await this.prisma.boardCard.update({
+      where: { id: card.id },
+      data: { autoRunWhenReady: on },
+    });
+    await this.audit.record({
+      ...actor.ctx,
+      action: 'card.auto_run_toggled',
+      target: { type: 'board_card', id: card.id },
+      projectId: card.projectId,
+      before: { number: card.number, autoRunWhenReady: !on },
+      after: { number: card.number, autoRunWhenReady: on },
       result: 'ok',
     });
   }
@@ -998,103 +1130,14 @@ export class BoardService implements OnModuleInit {
   }
 
   /** #273 D13: `card.merge`, audited; a refusal is 409 `merge_failed`. */
-  private async merge(
+  private merge(
     project: BoardProject,
     card: CardWithRounds,
     headSha: string,
     deleteBranch: boolean,
     actor: BoardActor,
   ): Promise<CardMergeOutcome> {
-    if (isActiveRoundPhase(card.rounds[0]?.phase)) {
-      throw boardError(
-        409,
-        BOARD_ERROR.cardRunning,
-        'A worker is running on this card',
-      );
-    }
-    const pr = card.prNumber;
-    if (pr === null) {
-      throw boardError(
-        409,
-        BOARD_ERROR.noPullRequest,
-        `${cardLabel(card.number)} has no pull request to merge`,
-      );
-    }
-    const output = boardOutput(
-      'card.merge',
-      await this.commands.send(
-        project.runnerId,
-        'card.merge',
-        {
-          cardId: card.id,
-          projectId: project.id,
-          root: project.rootPath,
-          pr,
-          headSha,
-          method: mergeMethodOf(project.codeSentinelConfig),
-          issue: card.issueNumber,
-          comment: `Completed as ${cardLabel(card.number)} on the AgentDock board; merged in #${pr}.`,
-          // #329 D9: an older runner refuses the arg; it is sent only when asked.
-          ...(deleteBranch ? { deleteBranch } : {}),
-        },
-        { role: actor.role, ctx: actor.ctx },
-      ),
-    );
-    const target = { type: 'board_card', id: card.id } as const;
-    if (!output.merged) {
-      await this.audit.record({
-        ...actor.ctx,
-        action: 'card.merge_failed',
-        target,
-        projectId: project.id,
-        after: { number: card.number, pr, reason: output.error },
-        result: 'error',
-        meta: { message: output.message },
-      });
-      throw boardError(
-        409,
-        BOARD_ERROR.mergeFailed,
-        output.message || `The merge of #${pr} was refused`,
-        { reason: output.error },
-      );
-    }
-    await this.audit.record({
-      ...actor.ctx,
-      action: 'card.merged',
-      target,
-      projectId: project.id,
-      after: {
-        number: card.number,
-        pr,
-        method: output.method,
-        ...(output.mergeCommit !== null
-          ? { mergeCommit: output.mergeCommit }
-          : {}),
-        alreadyMerged: output.alreadyMerged,
-        issueClosed: output.issueClosed,
-        branchDeleted: output.branchDeleted,
-      },
-      result: 'ok',
-    });
-    // #329 D6: the card's PR state from the merge result.
-    await this.prisma.boardCard.update({
-      where: { id: card.id },
-      data: { prState: 'merged' },
-    });
-    return {
-      merged: true,
-      alreadyMerged: output.alreadyMerged,
-      method: output.method,
-      mergeCommit: output.mergeCommit,
-      issueClosed: output.issueClosed,
-      ...(output.issueError !== undefined
-        ? { issueError: output.issueError }
-        : {}),
-      branchDeleted: output.branchDeleted,
-      ...(output.branchError !== undefined
-        ? { branchError: output.branchError }
-        : {}),
-    };
+    return this.work.mergePr(project, card, headSha, deleteBranch, actor);
   }
 
   /**
@@ -1190,9 +1233,12 @@ export class BoardService implements OnModuleInit {
   }
 
   async settings(projectId: string): Promise<BoardSettingsView> {
+    const project = await this.work.project(projectId);
     return toSettingsView(
       projectId,
       await this.prisma.boardSettings.findUnique({ where: { projectId } }),
+      project.base,
+      project.defaultBranch,
     );
   }
 
@@ -1230,6 +1276,13 @@ export class BoardService implements OnModuleInit {
       ...(dto.autoCollectTracked !== undefined
         ? { autoCollectTracked: dto.autoCollectTracked }
         : {}),
+      // #359 D7: `null` returns to the default.
+      ...(dto.autoMergeCards !== undefined
+        ? { autoMergeCards: dto.autoMergeCards }
+        : {}),
+      ...(dto.backgroundStallMinutes !== undefined
+        ? { backgroundStallMinutes: dto.backgroundStallMinutes }
+        : {}),
       updatedById: actor.userId,
     };
     const row = await this.prisma.boardSettings.upsert({
@@ -1249,6 +1302,8 @@ export class BoardService implements OnModuleInit {
         captureEnabled: before.captureEnabled,
         captureModel: before.captureModel,
         autoCollectTracked: before.autoCollectTracked,
+        autoMergeCards: before.autoMergeCards,
+        backgroundStallMinutes: before.backgroundStallMinutes,
       },
       after: {
         issueOnRun: row.issueOnRun,
@@ -1257,9 +1312,12 @@ export class BoardService implements OnModuleInit {
         captureEnabled: row.captureEnabled,
         captureModel: row.captureModel,
         autoCollectTracked: row.autoCollectTracked,
+        autoMergeCards: row.autoMergeCards,
+        backgroundStallMinutes: row.backgroundStallMinutes,
       },
       result: 'ok',
     });
-    return toSettingsView(projectId, row);
+    const project = await this.work.project(projectId);
+    return toSettingsView(projectId, row, project.base, project.defaultBranch);
   }
 }

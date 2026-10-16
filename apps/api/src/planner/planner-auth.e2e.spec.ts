@@ -22,6 +22,7 @@ const planRoutes = (
   ['post', `${base}/revise`, {}],
   ['post', `${base}/visibility`, { visibility: 'project' }],
   ['post', `${base}/send`, {}],
+  ['post', `${base}/cards`, {}],
   ['post', `${base}/archive`, {}],
   ['post', `${base}/turns/${turnId}/cancel`, {}],
   ['post', `${base}/turns/${turnId}/retry`, {}],

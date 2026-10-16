@@ -1,11 +1,16 @@
-import type {
-  AcceptBoardCardResponse,
-  BoardCardDetail,
-  BoardSettingsView,
-  BoardView,
-  CardPullRequestView,
-  CollectBoardCardResponse,
-  DismissAllResult,
+import {
+  type AcceptBoardCardResponse,
+  BOARD_ERROR,
+  type BoardCardDetail,
+  type BoardSettingsView,
+  type BoardStackDetail,
+  type BoardView,
+  type BulkBoardCardsResponse,
+  type CardDependenciesView,
+  type CardPullRequestView,
+  type CollectBoardCardResponse,
+  type DismissAllResult,
+  type SessionMessageView,
 } from '@agentdock/shared';
 import {
   Body,
@@ -29,26 +34,43 @@ import {
   ProjectRole,
   type ResolvedProjectAccess,
 } from '../projects';
+import { SessionMessageDto, sessionMessageInput } from '../session-message/dto';
 import { BoardService } from './board.service';
-import { cardNotFound } from './board-error';
+import { BoardBulk } from './board-bulk';
+import { BoardDependencies } from './board-dependencies.service';
+import { boardError, cardNotFound } from './board-error';
 import { BoardInboxService } from './board-inbox.service';
 import { BoardRoundsService } from './board-rounds.service';
+import { BoardSessionMessages } from './board-session-message.service';
+import { BoardStacks } from './board-stacks';
 import type { BoardActor } from './board-work';
 import {
   AcceptBoardCardDto,
   AcceptSuggestionDto,
+  AddCardDependencyDto,
+  AddStackCardDto,
   BoardQueryDto,
+  BulkBoardCardsDto,
   CardFeedbackDto,
   CreateBoardCardDto,
   MoveBoardCardDto,
   RunBoardCardDto,
   UpdateBoardCardDto,
   UpdateBoardSettingsDto,
+  UpdateBoardStackDto,
 } from './dto';
 
 /** A card's per-project number from the path; anything else is no card. */
 export const cardNumber = (value: string): number => {
   if (!/^[1-9]\d{0,8}$/.test(value)) throw cardNotFound();
+  return Number(value);
+};
+
+/** #480: a stack's per-project number from the path; anything else is no stack. */
+export const stackNumber = (value: string): number => {
+  if (!/^[1-9]\d{0,8}$/.test(value)) {
+    throw boardError(404, BOARD_ERROR.notFound, 'Stack not found');
+  }
   return Number(value);
 };
 
@@ -71,7 +93,72 @@ export class BoardController {
     private readonly board: BoardService,
     private readonly rounds: BoardRoundsService,
     private readonly inbox: BoardInboxService,
+    private readonly deps: BoardDependencies,
+    private readonly bulk: BoardBulk,
+    private readonly messages: BoardSessionMessages,
+    private readonly stacks: BoardStacks,
   ) {}
+
+  // ─── Stacks (#480, ADR-0044) ───────────────────────────────────────────────
+
+  @Get('board/stacks/:number')
+  stack(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @Param('number') number: string,
+  ): Promise<BoardStackDetail> {
+    return this.stacks.detail(access.projectId, stackNumber(number));
+  }
+
+  @Patch('board/stacks/:number')
+  @ProjectRole('operator')
+  updateStack(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Param('number') number: string,
+    @Body() dto: UpdateBoardStackDto,
+  ): Promise<BoardStackDetail> {
+    return this.stacks.update(
+      access.projectId,
+      stackNumber(number),
+      dto,
+      actorOf(access, user, ctx),
+    );
+  }
+
+  @Post('board/stacks/:number/cards')
+  @ProjectRole('operator')
+  addStackCard(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Param('number') number: string,
+    @Body() dto: AddStackCardDto,
+  ): Promise<BoardStackDetail> {
+    return this.stacks.addCard(
+      access.projectId,
+      stackNumber(number),
+      dto,
+      actorOf(access, user, ctx),
+    );
+  }
+
+  @Delete('board/stacks/:number/cards/:card')
+  @ProjectRole('operator')
+  removeStackCard(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Param('number') number: string,
+    @Param('card') card: string,
+  ): Promise<BoardStackDetail> {
+    return this.stacks.removeCard(
+      access.projectId,
+      stackNumber(number),
+      cardNumber(card),
+      actorOf(access, user, ctx),
+    );
+  }
 
   @Get('board')
   view(
@@ -94,6 +181,22 @@ export class BoardController {
     @Body() dto: CreateBoardCardDto,
   ): Promise<BoardCardDetail> {
     return this.board.create(access.projectId, dto, actorOf(access, user, ctx));
+  }
+
+  /**
+   * #452: one action for several cards — each skipped or done on its own, so
+   * the answer is always 200 with an outcome per card.
+   */
+  @Post('board/cards/bulk')
+  @HttpCode(200)
+  @ProjectRole('operator')
+  bulkAction(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Body() dto: BulkBoardCardsDto,
+  ): Promise<BulkBoardCardsResponse> {
+    return this.bulk.run(access.projectId, dto, actorOf(access, user, ctx));
   }
 
   @Get('board/cards/:number')
@@ -133,6 +236,49 @@ export class BoardController {
     await this.board.delete(
       access.projectId,
       cardNumber(number),
+      actorOf(access, user, ctx),
+    );
+  }
+
+  @Get('board/cards/:number/dependencies')
+  dependencies(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @Param('number') number: string,
+  ): Promise<CardDependenciesView> {
+    return this.deps.list(access.projectId, cardNumber(number), access.role);
+  }
+
+  @Post('board/cards/:number/dependencies')
+  @HttpCode(200)
+  @ProjectRole('operator')
+  addDependency(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Param('number') number: string,
+    @Body() dto: AddCardDependencyDto,
+  ): Promise<CardDependenciesView> {
+    return this.deps.add(
+      access.projectId,
+      cardNumber(number),
+      dto.dependsOn,
+      actorOf(access, user, ctx),
+    );
+  }
+
+  @Delete('board/cards/:number/dependencies/:dependsOn')
+  @ProjectRole('operator')
+  removeDependency(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Param('number') number: string,
+    @Param('dependsOn') dependsOn: string,
+  ): Promise<CardDependenciesView> {
+    return this.deps.remove(
+      access.projectId,
+      cardNumber(number),
+      cardNumber(dependsOn),
       actorOf(access, user, ctx),
     );
   }
@@ -187,6 +333,25 @@ export class BoardController {
       access.projectId,
       cardNumber(number),
       dto,
+      actorOf(access, user, ctx),
+    );
+  }
+
+  /** #489: text or an answer to the card's running session. */
+  @Post('board/cards/:number/message')
+  @HttpCode(200)
+  @ProjectRole('operator')
+  message(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Param('number') number: string,
+    @Body() dto: SessionMessageDto,
+  ): Promise<SessionMessageView> {
+    return this.messages.message(
+      access.projectId,
+      cardNumber(number),
+      sessionMessageInput(dto),
       actorOf(access, user, ctx),
     );
   }

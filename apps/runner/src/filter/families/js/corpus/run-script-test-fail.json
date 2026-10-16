@@ -1,0 +1,7 @@
+{
+  "argv": ["bun", "run", "--cwd", "apps/api", "test"],
+  "exitCode": 1,
+  "category": "test",
+  "outcome": "failing",
+  "expect": "filtered"
+}

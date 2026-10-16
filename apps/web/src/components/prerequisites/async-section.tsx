@@ -18,6 +18,7 @@ export function AsyncSection<T>({
   empty,
   isEmpty,
   skeleton = <Skeleton className="h-32 w-full" />,
+  className,
   children,
 }: {
   section: Section<T>;
@@ -27,6 +28,12 @@ export function AsyncSection<T>({
   empty: ReactNode;
   isEmpty?: (data: T) => boolean;
   skeleton?: ReactNode;
+  /**
+   * Added to the wrapper around the data: a page that fills the screen passes
+   * `min-h-0 flex-1`, or the wrapper takes its content's height and the
+   * regions inside it (the Board's columns, #384) never scroll.
+   */
+  className?: string;
   children: (data: T) => ReactNode;
 }) {
   const view = sectionView(section, isEmpty);
@@ -52,7 +59,7 @@ export function AsyncSection<T>({
   if (view === 'unavailable') return failure;
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className={`flex flex-col gap-3${className ? ` ${className}` : ''}`}>
       {failure}
       {view === 'empty' || section.data === undefined
         ? empty

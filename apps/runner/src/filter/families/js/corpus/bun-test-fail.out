@@ -1,0 +1,67 @@
+bun test v1.4.0 (34cbb9a40)
+
+src/spool/spool.test.ts:
+ 6 |       expect(i + 1).toBe(i + 1);
+ 7 |     });
+ 8 |   }
+ 9 |   it('drops the oldest segment at the cap', () => {
+10 |     const segments = [1, 2, 3, 4];
+11 |     expect(segments.length).toBe(3);
+                                 ^
+error: expect(received).toBe(expected)
+
+Expected: 3
+Received: 4
+
+      at <anonymous> (/home/dev/agent/src/spool/spool.test.ts:11:29)
+(fail) spool > drops the oldest segment at the cap [0.26ms]
+11 |     expect(segments.length).toBe(3);
+12 |   });
+13 |   it('rejects a corrupt meta', () => {
+14 |     expect(() => {
+15 |       throw new Error('corrupt meta file');
+16 |     }).not.toThrow();
+                ^
+error: expect(received).not.toThrow()
+
+Error name: "Error"
+Error message: "corrupt meta file"
+
+      at <anonymous> (/home/dev/agent/src/spool/spool.test.ts:16:12)
+(fail) spool > rejects a corrupt meta [0.12ms]
+
+src/spool/rotate.test.ts:
+(pass) rotate > rotates a full segment [0.08ms]
+(pass) rotate > keeps the newest segment open [0.05ms]
+(pass) rotate > names segments by sequence [0.04ms]
+(pass) rotate > survives a torn last line [0.11ms]
+
+src/spool/ack.test.ts:
+(pass) ack > acks up to a seq [0.05ms]
+(pass) ack > ignores an ack below the floor [0.03ms]
+(pass) ack > deletes fully acked segments [0.09ms]
+
+src/spool/meta.test.ts:
+(pass) meta > reads the spool's meta [0.04ms]
+(pass) meta > refuses a corrupt meta file [0.07ms]
+(pass) meta > writes atomically [0.12ms]
+(pass) meta > migrates a v1 meta [0.06ms]
+
+src/events/envelope.test.ts:
+(pass) envelope > stamps a seq [0.03ms]
+(pass) envelope > stamps a monotonic time [0.02ms]
+(pass) envelope > rejects an unknown kind [0.04ms]
+(pass) envelope > round-trips through JSON [0.05ms]
+(pass) envelope > keeps the payload byte for byte [0.03ms]
+
+src/events/batch.test.ts:
+(pass) batch > flushes at the size cap [0.07ms]
+(pass) batch > flushes at the age cap [0.31ms]
+(pass) batch > never splits an envelope [0.04ms]
+(pass) batch > resumes after a failed send [0.15ms]
+(pass) batch > backs off with jitter [0.09ms]
+
+ 30 pass
+ 2 fail
+ 32 expect() calls
+Ran 32 tests across 4 files. [4.00ms]

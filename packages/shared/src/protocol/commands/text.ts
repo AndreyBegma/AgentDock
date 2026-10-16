@@ -5,6 +5,7 @@ import {
   TEXT_NORMALIZE_MODEL,
   TEXT_PROMPT_MAX_BYTES,
 } from '../../text/limits';
+import { tokenSaverConfigSchema } from '../../token-saver/contracts';
 import type { CommandDefinition } from '../commands';
 import { profileKeySchema, skillRunIdSchema } from './skills';
 
@@ -56,6 +57,8 @@ export const textNormalizeArgsSchema = z.strictObject({
     .int()
     .min(TEXT_NORMALIZE_MIN_TIMEOUT_SEC)
     .max(TEXT_NORMALIZE_MAX_TIMEOUT_SEC),
+  /** #445 D11: as on `card.run`. */
+  tokenSaver: tokenSaverConfigSchema.optional(),
 });
 export type TextNormalizeArgs = z.infer<typeof textNormalizeArgsSchema>;
 

@@ -1,0 +1,19 @@
+Installing dependencies from lock file (including require-dev)
+Verifying lock file contents can be installed on current platform.
+Package operations: 12 installs, 0 updates, 0 removals
+  - Downloading psr/log (3.0.1)
+  - Downloading symfony/polyfill-mbstring (v1.30.0)
+  - Downloading symfony/deprecation-contracts (v3.5.0)
+  - Downloading monolog/monolog (3.7.0)
+  - Downloading nesbot/carbon (3.7.0)
+  - Downloading phpunit/phpunit (10.5.20)
+  - Installing psr/log (3.0.1): Extracting archive
+  - Installing symfony/polyfill-mbstring (v1.30.0): Extracting archive
+  - Installing symfony/deprecation-contracts (v3.5.0): Extracting archive
+  - Installing monolog/monolog (3.7.0): Extracting archive
+  - Installing nesbot/carbon (3.7.0): Extracting archive
+  - Installing phpunit/phpunit (10.5.20): Extracting archive
+2 package suggestions were added by new dependencies, use `composer suggest` to see details.
+Generating autoload files
+38 packages you are using are looking for funding.
+Use the `composer fund` command to find out more!

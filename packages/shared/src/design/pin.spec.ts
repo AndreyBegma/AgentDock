@@ -17,14 +17,24 @@ type Listener = (event: Record<string, unknown>) => void;
 const runHelper = () => {
   const sent: unknown[] = [];
   const parent = { postMessage: (msg: unknown) => sent.push(msg) };
-  const listeners: { click?: Listener; message?: Listener } = {};
+  const listeners: {
+    click?: Listener;
+    wheel?: Listener;
+    message?: Listener;
+  } = {};
+  let wheelOptions: unknown;
   const root = { style: { cursor: '' }, setAttribute: () => {} };
   const body = { nodeType: 1, tagName: 'BODY', parentElement: root };
   const document = {
     documentElement: root,
     body,
-    addEventListener: (type: 'click', fn: Listener) => {
+    addEventListener: (
+      type: 'click' | 'wheel',
+      fn: Listener,
+      options?: unknown,
+    ) => {
       listeners[type] = fn;
+      if (type === 'wheel') wheelOptions = options;
     },
   };
   const window = {
@@ -50,7 +60,17 @@ const runHelper = () => {
       preventDefault: () => {},
       stopPropagation: () => {},
     });
-  return { sent, viewer, click };
+  const wheel = (event: Record<string, unknown>) => {
+    let prevented = false;
+    listeners.wheel?.({
+      ...event,
+      preventDefault: () => {
+        prevented = true;
+      },
+    });
+    return prevented;
+  };
+  return { sent, viewer, click, wheel, wheelOptions: () => wheelOptions };
 };
 
 describe('the pin message', () => {
@@ -81,6 +101,43 @@ describe('the pin message', () => {
         mockupMessageSchema.safeParse({ ...pin, clientX: 1, clientY }).success,
       ).toBe(false);
     }
+  });
+});
+
+describe('the wheel message', () => {
+  const wheel = { source: MOCKUP_MESSAGE_SOURCE, type: 'wheel', deltaY: -120 };
+
+  it('parses a finite travel and refuses anything else', () => {
+    expect(mockupMessageSchema.safeParse(wheel).success).toBe(true);
+    for (const deltaY of [Number.NaN, Number.POSITIVE_INFINITY, 1e9]) {
+      expect(mockupMessageSchema.safeParse({ ...wheel, deltaY }).success).toBe(
+        false,
+      );
+    }
+    expect(
+      mockupMessageSchema.safeParse({ ...wheel, deltaY: undefined }).success,
+    ).toBe(false);
+  });
+});
+
+describe('the pin helper wheel', () => {
+  it('forwards Ctrl/⌘ + wheel and stops the frame from zooming the page', () => {
+    const { sent, wheel, wheelOptions } = runHelper();
+    expect(wheelOptions()).toEqual({ passive: false });
+    for (const mod of [{ ctrlKey: true }, { metaKey: true }]) {
+      expect(wheel({ ...mod, deltaY: -100 })).toBe(true);
+    }
+    const messages = sent.slice(1).map((m) => mockupMessageSchema.parse(m));
+    expect(messages).toEqual([
+      { source: MOCKUP_MESSAGE_SOURCE, type: 'wheel', deltaY: -100 },
+      { source: MOCKUP_MESSAGE_SOURCE, type: 'wheel', deltaY: -100 },
+    ]);
+  });
+
+  it('leaves a plain wheel to scroll the mockup', () => {
+    const { sent, wheel } = runHelper();
+    expect(wheel({ deltaY: 100 })).toBe(false);
+    expect(sent).toHaveLength(1);
   });
 });
 

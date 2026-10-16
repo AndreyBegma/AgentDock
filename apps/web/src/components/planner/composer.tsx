@@ -1,8 +1,8 @@
 'use client';
 
 import {
-  CLAUDE_MODELS,
   type CreatePlanRequest,
+  claudeModelOptions,
   type PlanMode,
   type ProjectRuntimeProfile,
 } from '@agentdock/shared';
@@ -34,13 +34,12 @@ const MODES: { value: PlanMode; label: string; hint: string }[] = [
   },
 ];
 
-/** D14: opus unless the person picks another. */
-const DEFAULT_MODEL = 'opus';
-
 /**
- * The brief composer (spec 172 UI): a large text box, the mode, and the
- * model and runtime profile every turn of the plan will use. **Plan** is the
- * page's one solid action. The profile starts on the project default or the
+ * The brief composer (spec 172 UI), the Board's plan panel (#337 D7; no link
+ * opens it since New Plan went away, #409): a large
+ * text box, the mode, and the model and runtime profile every turn of the
+ * plan will use. The model starts on the person's planning model (#337 D9)
+ * and the pick is for this plan only. **Plan** is the one solid action. The profile starts on the project default or the
  * only one (#213); with none to use, Plan says why and links to the fix
  * instead of letting the API answer 422. Below `md` the model, the profile
  * and Plan stick to the bottom of the screen while the brief scrolls.
@@ -48,6 +47,7 @@ const DEFAULT_MODEL = 'opus';
 export function Composer({
   projectId,
   initialBrief,
+  defaultModel,
   profiles,
   disabledReason,
   runnerReason = null,
@@ -56,6 +56,8 @@ export function Composer({
   projectId: string;
   /** `?brief=` from the Fleet canvas's "Plan this" (#160). */
   initialBrief: string;
+  /** #337 D9: the person's planning model, preselected. */
+  defaultModel: string;
   /**
    * The runner's Claude profiles; `undefined` while they load, `'failed'`
    * when they could not be read.
@@ -73,7 +75,8 @@ export function Composer({
 }) {
   const [brief, setBrief] = useState(initialBrief);
   const [mode, setMode] = useState<PlanMode>('batch');
-  const [model, setModel] = useState(DEFAULT_MODEL);
+  const [pickedModel, setModel] = useState<string>();
+  const model = pickedModel ?? defaultModel;
   // The person's pick; until then the preselection follows the loaded list.
   const [picked, setPicked] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -100,7 +103,7 @@ export function Composer({
       await onCreate({
         brief: text,
         mode,
-        ...(model !== DEFAULT_MODEL ? { model } : {}),
+        model,
         profileKey,
       });
     } catch {
@@ -172,8 +175,8 @@ export function Composer({
                 disabled={off}
                 onChange={(e) => setModel(e.target.value)}
               >
-                {CLAUDE_MODELS.map((m) => (
-                  <option key={m.alias} value={m.alias}>
+                {claudeModelOptions({ selected: model }).map((m) => (
+                  <option key={m.value} value={m.value}>
                     {m.label}
                   </option>
                 ))}

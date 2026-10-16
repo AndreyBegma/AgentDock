@@ -1,12 +1,37 @@
 import type { z } from 'zod';
 import { DESIGN_CDN_ALLOWLIST } from '../design/cdn';
-import { DESIGN_HTML_MAX_BYTES, DESIGN_VARIANTS_MAX } from '../design/limits';
-import { validateMockup } from '../design/validate';
 import {
+  DESIGN_FRAME_NAME_MAX,
+  DESIGN_LEGACY_FRAME_NAME,
+  type DesignFrameDraft,
+} from '../design/frames';
+import {
+  DESIGN_HTML_MAX_BYTES,
+  DESIGN_VARIANTS_MAX,
+  designBytes,
+} from '../design/limits';
+import { validateMockup } from '../design/validate';
+import { isReliablyEnglish } from '../text/english';
+import type { PlanTurnView } from './contracts';
+import {
+  CARD_DRAFT_SECTIONS,
+  CARD_DRAFT_TITLE_MAX,
+  type CardDraft,
+  INTAKE_SPLIT_MAX,
+  INTAKE_SPLIT_MIN,
+  INTAKE_STACK_STAGES_MIN,
+  intakeCardOutputSchema,
+  intakeRoundOutputSchema,
+  intakeSplitOutputSchema,
+  intakeStackOutputSchema,
+  isIntakeCard,
+  isIntakeSplit,
+  isIntakeStack,
   isPlannedTask,
   PLANNER_BLOCK_TAG,
   PLANNER_CONTRACT_VERSION,
   PLANNER_DESIGN_BLOCK_TAG,
+  PLANNER_INTAKE_MAX_ROUNDS,
   PLANNER_MAX_OPTIONS,
   PLANNER_MAX_QUESTIONS,
   PLANNER_MAX_TASKS,
@@ -60,9 +85,14 @@ export const PLANNER_VIOLATION_REASONS = [
   'missing_reproduction',
   /** Design: no `agentdock-design` block, or one that is never closed. */
   'no_design_block',
-  /** Design: two or more `agentdock-design` blocks. */
+  /** Design: two or more `agentdock-design` blocks and no `frames`. */
   'multiple_design_blocks',
-  /** Design: the HTML is over `DESIGN_HTML_MAX_BYTES`. */
+  /**
+   * Design (#441): `frames` names a different number of frames than there
+   * are design blocks, or names one frame twice.
+   */
+  'frame_mismatch',
+  /** Design: the HTML of every frame together is over `DESIGN_HTML_MAX_BYTES`. */
   'design_too_large',
   /** Design: a resource from a host that is not on the CDN allowlist. */
   'design_host_not_allowed',
@@ -74,6 +104,17 @@ export const PLANNER_VIOLATION_REASONS = [
   'variant_mismatch',
   /** Design: `addressed` names a comment that is not open on the design. */
   'unknown_comment',
+  /**
+   * Intake (#337 D3, D4): a question round where the turn had to write the
+   * card — after `PLANNER_INTAKE_MAX_ROUNDS` rounds, or on Enough — generate.
+   */
+  'must_generate',
+  /** Intake (#337 D6): the card's body lacks one of `CARD_DRAFT_SECTIONS`. */
+  'missing_card_section',
+  /** Intake (#337 D5, ADR-0027 §6): the card's title or body is not English. */
+  'not_english',
+  /** Intake (#409): a split proposed after the person chose Keep one card. */
+  'split_declined',
 ] as const;
 export type PlannerViolationReason = (typeof PLANNER_VIOLATION_REASONS)[number];
 
@@ -83,10 +124,13 @@ export interface PlannerContractViolation {
   message: string;
 }
 
-/** A design turn's result also carries the validated HTML, kept out of `output`. */
+/**
+ * A design turn's result also carries its frames' validated HTML (#441), in
+ * order, kept out of `output`.
+ */
 export type PlannerParseResult<A extends PlanTurnAction> =
   | ({ ok: true; output: PlannerOutput<A> } & (A extends 'design'
-      ? { html: string }
+      ? { frames: DesignFrameDraft[] }
       : unknown))
   | { ok: false; error: PlannerContractViolation };
 
@@ -117,7 +161,47 @@ export interface PlannerParseContexts {
     variant: number;
     openCommentIds: readonly string[];
   };
+  /** #337: what decides whether the intake turn may still ask. */
+  intake: VersionContext & IntakeTurnState;
 }
+
+/**
+ * #337 D3, D4: a card intake's state before a turn. `roundsAsked`: the
+ * question rounds its earlier turns opened. `generate`: the person pressed
+ * Enough — generate. `acceptNonEnglish`: the one re-ask of a non-English card
+ * is over — the card is taken and shown with a "Not English" warning (spec
+ * "Risks"). `keepOne` (#409): the person declined the split — the turn
+ * writes one card, neither a round nor another split.
+ */
+export interface IntakeTurnState {
+  roundsAsked: number;
+  generate: boolean;
+  acceptNonEnglish?: boolean;
+  keepOne?: boolean;
+}
+
+/**
+ * #337 D4: the rounds an intake asked — its succeeded `intake` turns that
+ * opened one. A failed turn, or one that wrote the card, opened none.
+ */
+export const intakeRoundsAsked = (
+  turns: readonly Pick<PlanTurnView, 'action' | 'phase' | 'rounds'>[],
+): number =>
+  turns.filter(
+    (t) =>
+      t.action === 'intake' && t.phase === 'succeeded' && t.rounds.length > 0,
+  ).length;
+
+/**
+ * #337 D4: the next intake turn must write the card — no fifth round, and
+ * none after Enough or after Keep one card (#409).
+ */
+export const intakeMustGenerate = (
+  state: Pick<IntakeTurnState, 'roundsAsked' | 'generate' | 'keepOne'>,
+): boolean =>
+  state.generate ||
+  state.keepOne === true ||
+  state.roundsAsked >= PLANNER_INTAKE_MAX_ROUNDS;
 
 type ContextArgs<A extends PlanTurnAction> =
   // biome-ignore lint/complexity/noBannedTypes: an empty context is optional
@@ -269,31 +353,123 @@ export const PLANNER_REQUIRED_HEADING: Record<PlanTaskKind, string> = {
   bug: 'Reproduction',
 };
 
-/** Spec 223 D7: the one design block, its HTML validated against D6. */
-const parseDesignBlock = (
+/** #337 D6: the `CARD_DRAFT_SECTIONS` a card body lacks, in order. */
+export const missingCardSections = (body: string): string[] =>
+  CARD_DRAFT_SECTIONS.filter((section) => !hasHeading(body, section));
+
+const SECTION_LINE = new RegExp(
+  `^##[ \\t]+(?:${CARD_DRAFT_SECTIONS.join('|')})[ \\t]*#*[ \\t]*$`,
+  'gim',
+);
+
+/**
+ * #337 D5: the card's title and body pass ADR-0027 §6's English check. The
+ * fixed section headings are left out of the body first: they are English in
+ * any card and would carry a body in another Latin-script language over the
+ * function-word share.
+ */
+export const isCardDraftEnglish = (draft: Pick<CardDraft, 'title' | 'body'>) =>
+  isReliablyEnglish(draft.title) &&
+  isReliablyEnglish(draft.body.replace(SECTION_LINE, ''));
+
+/**
+ * #337 D5, D6; #409: a written card — the single one or one of a split —
+ * carries the four sections and is English. `what` names it in the message.
+ */
+const checkCardDraft = (
+  draft: Pick<CardDraft, 'title' | 'body'>,
+  ctx: PlannerParseContexts['intake'],
+  what: string,
+) => {
+  const missing = missingCardSections(draft.body);
+  if (missing.length > 0) {
+    return violation(
+      'missing_card_section',
+      `${what}'s body needs ${missing.map((s) => `"## ${s}"`).join(', ')}`,
+    );
+  }
+  if (ctx.acceptNonEnglish !== true && !isCardDraftEnglish(draft)) {
+    return violation(
+      'not_english',
+      `${what}'s title and body must be written in English`,
+    );
+  }
+  return null;
+};
+
+/** #337, #409: the intake branch an output names by its key. */
+const intakeBranchSchema = (json: unknown) => {
+  if (typeof json === 'object' && json !== null) {
+    if ('cardDraft' in json) return intakeCardOutputSchema;
+    if ('split' in json) return intakeSplitOutputSchema;
+    if ('stack' in json) return intakeStackOutputSchema;
+  }
+  return intakeRoundOutputSchema;
+};
+
+/**
+ * Spec 223 D7, #441: the design blocks, one per frame `names` lists — or the
+ * one block of a turn that names no frames — each validated against D6, and
+ * together at most `DESIGN_HTML_MAX_BYTES`.
+ */
+const parseDesignBlocks = (
   text: string,
+  names: readonly string[] | undefined,
 ):
-  | { ok: true; html: string }
+  | { ok: true; frames: DesignFrameDraft[] }
   | { ok: false; error: PlannerContractViolation } => {
   const blocks = extractFencedBlocks(text, PLANNER_DESIGN_BLOCK_TAG);
-  if (blocks.length > 1) {
-    return violation(
-      'multiple_design_blocks',
-      `expected one ${PLANNER_DESIGN_BLOCK_TAG} block, found ${blocks.length}`,
-    );
-  }
-  const html = blocks[0];
-  if (html === undefined || html === null) {
+  if (blocks.includes(null)) {
     return violation(
       'no_design_block',
-      html === null
-        ? `the ${PLANNER_DESIGN_BLOCK_TAG} block is never closed`
-        : `no ${PLANNER_DESIGN_BLOCK_TAG} block`,
+      `the ${PLANNER_DESIGN_BLOCK_TAG} block is never closed`,
     );
   }
-  const check = validateMockup(html);
-  if (!check.ok) return violation(check.reason, check.message);
-  return { ok: true, html };
+  if (blocks.length === 0) {
+    return violation('no_design_block', `no ${PLANNER_DESIGN_BLOCK_TAG} block`);
+  }
+  if (names === undefined && blocks.length > 1) {
+    return violation(
+      'multiple_design_blocks',
+      `expected one ${PLANNER_DESIGN_BLOCK_TAG} block, found ${blocks.length} — name each frame in "frames"`,
+    );
+  }
+  const frameNames = names ?? [DESIGN_LEGACY_FRAME_NAME];
+  if (frameNames.length !== blocks.length) {
+    return violation(
+      'frame_mismatch',
+      `"frames" names ${frameNames.length} frame${frameNames.length === 1 ? '' : 's'}, but there ${blocks.length === 1 ? 'is 1' : `are ${blocks.length}`} ${PLANNER_DESIGN_BLOCK_TAG} block${blocks.length === 1 ? '' : 's'}`,
+    );
+  }
+  const seen = new Set<string>();
+  for (const name of frameNames) {
+    const key = name.toLowerCase();
+    if (seen.has(key)) {
+      return violation('frame_mismatch', `"frames" names ${name} twice`);
+    }
+    seen.add(key);
+  }
+  const frames: DesignFrameDraft[] = [];
+  let total = 0;
+  for (const [i, html] of (blocks as string[]).entries()) {
+    const name = frameNames[i];
+    const check = validateMockup(html);
+    if (!check.ok) {
+      return violation(
+        check.reason,
+        blocks.length > 1 ? `frame "${name}": ${check.message}` : check.message,
+      );
+    }
+    total += designBytes(html);
+    frames.push({ name, html });
+  }
+  if (total > DESIGN_HTML_MAX_BYTES) {
+    return violation(
+      'design_too_large',
+      `the frames are ${total} bytes together; at most ${DESIGN_HTML_MAX_BYTES} — draw fewer frames or move styling to an allowlisted CDN`,
+    );
+  }
+  return { ok: true, frames };
 };
 
 /**
@@ -350,7 +526,13 @@ export function parsePlannerOutput(
   }
 
   const version = context?.contractVersion ?? PLANNER_CONTRACT_VERSION;
-  const parsed = plannerOutputSchemasFor(version)[action].safeParse(json);
+  // #337: an intake names its branch by its key, so a bad card reports the
+  // card's error rather than the round's "unknown key cardDraft".
+  const schema =
+    action === 'intake'
+      ? intakeBranchSchema(json)
+      : plannerOutputSchemasFor(version)[action];
+  const parsed = schema.safeParse(json);
   if (!parsed.success) return shapeViolation(parsed.error.issues);
   const output: PlannerOutput = parsed.data;
 
@@ -444,14 +626,81 @@ export function parsePlannerOutput(
           `addressed names ${unknown}, which is not an open comment of this design`,
         );
       }
-      const design = parseDesignBlock(text);
+      const design = parseDesignBlocks(text, output.frames);
       if (!design.ok) return design;
       const parsedDesign: PlannerParseResult<'design'> = {
         ok: true,
         output,
-        html: design.html,
+        frames: design.frames,
       };
       return parsedDesign;
+    }
+    case 'intake': {
+      const ctx = context as PlannerParseContexts['intake'];
+      if (isIntakeStack(output)) {
+        if (ctx.keepOne === true) {
+          return violation(
+            'split_declined',
+            'the person chose to keep one card: write one card for the whole request',
+          );
+        }
+        if (
+          ctx.acceptNonEnglish !== true &&
+          !isReliablyEnglish(
+            [
+              output.stack.title,
+              output.stack.body,
+              ...output.stack.stages.map((st) => st.title),
+            ].join('\n'),
+          )
+        ) {
+          return violation(
+            'not_english',
+            "the stack's title and body must be written in English",
+          );
+        }
+        let n = 0;
+        for (const stage of output.stack.stages) {
+          for (const card of stage.cards) {
+            n += 1;
+            const bad = checkCardDraft(card, ctx, `stack card ${n}`);
+            if (bad) return bad;
+          }
+        }
+        return { ok: true, output };
+      }
+      if (isIntakeSplit(output)) {
+        if (ctx.keepOne === true) {
+          return violation(
+            'split_declined',
+            'the person chose to keep one card: write one card for the whole request',
+          );
+        }
+        for (const [i, card] of output.split.cards.entries()) {
+          const bad = checkCardDraft(card, ctx, `split card ${i + 1}`);
+          if (bad) return bad;
+        }
+        return { ok: true, output };
+      }
+      if (!isIntakeCard(output)) {
+        if (intakeMustGenerate(ctx)) {
+          return violation(
+            'must_generate',
+            ctx.keepOne === true
+              ? 'the person chose to keep one card: write it now'
+              : ctx.generate
+                ? 'the person asked to generate: write the card now'
+                : `${PLANNER_INTAKE_MAX_ROUNDS} rounds were asked: write the card now`,
+          );
+        }
+        return { ok: true, output };
+      }
+      return (
+        checkCardDraft(output.cardDraft, ctx, 'the card') ?? {
+          ok: true,
+          output,
+        }
+      );
     }
   }
 }
@@ -467,10 +716,11 @@ const CDN_HOSTS = DESIGN_CDN_ALLOWLIST.map(
  */
 export const PLANNER_DESIGN_CONTRACT = `## The design action
 
-A \`design\` turn draws one variant of the task's mockup. Its final message
-holds the usual \`${PLANNER_BLOCK_TAG}\` block **and** exactly one fenced block
-tagged \`${PLANNER_DESIGN_BLOCK_TAG}\`, fenced with four backticks, holding
-one self-contained HTML document:
+A \`design\` turn draws one variant of the task's mockup as one or more
+**frames**: each frame is a named, separately rendered HTML document. Its
+final message holds the usual \`${PLANNER_BLOCK_TAG}\` block **and** one fenced
+block tagged \`${PLANNER_DESIGN_BLOCK_TAG}\` per frame, fenced with four
+backticks, each holding one self-contained HTML document:
 
 ~~~text
 \`\`\`\`${PLANNER_DESIGN_BLOCK_TAG}
@@ -479,9 +729,14 @@ one self-contained HTML document:
 \`\`\`\`
 ~~~
 
-The mockup's rules — a mockup that breaks one fails the turn:
+Frames:
 
-- At most ${DESIGN_HTML_MAX_BYTES / 1024} KiB of HTML. Inline CSS and JS are allowed.
+- Draw one frame unless the task touches several pages or several standalone components. Then draw one frame per page, plus one per component that matters on its own (its states side by side).
+- \`"frames"\` lists a short name per frame (at most ${DESIGN_FRAME_NAME_MAX} characters, distinct), in the order of the design blocks: \`"frames": ["Board page", "Card tile"]\`. With one frame it may be left out; the frame is then named "${DESIGN_LEGACY_FRAME_NAME}".
+
+The mockup's rules — a frame that breaks one fails the turn:
+
+- At most ${DESIGN_HTML_MAX_BYTES / 1024} KiB of HTML, all frames together. Inline CSS and JS are allowed.
 - External scripts, styles, fonts and images only from ${CDN_HOSTS}, over HTTPS. No other host, and no relative URL: inline it or use a \`data:\` URL (images and fonts only).
 - Every script or package URL names an exact version: \`react@18.3.1\`, never \`react@18\` or \`latest\`.
 - No network calls (\`fetch\`, \`XMLHttpRequest\`, \`WebSocket\`, \`EventSource\`, \`sendBeacon\`), no form that submits, no navigation of the top or parent window, no \`window.open\`, no \`<iframe>\`, \`<object>\`, \`<embed>\` or \`<base>\`, no link to another site.
@@ -491,6 +746,25 @@ The mockup's rules — a mockup that breaks one fails the turn:
 
 const TASK_DESIGN_LINE = `
   "design": DesignSuggestion`;
+
+/** #337 D3, contract v3. */
+const MULTIPLE_RULE =
+  '- Set `"multiple": true` only when several options can hold at once. The person may always answer in their own words instead of, or beside, the options.';
+
+/** The Question shape as the contract text of `version` writes it. */
+const questionShape = (version: PlannerContractVersion): string => `Question = {
+  "id": string,              // short, unique within the round: "q1"
+  "title": string,
+  "question": string,
+  "options": [ { "id": string, "label": string, "detail"?: string } ],   // 0–${PLANNER_MAX_OPTIONS}${
+    version >= 3
+      ? `
+  "multiple"?: boolean,      // true: the person may pick several options`
+      : ''
+  }
+  "recommendation": { "optionId"?: string, "text": string, "why": string },
+  "blocking": boolean        // true only when there is no safe default
+}`;
 
 /**
  * The fixed contract text of `version` the API appends after the
@@ -513,23 +787,16 @@ is closed: a key it does not name makes the whole turn fail, and nothing of it
 is applied.
 
 \`\`\`
-Question = {
-  "id": string,              // short, unique within the round: "q1"
-  "title": string,
-  "question": string,
-  "options": [ { "id": string, "label": string, "detail"?: string } ],   // 0–${PLANNER_MAX_OPTIONS}
-  "recommendation": { "optionId"?: string, "text": string, "why": string },
-  "blocking": boolean        // true only when there is no safe default
-}${
-    v2
-      ? `
+${questionShape(version)}${
+  v2
+    ? `
 DesignSuggestion = {
   "needed": boolean,         // does this task need a mockup before it is written?
   "why": string,             // one line
   "variants": 1 | 2 | 3      // 1 for an unambiguous change; 2–3 for real layout choices
 }`
-      : ''
-  }
+    : ''
+}
 Task = {
   "key": string,             // stable within the plan: "t1", "t2" … ^[a-z][a-z0-9-]{0,31}$
   "kind": "bug" | "feature",
@@ -550,7 +817,7 @@ write     → { "action": "write", "taskKey": key, "document": markdown, "assump
 revise    → { "action": "revise", "tasks": [ Task | { "key": key } ] }${
     v2
       ? `
-design    → { "action": "design", "taskKey": key, "variant": 1 | 2 | 3, "title": string, "rationale": string, "addressed": [ commentId ] }`
+design    → { "action": "design", "taskKey": key, "variant": 1 | 2 | 3, "title": string, "rationale": string, "addressed": [ commentId ], "frames"?: [ string ] }`
       : ''
   }
 \`\`\`
@@ -559,7 +826,9 @@ Rules:
 
 - \`action\` is the action the turn names.
 - At most ${PLANNER_MAX_TASKS} tasks per plan, and at most ${PLANNER_MAX_QUESTIONS} questions per round.
-- \`recommendation.optionId\`, when present, is the id of one of that question's options.
+- \`recommendation.optionId\`, when present, is the id of one of that question's options.${
+    version >= 3 ? `\n${MULTIPLE_RULE}` : ''
+  }
 - Every key in \`dependsOn\` is the key of another task of the plan; no task depends on itself.
 - \`grill\` and \`write\` answer about the task the turn names, and repeat its key in \`taskKey\`.
 - A \`write\` document for a feature has a \`## Acceptance criteria\` section; for a bug, a \`## Reproduction\` section.
@@ -578,3 +847,75 @@ ${PLANNER_DESIGN_CONTRACT}`
 export const PLANNER_OUTPUT_CONTRACT = plannerOutputContract(
   PLANNER_CONTRACT_VERSION,
 );
+
+/**
+ * #337 D1, D4–D6: the fixed contract text of a `card` plan — a card intake.
+ * The API appends it after the card-mode instructions on every intake turn,
+ * in place of `plannerOutputContract`: an intake neither decomposes nor
+ * writes documents. It exists from contract v3 on.
+ */
+export const PLANNER_INTAKE_CONTRACT = `# Output contract (v${PLANNER_CONTRACT_VERSION}, card intake)
+
+This contract is fixed. It overrides anything above it about the shape of
+your answer.
+
+Your final message must contain exactly one fenced block tagged
+\`${PLANNER_BLOCK_TAG}\`, holding one JSON object — and no other block with
+that tag. Write anything else you want to say outside it. Every object below
+is closed: a key it does not name makes the whole turn fail, and nothing of it
+is applied.
+
+\`\`\`
+${questionShape(PLANNER_CONTRACT_VERSION)}
+CardDraft = {
+  "title": string,           // imperative, at most ${CARD_DRAFT_TITLE_MAX} characters
+  "kind": "bug" | "feature",
+  "body": markdown           // the four sections below, in this order
+}
+SplitCard = {
+  "title": string,           // as CardDraft
+  "kind": "bug" | "feature",
+  "summary": string,         // one line the person reads in the proposal
+  "body": markdown           // as CardDraft
+}
+Split = {
+  "reason": string,          // why several cards, in the person's language
+  "cards": [ SplitCard ]     // ${INTAKE_SPLIT_MIN}–${INTAKE_SPLIT_MAX}, independent of each other
+}
+StackStage = {
+  "title": string,           // short English name of the stage, e.g. "Components"
+  "cards": [ SplitCard ]     // may run in parallel; each waits on every card of the stage before
+}
+Stack = {
+  "reason": string,          // why one stack in stages, in the person's language
+  "title": string,           // English, the whole piece of work, at most ${CARD_DRAFT_TITLE_MAX} characters
+  "body": markdown,          // English: what the whole piece of work is and when it is done
+  "design": boolean,         // true when the result is UI: one shared design is drawn and approved first
+  "stages": [ StackStage ]   // ${INTAKE_STACK_STAGES_MIN} or more, in order; ${INTAKE_SPLIT_MIN}–${INTAKE_SPLIT_MAX} cards in all
+}
+\`\`\`
+
+Every intake turn answers with one of:
+
+\`\`\`
+intake → { "action": "intake", "questions": [ Question ] }   // a round: 1–${PLANNER_MAX_QUESTIONS} questions
+intake → { "action": "intake", "cardDraft": CardDraft }      // the card
+intake → { "action": "intake", "split": Split }              // a proposal of several independent cards
+intake → { "action": "intake", "stack": Stack }              // a proposal of cards in ordered stages
+\`\`\`
+
+Rules:
+
+- \`action\` is \`intake\`.
+- Ask a round only while something material is unknown; write the card as soon as nothing is.
+- At most ${PLANNER_INTAKE_MAX_ROUNDS} rounds. After the ${PLANNER_INTAKE_MAX_ROUNDS}th, or when the turn says the person asked to generate, write the card, the split or the stack — a round then fails the turn.
+- Propose a \`split\` only when the request is several independent tasks, or one task too big for a single agent. Each card stands alone: no card depends on another. One clear task is one \`cardDraft\`.
+- Propose a \`stack\` instead when the request is one larger piece of work whose parts must happen in order and share one look — for example a page redesign: its components first, then the page built from them. Group the cards into stages in that order. Set \`design\` to true when the result is UI.
+- When the turn says the person chose to keep one card, write one \`cardDraft\` covering the whole request — a round, a split or a stack then fails the turn.
+- Questions, options and anything you say outside the block are in the language of the person's latest text.
+- Every card — \`title\`, \`summary\`, \`body\` — and a stack's \`title\`, \`body\` and stage titles are in English, whatever language the person wrote in.
+- Every card's \`body\` has exactly these \`##\` sections: ${CARD_DRAFT_SECTIONS.map((s) => `\`## ${s}\``).join(', ')}. Acceptance criteria are checkable bullets; each open question names the default taken.
+- \`recommendation.optionId\`, when present, is the id of one of that question's options.
+${MULTIPLE_RULE}
+- The \`body\` is a JSON string: newlines are \`\\n\`.
+`;

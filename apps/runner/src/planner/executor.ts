@@ -11,11 +11,13 @@ import {
   planTurnPhaseChangedDataSchema,
   type UnsequencedEvent,
 } from '@agentdock/shared/protocol';
+import { type AttachmentSource, syncAttachments } from '../cards/attachments';
 import { type Cancel, isoNow } from '../clock';
 import { CommandFailure } from '../commands/failure';
 import { watchedProject } from '../control/target';
 import { TmuxControl } from '../control/tmux';
 import { resolveFleetProject } from '../fleet/project';
+import { type RunNotes, runWorkKey } from '../handoff/runs';
 import { errorMessage, type Logger } from '../log';
 import {
   gitOk,
@@ -28,6 +30,7 @@ import { writeJsonAtomic } from '../skills/run/record';
 import {
   planTurnLaunchSpec,
   planTurnSessionName,
+  planTurnTokenSaver,
   planWorktreePath,
 } from './launch';
 import {
@@ -60,6 +63,18 @@ export interface PlanExecutorOptions {
   log: Logger;
   /** The OTLP receiver's bound port, null when it is off (#24 D9). */
   otlpPort?: () => number | null;
+  /**
+   * #337 D10: where `plan.turn` downloads attachments from — the API and the
+   * runner token, as for `card.run`. Required, so a missing wiring is a
+   * compile error, not a turn that fails at run time (#326).
+   */
+  attachmentSource: AttachmentSource;
+  /**
+   * #494: notes of interrupted turns. With Token saver on, a turn that
+   * starts a new session for the same work picks up the last interrupted
+   * attempt's note.
+   */
+  runNotes?: RunNotes;
   tickMs?: number;
   cleanupMs?: number;
   idleMs?: number;
@@ -237,14 +252,26 @@ export class PlanTurnExecutor {
 
     const { prompt, ...rest } = args;
     const turnShortId = shortId();
+    // #494: Context handoff is on with Token saver.
+    const { runNotes } = this.options;
+    const handoffKey =
+      runNotes && args.tokenSaver?.enabled
+        ? runWorkKey(args.projectId, prompt)
+        : undefined;
     const turn: TurnRecord = {
       ...rest,
+      ...(handoffKey ? { handoffKey } : {}),
       shortId: turnShortId,
       tmuxSession: planTurnSessionName(turnShortId),
       phase: 'queued',
       queuedAt: now,
     };
-    if (!this.store.createTurn(turn, prompt)) {
+    // Only a new session starts from the note: a resumed one has the context.
+    const seeded =
+      runNotes && handoffKey && !args.session.resume
+        ? runNotes.seed(handoffKey, prompt)
+        : prompt;
+    if (!this.store.createTurn(turn, seeded)) {
       throw new CommandFailure(
         'already_exists',
         `turn ${args.turnId} already exists`,
@@ -442,6 +469,14 @@ export class PlanTurnExecutor {
         if (this.closing.has(turn.planId)) this.store.removePlan(turn.planId);
         return;
       }
+      // #337 D10: the files the person attached, in the worktree before the
+      // session starts; one that cannot be had fails the turn.
+      await syncAttachments(
+        deps,
+        plan.worktree,
+        turn.attachments ?? [],
+        this.options.attachmentSource,
+      );
       const profile = profileOf(deps, turn.profileKey);
       writeJsonAtomic(
         this.store.file(turn, 'launch'),
@@ -451,6 +486,13 @@ export class PlanTurnExecutor {
           plan.worktree,
           this.store.promptFile(turn),
           this.options.otlpPort?.() ?? null,
+          planTurnTokenSaver(
+            profile,
+            turn,
+            deps.home,
+            this.store.turnDir(turn.planId, turn.turnId),
+            this.options.selfCommand,
+          ),
         ),
       );
       turn.startedAt = isoNow(deps.clock);
@@ -544,6 +586,28 @@ export class PlanTurnExecutor {
     this.emitEvent(turn, 'plan_turn.finished', data);
     // Released after the event, so the API hears the end before the next start.
     this.options.slots.release(slotId(turn));
+    this.keepNote(turn, outcome.phase);
+  }
+
+  /**
+   * #494, #449 D2: a turn that started and did not succeed leaves a note
+   * (haiku, off the slot) for the next new session at the same work; a
+   * success clears it.
+   */
+  private keepNote(turn: TurnRecord, phase: PlanTurnPhase): void {
+    const { runNotes } = this.options;
+    if (!runNotes || !turn.handoffKey) return;
+    if (phase === 'succeeded') {
+      runNotes.succeeded(turn.handoffKey);
+      return;
+    }
+    if (!turn.startedAt) return;
+    void runNotes.interrupted(
+      { ...turn, repo: this.repoOf(turn) },
+      turn.handoffKey,
+      this.store.turnDir(turn.planId, turn.turnId),
+      this.store.file(turn, 'stream'),
+    );
   }
 
   private ref(turn: TurnRecord) {

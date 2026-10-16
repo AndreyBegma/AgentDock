@@ -18,6 +18,7 @@ import {
   activityChipDefs,
   CATEGORY_LABEL,
   moreFilterCount,
+  STEWARD_TYPE_OPTIONS,
   TYPE_OPTIONS,
 } from '../../../lib/activity/format';
 import {
@@ -60,11 +61,20 @@ function MoreFilters({
               onChange={(e) => set({ type: e.target.value })}
             >
               <option value="">Any type</option>
-              {TYPE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
+              <optgroup label="Steward">
+                {STEWARD_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Everything else">
+                {TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </optgroup>
             </Select>
           </Field>
           <Field

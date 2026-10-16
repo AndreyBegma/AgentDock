@@ -1,0 +1,87 @@
+   Compiling proc-macro2 v1.0.86
+   Compiling unicode-ident v1.0.12
+   Compiling quote v1.0.36
+   Compiling syn v2.0.72
+   Compiling serde_derive v1.0.204
+   Compiling serde v1.0.204
+   Compiling serde_json v1.0.120
+   Compiling tokio v1.39.2
+   Compiling relay-core v0.4.0 (/home/dev/relay/crates/core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 12.40s
+     Running unittests src/lib.rs (target/debug/deps/relay_core-3f2a91c4d5e6b708)
+
+running 56 tests
+test backoff::tests::caps_at_max ... ok
+test backoff::tests::grows_exponentially ... ok
+test backoff::tests::jitter_stays_in_range ... ok
+test backoff::tests::resets_after_success ... ok
+test config::tests::defaults ... ok
+test config::tests::env_overrides_file ... ok
+test config::tests::rejects_unknown_keys ... ok
+test config::tests::reload_keeps_listeners ... ok
+test config::tests::validates_ports ... ok
+test limits::tests::burst_is_honoured ... ok
+test limits::tests::refills_over_time ... ok
+test limits::tests::separate_buckets_per_key ... ok
+test metrics::tests::counter_increments ... ok
+test metrics::tests::gauge_set_and_add ... ok
+test metrics::tests::histogram_buckets ... ok
+test metrics::tests::render_escapes_quotes ... ok
+test queue::tests::close_wakes_waiters ... ok
+test queue::tests::drain_returns_all ... ok
+test queue::tests::fifo_order ... ok
+test queue::tests::full_queue_rejects ... ok
+test queue::tests::push_pop ... ok
+test queue::tests::concurrent_producers ... ok
+test registry::tests::duplicate_is_rejected ... ok
+test registry::tests::lookup ... ok
+test registry::tests::remove_then_lookup ... ok
+test scheduler::tests::cancel_pending ... ok
+test scheduler::tests::priority_order ... ok
+test scheduler::tests::recovers_from_panic ... ok
+test scheduler::tests::runs_due_jobs ... ok
+test scheduler::tests::skips_future_jobs ... ok
+test scheduler::tests::stops_on_cancel ... ok
+test scheduler::tests::retry_uses_backoff ... ok
+test session::tests::expires_idle ... ok
+test session::tests::keeps_active ... ok
+test session::tests::rotates_id ... ok
+test store::tests::compacts_on_reopen ... FAILED
+test store::tests::delete_missing_is_ok ... ok
+test store::tests::list_prefix ... ok
+test store::tests::load_missing ... ok
+test store::tests::overwrite ... ok
+test store::tests::save_and_load ... ok
+test store::tests::snapshot_is_consistent ... ok
+test store::tests::truncated_tail_is_ignored ... ok
+test tls::tests::loads_pem_chain ... ok
+test tls::tests::rejects_expired_cert ... ok
+test util::tests::human_bytes ... ok
+test util::tests::human_duration ... ok
+test util::tests::parse_duration_units ... ok
+test util::tests::split_host_port_ipv6 ... ok
+test util::tests::truncate_utf8_boundary ... ok
+test wire::tests::close ... ok
+test wire::tests::encode_decode_roundtrip ... ok
+test wire::tests::oversized_frame_is_rejected ... ok
+test wire::tests::ping ... ok
+test wire::tests::rejects_bad_magic ... ok
+test worker::tests::drains_on_shutdown ... ok
+test worker::tests::respects_concurrency_limit ... ok
+
+failures:
+
+---- store::tests::compacts_on_reopen stdout ----
+thread 'store::tests::compacts_on_reopen' panicked at crates/core/src/store.rs:214:9:
+assertion `left == right` failed: segment count after reopen
+  left: 3
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    store::tests::compacts_on_reopen
+
+test result: FAILED. 55 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.62s
+
+error: test failed, to rerun pass `-p relay-core --lib`

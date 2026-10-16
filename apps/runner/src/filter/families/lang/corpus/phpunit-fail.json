@@ -1,0 +1,7 @@
+{
+  "argv": ["vendor/bin/phpunit"],
+  "exitCode": 2,
+  "category": "test",
+  "outcome": "failing",
+  "expect": "filtered"
+}

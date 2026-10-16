@@ -1,9 +1,15 @@
 import { BOARD_ERROR } from '@agentdock/shared';
 import {
+  type CardChecksArgs,
+  type CardChecksResult,
+  type CardCiRetriggerArgs,
+  type CardCiRetriggerResult,
   type CardCommandName,
   type CardPrCloseArgs,
   type CardPrCloseResult,
   type CommandErrorCode,
+  cardChecksResultSchema,
+  cardCiRetriggerResultSchema,
   cardCommands,
   cardPrCloseResultSchema,
   type IssueCreateArgs,
@@ -60,6 +66,8 @@ export class BoardCommands {
     runnerId: string,
     name:
       | CardCommandName
+      | 'card.checks'
+      | 'card.ciRetrigger'
       | 'card.prClose'
       | 'issue.create'
       | 'plan.close'
@@ -113,6 +121,42 @@ export class BoardCommands {
   }
 
   /**
+   * #359: whether a card ships itself on `runnerId` — the runner advertises
+   * `card.checks`, whose release also takes `card.run`'s `pullRequest` and
+   * `newBranch` and reports `card_run.pushed`. Until the runner enters it in
+   * the `commands` allowlist, no card ships itself and the board works as
+   * before #359.
+   */
+  servesChecks(runnerId: string): boolean {
+    const wired: string = 'card.checks';
+    if (!isCommandName(wired) || !this.presence.isConnected(runnerId)) {
+      return false;
+    }
+    const support = this.presence.commandSupport(runnerId, wired);
+    return support === 'supported' || support === 'disabled';
+  }
+
+  /** #359 D5: a card PR's head, merge state and checks, read by the runner's `gh`. */
+  async checks(
+    runnerId: string,
+    args: CardChecksArgs,
+    options: SendOptions,
+  ): Promise<BoardSendResult<CardChecksResult>> {
+    this.assertReady(runnerId, 'card.checks');
+    const wired: string = 'card.checks';
+    if (!isCommandName(wired)) throw new Error('unreachable');
+    const result = await this.commands.send(runnerId, wired, args, options);
+    if (result.status !== 'ok') return result;
+    const output = cardChecksResultSchema.safeParse(result.output);
+    return output.success
+      ? { status: 'ok', output: output.data }
+      : {
+          status: 'error',
+          error: { code: 'internal', message: 'malformed result' },
+        };
+  }
+
+  /**
    * #329 D8: `card.prClose`. Until i329-runner enters it in the `commands`
    * allowlist, `assertReady` answers 503 `command_unavailable` and nothing
    * is sent.
@@ -128,6 +172,38 @@ export class BoardCommands {
     const result = await this.commands.send(runnerId, wired, args, options);
     if (result.status !== 'ok') return result;
     const output = cardPrCloseResultSchema.safeParse(result.output);
+    return output.success
+      ? { status: 'ok', output: output.data }
+      : {
+          status: 'error',
+          error: { code: 'internal', message: 'malformed result' },
+        };
+  }
+
+  /** #484: whether the connected runner advertises `card.ciRetrigger`. */
+  servesCiRetrigger(runnerId: string): boolean {
+    const wired: string = 'card.ciRetrigger';
+    if (!isCommandName(wired) || !this.presence.isConnected(runnerId)) {
+      return false;
+    }
+    return this.presence.commandSupport(runnerId, wired) === 'supported';
+  }
+
+  /** #484: sends a card PR's pull-request event again — close, then reopen. */
+  async ciRetrigger(
+    runnerId: string,
+    args: CardCiRetriggerArgs,
+    options: SendOptions,
+  ): Promise<BoardSendResult<CardCiRetriggerResult>> {
+    this.assertReady(runnerId, 'card.ciRetrigger');
+    const result = await this.commands.send(
+      runnerId,
+      'card.ciRetrigger',
+      args,
+      options,
+    );
+    if (result.status !== 'ok') return result;
+    const output = cardCiRetriggerResultSchema.safeParse(result.output);
     return output.success
       ? { status: 'ok', output: output.data }
       : {

@@ -2,6 +2,7 @@ import {
   PLANNER_ERROR,
   type PlanAttention,
   type PlanDetail,
+  type PlanMode,
   type PlannerErrorCode,
   type PlannerSpecOutput,
   type PlanStatus,
@@ -33,6 +34,14 @@ export const PLAN_STATUS_LABEL: Record<PlanStatus, string> = {
   sending: 'Sending',
   sent: 'Sent',
   archived: 'Archived',
+  done: 'Done',
+};
+
+/** A plan's mode, as a list row names it; `card` is a New work intake (#337, #409). */
+export const PLAN_MODE_LABEL: Record<PlanMode, string> = {
+  batch: 'Batch',
+  dialogue: 'Dialogue',
+  card: 'New work',
 };
 
 export const PLAN_STATUS_PILL: Record<PlanStatus, Status> = {
@@ -44,6 +53,8 @@ export const PLAN_STATUS_PILL: Record<PlanStatus, Status> = {
   sending: 'running',
   sent: 'done',
   archived: 'idle',
+  // #337: the plan made its cards.
+  done: 'done',
 };
 
 /**
@@ -253,6 +264,7 @@ export function turnActionText(
     write: `Writing ${task}’s document…`,
     revise: 'Revising the plan…',
     design: `Drawing ${task}’s mockup…`,
+    intake: 'Thinking about the card…',
   };
   return sentence[turn.action];
 }
@@ -305,6 +317,7 @@ export const TURN_ACTION_LABEL: Record<PlanTurnAction, string> = {
   write: 'Write the document',
   revise: 'Revise the plan',
   design: 'Draw the mockup',
+  intake: 'Shape the card',
 };
 
 const TURN_PHASE_WORD: Record<PlanTurnPhase, string> = {
@@ -326,9 +339,12 @@ export function turnBody(
   const lines: string[] = [];
   if (turn.input.message) lines.push(turn.input.message);
   for (const a of turn.input.answers ?? []) {
-    const parts = [a.optionId, a.text].filter(Boolean).join(' — ');
+    const parts = [a.optionIds?.join(', ') ?? a.optionId, a.text]
+      .filter(Boolean)
+      .join(' — ');
     lines.push(`${a.questionId}: ${parts}`);
   }
+  if (turn.input.generate) lines.push('Enough — generate');
   lines.push(
     `${TURN_ACTION_LABEL[turn.action]} · ${TURN_PHASE_WORD[turn.phase]}`,
   );
@@ -340,7 +356,8 @@ export function turnBody(
 export const isClosed = (plan: Pick<PlanSummary, 'status'>): boolean =>
   plan.status === 'sent' ||
   plan.status === 'archived' ||
-  plan.status === 'sending';
+  plan.status === 'sending' ||
+  plan.status === 'done';
 
 /** Statuses a task can be approved from; `needs_talk` waits on its answers (D6). */
 const APPROVABLE: readonly PlanTaskStatus[] = [
@@ -424,6 +441,10 @@ const ERROR_TEXT: Partial<Record<PlannerErrorCode, string>> = {
   budget_exceeded: 'A budget refuses new runs in this project.',
   command_unavailable: 'The runner is too old to run the planner. Update it.',
   runner_timeout: 'The runner did not answer in time.',
+  cards_exist: 'This plan already made its cards. Find them in Todo.',
+  wrong_mode: 'This does not apply to this kind of plan.',
+  split_stale:
+    'The planner changed its proposal meanwhile. Review the new one, then confirm again.',
 };
 
 /** A sentence for a failed planner request. */
@@ -471,6 +492,7 @@ export function writeBlock(
     return 'This plan was sent. Follow-up work is a new plan.';
   }
   if (plan.status === 'archived') return 'This plan is archived.';
+  if (plan.status === 'done') return 'This plan made its cards.';
   if (plan.status === 'sending') return 'This plan is being sent.';
   return null;
 }

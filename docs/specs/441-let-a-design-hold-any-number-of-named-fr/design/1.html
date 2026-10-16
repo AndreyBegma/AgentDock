@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>C-84 · Design viewer with frames</title>
+<style>
+:root{
+  --font-sans:'SF Pro Text','SF Pro Display',Inter,system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  --radius-control:6px;--radius-surface:8px;--radius-sheet:12px;
+  --size-row:32px;--size-control:28px;--size-field:28px;--size-nav:28px;--size-tap:44px;
+  --dur-fast:100ms;--dur-base:150ms;--dur-sheet:260ms;
+  --ease-sheet:cubic-bezier(.32,.72,0,1);
+  --blur-scrim:2px;--glass-blur:26px;--glass-blur-strong:40px;
+}
+:root,:root[data-theme="dark"]{
+  color-scheme:dark;
+  --color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-canvas:#0a1022;--color-paper:#1b2647;
+  --color-content:rgb(27 38 71/.96);
+  --color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246/.62);--color-ink-3:rgb(242 242 246/.53);
+  --color-line:rgb(255 255 255/.1);--color-line-strong:rgb(255 255 255/.18);--color-hover:rgb(255 255 255/.06);
+  --color-focus:#b4b2ff;--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-soft:rgb(91 91 246/.2);--color-accent-ink:#b4b2ff;
+  --color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;--color-info:#5fb4f0;--color-info-soft:rgb(95 180 240/.16);
+  --color-scrim:rgb(10 16 34/.3);
+  --color-hue-1:#5b9cf6;--color-hue-1-soft:rgb(91 156 246/.18);--color-hue-1-line:rgb(91 156 246/.5);--color-hue-1-ink:#a4c8ff;
+  --color-hue-2:#2fbf94;--color-hue-2-soft:rgb(47 191 148/.18);--color-hue-2-ink:#7ee0c0;
+  --color-hue-3:#7cc95a;--color-hue-3-soft:rgb(124 201 90/.18);--color-hue-3-ink:#ade58f;
+  --color-hue-4:#e69f00;--color-hue-4-soft:rgb(230 159 0/.18);--color-hue-4-ink:#f5c25c;
+  --color-hue-6:#f0606e;--color-hue-6-soft:rgb(240 96 110/.18);--color-hue-6-ink:#ff9da5;
+  --color-hue-7:#a68bfa;--color-hue-7-soft:rgb(166 139 250/.18);--color-hue-7-ink:#cbbcff;
+  --canvas-glow:18%;
+  --glass-sheen:rgb(255 255 255/.06);--glass-scrim:rgb(9 9 12/.55);--glass-scrim-strong:rgb(9 9 12/.64);
+  --glass-brightness:.85;--glass-brightness-strong:.7;
+  --glass-edge:rgb(255 255 255/.14);--glass-spec:rgb(255 255 255/.2);
+  --glass-rim:rgb(242 242 246/.8);--glass-rim-shade:rgb(9 9 12/.5);--glass-meniscus:rgb(9 9 12/.55);--glass-refract:rgb(242 242 246/.35);
+  --glass-shadow:rgb(0 0 0/.35);--glass-shadow-strong:rgb(0 0 0/.45);--glass-shadow-clear:rgb(0 0 0/.15);
+}
+:root[data-theme="light"]{
+  color-scheme:light;
+  --color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-canvas:#e9eef8;--color-paper:#fff;
+  --color-content:rgb(255 255 255/.96);
+  --color-ink:#18181b;--color-ink-2:rgb(24 24 27/.72);--color-ink-3:rgb(24 24 27/.64);
+  --color-line:rgb(0 0 0/.1);--color-line-strong:rgb(0 0 0/.23);--color-hover:rgb(0 0 0/.06);
+  --color-focus:#4f46e5;--color-accent:#4f46e5;--color-on-accent:#fff;--color-accent-soft:rgb(79 70 229/.12);--color-accent-ink:#4338ca;
+  --color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;--color-info:#03629a;--color-info-soft:rgb(3 98 154/.12);
+  --color-scrim:rgb(10 16 34/.22);
+  --color-hue-1:#1f64d6;--color-hue-1-soft:rgb(31 100 214/.12);--color-hue-1-line:rgb(31 100 214/.45);--color-hue-1-ink:#1550b0;
+  --color-hue-2:#00805e;--color-hue-2-soft:rgb(0 128 94/.12);--color-hue-2-ink:#006a4e;
+  --color-hue-3:#3a7d1c;--color-hue-3-soft:rgb(58 125 28/.12);--color-hue-3-ink:#2f6617;
+  --color-hue-4:#b36b00;--color-hue-4-soft:rgb(179 107 0/.12);--color-hue-4-ink:#8a5200;
+  --color-hue-6:#d02a3e;--color-hue-6-soft:rgb(208 42 62/.12);--color-hue-6-ink:#ad1f31;
+  --color-hue-7:#7244e0;--color-hue-7-soft:rgb(114 68 224/.12);--color-hue-7-ink:#5b30c4;
+  --canvas-glow:10%;
+  --glass-sheen:rgb(0 0 0/.06);--glass-scrim:rgb(255 255 255/.52);--glass-scrim-strong:rgb(255 255 255/.64);
+  --glass-brightness:1.15;--glass-brightness-strong:1.3;
+  --glass-edge:rgb(0 0 0/.18);--glass-spec:rgb(0 0 0/.2);
+  --glass-rim:rgb(255 255 255/.9);--glass-rim-shade:rgb(24 24 27/.18);--glass-meniscus:rgb(24 24 27/.12);--glass-refract:rgb(255 255 255/.5);
+  --glass-shadow:rgb(0 0 0/.12);--glass-shadow-strong:rgb(0 0 0/.16);--glass-shadow-clear:rgb(0 0 0/.08);
+}
+:root{
+  --color-status-running:var(--color-hue-2);--color-status-running-soft:var(--color-hue-2-soft);--color-status-running-ink:var(--color-hue-2-ink);
+  --color-status-waiting:var(--color-hue-1);--color-status-waiting-soft:var(--color-hue-1-soft);--color-status-waiting-ink:var(--color-hue-1-ink);
+  --color-status-done:var(--color-hue-3);--color-status-done-soft:var(--color-hue-3-soft);--color-status-done-ink:var(--color-hue-3-ink);
+  --glass-filter:blur(var(--glass-blur)) saturate(180%) brightness(var(--glass-brightness));
+  --glass-filter-strong:blur(var(--glass-blur-strong)) saturate(180%) brightness(var(--glass-brightness-strong));
+}
+*,*::before,*::after{box-sizing:border-box}
+html{font-size:16px;background:var(--color-ground);color:var(--color-ink)}
+body{margin:0;min-height:100vh;font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+h1,h2,h3,h4,p{margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}
+input:focus-visible,select:focus-visible,textarea:focus-visible{outline:none}
+.num{font-variant-numeric:tabular-nums}
+code,.mono{font-family:var(--font-mono)}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.text-sm{font-size:13px;line-height:20px}.text-xs{font-size:12px;line-height:16px}
+.ink-2{color:var(--color-ink-2)}.ink-3{color:var(--color-ink-3)}
+.icon{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:
+  radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),
+  radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%),
+  radial-gradient(70vmax 50vmax at 45% 110%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%)}
+.glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);backdrop-filter:var(--glass-filter);-webkit-backdrop-filter:var(--glass-filter);border:1px solid var(--glass-edge);
+  box-shadow:inset 0 1px 0 var(--glass-spec),inset 1px 1px 0 var(--glass-rim),inset -1px -1px 0 var(--glass-rim-shade),inset 0 -3px 3px -1px var(--glass-meniscus),inset 0 0 18px -4px var(--glass-refract),0 12px 32px var(--glass-shadow)}
+.glass-strong{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim-strong);backdrop-filter:var(--glass-filter-strong);-webkit-backdrop-filter:var(--glass-filter-strong);border:1px solid var(--glass-edge);
+  box-shadow:inset 0 1px 0 var(--glass-spec),inset -1px -1px 0 var(--glass-rim-shade),inset 0 -3px 3px -1px var(--glass-meniscus),inset 0 0 18px -4px var(--glass-refract),0 20px 48px var(--glass-shadow-strong)}
+.surface-content{background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font-weight:600;user-select:none;cursor:pointer;border:1px solid transparent;
+  height:var(--size-control);padding:0 16px;font-size:14px;border-radius:var(--radius-control);text-decoration:none;transition:background-color var(--dur-fast),border-color var(--dur-fast),color var(--dur-fast),transform var(--dur-fast) var(--ease-sheet)}
+.btn:active{transform:scale(.97)}
+.btn-solid{background:var(--color-accent);color:var(--color-on-accent)}
+.btn-solid:hover{background:color-mix(in oklab,var(--color-accent) 88%,var(--color-on-accent))}
+.btn-glass{background:var(--color-raised);color:var(--color-ink);border-color:var(--color-line-strong)}
+.btn-glass:hover{background:linear-gradient(var(--color-hover),var(--color-hover)),var(--color-raised)}
+.btn-ghost{background:transparent;color:var(--color-ink-2)}
+.btn-ghost:hover{background:var(--color-hover);color:var(--color-ink)}
+.btn-sm{height:28px;padding:0 10px;font-size:12px}
+.btn-icon{padding:0;aspect-ratio:1}
+.btn[aria-pressed="true"]{background:var(--color-accent-soft);color:var(--color-accent-ink);border-color:transparent}
+.input,.select,.textarea{width:100%;background:var(--color-surface);color:var(--color-ink);border:1px solid var(--color-line-strong);border-radius:var(--radius-control);font-size:13px}
+.input,.select{height:var(--size-field);padding:0 10px}
+.textarea{padding:8px 12px;min-height:72px;resize:vertical;line-height:20px}
+.textarea::placeholder{color:var(--color-ink-3)}
+.textarea:focus,.select:focus,.input:focus{outline:none;border-color:color-mix(in oklab,var(--color-ink) 70%,transparent);box-shadow:0 0 0 2px color-mix(in oklab,var(--color-ink) 22%,transparent)}
+.select{appearance:none;padding-right:28px;cursor:pointer;width:auto;background-image:linear-gradient(45deg,transparent 50%,var(--color-ink-3) 50%),linear-gradient(135deg,var(--color-ink-3) 50%,transparent 50%);
+  background-position:calc(100% - 14px) 50%,calc(100% - 9px) 50%;background-size:5px 5px;background-repeat:no-repeat}
+.checkbox{appearance:none;width:16px;height:16px;margin:0;border-radius:4px;border:1px solid var(--color-line-strong);background:var(--color-surface);display:inline-grid;place-content:center;cursor:pointer}
+.checkbox:checked{background:var(--color-accent);border-color:var(--color-accent)}
+.checkbox:checked::after{content:'';width:8px;height:4px;border:2px solid var(--color-on-accent);border-top:0;border-right:0;transform:translateY(-1px) rotate(-45deg)}
+.check-row{display:inline-flex;align-items:center;gap:8px;font-size:13px}
+.badge{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;font-weight:600;line-height:1;font-variant-numeric:tabular-nums;border-radius:999px;height:18px;min-width:18px;padding:0 5px;font-size:10px;background:var(--color-hover);color:var(--color-ink-2)}
+.badge-md{height:20px;min-width:20px;padding:0 6px;font-size:12px}
+.badge-ok{background:color-mix(in oklab,var(--color-ok) 14%,transparent);color:var(--color-ok)}
+.badge-warn{background:color-mix(in oklab,var(--color-warn) 14%,transparent);color:var(--color-warn)}
+.status-pill{display:inline-flex;flex:none;align-items:center;white-space:nowrap;border-radius:999px;font-weight:500;line-height:1;height:20px;gap:6px;padding:0 8px;font-size:11px;background:var(--color-hover);color:var(--color-ink-2)}
+.status-dot{position:relative;display:inline-flex;width:6px;height:6px;flex:none}
+.status-dot::before{content:'';position:absolute;inset:0;border-radius:999px;background:var(--color-ink-3)}
+[data-status="waiting"]{background:var(--color-status-waiting-soft);color:var(--color-status-waiting-ink)}
+[data-status="waiting"] .status-dot::before{background:var(--color-status-waiting)}
+[data-status="done"]{background:var(--color-status-done-soft);color:var(--color-status-done-ink)}
+[data-status="done"] .status-dot::before{background:var(--color-status-done)}
+.segmented{display:inline-flex;gap:2px;padding:2px;border-radius:999px;list-style:none;margin:0;height:var(--size-control)}
+.segmented button{height:100%;padding:0 10px;border:0;background:none;border-radius:999px;font-size:12px;font-weight:500;color:var(--color-ink-2);cursor:pointer;white-space:nowrap}
+.segmented button:hover{color:var(--color-ink)}
+.segmented button[aria-pressed="true"]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.section-header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.section-header h2{font-size:14px;line-height:20px;font-weight:600}
+.separator{height:1px;background:var(--color-line);border:0;margin:0}
+.kbd{display:inline-flex;align-items:center;height:18px;padding:0 5px;border-radius:4px;border:1px solid var(--color-line-strong);font-family:var(--font-mono);font-size:11px;color:var(--color-ink-3)}
+
+/* ---- Full-screen design layer ---- */
+.layer{position:fixed;inset:12px;display:flex;flex-direction:column;border-radius:var(--radius-sheet);overflow:hidden}
+.layer-head{display:flex;align-items:center;gap:12px;height:56px;padding:0 12px 0 16px;border-bottom:1px solid var(--color-line);flex:none}
+.layer-title{display:flex;flex-direction:column;min-width:0}
+.layer-title b{font-size:15px;line-height:22px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.layer-body{display:flex;min-height:0;flex:1}
+.stage{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px;padding:16px;overflow:auto}
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.tgroup{display:flex;align-items:center;gap:6px}
+.vsep{width:1px;height:20px;background:var(--color-line)}
+
+/* Frame strip: glass-ui TabList */
+.frames{display:flex;align-items:center;gap:8px}
+.frames-label{font-size:12px;font-weight:500;color:var(--color-ink-3);white-space:nowrap}
+.tablist{display:flex;gap:4px;padding:4px;border-radius:var(--radius-control);background:var(--color-surface);border:1px solid var(--color-line);overflow-x:auto;scrollbar-width:thin;min-width:0;flex:1}
+.tab{position:relative;display:flex;flex:none;align-items:center;gap:8px;white-space:nowrap;border:0;background:none;border-radius:calc(var(--radius-control) - 2px);padding:0 10px;height:28px;font-size:13px;font-weight:500;color:var(--color-ink-3);cursor:pointer;transition:background-color var(--dur-fast),color var(--dur-fast)}
+.tab:hover{color:var(--color-ink-2);background:var(--color-hover)}
+.tab[aria-selected="true"]{background:var(--color-raised);color:var(--color-ink);font-weight:600;box-shadow:inset 0 0 0 1px var(--color-line-strong)}
+.tab .idx{font-family:var(--font-mono);font-size:11px;color:var(--color-ink-3);font-weight:500}
+.tab[aria-selected="true"] .idx{color:var(--color-accent-ink)}
+.tab .pindot{width:6px;height:6px;border-radius:999px;background:var(--color-accent)}
+.frames-nav{display:flex;gap:2px}
+
+/* Mockup frame */
+.frame-meta{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--color-ink-3)}
+.frame-meta .mono{color:var(--color-ink-2)}
+.frame-wrap{position:relative;align-self:flex-start;width:100%;max-width:960px;border-radius:var(--radius-surface);border:1px solid var(--color-line-strong);background:var(--color-ground);overflow:hidden;box-shadow:0 12px 32px var(--glass-shadow)}
+.frame-chrome{display:flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-bottom:1px solid var(--color-line);background:var(--color-surface);font-size:11px;color:var(--color-ink-3)}
+.frame-chrome i{width:8px;height:8px;border-radius:999px;background:var(--color-line-strong)}
+.frame-chrome span{margin-left:8px;font-family:var(--font-mono)}
+.mock{position:relative;min-height:420px;padding:20px;display:none}
+.mock.on{display:block}
+.pin{position:absolute;width:24px;height:24px;border-radius:999px 999px 999px 4px;display:grid;place-content:center;background:var(--color-accent);color:var(--color-on-accent);font-size:11px;font-weight:700;box-shadow:0 0 0 2px var(--color-ground),0 6px 14px var(--glass-shadow-strong);transform:translate(-4px,-20px);cursor:pointer;border:0}
+.pin.resolved{background:var(--color-raised);color:var(--color-ink-3);box-shadow:0 0 0 1px var(--color-line-strong)}
+
+/* Fake mockup content (what the model drew) */
+.m-row{display:flex;gap:12px}
+.m-col{flex:1;display:flex;flex-direction:column;gap:8px;padding:8px;border-radius:8px;background:var(--color-surface);border:1px solid var(--color-line)}
+.m-card{padding:10px;border-radius:6px;background:var(--color-content);border:1px solid var(--color-line);display:flex;flex-direction:column;gap:6px}
+.m-bar{height:8px;border-radius:4px;background:var(--color-line-strong)}
+.m-bar.s{width:40%}.m-bar.m{width:65%}.m-bar.l{width:90%}
+.m-h{font-size:12px;font-weight:600;color:var(--color-ink-2);display:flex;align-items:center;gap:6px}
+.m-title{font-size:22px;line-height:28px;font-weight:600;letter-spacing:-.01em}
+
+/* Review panel */
+.panel{width:368px;flex:none;border-left:1px solid var(--color-line);display:flex;flex-direction:column;gap:16px;padding:16px;overflow-y:auto}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+.rev-title{font-size:13px;font-weight:600}
+.publish{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-radius:var(--radius-surface);background:var(--color-surface);border:1px solid var(--color-line)}
+.publish ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.publish li{display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:12px;color:var(--color-ink-2)}
+.publish li .icon{width:14px;height:14px;color:var(--color-ink-3)}
+.comments{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.comment{display:flex;flex-direction:column;gap:6px;border-radius:6px;border:1px solid var(--color-line);padding:10px 12px;transition:border-color var(--dur-fast)}
+.comment.active{border-color:var(--color-hue-1-line)}
+.comment-head{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12px;color:var(--color-ink-3)}
+.comment-head b{color:var(--color-ink-2);font-weight:500}
+.fchip{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 6px;border-radius:4px;background:var(--color-hover);color:var(--color-ink-2);font-size:11px;font-weight:500;border:0;cursor:pointer}
+.fchip:hover{color:var(--color-ink)}
+.fchip .icon{width:12px;height:12px}
+.pinref{display:inline-grid;place-content:center;width:18px;height:18px;border-radius:999px 999px 999px 3px;background:var(--color-accent);color:var(--color-on-accent);font-size:10px;font-weight:700}
+.comment p{font-size:13px;line-height:20px}
+.composer{display:flex;flex-direction:column;gap:8px}
+.composer-target{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--color-ink-3)}
+.composer-target b{color:var(--color-ink);font-weight:600}
+.empty{font-size:13px;color:var(--color-ink-3);padding:12px;border:1px dashed var(--color-line-strong);border-radius:6px;text-align:center}
+.hint{font-size:12px;line-height:16px;color:var(--color-ink-3)}
+@media (max-width:1100px){.panel{width:320px}}
+@media (max-width:900px){.layer-body{flex-direction:column}.panel{width:auto;border-left:0;border-top:1px solid var(--color-line)}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<div class="canvas"></div>
+
+<div class="layer glass-strong" role="dialog" aria-label="Design of C-84">
+  <header class="layer-head">
+    <div class="layer-title">
+      <span class="text-xs ink-3">agentdock · Board · C-84</span>
+      <b>Let a design hold any number of named frames</b>
+    </div>
+    <span class="status-pill" data-status="waiting" style="margin-left:8px"><span class="status-dot"></span>Waiting for review</span>
+    <span style="margin-left:auto" class="text-xs ink-3">Press <span class="kbd">[</span> <span class="kbd">]</span> to switch frames</span>
+    <button class="btn btn-ghost btn-icon" id="themeBtn" aria-label="Toggle page theme" title="Toggle page theme"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button>
+    <button class="btn btn-ghost btn-icon" aria-label="Close"><svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  </header>
+
+  <div class="layer-body">
+    <!-- Stage -->
+    <section class="stage" aria-label="Mockup stage">
+      <!-- Existing toolbar, unchanged -->
+      <div class="toolbar" role="toolbar" aria-label="Mockup view">
+        <div class="tgroup">
+          <ul class="segmented glass" role="group" aria-label="Viewport">
+            <li><button aria-pressed="true">Desktop</button></li><li><button aria-pressed="false">Tablet</button></li><li><button aria-pressed="false">Phone</button></li>
+          </ul>
+          <input class="input num" style="width:72px" aria-label="Width in pixels" value="1280"><span class="text-xs ink-2">× 800</span>
+        </div>
+        <div class="tgroup">
+          <button class="btn btn-ghost btn-sm btn-icon" aria-label="Zoom out"><svg class="icon" viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+          <ul class="segmented glass" role="group" aria-label="Zoom level"><li><button aria-pressed="true">Fit</button></li><li><button aria-pressed="false" class="num">100%</button></li></ul>
+          <button class="btn btn-ghost btn-sm btn-icon" aria-label="Zoom in"><svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+        </div>
+        <div class="tgroup">
+          <ul class="segmented glass" role="group" aria-label="Theme" id="mockTheme"><li><button aria-pressed="false" data-t="light">Light</button></li><li><button aria-pressed="true" data-t="dark">Dark</button></li></ul>
+          <select class="select" aria-label="Variant"><option>Variant 1</option><option>Variant 2</option></select>
+          <select class="select" aria-label="Revision"><option>Revision 2 · latest</option><option>Revision 1</option></select>
+          <button class="btn btn-glass btn-sm" id="pinBtn" aria-pressed="false"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M22 12h-4M6 12H2M12 6V2M12 22v-4"/></svg>Pin</button>
+        </div>
+      </div>
+
+      <!-- NEW: frame strip -->
+      <div class="frames">
+        <span class="frames-label" id="framesLabel">Frames <span class="num">· 4</span></span>
+        <div class="tablist" role="tablist" aria-labelledby="framesLabel" id="tabs"></div>
+        <div class="frames-nav">
+          <button class="btn btn-ghost btn-sm btn-icon" id="prevF" aria-label="Previous frame"><svg class="icon" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
+          <button class="btn btn-ghost btn-sm btn-icon" id="nextF" aria-label="Next frame"><svg class="icon" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+        </div>
+      </div>
+
+      <div class="frame-meta">
+        <span id="metaName" style="color:var(--color-ink);font-weight:600">Board page</span>
+        <span>·</span><span class="mono" id="metaPath">design/84/board-page.html</span>
+        <span>·</span><span class="num" id="metaPos">Frame 1 of 4</span>
+      </div>
+
+      <div class="frame-wrap" role="tabpanel" id="panel" aria-labelledby="tab-0">
+        <div class="frame-chrome"><i></i><i></i><i></i><span id="chromeName">board-page.html</span></div>
+
+        <!-- Frame 1: whole page -->
+        <div class="mock on" data-frame="0">
+          <div class="m-title">Board</div>
+          <div class="text-sm ink-3" style="margin:4px 0 16px">agentdock · 14 cards</div>
+          <div class="m-row">
+            <div class="m-col"><div class="m-h">Inbox <span class="badge">3</span></div>
+              <div class="m-card"><div class="m-bar m"></div><div class="m-bar s"></div></div>
+              <div class="m-card"><div class="m-bar l"></div><div class="m-bar s"></div></div></div>
+            <div class="m-col"><div class="m-h">Design <span class="badge">2</span></div>
+              <div class="m-card" style="border-color:var(--color-accent)"><div class="m-bar m"></div><div style="display:flex;gap:4px"><span class="badge">4 frames</span><span class="badge badge-warn">Review</span></div></div>
+              <div class="m-card"><div class="m-bar l"></div><div class="m-bar s"></div></div></div>
+            <div class="m-col"><div class="m-h">In progress <span class="badge">1</span></div>
+              <div class="m-card"><div class="m-bar m"></div><div class="m-bar s"></div></div></div>
+            <div class="m-col"><div class="m-h">Done <span class="badge">8</span></div>
+              <div class="m-card"><div class="m-bar s"></div></div></div>
+          </div>
+          <button class="pin" style="left:44%;top:150px" data-c="c1">1</button>
+          <button class="pin resolved" style="left:12%;top:88px" data-c="c2">2</button>
+        </div>
+
+        <!-- Frame 2: card page -->
+        <div class="mock" data-frame="1">
+          <div class="text-xs ink-3">Board / C-84</div>
+          <div class="m-title" style="margin-top:4px">Let a design hold any number of named frames</div>
+          <div style="display:flex;gap:6px;margin:10px 0 16px"><span class="badge badge-md">feature</span><span class="badge badge-md badge-warn">Design waiting</span></div>
+          <div class="m-row">
+            <div style="flex:2;display:flex;flex-direction:column;gap:8px"><div class="m-bar l"></div><div class="m-bar l"></div><div class="m-bar m"></div><div class="m-bar l"></div><div class="m-bar s"></div></div>
+            <div class="m-col" style="flex:1"><div class="m-h">Design</div>
+              <div class="m-card"><div class="m-bar m"></div><div class="text-xs ink-3">Variant 1 · 4 frames</div></div>
+              <div class="m-card"><div class="m-bar s"></div></div></div>
+          </div>
+          <button class="pin" style="left:72%;top:118px" data-c="c3">3</button>
+        </div>
+
+        <!-- Frame 3: component -->
+        <div class="mock" data-frame="2">
+          <div class="m-h" style="margin-bottom:12px">Component · Frame tabs</div>
+          <div style="display:inline-flex;gap:4px;padding:4px;border-radius:6px;background:var(--color-surface);border:1px solid var(--color-line)">
+            <span style="padding:4px 10px;border-radius:4px;background:var(--color-raised);font-size:13px;font-weight:600">1 Board page</span>
+            <span style="padding:4px 10px;font-size:13px;color:var(--color-ink-3)">2 Card page</span>
+            <span style="padding:4px 10px;font-size:13px;color:var(--color-ink-3)">3 Frame tabs</span>
+          </div>
+          <div class="m-h" style="margin:24px 0 12px">States</div>
+          <div style="display:flex;gap:16px;flex-wrap:wrap">
+            <div class="m-card" style="width:180px"><div class="text-xs ink-3">Default</div><div class="m-bar m"></div></div>
+            <div class="m-card" style="width:180px"><div class="text-xs ink-3">Overflow → scroll</div><div class="m-bar l"></div></div>
+            <div class="m-card" style="width:180px"><div class="text-xs ink-3">Single frame</div><div class="m-bar s"></div></div>
+          </div>
+          <button class="pin" style="left:30%;top:40px" data-c="c4">4</button>
+        </div>
+
+        <!-- Frame 4: component -->
+        <div class="mock" data-frame="3">
+          <div class="m-h" style="margin-bottom:12px">Component · Comment with frame chip</div>
+          <div class="m-card" style="max-width:360px">
+            <div style="display:flex;gap:6px;align-items:center"><span class="text-xs ink-2">Andriy</span><span class="badge">Board page</span></div>
+            <div class="m-bar l"></div><div class="m-bar m"></div>
+          </div>
+        </div>
+      </div>
+      <p class="hint">Each frame is a separate HTML document rendered in its own sandboxed iframe. Pins show only on the frame they were made on.</p>
+    </section>
+
+    <!-- Review panel -->
+    <aside class="panel" aria-label="Comments and review">
+      <div class="actions">
+        <button class="btn btn-glass" id="reviseBtn">Revise design (3)</button>
+        <button class="btn btn-solid">Approve variant 1</button>
+      </div>
+      <p class="hint" style="margin-top:-8px">Revise rewrites the whole revision and passes every open comment with its frame name. Approve covers all 4 frames.</p>
+
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <h2 class="rev-title">Board, card page and two components</h2>
+        <p class="text-sm ink-2">The task touches two pages, so each gets its own frame. The tab strip and the comment chip are shown on their own so their states are easy to read.</p>
+      </div>
+
+      <div class="publish">
+        <div class="section-header"><span class="text-xs" style="font-weight:600">Publishes on approve</span><span class="badge num">4 files</span></div>
+        <ul id="pubList"></ul>
+        <span class="hint">Into the card branch, and listed under <span class="mono">## Design</span> in the worker prompt.</span>
+      </div>
+
+      <hr class="separator">
+
+      <section aria-label="Comments" style="display:flex;flex-direction:column;gap:12px">
+        <div class="section-header">
+          <h2>Comments</h2>
+          <ul class="segmented glass" role="group" aria-label="Comment scope" id="scope">
+            <li><button aria-pressed="true" data-s="frame">This frame</button></li>
+            <li><button aria-pressed="false" data-s="all">All <span class="num">4</span></button></li>
+          </ul>
+        </div>
+        <label class="check-row"><input type="checkbox" class="checkbox">Show resolved</label>
+        <ul class="comments" id="comments"></ul>
+
+        <div class="composer">
+          <div class="composer-target"><svg class="icon" viewBox="0 0 24 24" style="width:14px;height:14px"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg>Commenting on <b id="composerFrame">Board page</b></div>
+          <textarea class="textarea" aria-label="New comment" placeholder="What should change in this frame?"></textarea>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+            <span class="hint">Or press Pin and click the frame.</span>
+            <button class="btn btn-glass btn-sm">Comment</button>
+          </div>
+        </div>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<script>
+(function(){
+  var frames=[
+    {name:'Board page',slug:'board-page'},
+    {name:'Card page',slug:'card-page'},
+    {name:'Frame tabs',slug:'frame-tabs'},
+    {name:'Comment chip',slug:'comment-chip'}
+  ];
+  var comments=[
+    {id:'c1',frame:0,pin:1,who:'Andriy',when:'12 min ago',body:'The frame count badge on the board card should only appear when there is more than one frame.'},
+    {id:'c2',frame:0,pin:2,who:'Andriy',when:'1 h ago',body:'Inbox column header is too tight.',resolved:true},
+    {id:'c3',frame:1,pin:3,who:'Andriy',when:'8 min ago',body:'Show the frame names in the design side card, not only the count.'},
+    {id:'c4',frame:2,pin:4,who:'Andriy',when:'5 min ago',body:'Make the overflow state show a fade at the right edge.'},
+    {id:'c5',frame:3,pin:null,who:'Andriy',when:'2 min ago',body:'Looks right — keep the chip clickable so it jumps to its frame.',resolved:true}
+  ];
+  var cur=0,scope='frame';
+  var tabs=document.getElementById('tabs');
+  function el(t,c,h){var e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;}
+  function openCount(i){return comments.filter(function(c){return c.frame===i&&!c.resolved;}).length;}
+  function renderTabs(){
+    tabs.innerHTML='';
+    frames.forEach(function(f,i){
+      var b=el('button','tab');
+      b.setAttribute('role','tab');b.id='tab-'+i;b.setAttribute('aria-controls','panel');
+      b.setAttribute('aria-selected',i===cur?'true':'false');b.tabIndex=i===cur?0:-1;
+      var n=openCount(i);
+      b.innerHTML='<span class="idx">'+(i+1)+'</span>'+f.name+(n?'<span class="badge num" aria-label="'+n+' open comments">'+n+'</span>':'');
+      b.onclick=function(){select(i);};
+      b.onkeydown=function(e){if(e.key==='ArrowRight'){select((cur+1)%frames.length);tabs.children[cur].focus();}if(e.key==='ArrowLeft'){select((cur-1+frames.length)%frames.length);tabs.children[cur].focus();}};
+      tabs.appendChild(b);
+    });
+  }
+  function renderPub(){
+    var ul=document.getElementById('pubList');ul.innerHTML='';
+    frames.forEach(function(f,i){var li=el('li','', '<svg class="icon" viewBox="0 0 24 24"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><path d="M14 2v6h6"/></svg>design/84/'+f.slug+'.html');if(i===cur)li.style.color='var(--color-ink)';ul.appendChild(li);});
+  }
+  function renderComments(){
+    var ul=document.getElementById('comments');ul.innerHTML='';
+    var list=comments.filter(function(c){return !c.resolved&&(scope==='all'||c.frame===cur);});
+    if(!list.length){ul.appendChild(el('li','empty','No open comments on '+frames[cur].name+'.'));return;}
+    list.forEach(function(c){
+      var li=el('li','comment');li.id='cm-'+c.id;
+      var head=el('div','comment-head');
+      head.innerHTML=(c.pin?'<span class="pinref">'+c.pin+'</span>':'')+'<b>'+c.who+'</b><span>'+c.when+'</span>';
+      var chip=el('button','fchip','<svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg>'+frames[c.frame].name);
+      chip.style.marginLeft='auto';chip.title='Open this frame';
+      chip.onclick=function(){select(c.frame);};
+      head.appendChild(chip);
+      li.appendChild(head);li.appendChild(el('p','',c.body));
+      ul.appendChild(li);
+    });
+  }
+  function select(i){
+    cur=i;
+    document.querySelectorAll('.mock').forEach(function(m){m.classList.toggle('on',+m.dataset.frame===i);});
+    var f=frames[i];
+    document.getElementById('metaName').textContent=f.name;
+    document.getElementById('metaPath').textContent='design/84/'+f.slug+'.html';
+    document.getElementById('metaPos').textContent='Frame '+(i+1)+' of '+frames.length;
+    document.getElementById('chromeName').textContent=f.slug+'.html';
+    document.getElementById('composerFrame').textContent=f.name;
+    document.getElementById('panel').setAttribute('aria-labelledby','tab-'+i);
+    renderTabs();renderPub();renderComments();
+  }
+  document.getElementById('prevF').onclick=function(){select((cur-1+frames.length)%frames.length);};
+  document.getElementById('nextF').onclick=function(){select((cur+1)%frames.length);};
+  document.addEventListener('keydown',function(e){
+    if(e.target.tagName==='TEXTAREA'||e.target.tagName==='INPUT')return;
+    if(e.key===']')select((cur+1)%frames.length);
+    if(e.key==='[')select((cur-1+frames.length)%frames.length);
+  });
+  document.querySelectorAll('#scope button').forEach(function(b){b.onclick=function(){
+    scope=b.dataset.s;document.querySelectorAll('#scope button').forEach(function(x){x.setAttribute('aria-pressed',x===b?'true':'false');});renderComments();};});
+  document.querySelectorAll('.pin').forEach(function(p){p.onclick=function(){
+    var row=document.getElementById('cm-'+p.dataset.c);
+    document.querySelectorAll('.comment').forEach(function(c){c.classList.remove('active');});
+    if(row){row.classList.add('active');row.scrollIntoView({block:'nearest'});}
+  };});
+  var pinBtn=document.getElementById('pinBtn');
+  pinBtn.onclick=function(){pinBtn.setAttribute('aria-pressed',pinBtn.getAttribute('aria-pressed')==='true'?'false':'true');};
+  var root=document.documentElement;
+  function setTheme(t){root.setAttribute('data-theme',t);document.querySelectorAll('#mockTheme button').forEach(function(x){x.setAttribute('aria-pressed',x.dataset.t===t?'true':'false');});}
+  document.getElementById('themeBtn').onclick=function(){setTheme(root.getAttribute('data-theme')==='dark'?'light':'dark');};
+  document.querySelectorAll('#mockTheme button').forEach(function(b){b.onclick=function(){setTheme(b.dataset.t);};});
+  select(0);
+})();
+</script>
+</body>
+</html>

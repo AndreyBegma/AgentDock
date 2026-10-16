@@ -1,4 +1,8 @@
-import { PLANNER_OUTPUT_CONTRACT, type PlanQuestion } from '@agentdock/shared';
+import {
+  PLANNER_INTAKE_CONTRACT,
+  type PlanQuestion,
+  plannerOutputContract,
+} from '@agentdock/shared';
 import {
   assemblePrompt,
   type PromptInput,
@@ -46,7 +50,9 @@ describe('assemblePrompt', () => {
   it('puts the instructions first and the fixed contract after them (D11)', () => {
     const prompt = assemblePrompt(base);
     const instructions = prompt.indexOf('INSTRUCTIONS v3');
-    const contract = prompt.indexOf(PLANNER_OUTPUT_CONTRACT.trim());
+    const contract = prompt.indexOf(
+      plannerOutputContract(base.contractVersion).trim(),
+    );
     expect(instructions).toBe(0);
     expect(contract).toBeGreaterThan(instructions);
     expect(prompt).toContain('Action: `decompose`');
@@ -93,5 +99,52 @@ describe('assemblePrompt', () => {
     });
     expect(prompt).toContain('## Frozen tasks\n\n- `t1`');
     expect(prompt).toContain('"rewriteComment": "Split it"');
+  });
+});
+
+describe('assemblePrompt — the New work intake (#409)', () => {
+  const intake = (
+    state: Partial<NonNullable<PromptInput['intake']>> = {},
+  ): PromptInput => ({
+    ...base,
+    action: 'intake',
+    plan: { title: '', mode: 'card', version: 1 },
+    contractVersion: 3,
+    brief: 'Сделай экспорт в CSV и почини логин',
+    intake: {
+      roundsAsked: 0,
+      maxRounds: 4,
+      generate: false,
+      mustGenerate: false,
+      ...state,
+    },
+  });
+
+  it('carries the intake contract with the split, never "New Plan"', () => {
+    const prompt = assemblePrompt(intake());
+    expect(prompt).toContain(PLANNER_INTAKE_CONTRACT.trim());
+    expect(prompt).toContain('"split": Split');
+    expect(prompt).toContain('propose the split');
+    expect(prompt).not.toContain('New Plan');
+  });
+
+  it('a single clear task still asks or writes one card', () => {
+    const prompt = assemblePrompt(intake());
+    expect(prompt).toContain('otherwise write the card now');
+  });
+
+  it('after Keep one card, asks for one card for the whole request', () => {
+    const prompt = assemblePrompt(
+      intake({ keepOne: true, mustGenerate: true }),
+    );
+    expect(prompt).toContain('declined the split and keeps one card');
+    expect(prompt).not.toContain('write the card now — or the split');
+  });
+
+  it('on Enough — generate, the card or the split', () => {
+    const prompt = assemblePrompt(
+      intake({ generate: true, mustGenerate: true }),
+    );
+    expect(prompt).toContain('write the card now — or the split');
   });
 });

@@ -8,6 +8,7 @@ import type {
   TaskPage,
 } from '@agentdock/shared';
 import { BudgetGate } from '../budgets/budget-gate';
+import { capabilities } from '../runners/testing/runner-e2e';
 import {
   block,
   decomposed,
@@ -80,6 +81,32 @@ describe('planner (e2e)', () => {
       ...(comment ? { comment } : {}),
     });
 
+  describe('#445 token saver on plan.turn', () => {
+    const runOf = async (planId: string) =>
+      h.ctx.prisma.run.findUniqueOrThrow({
+        where: { id: (await h.activeTurn(planId)).runId },
+      });
+
+    it('is absent for a runner that does not advertise it', async () => {
+      const plan = await h.createPlan('batch');
+      expect(h.sentOf('plan.turn')[0]).not.toHaveProperty('tokenSaver');
+      expect((await runOf(plan.id)).tokenSaver).toBe(false);
+    });
+
+    it('carries the setting for a runner that advertises it', async () => {
+      await h.ctx.prisma.runner.update({
+        where: { id: h.runnerId },
+        data: { capabilities: { ...capabilities, tokenSaver: true } },
+      });
+      const plan = await h.createPlan('batch');
+      expect(h.sentOf('plan.turn')[0].tokenSaver).toEqual({
+        enabled: true,
+        mcpAllow: [],
+      });
+      expect((await runOf(plan.id)).tokenSaver).toBe(true);
+    });
+  });
+
   describe('the batch flow (D1–D8)', () => {
     it('creates, decomposes, refuses needs_talk, grills, writes, reviews and sends with issue_body', async () => {
       const created = await h.createPlan('batch');
@@ -87,7 +114,8 @@ describe('planner (e2e)', () => {
         visibility: 'private',
         status: 'drafting',
         mode: 'batch',
-        model: 'opus',
+        // #337 D9: the author's planning model, `sonnet` without a setting.
+        model: 'sonnet',
         profileKey: 'claude-main',
         instructionsVersion: 1,
       });
@@ -98,7 +126,7 @@ describe('planner (e2e)', () => {
         root: ROOT,
         base: 'develop',
         profileKey: 'claude-main',
-        model: 'opus',
+        model: 'sonnet',
         timeoutSec: 1200,
         session: { resume: false },
       });
@@ -718,7 +746,7 @@ describe('planner (e2e)', () => {
         id: run.id,
         kind: 'plan',
         status: 'succeeded',
-        model: 'opus',
+        model: 'sonnet',
         profileKey: 'claude-main',
         triggeredByType: 'user',
         triggeredById: h.authorId,

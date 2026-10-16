@@ -1,0 +1,7 @@
+{
+  "argv": ["bun", "run", "check"],
+  "exitCode": 0,
+  "category": "other",
+  "outcome": "passing",
+  "expect": "any"
+}

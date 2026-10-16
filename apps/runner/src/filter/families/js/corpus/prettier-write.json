@@ -1,0 +1,7 @@
+{
+  "argv": ["prettier", "--write", "."],
+  "exitCode": 0,
+  "category": "other",
+  "outcome": "passing",
+  "expect": "filtered"
+}

@@ -367,6 +367,44 @@ describe('boardMoveRule', () => {
       }
     });
 
+    it('lets a person move a gone slot’s card to Finished or To Do (#424)', () => {
+      const gone = { cardSource: 'fleet', slotGone: true } as const;
+      for (const from of WORK_COLUMNS) {
+        for (const to of ['todo', 'finished'] as const) {
+          if (from === to) continue;
+          expect([
+            from,
+            to,
+            boardMoveRule(move({ ...gone, from, to })),
+          ]).toEqual([
+            from,
+            to,
+            { allowed: true, effects: [], offerRun: false },
+          ]);
+        }
+      }
+      expect(
+        boardMoveRule(move({ ...gone, from: 'finished', to: 'completed' })),
+      ).toEqual({ allowed: true, effects: ['accept'], offerRun: false });
+    });
+
+    it('still refuses a gone slot’s card into In progress, or out of Completed (#424)', () => {
+      const gone = { cardSource: 'fleet', slotGone: true } as const;
+      for (const [from, to] of [
+        ['todo', 'in_progress'],
+        ['finished', 'in_progress'],
+        ['completed', 'todo'],
+        ['completed', 'finished'],
+        ['todo', 'completed'],
+      ] as const) {
+        expect([from, to, boardMoveRule(move({ ...gone, from, to }))]).toEqual([
+          from,
+          to,
+          { allowed: false, error: 'fleet_slot' },
+        ]);
+      }
+    });
+
     it('lets a person reorder a fleet card inside its column', () => {
       expect(
         boardMoveRule(

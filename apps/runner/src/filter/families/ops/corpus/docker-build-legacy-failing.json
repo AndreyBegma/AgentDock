@@ -1,0 +1,7 @@
+{
+  "argv": ["docker", "build", "-t", "agentdock-api", "."],
+  "exitCode": 1,
+  "category": "other",
+  "outcome": "failing",
+  "expect": "filtered"
+}

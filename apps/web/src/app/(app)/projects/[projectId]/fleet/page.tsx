@@ -26,7 +26,6 @@ import {
   useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
 } from 'react';
 import { BudgetExceededBanner } from '../../../../../components/budgets/exceeded-banner';
 import { AsyncSection } from '../../../../../components/prerequisites/async-section';
@@ -34,6 +33,7 @@ import { RunnerOfflineBanner } from '../../../../../components/prerequisites/pre
 import { TerminalSheet } from '../../../../../components/terminal/terminal-sheet';
 import type { TerminalTarget } from '../../../../../components/terminal/terminal-view';
 import { api } from '../../../../../lib/api';
+import { boardNewPlanHref } from '../../../../../lib/board/href';
 import { useControl } from '../../../../../lib/control/use-control';
 import {
   EMPTY_FLEET_DESCRIPTION,
@@ -52,9 +52,9 @@ import {
   type WorkspaceState,
 } from '../../../../../lib/fleet/workspace-url';
 import { useLive } from '../../../../../lib/live/use-live';
-import { plannerBriefHref } from '../../../../../lib/planner/href';
 import { allowedLabels } from '../../../../../lib/queue/format';
 import { useSection } from '../../../../../lib/section/use-section';
+import { slotSessionMessenger } from '../../../../../lib/session-message/actions';
 import { useTerminalAvailable } from '../../../../../lib/terminal/use-terminal-available';
 import { NewIssueDialog } from '../queue/new-issue-dialog';
 import { useProjectDetail } from '../use-project-detail';
@@ -70,30 +70,14 @@ import { SlotPanel } from './slot-panel';
 import { SlotsView } from './slots-view';
 import { StartOrchestratorDialog } from './start-dialog';
 import { useControlReasons } from './use-control-reasons';
+import { useDesktop } from './use-desktop';
 
 /** Pushes arrive in bursts (one per projected batch); one refetch covers them. */
 const REFETCH_DEBOUNCE_MS = 300;
 /** Ages in the table are relative to now. */
 const AGE_TICK_MS = 30_000;
-/** Where the canvas is drawn; below it a phone gets the list (and the panel a sheet). */
-const DESKTOP_QUERY = '(min-width: 1024px)';
 const DEPENDENCIES_ID = 'fleet-dependencies';
 const NEXT_WAVE_BRIEF = 'Plan the next wave of work for this project.';
-
-function subscribeDesktop(onChange: () => void) {
-  const query = window.matchMedia(DESKTOP_QUERY);
-  query.addEventListener('change', onChange);
-  return () => query.removeEventListener('change', onChange);
-}
-
-/** True at the canvas's width. False on the server: the first paint is the list. */
-function useDesktop(): boolean {
-  return useSyncExternalStore(
-    subscribeDesktop,
-    () => window.matchMedia(DESKTOP_QUERY).matches,
-    () => false,
-  );
-}
 
 export default function FleetPage() {
   // `useSearchParams` needs a boundary, or the route cannot prerender its shell.
@@ -285,7 +269,7 @@ function FleetWorkspace() {
             </Button>
           ) : null}
           <Link
-            href={plannerBriefHref(projectId, NEXT_WAVE_BRIEF)}
+            href={boardNewPlanHref(projectId, NEXT_WAVE_BRIEF)}
             className="text-sm text-accent-ink underline"
           >
             Plan the next wave
@@ -471,6 +455,11 @@ function FleetWorkspace() {
         target={attach?.target}
         title={attach?.title ?? ''}
         onClose={() => setAttach(undefined)}
+        message={
+          canOperate && attach?.target.kind === 'slot'
+            ? { send: slotSessionMessenger(projectId, attach.target.slot) }
+            : undefined
+        }
       />
     </div>
   );

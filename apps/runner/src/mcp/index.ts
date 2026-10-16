@@ -1,7 +1,15 @@
+import { LOCAL_REQUEST_TIMEOUT_MS } from '@agentdock/shared/protocol';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { FinishGuard, parseFinishGuardArgs } from '../cards/finish-guard';
+import { cardsDirOf, sessionCardNote } from '../handoff/context';
 import { localRequest } from '../local/client';
 import type { LocalCommandDeps } from '../local/subcommand';
+import { LOCAL_RETRY_METHODS, LOCAL_RETRY_WINDOW_MS } from '../local/types';
 import { buildMcpServer, type McpRequest } from './server';
+
+/** The daemon retries inside its window, then makes one last attempt (#434). */
+const RETRY_CALL_MS =
+  LOCAL_RETRY_WINDOW_MS + 2 * LOCAL_REQUEST_TIMEOUT_MS + 1_000;
 
 /**
  * `agentdock-runner mcp` (spec 201 D20): the `agentdock` MCP server over
@@ -11,18 +19,27 @@ import { buildMcpServer, type McpRequest } from './server';
  * (`daemon_unavailable`), never a crash: Claude keeps its other tools.
  */
 export const runMcp = async (
-  _args: readonly string[],
+  args: readonly string[],
   deps: LocalCommandDeps,
 ): Promise<number> => {
   const cwd = deps.env.CLAUDE_PROJECT_DIR || deps.cwd;
+  // #445 D8: a card round with Token saver on guards `finish_card`.
+  const guard = parseFinishGuardArgs(args);
+  const finishGuard = guard
+    ? new FinishGuard({ ...guard, worktree: cwd })
+    : undefined;
   const request: McpRequest = (method, args) =>
     // The daemon and the server check `args` against the method's schema.
-    localRequest(deps.socketPath, method, args as never, {
-      via: 'mcp',
-      cwd,
-      ppid: deps.ppid,
-    });
-  const server = buildMcpServer(request);
+    localRequest(
+      deps.socketPath,
+      method,
+      args as never,
+      { via: 'mcp', cwd, ppid: deps.ppid },
+      LOCAL_RETRY_METHODS.has(method) ? { callTimeoutMs: RETRY_CALL_MS } : {},
+    );
+  // #449 D6: the session's card note, from the daemon's store on disk.
+  const cardNote = () => sessionCardNote(cardsDirOf(deps.env), cwd, deps.exec);
+  const server = buildMcpServer(request, { finishGuard, cardNote });
   const closed = new Promise<void>((resolve) => {
     server.server.onclose = resolve;
   });

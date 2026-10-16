@@ -1,14 +1,30 @@
 import {
+  CARD_BACKGROUND_COMMAND_MAX,
   CARD_WAITING_EVENT,
   type CardWaitingEventData,
+  type CardWaitingReason,
   isActiveRoundPhase,
 } from '@agentdock/shared';
 import {
+  type CardRunFinishRefusedData,
+  type CardRunPendingQuestionData,
   type CardRunPhaseChangedData,
+  type CardRunPushedData,
+  type CardRunQuestionData,
+  cardFinishRefusedEventDataSchemas,
+  cardPendingQuestionEventDataSchemas,
+  cardPushEventDataSchemas,
+  cardQuestionEventDataSchemas,
   cardRunEventDataSchemas,
   HOOK_PROMPT_SUBMITTED_EVENT,
   HOOK_SESSION_ENDED_EVENT,
   HOOK_STOPPED_EVENT,
+  HOOK_TOOL_FINISHED_EVENT,
+  type HookEvent,
+  isCardFinishRefusedEventType,
+  isCardPendingQuestionEventType,
+  isCardPushEventType,
+  isCardQuestionEventType,
   isCardRunEventType,
   parseHookEvent,
   type RunnerEvent,
@@ -18,6 +34,7 @@ import {
   Logger,
   type OnApplicationBootstrap,
 } from '@nestjs/common';
+import { type BoardCard, type BoardCardRound, Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import {
   type RunnerEventSink,
@@ -31,11 +48,20 @@ import {
   BoardWork,
 } from './board-work';
 
+/** #390: a round that left `background` keeps nothing of it. */
+const NO_BACKGROUND = {
+  backgroundAt: null,
+  backgroundTasks: null,
+  backgroundCommand: null,
+  backgroundStalledAt: null,
+} as const;
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * Sink `board` (issue #242 D6, D14): applies `card_run.phase_changed` and the
- * `hook.*` events of card sessions to rounds and cards. A card is touched
+ * Sink `board` (issue #242 D6, D14): applies `card_run.phase_changed`,
+ * `card_run.question` (#473) and the `hook.*` events of card sessions to
+ * rounds and cards. A card is touched
  * only by the runner of its project. Every transition is a conditional
  * update on the round's phase, so a replayed batch changes nothing.
  *
@@ -75,28 +101,227 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
         await this.phaseChanged(runnerId, parsed.data);
         continue;
       }
-      const hook = parseHookEvent(event);
-      if (hook?.ok) {
-        await this.hook(
-          runnerId,
-          event.seq,
-          hook.event.type,
-          hook.event.session,
+      if (isCardPushEventType(event.type)) {
+        const parsed = cardPushEventDataSchemas[event.type].safeParse(
+          event.data,
         );
+        if (!parsed.success) {
+          this.logger.warn(
+            `runner ${runnerId}: malformed ${event.type} (seq ${event.seq}), skipped`,
+          );
+          continue;
+        }
+        await this.pushed(runnerId, parsed.data);
+        continue;
       }
+      if (isCardQuestionEventType(event.type)) {
+        const parsed = cardQuestionEventDataSchemas[event.type].safeParse(
+          event.data,
+        );
+        if (!parsed.success) {
+          this.logger.warn(
+            `runner ${runnerId}: malformed ${event.type} (seq ${event.seq}), skipped`,
+          );
+          continue;
+        }
+        await this.question(runnerId, event.seq, parsed.data);
+        continue;
+      }
+      if (isCardPendingQuestionEventType(event.type)) {
+        const parsed = cardPendingQuestionEventDataSchemas[
+          event.type
+        ].safeParse(event.data);
+        if (!parsed.success) {
+          this.logger.warn(
+            `runner ${runnerId}: malformed ${event.type} (seq ${event.seq}), skipped`,
+          );
+          continue;
+        }
+        await this.pendingQuestion(runnerId, parsed.data);
+        continue;
+      }
+      if (isCardFinishRefusedEventType(event.type)) {
+        const parsed = cardFinishRefusedEventDataSchemas[event.type].safeParse(
+          event.data,
+        );
+        if (!parsed.success) {
+          this.logger.warn(
+            `runner ${runnerId}: malformed ${event.type} (seq ${event.seq}), skipped`,
+          );
+          continue;
+        }
+        await this.finishRefused(runnerId, parsed.data);
+        continue;
+      }
+      const hook = parseHookEvent(event);
+      if (hook?.ok) await this.hook(runnerId, event.seq, hook.event);
     }
   }
 
   /** The round of `runId`, if its card is `cardId` of `projectId` on this runner. */
-  private roundOf(runnerId: string, data: CardRunPhaseChangedData) {
+  private roundOf(
+    runnerId: string,
+    data: Pick<CardRunPhaseChangedData, 'runId' | 'cardId' | 'projectId'>,
+  ) {
     return this.prisma.boardCardRound.findFirst({
       where: {
         runId: data.runId,
         cardId: data.cardId,
         card: { projectId: data.projectId, project: { runnerId } },
       },
-      include: { card: { select: { number: true, column: true } } },
+      include: {
+        card: {
+          select: { number: true, column: true, branch: true, ciHeadSha: true },
+        },
+      },
     });
+  }
+
+  /**
+   * #359 D1: the runner pushed the round's committed HEAD and, once one is
+   * open, names the draft PR — the card shows it while In progress, lists
+   * it (D8), and a new head starts its CI state over (D5). A push of a
+   * branch the card has left (a follow-up started since) is stale.
+   */
+  private async pushed(
+    runnerId: string,
+    data: CardRunPushedData,
+  ): Promise<void> {
+    const round = await this.roundOf(runnerId, data);
+    if (!round) {
+      this.logger.warn(
+        `runner ${runnerId}: push for unknown card round ${data.runId}, skipped`,
+      );
+      return;
+    }
+    if (round.card.branch !== data.branch) return;
+    const newHead = round.card.ciHeadSha !== data.headSha;
+    await this.prisma.boardCard.update({
+      where: { id: round.cardId },
+      data: {
+        ...(data.prNumber !== undefined && data.prUrl !== undefined
+          ? {
+              prNumber: data.prNumber,
+              prUrl: data.prUrl,
+              prState: data.prState ?? 'open',
+            }
+          : {}),
+        ...(newHead
+          ? {
+              ciHeadSha: data.headSha,
+              ciState: 'none',
+              ciChecks: Prisma.DbNull,
+              ciCheckedAt: null,
+            }
+          : {}),
+      },
+    });
+    if (data.prNumber !== undefined && data.prUrl !== undefined) {
+      await this.work.recordPullRequest(round.cardId, {
+        number: data.prNumber,
+        url: data.prUrl,
+        branch: data.branch,
+        state: data.prState ?? 'open',
+        round: round.round,
+      });
+    }
+    this.work.publish(data.projectId, round.cardId);
+  }
+
+  /**
+   * #473: the worker asks the person a question in its session — the round
+   * waits for the person, as after a stop, and `card.waiting` tells them.
+   * Only an active round of the card's current run moves; the answer's
+   * `hook.tool_finished` moves it back to `running`.
+   */
+  private async question(
+    runnerId: string,
+    seq: number,
+    data: CardRunQuestionData,
+  ): Promise<void> {
+    const card = await this.prisma.boardCard.findFirst({
+      where: {
+        id: data.cardId,
+        projectId: data.projectId,
+        project: { runnerId },
+      },
+      include: {
+        rounds: { orderBy: { round: 'desc' }, take: 1 },
+        project: { select: { runnerId: true, rootPath: true, repo: true } },
+      },
+    });
+    const round = card?.rounds[0];
+    if (!card || !round || round.runId !== data.runId) {
+      this.logger.warn(
+        `runner ${runnerId}: question for unknown card round ${data.runId}, skipped`,
+      );
+      return;
+    }
+    if (!isActiveRoundPhase(round.phase)) return;
+    if (await this.toWaiting(runnerId, seq, card, round, 'question')) {
+      this.work.publish(card.projectId, card.id);
+    }
+  }
+
+  /**
+   * #489 M4: what the round's question selector shows now, or null once it
+   * is gone. Kept on an active round of the card's current run only; the
+   * Board offers its options and Telegram its buttons.
+   */
+  private async pendingQuestion(
+    runnerId: string,
+    data: CardRunPendingQuestionData,
+  ): Promise<void> {
+    const round = await this.roundOf(runnerId, data);
+    if (!round) {
+      this.logger.warn(
+        `runner ${runnerId}: question screen for unknown card round ${data.runId}, skipped`,
+      );
+      return;
+    }
+    const { count } = await this.prisma.boardCardRound.updateMany({
+      where: {
+        id: round.id,
+        phase: { in: [...ACTIVE_PHASES] },
+      },
+      data: { pendingQuestion: data.question ?? Prisma.DbNull },
+    });
+    if (count > 0) this.work.publish(data.projectId, round.cardId);
+  }
+
+  /**
+   * #482: the API refused the worker's `finish_card` — the round needs
+   * attention, with the reason, instead of waiting in silence. Only an active
+   * round of the card's current run is marked; a later refusal replaces the
+   * reason, and a finish that is taken leaves the active phases behind it.
+   */
+  private async finishRefused(
+    runnerId: string,
+    data: CardRunFinishRefusedData,
+  ): Promise<void> {
+    const card = await this.prisma.boardCard.findFirst({
+      where: {
+        id: data.cardId,
+        projectId: data.projectId,
+        project: { runnerId },
+      },
+      include: { rounds: { orderBy: { round: 'desc' }, take: 1 } },
+    });
+    const round = card?.rounds[0];
+    if (!card || !round || round.runId !== data.runId) {
+      this.logger.warn(
+        `runner ${runnerId}: refused finish for unknown card round ${data.runId}, skipped`,
+      );
+      return;
+    }
+    const { count } = await this.prisma.boardCardRound.updateMany({
+      where: { id: round.id, phase: { in: ACTIVE_PHASES } },
+      data: {
+        finishRefusedCode: data.code,
+        finishRefusedAt: new Date(data.at),
+      },
+    });
+    if (count > 0) this.work.publish(card.projectId, card.id);
   }
 
   private async phaseChanged(
@@ -127,6 +352,21 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
             await tx.boardCardRound.updateMany({
               where: { id: round.id, tmuxSession: null },
               data: { tmuxSession: data.tmuxSession },
+            });
+          }
+          if (data.phase === 'running') {
+            // #367 D3: a runner older than #367 sends no facts — it wires nothing.
+            const wiring = data.wiring ?? 'none';
+            await tx.boardCardRound.updateMany({
+              where: { id: round.id, wiring: null },
+              data: {
+                wiring,
+                wiringReason:
+                  wiring === 'none'
+                    ? (data.wiringReason ??
+                      (data.wiring === undefined ? 'runner_outdated' : null))
+                    : null,
+              },
             });
           }
           if (data.worktree) {
@@ -202,15 +442,18 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
   }
 
   /**
-   * D6: `hook.stopped` → `waiting` and `card.waiting`; `hook.prompt_submitted`
-   * → `running`. D14: every hook event claims the session as `origin = run`.
+   * D6: `hook.stopped` → `waiting` and `card.waiting`; #390 (ADR-0038): a stop
+   * with the session's background tasks still running → `background`, and
+   * any later activity (`hook.prompt_submitted`, `hook.tool_finished` — a
+   * task notification wakes the worker without a prompt) → `running`. D14:
+   * every hook event claims the session as `origin = run`.
    */
   private async hook(
     runnerId: string,
     seq: number,
-    type: string,
-    session: { runtime: string; id: string },
+    event: HookEvent,
   ): Promise<void> {
+    const { type, session } = event;
     if (session.runtime !== 'claude' || !UUID.test(session.id)) return;
     // #282 D2: a tracked session's end moves its card to Finished. The
     // sessions sink, registered earlier, has written its `endedAt` by now.
@@ -221,7 +464,14 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
       where: { sessionId: session.id, project: { runnerId } },
       include: {
         rounds: { orderBy: { round: 'desc' }, take: 1 },
-        project: { select: { runnerId: true, rootPath: true, repo: true } },
+        project: {
+          select: {
+            runnerId: true,
+            rootPath: true,
+            repo: true,
+            shipSessionContent: true,
+          },
+        },
       },
     });
     if (!card) return;
@@ -238,41 +488,27 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
     if (!round || !isActiveRoundPhase(round.phase)) return;
 
     let changed = false;
-    if (type === HOOK_STOPPED_EVENT) {
-      changed = await this.prisma.$transaction(async (tx) => {
-        const now = new Date();
-        const { count } = await tx.boardCardRound.updateMany({
-          where: {
-            id: round.id,
-            phase: { in: ['queued', 'starting', 'running'] },
-          },
-          data: { phase: 'waiting', waitingAt: now },
-        });
-        if (count === 0) return false;
-        await this.work.runStatus(tx, round.runId, 'waiting_person');
-        const data: CardWaitingEventData = {
-          cardId: card.id,
-          number: card.number,
-          title: card.title,
-          round: round.round,
-        };
-        await this.work.serverEvent(
-          tx,
-          card.project,
-          CARD_WAITING_EVENT,
-          `${round.id}:${runnerId}:${seq}`,
-          { ...data },
-        );
-        return true;
-      });
-    } else if (type === HOOK_PROMPT_SUBMITTED_EVENT) {
+    if (event.type === HOOK_STOPPED_EVENT) {
+      const tasks = event.data.backgroundTasks ?? 0;
+      changed =
+        tasks > 0
+          ? await this.toBackground(round, tasks, {
+              command: card.project.shipSessionContent
+                ? (event.data.background?.text ?? null)
+                : null,
+            })
+          : await this.toWaiting(runnerId, seq, card, round, 'stopped');
+    } else if (
+      type === HOOK_PROMPT_SUBMITTED_EVENT ||
+      type === HOOK_TOOL_FINISHED_EVENT
+    ) {
       changed = await this.prisma.$transaction(async (tx) => {
         const { count } = await tx.boardCardRound.updateMany({
           where: {
             id: round.id,
             phase: { in: ACTIVE_PHASES.filter((p) => p !== 'running') },
           },
-          data: { phase: 'running' },
+          data: { phase: 'running', ...NO_BACKGROUND },
         });
         if (count === 0) return false;
         await this.work.runStatus(tx, round.runId, 'running');
@@ -280,5 +516,94 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
       });
     }
     if (changed) this.work.publish(card.projectId, card.id);
+  }
+
+  /**
+   * D6: the turn ended, or (#473) the worker asks a question — it waits for
+   * the person. Only a round not yet waiting moves, so `card.waiting` is
+   * recorded once per stop or question.
+   */
+  private toWaiting(
+    runnerId: string,
+    seq: number,
+    card: Pick<BoardCard, 'id' | 'number' | 'title'> & {
+      project: Pick<BoardProject, 'runnerId' | 'rootPath' | 'repo'>;
+    },
+    round: Pick<BoardCardRound, 'id' | 'runId' | 'round'>,
+    reason: CardWaitingReason,
+  ): Promise<boolean> {
+    return this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.boardCardRound.updateMany({
+        where: {
+          id: round.id,
+          phase: { in: ['queued', 'starting', 'running', 'background'] },
+        },
+        data: { phase: 'waiting', waitingAt: new Date(), ...NO_BACKGROUND },
+      });
+      if (count === 0) return false;
+      await this.work.runStatus(tx, round.runId, 'waiting_person');
+      const data: CardWaitingEventData = {
+        cardId: card.id,
+        number: card.number,
+        title: card.title,
+        round: round.round,
+        reason,
+      };
+      await this.work.serverEvent(
+        tx,
+        card.project,
+        CARD_WAITING_EVENT,
+        `${round.id}:${runnerId}:${seq}`,
+        { ...data },
+      );
+      return true;
+    });
+  }
+
+  /**
+   * #390: the turn ended with background tasks running — the worker waits on
+   * them, not on the person. A stall starts on entry; a stop while already
+   * in `background` only refreshes what runs.
+   */
+  private toBackground(
+    round: Pick<
+      BoardCardRound,
+      'id' | 'runId' | 'backgroundTasks' | 'backgroundCommand'
+    >,
+    tasks: number,
+    { command }: { command: string | null },
+  ): Promise<boolean> {
+    const backgroundCommand =
+      command === null ? null : command.slice(0, CARD_BACKGROUND_COMMAND_MAX);
+    return this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.boardCardRound.updateMany({
+        where: {
+          id: round.id,
+          phase: { in: ['queued', 'starting', 'running', 'waiting'] },
+        },
+        data: {
+          phase: 'background',
+          backgroundAt: new Date(),
+          backgroundTasks: tasks,
+          backgroundCommand,
+          backgroundStalledAt: null,
+        },
+      });
+      if (count > 0) {
+        await this.work.runStatus(tx, round.runId, 'running');
+        return true;
+      }
+      if (
+        round.backgroundTasks === tasks &&
+        round.backgroundCommand === backgroundCommand
+      ) {
+        return false;
+      }
+      const refreshed = await tx.boardCardRound.updateMany({
+        where: { id: round.id, phase: 'background' },
+        data: { backgroundTasks: tasks, backgroundCommand },
+      });
+      return refreshed.count > 0;
+    });
   }
 }

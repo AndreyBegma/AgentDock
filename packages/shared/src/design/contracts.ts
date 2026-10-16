@@ -107,6 +107,20 @@ export interface DesignSettingsUpdateRequest {
 
 // A task's design (D1–D4, D9, D10)
 
+/**
+ * #441: one frame of a revision, without its HTML. A revision stored before
+ * frames existed reads as one frame named `DESIGN_LEGACY_FRAME_NAME`.
+ */
+export interface DesignFrameView {
+  /** 0-based, in the order the turn drew the frames. */
+  position: number;
+  name: string;
+  /** The published file's stem: `design/<variant>/<slug>.html`. */
+  slug: string;
+  /** `GET /design-revisions/:id/frames/:position/html`, through the web's `/api` rewrite. */
+  htmlUrl: string;
+}
+
 /** A design revision of one variant (`design_revisions` row), without its HTML. */
 export interface DesignRevisionView {
   id: string;
@@ -117,8 +131,10 @@ export interface DesignRevisionView {
   turnId: string;
   /** D4: a variant not picked on approve — readable, never published. */
   archived: boolean;
-  /** `GET /design-revisions/:id/html`, through the web's `/api` rewrite. */
+  /** The first frame's mockup, `GET /design-revisions/:id/html`. Prefer `frames`. */
   htmlUrl: string;
+  /** #441: one or more, in order. */
+  frames: DesignFrameView[];
   createdAt: string;
 }
 
@@ -126,6 +142,8 @@ export interface DesignRevisionView {
 export interface DesignCommentView {
   id: string;
   revisionId: string;
+  /** #441: the position of the frame it was left on, in its revision. */
+  frame: number;
   kind: DesignCommentKind;
   viewport: string | null;
   theme: DesignTheme | null;
@@ -163,11 +181,14 @@ export interface TaskDesignSummary {
 
 /**
  * ADR-0025: a design has exactly one owner — a plan task or a board card
- * (#243). `number` is the card's per-project number (`C-<number>`).
+ * (#243), or — ADR-0044 — a stack (#480). `number` is the card's or the
+ * stack's per-project number (`C-<number>`, `S-<number>`).
  */
 export type DesignOwnerView =
   | { kind: 'task'; planId: string; taskKey: string }
-  | { kind: 'card'; cardId: string; number: number };
+  | { kind: 'card'; cardId: string; number: number }
+  /** #480 (ADR-0044): a stack's shared design; `number` is `S-<number>`'s. */
+  | { kind: 'stack'; stackId: string; number: number };
 export type DesignOwnerKind = DesignOwnerView['kind'];
 
 /**
@@ -248,6 +269,8 @@ export interface TaskDesignPatchRequest {
 export interface DesignCommentRequest {
   /** The revision in view; the comment records it (D10). */
   revisionId: string;
+  /** #441: the frame in view, by position. Default 0, the first. */
+  frame?: number;
   kind: DesignCommentKind;
   /** `screen` and `pin`. */
   viewport?: string;
@@ -299,6 +322,8 @@ export interface DesignLiveChange {
   taskKey: string | null;
   /** Set for a card's design (#243). */
   cardId?: string;
+  /** Set for a stack's design (#480). */
+  stackId?: string;
 }
 
 // Errors

@@ -6,6 +6,7 @@ import {
   eventSourceSchema,
 } from '../protocol';
 import { SCHEDULE_EVENT_TYPES } from '../schedules';
+import { STEWARD_ACTIVITY_TYPES } from '../steward';
 import { ACTIVITY_DATA_MAX_BYTES } from './contracts';
 import {
   ACTIVITY_AUDIT_ACTIONS,
@@ -56,6 +57,8 @@ const API_ONLY = new Set<string>([
   ...SCHEDULE_EVENT_TYPES,
   'manual.note',
   'manual.handoff',
+  'card.background_stalled',
+  ...STEWARD_ACTIVITY_TYPES,
 ]);
 
 describe('the curated event map (spec 21 D3)', () => {
@@ -101,6 +104,11 @@ describe('the curated event map (spec 21 D3)', () => {
         'schedule.disabled',
         'manual.note',
         'manual.handoff',
+        'card.background_stalled',
+        'steward_incident.opened',
+        'steward_incident.acted',
+        'steward_incident.escalated',
+        'steward_incident.resolved',
       ].sort(),
     );
   });
@@ -221,6 +229,36 @@ describe('the curated event map (spec 21 D3)', () => {
       link: '/admin/runners',
       title: 'Runner spool full: events 1–9 dropped',
     });
+  });
+});
+
+describe('card.background_stalled (#390)', () => {
+  const stalled = (source: string) =>
+    event(
+      'card.background_stalled',
+      {
+        cardId: 'c1',
+        number: 39,
+        title: 'Secret title',
+        round: 2,
+        minutes: 30,
+      },
+      { source, slot: null, issue: null },
+    );
+
+  it('warns, names the card and links to it', () => {
+    expect(activityFromEvent(stalled(API_EVENT_SOURCE), 'p1')).toMatchObject({
+      type: 'card.background_stalled',
+      severity: 'warn',
+      title: 'C-39 has been waiting on its own background task for 30 min',
+      actorType: 'system',
+      link: '/projects/p1/board?card=39',
+      data: { cardId: 'c1', number: 39, round: 2, minutes: 30 },
+    });
+  });
+
+  it('shows none from a runner', () => {
+    expect(activityFromEvent(stalled('runner'), 'p1')).toBeNull();
   });
 });
 

@@ -4,6 +4,7 @@ import {
   UIPROFILE_FINGERPRINT_MAX_GLOBS,
 } from '../../design/limits';
 import { fingerprintGlobSchema } from '../../design/types';
+import { tokenSaverConfigSchema } from '../../token-saver/contracts';
 import type { CommandDefinition } from '../commands';
 import { absolutePathSchema } from '../projects';
 import { orchestratorModelSchema } from './control';
@@ -68,6 +69,8 @@ export const uiProfileBuildArgsSchema = z.strictObject({
     .int()
     .min(PLAN_TURN_MIN_TIMEOUT_SEC)
     .max(PLAN_TURN_MAX_TIMEOUT_SEC),
+  /** #445 D11: as on `card.run`. */
+  tokenSaver: tokenSaverConfigSchema.optional(),
 });
 export type UiProfileBuildArgs = z.infer<typeof uiProfileBuildArgsSchema>;
 

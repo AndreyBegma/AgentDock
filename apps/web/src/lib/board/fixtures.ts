@@ -42,6 +42,11 @@ export const card = (
   prState: null,
   collectState: 'none',
   collectError: null,
+  ciState: 'none',
+  ciChecks: [],
+  ciFixAttempts: 0,
+  needsPerson: false,
+  mergedAt: null,
   round: null,
   design: null,
   continueAfterDesign: false,
@@ -50,6 +55,7 @@ export const card = (
   captureConfidence: null,
   sourceSessionId: null,
   autoRunFailure: null,
+  autoRunWhenReady: false,
   tracking: null,
   fleet: null,
   autoCollect: false,
@@ -70,7 +76,9 @@ export const boardView = (cards: BoardCardView[]): BoardView => ({
   running: cards.filter(
     (c) =>
       c.round !== null &&
-      ['queued', 'starting', 'running', 'waiting'].includes(c.round.phase),
+      ['queued', 'starting', 'running', 'waiting', 'background'].includes(
+        c.round.phase,
+      ),
   ).length,
   settings: {
     projectId: 'p1',
@@ -80,6 +88,9 @@ export const boardView = (cards: BoardCardView[]): BoardView => ({
     captureEnabled: false,
     captureModel: 'haiku',
     autoCollectTracked: false,
+    autoMergeCards: null,
+    autoMergeCardsDefault: true,
+    backgroundStallMinutes: 30,
     isDefault: true,
     updatedAt: null,
   },

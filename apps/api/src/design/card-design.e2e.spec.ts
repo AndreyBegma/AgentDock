@@ -1,6 +1,7 @@
 import { BOARD_ERROR } from '@agentdock/shared';
 import { BoardFailure } from '../board/board-error';
 import { BudgetGate } from '../budgets/budget-gate';
+import { capabilities } from '../runners/testing/runner-e2e';
 import { CardDesignHarness } from './testing/card-design-e2e';
 import { designResult, profileResult } from './testing/design-e2e';
 
@@ -17,6 +18,31 @@ describe('card design (e2e, #243)', () => {
 
   const generate = (number: number) =>
     h.author.send('post', `${h.cardDesignBase(number)}/generate`);
+
+  it('#445: the profile build and the design turn carry the token saver when advertised', async () => {
+    const tokenSaverOfRun = async (id: string) =>
+      (await h.ctx.prisma.run.findUniqueOrThrow({ where: { id } })).tokenSaver;
+    await h.ctx.prisma.runner.update({
+      where: { id: h.runnerId },
+      data: { capabilities: { ...capabilities, tokenSaver: true } },
+    });
+    const card = await h.designedCard(1);
+    expect((await generate(card.number)).status).toBe(201);
+    expect(h.designSent('uiprofile.build')[0].tokenSaver).toEqual({
+      enabled: true,
+      mcpAllow: [],
+    });
+    const build = await h.ctx.prisma.run.findFirstOrThrow({
+      where: { kind: 'ui_profile' },
+    });
+    expect(await tokenSaverOfRun(build.id)).toBe(true);
+
+    await h.finishBuild(profileResult());
+    const [turn] = h.sentOf('plan.turn');
+    expect(turn.tokenSaver).toEqual({ enabled: true, mcpAllow: [] });
+    const active = await h.activeCardTurn(card.id);
+    expect(await tokenSaverOfRun(active.runId)).toBe(true);
+  });
 
   it('builds the profile first, then sends one plan.turn per variant with planId = card.id in the card design session', async () => {
     const card = await h.designedCard(2);

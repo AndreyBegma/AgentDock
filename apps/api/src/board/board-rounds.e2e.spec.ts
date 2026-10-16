@@ -1,4 +1,8 @@
-import { type BoardCardDetail, CARD_CONTINUE_PROMPT } from '@agentdock/shared';
+import {
+  type BoardCardDetail,
+  CARD_CONTINUE_PROMPT,
+  CARD_WORKER_PROMPT_VERSION,
+} from '@agentdock/shared';
 import { BudgetGate } from '../budgets/budget-gate';
 import { BoardWorld, failed } from './testing/board-e2e';
 
@@ -271,7 +275,9 @@ describe('board rounds (e2e)', () => {
       const run = await w.ctx.prisma.run.findUniqueOrThrow({
         where: { id: card.rounds[1].runId },
       });
-      expect(run.args).toMatchObject({ promptVersion: 4 });
+      expect(run.args).toMatchObject({
+        promptVersion: CARD_WORKER_PROMPT_VERSION,
+      });
 
       // A second feedback without edits: the plain feedback prompt.
       await post(1, 'finish');
@@ -355,12 +361,14 @@ describe('board rounds (e2e)', () => {
       expect(w.sent('card.run')[0].prompt).toContain('#41');
     });
 
-    it('specOnRun without a specDir → 422 no_spec_dir', async () => {
+    it('#359 D4: without a specDir the card runs with no spec file and no issue', async () => {
       await w.createCard({ specOnRun: true });
       const response = await w.runCard(1);
-      expect(response.status).toBe(422);
-      expect(response.body.error).toBe('no_spec_dir');
-      expect(w.sent('card.run')).toEqual([]);
+      expect(response.status).toBe(200);
+      const [sent] = w.sent('card.run');
+      expect(sent).not.toHaveProperty('files');
+      expect(w.issues()).toEqual([]);
+      expect((await w.card(1)).specPath).toBeNull();
     });
 
     it('specOnRun with a specDir commits the spec first', async () => {

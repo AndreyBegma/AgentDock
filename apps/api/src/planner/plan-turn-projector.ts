@@ -1,9 +1,12 @@
 import {
   asPlannerContractVersion,
+  type CardDraft,
   type ClarifyOutput,
   type DecomposeOutput,
   type DesignOutput,
   type GrillOutput,
+  type IntakeOutput,
+  isIntakeCard,
   isPlannedTask,
   type PlannerParseResult,
   type PlanTurnAction,
@@ -26,6 +29,9 @@ import type {
   PlanTurn,
   Prisma,
 } from '@prisma/client';
+import { AttachmentsService } from '../attachments/attachments.service';
+import { SYSTEM_ACTOR, systemActorFor } from '../audit/audit.types';
+import { BoardPlanCards } from '../board/board-plan-cards';
 import { PrismaService } from '../database/prisma.service';
 import { applyDesignOutput, settleDesign } from '../design/design-apply';
 import { CARD_DESIGN_CONTRACT_VERSION } from '../design/design-prompt';
@@ -38,7 +44,9 @@ import {
 import {
   applySuggestions,
   cardDesignTaskKey,
+  type DesignKey,
   designGates,
+  stackDesignTaskKey,
 } from '../design/design-store';
 import {
   type RunnerEventSink,
@@ -52,9 +60,11 @@ import {
   revisedTasks,
   type TaskDraft,
 } from './plan-apply';
-import { questionsOf } from './plan-mapper';
+import { intakeTurnState } from './plan-intake';
+import { inputOf, questionsOf } from './plan-mapper';
 import { PlanStore } from './plan-store';
 import { PlanTurnService } from './plan-turn.service';
+import { StackDesignTurnService } from './stack-design-turn.service';
 
 type Tx = Prisma.TransactionClient;
 
@@ -64,11 +74,28 @@ type PlanOwnedTurn = PlanTurn & {
   planId: string;
   task: PlanTask | null;
 };
-/** A board card's design turn, with its card (#243 D2). */
-type CardTurn = PlanTurn & { card: BoardCard };
+/**
+ * A design turn owned outside a plan — a board card's (#243 D2) or a stack's
+ * (#480, ADR-0044) — and what its end needs of the owner.
+ */
+interface DesignHost {
+  key: DesignKey;
+  projectId: string;
+  /** The `taskKey` the turn answers under. */
+  taskKey: string;
+  publish(): void;
+  /** The next turn of the batch; false when it did not start. */
+  chain(batch: DesignTurnPlan, authorId: string | null): Promise<boolean>;
+}
 type OwnedTurn =
   | { kind: 'plan'; turn: PlanOwnedTurn }
-  | { kind: 'card'; turn: CardTurn };
+  | { kind: 'host'; turn: PlanTurn; host: DesignHost };
+
+/** #337 D6: the card an intake wrote, and the attachments it took from the plan. */
+interface MadeCard {
+  card: BoardCard;
+  attachmentIds: string[];
+}
 
 /** A turn the API starts once this one is applied (D7; spec 223 D4). */
 type Chain =
@@ -131,6 +158,9 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
     private readonly store: PlanStore,
     private readonly turns: PlanTurnService,
     private readonly cardTurns: CardDesignTurnService,
+    private readonly stackTurns: StackDesignTurnService,
+    private readonly planCards: BoardPlanCards,
+    private readonly attachments: AttachmentsService,
   ) {}
 
   onModuleInit(): void {
@@ -175,9 +205,10 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
         OR: [
           { planId: data.planId, plan: owner },
           { cardId: data.planId, card: owner },
+          { stackId: data.planId, stack: owner },
         ],
       },
-      include: { plan: true, task: true, card: true },
+      include: { plan: true, task: true, card: true, stack: true },
     });
     if (turn?.plan && turn.planId !== null) {
       return {
@@ -185,7 +216,37 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
         turn: { ...turn, plan: turn.plan, planId: turn.planId },
       };
     }
-    if (turn?.card) return { kind: 'card', turn: { ...turn, card: turn.card } };
+    if (turn?.card) {
+      const card = turn.card;
+      return {
+        kind: 'host',
+        turn,
+        host: {
+          key: { cardId: card.id },
+          projectId: card.projectId,
+          taskKey: cardDesignTaskKey(card.number),
+          publish: () => this.store.publishCardDesign(card.projectId, card.id),
+          chain: (batch, authorId) =>
+            this.cardTurns.chain(card.id, batch, authorId),
+        },
+      };
+    }
+    if (turn?.stack) {
+      const stack = turn.stack;
+      return {
+        kind: 'host',
+        turn,
+        host: {
+          key: { stackId: stack.id },
+          projectId: stack.projectId,
+          taskKey: stackDesignTaskKey(stack.number),
+          publish: () =>
+            this.store.publishStackDesign(stack.projectId, stack.id),
+          chain: (batch, authorId) =>
+            this.stackTurns.chain(stack.id, batch, authorId),
+        },
+      };
+    }
     this.logger.warn(
       `runner ${runnerId}: plan turn ${data.turnId} of project ${data.projectId} not found, skipped`,
     );
@@ -206,8 +267,9 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
       data: { phase: 'running' },
     });
     if (updated.count === 0) return;
-    if (owned.kind === 'card') {
-      await this.publishCard(owned.turn.card, turn.runId);
+    if (owned.kind === 'host') {
+      owned.host.publish();
+      await this.store.publishRun(owned.host.projectId, turn.runId);
     } else {
       await this.publish(owned.turn.plan, turn.runId);
     }
@@ -219,14 +281,18 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
   ): Promise<void> {
     const owned = await this.turnOf(runnerId, data);
     if (!owned) return;
-    if (owned.kind === 'card') {
-      await this.cardFinished(owned.turn, data);
+    if (owned.kind === 'host') {
+      await this.hostFinished(owned.turn, owned.host, data);
       return;
     }
     const { turn } = owned;
     const at = new Date(data.at);
     const resultText = data.resultText ?? null;
     let chain: Chain | null = null;
+    /** #337 D6: the card an intake wrote, announced once committed. */
+    let made: MadeCard | null = null;
+    /** #337: the intake's card was not English — asked once more. */
+    let reask = false;
 
     const designPlan =
       turn.action === 'design'
@@ -263,14 +329,7 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
       }
       const parsed = data.resultTruncated
         ? null
-        : await this.parse(
-            tx,
-            turn.plan,
-            turn.task,
-            turn.action,
-            resultText,
-            designPlan,
-          );
+        : await this.parse(tx, turn, turn.action, resultText, designPlan);
       if (!parsed?.ok) {
         const why = parsed
           ? `${parsed.error.reason}: ${parsed.error.message}`
@@ -286,12 +345,14 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
           tx,
         );
         if (settled) await unsettle(tx);
+        // #337 spec "Risks": a card in another language is asked again once.
+        reask = settled && parsed?.error.reason === 'not_english';
         return settled;
       }
       if (
         parsed.output.action === 'design' &&
-        'html' in parsed &&
-        typeof parsed.html === 'string' &&
+        'frames' in parsed &&
+        Array.isArray(parsed.frames) &&
         turn.task &&
         designPlan
       ) {
@@ -314,7 +375,7 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
           },
           designPlan,
           parsed.output,
-          parsed.html,
+          parsed.frames,
         );
         chain = next
           ? { action: 'design', taskId: turn.task.id, design: next }
@@ -332,11 +393,27 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
         tx,
       );
       if (!settled) return false;
+      if (parsed.output.action === 'intake') {
+        // #337 D4: a round waits for the person; the card closes the intake.
+        made = isIntakeCard(parsed.output)
+          ? await this.writeCard(tx, turn.planId, parsed.output.cardDraft)
+          : null;
+        return true;
+      }
       chain = await this.apply(tx, turn.plan, turn.task, parsed.output);
       return true;
     });
     if (!applied) return;
     await this.publish(turn.plan, turn.runId);
+    const card = made as MadeCard | null;
+    if (card) await this.announceCard(card, turn.authorId);
+    if (reask) {
+      await this.turns.chainIntake(
+        turn.planId,
+        inputOf(turn.input),
+        turn.authorId,
+      );
+    }
     if (turn.action === 'design') {
       this.store.publishDesign(
         turn.plan.projectId,
@@ -374,18 +451,19 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
   }
 
   /**
-   * #243 D2: a board card's design turn ended. Validated against contract v2
-   * like a plan task's design turn — a violation fails the turn and stores no
-   * revision — then the next variant of the batch starts, or the design
-   * rests. No write turn follows a card's design (D7).
+   * #243 D2: a board card's design turn ended — or, #480, a stack's.
+   * Validated against contract v2 like a plan task's design turn — a
+   * violation fails the turn and stores no revision — then the next variant
+   * of the batch starts, or the design rests. No write turn follows (D7).
    */
-  private async cardFinished(
-    turn: CardTurn,
+  private async hostFinished(
+    turn: PlanTurn,
+    host: DesignHost,
     data: PlanTurnFinishedData,
   ): Promise<void> {
     const at = new Date(data.at);
     const resultText = data.resultText ?? null;
-    const owner = { cardId: turn.card.id };
+    const owner = host.key;
     const designPlan = designTurnPlanOf(
       (
         await this.prisma.run.findUnique({
@@ -425,7 +503,7 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
       }
       const parsed = parsePlannerOutput(resultText ?? '', 'design', {
         contractVersion: CARD_DESIGN_CONTRACT_VERSION,
-        taskKey: cardDesignTaskKey(turn.card.number),
+        taskKey: host.taskKey,
         variant: designPlan.variant,
         openCommentIds: designPlan.comments,
       });
@@ -435,7 +513,7 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
           `contract_violation: ${parsed.error.reason}: ${parsed.error.message}`,
         );
       }
-      if (!('html' in parsed) || typeof parsed.html !== 'string') {
+      if (!('frames' in parsed) || parsed.frames.length === 0) {
         return fail(
           'failed',
           'contract_violation: invalid_shape: the design turn drew no mockup',
@@ -457,34 +535,81 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
         { id: turn.id, owner },
         designPlan,
         parsed.output,
-        parsed.html,
+        parsed.frames,
       );
       return true;
     });
     if (!applied) return;
-    await this.publishCard(turn.card, turn.runId);
+    host.publish();
+    await this.store.publishRun(host.projectId, turn.runId);
     const batch = next as DesignTurnPlan | null;
     if (!batch) return;
-    const started = await this.cardTurns.chain(
-      turn.card.id,
-      batch,
-      turn.authorId,
-    );
+    const started = await host.chain(batch, turn.authorId);
     if (!started) {
       await settleDesign(this.prisma, owner);
-      this.store.publishCardDesign(turn.card.projectId, turn.card.id);
+      host.publish();
     }
+  }
+
+  /**
+   * #337 D6: the intake's card, in Todo with the plan as its origin, its
+   * attachments re-claimed from the plan; the plan is `done`. Nothing when
+   * the intake was closed meanwhile.
+   */
+  private async writeCard(
+    tx: Tx,
+    planId: string,
+    draft: CardDraft,
+  ): Promise<MadeCard | null> {
+    await tx.$queryRaw`SELECT id FROM plans WHERE id = ${planId} FOR UPDATE`;
+    const plan = await tx.plan.findUniqueOrThrow({ where: { id: planId } });
+    if (plan.mode !== 'card' || plan.status !== 'clarifying') return null;
+    const [card] = await this.planCards.create(tx, {
+      projectId: plan.projectId,
+      planId: plan.id,
+      authorId: plan.authorId,
+      drafts: [{ title: draft.title, body: draft.body, kind: draft.kind }],
+    });
+    const attachmentIds = await this.attachments.claimPlanOntoCard(
+      tx,
+      plan.id,
+      card.id,
+    );
+    await tx.plan.update({
+      where: { id: plan.id },
+      data: { status: 'done', title: draft.title },
+    });
+    return { card, attachmentIds };
+  }
+
+  /** After commit: the card's audit, live event and assessment, for the intake's author. */
+  private async announceCard(
+    made: MadeCard,
+    authorId: string | null,
+  ): Promise<void> {
+    const actor = {
+      userId: authorId,
+      role: 'operator' as const,
+      ctx: { actor: authorId ? systemActorFor(authorId) : SYSTEM_ACTOR },
+    };
+    await this.planCards.announce([made.card], actor);
+    await this.attachments.recordClaim(
+      made.card.projectId,
+      { cardId: made.card.id },
+      made.attachmentIds,
+      actor,
+    );
   }
 
   /** Validates against the contract with what only the API knows (D17). */
   private async parse(
     tx: Tx,
-    plan: Plan,
-    task: PlanTask | null,
+    turn: PlanOwnedTurn,
     action: PlanTurnAction,
     text: string | null,
     designPlan: DesignTurnPlan | null,
   ): Promise<PlannerParseResult<PlanTurnAction>> {
+    const { plan, task } = turn;
     const body = text ?? '';
     // D11: a plan's turns are validated against the version it was created with.
     const contractVersion = asPlannerContractVersion(plan.contractVersion);
@@ -520,6 +645,12 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
           taskKey: task?.key ?? '',
           taskKind: task?.kind ?? 'feature',
         });
+      case 'intake':
+        // #337 D4: rounds asked before this turn, its Enough, the re-ask.
+        return parsePlannerOutput(body, 'intake', {
+          contractVersion,
+          ...(await intakeTurnState(tx, plan.id, turn)),
+        });
       case 'revise': {
         const approved = await tx.planTask.findMany({
           where: {
@@ -548,10 +679,12 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
       | GrillOutput
       | WriteOutput
       | ReviseOutput
-      | DesignOutput,
+      | DesignOutput
+      | IntakeOutput,
   ): Promise<Chain | null> {
-    // A design turn is applied by `applyDesignOutput` before this is reached.
-    if (output.action === 'design') return null;
+    // A design turn is applied by `applyDesignOutput`, an intake by
+    // `writeCard`, before this is reached.
+    if (output.action === 'design' || output.action === 'intake') return null;
     // The turn may have been started on an older row; read the plan now.
     const plan = await tx.plan.findUniqueOrThrow({ where: { id: planRow.id } });
     switch (output.action) {
@@ -623,10 +756,5 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
   private publish(plan: Plan, runId: string): Promise<void> {
     this.store.publish(plan.projectId, plan.id);
     return this.store.publishRun(plan.projectId, runId);
-  }
-
-  private publishCard(card: BoardCard, runId: string): Promise<void> {
-    this.store.publishCardDesign(card.projectId, card.id);
-    return this.store.publishRun(card.projectId, runId);
   }
 }

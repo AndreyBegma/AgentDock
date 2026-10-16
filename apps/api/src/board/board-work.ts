@@ -18,8 +18,11 @@ import {
   type CardCollectOutcome,
   type CardFinishedBy,
   type CardFinishedEventData,
+  type CardMergeOutcome,
+  type CardPrState,
   cardLabel,
   cardPullRequestBody,
+  isActiveRoundPhase,
   positionForIndex,
   type Role,
   RUN_UPDATED_LIVE_EVENT,
@@ -33,6 +36,7 @@ import { AuditService } from '../audit/audit.service';
 import { type AuditContext, SYSTEM_ACTOR } from '../audit/audit.types';
 import { PrismaService } from '../database/prisma.service';
 import { LiveService } from '../live/live.service';
+import { mergeMethodOf } from '../planner/planner-instructions.service';
 import { projectNotFound } from '../projects';
 import { RunnerConnectHooks } from '../runners/runner-connect-hooks';
 import { recordServerEvent } from '../server-events/server-events';
@@ -65,9 +69,43 @@ export interface BoardProject {
   rootPath: string;
   repo: string;
   base: string;
+  /**
+   * #359 D7: the repository's default branch, where the runner read it —
+   * `origin/HEAD` or `gh repo view` (`baseSource` `origin_head` / `gh`), so
+   * `baseBranch` is it. `null` when the base came from the project's config
+   * or the fallback: the shared name rule then decides.
+   */
+  defaultBranch: string | null;
   defaultProfileId: string | null;
   codeSentinelConfig: Prisma.JsonValue;
 }
+
+/** #359: the base sources under which `baseBranch` is the repository's default branch. */
+const DEFAULT_BRANCH_SOURCES: ReadonlySet<string> = new Set([
+  'origin_head',
+  'gh',
+]);
+
+/**
+ * #359 D6, D7: what a card that ships itself does after its round's collect.
+ * `BoardShipping` registers it; `BoardWork` cannot depend on it (it starts
+ * rounds, which move cards through here).
+ */
+export type RoundCollectedHook = (
+  cardId: string,
+  outcome: CardCollectOutcome | null,
+) => Promise<void>;
+
+/**
+ * #443: what follows a card's acceptance — Auto-run when ready of the cards
+ * that depend on it. `BoardAutoRun` registers it; `BoardWork` cannot depend
+ * on it (it starts rounds, which move cards through here).
+ */
+export type CardAcceptedHook = (
+  projectId: string,
+  card: Pick<BoardCard, 'id' | 'number'>,
+  actor: BoardActor,
+) => Promise<void>;
 
 export const ACTIVE_PHASES = [...ACTIVE_CARD_ROUND_PHASES];
 
@@ -139,6 +177,11 @@ export interface MoveRequest {
   summary?: string;
   /** `accept_suggestion` (#244 D9): the fields Edit & accept changed, for the audit record. */
   edits?: Record<string, unknown>;
+  /**
+   * #359: `false` skips the `collect` effect — the round's collect already
+   * ran while the card stayed In progress.
+   */
+  collect?: false;
 }
 
 /** The message of each `move_refused` reason. */
@@ -149,9 +192,9 @@ const MOVE_REFUSED: Record<
   automatic_to_completed: 'Only a person completes a card',
   card_completed: 'A completed card is moved only by a person',
   plan_task_derived: 'A completed card is moved only by a person',
-  // #282 D4: the column follows the slot.
+  // #282 D4: the column follows the slot; #424: until the slot is gone.
   fleet_slot:
-    'A fleet card follows its slot: the one move it takes is Finished → Completed',
+    'A fleet card follows its live slot: the one move it takes is Finished → Completed',
 };
 
 const refusalOf = (
@@ -184,6 +227,8 @@ const refusalOf = (
 export class BoardWork implements OnModuleInit {
   private readonly logger = new Logger(BoardWork.name);
   private readonly pending = new Set<Promise<void>>();
+  private roundCollected: RoundCollectedHook | null = null;
+  private cardAccepted: CardAcceptedHook | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -211,6 +256,7 @@ export class BoardWork implements OnModuleInit {
         rootPath: true,
         repo: true,
         baseBranch: true,
+        baseSource: true,
         baseOverride: true,
         defaultProfileId: true,
         codeSentinelConfig: true,
@@ -223,6 +269,9 @@ export class BoardWork implements OnModuleInit {
       rootPath: row.rootPath,
       repo: row.repo,
       base: row.baseOverride ?? row.baseBranch,
+      defaultBranch: DEFAULT_BRANCH_SOURCES.has(row.baseSource)
+        ? row.baseBranch
+        : null,
       defaultProfileId: row.defaultProfileId,
       codeSentinelConfig: row.codeSentinelConfig,
     };
@@ -281,6 +330,19 @@ export class BoardWork implements OnModuleInit {
     request: MoveRequest,
     actor: BoardActor,
   ): Promise<void> {
+    // #359 D7: the work never moves a card that ships itself to Finished on
+    // its own; the round ends in place and CI decides. `collect: false` is
+    // that decision: the round's collect has run.
+    if (
+      request.to === 'finished' &&
+      request.source === 'automatic' &&
+      request.collect !== false &&
+      card.column === 'in_progress' &&
+      this.ships(project, card)
+    ) {
+      await this.finishInPlace(project, card, request, actor);
+      return;
+    }
     const before = this.decide(card, request);
     if (!before.allowed) throw refusalOf(before);
     let stopped: boolean | null = null;
@@ -408,7 +470,24 @@ export class BoardWork implements OnModuleInit {
     }
     for (const run of ended) this.publishRun(project.id, run.runId, run.status);
     this.publish(project.id, fresh.id);
-    if (effects.includes('collect')) this.collect(fresh.id);
+    // #443: the cards that wait for this one change Ready / Waiting.
+    if (effects.includes('accept') || effects.includes('reopen')) {
+      await this.publishDependants(project.id, fresh.id);
+    }
+    if (effects.includes('accept') && this.cardAccepted) {
+      const hook = this.cardAccepted;
+      this.track(
+        hook(project.id, fresh, actor).catch((error: unknown) => {
+          this.logger.error(
+            `the auto-run after ${cardLabel(fresh.number)} failed`,
+            error instanceof Error ? error.stack : String(error),
+          );
+        }),
+      );
+    }
+    if (effects.includes('collect') && request.collect !== false) {
+      this.collect(fresh.id);
+    }
     if (effects.includes('accept') && fresh.branch !== null) {
       this.close(project, fresh.id, actor);
     }
@@ -428,7 +507,237 @@ export class BoardWork implements OnModuleInit {
       // with Automatic work on.
       cardSource: card.source,
       autoCollect: card.autoCollect,
+      // #424: a gone slot no longer moves its card, so a person may.
+      // #433: a card with no slot at all has nothing to follow either.
+      slotGone: card.fleetSlotGone || card.fleetSlot === null,
     });
+  }
+
+  /**
+   * #359: a card that ships itself — a card worker's card (not a fleet slot,
+   * not a tracked terminal session) that has run, on a runner that
+   * advertises `card.checks`.
+   */
+  ships(
+    project: Pick<BoardProject, 'runnerId'>,
+    card: Pick<BoardCard, 'source' | 'branch'>,
+  ): boolean {
+    return (
+      card.source !== 'fleet' &&
+      card.source !== 'terminal' &&
+      card.branch !== null &&
+      this.commands.servesChecks(project.runnerId)
+    );
+  }
+
+  /** #443: `BoardAutoRun` registers what follows a card's acceptance. */
+  onAccepted(hook: CardAcceptedHook): void {
+    this.cardAccepted = hook;
+  }
+
+  /** #359: `BoardShipping` registers what follows a round's collect. */
+  onRoundCollected(hook: RoundCollectedHook): void {
+    this.roundCollected = hook;
+  }
+
+  /**
+   * #359 D7: the worker is done, but Finished waits for CI. The round ends
+   * (`finish`), the card stays In progress, and the collect — the last push,
+   * the PR out of draft, its description (D3) — runs in the background;
+   * `BoardShipping` reads the checks after it.
+   */
+  private async finishInPlace(
+    project: BoardProject,
+    card: CardWithRounds,
+    request: MoveRequest,
+    actor: BoardActor,
+  ): Promise<void> {
+    const now = new Date();
+    const finishedBy = request.finishedBy ?? 'person';
+    // The sink ends a round whose session ended before it moves the card;
+    // the worker's `finish_card` ends it here.
+    const { round, ended } = await this.prisma.$transaction(async (tx) => {
+      const fresh = await this.lock(tx, card.id);
+      const latest = fresh.rounds[0] ?? null;
+      if (!latest || !isActiveRoundPhase(latest.phase)) {
+        return { round: latest, ended: false };
+      }
+      if (
+        !(await this.endRound(tx, latest.id, 'finished', now, {
+          finishedBy,
+          summary: request.summary,
+        }))
+      ) {
+        return { round: null, ended: false };
+      }
+      await this.closeRun(tx, latest.runId, 'succeeded');
+      return { round: latest, ended: true };
+    });
+    if (!round) return;
+    if (ended) {
+      await this.audit.record({
+        ...actor.ctx,
+        action: 'card.finished',
+        target: { type: 'board_card', id: card.id },
+        projectId: project.id,
+        after: { number: card.number, round: round.round, finishedBy },
+        result: 'ok',
+      });
+      this.publishRun(project.id, round.runId, 'succeeded');
+    }
+    this.publish(project.id, card.id);
+    this.track(
+      (async () => {
+        const outcome = await this.collectNow(card.id, 'move');
+        await this.roundCollected?.(card.id, outcome);
+      })().catch((error: unknown) => {
+        this.logger.error(
+          `the round end of ${cardLabel(card.number)} failed`,
+          error instanceof Error ? error.stack : String(error),
+        );
+      }),
+    );
+  }
+
+  /**
+   * #273 D13, #359 D7: `card.merge` of the card's PR at `headSha`, audited
+   * — Accept's, or the auto-merge's by the system actor. A refusal is 409
+   * `merge_failed`. A merge records `prState merged`, `mergedAt` and the PR
+   * row's state (D8).
+   */
+  async mergePr(
+    project: BoardProject,
+    card: Pick<
+      CardWithRounds,
+      'id' | 'number' | 'prNumber' | 'issueNumber' | 'rounds'
+    >,
+    headSha: string,
+    deleteBranch: boolean,
+    actor: BoardActor,
+  ): Promise<CardMergeOutcome> {
+    if (isActiveRoundPhase(card.rounds[0]?.phase)) {
+      throw boardError(
+        409,
+        BOARD_ERROR.cardRunning,
+        'A worker is running on this card',
+      );
+    }
+    const pr = card.prNumber;
+    if (pr === null) {
+      throw boardError(
+        409,
+        BOARD_ERROR.noPullRequest,
+        `${cardLabel(card.number)} has no pull request to merge`,
+      );
+    }
+    const output = boardOutput(
+      'card.merge',
+      await this.commands.send(
+        project.runnerId,
+        'card.merge',
+        {
+          cardId: card.id,
+          projectId: project.id,
+          root: project.rootPath,
+          pr,
+          headSha,
+          method: mergeMethodOf(project.codeSentinelConfig),
+          issue: card.issueNumber,
+          comment: `Completed as ${cardLabel(card.number)} on the AgentDock board; merged in #${pr}.`,
+          // #329 D9: an older runner refuses the arg; it is sent only when asked.
+          ...(deleteBranch ? { deleteBranch } : {}),
+        },
+        { role: actor.role, ctx: actor.ctx },
+      ),
+    );
+    const target = { type: 'board_card', id: card.id } as const;
+    if (!output.merged) {
+      await this.audit.record({
+        ...actor.ctx,
+        action: 'card.merge_failed',
+        target,
+        projectId: project.id,
+        after: { number: card.number, pr, reason: output.error },
+        result: 'error',
+        meta: { message: output.message },
+      });
+      throw boardError(
+        409,
+        BOARD_ERROR.mergeFailed,
+        output.message || `The merge of #${pr} was refused`,
+        { reason: output.error },
+      );
+    }
+    await this.audit.record({
+      ...actor.ctx,
+      action: 'card.merged',
+      target,
+      projectId: project.id,
+      after: {
+        number: card.number,
+        pr,
+        method: output.method,
+        ...(output.mergeCommit !== null
+          ? { mergeCommit: output.mergeCommit }
+          : {}),
+        alreadyMerged: output.alreadyMerged,
+        issueClosed: output.issueClosed,
+        branchDeleted: output.branchDeleted,
+      },
+      result: 'ok',
+    });
+    // #329 D6: the card's PR state from the merge result; #359 D8: Merged.
+    await this.markMerged(card.id, pr);
+    return {
+      merged: true,
+      alreadyMerged: output.alreadyMerged,
+      method: output.method,
+      mergeCommit: output.mergeCommit,
+      issueClosed: output.issueClosed,
+      ...(output.issueError !== undefined
+        ? { issueError: output.issueError }
+        : {}),
+      branchDeleted: output.branchDeleted,
+      ...(output.branchError !== undefined
+        ? { branchError: output.branchError }
+        : {}),
+    };
+  }
+
+  /**
+   * #359 D8: a PR of the card, listed once; a later report updates its state.
+   * The round is the one that opened it, kept.
+   */
+  async recordPullRequest(
+    cardId: string,
+    pr: {
+      number: number;
+      url: string;
+      branch: string;
+      state: CardPrState;
+      round: number;
+    },
+  ): Promise<void> {
+    await this.prisma.boardCardPullRequest.upsert({
+      where: { cardId_number: { cardId, number: pr.number } },
+      create: { cardId, ...pr },
+      update: { url: pr.url, state: pr.state },
+    });
+  }
+
+  /** #359 D8: the card's PR `pr` merged — the card's state and its PR row. */
+  async markMerged(cardId: string, pr: number): Promise<void> {
+    const now = new Date();
+    await this.prisma.$transaction([
+      this.prisma.boardCard.updateMany({
+        where: { id: cardId, prNumber: pr },
+        data: { prState: 'merged', mergedAt: now },
+      }),
+      this.prisma.boardCardPullRequest.updateMany({
+        where: { cardId, number: pr },
+        data: { state: 'merged' },
+      }),
+    ]);
   }
 
   /** The position for `index` in `column`, rebalancing it when it is too tight. */
@@ -805,6 +1114,15 @@ export class BoardWork implements OnModuleInit {
               prUrl: null,
             }
           : { ...failedCollect(PUSHED_WITHOUT_PR), ahead: output.ahead };
+      if (open) {
+        await this.recordPullRequest(card.id, {
+          number: prNumber,
+          url: prUrl,
+          branch: target.branch,
+          state: output.prState ?? 'open',
+          round: round?.round ?? 1,
+        });
+      }
       // A terminal card's earlier failure no longer holds once one succeeds.
       const cleared =
         terminal && card.autoRunError !== null && outcome.state !== 'failed';
@@ -945,6 +1263,27 @@ export class BoardWork implements OnModuleInit {
         `board.changed ${cardId} not published: ${(error as Error).message}`,
       );
     }
+  }
+
+  /** #480: `board.changed` for a stack — its face, its page and its design. */
+  publishStack(projectId: string, stackId: string): void {
+    const data: BoardChangedData = { stackId };
+    try {
+      this.live.publish(`project:${projectId}`, BOARD_CHANGED_EVENT, data);
+    } catch (error) {
+      this.logger.warn(
+        `board.changed stack ${stackId} not published: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  /** #443: `board.changed` for every card that depends on `cardId`. */
+  async publishDependants(projectId: string, cardId: string): Promise<void> {
+    const rows = await this.prisma.boardCardDependency.findMany({
+      where: { dependsOnId: cardId },
+      select: { cardId: true },
+    });
+    for (const row of rows) this.publish(projectId, row.cardId);
   }
 
   publishRun(projectId: string, runId: string, status: RunStatus): void {

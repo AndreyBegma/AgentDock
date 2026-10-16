@@ -1,0 +1,40 @@
+
+ ▐▛███▛█   Claude Code v2.1.301
+▝▜██████▀  Haiku 5.5 · Claude Max
+ ▝▝   ▝▝   /…/02326dc1-6c42-44d5-8435-ba25429d5858/scratchpad/q
+
+
+❯ Call the AskUserQuestion tool exactly once: question "SelectionBar is missing in glass-ui — what
+  now?", header "glass-ui", two options: "Add it to glass-ui" (Write the component in glass-ui
+  first) and "Use a Toolbar" (Compose it from the existing Toolbar). Do nothing else.
+────────────────────────────────────────────────────────────────────────────────────────────────────
+ ☐ glass-ui
+
+SelectionBar is missing in glass-ui — what now?
+
+  1. Add it to glass-ui
+     Write the component in glass-ui first
+❯ 2. Use a Toolbar
+     Compose it from the existing Toolbar
+  3. Type something.
+────────────────────────────────────────────────────────────────────────────────────────────────────
+  4. Chat about this
+
+Enter to select · ↑/↓ to navigate · Esc to cancel
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

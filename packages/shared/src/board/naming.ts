@@ -10,6 +10,15 @@ import type { BoardCardKind } from './types';
 /** D1: the per-project number as people see it. */
 export const cardLabel = (number: number): string => `C-${number}`;
 
+/** #390: "C-39 has been waiting on its own background task for 30 min". */
+export const cardBackgroundStalledTitle = (
+  number: number,
+  minutes: number,
+): string =>
+  `${cardLabel(number)} has been waiting on its own background task for ${
+    minutes % 60 === 0 && minutes >= 60 ? `${minutes / 60} h` : `${minutes} min`
+  }`;
+
 /** D8: the line every card PR body carries, so a PR is traced back to its card. */
 export const CARD_PR_MARKER = 'AgentDock-Card';
 
@@ -81,21 +90,41 @@ const cardSpecStem = (card: CardSpecPathInput): string => {
 export const CARD_DESIGN_FALLBACK_DIR = 'docs/design/cards';
 
 /**
- * #243 D7: the approved variant's file in the card's branch, repository-
- * relative. With a `specDir`, beside the card's spec:
- * `<specDir>/<issue|card-n>-<slug>/design/<variant>.html`; without one,
- * `docs/design/cards/C-<n>-<slug>/<variant>.html`.
+ * #243 D7, #441: one frame of the approved variant in the card's branch,
+ * repository-relative. With a `specDir`, beside the card's spec:
+ * `<specDir>/<issue|card-n>-<slug>/design/<variant>/<frame>.html`; without
+ * one, `docs/design/cards/C-<n>-<slug>/<variant>/<frame>.html`. `frame` is
+ * the frame's slug.
  */
 export const cardDesignPath = (
   specDir: string | null,
   card: CardSpecPathInput,
   variant: number,
+  frame: string,
 ): string => {
   const dir = specDir?.replace(/\/+$/, '') ?? '';
   if (dir === '') {
-    return `${CARD_DESIGN_FALLBACK_DIR}/${cardLabel(card.number)}-${cardSlug(card.title)}/${variant}.html`;
+    return `${CARD_DESIGN_FALLBACK_DIR}/${cardLabel(card.number)}-${cardSlug(card.title)}/${variant}/${frame}.html`;
   }
-  return `${dir}/${cardSpecStem(card)}/design/${variant}.html`;
+  return `${dir}/${cardSpecStem(card)}/design/${variant}/${frame}.html`;
+};
+
+/**
+ * #480 (ADR-0044): one frame of a stack's approved design in a stack card's
+ * branch, as reference, repository-relative:
+ * `<specDir>/stacks/S-<n>-<slug>/design/<variant>/<frame>.html`; without a
+ * `specDir`, `docs/design/stacks/S-<n>-<slug>/<variant>/<frame>.html`.
+ */
+export const stackDesignPath = (
+  specDir: string | null,
+  stack: { number: number; title: string },
+  variant: number,
+  frame: string,
+): string => {
+  const dir = specDir?.replace(/\/+$/, '') ?? '';
+  const stem = `S-${stack.number}-${cardSlug(stack.title)}`;
+  if (dir === '') return `docs/design/stacks/${stem}/${variant}/${frame}.html`;
+  return `${dir}/stacks/${stem}/design/${variant}/${frame}.html`;
 };
 
 /** The largest issue body `issue.create` takes. */

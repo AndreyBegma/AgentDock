@@ -41,7 +41,7 @@ This table is what the plugin writes. What the runner forwards is in
 | `slot.resumed` | `slot, reason` |
 | `slot.redispatched` | `slot, fromModel, toModel, reason` |
 | `slot.checkpoint` | `slot, checkpoint` (`picked_up` · `plan_ready` · `implementation_done` · `pr_open` · `blocked` · `misclassified`), `summary`, `pr?` |
-| `slot.message_sent` | `slot, text` |
+| `slot.message_sent` | `slot, text`, `by?` — `by: person` when AgentDock appended it for a person's message to the worker (#489, ADR-0045; `source: agentdock`, `eid` `agentdock-<uuid>`) |
 | `slot.fence_widened` | `slot, added[]` |
 | `slot.stopped` | `slot, by` |
 | `pr.merged` | `pr, slot, issue, method` |
@@ -59,10 +59,13 @@ This table is what the plugin writes. What the runner forwards is in
 | `commit.trailer_found` | `slot, sha` |
 | `worktree.changed` | `slot, ahead, behind, dirty` |
 | `card_run.phase_changed` | `cardId, runId, projectId, phase: starting\|running\|ended\|failed, at, tmuxSession?, worktree?, exitCode?, error?` — a board card's worker (issue #242; `events/cards.ts`) |
+| `card_run.question` | `cardId, runId, projectId, at` — the round's pane shows Claude Code's question selector (`AskUserQuestion`); once per question, never the question text. The round goes to `waiting` until the answer's `hook.tool_finished` (#473) |
+| `card_run.pending_question` | `cardId, runId, projectId, at, question` — `question` is the selector screen the round's pane shows now (`key, header, text, options[{index, label, description?}], other`) or `null` once it is gone; sent when the screen changes, before the `card_run.question` of a new question. Session content: only for a project that ships content (#489, ADR-0045) |
+| `card_run.finish_refused` | `cardId, runId, projectId, at, code` — the API refused the round's `finish_card`; `code` is the local error it answered (`localErrorCodeSchema`). Sent by the runner's local socket for a refused `card.finish` from a session in the worktree of a live round. The round needs attention, with the reason, while it is active; never the summary (#482) |
 
 Board server events (source `api`, ADR-0014, issue #242 D15): `card.finished`
 `{ cardId, number, title, round, finishedBy, prNumber, prUrl }` and
-`card.waiting` `{ cardId, number, title, round }` — never prompt or summary
+`card.waiting` `{ cardId, number, title, round, reason?: stopped|question }` — never prompt or summary
 text. They drive the `card.finished` and `card.waiting` notifications.
 
 ### Usage (source `otel` / `transcript`)
@@ -266,6 +269,7 @@ and transcripts (ADR-0003). The content fields (`content`, `input`, `output`,
 | `hook.permission_requested` | `PermissionRequest` | `toolName` |
 | `hook.notification` | `Notification` | `notificationType` (the message text is never sent) |
 | `hook.stopped` | `Stop` | `response?` |
+| `hook.pre_compact` | `PreCompact` | `trigger: manual\|auto` (`custom_instructions` is never sent) — the runner checks the card's handoff note before compaction (#494) |
 | `hook.session_ended` | `SessionEnd` | `reason: clear\|resume\|logout\|prompt_input_exit\|other` |
 
 The API derives the session's `origin`, `issue`, `ownerId` and `liveState` from

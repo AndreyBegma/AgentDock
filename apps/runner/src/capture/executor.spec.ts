@@ -8,6 +8,7 @@ import type {
 } from '@agentdock/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import type { ConfigProfile } from '../config';
+import { expectTextCallWired } from '../launch/testing';
 import { FakeClock } from '../testing/fake-clock';
 import { fakeExec, memoryLogger, tempDir } from '../testing/fixtures';
 import {
@@ -99,6 +100,8 @@ const setup = (script: Script = { stdout: resultLine('ok') }) => {
     emit: (event) => events.push(event),
     log: memoryLogger().log,
     spawn,
+    home: dir,
+    selfCommand: ['/opt/agentdock-runner'],
   });
   const args = (over: Partial<CardsExtractArgs> = {}): CardsExtractArgs => ({
     runId: 'run_1',
@@ -134,6 +137,31 @@ const codeOf = (promise: Promise<unknown>): Promise<string> =>
     () => 'resolved',
     (e: unknown) => (e instanceof CommandFailure ? e.code : String(e)),
   );
+
+describe('CaptureExecutor — Token saver (#445)', () => {
+  it('launches exactly as without the field when it is off', async () => {
+    const absent = setup();
+    await absent.executor.run(absent.args());
+    await absent.finished();
+    const off = setup();
+    await off.executor.run(
+      off.args({ tokenSaver: { enabled: false, mcpAllow: [] } }),
+    );
+    await off.finished();
+    expect(off.calls[0]?.command).toEqual(absent.calls[0]?.command ?? []);
+    expect(off.calls[0]?.env).toEqual(absent.calls[0]?.env ?? {});
+  });
+
+  it('wires the settings and a strict MCP list when it is on', async () => {
+    const t = setup();
+    await t.executor.run(
+      t.args({ tokenSaver: { enabled: true, mcpAllow: [] } }),
+    );
+    await t.finished();
+    const call = t.calls[0] as Call;
+    expectTextCallWired(call, call.cwd, 'card_capture');
+  });
+});
 
 describe('CaptureExecutor (#244 D4)', () => {
   it('pins the CLI flag that disables every tool: --tools "" (claude --help)', () => {

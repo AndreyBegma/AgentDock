@@ -1,6 +1,8 @@
 import {
   type AcceptBoardCardRequest,
   type AcceptSuggestionRequest,
+  type AddCardDependencyRequest,
+  type AddStackCardRequest,
   BOARD_CARD_BODY_MAX,
   BOARD_CARD_KINDS,
   BOARD_CARD_TITLE_MAX,
@@ -9,15 +11,25 @@ import {
   BOARD_MAX_RUNNING_MIN,
   type BoardCardKind,
   type BoardColumn,
+  BULK_CARD_ACTIONS,
+  BULK_CARDS_MAX,
+  type BulkBoardCardsRequest,
+  type BulkCardAction,
   CAPTURE_MODELS,
+  CARD_BACKGROUND_STALL_MINUTES_MAX,
+  CARD_BACKGROUND_STALL_MINUTES_MIN,
   CARD_FEEDBACK_MAX,
   type CaptureModel,
   type CardFeedbackRequest,
   type CreateBoardCardRequest,
+  INTAKE_SPLIT_MAX,
   type MoveBoardCardRequest,
   type RunBoardCardRequest,
+  STACK_BODY_MAX,
+  STACK_TITLE_MAX,
   type UpdateBoardCardRequest,
   type UpdateBoardSettingsRequest,
+  type UpdateBoardStackRequest,
 } from '@agentdock/shared';
 import {
   type OrchestratorPermissionMode,
@@ -25,6 +37,10 @@ import {
 } from '@agentdock/shared/protocol';
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  ArrayUnique,
+  IsArray,
   IsBoolean,
   IsIn,
   IsInt,
@@ -111,6 +127,16 @@ export class UpdateBoardCardDto implements UpdateBoardCardRequest {
   @IsBoolean()
   specOnRun?: boolean;
 
+  /**
+   * #447 D8: links the card to an open issue of the project's repository —
+   * its Run then creates none; `null` unlinks.
+   */
+  @ValidateIf((dto: UpdateBoardCardDto) => dto.issueNumber !== null)
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  issueNumber?: number | null;
+
   @ValidateIf((dto: UpdateBoardCardDto) => dto.model !== null)
   @IsOptional()
   @IsString()
@@ -143,6 +169,11 @@ export class UpdateBoardCardDto implements UpdateBoardCardRequest {
   @IsOptional()
   @IsBoolean()
   autoCollect?: boolean;
+
+  /** #443: turning it on outside To Do is refused `wrong_column`. */
+  @IsOptional()
+  @IsBoolean()
+  autoRunWhenReady?: boolean;
 }
 
 /** `POST /board/cards/:number/move` (D7). */
@@ -158,6 +189,21 @@ export class MoveBoardCardDto implements MoveBoardCardRequest {
   @IsOptional()
   @IsBoolean()
   stopWorker?: boolean;
+}
+
+/** `POST /board/cards/bulk` (#452): distinct card numbers, one action. */
+export class BulkBoardCardsDto implements BulkBoardCardsRequest {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(BULK_CARDS_MAX)
+  @ArrayUnique()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  @Max(999_999_999, { each: true })
+  numbers!: number[];
+
+  @IsIn(BULK_CARD_ACTIONS)
+  action!: BulkCardAction;
 }
 
 /** `POST /board/cards/:number/run`. */
@@ -179,6 +225,47 @@ export class RunBoardCardDto implements RunBoardCardRequest {
   @IsOptional()
   @IsIn(orchestratorPermissionModeSchema.options)
   permissionMode?: OrchestratorPermissionMode;
+
+  /** #337 D8: run although a dependency is not in Completed. */
+  @IsOptional()
+  @IsBoolean()
+  ignoreDependencies?: boolean;
+}
+
+/** `POST /board/cards/:number/dependencies` (#337 D8). */
+export class AddCardDependencyDto implements AddCardDependencyRequest {
+  @IsInt()
+  @Min(1)
+  @Max(999_999_999)
+  dependsOn!: number;
+}
+
+/** `PATCH /board/stacks/:number` (#480). */
+export class UpdateBoardStackDto implements UpdateBoardStackRequest {
+  @IsOptional()
+  @IsString()
+  @Matches(/\S/, { message: 'title must not be blank' })
+  @MaxLength(STACK_TITLE_MAX)
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(STACK_BODY_MAX)
+  body?: string;
+}
+
+/** `POST /board/stacks/:number/cards` (#480). */
+export class AddStackCardDto implements AddStackCardRequest {
+  @IsInt()
+  @Min(1)
+  @Max(999_999_999)
+  card!: number;
+
+  /** 0-based; the number of stages adds a new last stage. */
+  @IsInt()
+  @Min(0)
+  @Max(INTAKE_SPLIT_MAX)
+  stage!: number;
 }
 
 /** `POST /board/cards/:number/feedback` (D9). */
@@ -220,6 +307,19 @@ export class UpdateBoardSettingsDto implements UpdateBoardSettingsRequest {
   @IsOptional()
   @IsBoolean()
   autoCollectTracked?: boolean;
+
+  /** #359 D7: `null` returns to the default (on unless the base is main). */
+  @ValidateIf((dto: UpdateBoardSettingsDto) => dto.autoMergeCards !== null)
+  @IsOptional()
+  @IsBoolean()
+  autoMergeCards?: boolean | null;
+
+  /** #390: minutes in `background` before `card.background_stalled`. */
+  @IsOptional()
+  @IsInt()
+  @Min(CARD_BACKGROUND_STALL_MINUTES_MIN)
+  @Max(CARD_BACKGROUND_STALL_MINUTES_MAX)
+  backgroundStallMinutes?: number;
 }
 
 /** #273 D13: the head the person saw in the accept dialog. */

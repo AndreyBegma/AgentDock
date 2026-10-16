@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import type { ConfigProfile } from '../config';
 import { fakeExec, tempDir } from '../testing/fixtures';
 import {
   commandsCapability,
   detectCapabilities,
   ptyAvailable,
+  readClaudeProfilesAgentdock,
   readProfileAgentdock,
   terminalCapability,
   terminalUnsupported,
@@ -160,6 +162,33 @@ describe('agentdock plugin and telemetry per profile (#281 D1)', () => {
     expect(readProfileAgentdock(dir, 4318).telemetry).toBe(false);
     writeEndpoint(4318);
     expect(readProfileAgentdock(dir, 4318).telemetry).toBe(false);
+  });
+
+  it('reads each Claude profile fresh on every call, and never a Codex one (#348 D4)', () => {
+    const profiles: ConfigProfile[] = [
+      {
+        id: 'claude-a',
+        runtime: 'claude',
+        env: { CLAUDE_CONFIG_DIR: dir },
+        args: [],
+      },
+      { id: 'codex-default', runtime: 'codex', env: {}, args: [] },
+    ];
+    expect(readClaudeProfilesAgentdock(profiles, dir, 4318)).toEqual({
+      'claude-a': { plugin: null, telemetry: false },
+    });
+    writePlugins({
+      'agentdock@agentdock': [
+        { version: '0.2.0', installPath: '/p', scope: 'user' },
+      ],
+    });
+    expect(
+      readClaudeProfilesAgentdock(profiles, dir, 4318)['claude-a'],
+    ).toEqual({ plugin: '0.2.0', telemetry: false });
+    writePlugins({});
+    expect(
+      readClaudeProfilesAgentdock(profiles, dir, 4318)['claude-a']?.plugin,
+    ).toBeNull();
   });
 
   it('is reported for claude profiles only', async () => {

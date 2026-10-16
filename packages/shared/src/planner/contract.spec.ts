@@ -5,6 +5,7 @@ import {
   extractPlannerBlocks,
   PLAN_TURN_ACTIONS,
   PLANNER_DESIGN_CONTRACT,
+  PLANNER_INTAKE_CONTRACT,
   PLANNER_MAX_QUESTIONS,
   PLANNER_MAX_TASKS,
   PLANNER_OUTPUT_CONTRACT,
@@ -511,7 +512,7 @@ describe('parsePlannerOutput — design', () => {
     const r = parsePlannerOutput(designMessage(design), 'design', ctx);
     expect(r.ok).toBe(true);
     if (r.ok) {
-      expect(r.html).toBe(html);
+      expect(r.frames).toEqual([{ name: 'Mockup', html }]);
       expect(r.output).toEqual(design as never);
       expect('html' in r.output).toBe(false);
     }
@@ -529,7 +530,56 @@ describe('parsePlannerOutput — design', () => {
     const body = html.replace('Facts', 'Facts\n```\nnot a fence\n```');
     const r = parsePlannerOutput(designMessage(design, body), 'design', ctx);
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.html).toContain('not a fence');
+    if (r.ok) expect(r.frames[0].html).toContain('not a fence');
+  });
+
+  // #441: one design block per named frame, in order.
+  const block = (body: string) => `\`\`\`\`agentdock-design\n${body}\n\`\`\`\``;
+  const framed = (names: string[], bodies: string[]) =>
+    `${fence({ ...design, frames: names })}\n\n${bodies.map(block).join('\n\n')}\n`;
+
+  it('returns several named frames in order, with no fixed upper limit', () => {
+    const names = Array.from({ length: 14 }, (_, i) => `Frame ${i + 1}`);
+    const bodies = names.map((n) => html.replace('Facts', n));
+    const r = parsePlannerOutput(framed(names, bodies), 'design', ctx);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.frames.map((f) => f.name)).toEqual(names);
+      expect(r.frames[13].html).toContain('Frame 14');
+      expect(r.output.frames).toEqual(names);
+    }
+  });
+
+  it('names a single frame when frames is given', () => {
+    const r = parsePlannerOutput(framed(['Board page'], [html]), 'design', ctx);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.frames).toEqual([{ name: 'Board page', html }]);
+  });
+
+  it.each([
+    ['fewer names than blocks', framed(['Page'], [html, html])],
+    ['more names than blocks', framed(['Page', 'Tile'], [html])],
+    ['one name twice', framed(['Page', 'page'], [html, html])],
+  ])('refuses %s as frame_mismatch', (_, text) => {
+    expectViolation(parsePlannerOutput(text, 'design', ctx), 'frame_mismatch');
+  });
+
+  it('caps the frames together, and names the frame that breaks a rule', () => {
+    const half = `<p>${'x'.repeat(90 * 1024)}</p>`;
+    expectViolation(
+      parsePlannerOutput(framed(['A', 'B'], [half, half]), 'design', ctx),
+      'design_too_large',
+    );
+    const r = parsePlannerOutput(
+      framed(['Page', 'Tile'], [html, '<script>fetch("/x")</script>']),
+      'design',
+      ctx,
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error.reason).toBe('design_forbidden_feature');
+      expect(r.error.message).toContain('frame "Tile"');
+    }
   });
 
   it.each([
@@ -604,11 +654,14 @@ describe('extractPlannerBlocks', () => {
 
 describe('the fixed contract and the default instructions', () => {
   it('the contract text names every action and the block tag', () => {
-    for (const action of PLAN_TURN_ACTIONS) {
+    // #337: the intake has its own text, appended to `card` plans instead.
+    for (const action of PLAN_TURN_ACTIONS.filter((a) => a !== 'intake')) {
       expect(PLANNER_OUTPUT_CONTRACT).toContain(`"action": "${action}"`);
     }
+    expect(PLANNER_OUTPUT_CONTRACT).not.toContain('"action": "intake"');
+    expect(PLANNER_INTAKE_CONTRACT).toContain('"action": "intake"');
     expect(PLANNER_OUTPUT_CONTRACT).toContain('agentdock-plan');
-    expect(PLANNER_OUTPUT_CONTRACT).toContain('# Output contract (v2)');
+    expect(PLANNER_OUTPUT_CONTRACT).toContain('# Output contract (v3)');
     expect(PLANNER_OUTPUT_CONTRACT).toContain(PLANNER_DESIGN_CONTRACT);
     for (const host of ['cdnjs.cloudflare.com', 'cdn.jsdelivr.net/npm/']) {
       expect(PLANNER_DESIGN_CONTRACT).toContain(host);
