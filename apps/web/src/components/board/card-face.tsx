@@ -12,6 +12,7 @@ import {
   approveRunOffer,
   autoRunFailureText,
   confidenceLabel,
+  finishRefusedText,
   fleetHref,
   fleetSummary,
   HOOKS_GUIDE_LABEL,
@@ -192,6 +193,13 @@ export function CardFace({
             >
               {card.round.backgroundCommand}
             </span>
+          ) : null}
+          {card.round?.finishRefused ? (
+            <Tooltip content={finishRefusedText(card.round.finishRefused)}>
+              <span>
+                <Badge tone="danger" size="md" label="Finish refused" />
+              </span>
+            </Tooltip>
           ) : null}
           {card.round?.hooksMissing ? (
             <HooksChip projectId={projectId} card={card} round={card.round} />

@@ -37,6 +37,8 @@ import {
   type CardRunWiringReason,
   cardRunWiringReasonSchema,
   cardRunWiringSchema,
+  type LocalErrorCode,
+  localErrorCodeSchema,
   type ProfileAgentdock,
 } from '@agentdock/shared/protocol';
 import {
@@ -260,6 +262,15 @@ export const wiringOf = (
   };
 };
 
+/** #482: a refused `finish_card` counts only while the round is active. */
+export const finishRefusedOf = (
+  round: Pick<BoardCardRound, 'phase' | 'finishRefusedCode'>,
+): LocalErrorCode | null => {
+  if (!isActiveRoundPhase(round.phase)) return null;
+  const code = localErrorCodeSchema.safeParse(round.finishRefusedCode);
+  return code.success ? code.data : null;
+};
+
 const brief = (
   card: BoardCard,
   round: BoardCardRound | undefined,
@@ -277,6 +288,7 @@ const brief = (
         ...hooksCauseOf(card, round, facts),
         ...wiringOf(round),
         autoRunAfter: round.autoRunAfter,
+        finishRefused: finishRefusedOf(round),
       }
     : null;
 
@@ -411,6 +423,7 @@ const toRoundView = (
   ...hooksCauseOf(card, round, facts),
   ...wiringOf(round),
   autoRunAfter: round.autoRunAfter,
+  finishRefused: finishRefusedOf(round),
   costUsd: facts.costs.get(round.runId) ?? null,
   tokenSaved: facts.tokenSaver.tokenSaved.get(round.runId) ?? null,
   tokenSaverFilters: facts.tokenSaver.tokenSaverFilters.get(round.runId) ?? [],

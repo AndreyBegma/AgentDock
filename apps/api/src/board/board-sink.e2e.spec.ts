@@ -1,4 +1,4 @@
-import type { BoardCardDetail } from '@agentdock/shared';
+import type { BoardCardDetail, BoardView } from '@agentdock/shared';
 import type { LocalCall } from '../local/local-call';
 import { LocalError } from '../local/local-error';
 import { LocalHandlers } from '../local/local-handlers';
@@ -459,6 +459,73 @@ describe('board sink (e2e)', () => {
       expect((await detail()).hooksCause).toBe('session_predates');
       await report();
       expect((await detail()).hooksCause).toBe('unknown');
+    });
+  });
+
+  describe('card_run.finish_refused (#482)', () => {
+    const refused = (
+      card: { id: string },
+      runId: string,
+      code = 'not_a_card_session',
+      projectId = w.a,
+    ) =>
+      w.deliver('card_run.finish_refused', {
+        cardId: card.id,
+        runId,
+        projectId,
+        at: new Date().toISOString(),
+        code,
+      });
+    const views = async () => {
+      const board = (await w.viewer.get(`${w.path()}/board`)).body as BoardView;
+      const brief = board.columns.flatMap((c) => c.cards)[0]?.round;
+      const detail = (await w.operator.get(`${w.path()}/board/cards/1`))
+        .body as BoardCardDetail;
+      return { brief, round: detail.rounds[detail.rounds.length - 1] };
+    };
+
+    it('the round needs attention with the reason until a finish is taken', async () => {
+      const { card, round, sessionId } = await running();
+      await phase(card, round.runId, { phase: 'running' });
+      await w.hook('hook.stopped', sessionId);
+      await refused(card, round.runId);
+
+      let after = (await w.card(1)).rounds[0];
+      expect(after.phase).toBe('waiting');
+      expect(after.finishRefusedCode).toBe('not_a_card_session');
+      expect(after.finishRefusedAt).not.toBeNull();
+      let view = await views();
+      expect(view.brief?.finishRefused).toBe('not_a_card_session');
+      expect(view.round?.finishRefused).toBe('not_a_card_session');
+
+      // A later refusal replaces the reason.
+      await refused(card, round.runId, 'runner_offline');
+      expect((await views()).brief?.finishRefused).toBe('runner_offline');
+
+      await finishCard(sessionId, 'Done. Tested.');
+      await w.work.settled();
+      after = (await w.card(1)).rounds[0];
+      expect(after.phase).toBe('finished');
+      view = await views();
+      expect(view.brief?.finishRefused ?? null).toBeNull();
+      expect(view.round?.finishRefused).toBeNull();
+    });
+
+    it('ignores a refusal of an old run, another project or an ended round', async () => {
+      const { card, round } = await running();
+      await refused(card, 'cm1run00000000000000000999');
+      await refused(card, round.runId, 'not_a_card_session', w.b);
+      expect((await w.card(1)).rounds[0].finishRefusedCode).toBeNull();
+
+      await phase(card, round.runId, { phase: 'failed', error: 'gone' });
+      await refused(card, round.runId);
+      expect((await w.card(1)).rounds[0].finishRefusedCode).toBeNull();
+    });
+
+    it('skips a malformed refusal', async () => {
+      const { card, round } = await running();
+      await refused(card, round.runId, 'no_such_code');
+      expect((await w.card(1)).rounds[0].finishRefusedCode).toBeNull();
     });
   });
 

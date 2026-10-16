@@ -766,7 +766,7 @@ daemon relays their request. Schemas are in `local.ts`.
 | `handoff.create` | operator | `title, body, branch` | an issue queued for the fleet, plus `manual.handoff` |
 | `action.request` | operator | `kind, args, summary` | a pending action request (spec 201 D18) |
 | `away.set` | operator | `on` | the runner's away mode; needs no project |
-| `card.finish` | operator | `summary` (≤ 4 000), `artifactIncomplete?` (#445 D8, set by the runner's artifact guard) | `{ number, finished: true }`; the card is the one whose session uuid is the request's `session.id`, else `not_a_card_session` (issue #242 D6) |
+| `card.finish` | operator | `summary` (≤ 4 000), `artifactIncomplete?` (#445 D8, set by the runner's artifact guard) | `{ number, finished: true }`; the card is the one whose session uuid is the request's `session.id`, else `not_a_card_session` (issue #242 D6). An MCP caller's session is the one whose `claude` pid a `SessionStart` reported, else (#482) the session of the live card round whose worktree holds the caller's cwd — read from the card store on disk, so it survives a daemon restart — else the one live session in that cwd. A refused `card.finish` from a live round's worktree is also sent as `card_run.finish_refused` |
 
 ```json
 {

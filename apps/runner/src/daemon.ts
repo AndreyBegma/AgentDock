@@ -47,6 +47,7 @@ import {
   HandoffWriter,
   RunNotes,
 } from './handoff';
+import { cardAtWorktree } from './handoff/context';
 import { LocalSocketServer } from './local/server';
 import { LocalService } from './local/service';
 import { HookSessions } from './local/sessions';
@@ -632,6 +633,14 @@ export const runDaemon = async (
       envelope: async (projectId) =>
         (await directory.resolve([projectId])).get(projectId),
       sessions: hookSessions,
+      // #482: a round's session is known from its record after a restart.
+      liveRound: (cwd) =>
+        cardAtWorktree(
+          cards.store
+            .all()
+            .filter((r) => r.phase === 'starting' || r.phase === 'running'),
+          cwd,
+        ),
       now: () => new Date(clock.now()).toISOString(),
       log,
     });

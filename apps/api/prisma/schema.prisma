@@ -3008,6 +3008,11 @@ model BoardCardRound {
   backgroundCommand   String?
   /// #390: when this stall raised `card.background_stalled` — once per stall.
   backgroundStalledAt DateTime?
+  /// #482: the local error the API answered the round's last refused
+  /// `finish_card` with (shared `localErrorCodeSchema`), from
+  /// `card_run.finish_refused`; the round needs attention while it is active.
+  finishRefusedCode   String?
+  finishRefusedAt     DateTime?
   finishedAt          DateTime?
   endedAt             DateTime?
   /// #449 D3: how the round's session started, from `round.restart`; `null`

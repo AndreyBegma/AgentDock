@@ -86,15 +86,18 @@ export class HookSessions {
    * the pid map, else the single live session in that cwd, else none.
    */
   resolve(ppid: number | undefined, cwd: string | undefined): string | null {
-    if (ppid !== undefined) {
-      const byPid = this.byPid.get(ppid);
-      if (byPid) return byPid;
-    }
+    const byPid = this.byParent(ppid);
+    if (byPid) return byPid;
     if (cwd === undefined) return null;
     const live = [...this.sessions.values()].filter(
       (s) => !s.ended && s.cwd === cwd,
     );
     return live.length === 1 ? live[0].id : null;
+  }
+
+  /** The session whose `claude` process is `ppid`, as `SessionStart` reported it. */
+  byParent(ppid: number | undefined): string | null {
+    return ppid === undefined ? null : (this.byPid.get(ppid) ?? null);
   }
 
   cwdOf(sessionId: string): string | undefined {

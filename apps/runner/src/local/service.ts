@@ -1,16 +1,19 @@
 import { ACTION_REQUEST_TOOL_INPUT_MAX } from '@agentdock/shared';
 import {
+  cardRunFinishRefusedDataSchema,
   EVENT_SCHEMA_VERSION,
   HOOK_SESSION_ENDED_EVENT,
   HOOK_SESSION_STARTED_EVENT,
   type HookEventType,
   hookEventDataSchemas,
+  type LocalErrorCode,
   manualTmuxSessionSchema,
   type UnsequencedEvent,
   type WatchedProject,
 } from '@agentdock/shared/protocol';
 import { z } from 'zod';
 import { correlateCwd } from '../adapters/correlate';
+import type { CardRecord } from '../cards/record';
 import { errorMessage, type Logger } from '../log';
 import type { EnvelopeProject } from '../otlp/map';
 import { toHookContent } from './redact';
@@ -41,6 +44,11 @@ export interface LocalServiceDeps {
   /** The envelope `project` of a watched project id, resolved through git. */
   envelope: (projectId: string) => Promise<EnvelopeProject | undefined>;
   sessions: HookSessions;
+  /**
+   * #482: the live card round whose worktree holds `cwd`, from the card
+   * store on disk — it outlives a daemon restart, the hook sessions do not.
+   */
+  liveRound?: (cwd: string) => CardRecord | null;
   now: () => string;
   log: Logger;
 }
@@ -189,14 +197,71 @@ export class LocalService {
     const projectId = input.cwd
       ? correlateCwd(input.cwd, projects).projectId
       : undefined;
-    const sessionId =
-      input.sessionId ?? this.deps.sessions.resolve(input.ppid, input.cwd);
-    return this.deps.relay({
+    let round: CardRecord | null | undefined;
+    const roundAt = (): CardRecord | null => {
+      if (round === undefined) {
+        round = input.cwd ? (this.deps.liveRound?.(input.cwd) ?? null) : null;
+      }
+      return round;
+    };
+    const sessionId = input.sessionId ?? this.sessionOf(input, roundAt);
+    const result = await this.deps.relay({
       method: input.method,
       args: this.gate(input, shipsContent(projectId, projects)),
       ...(projectId ? { projectId } : {}),
       ...(sessionId ? { session: { runtime: 'claude', id: sessionId } } : {}),
       via: input.via,
+    });
+    if (input.method === 'card.finish' && !result.ok) {
+      const refused = roundAt();
+      if (refused) this.finishRefused(refused, result.error.code);
+    }
+    return result;
+  }
+
+  /**
+   * The session of a caller that knows only its parent pid and cwd (D10):
+   * the pid a `SessionStart` reported, else (#482) the session of the live
+   * card round whose worktree holds the cwd — the card store survives a
+   * daemon restart, the hook sessions do not — else the one live session
+   * in that cwd.
+   */
+  private sessionOf(
+    input: LocalRequestArgs,
+    roundAt: () => CardRecord | null,
+  ): string | null {
+    const { sessions } = this.deps;
+    return (
+      sessions.byParent(input.ppid) ??
+      roundAt()?.sessionId ??
+      sessions.resolve(undefined, input.cwd)
+    );
+  }
+
+  /**
+   * #482: the API refused a live round's `finish_card` — reported, so the
+   * card needs attention with the reason instead of waiting in silence.
+   */
+  private finishRefused(round: CardRecord, code: LocalErrorCode): void {
+    const at = this.deps.now();
+    this.deps.emit({
+      v: EVENT_SCHEMA_VERSION,
+      ts: at,
+      type: 'card_run.finish_refused',
+      source: 'runner',
+      project: { repo: round.repo, root: round.root },
+      data: cardRunFinishRefusedDataSchema.parse({
+        cardId: round.cardId,
+        runId: round.runId,
+        projectId: round.projectId,
+        at,
+        code,
+      }),
+    });
+    this.deps.log.warn('local: finish_card was refused', {
+      cardId: round.cardId,
+      runId: round.runId,
+      code,
     });
   }
 
