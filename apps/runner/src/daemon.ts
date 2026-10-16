@@ -29,6 +29,7 @@ import {
   detectCapabilities,
   extractVersion,
   ptyAvailable,
+  readClaudeProfilesAgentdock,
   terminalCapability,
   terminalUnsupported,
 } from './detect/capabilities';
@@ -386,6 +387,12 @@ export const runDaemon = async (
         load: [one, five, fifteen],
         tmuxSessions: await countTmuxSessions(exec),
         collectors: {},
+        // #348 D4: sent every time, so a lost heartbeat heals on the next one.
+        profiles: readClaudeProfilesAgentdock(
+          config.profiles,
+          home,
+          otlpCapability()?.http ?? null,
+        ),
       };
     };
 

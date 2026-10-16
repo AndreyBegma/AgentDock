@@ -155,6 +155,25 @@ export const readProfileAgentdock = (
   telemetry: readTelemetry(configDir, otlpPort),
 });
 
+/**
+ * Every Claude profile's agentdock state, by profile id (#348 D4) — the
+ * heartbeat's `profiles`. Reads two JSON files per profile and runs nothing;
+ * a Codex profile is never in it.
+ */
+export const readClaudeProfilesAgentdock = (
+  profiles: readonly ConfigProfile[],
+  home: string,
+  otlpPort: number | null,
+): Record<string, ProfileAgentdock> =>
+  Object.fromEntries(
+    profiles
+      .filter((p) => p.runtime === 'claude')
+      .map((p) => [
+        p.id,
+        readProfileAgentdock(claudeConfigDir(p, home), otlpPort),
+      ]),
+  );
+
 /** `a.b.c` ≥ `min`, comparing the leading numbers; an unparsable version is not. */
 export const versionAtLeast = (
   version: string | null,
