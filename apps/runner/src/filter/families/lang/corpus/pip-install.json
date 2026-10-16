@@ -1,0 +1,7 @@
+{
+  "argv": ["pip", "install", "-r", "requirements.txt"],
+  "exitCode": 0,
+  "category": "other",
+  "outcome": "passing",
+  "expect": "filtered"
+}

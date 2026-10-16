@@ -1,0 +1,20 @@
+Installing dependencies from lock file
+
+Package operations: 14 installs, 0 updates, 0 removals
+
+  - Installing certifi (2024.7.4)
+  - Installing charset-normalizer (3.3.2)
+  - Installing idna (3.7)
+  - Installing urllib3 (2.2.2)
+  - Installing annotated-types (0.7.0)
+  - Installing typing-extensions (4.12.2)
+  - Installing requests (2.32.3)
+  - Installing pydantic-core (2.20.1)
+  - Installing pydantic (2.8.2)
+  - Installing iniconfig (2.0.0)
+  - Installing packaging (24.1)
+  - Installing pluggy (1.5.0)
+  - Installing pytest (8.3.2)
+  - Installing ruff (0.5.5)
+
+Installing the current project: shop (0.3.0)

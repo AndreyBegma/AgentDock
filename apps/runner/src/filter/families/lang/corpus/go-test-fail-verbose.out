@@ -1,0 +1,58 @@
+=== RUN   TestParseDuration
+=== RUN   TestParseDuration/seconds
+=== RUN   TestParseDuration/minutes
+=== RUN   TestParseDuration/hours
+=== RUN   TestParseDuration/mixed
+=== RUN   TestParseDuration/empty
+--- PASS: TestParseDuration (0.00s)
+    --- PASS: TestParseDuration/seconds (0.00s)
+    --- PASS: TestParseDuration/minutes (0.00s)
+    --- PASS: TestParseDuration/hours (0.00s)
+    --- PASS: TestParseDuration/mixed (0.00s)
+    --- PASS: TestParseDuration/empty (0.00s)
+=== RUN   TestBackoffGrowsExponentially
+--- PASS: TestBackoffGrowsExponentially (0.00s)
+=== RUN   TestBackoffIsCapped
+--- PASS: TestBackoffIsCapped (0.00s)
+=== RUN   TestBackoffJitterStaysInRange
+--- PASS: TestBackoffJitterStaysInRange (0.01s)
+=== RUN   TestQueuePushPop
+--- PASS: TestQueuePushPop (0.00s)
+=== RUN   TestQueueIsFIFO
+--- PASS: TestQueueIsFIFO (0.00s)
+=== RUN   TestQueueBlocksWhenEmpty
+--- PASS: TestQueueBlocksWhenEmpty (0.05s)
+=== RUN   TestQueueCloseWakesWaiters
+--- PASS: TestQueueCloseWakesWaiters (0.02s)
+=== RUN   TestSchedulerRunsDueJobs
+--- PASS: TestSchedulerRunsDueJobs (0.03s)
+=== RUN   TestSchedulerSkipsFutureJobs
+--- PASS: TestSchedulerSkipsFutureJobs (0.01s)
+=== RUN   TestSchedulerRecoversFromPanic
+--- PASS: TestSchedulerRecoversFromPanic (0.00s)
+=== RUN   TestRegistryRegisterAndLookup
+--- PASS: TestRegistryRegisterAndLookup (0.00s)
+=== RUN   TestRegistryRejectsDuplicates
+--- PASS: TestRegistryRejectsDuplicates (0.00s)
+=== RUN   TestStoreSaveAndLoad
+--- PASS: TestStoreSaveAndLoad (0.01s)
+=== RUN   TestStoreLoadMissing
+--- PASS: TestStoreLoadMissing (0.00s)
+=== RUN   TestStoreCompactsOnReopen
+    store_test.go:88: segment count after reopen = 3, want 1
+--- FAIL: TestStoreCompactsOnReopen (0.03s)
+=== RUN   TestStoreTruncatedTailIsIgnored
+--- PASS: TestStoreTruncatedTailIsIgnored (0.00s)
+=== RUN   TestWireEncodeDecode
+=== RUN   TestWireEncodeDecode/ping
+=== RUN   TestWireEncodeDecode/data
+=== RUN   TestWireEncodeDecode/close
+--- PASS: TestWireEncodeDecode (0.00s)
+    --- PASS: TestWireEncodeDecode/ping (0.00s)
+    --- PASS: TestWireEncodeDecode/data (0.00s)
+    --- PASS: TestWireEncodeDecode/close (0.00s)
+=== RUN   TestWireRejectsOversizedFrame
+--- PASS: TestWireRejectsOversizedFrame (0.00s)
+FAIL
+exit status 1
+FAIL	github.com/acme/relay/internal/core	0.376s

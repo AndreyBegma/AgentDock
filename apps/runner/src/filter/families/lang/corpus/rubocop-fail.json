@@ -1,0 +1,7 @@
+{
+  "argv": ["bundle", "exec", "rubocop"],
+  "exitCode": 1,
+  "category": "typecheck",
+  "outcome": "failing",
+  "expect": "filtered"
+}

@@ -1,0 +1,54 @@
+src/shop/cart.py:3:8: F401 [*] `os` imported but unused
+  |
+1 | from __future__ import annotations
+2 |
+3 | import os
+  |        ^^ F401
+4 | import sys
+5 | from decimal import Decimal
+  |
+  = help: Remove unused import: `os`
+
+src/shop/cart.py:48:5: E741 Ambiguous variable name: `l`
+   |
+46 |     def total(self) -> Decimal:
+47 |         result = Decimal(0)
+48 |     for l in self.lines:
+   |         ^ E741
+49 |         result += l.price * l.quantity
+50 |     return result
+   |
+
+src/shop/checkout.py:12:1: I001 [*] Import block is un-sorted or un-formatted
+   |
+10 |   from shop.cart import Cart
+11 |   from shop.payments import charge
+12 | / import logging
+13 | | from decimal import Decimal
+   | |___________________________^ I001
+14 |
+15 |   log = logging.getLogger(__name__)
+   |
+   = help: Organize imports
+
+src/shop/checkout.py:77:89: E501 Line too long (104 > 88)
+   |
+75 |         if order.total > Decimal("0"):
+76 |             # The gateway rejects amounts below the minimum charge for the currency of the order
+77 |             raise ValueError(f"order {order.id} total {order.total} is below the minimum for {order.currency}")
+   |                                                                                         ^^^^^^^^^^^^^^^ E501
+78 |         return charge(order)
+   |
+
+src/shop/reports.py:19:5: F841 [*] Local variable `rows` is assigned to but never used
+   |
+17 | def monthly_report(month: date) -> bytes:
+18 |     start, end = month_bounds(month)
+19 |     rows = db.fetch_orders(start, end)
+   |     ^^^^ F841
+20 |     return render_template("monthly.html", month=month)
+   |
+   = help: Remove assignment to unused variable `rows`
+
+Found 5 errors.
+[*] 3 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
