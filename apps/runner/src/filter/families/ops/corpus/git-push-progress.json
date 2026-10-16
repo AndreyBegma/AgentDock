@@ -1,0 +1,7 @@
+{
+  "argv": ["git", "push", "-u", "origin", "feat/445-filters-ops"],
+  "exitCode": 0,
+  "category": "other",
+  "outcome": "passing",
+  "expect": "filtered"
+}

@@ -1,0 +1,28 @@
+2026-10-16T14:02:11.402Z INFO  [Bootstrap] Nest application starting
+2026-10-16T14:02:11.511Z INFO  [InstanceLoader] AppModule dependencies initialized
+2026-10-16T14:02:11.512Z INFO  [InstanceLoader] ConfigModule dependencies initialized
+2026-10-16T14:02:11.514Z INFO  [InstanceLoader] PrismaModule dependencies initialized
+2026-10-16T14:02:11.601Z INFO  [RoutesResolver] AuthController {/auth}:
+2026-10-16T14:02:11.603Z INFO  [RouterExplorer] Mapped {/auth/login, POST} route
+2026-10-16T14:02:11.603Z INFO  [RouterExplorer] Mapped {/auth/logout, POST} route
+2026-10-16T14:02:11.604Z INFO  [RoutesResolver] BoardController {/board}:
+2026-10-16T14:02:11.604Z INFO  [RouterExplorer] Mapped {/board/cards, GET} route
+2026-10-16T14:02:11.605Z INFO  [RouterExplorer] Mapped {/board/cards/:id, GET} route
+2026-10-16T14:02:11.605Z INFO  [RouterExplorer] Mapped {/board/cards/:id, PATCH} route
+2026-10-16T14:02:11.606Z INFO  [RoutesResolver] ProjectsController {/projects}:
+2026-10-16T14:02:11.606Z INFO  [RouterExplorer] Mapped {/projects, GET} route
+2026-10-16T14:02:11.607Z INFO  [RouterExplorer] Mapped {/projects/:id, GET} route
+2026-10-16T14:02:11.607Z INFO  [RouterExplorer] Mapped {/projects/:id, PUT} route
+2026-10-16T14:02:11.608Z INFO  [RoutesResolver] RunnersController {/runners}:
+2026-10-16T14:02:11.608Z INFO  [RouterExplorer] Mapped {/runners, GET} route
+2026-10-16T14:02:11.609Z INFO  [RouterExplorer] Mapped {/runners/:id, GET} route
+2026-10-16T14:02:11.610Z INFO  [RoutesResolver] UsageController {/usage}:
+2026-10-16T14:02:11.610Z INFO  [RouterExplorer] Mapped {/usage, GET} route
+2026-10-16T14:02:11.611Z INFO  [RouterExplorer] Mapped {/usage/summary, GET} route
+2026-10-16T14:02:11.700Z INFO  [PrismaService] Connecting to database
+2026-10-16T14:02:12.210Z ERROR [PrismaService] Can't reach database server at `agentdock-pg:5432`
+2026-10-16T14:02:12.211Z ERROR [ExceptionHandler] PrismaClientInitializationError: Can't reach database server at `agentdock-pg:5432`
+Please make sure your database server is running at `agentdock-pg:5432`.
+    at Object.initialize (/app/node_modules/@prisma/client/runtime/library.js:112:13)
+    at async PrismaService.onModuleInit (/app/apps/api/src/database/prisma.service.ts:18:5)
+2026-10-16T14:02:12.215Z INFO  [Bootstrap] shutting down

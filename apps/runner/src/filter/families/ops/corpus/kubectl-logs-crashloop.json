@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "kubectl",
+    "logs",
+    "agentdock-api-7d9f8b6c5-x2k4q",
+    "-n",
+    "agentdock",
+    "--previous"
+  ],
+  "exitCode": 0,
+  "category": "other",
+  "outcome": "failing",
+  "expect": "any"
+}
