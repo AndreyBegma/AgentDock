@@ -52,8 +52,8 @@ describe('card.handoff.set (#449 D7)', () => {
     expect(HANDOFF_COMMAND_NAMES).toEqual(['card.handoff.set']);
   });
 
-  it('is not in the allowlist until the runner handles it', () => {
-    expect(isCommandName('card.handoff.set')).toBe(false);
+  it('is in the allowlist, with the runner handler beside it', () => {
+    expect(isCommandName('card.handoff.set')).toBe(true);
   });
 });
 

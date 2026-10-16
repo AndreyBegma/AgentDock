@@ -1,10 +1,16 @@
 import { readFileSync, statSync } from 'node:fs';
-import { CARD_BACKGROUND_COMMAND_MAX } from '@agentdock/shared';
+import { CARD_BACKGROUND_COMMAND_MAX, CARD_ENV_ID } from '@agentdock/shared';
 import {
   type HookCliName,
   hookCliNameSchema,
   hooksDisabled,
 } from '@agentdock/shared/protocol';
+import {
+  cardsDirOf,
+  noteIsStale,
+  sessionCardNote,
+  sessionNoteContext,
+} from '../handoff/context';
 import { connectLocal, type LocalClient } from '../local/client';
 import type { LocalCommandDeps } from '../local/subcommand';
 import { LOCAL_LINE_MAX_BYTES, type LocalEventArgs } from '../local/types';
@@ -17,6 +23,7 @@ import {
 import {
   commonInputSchema,
   permissionRequestInputSchema,
+  sessionStartInputSchema,
   stopInputSchema,
 } from './input';
 import {
@@ -35,7 +42,49 @@ export interface HookDeps extends LocalCommandDeps {
   now?: () => number;
   /** Tests point it at a fake `/proc`. */
   readFile?: (path: string) => string;
+  /** The daemon's card store (#449 D6); `cardsDirOf(env)` by default. */
+  cardsDir?: string;
 }
+
+/**
+ * #449 D6, D8: the card's handoff note for a session that starts in a card's
+ * worktree or on its branch — a person's own session at every start, the
+ * card's worker only after a compaction (its round prompt carries the rest),
+ * with one line asking to refresh a note older than the last commit. Read
+ * from the machine, never from the API; '' for any other session.
+ */
+const sessionNote = async (
+  input: unknown,
+  cwd: string,
+  deps: HookDeps,
+): Promise<string> => {
+  try {
+    const start = sessionStartInputSchema.safeParse(input);
+    const compact = start.success && start.data.source === 'compact';
+    if (deps.env[CARD_ENV_ID] && !compact) return '';
+    const found = await sessionCardNote(
+      deps.cardsDir ?? cardsDirOf(deps.env),
+      cwd,
+      deps.exec,
+    );
+    if (!found?.note) return '';
+    const stale = compact && (await noteIsStale(found.record, deps.exec));
+    return sessionNoteContext(found, { stale });
+  } catch {
+    return '';
+  }
+};
+
+const printSessionContext = (deps: HookDeps, text: string): void => {
+  deps.stdout(
+    `${JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: 'SessionStart',
+        additionalContext: text,
+      },
+    })}\n`,
+  );
+};
 
 const readStdin = async (stream: ReadableStream<Uint8Array>): Promise<string> =>
   new Response(stream).text();
@@ -131,10 +180,19 @@ export const runHook = async (
   const common = commonInputSchema.safeParse(input);
   if (!common.success) return 0;
 
+  // #449 D6: the note is on this machine; it reaches the session with the
+  // daemon down too.
+  const note =
+    name.data === 'session-start'
+      ? await sessionNote(input, common.data.cwd, deps)
+      : '';
   const client = await connectLocal(deps.socketPath);
-  if (!client) return 0;
+  if (!client) {
+    if (note) printSessionContext(deps, note);
+    return 0;
+  }
   try {
-    await handle(name.data, input, common.data, client, deps);
+    await handle(name.data, input, common.data, client, deps, note);
   } finally {
     client.close();
   }
@@ -147,6 +205,7 @@ const handle = async (
   common: { session_id: string; cwd: string },
   client: LocalClient,
   deps: HookDeps,
+  note: string,
 ): Promise<void> => {
   const extras: HookExtras = {};
   if (name === 'session-start') {
@@ -177,16 +236,10 @@ const handle = async (
       extras.gitBranch ? { gitBranch: extras.gitBranch } : {},
       { via: 'hook', cwd: common.cwd, sessionId: common.session_id },
     );
-    if (context.ok && context.data.text.trim().length > 0) {
-      deps.stdout(
-        `${JSON.stringify({
-          hookSpecificOutput: {
-            hookEventName: 'SessionStart',
-            additionalContext: context.data.text,
-          },
-        })}\n`,
-      );
-    }
+    const text = [context.ok ? context.data.text.trim() : '', note]
+      .filter((part) => part.length > 0)
+      .join('\n\n');
+    if (text) printSessionContext(deps, text);
     return;
   }
 

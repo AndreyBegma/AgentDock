@@ -300,5 +300,7 @@ export const detectCapabilities = async (
     tokenSaver: true,
     // #447: this runner observes for Steward and takes its commands.
     steward: true,
+    // #449: this runner keeps handoff notes and takes `card.handoff.set`.
+    handoff: true,
   };
 };

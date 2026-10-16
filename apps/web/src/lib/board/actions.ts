@@ -7,6 +7,8 @@ import type {
   BoardCardView,
   BoardSettingsView,
   BoardView,
+  BulkBoardCardsRequest,
+  BulkBoardCardsResponse,
   CardCapturePage,
   CardDependenciesView,
   CardFeedbackRequest,
@@ -55,6 +57,13 @@ export const moveCard = (
   number: number,
   body: MoveBoardCardRequest,
 ) => api(`${cardPath(projectId, number)}/move`, { method: 'POST', body });
+
+/** #452: one action for up to `BULK_CARDS_MAX` cards; each card's outcome is in the answer. */
+export const bulkCards = (projectId: string, body: BulkBoardCardsRequest) =>
+  api<BulkBoardCardsResponse>(`${base(projectId)}/cards/bulk`, {
+    method: 'POST',
+    body,
+  });
 
 export const runCard = (
   projectId: string,
