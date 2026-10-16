@@ -87,15 +87,15 @@ export function Capsule({
   const plus = capsuleAction(registered, role, fallback);
 
   // BottomCapsuleTab has no `badge` (docs/ui/glass-ui.md): the counts the
-  // rail shows on Approvals and Fleet head More's sheet instead.
-  const needsYou = tabs.flatMap((entry) => {
-    const badge =
-      entry.id === 'approvals'
-        ? approvalsBadge(waitingApprovals)
-        : entry.id === 'fleet'
-          ? attentionBadge(slotsNeedingAttention)
-          : undefined;
-    return badge
+  // rail shows on Approvals and Fleet head More's sheet instead, Approvals first.
+  const counts = {
+    approvals: approvalsBadge(waitingApprovals),
+    fleet: attentionBadge(slotsNeedingAttention),
+  };
+  const needsYou = (['approvals', 'fleet'] as const).flatMap((id) => {
+    const entry = tabs.find((tab) => tab.id === id);
+    const badge = counts[id];
+    return entry && badge
       ? [
           {
             id: `needs-${entry.id}`,
