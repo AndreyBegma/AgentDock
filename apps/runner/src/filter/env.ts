@@ -3,9 +3,10 @@ import type { TokenSaverRunKind } from '@agentdock/shared';
 
 /**
  * The environment a launch gives its Claude session so the command-output
- * filter (#445, ADR-0039) knows where to write and whom to count for. Every
- * launch spreads `filterEnv(…)` into the session's env; the `filter` and
- * `filter-hook` subcommands read these names and nothing else.
+ * filter (#445, ADR-0039) knows where to write and whom to count for. The
+ * one source of these names: `launch/token-saver.ts` spreads `filterEnv(…)`
+ * into every launch's env; the `filter` and `filter-hook` subcommands read
+ * these names and nothing else.
  *
  * Kept free of runtime imports: this module is on the filter's hot path,
  * which must start in milliseconds (D3).
@@ -36,6 +37,12 @@ export const RAW_ENV = 'AGENTDOCK_RAW';
 
 /** The stats file's name inside a run dir. */
 export const FILTER_STATS_FILE = 'filter-stats.jsonl';
+/**
+ * Who the run dir belongs to, `FilterLaunch` minus the dir, written by the
+ * launch. The stats reader takes a row's project and run from this file,
+ * never from the row (DR-05).
+ */
+export const FILTER_RUN_FILE = 'filter-run.json';
 /** The raw outputs' directory inside a run dir (amendment 6). */
 export const FILTER_RAW_DIR = 'raw';
 /**

@@ -115,6 +115,29 @@ describe('filter -- <argv> (#445 D3, D4)', () => {
     expect(ratio).toBeLessThan(0.1);
   });
 
+  it('redacts what the agent reads, never the raw file (DR-07)', async () => {
+    // Built at run time, so no scanner takes the fixture for a real token.
+    const token = `ghp_${'A1b2'.repeat(9)}`;
+    const failures = [
+      'not ok 201 - pushes with the token',
+      `  Error: remote rejected https://x-access-token:${token}@github.com/acme/x`,
+    ];
+    const output = tapOutput(200, failures);
+    writeFileSync(join(dir, 'expected.txt'), output);
+    const demo = script(
+      'demo.sh',
+      `cat "${join(dir, 'expected.txt')}"\nexit 1`,
+    );
+
+    expect(await runFilter([demo], deps)).toBe(1);
+
+    const text = printed();
+    expect(text).not.toContain(token);
+    expect(text).toContain('x-access-token:•••@github.com');
+    expect(readFileSync(join(dir, 'raw', '1.log'), 'utf8')).toBe(output);
+    expect(stats()[0]?.row.keptBytes).toBe(Buffer.byteLength(text));
+  });
+
   it('numbers raw files per command', async () => {
     const demo = script(
       'demo.sh',

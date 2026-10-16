@@ -6,17 +6,23 @@ import {
   type SettingsSources,
   settingsFiles,
 } from './permissions';
-import { parseSimpleCommand, shellQuote } from './shell';
+import {
+  parseSimpleCommand,
+  quoteAssignment,
+  type SimpleCommand,
+  shellQuote,
+} from './shell';
 import { statsTarget, writeStat } from './stats';
 import type { Filter } from './types';
 
 /**
  * `agentdock-runner filter-hook` (#445 D3): Claude Code's PreToolUse hook for
  * Bash. It turns `bun run test` into `<runner> filter -- bun run test` when —
- * and only when — the call is a single simple command a filter covers, not a
- * background call or a dev/watch mode, and the rewrite changes nothing about
- * what the session allows, asks or denies (see `permissions.ts`). Every other
- * Bash call is left alone and counted `passedThrough`.
+ * and only when — the session is in `bypassPermissions` (amendment 9), the
+ * call is a single simple command a filter covers, not a background call or a
+ * dev/watch mode, and the rewrite changes nothing about what the session
+ * asks or denies (see `permissions.ts`). Every other Bash call is left alone
+ * and counted `passedThrough`.
  *
  * It fails open: any error prints nothing and exits 0, which Claude Code
  * reads as "no decision" — the command runs as written.
@@ -106,6 +112,12 @@ export const decideHook = (
   if (toolInput.run_in_background === true) return leave('background');
   if (!filter) return leave('no filter');
   if (isLongRunning(argv, filter)) return leave('long-running');
+  const mode =
+    typeof input.permission_mode === 'string'
+      ? input.permission_mode
+      : undefined;
+  // Amendment 9: outside bypass mode Claude Code decides, never the hook.
+  if (mode !== 'bypassPermissions') return leave('not bypassPermissions');
 
   const cwd = typeof input.cwd === 'string' ? input.cwd : process.cwd();
   const sources: SettingsSources = {
@@ -116,22 +128,9 @@ export const decideHook = (
   };
   const rules = (deps.rules ?? ((s) => readRules(settingsFiles(s))))(sources);
   if (!rules) return leave('unreadable settings');
-  const mode =
-    typeof input.permission_mode === 'string'
-      ? input.permission_mode
-      : undefined;
-  const verdict = permissionFor(rules, mode, command, parsed.command);
+  const verdict = permissionFor(rules, mode, command, parsed);
   if (!verdict.rewrite) return leave(verdict.reason);
 
-  const wrapped = [
-    parsed.assignments,
-    ...deps.selfCommand.map(shellQuote),
-    'filter',
-    '--',
-    parsed.command,
-  ]
-    .filter((part) => part.length > 0)
-    .join(' ');
   return {
     rewrite: {
       hookSpecificOutput: {
@@ -139,11 +138,30 @@ export const decideHook = (
         permissionDecision: 'allow',
         permissionDecisionReason:
           'AgentDock token saver: the output is filtered; AGENTDOCK_RAW=1 runs it unfiltered',
-        updatedInput: { ...toolInput, command: wrapped },
+        updatedInput: {
+          ...toolInput,
+          command: wrappedCommand(parsed, deps.selfCommand),
+        },
       },
     },
   };
 };
+
+/**
+ * The rewrite, built from the parsed words and re-quoted — never from the
+ * original text, so bash runs exactly the argv the parser saw (DR-01).
+ */
+export const wrappedCommand = (
+  parsed: SimpleCommand,
+  selfCommand: readonly string[],
+): string =>
+  [
+    ...parsed.assignments.map(quoteAssignment),
+    ...selfCommand.map(shellQuote),
+    'filter',
+    '--',
+    ...parsed.argv.map(shellQuote),
+  ].join(' ');
 
 /**
  * Runs the hook on one stdin payload and returns what to print (empty for

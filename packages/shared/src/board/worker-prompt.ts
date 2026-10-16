@@ -18,9 +18,10 @@ import type { BoardCardKind } from './types';
  * (#441): the `## Design` section lists every frame of the approved variant.
  * Version 9 (#445 D7, D10, D14): the stable sections first and the card
  * last; the working and audience registers; Read/Grep guidance; with Token
- * saver, the scout and the `AGENTDOCK_RAW=1` bypass.
+ * saver, the scout and the `AGENTDOCK_RAW=1` bypass. Version 10 (#447 D7):
+ * no Claude attribution trailer on a commit.
  */
-export const CARD_WORKER_PROMPT_VERSION = 9;
+export const CARD_WORKER_PROMPT_VERSION = 10;
 
 /** #389: the env the runner sets in the card's session — its short id. */
 export const CARD_ENV_ID = 'AGENTDOCK_CARD';
@@ -37,6 +38,13 @@ const LOCAL_ENVIRONMENT_LINES = [
   `- This session has \`${CARD_ENV_ID}\` (this card's id) and \`${CARD_ENV_PORT}\` set. Tests and servers keep to a database and a port of their own: name a test database after \`$${CARD_ENV_ID}\` (a project's test setup may already do it — check before you create one), and start a server on \`$${CARD_ENV_PORT}\`. Never use, reset or wait for a database or port another worktree may use.`,
   "- Never wait for another process with `pgrep -f <pattern>`: the pattern is on your own command line, so it always matches and the wait never ends. Use a lock file, or a pattern that cannot match itself (`pgrep -f '[j]est'`). Never wait on another worktree's test run.",
 ];
+
+/**
+ * #447 D7: the runner holds the push of a commit that carries a Claude
+ * attribution trailer (`hasClaudeTrailer`), so the worker never writes one.
+ */
+const COMMIT_TRAILER_LINE =
+  '- Never add a Claude attribution trailer or footer to a commit message — no `Co-Authored-By: Claude …`, no `Claude-Session: …`, no "Generated with Claude Code". AgentDock does not push a commit that carries one; if it tells you which commits do, rewrite their messages without it (do not push).';
 
 /** The MCP tool the worker calls when done (D6). */
 export const FINISH_CARD_TOOL = 'finish_card';
@@ -340,6 +348,7 @@ const assemblePrompt = (
     '- Work only in this worktree and on this branch. Do not switch branches or touch other worktrees.',
     "- Follow the repository's CLAUDE.md / AGENTS.md.",
     '- Commit your work as you go, with clear messages.',
+    COMMIT_TRAILER_LINE,
     '- Run the tests and checks the repository defines before you finish.',
     ...LOCAL_ENVIRONMENT_LINES,
     '- Do not push and do not open a pull request: AgentDock pushes your commits as you make them and keeps a draft pull request open for this branch.',

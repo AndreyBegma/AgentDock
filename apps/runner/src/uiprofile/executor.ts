@@ -103,7 +103,7 @@ export const uiProfileLaunchSpec = (
  */
 export const uiProfileTokenSaver = (
   profile: ConfigProfile,
-  build: Pick<UiProfileBuildArgs, 'tokenSaver' | 'runId'>,
+  build: Pick<UiProfileBuildArgs, 'tokenSaver' | 'runId' | 'projectId'>,
   home: string,
   runDir: string,
   selfCommand: readonly string[],
@@ -115,6 +115,7 @@ export const uiProfileTokenSaver = (
     dir: runDir,
     selfCommand,
     runKind: 'ui_profile',
+    projectId: build.projectId,
     runId: build.runId,
     agentdock: false,
     scout: true,

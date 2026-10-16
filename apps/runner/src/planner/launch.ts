@@ -81,7 +81,7 @@ export const planTurnLaunchSpec = (
 /** #445: a plan turn's Token saver — `agentdock` and the scout; `null` when off. */
 export const planTurnTokenSaver = (
   profile: ConfigProfile,
-  args: Pick<PlanTurnArgs, 'tokenSaver' | 'runId'>,
+  args: Pick<PlanTurnArgs, 'tokenSaver' | 'runId' | 'projectId'>,
   home: string,
   turnDir: string,
   selfCommand: readonly string[],
@@ -93,6 +93,7 @@ export const planTurnTokenSaver = (
     dir: turnDir,
     selfCommand,
     runKind: 'plan',
+    projectId: args.projectId,
     runId: args.runId,
     agentdock: [],
     scout: true,
