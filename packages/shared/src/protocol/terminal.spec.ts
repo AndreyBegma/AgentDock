@@ -6,11 +6,16 @@ import {
   runnerMessageTypes,
   serverMessageSchema,
   serverMessageTypes,
+  TERMINAL_HISTORY_CHUNK_BYTES,
+  TERMINAL_HISTORY_LINE_MAX_CHARS,
+  TERMINAL_HISTORY_LINES,
   TERMINAL_MAX_DATA_B64_LENGTH,
   TERMINAL_MAX_DATA_BYTES,
   terminalClientFrameSchema,
   terminalCloseMessageSchema,
   terminalDataMessageSchema,
+  terminalHistoryMessageSchema,
+  terminalHistoryRequestMessageSchema,
   terminalResizeMessageSchema,
 } from './index';
 
@@ -164,6 +169,10 @@ describe('message unions', () => {
     expect(serverMessageTypes).toContain('terminal.close');
     expect(serverMessageTypes).toContain('terminal.resize');
     expect(runnerMessageTypes).not.toContain('terminal.resize');
+    expect(serverMessageTypes).toContain('terminal.history.request');
+    expect(runnerMessageTypes).not.toContain('terminal.history.request');
+    expect(runnerMessageTypes).toContain('terminal.history');
+    expect(serverMessageTypes).not.toContain('terminal.history');
   });
 
   it('has no message that carries a raw session name or a command', () => {
@@ -176,8 +185,81 @@ describe('message unions', () => {
   });
 });
 
+describe('terminal.history.request', () => {
+  it('names the attach and nothing else', () => {
+    const request = { type: 'terminal.history.request', id: 'term_1' };
+    expect(terminalHistoryRequestMessageSchema.safeParse(request).success).toBe(
+      true,
+    );
+    expect(serverMessageSchema.safeParse(request).success).toBe(true);
+    for (const extra of [
+      { session: 'cs-i42' },
+      { lines: 100 },
+      { args: ['-S', '-'] },
+    ]) {
+      expect(
+        terminalHistoryRequestMessageSchema.safeParse({ ...request, ...extra })
+          .success,
+      ).toBe(false);
+    }
+    expect(
+      terminalHistoryRequestMessageSchema.safeParse({
+        ...request,
+        id: 'term 1; rm',
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('terminal.history', () => {
+  const history = (lines: string[]) => ({
+    type: 'terminal.history',
+    id: 'term_1',
+    lines,
+    last: true,
+  });
+
+  it('carries ANSI lines from the runner', () => {
+    const reply = history(['\u001b[32mok\u001b[0m', '']);
+    expect(terminalHistoryMessageSchema.safeParse(reply).success).toBe(true);
+    expect(runnerMessageSchema.safeParse(reply).success).toBe(true);
+    expect(terminalHistoryMessageSchema.safeParse(history([])).success).toBe(
+      true,
+    );
+  });
+
+  it('is strict', () => {
+    expect(
+      terminalHistoryMessageSchema.safeParse({
+        ...history([]),
+        session: 'cs-i42',
+      }).success,
+    ).toBe(false);
+    const { last: _, ...noLast } = history([]);
+    expect(terminalHistoryMessageSchema.safeParse(noLast).success).toBe(false);
+  });
+
+  it('is bounded in lines, line length and bytes', () => {
+    const many = Array.from({ length: TERMINAL_HISTORY_LINES + 1 }, () => '');
+    expect(terminalHistoryMessageSchema.safeParse(history(many)).success).toBe(
+      false,
+    );
+    const long = 'a'.repeat(TERMINAL_HISTORY_LINE_MAX_CHARS + 1);
+    expect(
+      terminalHistoryMessageSchema.safeParse(history([long])).success,
+    ).toBe(false);
+    const wide = 'a'.repeat(TERMINAL_HISTORY_LINE_MAX_CHARS);
+    const count = Math.ceil(TERMINAL_HISTORY_CHUNK_BYTES / wide.length) + 1;
+    expect(
+      terminalHistoryMessageSchema.safeParse(
+        history(Array.from({ length: count }, () => wide)),
+      ).success,
+    ).toBe(false);
+  });
+});
+
 describe('browser text frames', () => {
-  it('accepts resize and close only', () => {
+  it('accepts resize, close and history only', () => {
     expect(
       terminalClientFrameSchema.safeParse({
         type: 'resize',
@@ -188,7 +270,12 @@ describe('browser text frames', () => {
     expect(terminalClientFrameSchema.safeParse({ type: 'close' }).success).toBe(
       true,
     );
+    expect(
+      terminalClientFrameSchema.safeParse({ type: 'history' }).success,
+    ).toBe(true);
     for (const frame of [
+      { type: 'history', lines: 5000 },
+      { type: 'history', session: 'cs-i42' },
       { type: 'data', b64: 'YWFh' },
       { type: 'resize', cols: 80, rows: 24, id: 'term_2' },
       { type: 'close', reason: 'idle' },

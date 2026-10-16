@@ -70,6 +70,8 @@ both sit at the root of that origin.
 | S ↔ R | `terminal.data` | `{ id, b64 }` — PTY bytes of an attach, ≤ 64 KiB decoded; S → R only on a `write` attach |
 | S → R | `terminal.resize` | `{ id, cols, rows }` |
 | S ↔ R | `terminal.close` | `{ id, reason: "client" \| "idle" \| "max_duration" \| "session_ended" \| "socket" }` |
+| S → R | `terminal.history.request` | `{ id }` — capture the attached pane's history; allowed on a `read` attach |
+| R → S | `terminal.history` | `{ id, lines, last }` — the captured lines with ANSI, oldest first, in chunks |
 | R → S | `local.request` | `{ id, method, args, projectId?, session?, via }` — a runner-initiated request from the `agentdock` plugin, see below |
 | S → R | `local.response` | `{ id, ok, data?, error? }` |
 
@@ -686,7 +688,7 @@ never persists frames: the D10 report fields arrive in `skill_run.finished`.
 { "type": "run_log", "id": "run_91c2", "frame": { "type": "ended", "phase": "succeeded" } }
 ```
 
-### `terminal.data`, `terminal.resize`, `terminal.close`
+### `terminal.data`, `terminal.resize`, `terminal.close`, `terminal.history`
 
 The byte stream of an interactive attach ([spec 29](../specs/29-terminal-attach.md)).
 The `terminal.attach` command opens it (see [Terminal](#terminal)), and its
@@ -733,6 +735,37 @@ therefore capped by the runner.
 
 ```json
 { "type": "terminal.close", "id": "term_4c1d", "reason": "idle" }
+```
+
+`terminal.history.request` asks for the history of an attach's pane (issue
+#522): tmux redraws the whole screen of an attach, so the browser's own
+scrollback never fills. It carries the attach `id` and nothing else — no
+session name, no line count, no argument. The runner captures the session it
+already holds for that `id`, and ignores an `id` it does not hold. It is
+allowed on a `read` attach, because asking is not input, and it neither
+writes to the PTY nor puts the session into copy-mode, so other clients of the
+session see nothing. One request per attach is answered at a time; the
+runner ignores another while one is being captured, and the API refuses one
+for `TERMINAL_HISTORY_TIMEOUT_MS` (10 s) while it waits for an answer.
+
+The runner answers with
+`tmux capture-pane -p -e -J -t =<session>: -S -5000` (argv, `=` exact
+target) and replies with `terminal.history`: the last
+`TERMINAL_HISTORY_LINES` (5,000) lines, oldest first, with their ANSI
+sequences. A line longer than `TERMINAL_HISTORY_LINE_MAX_CHARS` (16,384) is
+cut, and when the whole reply would serialize to more than
+`TERMINAL_HISTORY_MAX_BYTES` (2 MiB) the oldest lines are dropped. The reply
+is split into messages of at most `TERMINAL_HISTORY_CHUNK_BYTES` (128 KiB) of
+serialized lines; `last: true` marks the final one. A capture that fails
+answers one empty `last` chunk. The API relays the chunks to that attach's
+browser only, as `history` frames, and drops a chunk nobody asked for.
+
+```json
+{ "type": "terminal.history.request", "id": "term_4c1d" }
+```
+
+```json
+{ "type": "terminal.history", "id": "term_4c1d", "lines": ["\u001b[32m$\u001b[39m bun test", "12 pass"], "last": true }
 ```
 
 ### `local.request`, `local.response`

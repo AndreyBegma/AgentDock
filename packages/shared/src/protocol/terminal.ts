@@ -29,6 +29,16 @@ export const TERMINAL_MAX_DATA_BYTES = 64 * 1024;
 /** Base64 length of `TERMINAL_MAX_DATA_BYTES`: 4 characters per 3 bytes, padded. */
 export const TERMINAL_MAX_DATA_B64_LENGTH =
   Math.ceil(TERMINAL_MAX_DATA_BYTES / 3) * 4;
+/** Lines a history reply reaches back at most: `capture-pane -S -5000` (#522). */
+export const TERMINAL_HISTORY_LINES = 5000;
+/** Characters of one history line; the runner cuts a longer one (#522). */
+export const TERMINAL_HISTORY_LINE_MAX_CHARS = 16_384;
+/** Serialized lines of one `terminal.history` message (#522). */
+export const TERMINAL_HISTORY_CHUNK_BYTES = 128 * 1024;
+/** Serialized lines of a whole history reply; the oldest are dropped to fit (#522). */
+export const TERMINAL_HISTORY_MAX_BYTES = 2 * 1024 * 1024;
+/** The API refuses a second history request this long while one is unanswered (#522). */
+export const TERMINAL_HISTORY_TIMEOUT_MS = 10_000;
 /** The dedicated browser WebSocket on the API port (D5); not `/live`. */
 export const TERMINAL_WS_PATH = '/terminal';
 
@@ -94,6 +104,25 @@ export const terminalDataB64Schema = z
     message: `must decode to at most ${TERMINAL_MAX_DATA_BYTES} bytes`,
   });
 
+/** Bytes one line takes inside a JSON array: quotes, escapes and the comma. */
+export const historyLineBytes = (line: string): number =>
+  new TextEncoder().encode(JSON.stringify(line)).length + 1;
+
+/**
+ * Captured lines of one history chunk, ANSI kept: at most
+ * `TERMINAL_HISTORY_LINES`, each at most `TERMINAL_HISTORY_LINE_MAX_CHARS`,
+ * together at most `TERMINAL_HISTORY_CHUNK_BYTES` serialized.
+ */
+export const terminalHistoryLinesSchema = z
+  .array(z.string().max(TERMINAL_HISTORY_LINE_MAX_CHARS))
+  .max(TERMINAL_HISTORY_LINES)
+  .refine(
+    (lines) =>
+      lines.reduce((sum, line) => sum + historyLineBytes(line), 0) <=
+      TERMINAL_HISTORY_CHUNK_BYTES,
+    { message: `must serialize to at most ${TERMINAL_HISTORY_CHUNK_BYTES} bytes` },
+  );
+
 // Both directions
 
 /** Output of the PTY (runner → server), or input to it (server → runner, `write` only). */
@@ -124,6 +153,30 @@ export const terminalResizeMessageSchema = z.strictObject({
   rows: terminalRowsSchema,
 });
 
+/**
+ * Asks for the attached pane's history (#522). It names only the attach: the
+ * runner captures the session it already holds for that `id`, and ignores an
+ * `id` it does not hold. Allowed on a `read` attach — asking is not input.
+ */
+export const terminalHistoryRequestMessageSchema = z.strictObject({
+  type: z.literal('terminal.history.request'),
+  id: terminalIdSchema,
+});
+
+// Runner → server
+
+/**
+ * The answer to `terminal.history.request`, oldest line first, split into
+ * chunks; `last` marks the final one. A capture that failed answers one
+ * empty, `last` chunk. Never sent unasked.
+ */
+export const terminalHistoryMessageSchema = z.strictObject({
+  type: z.literal('terminal.history'),
+  id: terminalIdSchema,
+  lines: terminalHistoryLinesSchema,
+  last: z.boolean(),
+});
+
 // Browser ↔ API on `TERMINAL_WS_PATH`
 
 /**
@@ -137,9 +190,17 @@ export const terminalClientFrameSchema = z.discriminatedUnion('type', [
     rows: terminalRowsSchema,
   }),
   z.strictObject({ type: z.literal('close') }),
+  /** Asks for the pane's history; answered with `history` frames (#522). */
+  z.strictObject({ type: z.literal('history') }),
 ]);
 
 export type TerminalDataMessage = z.infer<typeof terminalDataMessageSchema>;
 export type TerminalCloseMessage = z.infer<typeof terminalCloseMessageSchema>;
 export type TerminalResizeMessage = z.infer<typeof terminalResizeMessageSchema>;
+export type TerminalHistoryRequestMessage = z.infer<
+  typeof terminalHistoryRequestMessageSchema
+>;
+export type TerminalHistoryMessage = z.infer<
+  typeof terminalHistoryMessageSchema
+>;
 export type TerminalClientFrame = z.infer<typeof terminalClientFrameSchema>;

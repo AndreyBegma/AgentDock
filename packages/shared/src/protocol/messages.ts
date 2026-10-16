@@ -14,6 +14,8 @@ import { watchedProjectSchema } from './projects';
 import {
   terminalCloseMessageSchema,
   terminalDataMessageSchema,
+  terminalHistoryMessageSchema,
+  terminalHistoryRequestMessageSchema,
   terminalResizeMessageSchema,
 } from './terminal';
 
@@ -154,6 +156,7 @@ const runnerMessages = [
   subscribeErrorMessageSchema,
   runLogMessageSchema,
   localRequestMessageSchema,
+  terminalHistoryMessageSchema,
   ...bothWayMessages,
 ] as const;
 
@@ -165,6 +168,7 @@ const serverOnlyMessages = [
   anySubscribeMessageSchema,
   unsubscribeMessageSchema,
   terminalResizeMessageSchema,
+  terminalHistoryRequestMessageSchema,
   localResponseMessageSchema,
 ] as const;
 

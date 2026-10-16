@@ -3,6 +3,7 @@ import {
   type TerminalMode,
   type TerminalTargetKind,
   terminalCloseReasonSchema,
+  terminalHistoryLinesSchema,
   terminalModeSchema,
 } from '../protocol';
 
@@ -146,6 +147,15 @@ export const terminalServerFrameSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('closed'),
     reason: terminalCloseReasonSchema,
+  }),
+  /**
+   * One chunk of the pane's history, asked for with `{ type: 'history' }`
+   * (#522): ANSI lines, oldest first; `last` marks the final chunk.
+   */
+  z.object({
+    type: z.literal('history'),
+    lines: terminalHistoryLinesSchema,
+    last: z.boolean(),
   }),
 ]);
 export type TerminalServerFrame = z.infer<typeof terminalServerFrameSchema>;
