@@ -4,6 +4,7 @@ import { systemClock } from '../clock';
 import { createExec, type Exec } from '../detect/exec';
 import { memoryLogger } from '../testing/fixtures';
 import { REAL_PROCESS_TIMEOUT_MS, workspace } from '../testing/projects';
+import { releaseTmuxServer } from '../testing/tmux';
 import { type PaneOutbound, PaneStreamer } from './streamer';
 
 /**
@@ -46,7 +47,7 @@ describe.skipIf(!tmuxInstalled)('pane streaming on a real tmux', () => {
 
       const server = ['-L', `agentdock-test-${process.pid}-${Date.now()}`];
       const tmuxExec = createExec({ PATH: process.env.PATH, HOME: ws.ws });
-      killServer = () => tmuxExec('tmux', [...server, 'kill-server']);
+      killServer = () => releaseTmuxServer(server);
       let captures = 0;
       const exec: Exec = (bin, args) => {
         if (bin === 'tmux' && args.includes('capture-pane')) captures++;

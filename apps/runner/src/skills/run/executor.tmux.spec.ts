@@ -14,6 +14,7 @@ import type { Exec } from '../../detect/exec';
 import { FakeClock } from '../../testing/fake-clock';
 import { memoryLogger } from '../../testing/fixtures';
 import { REAL_PROCESS_TIMEOUT_MS } from '../../testing/projects';
+import { releaseTmuxServer } from '../../testing/tmux';
 import { skillsWorkspace, withFakeGh } from '../testing';
 import { SkillRunExecutor } from './executor';
 
@@ -50,7 +51,7 @@ const setup = async (options: { maxConcurrentRuns?: number } = {}) => {
   const server = `agentdock-test-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
   const tmuxServer = ['-L', server];
   teardown.push(async () => {
-    await f.git('tmux', [...tmuxServer, 'kill-server']);
+    await releaseTmuxServer(tmuxServer);
     f.cleanup();
   });
 

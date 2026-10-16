@@ -29,6 +29,7 @@ import { assistantLine, validNote } from '../handoff/testing';
 import { FakeClock } from '../testing/fake-clock';
 import { memoryLogger } from '../testing/fixtures';
 import { REAL_PROCESS_TIMEOUT_MS } from '../testing/projects';
+import { releaseTmuxServer } from '../testing/tmux';
 import { CardExecutor } from './executor';
 import { cardsWorkspace } from './testing';
 
@@ -91,7 +92,7 @@ const setup = async (
   const server = `agentdock-test-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
   const tmuxServer = ['-L', server];
   teardown.push(async () => {
-    await f.git('tmux', [...tmuxServer, 'kill-server']);
+    await releaseTmuxServer(tmuxServer);
     f.cleanup();
   });
 
