@@ -11,6 +11,12 @@ export {
 } from './classifier';
 export { stewardConfigOf } from './config';
 export {
+  digestPrompt,
+  proseOf,
+  type StewardDigestOptions,
+  StewardDigestWriter,
+} from './digest';
+export {
   type StewardCardSource,
   StewardObserver,
   type StewardObserverOptions,

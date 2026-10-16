@@ -72,6 +72,7 @@ import { Spool } from './spool';
 import {
   StewardActions,
   StewardClassifier,
+  StewardDigestWriter,
   StewardObserver,
   type StewardRun,
 } from './steward';
@@ -427,6 +428,16 @@ export const runDaemon = async (
       log,
       onResumed: (subject) => steward.forget(subject),
     });
+    // #491: haiku writes the digest prose; the API books it as a `steward` run.
+    const stewardDigest = new StewardDigestWriter({
+      dir: join(dirname(options.spoolDir), 'steward'),
+      env: process.env,
+      clock,
+      log,
+      profiles: () => config.profiles,
+      watchedProjects: () => watchList.current,
+      otlpPort: () => otlp?.port ?? null,
+    });
     // Card capture (#244): headless, one per project; the API limits the rest.
     const capture = new CaptureExecutor({
       deps: skillsDeps,
@@ -484,7 +495,7 @@ export const runDaemon = async (
       capture: createCaptureHandlers(capture),
       normalize: createNormalizeHandlers(normalize),
       assess: createAssessHandlers(assess),
-      steward: stewardActions.handlers(),
+      steward: { ...stewardActions.handlers(), ...stewardDigest.handlers() },
       handoff: createHandoffHandlers(handoff),
     });
     const dispatch = createDispatcher({
