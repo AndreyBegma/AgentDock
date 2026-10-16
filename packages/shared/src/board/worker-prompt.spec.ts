@@ -641,3 +641,39 @@ describe('worker prompt v4 — attachments (#309 D10)', () => {
     }
   });
 });
+
+describe('worker prompt — ## Stack (#480)', () => {
+  const stackPath = 'docs/specs/stacks/S-3-redesign/design/1/mockup.html';
+  const stack = {
+    label: 'S-3',
+    title: 'Redesign the Settings page',
+    stage: 1,
+    stageTitle: 'Page',
+    stageCount: 2,
+    design: {
+      frames: [{ name: 'Mockup', path: stackPath }],
+      rationale: 'One look.',
+    },
+  };
+
+  it('names the stack and its stage, and the stack design as reference', () => {
+    const prompt = cardWorkerPrompt({ ...card, stack });
+    expect(prompt).toContain('## Stack');
+    expect(prompt).toContain(
+      'This card is part of stack S-3 "Redesign the Settings page", stage 2 of 2 (Page).',
+    );
+    expect(prompt).toContain(stackPath);
+    expect(prompt).toContain(
+      'Where this card has its own design (## Design), that one binds this card.',
+    );
+    // The card's own design stays its own section.
+    expect(prompt).toContain('## Design');
+  });
+
+  it('a stack without a design names the stage only; a card in none has no section', () => {
+    expect(
+      cardWorkerPrompt({ ...card, stack: { ...stack, design: null } }),
+    ).not.toContain(stackPath);
+    expect(cardWorkerPrompt(card)).not.toContain('## Stack');
+  });
+});

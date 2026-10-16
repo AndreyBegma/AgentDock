@@ -13,6 +13,7 @@ import {
   isIntakeCard,
   isIntakeRound,
   isIntakeSplit,
+  isIntakeStack,
   PLAN_MODES,
   PLAN_STATUSES,
   PLANNER_CONTRACT_VERSION,
@@ -507,5 +508,96 @@ describe('an intake turn may propose a split (#409)', () => {
     expect(planTurnInputSchema.parse({ keepOne: true })).toEqual({
       keepOne: true,
     });
+  });
+});
+
+/** #480 (ADR-0043): the stack proposal — cards in ordered stages. */
+describe('an intake turn may propose a stack (#480)', () => {
+  const stackCard = (title: string, over: Record<string, unknown> = {}) => ({
+    ...cardDraft({ title }),
+    summary: `${title}, as one part of the page.`,
+    ...over,
+  });
+  const stack = (stages: unknown[], over: Record<string, unknown> = {}) => ({
+    action: 'intake',
+    stack: {
+      reason: 'Одна страница: сначала компоненты, потом страница.',
+      title: 'Redesign the settings page',
+      body: 'Move the settings page to the new layout: the components come first, then the page that is built from them.',
+      design: true,
+      stages,
+      ...over,
+    },
+  });
+  const twoStages = [
+    {
+      title: 'Components',
+      cards: [stackCard('Add the toggle row to the kit')],
+    },
+    { title: 'Page', cards: [stackCard('Compose the settings page')] },
+  ];
+
+  it('takes cards in two or more stages and is told apart from a split', () => {
+    const result = parsePlannerOutput(fence(stack(twoStages)), 'intake', fresh);
+    expect(result.ok).toBe(true);
+    const output = intakeOutputSchema.parse(stack(twoStages));
+    expect(isIntakeStack(output)).toBe(true);
+    expect(isIntakeSplit(output)).toBe(false);
+    expect(isIntakeCard(output)).toBe(false);
+  });
+
+  it('refuses one stage, fewer than two or more than eight cards in all', () => {
+    expect(
+      reasonOf(
+        stack([{ title: 'All', cards: twoStages.flatMap((s) => s.cards) }]),
+      ),
+    ).toBe('invalid_shape');
+    const nine = Array.from({ length: INTAKE_SPLIT_MAX + 1 }, (_, i) =>
+      stackCard(`Add the part ${i + 1} of the page`),
+    );
+    expect(
+      reasonOf(
+        stack([
+          { title: 'One', cards: nine.slice(0, 5) },
+          { title: 'Two', cards: nine.slice(5) },
+        ]),
+      ),
+    ).toBe('invalid_shape');
+    expect(reasonOf(stack([{ title: 'One', cards: [] }, twoStages[1]]))).toBe(
+      'invalid_shape',
+    );
+  });
+
+  it('holds every card to the card rules, and the stack to English', () => {
+    expect(
+      reasonOf(
+        stack([
+          twoStages[0],
+          {
+            title: 'Page',
+            cards: [stackCard('Compose the page', { body: 'Just do it.' })],
+          },
+        ]),
+      ),
+    ).toBe('missing_card_section');
+    expect(
+      reasonOf(
+        stack(twoStages, {
+          title: 'Новая страница настроек',
+          body: 'Сначала компоненты, потом страница из них.',
+        }),
+      ),
+    ).toBe('not_english');
+  });
+
+  it('after Keep one card, a stack is refused like a split', () => {
+    expect(reasonOf(stack(twoStages), { ...fresh, keepOne: true })).toBe(
+      'split_declined',
+    );
+  });
+
+  it('the intake text offers the stack', () => {
+    expect(PLANNER_INTAKE_CONTRACT).toContain('"stack": Stack');
+    expect(PLANNER_INTAKE_CONTRACT).toContain('Propose a `stack`');
   });
 });

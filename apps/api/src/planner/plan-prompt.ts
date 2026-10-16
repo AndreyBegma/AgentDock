@@ -106,7 +106,7 @@ const WHAT: Record<PlanTurnAction, (input: PromptInput) => string> = {
     }
     const asked = `Rounds asked so far: ${state.roundsAsked} of ${state.maxRounds}.`;
     if (state.keepOne) {
-      return `${asked} The person declined the split (or stack) and keeps one card: write one \`cardDraft\` now that covers the whole request. Record every default you took under \`## Open questions\`.`;
+      return `${asked} The person declined the split and keeps one card: write one \`cardDraft\` now that covers the whole request. Record every default you took under \`## Open questions\`.`;
     }
     if (state.generate) {
       return `${asked} The person asked to generate: write the card now — or the split if the request is several independent tasks or too big for one agent, or the stack if it is one larger piece of work whose parts must happen in order. Every question they left unanswered takes its recommendation — record those under \`## Open questions\`.`;
