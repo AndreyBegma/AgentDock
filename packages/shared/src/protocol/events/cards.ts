@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { headShaSchema } from '../commands/approvals';
 import { cardIdSchema, cardTmuxSessionSchema } from '../commands/cards';
+import { pendingQuestionSchema } from '../../session-message/contracts';
 import { gitRefSchema, skillRunIdSchema } from '../commands/skills';
 
 /**
@@ -163,3 +164,33 @@ export const isCardQuestionEventType = (
   type: string,
 ): type is CardQuestionEventType =>
   Object.hasOwn(cardQuestionEventDataSchemas, type);
+
+/**
+ * #489 M4: the question selector a round's pane shows now — its text and
+ * options, so the Board and Telegram can answer it — or `null` once it is
+ * gone. Sent when what the pane shows changes, before the `card_run.question`
+ * of a new question. It is session content (ADR-0021): a runner sends it
+ * only for a project that ships content.
+ */
+export const cardRunPendingQuestionDataSchema = z.object({
+  cardId: cardIdSchema,
+  runId: skillRunIdSchema,
+  projectId: z.string().min(1),
+  at: z.iso.datetime(),
+  question: pendingQuestionSchema.nullable(),
+});
+export type CardRunPendingQuestionData = z.infer<
+  typeof cardRunPendingQuestionDataSchema
+>;
+
+export const cardPendingQuestionEventDataSchemas = {
+  'card_run.pending_question': cardRunPendingQuestionDataSchema,
+} as const;
+
+export type CardPendingQuestionEventType =
+  keyof typeof cardPendingQuestionEventDataSchemas;
+
+export const isCardPendingQuestionEventType = (
+  type: string,
+): type is CardPendingQuestionEventType =>
+  Object.hasOwn(cardPendingQuestionEventDataSchemas, type);

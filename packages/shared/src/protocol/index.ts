@@ -10,6 +10,7 @@ export * from './commands/handoff';
 export * from './commands/planner';
 export * from './commands/queue';
 export * from './commands/skills';
+export * from './commands/session-message';
 export * from './commands/steward';
 export * from './commands/terminal';
 export * from './commands/text';

@@ -119,6 +119,13 @@ export const capabilitiesSchema = z.object({
    * `true`. Absent means `false` — a runner older than Context handoff.
    */
   handoff: z.boolean().optional(),
+  /**
+   * #489: the runner handles `session.message` — a person's text or answer
+   * typed into a card round's or a fleet slot's session — and reports a
+   * card round's question selector as `card_run.pending_question`. The API
+   * sends the command only when this is `true`. Absent means `false`.
+   */
+  sessionMessage: z.boolean().optional(),
 });
 export type Capabilities = z.infer<typeof capabilitiesSchema>;
 
@@ -144,6 +151,10 @@ export const stewardAvailable = (capabilities: Capabilities): boolean =>
 /** Whether the API may send `card.handoff.set` (#449); absent is `false`. */
 export const handoffAvailable = (capabilities: Capabilities): boolean =>
   capabilities.handoff === true;
+
+/** Whether the API may send `session.message` (#489); absent is `false`. */
+export const sessionMessageAvailable = (capabilities: Capabilities): boolean =>
+  capabilities.sessionMessage === true;
 
 /** What a runner said it serves (#233, ADR-0023): names only, never paths or versions. */
 export interface RunnerCommands {
