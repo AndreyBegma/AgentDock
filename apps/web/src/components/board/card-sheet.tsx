@@ -65,6 +65,7 @@ import {
   noPrText,
   prChipText,
 } from '../../lib/board/pull-request';
+import { ciBanner, pullRequestRows } from '../../lib/board/shipping';
 import { formatCost } from '../../lib/format';
 import { Time } from '../../lib/format/time';
 import { safeHttpsUrl } from '../../lib/queue/format';
@@ -200,6 +201,69 @@ function Links({ card }: { card: BoardCardDetail }) {
         ),
       )}
     </div>
+  );
+}
+
+/** #359 D8: every PR of the card, newest first; shown from the second PR on. */
+function PullRequestList({ card }: { card: BoardCardDetail }) {
+  const rows = pullRequestRows(card);
+  if (rows.length < 2) return null;
+  return (
+    <ul className="flex flex-col gap-1 text-sm" aria-label="Pull requests">
+      {rows.map((row) => {
+        const href = safeHttpsUrl(row.url);
+        const text = `PR #${row.number} · ${row.state}`;
+        return (
+          <li key={row.number} className="flex flex-wrap gap-2">
+            {href ? (
+              <a
+                href={href}
+                target="_blank"
+                rel="noreferrer"
+                className="underline-offset-2 hover:underline"
+              >
+                {text}
+              </a>
+            ) : (
+              <span>{text}</span>
+            )}
+            <span className="text-ink-3">{row.branch}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** #359 D6: automation stopped on a red CI — names the failed checks and what the person can do. */
+function CiStoppedBanner({ card }: { card: BoardCardDetail }) {
+  const banner = ciBanner(card);
+  if (!banner) return null;
+  return (
+    <Banner tone="danger">
+      <div className="flex flex-col gap-1">
+        <span>{banner.title}</span>
+        {banner.checks.length > 0 ? (
+          <ul className="list-disc pl-4">
+            {banner.checks.map((check) => {
+              const href = check.link ? safeHttpsUrl(check.link) : null;
+              return (
+                <li key={check.name}>
+                  {href ? (
+                    <a href={href} target="_blank" rel="noreferrer">
+                      {check.name}
+                    </a>
+                  ) : (
+                    check.name
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
+        <span>{banner.hint}</span>
+      </div>
+    </Banner>
   );
 }
 
@@ -374,6 +438,8 @@ function CardDetailBody({
             ) : null}
           </div>
           <Links card={card} />
+          <PullRequestList card={card} />
+          <CiStoppedBanner card={card} />
           {canCreatePr(card) ? (
             <div className="flex flex-col gap-2">
               <Banner tone={noPrText(card).tone}>{noPrText(card).text}</Banner>

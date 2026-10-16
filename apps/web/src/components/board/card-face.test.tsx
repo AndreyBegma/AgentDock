@@ -51,3 +51,20 @@ describe('CardFace pull request link (#329 D6)', () => {
     expect(html).toContain('Issue #3');
   });
 });
+
+describe('CardFace shipping state (#359)', () => {
+  test('red CI shows the dot and Fixing CI (n/3)', () => {
+    const html = render('in_progress', { ciState: 'red', ciFixAttempts: 2 });
+    expect(html).toContain('aria-label="Checks failed"');
+    expect(html).toContain('Fixing CI (2/3)');
+  });
+
+  test('a merged card in Finished is badged Merged', () => {
+    const html = render('finished', { mergedAt: '2026-10-16T10:00:00.000Z' });
+    expect(html).toContain('Merged');
+  });
+
+  test('no checks, no dot', () => {
+    expect(render('in_progress')).not.toContain('Checks');
+  });
+});

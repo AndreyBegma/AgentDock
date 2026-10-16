@@ -25,6 +25,7 @@ import {
   trackedSessionHref,
 } from '../../lib/board/format';
 import { prChipText } from '../../lib/board/pull-request';
+import { ciDot, shippingBadge } from '../../lib/board/shipping';
 import { formatCost } from '../../lib/format';
 import { safeHttpsUrl } from '../../lib/queue/format';
 import { ApproveRunLink, CardFaceDesign } from './card-design';
@@ -46,6 +47,8 @@ export function CardFace({
 }) {
   const offer = approveRunOffer(card);
   const pill = roundPill(card.round);
+  const dot = ciDot(card);
+  const badge = shippingBadge(card);
   const cost = formatCost(card.costUsd);
   const prHref = card.prUrl ? safeHttpsUrl(card.prUrl) : null;
   const issueHref = card.issueUrl ? safeHttpsUrl(card.issueUrl) : null;
@@ -128,10 +131,29 @@ export function CardFace({
           ) : null}
         </div>
       ) : null}
+      {badge ? (
+        <div>
+          <Tooltip content={badge.label}>
+            <span>
+              <Badge tone={badge.tone} size="md" label={badge.label} />
+            </span>
+          </Tooltip>
+        </div>
+      ) : null}
       {!compact && (card.prNumber !== null || card.issueNumber !== null) ? (
-        <div className="flex flex-wrap gap-1.5 text-xs">
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
           {card.prNumber !== null ? (
             <Link href={prHref}>{prChipText(card)}</Link>
+          ) : null}
+          {card.prNumber !== null && dot ? (
+            <span
+              role="img"
+              aria-label={dot.label}
+              title={dot.label}
+              className="inline-flex"
+            >
+              <Badge tone={dot.tone} dot />
+            </span>
           ) : null}
           {card.issueNumber !== null ? (
             <Link href={issueHref}>Issue #{card.issueNumber}</Link>

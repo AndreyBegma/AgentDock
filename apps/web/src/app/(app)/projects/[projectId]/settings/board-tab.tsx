@@ -26,6 +26,11 @@ import {
   describeBoardError,
   parseMaxRunning,
 } from '../../../../../lib/board/format';
+import {
+  AUTO_MERGE_LABEL,
+  autoMergeHint,
+  effectiveAutoMerge,
+} from '../../../../../lib/board/shipping';
 import { Time } from '../../../../../lib/format/time';
 import { useErrorToast } from '../../../../../lib/section/use-error-toast';
 import { CaptureFields, CapturesTable } from './capture-section';
@@ -47,6 +52,7 @@ export function BoardTab({
   const [issueOnRun, setIssueOnRun] = useState(false);
   const [specOnRun, setSpecOnRun] = useState(false);
   const [autoCollectTracked, setAutoCollectTracked] = useState(false);
+  const [autoMerge, setAutoMerge] = useState(false);
   const [maxRunning, setMaxRunning] = useState('3');
   const [captureEnabled, setCaptureEnabled] = useState(false);
   const [captureModel, setCaptureModel] = useState<CaptureModel>('haiku');
@@ -60,6 +66,7 @@ export function BoardTab({
       setIssueOnRun(view.issueOnRun);
       setSpecOnRun(view.specOnRun);
       setAutoCollectTracked(view.autoCollectTracked);
+      setAutoMerge(effectiveAutoMerge(view));
       setMaxRunning(String(view.maxRunning));
       setCaptureEnabled(view.captureEnabled);
       setCaptureModel(view.captureModel);
@@ -79,6 +86,7 @@ export function BoardTab({
     issueOnRun !== settings.issueOnRun ||
     specOnRun !== settings.specOnRun ||
     autoCollectTracked !== settings.autoCollectTracked ||
+    autoMerge !== effectiveAutoMerge(settings) ||
     limit !== settings.maxRunning ||
     captureEnabled !== settings.captureEnabled ||
     captureModel !== settings.captureModel;
@@ -92,6 +100,10 @@ export function BoardTab({
         issueOnRun,
         specOnRun,
         autoCollectTracked,
+        // Untouched keeps the stored value, so a project following the default keeps following it.
+        ...(autoMerge !== effectiveAutoMerge(settings)
+          ? { autoMergeCards: autoMerge }
+          : {}),
         maxRunning: limit,
         captureEnabled: captureEnabled && contentOn,
         captureModel,
@@ -130,6 +142,19 @@ export function BoardTab({
               label={AUTO_COLLECT_DEFAULT_LABEL}
               hint={AUTO_COLLECT_DEFAULT_HINT}
               onChange={setAutoCollectTracked}
+            />
+            <AutoCollectToggle
+              id="board-set-auto-merge"
+              checked={autoMerge}
+              disabled={!isAdmin}
+              label={AUTO_MERGE_LABEL}
+              hint={autoMergeHint(
+                settings,
+                autoMerge,
+                settings.autoMergeCards === null &&
+                  autoMerge === effectiveAutoMerge(settings),
+              )}
+              onChange={setAutoMerge}
             />
             <Field
               label="Workers at once"
