@@ -44,3 +44,4 @@ Numbered, never rewritten. A changed decision gets a new ADR that supersedes the
 | [0039](0039-token-saver.md) | Token saver: the runner compresses what agents read (own command filter, strict MCP, scout, earlier compaction), never what people read |
 | [0040](0040-steward.md) | Steward: the runner watches agent sessions and does the safe fixes (nudge, known dialogs, resume), the API decides and reports; the fleet is observe-only |
 | [0041](0041-a-design-revision-holds-named-frames.md) | A design revision holds any number of named frames, published one file each (amends ADR-0022 §1) |
+| [0042](0042-context-handoff.md) | Context handoff: every card and long run keeps a short handoff note; the runner restarts with `--resume` or a fresh seeded session, whichever is cheaper |
