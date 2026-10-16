@@ -93,7 +93,7 @@ export const launchSpec = (
 /** #445: a skill run's Token saver — `agentdock` and the scout; `null` when off. */
 export const skillTokenSaver = (
   profile: ConfigProfile,
-  args: Pick<SkillRunArgs, 'tokenSaver' | 'runId'>,
+  args: Pick<SkillRunArgs, 'tokenSaver' | 'runId' | 'projectId'>,
   home: string,
   runDir: string,
   selfCommand: readonly string[],
@@ -105,6 +105,7 @@ export const skillTokenSaver = (
     dir: runDir,
     selfCommand,
     runKind: 'skill',
+    projectId: args.projectId,
     runId: args.runId,
     agentdock: [],
     scout: true,

@@ -8,7 +8,7 @@ import {
   readSync,
   writeFileSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import {
   FILTER_STATS_EVENT,
   FILTER_STATS_MAX_ROWS,
@@ -21,7 +21,7 @@ import {
 } from '@agentdock/shared/protocol';
 import { z } from 'zod';
 import { errorMessage, type Logger } from '../log';
-import { FILTER_RAW_DIR, FILTER_STATS_FILE } from './env';
+import { FILTER_RAW_DIR, FILTER_RUN_FILE, FILTER_STATS_FILE } from './env';
 
 /**
  * The daemon's side of the stats transport (#445 amendment 5): the `filter`
@@ -43,9 +43,17 @@ const READ_CHUNK_BYTES = 1024 * 1024;
 /** Run dirs sit at most this deep under a root (`<root>/<id>[/<round>]`). */
 const MAX_DEPTH = 2;
 
+const projectIdSchema = z.string().min(1).max(64);
+
 const lineSchema = z.object({
-  projectId: z.string().min(1).max(64),
+  projectId: projectIdSchema,
   row: filterStatRowSchema,
+});
+
+const identitySchema = z.object({
+  projectId: projectIdSchema,
+  runId: filterStatRowSchema.shape.runId,
+  runKind: filterStatRowSchema.shape.runKind,
 });
 
 type EnvelopeProject = NonNullable<UnsequencedEvent['project']>;
@@ -130,11 +138,31 @@ export const readNewLines = (
   }
 };
 
-/** Valid rows grouped by project; bad lines are counted, never sent. */
+/** Who a run dir belongs to, as its launch wrote it (`FILTER_RUN_FILE`). */
+export type RunIdentity = z.infer<typeof identitySchema>;
+
+/** The run dir's identity, or `null` when it is missing or does not parse. */
+export const readIdentity = (statsFile: string): RunIdentity | null => {
+  try {
+    const parsed = identitySchema.safeParse(
+      JSON.parse(readFileSync(join(dirname(statsFile), FILTER_RUN_FILE), 'utf8')),
+    );
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * The valid rows of one run dir. A row is the dir's only when its project,
+ * run and kind are the dir's identity (DR-05): a session writing rows for
+ * another project or run gets them counted as rejected, never sent.
+ */
 export const parseLines = (
   lines: readonly string[],
-): { byProject: Map<string, FilterStatRow[]>; rejected: number } => {
-  const byProject = new Map<string, FilterStatRow[]>();
+  identity: RunIdentity,
+): { rows: FilterStatRow[]; rejected: number } => {
+  const rows: FilterStatRow[] = [];
   let rejected = 0;
   for (const line of lines) {
     let json: unknown;
@@ -145,15 +173,18 @@ export const parseLines = (
       continue;
     }
     const parsed = lineSchema.safeParse(json);
-    if (!parsed.success) {
+    if (
+      !parsed.success ||
+      parsed.data.projectId !== identity.projectId ||
+      parsed.data.row.runId !== identity.runId ||
+      parsed.data.row.runKind !== identity.runKind
+    ) {
       rejected++;
       continue;
     }
-    const rows = byProject.get(parsed.data.projectId) ?? [];
     rows.push(parsed.data.row);
-    byProject.set(parsed.data.projectId, rows);
   }
-  return { byProject, rejected };
+  return { rows, rejected };
 };
 
 export class FilterStatsReader {
@@ -199,20 +230,26 @@ export class FilterStatsReader {
   }
 
   private async drain(file: string): Promise<void> {
+    const identity = readIdentity(file);
+    // Not a launch's run dir, or not one yet: nobody to count the rows for.
+    if (!identity) {
+      this.options.log.debug('filter stats: no run identity', { file });
+      return;
+    }
     const { lines, next } = readNewLines(file, readOffset(file));
     if (lines.length > 0) {
-      const { byProject, rejected } = parseLines(lines);
+      const { rows, rejected } = parseLines(lines, identity);
       if (rejected > 0) {
-        this.options.log.warn('filter stats: skipped malformed rows', {
+        this.options.log.warn('filter stats: skipped malformed or foreign rows', {
           file,
           rejected,
         });
       }
-      const projects = await this.options.resolve([...byProject.keys()]);
-      for (const [projectId, rows] of byProject) {
-        const project = projects.get(projectId);
-        // A project the runner no longer watches: nowhere to report it.
-        if (!project) continue;
+      const project = (await this.options.resolve([identity.projectId])).get(
+        identity.projectId,
+      );
+      // A project the runner no longer watches: nowhere to report it.
+      if (project) {
         for (let i = 0; i < rows.length; i += FILTER_STATS_MAX_ROWS) {
           this.options.emit({
             v: EVENT_SCHEMA_VERSION,

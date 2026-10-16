@@ -1,7 +1,7 @@
 import { expect } from 'bun:test';
 import { join } from 'node:path';
 import type { TokenSaverRunKind } from '@agentdock/shared';
-import { FILTER_RUN_KIND_ENV, LAUNCH_SETTINGS_ENV } from './filter-env';
+import { FILTER_RUN_KIND_ENV, LAUNCH_SETTINGS_ENV } from '../filter/env';
 import { AUTOCOMPACT_ENV, TOKEN_SAVER_FILES } from './token-saver';
 
 /** One launch as a test saw it: its argv and env. */

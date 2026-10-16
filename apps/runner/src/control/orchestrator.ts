@@ -20,6 +20,7 @@ import { classifyPane } from '../collectors/tmux/classify';
 import { CommandFailure } from '../commands/failure';
 import type { ConfigProfile } from '../config';
 import { resolvePaths } from '../env';
+import { removeRawDir } from '../filter/raw-store';
 import { resolveFleetProject } from '../fleet/project';
 import {
   defaultSelfCommand,
@@ -68,19 +69,23 @@ export const orchestratorArgv = (
 export const defaultOrchestratorDir = (): string =>
   join(dirname(resolvePaths(process.env).spoolDir), 'orchestrator');
 
+/** #445: the orchestrator session's own dir, for its Token saver files. */
+const orchestratorSessionDir = (deps: ControlDeps, session: string): string =>
+  join(deps.orchestratorDir ?? defaultOrchestratorDir(), session);
+
 /**
  * #445: the orchestrator session's Token saver — `agentdock` and the scout,
  * its files in a directory of the session's own (it has no run). `null` when
  * off: the session starts as before.
  */
 export const orchestratorTokenSaver = async (
-  args: Pick<OrchestratorStartArgs, 'tokenSaver'>,
+  args: Pick<OrchestratorStartArgs, 'tokenSaver' | 'projectId'>,
   deps: ControlDeps,
   profile: ConfigProfile,
   session: string,
 ): Promise<TokenSaverLaunch | null> => {
   if (!args.tokenSaver?.enabled) return null;
-  const dir = join(deps.orchestratorDir ?? defaultOrchestratorDir(), session);
+  const dir = orchestratorSessionDir(deps, session);
   try {
     await mkdir(dir, { recursive: true, mode: 0o700 });
   } catch {
@@ -93,6 +98,7 @@ export const orchestratorTokenSaver = async (
     dir,
     selfCommand: deps.selfCommand ?? defaultSelfCommand(),
     runKind: 'orchestrator',
+    projectId: args.projectId,
     runId: null,
     agentdock: [],
     scout: true,
@@ -174,6 +180,8 @@ export const stopOrchestrator = async (
   const tmux = tmuxOf(deps);
   if (!(await tmux.find(session))) return { stopped: false };
   await tmux.killSession(session);
+  // #445 amendment 6: the session's raw outputs go with it.
+  removeRawDir(orchestratorSessionDir(deps, session));
   return { stopped: true };
 };
 

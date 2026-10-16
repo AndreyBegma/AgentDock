@@ -18,7 +18,11 @@ import {
   uiProfileLaunchSpec,
   uiProfileTokenSaver,
 } from '../uiprofile/executor';
-import { FILTER_RUN_ID_ENV, FILTER_RUN_KIND_ENV } from './filter-env';
+import {
+  FILTER_PROJECT_ENV,
+  FILTER_RUN_ENV,
+  FILTER_RUN_KIND_ENV,
+} from '../filter/env';
 import { AUTOCOMPACT_ENV, type TokenSaverLaunch } from './token-saver';
 
 /**
@@ -142,7 +146,7 @@ describe('card worker launch (#445)', () => {
       playwright: { command: 'pw' },
     });
     expect(spec.env[AUTOCOMPACT_ENV]).toBe('60');
-    expect(spec.env[FILTER_RUN_ID_ENV]).toBe('run_1');
+    expect(spec.env[FILTER_RUN_ENV]).toBe('run_1');
     expect(spec.env.AGENTDOCK_CARD).toBe('abcd1234');
   });
 
@@ -322,7 +326,7 @@ describe('orchestrator session launch (#445)', () => {
   it('is today’s launch when off or absent', async () => {
     for (const config of [undefined, OFF]) {
       const ts = await orchestratorTokenSaver(
-        { tokenSaver: config },
+        { tokenSaver: config, projectId: 'prj_a' },
         deps(),
         profile,
         'cs-orch',
@@ -336,7 +340,7 @@ describe('orchestrator session launch (#445)', () => {
 
   it('wires it when on, in a directory of the session’s own, with no run id', async () => {
     const ts = await orchestratorTokenSaver(
-      { tokenSaver: ON },
+      { tokenSaver: ON, projectId: 'prj_a' },
       deps(),
       profile,
       'cs-orch',
@@ -353,6 +357,7 @@ describe('orchestrator session launch (#445)', () => {
       'playwright',
     ]);
     expect(ts.env[FILTER_RUN_KIND_ENV]).toBe('orchestrator');
-    expect(ts.env[FILTER_RUN_ID_ENV]).toBeUndefined();
+    expect(ts.env[FILTER_PROJECT_ENV]).toBe('prj_a');
+    expect(ts.env[FILTER_RUN_ENV]).toBeUndefined();
   });
 });

@@ -10,12 +10,13 @@ import { join } from 'node:path';
 import type { ConfigProfile } from '../config';
 import { tempDir } from '../testing/fixtures';
 import {
-  FILTER_RAW_DIR_ENV,
-  FILTER_RUN_ID_ENV,
+  FILTER_PROJECT_ENV,
+  FILTER_RUN_ENV,
+  FILTER_RUN_FILE,
   FILTER_RUN_KIND_ENV,
   FILTER_STATS_ENV,
   LAUNCH_SETTINGS_ENV,
-} from './filter-env';
+} from '../filter/env';
 import { profileClaudeJson, profileMcpServerNames } from './profile-mcp';
 import {
   AUTOCOMPACT_ENV,
@@ -66,6 +67,7 @@ describe('tokenSaverLaunch (#445)', () => {
     dir,
     selfCommand: SELF,
     runKind: 'card',
+    projectId: 'prj_a',
     runId: 'run-1',
     agentdock: [],
     scout: true,
@@ -159,18 +161,30 @@ describe('tokenSaverLaunch (#445)', () => {
       [AUTOCOMPACT_ENV]: '60',
       [LAUNCH_SETTINGS_ENV]: join(dir, 'token-saver-settings.json'),
       [FILTER_STATS_ENV]: join(dir, 'filter-stats.jsonl'),
-      [FILTER_RAW_DIR_ENV]: join(dir, 'raw'),
+      [FILTER_PROJECT_ENV]: 'prj_a',
       [FILTER_RUN_KIND_ENV]: 'card',
-      [FILTER_RUN_ID_ENV]: 'run-1',
+      [FILTER_RUN_ENV]: 'run-1',
     });
     expect(existsSync(join(dir, 'raw'))).toBe(true);
+  });
+
+  it('writes the run dir its identity, for the stats reader (DR-05)', () => {
+    const launch = tokenSaverLaunch(input());
+    expect(launch).not.toBeNull();
+    const file = join(dir, FILTER_RUN_FILE);
+    expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual({
+      projectId: 'prj_a',
+      runId: 'run-1',
+      runKind: 'card',
+    });
+    expect(statSync(file).mode & 0o777).toBe(0o600);
   });
 
   it('sets no run id for the orchestrator session', () => {
     const launch = tokenSaverLaunch(
       input({ runKind: 'orchestrator', runId: null }),
     );
-    expect(launch?.env[FILTER_RUN_ID_ENV]).toBeUndefined();
+    expect(launch?.env[FILTER_RUN_ENV]).toBeUndefined();
     expect(launch?.env[FILTER_RUN_KIND_ENV]).toBe('orchestrator');
   });
 

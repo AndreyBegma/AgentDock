@@ -1,5 +1,6 @@
 import { constants } from 'node:os';
 import { basename, dirname } from 'node:path';
+import { redact } from '../pane/redact';
 import { missingProtectedLines } from './classify';
 import { RAW_ENV } from './env';
 import { RAW_CAP_BYTES, RawFile } from './raw-store';
@@ -95,6 +96,14 @@ export const judge = (
   }
   return { kind: 'filtered', text };
 };
+
+/**
+ * The compressed output with tokens and private-key blocks masked — the
+ * pane's rules, which load nothing (`local/redact.ts` adds more rules but
+ * pulls the protocol schemas onto this hot path).
+ */
+export const redactShown = (text: string): string =>
+  redact(text.split('\n')).join('\n');
 
 const lineCount = (text: string): number => {
   if (text.length === 0) return 0;
@@ -217,8 +226,10 @@ export const runFilter = async (
       filterFooter(hidden, raw.path, raw.truncated),
     );
     if (verdict.kind === 'filtered') {
-      deps.stdout(verdict.text);
-      const kept = Buffer.byteLength(verdict.text);
+      // DR-07: what the agent reads is redacted; the raw file keeps every byte.
+      const shown = redactShown(verdict.text);
+      deps.stdout(shown);
+      const kept = Buffer.byteLength(shown);
       counts = {
         filter: filter.id,
         rawBytes: total,

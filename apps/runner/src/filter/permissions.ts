@@ -1,23 +1,26 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { LAUNCH_SETTINGS_ENV } from './env';
+import type { SimpleCommand } from './shell';
 
 /**
  * The hook must never change what a session allows, asks or denies (#445,
- * decision on the hook's permissions). Claude Code matches its permission
- * rules against the command a PreToolUse hook returns, so a rewritten
- * `agentdock-runner filter -- git push` would slip past `Bash(git push:*)`.
- * The hook therefore rewrites only when:
+ * decision on the hook's permissions, narrowed by amendment 9). Claude Code
+ * matches its permission rules against the command a PreToolUse hook
+ * returns, so a rewritten `agentdock-runner filter -- git push` would slip
+ * past `Bash(git push:*)`. The hook therefore rewrites only when:
  *
- * - no `deny` or `ask` `Bash(…)` rule matches the original command, and
- * - the session is in `bypassPermissions`, or an `allow` rule already matches
- *   the original command — then the rewrite carries `allow`, which only skips
- *   a prompt the original would not have had.
+ * - the session is in `bypassPermissions` — in every other mode Claude Code
+ *   (its prompt, its auto-mode classifier, plan mode) decides, and a hook
+ *   `allow` would skip that; and
+ * - no `deny` or `ask` `Bash(…)` rule matches the command, at any word.
  *
  * Rules are read best-effort from the files Claude loads; any doubt (a file
  * that exists but does not parse, a rule this parser does not understand)
- * means no rewrite. Deny and ask rules are matched generously, allow rules
- * strictly, so every mismatch errs toward leaving the command alone.
+ * means no rewrite. Deny and ask rules are matched generously — on the
+ * command's words with whitespace collapsed and quotes dropped, the program
+ * with and without its directory, starting at every word — so every mismatch
+ * errs toward leaving the command alone.
  */
 
 export interface PermissionRules {
@@ -49,24 +52,28 @@ export const parseBashRule = (rule: unknown): Pattern | 'other' | 'unknown' => {
   const body = (match[1] ?? '').trim();
   if (body === '' || body === '*' || body === ':*') return { kind: 'all' };
   if (body.endsWith(':*')) {
-    const text = body.slice(0, -2).trim();
+    const text = collapse(body.slice(0, -2));
     if (text === '' || text.includes(':*') || text.includes('*')) {
       return 'unknown';
     }
     return { kind: 'prefix', text };
   }
   if (body.includes(':*')) return 'unknown';
-  if (body.includes('*')) {
-    const source = body
+  const text = collapse(body);
+  if (text.includes('*')) {
+    const source = text
       .split('*')
       .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
       .join('.*');
     // `Bash(ls *)` also names the bare `ls` for the generous match.
-    const bare = body.endsWith(' *') ? body.slice(0, -2).trim() : null;
+    const bare = text.endsWith(' *') ? text.slice(0, -2).trim() : null;
     return { kind: 'glob', regex: new RegExp(`^${source}$`, 's'), bare };
   }
-  return { kind: 'exact', text: body };
+  return { kind: 'exact', text };
 };
+
+/** Runs of whitespace as one space, trimmed. */
+const collapse = (text: string): string => text.trim().replace(/\s+/g, ' ');
 
 const startsWord = (command: string, text: string): boolean =>
   command === text || command.startsWith(`${text} `);
@@ -88,32 +95,47 @@ const matchesGenerously = (pattern: Pattern, command: string): boolean => {
   }
 };
 
-/** Allow: only a clear match counts. */
-const matchesStrictly = (pattern: Pattern, command: string): boolean => {
-  switch (pattern.kind) {
-    case 'all':
-      return true;
-    case 'prefix':
-      return startsWord(command, pattern.text);
-    case 'glob':
-      return pattern.regex.test(command);
-    case 'exact':
-      return command === pattern.text;
+/**
+ * Every text a deny or ask rule is tried against: the original with
+ * whitespace collapsed, and the parsed words — with and without the
+ * assignments, the program with and without its directory — each from every
+ * word on, so a rule also meets the command wherever it sits.
+ */
+export const ruleCandidates = (
+  original: string,
+  parsed: SimpleCommand,
+): string[] => {
+  const [program = '', ...args] = parsed.argv;
+  const forms = [
+    parsed.argv,
+    [basename(program), ...args],
+    [...parsed.assignments.map((a) => `${a.name}=${a.value}`), ...parsed.argv],
+  ];
+  const out = new Set<string>();
+  const text = collapse(original);
+  const spaces = text.split(' ');
+  for (let i = 0; i < spaces.length; i++) out.add(spaces.slice(i).join(' '));
+  for (const words of forms) {
+    for (let i = 0; i < words.length; i++) {
+      out.add(collapse(words.slice(i).join(' ')));
+    }
   }
+  return [...out].filter((c) => c.length > 0);
 };
 
 /**
- * The verdict for one command. `command` is the original as Claude sent it;
- * `bare` is the same without leading `NAME=value` words, which the deny and
- * ask rules are checked against too.
+ * The verdict for one parsed command; `original` is the text Claude sent.
  */
 export const permissionFor = (
   rules: PermissionRules,
   permissionMode: string | undefined,
-  command: string,
-  bare: string,
+  original: string,
+  parsed: SimpleCommand,
 ): PermissionVerdict => {
-  const candidates = [command.trim(), bare.trim()];
+  if (permissionMode !== 'bypassPermissions') {
+    return { rewrite: false, reason: 'not bypassPermissions' };
+  }
+  const candidates = ruleCandidates(original, parsed);
   for (const list of ['deny', 'ask'] as const) {
     for (const rule of rules[list]) {
       const pattern = parseBashRule(rule);
@@ -126,16 +148,7 @@ export const permissionFor = (
       }
     }
   }
-  if (permissionMode === 'bypassPermissions') return { rewrite: true };
-  for (const rule of rules.allow) {
-    const pattern = parseBashRule(rule);
-    if (pattern === 'other') continue;
-    if (pattern === 'unknown') {
-      return { rewrite: false, reason: 'unparsed allow rule' };
-    }
-    if (matchesStrictly(pattern, command.trim())) return { rewrite: true };
-  }
-  return { rewrite: false, reason: 'not allowed already' };
+  return { rewrite: true };
 };
 
 export interface SettingsSources {
