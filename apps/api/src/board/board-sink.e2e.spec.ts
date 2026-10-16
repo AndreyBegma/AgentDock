@@ -204,6 +204,49 @@ describe('board sink (e2e)', () => {
       await w.hook('hook.prompt_submitted', sessionId, { chars: 3 });
       expect((await detail()).round?.hooksMissing).toBe(false);
     });
+
+    it('says why hooks are missing from what the runner reports (#348 D1)', async () => {
+      const { round } = await running();
+      await w.ctx.prisma.boardCardRound.update({
+        where: { id: round.id },
+        data: { startedAt: new Date(Date.now() - 3 * 60 * 1000) },
+      });
+      const report = async (agentdock?: { plugin: string | null }) =>
+        w.ctx.prisma.runner.update({
+          where: { id: w.runnerId },
+          data: {
+            capabilities: {
+              profiles: [
+                {
+                  id: 'claude-main',
+                  runtime: 'claude',
+                  env: {},
+                  args: [],
+                  ...(agentdock && {
+                    agentdock: { ...agentdock, telemetry: false },
+                  }),
+                },
+              ],
+            },
+          },
+        });
+      const detail = async () =>
+        (
+          (await w.operator.get(`${w.path()}/board/cards/1`))
+            .body as BoardCardDetail
+        ).rounds[0];
+
+      await report({ plugin: null });
+      expect(await detail()).toMatchObject({
+        hooksMissing: true,
+        hooksCause: 'no_plugin',
+        hooksProfile: 'claude-main',
+      });
+      await report({ plugin: '0.4.2' });
+      expect((await detail()).hooksCause).toBe('session_predates');
+      await report();
+      expect((await detail()).hooksCause).toBe('unknown');
+    });
   });
 
   describe('card.finish over the local channel', () => {

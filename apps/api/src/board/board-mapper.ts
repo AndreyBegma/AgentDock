@@ -10,6 +10,7 @@ import {
   type CardDependencyRef,
   type CardEvidenceView,
   type CardFleetView,
+  type CardHooksCause,
   type CardPullRequestRef,
   type CardRoundBrief,
   type CardRoundView,
@@ -30,6 +31,7 @@ import {
   type CardRunWiringReason,
   cardRunWiringReasonSchema,
   cardRunWiringSchema,
+  type ProfileAgentdock,
 } from '@agentdock/shared/protocol';
 import {
   type BoardCard,
@@ -103,6 +105,10 @@ export interface CardFacts {
   hooked: ReadonlySet<string>;
   /** #282 D1: tracked sessions (`sessions.id`) that have not ended. */
   alive: ReadonlySet<string>;
+  /** #348 D1: each round's run profile key (`runs.profileKey`); absent is none. */
+  runProfileKeys: ReadonlyMap<string, string>;
+  /** #348 D1: each project's runner reports, by profile key (`profileAgentdockOf`). */
+  profileAgentdock: ReadonlyMap<string, Record<string, ProfileAgentdock>>;
   /** #309: attachments of each card, its rounds' included; absent is none. */
   attachmentCounts: ReadonlyMap<string, number>;
   /** #337 D8: the cards each one runs after, in number order; absent is none. */
@@ -154,6 +160,36 @@ const hooksMissing = (
   facts.now.getTime() - round.startedAt.getTime() >= CARD_HOOKS_GRACE_MS &&
   !(card.sessionId !== null && facts.hooked.has(card.sessionId));
 
+/**
+ * #348 D1: why hooks are missing, and for which profile. `null` cause when they
+ * are not missing; `unknown` when the run has no profile key, the runner
+ * reports no such profile, or the profile has no `agentdock` field.
+ */
+export const hooksCauseOf = (
+  card: BoardCard,
+  round: BoardCardRound,
+  facts: CardFacts,
+): {
+  hooksCause: CardHooksCause | null;
+  hooksProfile: string | null;
+} => {
+  if (!hooksMissing(card, round, facts)) {
+    return { hooksCause: null, hooksProfile: null };
+  }
+  const hooksProfile = facts.runProfileKeys.get(round.runId) ?? null;
+  const report =
+    hooksProfile === null
+      ? undefined
+      : facts.profileAgentdock.get(card.projectId)?.[hooksProfile];
+  const hooksCause: CardHooksCause =
+    report === undefined
+      ? 'unknown'
+      : report.plugin === null
+        ? 'no_plugin'
+        : 'session_predates';
+  return { hooksCause, hooksProfile };
+};
+
 /** #367 D3: a round's launch facts as stored (`null` until it started). */
 export const wiringOf = (
   round: Pick<BoardCardRound, 'wiring' | 'wiringReason'>,
@@ -182,8 +218,7 @@ const brief = (
         finishedBy: round.finishedBy,
         waitingAt: iso(round.waitingAt),
         hooksMissing: hooksMissing(card, round, facts),
-        hooksCause: null,
-        hooksProfile: null,
+        ...hooksCauseOf(card, round, facts),
         ...wiringOf(round),
       }
     : null;
@@ -293,8 +328,7 @@ const toRoundView = (
   exitCode: round.exitCode,
   error: round.error,
   hooksMissing: hooksMissing(card, round, facts),
-  hooksCause: null,
-  hooksProfile: null,
+  ...hooksCauseOf(card, round, facts),
   ...wiringOf(round),
   costUsd: facts.costs.get(round.runId) ?? null,
   startedAt: round.startedAt.toISOString(),
