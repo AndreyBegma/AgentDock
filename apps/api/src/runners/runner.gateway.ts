@@ -166,6 +166,7 @@ class RunnerSocket {
         return;
       case 'terminal.data':
       case 'terminal.close':
+      case 'terminal.history':
         this.deps.streams.deliverTerminal(runnerId, message);
         return;
       case 'local.request':

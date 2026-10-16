@@ -7,6 +7,7 @@ import {
 } from '@agentdock/shared';
 import {
   type CommandErrorCode,
+  TERMINAL_HISTORY_TIMEOUT_MS,
   TERMINAL_MAX_DATA_BYTES,
   type TerminalCloseReason,
   type TerminalMode,
@@ -74,6 +75,8 @@ export class TerminalAttach {
   droppedIn = 0;
   lastInputAt: number;
   lastTrafficAt: number;
+  /** When the unanswered history request was sent; null when none is (#522). */
+  historyAskedAt: number | null = null;
   endReason: TerminalCloseReason | null = null;
   endCause: string | null = null;
   idleTimer: NodeJS.Timeout | null = null;
@@ -319,6 +322,30 @@ export class TerminalRelay
     });
   }
 
+  /**
+   * `{ type: 'history' }` from the browser (#522): asks the runner for this
+   * attach's pane history. Allowed on a `read` attach — it is not input, and
+   * it does not count as input for a `write` attach's idle. One at a time:
+   * another is dropped until the answer's last chunk or
+   * `TERMINAL_HISTORY_TIMEOUT_MS`.
+   */
+  history(attach: TerminalAttach): void {
+    if (attach.state !== 'open') return;
+    const now = Date.now();
+    if (
+      attach.historyAskedAt !== null &&
+      now - attach.historyAskedAt < TERMINAL_HISTORY_TIMEOUT_MS
+    ) {
+      return;
+    }
+    attach.lastTrafficAt = now;
+    const sent = this.runner.send(attach.runnerId, {
+      type: 'terminal.history.request',
+      id: attach.id,
+    });
+    if (sent) attach.historyAskedAt = now;
+  }
+
   /** The admin detached (`{ type: 'close' }`) or the browser socket closed. */
   detach(attach: TerminalAttach): Promise<void> {
     return this.end(attach, 'client');
@@ -326,7 +353,7 @@ export class TerminalRelay
 
   // Runner side
 
-  /** A `terminal.data` or `terminal.close` from a runner. */
+  /** A `terminal.data`, `terminal.close` or `terminal.history` from a runner. */
   fromRunner(runnerId: string, message: TerminalFromRunner): void {
     const attach = this.attaches.get(message.id);
     // A runner feeds only its own attaches; a late message of an ended one is dropped.
@@ -336,6 +363,18 @@ export class TerminalRelay
     }
     if (message.type === 'terminal.close') {
       void this.end(attach, message.reason, { notifyRunner: false });
+      return;
+    }
+    if (message.type === 'terminal.history') {
+      // Only to the browser that asked; a chunk nobody asked for is dropped.
+      if (attach.historyAskedAt === null) return;
+      if (message.last) attach.historyAskedAt = null;
+      attach.lastTrafficAt = Date.now();
+      attach.browser.sendFrame({
+        type: 'history',
+        lines: message.lines,
+        last: message.last,
+      });
       return;
     }
     const bytes = Buffer.from(message.b64, 'base64');
