@@ -221,6 +221,7 @@ export function CardDesignSection({
                   size="sm"
                   variant="ghost"
                   icon
+                  className="max-lg:size-11"
                   aria-label="Design options"
                   disabled={busy}
                 >
@@ -252,7 +253,11 @@ export function CardDesignSection({
         {opensCardDesign(card.design) ? (
           <Link
             href={cardDesignHref(projectId, card.number)}
-            className={buttonClassName({ variant: 'glass', size: 'sm' })}
+            className={buttonClassName({
+              variant: 'glass',
+              size: 'sm',
+              className: 'max-lg:h-11',
+            })}
           >
             Open design
           </Link>

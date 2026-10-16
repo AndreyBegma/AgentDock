@@ -25,7 +25,9 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { MockupFrame } from '../../../../../../../components/design/mockup-frame';
+import { ScaledPreview } from '../../../../../../../components/design/scaled-preview';
 import { Markdown } from '../../../../../../../components/markdown/markdown';
+import { useNarrow } from '../../../../../../../components/shell/narrow';
 import { api } from '../../../../../../../lib/api';
 import {
   addStackCard,
@@ -63,6 +65,7 @@ import {
   stackDesignApi,
   stackDesignHref,
 } from '../../../../../../../lib/design/href';
+import { mobilePreset } from '../../../../../../../lib/design/mobile-preview';
 import { formatCost } from '../../../../../../../lib/format';
 import { useLive } from '../../../../../../../lib/live/use-live';
 import { useErrorToast } from '../../../../../../../lib/section/use-error-toast';
@@ -203,50 +206,70 @@ function StackDetail({
   const viewer = stackDesignHref(projectId, stack.number);
   const cost = formatCost(stack.costUsd);
 
+  const reviewing = stack.design?.status === 'reviewing';
+  const approve = approvable ? (
+    <Button
+      variant="solid"
+      disabled={busy}
+      onClick={() =>
+        run(
+          () =>
+            api(`${stackDesignApi(projectId, stack.number)}/approve`, {
+              method: 'POST',
+              body: { revisionId: approvable.id },
+            }),
+          true,
+        )
+      }
+    >
+      Approve design
+    </Button>
+  ) : (
+    <Link href={viewer} className={buttonClassName({ variant: 'solid' })}>
+      Pick and approve
+    </Link>
+  );
+  const generate = (
+    <Button
+      variant="solid"
+      disabled={busy}
+      onClick={() =>
+        run(
+          () =>
+            api(`${stackDesignApi(projectId, stack.number)}/generate`, {
+              method: 'POST',
+            }),
+          true,
+        )
+      }
+    >
+      Generate design
+    </Button>
+  );
+
   const actions = canOperate ? (
     stack.design === null ? null : stack.design.status === 'idle' ? (
-      <Button
-        variant="solid"
-        disabled={busy}
-        onClick={() =>
-          run(
-            () =>
-              api(`${stackDesignApi(projectId, stack.number)}/generate`, {
-                method: 'POST',
-              }),
-            true,
-          )
-        }
-      >
-        Generate design
-      </Button>
-    ) : stack.design.status === 'reviewing' ? (
+      generate
+    ) : reviewing ? (
       <>
         <Link href={viewer} className={buttonClassName({ variant: 'glass' })}>
           Revise design
         </Link>
-        {approvable ? (
-          <Button
-            variant="solid"
-            disabled={busy}
-            onClick={() =>
-              run(
-                () =>
-                  api(`${stackDesignApi(projectId, stack.number)}/approve`, {
-                    method: 'POST',
-                    body: { revisionId: approvable.id },
-                  }),
-                true,
-              )
-            }
-          >
-            Approve design
-          </Button>
-        ) : (
-          <Link href={viewer} className={buttonClassName({ variant: 'solid' })}>
-            Pick and approve
-          </Link>
-        )}
+        {approve}
+      </>
+    ) : null
+  ) : null;
+  // #526: below `lg` the same actions sit in a dock; Revise design opens the
+  // viewer just as Open viewer does, so the dock keeps the one.
+  const dock = canOperate ? (
+    stack.design?.status === 'idle' ? (
+      generate
+    ) : reviewing ? (
+      <>
+        {approve}
+        <Link href={viewer} className={buttonClassName({ variant: 'glass' })}>
+          Open viewer
+        </Link>
       </>
     ) : null
   ) : null;
@@ -296,7 +319,12 @@ function StackDetail({
             </span>
           </div>
         }
-        actions={actions ?? undefined}
+        actions={
+          actions ? (
+            // Below `lg` the same actions sit in the dock (#526).
+            <div className="hidden items-center gap-2 lg:flex">{actions}</div>
+          ) : undefined
+        }
       />
 
       {gated ? (
@@ -305,7 +333,7 @@ function StackDetail({
         </Banner>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="flex min-w-0 flex-col gap-6">
           <Description
             projectId={projectId}
@@ -330,6 +358,20 @@ function StackDetail({
           run={run}
         />
       </div>
+
+      {dock ? (
+        // #526: Approve design and Open viewer stay in reach on a phone, above
+        // the tab bar (3.5rem and the safe area, as its spacer).
+        <>
+          <div aria-hidden="true" className="h-14 lg:hidden" />
+          <section
+            aria-label="Design actions"
+            className="glass-strong fixed inset-x-4 bottom-[calc(var(--dock-bottom)+0.5rem)] z-chrome flex items-center gap-2 rounded-sheet p-2 lg:hidden [&>*]:h-11 [&>*]:flex-1"
+          >
+            {dock}
+          </section>
+        </>
+      ) : null}
     </div>
   );
 }
@@ -650,6 +692,7 @@ function StackDesignAside({
   const viewer = stackDesignHref(projectId, stack.number);
   const preview = design ? previewRevision(design) : null;
   const frame = preview?.frames[0];
+  const narrow = useNarrow();
   const setNeeded = (needed: boolean) =>
     run(
       () =>
@@ -662,7 +705,7 @@ function StackDesignAside({
   return (
     <aside
       aria-label="Stack design"
-      className="flex flex-col gap-2 lg:sticky lg:top-16 lg:self-start"
+      className="flex flex-col gap-2 max-lg:order-first lg:sticky lg:top-16 lg:self-start"
     >
       <SectionHeader
         title="Stack design"
@@ -690,23 +733,32 @@ function StackDesignAside({
           </>
         ) : (
           <>
-            <div className="aspect-[4/3] overflow-hidden rounded-control border border-line">
-              {frame ? (
-                <MockupFrame
-                  src={frame.htmlUrl}
-                  title={`${stack.label} design · variant ${preview?.variant}`}
-                  theme="light"
-                  pinMode={false}
-                  pins={[]}
-                  onPin={() => {}}
-                  onWheel={() => {}}
-                />
-              ) : (
-                <div className="flex size-full items-center justify-center text-sm text-ink-3">
-                  Not drawn yet
-                </div>
-              )}
-            </div>
+            {frame && narrow ? (
+              <ScaledPreview
+                src={frame.htmlUrl}
+                title={`${stack.label} design · variant ${preview?.variant}`}
+                preset={mobilePreset(design?.viewports ?? [])}
+                href={viewer}
+              />
+            ) : (
+              <div className="aspect-[4/3] overflow-hidden rounded-control border border-line">
+                {frame ? (
+                  <MockupFrame
+                    src={frame.htmlUrl}
+                    title={`${stack.label} design · variant ${preview?.variant}`}
+                    theme="light"
+                    pinMode={false}
+                    pins={[]}
+                    onPin={() => {}}
+                    onWheel={() => {}}
+                  />
+                ) : (
+                  <div className="flex size-full items-center justify-center text-sm text-ink-3">
+                    Not drawn yet
+                  </div>
+                )}
+              </div>
+            )}
             <KeyValueList
               dense
               items={[
@@ -742,7 +794,11 @@ function StackDesignAside({
             <div className="flex flex-wrap gap-2">
               <Link
                 href={viewer}
-                className={buttonClassName({ variant: 'glass', size: 'sm' })}
+                className={buttonClassName({
+                  variant: 'glass',
+                  size: 'sm',
+                  className: 'max-lg:h-11',
+                })}
               >
                 Open full size
               </Link>
@@ -750,6 +806,7 @@ function StackDesignAside({
                 <Button
                   size="sm"
                   variant="ghost"
+                  className="max-lg:h-11"
                   disabled={busy}
                   onClick={() => setNeeded(false)}
                 >
