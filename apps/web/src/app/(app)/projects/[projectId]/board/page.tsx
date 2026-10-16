@@ -369,34 +369,26 @@ function BoardScreen() {
       >
         {() =>
           view ? (
-            <>
-              <BoardColumns
-                projectId={projectId}
-                view={view}
-                planTasks={planTaskItems}
-                runnerName={project?.runnerName}
-                canOperate={canOperate}
-                canTerminal={canAttach}
-                actions={actions}
-                filter={url.filters}
-                compact={density === 'compact'}
-                onOpen={(card) => select(card.number)}
-                onOpenPlanTask={selectPlanTask}
-                onOpenTerminal={setAttaching}
-                onReload={reload}
-              />
-              {hasMoreOlder && lastCompleted?.completedAt ? (
-                <div className="shrink-0">
-                  <Button
-                    variant="glass"
-                    disabled={loadingOlder}
-                    onClick={() => void loadOlder()}
-                  >
-                    {loadingOlder ? 'Loading…' : 'Show older completed cards'}
-                  </Button>
-                </div>
-              ) : null}
-            </>
+            <BoardColumns
+              projectId={projectId}
+              view={view}
+              planTasks={planTaskItems}
+              runnerName={project?.runnerName}
+              canOperate={canOperate}
+              canTerminal={canAttach}
+              actions={actions}
+              filter={url.filters}
+              compact={density === 'compact'}
+              olderCompleted={
+                hasMoreOlder && lastCompleted?.completedAt
+                  ? { loading: loadingOlder, onLoad: () => void loadOlder() }
+                  : undefined
+              }
+              onOpen={(card) => select(card.number)}
+              onOpenPlanTask={selectPlanTask}
+              onOpenTerminal={setAttaching}
+              onReload={reload}
+            />
           ) : null
         }
       </AsyncSection>

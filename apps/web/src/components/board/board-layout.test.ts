@@ -34,6 +34,12 @@ describe('boardColumnWidth', () => {
     );
   });
 
+  test('folded strips and their gaps come off the width the open columns share', () => {
+    expect(boardColumnWidth(4, 1)).toBe(
+      'max(13.5rem, calc((100% - 1 * (2.75rem + 0.75rem) - 3 * 0.75rem) / 4))',
+    );
+  });
+
   test('never divides by zero', () => {
     expect(boardColumnWidth(0)).toContain('/ 1))');
   });
