@@ -23,9 +23,10 @@ import type { BoardCardKind } from './types';
  * no Claude attribution trailer on a commit. Version 11 (#449 D2, D5, D7):
  * with Token saver (Context handoff rides on it), the `## Handoff note`
  * section. Version 12 (#445 amendment 11): with Token saver, one
- * command per Bash call.
+ * command per Bash call. Version 13 (#487): never a project's whole e2e
+ * suite locally — only the suites the card touched; CI runs the rest.
  */
-export const CARD_WORKER_PROMPT_VERSION = 12;
+export const CARD_WORKER_PROMPT_VERSION = 13;
 
 /** #389: the env the runner sets in the card's session — its short id. */
 export const CARD_ENV_ID = 'AGENTDOCK_CARD';
@@ -36,12 +37,21 @@ export const CARD_ENV_PORT = 'AGENTDOCK_CARD_PORT';
 /**
  * #389: two cards' e2e runs wiped one shared test database, and a worker
  * waited 7.5 h on a `pgrep -f` loop that matched itself. Every card worktree
- * keeps to a database and a port of its own, so no card waits on another.
+ * #487: three cards' e2e runs at once — one of them the whole project —
  */
 const LOCAL_ENVIRONMENT_LINES = [
   `- This session has \`${CARD_ENV_ID}\` (this card's id) and \`${CARD_ENV_PORT}\` set. Tests and servers keep to a database and a port of their own: name a test database after \`$${CARD_ENV_ID}\` (a project's test setup may already do it — check before you create one), and start a server on \`$${CARD_ENV_PORT}\`. Never use, reset or wait for a database or port another worktree may use.`,
-  "- Never wait for another process with `pgrep -f <pattern>`: the pattern is on your own command line, so it always matches and the wait never ends. Use a lock file, or a pattern that cannot match itself (`pgrep -f '[j]est'`). Never wait on another worktree's test run.",
+  "- Never wait for another process with `pgrep -f <pattern>`: the pattern is on your own command line, so it always matches and the wait never ends. Use a lock file, or a pattern that cannot match itself (`pgrep -f '[j]est'`).",
 ];
+
+/**
+ * #487: three cards' e2e runs at once — one of them the whole project —
+ * exhausted the dev Postgres's connections and failed all three. Kept short
+ * (the #389 line gave up its last sentence for it): the largest card must
+ * still fit `card.run` whole.
+ */
+const E2E_SCOPE_LINE =
+  '- Run the tests and checks the repository defines before you finish — only the e2e suites you touched (`--testPathPatterns`); CI runs the rest.';
 
 /**
  * #447 D7: the runner holds the push of a commit that carries a Claude
@@ -380,7 +390,7 @@ const assemblePrompt = (
     "- Follow the repository's CLAUDE.md / AGENTS.md.",
     '- Commit your work as you go, with clear messages.',
     COMMIT_TRAILER_LINE,
-    '- Run the tests and checks the repository defines before you finish.',
+    E2E_SCOPE_LINE,
     ...(card.tokenSaver ? [ONE_COMMAND_LINE] : []),
     ...LOCAL_ENVIRONMENT_LINES,
     '- Do not push and do not open a pull request: AgentDock pushes your commits as you make them and keeps a draft pull request open for this branch.',
