@@ -181,9 +181,9 @@ const MOVE_REFUSED: Record<
   automatic_to_completed: 'Only a person completes a card',
   card_completed: 'A completed card is moved only by a person',
   plan_task_derived: 'A completed card is moved only by a person',
-  // #282 D4: the column follows the slot.
+  // #282 D4: the column follows the slot; #424: until the slot is gone.
   fleet_slot:
-    'A fleet card follows its slot: the one move it takes is Finished → Completed',
+    'A fleet card follows its live slot: the one move it takes is Finished → Completed',
 };
 
 const refusalOf = (
@@ -480,6 +480,8 @@ export class BoardWork implements OnModuleInit {
       // with Automatic work on.
       cardSource: card.source,
       autoCollect: card.autoCollect,
+      // #424: a gone slot no longer moves its card, so a person may.
+      slotGone: card.fleetSlotGone,
     });
   }
 

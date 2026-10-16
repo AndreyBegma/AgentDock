@@ -51,7 +51,9 @@ export type BoardMoveEffect =
  *   move, reorder or column change of it is ever allowed;
  * - `fleet_slot` — a person moved a `fleet` card (#282 D4, ADR-0030 §4):
  *   its column follows the slot, so the one move a person makes is Finished
- *   → Completed (Accept). A reorder inside a column is not a move.
+ *   → Completed (Accept). A reorder inside a column is not a move. Once the
+ *   slot is gone (#424) a person may also move the card to To Do or
+ *   Finished, never into In progress.
  */
 export type BoardMoveRefusal =
   | 'card_running'
@@ -83,6 +85,11 @@ export interface BoardMoveInput {
    * worker, so no Run is offered. Default `false`.
    */
   trackingAlive?: boolean;
+  /**
+   * #424: a `fleet` card's slot ended without a PR of its own — nothing
+   * moves the card any more, so a person may. Default `false`.
+   */
+  slotGone?: boolean;
 }
 
 export type BoardMoveDecision =
@@ -101,6 +108,26 @@ const refuse = (error: BoardMoveRefusal): BoardMoveDecision => ({
   allowed: false,
   error,
 });
+
+const WORK_COLUMNS: readonly BoardColumn[] = [
+  'todo',
+  'in_progress',
+  'finished',
+];
+
+/** #282 D4 / #424: the moves a person makes of a `fleet` card. */
+const personMovesFleetCard = (
+  from: BoardColumn,
+  to: BoardColumn,
+  slotGone: boolean,
+): boolean => {
+  if (from === 'finished' && to === 'completed') return true;
+  return (
+    slotGone &&
+    WORK_COLUMNS.includes(from) &&
+    (to === 'todo' || to === 'finished')
+  );
+};
 
 /**
  * D8 / #282 D3: a card worker's work is always collected; a terminal
@@ -133,7 +160,7 @@ export const boardMoveRule = (move: BoardMoveInput): BoardMoveDecision => {
   if (
     cardSource === 'fleet' &&
     source === 'person' &&
-    !(from === 'finished' && to === 'completed')
+    !personMovesFleetCard(from, to, move.slotGone === true)
   ) {
     return refuse('fleet_slot');
   }

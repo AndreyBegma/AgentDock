@@ -64,10 +64,22 @@ const LIVE_STATUSES: ReadonlySet<Slot['status']> = new Set([
   'quota',
 ]);
 
-/** Where a slot's card belongs; `null` keeps the card where it is. */
-const columnOf = (slot: Slot): BoardColumn | null => {
+/**
+ * Where a slot's card belongs; `null` keeps the card where it is. A slot that
+ * ended without a live PR of its own (#424) — a resumed slot whose PR was its
+ * predecessor's, or one abandoned — never holds its card in In progress: the
+ * card goes to Finished once the issue is `settled` (closed, or a sibling
+ * slot's PR merged), else back to To Do. A gone card a person moved stays put.
+ */
+const columnOf = (
+  slot: Slot,
+  settled: boolean,
+  column: BoardColumn,
+): BoardColumn | null => {
   if (slot.prNumber !== null && slot.prState !== 'closed') return 'finished';
-  return slot.status === 'ended' ? null : 'in_progress';
+  if (slot.status !== 'ended') return 'in_progress';
+  if (settled) return 'finished';
+  return column === 'in_progress' ? 'todo' : null;
 };
 
 /** The slot left the projection: its run ended without a merge. */
@@ -262,6 +274,20 @@ export class BoardFleetService
       cards.map((c) => [`${c.fleetIssue}:${c.fleetSlot ?? ''}`, c]),
     );
 
+    // #424: an issue whose work is done — closed, or a slot's PR merged.
+    const settled = new Set<number>(
+      runs.filter((r) => r.prState === 'merged').map((r) => r.issue as number),
+    );
+    const closed = await tx.issueCache.findMany({
+      where: {
+        projectId,
+        number: { in: [...new Set(runs.map((r) => r.issue as number))] },
+        state: 'closed',
+      },
+      select: { number: true },
+    });
+    for (const { number } of closed) settled.add(number);
+
     const created: BoardCard[] = [];
     const moves: { number: number; to: BoardColumn }[] = [];
     const touched: string[] = [];
@@ -290,7 +316,7 @@ export class BoardFleetService
         // #329 D6: the PR's state from the fleet's PR poll.
         prState: slot.prNumber === null ? null : slot.prState,
       };
-      const to = columnOf(slot);
+      const settledIssue = settled.has(issue);
       let card = byKey.get(`${issue}:${slot.name}`);
       if (!card) {
         const unslotted = byKey.get(`${issue}:`);
@@ -303,6 +329,7 @@ export class BoardFleetService
           });
           byKey.set(`${issue}:${slot.name}`, card);
           touched.push(card.id);
+          const to = columnOf(slot, settledIssue, card.column);
           if (to) moves.push({ number: card.number, to });
           continue;
         }
@@ -312,6 +339,7 @@ export class BoardFleetService
         byKey.set(`${issue}:${slot.name}`, card);
         created.push(card);
         touched.push(card.id);
+        const to = columnOf(slot, settledIssue, card.column);
         if (to && to !== card.column) {
           moves.push({ number: card.number, to });
         }
@@ -327,6 +355,7 @@ export class BoardFleetService
         await tx.boardCard.update({ where: { id: card.id }, data: fields });
         touched.push(card.id);
       }
+      const to = columnOf(slot, settledIssue, card.column);
       if (to && to !== card.column && card.column !== 'completed') {
         moves.push({ number: card.number, to });
       }
