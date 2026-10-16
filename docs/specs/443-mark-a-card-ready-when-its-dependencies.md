@@ -28,3 +28,10 @@ Cards can already depend on other cards (`BoardCardDependency`, set by hand in `
 
 ## Migration name
 Name the schema migration exactly `20261201000000_card_auto_run` (create it with `prisma migrate dev --create-only --name ...` and rename the folder if needed). The repository's migrations use fixed future timestamps; the newest on develop is `20261129000000_card_round_background`. Another card (C-84) runs in parallel and owns `20261130000000_design_frames` on a different table.
+
+## Decisions taken in the build
+- **Accepted** is the dependency's column: in Completed, however many PRs it had. Readiness exists only for a card in To Do with at least one dependency (`cardReadiness`, shared); the API sends it on every card view as `readiness`.
+- **Exactly once.** The switch is consumed: one conditional `UPDATE` turns `autoRunWhenReady` off only while the card is in To Do with the switch on and no open dependency. Every acceptance tries it after its own commit, so the last to commit sees every dependency accepted, and of racing acceptances the row lock lets one through.
+- **No new queue.** The automatic start is the manual Run (`BoardRoundsService.run`) as the person who accepted the dependency; a refusal (`max_running`, `budget_exceeded`, a profile, …) is stored on the card like a refused design auto-run (`autoRunError` / `autoRunMessage` / `autoRunFailedAt`, plus `autoRunAfter`) and audited as `card.auto_run_failed`. The person presses Run once it is fixed.
+- **Only acceptance fires it.** Turning the switch on for a card that is already ready, or removing its last open dependency, starts nothing.
+- The round the auto-run started stores `autoRunAfter` (the accepted dependency's number); the card's Rounds show it as Auto-run.
