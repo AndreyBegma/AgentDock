@@ -1,0 +1,6 @@
+{
+  "argv": ["demo-test", "--version"],
+  "exitCode": 0,
+  "category": "other",
+  "outcome": "passing"
+}

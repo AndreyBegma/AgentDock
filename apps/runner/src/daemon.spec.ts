@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { existsSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   CommandResultMessage,
@@ -10,6 +10,7 @@ import type { PairedConfig } from './config';
 import type { RunnerConnection } from './connection';
 import { runDaemon } from './daemon';
 import type { Exec } from './detect/exec';
+import { FILTER_STATS_FILE } from './filter/env';
 import { type HookDeps, runHook } from './hooks/run';
 import { FORBIDDEN, fixtureProtobuf, PROTOBUF_SESSION } from './otlp/testing';
 import { FakeClock } from './testing/fake-clock';
@@ -414,5 +415,94 @@ describe('daemon — local socket (spec 201)', () => {
     controller.abort();
     await done;
     expect(existsSync(join(dir, 'runner.sock'))).toBe(false);
+  });
+});
+
+describe('daemon — filter stats (#445 amendment 5)', () => {
+  let dir = '';
+  let cleanup = () => {};
+  let server: MockServer;
+
+  beforeEach(() => {
+    ({ dir, cleanup } = tempDir());
+    server = new MockServer().start();
+    server.welcome = () => ({
+      type: 'welcome',
+      runnerId: 'rn_1',
+      config: {
+        projects: [{ id: 'prj_fixture', root: ROOT }],
+        pollIntervalsMs: {},
+      },
+      ackedSeq: 0,
+    });
+  });
+  afterEach(() => {
+    server.stop();
+    cleanup();
+  });
+
+  it('sends the rows a card launch wrote as filter.stats events', async () => {
+    const runDir = join(dir, 'cards', 'card_1');
+    mkdirSync(runDir, { recursive: true });
+    const row = {
+      id: 'f_1',
+      runId: 'run_1',
+      runKind: 'card',
+      filter: 'js/jest',
+      rawBytes: 4000,
+      keptBytes: 300,
+      bypassed: false,
+      passedThrough: false,
+      at: '2026-10-16T12:00:00.000Z',
+    };
+    writeFileSync(
+      join(runDir, FILTER_STATS_FILE),
+      `${JSON.stringify({ projectId: 'prj_fixture', row })}\n`,
+    );
+
+    const controller = new AbortController();
+    const done = runDaemon({
+      config: {
+        server: server.origin,
+        runnerId: 'rn_1',
+        token: TOKEN,
+        profiles: [],
+        projects: [{ id: 'prj_fixture', root: ROOT }],
+        disabledCommands: [],
+        otlp: { enabled: false, grpc: null, http: null },
+        fleet: { pollSeconds: 15, prPollSeconds: 60, eventsPollSeconds: 5 },
+        queue: { pollSeconds: 60 },
+        sessions: { enabled: false },
+        skills: { maxConcurrentRuns: 2, maxTimeoutSec: 21_600 },
+      },
+      configFile: join(dir, 'runner.json'),
+      localSocket: null,
+      home: dir,
+      spoolDir: join(dir, 'spool'),
+      offsetsFile: join(dir, 'offsets.json'),
+      host,
+      exec: machineWithoutCodex(),
+      env: {},
+      clock: new FakeClock(),
+      log: memoryLogger().log,
+      signal: controller.signal,
+      filterStatsPollMs: 20,
+    });
+
+    const stats = () =>
+      server
+        .of('events')
+        .flatMap((m) => m.events)
+        .filter((e) => e.type === 'filter.stats');
+    await until(() => stats().length > 0);
+    expect(stats()[0]).toMatchObject({
+      source: 'runner',
+      project: { repo: 'fixture', root: ROOT },
+      data: { rows: [row] },
+    });
+
+    controller.abort();
+    await done;
+    expect(stats()).toHaveLength(1);
   });
 });

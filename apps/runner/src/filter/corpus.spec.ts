@@ -1,0 +1,118 @@
+import { describe, expect, it } from 'bun:test';
+import { join } from 'node:path';
+import {
+  type CorpusCase,
+  loadCorpus,
+  runCorpusCase,
+  SAVINGS_CEILING,
+  savingsMedian,
+} from './corpus';
+import { ALL_FILTERS, FAMILIES } from './families';
+import { demoFilter, lossyFilter, tapOutput } from './testing';
+
+/**
+ * The regression corpus (#445 D4d) and the savings criteria. Each family's
+ * cases live in `families/<family>/corpus/`; this file runs them all against
+ * the registry, so a family slot adds cases and nothing else.
+ */
+
+const familyCorpus = (family: string) =>
+  loadCorpus(join(import.meta.dir, 'families', family, 'corpus'));
+
+describe.each(Object.keys(FAMILIES))('corpus: %s family', (family) => {
+  const cases = familyCorpus(family);
+  const results = cases.map((c) => runCorpusCase(ALL_FILTERS, c));
+
+  it('keeps every error, failure, warning and stack line of every case', () => {
+    for (const r of results) {
+      expect({ case: r.case.name, missing: r.missing }).toEqual({
+        case: r.case.name,
+        missing: [],
+      });
+    }
+  });
+
+  it('filters every case marked `expect: filtered`', () => {
+    for (const r of results.filter((x) => x.case.expect === 'filtered')) {
+      expect({ case: r.case.name, filtered: r.filtered }).toEqual({
+        case: r.case.name,
+        filtered: true,
+      });
+    }
+  });
+
+  // Test runners and type checkers only (`savingsMedian`).
+  it.each(['failing', 'passing'] as const)('median kept/raw, %s', (outcome) => {
+    const value = savingsMedian(results, outcome);
+    if (value !== null) {
+      expect(value).toBeLessThanOrEqual(SAVINGS_CEILING[outcome]);
+    }
+  });
+});
+
+describe('the corpus harness itself', () => {
+  const fixtures = loadCorpus(join(import.meta.dir, 'fixtures', 'corpus'));
+
+  it('loads cases from json + out pairs', () => {
+    expect(fixtures.map((c) => c.name)).toEqual([
+      'demo-failing',
+      'demo-unclassified',
+    ]);
+    expect(fixtures[0]).toMatchObject({
+      argv: ['demo-test', '--all'],
+      exitCode: 1,
+      category: 'test',
+      outcome: 'failing',
+      expect: 'filtered',
+    });
+  });
+
+  it('filters a case, keeping its failure and stack lines', () => {
+    const [failing, unclassified] = fixtures.map((c) =>
+      runCorpusCase([demoFilter], c),
+    );
+    expect(failing?.filtered).toBe(true);
+    expect(failing?.missing).toEqual([]);
+    expect(failing?.kept).toContain('at dropOldest (src/spool.ts:212:11)');
+    expect(unclassified?.filtered).toBe(false);
+    expect(unclassified?.kept).toBe('demo-test 4.2.0\n');
+  });
+
+  it('catches a filter that would lose a line, by returning the original', () => {
+    const lossy = { ...lossyFilter, matches: () => true };
+    const [failing] = fixtures.map((c) => runCorpusCase([lossy], c));
+    expect(failing?.filtered).toBe(false);
+    expect(failing?.missing).toEqual([]);
+  });
+
+  it('computes the savings medians the acceptance criteria name', () => {
+    const make = (
+      name: string,
+      output: string,
+      outcome: CorpusCase['outcome'],
+    ): CorpusCase => ({
+      name,
+      argv: ['demo-test'],
+      exitCode: outcome === 'failing' ? 1 : 0,
+      category: 'test',
+      outcome,
+      expect: 'filtered',
+      output,
+    });
+    const results = [
+      make('p1', tapOutput(300), 'passing'),
+      make('p2', tapOutput(500), 'passing'),
+      make(
+        'f1',
+        tapOutput(300, ['not ok 301 - x', '  Error: boom']),
+        'failing',
+      ),
+    ].map((c) => runCorpusCase([demoFilter], c));
+    for (const outcome of ['passing', 'failing'] as const) {
+      expect(savingsMedian(results, outcome)).toBeLessThanOrEqual(
+        SAVINGS_CEILING[outcome],
+      );
+    }
+    expect(savingsMedian([], 'failing')).toBeNull();
+  });
+});
