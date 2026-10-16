@@ -1,0 +1,51 @@
+============================= test session starts ==============================
+platform linux -- Python 3.11.9, pytest-8.2.0, pluggy-1.5.0
+rootdir: /srv/shop
+configfile: pytest.ini
+plugins: django-4.8.0, xdist-3.6.1, freezegun-0.4.2
+collected 1352 items
+
+shop/tests/accounts/test_addresses.py ..........................         [  1%]
+shop/tests/accounts/test_auth.py ................................         [  4%]
+shop/tests/accounts/test_customers.py ...............................     [  6%]
+shop/tests/accounts/test_permissions.py ..........................        [  8%]
+shop/tests/accounts/test_profiles.py ...............................      [ 10%]
+shop/tests/cart/test_cart.py ......................................       [ 13%]
+shop/tests/cart/test_coupons.py ....................................      [ 16%]
+shop/tests/cart/test_totals.py ..............................s...        [ 18%]
+shop/tests/catalog/test_categories.py ......................              [ 20%]
+shop/tests/catalog/test_catalog.py ...............................................  [ 23%]
+shop/tests/catalog/test_import.py ...........................             [ 25%]
+shop/tests/catalog/test_pricing.py ..................................     [ 28%]
+shop/tests/catalog/test_search.py ......................................  [ 31%]
+shop/tests/catalog/test_variants.py ..........................            [ 33%]
+shop/tests/checkout/test_checkout.py ..........................s...........  [ 36%]
+shop/tests/checkout/test_gateways.py ......................................  [ 39%]
+shop/tests/checkout/test_taxes.py ..........................              [ 41%]
+shop/tests/emails/test_emails.py ..............................           [ 43%]
+shop/tests/emails/test_templates.py ...........................           [ 45%]
+shop/tests/inventory/test_inventory.py ..................................  [ 48%]
+shop/tests/inventory/test_reservations.py ............................    [ 50%]
+shop/tests/inventory/test_restock.py .......................              [ 52%]
+shop/tests/orders/test_fulfilment.py ...................................  [ 55%]
+shop/tests/orders/test_orders.py ........................................ [ 58%]
+shop/tests/orders/test_refunds.py ...............................         [ 60%]
+shop/tests/orders/test_returns.py .............................           [ 62%]
+shop/tests/payments/test_payments.py ...................................x. [ 65%]
+shop/tests/payments/test_webhooks.py ........................              [ 67%]
+shop/tests/reports/test_exports.py ..........................              [ 69%]
+shop/tests/reports/test_reports.py .............................          [ 71%]
+shop/tests/search/test_indexer.py ..................................      [ 74%]
+shop/tests/search/test_query.py ..............................            [ 76%]
+shop/tests/shipping/test_rates.py ................................         [ 79%]
+shop/tests/shipping/test_shipping.py ..............................       [ 81%]
+shop/tests/shipping/test_tracking.py ..........................            [ 83%]
+shop/tests/tasks/test_cleanup.py ..................................       [ 86%]
+shop/tests/tasks/test_scheduler.py ...........................            [ 88%]
+shop/tests/web/test_api_cart.py ...................................       [ 91%]
+shop/tests/web/test_api_orders.py ..................................      [ 93%]
+shop/tests/web/test_api_products.py ..............................         [ 96%]
+shop/tests/web/test_pages.py .................................             [ 98%]
+shop/tests/web/test_sitemap.py ......................                      [100%]
+
+====================== 1350 passed, 1 skipped, 1 xfailed in 74.21s (0:01:14) ======================

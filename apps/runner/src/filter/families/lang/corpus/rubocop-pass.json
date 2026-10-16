@@ -1,0 +1,7 @@
+{
+  "argv": ["rubocop"],
+  "exitCode": 0,
+  "category": "typecheck",
+  "outcome": "passing",
+  "expect": "filtered"
+}
