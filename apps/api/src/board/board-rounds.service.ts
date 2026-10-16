@@ -5,12 +5,16 @@ import {
   CARD_WORKER_PROMPT_VERSION,
   type CardAttachmentBrief,
   type CardChange,
+  type CardCiFixInput,
   type CardRoundPhase,
   type CardRoundTrigger,
   cardAttachmentSnapshotSchema,
   cardBranch,
   cardChange,
+  cardCiFixPrompt,
   cardDesignPath,
+  cardDraftPullRequest,
+  cardFollowUpBranch,
   cardIssueBody,
   cardLabel,
   cardNextRoundPrompt,
@@ -32,7 +36,7 @@ import {
   Injectable,
   Optional,
 } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import {
   AttachmentsService,
@@ -190,6 +194,28 @@ export class BoardRoundsService {
     return this.board.detail(projectId, number);
   }
 
+  /**
+   * #359 D6: AgentDock's own round for a red check or a merge conflict on
+   * the card's PR — the system actor, the card's session resumed, the
+   * `ci_fix` prompt. Counts one of the PR's `ci_fix` attempts. Refused like
+   * any round (running, no room, budget); the poller tries again.
+   */
+  async ciFix(
+    projectId: string,
+    number: number,
+    input: CardCiFixInput,
+  ): Promise<void> {
+    const card = await this.work.card(projectId, number);
+    if (card.sessionId === null) {
+      throw boardError(
+        409,
+        BOARD_ERROR.wrongColumn,
+        'A CI fix resumes the card worker, which has not run',
+      );
+    }
+    await this.start(card, 'ci_fix', {}, null, BOARD_SYSTEM_ACTOR, [], input);
+  }
+
   private running(): BoardFailure {
     return boardError(
       409,
@@ -206,9 +232,16 @@ export class BoardRoundsService {
     actor: BoardActor,
     /** #309 D3: pending uploads that come with the feedback. */
     claimIds: readonly string[] = [],
+    /** #359 D6: why a `ci_fix` round starts. */
+    ciFix: CardCiFixInput | null = null,
   ): Promise<void> {
     const project = await this.work.project(card.projectId);
     if (isActiveRoundPhase(card.rounds[0]?.phase)) throw this.running();
+    // #359: the runner pushes during the round and opens a draft PR (D1).
+    const ships =
+      card.source !== 'fleet' &&
+      card.source !== 'terminal' &&
+      this.commands.servesChecks(project.runnerId);
 
     const settings = await this.prisma.projectOrchestratorSettings.findUnique({
       where: { projectId: project.id },
@@ -226,7 +259,12 @@ export class BoardRoundsService {
       dto.permissionMode ??
       settings?.permissionMode ??
       ORCHESTRATOR_DEFAULTS.permissionMode;
-    if (permissionMode === 'bypassPermissions' && actor.role !== 'admin') {
+    // #359 D6: a `ci_fix` round runs as the project's admin configured it.
+    if (
+      permissionMode === 'bypassPermissions' &&
+      actor.role !== 'admin' &&
+      trigger !== 'ci_fix'
+    ) {
       throw new ForbiddenException(
         '`bypassPermissions` needs the admin role on the project',
       );
@@ -257,13 +295,6 @@ export class BoardRoundsService {
     const firstStart = !resume;
     // #243 D6: a needed design is approved before the worker starts.
     const design = trigger === 'run' ? await this.approvedDesign(card) : null;
-    if (firstStart && card.specOnRun && card.specPath === null && !specDir) {
-      throw boardError(
-        422,
-        BOARD_ERROR.noSpecDir,
-        'The project has no spec directory: set orchestrator.specDir, or turn off the spec',
-      );
-    }
 
     this.commands.assertReady(project.runnerId, 'card.run');
     await this.assertRoom(project.id);
@@ -279,9 +310,13 @@ export class BoardRoundsService {
       userId: actor.userId,
     });
 
-    // D2: the issue first, so the branch can name it (D5).
+    // D2: the issue first, so the branch can name it (D5). #359 D4: a bug
+    // gets one — also when the model chose the kind; a feature none. Without
+    // a spec directory there is no spec file, and an issue holds the spec.
     let issue = { number: card.issueNumber, url: card.issueUrl };
-    if (firstStart && card.issueOnRun && issue.number === null) {
+    const wantsIssue =
+      card.issueOnRun || (card.kindSource === 'auto' && card.kind === 'bug');
+    if (firstStart && wantsIssue && issue.number === null) {
       const created = boardOutput(
         'issue.create',
         await this.commands.createIssue(
@@ -303,17 +338,22 @@ export class BoardRoundsService {
       });
     }
 
-    const branch =
-      card.branch ??
-      cardBranch({
-        kind: card.kind,
-        number: card.number,
-        title: card.title,
-        issueNumber: issue.number,
-      });
+    // #359 D8: after a merge, the round works on a fresh branch from the
+    // updated base, and opens the card's next PR.
+    const followUp = ships && resume && card.mergedAt !== null;
+    const branch = followUp
+      ? await this.followUpBranch(card)
+      : (card.branch ??
+        cardBranch({
+          kind: card.kind,
+          number: card.number,
+          title: card.title,
+          issueNumber: issue.number,
+        }));
+    // #359 D4: every card gets its spec file; `specOnRun` is no longer read.
     const specPath =
       card.specPath ??
-      (card.specOnRun && specDir
+      (specDir
         ? cardSpecPath(specDir, {
             number: card.number,
             title: card.title,
@@ -342,8 +382,9 @@ export class BoardRoundsService {
     const attached = await this.attachments.withClaim(card.id, claimIds);
     const attachmentRefs = attached.map(toAttachmentRef);
     const attachmentBriefs = attached.map(toAttachmentBrief);
-    const prompt =
-      resume || (trigger === 'feedback' && feedback !== null)
+    const prompt = ciFix
+      ? cardCiFixPrompt(ciFix)
+      : resume || (trigger === 'feedback' && feedback !== null)
         ? cardNextRoundPrompt({
             label: cardLabel(card.number),
             change: changeSinceLastRound(card, attachmentBriefs),
@@ -389,6 +430,16 @@ export class BoardRoundsService {
       profileKey: profile.key,
       model,
       permissionMode,
+      ...(ships
+        ? {
+            pullRequest: cardDraftPullRequest({
+              number: card.number,
+              title: card.title,
+              issueNumber: issue.number,
+            }),
+          }
+        : {}),
+      ...(followUp ? { newBranch: true } : {}),
     };
     const valid = cardRunArgsSchema.safeParse({ ...draft, runId: 'pending' });
     if (!valid.success) {
@@ -466,6 +517,25 @@ export class BoardRoundsService {
           autoRunError: null,
           autoRunMessage: null,
           autoRunFailedAt: null,
+          // #359 D6: one of the PR's fix attempts; a person's round is the
+          // person acting, so automation resumes.
+          ...(trigger === 'ci_fix'
+            ? { ciFixAttempts: { increment: 1 } }
+            : { needsPerson: false }),
+          // #359 D8: the next PR starts with nothing of the merged one.
+          ...(followUp
+            ? {
+                prNumber: null,
+                prUrl: null,
+                prState: null,
+                mergedAt: null,
+                ciState: 'none' as const,
+                ciChecks: Prisma.DbNull,
+                ciHeadSha: null,
+                ciCheckedAt: null,
+                ciFixAttempts: 0,
+              }
+            : {}),
         },
       });
       return created;
@@ -502,7 +572,10 @@ export class BoardRoundsService {
       number: card.number,
       round: round.round,
       runId: round.runId,
+      trigger,
+      ...(ciFix ? { ciFix: ciFix.reason } : {}),
       branch,
+      ...(followUp ? { newBranch: true } : {}),
       resume,
       profileKey: profile.key,
       model,
@@ -616,6 +689,28 @@ export class BoardRoundsService {
       select: { body: true },
     });
     return { ...approved, comments: comments.map((c) => c.body) };
+  }
+
+  /**
+   * #359 D8: the branch of the card's next PR — `cardFollowUpBranch` of its
+   * first PR's branch (the card's own), `k` one past the PRs it has.
+   */
+  private async followUpBranch(card: CardWithRounds): Promise<string> {
+    const prs = await this.prisma.boardCardPullRequest.findMany({
+      where: { cardId: card.id },
+      orderBy: { createdAt: 'asc' },
+      select: { branch: true },
+    });
+    const first =
+      prs[0]?.branch ??
+      card.branch ??
+      cardBranch({
+        kind: card.kind,
+        number: card.number,
+        title: card.title,
+        issueNumber: card.issueNumber,
+      });
+    return cardFollowUpBranch(first, Math.max(prs.length, 1) + 1);
   }
 
   /** #322 D3: the profile #272 D1 picks without a card or launch key. */

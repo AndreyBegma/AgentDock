@@ -5,10 +5,13 @@ import {
 } from '@agentdock/shared';
 import {
   type CardRunPhaseChangedData,
+  type CardRunPushedData,
+  cardPushEventDataSchemas,
   cardRunEventDataSchemas,
   HOOK_PROMPT_SUBMITTED_EVENT,
   HOOK_SESSION_ENDED_EVENT,
   HOOK_STOPPED_EVENT,
+  isCardPushEventType,
   isCardRunEventType,
   parseHookEvent,
   type RunnerEvent,
@@ -18,6 +21,7 @@ import {
   Logger,
   type OnApplicationBootstrap,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import {
   type RunnerEventSink,
@@ -75,6 +79,19 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
         await this.phaseChanged(runnerId, parsed.data);
         continue;
       }
+      if (isCardPushEventType(event.type)) {
+        const parsed = cardPushEventDataSchemas[event.type].safeParse(
+          event.data,
+        );
+        if (!parsed.success) {
+          this.logger.warn(
+            `runner ${runnerId}: malformed ${event.type} (seq ${event.seq}), skipped`,
+          );
+          continue;
+        }
+        await this.pushed(runnerId, parsed.data);
+        continue;
+      }
       const hook = parseHookEvent(event);
       if (hook?.ok) {
         await this.hook(
@@ -88,15 +105,73 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
   }
 
   /** The round of `runId`, if its card is `cardId` of `projectId` on this runner. */
-  private roundOf(runnerId: string, data: CardRunPhaseChangedData) {
+  private roundOf(
+    runnerId: string,
+    data: Pick<CardRunPhaseChangedData, 'runId' | 'cardId' | 'projectId'>,
+  ) {
     return this.prisma.boardCardRound.findFirst({
       where: {
         runId: data.runId,
         cardId: data.cardId,
         card: { projectId: data.projectId, project: { runnerId } },
       },
-      include: { card: { select: { number: true, column: true } } },
+      include: {
+        card: {
+          select: { number: true, column: true, branch: true, ciHeadSha: true },
+        },
+      },
     });
+  }
+
+  /**
+   * #359 D1: the runner pushed the round's committed HEAD and, once one is
+   * open, names the draft PR — the card shows it while In progress, lists
+   * it (D8), and a new head starts its CI state over (D5). A push of a
+   * branch the card has left (a follow-up started since) is stale.
+   */
+  private async pushed(
+    runnerId: string,
+    data: CardRunPushedData,
+  ): Promise<void> {
+    const round = await this.roundOf(runnerId, data);
+    if (!round) {
+      this.logger.warn(
+        `runner ${runnerId}: push for unknown card round ${data.runId}, skipped`,
+      );
+      return;
+    }
+    if (round.card.branch !== data.branch) return;
+    const newHead = round.card.ciHeadSha !== data.headSha;
+    await this.prisma.boardCard.update({
+      where: { id: round.cardId },
+      data: {
+        ...(data.prNumber !== undefined && data.prUrl !== undefined
+          ? {
+              prNumber: data.prNumber,
+              prUrl: data.prUrl,
+              prState: data.prState ?? 'open',
+            }
+          : {}),
+        ...(newHead
+          ? {
+              ciHeadSha: data.headSha,
+              ciState: 'none',
+              ciChecks: Prisma.DbNull,
+              ciCheckedAt: null,
+            }
+          : {}),
+      },
+    });
+    if (data.prNumber !== undefined && data.prUrl !== undefined) {
+      await this.work.recordPullRequest(round.cardId, {
+        number: data.prNumber,
+        url: data.prUrl,
+        branch: data.branch,
+        state: data.prState ?? 'open',
+        round: round.round,
+      });
+    }
+    this.work.publish(data.projectId, round.cardId);
   }
 
   private async phaseChanged(

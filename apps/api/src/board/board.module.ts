@@ -11,6 +11,7 @@ import { BoardDependencies } from './board-dependencies.service';
 import { BoardInboxService } from './board-inbox.service';
 import { BoardPlanCards } from './board-plan-cards';
 import { BoardRoundsService } from './board-rounds.service';
+import { BoardShipping } from './board-shipping';
 import { BoardSink } from './board-sink';
 import { BoardTerminalService } from './board-terminal.service';
 import { BoardWork } from './board-work';
@@ -35,6 +36,8 @@ import { CollectRetryTimer } from './collect-retry-timer';
     BoardPlanCards,
     BoardRoundsService,
     BoardService,
+    // #359: a card ships itself — CI watched, fixed, merged.
+    BoardShipping,
     BoardSink,
     BoardTerminalService,
     BoardWork,

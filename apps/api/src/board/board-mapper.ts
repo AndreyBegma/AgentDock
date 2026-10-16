@@ -331,16 +331,18 @@ export const toCardDetail = (
 
 /**
  * No row is the defaults (`isDefault: true`). #359 D7: `baseBranch` is the
- * project's base, which decides `autoMergeCardsDefault`; without it the
- * default reads as off, the safe side.
+ * project's base and `defaultBranch` the repository's, where known
+ * (`BoardProject.defaultBranch`); they decide `autoMergeCardsDefault`.
+ * Without a base the default reads as off, the safe side.
  */
 export const toSettingsView = (
   projectId: string,
   row: BoardSettings | null,
   baseBranch: string | null = null,
+  defaultBranch: string | null = null,
 ): BoardSettingsView => {
   const autoMergeCardsDefault =
-    baseBranch !== null && cardAutoMergeDefault(baseBranch);
+    baseBranch !== null && cardAutoMergeDefault(baseBranch, defaultBranch);
   return row
     ? {
         projectId,
