@@ -31,6 +31,7 @@ import { RunnersModule } from './runners/runners.module';
 import { SchedulesModule } from './schedules';
 import { SessionsModule } from './sessions/sessions.module';
 import { SkillsModule } from './skills';
+import { StewardModule } from './steward';
 import { StewardDigestModule } from './steward-digest';
 import { TelegramModule } from './telegram';
 import { TerminalModule } from './terminal';
@@ -90,6 +91,8 @@ import { WorkflowsModule } from './workflows';
     TextModule,
     // Issue #445: Token saver. Global: every launch sender asks it what to send.
     TokenSaverModule,
+    // Issue #447: Steward — incidents, safe automatic fixes, escalation.
+    StewardModule,
     // Issue #322: a card's model recommended on the runner. Global, and here
     // alone: its conditional queue must not be registered while the graph loads.
     AssessModule,
