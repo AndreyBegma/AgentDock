@@ -14,9 +14,10 @@ import type { BoardCardKind } from './types';
  * Version 4 (#309 D10): the `## Attachments` sections. Version 5 (#359 D3):
  * the pull request description file. Version 6 (#359 D1, D6): AgentDock
  * pushes during the round; the `ci_fix` round prompt. Version 7 (#389): the
- * card's own test database and port, and no `pgrep -f` waits.
+ * card's own test database and port, and no `pgrep -f` waits. Version 8
+ * (#441): the `## Design` section lists every frame of the approved variant.
  */
-export const CARD_WORKER_PROMPT_VERSION = 7;
+export const CARD_WORKER_PROMPT_VERSION = 8;
 
 /** #389: the env the runner sets in the card's session — its short id. */
 export const CARD_ENV_ID = 'AGENTDOCK_CARD';
@@ -47,10 +48,17 @@ export const CARD_PR_DESCRIPTION_FILE = '.agentdock/pull-request.md';
 /** #243 D7: the addressed comment bodies the `## Design` section carries, in UTF-8 bytes. */
 export const CARD_DESIGN_COMMENTS_MAX_BYTES = 4 * 1024;
 
-/** #243 D7: the card's approved design, committed by the runner before round 1. */
-export interface CardWorkerDesign {
+/** #441: one frame of the approved design, as the worker opens it. */
+export interface CardWorkerDesignFrame {
+  name: string;
   /** Repository-relative, from `cardDesignPath`. */
   path: string;
+}
+
+/** #243 D7: the card's approved design, committed by the runner before round 1. */
+export interface CardWorkerDesign {
+  /** #441: every frame of the approved variant, in order; at least one. */
+  frames: CardWorkerDesignFrame[];
   /** The approved revision's rationale. */
   rationale: string;
   /** Bodies of the comments a revision addressed, oldest first. */
@@ -116,19 +124,31 @@ const designCommentLines = (comments: string[], budget: number): string[] => {
   return lines;
 };
 
-/** #243 D7: what the approved mockup binds, and the decisions behind it. */
+/**
+ * #243 D7, #441: what the approved mockup binds — one file, or every frame
+ * with its name — and the decisions behind it.
+ */
 const designSection = (
-  path: string,
+  frames: readonly CardWorkerDesignFrame[],
   rationale: string,
   comments: string[],
   commentBudget: number,
 ): string[] => {
-  const lines = [
-    '## Design',
-    '',
-    `The approved mockup is ${path} (already committed on this branch — open it first).`,
-    "It binds the layout, the states and the copy. It is not code to copy: build it with the project's real components.",
-  ];
+  const lines = ['## Design', ''];
+  if (frames.length === 1) {
+    lines.push(
+      `The approved mockup is ${frames[0].path} (already committed on this branch — open it first).`,
+      "It binds the layout, the states and the copy. It is not code to copy: build it with the project's real components.",
+    );
+  } else {
+    lines.push(
+      `The approved design has ${frames.length} frames, each a separate mockup (already committed on this branch — open them first):`,
+      '',
+      ...frames.map((f) => `- ${f.path} — ${oneLine(f.name)}`),
+      '',
+      "They bind the layout, the states and the copy. They are not code to copy: build them with the project's real components.",
+    );
+  }
   if (rationale) lines.push('', `Why this design: ${rationale}`);
   if (comments.length > 0) {
     lines.push(
@@ -198,7 +218,12 @@ export const cardWorkerPrompt = (card: CardWorkerPromptInput): string => {
       card,
       body,
       design
-        ? designSection(design.path, rationale, design.comments, commentBudget)
+        ? designSection(
+            design.frames,
+            rationale,
+            design.comments,
+            commentBudget,
+          )
         : null,
       attachments.length > 0
         ? attachmentsSection(attachments, withNames)
@@ -222,6 +247,18 @@ export const cardWorkerPrompt = (card: CardWorkerPromptInput): string => {
 };
 
 /**
+ * #441: the design's link in the PR description — its one file, or the
+ * folder that holds every frame.
+ */
+const designLink = (card: CardWorkerPromptInput): string => {
+  const frames = card.design?.frames ?? [];
+  const repo = 'https://github.com/<owner>/<repo>';
+  if (frames.length === 1) return `${repo}/blob/${card.branch}/${frames[0].path}`;
+  const first = frames[0]?.path ?? '';
+  return `${repo}/tree/${card.branch}/${first.slice(0, first.lastIndexOf('/'))}`;
+};
+
+/**
  * #359 D3: what the worker writes to `CARD_PR_DESCRIPTION_FILE` before it
  * finishes — the spec (and design) link, `Closes #n` with an issue, what
  * changed, and the acceptance checklist.
@@ -233,7 +270,7 @@ const pullRequestSection = (card: CardWorkerPromptInput): string[] => {
     '',
   ];
   if (card.specPath !== null) {
-    const design = card.design ? ` · Design: ${blob}${card.design.path}` : '';
+    const design = card.design ? ` · Design: ${designLink(card)}` : '';
     lines.push(
       `- \`Spec: ${blob}${card.specPath}${design}\` — <owner>/<repo> from \`git remote get-url origin\`;`,
     );
