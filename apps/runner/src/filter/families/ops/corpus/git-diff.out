@@ -1,0 +1,54 @@
+diff --git a/apps/runner/src/spool/queue.ts b/apps/runner/src/spool/queue.ts
+index 3f2a9c1..b7d40e8 100644
+--- a/apps/runner/src/spool/queue.ts
++++ b/apps/runner/src/spool/queue.ts
+@@ -18,14 +18,16 @@ export class SpoolQueue {
+   private readonly limit: number;
+   private items: SpoolItem[] = [];
+   private dropped = 0;
++  private lastDropAt = 0;
+
+   constructor(limit: number) {
+     this.limit = limit;
+   }
+
+   push(item: SpoolItem): void {
+     if (this.items.length >= this.limit) {
+-      this.items.shift();
+-      this.dropped += 1;
++      const oldest = this.items.shift();
++      this.dropped += oldest ? 1 : 0;
++      this.lastDropAt = Date.now();
+     }
+     this.items.push(item);
+   }
+@@ -41,6 +43,10 @@ export class SpoolQueue {
+     return this.items.splice(0, count);
+   }
+
++  get droppedSince(): number {
++    return this.lastDropAt;
++  }
++
+   get size(): number {
+     return this.items.length;
+   }
+diff --git a/apps/runner/src/spool/queue.spec.ts b/apps/runner/src/spool/queue.spec.ts
+index 91ac0d4..0e6f1b2 100644
+--- a/apps/runner/src/spool/queue.spec.ts
++++ b/apps/runner/src/spool/queue.spec.ts
+@@ -7,6 +7,14 @@ describe('SpoolQueue', () => {
+     const queue = new SpoolQueue(2);
+     queue.push({ id: 1 });
+     queue.push({ id: 2 });
++    queue.push({ id: 3 });
++    expect(queue.size).toBe(2);
++  });
++
++  it('remembers when it last dropped', () => {
++    const queue = new SpoolQueue(1);
++    queue.push({ id: 1 });
++    queue.push({ id: 2 });
++    expect(queue.droppedSince).toBeGreaterThan(0);
+   });
+ });

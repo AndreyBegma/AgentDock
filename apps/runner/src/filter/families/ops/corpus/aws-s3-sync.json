@@ -1,0 +1,7 @@
+{
+  "argv": ["aws", "s3", "sync", "dist/", "s3://agentdock-static/", "--delete"],
+  "exitCode": 1,
+  "category": "other",
+  "outcome": "failing",
+  "expect": "filtered"
+}

@@ -1,0 +1,36 @@
+Sending build context to Docker daemon  4.826MB
+
+Step 1/9 : FROM node:22-alpine
+ ---> 8d1f2c3b4a59
+Step 2/9 : WORKDIR /app
+ ---> Using cache
+ ---> 2b7c0a9e41d3
+Step 3/9 : COPY package.json bun.lock ./
+ ---> Using cache
+ ---> 6e1d4f8a7b02
+Step 4/9 : RUN npm install -g bun
+ ---> Using cache
+ ---> 0a3c5e7f9b11
+Step 5/9 : RUN bun install --frozen-lockfile
+ ---> Running in 4f3e2d1c0b9a
+bun install v1.4.0 (34cbb9a4)
+Resolving dependencies
+Resolved, downloading and extracting [942]
+Saved lockfile
+
+941 packages installed [2.85s]
+Removing intermediate container 4f3e2d1c0b9a
+ ---> 7c9e1b3d5f20
+Step 6/9 : COPY . .
+ ---> 1f3b5d7a9c42
+Step 7/9 : RUN bun run --cwd apps/api build
+ ---> Running in 9a8b7c6d5e4f
+$ nest build
+src/board/board-mapper.ts:212:19 - error TS2339: Property 'tokenSaved' does not exist on type 'CardView'.
+
+212     view.tokenSaved = null;
+                ~~~~~~~~~~
+
+Found 1 error(s).
+
+The command '/bin/sh -c bun run --cwd apps/api build' returned a non-zero code: 1

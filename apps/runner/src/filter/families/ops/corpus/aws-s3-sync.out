@@ -1,0 +1,13 @@
+upload: dist/index.html to s3://agentdock-static/index.html
+upload: dist/favicon.ico to s3://agentdock-static/favicon.ico
+upload: dist/assets/app.3f9a1c.js to s3://agentdock-static/assets/app.3f9a1c.js
+upload: dist/assets/app.3f9a1c.css to s3://agentdock-static/assets/app.3f9a1c.css
+upload: dist/assets/vendor.77b2de.js to s3://agentdock-static/assets/vendor.77b2de.js
+upload: dist/assets/logo.5d41.svg to s3://agentdock-static/assets/logo.5d41.svg
+upload: dist/assets/fonts/inter-400.woff2 to s3://agentdock-static/assets/fonts/inter-400.woff2
+upload: dist/assets/fonts/inter-600.woff2 to s3://agentdock-static/assets/fonts/inter-600.woff2
+upload: dist/assets/fonts/mono-400.woff2 to s3://agentdock-static/assets/fonts/mono-400.woff2
+delete: s3://agentdock-static/assets/app.0c1d2e.js
+delete: s3://agentdock-static/assets/app.0c1d2e.css
+delete: s3://agentdock-static/assets/vendor.1a2b3c.js
+upload failed: dist/assets/big.mp4 to s3://agentdock-static/assets/big.mp4 An error occurred (AccessDenied) when calling the PutObject operation: Access Denied

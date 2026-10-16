@@ -1,0 +1,24 @@
+Using default tag: latest
+latest: Pulling from library/postgres
+a2318d6c47ec: Pulling fs layer
+c6ae1f8f5b54: Pulling fs layer
+2f0a1d8e9c71: Pulling fs layer
+87e5b4a31f0d: Pulling fs layer
+5b2d09c8f1a7: Pulling fs layer
+a2318d6c47ec: Downloading [==>                                                ]  1.2MB/29.1MB
+c6ae1f8f5b54: Waiting
+a2318d6c47ec: Verifying Checksum
+a2318d6c47ec: Download complete
+2f0a1d8e9c71: Verifying Checksum
+2f0a1d8e9c71: Download complete
+87e5b4a31f0d: Download complete
+5b2d09c8f1a7: Download complete
+a2318d6c47ec: Extracting [==================================================>]  29.1MB/29.1MB
+a2318d6c47ec: Pull complete
+c6ae1f8f5b54: Pull complete
+2f0a1d8e9c71: Pull complete
+87e5b4a31f0d: Pull complete
+5b2d09c8f1a7: Pull complete
+Digest: sha256:3e7b6a5f0d8c9b1a2e4f6d8c0b2a4e6f8d0c2b4a6e8f0d2c4b6a8e0f2d4c6b8a
+Status: Downloaded newer image for postgres:latest
+docker.io/library/postgres:latest
