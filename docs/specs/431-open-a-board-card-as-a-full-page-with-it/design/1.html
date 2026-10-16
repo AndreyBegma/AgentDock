@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>C-75 · Board card page</title>
+<style>
+/* AgentDock mockup kit — glass-ui 0.32.0 tokens, data-scale="desk" + data-palette="navy". No network. */
+:root{
+  --font-sans:'SF Pro Text','SF Pro Display',Inter,system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  --radius-control:6px;--radius-surface:8px;--radius-sheet:12px;
+  --size-row:32px;--size-control:28px;--size-field:28px;--size-nav:28px;--size-tap:44px;
+  --dur-fast:100ms;--dur-base:150ms;--dur-sheet:260ms;
+  --ease-sheet:cubic-bezier(.32,.72,0,1);
+  --blur-scrim:2px;--glass-blur:26px;--glass-blur-strong:40px;
+}
+:root,:root[data-theme="dark"]{
+  color-scheme:dark;
+  --color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-canvas:#0a1022;--color-paper:#1b2647;
+  --color-content:rgb(27 38 71/.96);
+  --color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246/.62);--color-ink-3:rgb(242 242 246/.53);
+  --color-line:rgb(255 255 255/.1);--color-line-strong:rgb(255 255 255/.18);--color-hover:rgb(255 255 255/.06);
+  --color-focus:#b4b2ff;--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-soft:rgb(91 91 246/.2);--color-accent-ink:#b4b2ff;
+  --color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;--color-info:#5fb4f0;--color-info-soft:rgb(95 180 240/.16);
+  --color-scrim:rgb(10 16 34/.3);
+  --color-hue-1:#5b9cf6;--color-hue-1-soft:rgb(91 156 246/.18);--color-hue-1-line:rgb(91 156 246/.5);--color-hue-1-ink:#a4c8ff;--color-hue-1-glow:rgb(91 156 246/.45);
+  --color-hue-2:#2fbf94;--color-hue-2-soft:rgb(47 191 148/.18);--color-hue-2-line:rgb(47 191 148/.5);--color-hue-2-ink:#7ee0c0;--color-hue-2-glow:rgb(47 191 148/.45);
+  --color-hue-3:#7cc95a;--color-hue-3-soft:rgb(124 201 90/.18);--color-hue-3-line:rgb(124 201 90/.5);--color-hue-3-ink:#ade58f;--color-hue-3-glow:rgb(124 201 90/.45);
+  --color-hue-4:#e69f00;--color-hue-4-soft:rgb(230 159 0/.18);--color-hue-4-line:rgb(230 159 0/.5);--color-hue-4-ink:#f5c25c;--color-hue-4-glow:rgb(230 159 0/.45);
+  --color-hue-5:#e8743b;--color-hue-5-soft:rgb(232 116 59/.18);--color-hue-5-line:rgb(232 116 59/.5);--color-hue-5-ink:#f9a77c;--color-hue-5-glow:rgb(232 116 59/.45);
+  --color-hue-6:#f0606e;--color-hue-6-soft:rgb(240 96 110/.18);--color-hue-6-line:rgb(240 96 110/.5);--color-hue-6-ink:#ff9da5;--color-hue-6-glow:rgb(240 96 110/.45);
+  --color-hue-7:#a68bfa;--color-hue-7-soft:rgb(166 139 250/.18);--color-hue-7-line:rgb(166 139 250/.5);--color-hue-7-ink:#cbbcff;--color-hue-7-glow:rgb(166 139 250/.45);
+  --color-hue-8:#cc79a7;--color-hue-8-soft:rgb(204 121 167/.18);--color-hue-8-line:rgb(204 121 167/.5);--color-hue-8-ink:#efabd1;--color-hue-8-glow:rgb(204 121 167/.45);
+  --canvas-glow:18%;
+  --glass-sheen:rgb(255 255 255/.06);--glass-scrim:rgb(9 9 12/.55);--glass-scrim-strong:rgb(9 9 12/.64);
+  --glass-brightness:.85;--glass-brightness-strong:.7;
+  --glass-edge:rgb(255 255 255/.14);--glass-spec:rgb(255 255 255/.2);
+  --glass-rim:rgb(242 242 246/.8);--glass-rim-shade:rgb(9 9 12/.5);--glass-meniscus:rgb(9 9 12/.55);--glass-refract:rgb(242 242 246/.35);
+  --glass-shadow:rgb(0 0 0/.35);--glass-shadow-strong:rgb(0 0 0/.45);--glass-shadow-clear:rgb(0 0 0/.15);
+}
+:root[data-theme="light"]{
+  color-scheme:light;
+  --color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-canvas:#e9eef8;--color-paper:#fff;
+  --color-content:rgb(255 255 255/.96);
+  --color-ink:#18181b;--color-ink-2:rgb(24 24 27/.72);--color-ink-3:rgb(24 24 27/.64);
+  --color-line:rgb(0 0 0/.1);--color-line-strong:rgb(0 0 0/.23);--color-hover:rgb(0 0 0/.06);
+  --color-focus:#4f46e5;--color-accent:#4f46e5;--color-on-accent:#fff;--color-accent-soft:rgb(79 70 229/.12);--color-accent-ink:#4338ca;
+  --color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;--color-info:#03629a;--color-info-soft:rgb(3 98 154/.12);
+  --color-scrim:rgb(10 16 34/.22);
+  --color-hue-1:#1f64d6;--color-hue-1-soft:rgb(31 100 214/.12);--color-hue-1-line:rgb(31 100 214/.45);--color-hue-1-ink:#1550b0;--color-hue-1-glow:rgb(31 100 214/.28);
+  --color-hue-2:#00805e;--color-hue-2-soft:rgb(0 128 94/.12);--color-hue-2-line:rgb(0 128 94/.45);--color-hue-2-ink:#006a4e;--color-hue-2-glow:rgb(0 128 94/.28);
+  --color-hue-3:#3a7d1c;--color-hue-3-soft:rgb(58 125 28/.12);--color-hue-3-line:rgb(58 125 28/.45);--color-hue-3-ink:#2f6617;--color-hue-3-glow:rgb(58 125 28/.28);
+  --color-hue-4:#b36b00;--color-hue-4-soft:rgb(179 107 0/.12);--color-hue-4-line:rgb(179 107 0/.45);--color-hue-4-ink:#8a5200;--color-hue-4-glow:rgb(179 107 0/.28);
+  --color-hue-5:#c24e00;--color-hue-5-soft:rgb(194 78 0/.12);--color-hue-5-line:rgb(194 78 0/.45);--color-hue-5-ink:#9c3d00;--color-hue-5-glow:rgb(194 78 0/.28);
+  --color-hue-6:#d02a3e;--color-hue-6-soft:rgb(208 42 62/.12);--color-hue-6-line:rgb(208 42 62/.45);--color-hue-6-ink:#ad1f31;--color-hue-6-glow:rgb(208 42 62/.28);
+  --color-hue-7:#7244e0;--color-hue-7-soft:rgb(114 68 224/.12);--color-hue-7-line:rgb(114 68 224/.45);--color-hue-7-ink:#5b30c4;--color-hue-7-glow:rgb(114 68 224/.28);
+  --color-hue-8:#b0457f;--color-hue-8-soft:rgb(176 69 127/.12);--color-hue-8-line:rgb(176 69 127/.45);--color-hue-8-ink:#933668;--color-hue-8-glow:rgb(176 69 127/.28);
+  --canvas-glow:10%;
+  --glass-sheen:rgb(0 0 0/.06);--glass-scrim:rgb(255 255 255/.52);--glass-scrim-strong:rgb(255 255 255/.64);
+  --glass-brightness:1.15;--glass-brightness-strong:1.3;
+  --glass-edge:rgb(0 0 0/.18);--glass-spec:rgb(0 0 0/.2);
+  --glass-rim:rgb(255 255 255/.9);--glass-rim-shade:rgb(24 24 27/.18);--glass-meniscus:rgb(24 24 27/.12);--glass-refract:rgb(255 255 255/.5);
+  --glass-shadow:rgb(0 0 0/.12);--glass-shadow-strong:rgb(0 0 0/.16);--glass-shadow-clear:rgb(0 0 0/.08);
+}
+:root{
+  --color-status-running:var(--color-hue-2);--color-status-running-soft:var(--color-hue-2-soft);--color-status-running-ink:var(--color-hue-2-ink);
+  --color-status-waiting:var(--color-hue-1);--color-status-waiting-soft:var(--color-hue-1-soft);--color-status-waiting-ink:var(--color-hue-1-ink);
+  --color-status-paused:var(--color-hue-4);--color-status-paused-soft:var(--color-hue-4-soft);--color-status-paused-ink:var(--color-hue-4-ink);
+  --color-status-blocked:var(--color-hue-5);--color-status-blocked-soft:var(--color-hue-5-soft);--color-status-blocked-ink:var(--color-hue-5-ink);
+  --color-status-done:var(--color-hue-3);--color-status-done-soft:var(--color-hue-3-soft);--color-status-done-ink:var(--color-hue-3-ink);
+  --color-status-error:var(--color-hue-6);--color-status-error-soft:var(--color-hue-6-soft);--color-status-error-ink:var(--color-hue-6-ink);
+  --glass-filter:blur(var(--glass-blur)) saturate(180%) brightness(var(--glass-brightness));
+  --glass-filter-strong:blur(var(--glass-blur-strong)) saturate(180%) brightness(var(--glass-brightness-strong));
+}
+*,*::before,*::after{box-sizing:border-box}
+html{font-size:16px;background:var(--color-ground);color:var(--color-ink);scrollbar-gutter:stable}
+body{margin:0;min-height:100vh;font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+h1,h2,h3,h4,p{margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}
+input:focus-visible,select:focus-visible,textarea:focus-visible{outline:none}
+a:not([class]){color:var(--color-accent-ink);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:.2em}
+table,time,output,.num{font-variant-numeric:tabular-nums}
+code,pre,kbd,.mono{font-family:var(--font-mono)}
+.text-section{font-size:15px;line-height:22px;font-weight:600}
+.text-sm{font-size:13px;line-height:20px}
+.text-xs{font-size:12px;line-height:16px}
+.ink{color:var(--color-ink)}.ink-2{color:var(--color-ink-2)}.ink-3{color:var(--color-ink-3)}
+.tone-danger{color:var(--color-danger)}
+.icon{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:
+  radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),
+  radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%),
+  radial-gradient(70vmax 50vmax at 45% 110%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%)}
+.glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);backdrop-filter:var(--glass-filter);-webkit-backdrop-filter:var(--glass-filter);border:1px solid var(--glass-edge);
+  box-shadow:inset 0 1px 0 var(--glass-spec),inset 1px 1px 0 var(--glass-rim),inset -1px -1px 0 var(--glass-rim-shade),inset 0 -3px 3px -1px var(--glass-meniscus),inset 0 0 18px -4px var(--glass-refract),0 12px 32px var(--glass-shadow)}
+.glass-strong{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim-strong);backdrop-filter:var(--glass-filter-strong);-webkit-backdrop-filter:var(--glass-filter-strong);border:1px solid var(--glass-edge);
+  box-shadow:inset 0 1px 0 var(--glass-spec),inset -1px -1px 0 var(--glass-rim-shade),inset 0 -3px 3px -1px var(--glass-meniscus),inset 0 0 18px -4px var(--glass-refract),0 20px 48px var(--glass-shadow-strong)}
+.surface-content{background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.app-shell{display:flex;gap:12px;padding:12px;min-height:100vh}
+.app-rail-wrap{position:sticky;top:12px;height:calc(100vh - 24px);flex:none}
+.app-column{display:flex;flex-direction:column;gap:12px;flex:1;min-width:0}
+.topbar{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;border-radius:var(--radius-surface);flex:none}
+.main{margin:0 auto;width:100%;max-width:64rem;padding-bottom:24px;display:flex;flex-direction:column;gap:24px}
+.main.wide{max-width:80rem}
+.breadcrumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--color-ink-3);min-width:0}
+.breadcrumb a{color:var(--color-ink-2);text-decoration:none}.breadcrumb a:hover{color:var(--color-ink)}
+.breadcrumb [aria-current]{color:var(--color-ink);font-weight:500}
+.nav-rail{display:flex;flex-direction:column;gap:8px;padding:8px;width:240px;height:100%;border-radius:var(--radius-surface)}
+.nav-rail-head{display:flex;align-items:center;gap:8px;padding:6px 8px 8px;font-weight:600}
+.nav-group{display:flex;flex-direction:column;gap:2px}
+.nav-group-label{padding:8px 8px 4px;font-size:12px;line-height:16px;font-weight:500;color:var(--color-ink-3)}
+.nav-item{position:relative;display:flex;align-items:center;gap:10px;height:var(--size-nav);padding:0 8px;border-radius:var(--radius-control);font-size:13px;font-weight:500;color:var(--color-ink-2);text-decoration:none;transition:background-color var(--dur-fast),color var(--dur-fast)}
+.nav-item:hover{background:var(--color-hover);color:var(--color-ink)}
+.nav-item[aria-current="page"]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.nav-item .badge{margin-left:auto}
+.btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font-weight:600;user-select:none;cursor:pointer;border:1px solid transparent;
+  height:var(--size-control);padding:0 16px;font-size:14px;border-radius:var(--radius-control);text-decoration:none;transition:background-color var(--dur-fast),border-color var(--dur-fast),color var(--dur-fast),transform var(--dur-fast) var(--ease-sheet)}
+.btn:active{transform:scale(.97)}
+.btn:disabled,.btn[aria-disabled="true"]{opacity:.4;pointer-events:none}
+.btn-solid{background:var(--color-accent);color:var(--color-on-accent)}
+.btn-solid:hover{background:color-mix(in oklab,var(--color-accent) 88%,var(--color-on-accent))}
+.btn-glass{background:var(--color-raised);color:var(--color-ink);border-color:var(--color-line-strong);box-shadow:inset 0 1px 0 color-mix(in oklab,white 5%,transparent)}
+.btn-glass:hover{background:linear-gradient(var(--color-hover),var(--color-hover)),var(--color-raised)}
+.btn-ghost{background:transparent;color:var(--color-ink-2)}
+.btn-ghost:hover{background:var(--color-hover);color:var(--color-ink)}
+.btn-sm{height:32px;padding:0 12px;font-size:12px;border-radius:calc(var(--radius-control) - 4px)}
+.btn-icon{padding:0;aspect-ratio:1}
+.field{display:flex;flex-direction:column;gap:4px}
+.field-label{font-size:12px;line-height:16px;font-weight:500;color:var(--color-ink-2)}
+.field-hint{font-size:12px;line-height:16px;color:var(--color-ink-3)}
+.input,.select,.textarea{width:100%;background:var(--color-surface);color:var(--color-ink);border:1px solid var(--color-line-strong);border-radius:var(--radius-control);font-size:13px;transition:border-color var(--dur-fast),box-shadow var(--dur-fast)}
+.input,.select{height:var(--size-field);padding:0 12px}
+.textarea{padding:8px 12px;min-height:80px;resize:vertical;line-height:20px}
+.input:focus,.select:focus,.textarea:focus{outline:none;border-color:color-mix(in oklab,var(--color-ink) 70%,transparent);box-shadow:0 0 0 2px color-mix(in oklab,var(--color-ink) 22%,transparent)}
+.input:disabled,.select:disabled,.textarea:disabled{opacity:.4}
+.select{appearance:none;padding-right:32px;cursor:pointer;background-image:linear-gradient(45deg,transparent 50%,var(--color-ink-3) 50%),linear-gradient(135deg,var(--color-ink-3) 50%,transparent 50%);
+  background-position:calc(100% - 15px) 50%,calc(100% - 10px) 50%;background-size:5px 5px;background-repeat:no-repeat}
+.toggle{position:relative;display:inline-flex;align-items:center;width:44px;height:24px;flex:none;border-radius:999px;border:0;padding:0;cursor:pointer;background:var(--color-line-strong);transition:background-color var(--dur-fast)}
+.toggle::after{content:'';width:16px;height:16px;border-radius:999px;background:var(--color-ink);transform:translateX(4px);transition:transform var(--dur-fast);box-shadow:0 1px 2px rgb(0 0 0/.3)}
+.toggle[aria-checked="true"]{background:var(--color-accent)}
+.toggle[aria-checked="true"]::after{background:var(--color-on-accent);transform:translateX(24px)}
+.toggle:disabled{opacity:.4;cursor:default}
+.check-row{display:inline-flex;align-items:center;gap:8px;font-size:13px}
+.card{border-radius:var(--radius-surface);padding:16px}
+.page-header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px}
+.page-header-text{display:flex;flex-direction:column;gap:4px;min-width:0}
+.page-header-eyebrow{font-size:12px;font-weight:500;color:var(--color-ink-3)}
+.page-header-title{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px}
+.page-header-title h1{font-size:28px;line-height:32px;letter-spacing:-.02em;font-weight:600;color:var(--color-ink)}
+.page-header-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.meta-bar{display:flex;flex-wrap:wrap;gap:16px;font-size:12px;color:var(--color-ink-3)}
+.meta-bar b{color:var(--color-ink);font-weight:600;font-variant-numeric:tabular-nums}
+.section-header{display:flex;align-items:center;justify-content:space-between;gap:16px;min-width:0}
+.section-header h2,.section-header h3{font-size:16px;line-height:24px;font-weight:600;color:var(--color-ink)}
+.section-header-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.badge{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;font-weight:600;line-height:1;font-variant-numeric:tabular-nums;border-radius:999px;
+  height:18px;min-width:18px;padding:0 4px;font-size:10px;background:var(--color-hover);color:var(--color-ink-2)}
+.badge-md{height:20px;min-width:20px;padding:0 6px;font-size:12px}
+.badge-ok{background:color-mix(in oklab,var(--color-ok) 14%,transparent);color:var(--color-ok)}
+.badge-warn{background:color-mix(in oklab,var(--color-warn) 14%,transparent);color:var(--color-warn)}
+.badge-solid.badge-warn{background:var(--color-warn);color:var(--color-ground)}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:2px;flex:none}
+.swatch[data-hue="7"]{background:var(--color-hue-7)}
+.status-pill{display:inline-flex;flex:none;align-items:center;white-space:nowrap;border-radius:999px;font-weight:500;line-height:1;height:24px;gap:8px;padding:0 10px;font-size:12px;background:var(--color-hover);color:var(--color-ink-2)}
+.status-pill.sm{height:20px;gap:6px;padding:0 8px;font-size:11px}
+.status-dot{position:relative;display:inline-flex;width:8px;height:8px;flex:none}
+.status-dot::before{content:'';position:absolute;inset:0;border-radius:999px;background:var(--color-ink-3)}
+.status-pill.sm .status-dot{width:6px;height:6px}
+[data-status="running"]{background:var(--color-status-running-soft);color:var(--color-status-running-ink)}
+[data-status="running"] .status-dot::before,.status-dot[data-status="running"]::before{background:var(--color-status-running)}
+[data-status="running"] .status-dot::after,.status-dot[data-status="running"]::after{content:'';position:absolute;inset:0;border-radius:999px;background:var(--color-status-running);opacity:.6;animation:ping 1s cubic-bezier(0,0,.2,1) infinite}
+[data-status="waiting"]{background:var(--color-status-waiting-soft);color:var(--color-status-waiting-ink)}
+[data-status="waiting"] .status-dot::before,.status-dot[data-status="waiting"]::before{background:var(--color-status-waiting)}
+[data-status="done"]{background:var(--color-status-done-soft);color:var(--color-status-done-ink)}
+[data-status="done"] .status-dot::before,.status-dot[data-status="done"]::before{background:var(--color-status-done)}
+[data-status="error"]{background:var(--color-status-error-soft);color:var(--color-status-error-ink)}
+[data-status="error"] .status-dot::before,.status-dot[data-status="error"]::before{background:var(--color-status-error)}
+.status-dot[data-status]{background:none}
+@keyframes ping{75%,100%{transform:scale(2);opacity:0}}
+.segmented{display:inline-flex;gap:4px;padding:4px;border-radius:999px;list-style:none;margin:0}
+.segmented.sm{height:var(--size-control);padding:2px}
+.segmented button{position:relative;flex:1;min-width:max-content;height:100%;padding:0 12px;border:0;background:none;border-radius:999px;font-size:13px;font-weight:500;color:var(--color-ink-2);cursor:pointer}
+.segmented button:hover{color:var(--color-ink)}
+.segmented button[aria-pressed="true"]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.banner{display:flex;width:100%;align-items:flex-start;gap:12px;padding:12px;border-radius:var(--radius-surface);border:1px solid var(--color-line);background:var(--color-hover);font-size:13px;color:var(--color-ink)}
+.banner .icon{margin-top:2px}
+.banner-danger{border-color:color-mix(in oklab,var(--color-danger) 30%,transparent);background:color-mix(in oklab,var(--color-danger) 10%,transparent)}.banner-danger .icon{color:var(--color-danger)}
+.banner-body{flex:1;display:flex;flex-direction:column;gap:2px}
+.banner-title{font-weight:600}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:48px 24px;text-align:center;border-radius:var(--radius-surface)}
+.empty-state .icon{width:24px;height:24px;color:var(--color-ink-3)}
+.empty-state-title{font-size:14px;font-weight:500;color:var(--color-ink)}
+.empty-state-desc{max-width:24rem;font-size:13px;color:var(--color-ink-2)}
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:8px 24px;margin:0;font-size:13px}
+.kv dt{color:var(--color-ink-3)}
+.kv dd{margin:0;color:var(--color-ink);min-width:0;overflow-wrap:anywhere}
+.code-block{margin:0;padding:12px;border-radius:var(--radius-control);background:var(--color-surface);border:1px solid var(--color-line);font-size:12px;line-height:18px;color:var(--color-ink);overflow-x:auto;white-space:pre}
+.kbd{display:inline-flex;align-items:center;height:18px;padding:0 5px;border-radius:4px;border:1px solid var(--color-line-strong);font-family:var(--font-mono);font-size:11px;color:var(--color-ink-3)}
+.avatar{display:inline-grid;place-content:center;width:28px;height:28px;border-radius:999px;background:var(--color-accent-soft);color:var(--color-accent-ink);font-size:12px;font-weight:600;flex:none}
+.timeline{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.timeline li{position:relative;display:flex;gap:12px;padding:0 0 16px 0}
+.timeline li::before{content:'';position:absolute;left:3.5px;top:14px;bottom:0;width:1px;background:var(--color-line)}
+.timeline li:last-child::before{display:none}
+.timeline .status-dot{margin-top:6px}
+.timeline-time{margin-left:auto;font-size:12px;color:var(--color-ink-3);white-space:nowrap}
+.scrim{position:fixed;inset:0;background:var(--color-scrim);backdrop-filter:blur(var(--blur-scrim));-webkit-backdrop-filter:blur(var(--blur-scrim));z-index:60}
+.sheet{position:fixed;top:12px;right:12px;bottom:12px;width:min(480px,calc(100vw - 24px));border-radius:var(--radius-sheet);display:flex;flex-direction:column;z-index:61}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px;border-bottom:1px solid var(--color-line)}
+.sheet-body{flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:24px}
+.sheet-foot{display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--color-line)}
+.tooltip{display:inline-block;padding:4px 8px;border-radius:var(--radius-control);font-size:12px;line-height:16px;color:var(--color-ink)}
+@media (max-width:1023px){.app-shell{padding:8px 16px;gap:8px}.app-rail-wrap{display:none}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+/* ---- C-75 additions (all token-based) ---- */
+.back-link{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;font-size:13px;font-weight:500;color:var(--color-ink-2);text-decoration:none;height:24px;padding:0 6px;margin-left:-6px;border-radius:var(--radius-control)}
+.back-link:hover{background:var(--color-hover);color:var(--color-ink)}
+.detail-grid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;align-items:start}
+.detail-col{display:flex;flex-direction:column;gap:16px;min-width:0}
+.detail-aside{position:sticky;top:12px}
+@media (max-width:1180px){.detail-grid{grid-template-columns:minmax(0,1fr)}.detail-aside{position:static}}
+.sec{display:flex;flex-direction:column;gap:12px}
+.desc-box{border:1px solid var(--color-line);border-radius:var(--radius-control);background:var(--color-surface);padding:16px 20px}
+.md{font-size:14px;line-height:22px;color:var(--color-ink);max-width:76ch}
+.md>*+*{margin-top:12px}
+.md h2{font-size:16px;line-height:24px;font-weight:600;margin-top:20px}
+.md h2:first-child{margin-top:0}
+.md p{color:var(--color-ink-2)}
+.md ul{margin:0;padding-left:20px;color:var(--color-ink-2)}
+.md ul li+li{margin-top:4px}
+.md ul.task-list{list-style:none;padding-left:0}
+.md .task-list li{display:flex;gap:8px;align-items:flex-start}
+.md .task-box{width:16px;height:16px;margin-top:3px;flex:none;border-radius:4px;border:1px solid var(--color-line-strong);background:var(--color-raised);display:inline-grid;place-content:center}
+.md .task-box.done{background:var(--color-accent);border-color:var(--color-accent)}
+.md .task-box.done::after{content:'';width:8px;height:4px;border:2px solid var(--color-on-accent);border-top:0;border-right:0;transform:translateY(-1px) rotate(-45deg)}
+.md code{font-size:12px;padding:1px 5px;border-radius:4px;background:var(--color-hover);color:var(--color-ink)}
+.md pre code{padding:0;background:none}
+.md a{color:var(--color-accent-ink)}
+.field-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.desc-textarea{min-height:360px;font-family:var(--font-mono);font-size:12px;line-height:18px}
+.opt-list{display:flex;flex-direction:column;gap:10px}
+.opt-list .check-row{justify-content:space-between;width:100%}
+.split2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.pr-row{display:flex;align-items:center;gap:8px;font-size:13px}
+.pr-row a{color:var(--color-ink);text-decoration:none;font-weight:500}
+.pr-row a:hover{text-decoration:underline}
+.dep-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:var(--radius-control);font-size:13px}
+.dep-row:hover{background:var(--color-hover)}
+.file-row{display:flex;align-items:center;gap:8px;font-size:13px;padding:4px 0}
+.design-thumb{height:96px;border-radius:var(--radius-control);border:1px solid var(--color-line);background:
+  linear-gradient(var(--color-raised),var(--color-raised)) 10px 10px/42% 10px no-repeat,
+  linear-gradient(var(--color-hover),var(--color-hover)) 10px 28px/70% 8px no-repeat,
+  linear-gradient(var(--color-accent-soft),var(--color-accent-soft)) 10px 46px/30% 36px no-repeat,
+  linear-gradient(var(--color-hover),var(--color-hover)) calc(30% + 20px) 46px/55% 36px no-repeat,
+  var(--color-surface)}
+.callout{position:absolute;z-index:70;font-size:11px;line-height:14px;padding:4px 8px;border-radius:999px;background:var(--color-accent);color:var(--color-on-accent);font-weight:600;white-space:nowrap;pointer-events:none}
+.demo{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:80;display:flex;gap:8px;align-items:center;padding:6px 8px;border-radius:999px}
+.demo-label{font-size:11px;font-weight:600;color:var(--color-ink-3);padding:0 6px;text-transform:uppercase;letter-spacing:.04em}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="canvas"></div>
+
+<div class="app-shell">
+  <aside class="app-rail-wrap">
+    <nav class="nav-rail glass" aria-label="Main">
+      <div class="nav-rail-head"><span class="swatch" data-hue="7" style="width:20px;height:20px;border-radius:6px"></span>AgentDock</div>
+      <div class="nav-group">
+        <div class="nav-group-label">Workspace</div>
+        <a class="nav-item" href="#"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>Overview</a>
+        <a class="nav-item" href="#"><svg class="icon" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01"/></svg>Fleet<span class="badge">2</span></a>
+        <a class="nav-item" href="#"><svg class="icon" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Approvals<span class="badge badge-solid badge-warn">3</span></a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-group-label">agentdock</div>
+        <a class="nav-item" href="#" aria-current="page"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18"/></svg>Board</a>
+        <a class="nav-item" href="#"><svg class="icon" viewBox="0 0 24 24"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>Activity</a>
+      </div>
+    </nav>
+  </aside>
+
+  <div class="app-column">
+    <header class="topbar glass">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="#">Workspace</a><span>/</span><a href="#">agentdock</a><span>/</span><a href="#" data-go="board">Board</a><span>/</span><span aria-current="page">C-75</span></nav>
+      <span style="margin-left:auto" class="status-dot" data-status="running" title="Live"></span>
+      <button class="btn btn-ghost btn-icon" aria-label="Notifications"><svg class="icon" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></button>
+      <span class="avatar">AB</span>
+    </header>
+
+    <!-- ============ STATE: PAGE ============ -->
+    <main id="main-content" class="main wide" data-view="page">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <a class="back-link" href="#" data-go="board"><svg class="icon" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>Back to the board</a>
+        <header class="page-header">
+          <div class="page-header-text">
+            <div class="page-header-eyebrow">Board card · C-75 · Feature</div>
+            <div class="page-header-title"><h1>Open a Board card as a full page</h1><span class="status-pill" data-status="running"><span class="status-dot"></span>In progress</span></div>
+            <div class="meta-bar"><span>Round <b>2</b></span><span><b>$3.84</b> spent</span><span>Slot <b class="mono">slot-2</b></span><span>Updated <b>12 min</b> ago</span></div>
+          </div>
+          <div class="page-header-actions" data-operator-only>
+            <button class="btn btn-ghost">Delete</button>
+            <button class="btn btn-solid" id="save-btn" disabled>Save</button>
+          </div>
+          <div class="page-header-actions" data-viewer-only hidden>
+            <span class="badge badge-md">Read-only · viewer</span>
+          </div>
+        </header>
+      </div>
+
+      <div class="detail-grid">
+        <!-- LEFT: the card itself -->
+        <div class="detail-col">
+          <form class="card surface-content sec" aria-label="Card" onsubmit="return false">
+            <div class="section-header"><h3>Card</h3></div>
+            <p class="text-xs ink-3" style="margin-top:-8px">Changes go to the worker with the next round.</p>
+            <div class="field">
+              <label class="field-label" for="t">Title</label>
+              <input class="input" id="t" value="Open a Board card as a full page with its description rendered" data-edit>
+            </div>
+            <div class="field">
+              <div class="field-row">
+                <span class="field-label" id="desc-label">What to do</span>
+                <button type="button" class="btn btn-ghost btn-sm" id="desc-toggle" data-operator-only aria-pressed="false">
+                  <svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span>Edit</span>
+                </button>
+              </div>
+              <div class="desc-box" id="desc-rendered" aria-labelledby="desc-label">
+                <div class="md">
+                  <h2>What to do</h2>
+                  <p>Today a Board card opens only in a side sheet (<code>CardSheet</code>, through <code>?card=&lt;number&gt;</code>). Add a full page for one card at <code>/projects/[projectId]/board/cards/[number]</code>.</p>
+                  <p>Reuse the sheet's content instead of copying it. Extract and export <code>CardDetailBody</code> so the sheet and the page render the same component. See the <a href="#">design viewer page</a> for loading and not-found.</p>
+                  <pre class="code-block"><code>// lib/board/href.ts
+export const boardCardPageHref = (projectId: string, n: number) =&gt;
+  `/projects/${projectId}/board/cards/${n}`;</code></pre>
+                  <h2>Acceptance criteria</h2>
+                  <ul class="task-list">
+                    <li><span class="task-box done"></span><span>Visiting <code>/projects/&lt;id&gt;/board/cards/&lt;number&gt;</code> shows that card at full width.</span></li>
+                    <li><span class="task-box done"></span><span>The description is rendered as Markdown on load.</span></li>
+                    <li><span class="task-box"></span><span>Edit switches the description to the textarea.</span></li>
+                    <li><span class="task-box"></span><span>The sheet header has an “Open as page” link.</span></li>
+                  </ul>
+                  <h2>Out of scope</h2>
+                  <ul><li>A full page for plan tasks or Inbox suggestions.</li><li>New items in the card's “…” menu (C-35).</li></ul>
+                </div>
+              </div>
+              <textarea class="textarea desc-textarea" id="desc-edit" hidden aria-labelledby="desc-label">## What to do
+Today a Board card opens only in a side sheet (`CardSheet`, through `?card=&lt;number&gt;`). Add a full page for one card at `/projects/[projectId]/board/cards/[number]`.
+
+Reuse the sheet's content instead of copying it. Extract and export `CardDetailBody` so the sheet and the page render the same component. See the [design viewer page](…) for loading and not-found.
+
+```ts
+// lib/board/href.ts
+export const boardCardPageHref = (projectId: string, n: number) =&gt;
+  `/projects/${projectId}/board/cards/${n}`;
+```
+
+## Acceptance criteria
+- [x] Visiting `/projects/&lt;id&gt;/board/cards/&lt;number&gt;` shows that card at full width.
+- [x] The description is rendered as Markdown on load.
+- [ ] Edit switches the description to the textarea.
+- [ ] The sheet header has an “Open as page” link.</textarea>
+              <span class="field-hint" id="desc-hint" hidden>Markdown. Headings, checklists, code and links render when you leave Edit.</span>
+            </div>
+            <div class="split2">
+              <div class="field">
+                <label class="field-label" for="k">Kind</label>
+                <select class="select" id="k" data-edit><option>Feature</option><option>Bug</option></select>
+              </div>
+              <div class="field">
+                <span class="field-label">Options</span>
+                <div class="opt-list">
+                  <label class="check-row">Continue after design<button type="button" class="toggle" role="switch" aria-checked="true" data-edit></button></label>
+                  <label class="check-row">Collect the result automatically<button type="button" class="toggle" role="switch" aria-checked="false" data-edit></button></label>
+                </div>
+              </div>
+            </div>
+          </form>
+
+          <section class="card surface-content sec" aria-label="Rounds">
+            <div class="section-header"><h3>Rounds</h3><span class="text-xs ink-3">2 rounds</span></div>
+            <ol class="timeline">
+              <li><span class="status-dot" data-status="running"></span><div><div class="text-sm ink">Round 2 · feedback · Working</div><div class="text-xs ink-2" style="margin-top:2px">“Keep the Edit toggle in the same place as the sheet's, and move Save to the header.”</div><div class="text-xs ink-3">andriy · <span class="num">$1.12</span></div></div><span class="timeline-time">09:41</span></li>
+              <li><span class="status-dot" data-status="done"></span><div><div class="text-sm ink">Round 1 · run · Done</div><div class="text-xs ink-2" style="margin-top:2px">Extracted <code class="mono">CardDetailBody</code>, added the page and <code class="mono">boardCardPageHref</code>. 14 tests pass.</div><div class="text-xs ink-3"><span class="num">$2.72</span></div></div><span class="timeline-time">08:55</span></li>
+            </ol>
+          </section>
+        </div>
+
+        <!-- RIGHT: what happens to the card -->
+        <aside class="detail-col detail-aside" aria-label="Card status">
+          <section class="card surface-content sec" aria-label="Run">
+            <div class="section-header"><h3>Run</h3><span class="status-pill sm" data-status="running"><span class="status-dot"></span>Working</span></div>
+            <dl class="kv">
+              <dt>Slot</dt><dd class="mono">slot-2</dd>
+              <dt>Branch</dt><dd class="mono">card/c75-open-card-as-page</dd>
+              <dt>Cost</dt><dd class="num">$3.84</dd>
+            </dl>
+            <div class="banner banner-danger" role="status"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg><div class="banner-body"><span class="banner-title">CI stopped on PR #431</span><span class="ink-2">web · test failed in <span class="mono">card-page.test.tsx</span></span></div></div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div class="pr-row"><svg class="icon ink-3" viewBox="0 0 24 24"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7M6 9v12"/></svg><a href="#">PR #431 · open</a><span class="status-pill sm" data-status="error" style="margin-left:auto"><span class="status-dot"></span>Checks failed</span></div>
+              <div class="pr-row"><svg class="icon ink-3" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg><a href="#">Issue #428</a></div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px">
+              <button class="btn btn-glass btn-sm" data-edit-btn>Stop</button>
+              <button class="btn btn-glass btn-sm" data-edit-btn>Open terminal</button>
+            </div>
+            <div class="field" data-operator-only>
+              <label class="field-label" for="fb">Send back with feedback</label>
+              <textarea class="textarea" id="fb" rows="3" style="min-height:64px"></textarea>
+              <span class="field-hint">Resumes the same Claude session in the same worktree.</span>
+              <div><button class="btn btn-glass btn-sm" disabled>Send back</button></div>
+            </div>
+          </section>
+
+          <section class="card surface-content sec" aria-label="Design">
+            <div class="section-header"><h3>Design</h3><span class="status-pill sm" data-status="done"><span class="status-dot"></span>Approved</span></div>
+            <div class="design-thumb" role="img" aria-label="Design preview"></div>
+            <a class="btn btn-glass btn-sm" href="#" style="align-self:flex-start">Open the design</a>
+          </section>
+
+          <section class="card surface-content sec" aria-label="Dependencies">
+            <div class="section-header"><h3>Dependencies</h3><button class="btn btn-ghost btn-sm" data-edit-btn>Add</button></div>
+            <div>
+              <div class="dep-row"><span class="status-dot" data-status="done"></span><span class="mono ink-3 text-xs">C-51</span><span class="ink">A card that waits on its own background</span></div>
+            </div>
+          </section>
+
+          <section class="card surface-content sec" aria-label="Attachments">
+            <div class="section-header"><h3>Attachments</h3><span class="text-xs ink-3">1 file</span></div>
+            <div class="file-row"><svg class="icon ink-3" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg><span class="ink">sheet-today.png</span><span class="text-xs ink-3" style="margin-left:auto">184 KB</span></div>
+            <button class="btn btn-ghost btn-sm" style="align-self:flex-start" data-edit-btn>Attach files</button>
+          </section>
+        </aside>
+      </div>
+    </main>
+
+    <!-- ============ STATE: NOT FOUND ============ -->
+    <main class="main wide" data-view="notfound" hidden>
+      <a class="back-link" href="#" data-go="board"><svg class="icon" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>Back to the board</a>
+      <div class="empty-state surface-content">
+        <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18"/></svg>
+        <div class="empty-state-title">Card not found</div>
+        <div class="empty-state-desc">It was removed, or you are not a member of its project.</div>
+        <a class="btn btn-glass" href="#" data-go="board">Back to the board</a>
+      </div>
+    </main>
+
+    <!-- ============ STATE: BOARD + SHEET ============ -->
+    <main class="main wide" data-view="sheet" hidden>
+      <header class="page-header"><div class="page-header-text"><div class="page-header-eyebrow">agentdock</div><div class="page-header-title"><h1>Board</h1></div></div></header>
+      <div class="card surface-content" style="height:420px;opacity:.6"></div>
+    </main>
+  </div>
+</div>
+
+<div data-view="sheet" hidden>
+  <div class="scrim"></div>
+  <aside class="sheet glass-strong" role="dialog" aria-label="C-75">
+    <div class="sheet-head">
+      <div style="min-width:0"><div class="text-section">C-75 Open a Board card as a full page</div><div class="text-xs ink-3">Board card</div></div>
+      <div style="display:flex;gap:4px;align-items:center;position:relative">
+        <a class="btn btn-ghost btn-sm" href="#" data-go="page" title="Open as page (Ctrl/Cmd+click for a new tab)"><svg class="icon" viewBox="0 0 24 24"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>Open as page</a>
+        <button class="btn btn-ghost btn-icon" aria-label="Close" data-go="board"><svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+        <span class="callout" style="top:36px;right:36px">New · a real link</span>
+      </div>
+    </div>
+    <div class="sheet-body">
+      <section class="sec"><div class="section-header"><h3>Run</h3><span class="status-pill sm" data-status="running"><span class="status-dot"></span>Working</span></div><p class="text-xs ink-3">Run, CI, pull requests, design, dependencies, rounds and attachments: the same <code class="mono">CardDetailBody</code>, stacked in one column.</p></section>
+      <section class="sec">
+        <div class="section-header"><h3>Card</h3></div>
+        <div class="field">
+          <div class="field-row"><span class="field-label">What to do</span><button class="btn btn-ghost btn-sm"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Edit</button></div>
+          <div class="desc-box" style="padding:12px 14px"><div class="md" style="font-size:13px;line-height:20px">
+            <h2 style="font-size:14px">What to do</h2>
+            <p>Today a Board card opens only in a side sheet (<code>CardSheet</code>)…</p>
+            <ul class="task-list"><li><span class="task-box done"></span><span>Rendered on load</span></li><li><span class="task-box"></span><span>Edit switches to the textarea</span></li></ul>
+          </div></div>
+        </div>
+      </section>
+    </div>
+    <div class="sheet-foot"><button class="btn btn-ghost">Delete</button><button class="btn btn-solid" disabled>Save</button></div>
+  </aside>
+</div>
+
+<!-- Mockup-only state switcher (not part of the product) -->
+<div class="demo glass-strong" role="toolbar" aria-label="Mockup states">
+  <span class="demo-label">State</span>
+  <ul class="segmented sm" id="seg-view"><li><button aria-pressed="true" data-v="page">Page</button></li><li><button aria-pressed="false" data-v="sheet">Sheet</button></li><li><button aria-pressed="false" data-v="notfound">Not found</button></li></ul>
+  <ul class="segmented sm" id="seg-role"><li><button aria-pressed="true" data-r="operator">Operator</button></li><li><button aria-pressed="false" data-r="viewer">Viewer</button></li></ul>
+  <button class="btn btn-ghost btn-icon" id="theme" aria-label="Switch theme"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
+</div>
+
+<script>
+(function(){
+  var root=document.documentElement;
+  function setView(v){
+    document.querySelectorAll('[data-view]').forEach(function(el){el.hidden=el.getAttribute('data-view')!==v;});
+    document.querySelectorAll('#seg-view button').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.v===v));});
+  }
+  function setRole(r){
+    var viewer=r==='viewer';
+    document.querySelectorAll('[data-operator-only]').forEach(function(el){el.hidden=viewer;});
+    document.querySelectorAll('[data-viewer-only]').forEach(function(el){el.hidden=!viewer;});
+    document.querySelectorAll('[data-edit],[data-edit-btn]').forEach(function(el){el.disabled=viewer;});
+    if(viewer) showRendered();
+    document.querySelectorAll('#seg-role button').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.r===r));});
+  }
+  var tgl=document.getElementById('desc-toggle'),rend=document.getElementById('desc-rendered'),ed=document.getElementById('desc-edit'),hint=document.getElementById('desc-hint'),save=document.getElementById('save-btn');
+  function showRendered(){rend.hidden=false;ed.hidden=true;hint.hidden=true;tgl.setAttribute('aria-pressed','false');tgl.querySelector('span').textContent='Edit';}
+  tgl.addEventListener('click',function(){
+    if(ed.hidden){rend.hidden=true;ed.hidden=false;hint.hidden=false;tgl.setAttribute('aria-pressed','true');tgl.querySelector('span').textContent='Preview';ed.focus();}
+    else showRendered();
+  });
+  ed.addEventListener('input',function(){save.disabled=false;});
+  document.getElementById('t').addEventListener('input',function(){save.disabled=false;});
+  document.querySelectorAll('.toggle[data-edit]').forEach(function(t){t.addEventListener('click',function(){t.setAttribute('aria-checked',String(t.getAttribute('aria-checked')!=='true'));save.disabled=false;});});
+  document.querySelectorAll('#seg-view button').forEach(function(b){b.addEventListener('click',function(){setView(b.dataset.v);});});
+  document.querySelectorAll('#seg-role button').forEach(function(b){b.addEventListener('click',function(){setRole(b.dataset.r);});});
+  document.querySelectorAll('[data-go]').forEach(function(a){a.addEventListener('click',function(e){e.preventDefault();var g=a.getAttribute('data-go');setView(g==='board'?'sheet':g);});});
+  document.getElementById('theme').addEventListener('click',function(){root.setAttribute('data-theme',root.getAttribute('data-theme')==='dark'?'light':'dark');});
+})();
+</script>
+</body>
+</html>
