@@ -80,6 +80,8 @@ import { PageHeader } from '../page-header/page-header';
 import { ReadinessNotice } from '../readiness/readiness-notice';
 import { useCurrentUser } from '../shell/user-context';
 import { NormalizedNote } from '../text/normalized-note';
+import { DescriptionIncompleteBadge } from '../token-saver/description-incomplete-badge';
+import { FilterBreakdown } from '../token-saver/filter-breakdown';
 import { CardDependenciesSection } from './card-dependencies';
 import { CardDescription } from './card-description';
 import { ApproveRunLink, CardDesignSection } from './card-design';
@@ -193,6 +195,8 @@ function roundItems(
             <span>{hooksNotice({ source: 'manual' }, round).text}</span>
           ) : null}
           {cost ? <span className="tabular-nums">{cost}</span> : null}
+          <DescriptionIncompleteBadge incomplete={round.artifactIncomplete} />
+          <FilterBreakdown filters={round.tokenSaverFilters} />
         </span>
       ),
     };
