@@ -11,6 +11,7 @@ export * from './control';
 export * from './design';
 export * from './fleet';
 export * from './github-app';
+export * from './handoff';
 export * from './history';
 export * from './live';
 export * from './models';

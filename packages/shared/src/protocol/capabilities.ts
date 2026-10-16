@@ -112,6 +112,13 @@ export const capabilitiesSchema = z.object({
    * when this is `true`. Absent means `false` — a runner older than Steward.
    */
   steward: z.boolean().optional(),
+  /**
+   * #449: the runner serves Context handoff — it keeps notes, picks the
+   * restart, sends `handoff.updated` / `round.restart` / `round.warmup`, and
+   * handles `card.handoff.set`. The API sends that command only when this is
+   * `true`. Absent means `false` — a runner older than Context handoff.
+   */
+  handoff: z.boolean().optional(),
 });
 export type Capabilities = z.infer<typeof capabilitiesSchema>;
 
@@ -133,6 +140,10 @@ export const tokenSaverAvailable = (capabilities: Capabilities): boolean =>
 /** Whether the API may send Steward's commands (#447); absent is `false`. */
 export const stewardAvailable = (capabilities: Capabilities): boolean =>
   capabilities.steward === true;
+
+/** Whether the API may send `card.handoff.set` (#449); absent is `false`. */
+export const handoffAvailable = (capabilities: Capabilities): boolean =>
+  capabilities.handoff === true;
 
 /** What a runner said it serves (#233, ADR-0023): names only, never paths or versions. */
 export interface RunnerCommands {

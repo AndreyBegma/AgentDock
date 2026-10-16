@@ -410,6 +410,7 @@ model Project {
   stewardSettings      StewardSettings?
   stewardIncidents     StewardIncident[]
   stewardDigests       StewardDigest[]
+  handoffNotes         HandoffNote[]
 
   @@unique([runnerId, rootPath])
   @@map("projects")
@@ -3004,6 +3005,20 @@ model BoardCardRound {
   backgroundStalledAt DateTime?
   finishedAt          DateTime?
   endedAt             DateTime?
+  /// #449 D3: how the round's session started, from `round.restart`; `null`
+  /// until that event arrives, and for a runner older than Context handoff.
+  restartMode         CardRestartMode?
+  /// #449 D3: `{ resumeTokens, freshTokens, cacheWarm }` (shared
+  /// `restartEstimateSchema`); `null` for a `first` round.
+  restartEstimate     Json?
+  /// #449 D3: the Claude session the round ran in, from `round.restart`. A
+  /// `fresh` round starts a new one; the earlier rounds keep theirs, so an old
+  /// session can still be resumed.
+  sessionId           String?          @db.Uuid
+  /// #449 D9: tokens and ms from the round's start to its first file edit,
+  /// from `round.warmup`.
+  warmupTokens        Int?
+  warmupMs            Int?
 
   card   BoardCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
   run    Run       @relation(fields: [runId], references: [id], onDelete: Cascade)
@@ -3440,4 +3455,47 @@ model StewardDigest {
 
   @@index([projectId, createdAt])
   @@map("steward_digests")
+}
+
+/// Mirrors `CARD_RESTART_MODES` (#449 D3).
+enum CardRestartMode {
+  resume
+  fresh
+  first
+}
+
+/// Mirrors `HANDOFF_SUBJECT_KINDS` (#449 D1).
+enum HandoffSubjectKind {
+  card
+  run
+}
+
+/// Mirrors `HANDOFF_UPDATED_BY` (#449 D2, D7).
+enum HandoffUpdatedBy {
+  agent
+  haiku
+  person
+}
+
+/// #449 (ADR-0042): the API's copy of a card's or a run's handoff note. The
+/// runner keeps the note on the machine always (D4); a row exists only for a
+/// project with session content on (ADR-0021).
+model HandoffNote {
+  id          String             @id @default(cuid())
+  projectId   String
+  subjectKind HandoffSubjectKind
+  /// `board_cards.id` or `runs.id`.
+  subjectId   String
+  /// The note's markdown (shared `validateHandoffNote`).
+  content     String
+  /// `HandoffLineRange[]`: the lines a person wrote (D7), `[{ from, to }]`.
+  personLines Json               @default("[]")
+  updatedBy   HandoffUpdatedBy
+  updatedAt   DateTime           @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([subjectKind, subjectId])
+  @@index([projectId])
+  @@map("handoff_notes")
 }
