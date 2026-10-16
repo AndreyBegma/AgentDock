@@ -379,6 +379,66 @@ describe('hooksNotice (#281 D6, #367 D3/D4)', () => {
     expect(notice.commands[0]?.label).toContain('claude-work');
   });
 
+  test('#348: no_plugin names the profile and its setup command, no placeholder', () => {
+    for (const source of ['manual', 'terminal'] as const) {
+      const notice = hooksNotice(
+        { source },
+        { wiring: null, hooksCause: 'no_plugin', hooksProfile: 'claude-work' },
+      );
+      expect(notice.text).toContain('not set up for the profile claude-work');
+      expect(notice.commands.map((c) => c.code)).toEqual([
+        'agentdock-runner setup claude --profile claude-work',
+      ]);
+      expect(notice.commands[0]?.label).toContain('restart its sessions');
+      expect(JSON.stringify(notice)).not.toContain('<key>');
+      expect(notice.guide).toBe(true);
+    }
+  });
+
+  test('#348: session_predates says to stop and run again, with no command', () => {
+    const notice = hooksNotice(
+      { source: 'manual' },
+      {
+        wiring: 'plugin',
+        hooksCause: 'session_predates',
+        hooksProfile: 'claude-work',
+      },
+    );
+    expect(notice.text).toContain('set up for claude-work');
+    expect(notice.text).toContain('Stop the card and run it again');
+    expect(notice.commands).toEqual([]);
+    expect(notice.guide).toBe(false);
+  });
+
+  test('#348: unknown, or a cause without a profile, keeps today’s text', () => {
+    const today = hooksNotice({ source: 'terminal' }, { wiring: null });
+    expect(
+      hooksNotice(
+        { source: 'terminal' },
+        { wiring: null, hooksCause: 'unknown', hooksProfile: 'p' },
+      ),
+    ).toEqual(today);
+    expect(
+      hooksNotice(
+        { source: 'terminal' },
+        { wiring: null, hooksCause: 'no_plugin', hooksProfile: null },
+      ),
+    ).toEqual(today);
+  });
+
+  test('#348: the runner’s launch facts outrank the plugin state', () => {
+    const notice = hooksNotice(
+      { source: 'manual' },
+      {
+        wiring: 'none',
+        wiringReason: 'claude_too_old',
+        hooksCause: 'session_predates',
+        hooksProfile: 'p',
+      },
+    );
+    expect(notice.text).toContain('--settings');
+  });
+
   test('links the Settings › Sessions checklist of the project', () => {
     expect(HOOKS_GUIDE_LABEL).toBe('See the exact command for each profile');
     expect(hooksGuideHref('p1')).toBe('/projects/p1/settings?tab=sessions');
