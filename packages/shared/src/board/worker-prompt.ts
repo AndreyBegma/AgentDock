@@ -13,9 +13,26 @@ import type { BoardCardKind } from './types';
  * `CARD_WORKER_PROMPT_VERSION`, which the API records on each round's run.
  * Version 4 (#309 D10): the `## Attachments` sections. Version 5 (#359 D3):
  * the pull request description file. Version 6 (#359 D1, D6): AgentDock
- * pushes during the round; the `ci_fix` round prompt.
+ * pushes during the round; the `ci_fix` round prompt. Version 7 (#389): the
+ * card's own test database and port, and no `pgrep -f` waits.
  */
-export const CARD_WORKER_PROMPT_VERSION = 6;
+export const CARD_WORKER_PROMPT_VERSION = 7;
+
+/** #389: the env the runner sets in the card's session — its short id. */
+export const CARD_ENV_ID = 'AGENTDOCK_CARD';
+
+/** #389: the env the runner sets in the card's session — a port of its own. */
+export const CARD_ENV_PORT = 'AGENTDOCK_CARD_PORT';
+
+/**
+ * #389: two cards' e2e runs wiped one shared test database, and a worker
+ * waited 7.5 h on a `pgrep -f` loop that matched itself. Every card worktree
+ * keeps to a database and a port of its own, so no card waits on another.
+ */
+const LOCAL_ENVIRONMENT_LINES = [
+  `- This session has \`${CARD_ENV_ID}\` (this card's id) and \`${CARD_ENV_PORT}\` set. Tests and servers keep to a database and a port of their own: name a test database after \`$${CARD_ENV_ID}\` (a project's test setup may already do it — check before you create one), and start a server on \`$${CARD_ENV_PORT}\`. Never use, reset or wait for a database or port another worktree may use.`,
+  "- Never wait for another process with `pgrep -f <pattern>`: the pattern is on your own command line, so it always matches and the wait never ends. Use a lock file, or a pattern that cannot match itself (`pgrep -f '[j]est'`). Never wait on another worktree's test run.",
+];
 
 /** The MCP tool the worker calls when done (D6). */
 export const FINISH_CARD_TOOL = 'finish_card';
@@ -262,6 +279,7 @@ const assemblePrompt = (
     "- Follow the repository's CLAUDE.md / AGENTS.md.",
     '- Commit your work as you go, with clear messages.',
     '- Run the tests and checks the repository defines before you finish.',
+    ...LOCAL_ENVIRONMENT_LINES,
     '- Do not push and do not open a pull request: AgentDock pushes your commits as you make them and keeps a draft pull request open for this branch.',
     '- If something is unclear, ask in this session and wait for the person.',
     '',

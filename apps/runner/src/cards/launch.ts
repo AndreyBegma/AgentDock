@@ -1,4 +1,5 @@
 import { basename, dirname, join } from 'node:path';
+import { CARD_ENV_ID, CARD_ENV_PORT } from '@agentdock/shared';
 import type {
   CardRunArgs,
   CardSession,
@@ -22,6 +23,36 @@ export const cardWorktreePath = (root: string, shortId: string): string => {
   const trimmed = root.replace(/\/+$/, '');
   return join(dirname(trimmed), `.wt-${basename(trimmed)}-card-${shortId}`);
 };
+
+/** #389: the first port `cardPort` hands out; below Linux's ephemeral range. */
+export const CARD_PORT_BASE = 20000;
+/** #389: how many ports `cardPort` spreads cards over. */
+export const CARD_PORT_SPAN = 10000;
+
+/**
+ * #389: the port a card's worker gives a server it starts — the same on every
+ * round of the card, and another card's only by a hash collision (FNV-1a of
+ * the short id).
+ */
+export const cardPort = (shortId: string): number => {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < shortId.length; i += 1) {
+    hash ^= shortId.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return CARD_PORT_BASE + (hash % CARD_PORT_SPAN);
+};
+
+/**
+ * #389: what the card's session is told about itself, so its tests and
+ * servers keep to a database and a port of their own. The project's own test
+ * setup reads `AGENTDOCK_CARD` (AgentDock's: `apps/api/src/test`); the prompt
+ * names both.
+ */
+export const cardEnv = (shortId: string): Record<string, string> => ({
+  [CARD_ENV_ID]: shortId,
+  [CARD_ENV_PORT]: String(cardPort(shortId)),
+});
 
 /** D5: round 1 fixes the session id the API chose; a later round resumes it. */
 export const cardSessionFlags = (session: CardSession): string[] =>
@@ -61,20 +92,27 @@ export const cardArgv = (
 /**
  * What `exec-run` starts in the card's tmux session. The round's `runId` is
  * in the resource attributes, so the cost of a resumed session is booked to
- * the round that resumed it.
+ * the round that resumed it; the card's own env (#389) is set over the
+ * profile's.
  */
 export const cardLaunchSpec = (
   profile: ConfigProfile,
   args: Pick<
     CardRunArgs,
-    'session' | 'model' | 'permissionMode' | 'prompt' | 'projectId' | 'runId'
+    | 'session'
+    | 'model'
+    | 'permissionMode'
+    | 'prompt'
+    | 'projectId'
+    | 'runId'
+    | 'shortId'
   >,
   worktree: string,
   otlpPort: number | null,
   wiring?: CardWiringFiles,
 ): LaunchSpec => ({
   ...cardArgv(profile, args, wiring),
-  env: runEnv(profile, args, otlpPort),
+  env: { ...runEnv(profile, args, otlpPort), ...cardEnv(args.shortId) },
   cwd: worktree,
   interactive: true,
 });
