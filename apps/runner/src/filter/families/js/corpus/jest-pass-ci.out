@@ -1,0 +1,122 @@
+PASS unit src/activity/event-frontier.spec.ts
+PASS unit src/activity/resolve-project.spec.ts
+PASS unit src/approvals/approval-rules.spec.ts
+PASS unit src/assess/assess-input.spec.ts
+PASS unit src/attachments/attachment-store.spec.ts
+PASS unit src/audit/canonical.spec.ts
+PASS unit src/board/board-mapper.spec.ts
+PASS unit src/board/launch-choice.spec.ts
+PASS unit src/bullmq/bullmq-options.spec.ts
+PASS unit src/capture/capture-apply.spec.ts
+PASS unit src/capture/capture-input.spec.ts
+PASS unit src/cli/create-admin.spec.ts
+PASS unit src/common/crypto/secret-cipher.spec.ts
+PASS unit src/control/control-outcome.spec.ts
+PASS unit src/design/design-prompt.spec.ts
+PASS unit src/design/design-rules.spec.ts
+PASS unit src/design/ui-profile-mapper.spec.ts
+PASS unit src/fleet/slot-status.spec.ts
+PASS unit src/github-app/collector-poll-sender.spec.ts
+PASS unit src/github-app/github-health.spec.ts
+PASS unit src/github-app/github-jwt.spec.ts
+PASS unit src/github-app/github-routing.spec.ts
+PASS unit src/github-app/github-signature.spec.ts
+PASS unit src/github-app/poll-debouncer.spec.ts
+PASS unit src/health.controller.spec.ts
+PASS unit src/history/run-projection.spec.ts
+PASS unit src/live/live.spec.ts
+PASS unit src/local/action-request-expiry.job.spec.ts
+PASS unit src/local/local-request-router.spec.ts
+PASS unit src/notifications/event-mapping.spec.ts
+PASS unit src/notifications/periodic-jobs.spec.ts
+PASS unit src/notifications/telegram-delivery-plan.spec.ts
+PASS unit src/pane/pane-chunks.spec.ts
+PASS unit src/planner/plan-apply.spec.ts
+PASS unit src/planner/plan-intake.spec.ts
+PASS unit src/planner/plan-mapper.spec.ts
+PASS unit src/planner/planner-instructions.service.spec.ts
+PASS unit src/planner/plan-prompt.spec.ts
+PASS unit src/planner/plan-send.spec.ts
+PASS unit src/planner/plan-status.spec.ts
+PASS unit src/planner/plan-versions.spec.ts
+PASS unit src/planner/task-status.spec.ts
+PASS unit src/prices/langfuse.spec.ts
+PASS unit src/prices/pricing.spec.ts
+PASS unit src/projects/project-access.guard.spec.ts
+PASS unit src/queue/queue-state.spec.ts
+PASS unit src/runners/pure.spec.ts
+PASS unit src/runners/runner-command.service.spec.ts
+PASS unit src/runners/runner-connect-hooks.spec.ts
+PASS unit src/runners/runner-event-sinks.spec.ts
+PASS unit src/runners/runner-ingest.service.spec.ts
+PASS unit src/runners/runner-presence.spec.ts
+PASS unit src/runners/runner-streams.spec.ts
+PASS unit src/schedules/before-fire.spec.ts
+PASS unit src/schedules/cron.spec.ts
+PASS unit src/schedules/schedule-fire.processor.spec.ts
+PASS unit src/schedules/schedule-reconciler.spec.ts
+PASS unit src/sessions/session-status.spec.ts
+PASS unit src/sessions/session-mapper.spec.ts
+PASS unit src/settings/settings-input.spec.ts
+PASS unit src/skills/skill-catalog.spec.ts
+PASS unit src/skills/skill-run-prompt.spec.ts
+PASS unit src/telegram/telegram-client.spec.ts
+PASS unit src/telegram/telegram-format.spec.ts
+PASS unit src/triggers/trigger-matcher.spec.ts
+PASS unit src/triggers/trigger-schedule.spec.ts
+PASS unit src/usage/usage-rollup.spec.ts
+PASS unit src/users/password.spec.ts
+PASS unit src/users/user-mapper.spec.ts
+PASS unit src/webhooks/webhook-signature.spec.ts
+PASS unit src/webhooks/webhook-delivery.spec.ts
+PASS unit src/workflows/workflow-graph.spec.ts
+PASS unit src/workflows/workflow-run.spec.ts
+PASS unit src/workflows/workflow-status.spec.ts
+PASS unit src/work/work-mapper.spec.ts
+PASS unit src/work/work-query.spec.ts
+PASS unit src/tasks/task-mapper.spec.ts
+PASS unit src/tasks/task-query.spec.ts
+PASS unit src/prices/price-import.spec.ts
+PASS unit src/budgets/budget-math.spec.ts
+PASS unit src/audit/audit-chain.spec.ts
+PASS unit src/auth/session-cookie.spec.ts
+PASS unit src/auth/password-hash.spec.ts
+PASS unit src/auth/csrf.spec.ts
+PASS unit src/auth/login-throttle.spec.ts
+PASS unit src/auth/role-guard.spec.ts
+PASS unit src/common/pagination.spec.ts
+PASS unit src/common/cursor.spec.ts
+PASS unit src/common/clock.spec.ts
+PASS unit src/common/problem-filter.spec.ts
+PASS unit src/live/live-gateway.spec.ts
+PASS unit src/live/live-fanout.spec.ts
+PASS unit src/live/live-backfill.spec.ts
+PASS unit src/runners/runner-token.spec.ts
+PASS unit src/runners/runner-heartbeat.spec.ts
+PASS unit src/runners/runner-version.spec.ts
+PASS unit src/fleet/fleet-reducer.spec.ts
+PASS unit src/fleet/fleet-slots.spec.ts
+PASS unit src/board/board-columns.spec.ts
+PASS unit src/board/board-filters.spec.ts
+PASS unit src/board/board-sort.spec.ts
+PASS unit src/planner/plan-diff.spec.ts
+PASS unit src/planner/plan-validate.spec.ts
+PASS unit src/notifications/telegram-chunker.spec.ts
+PASS unit src/notifications/notification-rules.spec.ts
+  console.warn
+    runner presence: heartbeat is deprecated, use runner.hello
+
+      41 |   const warnOnce = (message: string) => {
+      42 |     if (seen.has(message)) return;
+    > 43 |     console.warn(message);
+         |             ^
+      44 |     seen.add(message);
+      45 |   };
+
+      at warnOnce (runners/runner-presence.ts:43:13)
+
+Test Suites: 106 passed, 106 total
+Tests:       892 passed, 892 total
+Snapshots:   0 total
+Time:        14.318 s
+Ran all test suites.

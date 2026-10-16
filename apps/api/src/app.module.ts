@@ -31,10 +31,12 @@ import { RunnersModule } from './runners/runners.module';
 import { SchedulesModule } from './schedules';
 import { SessionsModule } from './sessions/sessions.module';
 import { SkillsModule } from './skills';
+import { StewardDigestModule } from './steward-digest';
 import { TelegramModule } from './telegram';
 import { TerminalModule } from './terminal';
 import { TerminalSetupModule } from './terminal-setup';
 import { TextModule } from './text';
+import { TokenSaverModule } from './token-saver';
 import { UsageModule } from './usage/usage.module';
 import { WebhooksModule } from './webhooks';
 import { WorkModule } from './work';
@@ -86,6 +88,8 @@ import { WorkflowsModule } from './workflows';
     WorkModule,
     // Issue #271: saved text normalized to English on the runner.
     TextModule,
+    // Issue #445: Token saver. Global: every launch sender asks it what to send.
+    TokenSaverModule,
     // Issue #322: a card's model recommended on the runner. Global, and here
     // alone: its conditional queue must not be registered while the graph loads.
     AssessModule,
@@ -94,6 +98,9 @@ import { WorkflowsModule } from './workflows';
     AttachmentsModule.forRoot(),
     SchedulesModule,
     BudgetsModule,
+    // Issue #447: the Steward digest. Global, and here alone: its conditional
+    // queue must not be registered while the graph loads.
+    StewardDigestModule,
     // Before WebhooksModule: its `POST /hooks/:publicId` would otherwise
     // claim `/hooks/github` (spec 27 notes; pinned by an e2e test).
     GitHubAppModule,

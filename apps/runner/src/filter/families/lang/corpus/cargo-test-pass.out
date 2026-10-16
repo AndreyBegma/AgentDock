@@ -1,0 +1,147 @@
+   Compiling proc-macro2 v1.0.86
+   Compiling unicode-ident v1.0.12
+   Compiling quote v1.0.36
+   Compiling syn v2.0.72
+   Compiling serde_derive v1.0.204
+   Compiling serde v1.0.204
+   Compiling itoa v1.0.11
+   Compiling ryu v1.0.18
+   Compiling serde_json v1.0.120
+   Compiling thiserror-impl v1.0.63
+   Compiling thiserror v1.0.63
+   Compiling tokio v1.39.2
+   Compiling relay-core v0.4.0 (/home/dev/relay/crates/core)
+   Compiling relay-wire v0.4.0 (/home/dev/relay/crates/wire)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 14.82s
+     Running unittests src/lib.rs (target/debug/deps/relay_core-3f2a91c4d5e6b708)
+
+running 72 tests
+test backoff::tests::caps_at_max ... ok
+test backoff::tests::grows_exponentially ... ok
+test backoff::tests::jitter_stays_in_range ... ok
+test backoff::tests::resets_after_success ... ok
+test backoff::tests::zero_base_is_rejected ... ok
+test config::tests::defaults ... ok
+test config::tests::env_overrides_file ... ok
+test config::tests::rejects_unknown_keys ... ok
+test config::tests::reload_keeps_listeners ... ok
+test config::tests::secrets_are_redacted_in_debug ... ok
+test config::tests::validates_ports ... ok
+test limits::tests::burst_is_honoured ... ok
+test limits::tests::refills_over_time ... ok
+test limits::tests::separate_buckets_per_key ... ok
+test limits::tests::zero_rate_blocks_everything ... ok
+test metrics::tests::counter_increments ... ok
+test metrics::tests::gauge_set_and_add ... ok
+test metrics::tests::histogram_buckets ... ok
+test metrics::tests::labels_are_sorted ... ok
+test metrics::tests::render_escapes_quotes ... ok
+test queue::tests::close_wakes_waiters ... ok
+test queue::tests::drain_returns_all ... ok
+test queue::tests::fifo_order ... ok
+test queue::tests::full_queue_rejects ... ok
+test queue::tests::peek_does_not_remove ... ok
+test queue::tests::push_pop ... ok
+test queue::tests::concurrent_producers ... ok
+test registry::tests::duplicate_is_rejected ... ok
+test registry::tests::lookup ... ok
+test registry::tests::remove_then_lookup ... ok
+test registry::tests::iteration_is_sorted ... ok
+test scheduler::tests::cancel_pending ... ok
+test scheduler::tests::cancel_running_is_noop ... ok
+test scheduler::tests::priority_order ... ok
+test scheduler::tests::recovers_from_panic ... ok
+test scheduler::tests::runs_due_jobs ... ok
+test scheduler::tests::skips_future_jobs ... ok
+test scheduler::tests::stops_on_cancel ... ok
+test scheduler::tests::retry_uses_backoff ... ok
+test scheduler::tests::gives_up_after_max_retries ... ok
+test session::tests::expires_idle ... ok
+test session::tests::keeps_active ... ok
+test session::tests::rotates_id ... ok
+test session::tests::rejects_reuse_after_rotation ... ok
+test store::tests::compacts_on_reopen ... ok
+test store::tests::delete_missing_is_ok ... ok
+test store::tests::list_prefix ... ok
+test store::tests::load_missing ... ok
+test store::tests::overwrite ... ok
+test store::tests::save_and_load ... ok
+test store::tests::snapshot_is_consistent ... ok
+test store::tests::truncated_tail_is_ignored ... ok
+test store::tests::writes_are_fsynced ... ok
+test tls::tests::loads_pem_chain ... ok
+test tls::tests::rejects_expired_cert ... ok
+test tls::tests::rejects_key_mismatch ... ok
+test util::tests::human_bytes ... ok
+test util::tests::human_duration ... ok
+test util::tests::parse_duration_units ... ok
+test util::tests::parse_duration_rejects_garbage ... ok
+test util::tests::split_host_port_ipv6 ... ok
+test util::tests::split_host_port_plain ... ok
+test util::tests::truncate_utf8_boundary ... ok
+test wire::tests::close ... ok
+test wire::tests::encode_decode_roundtrip ... ok
+test wire::tests::oversized_frame_is_rejected ... ok
+test wire::tests::ping ... ok
+test wire::tests::rejects_bad_magic ... ok
+test wire::tests::rejects_bad_version ... ok
+test wire::tests::reserved_bits_must_be_zero ... ok
+test wire::tests::split_frames_reassemble ... ok
+test wire::tests::zero_length_payload ... ok
+test worker::tests::drains_on_shutdown ... ok
+test worker::tests::panics_do_not_kill_pool ... ok
+test worker::tests::respects_concurrency_limit ... ok
+
+test result: ok. 72 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.84s
+
+     Running unittests src/lib.rs (target/debug/deps/relay_wire-9b1e4c7a02d3f651)
+
+running 18 tests
+test codec::tests::decodes_varint ... ok
+test codec::tests::encodes_varint ... ok
+test codec::tests::varint_overflow_is_rejected ... ok
+test codec::tests::zigzag_roundtrip ... ok
+test frame::tests::header_roundtrip ... ok
+test frame::tests::checksum_detects_flip ... ok
+test frame::tests::max_len_boundary ... ok
+test frame::tests::partial_header_needs_more ... ok
+test stream::tests::interleaved_streams ... ok
+test stream::tests::reset_stream ... ok
+test stream::tests::window_update_unblocks ... ok
+test stream::tests::flow_control_blocks_writer ... ok
+test stream::tests::half_close ... ok
+test stream::tests::unknown_stream_is_ignored ... ok
+test util::tests::crc_known_vectors ... ok
+test util::tests::pad_to_alignment ... ok
+test util::tests::read_exact_eof ... ok
+test util::tests::write_all_partial ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/integration.rs (target/debug/deps/integration-5d2a77c01e8b94f3)
+
+running 6 tests
+test echo_roundtrip ... ok
+test graceful_shutdown ... ok
+test large_payload ... ok
+test many_clients ... ok
+test reconnect_after_drop ... ok
+test slow_reader_does_not_stall_others ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.92s
+
+   Doc-tests relay_core
+
+running 3 tests
+test crates/core/src/limits.rs - limits::Bucket (line 12) ... ok
+test crates/core/src/queue.rs - queue::Queue (line 20) ... ok
+test crates/core/src/util.rs - util::human_bytes (line 8) ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.41s
+
+   Doc-tests relay_wire
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

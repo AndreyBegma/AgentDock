@@ -1,0 +1,7 @@
+{
+  "argv": ["gh", "pr", "checks", "456"],
+  "exitCode": 1,
+  "category": "other",
+  "outcome": "failing",
+  "expect": "filtered"
+}

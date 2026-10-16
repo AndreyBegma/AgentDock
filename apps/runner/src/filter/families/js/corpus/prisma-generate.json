@@ -1,0 +1,7 @@
+{
+  "argv": ["prisma", "generate"],
+  "exitCode": 0,
+  "category": "other",
+  "outcome": "passing",
+  "expect": "any"
+}

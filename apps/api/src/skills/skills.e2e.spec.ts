@@ -19,6 +19,7 @@ import {
   TestLiveSocket,
 } from '../live/testing/live-e2e';
 import { RunnerEventSinks } from '../runners/runner-event-sinks';
+import { capabilities } from '../runners/testing/runner-e2e';
 import {
   createUser,
   login,
@@ -741,6 +742,21 @@ describe('skills (e2e)', () => {
       expect(await auditOf('skill.run_started')).toEqual([
         expect.objectContaining({ result: 'ok', projectId: a }),
       ]);
+    });
+
+    it('#445: sends the token saver to a runner that advertises it', async () => {
+      await ctx.prisma.runner.update({
+        where: { id: runnerId },
+        data: { capabilities: { ...capabilities, tokenSaver: true } },
+      });
+      const view = (await startRun()).body as SkillRunView;
+      expect(sent('skill.run')[0].args).toMatchObject({
+        tokenSaver: { enabled: true, mcpAllow: [] },
+      });
+      const run = await ctx.prisma.run.findUniqueOrThrow({
+        where: { id: view.runId },
+      });
+      expect(run.tokenSaver).toBe(true);
     });
 
     it('takes the permission mode from the project orchestrator settings and keeps bypass for admins', async () => {

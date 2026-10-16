@@ -37,6 +37,7 @@ import {
 import { Segment } from '../workflows/segment';
 import { BreakdownTable } from './breakdown-table';
 import { SetBudget } from './set-budget';
+import { TokenSaverSection } from './token-saver-section';
 import { CostChart, UsageEmpty, UsageTiles } from './usage-figures';
 import { UsageFilters } from './usage-filters';
 
@@ -110,6 +111,12 @@ function UsageView() {
       breakdown,
     }));
   }, [key]);
+
+  // Token saver is per project: the narrowed one, else every project listed.
+  const tokenSaverIds = useMemo(
+    () => (filters.projectId ? [filters.projectId] : projects.map((p) => p.id)),
+    [filters.projectId, projects],
+  );
 
   const clearProject = () => set({ projectId: '' });
   const empty = (
@@ -282,6 +289,14 @@ function UsageView() {
           }
         </AsyncSection>
       )}
+
+      {range && tokenSaverIds.length > 0 ? (
+        <TokenSaverSection
+          projectIds={tokenSaverIds}
+          singleProjectId={filters.projectId}
+          range={range}
+        />
+      ) : null}
     </>
   );
 }

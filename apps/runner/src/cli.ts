@@ -70,6 +70,12 @@ Used by the agentdock Claude Code plugin:
   mcp                                      the agentdock MCP server (stdio)
   claude [-- <args>]                       run claude in a tmux session AgentDock
                                            can attach to
+
+Used by the runner's launches (Token saver):
+  filter -- <command> [args…]              run a command and compress its output;
+                                           AGENTDOCK_RAW=1 leaves it unfiltered
+  filter-hook                              the PreToolUse hook that routes Bash
+                                           calls through filter (JSON on stdin)
 `;
 
 class UsageError extends Error {}
@@ -396,6 +402,29 @@ export const runCli = async (
   if (command === 'help' || command === '--help' || command === '-h') {
     deps.stdout(USAGE);
     return EXIT.ok;
+  }
+  // `main.ts` serves these before loading the CLI (#445 D3); this path is for
+  // callers of `runCli` itself.
+  if (command === 'filter' || command === 'filter-hook') {
+    const { runFilterCommand } = await import('./filter/main');
+    // One decoder per stream: a character may span two chunks.
+    const writer = (write: (text: string) => void) => {
+      const decoder = new TextDecoder();
+      return (bytes: Uint8Array | string) =>
+        write(
+          typeof bytes === 'string'
+            ? bytes
+            : decoder.decode(bytes, { stream: true }),
+        );
+    };
+    const stdin = deps.stdin ?? (() => Bun.stdin.stream());
+    return runFilterCommand(argv, {
+      env: deps.env,
+      stdout: writer(deps.stdout),
+      stderr: writer(deps.stderr),
+      stdin: () => new Response(stdin()).text(),
+      flush: async () => {},
+    });
   }
   // A hook must never fail the session it reports: exit 0 whatever happens,
   // and log nothing (spec 201 D12).

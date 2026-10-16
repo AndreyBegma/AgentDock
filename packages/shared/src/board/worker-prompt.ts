@@ -16,8 +16,12 @@ import type { BoardCardKind } from './types';
  * pushes during the round; the `ci_fix` round prompt. Version 7 (#389): the
  * card's own test database and port, and no `pgrep -f` waits. Version 8
  * (#441): the `## Design` section lists every frame of the approved variant.
+ * Version 9 (#445 D7, D10, D14): the stable sections first and the card
+ * last; the working and audience registers; Read/Grep guidance; with Token
+ * saver, the scout and the `AGENTDOCK_RAW=1` bypass. Version 10 (#447 D7):
+ * no Claude attribution trailer on a commit.
  */
-export const CARD_WORKER_PROMPT_VERSION = 8;
+export const CARD_WORKER_PROMPT_VERSION = 10;
 
 /** #389: the env the runner sets in the card's session — its short id. */
 export const CARD_ENV_ID = 'AGENTDOCK_CARD';
@@ -34,6 +38,13 @@ const LOCAL_ENVIRONMENT_LINES = [
   `- This session has \`${CARD_ENV_ID}\` (this card's id) and \`${CARD_ENV_PORT}\` set. Tests and servers keep to a database and a port of their own: name a test database after \`$${CARD_ENV_ID}\` (a project's test setup may already do it — check before you create one), and start a server on \`$${CARD_ENV_PORT}\`. Never use, reset or wait for a database or port another worktree may use.`,
   "- Never wait for another process with `pgrep -f <pattern>`: the pattern is on your own command line, so it always matches and the wait never ends. Use a lock file, or a pattern that cannot match itself (`pgrep -f '[j]est'`). Never wait on another worktree's test run.",
 ];
+
+/**
+ * #447 D7: the runner holds the push of a commit that carries a Claude
+ * attribution trailer (`hasClaudeTrailer`), so the worker never writes one.
+ */
+const COMMIT_TRAILER_LINE =
+  '- Never add a Claude attribution trailer or footer to a commit message — no `Co-Authored-By: Claude …`, no `Claude-Session: …`, no "Generated with Claude Code". AgentDock does not push a commit that carries one; if it tells you which commits do, rewrite their messages without it (do not push).';
 
 /** The MCP tool the worker calls when done (D6). */
 export const FINISH_CARD_TOOL = 'finish_card';
@@ -83,6 +94,12 @@ export interface CardWorkerPromptInput {
    * same list `card.run` carries. Absent is none.
    */
   attachments?: readonly CardAttachmentBrief[];
+  /**
+   * #445: the round is launched with Token saver on (`card.run` carries
+   * `tokenSaver.enabled`). The prompt then names the scout and the
+   * `AGENTDOCK_RAW=1` bypass, which exist only then. Absent is off.
+   */
+  tokenSaver?: boolean;
 }
 
 const utf8Bytes = (text: string): number =>
@@ -267,6 +284,8 @@ const designLink = (card: CardWorkerPromptInput): string => {
 const pullRequestSection = (card: CardWorkerPromptInput): string[] => {
   const blob = `https://github.com/<owner>/<repo>/blob/${card.branch}/`;
   const lines = [
+    '## Pull request description',
+    '',
     `Before you finish, write the pull request's description to \`${CARD_PR_DESCRIPTION_FILE}\` in this worktree. It is git-excluded — do not commit it; AgentDock makes it the pull request's body. Keep it current in later rounds. It holds, in this order:`,
     '',
   ];
@@ -286,6 +305,34 @@ const pullRequestSection = (card: CardWorkerPromptInput): string[] => {
   return lines;
 };
 
+/**
+ * #445 D7: two registers. What only the worker reads is terse; what a person
+ * reads is complete.
+ */
+const REGISTER_LINES = [
+  '## How to write',
+  '',
+  '- Working register — everything only you read while you work: do not narrate what you are about to do, do not restate the plan, keep status lines short. Let the tool calls and the code speak.',
+  `- Audience register — everything a person reads: a question to the person, the pull request description, the \`${FINISH_CARD_TOOL}\` summary, a spec, a design file. Write it in full sentences, with every required section, and leave nothing out. Never shorten these to save tokens.`,
+];
+
+/** #445 D14: built-in Read, Grep and Glob are not filtered — the worker reads only what it needs. */
+const READING_LINES = [
+  '## Reading the codebase',
+  '',
+  '- Find where to look with Grep and Glob first. Read a large file with `offset` and `limit` — the part you need, not the whole file.',
+];
+
+/** #445 D4c, D9: what exists only when the runner launched the card with Token saver on. */
+const TOKEN_SAVER_LINES = [
+  '- For a broad search or to read many files for one question, use the `scout` subagent: it is fast and cheap, and reports file paths and lines. Make decisions and write code yourself, never through the scout.',
+  '- Long command output is compressed: every error, failure and warning line is kept, and a last line names the file with the full output. Read that file when you need more, or run the command as `AGENTDOCK_RAW=1 <command>` to see it unfiltered.',
+];
+
+/**
+ * #445 D10: the stable sections — the same for every card — come first, so
+ * the prompt cache hits; the card's own sections come last.
+ */
 const assemblePrompt = (
   card: CardWorkerPromptInput,
   body: string,
@@ -294,7 +341,30 @@ const assemblePrompt = (
 ): string => {
   const label = cardLabel(card.number);
   const lines = [
-    `You are the dedicated worker for AgentDock board card ${label}: ${card.title}`,
+    'You are the dedicated worker for an AgentDock board card. How to work comes first; the card itself is at the end of this prompt.',
+    '',
+    '## How to work',
+    '',
+    '- Work only in this worktree and on this branch. Do not switch branches or touch other worktrees.',
+    "- Follow the repository's CLAUDE.md / AGENTS.md.",
+    '- Commit your work as you go, with clear messages.',
+    COMMIT_TRAILER_LINE,
+    '- Run the tests and checks the repository defines before you finish.',
+    ...LOCAL_ENVIRONMENT_LINES,
+    '- Do not push and do not open a pull request: AgentDock pushes your commits as you make them and keeps a draft pull request open for this branch.',
+    '- If something is unclear, ask in this session and wait for the person.',
+    '',
+    ...REGISTER_LINES,
+    '',
+    ...READING_LINES,
+    ...(card.tokenSaver ? TOKEN_SAVER_LINES : []),
+    '',
+    '## When you are done',
+    '',
+    `Write the pull request description the last section of this prompt asks for. Then call the \`${FINISH_CARD_TOOL}\` tool with a summary of what you changed and how you checked it, in at least two full sentences. If it answers with what is missing, write that and call it again.`,
+    `If the \`${FINISH_CARD_TOOL}\` tool is not available, reply with the summary followed by the single word DONE, and stop.`,
+    '',
+    `## Card ${label}: ${card.title}`,
     '',
     `Kind: ${card.kind === 'bug' ? 'bug fix' : 'feature'}`,
     `Branch: ${card.branch} (based on ${card.base})`,
@@ -310,24 +380,7 @@ const assemblePrompt = (
   lines.push('', '## The card', '', body || '(no description)', '');
   if (design !== null) lines.push(...design, '');
   if (attachments !== null) lines.push(...attachments, '');
-  lines.push(
-    '## How to work',
-    '',
-    '- Work only in this worktree and on this branch. Do not switch branches or touch other worktrees.',
-    "- Follow the repository's CLAUDE.md / AGENTS.md.",
-    '- Commit your work as you go, with clear messages.',
-    '- Run the tests and checks the repository defines before you finish.',
-    ...LOCAL_ENVIRONMENT_LINES,
-    '- Do not push and do not open a pull request: AgentDock pushes your commits as you make them and keeps a draft pull request open for this branch.',
-    '- If something is unclear, ask in this session and wait for the person.',
-    '',
-    '## When you are done',
-    '',
-    ...pullRequestSection(card),
-    '',
-    `Then call the \`${FINISH_CARD_TOOL}\` tool with a short summary of what you changed and how you checked it.`,
-    `If the \`${FINISH_CARD_TOOL}\` tool is not available, reply with the summary followed by the single word DONE, and stop.`,
-  );
+  lines.push(...pullRequestSection(card));
   return lines.join('\n');
 };
 

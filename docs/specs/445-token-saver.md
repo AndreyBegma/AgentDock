@@ -107,7 +107,7 @@ The parts:
   - the raw file exists and matches the original byte for byte;
   - `AGENTDOCK_RAW=1` returns the original.
 - [ ] **Filter, pass-through:** an uncovered command, or output the filter cannot classify, is returned unchanged and counted as `passedThrough`.
-- [ ] **Filter, savings:** on the corpus, the median `keptBytes/rawBytes` for test runners and type checkers with failures is ≤ 0.3, and for passing runs ≤ 0.1.
+- [ ] **Filter, savings:** on the corpus, the median `keptBytes/rawBytes` for test runners with failures is ≤ 0.3, for type checkers and linters with failures ≤ 0.8 (amendment 8), and for passing runs ≤ 0.1.
 - [ ] **Overhead:** p95 added latency per command ≤ 50 ms on the CI runner, measured by a benchmark test.
 - [ ] **Hook:** with Token saver on, a Bash tool call `bun run test` is executed as `agentdock-runner filter -- bun run test` (hook unit test with Claude Code's PreToolUse input shape). With it off, nothing is rewritten.
 - [ ] **All eight launches:** each passes `--settings` (hook, scout, compaction) and `--strict-mcp-config` with the allowed servers when on, and each launches exactly as today when off (runner unit tests per launch).
@@ -193,6 +193,13 @@ Settled by the person (1–3) and by the orchestrator (4–7) while the contract
    - i445-launch reports `mcpServers` per profile and the capability.
    - i445-api sets `runs.tokenSaver`, ingests the stats and gates on the capability.
    - i445-web shows the checkboxes from `mcpServers`.
+8. **Savings ceilings by category.** The failing-run ceiling is split: test runners ≤ 0.3, type checkers and linters ≤ 0.8. D4b keeps every error line, and a type-check or lint failure report is almost entirely error lines, so it cannot shrink to 0.3. Only the source snippets, underlines, notes and fix diffs go. Measured on the JS corpus: `tsc` 0.98 (plain) and 0.67 (`--pretty`), `biome check` 0.61. The passing ceiling (≤ 0.1) is unchanged.
+9. **The hook rewrites only in bypass mode** (settled by the orchestrator after the delta security review, slot i445-harden). This narrows the earlier decision on the hook's permissions, decision (a), which also let the hook rewrite outside bypass mode when an `allow` rule already matched the original command.
+   - The hook rewrites, and returns `permissionDecision: "allow"`, only when the PreToolUse input's `permission_mode` is `bypassPermissions`. In every other mode (`default`, `acceptEdits`, `auto`, `plan` and any later one) it passes the command through unchanged and counts it `passedThrough`. In those modes Claude Code decides through its prompt, its auto-mode classifier or plan mode's read-only rule, and a hook `allow` would skip that decision. The hook also cannot see every policy source, such as server-delivered managed settings or MDM.
+   - In bypass mode, `deny` and `ask` `Bash(…)` rules still block a rewrite. They are matched generously: on the command with whitespace collapsed and quotes removed, with the program's directory dropped, with and without the leading assignments, and starting at every word. Any doubt means no rewrite.
+   - The rewrite is built from the parsed argv, each word re-quoted, never from the original text. Amendment 3's "single simple command" is a whitelist. A command that contains `$`, a backtick, `#`, `!`, a newline or a non-printable or non-ASCII character anywhere passes through, and so does one with an unquoted glob, brace or tilde.
+   - The stats reader takes a row's project, run and kind from the run dir's `filter-run.json`, which the launch writes. It rejects rows that disagree with it.
+   - Amendment 6 holds for every launch. A card drops its earlier rounds' `raw/` when a new round starts, and the orchestrator's `raw/` goes when it stops. One run dir's raw files stay under 200 MB together, and the oldest go first. The compressed output the agent reads is redacted, and the raw file keeps every byte.
 
 ## Open questions
 

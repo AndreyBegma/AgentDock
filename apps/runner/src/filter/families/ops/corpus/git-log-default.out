@@ -1,0 +1,54 @@
+commit ddbf0ec2e671d79e4ce69402c2ab4bdc54162d13
+Merge: c14459a a1b192c
+Author: Dana Reviewer <dana@example.com>
+Date:   Fri Oct 16 16:37:13 2026 +0300
+
+    Merge pull request #456 from AndreyBegma/feat/445-engine
+
+    feat(runner): Token saver filter engine — filter, filter-hook, raw store, stats (#445)
+
+commit a1b192cb51f50e0c6fa76eea8008433c1ce01c09
+Author: Sam Builder <sam@example.com>
+Date:   Fri Oct 16 15:34:15 2026 +0200
+
+    feat(runner): Token saver filter engine — filter, filter-hook, raw store, stats (#445)
+
+    The runner's own command-output filter (spec 445 D2-D4, amendments 3, 5, 6):
+
+    - `agentdock-runner filter -- <argv>` runs the command, keeps the raw output
+      in `<run dir>/raw/<n>.log` (10 MB cap with a marker), and prints a
+      compressed version when a family filter covers the command.
+    - `agentdock-runner filter-hook` is the PreToolUse hook: it rewrites only a
+      single simple command a filter covers, and it fails open.
+    - Stats: one JSONL row per command in $AGENTDOCK_FILTER_STATS.
+
+    Closes #445 (part of)
+    Reviewed-by: Dana Reviewer <dana@example.com>
+
+commit c14459a788f11774dac40e149d0ddbf616150f9e
+Merge: be7fe01 e1de325
+Author: Dana Reviewer <dana@example.com>
+Date:   Fri Oct 16 16:09:11 2026 +0300
+
+    Merge pull request #450 from AndreyBegma/feat/445-contract
+
+    feat(shared): Token saver contract — schema, launch field, filter.stats (#445)
+
+commit be7fe01e41a3030a2f5c1d6981d3289270f02d17
+Merge: 3b66246 e108215
+Author: Dana Reviewer <dana@example.com>
+Date:   Fri Oct 16 16:06:55 2026 +0300
+
+    Merge pull request #451 from AndreyBegma/docs/449-context-handoff
+
+    docs: spec for #449 — Context handoff (ADR-0042)
+
+commit e108215aa0f0f3a1c0d9a8f4c3c1b53a1d8d1111
+Author: Sam Builder <sam@example.com>
+Date:   Fri Oct 16 15:58:02 2026 +0200
+
+    docs: renumber the context handoff ADR to 0042 (#449)
+
+    The number 0041 was taken by the Usage rollup ADR that merged first.
+
+    Co-authored-by: Dana Reviewer <dana@example.com>

@@ -4,6 +4,10 @@ import type {
   SkillRunArgs,
 } from '@agentdock/shared/protocol';
 import type { ConfigProfile } from '../../config';
+import {
+  type TokenSaverLaunch,
+  tokenSaverLaunch,
+} from '../../launch/token-saver';
 import { OTLP_HOST } from '../../otlp/receiver';
 import type { LaunchSpec } from './record';
 
@@ -29,10 +33,13 @@ export const skillPrompt = (skill: string, args: string): string =>
 export const runArgv = (
   profile: ConfigProfile,
   args: Pick<SkillRunArgs, 'skill' | 'args' | 'model' | 'permissionMode'>,
+  tokenSaver?: TokenSaverLaunch | null,
 ): { binary: string; args: string[] } => ({
   binary: profile.binary ?? profile.runtime,
   args: [
     ...profile.args,
+    // #445: before a flag, so `--mcp-config <configs...>` takes only its file.
+    ...(tokenSaver?.args ?? []),
     '-p',
     skillPrompt(args.skill, args.args),
     '--model',
@@ -76,8 +83,30 @@ export const launchSpec = (
   args: SkillRunArgs,
   worktree: string,
   otlpPort: number | null,
+  tokenSaver?: TokenSaverLaunch | null,
 ): LaunchSpec => ({
-  ...runArgv(profile, args),
-  env: runEnv(profile, args, otlpPort),
+  ...runArgv(profile, args, tokenSaver),
+  env: { ...runEnv(profile, args, otlpPort), ...(tokenSaver?.env ?? {}) },
   cwd: worktree,
 });
+
+/** #445: a skill run's Token saver — `agentdock` and the scout; `null` when off. */
+export const skillTokenSaver = (
+  profile: ConfigProfile,
+  args: Pick<SkillRunArgs, 'tokenSaver' | 'runId' | 'projectId'>,
+  home: string,
+  runDir: string,
+  selfCommand: readonly string[],
+): TokenSaverLaunch | null =>
+  tokenSaverLaunch({
+    config: args.tokenSaver,
+    profile,
+    home,
+    dir: runDir,
+    selfCommand,
+    runKind: 'skill',
+    projectId: args.projectId,
+    runId: args.runId,
+    agentdock: [],
+    scout: true,
+  });

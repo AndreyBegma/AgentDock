@@ -1,0 +1,57 @@
+make[1]: Entering directory '/home/dev/src/legacy-svc'
+cc -O2 -Wall -Iinclude -c src/alloc.c -o build/alloc.o
+cc -O2 -Wall -Iinclude -c src/arena.c -o build/arena.o
+cc -O2 -Wall -Iinclude -c src/buffer.c -o build/buffer.o
+cc -O2 -Wall -Iinclude -c src/cache.c -o build/cache.o
+cc -O2 -Wall -Iinclude -c src/cli.c -o build/cli.o
+cc -O2 -Wall -Iinclude -c src/codec.c -o build/codec.o
+cc -O2 -Wall -Iinclude -c src/config.c -o build/config.o
+cc -O2 -Wall -Iinclude -c src/conn.c -o build/conn.o
+cc -O2 -Wall -Iinclude -c src/crc32.c -o build/crc32.o
+cc -O2 -Wall -Iinclude -c src/dns.c -o build/dns.o
+cc -O2 -Wall -Iinclude -c src/epoll.c -o build/epoll.o
+cc -O2 -Wall -Iinclude -c src/event.c -o build/event.o
+cc -O2 -Wall -Iinclude -c src/fd.c -o build/fd.o
+cc -O2 -Wall -Iinclude -c src/fs.c -o build/fs.o
+cc -O2 -Wall -Iinclude -c src/gzip.c -o build/gzip.o
+cc -O2 -Wall -Iinclude -c src/hash.c -o build/hash.o
+cc -O2 -Wall -Iinclude -c src/heap.c -o build/heap.o
+cc -O2 -Wall -Iinclude -c src/http.c -o build/http.o
+src/http.c: In function ‘parse_request_line’:
+src/http.c:88:17: warning: unused variable ‘version’ [-Wunused-variable]
+   88 |     const char *version = NULL;
+      |                 ^~~~~~~
+cc -O2 -Wall -Iinclude -c src/idle.c -o build/idle.o
+cc -O2 -Wall -Iinclude -c src/ini.c -o build/ini.o
+cc -O2 -Wall -Iinclude -c src/json.c -o build/json.o
+cc -O2 -Wall -Iinclude -c src/list.c -o build/list.o
+cc -O2 -Wall -Iinclude -c src/log.c -o build/log.o
+cc -O2 -Wall -Iinclude -c src/lru.c -o build/lru.o
+cc -O2 -Wall -Iinclude -c src/md5.c -o build/md5.o
+cc -O2 -Wall -Iinclude -c src/metrics.c -o build/metrics.o
+cc -O2 -Wall -Iinclude -c src/net.c -o build/net.o
+cc -O2 -Wall -Iinclude -c src/pool.c -o build/pool.o
+cc -O2 -Wall -Iinclude -c src/proc.c -o build/proc.o
+cc -O2 -Wall -Iinclude -c src/queue.c -o build/queue.o
+cc -O2 -Wall -Iinclude -c src/rbtree.c -o build/rbtree.o
+cc -O2 -Wall -Iinclude -c src/ring.c -o build/ring.o
+cc -O2 -Wall -Iinclude -c src/sha1.c -o build/sha1.o
+cc -O2 -Wall -Iinclude -c src/signal.c -o build/signal.o
+cc -O2 -Wall -Iinclude -c src/slab.c -o build/slab.o
+cc -O2 -Wall -Iinclude -c src/sock.c -o build/sock.o
+cc -O2 -Wall -Iinclude -c src/str.c -o build/str.o
+cc -O2 -Wall -Iinclude -c src/timer.c -o build/timer.o
+cc -O2 -Wall -Iinclude -c src/tls.c -o build/tls.o
+cc -O2 -Wall -Iinclude -c src/trie.c -o build/trie.o
+cc -O2 -Wall -Iinclude -c src/url.c -o build/url.o
+cc -O2 -Wall -Iinclude -c src/utf8.c -o build/utf8.o
+cc -O2 -Wall -Iinclude -c src/util.c -o build/util.o
+cc -O2 -Wall -Iinclude -c src/worker.c -o build/worker.o
+cc -O2 -Wall -Iinclude -c src/main.c -o build/main.o
+src/main.c: In function ‘main’:
+src/main.c:41:5: error: implicit declaration of function ‘daemonize’ [-Wimplicit-function-declaration]
+   41 |     daemonize(cfg);
+      |     ^~~~~~~~~
+make[1]: *** [Makefile:37: build/main.o] Error 1
+make[1]: Leaving directory '/home/dev/src/legacy-svc'
+make: *** [Makefile:12: all] Error 2

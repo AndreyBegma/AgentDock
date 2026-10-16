@@ -1,0 +1,117 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-8.3.2, pluggy-1.5.0 -- /home/dev/app/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/dev/app
+configfile: pyproject.toml
+plugins: anyio-4.4.0, cov-5.0.0, mock-3.14.0
+collecting ... collected 64 items
+
+tests/test_auth.py::test_login_with_valid_password PASSED                [  1%]
+tests/test_auth.py::test_login_with_wrong_password PASSED                [  3%]
+tests/test_auth.py::test_login_locks_after_five_attempts PASSED          [  4%]
+tests/test_auth.py::test_logout_clears_session PASSED                    [  6%]
+tests/test_auth.py::test_refresh_token_rotates PASSED                    [  7%]
+tests/test_auth.py::test_refresh_token_reuse_is_rejected PASSED          [  9%]
+tests/test_auth.py::test_password_reset_email_is_sent PASSED             [ 10%]
+tests/test_auth.py::test_password_reset_token_expires PASSED             [ 12%]
+tests/test_billing.py::test_invoice_total_includes_tax PASSED            [ 14%]
+tests/test_billing.py::test_invoice_total_rounds_half_up FAILED          [ 15%]
+tests/test_billing.py::test_invoice_for_empty_cart PASSED                [ 17%]
+tests/test_billing.py::test_discount_cannot_exceed_total PASSED          [ 18%]
+tests/test_billing.py::test_discount_code_is_case_insensitive PASSED     [ 20%]
+tests/test_billing.py::test_proration_on_upgrade PASSED                  [ 21%]
+tests/test_billing.py::test_proration_on_downgrade PASSED                [ 23%]
+tests/test_billing.py::test_currency_conversion_uses_cached_rate PASSED  [ 25%]
+tests/test_billing.py::test_currency_conversion_refreshes_stale_rate PASSED [ 26%]
+tests/test_cache.py::test_get_returns_none_for_missing_key PASSED        [ 28%]
+tests/test_cache.py::test_set_then_get PASSED                            [ 29%]
+tests/test_cache.py::test_ttl_expires_entry PASSED                       [ 31%]
+tests/test_cache.py::test_delete_is_idempotent PASSED                    [ 32%]
+tests/test_cache.py::test_lru_evicts_oldest PASSED                       [ 34%]
+tests/test_cache.py::test_lru_touch_on_read PASSED                       [ 35%]
+tests/test_cache.py::test_namespaces_are_isolated PASSED                 [ 37%]
+tests/test_cache.py::test_serializes_dataclasses PASSED                  [ 39%]
+tests/test_config.py::test_defaults PASSED                               [ 40%]
+tests/test_config.py::test_env_overrides_file PASSED                     [ 42%]
+tests/test_config.py::test_unknown_key_is_reported PASSED                [ 43%]
+tests/test_config.py::test_secret_values_are_masked_in_repr PASSED       [ 45%]
+tests/test_config.py::test_reload_picks_up_changes PASSED                [ 46%]
+tests/test_export.py::test_csv_header PASSED                             [ 48%]
+tests/test_export.py::test_csv_quotes_commas PASSED                      [ 50%]
+tests/test_export.py::test_csv_escapes_quotes PASSED                     [ 51%]
+tests/test_export.py::test_csv_streams_large_tables PASSED               [ 53%]
+tests/test_export.py::test_json_lines_roundtrip PASSED                   [ 54%]
+tests/test_export.py::test_xlsx_sheet_names_are_unique PASSED            [ 56%]
+tests/test_jobs.py::test_enqueue_returns_id PASSED                       [ 57%]
+tests/test_jobs.py::test_worker_runs_job PASSED                          [ 59%]
+tests/test_jobs.py::test_worker_retries_with_backoff PASSED              [ 60%]
+tests/test_jobs.py::test_worker_gives_up_after_max_retries PASSED        [ 62%]
+tests/test_jobs.py::test_jobs_run_in_priority_order PASSED               [ 64%]
+tests/test_jobs.py::test_scheduled_job_waits PASSED                      [ 65%]
+tests/test_jobs.py::test_cancel_pending_job PASSED                       [ 67%]
+tests/test_jobs.py::test_cancel_running_job_is_noop PASSED               [ 68%]
+tests/test_models.py::test_user_full_name PASSED                         [ 70%]
+tests/test_models.py::test_user_email_is_normalised PASSED               [ 71%]
+tests/test_models.py::test_user_equality PASSED                          [ 73%]
+tests/test_models.py::test_order_status_transitions PASSED               [ 75%]
+tests/test_models.py::test_order_cannot_skip_to_shipped PASSED           [ 76%]
+tests/test_models.py::test_order_totals_follow_lines PASSED              [ 78%]
+tests/test_search.py::test_tokenizer_splits_on_punctuation PASSED        [ 79%]
+tests/test_search.py::test_tokenizer_keeps_unicode_words PASSED          [ 81%]
+tests/test_search.py::test_ranking_prefers_title_matches PASSED          [ 82%]
+tests/test_search.py::test_ranking_is_stable PASSED                      [ 84%]
+tests/test_search.py::test_pagination_cursor_roundtrip FAILED            [ 85%]
+tests/test_search.py::test_empty_query_returns_nothing PASSED            [ 87%]
+tests/test_search.py::test_filters_combine_with_and PASSED               [ 89%]
+tests/test_search.py::test_highlight_escapes_html PASSED                 [ 90%]
+tests/test_storage.py::test_put_and_get_blob PASSED                      [ 92%]
+tests/test_storage.py::test_put_overwrites PASSED                        [ 93%]
+tests/test_storage.py::test_get_missing_raises_not_found PASSED          [ 95%]
+tests/test_storage.py::test_list_prefix PASSED                           [ 96%]
+tests/test_storage.py::test_list_prefix_is_paginated PASSED              [ 98%]
+tests/test_storage.py::test_delete_prefix PASSED                         [100%]
+
+=================================== FAILURES ===================================
+____________________ test_invoice_total_rounds_half_up _________________________
+
+    def test_invoice_total_rounds_half_up():
+        invoice = Invoice(
+            lines=[Line(sku="A-1", unit_price=Decimal("0.125"), quantity=1)],
+            tax_rate=Decimal("0.00"),
+        )
+>       assert invoice.total() == Decimal("0.13")
+E       AssertionError: assert Decimal('0.12') == Decimal('0.13')
+E        +  where Decimal('0.12') = total()
+E        +    where total = <app.billing.Invoice object at 0x7f3c1a2b9d90>.total
+
+tests/test_billing.py:41: AssertionError
+___________________ test_pagination_cursor_roundtrip ___________________
+
+    def test_pagination_cursor_roundtrip():
+        page = search("invoice", limit=10)
+        cursor = page.next_cursor
+>       again = search("invoice", limit=10, cursor=cursor)
+
+tests/test_search.py:77:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+query = 'invoice', limit = 10, cursor = 'eyJvZmZzZXQiOiAxMH0'
+
+    def search(query, limit=20, cursor=None):
+        offset = decode_cursor(cursor) if cursor else 0
+>       return _run(query, limit, offset)
+
+app/search/engine.py:58:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+data = 'eyJvZmZzZXQiOiAxMH0'
+
+    def decode_cursor(data):
+>       return json.loads(base64.urlsafe_b64decode(data))["offset"]
+E       binascii.Error: Incorrect padding
+
+app/search/cursor.py:12: Error
+=========================== short test summary info ============================
+FAILED tests/test_billing.py::test_invoice_total_rounds_half_up - AssertionError: assert Decimal('0.12') == Decimal('0.13')
+FAILED tests/test_search.py::test_pagination_cursor_roundtrip - binascii.Error: Incorrect padding
+========================= 2 failed, 62 passed in 3.97s =========================

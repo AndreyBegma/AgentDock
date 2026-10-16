@@ -1,0 +1,42 @@
+Starting a Gradle Daemon, 1 incompatible Daemon could not be reused, use --status for details
+> Configure project :
+> Task :compileJava
+> Task :processResources
+> Task :classes
+> Task :compileTestJava
+> Task :processTestResources NO-SOURCE
+> Task :testClasses
+> Task :test
+
+CartServiceTest > appliesCoupon() FAILED
+    org.opentest4j.AssertionFailedError at CartServiceTest.java:58
+
+DiscountCalculatorTest > stacksPercentageAfterFixed() FAILED
+    java.lang.NullPointerException at DiscountCalculator.java:77
+        at DiscountCalculatorTest.java:34
+
+CartServiceTest > addsLine() PASSED
+CartServiceTest > removesLine() PASSED
+CartServiceTest > clearsCart() PASSED
+DiscountCalculatorTest > fixedDiscount() PASSED
+DiscountCalculatorTest > percentageDiscount() PASSED
+TaxCalculatorTest > roundsHalfUp() PASSED
+TaxCalculatorTest > zeroRate() PASSED
+
+9 tests completed, 2 failed
+
+> Task :test FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':test'.
+> There were failing tests. See the report at: file:///home/dev/shop/build/reports/tests/test/index.html
+
+* Try:
+> Run with --scan to get full insights.
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+
+BUILD FAILED in 9s
+5 actionable tasks: 5 executed

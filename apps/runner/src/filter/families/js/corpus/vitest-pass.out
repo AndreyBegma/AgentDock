@@ -1,0 +1,57 @@
+
+ RUN  v3.2.4 /home/dev/shop/web
+
+ ✓ src/lib/money.test.ts (14 tests) 6ms
+ ✓ src/lib/slug.test.ts (9 tests) 4ms
+ ✓ src/lib/dates.test.ts (22 tests) 11ms
+ ✓ src/lib/cn.test.ts (4 tests) 2ms
+ ✓ src/lib/validators.test.ts (31 tests) 15ms
+ ✓ src/lib/url.test.ts (12 tests) 5ms
+ ✓ src/lib/format-bytes.test.ts (8 tests) 3ms
+ ✓ src/lib/pluralize.test.ts (6 tests) 2ms
+ ✓ src/lib/storage.test.ts (10 tests) 9ms
+ ✓ src/lib/retry.test.ts (7 tests) 33ms
+ ✓ src/hooks/use-debounce.test.ts (6 tests) 41ms
+ ✓ src/hooks/use-media-query.test.ts (5 tests) 18ms
+ ✓ src/hooks/use-local-storage.test.ts (8 tests) 22ms
+ ✓ src/hooks/use-click-outside.test.ts (4 tests) 15ms
+ ✓ src/hooks/use-interval.test.ts (5 tests) 29ms
+ ✓ src/store/cart.test.ts (17 tests) 9ms
+ ✓ src/store/session.test.ts (11 tests) 7ms
+ ✓ src/store/filters.test.ts (13 tests) 8ms
+ ✓ src/components/Button.test.tsx (7 tests) 64ms
+ ✓ src/components/Input.test.tsx (9 tests) 71ms
+ ✓ src/components/Modal.test.tsx (6 tests) 88ms
+ ✓ src/components/Tabs.test.tsx (8 tests) 77ms
+ ✓ src/components/Table.test.tsx (13 tests) 120ms
+ ✓ src/components/Toast.test.tsx (5 tests) 52ms
+ ✓ src/components/Select.test.tsx (10 tests) 93ms
+ ✓ src/components/Tooltip.test.tsx (6 tests) 58ms
+ ✓ src/components/Pagination.test.tsx (9 tests) 61ms
+ ✓ src/components/Avatar.test.tsx (4 tests) 21ms
+ ✓ src/components/Badge.test.tsx (3 tests) 14ms
+ ✓ src/components/Skeleton.test.tsx (2 tests) 10ms
+ ✓ src/features/search/search.test.ts (12 tests) 14ms
+ ✓ src/features/search/search-box.test.tsx (8 tests) 84ms
+ ✓ src/features/auth/login-form.test.tsx (9 tests) 133ms
+ ✓ src/features/auth/register-form.test.tsx (12 tests) 151ms
+ ✓ src/features/auth/reset-password.test.tsx (6 tests) 90ms
+ ✓ src/features/orders/order-list.test.tsx (6 tests) 101ms
+ ✓ src/features/orders/order-detail.test.tsx (7 tests) 97ms
+ ✓ src/features/cart/checkout.test.tsx (8 tests) 148ms
+ ✓ src/features/cart/cart-badge.test.tsx (4 tests) 38ms
+ ✓ src/features/cart/cart-line.test.tsx (6 tests) 55ms
+ ✓ src/features/profile/profile-form.test.tsx (11 tests) 119ms
+ ✓ src/features/profile/avatar-upload.test.tsx (5 tests) 70ms
+ ✓ src/features/settings/theme-switch.test.tsx (3 tests) 25ms
+ ✓ src/features/settings/notifications.test.tsx (7 tests) 66ms
+ ✓ src/api/client.test.ts (15 tests) 27ms
+ ✓ src/api/orders.test.ts (9 tests) 18ms
+ ✓ src/api/products.test.ts (8 tests) 16ms
+ ✓ src/api/errors.test.ts (6 tests) 5ms
+
+ Test Files  47 passed (47)
+      Tests  352 passed (352)
+   Start at  14:08:02
+   Duration  3.84s (transform 1.7s, setup 0ms, collect 5.0s, tests 1.9s, environment 7.4s, prepare 2.9s)
+

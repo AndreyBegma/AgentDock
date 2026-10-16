@@ -5,6 +5,7 @@ import type {
 import type { AttachmentRefusal, AttachmentView } from '../attachments';
 import type { TaskDesignSummary, TaskDesignView } from '../design';
 import type { FleetStage } from '../fleet';
+import type { CardRestartMode, RestartEstimate } from '../handoff/contracts';
 import type {
   CardMergeMethod,
   CardRunWiring,
@@ -14,6 +15,7 @@ import type {
   PrInspectState,
 } from '../protocol';
 import type { ProfileSource } from '../readiness';
+import type { StewardCardChip } from '../steward/contracts';
 import type { CardKindSource } from '../text/limits';
 import type {
   TokenSavedView,
@@ -236,6 +238,25 @@ export interface BoardCardView {
   movedAt: string;
   completedAt: string | null;
   updatedAt: string;
+  /**
+   * #447 D15: the latest round's open or escalated Steward incident — the
+   * `Stuck: API error · nudged 1/2` chip (`stewardChipLabel`). Optional so
+   * no route must fill it yet; absent reads as null.
+   */
+  steward?: StewardCardChip | null;
+  // #449 Context handoff — optional so no route must fill them yet.
+  /**
+   * #449 D9: how the latest round's session started — the
+   * `resumed from handoff · saved ≈ $x` / `resumed session` chip
+   * (`restartChipLabel`). Absent reads as null.
+   */
+  restartMode?: CardRestartMode | null;
+  /**
+   * #449 D9: the latest `fresh` round's first-turn saving — its resume
+   * estimate's cost less its fresh estimate's, a decimal string like
+   * `costUsd`. Null for any other round. Absent reads as null.
+   */
+  warmupSavedUsd?: string | null;
 }
 
 /** #337 D8: a card another one depends on, as the face and Run's warning name it. */
@@ -354,6 +375,14 @@ export interface CardRoundView {
   backgroundCommand: string | null;
   finishedAt: string | null;
   endedAt: string | null;
+  // #449 Context handoff — optional so no route must fill them yet.
+  /** #449 D3: from `round.restart`; null until it arrives. */
+  restartMode?: CardRestartMode | null;
+  /** #449 D3: both estimates; null for a `first` round. */
+  restartEstimate?: RestartEstimate | null;
+  /** #449 D9: from `round.warmup`; null until the round's first edit. */
+  warmupTokens?: number | null;
+  warmupMs?: number | null;
 }
 
 /** #322 D6: one recommended model, with its one-line reason. */

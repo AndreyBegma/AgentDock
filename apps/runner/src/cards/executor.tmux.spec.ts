@@ -1,9 +1,19 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from 'bun:test';
-import { chmodSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import {
   CARD_PUSH_MIN_INTERVAL_MS,
   cardDraftPullRequest,
+  STEWARD_ACTED_EVENT,
+  STEWARD_OBSERVED_EVENT,
+  STEWARD_RESUME_TEXT,
+  type StewardRunnerConfig,
 } from '@agentdock/shared';
 import type {
   CardRunArgs,
@@ -45,10 +55,22 @@ printf '%s\\n' "$@" > "$RECORD_DIR/argv-$round"
 pwd >> "$RECORD_DIR/argv-$round"
 if [ "$FAKE_MODE" = sleep ]; then sleep 60; fi
 if [ "$FAKE_MODE" = dialog ]; then
-  printf 'Teach auto mode about your environment?\\n 1. Yes\\n 2. Not now\\n 3. Don'"'"'t show again\\n'
+  printf '╭──────────────────────────────────────────╮\\n│ Teach auto mode about your environment?  │\\n│                                          │\\n│ ❯ 1. Yes                                 │\\n│   2. Not now                             │\\n│   3. Don'"'"'t show again                    │\\n╰──────────────────────────────────────────╯\\n'
   stty raw -echo
   dd bs=1 count=1 2>/dev/null | od -An -tx1 > "$RECORD_DIR/key-$round"
   exit 0
+fi
+if [ "$FAKE_MODE" = quoted ]; then
+  printf '● The dialog reads:\\n  Teach auto mode about your environment?\\n   1. Yes\\n   2. Not now\\n   3. Don'"'"'t show again\\n\\n╭──────────────────────────────╮\\n│ >                            │\\n╰──────────────────────────────╯\\n'
+  stty raw -echo
+  dd bs=1 count=1 2>/dev/null | od -An -tx1 > "$RECORD_DIR/key-$round"
+  exit 0
+fi
+if [ "$FAKE_MODE" = prompt ]; then
+  printf '\\n╭────────────────────────────╮\\n│ >                          │\\n╰────────────────────────────╯\\n'
+  IFS= read -r line
+  printf '%s' "$line" > "$RECORD_DIR/typed-$round"
+  sleep 60
 fi
 if [ "$FAKE_MODE" = permission ]; then
   printf 'Do you want to proceed?\\n 1. Yes\\n 2. No\\n'
@@ -60,7 +82,7 @@ exit 3
 const SESSION_ID = '3bb1739e-1a1c-4baa-b8b4-a4b1e6700361';
 const PROMPT = 'Work on card C-12; $(touch pwned) `id` "quoted" -- --model x';
 
-const setup = async () => {
+const setup = async (options: { steward?: StewardRunnerConfig } = {}) => {
   const f = await cardsWorkspace();
   const server = `agentdock-test-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
   const tmuxServer = ['-L', server];
@@ -88,6 +110,8 @@ const setup = async () => {
     profile('claude-slow', 'sleep'),
     profile('claude-dialog', 'dialog'),
     profile('claude-permission', 'permission'),
+    profile('claude-prompt', 'prompt'),
+    profile('claude-quoted', 'quoted'),
     { id: 'codex-default', runtime: 'codex', env: {}, args: [] },
   ];
 
@@ -104,6 +128,12 @@ const setup = async () => {
       deps: f.deps(exec, {
         clock,
         profiles: () => profiles,
+        // #447: Steward on for the project when the test asks for it.
+        watchedProjects: () => [
+          options.steward
+            ? { ...f.project, steward: options.steward }
+            : f.project,
+        ],
       }),
       cardsDir,
       selfCommand: [process.execPath, MAIN],
@@ -155,10 +185,20 @@ const setup = async () => {
     for (let i = 0; i < 400 && !existsSync(file); i++) await Bun.sleep(25);
     return readFileSync(file, 'utf8').trimEnd().split('\n');
   };
+  /** Waits until the session's pane shows `text`. */
+  const paneShows = async (session: string, text: string) => {
+    for (let i = 0; i < 400; i++) {
+      const pane = await tmux('capture-pane', '-p', '-t', `=${session}:`);
+      if (pane?.stdout.includes(text)) return;
+      await Bun.sleep(25);
+    }
+    throw new Error(`${session} never showed ${text}`);
+  };
   return {
     f,
     executor,
     make,
+    paneShows,
     args,
     events,
     phases,
@@ -199,6 +239,34 @@ describe.skipIf(!tmuxInstalled)(
         await Bun.sleep(25);
       }
       expect(readFileSync(keyFile, 'utf8').trim()).toBe('1b');
+    });
+
+    it('never answers the dialog text when the agent printed it above its input box (#447 DR-08)', async () => {
+      const t = await setup();
+      await t.executor.run(
+        t.args({
+          cardId: 'card_q',
+          runId: 'run_q',
+          profileKey: 'claude-quoted',
+        }),
+      );
+      await t.paneShows('agentdock-card-ab12cd34', '│ >');
+      for (let i = 0; i < 3; i++) await t.executor.poll();
+      expect(t.tmuxCalls.some((c) => c.includes('send-keys'))).toBe(false);
+      expect(
+        await t.executor.dismissDialog(
+          'agentdock-card-ab12cd34',
+          'teach-auto-mode',
+        ),
+      ).toBe(false);
+      expect(t.tmuxCalls.some((c) => c.includes('send-keys'))).toBe(false);
+      // The fake's redirect creates the file at once; no key ever reached it.
+      await Bun.sleep(200);
+      const keyFile = join(t.f.ws, 'key-run_q');
+      expect(
+        existsSync(keyFile) ? readFileSync(keyFile, 'utf8').trim() : '',
+      ).toBe('');
+      await t.tmux('kill-session', '-t', '=agentdock-card-ab12cd34');
     });
 
     it('never answers a permission prompt (#435)', async () => {
@@ -703,3 +771,165 @@ describe.skipIf(!tmuxInstalled)(
     });
   },
 );
+
+const STEWARD: StewardRunnerConfig = {
+  enabled: true,
+  silenceMinutes: 10,
+  trailerGuard: true,
+};
+
+describe.skipIf(!tmuxInstalled)('Steward on card rounds (#447)', () => {
+  /** What `card.resume` gets for round `run_1` of `card_1`. */
+  const resumeArgs = (t: Awaited<ReturnType<typeof setup>>) => ({
+    cardId: 'card_1',
+    projectId: t.f.project.id,
+    runId: 'run_1',
+    root: t.f.root,
+    base: 'main',
+    shortId: 'ab12cd34',
+    branch: 'card/c12-export-csv',
+    sessionId: SESSION_ID,
+    profileKey: 'claude-quick',
+    model: 'opus' as const,
+    permissionMode: 'acceptEdits' as const,
+  });
+
+  it('D10: a dead session is resumed with --resume in the same worktree and runs again', async () => {
+    const t = await setup({ steward: STEWARD });
+    await t.executor.run(t.args());
+    await t.argvOf('run_1');
+    await t.untilEnded(t.executor, 'run_1');
+    // The recorded argv is replaced by the resumed launch's.
+    rmSync(join(t.f.ws, 'argv-run_1'));
+
+    expect(await t.executor.resume(resumeArgs(t))).toEqual({
+      outcome: 'resumed',
+      tmuxSession: 'agentdock-card-ab12cd34',
+    });
+    const argv = await t.argvOf('run_1');
+    const worktree = join(t.f.ws, '.wt-widget-card-ab12cd34');
+    expect(argv.slice(0, 3)).toEqual([
+      '--strict-mcp-config',
+      '--resume',
+      SESSION_ID,
+    ]);
+    expect(argv.slice(-2)).toEqual([STEWARD_RESUME_TEXT, worktree]);
+    expect(t.phases('run_1').map((d) => d.phase)).toEqual([
+      'starting',
+      'running',
+      'ended',
+      'running',
+    ]);
+  });
+
+  it('D10: an alive session is left alone; a missing worktree starts nothing; a stopped round is never resumed', async () => {
+    const t = await setup({ steward: STEWARD });
+    await t.executor.run(t.args({ profileKey: 'claude-slow' }));
+    await t.argvOf('run_1');
+    expect(await t.executor.resume(resumeArgs(t))).toEqual({
+      outcome: 'alive',
+      tmuxSession: 'agentdock-card-ab12cd34',
+    });
+
+    // A person's stop.
+    await t.executor.stopCard({ cardId: 'card_1', projectId: t.f.project.id });
+    expect(await failure(t.executor.resume(resumeArgs(t)))).toBe('not_found');
+    expect(await t.alive('agentdock-card-ab12cd34')).toBe(false);
+
+    // A crash, then the worktree is gone.
+    const u = await setup({ steward: STEWARD });
+    await u.executor.run(u.args());
+    await u.untilEnded(u.executor, 'run_1');
+    rmSync(join(u.f.ws, '.wt-widget-card-ab12cd34'), {
+      recursive: true,
+      force: true,
+    });
+    expect(await u.executor.resume(resumeArgs(u))).toEqual({
+      outcome: 'no_worktree',
+    });
+    expect(await u.alive('agentdock-card-ab12cd34')).toBe(false);
+  });
+
+  it('D11: with Steward on, the poll leaves a known dialog to the API; dismissDialog answers it', async () => {
+    const t = await setup({ steward: STEWARD });
+    await t.executor.run(
+      t.args({ cardId: 'card_1', runId: 'run_d', profileKey: 'claude-dialog' }),
+    );
+    const keyFile = join(t.f.ws, 'key-run_d');
+    const session = 'agentdock-card-ab12cd34';
+    await t.paneShows(session, 'Not now');
+    for (let i = 0; i < 3; i++) await t.executor.poll();
+    expect(t.tmuxCalls.some((c) => c.includes('send-keys'))).toBe(false);
+
+    expect(await t.executor.dismissDialog(session, 'teach-auto-mode')).toBe(
+      true,
+    );
+    for (let i = 0; i < 400 && !existsSync(keyFile); i++) await Bun.sleep(25);
+    expect(readFileSync(keyFile, 'utf8').trim()).toBe('1b');
+  });
+
+  it('D7: a trailer commit is not pushed, is reported, and the worker at its prompt gets the list', async () => {
+    const t = await setup({ steward: STEWARD });
+    await t.executor.run(
+      t.args({
+        profileKey: 'claude-prompt',
+        pullRequest: cardDraftPullRequest({
+          number: 12,
+          title: 'Export as CSV',
+          issueNumber: null,
+        }),
+      }),
+    );
+    await t.argvOf('run_1');
+    const worktree = join(t.f.ws, '.wt-widget-card-ab12cd34');
+    t.f.write(worktree, { 'src/export.ts': 'export const csv = 1;\n' });
+    const sha = await t.f.commitAll(
+      worktree,
+      'feat: export\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>',
+    );
+    // Wait for the fake prompt box.
+    await t.paneShows('agentdock-card-ab12cd34', '│ >');
+
+    await t.executor.poll();
+    await t.executor.settled();
+    expect(
+      await t.f
+        .run(
+          t.f.origin,
+          'rev-parse',
+          '--verify',
+          '--quiet',
+          'refs/heads/card/c12-export-csv',
+        )
+        .catch(() => null),
+    ).toBeNull();
+    expect(t.events.some((e) => e.type === 'card_run.pushed')).toBe(false);
+    const steward = t.events.filter(
+      (e) =>
+        e.type === STEWARD_OBSERVED_EVENT || e.type === STEWARD_ACTED_EVENT,
+    );
+    expect(steward.map((e) => e.type)).toEqual([
+      STEWARD_OBSERVED_EVENT,
+      STEWARD_ACTED_EVENT,
+    ]);
+    expect(steward[0]?.data).toMatchObject({ kind: 'trailer' });
+    expect(steward[1]?.data).toMatchObject({
+      action: 'hold_push',
+      result: 'ok',
+      detail: '1 commit to rewrite',
+    });
+
+    const typedFile = join(t.f.ws, 'typed-run_1');
+    for (let i = 0; i < 400 && !existsSync(typedFile); i++) await Bun.sleep(25);
+    const typed = readFileSync(typedFile, 'utf8');
+    expect(typed).toContain(sha.slice(0, 12));
+    expect(typed).toContain('do not push');
+
+    // The same held head is reported once.
+    t.clock.advance(CARD_PUSH_MIN_INTERVAL_MS);
+    await t.executor.poll();
+    await t.executor.settled();
+    const acted = t.events.filter((e) => e.type === STEWARD_ACTED_EVENT);
+    expect(acted).toHaveLength(1);
+  });
+});

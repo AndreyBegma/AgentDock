@@ -1,0 +1,22 @@
+Inspecting 214 files
+..............................C.....................................................
+...W....................................................................C...........
+.....................................................................................
+............................................................................
+
+Offenses:
+
+app/models/invoice.rb:14:5: C: [Correctable] Style/StringLiterals: Prefer single-quoted strings when you don't need string interpolation or special symbols.
+    @currency = "USD"
+                ^^^^^
+app/models/invoice.rb:57:1: C: Metrics/MethodLength: Method has too many lines. [14/10]
+def total_with_tax(rate)
+^^^^^^^^^^^^^^^^^^^^^^^^
+app/services/reminder.rb:33:7: W: [Correctable] Lint/UselessAssignment: Useless assignment to variable - sent.
+      sent = mailer.deliver_later
+      ^^^^
+app/controllers/api/v1/orders_controller.rb:21:3: C: [Correctable] Layout/EmptyLinesAroundAccessModifier: Keep a blank line before and after private.
+  private
+  ^^^^^^^
+
+214 files inspected, 4 offenses detected, 3 offenses autocorrectable

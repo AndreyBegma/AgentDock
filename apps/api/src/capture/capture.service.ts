@@ -29,6 +29,7 @@ import { BOARD_SYSTEM_ACTOR, BoardWork } from '../board';
 import { BudgetGate } from '../budgets/budget-gate';
 import { PrismaService } from '../database/prisma.service';
 import { RuntimeProfileResolver } from '../readiness';
+import { TokenSaverService } from '../token-saver/token-saver.service';
 import {
   evidenceExcerpts,
   knownFingerprints,
@@ -111,6 +112,7 @@ export class CaptureService {
     private readonly queue: CaptureQueue,
     private readonly audit: AuditService,
     private readonly profiles: RuntimeProfileResolver,
+    private readonly tokenSaver: TokenSaverService,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
 
@@ -309,6 +311,8 @@ export class CaptureService {
         ? settings.captureModel
         : CAPTURE_MODEL_DEFAULT;
     const extractSessionId = randomUUID();
+    // #445 D11: only a runner that advertises the token saver gets the field.
+    const saver = await this.tokenSaver.launch(project.id);
 
     const started = await this.prisma.$transaction(async (tx) => {
       await this.lockProject(tx, project.id);
@@ -325,6 +329,7 @@ export class CaptureService {
             sessionId: session.id,
             ...(retry ? { retryOf: retry.id } : {}),
           },
+          tokenSaver: saver.on,
           status: 'running',
           triggeredByType: 'capture',
           triggeredById: null,
@@ -363,6 +368,7 @@ export class CaptureService {
       profileKey: profile.key,
       model,
       timeoutSec: CAPTURE_TIMEOUT_SEC,
+      ...saver.args,
     };
     let sent: Awaited<ReturnType<CaptureCommands['extract']>>;
     try {

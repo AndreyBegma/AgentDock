@@ -17,9 +17,11 @@ import {
 import { z } from 'zod';
 import { type Cancel, isoNow } from '../clock';
 import { CommandFailure } from '../commands/failure';
+import type { ConfigProfile } from '../config';
 import { watchedProject } from '../control/target';
 import { TmuxControl } from '../control/tmux';
 import { resolveFleetProject } from '../fleet/project';
+import { type TokenSaverLaunch, tokenSaverLaunch } from '../launch/token-saver';
 import { errorMessage, type Logger } from '../log';
 import {
   readTail,
@@ -64,6 +66,60 @@ export const uiProfileWorktreePath = (
 
 export const uiProfileSessionName = (shortId: string): string =>
   `agentdock-uiprofile-${shortId}`;
+
+/**
+ * What `exec-run` starts for a build: headless, read-only (`plan`), the
+ * prompt on stdin. #445: the Token saver's flags before the first flag.
+ */
+export const uiProfileLaunchSpec = (
+  profile: ConfigProfile,
+  build: Pick<UiProfileBuildArgs, 'model' | 'projectId' | 'runId'>,
+  worktree: string,
+  promptFile: string,
+  otlpPort: number | null,
+  tokenSaver?: TokenSaverLaunch | null,
+): LaunchSpec => ({
+  binary: profile.binary ?? profile.runtime,
+  args: [
+    ...profile.args,
+    ...(tokenSaver?.args ?? []),
+    '-p',
+    '--model',
+    build.model,
+    '--permission-mode',
+    'plan',
+    '--output-format',
+    'stream-json',
+    '--verbose',
+  ],
+  env: { ...runEnv(profile, build, otlpPort), ...(tokenSaver?.env ?? {}) },
+  cwd: worktree,
+  stdin: promptFile,
+});
+
+/**
+ * #445: a build's Token saver — the scout, no `agentdock` (a design build
+ * does not use it); `null` when off.
+ */
+export const uiProfileTokenSaver = (
+  profile: ConfigProfile,
+  build: Pick<UiProfileBuildArgs, 'tokenSaver' | 'runId' | 'projectId'>,
+  home: string,
+  runDir: string,
+  selfCommand: readonly string[],
+): TokenSaverLaunch | null =>
+  tokenSaverLaunch({
+    config: build.tokenSaver,
+    profile,
+    home,
+    dir: runDir,
+    selfCommand,
+    runKind: 'ui_profile',
+    projectId: build.projectId,
+    runId: build.runId,
+    agentdock: false,
+    scout: true,
+  });
 
 /** A build as the executor keeps it. The prompt is in `prompt.md`, never here. */
 const buildRecordSchema = uiProfileBuildArgsSchema
@@ -328,23 +384,20 @@ export class UiProfileBuildExecutor {
         base.stdout.trim(),
       ]);
       const profile = profileOf(deps, build.profileKey);
-      const spec: LaunchSpec = {
-        binary: profile.binary ?? profile.runtime,
-        args: [
-          ...profile.args,
-          '-p',
-          '--model',
-          build.model,
-          '--permission-mode',
-          'plan',
-          '--output-format',
-          'stream-json',
-          '--verbose',
-        ],
-        env: runEnv(profile, build, this.options.otlpPort?.() ?? null),
-        cwd: build.worktree,
-        stdin: join(this.dir(build.runId), PROMPT_FILE),
-      };
+      const spec = uiProfileLaunchSpec(
+        profile,
+        build,
+        build.worktree,
+        join(this.dir(build.runId), PROMPT_FILE),
+        this.options.otlpPort?.() ?? null,
+        uiProfileTokenSaver(
+          profile,
+          build,
+          deps.home,
+          this.dir(build.runId),
+          this.options.selfCommand,
+        ),
+      );
       if (build.cancelRequested) {
         await this.finish(build, {
           phase: 'cancelled',

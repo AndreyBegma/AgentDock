@@ -41,6 +41,7 @@ import { BudgetGate } from '../budgets/budget-gate';
 import { PrismaService } from '../database/prisma.service';
 import { LiveService } from '../live/live.service';
 import { RuntimeProfileResolver } from '../readiness';
+import { TokenSaverService } from '../token-saver/token-saver.service';
 import {
   DeepLClient,
   DeepLFailure,
@@ -139,6 +140,7 @@ export class TextNormalizer {
     private readonly live: LiveService,
     private readonly profiles: RuntimeProfileResolver,
     private readonly deepl: DeepLClient,
+    private readonly tokenSaver: TokenSaverService,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
 
@@ -428,6 +430,8 @@ export class TextNormalizer {
     }
 
     const sessionId = randomUUID();
+    // #445 D11: only a runner that advertises the token saver gets the field.
+    const saver = await this.tokenSaver.launch(project.id);
     const runId = await this.prisma
       .$transaction(async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`text-normalize:${project.id}`}))`;
@@ -445,6 +449,7 @@ export class TextNormalizer {
               ownerType: row.ownerType,
               attempt: row.attempts,
             },
+            tokenSaver: saver.on,
             status: 'running',
             triggeredByType: 'user',
             triggeredById: row.authorId,
@@ -491,6 +496,7 @@ export class TextNormalizer {
       profileKey: pick.profile.key,
       model: TEXT_NORMALIZE_MODEL,
       timeoutSec: TEXT_NORMALIZE_TIMEOUT_SEC,
+      ...saver.args,
     };
     let sent: Awaited<ReturnType<TextCommands['normalize']>>;
     try {
