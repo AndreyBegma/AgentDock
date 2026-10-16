@@ -1,6 +1,7 @@
 import {
   ACTIVE_CARD_ROUND_PHASES,
   CARD_CI_FIX_ATTEMPTS_MAX,
+  CARD_CI_MISSING_MS,
   CARD_CI_POLL_MS,
   type CardCiFixInput,
   type CardCiState,
@@ -35,6 +36,12 @@ export const shippingAutoStart = (env: NodeJS.ProcessEnv = process.env) =>
 
 /** #359 D6: the reason `needsPerson` is audited with. */
 export const CI_STILL_FAILING = 'ci_still_failing';
+
+/**
+ * #484: the reason `needsPerson` is audited with when a head of a project
+ * with CI got no checks, even after `card.ciRetrigger`.
+ */
+export const CI_NOT_REPORTED = 'ci_not_reported';
 
 /**
  * #359 D6: the project's own checks, as the fix prompt names them —
@@ -245,7 +252,7 @@ export class BoardShipping
       card.ciState === 'none' &&
       card.ciHeadSha === result.headSha &&
       card.ciCheckedAt !== null;
-    await this.store(card, result, state);
+    const noneSince = await this.store(card, result, state);
 
     if (result.state === 'merged') {
       await this.mergedOutside(project, card);
@@ -265,21 +272,162 @@ export class BoardShipping
         await this.fix(project, card, result, conflict);
         return;
       }
-      if (state !== 'green' && !noChecks) return;
+      if (state !== 'green') {
+        if (!noChecks) return;
+        if (!(await this.shipsWithoutChecks(project, card, result, noneSince)))
+          return;
+      }
       if (!(await this.toFinished(project, card))) return;
-    } else if (state !== 'green' && !noChecks) {
-      return;
+    } else if (state !== 'green') {
+      if (!noChecks) return;
+      if (!(await this.shipsWithoutChecks(project, card, result, noneSince)))
+        return;
     }
     await this.autoMerge(project, card.number, result.headSha);
   }
 
-  /** D5: the checks on the card, and the PR's state on its row. */
+  /**
+   * #484 (ADR-0043): whether a head with no checks ships as one. In a project
+   * whose CI never reported on a card, it does, as before. Otherwise the
+   * forge's event was probably lost — a CI that answered its webhook with an
+   * error never gets it again — so after `CARD_CI_MISSING_MS` the PR's event
+   * is sent again once per head (`card.ciRetrigger`), and a head still
+   * without checks `CARD_CI_MISSING_MS` after that marks the card
+   * `needsPerson`. It never ships unchecked.
+   */
+  private async shipsWithoutChecks(
+    project: BoardProject,
+    card: CardWithRounds,
+    result: CardChecksResult,
+    noneSince: Date,
+  ): Promise<boolean> {
+    if (!(await this.hasCi(project.id))) return true;
+    if (Date.now() - noneSince.getTime() < CARD_CI_MISSING_MS) return false;
+    if (
+      card.ciRetriggeredSha !== result.headSha &&
+      this.commands.servesCiRetrigger(project.runnerId)
+    ) {
+      await this.retrigger(project, card, result.headSha);
+      return false;
+    }
+    await this.ciNotReported(project, card, result.headSha, null);
+    return false;
+  }
+
+  /** #484: a project's CI has reported on one of its card PRs. */
+  private async hasCi(projectId: string): Promise<boolean> {
+    const reported = await this.prisma.boardCard.findFirst({
+      where: { projectId, ciState: { in: ['pending', 'green', 'red'] } },
+      select: { id: true },
+    });
+    return reported !== null;
+  }
+
+  /**
+   * #484: `card.ciRetrigger`, audited. The head counts as retriggered — and
+   * its wait starts again — whatever `gh` answered, except for a PR that
+   * moved on or is no longer open, which the next read sees. A PR left
+   * closed is a person's to reopen.
+   */
+  private async retrigger(
+    project: BoardProject,
+    card: CardWithRounds,
+    headSha: string,
+  ): Promise<void> {
+    if (card.prNumber === null) return;
+    const result = boardOutput(
+      'card.ciRetrigger',
+      await this.commands.ciRetrigger(
+        project.runnerId,
+        {
+          cardId: card.id,
+          projectId: project.id,
+          root: project.rootPath,
+          pr: card.prNumber,
+          headSha,
+        },
+        { role: 'operator', ctx: { actor: SYSTEM_ACTOR } },
+      ),
+    );
+    if (
+      !result.retriggered &&
+      (result.error === 'head_moved' || result.error === 'not_open')
+    ) {
+      return;
+    }
+    await this.prisma.boardCard.update({
+      where: { id: card.id },
+      data: { ciRetriggeredSha: headSha, ciNoneSince: new Date() },
+    });
+    await this.audit.record({
+      actor: SYSTEM_ACTOR,
+      action: 'card.ci_retriggered',
+      target: { type: 'board_card', id: card.id },
+      projectId: project.id,
+      after: {
+        number: card.number,
+        pr: card.prNumber,
+        headSha,
+        ...(result.retriggered
+          ? {}
+          : { error: result.error, message: result.message }),
+      },
+      result: result.retriggered ? 'ok' : 'error',
+    });
+    this.work.publish(project.id, card.id);
+    if (!result.retriggered && result.error === 'reopen_failed') {
+      await this.ciNotReported(project, card, headSha, result.message);
+    }
+  }
+
+  /** #484: CI never reported on the head — `needsPerson`, then Finished. */
+  private async ciNotReported(
+    project: BoardProject,
+    card: CardWithRounds,
+    headSha: string,
+    message: string | null,
+  ): Promise<void> {
+    await this.prisma.boardCard.update({
+      where: { id: card.id },
+      data: { needsPerson: true },
+    });
+    await this.audit.record({
+      actor: SYSTEM_ACTOR,
+      action: 'card.auto_run_failed',
+      target: { type: 'board_card', id: card.id },
+      projectId: project.id,
+      after: {
+        number: card.number,
+        reason: CI_NOT_REPORTED,
+        pr: card.prNumber,
+        headSha,
+        retriggered: card.ciRetriggeredSha === headSha,
+        ...(message ? { message } : {}),
+      },
+      result: 'ok',
+    });
+    this.work.publish(project.id, card.id);
+    await this.toFinished(project, card);
+  }
+
+  /**
+   * D5: the checks on the card, and the PR's state on its row. Answers since
+   * when the head has had no checks (#484) — now, when it has some.
+   */
   private async store(
     card: CardWithRounds,
     result: CardChecksResult,
     state: CardCiState,
-  ): Promise<void> {
+  ): Promise<Date> {
     const prState = result.state;
+    const now = new Date();
+    const noneSince =
+      state === 'none' &&
+      card.ciState === 'none' &&
+      card.ciHeadSha === result.headSha &&
+      card.ciNoneSince !== null
+        ? card.ciNoneSince
+        : now;
     await this.prisma.boardCard.update({
       where: { id: card.id },
       data: {
@@ -287,7 +435,8 @@ export class BoardShipping
         ciChecks:
           state === 'red' ? failedCardChecks(result.checks) : Prisma.DbNull,
         ciHeadSha: result.headSha,
-        ciCheckedAt: new Date(),
+        ciCheckedAt: now,
+        ciNoneSince: state === 'none' ? noneSince : null,
         ...(prState !== 'merged' ? { prState } : {}),
       },
     });
@@ -298,6 +447,7 @@ export class BoardShipping
       });
     }
     this.work.publish(card.projectId, card.id);
+    return noneSince;
   }
 
   /**

@@ -27,6 +27,7 @@ export type CardHandler = (args: Record<string, unknown>) => unknown;
 type WorldCommand =
   | CardCommandName
   | 'card.checks'
+  | 'card.ciRetrigger'
   | 'card.prClose'
   | 'issue.create'
   | 'pr.inspect';
@@ -110,6 +111,8 @@ export class BoardWorld {
    * itself. Off by default: the suites before #359 run as they did.
    */
   checksServed = false;
+  /** #484: whether the runner advertises `card.ciRetrigger`. */
+  ciRetriggerServed = true;
   /** #329 D4: the delayed collect retries scheduled so far, oldest first. */
   retries: ScheduledRetry[] = [];
   connectHooks!: RunnerConnectHooks;
@@ -150,6 +153,15 @@ export class BoardWorld {
         this.commands.assertReady(runnerId, 'card.checks');
         return this.answer('card.checks', { ...args });
       });
+    jest
+      .spyOn(this.commands, 'servesCiRetrigger')
+      .mockImplementation(() => this.ciRetriggerServed);
+    jest
+      .spyOn(this.commands, 'ciRetrigger')
+      .mockImplementation(async (runnerId, args) => {
+        this.commands.assertReady(runnerId, 'card.ciRetrigger');
+        return this.answer('card.ciRetrigger', { ...args });
+      });
     this.connectHooks = this.ctx.app.get(RunnerConnectHooks);
     const timer = this.ctx.app.get(CollectRetryTimer);
     jest.spyOn(timer, 'schedule').mockImplementation((cardId, delayMs, run) => {
@@ -177,6 +189,7 @@ export class BoardWorld {
     const defaults: Record<WorldCommand, unknown> = {
       'pr.inspect': prInspection(),
       'card.checks': cardChecks(),
+      'card.ciRetrigger': { retriggered: true },
       'card.run': {
         phase: 'starting',
         tmuxSession: `agentdock-card-${String(args.shortId)}`,
@@ -223,10 +236,12 @@ export class BoardWorld {
     jest.mocked(this.commands.inspectPr).mockClear();
     jest.mocked(this.commands.closePr).mockClear();
     jest.mocked(this.commands.checks).mockClear();
+    jest.mocked(this.commands.ciRetrigger).mockClear();
     this.handlers = {};
     this.offline = false;
     this.prCloseAdvertised = true;
     this.checksServed = false;
+    this.ciRetriggerServed = true;
     this.retries = [];
     await resetDatabase(this.ctx.prisma);
     ({ runnerId: this.runnerId, projectId: this.a } = await seedProject(
@@ -295,6 +310,13 @@ export class BoardWorld {
       .mocked(this.commands.send)
       .mock.calls.filter(([, n]) => n === name)
       .map(([, , args]) => args as Record<string, unknown>);
+  }
+
+  /** #484: the `card.ciRetrigger` commands sent, oldest first. */
+  ciRetriggers(): Record<string, unknown>[] {
+    return jest
+      .mocked(this.commands.ciRetrigger)
+      .mock.calls.map(([, args]) => args as unknown as Record<string, unknown>);
   }
 
   /** #329 D8: the `card.prClose` commands sent, oldest first. */

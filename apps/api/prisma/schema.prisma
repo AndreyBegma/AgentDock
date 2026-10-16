@@ -2832,6 +2832,11 @@ model BoardCard {
   ciCheckedAt             DateTime?
   /// #359 D6: `ci_fix` rounds on the current PR (at most 3).
   ciFixAttempts           Int              @default(0)
+  /// #484: since when `ciHeadSha` has had no checks (`ciState` `none`);
+  /// `null` while it has some. Reset when the head is retriggered.
+  ciNoneSince             DateTime?
+  /// #484: the head `card.ciRetrigger` was sent for — once per head.
+  ciRetriggeredSha        String?
   /// #359 D6: CI still failing after the budget — no automation until a person acts.
   needsPerson             Boolean          @default(false)
   /// #359 D8: when the latest PR merged; the card stays in Finished as Merged.

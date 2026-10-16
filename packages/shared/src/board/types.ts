@@ -170,6 +170,14 @@ export const CARD_CI_FIX_ATTEMPTS_MAX = 3;
 /** #359 D5: how often the API reads a PR's checks while any is pending. */
 export const CARD_CI_POLL_MS = 60_000;
 
+/**
+ * #484 (ADR-0043): how long a card PR's head may go without checks, in a
+ * project whose CI has reported on a card before, until the API asks the
+ * forge to send its event again (`card.ciRetrigger`) — and, after that one
+ * retrigger, until the card is marked `needsPerson`.
+ */
+export const CARD_CI_MISSING_MS = 5 * 60_000;
+
 /** #359 D1: the runner pushes a card's committed HEAD at most this often. */
 export const CARD_PUSH_MIN_INTERVAL_MS = 30_000;
 
