@@ -42,6 +42,8 @@ export const CARD_TIMEOUTS_MS = {
   merge: 90_000,
   /** #329 D8: `gh pr close`, the branch, then the issue. */
   prClose: 60_000,
+  /** #359 D5: `gh pr view` and `gh pr checks`. */
+  checks: 30_000,
 } as const;
 
 /** `card.run` prompt: one argv element read from `launch.json`, never a shell string (D5). */
@@ -110,6 +112,34 @@ const cardTarget = {
   projectId: z.string().min(1),
 };
 
+/** A PR title: one line, as `gh pr create --title` takes it. */
+const prTitleSchema = z
+  .string()
+  .min(1)
+  .max(256)
+  .refine((t) => !/[\r\n]/.test(t), { message: 'must be one line' });
+
+/** A PR body, at most `CARD_COLLECT_BODY_MAX_BYTES`. */
+const prBodySchema = z
+  .string()
+  .refine(noNul, { message: 'must not contain NUL' })
+  .refine((t) => utf8Bytes(t) <= CARD_COLLECT_BODY_MAX_BYTES, {
+    message: `must be at most ${CARD_COLLECT_BODY_MAX_BYTES} bytes`,
+  });
+
+/**
+ * #359 D1: the draft PR the runner opens during the round, once the
+ * worktree's HEAD is ahead of `origin/<base>` — `gh pr create --draft` with
+ * this title (`C-<n>: <title>`) and body (the spec link and the card summary,
+ * shared `cardDraftPullRequestBody`). The worker's description replaces the
+ * body at collect (D3).
+ */
+export const cardDraftPullRequestSchema = z.strictObject({
+  title: prTitleSchema,
+  body: prBodySchema,
+});
+export type CardDraftPullRequest = z.infer<typeof cardDraftPullRequestSchema>;
+
 // card.run
 
 /**
@@ -127,6 +157,21 @@ const cardTarget = {
  * unlisted files removed; `.agentdock/` git-excluded. Absent is an empty
  * list. A download or check that fails fails the command with
  * `attachments_unavailable`.
+ *
+ * #359 D1: with `pullRequest`, the runner's session poll pushes the committed
+ * HEAD of `branch` (never the index or the working tree, at most once per
+ * `CARD_PUSH_MIN_INTERVAL_MS`) and, when no PR is open for it, opens a draft
+ * one; each push is reported as `card_run.pushed`. Absent: nothing is pushed
+ * before collect.
+ *
+ * #359 D8: with `newBranch` (a later round only), the runner fetches `base`
+ * and creates `branch` from the updated `origin/<base>` in the card's
+ * existing worktree before it resumes the session — the follow-up of a
+ * merged card. `branch` must not exist yet, locally or on the remote.
+ *
+ * Both are taken by a runner that advertises `card.checks` (the same
+ * release); an older one refuses them as `invalid_args`, so the API sends
+ * them only to a runner that advertises it.
  */
 export const cardRunArgsSchema = z
   .strictObject({
@@ -147,6 +192,10 @@ export const cardRunArgsSchema = z
     profileKey: profileKeySchema,
     model: orchestratorModelSchema,
     permissionMode: orchestratorPermissionModeSchema,
+    /** #359 D1: push during the round and open this draft PR. */
+    pullRequest: cardDraftPullRequestSchema.optional(),
+    /** #359 D8: create `branch` from the updated `origin/<base>` first. */
+    newBranch: z.boolean().optional(),
   })
   .refine(
     (a) =>
@@ -154,6 +203,14 @@ export const cardRunArgsSchema = z
       (a.files ?? []).length,
     { message: 'file paths must be distinct', path: ['files'] },
   )
+  .refine((a) => a.newBranch !== true || a.session.resume, {
+    message: 'newBranch needs a resumed session',
+    path: ['newBranch'],
+  })
+  .refine((a) => a.pullRequest === undefined || a.branch !== a.base, {
+    message: 'a pushed branch must not be the base branch',
+    path: ['branch'],
+  })
   .refine(
     (a) =>
       new Set((a.attachments ?? []).map((f) => f.id)).size ===
@@ -200,17 +257,8 @@ export const cardCollectArgsSchema = z
     cwd: absolutePathSchema.optional(),
     /** The card's per-project number, for the leftovers commit message. */
     number: z.number().int().positive(),
-    title: z
-      .string()
-      .min(1)
-      .max(256)
-      .refine((t) => !/[\r\n]/.test(t), { message: 'must be one line' }),
-    body: z
-      .string()
-      .refine(noNul, { message: 'must not contain NUL' })
-      .refine((t) => utf8Bytes(t) <= CARD_COLLECT_BODY_MAX_BYTES, {
-        message: `must be at most ${CARD_COLLECT_BODY_MAX_BYTES} bytes`,
-      }),
+    title: prTitleSchema,
+    body: prBodySchema,
   })
   .refine((a) => a.branch !== a.base, {
     message: 'must not be the base branch',
@@ -487,3 +535,74 @@ export const cardPrCloseCommands = {
 } as const satisfies Record<string, CommandDefinition>;
 
 export type CardPrCloseCommandName = keyof typeof cardPrCloseCommands;
+
+// card.checks
+
+/** #359 D5: checks `card.checks` reports, at most. */
+export const CARD_CHECKS_MAX = 100;
+
+/**
+ * #359 D5 (ADR-0010, advertised per ADR-0023): a card PR's head and checks,
+ * read through the runner's `gh` in the project root — `gh pr view <pr>
+ * --json state,isDraft,headRefOid,mergeable` and `gh pr checks <pr> --json
+ * name,bucket,link`, never a command text. A PR with no checks answers
+ * `checks: []`. CI logs are not read (the spec's out of scope).
+ */
+export const cardChecksArgsSchema = z.strictObject({
+  ...cardTarget,
+  root: absolutePathSchema,
+  pr: z.number().int().positive(),
+});
+export type CardChecksArgs = z.infer<typeof cardChecksArgsSchema>;
+
+/** `gh pr checks`' `bucket`: how GitHub classifies a check's state. */
+export const cardCheckBucketSchema = z.enum([
+  'pass',
+  'fail',
+  'pending',
+  'skipping',
+  'cancel',
+]);
+export type CardCheckBucket = z.infer<typeof cardCheckBucketSchema>;
+
+export const cardCheckSchema = z.object({
+  name: z.string().min(1).max(200),
+  bucket: cardCheckBucketSchema,
+  /** The check's details page; `null` when GitHub gives none. */
+  link: z.url({ protocol: /^https$/ }).nullable(),
+});
+export type CardCheck = z.infer<typeof cardCheckSchema>;
+
+/** `gh pr view`'s `mergeable`: `CONFLICTING` starts a conflict round (D6). */
+export const cardPrMergeableSchema = z.enum([
+  'MERGEABLE',
+  'CONFLICTING',
+  'UNKNOWN',
+]);
+export type CardPrMergeable = z.infer<typeof cardPrMergeableSchema>;
+
+export const cardChecksResultSchema = z.object({
+  /** The PR's state; `draft` is an open PR with `isDraft`. */
+  state: z.enum(['open', 'draft', 'merged', 'closed']),
+  /** The PR's head; the checks are this commit's. */
+  headSha: headShaSchema,
+  mergeable: cardPrMergeableSchema,
+  checks: z.array(cardCheckSchema).max(CARD_CHECKS_MAX),
+});
+export type CardChecksResult = z.infer<typeof cardChecksResultSchema>;
+
+/**
+ * #359 D5: `card.checks`, an operator command. Exported here and entered in
+ * the `commands` allowlist together with its runner handler, as
+ * `cardPrCloseCommands` was.
+ */
+export const cardChecksCommands = {
+  'card.checks': {
+    args: cardChecksArgsSchema,
+    result: cardChecksResultSchema,
+    minRole: 'operator',
+    timeoutMs: CARD_TIMEOUTS_MS.checks,
+  },
+} as const satisfies Record<string, CommandDefinition>;
+
+export type CardChecksCommandName = keyof typeof cardChecksCommands;

@@ -129,6 +129,21 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
               data: { tmuxSession: data.tmuxSession },
             });
           }
+          if (data.phase === 'running') {
+            // #367 D3: a runner older than #367 sends no facts — it wires nothing.
+            const wiring = data.wiring ?? 'none';
+            await tx.boardCardRound.updateMany({
+              where: { id: round.id, wiring: null },
+              data: {
+                wiring,
+                wiringReason:
+                  wiring === 'none'
+                    ? (data.wiringReason ??
+                      (data.wiring === undefined ? 'runner_outdated' : null))
+                    : null,
+              },
+            });
+          }
           if (data.worktree) {
             await tx.boardCard.update({
               where: { id: round.cardId },

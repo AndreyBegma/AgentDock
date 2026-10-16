@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { BoardCardView, TaskDesignStatus } from '@agentdock/shared';
+import type { CardRunWiringReason } from '@agentdock/shared/protocol';
 import { ApiError } from '../api';
 import { boardView, card, round } from './fixtures';
 import {
@@ -15,10 +16,9 @@ import {
   columnsOf,
   describeBoardError,
   designBlocksRun,
-  HOOKS_COMMANDS,
   HOOKS_GUIDE_LABEL,
   hooksGuideHref,
-  hooksHint,
+  hooksNotice,
   parseCardParam,
   parseMaxRunning,
   roundPill,
@@ -283,18 +283,62 @@ describe('parsers', () => {
   });
 });
 
-describe('hooksHint (#281 D6)', () => {
-  test('names the cause in prose, with no markdown to show as text', () => {
-    expect(hooksHint).toContain('plugin is not set up for its runtime profile');
-    expect(hooksHint).not.toContain('`');
-    expect(hooksHint).not.toContain('not installed in this project');
+describe('hooksNotice (#281 D6, #367 D3/D4)', () => {
+  const manual = { source: 'manual' } as const;
+
+  test('a runner older than #367 is named, and no plugin is asked for', () => {
+    const notice = hooksNotice(manual, {
+      wiring: 'none',
+      wiringReason: 'runner_outdated',
+    });
+    expect(notice.text).toContain('older than 0.10.0');
+    expect(notice.text).not.toContain('plugin');
+    expect(notice.text).not.toContain('`');
+    expect(notice.commands).toEqual([]);
+    expect(notice.guide).toBe(false);
   });
 
-  test('the commands are separate, for code blocks', () => {
-    expect(HOOKS_COMMANDS.map((item) => item.code)).toEqual([
-      'agentdock-runner profiles',
-      'agentdock-runner setup claude --profile <key>',
+  test('each failed-wiring reason has its own text', () => {
+    const text = (wiringReason: CardRunWiringReason) =>
+      hooksNotice(manual, { wiring: 'none', wiringReason }).text;
+    expect(text('settings_write_failed')).toContain('could not write');
+    expect(text('claude_too_old')).toContain('--settings');
+    expect(text('settings_write_failed')).not.toBe(text('claude_too_old'));
+  });
+
+  test('wired but silent points at the runner connection, not at setup', () => {
+    for (const wiring of ['plugin', 'injected'] as const) {
+      const notice = hooksNotice(manual, { wiring });
+      expect(notice.text).toContain('no hook event reached AgentDock');
+      expect(notice.text).not.toContain('not set up');
+      expect(notice.commands.map((c) => c.code)).toEqual([
+        'agentdock-runner status',
+      ]);
+      expect(notice.guide).toBe(false);
+    }
+  });
+
+  test('a terminal or fleet card keeps the setup commands', () => {
+    for (const source of ['terminal', 'fleet'] as const) {
+      const notice = hooksNotice({ source }, { wiring: null });
+      expect(notice.text).toContain('plugin is not set up');
+      expect(notice.commands.map((c) => c.code)).toEqual([
+        'agentdock-runner profiles',
+        'agentdock-runner setup claude --profile <key>',
+      ]);
+      expect(notice.guide).toBe(true);
+    }
+  });
+
+  test('a terminal card names the profile it runs in', () => {
+    const notice = hooksNotice(
+      { source: 'terminal', profileKey: 'claude-work' },
+      { wiring: null },
+    );
+    expect(notice.commands.map((c) => c.code)).toEqual([
+      'agentdock-runner setup claude --profile claude-work',
     ]);
+    expect(notice.commands[0]?.label).toContain('claude-work');
   });
 
   test('links the Settings › Sessions checklist of the project', () => {

@@ -31,7 +31,7 @@ the project's runner, in the pattern ADR-0027 set for text normalization.
 - A runner command `card.assess` and an API job that store one recommendation
   per card for work and one for design, each with a one-line reason.
 - A shared model catalog: aliases, display labels, and order.
-- The card form's free-text **Model** field becomes the same select.
+- The card form's free-text **Model** field is removed; the launch popover is the only place to choose a profile and model (#381).
 
 ### Out of scope
 
@@ -75,9 +75,11 @@ the project's runner, in the pattern ADR-0027 set for text normalization.
   - Work and design share the card's `profileKey`.
   - The model override is separate: `model` (work, existing column) and
     `designModel` (new).
-  - Choosing the default option in the card form clears the override
+  - Choosing the default option in the launch popover clears the override
     (`null`). This is the existing `model: null` semantics [Confirmed
-    `apps/api/src/board/dto.ts`].
+    `apps/api/src/board/dto.ts`]. The card form has no profile or model
+    field (#381), so saving it never sends either and never clears an
+    override.
 - **D4 — Model catalog in `packages/shared`.** `CLAUDE_MODELS`, an ordered
   list of `{ alias, label }`:
 
@@ -196,9 +198,8 @@ the project's runner, in the pattern ADR-0027 set for text normalization.
 - `apps/web/src/components/board/`:
   - a `LaunchPopover` used by the card sheet's Run section and by the design
     viewer's Generate / Revise when the design's owner is a card;
-  - the card form's **Model** text input becomes the catalog select, whose
-    first option is "Recommended — Opus 5.5" or "Project default — …";
-  - a **Profile** select is added next to it.
+  - the card form's free-text **Model** input is removed (#381): the popover
+    is the only place to choose the profile and the model.
 - Plan-task designs keep their current controls: the Planner owns them
   (ADR-0025).
 - Labels follow glass-ui: popover, select, hint. A missing glass-ui part is
@@ -252,7 +253,7 @@ None. The assessment uses the project's Claude profile (D2 resolver) and
 | i322-contract | schema, migration, shared contracts, model catalog, compile fixes | apps/api/prisma/schema.prisma, apps/api/prisma/migrations/20261122000000_card_profile_and_model_recommendation/**, packages/shared/src/models/**, packages/shared/src/protocol/commands/assess.ts, packages/shared/src/protocol/events/assess.ts, packages/shared/src/protocol/index.ts, packages/shared/src/board/**, packages/shared/src/index.ts, packages/shared/src/design/contracts.ts | — | yes | opus |
 | i322-runner | `card.assess` handler and its allowlist entry | apps/runner/src/assess/**, apps/runner/src/commands/handlers.ts, packages/shared/src/protocol/commands.ts | i322-contract | no | sonnet |
 | i322-api | assessment job, launch overrides, design turn overrides | apps/api/src/assess/**, apps/api/src/app.module.ts, apps/api/src/board/**, apps/api/src/planner/card-design-turn.service.ts, apps/api/src/design/card-design.controller.ts, apps/api/src/design/dto.ts, apps/api/src/text/** | i322-contract | no | opus |
-| i322-web | launch popover, card form selects, catalog in web | apps/web/src/components/board/**, apps/web/src/components/design/design-viewer.tsx, apps/web/src/lib/design/use-design.ts, apps/web/src/lib/board/**, apps/web/src/lib/skills/format.ts, apps/web/src/components/planner/composer.tsx, apps/web/src/app/(app)/projects/[projectId]/skills/run-dialog.tsx, docs/ui/screens.md | i322-contract | no | sonnet |
+| i322-web | launch popover, catalog in web | apps/web/src/components/board/**, apps/web/src/components/design/design-viewer.tsx, apps/web/src/lib/design/use-design.ts, apps/web/src/lib/board/**, apps/web/src/lib/skills/format.ts, apps/web/src/components/planner/composer.tsx, apps/web/src/app/(app)/projects/[projectId]/skills/run-dialog.tsx, docs/ui/screens.md | i322-contract | no | sonnet |
 
 `i322-api` and `i322-runner` run in parallel. The API refuses `card.assess` on
 an old runner (ADR-0023), so the order of their merges does not matter.

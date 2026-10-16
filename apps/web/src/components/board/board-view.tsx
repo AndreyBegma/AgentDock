@@ -220,9 +220,14 @@ export function BoardColumns({
 
   return (
     <>
-      {/* Fills the height the page leaves; glass-ui's `Board` scrolls each column in it. */}
+      {/*
+       * Fills the height the page leaves; glass-ui's `Board` scrolls each column in it.
+       * Its card `li` sets a min height but no `shrink-0`, so in a bounded column the
+       * cards squash to one row instead of scrolling (#384) — kept here until glass-ui
+       * ships the fix (glass-ui#147; docs/ui/glass-ui.md).
+       */}
       <div
-        className="flex min-h-0 flex-1 flex-col"
+        className="flex min-h-0 flex-1 flex-col [&_[data-board-card]]:shrink-0"
         style={
           {
             '--board-column': boardColumnWidth(columns.length),

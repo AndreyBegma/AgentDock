@@ -110,6 +110,7 @@ Until then AgentDock does without it rather than drawing it here (ADR-0011).
 | Gap | Effect in AgentDock |
 |---|---|
 | `Board` has no `canDrop(card, column)` | The Board page checks `boardMoveRule` in `onMove` and declines there; a refused card snaps back, and the menu's "Move to" items still list every column. |
+| `Board`'s card `li` sets `min-h-(--size-row)` without `shrink-0` | In a height-bounded column the cards squash to one row instead of scrolling; `components/board/board-view.tsx` adds `[&_[data-board-card]]:shrink-0` on the board's wrapper (#384, glass-ui#147). |
 | `Toggle` has no `disabled` | `components/board/card-options.tsx` makes a locked toggle inert and dimmed and drops its change handler. |
 
 `Board` was checked at 390 px for #242: its columns scroll sideways inside the
