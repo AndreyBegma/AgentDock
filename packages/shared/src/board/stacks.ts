@@ -3,7 +3,7 @@ import type { BoardCardView, CardRoundBrief } from './contracts';
 import { BOARD_COLUMNS, type BoardColumn } from './types';
 
 /**
- * Stacks (#480, ADR-0043): a group of cards that make one larger piece of
+ * Stacks (#480, ADR-0044): a group of cards that make one larger piece of
  * work, ordered in stages, under one optional shared design. Every card of
  * stage N+1 depends on every card of stage N through ordinary card
  * dependencies; while the stack's design is needed and not approved, no card

@@ -2417,7 +2417,7 @@ model PlanTask {
 /// whose output fails the contract keeps `resultText` and applies nothing.
 model PlanTurn {
   id         String         @id @default(cuid())
-  /// Exactly one of `planId` / `cardId` / `stackId` (CHECK `plan_turns_owner_check`, ADR-0025, ADR-0043).
+  /// Exactly one of `planId` / `cardId` / `stackId` (CHECK `plan_turns_owner_check`, ADR-0025, ADR-0044).
   planId     String?
   /// A board card's design turn (#243 D2), sent as `plan.turn` with `planId = card.id`.
   cardId     String?
@@ -2545,7 +2545,7 @@ model TaskDesign {
   planId             String?
   taskKey            String?
   cardId             String?          @unique
-  /// #480 (ADR-0043): a stack's shared design, drawn for the whole result.
+  /// #480 (ADR-0044): a stack's shared design, drawn for the whole result.
   stackId            String?          @unique
   /// The person's switch (D2); starts as the planner's suggestion.
   needed             Boolean
@@ -2843,6 +2843,11 @@ model BoardCard {
   ciCheckedAt             DateTime?
   /// #359 D6: `ci_fix` rounds on the current PR (at most 3).
   ciFixAttempts           Int              @default(0)
+  /// #484: since when `ciHeadSha` has had no checks (`ciState` `none`);
+  /// `null` while it has some. Reset when the head is retriggered.
+  ciNoneSince             DateTime?
+  /// #484: the head `card.ciRetrigger` was sent for — once per head.
+  ciRetriggeredSha        String?
   /// #359 D6: CI still failing after the budget — no automation until a person acts.
   needsPerson             Boolean          @default(false)
   /// #359 D8: when the latest PR merged; the card stays in Finished as Merged.
@@ -2899,7 +2904,7 @@ model BoardCard {
   /// #337 D6, D7: the plan the card came from — a New Card intake or a New
   /// Plan's Create cards; kept as its origin.
   planId                  String?
-  /// #480 (ADR-0043): the stage of the stack the card belongs to; at most one.
+  /// #480 (ADR-0044): the stage of the stack the card belongs to; at most one.
   stageId                 String?
   createdAt               DateTime         @default(now())
   updatedAt               DateTime         @updatedAt
@@ -2953,7 +2958,7 @@ model BoardCardDependency {
   @@map("board_card_dependencies")
 }
 
-/// #480 (ADR-0043): a group of cards that make one larger piece of work,
+/// #480 (ADR-0044): a group of cards that make one larger piece of work,
 /// ordered in stages, under one optional shared design. Every card of stage
 /// N+1 has an ordinary `BoardCardDependency` on every card of stage N.
 model BoardStack {
@@ -3366,7 +3371,8 @@ model TextSettings {
 /// Token saver (#445, ADR-0039).
 
 /// The launch a filtered command ran under (shared `TOKEN_SAVER_RUN_KINDS`).
-/// `orchestrator` is the project's orchestrator session, which has no run.
+/// `orchestrator` is the project's orchestrator session and `manual` a session
+/// the runner did not launch (`/cs-eco`, #475); neither has a run.
 enum TokenSaverRunKind {
   card
   skill
@@ -3376,6 +3382,7 @@ enum TokenSaverRunKind {
   ui_profile
   text_normalize
   orchestrator
+  manual
 }
 
 /// A project's Token saver setting (D11). No row: on, with an empty allowlist.
@@ -3398,7 +3405,7 @@ model TokenSaverSettings {
 model TokenSaverStat {
   id            String            @id
   projectId     String
-  /// Null for the orchestrator session, or a run the API does not know.
+  /// Null for the orchestrator and manual sessions, or a run the API does not know.
   runId         String?
   runKind       TokenSaverRunKind
   /// `<family>/<command>`, e.g. `js/jest`; `none` when no filter matched.

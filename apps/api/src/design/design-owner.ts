@@ -7,7 +7,7 @@ import type { DesignKey } from './design-store';
 
 /**
  * ADR-0025 / #243 D3: a design's owner — a plan task, a board card or
- * (#480, ADR-0043) a stack — as
+ * (#480, ADR-0044) a stack — as
  * `DesignService` drives it. One module, two hosts: the stage's rules
  * (switch, Generate, comments, Revise, Approve) are the service's; what
  * differs by host is here. An owner is built only once its host is known

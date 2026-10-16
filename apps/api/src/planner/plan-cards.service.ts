@@ -192,7 +192,7 @@ export class PlanCardsService {
    * the title and kind they left. All land in Todo at once, with no
    * dependency links, the plan as their origin and the model's body; the
    * intake is `done` after it. The plan's attachments go to the first card.
-   * #480 (ADR-0043): with `stack`, the same cards are made in stage order as
+   * #480 (ADR-0044): with `stack`, the same cards are made in stage order as
    * one stack — its stages, a dependency from every card of a stage on every
    * card of the stage before, and its design when asked — in the same
    * transaction, whichever the intake proposed.

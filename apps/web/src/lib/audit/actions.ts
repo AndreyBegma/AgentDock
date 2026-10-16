@@ -127,6 +127,8 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   'card.collect_requested': "Asked for a card's pull request",
   'card.auto_run_failed':
     "A card's worker did not start on its own (design approval or Auto-run)",
+  'card.ci_retriggered':
+    "Reopened a card's pull request because CI reported no checks",
   'card.auto_run_toggled': 'Switched Auto-run when ready on a card',
   'attachment.added': 'Uploaded an attachment',
   'attachment.claimed': 'Attached files to a card',

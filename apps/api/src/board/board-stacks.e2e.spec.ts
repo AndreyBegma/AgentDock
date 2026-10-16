@@ -15,7 +15,7 @@ import { block } from '../planner/testing/planner-e2e';
 
 /**
  * #480 (docs/specs/480-add-card-stacks-staged-cards-sharing-one.md,
- * ADR-0043): a stack — staged cards under one shared design. The intake may
+ * ADR-0044): a stack — staged cards under one shared design. The intake may
  * propose one; Confirm makes it with its stage dependencies in one
  * transaction; while its design is not approved no card of it runs.
  */

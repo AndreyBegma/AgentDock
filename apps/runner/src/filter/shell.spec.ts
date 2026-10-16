@@ -1,6 +1,14 @@
-import { describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { wrappedCommand } from './hook';
-import { parseSimpleCommand, quoteAssignment, shellQuote } from './shell';
+import {
+  parseHookCommand,
+  parseSimpleCommand,
+  quoteAssignment,
+  shellQuote,
+} from './shell';
 
 /** The words bash itself makes of `text`, through a function that prints its args. */
 const bashWords = (text: string): string[] => {
@@ -155,13 +163,206 @@ describe('parseSimpleCommand (#445 amendment 3)', () => {
     ];
     expect(bashWords(command)).toEqual(words);
     const self = ['/opt/a b/agentdock-runner'];
-    expect(bashWords(wrappedCommand(parsed, self))).toEqual([
+    const rewrite = wrappedCommand(
+      { cd: null, command: parsed, mergeStderr: false },
+      self,
+    );
+    expect(bashWords(rewrite)).toEqual([
       ...parsed.assignments.map((a) => `${a.name}=${a.value}`),
       ...self,
       'filter',
       '--',
       ...parsed.argv,
     ]);
+  });
+});
+
+describe('parseHookCommand (#445 amendment 11)', () => {
+  it('takes `cd <path> && <command> 2>&1` apart', () => {
+    expect(parseHookCommand(`cd "a b" && CI=1 bun test 2>&1`)).toEqual({
+      cd: 'a b',
+      command: {
+        assignments: [{ name: 'CI', value: '1' }],
+        argv: ['bun', 'test'],
+      },
+      mergeStderr: true,
+    });
+    expect(parseHookCommand('bun test')).toEqual({
+      cd: null,
+      command: { assignments: [], argv: ['bun', 'test'] },
+      mergeStderr: false,
+    });
+  });
+
+  it('leaves `&&` and `2>&1` inside quotes to the command', () => {
+    expect(parseHookCommand(`cd 'a && b' && grep '&&' "2>&1"`)).toEqual({
+      cd: 'a && b',
+      command: { assignments: [], argv: ['grep', '&&', '2>&1'] },
+      mergeStderr: false,
+    });
+  });
+
+  it.each([
+    // the near misses of `cd <literal path> &&`
+    'cd a b && x',
+    'cd -- x && y',
+    'cd - && y',
+    'cd -P x && y',
+    'cd $HOME && x',
+    'cd "$HOME" && x',
+    'cd ~ && x',
+    'cd ~/x && y',
+    'cd *.d && y',
+    'cd a{b,c} && y',
+    'cd `pwd` && y',
+    "cd '' && y",
+    'cd && y',
+    'cd x &&',
+    'cd x && ',
+    '&& y',
+    'cd x && y && z',
+    'cd x; y',
+    'cd x && y; z',
+    'cd x && y | z',
+    'cd x || y',
+    'cd x & y',
+    'cd x &&& y',
+    'cd x && (y)',
+    'cd x && FOO=1',
+    'cd x && exec y',
+    'cd x && env y',
+    '"cd" x && y',
+    "c'd' x && y",
+    'FOO=1 cd x && y',
+    'y && cd x',
+    'x && y',
+    // an injected newline, anywhere
+    'cd x\n&& y',
+    'cd x &&\ny',
+    'cd x && y\nz',
+    'cd x\ny && z',
+    'cd x && y 2>&1\nz',
+    'y 2>&1\n',
+    // the near misses of a trailing `2>&1`
+    'y 2>&1 >f',
+    'y >f 2>&1',
+    'y 2>&3',
+    'y &>f',
+    'y &> f',
+    'y 1>&2',
+    'y >&2',
+    'y 2>& 1',
+    'y 2 >&1',
+    'y2>&1',
+    'y 12>&1',
+    'y 2>&1x',
+    'y 2>&1;',
+    'y 2>&1 &',
+    'y 2>&1 2>&1',
+    'y 2>&1 | z',
+    'y \\ 2>&1',
+    "y '2>&1",
+    'y "a 2>&1',
+    'cd x 2>&1 && y',
+    'cd x && 2>&1',
+    '2>&1',
+    ' 2>&1',
+    'FOO=1 2>&1',
+  ])('refuses %p', (command) => {
+    expect(parseHookCommand(command)).toBeNull();
+  });
+
+  describe('agrees with bash', () => {
+    let root: string;
+    beforeAll(() => {
+      root = realpathSync(mkdtempSync(join(tmpdir(), 'hook-cd-')));
+      for (const dir of ['sub/deeper', 'd i r', `it's`, '2>&1']) {
+        mkdirSync(join(root, dir), { recursive: true });
+      }
+    });
+    afterAll(() => {
+      rmSync(root, { recursive: true, force: true });
+    });
+
+    /**
+     * Runs `text` in `root`, with `a` a function that prints its working
+     * directory, `$FOO` and its args to stdout, then `E` to stderr.
+     */
+    const run = (text: string) => {
+      const result = Bun.spawnSync(
+        [
+          'bash',
+          '--noprofile',
+          '--norc',
+          '-c',
+          `a() { printf '%s\\0' "$PWD" "\${FOO-unset}" "$@"; printf E >&2; }; ${text}`,
+        ],
+        {
+          cwd: root,
+          stdout: 'pipe',
+          stderr: 'pipe',
+          env: { PATH: process.env.PATH },
+        },
+      );
+      if (result.exitCode !== 0) {
+        throw new Error(`bash failed on ${text}: ${result.stderr.toString()}`);
+      }
+      return { out: result.stdout.toString(), err: result.stderr.toString() };
+    };
+
+    /** The printed words, and where `E` went. */
+    const observed = (text: string) => {
+      const { out, err } = run(text);
+      const merged = out.endsWith('E');
+      const body = merged ? out.slice(0, -1) : out;
+      return {
+        words: body.slice(0, -1).split('\0'),
+        stderrInStdout: merged,
+        stderr: err,
+      };
+    };
+
+    it.each([
+      'cd sub && a x',
+      'cd sub/deeper&&a x',
+      `cd "d i r" && FOO='v w' a 'x y' z 2>&1`,
+      `cd 'it'\\''s' && a q`,
+      `cd it\\'s && a q\t2>&1\t`,
+      `cd '2>&1' && a "2>&1"`,
+      `cd ./sub && a 'x 2>&1'`,
+      `cd sub && a '&&' 2>&1`,
+      'a x 2>&1',
+      'FOO=1 a x 2>&1  ',
+      'a x',
+    ])('on %p and its rewrite', (command) => {
+      const parsed = parseHookCommand(command);
+      if (!parsed) throw new Error(`expected ${command} to be rewritable`);
+      const foo =
+        parsed.command.assignments.find((a) => a.name === 'FOO')?.value ??
+        'unset';
+      const cwd = parsed.cd === null ? root : join(root, parsed.cd);
+
+      // bash runs the command the parser saw…
+      const original = observed(command);
+      expect(original.words).toEqual([
+        cwd,
+        foo,
+        ...parsed.command.argv.slice(1),
+      ]);
+      expect(original.stderrInStdout).toBe(parsed.mergeStderr);
+
+      // …and the rewrite runs it the same way, behind `filter --`.
+      const rewrite = observed(wrappedCommand(parsed, ['a']));
+      expect(rewrite.words).toEqual([
+        cwd,
+        foo,
+        'filter',
+        '--',
+        ...parsed.command.argv,
+      ]);
+      expect(rewrite.stderrInStdout).toBe(original.stderrInStdout);
+      expect(rewrite.stderr).toBe(original.stderr);
+    });
   });
 });
 

@@ -236,7 +236,7 @@ export const approvedDesignSections = (d: ApprovedDesignContext): string[] => [
 export const CARD_DESIGN_CONTRACT_VERSION = 2;
 
 /**
- * #480 (ADR-0043): the approved design of the stack a card belongs to — the
+ * #480 (ADR-0044): the approved design of the stack a card belongs to — the
  * whole result. A card's design turn reads it as reference; the card's own
  * design stays its own.
  */
@@ -383,7 +383,7 @@ export const cardDesignPrompt = (input: CardDesignPromptInput): string => {
 };
 
 /**
- * #480 (ADR-0043): the prompt of a stack's design turn — one design of the
+ * #480 (ADR-0044): the prompt of a stack's design turn — one design of the
  * whole result (the full page, say) that every card of the stack builds a
  * part of. Each card may still have its own design, kept apart.
  */

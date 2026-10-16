@@ -110,7 +110,7 @@ export const cardDesignPath = (
 };
 
 /**
- * #480 (ADR-0043): one frame of a stack's approved design in a stack card's
+ * #480 (ADR-0044): one frame of a stack's approved design in a stack card's
  * branch, as reference, repository-relative:
  * `<specDir>/stacks/S-<n>-<slug>/design/<variant>/<frame>.html`; without a
  * `specDir`, `docs/design/stacks/S-<n>-<slug>/<variant>/<frame>.html`.

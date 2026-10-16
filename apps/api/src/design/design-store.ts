@@ -39,7 +39,7 @@ export type Db = Prisma.TransactionClient | PrismaService;
 export type DesignKey =
   | { planId: string; taskKey: string }
   | { cardId: string }
-  /** #480 (ADR-0043): a stack's shared design. */
+  /** #480 (ADR-0044): a stack's shared design. */
   | { stackId: string };
 
 /** The unique `task_designs` lookup of an owner. */
@@ -403,7 +403,7 @@ export const loadApprovedDesign = async (
 };
 
 /**
- * #480 (ADR-0043): the approved design of the stack a card belongs to, as the
+ * #480 (ADR-0044): the approved design of the stack a card belongs to, as the
  * card's design turn reads it for reference. Null when the card is in no
  * stack, or its stack's design is off or not approved.
  */

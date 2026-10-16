@@ -214,7 +214,7 @@ export interface BoardCardView {
    */
   readiness?: CardReadiness | null;
   /**
-   * #480 (ADR-0043): the stack and stage the card belongs to, with the gate
+   * #480 (ADR-0044): the stack and stage the card belongs to, with the gate
    * its stack's design sets. Optional like `readiness`; absent reads as null.
    */
   stack?: CardStackRef | null;
@@ -337,7 +337,7 @@ export interface BoardView {
   running: number;
   settings: BoardSettingsView;
   /**
-   * #480 (ADR-0043): the project's stacks, each with the column its collapsed
+   * #480 (ADR-0044): the project's stacks, each with the column its collapsed
    * face sits in. Optional so older fixtures stay valid; absent reads as none.
    */
   stacks?: BoardStackView[];
@@ -763,7 +763,7 @@ export const BOARD_ERROR = {
   /** 400 (#337 D8): the card itself, or a number that is no card of this project. */
   invalidDependency: 'invalid_dependency',
   /**
-   * 409 (#480, ADR-0043): Run on a card of a stack whose design is needed and
+   * 409 (#480, ADR-0044): Run on a card of a stack whose design is needed and
    * not approved — nothing writes project code before it is.
    */
   stackDesignNotApproved: 'stack_design_not_approved',
@@ -1004,11 +1004,19 @@ export interface CardFinishedEventData {
   prUrl: string | null;
 }
 
+/**
+ * Why a round waits for the person: its turn ended (`stopped`), or it asks
+ * a question in the session (`question`, #473). Absent from events recorded
+ * before #473 — a stop.
+ */
+export type CardWaitingReason = 'stopped' | 'question';
+
 export interface CardWaitingEventData {
   cardId: string;
   number: number;
   title: string;
   round: number;
+  reason?: CardWaitingReason;
 }
 
 /**

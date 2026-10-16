@@ -71,7 +71,7 @@ export const INTAKE_SPLIT_MAX = 8;
 export const INTAKE_SPLIT_SUMMARY_MAX = 300;
 export const INTAKE_SPLIT_REASON_MAX = 1000;
 /**
- * #480 (ADR-0043): a stack proposal's stages — at least two (one stage is a
+ * #480 (ADR-0044): a stack proposal's stages — at least two (one stage is a
  * split), at most one per card. Its cards together keep the split's limits.
  */
 export const INTAKE_STACK_STAGES_MIN = 2;
@@ -477,7 +477,7 @@ export const intakeSplitOutputSchema = z.strictObject({
   }),
 });
 /**
- * #480 (ADR-0043): one stage of a stack proposal — its cards may run in
+ * #480 (ADR-0044): one stage of a stack proposal — its cards may run in
  * parallel, and each waits on every card of the stage before it.
  */
 export const stackStageDraftSchema = z.strictObject({
@@ -487,7 +487,7 @@ export const stackStageDraftSchema = z.strictObject({
 export type StackStageDraft = z.infer<typeof stackStageDraftSchema>;
 
 /**
- * #480 (ADR-0043): the intake proposes a stack — one larger piece of work
+ * #480 (ADR-0044): the intake proposes a stack — one larger piece of work
  * whose parts must happen in order and share one look. `design` suggests a
  * shared design of the whole result, drawn and approved before any card runs.
  * 2–8 cards in all, in 2 or more stages.

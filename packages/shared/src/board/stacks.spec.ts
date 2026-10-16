@@ -9,7 +9,7 @@ import {
   stageLinks,
 } from './stacks';
 
-describe('stacks (#480, ADR-0043)', () => {
+describe('stacks (#480, ADR-0044)', () => {
   it('a stack sits in the column of its least advanced unfinished card', () => {
     expect(stackColumn(['completed', 'in_progress', 'todo'])).toBe('todo');
     expect(stackColumn(['completed', 'finished', 'in_progress'])).toBe(

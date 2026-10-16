@@ -201,7 +201,7 @@ export class ConfirmStackStageDto {
   cards!: number[];
 }
 
-/** #480 (ADR-0043): Confirm the cards as a stack. */
+/** #480 (ADR-0044): Confirm the cards as a stack. */
 export class ConfirmStackDto implements ConfirmStackRequest {
   @IsString()
   @IsNotEmpty()

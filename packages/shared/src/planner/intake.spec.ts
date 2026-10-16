@@ -511,7 +511,7 @@ describe('an intake turn may propose a split (#409)', () => {
   });
 });
 
-/** #480 (ADR-0043): the stack proposal — cards in ordered stages. */
+/** #480 (ADR-0044): the stack proposal — cards in ordered stages. */
 describe('an intake turn may propose a stack (#480)', () => {
   const stackCard = (title: string, over: Record<string, unknown> = {}) => ({
     ...cardDraft({ title }),

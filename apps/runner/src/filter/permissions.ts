@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { LAUNCH_SETTINGS_ENV } from './env';
-import type { SimpleCommand } from './shell';
+import type { HookCommand } from './shell';
 
 /**
  * The hook must never change what a session allows, asks or denies (#445,
@@ -101,18 +101,24 @@ const matchesGenerously = (pattern: Pattern, command: string): boolean => {
  * Every text a deny or ask rule is tried against: the original with
  * whitespace collapsed, and the parsed words — with and without the
  * assignments, the program with and without its directory — each from every
- * word on, so a rule also meets the command wherever it sits.
+ * word on, so a rule also meets the command wherever it sits. Amendment 11:
+ * the inner command after `cd <path> &&` is one of those forms, and so is the
+ * whole `cd <path> && …` with quotes dropped.
  */
 export const ruleCandidates = (
   original: string,
-  parsed: SimpleCommand,
+  parsed: HookCommand,
 ): string[] => {
-  const [program = '', ...args] = parsed.argv;
-  const forms = [
-    parsed.argv,
-    [basename(program), ...args],
-    [...parsed.assignments.map((a) => `${a.name}=${a.value}`), ...parsed.argv],
+  const { argv, assignments } = parsed.command;
+  const [program = '', ...args] = argv;
+  const withAssignments = [
+    ...assignments.map((a) => `${a.name}=${a.value}`),
+    ...argv,
   ];
+  const forms = [argv, [basename(program), ...args], withAssignments];
+  if (parsed.cd !== null) {
+    forms.push(['cd', parsed.cd, '&&', ...withAssignments]);
+  }
   const out = new Set<string>();
   const text = collapse(original);
   const spaces = text.split(' ');
@@ -132,7 +138,7 @@ export const permissionFor = (
   rules: PermissionRules,
   permissionMode: string | undefined,
   original: string,
-  parsed: SimpleCommand,
+  parsed: HookCommand,
 ): PermissionVerdict => {
   if (permissionMode !== 'bypassPermissions' && permissionMode !== 'auto') {
     return { rewrite: false, reason: 'not bypassPermissions or auto' };

@@ -28,7 +28,7 @@ import { UiProfileProjector } from './ui-profile-projector';
     CardDesignController,
     DesignController,
     DesignMockupController,
-    // #480: a stack's shared design (ADR-0043).
+    // #480: a stack's shared design (ADR-0044).
     StackDesignController,
   ],
   providers: [

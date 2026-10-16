@@ -31,7 +31,7 @@ import { useSection } from '../../../../../../../../lib/section/use-section';
 import { useProjectDetail } from '../../../../use-project-detail';
 
 /**
- * #480 (ADR-0043): a stack's shared design in the viewer of spec 223, full
+ * #480 (ADR-0044): a stack's shared design in the viewer of spec 223, full
  * screen over the shell — the same Generate, comments, Revise and Approve as
  * a card's design. Approving it lifts the design-first gate on every card of
  * the stack; it starts none of them.

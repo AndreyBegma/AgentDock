@@ -102,7 +102,7 @@ const STACK_INCLUDE = {
 type StackRow = Prisma.BoardStackGetPayload<{ include: typeof STACK_INCLUDE }>;
 
 /**
- * Stacks (#480, ADR-0043): a group of cards that make one larger piece of
+ * Stacks (#480, ADR-0044): a group of cards that make one larger piece of
  * work, in ordered stages, under one optional shared design. The stages are
  * written as ordinary card dependencies — every card of a stage on every
  * card of the stage before — so everything that reads dependencies applies.
@@ -498,7 +498,7 @@ export class BoardStacks {
   }
 
   /**
-   * Run's check (ADR-0043): a card of a stack whose design is needed and not
+   * Run's check (ADR-0044): a card of a stack whose design is needed and not
    * approved does not run — nothing writes project code before it is.
    */
   async assertRunnable(cardId: string): Promise<void> {

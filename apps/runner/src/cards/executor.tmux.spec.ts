@@ -29,6 +29,7 @@ import { assistantLine, validNote } from '../handoff/testing';
 import { FakeClock } from '../testing/fake-clock';
 import { memoryLogger } from '../testing/fixtures';
 import { REAL_PROCESS_TIMEOUT_MS } from '../testing/projects';
+import { releaseTmuxServer } from '../testing/tmux';
 import { CardExecutor } from './executor';
 import { cardsWorkspace } from './testing';
 
@@ -74,6 +75,14 @@ if [ "$FAKE_MODE" = prompt ]; then
   printf '%s' "$line" > "$RECORD_DIR/typed-$round"
   sleep 60
 fi
+if [ "$FAKE_MODE" = question ]; then
+  printf '\\033[2J\\033[H'; cat "$FIXTURES/ask-user-question.txt"
+  IFS= read -r line
+  printf '\\033[2J\\033[H'; cat "$FIXTURES/ask-user-question-answered.txt"
+  IFS= read -r line
+  printf '\\033[2J\\033[H'; cat "$FIXTURES/ask-user-questions-two.txt"
+  sleep 60
+fi
 if [ "$FAKE_MODE" = permission ]; then
   printf 'Do you want to proceed?\\n 1. Yes\\n 2. No\\n'
   sleep 60
@@ -91,7 +100,7 @@ const setup = async (
   const server = `agentdock-test-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
   const tmuxServer = ['-L', server];
   teardown.push(async () => {
-    await f.git('tmux', [...tmuxServer, 'kill-server']);
+    await releaseTmuxServer(tmuxServer);
     f.cleanup();
   });
 
@@ -106,6 +115,7 @@ const setup = async (
       CLAUDE_CONFIG_DIR: f.profileDir,
       RECORD_DIR: f.ws,
       FAKE_MODE: mode,
+      FIXTURES: join(import.meta.dir, '__fixtures__'),
     },
     args: ['--strict-mcp-config'],
   });
@@ -116,6 +126,7 @@ const setup = async (
     profile('claude-permission', 'permission'),
     profile('claude-prompt', 'prompt'),
     profile('claude-quoted', 'quoted'),
+    profile('claude-question', 'question'),
     { id: 'codex-default', runtime: 'codex', env: {}, args: [] },
   ];
 
@@ -292,6 +303,43 @@ describe.skipIf(!tmuxInstalled)(
         existsSync(keyFile) ? readFileSync(keyFile, 'utf8').trim() : '',
       ).toBe('');
       await t.tmux('kill-session', '-t', '=agentdock-card-ab12cd34');
+    });
+
+    it('reports a question on screen once, and the next question again (#473)', async () => {
+      const t = await setup();
+      await t.executor.run(
+        t.args({
+          cardId: 'card_a',
+          runId: 'run_a',
+          profileKey: 'claude-question',
+        }),
+      );
+      const session = 'agentdock-card-ab12cd34';
+      const questions = () =>
+        t.events.filter((e) => e.type === 'card_run.question');
+      await t.paneShows(session, 'Enter to select');
+      for (let i = 0; i < 3; i++) await t.executor.poll();
+      expect(questions().map((e) => e.data)).toEqual([
+        {
+          cardId: 'card_a',
+          runId: 'run_a',
+          projectId: expect.any(String),
+          at: expect.any(String),
+        },
+      ]);
+      // The selector is never answered by the runner.
+      expect(t.tmuxCalls.some((c) => c.includes('send-keys'))).toBe(false);
+
+      await t.tmux('send-keys', '-t', `=${session}:`, 'Enter');
+      await t.paneShows(session, 'auto mode on');
+      for (let i = 0; i < 3; i++) await t.executor.poll();
+      expect(questions()).toHaveLength(1);
+
+      await t.tmux('send-keys', '-t', `=${session}:`, 'Enter');
+      await t.paneShows(session, 'Tab/Arrow keys');
+      for (let i = 0; i < 3; i++) await t.executor.poll();
+      expect(questions()).toHaveLength(2);
+      await t.tmux('kill-session', '-t', `=${session}:`);
     });
 
     it('never answers a permission prompt (#435)', async () => {
@@ -956,8 +1004,10 @@ describe.skipIf(!tmuxInstalled)('Steward on card rounds (#447)', () => {
     expect(await t.executor.dismissDialog(session, 'teach-auto-mode')).toBe(
       true,
     );
-    for (let i = 0; i < 400 && !existsSync(keyFile); i++) await Bun.sleep(25);
-    expect(readFileSync(keyFile, 'utf8').trim()).toBe('1b');
+    const keyRead = () =>
+      existsSync(keyFile) ? readFileSync(keyFile, 'utf8').trim() : '';
+    for (let i = 0; i < 400 && keyRead() === ''; i++) await Bun.sleep(25);
+    expect(keyRead()).toBe('1b');
   });
 
   it('D7: a trailer commit is not pushed, is reported, and the worker at its prompt gets the list', async () => {

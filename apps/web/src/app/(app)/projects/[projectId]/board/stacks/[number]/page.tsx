@@ -73,7 +73,7 @@ import { useProjectDetail } from '../../../use-project-detail';
 const REFETCH_DEBOUNCE_MS = 300;
 
 /**
- * #480 (ADR-0043): one stack on its own page, built like the #431 card
+ * #480 (ADR-0044): one stack on its own page, built like the #431 card
  * page — its description, its stages with their cards and the links between
  * them, and its shared design. While the design holds the stack, a banner
  * says Run is disabled on every card of it.

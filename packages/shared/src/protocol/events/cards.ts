@@ -133,3 +133,33 @@ export type CardPushEventType = keyof typeof cardPushEventDataSchemas;
 
 export const isCardPushEventType = (type: string): type is CardPushEventType =>
   Object.hasOwn(cardPushEventDataSchemas, type);
+
+/**
+ * #473: the round's pane shows Claude Code's question selector — the worker
+ * asked the person a question (`AskUserQuestion`) and waits for the answer.
+ * Sent once per question, when the runner's session poll first sees it; the
+ * API moves the round to `waiting` and tells the person. The answer ends the
+ * tool call, and its `hook.tool_finished` moves the round back to `running`.
+ * Never carries the question: it is content.
+ *
+ * Its own map, outside `cardRunEventDataSchemas`: the board sink enters it
+ * together with its handler.
+ */
+export const cardRunQuestionDataSchema = z.object({
+  cardId: cardIdSchema,
+  runId: skillRunIdSchema,
+  projectId: z.string().min(1),
+  at: z.iso.datetime(),
+});
+export type CardRunQuestionData = z.infer<typeof cardRunQuestionDataSchema>;
+
+export const cardQuestionEventDataSchemas = {
+  'card_run.question': cardRunQuestionDataSchema,
+} as const;
+
+export type CardQuestionEventType = keyof typeof cardQuestionEventDataSchemas;
+
+export const isCardQuestionEventType = (
+  type: string,
+): type is CardQuestionEventType =>
+  Object.hasOwn(cardQuestionEventDataSchemas, type);

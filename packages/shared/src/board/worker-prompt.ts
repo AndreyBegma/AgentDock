@@ -22,9 +22,10 @@ import type { BoardCardKind } from './types';
  * saver, the scout and the `AGENTDOCK_RAW=1` bypass. Version 10 (#447 D7):
  * no Claude attribution trailer on a commit. Version 11 (#449 D2, D5, D7):
  * with Token saver (Context handoff rides on it), the `## Handoff note`
- * section.
+ * section. Version 12 (#445 amendment 11): with Token saver, one
+ * command per Bash call.
  */
-export const CARD_WORKER_PROMPT_VERSION = 11;
+export const CARD_WORKER_PROMPT_VERSION = 12;
 
 /** #389: the env the runner sets in the card's session — its short id. */
 export const CARD_ENV_ID = 'AGENTDOCK_CARD';
@@ -83,7 +84,7 @@ export interface CardWorkerDesign {
 }
 
 /**
- * #480 (ADR-0043): the stack the card is part of. Its approved design shows
+ * #480 (ADR-0044): the stack the card is part of. Its approved design shows
  * the whole result and is committed on the card's branch as reference; the
  * card's own design, if any, stays its own.
  */
@@ -377,6 +378,16 @@ const REGISTER_LINES = [
   `- Audience register — everything a person reads: a question to the person, the pull request description, the \`${FINISH_CARD_TOOL}\` summary, a spec, a design file. Write it in full sentences, with every required section, and leave nothing out. Never shorten these to save tokens.`,
 ];
 
+/**
+ * #445 amendment 11: 629 of 634 card Bash calls were chains the hook may not
+ * rewrite, so Token saver saved nothing. In the stable part, so the prompt
+ * cache still hits; only with Token saver on — without it, `| tail` is the
+ * worker's only way to keep output short, and the largest card must still
+ * fit `card.run` whole.
+ */
+const ONE_COMMAND_LINE =
+  '- Run one command per Bash call, without `cd … &&` chains, `;` lists or `| tail` / `| head`: Token saver already compresses long output and keeps every error. Where a working directory is needed, use the tool’s own working directory or a single `cd <path> && <command>`.';
+
 /** #445 D14: built-in Read, Grep and Glob are not filtered — the worker reads only what it needs. */
 const READING_LINES = [
   '## Reading the codebase',
@@ -426,6 +437,7 @@ const assemblePrompt = (
     '- Commit your work as you go, with clear messages.',
     COMMIT_TRAILER_LINE,
     '- Run the tests and checks the repository defines before you finish.',
+    ...(card.tokenSaver ? [ONE_COMMAND_LINE] : []),
     ...LOCAL_ENVIRONMENT_LINES,
     '- Do not push and do not open a pull request: AgentDock pushes your commits as you make them and keeps a draft pull request open for this branch.',
     '- If something is unclear, ask in this session and wait for the person.',

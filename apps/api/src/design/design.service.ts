@@ -297,7 +297,7 @@ export class DesignService implements OnModuleInit {
     return run;
   }
 
-  // ─── Stack (#480, ADR-0043) ────────────────────────────────────────────────
+  // ─── Stack (#480, ADR-0044) ────────────────────────────────────────────────
 
   /** `GET …/board/stacks/:number/design`: any project viewer. */
   async stackView(projectId: string, number: number): Promise<TaskDesignView> {

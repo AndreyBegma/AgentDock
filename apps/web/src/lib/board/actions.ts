@@ -181,7 +181,7 @@ export const saveBoardSettings = (
     body,
   });
 
-// ─── Stacks (#480, ADR-0043) ─────────────────────────────────────────────────
+// ─── Stacks (#480, ADR-0044) ─────────────────────────────────────────────────
 
 const stackPath = (projectId: string, number: number) =>
   `${base(projectId)}/stacks/${number}`;

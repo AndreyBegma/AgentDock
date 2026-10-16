@@ -95,7 +95,7 @@ export class BoardController {
     private readonly stacks: BoardStacks,
   ) {}
 
-  // ─── Stacks (#480, ADR-0043) ───────────────────────────────────────────────
+  // ─── Stacks (#480, ADR-0044) ───────────────────────────────────────────────
 
   @Get('board/stacks/:number')
   stack(

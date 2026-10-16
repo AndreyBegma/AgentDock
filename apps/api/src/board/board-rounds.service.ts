@@ -173,7 +173,7 @@ export class BoardRoundsService {
         'A suggestion runs once it is accepted',
       );
     }
-    // #480 (ADR-0043): no card of a stack runs before its design is approved.
+    // #480 (ADR-0044): no card of a stack runs before its design is approved.
     await this.stacks.assertRunnable(card.id);
     // #337 D8: an open dependency warns; the person may run anyway.
     await this.dependencies.assertRunnable(
@@ -693,6 +693,8 @@ export class BoardRoundsService {
                 ciHeadSha: null,
                 ciCheckedAt: null,
                 ciFixAttempts: 0,
+                ciNoneSince: null,
+                ciRetriggeredSha: null,
               }
             : {}),
         },

@@ -302,6 +302,146 @@ describe('a card ships itself (e2e, #359)', () => {
     });
   });
 
+  describe('#484: a head CI never reported on', () => {
+    /** Another card of project A whose PR CI reported on. */
+    const projectHasCi = async () => {
+      await w.createCard({ title: 'Earlier work' });
+      const other = await w.card(2);
+      await w.ctx.prisma.boardCard.update({
+        where: { id: other.id },
+        data: { ciState: 'green' },
+      });
+    };
+
+    /** The head has had no checks for longer than `CARD_CI_MISSING_MS`. */
+    const minutesPass = async () => {
+      const card = await w.card(1);
+      await w.ctx.prisma.boardCard.update({
+        where: { id: card.id },
+        data: { ciNoneSince: new Date(Date.now() - 6 * 60_000) },
+      });
+    };
+
+    const setup = async () => {
+      await w.createCard();
+      await projectHasCi();
+      expect((await w.runCard(1)).status).toBe(200);
+      checksAnswer({ checks: [] });
+      await ended();
+      await shipping.poll();
+      await w.work.settled();
+    };
+
+    it('waits, then sends the PR event again once, and ships on the checks it brings', async () => {
+      await setup();
+      expect((await w.card(1)).column).toBe('in_progress');
+      expect(w.ciRetriggers()).toEqual([]);
+
+      await minutesPass();
+      await shipping.poll();
+      const card = await w.card(1);
+      expect(w.ciRetriggers()).toEqual([
+        {
+          cardId: card.id,
+          projectId: w.a,
+          root: ROOT_A,
+          pr: 77,
+          headSha: HEAD_SHA,
+        },
+      ]);
+      expect(card).toMatchObject({
+        column: 'in_progress',
+        ciRetriggeredSha: HEAD_SHA,
+        needsPerson: false,
+      });
+      const [record] = await w.audit('card.ci_retriggered');
+      expect(record).toMatchObject({ actorType: 'system', result: 'ok' });
+      expect(record.after).toMatchObject({ pr: 77, headSha: HEAD_SHA });
+
+      // The wait starts again: the next read retriggers nothing.
+      await shipping.poll();
+      expect(w.ciRetriggers()).toHaveLength(1);
+
+      checksAnswer({});
+      await shipping.poll();
+      await w.work.settled();
+      expect((await w.card(1)).column).toBe('finished');
+      expect(w.sent('card.merge')).toHaveLength(1);
+    });
+
+    it('a head still without checks after its retrigger needs a person and is never merged', async () => {
+      await setup();
+      await minutesPass();
+      await shipping.poll();
+      await minutesPass();
+      await shipping.poll();
+      await w.work.settled();
+      expect(w.ciRetriggers()).toHaveLength(1);
+      expect(await w.card(1)).toMatchObject({
+        column: 'finished',
+        needsPerson: true,
+      });
+      expect(w.sent('card.merge')).toEqual([]);
+      const [record] = await w.audit('card.auto_run_failed');
+      expect(record.after).toMatchObject({
+        reason: 'ci_not_reported',
+        retriggered: true,
+      });
+    });
+
+    it('a PR the reopen left closed needs a person at once', async () => {
+      w.handlers['card.ciRetrigger'] = () =>
+        ok({ retriggered: false, error: 'reopen_failed', message: 'HTTP 502' });
+      await setup();
+      await minutesPass();
+      await shipping.poll();
+      await w.work.settled();
+      expect(await w.card(1)).toMatchObject({
+        column: 'finished',
+        needsPerson: true,
+      });
+      const [retriggered] = await w.audit('card.ci_retriggered');
+      expect(retriggered).toMatchObject({ result: 'error' });
+      expect(w.sent('card.merge')).toEqual([]);
+    });
+
+    it('a PR that moved on is not counted as retriggered', async () => {
+      w.handlers['card.ciRetrigger'] = () =>
+        ok({ retriggered: false, error: 'head_moved', message: 'moved' });
+      await setup();
+      await minutesPass();
+      await shipping.poll();
+      expect(await w.card(1)).toMatchObject({
+        column: 'in_progress',
+        ciRetriggeredSha: null,
+        needsPerson: false,
+      });
+      expect(await w.audit('card.ci_retriggered')).toEqual([]);
+    });
+
+    it('a runner without card.ciRetrigger marks the card after the wait', async () => {
+      w.ciRetriggerServed = false;
+      await setup();
+      await minutesPass();
+      await shipping.poll();
+      await w.work.settled();
+      expect(w.ciRetriggers()).toEqual([]);
+      expect(await w.card(1)).toMatchObject({
+        column: 'finished',
+        needsPerson: true,
+      });
+    });
+
+    it('checks arriving clear the wait', async () => {
+      await setup();
+      checksAnswer({
+        checks: [{ name: 'ci/check', bucket: 'pending', link: null }],
+      });
+      await shipping.poll();
+      expect((await w.card(1)).ciNoneSince).toBeNull();
+    });
+  });
+
   describe('D6: red CI is an automatic round', () => {
     it('a red check starts a ci_fix round naming the check and its link: "Fixing CI (1/3)"', async () => {
       checksAnswer(RED);

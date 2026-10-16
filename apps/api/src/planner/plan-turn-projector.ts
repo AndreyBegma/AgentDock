@@ -76,7 +76,7 @@ type PlanOwnedTurn = PlanTurn & {
 };
 /**
  * A design turn owned outside a plan — a board card's (#243 D2) or a stack's
- * (#480, ADR-0043) — and what its end needs of the owner.
+ * (#480, ADR-0044) — and what its end needs of the owner.
  */
 interface DesignHost {
   key: DesignKey;

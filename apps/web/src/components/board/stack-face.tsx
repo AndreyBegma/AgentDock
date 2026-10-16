@@ -33,7 +33,7 @@ import type { CardActions } from './use-card-actions';
 const HEAD_CHIP = 'h-4 shrink-0';
 
 /**
- * #480 (ADR-0043): a stack on the Board — one collapsed face in the column of
+ * #480 (ADR-0044): a stack on the Board — one collapsed face in the column of
  * its least advanced unfinished card: its label, title, progress (accepted /
  * total), current stage and, while it holds the stack, the design chip.
  * **Expand** opens it in place to its cards by stage, each with its own

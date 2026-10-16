@@ -10,7 +10,7 @@ import {
   readRules,
   settingsFiles,
 } from './permissions';
-import { parseSimpleCommand } from './shell';
+import { parseHookCommand } from './shell';
 
 const rules = (r: Partial<PermissionRules>): PermissionRules => ({
   allow: [],
@@ -69,11 +69,22 @@ const table: Row[] = [
   { name: 'unknown ask syntax', rules: { ask: ['Bash(a:*b:*)'] }, mode: BYPASS, command: 'bun test', rewrite: false },
   { name: 'non-string rule', rules: { deny: [42] }, mode: BYPASS, command: 'bun test', rewrite: false },
   { name: 'other tools are ignored', rules: { deny: ['WebFetch', 'Read(./.env)'] }, mode: BYPASS, command: 'bun test', rewrite: true },
+  // amendment 11: the rules meet the inner command behind `cd <path> &&`, and the whole line
+  { name: 'cd form, no rules', rules: {}, mode: BYPASS, command: 'cd apps/api && bun test 2>&1', rewrite: true },
+  { name: 'deny prefix on the inner command', rules: { deny: ['Bash(git push:*)'] }, mode: BYPASS, command: 'cd /repo && git push', rewrite: false },
+  { name: 'deny exact on the inner command', rules: { deny: ['Bash(git push)'] }, mode: 'auto', command: "cd '/a b' && git push --force", rewrite: false },
+  { name: 'deny on the inner command behind assignments', rules: { deny: ['Bash(git push:*)'] }, mode: BYPASS, command: 'cd x && GIT_TRACE=1 /usr/bin/git  push', rewrite: false },
+  { name: 'ask glob on the inner command', rules: { ask: ['Bash(terraform apply *)'] }, mode: 'auto', command: 'cd infra && terraform apply', rewrite: false },
+  { name: 'deny on cd itself', rules: { deny: ['Bash(cd:*)'] }, mode: BYPASS, command: 'cd x && bun test', rewrite: false },
+  { name: 'deny on the whole line, quotes dropped', rules: { deny: ['Bash(cd /a b && bun test:*)'] }, mode: BYPASS, command: "cd '/a b' && bun test", rewrite: false },
+  { name: 'deny on the line with 2>&1', rules: { deny: ['Bash(bun test 2>&1)'] }, mode: BYPASS, command: 'bun test 2>&1', rewrite: false },
+  { name: 'deny on the command behind 2>&1', rules: { deny: ['Bash(bun test:*)'] }, mode: 'auto', command: 'bun test 2>&1', rewrite: false },
+  { name: 'unrelated deny with cd and 2>&1', rules: { deny: ['Bash(git push:*)'] }, mode: BYPASS, command: 'cd x && bun test 2>&1', rewrite: true },
 ];
 
-describe('permissionFor (#445 hook decision (a), amendments 9 and 10)', () => {
+describe('permissionFor (#445 hook decision (a), amendments 9, 10 and 11)', () => {
   it.each(table)('$name', (row) => {
-    const parsed = parseSimpleCommand(row.command);
+    const parsed = parseHookCommand(row.command);
     if (!parsed) throw new Error(`not simple: ${row.command}`);
     const verdict = permissionFor(
       rules(row.rules),

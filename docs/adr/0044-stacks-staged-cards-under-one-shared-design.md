@@ -1,4 +1,4 @@
-# ADR-0043: Stacks — staged cards under one shared design
+# ADR-0044: Stacks — staged cards under one shared design
 
 Status: accepted · Date: 2026-10-16 · Amends [ADR-0037](0037-new-work-is-one-intake-that-can-split.md) §4,
 [ADR-0025](0025-a-design-has-one-owner-a-plan-task-or-a-board-card.md) §1–§4 ·

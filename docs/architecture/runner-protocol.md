@@ -1316,6 +1316,10 @@ listed so the slots agree:
 - The `filter` subprocess appends one JSONL row per command to the file named
   by `$AGENTDOCK_FILTER_STATS`, in the run dir. The launch sets the variable.
   The daemon reads the file in batches and sends `filter.stats`.
+- `/cs-eco` sessions (#475) keep their rows in the plugin's state dir,
+  `${XDG_STATE_HOME:-~/.local/state}/cs-eco/sessions/<session id>/filter-stats.jsonl`.
+  The daemon sends them as `runKind: manual`, `runId: null`, for the watched
+  project whose root holds the session's cwd. See the Token saver guide.
 - The raw output of command `n` goes to `<run dir>/raw/<n>.log`. It is removed
   with the run dir. One file is capped at 10 MB with a truncation marker, and
   the compressed output says it was truncated.
@@ -1329,8 +1333,8 @@ carry no `projectId`: the API resolves the project.
 | Field of each row | Meaning |
 |---|---|
 | `id` | the runner's id for the row (`^[A-Za-z0-9_-]{1,64}$`). The API inserts it as the `token_saver_stats` primary key and skips duplicates, so a resent batch counts once |
-| `runId` | the launch's run; `null` exactly when `runKind` is `orchestrator` |
-| `runKind` | `card`, `skill`, `plan`, `card_assess`, `card_capture`, `ui_profile`, `text_normalize` or `orchestrator` |
+| `runId` | the launch's run; `null` exactly when `runKind` is `orchestrator` or `manual` |
+| `runKind` | `card`, `skill`, `plan`, `card_assess`, `card_capture`, `ui_profile`, `text_normalize`, `orchestrator` or `manual` — a `/cs-eco` session the runner did not launch (#475) |
 | `filter` | `<family>/<command>` (e.g. `js/jest`), or `none` when no filter matched |
 | `rawBytes`, `keptBytes` | the output before and after the filter; `keptBytes ≤ rawBytes` |
 | `bypassed` | ran with `AGENTDOCK_RAW=1`; `keptBytes = rawBytes` |

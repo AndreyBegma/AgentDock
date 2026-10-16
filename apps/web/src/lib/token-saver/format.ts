@@ -7,7 +7,7 @@ import {
 import { ApiError, describeError } from '../api';
 import { formatCost, formatNumber, formatTokens } from '../format';
 
-/** What a run kind is called on screen (D1: the eight launches). */
+/** What a run kind is called on screen (D1: the eight launches; #475: manual). */
 export const RUN_KIND_LABEL: Record<TokenSaverRunKind, string> = {
   card: 'Card worker',
   skill: 'Skill',
@@ -17,6 +17,7 @@ export const RUN_KIND_LABEL: Record<TokenSaverRunKind, string> = {
   ui_profile: 'Design',
   text_normalize: 'Normalize',
   orchestrator: 'Orchestrator',
+  manual: 'Manual session',
 };
 
 export const runKindLabel = (kind: TokenSaverRunKind): string =>

@@ -124,7 +124,7 @@ export const confirmSplitCards = (
 export const confirmSplitText = (count: number): string =>
   `Create ${pluralize(count, 'card')}`;
 
-// ─── Stacks (#480, ADR-0043) ─────────────────────────────────────────────────
+// ─── Stacks (#480, ADR-0044) ─────────────────────────────────────────────────
 
 /** How the person confirms the proposal: independent cards, or one stack. */
 export type ProposalShape = 'split' | 'stack';

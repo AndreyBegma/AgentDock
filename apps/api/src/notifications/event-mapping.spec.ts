@@ -249,7 +249,25 @@ describe('draftFor (spec 22 D1)', () => {
       ).toMatchObject({
         kind: 'card.waiting',
         title: 'C-4 "Add login" is waiting for you',
+        body: 'Its worker stopped and waits for a reply in its session.',
         page: 'board',
+        card: 4,
+      });
+    });
+
+    it('maps card.waiting on a question the worker asks (#473)', () => {
+      expect(
+        draftFor(
+          card('card.waiting', {
+            number: 4,
+            title: 'Add login',
+            reason: 'question',
+          }),
+        ),
+      ).toMatchObject({
+        kind: 'card.waiting',
+        title: 'C-4 "Add login" is waiting for you',
+        body: 'Its worker asks you a question in its session.',
         card: 4,
       });
     });

@@ -84,4 +84,14 @@ describe('filter env (#445 amendment 5)', () => {
     }
     expect(statsTarget({ ...ok, [FILTER_PROJECT_ENV]: '' })).toBeNull();
   });
+
+  it('takes a manual (/cs-eco) session with or without a run (#475)', () => {
+    const env = {
+      [FILTER_STATS_ENV]: '/eco/sessions/s1/filter-stats.jsonl',
+      [FILTER_PROJECT_ENV]: 'AndreyBegma/AgentDock',
+      [FILTER_RUN_KIND_ENV]: 'manual',
+    };
+    expect(statsTarget(env)?.runId).toBeNull();
+    expect(statsTarget({ ...env, [FILTER_RUN_ENV]: 's1' })?.runId).toBe('s1');
+  });
 });

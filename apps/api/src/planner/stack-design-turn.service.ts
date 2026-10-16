@@ -40,7 +40,7 @@ const noProfile: NoProfileFailure = (details, message) =>
   designError(422, DESIGN_ERROR.noProfile, message, details);
 
 /**
- * A stack's design turns (#480, ADR-0043) — the same as a card's (#243 D2):
+ * A stack's design turns (#480, ADR-0044) — the same as a card's (#243 D2):
  * a `runs` row of kind `plan` and a `plan_turns` row owned by the stack, sent
  * as the unchanged runner command `plan.turn` with `planId = stack.id`, so
  * the runner keeps a read-only worktree for the stack. The session is the

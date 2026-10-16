@@ -18,9 +18,12 @@ import {
 import {
   EVENT_SCHEMA_VERSION,
   type UnsequencedEvent,
+  type WatchedProject,
 } from '@agentdock/shared/protocol';
 import { z } from 'zod';
+import { correlateCwd } from '../adapters/correlate';
 import { errorMessage, type Logger } from '../log';
+import { type EcoSessionFile, findEcoStatsFiles, parseEcoLines } from './eco';
 import { FILTER_RAW_DIR, FILTER_RUN_FILE, FILTER_STATS_FILE } from './env';
 
 /**
@@ -61,9 +64,19 @@ const identitySchema = z.object({
 
 type EnvelopeProject = NonNullable<UnsequencedEvent['project']>;
 
+/** `/cs-eco` sessions the runner did not launch (#475). */
+export interface EcoStatsSource {
+  /** `/cs-eco`'s sessions directory; a missing one has no sessions. */
+  dir: string;
+  projects: () => readonly WatchedProject[];
+  /** A Claude session's cwd, when it is known. */
+  sessionCwd: (sessionId: string) => string | undefined;
+}
+
 export interface FilterStatsReaderOptions {
   /** The executors' base dirs and the orchestrator's; missing ones are skipped. */
   roots: () => readonly string[];
+  eco?: EcoStatsSource;
   /** The envelope of each project id; ids the runner does not watch are absent. */
   resolve: (projectIds: string[]) => Promise<Map<string, EnvelopeProject>>;
   emit: (event: UnsequencedEvent) => void;
@@ -101,6 +114,12 @@ export const findStatsFiles = (roots: readonly string[]): string[] => {
 
 const offsetFileOf = (statsFile: string): string =>
   join(statsFile, '..', FILTER_STATS_OFFSET_FILE);
+
+const writeOffset = (statsFile: string, next: number): void => {
+  if (next !== readOffset(statsFile)) {
+    writeFileSync(offsetFileOf(statsFile), `${next}\n`, { mode: 0o600 });
+  }
+};
 
 const readOffset = (statsFile: string): number => {
   const file = offsetFileOf(statsFile);
@@ -232,6 +251,67 @@ export class FilterStatsReader {
         });
       }
     }
+    const { eco } = this.options;
+    if (!eco) return;
+    for (const session of findEcoStatsFiles(eco.dir)) {
+      try {
+        await this.drainEco(eco, session);
+      } catch (error) {
+        log.warn('filter stats: cannot read', {
+          file: session.file,
+          error: errorMessage(error),
+        });
+      }
+    }
+  }
+
+  private emitRows(project: EnvelopeProject, rows: FilterStatRow[]): void {
+    for (let i = 0; i < rows.length; i += FILTER_STATS_MAX_ROWS) {
+      this.options.emit({
+        v: EVENT_SCHEMA_VERSION,
+        ts: this.options.now().toISOString(),
+        type: FILTER_STATS_EVENT,
+        source: 'runner',
+        project,
+        data: { rows: rows.slice(i, i + FILTER_STATS_MAX_ROWS) },
+      });
+    }
+  }
+
+  /**
+   * One `/cs-eco` session (#475). Its project is the watched root its cwd is
+   * in; a session outside every watched root, or whose cwd is not known yet,
+   * is left unread — its rows wait, and go nowhere.
+   */
+  private async drainEco(
+    eco: EcoStatsSource,
+    { sessionId, file }: EcoSessionFile,
+  ): Promise<void> {
+    const cwd = eco.sessionCwd(sessionId);
+    if (!cwd) return;
+    const watched = eco.projects();
+    const { projectId } = correlateCwd(cwd, watched);
+    const root = watched.find((p) => p.id === projectId)?.root;
+    if (!projectId || !root) return;
+    const project = (await this.options.resolve([projectId])).get(projectId);
+    if (!project) return;
+    const { lines, next } = readNewLines(file, readOffset(file));
+    if (lines.length > 0) {
+      const { rows, rejected } = parseEcoLines(lines, {
+        sessionId,
+        projectId,
+        repo: project.repo,
+        root,
+      });
+      if (rejected > 0) {
+        this.options.log.warn(
+          'filter stats: skipped malformed or foreign rows',
+          { file, rejected },
+        );
+      }
+      this.emitRows(project, rows);
+    }
+    writeOffset(file, next);
   }
 
   private async drain(file: string): Promise<void> {
@@ -257,22 +337,9 @@ export class FilterStatsReader {
         identity.projectId,
       );
       // A project the runner no longer watches: nowhere to report it.
-      if (project) {
-        for (let i = 0; i < rows.length; i += FILTER_STATS_MAX_ROWS) {
-          this.options.emit({
-            v: EVENT_SCHEMA_VERSION,
-            ts: this.options.now().toISOString(),
-            type: FILTER_STATS_EVENT,
-            source: 'runner',
-            project,
-            data: { rows: rows.slice(i, i + FILTER_STATS_MAX_ROWS) },
-          });
-        }
-      }
+      if (project) this.emitRows(project, rows);
     }
     // Written only after the rows are in the spool (`emit` appends synchronously).
-    if (next !== readOffset(file)) {
-      writeFileSync(offsetFileOf(file), `${next}\n`, { mode: 0o600 });
-    }
+    writeOffset(file, next);
   }
 }

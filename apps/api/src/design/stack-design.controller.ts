@@ -31,7 +31,7 @@ const actorOf = (
 ): PlanActor => ({ userId: user.id, role: access.role, ctx });
 
 /**
- * A stack's shared design (#480, ADR-0043): the routes of a card's design
+ * A stack's shared design (#480, ADR-0044): the routes of a card's design
  * (#243) at the stack's number. Any project viewer reads it; the switch,
  * Generate, comments, Revise, Stop and Approve need an operator. Its turns
  * run with the project's profile and model — there is no launch choice.

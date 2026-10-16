@@ -17,11 +17,19 @@ the bypass, the raw files and the MCP allowlist.
    to `<runner> filter -- <command>` only when **all** of these hold:
    - the session's `permission_mode` is `bypassPermissions` (spec amendment 9)
      or `auto` (amendment 10);
-   - the command is a **single simple command**: `[NAME=value …] program args…`.
-     `filter/shell.ts` is a whitelist, not a shell. Anything it does not
-     understand exactly makes the command not simple:
-     - an unquoted `|`, `&`, `;`, `<`, `>`, `(` or `)`: lists, pipes, redirects,
-       heredocs, subshells, process substitution;
+   - the command is a **single simple command**: `[NAME=value …] program args…`,
+     optionally in one of two forms around it (amendment 11):
+     - after `cd <path> &&`, with exactly one literal path word, quoted or not,
+       not empty and not starting with `-`;
+     - followed by `2>&1`, as the very last token, after an unquoted blank.
+
+     `filter/shell.ts` (`parseHookCommand`) is a whitelist, not a shell.
+     Anything it does not understand exactly makes the command not simple:
+     - an unquoted `|`, `&`, `;`, `<`, `>`, `(` or `)` other than the two forms
+       above: lists, pipes, redirects, heredocs, subshells, process
+       substitution. `cd x && y && z`, `cd x; y`, `cd x && y | z`, `cd a b && y`,
+       `cd -- x && y`, `y 2>&1 >f`, `y 2>&3`, `y &>f` and `y 1>&2` all pass
+       through;
      - `$`, a backtick, `#` or `!` anywhere, quoted or not. That covers every
        expansion and substitution, `$'…'` and `$"…"` quoting, comments and
        history expansion;
@@ -43,7 +51,15 @@ the bypass, the raw files and the MCP allowlist.
 3. The rewrite is built from the parsed words, each re-quoted
    (`wrappedCommand` in `filter/hook.ts`), never from the original text. Bash
    therefore runs exactly the argv the parser saw. `shell.spec.ts` checks this
-   against a real `bash`, for the original and for the rewrite.
+   against a real `bash`, for the original and for the rewrite. A `cd` target
+   is re-quoted the same way and kept in front:
+   `cd '/a b' && CI=1 <runner> filter -- bun test 2>&1`. A trailing `2>&1` is
+   kept, written by the hook as a constant. When the filter does not compress
+   (the bypass, output past the buffer, no filter), it forwards the child's
+   stdout and stderr separately, so keeping the redirect gives the wrapped
+   command the file descriptors the original had. `shell.spec.ts` also checks
+   in `bash` that the original and the rewrite run in the same directory and
+   send stderr to the same place.
 4. `filter -- <argv…>` runs the command, keeps its raw output, and prints either
    the compressed output or the original.
 
@@ -57,7 +73,7 @@ saver is off.
 Claude Code matches its permission rules against the command a hook *returns*.
 A rewritten `agentdock-runner filter -- git push` would therefore slip past
 `Bash(git push:*)`. The hook (`permissionFor` in `filter/permissions.ts`)
-applies these rules in order (spec #445 amendments 9 and 10):
+applies these rules in order (spec #445 amendments 9, 10 and 11):
 
 | Situation | Result |
 |---|---|
@@ -86,7 +102,10 @@ whitespace collapsed to one space:
 - the original command;
 - the parsed words, with quotes removed;
 - the same with the program's directory dropped (`/usr/bin/git` becomes `git`);
-- the same with the leading `NAME=value` words.
+- the same with the leading `NAME=value` words;
+- with a leading `cd <path> &&` (amendment 11), `cd <path> && <words>` with
+  quotes removed. The parsed words above are the inner command's, so the rules
+  meet the command behind the `cd`.
 
 Each text is also tried from every word on, so the rule matches wherever the
 command sits in the line. Every mismatch therefore leaves the command alone.
@@ -177,6 +196,30 @@ counted as rejected and never sent, so a session cannot report rows for another
 project or run. A stats file without a valid identity is not read. A malformed
 row, or one for a project the runner no longer watches, is skipped. A resend
 after a crash is harmless, because the API skips row ids it already has.
+
+### Manual sessions (`/cs-eco`, #475)
+
+The code-sentinel plugin's `/cs-eco` runs `agentdock-runner filter-hook` in
+sessions the runner did not launch: manual terminals, the orchestrator's own
+session and fleet workers. It keeps one directory per Claude session,
+`${XDG_STATE_HOME:-~/.local/state}/cs-eco/sessions/<session id>/`, and appends
+rows in the same `{ "projectId", "row" }` shape to its `filter-stats.jsonl`.
+The daemon reads these files in the same pass (`filter/eco.ts`):
+
+- **The project comes from a watched root, never from the row** (DA-04/DR-05).
+  The session's cwd is taken from the plugin hooks' `SessionStart` when the
+  daemon saw it, else from the session's Claude Code transcript,
+  `<CLAUDE_CONFIG_DIR>/projects/*/<session id>.jsonl`, in `~/.claude` and every
+  Claude profile. The cwd is matched to a project like a transcript's
+  (`correlateCwd`): the deepest watched root holding it, or a fleet worktree
+  `.wt-<repo>-<slot>` beside it.
+- A session whose cwd is outside every watched root, or not known yet, is not
+  read and nothing of it is sent. Its offset stays where it was.
+- A row is sent only when its `projectId` names that project — the project's
+  id, its `owner/name` or its root's directory name, in any case — and its
+  `runId` is `null` or the session's id. Any other row is counted as rejected.
+- Rows go out as `runKind: manual` with `runId: null`, whatever kind the row
+  carries; the dashboard shows them as **Manual session**.
 
 ## Adding a filter
 

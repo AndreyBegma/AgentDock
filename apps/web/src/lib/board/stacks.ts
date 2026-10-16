@@ -12,7 +12,7 @@ import type { BoardItem } from './format';
 import type { WorkBoardItem } from './plan-tasks';
 
 /**
- * Stacks on the Board (#480, ADR-0043): a stack is one collapsed face in the
+ * Stacks on the Board (#480, ADR-0044): a stack is one collapsed face in the
  * column of its least advanced unfinished card. The cards of the stack that
  * sit in that column fold into the face; a card of the stack in another
  * column stays on its own, wearing its stack's label.

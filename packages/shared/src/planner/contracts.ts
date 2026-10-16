@@ -273,7 +273,7 @@ export interface PlanIntakeSplitView {
   /** In the proposal's order; `index` is what Confirm refers to. */
   cards: PlanIntakeSplitCard[];
   /**
-   * #480 (ADR-0043): set when the intake proposed a stack — `cards` then
+   * #480 (ADR-0044): set when the intake proposed a stack — `cards` then
    * lists every card of it in stage order, and the stages name them by
    * `index`. Null (or absent) for a plain split.
    */
@@ -309,7 +309,7 @@ export interface ConfirmSplitRequest {
   turnId: string;
   cards: ConfirmSplitCard[];
   /**
-   * #480 (ADR-0043): confirm the cards as a stack instead of independent
+   * #480 (ADR-0044): confirm the cards as a stack instead of independent
    * cards — whichever the intake proposed. Every kept card is in exactly one
    * stage; every card of a stage gets a dependency on every card of the stage
    * before it. Absent: independent cards, as before.
