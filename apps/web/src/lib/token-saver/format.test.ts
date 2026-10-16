@@ -51,6 +51,7 @@ describe('labels', () => {
   test('every run kind has a name', () => {
     expect(runKindLabel('card')).toBe('Card worker');
     expect(runKindLabel('text_normalize')).toBe('Normalize');
+    expect(runKindLabel('manual')).toBe('Manual session');
   });
 
   test('passThroughShare is 0 without commands', () => {
