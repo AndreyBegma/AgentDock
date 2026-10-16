@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'bun:test';
 import {
+  TERMINAL_HISTORY_CHUNK_BYTES,
+  TERMINAL_HISTORY_LINE_MAX_CHARS,
+  TERMINAL_HISTORY_LINES,
   TERMINAL_MAX_DATA_BYTES,
   type TerminalAttachArgs,
   type TerminalTarget,
   terminalCloseMessageSchema,
   terminalDataMessageSchema,
+  terminalHistoryMessageSchema,
 } from '@agentdock/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import { fakeTmux } from '../control/testing';
@@ -541,5 +545,134 @@ describe('terminal streams', () => {
     expect(detached).toContain('"bytesOut":10');
     expect(detached).toContain('"reason":"client"');
     expect(detached).toContain('"durationMs"');
+  });
+});
+
+describe('terminal.history (#522)', () => {
+  const request = (id: string) =>
+    ({ type: 'terminal.history.request', id }) as const;
+  const history = (sent: TerminalOutbound[]) =>
+    sent.filter((m) => m.type === 'terminal.history');
+
+  it('captures the attached session exactly, with ANSI, 5,000 lines back', async () => {
+    const { manager, fake, sent } = setup({
+      sessions: { 'cs-i42': '\u001b[32mok\u001b[0m\nsecond\n', 'cs-i7': '' },
+    });
+    await manager.attach(args('t1'));
+    await manager.history(request('t1'));
+    expect(fake.tmuxCalls().filter((c) => c[0] === 'capture-pane')).toEqual([
+      [
+        'capture-pane',
+        '-p',
+        '-e',
+        '-J',
+        '-t',
+        '=cs-i42:',
+        '-S',
+        `-${TERMINAL_HISTORY_LINES}`,
+      ],
+    ]);
+    expect(history(sent)).toEqual([
+      {
+        type: 'terminal.history',
+        id: 't1',
+        lines: ['\u001b[32mok\u001b[0m', 'second'],
+        last: true,
+      },
+    ]);
+  });
+
+  it('answers a read attach and writes nothing to the PTY', async () => {
+    const { manager, ptys, fake, sent } = setup();
+    await manager.attach(args('t1'));
+    await manager.history(request('t1'));
+    expect(ptys[0]?.written).toEqual([]);
+    expect(history(sent)).toHaveLength(1);
+    // Read only: no copy-mode, no send-keys, nothing that changes the session.
+    for (const call of fake.tmuxCalls()) {
+      expect(['list-sessions', 'capture-pane']).toContain(call[0] ?? '');
+    }
+  });
+
+  it('ignores an id it does not hold, and captures nothing', async () => {
+    const { manager, fake, sent } = setup();
+    await manager.attach(args('t1'));
+    await manager.history(request('nope'));
+    expect(fake.tmuxCalls().some((c) => c[0] === 'capture-pane')).toBe(false);
+    expect(sent).toEqual([]);
+  });
+
+  it('caps the reply at 5,000 lines, newest kept, in valid chunks', async () => {
+    const text = Array.from(
+      { length: TERMINAL_HISTORY_LINES + 300 },
+      (_, i) => `line ${i} ${'x'.repeat(60)}`,
+    ).join('\n');
+    const { manager, sent } = setup({
+      sessions: { 'cs-i42': `${text}\n`, 'cs-i7': '' },
+    });
+    await manager.attach(args('t1'));
+    await manager.history(request('t1'));
+    const chunks = history(sent);
+    expect(chunks.length).toBeGreaterThan(1);
+    for (const m of chunks) terminalHistoryMessageSchema.parse(m);
+    expect(chunks.map((m) => m.type === 'terminal.history' && m.last)).toEqual(
+      chunks.map((_, i) => i === chunks.length - 1),
+    );
+    const lines = chunks.flatMap((m) =>
+      m.type === 'terminal.history' ? m.lines : [],
+    );
+    expect(lines).toHaveLength(TERMINAL_HISTORY_LINES);
+    expect(lines[0]?.startsWith('line 300 ')).toBe(true);
+    expect(
+      lines.at(-1)?.startsWith(`line ${TERMINAL_HISTORY_LINES + 299} `),
+    ).toBe(true);
+  });
+
+  it('cuts an overlong line', async () => {
+    const long = 'a'.repeat(TERMINAL_HISTORY_LINE_MAX_CHARS * 3);
+    const { manager, sent } = setup({
+      sessions: { 'cs-i42': `${long}\n`, 'cs-i7': '' },
+    });
+    await manager.attach(args('t1'));
+    await manager.history(request('t1'));
+    const [reply] = history(sent);
+    terminalHistoryMessageSchema.parse(reply);
+    expect(reply?.type === 'terminal.history' && reply.lines[0]?.length).toBe(
+      TERMINAL_HISTORY_LINE_MAX_CHARS,
+    );
+    expect(TERMINAL_HISTORY_LINE_MAX_CHARS * 6).toBeLessThan(
+      TERMINAL_HISTORY_CHUNK_BYTES,
+    );
+  });
+
+  it('answers one empty last chunk when the capture fails', async () => {
+    const { manager, fake, sent } = setup();
+    await manager.attach(args('t1'));
+    fake.sessions.delete('cs-i42');
+    await manager.history(request('t1'));
+    expect(history(sent)).toEqual([
+      { type: 'terminal.history', id: 't1', lines: [], last: true },
+    ]);
+  });
+
+  it('sends nothing for an attach that ended during the capture', async () => {
+    const { manager, sent } = setup();
+    await manager.attach(args('t1'));
+    const pending = manager.history(request('t1'));
+    manager.close({ type: 'terminal.close', id: 't1', reason: 'client' });
+    await pending;
+    expect(history(sent)).toEqual([]);
+  });
+
+  it('runs one capture per attach at a time', async () => {
+    const { manager, fake } = setup();
+    await manager.attach(args('t1'));
+    await Promise.all([
+      manager.history(request('t1')),
+      manager.history(request('t1')),
+    ]);
+    expect(
+      fake.tmuxCalls().filter((c) => c[0] === 'capture-pane'),
+    ).toHaveLength(1);
   });
 });

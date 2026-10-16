@@ -194,6 +194,43 @@ describe.skipIf(!tmuxInstalled)(
       );
     });
 
+    it('history captures the attached pane with its colours, read-only, and leaves the session as it was (#522)', async () => {
+      const f = await fixture();
+      const respawned = await f.tmux(
+        'respawn-pane',
+        '-k',
+        '-t',
+        '=cs-i42:',
+        'sh',
+        '-c',
+        'i=1; while [ $i -le 120 ]; do printf "\\033[31mred %s\\033[0m\\n" $i; i=$((i+1)); done; exec cat',
+      );
+      expect(respawned?.code).toBe(0);
+      expect(
+        await eventually(async () => (await f.pane()).includes('red 120')),
+      ).toBe(true);
+      const m = f.manager();
+      await m.attach(f.args('h1', 'read'));
+      await m.history({ type: 'terminal.history.request', id: 'h1' });
+      const reply = f.sent.find((s) => s.type === 'terminal.history');
+      expect(reply?.type === 'terminal.history' && reply.last).toBe(true);
+      const lines = reply?.type === 'terminal.history' ? reply.lines : [];
+      // Earlier than the 30-row screen, with the SGR colour kept. tmux emits
+      // a change only, so the lines after the first carry on in red.
+      expect(lines[0]).toBe('\u001b[31mred 1');
+      expect(lines[1]).toBe('red 2');
+      expect(lines.some((l) => l.includes('red 120'))).toBe(true);
+      const mode = await f.tmux(
+        'display-message',
+        '-p',
+        '-t',
+        '=cs-i42:',
+        '#{pane_in_mode}',
+      );
+      expect(mode?.stdout.trim()).toBe('0');
+      expect(await f.alive()).toBe(true);
+    });
+
     it('attaches to a skill run of the project: read drops input, write types, the session survives; another project is refused', async () => {
       const f = await fixture();
       const session = 'agentdock-run-abc123';

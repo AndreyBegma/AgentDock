@@ -120,7 +120,9 @@ export const terminalHistoryLinesSchema = z
     (lines) =>
       lines.reduce((sum, line) => sum + historyLineBytes(line), 0) <=
       TERMINAL_HISTORY_CHUNK_BYTES,
-    { message: `must serialize to at most ${TERMINAL_HISTORY_CHUNK_BYTES} bytes` },
+    {
+      message: `must serialize to at most ${TERMINAL_HISTORY_CHUNK_BYTES} bytes`,
+    },
   );
 
 // Both directions

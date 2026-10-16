@@ -15,6 +15,7 @@ import {
   serverMessageSchema,
   type TerminalCloseMessage,
   type TerminalDataMessage,
+  type TerminalHistoryRequestMessage,
   type TerminalResizeMessage,
   type UnsequencedEvent,
 } from '@agentdock/shared/protocol';
@@ -100,6 +101,7 @@ export interface TerminalHandler {
   data(message: TerminalDataMessage): void;
   resize(message: TerminalResizeMessage): void;
   close(message: TerminalCloseMessage): void;
+  history(message: TerminalHistoryRequestMessage): Promise<void>;
   /** The socket closed: every attach ends with it (spec 29 D7). */
   reset(): void;
 }
@@ -403,6 +405,9 @@ export class RunnerConnection {
         return;
       case 'terminal.close':
         this.options.terminal?.close(message);
+        return;
+      case 'terminal.history.request':
+        void this.options.terminal?.history(message);
         return;
       case 'local.response':
         this.localResponse(message);

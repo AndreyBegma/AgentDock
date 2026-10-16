@@ -9,6 +9,8 @@ import {
   type TerminalCloseMessage,
   type TerminalCloseReason,
   type TerminalDataMessage,
+  type TerminalHistoryMessage,
+  type TerminalHistoryRequestMessage,
   type TerminalMode,
   type TerminalResizeMessage,
   type WatchedProject,
@@ -17,10 +19,14 @@ import type { Cancel, Clock } from '../clock';
 import { CommandFailure } from '../commands/failure';
 import type { Exec } from '../detect/exec';
 import { errorMessage, type Logger } from '../log';
+import { historyArgv, historyChunks } from './history';
 import { attachArgv, type PtyProcess, type SpawnPty } from './pty';
 import { type ResolveDeps, resolveTerminalTarget } from './resolve';
 
-export type TerminalOutbound = TerminalDataMessage | TerminalCloseMessage;
+export type TerminalOutbound =
+  | TerminalDataMessage
+  | TerminalCloseMessage
+  | TerminalHistoryMessage;
 
 export interface TerminalManagerOptions {
   exec: Exec;
@@ -69,6 +75,8 @@ interface Attach {
   /** Last input (`write`) or last traffic of either direction (`read`), D7. */
   lastActivity: number;
   closed: boolean;
+  /** A history capture is running; another request meanwhile is ignored. */
+  capturing: boolean;
   cancelIdle: Cancel;
   cancelMax: Cancel;
   cancelKill: Cancel;
@@ -162,6 +170,7 @@ export class TerminalManager {
       bytesDropped: 0,
       lastActivity: now,
       closed: false,
+      capturing: false,
       cancelIdle: () => {},
       cancelMax: () => {},
       cancelKill: () => {},
@@ -197,6 +206,58 @@ export class TerminalManager {
 
   resize(message: TerminalResizeMessage): void {
     this.attaches.get(message.id)?.proc.resize(message.cols, message.rows);
+  }
+
+  /**
+   * `terminal.history.request` (#522): captures the pane of the session this
+   * attach already holds — never one the message names — and answers with
+   * `terminal.history` chunks. An id it does not hold is ignored. Allowed on
+   * a `read` attach; nothing is written to the PTY and no mode is entered.
+   */
+  async history(message: TerminalHistoryRequestMessage): Promise<void> {
+    const attach = this.attaches.get(message.id);
+    if (!attach || attach.capturing) return;
+    const { clock, exec, log } = this.options;
+    attach.capturing = true;
+    if (attach.mode === 'read') attach.lastActivity = clock.now();
+    let chunks: string[][] = [[]];
+    try {
+      const result = await exec(
+        'tmux',
+        historyArgv(this.options.tmuxServer ?? [], attach.session),
+      );
+      if (result?.code === 0) chunks = historyChunks(result.stdout);
+      else {
+        log.warn('terminal: history capture failed', {
+          id: attach.id,
+          session: attach.session,
+          code: result?.code ?? null,
+        });
+      }
+    } catch (error) {
+      log.warn('terminal: history capture failed', {
+        id: attach.id,
+        session: attach.session,
+        error: errorMessage(error),
+      });
+    } finally {
+      attach.capturing = false;
+    }
+    // Nothing more is sent for an id that ended meanwhile.
+    if (attach.closed) return;
+    chunks.forEach((lines, i) => {
+      this.options.send({
+        type: 'terminal.history',
+        id: attach.id,
+        lines,
+        last: i === chunks.length - 1,
+      });
+    });
+    log.info('terminal: history sent', {
+      id: attach.id,
+      lines: chunks.reduce((sum, lines) => sum + lines.length, 0),
+      chunks: chunks.length,
+    });
   }
 
   /** `terminal.close` from the server: nothing more is sent for that id. */
