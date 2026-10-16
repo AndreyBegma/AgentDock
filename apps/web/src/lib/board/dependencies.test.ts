@@ -2,10 +2,12 @@ import { describe, expect, test } from 'bun:test';
 import type { CardDependencyRef } from '@agentdock/shared';
 import { ApiError } from '../api';
 import {
+  autoRunNote,
   dependencyChip,
   openDependenciesOf,
   openDependencyText,
   parseCardNumber,
+  readinessChip,
 } from './dependencies';
 
 const ref = (
@@ -70,5 +72,48 @@ describe('card dependencies (#337 D8)', () => {
     expect(parseCardNumber('0')).toBeNull();
     expect(parseCardNumber('twelve')).toBeNull();
     expect(parseCardNumber('')).toBeNull();
+  });
+});
+
+describe('readiness (#443)', () => {
+  test('Ready when every dependency is accepted', () => {
+    expect(readinessChip(null)).toBeNull();
+    expect(readinessChip(undefined)).toBeNull();
+    expect(
+      readinessChip({ state: 'ready', accepted: 2, total: 2, open: [] }),
+    ).toMatchObject({ text: 'Ready', tone: 'ok', waitsFor: null });
+  });
+
+  test('Waiting names the open ones', () => {
+    const chip = readinessChip({
+      state: 'waiting',
+      accepted: 1,
+      total: 3,
+      open: [ref(84, 'in_progress'), ref(86, 'todo')],
+    });
+    expect(chip).toEqual({
+      text: 'Waiting · 1 of 3',
+      tone: 'warn',
+      title: 'Waits for C-84 and C-86. 1 of 3 accepted.',
+      waitsFor: 'Waits for C-84 and C-86',
+    });
+  });
+
+  test('the Auto-run note says what will start the card', () => {
+    const waiting = {
+      state: 'waiting' as const,
+      accepted: 1,
+      total: 2,
+      open: [ref(84, 'in_progress')],
+    };
+    expect(autoRunNote(true, waiting)).toBe(
+      'Will start automatically after C-84 is accepted.',
+    );
+    expect(autoRunNote(false, waiting)).toBe(
+      'Nothing starts on its own. Press Run when you are ready.',
+    );
+    expect(
+      autoRunNote(true, { state: 'ready', accepted: 2, total: 2, open: [] }),
+    ).toContain('Press Run');
   });
 });

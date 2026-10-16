@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'bun:test';
-import { BOARD_ERROR, findDependencyCycle, openDependencies } from '../index';
+import {
+  BOARD_ERROR,
+  cardReadiness,
+  findDependencyCycle,
+  openDependencies,
+} from '../index';
 
 /** #337 D8: card dependencies. */
 
@@ -34,6 +39,35 @@ describe('openDependencies', () => {
       { number: 14, label: 'C-14', column: 'finished' as const },
     ];
     expect(openDependencies(deps).map((d) => d.number)).toEqual([12, 14]);
+  });
+});
+
+describe('cardReadiness', () => {
+  const accepted = { number: 83, label: 'C-83', column: 'completed' as const };
+  const open = { number: 84, label: 'C-84', column: 'in_progress' as const };
+
+  it('is ready when every dependency is accepted', () => {
+    expect(cardReadiness('todo', [accepted])).toEqual({
+      state: 'ready',
+      accepted: 1,
+      total: 1,
+      open: [],
+    });
+  });
+
+  it('is waiting while one is open, naming the open ones', () => {
+    expect(cardReadiness('todo', [accepted, open])).toEqual({
+      state: 'waiting',
+      accepted: 1,
+      total: 2,
+      open: [open],
+    });
+  });
+
+  it('is none for a card without dependencies or outside To Do', () => {
+    expect(cardReadiness('todo', [])).toBeNull();
+    expect(cardReadiness('in_progress', [open])).toBeNull();
+    expect(cardReadiness('finished', [accepted])).toBeNull();
   });
 });
 

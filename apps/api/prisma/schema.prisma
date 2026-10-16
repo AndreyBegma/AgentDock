@@ -2819,6 +2819,13 @@ model BoardCard {
   /// At most 500 characters.
   autoRunMessage          String?
   autoRunFailedAt         DateTime?
+  /// #443: the accepted dependency whose acceptance tried the failed auto-run;
+  /// `null` when the failure came from approving the design (#273).
+  autoRunAfter            Int?
+  /// #443: Auto-run when ready — accepting the last open dependency starts
+  /// the Run. Off by default; it turns itself off when it fires, so it starts
+  /// the card at most once.
+  autoRunWhenReady        Boolean          @default(false)
   /// #282 D1: the manual session a `terminal` card tracks; unique, so a
   /// second `card.track` of the session updates its card.
   trackedSessionId        String?          @unique
@@ -2915,6 +2922,9 @@ model BoardCardRound {
   round               Int
   runId               String           @unique
   trigger             CardRoundTrigger
+  /// #443: started by Auto-run when ready, after this dependency (`C-<n>`)
+  /// was accepted; `null` for a round a person or AgentDock started.
+  autoRunAfter        Int?
   /// The person's feedback (D9), at most 8 000 characters.
   feedback            String?
   /// #273 D1: the card text this round's prompt was built from.

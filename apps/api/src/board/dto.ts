@@ -146,6 +146,11 @@ export class UpdateBoardCardDto implements UpdateBoardCardRequest {
   @IsOptional()
   @IsBoolean()
   autoCollect?: boolean;
+
+  /** #443: turning it on outside To Do is refused `wrong_column`. */
+  @IsOptional()
+  @IsBoolean()
+  autoRunWhenReady?: boolean;
 }
 
 /** `POST /board/cards/:number/move` (D7). */

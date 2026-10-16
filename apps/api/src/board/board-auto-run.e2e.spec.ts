@@ -1,0 +1,301 @@
+import {
+  BOARD_ERROR,
+  type BoardCardDetail,
+  type BoardCardView,
+  type BoardView,
+} from '@agentdock/shared';
+import { userActor } from '../audit/audit.types';
+import { BudgetGate } from '../budgets/budget-gate';
+import { BoardAutoRun } from './board-auto-run';
+import { BoardWorld } from './testing/board-e2e';
+
+/** #443: Ready / Waiting of a card, and Auto-run when ready. */
+describe('card readiness and auto-run (e2e, #443)', () => {
+  const w = new BoardWorld();
+
+  beforeAll(() => w.init());
+  afterAll(() => w.close());
+  beforeEach(() => w.reset());
+  afterEach(() => w.work.settled());
+
+  const cardPath = (number: number) => `${w.path()}/board/cards/${number}`;
+  const link = (number: number, dependsOn: number) =>
+    w.operator.send('post', `${cardPath(number)}/dependencies`, { dependsOn });
+  const accept = (number: number) =>
+    w.operator.send('post', `${cardPath(number)}/move`, {
+      column: 'completed',
+      index: 0,
+    });
+  const autoRun = (number: number, on = true) =>
+    w.operator.send('patch', cardPath(number), { autoRunWhenReady: on });
+  const face = async (number: number): Promise<BoardCardView | undefined> => {
+    const board = (await w.viewer.get(`${w.path()}/board`)).body as BoardView;
+    return board.columns
+      .flatMap((c) => c.cards)
+      .find((c) => c.number === number);
+  };
+  const detail = async (number: number) =>
+    (await w.viewer.get(cardPath(number))).body as BoardCardDetail;
+
+  /** Cards A and B, and C that runs after both. */
+  const world = async () => {
+    const a = await w.createCard({ title: 'A', specOnRun: false });
+    const b = await w.createCard({ title: 'B', specOnRun: false });
+    const c = await w.createCard({ title: 'C', specOnRun: false });
+    expect((await link(c.number, a.number)).status).toBe(200);
+    expect((await link(c.number, b.number)).status).toBe(200);
+    return { a, b, c };
+  };
+
+  describe('readiness', () => {
+    it('is waiting with the open ones listed, then ready once every one is accepted', async () => {
+      const { a, b, c } = await world();
+      expect((await face(c.number))?.readiness).toEqual({
+        state: 'waiting',
+        accepted: 0,
+        total: 2,
+        open: [
+          { number: a.number, label: `C-${a.number}`, column: 'todo' },
+          { number: b.number, label: `C-${b.number}`, column: 'todo' },
+        ],
+      });
+
+      await accept(a.number);
+      expect((await face(c.number))?.readiness).toMatchObject({
+        state: 'waiting',
+        accepted: 1,
+        open: [expect.objectContaining({ number: b.number })],
+      });
+
+      await accept(b.number);
+      expect((await detail(c.number)).readiness).toEqual({
+        state: 'ready',
+        accepted: 2,
+        total: 2,
+        open: [],
+      });
+    });
+
+    it('is none without dependencies, and outside To Do', async () => {
+      const { a } = await world();
+      expect((await face(a.number))?.readiness).toBeNull();
+      const lone = await w.createCard({ specOnRun: false });
+      const dependant = await w.createCard({ specOnRun: false });
+      await link(dependant.number, lone.number);
+      await w.runCard(dependant.number, { ignoreDependencies: true });
+      expect((await face(dependant.number))?.readiness).toBeNull();
+    });
+
+    it('publishes board.changed for the dependants when a card is accepted', async () => {
+      const { a, c } = await world();
+      const publish = jest.spyOn(w.work, 'publish');
+      try {
+        await accept(a.number);
+        expect(publish).toHaveBeenCalledWith(w.a, c.id);
+      } finally {
+        publish.mockRestore();
+      }
+    });
+  });
+
+  describe('the switch', () => {
+    it('is off by default, turns on in To Do, and is audited', async () => {
+      const { c } = await world();
+      expect((await detail(c.number)).autoRunWhenReady).toBe(false);
+
+      const on = await autoRun(c.number);
+      expect(on.status).toBe(200);
+      expect((on.body as BoardCardDetail).autoRunWhenReady).toBe(true);
+      const [toggled] = await w.audit('card.auto_run_toggled');
+      expect(toggled.after).toEqual({
+        number: c.number,
+        autoRunWhenReady: true,
+      });
+      // A switch alone is not a card edit.
+      expect(await w.audit('card.updated')).toHaveLength(2);
+    });
+
+    it('is refused on outside To Do (409 wrong_column); off is always allowed', async () => {
+      const { a } = await world();
+      await accept(a.number);
+      const refused = await autoRun(a.number);
+      expect(refused.status).toBe(409);
+      expect(refused.body.error).toBe(BOARD_ERROR.wrongColumn);
+      expect((await autoRun(a.number, false)).status).toBe(200);
+    });
+
+    it('a viewer cannot set it', async () => {
+      const { c } = await world();
+      const response = await w.viewer.send('patch', cardPath(c.number), {
+        autoRunWhenReady: true,
+      });
+      expect(response.status).toBe(403);
+    });
+  });
+
+  describe('auto-run', () => {
+    it('starts the Run when the last open dependency is accepted, once, and marks the round', async () => {
+      const { a, b, c } = await world();
+      await autoRun(c.number);
+
+      await accept(a.number);
+      await w.work.settled();
+      expect(w.sent('card.run')).toHaveLength(0);
+
+      await accept(b.number);
+      await w.work.settled();
+      expect(w.sent('card.run')).toHaveLength(1);
+      const card = await w.card(c.number);
+      expect(card.column).toBe('in_progress');
+      expect(card.autoRunWhenReady).toBe(false);
+      expect(card.rounds).toEqual([
+        expect.objectContaining({
+          round: 1,
+          trigger: 'run',
+          autoRunAfter: b.number,
+          authorId: w.operatorId,
+        }),
+      ]);
+      const [started] = await w.audit('card.run_started');
+      expect(started.after).toMatchObject({
+        number: c.number,
+        autoRunAfter: b.number,
+      });
+
+      const shown = await detail(c.number);
+      expect(shown.rounds[0].autoRunAfter).toBe(b.number);
+      expect(shown.round?.autoRunAfter).toBe(b.number);
+      expect(shown.autoRunFailure).toBeNull();
+    });
+
+    it('starts nothing with the switch off, and the manual Run behaves as before', async () => {
+      const { a, b, c } = await world();
+      await accept(a.number);
+      await accept(b.number);
+      await w.work.settled();
+      expect(w.sent('card.run')).toHaveLength(0);
+      expect((await w.card(c.number)).column).toBe('todo');
+
+      expect((await w.runCard(c.number)).status).toBe(200);
+      expect((await w.card(c.number)).rounds[0].autoRunAfter).toBeNull();
+    });
+
+    it('starts the Run exactly once when the acceptances arrive concurrently', async () => {
+      const { a, b, c } = await world();
+      await autoRun(c.number);
+
+      const moves = await Promise.all([accept(a.number), accept(b.number)]);
+      expect(moves.map((m) => m.status)).toEqual([200, 200]);
+      await w.work.settled();
+
+      expect(w.sent('card.run')).toHaveLength(1);
+      expect((await w.card(c.number)).rounds).toHaveLength(1);
+      expect(await w.audit('card.auto_run_failed')).toEqual([]);
+    });
+
+    it('races of the same acceptance claim the card once', async () => {
+      const { a, b, c } = await world();
+      await w.ctx.prisma.boardCard.updateMany({
+        where: { id: { in: [a.id, b.id] } },
+        data: { column: 'completed', completedAt: new Date() },
+      });
+      await w.ctx.prisma.boardCard.update({
+        where: { id: c.id },
+        data: { autoRunWhenReady: true },
+      });
+
+      const auto = w.ctx.app.get(BoardAutoRun);
+      const actor = {
+        userId: w.operatorId,
+        role: 'operator' as const,
+        ctx: { actor: userActor(w.operatorId) },
+      };
+      await Promise.all(
+        Array.from({ length: 5 }, (_, i) =>
+          auto.afterAccepted(w.a, i % 2 === 0 ? a : b, actor),
+        ),
+      );
+
+      expect(w.sent('card.run')).toHaveLength(1);
+      expect((await w.card(c.number)).rounds).toHaveLength(1);
+      expect(await w.audit('card.auto_run_failed')).toEqual([]);
+    });
+
+    it('leaves a card that is not in To Do alone', async () => {
+      const { a, b, c } = await world();
+      await autoRun(c.number);
+      await w.runCard(c.number, { ignoreDependencies: true });
+      await accept(a.number);
+      await accept(b.number);
+      await w.work.settled();
+      expect(w.sent('card.run')).toHaveLength(1);
+      expect((await w.card(c.number)).rounds).toHaveLength(1);
+    });
+
+    it('with no free slot, refuses like a manual Run and says why on the card', async () => {
+      await w.admin.send('put', `${w.path()}/board-settings`, {
+        issueOnRun: false,
+        specOnRun: false,
+        maxRunning: 1,
+      });
+      const { a, b, c } = await world();
+      const busy = await w.createCard({ specOnRun: false });
+      expect((await w.runCard(busy.number)).status).toBe(200);
+      await autoRun(c.number);
+
+      await accept(a.number);
+      await accept(b.number);
+      await w.work.settled();
+
+      // Only the busy card's Run was sent; the manual Run is refused the same way.
+      expect(w.sent('card.run')).toHaveLength(1);
+      const manual = await w.runCard(c.number);
+      expect(manual.status).toBe(409);
+      expect(manual.body.error).toBe(BOARD_ERROR.maxRunning);
+
+      const shown = await face(c.number);
+      expect(shown?.column).toBe('todo');
+      expect(shown?.autoRunWhenReady).toBe(false);
+      expect(shown?.readiness?.state).toBe('ready');
+      expect(shown?.autoRunFailure).toMatchObject({
+        code: BOARD_ERROR.maxRunning,
+        message: manual.body.message,
+        after: b.number,
+      });
+      const [failed] = await w.audit('card.auto_run_failed');
+      expect(failed).toMatchObject({
+        result: 'error',
+        after: { number: c.number, error: 'max_running', after: b.number },
+      });
+    });
+
+    it('with the budget reached, refuses like a manual Run', async () => {
+      const gate = w.ctx.app.get(BudgetGate);
+      const check = jest.spyOn(gate, 'check').mockResolvedValue({
+        allowed: false,
+        budgetId: 'b1',
+        scope: 'project',
+        resetsAt: new Date('2026-11-01T00:00:00Z'),
+      });
+      try {
+        const { a, b, c } = await world();
+        await autoRun(c.number);
+        await accept(a.number);
+        await accept(b.number);
+        await w.work.settled();
+
+        expect(w.sent('card.run')).toEqual([]);
+        expect((await detail(c.number)).autoRunFailure).toMatchObject({
+          code: BOARD_ERROR.budgetExceeded,
+          after: b.number,
+        });
+        // A round that starts clears the failure.
+        check.mockRestore();
+        expect((await w.runCard(c.number)).status).toBe(200);
+        expect((await detail(c.number)).autoRunFailure).toBeNull();
+      } finally {
+        check.mockRestore();
+      }
+    });
+  });
+});

@@ -246,3 +246,57 @@ describe('PlanTaskFace with the inline menu (C-35)', () => {
     );
   });
 });
+
+describe('CardFace readiness and Auto-run (#443)', () => {
+  const dep = (number: number, column: BoardColumn) => ({
+    number,
+    label: `C-${number}`,
+    column,
+  });
+
+  test('a ready card shows Ready', () => {
+    const status = row(
+      render('todo', {
+        readiness: { state: 'ready', accepted: 2, total: 2, open: [] },
+      }),
+      'status',
+    );
+    expect(status).toContain('Ready');
+    expect(status).not.toContain('Waiting');
+  });
+
+  test('a waiting card shows Waiting and what it waits for', () => {
+    const status = row(
+      render('todo', {
+        readiness: {
+          state: 'waiting',
+          accepted: 1,
+          total: 2,
+          open: [dep(84, 'in_progress')],
+        },
+      }),
+      'status',
+    );
+    expect(status).toContain('Waiting · 1 of 2');
+    expect(status).toContain('Waits for C-84');
+  });
+
+  test('the Auto-run marker shows only with the switch on', () => {
+    expect(row(render('todo', { autoRunWhenReady: true }), 'status')).toContain(
+      'Auto-run',
+    );
+    expect(render('todo')).not.toContain('Auto-run');
+  });
+
+  test('a refused auto-run says it did not start', () => {
+    const html = render('todo', {
+      autoRunFailure: {
+        code: 'max_running',
+        message: '1 of 1 card workers are running in this project',
+        at: '2026-10-16T10:00:00.000Z',
+        after: 84,
+      },
+    });
+    expect(row(html, 'status')).toContain('Didn’t start');
+  });
+});

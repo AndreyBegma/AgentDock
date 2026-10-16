@@ -123,7 +123,9 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   'card.pr_closed': "Closed a card's pull request without merging",
   'card.pr_close_failed': "Failed to close a card's pull request",
   'card.collect_requested': "Asked for a card's pull request",
-  'card.auto_run_failed': "A card's worker did not start after design approval",
+  'card.auto_run_failed':
+    "A card's worker did not start on its own (design approval or Auto-run)",
+  'card.auto_run_toggled': 'Switched Auto-run when ready on a card',
   'attachment.added': 'Uploaded an attachment',
   'attachment.claimed': 'Attached files to a card',
   'attachment.removed': 'Removed an attachment',

@@ -55,6 +55,7 @@ export const card = (
   captureConfidence: null,
   sourceSessionId: null,
   autoRunFailure: null,
+  autoRunWhenReady: false,
   tracking: null,
   fleet: null,
   autoCollect: false,
