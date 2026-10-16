@@ -26,6 +26,8 @@ import {
   isActiveRoundPhase,
   isCaptureModel,
   isCardAutoRunCode,
+  type RestartEstimate,
+  restartEstimateSchema,
   type StewardCardChip,
   type TaskDesignSummary,
   type TokenSavedView,
@@ -125,8 +127,39 @@ export interface CardFacts {
    * (`StewardChips.forRounds`); absent is none.
    */
   steward?: ReadonlyMap<string, StewardCardChip>;
+  /**
+   * #449 D9: what each `fresh` round's start saved, a decimal string, by
+   * round id (`restartSavingsFor`); absent is none.
+   */
+  restartSavings?: ReadonlyMap<string, string>;
   now: Date;
 }
+
+/**
+ * #449 D9: the card chip's facts — how the latest round's session started
+ * and, after a `fresh` start, what it saved.
+ */
+export const restartOf = (
+  card: CardWithRounds,
+  facts: Pick<CardFacts, 'restartSavings'>,
+): Pick<BoardCardView, 'restartMode' | 'warmupSavedUsd'> => {
+  const latest = card.rounds[0];
+  return {
+    restartMode: latest?.restartMode ?? null,
+    warmupSavedUsd:
+      latest?.restartMode === 'fresh'
+        ? (facts.restartSavings?.get(latest.id) ?? null)
+        : null,
+  };
+};
+
+/** #449 D3: the round's stored estimates; `null` when none or unreadable. */
+const restartEstimateOf = (
+  json: Prisma.JsonValue | null,
+): RestartEstimate | null => {
+  const parsed = restartEstimateSchema.safeParse(json);
+  return parsed.success ? parsed.data : null;
+};
 
 /** #447 D15: the chip of the card's latest round's live incident. */
 export const stewardChipOf = (
@@ -334,6 +367,7 @@ export const toCardView = (
   dependsOn: facts.dependencies.get(card.id) ?? [],
   planId: card.planId,
   steward: stewardChipOf(card, facts),
+  ...restartOf(card, facts),
 });
 
 const isEvidence = (value: Prisma.JsonValue): value is Prisma.JsonObject =>
@@ -387,6 +421,10 @@ const toRoundView = (
   backgroundCommand: round.backgroundCommand,
   finishedAt: iso(round.finishedAt),
   endedAt: iso(round.endedAt),
+  restartMode: round.restartMode,
+  restartEstimate: restartEstimateOf(round.restartEstimate),
+  warmupTokens: round.warmupTokens,
+  warmupMs: round.warmupMs,
 });
 
 /** `attachments`: the card's and its rounds', oldest first (#309). */

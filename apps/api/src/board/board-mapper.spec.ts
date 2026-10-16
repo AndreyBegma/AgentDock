@@ -5,6 +5,7 @@ import {
   type CardFacts,
   type CardWithRounds,
   hooksCauseOf,
+  restartOf,
   stewardChipOf,
 } from './board-mapper';
 
@@ -129,5 +130,51 @@ describe('stewardChipOf (#447 D15)', () => {
   it('is null without rounds or without the facts', () => {
     expect(stewardChipOf(withRounds(), { steward: new Map() })).toBeNull();
     expect(stewardChipOf(withRounds('r1'), {})).toBeNull();
+  });
+});
+
+describe('restartOf (#449 D9)', () => {
+  const withRounds = (...rounds: Partial<BoardCardRound>[]): CardWithRounds =>
+    ({ ...card(), rounds: rounds.map((r) => round(r)) }) as CardWithRounds;
+  const restartSavings = new Map([
+    ['r2', '0.412500'],
+    ['r1', '0.100000'],
+  ]);
+
+  it("is the latest fresh round's mode and saving", () => {
+    expect(
+      restartOf(
+        withRounds(
+          { id: 'r2', restartMode: 'fresh' },
+          { id: 'r1', restartMode: 'fresh' },
+        ),
+        { restartSavings },
+      ),
+    ).toEqual({ restartMode: 'fresh', warmupSavedUsd: '0.412500' });
+  });
+
+  it('shows no saving after a resume, nor an earlier round’s', () => {
+    expect(
+      restartOf(
+        withRounds(
+          { id: 'r2', restartMode: 'resume' },
+          { id: 'r1', restartMode: 'fresh' },
+        ),
+        { restartSavings },
+      ),
+    ).toEqual({ restartMode: 'resume', warmupSavedUsd: null });
+  });
+
+  it('is null without rounds, before round.restart, or without the facts', () => {
+    const none = { restartMode: null, warmupSavedUsd: null };
+    expect(restartOf(withRounds(), { restartSavings })).toEqual(none);
+    expect(
+      restartOf(withRounds({ id: 'r2', restartMode: null }), {
+        restartSavings,
+      }),
+    ).toEqual(none);
+    expect(
+      restartOf(withRounds({ id: 'r2', restartMode: 'fresh' }), {}),
+    ).toEqual({ restartMode: 'fresh', warmupSavedUsd: null });
   });
 });

@@ -16,6 +16,7 @@ import { DatabaseModule } from './database/database.module';
 import { DesignModule } from './design/design.module';
 import { FleetModule } from './fleet';
 import { GitHubAppModule } from './github-app';
+import { HandoffModule } from './handoff';
 import { HealthController } from './health.controller';
 import { HistoryModule } from './history';
 import { LiveModule } from './live/live.module';
@@ -93,6 +94,8 @@ import { WorkflowsModule } from './workflows';
     TokenSaverModule,
     // Issue #447: Steward — incidents, safe automatic fixes, escalation.
     StewardModule,
+    // Issue #449: Context handoff — note copies, person edits, restarts.
+    HandoffModule,
     // Issue #322: a card's model recommended on the runner. Global, and here
     // alone: its conditional queue must not be registered while the graph loads.
     AssessModule,
