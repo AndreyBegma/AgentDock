@@ -18,6 +18,31 @@ describe('card capture runs (e2e)', () => {
     return { ...outcome, sessionId, contentId: String(content.id) };
   };
 
+  it('#445: sends the token saver only to a runner that advertises it', async () => {
+    const off = await start();
+    expect(w.extracted()[0]).not.toHaveProperty('tokenSaver');
+    expect(
+      (await w.ctx.prisma.run.findUniqueOrThrow({ where: { id: off.runId } }))
+        .tokenSaver,
+    ).toBe(false);
+    await w.finish(off.runId, cardsBlock([]));
+
+    await w.advertiseTokenSaver();
+    // Another session: one session is extracted at most once per interval.
+    const sessionId = await w.manualSession('m2');
+    await w.prompt('m2', LONG_PROMPT);
+    const on = await w.capture.extract({ sessionId });
+    if (on.kind !== 'started') throw new Error(on.kind);
+    expect(w.extracted()[1].tokenSaver).toEqual({
+      enabled: true,
+      mcpAllow: [],
+    });
+    expect(
+      (await w.ctx.prisma.run.findUniqueOrThrow({ where: { id: on.runId } }))
+        .tokenSaver,
+    ).toBe(true);
+  });
+
   it('each extraction is a card_capture run, triggered by capture', async () => {
     const { runId, captureId } = await start();
     const run = await w.ctx.prisma.run.findUniqueOrThrow({

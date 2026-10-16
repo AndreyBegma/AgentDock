@@ -720,6 +720,31 @@ describe('projects (e2e)', () => {
       expect(response.text).not.toContain('/home/');
       expect(response.text).not.toContain(main.id);
     });
+
+    it('#445: carries the MCP server names the runner reports per profile', async () => {
+      const a = await seedProject('/srv/a');
+      await seedProfile(runnerId, 'claude-main');
+      await seedProfile(runnerId, 'codex-main', { runtime: 'codex' });
+      await ctx.prisma.runner.update({
+        where: { id: runnerId },
+        data: {
+          capabilities: {
+            ...capabilities,
+            profiles: [
+              { ...capabilities.profiles[0], mcpServers: ['playwright', 'gh'] },
+              // A malformed entry hides nothing else.
+              { id: 'codex-main', mcpServers: ['not a name'] },
+            ],
+          },
+        },
+      });
+      const response = await admin.get(`/projects/${a.id}/runtime-profiles`);
+      expect(response.status).toBe(200);
+      const [claude, codex] = response.body as Record<string, unknown>[];
+      expect(claude.mcpServers).toEqual(['playwright', 'gh']);
+      // Unknown, never "none".
+      expect(codex).not.toHaveProperty('mcpServers');
+    });
   });
 
   describe('members', () => {

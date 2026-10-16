@@ -27,6 +27,7 @@ import {
   isCaptureModel,
   isCardAutoRunCode,
   type TaskDesignSummary,
+  type TokenSavedView,
 } from '@agentdock/shared';
 import {
   type CardRunWiring,
@@ -42,6 +43,7 @@ import {
   type BoardSettings,
   Prisma,
 } from '@prisma/client';
+import type { TokenSaverCardFacts } from '../token-saver/token-saver-facts';
 
 /** #243: what a card's face shows of its design — the Design chip. */
 export const cardDesignSelect = {
@@ -115,6 +117,8 @@ export interface CardFacts {
   attachmentCounts: ReadonlyMap<string, number>;
   /** #337 D8: the cards each one runs after, in number order; absent is none. */
   dependencies: ReadonlyMap<string, CardDependencyRef[]>;
+  /** #445: each round run's savings estimate and artifact-guard flag. */
+  tokenSaver: TokenSaverCardFacts;
   now: Date;
 }
 
@@ -242,6 +246,19 @@ const cardCost = (
   return total?.toFixed(6) ?? null;
 };
 
+/** #445 D13: the rounds' estimates summed, as `cardCost`; `null` when none. */
+const cardTokenSaved = (
+  rounds: readonly BoardCardRound[],
+  saved: TokenSaverCardFacts['tokenSaved'],
+): TokenSavedView | null => {
+  const of = rounds.flatMap((round) => saved.get(round.runId) ?? []);
+  if (of.length === 0) return null;
+  return {
+    estimateTokens: of.reduce((sum, s) => sum + s.estimateTokens, 0),
+    estimateUsd: of.reduce((sum, s) => sum + s.estimateUsd, 0),
+  };
+};
+
 export const toCardView = (
   card: CardWithRounds,
   facts: CardFacts,
@@ -271,9 +288,11 @@ export const toCardView = (
   design: designOf(card.design),
   continueAfterDesign: card.continueAfterDesign,
   costUsd: cardCost(card.rounds, facts.costs),
-  // #445: compile stubs — i445-api fills them from token_saver_stats and runs.
-  tokenSaved: null,
-  artifactIncomplete: false,
+  tokenSaved: cardTokenSaved(card.rounds, facts.tokenSaver.tokenSaved),
+  // #445 D8: the latest round's finish.
+  artifactIncomplete:
+    card.rounds[0] !== undefined &&
+    facts.tokenSaver.artifactIncomplete.has(card.rounds[0].runId),
   captureWhy: card.captureWhy,
   captureConfidence: card.captureConfidence,
   sourceSessionId: card.sourceSessionId,
@@ -343,10 +362,9 @@ const toRoundView = (
   ...wiringOf(round),
   autoRunAfter: round.autoRunAfter,
   costUsd: facts.costs.get(round.runId) ?? null,
-  // #445: compile stubs, as on the card view.
-  tokenSaved: null,
-  tokenSaverFilters: [],
-  artifactIncomplete: false,
+  tokenSaved: facts.tokenSaver.tokenSaved.get(round.runId) ?? null,
+  tokenSaverFilters: facts.tokenSaver.tokenSaverFilters.get(round.runId) ?? [],
+  artifactIncomplete: facts.tokenSaver.artifactIncomplete.has(round.runId),
   startedAt: round.startedAt.toISOString(),
   waitingAt: iso(round.waitingAt),
   backgroundAt: iso(round.backgroundAt),

@@ -24,6 +24,7 @@ import { LiveService } from '../live/live.service';
 import { projectNotFound } from '../projects';
 import { RunnerCommandService } from '../runners/runner-command.service';
 import { RunnerPresence } from '../runners/runner-presence';
+import { TokenSaverService } from '../token-saver/token-saver.service';
 import { CommandRunsService } from './command-runs.service';
 import { ControlFailure, controlError } from './control-error';
 import { CONTROL_OPTIONS, type ControlOptions } from './control-options';
@@ -107,6 +108,7 @@ export class ControlService {
     private readonly presence: RunnerPresence,
     private readonly runs: CommandRunsService,
     private readonly settings: OrchestratorSettingsService,
+    private readonly tokenSaver: TokenSaverService,
     @Inject(CONTROL_OPTIONS) private readonly options: ControlOptions,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
@@ -158,6 +160,9 @@ export class ControlService {
             args: requested,
           };
         }
+        // #445 D11: only a runner that advertises the token saver gets the
+        // field. The orchestrator session has no run row to mark.
+        const saver = await this.tokenSaver.launch(caller.projectId);
         return {
           args: {
             projectId: caller.projectId,
@@ -166,6 +171,7 @@ export class ControlService {
             model: launch.model,
             permissionMode: launch.permissionMode,
             mode: dto.mode,
+            ...saver.args,
           },
         };
       },
