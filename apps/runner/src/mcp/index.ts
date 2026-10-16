@@ -1,7 +1,13 @@
+import { LOCAL_REQUEST_TIMEOUT_MS } from '@agentdock/shared/protocol';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { localRequest } from '../local/client';
 import type { LocalCommandDeps } from '../local/subcommand';
+import { LOCAL_RETRY_METHODS, LOCAL_RETRY_WINDOW_MS } from '../local/types';
 import { buildMcpServer, type McpRequest } from './server';
+
+/** The daemon retries inside its window, then makes one last attempt (#434). */
+const RETRY_CALL_MS =
+  LOCAL_RETRY_WINDOW_MS + 2 * LOCAL_REQUEST_TIMEOUT_MS + 1_000;
 
 /**
  * `agentdock-runner mcp` (spec 201 D20): the `agentdock` MCP server over
@@ -17,11 +23,13 @@ export const runMcp = async (
   const cwd = deps.env.CLAUDE_PROJECT_DIR || deps.cwd;
   const request: McpRequest = (method, args) =>
     // The daemon and the server check `args` against the method's schema.
-    localRequest(deps.socketPath, method, args as never, {
-      via: 'mcp',
-      cwd,
-      ppid: deps.ppid,
-    });
+    localRequest(
+      deps.socketPath,
+      method,
+      args as never,
+      { via: 'mcp', cwd, ppid: deps.ppid },
+      LOCAL_RETRY_METHODS.has(method) ? { callTimeoutMs: RETRY_CALL_MS } : {},
+    );
   const server = buildMcpServer(request);
   const closed = new Promise<void>((resolve) => {
     server.server.onclose = resolve;

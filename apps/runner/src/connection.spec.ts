@@ -388,6 +388,87 @@ describe('RunnerConnection', () => {
       expect(s.of('local.request')).toEqual([]);
     });
 
+    describe('an idempotent method (card.finish, #434)', () => {
+      const finish = {
+        method: 'card.finish',
+        args: { summary: 'done' },
+        projectId: 'prj_1',
+        session: { runtime: 'claude', id: 's-1' },
+        via: 'mcp' as const,
+      };
+
+      /** Lets the retry loop re-arm its timer between two clock steps. */
+      const step = async (clock: FakeClock, ms: number): Promise<void> => {
+        clock.advance(ms);
+        await Bun.sleep(0);
+      };
+
+      it('waits for the connection and succeeds once it is back, without a second call', async () => {
+        const s = server();
+        s.welcome = () => null;
+        const { connection, clock } = connect(s.origin);
+        await s.waitFor('hello');
+        const pending = connection.request(finish);
+        await Bun.sleep(0);
+        await step(clock, 1_000);
+        await step(clock, 2_000);
+        expect(s.of('local.request')).toEqual([]);
+
+        s.send(welcome(0));
+        await until(() => connection.isLive);
+        await step(clock, 4_000);
+        const [sent] = await s.waitFor('local.request');
+        expect(sent).toMatchObject({ method: 'card.finish' });
+        s.send({
+          type: 'local.response',
+          id: sent.id,
+          ok: true,
+          data: { number: 75, finished: true },
+        });
+        expect(await pending).toEqual({
+          ok: true,
+          data: { number: 75, finished: true },
+        });
+        expect(s.of('local.request')).toHaveLength(1);
+      });
+
+      it('tells the worker to call again when the connection stays down, sending nothing', async () => {
+        const s = server();
+        s.welcome = () => null;
+        const { connection, clock } = connect(s.origin);
+        await s.waitFor('hello');
+        const pending = connection.request(finish);
+        await Bun.sleep(0);
+        for (let i = 0; i < 130; i++) await step(clock, 1_000);
+        const result = await pending;
+        expect(result).toEqual({
+          ok: false,
+          error: {
+            code: 'runner_offline',
+            message: expect.stringContaining(
+              'call this tool again in a minute',
+            ),
+          },
+        });
+        expect(s.of('local.request')).toEqual([]);
+      });
+
+      it('stops waiting when the connection is stopped', async () => {
+        const s = server();
+        s.welcome = () => null;
+        const { connection, clock } = connect(s.origin);
+        await s.waitFor('hello');
+        const pending = connection.request(finish);
+        await Bun.sleep(0);
+        connection.stop();
+        await step(clock, 1_000);
+        expect(await pending).toMatchObject({
+          ok: false,
+          error: { code: 'runner_offline' },
+        });
+      });
+    });
+
     it('sends local.request and settles it with the matching local.response', async () => {
       const s = server();
       const { connection } = connect(s.origin);
