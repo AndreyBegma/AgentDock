@@ -6,6 +6,7 @@ import type {
 } from '@agentdock/shared/protocol';
 import { z } from 'zod';
 import type { ConfigProfile, RunnerConfig } from '../config';
+import { profileMcpServerNames } from '../launch/profile-mcp';
 import type { Exec } from './exec';
 import { claudeConfigDir, withAuthentication } from './profiles';
 
@@ -288,10 +289,14 @@ export const detectCapabilities = async (
               claudeConfigDir(profile, home),
               config.otlp?.http ?? null,
             ),
+            // #445 Amendment 2: names only, from the profile's own config.
+            mcpServers: profileMcpServerNames(profile, home),
           }
         : profile,
     ),
     codeSentinel,
     otlp: config.otlp,
+    // #445 Amendment 4: this runner takes `tokenSaver` on launch commands.
+    tokenSaver: true,
   };
 };

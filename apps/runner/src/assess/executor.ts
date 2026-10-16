@@ -26,6 +26,10 @@ import { type Cancel, isoNow } from '../clock';
 import { CommandFailure } from '../commands/failure';
 import type { Env } from '../env';
 import { resolveFleetProject } from '../fleet/project';
+import {
+  type TextCallLaunchOptions,
+  textCallTokenSaver,
+} from '../launch/token-saver';
 import { errorMessage, type Logger } from '../log';
 import { cutBytes } from '../planner/result';
 import { profileOf, type SkillsDeps } from '../skills/deps';
@@ -34,7 +38,7 @@ import { finalResult } from '../skills/run/stream';
 
 const PROMPT_FILE = 'prompt.md';
 
-export interface AssessExecutorOptions {
+export interface AssessExecutorOptions extends TextCallLaunchOptions {
   deps: Pick<SkillsDeps, 'exec' | 'clock' | 'profiles' | 'watchedProjects'>;
   /** `$XDG_STATE_HOME/agentdock/assess`: one directory per run, deleted at its end. */
   assessDir: string;
@@ -140,6 +144,15 @@ export class AssessExecutor {
       runEnv(profile, args, this.options.otlpPort?.() ?? null),
     );
     env[AGENTDOCK_HOOKS_ENV] = AGENTDOCK_HOOKS_OFF;
+    // #445: off or absent launches exactly as before.
+    const tokenSaver = textCallTokenSaver(
+      this.options,
+      profile,
+      args,
+      dir,
+      'card_assess',
+    );
+    Object.assign(env, tokenSaver?.env ?? {});
 
     let proc: CaptureProcess;
     try {
@@ -147,6 +160,7 @@ export class AssessExecutor {
         command: [
           profile.binary ?? profile.runtime,
           ...profile.args,
+          ...(tokenSaver?.args ?? []),
           ...CAPTURE_CLAUDE_FLAGS,
           '--model',
           args.model,

@@ -39,7 +39,7 @@ import {
   removeCardWorktree,
   startFollowUpBranch,
 } from './git';
-import { cardLaunchSpec, cardWorktreePath } from './launch';
+import { cardLaunchSpec, cardTokenSaver, cardWorktreePath } from './launch';
 import { type PushStep, pushCardHead } from './push';
 import { type CardRecord, CardStore } from './record';
 import { type CardWiring, wireCardRound } from './wiring';
@@ -248,6 +248,15 @@ export class CardExecutor {
             reason: wiring.wiringReason,
           });
         }
+        // #445: off or absent launches exactly as before.
+        const tokenSaver = cardTokenSaver(
+          profile,
+          args,
+          deps.home,
+          roundDir,
+          this.options.selfCommand,
+          wiring,
+        );
         writeJsonAtomic(
           `${roundDir}/${RUN_FILES.launch}`,
           cardLaunchSpec(
@@ -256,6 +265,7 @@ export class CardExecutor {
             record.worktree,
             this.options.otlpPort?.() ?? null,
             wiring.files,
+            tokenSaver,
           ),
         );
         const created = await this.tmux.newSession(
