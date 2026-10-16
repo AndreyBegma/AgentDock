@@ -45,6 +45,9 @@ export interface BoardUserRef {
   email: string;
 }
 
+/** #348 D1: why a round's session sent no hook events. */
+export type CardHooksCause = 'no_plugin' | 'session_predates' | 'unknown';
+
 /** The latest round as a card on the board shows it. */
 export interface CardRoundBrief {
   round: number;
@@ -54,6 +57,13 @@ export interface CardRoundBrief {
   waitingAt: string | null;
   /** D6: no hook event within `CARD_HOOKS_GRACE_MS` of the start. */
   hooksMissing: boolean;
+  /**
+   * #348 D1: why hooks are missing; `null` when `hooksMissing` is false. The
+   * API always sends both; optional so older fixtures stay valid.
+   */
+  hooksCause?: CardHooksCause | null;
+  /** #348 D1: the round's profile key, when known. */
+  hooksProfile?: string | null;
   /**
    * #367 D3: how the round's session reports; `null` before it started. The
    * API always sends both; optional so older fixtures stay valid.
@@ -258,6 +268,9 @@ export interface CardRoundView {
   exitCode: number | null;
   error: string | null;
   hooksMissing: boolean;
+  /** #348 D1: as on `CardRoundBrief`. */
+  hooksCause: CardHooksCause | null;
+  hooksProfile: string | null;
   /** #367 D3: as on `CardRoundBrief`. */
   wiring: CardRunWiring | null;
   wiringReason: CardRunWiringReason | null;

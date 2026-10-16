@@ -182,6 +182,8 @@ const brief = (
         finishedBy: round.finishedBy,
         waitingAt: iso(round.waitingAt),
         hooksMissing: hooksMissing(card, round, facts),
+        hooksCause: null,
+        hooksProfile: null,
         ...wiringOf(round),
       }
     : null;
@@ -291,6 +293,8 @@ const toRoundView = (
   exitCode: round.exitCode,
   error: round.error,
   hooksMissing: hooksMissing(card, round, facts),
+  hooksCause: null,
+  hooksProfile: null,
   ...wiringOf(round),
   costUsd: facts.costs.get(round.runId) ?? null,
   startedAt: round.startedAt.toISOString(),
