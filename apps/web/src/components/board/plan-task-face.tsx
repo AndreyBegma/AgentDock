@@ -2,6 +2,7 @@ import { type BoardPlanTaskView, planTaskBoardLabel } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Chip } from '@andrewbehma/glass-ui/chip';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
+import type { ReactNode } from 'react';
 import { planTaskDesignChip, planTaskPill } from '../../lib/board/plan-tasks';
 import { safeHttpsUrl } from '../../lib/queue/format';
 import { TASK_KIND_LABEL } from '../../lib/tasks/format';
@@ -14,9 +15,12 @@ import { TASK_KIND_LABEL } from '../../lib/tasks/format';
  */
 export function PlanTaskFace({
   task,
+  menu,
   onOpen,
 }: {
   task: BoardPlanTaskView;
+  /** The Board's card menu (`slots.menu`), at the end of the header (C-35). */
+  menu?: ReactNode;
   onOpen: (task: BoardPlanTaskView) => void;
 }) {
   const pill = planTaskPill(task);
@@ -25,15 +29,20 @@ export function PlanTaskFace({
   const prHref = task.issue?.prUrl ? safeHttpsUrl(task.issue.prUrl) : null;
   return (
     <div className="flex min-w-0 flex-col gap-1.5 text-sm">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-2">
-        <Badge size="sm" label="Plan" />
-        <span className="min-w-0 break-words font-mono">
-          {planTaskBoardLabel(task.key, task.planTitle)}
-        </span>
-        {task.kind === 'bug' ? (
-          <Chip size="sm" tone="danger">
-            {TASK_KIND_LABEL.bug}
-          </Chip>
+      <div className="flex items-start gap-2">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-2">
+          <Badge size="sm" label="Plan" />
+          <span className="min-w-0 break-words font-mono">
+            {planTaskBoardLabel(task.key, task.planTitle)}
+          </span>
+          {task.kind === 'bug' ? (
+            <Chip size="sm" tone="danger">
+              {TASK_KIND_LABEL.bug}
+            </Chip>
+          ) : null}
+        </div>
+        {menu ? (
+          <span className="flex h-5 shrink-0 items-center">{menu}</span>
         ) : null}
       </div>
       <button

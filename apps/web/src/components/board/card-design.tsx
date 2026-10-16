@@ -62,14 +62,15 @@ function useClock(active: boolean): number {
 
 /**
  * The Design chip on a card's face (#243): shown once the design is on, with
- * a second one while the worker will start by itself on approval.
+ * a second one while the worker will start by itself on approval. Returned
+ * bare, for the face's status row to wrap with the rest (C-35).
  */
 export function CardFaceDesign({ card }: { card: BoardCardView }) {
   const state = cardDesignChipState(card.design);
   const now = useClock(state === 'generating');
   if (state === 'off') return null;
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
+    <>
       <Badge
         size="md"
         tone={CHIP_TONE[state]}
@@ -78,7 +79,7 @@ export function CardFaceDesign({ card }: { card: BoardCardView }) {
       {card.continueAfterDesign && state !== 'approved' ? (
         <Badge size="md" label="Runs after design" />
       ) : null}
-    </div>
+    </>
   );
 }
 
