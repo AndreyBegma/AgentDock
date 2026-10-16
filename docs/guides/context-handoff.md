@@ -36,6 +36,27 @@ or is too large is refused with the reasons, and the agent rewrites it.
 The note lives in the card's worktree (`.agentdock/handoff.md`, git-excluded).
 Only a project with **session content on** also sends a copy to the server.
 
+## Keeping the note fresh
+
+The runner checks the note at every stop and right before Claude Code compacts
+the session (the plugin's `PreCompact` hook, plugin 0.3.0). A note older than
+the round's last commit is stale, and the agent is asked to update it **once
+per round**:
+
+- At a stop, the request is typed at the agent's prompt.
+- Before a compaction, no hook can reach the model and its prompt is busy, so
+  the request comes with the note in the context Claude Code adds right after
+  the compaction. The stops of that round do not ask again.
+
+## Design builds and planner turns
+
+A design build or a planner turn runs headless and read-only, so its agent
+does not keep a note. When one is interrupted — killed, cancelled, timed out
+or failed — haiku writes a note from its stream. The next attempt at the same
+work (the same project and the same prompt) that starts a **new** session
+starts from that note. A planner turn that resumes its session already has the
+context and is not given the note. A run that succeeds clears it.
+
 ## Where you see it
 
 - **Card sheet → Handoff**: the note's sections, who updated it (the agent,

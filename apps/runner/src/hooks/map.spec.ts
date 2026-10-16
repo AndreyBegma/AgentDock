@@ -97,6 +97,8 @@ describe('hook payloads → hook.* events (spec 201 D11)', () => {
     expect(byType('hook.notification')).toEqual({
       notificationType: 'permission_prompt',
     });
+    // #494: the person's `/compact` text is never read.
+    expect(byType('hook.pre_compact')).toEqual({ trigger: 'manual' });
     expect(byType('hook.session_ended')).toEqual({
       reason: 'prompt_input_exit',
     });

@@ -57,6 +57,11 @@ export const turnRecordSchema = planTurnArgsSchema
     startedAt: z.iso.datetime().optional(),
     finishedAt: z.iso.datetime().optional(),
     cancelRequested: z.boolean().optional(),
+    /** #494: the work's key, when the turn runs with Context handoff. */
+    handoffKey: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/)
+      .optional(),
   });
 export type TurnRecord = z.infer<typeof turnRecordSchema>;
 

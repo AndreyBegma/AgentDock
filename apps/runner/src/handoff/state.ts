@@ -52,6 +52,12 @@ export const handoffStateSchema = z.object({
   number: z.number().int().positive().optional(),
   /** D8: the rounds already asked once to refresh a stale note. */
   asked: z.array(z.string().min(1)).default([]),
+  /**
+   * #494, D8: the round found stale before a compaction. Its one refresh
+   * request rides on the `SessionStart` that follows the compaction — no
+   * hook can reach the model before it — and is cleared once that started.
+   */
+  compactAsk: z.string().min(1).optional(),
   /** The note content last refused, so one refusal is sent once. */
   refused: z.string().optional(),
   /** D3: every session the card ran in, oldest first — none is discarded. */

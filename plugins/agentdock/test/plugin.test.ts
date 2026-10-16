@@ -36,6 +36,7 @@ const EVENTS: Record<string, [string, boolean]> = {
   PostToolUseFailure: ['post-tool-use-failure', false],
   Notification: ['notification', false],
   Stop: ['stop', false],
+  PreCompact: ['pre-compact', false],
   SessionEnd: ['session-end', false],
 };
 
@@ -107,9 +108,9 @@ describe('track-work skill (#282)', () => {
     expect(skill).toContain('not_a_manual_session');
   });
 
-  test('plugin version is bumped for the new skill', () => {
+  test('plugin version is bumped for the PreCompact hook (#494)', () => {
     const p = readJson(join(pluginDir, '.claude-plugin/plugin.json'));
-    expect(p.version).toBe('0.2.0');
+    expect(p.version).toBe('0.3.0');
   });
 });
 

@@ -73,6 +73,7 @@ describe('liveStateAfter', () => {
   it('leaves the state alone for tool results and notifications', () => {
     expect(liveStateAfter('hook.tool_finished')).toBeNull();
     expect(liveStateAfter('hook.notification')).toBeNull();
-    expect(HOOK_EVENT_TYPES.length).toBe(7);
+    expect(liveStateAfter('hook.pre_compact')).toBeNull();
+    expect(HOOK_EVENT_TYPES.length).toBe(8);
   });
 });

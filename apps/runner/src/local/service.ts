@@ -61,6 +61,7 @@ const CONTENT_OF: Record<HookEventType, readonly ContentField[]> = {
   'hook.permission_requested': [],
   'hook.notification': [],
   'hook.stopped': ['response', 'background'],
+  'hook.pre_compact': [],
   'hook.session_ended': [],
 };
 

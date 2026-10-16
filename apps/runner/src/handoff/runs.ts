@@ -19,12 +19,13 @@ import { RUN_HANDOFF_FILE } from './state';
 import { readTranscript, transcriptExcerpt } from './transcript';
 
 /**
- * #449 D1, D2, D4: notes of long runner runs — a design (`uiprofile`) build.
- * Such a run is headless and read-only (`--permission-mode plan`), so its
- * agent cannot keep a note: when it is interrupted, haiku writes one from
- * its `stream.jsonl` into `<run dir>/handoff.md`, and the same work started
- * again — the same project and the same prompt, i.e. the same revision —
- * starts from it instead of from zero. A run that succeeds clears it.
+ * #449 D1, D2, D4: notes of long runner runs — a design (`uiprofile`) build
+ * and a planner turn (#494). Such a run is headless and read-only
+ * (`--permission-mode plan`), so its agent cannot keep a note: when it is
+ * interrupted, haiku writes one from its `stream.jsonl` into
+ * `<run dir>/handoff.md`, and the same work started again — the same project
+ * and the same prompt, i.e. the same revision or plan task — starts from it
+ * instead of from zero. A run that succeeds clears it.
  */
 
 /** What the run notes need of a run. */

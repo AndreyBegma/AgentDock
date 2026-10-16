@@ -22,6 +22,8 @@ export const HOOK_TOOL_FINISHED_EVENT = 'hook.tool_finished';
 export const HOOK_PERMISSION_REQUESTED_EVENT = 'hook.permission_requested';
 export const HOOK_NOTIFICATION_EVENT = 'hook.notification';
 export const HOOK_STOPPED_EVENT = 'hook.stopped';
+/** #494, #449 D8: Claude Code is about to compact the session. */
+export const HOOK_PRE_COMPACT_EVENT = 'hook.pre_compact';
 export const HOOK_SESSION_ENDED_EVENT = 'hook.session_ended';
 
 export const HOOK_EVENT_TYPES = [
@@ -31,6 +33,7 @@ export const HOOK_EVENT_TYPES = [
   HOOK_PERMISSION_REQUESTED_EVENT,
   HOOK_NOTIFICATION_EVENT,
   HOOK_STOPPED_EVENT,
+  HOOK_PRE_COMPACT_EVENT,
   HOOK_SESSION_ENDED_EVENT,
 ] as const;
 export type HookEventType = (typeof HOOK_EVENT_TYPES)[number];
@@ -48,6 +51,7 @@ export const HOOK_CLI_NAMES = {
   'post-tool-use-failure': 'PostToolUseFailure',
   notification: 'Notification',
   stop: 'Stop',
+  'pre-compact': 'PreCompact',
   'session-end': 'SessionEnd',
 } as const;
 export type HookCliName = keyof typeof HOOK_CLI_NAMES;
@@ -64,6 +68,7 @@ export const HOOK_CLI_EVENT: Record<HookCliName, HookEventType> = {
   'post-tool-use-failure': HOOK_TOOL_FINISHED_EVENT,
   notification: HOOK_NOTIFICATION_EVENT,
   stop: HOOK_STOPPED_EVENT,
+  'pre-compact': HOOK_PRE_COMPACT_EVENT,
   'session-end': HOOK_SESSION_ENDED_EVENT,
 };
 
@@ -164,6 +169,14 @@ export const hookStoppedDataSchema = z.strictObject({
   background: hookContentSchema.optional(),
 });
 
+/** Claude Code's `PreCompact.trigger`: `/compact`, or the context window. */
+export const hookCompactTriggerSchema = z.enum(['manual', 'auto']);
+
+/** `custom_instructions` is what a person typed after `/compact`: never sent. */
+export const hookPreCompactDataSchema = z.strictObject({
+  trigger: hookCompactTriggerSchema,
+});
+
 /** Claude Code's `SessionEnd.reason`; unknown reasons arrive as `other`. */
 export const hookEndReasonSchema = z.enum([
   'clear',
@@ -184,6 +197,7 @@ export const hookEventDataSchemas = {
   [HOOK_PERMISSION_REQUESTED_EVENT]: hookPermissionRequestedDataSchema,
   [HOOK_NOTIFICATION_EVENT]: hookNotificationDataSchema,
   [HOOK_STOPPED_EVENT]: hookStoppedDataSchema,
+  [HOOK_PRE_COMPACT_EVENT]: hookPreCompactDataSchema,
   [HOOK_SESSION_ENDED_EVENT]: hookSessionEndedDataSchema,
 } as const satisfies Record<HookEventType, z.ZodType>;
 
@@ -199,6 +213,7 @@ export type HookPermissionRequestedData = z.infer<
 >;
 export type HookNotificationData = z.infer<typeof hookNotificationDataSchema>;
 export type HookStoppedData = z.infer<typeof hookStoppedDataSchema>;
+export type HookPreCompactData = z.infer<typeof hookPreCompactDataSchema>;
 export type HookSessionEndedData = z.infer<typeof hookSessionEndedDataSchema>;
 
 interface HookEventBase {
@@ -222,6 +237,7 @@ export type HookEvent = HookEventBase &
       }
     | { type: typeof HOOK_NOTIFICATION_EVENT; data: HookNotificationData }
     | { type: typeof HOOK_STOPPED_EVENT; data: HookStoppedData }
+    | { type: typeof HOOK_PRE_COMPACT_EVENT; data: HookPreCompactData }
     | { type: typeof HOOK_SESSION_ENDED_EVENT; data: HookSessionEndedData }
   );
 

@@ -199,6 +199,7 @@ describe('hook events (spec 201 D11)', () => {
         'post-tool-use-failure',
         'notification',
         'stop',
+        'pre-compact',
         'session-end',
       ].sort(),
     );
