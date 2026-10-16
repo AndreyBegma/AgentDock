@@ -77,6 +77,7 @@ import { useUrlFilters } from '../../../../../lib/filters/use-url-filters';
 import { useLive } from '../../../../../lib/live/use-live';
 import { useReadiness } from '../../../../../lib/readiness/use-readiness';
 import { useSection } from '../../../../../lib/section/use-section';
+import { cardSessionMessenger } from '../../../../../lib/session-message/actions';
 import { useTerminalAvailable } from '../../../../../lib/terminal/use-terminal-available';
 import { useProjectDetail } from '../use-project-detail';
 
@@ -483,6 +484,17 @@ function BoardScreen() {
         target={attaching ? { kind: 'card', cardId: attaching.id } : undefined}
         title={attaching ? `${attaching.label} ${attaching.title}` : 'Card'}
         onClose={() => setAttaching(undefined)}
+        message={
+          canOperate && attaching
+            ? {
+                send: cardSessionMessenger(projectId, attaching.number),
+                // The board's live copy: the question moves as it is answered.
+                question:
+                  (view ? cardByNumber(view, attaching.number) : attaching)
+                    ?.round?.pendingQuestion ?? null,
+              }
+            : undefined
+        }
       />
     </div>
   );

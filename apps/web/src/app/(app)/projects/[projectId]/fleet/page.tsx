@@ -54,6 +54,7 @@ import {
 import { useLive } from '../../../../../lib/live/use-live';
 import { allowedLabels } from '../../../../../lib/queue/format';
 import { useSection } from '../../../../../lib/section/use-section';
+import { slotSessionMessenger } from '../../../../../lib/session-message/actions';
 import { useTerminalAvailable } from '../../../../../lib/terminal/use-terminal-available';
 import { NewIssueDialog } from '../queue/new-issue-dialog';
 import { useProjectDetail } from '../use-project-detail';
@@ -454,6 +455,11 @@ function FleetWorkspace() {
         target={attach?.target}
         title={attach?.title ?? ''}
         onClose={() => setAttach(undefined)}
+        message={
+          canOperate && attach?.target.kind === 'slot'
+            ? { send: slotSessionMessenger(projectId, attach.target.slot) }
+            : undefined
+        }
       />
     </div>
   );

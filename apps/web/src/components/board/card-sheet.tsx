@@ -8,6 +8,7 @@ import {
   type BoardCardKind,
   CARD_FEEDBACK_MAX,
   type CardRoundView,
+  isActiveRoundPhase,
 } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
@@ -71,6 +72,7 @@ import { formatCost } from '../../lib/format';
 import { Time } from '../../lib/format/time';
 import { safeHttpsUrl } from '../../lib/queue/format';
 import { useReadiness } from '../../lib/readiness/use-readiness';
+import { cardSessionMessenger } from '../../lib/session-message/actions';
 import { type TextNotes, useTextNotes } from '../../lib/text/use-text-notes';
 import { AttachmentDropzone } from '../attachments/attachment-dropzone';
 import { AttachmentList } from '../attachments/attachment-list';
@@ -78,6 +80,7 @@ import { CardAttachmentsSection } from '../attachments/card-attachments-section'
 import { useRemoveAttachment } from '../attachments/use-remove-attachment';
 import { PageHeader } from '../page-header/page-header';
 import { ReadinessNotice } from '../readiness/readiness-notice';
+import { SessionMessageLine } from '../session/session-message-line';
 import { useCurrentUser } from '../shell/user-context';
 import { CardStewardSection } from '../steward/card-steward-section';
 import { NormalizedNote } from '../text/normalized-note';
@@ -675,6 +678,25 @@ export function CardDetailBody({
       ) : null}
       {canOperate && card.sessionId && terminal.state === 'disabled' ? (
         <p className="-mt-3 text-xs text-ink-3">{terminal.reason}</p>
+      ) : null}
+
+      {canOperate && card.round && isActiveRoundPhase(card.round.phase) ? (
+        <Field
+          label={
+            card.round.pendingQuestion
+              ? 'The agent asks you'
+              : 'Message the running session'
+          }
+          htmlFor="board-session-message"
+          hint="Text only, never keystrokes. While the agent works, Claude Code queues it for its next step."
+        >
+          <SessionMessageLine
+            send={cardSessionMessenger(projectId, card.number)}
+            question={card.round.pendingQuestion}
+            label="Message the agent"
+            inputId="board-session-message"
+          />
+        </Field>
       ) : null}
 
       {canGiveFeedback(card) && canOperate ? (
