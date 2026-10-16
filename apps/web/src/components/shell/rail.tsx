@@ -45,8 +45,8 @@ function useAdminOpen(): [boolean, (open: boolean) => void] {
  * The left rail (#159, #163), from `lg` up: Workspace, the project's own
  * section titled with its name, then Admin as a collapsible group that NavRail
  * unfolds by itself while one of its pages is open. Exactly one item is active
- * (`activeId`, from `activeEntryId`). Below `lg` the shell draws a TabBar
- * instead.
+ * (`activeId`, from `activeEntryId`). Below `lg` the shell draws a
+ * BottomCapsule instead.
  *
  * `collapsed` (C-14) narrows it to NavRail's icon column; the toggle sits in
  * the head, right of the wordmark, and under the mark once collapsed.

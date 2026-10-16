@@ -382,13 +382,13 @@ export function visibleNav(role: Role, pathname: string): VisibleSection[] {
 }
 
 /**
- * The phone's tab bar (#163): five places, the rest behind More. Outside a
- * project the workspace's five; inside one, the project's home and its
- * working pages — the project's Activity behind More (#213, C-6).
+ * The phone's capsule (#163, #521): three places, the rest behind More.
+ * Outside a project the workspace's three; inside one, the project's working
+ * pages — its home, Queue and Activity behind More.
  */
 const TAB_IDS = {
-  workspace: ['overview', 'projects', 'activity', 'sessions', 'usage'],
-  project: ['project-home', 'fleet', 'board', 'queue', 'approvals'],
+  workspace: ['overview', 'projects', 'activity'],
+  project: ['board', 'fleet', 'approvals'],
 } as const;
 
 export interface TabBarSplit {
