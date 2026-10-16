@@ -1,3 +1,4 @@
+import { STEWARD_DEFAULTS, stewardRunnerConfigOf } from '@agentdock/shared';
 import type { RunnerServerConfig } from '@agentdock/shared/protocol';
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
@@ -30,6 +31,9 @@ export class RunnerWatchList {
           rootPath: true,
           shipSessionContent: true,
           githubAppHealth: { select: { state: true } },
+          stewardSettings: {
+            select: { enabled: true, silenceMinutes: true, trailerGuard: true },
+          },
         },
       }),
       this.prisma.runner.findUnique({
@@ -48,6 +52,12 @@ export class RunnerWatchList {
           : {}),
         // Spec 201 D13 / ADR-0021: absent means the runner strips content.
         ...(p.shipSessionContent ? { shipContent: true } : {}),
+        // #447: what the runner applies of Steward itself; no row is the
+        // defaults (on). Absent would mean off to the runner.
+        steward: stewardRunnerConfigOf({
+          ...STEWARD_DEFAULTS,
+          ...(p.stewardSettings ?? {}),
+        }),
       })),
       pollIntervalsMs: {},
       // Spec 201 D17: absent means off.

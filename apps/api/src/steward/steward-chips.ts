@@ -46,7 +46,9 @@ export const stewardChipsFor = async (
 export class StewardChips {
   constructor(private readonly prisma: PrismaService) {}
 
-  forRounds(roundIds: readonly string[]): Promise<Map<string, StewardCardChip>> {
+  forRounds(
+    roundIds: readonly string[],
+  ): Promise<Map<string, StewardCardChip>> {
     return stewardChipsFor(this.prisma, roundIds);
   }
 }
