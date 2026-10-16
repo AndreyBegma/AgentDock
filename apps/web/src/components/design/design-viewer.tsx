@@ -13,7 +13,7 @@ import { Button } from '@andrewbehma/glass-ui/button';
 import { ResizableFrame } from '@andrewbehma/glass-ui/resizable-frame';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import { SidePanel } from '@andrewbehma/glass-ui/side-panel';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { LaunchCard } from '../../lib/board/launch';
 import {
   approveBlock,
@@ -129,19 +129,22 @@ export function DesignViewer({
 
   // Not React's `onWheel`: that listener is passive, and the browser's own
   // page zoom can only be stopped from an active one (D6).
+  const zoomByWheel = useCallback((deltaY: number) => {
+    const next = wheelZoom(live.current.zoom, deltaY);
+    live.current.zoom = next;
+    live.current.onChange({ kind: 'zoom', zoom: next });
+  }, []);
   useEffect(() => {
     const element = stage.current;
     if (!element || !hasMockup) return;
     const onWheel = (event: WheelEvent) => {
       if (!(event.ctrlKey || event.metaKey)) return;
       event.preventDefault();
-      const next = wheelZoom(live.current.zoom, event.deltaY);
-      live.current.zoom = next;
-      live.current.onChange({ kind: 'zoom', zoom: next });
+      zoomByWheel(event.deltaY);
     };
     element.addEventListener('wheel', onWheel, { passive: false });
     return () => element.removeEventListener('wheel', onWheel);
-  }, [hasMockup]);
+  }, [hasMockup, zoomByWheel]);
 
   const onStageKeyDown = (event: React.KeyboardEvent) => {
     const key = zoomKey(event);
@@ -348,6 +351,7 @@ export function DesignViewer({
                     theme={state.theme}
                     pinMode={pinMode && writeBlock === null}
                     pins={markers}
+                    onWheel={zoomByWheel}
                     onPin={(pin) => {
                       if (writeBlock === null) setDraft({ ...pin, zoom });
                     }}

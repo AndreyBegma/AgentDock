@@ -120,7 +120,7 @@ export function ViewerToolbar({
 
       <fieldset
         className="m-0 flex min-w-0 items-center gap-1 border-0 p-0"
-        title="Ctrl/⌘ + wheel, or Ctrl/⌘ + 0 − =, over the stage around the mockup (not over the mockup itself)"
+        title="Ctrl/⌘ + wheel, or Ctrl/⌘ + 0 − =, over the stage or the mockup"
       >
         <legend className="sr-only">Zoom</legend>
         <Button
