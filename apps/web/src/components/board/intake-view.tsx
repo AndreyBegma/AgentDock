@@ -2,9 +2,11 @@
 
 import type { BoardCardView, BoardView, PlanAnswer } from '@agentdock/shared';
 import { Banner } from '@andrewbehma/glass-ui/banner';
-import { Button } from '@andrewbehma/glass-ui/button';
+import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import NextLink from 'next/link';
 import { fetchBoard } from '../../lib/board/actions';
+import { boardStackPageHref } from '../../lib/board/href';
 import { intakePhase, roundText } from '../../lib/board/intake';
 import { pluralize } from '../../lib/format';
 import { roundKey } from '../../lib/planner/answers';
@@ -157,7 +159,11 @@ export function IntakeView({
       ) : null}
 
       {phase.kind === 'done' ? (
-        <DoneBanner cards={phase.cards} onOpenCard={onOpenCard} />
+        <DoneBanner
+          projectId={projectId}
+          cards={phase.cards}
+          onOpenCard={onOpenCard}
+        />
       ) : null}
 
       {phase.kind === 'closed' ? (
@@ -185,13 +191,36 @@ export function IntakeView({
 
 /** The intake's cards are in Todo: one opens from the banner, several from a list (#409). */
 function DoneBanner({
+  projectId,
   cards,
   onOpenCard,
 }: {
+  projectId: string;
   cards: readonly BoardCardView[];
   onOpenCard: (number: number) => void;
 }) {
   const [only] = cards;
+  // #480: the cards of a confirmed stack open from their stack.
+  const stack = only?.stack ?? null;
+  if (stack) {
+    return (
+      <Banner
+        tone="ok"
+        title={`${stack.label} is on the Board with ${pluralize(cards.length, 'card')}`}
+        action={
+          <NextLink
+            href={boardStackPageHref(projectId, stack.number)}
+            className={buttonClassName({ size: 'sm' })}
+          >
+            Open the stack
+          </NextLink>
+        }
+      >
+        {stack.title}
+        {stack.gate ? ` — ${stack.gate.toLowerCase()}.` : ''}
+      </Banner>
+    );
+  }
   if (cards.length <= 1) {
     return (
       <Banner

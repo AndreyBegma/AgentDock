@@ -165,6 +165,7 @@ export const ACTION_GROUP_LABEL: Record<string, string> = {
   'action_request.': 'Action requests',
   'session_content.': 'Session content',
   'card.': 'Board cards',
+  'stack.': 'Card stacks',
   'attachment.': 'Attachments',
   'board.': 'Board',
   'text.': 'Text',

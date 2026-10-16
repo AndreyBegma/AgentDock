@@ -117,7 +117,8 @@ export function CommentsPanel({
   const [onScreen, setOnScreen] = useState(false);
   const notes = useTextNotes(
     projectId ?? '',
-    projectId === undefined || owner === undefined
+    // #480: a stack's comments have no translation notes of their own yet.
+    projectId === undefined || owner === undefined || owner.kind === 'stack'
       ? null
       : owner.kind === 'card'
         ? { cardId: owner.cardId }

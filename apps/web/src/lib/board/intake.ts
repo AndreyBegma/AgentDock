@@ -2,13 +2,19 @@ import type {
   BoardCardView,
   BoardView,
   ConfirmSplitCard,
+  ConfirmSplitRequest,
   PlanDetail,
   PlanIntakeSplitView,
   PlanSummary,
   PlanTaskKind,
   PlanTurnView,
 } from '@agentdock/shared';
-import { CARD_DRAFT_TITLE_MAX } from '@agentdock/shared';
+import {
+  CARD_DRAFT_TITLE_MAX,
+  INTAKE_SPLIT_MAX,
+  STACK_STAGE_TITLE_MAX,
+  STACK_TITLE_MAX,
+} from '@agentdock/shared';
 import { pluralize } from '../format';
 import { activeTurn, failedTurn } from '../planner/format';
 
@@ -88,6 +94,9 @@ export const splitRows = (split: PlanIntakeSplitView): SplitRow[] =>
 
 const NON_ASCII_LETTER = /[^\p{ASCII}]/u;
 
+const hasNonAsciiLetter = (text: string): boolean =>
+  [...text].some((ch) => /\p{L}/u.test(ch) && NON_ASCII_LETTER.test(ch));
+
 /**
  * #409: why a row cannot be confirmed — the API's rule, said before the
  * round trip: a title, at most `CARD_DRAFT_TITLE_MAX` characters, in English
@@ -99,7 +108,7 @@ export function splitRowProblem(row: Pick<SplitRow, 'title'>): string | null {
   if (title.length > CARD_DRAFT_TITLE_MAX) {
     return `At most ${CARD_DRAFT_TITLE_MAX} characters.`;
   }
-  if ([...title].some((ch) => /\p{L}/u.test(ch) && NON_ASCII_LETTER.test(ch))) {
+  if (hasNonAsciiLetter(title)) {
     return 'Write the title in English — cards are stored in English.';
   }
   return null;
@@ -114,6 +123,188 @@ export const confirmSplitCards = (
 /** "Create 3 cards" — Confirm's label. */
 export const confirmSplitText = (count: number): string =>
   `Create ${pluralize(count, 'card')}`;
+
+// ─── Stacks (#480, ADR-0043) ─────────────────────────────────────────────────
+
+/** How the person confirms the proposal: independent cards, or one stack. */
+export type ProposalShape = 'split' | 'stack';
+
+/** One stage of the stack being reviewed: its name and its cards by index. */
+export interface StageDraft {
+  title: string;
+  cards: number[];
+}
+
+/** The stack being reviewed, beside the rows (titles, kinds) it orders. */
+export interface StackDraft {
+  title: string;
+  body: string;
+  design: boolean;
+  stages: StageDraft[];
+}
+
+/** The shape the review opens in: whatever the intake proposed. */
+export const proposedShape = (split: PlanIntakeSplitView): ProposalShape =>
+  split.stack ? 'stack' : 'split';
+
+/**
+ * The stack the review starts from: the intake's, or — for a split the
+ * person turns into a stack — every card in one stage, to be ordered.
+ */
+export function stackDraft(split: PlanIntakeSplitView): StackDraft {
+  if (split.stack) {
+    return {
+      title: split.stack.title,
+      body: split.stack.body,
+      design: split.stack.design,
+      stages: split.stack.stages.map((s) => ({
+        title: s.title,
+        cards: [...s.cards],
+      })),
+    };
+  }
+  return {
+    title: '',
+    body: '',
+    design: false,
+    stages: [{ title: 'Stage 1', cards: split.cards.map((c) => c.index) }],
+  };
+}
+
+/** The stage a card is in now; -1 when it was removed. */
+export const stageOf = (draft: StackDraft, index: number): number =>
+  draft.stages.findIndex((s) => s.cards.includes(index));
+
+/**
+ * Moves a card to the stage before (`-1`) or after (`1`) its own; a card
+ * already at the edge stays.
+ */
+export function moveToStage(
+  draft: StackDraft,
+  index: number,
+  direction: -1 | 1,
+): StackDraft {
+  const from = stageOf(draft, index);
+  const to = from + direction;
+  if (from < 0 || to < 0 || to >= draft.stages.length) return draft;
+  return {
+    ...draft,
+    stages: draft.stages.map((stage, i) =>
+      i === from
+        ? { ...stage, cards: stage.cards.filter((c) => c !== index) }
+        : i === to
+          ? { ...stage, cards: [...stage.cards, index] }
+          : stage,
+    ),
+  };
+}
+
+/** A new, empty last stage named "Stage N"; at most one per card. */
+export function addStage(draft: StackDraft): StackDraft {
+  if (draft.stages.length >= INTAKE_SPLIT_MAX) return draft;
+  return {
+    ...draft,
+    stages: [
+      ...draft.stages,
+      { title: `Stage ${draft.stages.length + 1}`, cards: [] },
+    ],
+  };
+}
+
+/** The card is removed from the proposal: it leaves its stage too. */
+export const dropFromStages = (
+  draft: StackDraft,
+  index: number,
+): StackDraft => ({
+  ...draft,
+  stages: draft.stages.map((s) => ({
+    ...s,
+    cards: s.cards.filter((c) => c !== index),
+  })),
+});
+
+/**
+ * Why the stack cannot be confirmed — the API's rules, said first: a title
+ * in English, English stage names, and at least one stage with a card.
+ * Null when it can.
+ */
+export function stackProblem(draft: StackDraft): string | null {
+  const title = draft.title.trim();
+  if (title === '') return 'A stack needs a title.';
+  if (title.length > STACK_TITLE_MAX) {
+    return `At most ${STACK_TITLE_MAX} characters.`;
+  }
+  if (hasNonAsciiLetter(title)) {
+    return 'Write the title in English — stacks are stored in English.';
+  }
+  const named = draft.stages.find(
+    (s) => s.title.length > STACK_STAGE_TITLE_MAX || hasNonAsciiLetter(s.title),
+  );
+  if (named) return 'Stage names are short and in English.';
+  if (draft.stages.every((s) => s.cards.length === 0)) {
+    return 'A stack needs a card in a stage.';
+  }
+  return null;
+}
+
+/**
+ * Confirm's body for the reviewed proposal: the kept rows in their order —
+ * stage order for a stack — and, for a stack, its stages without the empty
+ * ones.
+ */
+export function confirmRequest(
+  turnId: string,
+  shape: ProposalShape,
+  rows: readonly SplitRow[],
+  draft: StackDraft,
+): ConfirmSplitRequest {
+  if (shape === 'split') {
+    return { turnId, cards: confirmSplitCards(rows) };
+  }
+  const kept = new Set(rows.map((r) => r.index));
+  const stages = draft.stages
+    .map((s) => ({
+      title: s.title.trim(),
+      cards: s.cards.filter((c) => kept.has(c)),
+    }))
+    .filter((s) => s.cards.length > 0);
+  const order = stages.flatMap((s) => s.cards);
+  const byIndex = new Map(rows.map((r) => [r.index, r]));
+  return {
+    turnId,
+    cards: confirmSplitCards(
+      order.map((i) => byIndex.get(i)).filter((r): r is SplitRow => !!r),
+    ),
+    stack: {
+      title: draft.title.trim(),
+      body: draft.body.trim(),
+      design: draft.design,
+      stages,
+    },
+  };
+}
+
+/** "Create stack · 5 cards", or a split's "Create 3 cards". */
+export const confirmText = (shape: ProposalShape, count: number): string =>
+  shape === 'stack'
+    ? `Create stack · ${pluralize(count, 'card')}`
+    : confirmSplitText(count);
+
+/** The line beside Confirm: where the cards land, and what holds them. */
+export const confirmHint = (shape: ProposalShape, design: boolean): string =>
+  shape === 'split'
+    ? 'Cards land in To Do.'
+    : design
+      ? 'Cards land in To Do; Run waits for the stack design.'
+      : 'Cards land in To Do with stage dependencies.';
+
+/** "The planner proposes a stack of 5 cards in 2 stages". */
+export function proposalTitle(split: PlanIntakeSplitView): string {
+  const cards = pluralize(split.cards.length, 'card');
+  return split.stack
+    ? `The planner proposes a stack of ${cards} in ${pluralize(split.stack.stages.length, 'stage')}`
+    : `The planner proposes ${cards}`;
+}
 
 /** "Round 2 of at most 4". */
 export const roundText = (round: number, maxRounds: number): string =>
@@ -164,7 +355,9 @@ export function draftStateText(plan: PlanDetail | undefined): string | null {
     case 'round':
       return `${pluralize(plan.questions.length, 'question')} waiting`;
     case 'split':
-      return `split into ${pluralize(phase.split.cards.length, 'card')}?`;
+      return phase.split.stack
+        ? `stack of ${pluralize(phase.split.cards.length, 'card')}?`
+        : `split into ${pluralize(phase.split.cards.length, 'card')}?`;
     case 'idle':
       return 'ready to generate';
     case 'done':
