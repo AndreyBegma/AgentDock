@@ -11,7 +11,7 @@ const data = {
   runId: 'cm1run00000000000000000001',
   projectId: 'p1',
   at: '2026-10-16T10:00:00.000Z',
-  code: 'not_a_card_session',
+  code: 'not_a_card_session' as const,
 };
 
 describe('card_run.finish_refused (#482)', () => {
