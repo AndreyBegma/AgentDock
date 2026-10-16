@@ -16,6 +16,10 @@ import type {
 import type { ProfileSource } from '../readiness';
 import type { CardKindSource } from '../text/limits';
 import type {
+  TokenSavedView,
+  TokenSaverFilterSavings,
+} from '../token-saver/contracts';
+import type {
   CaptureModel,
   CaptureSkipReason,
   CaptureStatus,
@@ -168,6 +172,18 @@ export interface BoardCardView {
   continueAfterDesign: boolean;
   /** Sum over every round's run, a decimal string; `null` when nothing is priced. */
   costUsd: string | null;
+  /**
+   * #445 D13: the Token saver estimate summed over every round's run, as
+   * `costUsd` — "saved ≈ $x" beside the cost; `null` when nothing was
+   * filtered. The API always sends it; optional so older fixtures stay valid.
+   */
+  tokenSaved?: TokenSavedView | null;
+  /**
+   * #445 D8: the latest round's finish was accepted after the artifact
+   * guard's 2 rejections — the **Description incomplete** badge. Optional
+   * like `tokenSaved`; absent reads as `false`.
+   */
+  artifactIncomplete?: boolean;
   /** #244: why capture suggested the card; `null` for a manual card. */
   captureWhy: string | null;
   /** #244: 0–1; `null` for a manual card. */
@@ -324,6 +340,12 @@ export interface CardRoundView {
   wiringReason: CardRunWiringReason | null;
   /** This round's run, a decimal string. */
   costUsd: string | null;
+  /** #445: this round's run, as on `BoardCardView`. */
+  tokenSaved?: TokenSavedView | null;
+  /** #445 D13: the sheet's per-filter breakdown of this round, most saved first. */
+  tokenSaverFilters?: TokenSaverFilterSavings[];
+  /** #445 D8: this round's finish, as on `BoardCardView`. */
+  artifactIncomplete?: boolean;
   startedAt: string;
   waitingAt: string | null;
   /** #390: as on `CardRoundBrief`. */

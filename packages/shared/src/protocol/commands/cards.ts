@@ -3,6 +3,7 @@ import {
   ATTACHMENTS_PER_CARD_MAX,
   attachmentRefSchema,
 } from '../../attachments';
+import { tokenSaverConfigSchema } from '../../token-saver/contracts';
 import type { CommandDefinition } from '../commands';
 import { absolutePathSchema } from '../projects';
 import { headShaSchema } from './approvals';
@@ -200,6 +201,8 @@ export const cardRunArgsSchema = z
     pullRequest: cardDraftPullRequestSchema.optional(),
     /** #359 D8: create `branch` from the updated `origin/<base>` first. */
     newBranch: z.boolean().optional(),
+    /** #445 D11: the project's Token saver; absent is off (a runner without the `tokenSaver` capability refuses it). */
+    tokenSaver: tokenSaverConfigSchema.optional(),
   })
   .refine(
     (a) =>

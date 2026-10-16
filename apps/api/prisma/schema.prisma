@@ -82,6 +82,7 @@ model User {
   textNormalizations          TextNormalization[]
   textSettingsUpdated         TextSettings[]
   attachmentsUploaded         Attachment[]
+  tokenSaverSettingsUpdated   TokenSaverSettings[]
   settings                    UserSettings?
 
   @@map("users")
@@ -403,6 +404,8 @@ model Project {
   textNormalizations   TextNormalization[]
   textSettings         TextSettings?
   attachments          Attachment[]
+  tokenSaverSettings   TokenSaverSettings?
+  tokenSaverStats      TokenSaverStat[]
 
   @@unique([runnerId, rootPath])
   @@map("projects")
@@ -1587,6 +1590,12 @@ model Run {
   /// The slot's `updatedAt` (event time) for a slot run, so a rebuild from the
   /// same slot is identical.
   updatedAt       DateTime
+  /// #445 D8: the finish was accepted after the artifact guard's 2 rejections —
+  /// the card shows "Description incomplete".
+  artifactIncomplete Boolean @default(false)
+  /// #445 D12: the launch carried `tokenSaver.enabled`. The before/after
+  /// compares runs with `false` against runs with `true`, by kind.
+  tokenSaver         Boolean @default(false)
 
   project           Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
   slot              Slot?              @relation(fields: [slotId], references: [id], onDelete: Cascade)
@@ -1598,6 +1607,7 @@ model Run {
   cardCapture       CardCapture?
   textNormalization TextNormalization?
   inboundDeliveries InboundDelivery[]
+  tokenSaverStats   TokenSaverStat[]
 
   @@index([projectId, startedAt])
   @@index([projectId, status])
@@ -3265,4 +3275,60 @@ model TextSettings {
   updatedBy User?   @relation(fields: [updatedById], references: [id], onDelete: SetNull)
 
   @@map("text_settings")
+}
+
+/// Token saver (#445, ADR-0039).
+
+/// The launch a filtered command ran under (shared `TOKEN_SAVER_RUN_KINDS`).
+/// `orchestrator` is the project's orchestrator session, which has no run.
+enum TokenSaverRunKind {
+  card
+  skill
+  plan
+  card_assess
+  card_capture
+  ui_profile
+  text_normalize
+  orchestrator
+}
+
+/// A project's Token saver setting (D11). No row: on, with an empty allowlist.
+model TokenSaverSettings {
+  projectId   String   @id
+  enabled     Boolean  @default(true)
+  /// D6: MCP servers a launch may load besides `agentdock`, by name.
+  mcpAllow    String[] @default([])
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  updatedBy User?   @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@map("token_saver_settings")
+}
+
+/// One filtered command (D12), from the runner's `filter.stats` event.
+/// `id` is the runner's, so a resent `events` batch inserts nothing twice.
+model TokenSaverStat {
+  id            String            @id
+  projectId     String
+  /// Null for the orchestrator session, or a run the API does not know.
+  runId         String?
+  runKind       TokenSaverRunKind
+  /// `<family>/<command>`, e.g. `js/jest`; `none` when no filter matched.
+  filter        String
+  rawBytes      Int
+  keptBytes     Int
+  /// `AGENTDOCK_RAW=1`: the command ran unfiltered.
+  bypassed      Boolean
+  /// The filter returned the original output.
+  passedThrough Boolean
+  createdAt     DateTime
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  run     Run?    @relation(fields: [runId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, createdAt])
+  @@index([runId])
+  @@map("token_saver_stats")
 }

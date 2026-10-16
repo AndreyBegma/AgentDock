@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { tokenSaverConfigSchema } from '../../token-saver/contracts';
 import type { CommandDefinition } from '../commands';
 import { absolutePathSchema } from '../projects';
 
@@ -107,6 +108,8 @@ export const orchestratorStartArgsSchema = z.strictObject({
   model: orchestratorModelSchema,
   permissionMode: orchestratorPermissionModeSchema,
   mode: orchestratorModeSchema,
+  /** #445 D11: as on `card.run`. */
+  tokenSaver: tokenSaverConfigSchema.optional(),
 });
 export type OrchestratorStartArgs = z.infer<typeof orchestratorStartArgsSchema>;
 

@@ -136,6 +136,10 @@ than the feature never sends it; read it with `terminalAvailable()`. It stays
 the machine fact even with `commands` below: `terminal.attach` can be served by
 the build and still have no PTY or tmux to run on.
 
+`tokenSaver` (#445) says whether the runner accepts `tokenSaver` on its launch
+commands. An absent `tokenSaver` means `false`; read it with
+`tokenSaverAvailable()`. See [Token saver](#token-saver).
+
 `commands` lists every command the runner build serves — its handler keys,
 sorted — and `disabledCommands` the subset its config switches off (#233,
 ADR-0023). Both are plain strings, not an enum of the allowlist: a runner newer
@@ -746,7 +750,7 @@ daemon relays their request. Schemas are in `local.ts`.
 | `handoff.create` | operator | `title, body, branch` | an issue queued for the fleet, plus `manual.handoff` |
 | `action.request` | operator | `kind, args, summary` | a pending action request (spec 201 D18) |
 | `away.set` | operator | `on` | the runner's away mode; needs no project |
-| `card.finish` | operator | `summary` (≤ 4 000) | `{ number, finished: true }`; the card is the one whose session uuid is the request's `session.id`, else `not_a_card_session` (issue #242 D6) |
+| `card.finish` | operator | `summary` (≤ 4 000), `artifactIncomplete?` (#445 D8, set by the runner's artifact guard) | `{ number, finished: true }`; the card is the one whose session uuid is the request's `session.id`, else `not_a_card_session` (issue #242 D6) |
 
 ```json
 {
@@ -1244,6 +1248,110 @@ Schemas in `commands/worktree.ts` (`worktreeCommands`); the rules are
   }
 }
 ```
+
+### Token saver
+
+Schemas in `packages/shared/src/token-saver/contracts.ts`; the rules are
+[spec 445](../specs/445-token-saver.md) and
+[ADR-0039](../adr/0039-token-saver.md). The runner compresses what agents
+read, never what people read.
+
+**On the launch commands.** Each of the eight commands that start a Claude
+session takes an optional `tokenSaver: { enabled, mcpAllow }`. The eight are
+`card.run`, `skill.run`, `plan.turn`, `card.assess`, `cards.extract`,
+`uiprofile.build`, `text.normalize` and `orchestrator.start`.
+
+- `mcpAllow` lists the MCP servers, by name, that the launch loads besides
+  `agentdock`. There are at most 32, with no duplicates, each matching
+  `^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$`. The runner takes each server's
+  definition from the launch profile's own config (D6).
+- An absent `tokenSaver`, or `enabled: false`, launches exactly as before #445.
+- Every launch args schema is strict, so a runner older than the field
+  refuses it as `invalid_args`. The runner advertises the field with the
+  capability `tokenSaver: true` in `hello`; read it with
+  `tokenSaverAvailable()`. The API sends `tokenSaver` only to a runner that
+  advertises it, as with `terminal`. An absent capability means `false`.
+- The API fills the field from `token_saver_settings`. A project with no row
+  gets `TOKEN_SAVER_DEFAULT` (`{ enabled: true, mcpAllow: [] }`).
+- The API records on the run whether the launch carried
+  `tokenSaver.enabled: true` (`runs.tokenSaver`). The before/after of D12
+  compares runs with `false` against runs with `true`, by run kind.
+
+**MCP servers per profile.** Each Claude profile in `capabilities.profiles`
+may carry `mcpServers`: the names of the MCP servers in that profile's own
+Claude config. It holds names only, never a command, env or secret. There are
+at most 64 (`PROFILE_MCP_SERVERS_MAX`), each matching the server-name pattern
+above. An absent `mcpServers` means unknown: a runner older than the field, or
+a Codex profile. The project's **Token saver** tab offers these names as the
+allowlist's checkboxes.
+
+**The hook's scope.** The PreToolUse hook rewrites only a single simple
+command of a covered family. These pass through unchanged and are counted
+`passedThrough`:
+
+- a command with `|`, `&&`, `||`, `;`, a redirect, a heredoc, a subshell or a
+  command substitution;
+- a Bash call with `run_in_background: true`;
+- a dev server or a watch mode.
+
+**Inside the runner.** These are not part of the wire protocol; they are
+listed so the slots agree:
+
+- The `filter` subprocess appends one JSONL row per command to the file named
+  by `$AGENTDOCK_FILTER_STATS`, in the run dir. The launch sets the variable.
+  The daemon reads the file in batches and sends `filter.stats`.
+- The raw output of command `n` goes to `<run dir>/raw/<n>.log`. It is removed
+  with the run dir. One file is capped at 10 MB with a truncation marker, and
+  the compressed output says it was truncated.
+
+**The `filter.stats` event.** The runner reports filtered commands in the
+ordinary `events` stream, so stats are spooled, resent and acked like every
+other event. Each event has `source: "runner"` and type `filter.stats`
+(`FILTER_STATS_EVENT`). The envelope's `project` names the project. The rows
+carry no `projectId`: the API resolves the project.
+
+| Field of each row | Meaning |
+|---|---|
+| `id` | the runner's id for the row (`^[A-Za-z0-9_-]{1,64}$`). The API inserts it as the `token_saver_stats` primary key and skips duplicates, so a resent batch counts once |
+| `runId` | the launch's run; `null` exactly when `runKind` is `orchestrator` |
+| `runKind` | `card`, `skill`, `plan`, `card_assess`, `card_capture`, `ui_profile`, `text_normalize` or `orchestrator` |
+| `filter` | `<family>/<command>` (e.g. `js/jest`), or `none` when no filter matched |
+| `rawBytes`, `keptBytes` | the output before and after the filter; `keptBytes ≤ rawBytes` |
+| `bypassed` | ran with `AGENTDOCK_RAW=1`; `keptBytes = rawBytes` |
+| `passedThrough` | the filter returned the original output; `keptBytes = rawBytes` |
+| `at` | when the command finished (ISO); stored as `createdAt` |
+
+```json
+{
+  "type": "events",
+  "events": [
+    {
+      "v": 1, "seq": 18412, "ts": "2026-12-02T10:14:03.000Z",
+      "type": "filter.stats", "source": "runner",
+      "project": { "repo": "AndreyBegma/AgentDock", "root": "/home/archi/dev/AgentDock" },
+      "data": {
+        "rows": [
+          { "id": "f_9c2e1a", "runId": "cmrun0001", "runKind": "card", "filter": "js/jest",
+            "rawBytes": 48211, "keptBytes": 3920, "bypassed": false, "passedThrough": false,
+            "at": "2026-12-02T10:14:02.000Z" }
+        ]
+      }
+    }
+  ]
+}
+```
+
+- A batch holds 1 to 200 rows (`FILTER_STATS_MAX_ROWS`).
+- An event whose `data` fails `filterStatsDataSchema` is logged and skipped,
+  like any bad sink input.
+- The savings estimate is `(rawBytes − keptBytes) / 4` tokens
+  (`estimateTokensSaved`), priced at the session model's input price
+  (ADR-0009). It is always shown with "≈".
+
+**On `card.finish`.** The runner's artifact guard (D8) may send
+`artifactIncomplete: true` when it accepts a finish after 2 rejections in the
+round. The API stores it as `runs.artifactIncomplete`, and the card shows
+**Description incomplete**.
 
 ## Delivery guarantees
 

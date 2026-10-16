@@ -271,6 +271,9 @@ export const toCardView = (
   design: designOf(card.design),
   continueAfterDesign: card.continueAfterDesign,
   costUsd: cardCost(card.rounds, facts.costs),
+  // #445: compile stubs — i445-api fills them from token_saver_stats and runs.
+  tokenSaved: null,
+  artifactIncomplete: false,
   captureWhy: card.captureWhy,
   captureConfidence: card.captureConfidence,
   sourceSessionId: card.sourceSessionId,
@@ -340,6 +343,10 @@ const toRoundView = (
   ...wiringOf(round),
   autoRunAfter: round.autoRunAfter,
   costUsd: facts.costs.get(round.runId) ?? null,
+  // #445: compile stubs, as on the card view.
+  tokenSaved: null,
+  tokenSaverFilters: [],
+  artifactIncomplete: false,
   startedAt: round.startedAt.toISOString(),
   waitingAt: iso(round.waitingAt),
   backgroundAt: iso(round.backgroundAt),
