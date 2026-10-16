@@ -418,13 +418,22 @@ export class DesignService implements OnModuleInit {
     }
     const revision = await this.prisma.designRevision.findFirst({
       where: { id: request.revisionId, designId: design.id },
-      select: { id: true },
+      select: { id: true, _count: { select: { frames: true } } },
     });
     if (!revision) {
       throw designError(
         400,
         DESIGN_ERROR.invalidArgs,
         'The revision is not a revision of this design',
+      );
+    }
+    // #441: a revision stored before frames has one, its `html`.
+    const frame = request.frame ?? 0;
+    if (frame >= Math.max(revision._count.frames, 1)) {
+      throw designError(
+        400,
+        DESIGN_ERROR.invalidArgs,
+        'The frame is not a frame of this revision',
       );
     }
     const anchor = commentAnchor(request);
@@ -435,6 +444,7 @@ export class DesignService implements OnModuleInit {
       data: {
         designId: design.id,
         revisionId: revision.id,
+        frame,
         authorId: actor.userId,
         kind: request.kind,
         ...anchor,

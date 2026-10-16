@@ -21,6 +21,8 @@ export interface DesignPromptComment {
   kind: DesignCommentKind;
   variant: number;
   revision: number;
+  /** #441: the name of the frame it was left on. */
+  frame: string;
   viewport: string | null;
   theme: DesignTheme | null;
   x: number | null;
@@ -44,8 +46,13 @@ export interface DesignPromptContext {
   variantCount: number;
   /** `generate` draws a variant's first revision; `revise` its next (D10). */
   mode: 'generate' | 'revise';
-  /** The variant's latest revision, on a revise. */
-  previous: { revision: number; title: string; rationale: string } | null;
+  /** The variant's latest revision, on a revise, with its frames' names (#441). */
+  previous: {
+    revision: number;
+    title: string;
+    rationale: string;
+    frames: string[];
+  } | null;
   profile: DesignPromptProfile | null;
   /** The design skills to apply, installed ones only (D15). */
   skills: string[];
@@ -55,13 +62,22 @@ export interface DesignPromptContext {
 
 /** The approved design a `write` turn records under `## Design` (D16). */
 export interface ApprovedDesignContext {
-  /** The file the design is published at; `<issue>` stands for the issue number. */
-  path: string;
+  /**
+   * #441: the folder the frames are published in, and each frame's file;
+   * `<issue>` stands for the issue number.
+   */
+  dir: string;
+  frames: { name: string; path: string }[];
   variant: number;
   title: string;
   rationale: string;
-  /** The comments the design took, as decisions. */
-  decisions: { kind: DesignCommentKind; anchor: string | null; body: string }[];
+  /** The comments the design took, as decisions, with their frame's name. */
+  decisions: {
+    kind: DesignCommentKind;
+    frame: string;
+    anchor: string | null;
+    body: string;
+  }[];
 }
 
 const fence = (lang: string, body: string): string => {
@@ -98,7 +114,7 @@ const commentsJson = (comments: readonly DesignPromptComment[]): string =>
     comments.map((c) => ({
       id: c.id,
       kind: c.kind,
-      leftOn: { variant: c.variant, revision: c.revision },
+      leftOn: { variant: c.variant, revision: c.revision, frame: c.frame },
       ...(c.viewport !== null ? { viewport: c.viewport } : {}),
       ...(c.theme !== null ? { theme: c.theme } : {}),
       ...(c.x !== null && c.y !== null ? { point: { x: c.x, y: c.y } } : {}),
@@ -137,7 +153,11 @@ export const designSections = (
       ctx.previous
         ? `Your latest revision of this variant is revision ${ctx.previous.revision}: "${ctx.previous.title}". Its rationale: ${ctx.previous.rationale}`
         : null,
-      `Answer with the \`agentdock-plan\` block — \`"variant": ${ctx.variant}\` — and one \`agentdock-design\` block fenced with four backticks.`,
+      ctx.previous
+        ? `Its frames, in order: ${ctx.previous.frames.map((f) => `"${f}"`).join(', ')}. Draw the whole revision again: keep the frames the comments leave alone, and change, add or drop frames as they ask. A comment names the frame it was left on in \`leftOn.frame\`.`
+        : null,
+      'Use one frame unless the task touches several pages or several standalone components; then draw one frame per page, plus one per component that matters on its own.',
+      `Answer with the \`agentdock-plan\` block — \`"variant": ${ctx.variant}\`, and \`"frames"\` naming each frame in order — and one \`agentdock-design\` block per frame, each fenced with four backticks.`,
     ]
       .filter((l): l is string => l !== null)
       .join('\n'),
@@ -193,7 +213,9 @@ export const designSections = (
 export const approvedDesignSections = (d: ApprovedDesignContext): string[] => [
   '## Approved design',
   [
-    `The approved mockup is variant ${d.variant}: "${d.title}". It is published at \`${d.path}\` — write that path, with \`<issue>\` as it is, in the document's \`## Design\` section; AgentDock fills in the issue number.`,
+    d.frames.length === 1
+      ? `The approved mockup is variant ${d.variant}: "${d.title}". It is published at \`${d.frames[0].path}\` — write that path, with \`<issue>\` as it is, in the document's \`## Design\` section; AgentDock fills in the issue number.`
+      : `The approved design is variant ${d.variant}: "${d.title}", in ${d.frames.length} frames published under \`${d.dir}/\` — list every one of these paths, with \`<issue>\` as it is, in the document's \`## Design\` section; AgentDock fills in the issue number:\n${d.frames.map((f) => `- \`${f.path}\` — ${f.name}`).join('\n')}`,
     `Its rationale: ${d.rationale}`,
   ].join('\n'),
   d.decisions.length > 0
@@ -202,7 +224,7 @@ export const approvedDesignSections = (d: ApprovedDesignContext): string[] => [
         d.decisions
           .map(
             (c) =>
-              `- ${c.kind}${c.anchor ? ` (${c.anchor})` : ''}: ${c.body.replace(/\s+/g, ' ')}`,
+              `- ${c.kind}${d.frames.length > 1 ? ` on "${c.frame}"` : ''}${c.anchor ? ` (${c.anchor})` : ''}: ${c.body.replace(/\s+/g, ' ')}`,
           )
           .join('\n'),
       )}`

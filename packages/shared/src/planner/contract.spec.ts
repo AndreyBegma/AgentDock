@@ -534,8 +534,7 @@ describe('parsePlannerOutput — design', () => {
   });
 
   // #441: one design block per named frame, in order.
-  const block = (body: string) =>
-    `\`\`\`\`agentdock-design\n${body}\n\`\`\`\``;
+  const block = (body: string) => `\`\`\`\`agentdock-design\n${body}\n\`\`\`\``;
   const framed = (names: string[], bodies: string[]) =>
     `${fence({ ...design, frames: names })}\n\n${bodies.map(block).join('\n\n')}\n`;
 

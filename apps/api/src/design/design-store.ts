@@ -1,6 +1,8 @@
 import {
   DESIGN_COMMENTS_PER_TURN_MAX,
+  DESIGN_LEGACY_FRAME_NAME,
   type DesignSuggestion,
+  designFrameSlug,
   type TaskDesignSummary,
   type UiProfileSnippet,
   uiProfileSnippetSchema,
@@ -207,8 +209,65 @@ export const applySuggestions = async (
   }
 };
 
-/** A revision's variant and number, for a comment's `leftOn`. */
-const revisionSelect = { select: { variant: true, revision: true } } as const;
+/** #441: a frame's name and slug, in order, without its HTML. */
+export interface FrameName {
+  name: string;
+  slug: string;
+}
+
+/** #441: a frame with its HTML, as publication commits it. */
+export interface FrameFile extends FrameName {
+  html: string;
+}
+
+/** The frame a revision stored before #441 reads as. */
+export const LEGACY_FRAME: FrameName = {
+  name: DESIGN_LEGACY_FRAME_NAME,
+  slug: designFrameSlug(DESIGN_LEGACY_FRAME_NAME),
+};
+
+/** A revision's frame names: its rows, or the one legacy frame. */
+export const frameNamesOf = (rows: readonly FrameName[]): FrameName[] =>
+  rows.length > 0
+    ? rows.map(({ name, slug }) => ({ name, slug }))
+    : [LEGACY_FRAME];
+
+/** The `frames` select of a revision: names in order, no HTML. */
+export const frameNameSelect = {
+  select: { name: true, slug: true },
+  orderBy: { position: 'asc' },
+} as const;
+
+/**
+ * #441: every frame of a revision with its HTML, in order. A revision stored
+ * before frames holds its one mockup in `html` and reads as one frame.
+ */
+export const revisionFrames = async (
+  db: Db,
+  revisionId: string,
+): Promise<FrameFile[]> => {
+  const revision = await db.designRevision.findUniqueOrThrow({
+    where: { id: revisionId },
+    select: {
+      html: true,
+      frames: {
+        select: { name: true, slug: true, html: true },
+        orderBy: { position: 'asc' },
+      },
+    },
+  });
+  if (revision.frames.length > 0) return revision.frames;
+  return [{ ...LEGACY_FRAME, html: revision.html ?? '' }];
+};
+
+/** The frame's name at `position` of a revision, for a comment's anchor. */
+const frameNameAt = (frames: readonly FrameName[], position: number): string =>
+  frameNamesOf(frames)[position]?.name ?? DESIGN_LEGACY_FRAME_NAME;
+
+/** A revision's variant, number and frames, for a comment's `leftOn`. */
+const revisionSelect = {
+  select: { variant: true, revision: true, frames: frameNameSelect },
+} as const;
 
 /**
  * D8: what a design turn carries — the profile it draws from, the design's
@@ -230,7 +289,12 @@ export const loadDesignPrompt = async (
       ? db.designRevision.findFirst({
           where: { designId: design.id, variant: plan.variant },
           orderBy: { revision: 'desc' },
-          select: { revision: true, title: true, rationale: true },
+          select: {
+            revision: true,
+            title: true,
+            rationale: true,
+            frames: frameNameSelect,
+          },
         })
       : Promise.resolve(null),
     plan.comments.length > 0
@@ -246,7 +310,14 @@ export const loadDesignPrompt = async (
     variant: plan.variant,
     variantCount: design.variantCount,
     mode: plan.mode,
-    previous,
+    previous: previous
+      ? {
+          revision: previous.revision,
+          title: previous.title,
+          rationale: previous.rationale,
+          frames: frameNamesOf(previous.frames).map((f) => f.name),
+        }
+      : null,
     profile: profile
       ? {
           version: profile.version,
@@ -262,6 +333,7 @@ export const loadDesignPrompt = async (
       kind: c.kind,
       variant: c.revision.variant,
       revision: c.revision.revision,
+      frame: frameNameAt(c.revision.frames, c.frame),
       viewport: c.viewport,
       theme: c.theme,
       x: c.x,
@@ -273,19 +345,28 @@ export const loadDesignPrompt = async (
 };
 
 /**
- * D16: the approved design of a task, for its write turn — without the path,
- * which the planner names. Null when the design is off or not approved.
+ * D16: the approved design of a task, for its write turn — its frames'
+ * names without their paths, which the planner names. Null when the design
+ * is off or not approved.
  */
 export const loadApprovedDesign = async (
   db: Db,
   planId: string,
   taskKey: string,
-): Promise<Omit<ApprovedDesignContext, 'path'> | null> => {
+): Promise<
+  | (Omit<ApprovedDesignContext, 'dir' | 'frames'> & { frames: FrameName[] })
+  | null
+> => {
   const design = await db.taskDesign.findUnique({
     where: { planId_taskKey: { planId, taskKey } },
     include: {
       approvedRevision: {
-        select: { variant: true, title: true, rationale: true },
+        select: {
+          variant: true,
+          title: true,
+          rationale: true,
+          frames: frameNameSelect,
+        },
       },
       comments: {
         include: { revision: revisionSelect },
@@ -294,17 +375,19 @@ export const loadApprovedDesign = async (
     },
   });
   if (!design?.needed || !design.approvedRevision) return null;
-  const { variant, title, rationale } = design.approvedRevision;
+  const { variant, title, rationale, frames } = design.approvedRevision;
   return {
     variant,
     title,
     rationale,
+    frames: frameNamesOf(frames),
     // The comments left on the picked variant; the others' were about a
     // layout that was not chosen.
     decisions: design.comments
       .filter((c) => c.revision.variant === variant)
       .map((c) => ({
         kind: c.kind,
+        frame: frameNameAt(c.revision.frames, c.frame),
         anchor: anchorOf(c),
         body: c.body,
       })),

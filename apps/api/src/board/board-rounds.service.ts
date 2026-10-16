@@ -46,6 +46,12 @@ import {
 import { AuditService } from '../audit/audit.service';
 import { BudgetGate } from '../budgets/budget-gate';
 import { PrismaService } from '../database/prisma.service';
+import {
+  type FrameFile,
+  frameNameSelect,
+  frameNamesOf,
+  revisionFrames,
+} from '../design/design-store';
 import { specDirOf } from '../planner/planner-instructions.service';
 import { RuntimeProfileResolver } from '../readiness';
 import { TextNormalizer } from '../text/text-normalizer';
@@ -360,11 +366,13 @@ export class BoardRoundsService {
             issueNumber: issue.number,
           })
         : null);
-    // #243 D7: round 1 commits the approved mockup into the card's branch,
-    // as stored — without the viewer's pin helper, which is never stored.
-    const designFile: CardRunFile | null =
+    // #243 D7, #441: round 1 commits every frame of the approved variant
+    // into the card's branch, as stored — without the viewer's pin helper,
+    // which is never stored.
+    const designFrames: (CardRunFile & { name: string })[] =
       firstStart && design
-        ? {
+        ? design.frames.map((f) => ({
+            name: f.name,
             path: cardDesignPath(
               specDir,
               {
@@ -373,10 +381,11 @@ export class BoardRoundsService {
                 issueNumber: issue.number,
               },
               design.variant,
+              f.slug,
             ),
-            content: design.html,
-          }
-        : null;
+            content: f.html,
+          }))
+        : [];
     const sessionId = card.sessionId ?? randomUUID();
     // #309 D9, D10: what the card holds once this round's claim is made.
     const attached = await this.attachments.withClaim(card.id, claimIds);
@@ -400,9 +409,12 @@ export class BoardRoundsService {
             specPath,
             issueNumber: issue.number,
             design:
-              designFile && design
+              designFrames.length > 0 && design
                 ? {
-                    path: designFile.path,
+                    frames: designFrames.map((f) => ({
+                      name: f.name,
+                      path: f.path,
+                    })),
                     rationale: design.rationale,
                     comments: design.comments,
                   }
@@ -413,7 +425,7 @@ export class BoardRoundsService {
       ...(firstStart && specPath !== null
         ? [{ path: specPath, content: specContent(card, issue.number) }]
         : []),
-      ...(designFile ? [designFile] : []),
+      ...designFrames.map((f) => ({ path: f.path, content: f.content })),
     ];
     const draft: Omit<CardRunArgs, 'runId'> = {
       cardId: card.id,
@@ -651,12 +663,14 @@ export class BoardRoundsService {
   /**
    * #243 D6, D7: the card's approved design for round 1 — `null` when the
    * card has none or it is off; 409 `design_not_approved` while a needed
-   * design is not approved. The comments are the bodies the approved
-   * variant's revisions addressed, oldest first: the review's decisions.
+   * design is not approved. #441: every frame of it, in order. The comments
+   * are the bodies the approved variant's revisions addressed, oldest first
+   * — the review's decisions — each led by its frame's name when the design
+   * has several.
    */
   private async approvedDesign(card: CardWithRounds): Promise<{
     variant: number;
-    html: string;
+    frames: FrameFile[];
     rationale: string;
     comments: string[];
   } | null> {
@@ -667,7 +681,7 @@ export class BoardRoundsService {
         needed: true,
         status: true,
         approvedRevision: {
-          select: { variant: true, html: true, rationale: true },
+          select: { id: true, variant: true, rationale: true },
         },
       },
     });
@@ -686,9 +700,23 @@ export class BoardRoundsService {
         addressedIn: { variant: approved.variant },
       },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-      select: { body: true },
+      select: {
+        body: true,
+        frame: true,
+        revision: { select: { frames: frameNameSelect } },
+      },
     });
-    return { ...approved, comments: comments.map((c) => c.body) };
+    const frames = await revisionFrames(this.prisma, approved.id);
+    return {
+      variant: approved.variant,
+      rationale: approved.rationale,
+      frames,
+      comments: comments.map((c) => {
+        if (frames.length === 1) return c.body;
+        const frame = frameNamesOf(c.revision.frames)[c.frame];
+        return frame ? `${frame.name}: ${c.body}` : c.body;
+      }),
+    };
   }
 
   /**

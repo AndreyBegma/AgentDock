@@ -253,7 +253,8 @@ export const cardWorkerPrompt = (card: CardWorkerPromptInput): string => {
 const designLink = (card: CardWorkerPromptInput): string => {
   const frames = card.design?.frames ?? [];
   const repo = 'https://github.com/<owner>/<repo>';
-  if (frames.length === 1) return `${repo}/blob/${card.branch}/${frames[0].path}`;
+  if (frames.length === 1)
+    return `${repo}/blob/${card.branch}/${frames[0].path}`;
   const first = frames[0]?.path ?? '';
   return `${repo}/tree/${card.branch}/${first.slice(0, first.lastIndexOf('/'))}`;
 };
