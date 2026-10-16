@@ -8,6 +8,7 @@ import { BoardController } from './board.controller';
 import { BoardService, FleetCardEditsRef } from './board.service';
 import { BoardAutoRun } from './board-auto-run';
 import { BoardBackgroundStall } from './board-background-stall';
+import { BoardBulk } from './board-bulk';
 import { BoardCommands } from './board-commands';
 import { BoardDependencies } from './board-dependencies.service';
 import { BoardInboxService } from './board-inbox.service';
@@ -36,6 +37,8 @@ import { CollectRetryTimer } from './collect-retry-timer';
     BoardAutoRun,
     // #390: a round stuck on its own background task raises one warning.
     BoardBackgroundStall,
+    // #452: one action for several cards.
+    BoardBulk,
     BoardCommands,
     BoardDependencies,
     BoardInboxService,

@@ -1,3 +1,4 @@
+export * from './bulk';
 export * from './capture-contract';
 export * from './capture-fingerprint';
 export * from './capture-input';

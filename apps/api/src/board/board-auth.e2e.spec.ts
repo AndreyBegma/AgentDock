@@ -4,6 +4,7 @@ import { BoardWorld } from './testing/board-e2e';
 const WRITES: ['post' | 'patch' | 'delete', string, object?][] = [
   ['post', '/board/cards', { title: 'x' }],
   ['patch', '/board/cards/1', { title: 'y' }],
+  ['post', '/board/cards/bulk', { numbers: [1], action: 'delete' }],
   ['post', '/board/cards/1/move', { column: 'finished', index: 0 }],
   ['post', '/board/cards/1/run', {}],
   ['post', '/board/cards/1/feedback', { text: 'z' }],

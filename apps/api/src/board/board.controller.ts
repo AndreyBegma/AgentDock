@@ -3,6 +3,7 @@ import type {
   BoardCardDetail,
   BoardSettingsView,
   BoardView,
+  BulkBoardCardsResponse,
   CardDependenciesView,
   CardPullRequestView,
   CollectBoardCardResponse,
@@ -31,6 +32,7 @@ import {
   type ResolvedProjectAccess,
 } from '../projects';
 import { BoardService } from './board.service';
+import { BoardBulk } from './board-bulk';
 import { BoardDependencies } from './board-dependencies.service';
 import { cardNotFound } from './board-error';
 import { BoardInboxService } from './board-inbox.service';
@@ -41,6 +43,7 @@ import {
   AcceptSuggestionDto,
   AddCardDependencyDto,
   BoardQueryDto,
+  BulkBoardCardsDto,
   CardFeedbackDto,
   CreateBoardCardDto,
   MoveBoardCardDto,
@@ -75,6 +78,7 @@ export class BoardController {
     private readonly rounds: BoardRoundsService,
     private readonly inbox: BoardInboxService,
     private readonly deps: BoardDependencies,
+    private readonly bulk: BoardBulk,
   ) {}
 
   @Get('board')
@@ -98,6 +102,22 @@ export class BoardController {
     @Body() dto: CreateBoardCardDto,
   ): Promise<BoardCardDetail> {
     return this.board.create(access.projectId, dto, actorOf(access, user, ctx));
+  }
+
+  /**
+   * #452: one action for several cards — each skipped or done on its own, so
+   * the answer is always 200 with an outcome per card.
+   */
+  @Post('board/cards/bulk')
+  @HttpCode(200)
+  @ProjectRole('operator')
+  bulkAction(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Body() dto: BulkBoardCardsDto,
+  ): Promise<BulkBoardCardsResponse> {
+    return this.bulk.run(access.projectId, dto, actorOf(access, user, ctx));
   }
 
   @Get('board/cards/:number')

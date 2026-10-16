@@ -10,6 +10,10 @@ import {
   BOARD_MAX_RUNNING_MIN,
   type BoardCardKind,
   type BoardColumn,
+  BULK_CARD_ACTIONS,
+  BULK_CARDS_MAX,
+  type BulkBoardCardsRequest,
+  type BulkCardAction,
   CAPTURE_MODELS,
   CARD_BACKGROUND_STALL_MINUTES_MAX,
   CARD_BACKGROUND_STALL_MINUTES_MIN,
@@ -28,6 +32,10 @@ import {
 } from '@agentdock/shared/protocol';
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  ArrayUnique,
+  IsArray,
   IsBoolean,
   IsIn,
   IsInt,
@@ -166,6 +174,21 @@ export class MoveBoardCardDto implements MoveBoardCardRequest {
   @IsOptional()
   @IsBoolean()
   stopWorker?: boolean;
+}
+
+/** `POST /board/cards/bulk` (#452): distinct card numbers, one action. */
+export class BulkBoardCardsDto implements BulkBoardCardsRequest {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(BULK_CARDS_MAX)
+  @ArrayUnique()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  @Max(999_999_999, { each: true })
+  numbers!: number[];
+
+  @IsIn(BULK_CARD_ACTIONS)
+  action!: BulkCardAction;
 }
 
 /** `POST /board/cards/:number/run`. */
