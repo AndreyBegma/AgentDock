@@ -31,6 +31,7 @@ import { RunnersModule } from './runners/runners.module';
 import { SchedulesModule } from './schedules';
 import { SessionsModule } from './sessions/sessions.module';
 import { SkillsModule } from './skills';
+import { StewardDigestModule } from './steward-digest';
 import { TelegramModule } from './telegram';
 import { TerminalModule } from './terminal';
 import { TerminalSetupModule } from './terminal-setup';
@@ -97,6 +98,9 @@ import { WorkflowsModule } from './workflows';
     AttachmentsModule.forRoot(),
     SchedulesModule,
     BudgetsModule,
+    // Issue #447: the Steward digest. Global, and here alone: its conditional
+    // queue must not be registered while the graph loads.
+    StewardDigestModule,
     // Before WebhooksModule: its `POST /hooks/:publicId` would otherwise
     // claim `/hooks/github` (spec 27 notes; pinned by an e2e test).
     GitHubAppModule,
