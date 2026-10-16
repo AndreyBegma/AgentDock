@@ -1,9 +1,14 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from 'bun:test';
 import { chmodSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import {
+  CARD_PUSH_MIN_INTERVAL_MS,
+  cardDraftPullRequest,
+} from '@agentdock/shared';
 import type {
   CardRunArgs,
   CardRunPhaseChangedData,
+  CardRunPushedData,
   UnsequencedEvent,
 } from '@agentdock/shared/protocol';
 import { CommandFailure } from '../commands/failure';
@@ -81,10 +86,11 @@ const setup = async () => {
   };
   const events: UnsequencedEvent[] = [];
   const cardsDir = join(f.ws, 'state', 'cards');
+  const clock = new FakeClock(Date.parse('2026-10-14T12:00:00.000Z'));
   const make = () =>
     new CardExecutor({
       deps: f.deps(exec, {
-        clock: new FakeClock(Date.parse('2026-10-14T12:00:00.000Z')),
+        clock,
         profiles: () => profiles,
       }),
       cardsDir,
@@ -150,6 +156,7 @@ const setup = async () => {
     untilEnded,
     argvOf,
     cardsDir,
+    clock,
   };
 };
 
@@ -422,6 +429,192 @@ describe.skipIf(!tmuxInstalled)(
       expect(readFileSync(join(worktree, 'src/export.ts'), 'utf8')).toBe(
         'export const csv = 1;\n',
       );
+    });
+
+    it('#359 D1: within one poll of the first commit the branch is pushed with a draft PR, reported as card_run.pushed; later commits wait for the interval', async () => {
+      const t = await setup();
+      const draft = cardDraftPullRequest({
+        number: 12,
+        title: 'Export as CSV',
+        issueNumber: null,
+      });
+      await t.executor.run(
+        t.args({
+          profileKey: 'claude-slow',
+          pullRequest: draft,
+          files: [
+            { path: 'docs/specs/card-12-export-csv.md', content: '# C-12\n' },
+          ],
+        }),
+      );
+      const worktree = join(t.f.ws, '.wt-widget-card-ab12cd34');
+      const pushed = () =>
+        t.events
+          .filter((e) => e.type === 'card_run.pushed')
+          .map((e) => e.data as CardRunPushedData);
+
+      await t.executor.poll();
+      await t.executor.settled();
+      const head = await t.f.run(worktree, 'rev-parse', 'HEAD');
+      expect(pushed()).toEqual([
+        {
+          cardId: 'card_1',
+          runId: 'run_1',
+          projectId: t.f.project.id,
+          at: '2026-10-14T12:00:00.000Z',
+          branch: 'card/c12-export-csv',
+          headSha: head,
+          prNumber: 7,
+          prUrl: 'https://github.com/acme/widget/pull/7',
+          prState: 'draft',
+        },
+      ]);
+      expect(
+        await t.f.run(
+          t.f.origin,
+          'rev-parse',
+          'refs/heads/card/c12-export-csv',
+        ),
+      ).toBe(head);
+      expect(t.f.prCreates()).toHaveLength(1);
+      expect(t.f.prCreates()[0]?.args).toContain('--draft');
+
+      // A second commit inside the interval waits; after it, one push.
+      t.f.write(worktree, { 'src/export.ts': 'export const csv = 1;\n' });
+      const second = await t.f.commitAll(worktree, 'feat: export');
+      await t.executor.poll();
+      await t.executor.settled();
+      expect(pushed()).toHaveLength(1);
+      t.clock.advance(CARD_PUSH_MIN_INTERVAL_MS);
+      await t.executor.poll();
+      await t.executor.settled();
+      expect(pushed().map((d) => d.headSha)).toEqual([head, second]);
+      expect(pushed()[1]).toMatchObject({ prNumber: 7, prState: 'draft' });
+      expect(t.f.prCreates()).toHaveLength(1);
+
+      // Nothing new: nothing pushed, nothing reported.
+      t.clock.advance(CARD_PUSH_MIN_INTERVAL_MS);
+      await t.executor.poll();
+      await t.executor.settled();
+      expect(pushed()).toHaveLength(2);
+
+      // Collect readies the draft the poll opened (D3).
+      const collected = await t.executor.collect({
+        cardId: 'card_1',
+        projectId: t.f.project.id,
+        root: t.f.root,
+        base: 'main',
+        branch: 'card/c12-export-csv',
+        number: 12,
+        title: draft.title,
+        body: 'Exported.\n\nAgentDock-Card: C-12',
+      });
+      expect(collected).toMatchObject({ prNumber: 7, prState: 'open' });
+      expect(t.f.readies).toHaveLength(1);
+    });
+
+    it('#359 D1: a round without pullRequest pushes nothing from the poll', async () => {
+      const t = await setup();
+      await t.executor.run(
+        t.args({
+          profileKey: 'claude-slow',
+          files: [
+            { path: 'docs/specs/card-12-export-csv.md', content: '# C-12\n' },
+          ],
+        }),
+      );
+      await t.executor.poll();
+      await t.executor.settled();
+      expect(t.events.some((e) => e.type === 'card_run.pushed')).toBe(false);
+      expect(t.f.gh.calls).toEqual([]);
+    });
+
+    it('#359 D8: newBranch resumes the session on a fresh branch from the updated base, opening a second draft PR; Completed removes both branches', async () => {
+      const t = await setup();
+      const draft = cardDraftPullRequest({
+        number: 12,
+        title: 'Export as CSV',
+        issueNumber: null,
+      });
+      await t.executor.run(
+        t.args({
+          profileKey: 'claude-slow',
+          pullRequest: draft,
+          files: [
+            { path: 'docs/specs/card-12-export-csv.md', content: '# C-12\n' },
+          ],
+        }),
+      );
+      await t.executor.poll();
+      await t.executor.settled();
+      const worktree = join(t.f.ws, '.wt-widget-card-ab12cd34');
+      const first = await t.f.run(worktree, 'rev-parse', 'HEAD');
+      // Auto-merged with deleteBranch on origin.
+      await t.f.run(t.f.origin, 'update-ref', 'refs/heads/main', first);
+      await t.f.run(
+        t.f.origin,
+        'update-ref',
+        '-d',
+        'refs/heads/card/c12-export-csv',
+      );
+      t.f.open.splice(0);
+
+      await t.executor.run(
+        t.args({
+          runId: 'run_2',
+          profileKey: 'claude-slow',
+          branch: 'card/c12-export-csv-2',
+          newBranch: true,
+          session: { id: SESSION_ID, resume: true },
+          prompt: 'Feedback: add a header row.',
+          pullRequest: draft,
+        }),
+      );
+      const argv = await t.argvOf('run_2');
+      expect(argv.slice(1, 3)).toEqual(['--resume', SESSION_ID]);
+      expect(await t.f.run(worktree, 'branch', '--show-current')).toBe(
+        'card/c12-export-csv-2',
+      );
+      expect(await t.f.run(worktree, 'rev-parse', 'HEAD')).toBe(first);
+
+      t.f.write(worktree, { 'src/header.ts': 'export const h = 1;\n' });
+      const second = await t.f.commitAll(worktree, 'feat: header row');
+      t.clock.advance(CARD_PUSH_MIN_INTERVAL_MS);
+      await t.executor.poll();
+      await t.executor.settled();
+      const pushed = t.events
+        .filter((e) => e.type === 'card_run.pushed')
+        .map((e) => e.data as CardRunPushedData);
+      expect(pushed.at(-1)).toMatchObject({
+        runId: 'run_2',
+        branch: 'card/c12-export-csv-2',
+        headSha: second,
+        prState: 'draft',
+      });
+      const creates = t.f.prCreates();
+      expect(creates).toHaveLength(2);
+      expect(creates[1]?.args).toContain('card/c12-export-csv-2');
+
+      await t.f.run(
+        t.f.origin,
+        'update-ref',
+        '-d',
+        'refs/heads/card/c12-export-csv-2',
+      );
+      expect(
+        await t.executor.close({
+          cardId: 'card_1',
+          projectId: t.f.project.id,
+          removeWorktree: true,
+        }),
+      ).toEqual({ stopped: true, worktreeRemoved: true, branchDeleted: true });
+      const branches = await t.f.run(
+        t.f.root,
+        'branch',
+        '--list',
+        '--format=%(refname:short)',
+      );
+      expect(branches).not.toContain('card/c12-export-csv');
     });
 
     it('refuses a codex profile, an unwatched root, another project’s card and a file path into .git', async () => {

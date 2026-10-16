@@ -1,6 +1,7 @@
 import { mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  cardDraftPullRequestSchema,
   cardIdSchema,
   cardShortIdSchema,
   cardTmuxSessionSchema,
@@ -51,6 +52,37 @@ export const cardRecordSchema = z.object({
    * across rounds; the PR body links them when the worker wrote none.
    */
   specFiles: z.array(z.string().min(1)).optional(),
+  /**
+   * #359 D1: the round's draft PR (`card.run`'s `pullRequest`). Set, the
+   * session poll pushes the committed HEAD and opens the draft; absent,
+   * nothing is pushed before collect.
+   */
+  pullRequest: cardDraftPullRequestSchema.optional(),
+  /** #359 D1: the commit of `branch` this runner last pushed. */
+  pushedHead: z.string().min(1).optional(),
+  /**
+   * #359 D1: the open PR of `branch` the poll found or opened; `opened` when
+   * this runner opened it as a draft — the one collect marks ready (D3).
+   */
+  pushPr: z
+    .object({
+      number: z.number().int().positive(),
+      url: z.string().min(1),
+      opened: z.boolean(),
+    })
+    .optional(),
+  /**
+   * #359 D8: the card's earlier branches, a follow-up round ago, with the
+   * head this runner pushed of each; Completed's cleanup deletes them.
+   */
+  previousBranches: z
+    .array(
+      z.object({
+        branch: z.string().min(1),
+        pushedHead: z.string().min(1).optional(),
+      }),
+    )
+    .optional(),
 });
 export type CardRecord = z.infer<typeof cardRecordSchema>;
 

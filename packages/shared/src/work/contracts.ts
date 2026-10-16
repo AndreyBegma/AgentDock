@@ -1,3 +1,4 @@
+import type { CardFleetView } from '../board/contracts';
 import type {
   BoardCardKind,
   BoardColumn,
@@ -82,7 +83,9 @@ interface WorkItemBase {
  * D11). Its status pill is `column`; `roundPhase` is the native detail.
  */
 export interface WorkCardItem extends WorkItemBase {
-  source: 'card' | 'inbox';
+  source: 'card' | 'inbox' | 'fleet';
+  /** #388: a `fleet` row's slot, stage and issue; absent on every other source. */
+  fleet?: CardFleetView;
   cardId: string;
   number: number;
   /** `C-<number>`. */

@@ -57,6 +57,8 @@ export interface CardSeed {
   column?: BoardColumn;
   updatedAt: Date;
   issueNumber?: number;
+  /** #388: seeds a mirrored `fleet` card of this issue and slot. */
+  fleet?: { issue: number; slot: string; stage?: string };
 }
 
 /**
@@ -264,7 +266,14 @@ export class WorkWorld {
         title: seed.title ?? `Card ${seed.number}`,
         kind: seed.kind ?? 'feature',
         column: seed.column ?? 'todo',
-        source: seed.column === 'inbox' ? 'captured' : 'manual',
+        source: seed.fleet
+          ? 'fleet'
+          : seed.column === 'inbox'
+            ? 'captured'
+            : 'manual',
+        fleetIssue: seed.fleet?.issue ?? null,
+        fleetSlot: seed.fleet?.slot ?? null,
+        fleetStage: seed.fleet?.stage ?? null,
         position: seed.number,
         issueOnRun: false,
         specOnRun: false,

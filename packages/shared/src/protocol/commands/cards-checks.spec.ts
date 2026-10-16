@@ -159,11 +159,10 @@ describe('card.checks (#359 D5)', () => {
     }
   });
 
-  it('is an operator command with its own timeout, not yet in the allowlist', () => {
+  it('is an operator command with its own timeout, in the allowlist', () => {
     const def = cardChecksCommands['card.checks'];
     expect(def.minRole).toBe('operator');
     expect(def.timeoutMs).toBe(CARD_TIMEOUTS_MS.checks);
-    // The runner slot enters it together with its handler.
-    expect(Object.hasOwn(commands, 'card.checks')).toBe(false);
+    expect(Object.hasOwn(commands, 'card.checks')).toBe(true);
   });
 });

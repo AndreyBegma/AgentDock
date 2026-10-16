@@ -3,6 +3,8 @@ import {
   type BoardColumn,
   cardLabel,
   effectiveProjectRole,
+  FLEET_STAGES,
+  type FleetStage,
   parseWorkSearch,
   projectRoleAtLeast,
   WORK_PAGE_SIZE,
@@ -27,6 +29,20 @@ interface Row {
   key: Keyset;
   item: WorkItem;
 }
+
+const isFleetStage = (value: string): value is FleetStage =>
+  (FLEET_STAGES as readonly string[]).includes(value);
+
+/** #388: a mirrored fleet slot is `fleet`, an Inbox suggestion `inbox`, the rest `card`. */
+export const workSourceOfCard = (card: {
+  source: string;
+  column: string;
+}): 'card' | 'inbox' | 'fleet' =>
+  card.source === 'fleet'
+    ? 'fleet'
+    : card.column === 'inbox'
+      ? 'inbox'
+      : 'card';
 
 /** `(updatedAt, id)` descending: newer first, then the larger id. */
 const before = (a: Keyset, b: Keyset): boolean =>
@@ -110,7 +126,8 @@ export class WorkQueryService {
       (c: BoardColumn) =>
         (query.source === 'inbox'
           ? c === 'inbox'
-          : query.source !== 'card' || c !== 'inbox') &&
+          : (query.source !== 'card' && query.source !== 'fleet') ||
+            c !== 'inbox') &&
         (!query.status || query.status === c),
     );
     if (wanted.length === 0) return [];
@@ -132,6 +149,9 @@ export class WorkQueryService {
     ];
     if (query.projectId) and.push({ projectId: query.projectId });
     if (query.kind) and.push({ kind: query.kind });
+    // #388: `fleet` is its own source; `card` and `inbox` no longer include it.
+    if (query.source === 'fleet') and.push({ source: 'fleet' });
+    else if (query.source) and.push({ source: { not: 'fleet' } });
     if (after) and.push({ updatedAt: { lte: after.at } });
     if (search) {
       const or: Prisma.BoardCardWhereInput[] = [
@@ -157,7 +177,7 @@ export class WorkQueryService {
     return cards.map((card) => ({
       key: { at: card.updatedAt, id: card.id },
       item: {
-        source: card.column === 'inbox' ? 'inbox' : 'card',
+        source: workSourceOfCard(card),
         projectId: card.projectId,
         projectName: card.project.displayName,
         cardId: card.id,
@@ -173,6 +193,19 @@ export class WorkQueryService {
         prUrl: card.prUrl,
         updatedAt: card.updatedAt.toISOString(),
         href: workCardHref(card.projectId, card.number),
+        ...(card.source === 'fleet' && card.fleetIssue !== null
+          ? {
+              fleet: {
+                issue: card.fleetIssue,
+                slot: card.fleetSlot,
+                stage:
+                  card.fleetStage !== null && isFleetStage(card.fleetStage)
+                    ? card.fleetStage
+                    : null,
+                slotGone: card.fleetSlotGone,
+              },
+            }
+          : {}),
       },
     }));
   }

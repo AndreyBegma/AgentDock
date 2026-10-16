@@ -16,14 +16,18 @@ import { ApiError } from '../api';
 
 const DEFAULT_LIVE_URL = 'ws://localhost:8180/live';
 
-/** The `/terminal` socket sits on the API port beside `/live` (spec 29 D5). */
+/**
+ * The `/terminal` socket sits beside `/live` (spec 29 D5): only the last
+ * segment of the live path is swapped, so a proxy prefix such as `/api` stays.
+ */
 export function terminalSocketUrl(
   ticket: string,
   size: { cols: number; rows: number },
   liveUrl: string = process.env.NEXT_PUBLIC_LIVE_URL ?? DEFAULT_LIVE_URL,
 ): string {
   const url = new URL(liveUrl);
-  url.pathname = TERMINAL_WS_PATH;
+  const prefix = url.pathname.replace(/\/+$/, '').replace(/\/[^/]*$/, '');
+  url.pathname = `${prefix}${TERMINAL_WS_PATH}`;
   url.search = '';
   url.searchParams.set(TERMINAL_WS_QUERY.ticket, ticket);
   url.searchParams.set(TERMINAL_WS_QUERY.cols, String(size.cols));

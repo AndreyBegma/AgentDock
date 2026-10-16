@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import {
   AGENTDOCK_WORKTREE_DIR,
+  CARD_PUSH_MIN_INTERVAL_MS,
   CARD_SESSION_POLL_MS,
 } from '@agentdock/shared';
 import {
@@ -15,6 +16,7 @@ import {
   type CardStopArgs,
   type CardStopResult,
   cardRunPhaseChangedDataSchema,
+  cardRunPushedDataSchema,
   cardSessionName,
   type UnsequencedEvent,
 } from '@agentdock/shared/protocol';
@@ -34,8 +36,10 @@ import {
   ensureWorktree,
   excludeFromGit,
   removeCardWorktree,
+  startFollowUpBranch,
 } from './git';
 import { cardLaunchSpec, cardWorktreePath } from './launch';
+import { type PushStep, pushCardHead } from './push';
 import { type CardRecord, CardStore } from './record';
 import { type CardWiring, wireCardRound } from './wiring';
 
@@ -52,6 +56,8 @@ export interface CardExecutorOptions {
   /** The OTLP receiver's bound port, null when it is off. */
   otlpPort?: () => number | null;
   pollMs?: number;
+  /** #359 D1: `CARD_PUSH_MIN_INTERVAL_MS` unless a test sets it. */
+  pushIntervalMs?: number;
   /**
    * Where `card.run` downloads attachments from (#309 D9): the API and the
    * runner token. Required: without it every card with an attachment fails
@@ -59,6 +65,46 @@ export interface CardExecutorOptions {
    */
   attachmentSource: AttachmentSource;
 }
+
+/**
+ * #359 D1/D8: what a new round's record keeps of the last one. The draft PR
+ * is the round's own. On the same branch, what was pushed and the PR found
+ * stay; on another branch (a follow-up), the last branch joins
+ * `previousBranches` with the head pushed of it, for Completed's cleanup.
+ */
+const pushStateOf = (
+  previous: CardRecord | null,
+  args: CardRunArgs,
+): Pick<
+  CardRecord,
+  'pullRequest' | 'pushedHead' | 'pushPr' | 'previousBranches'
+> => {
+  const pullRequest = args.pullRequest ? { pullRequest: args.pullRequest } : {};
+  if (!previous) return pullRequest;
+  if (previous.branch === args.branch) {
+    return {
+      ...pullRequest,
+      ...(previous.pushedHead ? { pushedHead: previous.pushedHead } : {}),
+      ...(previous.pushPr ? { pushPr: previous.pushPr } : {}),
+      ...(previous.previousBranches
+        ? { previousBranches: previous.previousBranches }
+        : {}),
+    };
+  }
+  const earlier = (previous.previousBranches ?? []).filter(
+    (b) => b.branch !== previous.branch && b.branch !== args.branch,
+  );
+  return {
+    ...pullRequest,
+    previousBranches: [
+      ...earlier,
+      {
+        branch: previous.branch,
+        ...(previous.pushedHead ? { pushedHead: previous.pushedHead } : {}),
+      },
+    ],
+  };
+};
 
 /** An event's `error`: one line, at most 500 characters, no stack. */
 const eventError = (error: unknown): string =>
@@ -82,8 +128,10 @@ export class CardExecutor {
   private readonly tmux: TmuxControl;
   /** One operation per card at a time; `poll` skips a card that is busy. */
   private readonly chains = new Map<string, Promise<unknown>>();
-  private polling = false;
+  private polling: Promise<void> | null = null;
   private cancelPoll: Cancel = () => {};
+  /** #359 D1: when a card's last push step reached the network, per card. */
+  private readonly lastPushAt = new Map<string, number>();
 
   constructor(private readonly options: CardExecutorOptions) {
     this.store = new CardStore(options.cardsDir);
@@ -160,10 +208,13 @@ export class CardExecutor {
         specFiles: args.files?.length
           ? args.files.map((f) => f.path)
           : previous?.specFiles,
+        ...pushStateOf(previous, args),
       };
       this.setPhase(record, 'starting');
       let wiring: CardWiring;
       try {
+        // #359 D8: the follow-up branch, from the updated base, first.
+        if (args.newBranch) await startFollowUpBranch(deps, record);
         await ensureWorktree(deps, record);
         // #359 D3: the worker's PR description goes under `.agentdock/`,
         // excluded whether or not the card has attachments.
@@ -324,30 +375,134 @@ export class CardExecutor {
     });
   }
 
-  /** D6 (2): reports every running session that is gone as `ended`. */
-  async poll(): Promise<void> {
-    if (this.polling) return;
-    this.polling = true;
-    try {
-      for (const record of this.store.all()) {
-        if (record.phase !== 'running' || this.chains.has(record.cardId))
-          continue;
-        if (await this.tmux.find(record.tmuxSession)) continue;
-        // Re-read: an operation may have started while tmux answered.
-        if (this.chains.has(record.cardId)) continue;
-        const exit = this.store.exit(record);
-        record.endedAt = isoNow(this.options.deps.clock);
-        this.setPhase(
-          record,
-          'ended',
-          exit?.code !== null && exit?.code !== undefined
-            ? { exitCode: exit.code }
-            : {},
-        );
+  /**
+   * D6 (2): reports every running session that is gone as `ended`; #359 D1:
+   * queues a push step for every live one. A poll already under way is
+   * joined, not repeated.
+   */
+  poll(): Promise<void> {
+    if (this.polling) return this.polling;
+    this.polling = this.pollOnce().finally(() => {
+      this.polling = null;
+    });
+    return this.polling;
+  }
+
+  private async pollOnce(): Promise<void> {
+    for (const record of this.store.all()) {
+      if (record.phase !== 'running' || this.chains.has(record.cardId))
+        continue;
+      if (await this.tmux.find(record.tmuxSession)) {
+        this.queuePush(record);
+        continue;
       }
-    } finally {
-      this.polling = false;
+      // Re-read: an operation may have started while tmux answered, and a
+      // push step may have finished since the list was read.
+      if (this.chains.has(record.cardId)) continue;
+      const current = this.store.load(record.cardId);
+      if (!current || current.phase !== 'running') continue;
+      const exit = this.store.exit(current);
+      current.endedAt = isoNow(this.options.deps.clock);
+      this.setPhase(
+        current,
+        'ended',
+        exit?.code !== null && exit?.code !== undefined
+          ? { exitCode: exit.code }
+          : {},
+      );
     }
+  }
+
+  /** Resolves once every card operation queued so far, pushes included, settled. */
+  async settled(): Promise<void> {
+    while (this.chains.size > 0) {
+      await Promise.all([...this.chains.values()]);
+    }
+  }
+
+  /**
+   * #359 D1: queues a push step for a live round that asked for a draft PR,
+   * on the card's chain — so it never interleaves with `run`, `collect` or
+   * `close`, and the poll does not wait on the network. At most one step
+   * that reached the network per `CARD_PUSH_MIN_INTERVAL_MS`; a failure is
+   * logged and tried again after the interval, never failing the round.
+   */
+  private queuePush(record: CardRecord): void {
+    if (!record.pullRequest) return;
+    const { clock } = this.options.deps;
+    const last = this.lastPushAt.get(record.cardId);
+    const interval = this.options.pushIntervalMs ?? CARD_PUSH_MIN_INTERVAL_MS;
+    if (last !== undefined && clock.now() - last < interval) return;
+    void this.serial(record.cardId, async () => {
+      // Re-read: the round may have been replaced or stopped meanwhile.
+      const fresh = this.store.load(record.cardId);
+      if (
+        !fresh ||
+        fresh.phase !== 'running' ||
+        fresh.runId !== record.runId ||
+        !existsSync(fresh.worktree)
+      ) {
+        return;
+      }
+      let step: PushStep | null;
+      try {
+        step = await pushCardHead(this.options.deps, fresh);
+      } catch (error) {
+        this.lastPushAt.set(fresh.cardId, clock.now());
+        this.options.log.warn('cards: pushing the round failed', {
+          cardId: fresh.cardId,
+          runId: fresh.runId,
+          error: errorMessage(error),
+        });
+        return;
+      }
+      if (!step) return;
+      this.lastPushAt.set(fresh.cardId, clock.now());
+      if (step.prError) {
+        this.options.log.warn('cards: opening the draft PR failed', {
+          cardId: fresh.cardId,
+          runId: fresh.runId,
+          error: step.prError,
+        });
+      }
+      fresh.pushedHead = step.headSha;
+      if (step.pr) {
+        fresh.pushPr = {
+          number: step.pr.number,
+          url: step.pr.url,
+          opened: step.pr.opened,
+        };
+      }
+      this.store.save(fresh);
+      this.emitPushed(fresh, step);
+    });
+  }
+
+  private emitPushed(record: CardRecord, step: PushStep): void {
+    const at = isoNow(this.options.deps.clock);
+    const data = cardRunPushedDataSchema.parse({
+      cardId: record.cardId,
+      runId: record.runId,
+      projectId: record.projectId,
+      at,
+      branch: record.branch,
+      headSha: step.headSha,
+      ...(step.pr
+        ? {
+            prNumber: step.pr.number,
+            prUrl: step.pr.url,
+            prState: step.pr.state,
+          }
+        : {}),
+    });
+    this.options.emit({
+      v: 1,
+      ts: at,
+      type: 'card_run.pushed',
+      source: 'runner',
+      project: { repo: record.repo, root: record.root },
+      data,
+    });
   }
 
   /** A card that exists here belongs to one project; any other is `not_found`. */
