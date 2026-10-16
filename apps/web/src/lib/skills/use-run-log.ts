@@ -1,104 +1,49 @@
 'use client';
 
+import { type LiveTopic, runTopic } from '@agentdock/shared';
+import { useCallback, useSyncExternalStore } from 'react';
+import { getLiveClient } from '../live/client';
 import {
-  type LiveErrorCode,
-  type LiveTopic,
-  runTopic,
-} from '@agentdock/shared';
-import {
-  RUN_LOG_LIVE_EVENTS,
-  runLogFrameSchema,
-} from '@agentdock/shared/protocol';
-import { useCallback, useEffect, useReducer, useState } from 'react';
-import { useLive, useLiveStatus } from '../live/use-live';
-import {
-  applyRunLogFrame,
-  beginReplay,
-  EMPTY_RUN_LOG,
-  type RunLogState,
-} from './run-log';
+  EMPTY_RUN_LOG_VIEW,
+  RunLogRegistry,
+  type RunLogView,
+} from './run-log-store';
 
-type Action =
-  | { type: 'frame'; frame: Parameters<typeof applyRunLogFrame>[1] }
-  | { type: 'replay' }
-  | { type: 'reset' };
+export type { RunLogView } from './run-log-store';
 
-function reduce(state: RunLogState, action: Action): RunLogState {
-  switch (action.type) {
-    case 'frame':
-      return applyRunLogFrame(state, action.frame);
-    case 'replay':
-      return beginReplay(state);
-    case 'reset':
-      return EMPTY_RUN_LOG;
-  }
-}
+let registry: RunLogRegistry | null = null;
 
-const ERROR_SENTENCE: Partial<Record<LiveErrorCode, string>> = {
-  forbidden: 'You are not a member of this project, so you cannot watch it.',
-  not_found: 'This run does not belong to this project.',
+/** The tab's run-log stores; browser only. */
+const getRegistry = (): RunLogRegistry => {
+  registry ??= new RunLogRegistry(getLiveClient());
+  return registry;
 };
 
-export interface RunLogView {
-  log: RunLogState;
-  /** When the newest live line arrived here (ms); null before any (#275 D4). */
-  lastLineAt: number | null;
-  connected: boolean;
-  /** A sentence when the server refused the topic. */
-  error: string | undefined;
-}
+const NO_TOPIC_SUBSCRIBE = () => () => {};
 
 /**
- * Streams a skill run's rendered log while `enabled` (the run is not over):
- * the topic is subscribed on enable and unsubscribed on disable or unmount.
- * A reconnect makes the server replay the backlog, so the next backlog frame
- * replaces the lines instead of appending to them. Nothing is stored.
+ * Streams a skill run's rendered log while `enabled` (the run is not over).
+ * Every caller of the same run shares one store, so one that mounts late (the
+ * Run log panel opened over the progress card) sees the lines already received
+ * instead of waiting for new ones. The topic is subscribed while at least one
+ * caller is enabled. A reconnect makes the server replay the backlog, so the
+ * next backlog frame replaces the lines instead of appending. Nothing is stored
+ * once the last caller is gone.
  */
 export function useRunLog(
   projectId: string,
   runId: string,
   enabled: boolean,
 ): RunLogView {
-  const [log, dispatch] = useReducer(reduce, EMPTY_RUN_LOG);
-  const [error, setError] = useState<string>();
-  const [lastLineAt, setLastLineAt] = useState<number | null>(null);
-  const status = useLiveStatus();
   const topic = enabled ? (runTopic(projectId, runId) as LiveTopic) : null;
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: topic is the reset trigger
-  useEffect(() => {
-    dispatch({ type: 'reset' });
-    setError(undefined);
-    setLastLineAt(null);
-  }, [topic]);
-
-  useEffect(() => {
-    if (status.status !== 'connected') dispatch({ type: 'replay' });
-  }, [status.status]);
-
-  const onMessage = useCallback((message: { event: string; data: unknown }) => {
-    if (
-      message.event !== RUN_LOG_LIVE_EVENTS.lines &&
-      message.event !== RUN_LOG_LIVE_EVENTS.ended
-    ) {
-      return;
-    }
-    const parsed = runLogFrameSchema.safeParse(message.data);
-    if (!parsed.success) return;
-    dispatch({ type: 'frame', frame: parsed.data });
-    if (
-      parsed.data.type === 'lines' &&
-      !parsed.data.backlog &&
-      parsed.data.lines.length > 0
-    ) {
-      setLastLineAt(Date.now());
-    }
-  }, []);
-
-  useLive(topic, onMessage, {
-    onError: (code) =>
-      setError(ERROR_SENTENCE[code] ?? 'The live log could not be opened.'),
-  });
-
-  return { log, lastLineAt, connected: status.status === 'connected', error };
+  const subscribe = useCallback(
+    (listener: () => void) =>
+      topic ? getRegistry().attach(topic, listener) : NO_TOPIC_SUBSCRIBE(),
+    [topic],
+  );
+  const getSnapshot = useCallback(
+    () => (topic ? getRegistry().getView(topic) : EMPTY_RUN_LOG_VIEW),
+    [topic],
+  );
+  return useSyncExternalStore(subscribe, getSnapshot, () => EMPTY_RUN_LOG_VIEW);
 }
