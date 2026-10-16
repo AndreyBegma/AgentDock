@@ -57,6 +57,23 @@ export const slotMessageLine = (
     data: { slot, text, by: 'person' },
   })}\n`;
 
+/** Appends `slotMessageLine` to the orchestrator's `events.jsonl` (M5). */
+export const appendSlotMessage = async (
+  exec: Exec,
+  project: WatchedProject,
+  slot: string,
+  text: string,
+  at: string,
+): Promise<void> => {
+  const fleet = await resolveFleetProject(exec, project);
+  await mkdir(fleet.boardDir, { recursive: true });
+  await appendFile(
+    join(fleet.boardDir, EVENTS_FILE),
+    slotMessageLine(slot, text, at, { repo: fleet.repo, root: fleet.root }),
+    { encoding: 'utf8', mode: 0o600 },
+  );
+};
+
 /**
  * #489, ADR-0010: `session.message` — a person's text or answer, delivered
  * to a card round's session or a fleet slot's `cs-*` pane through the one
@@ -162,15 +179,12 @@ export class SessionMessenger {
         ? `answered option ${message.index}`
         : message.text;
     try {
-      const fleet = await resolveFleetProject(this.options.exec, project);
-      await mkdir(fleet.boardDir, { recursive: true });
-      await appendFile(
-        join(fleet.boardDir, EVENTS_FILE),
-        slotMessageLine(slot, text, isoNow(this.options.clock), {
-          repo: fleet.repo,
-          root: fleet.root,
-        }),
-        { encoding: 'utf8', mode: 0o600 },
+      await appendSlotMessage(
+        this.options.exec,
+        project,
+        slot,
+        text,
+        isoNow(this.options.clock),
       );
     } catch (error) {
       this.options.log.warn('session: recording a slot message failed', {
