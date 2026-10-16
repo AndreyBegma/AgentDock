@@ -4,7 +4,6 @@ import {
   type PendingQuestion,
   type SessionMessageInput,
 } from '@agentdock/shared';
-import { roleAtLeast } from '@agentdock/shared/protocol';
 import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { AuditService } from '../audit';
 import { ANONYMOUS_ACTOR, userActor } from '../audit/audit.types';
@@ -13,7 +12,6 @@ import { BoardSessionMessages } from '../board/board-session-message.service';
 import type { BoardActor } from '../board/board-work';
 import { PrismaService } from '../database/prisma.service';
 import { httpErrorBody } from '../local/local-error';
-import { ProjectAccessService } from '../projects';
 import {
   decodeSessionOptionCallback,
   parseSessionReference,
@@ -30,6 +28,7 @@ import type {
   TelegramMessage,
   TelegramReplyMarkup,
 } from './telegram-client';
+import { TelegramGuard } from './telegram-guard.service';
 
 const KIND = 'card.waiting';
 
@@ -72,7 +71,7 @@ export class TelegramSessionMessageService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly messages: BoardSessionMessages,
-    private readonly access: ProjectAccessService,
+    private readonly guard: TelegramGuard,
     private readonly audit: AuditService,
   ) {}
 
@@ -234,14 +233,10 @@ export class TelegramSessionMessageService {
     chatId: number,
     notificationId: bigint,
   ): Promise<Authorized> {
-    const link = await this.prisma.telegramLink.findUnique({
-      where: { chatId: BigInt(chatId) },
-      select: { userId: true },
-    });
-    if (!link) {
+    const userId = await this.guard.linkedUserId(chatId);
+    if (!userId) {
       return { ok: false, reason: 'not_linked', userId: null, projectId: null };
     }
-    const userId = link.userId;
     const notification = await this.prisma.notification.findUnique({
       where: { id: notificationId },
       select: { userId: true, kind: true, projectId: true, eventId: true },
@@ -254,25 +249,16 @@ export class TelegramSessionMessageService {
       return { ok: false, reason: 'unknown_message', userId, projectId: null };
     }
     const projectId = notification.projectId;
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, email: true, role: true, status: true },
-    });
-    if (user?.status !== 'active') {
-      return { ok: false, reason: 'inactive_user', userId, projectId };
-    }
-    const access = await this.access.resolve(user, projectId);
-    if (!access) return { ok: false, reason: 'not_member', userId, projectId };
-    if (!roleAtLeast(access.role, 'operator')) {
-      return { ok: false, reason: 'role', userId, projectId };
-    }
+    const check = await this.guard.member(userId, projectId, 'write');
+    if (!check.ok)
+      return { ok: false, reason: check.reason, userId, projectId };
     const card = await this.waitingCard(projectId, notification.eventId);
     if (!card) {
       return { ok: false, reason: 'unknown_message', userId, projectId };
     }
     return {
       ok: true,
-      actor: { userId, role: access.role, ctx: { actor: userActor(userId) } },
+      actor: { userId, role: check.role, ctx: { actor: userActor(userId) } },
       card,
     };
   }

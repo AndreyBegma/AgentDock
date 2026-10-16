@@ -7,7 +7,7 @@ import { type AuditContext, userActor } from '../audit/audit.types';
 import type { AuthUser } from '../auth';
 import { PrismaService } from '../database/prisma.service';
 import { BotTokenStore } from '../notifications';
-import type { TelegramMessage, TelegramUpdate } from './telegram-client';
+import type { TelegramMessage } from './telegram-client';
 import { telegramNotConfigured } from './telegram-error';
 
 /** D9: a link code is good for this long, once. */
@@ -114,13 +114,12 @@ export class TelegramLinkingService {
   }
 
   /** The bot's side: `/start <code>` and `/stop`. Anything else is ignored. */
-  async handleUpdate(
-    update: TelegramUpdate,
+  async handleMessage(
+    message: TelegramMessage,
     now = new Date(),
   ): Promise<UpdateReply | null> {
-    const message = update.message;
-    const match = message?.text?.trim().match(COMMAND);
-    if (!message || !match) return null;
+    const match = message.text?.trim().match(COMMAND);
+    if (!match) return null;
     const chatId = message.chat.id;
     if (message.chat.type !== 'private') {
       return { chatId, reply: 'notPrivate' };

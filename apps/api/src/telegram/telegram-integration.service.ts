@@ -1,5 +1,5 @@
 import type { TelegramIntegrationStatus } from '@agentdock/shared';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { AuditService } from '../audit';
 import type { AuditContext } from '../audit/audit.types';
 import type { AuthUser } from '../auth';
@@ -12,6 +12,7 @@ import {
 import { SettingsService } from '../settings/settings.service';
 import { escapeMarkdownV2 } from './markdown-v2';
 import { TelegramApiError, TelegramClient } from './telegram-client';
+import { BOT_COMMANDS } from './telegram-commands';
 import {
   telegramNotConfigured,
   telegramNotLinked,
@@ -50,6 +51,8 @@ const asHttpError = (error: unknown): never => {
  */
 @Injectable()
 export class TelegramIntegrationService {
+  private readonly logger = new Logger(TelegramIntegrationService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly tokens: BotTokenStore,
@@ -88,6 +91,18 @@ export class TelegramIntegrationService {
     const bot = await this.client.getMe(token).catch(asHttpError);
     const linksBot = await this.linksBot();
     await this.tokens.set(token, bot.username, admin.id, ctx);
+    // #500: the command menu. The token is already stored, so a menu Telegram
+    // refused is only logged; the poller sets it once more for a bot it has
+    // not polled for yet, and after a restart.
+    await this.client
+      .setMyCommands(token, [...BOT_COMMANDS])
+      .catch((error: unknown) => {
+        this.logger.warn(
+          `Telegram command menu not set: ${
+            error instanceof TelegramApiError ? error.message : 'internal error'
+          }`,
+        );
+      });
 
     let unlinkedUsers = 0;
     if (linksBot !== null && linksBot !== bot.username) {
