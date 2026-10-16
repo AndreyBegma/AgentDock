@@ -55,7 +55,13 @@ printf '%s\\n' "$@" > "$RECORD_DIR/argv-$round"
 pwd >> "$RECORD_DIR/argv-$round"
 if [ "$FAKE_MODE" = sleep ]; then sleep 60; fi
 if [ "$FAKE_MODE" = dialog ]; then
-  printf 'Teach auto mode about your environment?\\n 1. Yes\\n 2. Not now\\n 3. Don'"'"'t show again\\n'
+  printf '╭──────────────────────────────────────────╮\\n│ Teach auto mode about your environment?  │\\n│                                          │\\n│ ❯ 1. Yes                                 │\\n│   2. Not now                             │\\n│   3. Don'"'"'t show again                    │\\n╰──────────────────────────────────────────╯\\n'
+  stty raw -echo
+  dd bs=1 count=1 2>/dev/null | od -An -tx1 > "$RECORD_DIR/key-$round"
+  exit 0
+fi
+if [ "$FAKE_MODE" = quoted ]; then
+  printf '● The dialog reads:\\n  Teach auto mode about your environment?\\n   1. Yes\\n   2. Not now\\n   3. Don'"'"'t show again\\n\\n╭──────────────────────────────╮\\n│ >                            │\\n╰──────────────────────────────╯\\n'
   stty raw -echo
   dd bs=1 count=1 2>/dev/null | od -An -tx1 > "$RECORD_DIR/key-$round"
   exit 0
@@ -105,6 +111,7 @@ const setup = async (options: { steward?: StewardRunnerConfig } = {}) => {
     profile('claude-dialog', 'dialog'),
     profile('claude-permission', 'permission'),
     profile('claude-prompt', 'prompt'),
+    profile('claude-quoted', 'quoted'),
     { id: 'codex-default', runtime: 'codex', env: {}, args: [] },
   ];
 
@@ -232,6 +239,34 @@ describe.skipIf(!tmuxInstalled)(
         await Bun.sleep(25);
       }
       expect(readFileSync(keyFile, 'utf8').trim()).toBe('1b');
+    });
+
+    it('never answers the dialog text when the agent printed it above its input box (#447 DR-08)', async () => {
+      const t = await setup();
+      await t.executor.run(
+        t.args({
+          cardId: 'card_q',
+          runId: 'run_q',
+          profileKey: 'claude-quoted',
+        }),
+      );
+      await t.paneShows('agentdock-card-ab12cd34', '│ >');
+      for (let i = 0; i < 3; i++) await t.executor.poll();
+      expect(t.tmuxCalls.some((c) => c.includes('send-keys'))).toBe(false);
+      expect(
+        await t.executor.dismissDialog(
+          'agentdock-card-ab12cd34',
+          'teach-auto-mode',
+        ),
+      ).toBe(false);
+      expect(t.tmuxCalls.some((c) => c.includes('send-keys'))).toBe(false);
+      // The fake's redirect creates the file at once; no key ever reached it.
+      await Bun.sleep(200);
+      const keyFile = join(t.f.ws, 'key-run_q');
+      expect(
+        existsSync(keyFile) ? readFileSync(keyFile, 'utf8').trim() : '',
+      ).toBe('');
+      await t.tmux('kill-session', '-t', '=agentdock-card-ab12cd34');
     });
 
     it('never answers a permission prompt (#435)', async () => {

@@ -159,7 +159,14 @@ describe('StewardObserver — pane signals (#447 D6, D9)', () => {
   it('a listed dialog carries its dialogId; a permission prompt is reported, not more', async () => {
     const t = setup();
     t.setPane(
-      'Teach auto mode about your environment?\n ❯ 1. Yes\n   2. Not now\n',
+      [
+        '╭────────────────────────────────────────────╮',
+        '│ Teach auto mode about your environment?    │',
+        '│ ❯ 1. Yes                                   │',
+        '│   2. Not now                               │',
+        "│   3. Don't show again                      │",
+        '╰────────────────────────────────────────────╯',
+      ].join('\n'),
     );
     await t.observer.poll();
     t.setPane('Do you want to proceed?\n ❯ 1. Yes\n   2. No\n');
