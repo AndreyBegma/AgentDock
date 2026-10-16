@@ -7,6 +7,15 @@ import { DEFAULT_VIEWPORTS } from '@agentdock/shared';
 
 /** Design fixtures for the tests: one task, two variants, under review. */
 
+/** #441: a revision's frames, named in order. */
+export const framesOf = (id: string, names: readonly string[]) =>
+  names.map((name, position) => ({
+    position,
+    name,
+    slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+    htmlUrl: `/api/design-revisions/${id}/frames/${position}/html`,
+  }));
+
 export const revision = (
   over: Partial<DesignRevisionView> = {},
 ): DesignRevisionView => {
@@ -20,6 +29,14 @@ export const revision = (
     turnId: 'turn-d1',
     archived: false,
     htmlUrl: `/api/design-revisions/${id}/html`,
+    frames: [
+      {
+        position: 0,
+        name: 'Mockup',
+        slug: 'mockup',
+        htmlUrl: `/api/design-revisions/${id}/frames/0/html`,
+      },
+    ],
     createdAt: '2026-10-14T10:00:00.000Z',
     ...over,
   };
@@ -30,6 +47,7 @@ export const comment = (
 ): DesignCommentView => ({
   id: 'c1',
   revisionId: 'rev-1-1',
+  frame: 0,
   kind: 'general',
   viewport: null,
   theme: null,
