@@ -60,8 +60,10 @@ no such owner.
    `## Design`.
 6. **Design first.** While a stack's design is needed and not approved, Run
    on any card of the stack is refused (`409 stack_design_not_approved`) and
-   disabled in the UI with the reason. A stack without a design — the person
-   switched it off — holds nothing.
+   disabled in the UI with the reason. Generate and Revise of a card's own
+   design are refused and disabled the same way (#527): until the stack
+   design is approved, a card's design turn has no reference to read (§5).
+   A stack without a design — the person switched it off — holds nothing.
 7. **On the Board a stack is one face.** It sits in the column of its least
    advanced unfinished card (Completed once every card is), shows its
    progress (accepted / total) and current stage, and expands in place to its
