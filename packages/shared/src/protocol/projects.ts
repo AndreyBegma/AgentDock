@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { stewardRunnerConfigSchema } from '../steward/contracts';
 
 /** An absolute POSIX path. Runners run on Linux and macOS only. */
 export const absolutePathSchema = z
@@ -24,6 +25,12 @@ export const watchedProjectSchema = z.object({
    * then strips every content field before the spool.
    */
   shipContent: z.boolean().optional(),
+  /**
+   * #447: the part of the project's Steward setting the runner applies
+   * itself (`stewardRunnerConfigOf`). Absent means Steward is off on the
+   * runner: it observes nothing and guards no push.
+   */
+  steward: stewardRunnerConfigSchema.optional(),
 });
 export type WatchedProject = z.infer<typeof watchedProjectSchema>;
 

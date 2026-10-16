@@ -83,6 +83,7 @@ model User {
   textSettingsUpdated         TextSettings[]
   attachmentsUploaded         Attachment[]
   tokenSaverSettingsUpdated   TokenSaverSettings[]
+  stewardSettingsUpdated      StewardSettings[]
   settings                    UserSettings?
 
   @@map("users")
@@ -406,6 +407,9 @@ model Project {
   attachments          Attachment[]
   tokenSaverSettings   TokenSaverSettings?
   tokenSaverStats      TokenSaverStat[]
+  stewardSettings      StewardSettings?
+  stewardIncidents     StewardIncident[]
+  stewardDigests       StewardDigest[]
 
   @@unique([runnerId, rootPath])
   @@map("projects")
@@ -1535,6 +1539,9 @@ enum RunKind {
   text_normalize
   /// A card's model assessment (issue #322 D5, ADR-0032).
   card_assess
+  /// Steward's local haiku: a stall's classification or the digest prose
+  /// (issue #447 D3, D16).
+  steward
 }
 
 enum RunStatus {
@@ -3331,4 +3338,106 @@ model TokenSaverStat {
   @@index([projectId, createdAt])
   @@index([runId])
   @@map("token_saver_stats")
+}
+
+// Steward (issue #447, ADR-0040)
+
+/// Mirrors `STEWARD_SUBJECT_KINDS`. `fleet_slot` is observe-only (D5).
+enum StewardSubjectKind {
+  card_round
+  run
+  fleet_slot
+}
+
+/// Mirrors `STEWARD_INCIDENT_KINDS`.
+enum StewardIncidentKind {
+  api_error
+  dialog
+  permission_prompt
+  quota
+  silent
+  dead_session
+  trailer
+  unknown
+}
+
+/// Mirrors `STEWARD_INCIDENT_STATUSES`. `escalated` is still open (D13).
+enum StewardIncidentStatus {
+  open
+  resolved
+  escalated
+}
+
+/// A project's Steward setting (D16). A missing row means `STEWARD_DEFAULTS`.
+model StewardSettings {
+  projectId      String   @id
+  enabled        Boolean  @default(true)
+  /// D6: minutes without a hook event or a live background task.
+  silenceMinutes Int      @default(10)
+  /// D14: `HH:MM` in the person's timezone.
+  digestTime     String   @default("09:00")
+  autoNudge      Boolean  @default(true)
+  autoDismiss    Boolean  @default(true)
+  autoResume     Boolean  @default(true)
+  trailerGuard   Boolean  @default(true)
+  updatedById    String?
+  updatedAt      DateTime @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  updatedBy User?   @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@map("steward_settings")
+}
+
+/// One stall of one subject, from open to resolved (D13). `subjectId` is the
+/// `board_card_rounds.id`, the `runs.id`, or the slot name — no foreign key,
+/// so a fleet slot fits and history outlives its subject.
+model StewardIncident {
+  id             String                @id @default(cuid())
+  projectId      String
+  subjectKind    StewardSubjectKind
+  subjectId      String
+  kind           StewardIncidentKind
+  /// One line (D12): the rule's, or haiku's for `unknown`.
+  reason         String
+  /// `StewardActionRecord[]`: `{ action, at, result, detail? }`.
+  actions        Json                  @default("[]")
+  status         StewardIncidentStatus @default(open)
+  openedAt       DateTime              @default(now())
+  resolvedAt     DateTime?
+  /// D13: the reason last notified; a different reason notifies again.
+  notifiedReason String?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, openedAt])
+  @@index([subjectKind, subjectId, status])
+  @@map("steward_incidents")
+}
+
+/// Mirrors `STEWARD_DIGEST_TRIGGERS` (D14).
+enum StewardDigestTrigger {
+  daily
+  away_off
+}
+
+/// One delivered digest (D14) — `GET …/steward/digest/latest` reads the newest.
+/// Stored because haiku's prose cannot be recomputed.
+model StewardDigest {
+  id        String               @id @default(cuid())
+  projectId String
+  trigger   StewardDigestTrigger
+  /// The period covered.
+  from      DateTime
+  to        DateTime
+  /// `{ done, stuck, waiting, spendUsd }` of `StewardDigestView`.
+  content   Json
+  /// haiku's summary; null when the template was used (runner offline).
+  prose     String?
+  createdAt DateTime             @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt])
+  @@map("steward_digests")
 }

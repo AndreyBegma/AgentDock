@@ -49,6 +49,7 @@ export const RUN_KIND_LABEL: Record<RunKind, string> = {
   card_capture: 'Card capture',
   text_normalize: 'Text translation',
   card_assess: 'Card model assessment',
+  steward: 'Steward check',
 };
 
 export const isRunKind = (value: string): value is RunKind =>

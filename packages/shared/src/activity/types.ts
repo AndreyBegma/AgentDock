@@ -2,6 +2,7 @@ import type { AuditActorType, AuditResult } from '../audit/actions';
 import { CARD_BACKGROUND_STALLED_EVENT } from '../board/contracts';
 import { cardBackgroundStalledTitle } from '../board/naming';
 import { API_EVENT_SOURCE } from '../protocol/envelope';
+import { STEWARD_EVENT_RULES } from '../steward/activity-rules';
 import type {
   ActivityActorType,
   ActivityCategory,
@@ -346,6 +347,7 @@ const EVENT_RULES: Record<string, EventRule> = {
         : null;
     },
   },
+  ...STEWARD_EVENT_RULES,
 };
 
 /** Every event type the feed shows — the projector's `type IN (…)` filter. */

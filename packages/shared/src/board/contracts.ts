@@ -14,6 +14,7 @@ import type {
   PrInspectState,
 } from '../protocol';
 import type { ProfileSource } from '../readiness';
+import type { StewardCardChip } from '../steward/contracts';
 import type { CardKindSource } from '../text/limits';
 import type {
   TokenSavedView,
@@ -235,6 +236,12 @@ export interface BoardCardView {
   movedAt: string;
   completedAt: string | null;
   updatedAt: string;
+  /**
+   * #447 D15: the latest round's open or escalated Steward incident — the
+   * `Stuck: API error · nudged 1/2` chip (`stewardChipLabel`). Optional so
+   * no route must fill it yet; absent reads as null.
+   */
+  steward?: StewardCardChip | null;
 }
 
 /** #337 D8: a card another one depends on, as the face and Run's warning name it. */

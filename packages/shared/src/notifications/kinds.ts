@@ -14,6 +14,9 @@ import type { Role } from '../auth';
  * `cards.suggested` comes from card capture (issue #244 D11): suggestions are
  * content-derived, so it goes to operators and admins only, and never quotes
  * content.
+ * `steward.incident` comes from Steward escalating an incident (issue #447
+ * D13): once per incident and again on a changed reason. Its reason can be
+ * haiku's reading of the pane, so it goes to operators and admins only.
  */
 export const NOTIFICATION_KINDS = [
   'person.needed',
@@ -32,6 +35,7 @@ export const NOTIFICATION_KINDS = [
   'card.waiting',
   'card.background_stalled',
   'cards.suggested',
+  'steward.incident',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -176,6 +180,14 @@ export const NOTIFICATION_KIND_SPECS: Record<
     source: 'cards.suggested (issue #244 D11)',
     channels: BOTH,
     defaults: ON_OFF,
+    viewerDefaults: { inApp: false, telegram: false },
+    operatorsOnly: true,
+  },
+  'steward.incident': {
+    scope: 'project',
+    source: 'steward incident escalated (issue #447 D13)',
+    channels: BOTH,
+    defaults: ON_ON,
     viewerDefaults: { inApp: false, telegram: false },
     operatorsOnly: true,
   },
