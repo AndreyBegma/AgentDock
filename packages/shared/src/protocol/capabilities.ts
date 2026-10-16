@@ -105,6 +105,13 @@ export const capabilitiesSchema = z.object({
    * `true`. Absent means `false` — a runner older than the feature.
    */
   tokenSaver: z.boolean().optional(),
+  /**
+   * #447: the runner serves Steward — it reads `watchedProjectSchema.steward`,
+   * sends `steward.observed` / `steward.acted`, and handles `session.nudge`,
+   * `session.dismiss` and `card.resume`. The API sends those commands only
+   * when this is `true`. Absent means `false` — a runner older than Steward.
+   */
+  steward: z.boolean().optional(),
 });
 export type Capabilities = z.infer<typeof capabilitiesSchema>;
 
@@ -122,6 +129,10 @@ export const terminalAvailable = (capabilities: Capabilities): boolean =>
 /** Whether the API may send `tokenSaver` on launch commands; absent is `false`. */
 export const tokenSaverAvailable = (capabilities: Capabilities): boolean =>
   capabilities.tokenSaver === true;
+
+/** Whether the API may send Steward's commands (#447); absent is `false`. */
+export const stewardAvailable = (capabilities: Capabilities): boolean =>
+  capabilities.steward === true;
 
 /** What a runner said it serves (#233, ADR-0023): names only, never paths or versions. */
 export interface RunnerCommands {

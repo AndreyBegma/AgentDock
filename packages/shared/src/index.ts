@@ -25,6 +25,7 @@ export * from './sessions';
 export * from './settings';
 export * from './setup';
 export * from './skills';
+export * from './steward';
 export * from './terminal';
 export * from './text';
 export * from './token-saver';

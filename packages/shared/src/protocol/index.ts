@@ -9,6 +9,7 @@ export * from './commands/github';
 export * from './commands/planner';
 export * from './commands/queue';
 export * from './commands/skills';
+export * from './commands/steward';
 export * from './commands/terminal';
 export * from './commands/text';
 export * from './commands/uiprofile';

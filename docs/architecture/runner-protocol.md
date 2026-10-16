@@ -140,6 +140,11 @@ the build and still have no PTY or tmux to run on.
 commands. An absent `tokenSaver` means `false`; read it with
 `tokenSaverAvailable()`. See [Token saver](#token-saver).
 
+`steward` (#447) says whether the runner serves Steward: it reads
+`projects[].steward`, sends `steward.observed` and `steward.acted`, and handles
+`session.nudge`, `session.dismiss` and `card.resume`. An absent `steward` means
+`false`; read it with `stewardAvailable()`. See [Steward](#steward).
+
 `commands` lists every command the runner build serves — its handler keys,
 sorted — and `disabledCommands` the subset its config switches off (#233,
 ADR-0023). Both are plain strings, not an enum of the allowlist: a runner newer
@@ -203,6 +208,11 @@ Two optional fields belong to the Claude Code integration
   spool.
 - `config.awayMode` — the runner's `PermissionRequest` hook routes permission
   prompts to action requests (D17). Absent means off.
+
+One optional field belongs to [Steward](#steward) (#447):
+- `projects[].steward` — `{ enabled, silenceMinutes, trailerGuard }`, the part
+  of the project's Steward setting the runner applies itself. Absent means
+  Steward is off on the runner: it observes nothing and guards no push.
 
 ### `heartbeat`
 
@@ -1352,6 +1362,134 @@ carry no `projectId`: the API resolves the project.
 `artifactIncomplete: true` when it accepts a finish after 2 rejections in the
 round. The API stores it as `runs.artifactIncomplete`, and the card shows
 **Description incomplete**.
+
+### Steward
+
+Schemas in `packages/shared/src/steward/` (the vocabulary, the setting, the
+events) and `packages/shared/src/protocol/commands/steward.ts` (the commands);
+the rules are [spec 447](../specs/447-steward.md) and
+[ADR-0040](../adr/0040-steward.md). **The runner observes and acts; the API
+decides and reports** (D2). Steward acts on card rounds and runner runs; a
+fleet slot is observe-only (D5, ADR-0005), and no command schema can name one.
+
+**The subject.** Every event and command names what it is about:
+
+| `subject.kind` | Fields | Acted on |
+|---|---|---|
+| `card_round` | `cardId`, `runId` (the round's run) | yes |
+| `run` | `runId` (a skill, design, planner, assess, capture or normalize run) | yes |
+| `fleet_slot` | `slot` | never — events only |
+
+The runner resolves the tmux session from the subject; no field is a session
+name or a path.
+
+**What the runner applies itself.** From `projects[].steward`
+(`stewardRunnerConfigOf` of the project's `steward_settings`, defaults when it
+has no row):
+
+- `enabled: false` — no observation, no `steward.*` event, no guard.
+- `silenceMinutes` — a round or run in `running` or `waiting` with no hook
+  event and no live background task (#390) for this long is `silent` (D6). A
+  pane signal — an API error or an interrupted response, a modal dialog, a
+  permission prompt, the quota banner — is reported at the next pane poll,
+  without waiting for the threshold.
+- `trailerGuard` — before a card's push (#359 draft push and collect), the
+  runner checks every new commit message with `hasClaudeTrailer`
+  (`Co-Authored-By: Claude`, `Claude-Session:`, `Generated with Claude Code`).
+  On a hit it does not push, tells the worker the commits to rewrite (no
+  automatic rebase), and reports `steward.acted` with `action: "hold_push"`
+  (D7).
+
+Nudge, dismiss and resume are API decisions — the switches, the per-round
+limits, a person-stopped round — so their switches stay on the API.
+
+**The `steward.observed` event.** In the ordinary `events` stream,
+`source: "runner"`. Sent once per change of `kind` or `reason` for a subject,
+not on every poll.
+
+| Field | Meaning |
+|---|---|
+| `projectId` | the project, repeated from the envelope |
+| `at` | when it was seen (ISO) |
+| `subject` | see above |
+| `kind` | `api_error`, `dialog`, `permission_prompt`, `quota`, `silent`, `dead_session`, `trailer` or `unknown` |
+| `reason` | one line, ≤ 200 characters: the rule's, or for `unknown` the one line from haiku, run locally through the launch profile (D3) |
+| `dialogId` | with `kind: "dialog"` only, when the dialog is on the #435 list (`STEWARD_DIALOG_IDS`) |
+| `paneTail` | the pane's last lines, ≤ 4 KiB — **only** when `projects[].shipContent` is true (D12) |
+
+With `shipContent` off, no pane or transcript text reaches the API: the
+reason is the only text, and a rule's reason quotes no pane content.
+
+**The `steward.acted` event.** Every Steward action the runner performs, the
+commanded ones and `hold_push`: `projectId`, `at`, `subject` (never a fleet
+slot), `action` (`nudge`, `dismiss`, `resume`, `hold_push`), `result` (`ok`,
+`failed`) and an optional one-line `detail` (never pane text). The API appends
+it to the subject's open incident; this event, not the command's result, is
+the record.
+
+```json
+{
+  "type": "events",
+  "events": [
+    {
+      "v": 1, "seq": 20117, "ts": "2026-12-03T09:41:07.000Z",
+      "type": "steward.observed", "source": "runner",
+      "project": { "repo": "AndreyBegma/AgentDock", "root": "/home/archi/dev/AgentDock" },
+      "data": {
+        "projectId": "prj_agentdock", "at": "2026-12-03T09:41:06.000Z",
+        "subject": { "kind": "card_round", "cardId": "cmcard0001", "runId": "cmrun0001" },
+        "kind": "api_error", "reason": "API Error: Connection lost mid-response"
+      }
+    },
+    {
+      "v": 1, "seq": 20118, "ts": "2026-12-03T09:41:09.000Z",
+      "type": "steward.acted", "source": "runner",
+      "project": { "repo": "AndreyBegma/AgentDock", "root": "/home/archi/dev/AgentDock" },
+      "data": {
+        "projectId": "prj_agentdock", "at": "2026-12-03T09:41:09.000Z",
+        "subject": { "kind": "card_round", "cardId": "cmcard0001", "runId": "cmrun0001" },
+        "action": "nudge", "result": "ok"
+      }
+    }
+  ]
+}
+```
+
+An event whose `data` fails its schema (`stewardEventDataSchemas`) is logged
+and skipped, like any bad sink input.
+
+**The commands.** Each is sent only to a runner whose capabilities say
+`steward: true`, needs `operator`, and is entered in the allowlist together
+with its runner handler.
+
+| Command | Args | Result |
+|---|---|---|
+| `session.nudge` | `projectId`, `subject` (card round or run), `text` — exactly `STEWARD_NUDGE_TEXT` | `{ sent }`; `false` when the pane shows no idle prompt or the session is gone — nothing is typed |
+| `session.dismiss` | `projectId`, `subject`, `dialogId` from `STEWARD_DIALOG_IDS` | `{ dismissed }`; `false` when the pane no longer shows that dialog |
+| `card.resume` | `cardId`, `projectId`, `runId`, `root`, `base`, `shortId`, `branch`, `sessionId`, `profileKey`, `model`, `permissionMode`, `pullRequest?`, `tokenSaver?` — the round's `card.run` facts | `{ outcome: "resumed" \| "alive" \| "no_worktree", tmuxSession? }` |
+
+- **Nudge (D9).** The text is "The previous response was cut off by an
+  API/network error. Continue from where you stopped." At most 2 per round
+  (`STEWARD_NUDGE_MAX_PER_ROUND`), the first at once and the second 2 minutes
+  later (`STEWARD_NUDGE_REPEAT_DELAY_MS`); a third error escalates.
+- **Dismiss (D11).** Only the dialogs on the #435 list, with the key that
+  changes nothing. An unlisted dialog or a permission prompt is never
+  answered: it escalates at once with "open the terminal".
+- **Resume (D10).** `claude --resume <sessionId>` in the card's existing
+  worktree (`<parent>/.wt-<repo>-card-<shortId>`) with the prompt "The session
+  was restarted after a crash. Continue from where you stopped."
+  (`STEWARD_RESUME_TEXT`). It never creates a worktree: with none the outcome
+  is `no_worktree` and nothing starts. A session still alive is `alive`, left
+  alone. At most 2 per round (`STEWARD_RESUME_MAX_PER_ROUND`); the API never
+  sends it for a round a person stopped.
+
+**What the API records.** Incidents live in `steward_incidents` (one per stall
+of a subject; `actions` holds `{ action, at, result, detail? }`). As one moves
+the API records `steward_incident.opened`, `.acted`, `.escalated` and
+`.resolved` itself (`source: "api"`, ADR-0014); those are what Activity shows,
+under the **Steward** filter (`STEWARD_ACTIVITY_TYPES`). An escalation sends
+one `steward.incident` notification; a changed reason sends another
+(`notifiedReason`); recovery writes `.resolved` and pushes nothing (D13).
 
 ## Delivery guarantees
 
