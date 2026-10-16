@@ -29,6 +29,7 @@ import { assistantLine, validNote } from '../handoff/testing';
 import { FakeClock } from '../testing/fake-clock';
 import { memoryLogger } from '../testing/fixtures';
 import { REAL_PROCESS_TIMEOUT_MS } from '../testing/projects';
+import { releaseTmuxServer } from '../testing/tmux';
 import { CardExecutor } from './executor';
 import { cardsWorkspace } from './testing';
 
@@ -99,7 +100,7 @@ const setup = async (
   const server = `agentdock-test-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
   const tmuxServer = ['-L', server];
   teardown.push(async () => {
-    await f.git('tmux', [...tmuxServer, 'kill-server']);
+    await releaseTmuxServer(tmuxServer);
     f.cleanup();
   });
 
@@ -1003,8 +1004,10 @@ describe.skipIf(!tmuxInstalled)('Steward on card rounds (#447)', () => {
     expect(await t.executor.dismissDialog(session, 'teach-auto-mode')).toBe(
       true,
     );
-    for (let i = 0; i < 400 && !existsSync(keyFile); i++) await Bun.sleep(25);
-    expect(readFileSync(keyFile, 'utf8').trim()).toBe('1b');
+    const keyRead = () =>
+      existsSync(keyFile) ? readFileSync(keyFile, 'utf8').trim() : '';
+    for (let i = 0; i < 400 && keyRead() === ''; i++) await Bun.sleep(25);
+    expect(keyRead()).toBe('1b');
   });
 
   it('D7: a trailer commit is not pushed, is reported, and the worker at its prompt gets the list', async () => {
