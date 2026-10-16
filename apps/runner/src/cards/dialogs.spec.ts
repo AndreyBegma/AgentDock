@@ -42,6 +42,61 @@ describe('known blocking dialogs (#435)', () => {
     expect(matchKnownDialog('> working on the card')).toBeNull();
   });
 
+  it('matches with key hints under the frame, and a typographic apostrophe', () => {
+    expect(
+      matchKnownDialog(
+        `${TEACH_AUTO_MODE.replace("Don't", 'Don’t')}   Enter to confirm · Esc to cancel\n`,
+      )?.name,
+    ).toBe('teach-auto-mode');
+  });
+
+  // #447 DR-08: text an agent prints must never make the runner press a key.
+  const INPUT_BOX = [
+    '╭──────────────────────────────────────────────╮',
+    '│ >                                            │',
+    '╰──────────────────────────────────────────────╯',
+    '  ⏵⏵ bypass permissions on (shift+tab to cycle)',
+  ].join('\n');
+
+  it('never matches the dialog text in the agent’s own output above the input box', () => {
+    const quoted = [
+      '● The runner answers this dialog with Escape:',
+      '  Teach auto mode about your environment?',
+      '   1. Yes',
+      '   2. Not now',
+      "   3. Don't show again",
+      '',
+    ].join('\n');
+    expect(matchKnownDialog(`${quoted}\n${INPUT_BOX}\n`)).toBeNull();
+    // Even the whole framed dialog, printed as output, is not the prompt.
+    expect(matchKnownDialog(`${TEACH_AUTO_MODE}\n${INPUT_BOX}\n`)).toBeNull();
+    // Nor in scrollback with more output after it.
+    expect(
+      matchKnownDialog(`${TEACH_AUTO_MODE}\n● Next step.\n  ⎿  done\n`),
+    ).toBeNull();
+  });
+
+  it('never matches an unframed copy, a frame with other options, or a frame that is not closed', () => {
+    expect(
+      matchKnownDialog(
+        "Teach auto mode about your environment?\n 1. Yes\n 2. Not now\n 3. Don't show again\n",
+      ),
+    ).toBeNull();
+    expect(
+      matchKnownDialog(TEACH_AUTO_MODE.replace('Not now', 'Allow always')),
+    ).toBeNull();
+    expect(matchKnownDialog(TEACH_AUTO_MODE.replace(/ ╭─+╮\n/, ''))).toBeNull();
+    // The title must be the frame's first line, not text inside it.
+    expect(
+      matchKnownDialog(
+        TEACH_AUTO_MODE.replace(
+          '│ Teach auto mode about your environment?                      │',
+          '│ Echo: Teach auto mode about your environment?                │',
+        ),
+      ),
+    ).toBeNull();
+  });
+
   it('lists no dialog that asks for a decision', () => {
     for (const dialog of KNOWN_DIALOGS) {
       expect(dialog.key).toBe('Escape');

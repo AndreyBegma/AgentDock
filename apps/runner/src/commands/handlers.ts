@@ -28,6 +28,7 @@ import type { PlannerHandlers } from '../planner';
 import type { ProjectFs } from '../projects/fs';
 import { inspectProject, refreshProject } from '../projects/inspect';
 import type { SkillHandlers } from '../skills';
+import type { StewardHandlers } from '../steward';
 import type { UiProfileHandlers } from '../uiprofile';
 import {
   prApprove,
@@ -81,7 +82,13 @@ export interface HandlerContext {
   normalize?: NormalizeHandlers;
   /** Card model assessment (#322); absent means this runner does not assess cards. */
   assess?: AssessHandlers;
+  /** Steward's actions (#447); absent means this runner does not serve them. */
+  steward?: StewardHandlers;
 }
+
+const noSteward = (): never => {
+  throw new CommandFailure('unsupported', 'this runner does not serve Steward');
+};
 
 const noAssess = (): never => {
   throw new CommandFailure('unsupported', 'this runner does not assess cards');
@@ -247,5 +254,11 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
       context.normalize?.['text.normalize'](args) ?? noNormalize(),
     'card.assess': (args) =>
       context.assess?.['card.assess'](args) ?? noAssess(),
+    'session.nudge': (args) =>
+      context.steward?.['session.nudge'](args) ?? noSteward(),
+    'session.dismiss': (args) =>
+      context.steward?.['session.dismiss'](args) ?? noSteward(),
+    'card.resume': (args) =>
+      context.steward?.['card.resume'](args) ?? noSteward(),
   };
 };
