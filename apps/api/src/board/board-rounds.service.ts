@@ -55,6 +55,7 @@ import {
 import { specDirOf } from '../planner/planner-instructions.service';
 import { RuntimeProfileResolver } from '../readiness';
 import { TextNormalizer } from '../text/text-normalizer';
+import { TokenSaverService } from '../token-saver/token-saver.service';
 import { BoardService } from './board.service';
 import { BoardCommands, boardOutput } from './board-commands';
 import { BoardDependencies } from './board-dependencies.service';
@@ -137,6 +138,7 @@ export class BoardRoundsService {
     private readonly text: TextNormalizer,
     private readonly attachments: AttachmentsService,
     private readonly dependencies: BoardDependencies,
+    private readonly tokenSaver: TokenSaverService,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
 
@@ -434,6 +436,8 @@ export class BoardRoundsService {
         : []),
       ...designFrames.map((f) => ({ path: f.path, content: f.content })),
     ];
+    // #445 D11: only a runner that advertises the token saver gets the field.
+    const saver = await this.tokenSaver.launch(project.id);
     const draft: Omit<CardRunArgs, 'runId'> = {
       cardId: card.id,
       projectId: project.id,
@@ -459,6 +463,7 @@ export class BoardRoundsService {
           }
         : {}),
       ...(followUp ? { newBranch: true } : {}),
+      ...saver.args,
     };
     const valid = cardRunArgsSchema.safeParse({ ...draft, runId: 'pending' });
     if (!valid.success) {
@@ -490,6 +495,7 @@ export class BoardRoundsService {
             trigger,
             promptVersion: CARD_WORKER_PROMPT_VERSION,
           },
+          tokenSaver: saver.on,
           status: 'running',
           triggeredByType: 'user',
           triggeredById: actor.userId,

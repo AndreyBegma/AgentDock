@@ -6,6 +6,7 @@ import type {
 import { seedProject } from '../../fleet/testing/fleet-e2e';
 import { RunnerConnectHooks } from '../../runners/runner-connect-hooks';
 import { RunnerEventSinks } from '../../runners/runner-event-sinks';
+import { capabilities } from '../../runners/testing/runner-e2e';
 import {
   createE2eApp,
   createUser,
@@ -341,6 +342,17 @@ export class BoardWorld {
       `${this.path()}/board/cards/${number}/run`,
       body,
     );
+  }
+
+  /**
+   * #445: the runner advertises `tokenSaver` in its capabilities; without a
+   * call it stores none, as a runner older than the feature.
+   */
+  async advertiseTokenSaver(tokenSaver = true): Promise<void> {
+    await this.ctx.prisma.runner.update({
+      where: { id: this.runnerId },
+      data: { capabilities: { ...capabilities, tokenSaver } },
+    });
   }
 
   /** Delivers runner events to the sinks, as ingest does. */
