@@ -166,8 +166,9 @@ export interface TokenSaverFilterSavings extends TokenSavedView {
 }
 
 /**
- * The fact from usage (D12): the average cost of a run of one kind before and
- * after the project's first filtered command. Costs are decimal strings, as
+ * The fact from usage (D12): the average cost of a run of one kind launched
+ * without the token saver (`runs.tokenSaver = false`, "before") and with it
+ * (`true`, "after") — never split by a date. Costs are decimal strings, as
  * every `costUsd`; `null` when no run of the kind is priced on that side.
  */
 export interface TokenSaverBeforeAfter {

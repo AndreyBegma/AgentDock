@@ -65,7 +65,7 @@ The parts:
 | D9 | A `scout` subagent on haiku, defined in the launch's settings, for broad codebase searches and reading many files. Decisions and code stay on the session model. The prompt says when to use it | person, Q7 |
 | D10 | Context: an earlier autocompact threshold for worker sessions, and a worker prompt ordered from stable sections (how to work, rules) to variable ones (the card, the round), so the prompt cache hits | person, Q12 |
 | D11 | A project setting **Token saver**, on by default, which an admin can switch off. It holds the MCP allowlist. Off means today's launches exactly | person, Q9 |
-| D12 | Savings are counted two ways: the filter's estimate (raw vs compressed, ≈ bytes/4, labelled "≈"), reported per command; and the fact from usage (ADR-0003, ADR-0009), the average cost per round before and after the setting was on, by run kind | person, Q8, Q14 |
+| D12 | Savings are counted two ways: the filter's estimate (raw vs compressed, ≈ bytes/4, labelled "≈"), reported per command; and the fact from usage (ADR-0003, ADR-0009), the average cost per round of runs launched without and with the token saver (`runs.tokenSaver`), by run kind — never split by a date (amended 2026-10-16) | person, Q8, Q14 |
 | D13 | Shown in three places: the card (next to its cost: `$0.88 · saved ≈ $0.41`, with details in the sheet); the Usage page (period total, before/after, top filters by savings, bypass rate); and a **Token saver** dashboard per project (savings over time, by filter, by run kind, bypass rate, the filters that most often returned the original) | person, Q15 |
 | D14 | Built-in Read, Grep and Glob are not covered by the Bash hook. The prompt asks for `offset`/`limit` on big files and for the scout on broad searches | default |
 
@@ -76,6 +76,7 @@ The parts:
   - `id`, `projectId`, `runId`, `runKind`;
   - `filter` (family/command id), `rawBytes`, `keptBytes`, `bypassed` (bool), `passedThrough` (bool: the filter returned the original);
   - `createdAt`, indexed `(projectId, createdAt)` and `(runId)`.
+- `runs.tokenSaver` boolean, not null, default false: whether the launch carried `tokenSaver.enabled` (amended 2026-10-16).
 - `board_card_rounds` gets no column. `artifactIncomplete` lives on the run's finish record (the existing finish path; the contract slot names the field).
 - One migration: `apps/api/prisma/migrations/20261202000000_token_saver/`. The newest on develop is `20261129000000`; #441 owns `20261130000000_design_frames` and #443 owns `20261201000000_card_auto_run`.
 
@@ -83,13 +84,13 @@ The parts:
 
 - `GET/PUT /projects/:id/token-saver` (admin for PUT) returns `{ enabled, mcpAllow }`.
 - The runner reports filter stats in batches over the existing runner connection: a new runner event `filter.stats`, defined in the contract, carrying the rows above without `projectId`. The API resolves the project and run.
-- `GET /projects/:id/token-saver/summary?from&to` returns totals, before/after per run kind, top filters, bypass rate and pass-through rate.
+- `GET /projects/:id/token-saver/summary?from&to` returns totals, before/after per run kind (by `runs.tokenSaver`), top filters, bypass rate and pass-through rate.
 - The board card view gets `tokenSaved: { estimateUsd: number; estimateTokens: number } | null` and the finish's `artifactIncomplete: boolean`.
 - Authorization: a member of project A never reads project B's settings, stats or summary. This is an e2e acceptance criterion.
 
 ## UI
 
-- Project settings get a **Token saver** tab: the switch and the MCP allowlist, picked from the servers the runner reports for its profiles.
+- Project settings get a **Token saver** tab: the switch and the MCP allowlist, picked from the servers the runner reports for its profiles (`mcpServers` on each runtime profile, shown as checkboxes; amended 2026-10-16).
 - The card face shows `saved ≈ $x` next to the cost. The card sheet shows the per-filter breakdown for the round and the **Description incomplete** badge when it applies.
 - The Usage page gets a Token saver section (D13).
 - A new page `/projects/[projectId]/token-saver`: the dashboard (D13), built from glass-ui components only (ADR-0011).
@@ -174,6 +175,24 @@ Waves:
 - **Medium — strict MCP removes a tool a project relied on.** Mitigation: the allowlist UI lists the profile's servers, and the guide explains it. The bypass rate does not show this, so the risk is noted for the person.
 - **Low — the ≈ bytes/4 estimate overstates savings.** Mitigation: it is labelled "≈" and shown next to the fact from usage (D12).
 - **Low — the artifact guard loops.** Mitigation: it accepts after 2 rejections (D8).
+
+## Amendments (2026-10-16)
+
+Settled by the person (1–3) and by the orchestrator (4–7) while the contract slot was open. They override the lines above where they differ.
+
+1. **`runs.tokenSaver`.** A new column `runs.tokenSaver boolean NOT NULL DEFAULT false`, in migration `20261202000000_token_saver`. The API sets it at launch to whether the launch carried `tokenSaver.enabled`. D12's before/after compares runs with `tokenSaver = false` against runs with `true`, by run kind. It never splits by `token_saver_settings.updatedAt` or any other date.
+2. **`mcpServers` on runtime profiles.** `runtimeProfileSchema` gets `mcpServers?: string[]`: the names of the MCP servers in that profile's own Claude config. It holds names only, never a command, env or secret. There are at most 64, each matching the server-name pattern. Absent means unknown (an older runner, or a Codex profile). The **Token saver** tab lists these as checkboxes.
+3. **Hook scope.** The PreToolUse hook rewrites only a single simple command of a covered family. These pass through unchanged and are counted `passedThrough`:
+   - a command with `|`, `&&`, `||`, `;`, a redirect, a heredoc, a subshell or a command substitution;
+   - a Bash call with `run_in_background: true`;
+   - a dev server or a watch mode.
+4. **Capability gate.** The runner advertises `tokenSaver: true` in its capabilities. Every launch args schema is strict, so the API sends `tokenSaver` only to a runner that advertises it, as with `terminal`. i445-launch makes the runner advertise it.
+5. **Stats transport.** The `filter` subprocess appends JSONL rows to `$AGENTDOCK_FILTER_STATS`, a file in the run dir. The launch sets the variable next to the other run-dir variables. The runner daemon reads the file in batches and sends `filter.stats` in the ordinary `events` stream. i445-engine owns the writer and the reader; i445-launch owns the env.
+6. **Raw files.** The raw output goes to `<run dir>/raw/<n>.log` and is removed with the run dir. One file is capped at 10 MB with a truncation marker, and the compressed output says it was truncated.
+7. **Who fills what.**
+   - i445-launch reports `mcpServers` per profile and the capability.
+   - i445-api sets `runs.tokenSaver`, ingests the stats and gates on the capability.
+   - i445-web shows the checkboxes from `mcpServers`.
 
 ## Open questions
 

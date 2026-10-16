@@ -1593,6 +1593,9 @@ model Run {
   /// #445 D8: the finish was accepted after the artifact guard's 2 rejections —
   /// the card shows "Description incomplete".
   artifactIncomplete Boolean @default(false)
+  /// #445 D12: the launch carried `tokenSaver.enabled`. The before/after
+  /// compares runs with `false` against runs with `true`, by kind.
+  tokenSaver         Boolean @default(false)
 
   project           Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
   slot              Slot?              @relation(fields: [slotId], references: [id], onDelete: Cascade)

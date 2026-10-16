@@ -1,6 +1,10 @@
 import { z } from 'zod';
+import { mcpServerNameSchema } from '../token-saver/contracts';
 // Type-only: `./commands` imports this module's schemas.
 import type { CommandName } from './commands';
+
+/** At most this many MCP server names on one runtime profile (#445). */
+export const PROFILE_MCP_SERVERS_MAX = 64;
 
 export const runtimeSchema = z.enum(['claude', 'codex']);
 export type Runtime = z.infer<typeof runtimeSchema>;
@@ -36,6 +40,15 @@ export const runtimeProfileSchema = z.object({
    * the field, or a Codex profile — never "not installed".
    */
   agentdock: profileAgentdockSchema.optional(),
+  /**
+   * #445 D6: the names of the MCP servers in this profile's own Claude config —
+   * names only, never a command, env or secret. Absent means unknown: a runner
+   * older than the field, or a Codex profile.
+   */
+  mcpServers: z
+    .array(mcpServerNameSchema)
+    .max(PROFILE_MCP_SERVERS_MAX)
+    .optional(),
 });
 export type RuntimeProfile = z.infer<typeof runtimeProfileSchema>;
 

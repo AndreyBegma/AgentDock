@@ -2,7 +2,8 @@
 -- stats, and the artifact guard's mark on the run.
 CREATE TYPE "TokenSaverRunKind" AS ENUM ('card', 'skill', 'plan', 'card_assess', 'card_capture', 'ui_profile', 'text_normalize', 'orchestrator');
 
-ALTER TABLE "runs" ADD COLUMN "artifactIncomplete" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "runs" ADD COLUMN "artifactIncomplete" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN "tokenSaver" BOOLEAN NOT NULL DEFAULT false;
 
 CREATE TABLE "token_saver_settings" (
     "projectId" TEXT NOT NULL,

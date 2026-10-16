@@ -1273,6 +1273,36 @@ session takes an optional `tokenSaver: { enabled, mcpAllow }`. The eight are
   advertises it, as with `terminal`. An absent capability means `false`.
 - The API fills the field from `token_saver_settings`. A project with no row
   gets `TOKEN_SAVER_DEFAULT` (`{ enabled: true, mcpAllow: [] }`).
+- The API records on the run whether the launch carried
+  `tokenSaver.enabled: true` (`runs.tokenSaver`). The before/after of D12
+  compares runs with `false` against runs with `true`, by run kind.
+
+**MCP servers per profile.** Each Claude profile in `capabilities.profiles`
+may carry `mcpServers`: the names of the MCP servers in that profile's own
+Claude config. It holds names only, never a command, env or secret. There are
+at most 64 (`PROFILE_MCP_SERVERS_MAX`), each matching the server-name pattern
+above. An absent `mcpServers` means unknown: a runner older than the field, or
+a Codex profile. The project's **Token saver** tab offers these names as the
+allowlist's checkboxes.
+
+**The hook's scope.** The PreToolUse hook rewrites only a single simple
+command of a covered family. These pass through unchanged and are counted
+`passedThrough`:
+
+- a command with `|`, `&&`, `||`, `;`, a redirect, a heredoc, a subshell or a
+  command substitution;
+- a Bash call with `run_in_background: true`;
+- a dev server or a watch mode.
+
+**Inside the runner.** These are not part of the wire protocol; they are
+listed so the slots agree:
+
+- The `filter` subprocess appends one JSONL row per command to the file named
+  by `$AGENTDOCK_FILTER_STATS`, in the run dir. The launch sets the variable.
+  The daemon reads the file in batches and sends `filter.stats`.
+- The raw output of command `n` goes to `<run dir>/raw/<n>.log`. It is removed
+  with the run dir. One file is capped at 10 MB with a truncation marker, and
+  the compressed output says it was truncated.
 
 **The `filter.stats` event.** The runner reports filtered commands in the
 ordinary `events` stream, so stats are spooled, resent and acked like every

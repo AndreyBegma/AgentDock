@@ -8,6 +8,8 @@ import {
   commands,
   eventsMessageSchema,
   localCardFinishArgsSchema,
+  PROFILE_MCP_SERVERS_MAX,
+  runtimeProfileSchema,
   tokenSaverAvailable,
 } from '../protocol';
 import {
@@ -116,6 +118,61 @@ describe('tokenSaver capability (#445)', () => {
         capabilitiesSchema.parse({ ...base, tokenSaver: true }),
       ),
     ).toBe(true);
+  });
+});
+
+describe('profile mcpServers (#445 D6)', () => {
+  const profile = {
+    id: 'default',
+    runtime: 'claude',
+    env: {},
+    args: [],
+    authenticated: true,
+  };
+
+  it('is optional — absent means unknown', () => {
+    const parsed = runtimeProfileSchema.parse(profile);
+    expect(parsed.mcpServers).toBeUndefined();
+  });
+
+  it('takes server names', () => {
+    expect(
+      runtimeProfileSchema.parse({
+        ...profile,
+        mcpServers: ['playwright', 'agentdock', 'my_server.v2'],
+      }).mcpServers,
+    ).toEqual(['playwright', 'agentdock', 'my_server.v2']);
+  });
+
+  it('rejects anything that is not a bare name', () => {
+    for (const name of ['', '-x', 'npx foo', 'a/b', 'x'.repeat(65)]) {
+      expect(
+        runtimeProfileSchema.safeParse({ ...profile, mcpServers: [name] })
+          .success,
+      ).toBe(false);
+    }
+    expect(
+      runtimeProfileSchema.safeParse({
+        ...profile,
+        mcpServers: [{ name: 'x', command: 'npx' }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it(`holds at most ${PROFILE_MCP_SERVERS_MAX} names`, () => {
+    const names = (n: number) => Array.from({ length: n }, (_, i) => `s${i}`);
+    expect(
+      runtimeProfileSchema.safeParse({
+        ...profile,
+        mcpServers: names(PROFILE_MCP_SERVERS_MAX),
+      }).success,
+    ).toBe(true);
+    expect(
+      runtimeProfileSchema.safeParse({
+        ...profile,
+        mcpServers: names(PROFILE_MCP_SERVERS_MAX + 1),
+      }).success,
+    ).toBe(false);
   });
 });
 
