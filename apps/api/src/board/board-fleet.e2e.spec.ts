@@ -205,6 +205,52 @@ describe('board fleet mirror (e2e, #282 D4)', () => {
     expect(cards[1]).toMatchObject({ fleetSlot: 'i42b' });
   });
 
+  describe('a slotless To Do card whose issue left the ready set (#433)', () => {
+    const leaveQueue = (state: 'open' | 'closed') =>
+      w.ctx.prisma.$transaction([
+        w.ctx.prisma.queueStateRow.deleteMany({ where: { projectId: w.a } }),
+        w.ctx.prisma.issueCache.updateMany({
+          where: { projectId: w.a, number: 42 },
+          data: { state, labels: [] },
+        }),
+      ]);
+
+    it('moves the card to Finished when the issue is closed', async () => {
+      await ready(42);
+      await fleet.mirror(w.a);
+      await leaveQueue('closed');
+      await fleet.mirror(w.a);
+
+      const cards = await fleetCards();
+      expect(cards).toHaveLength(1);
+      expect(cards[0]).toMatchObject({ column: 'finished', fleetSlot: null });
+    });
+
+    it('removes the card when the issue is open but unlabelled', async () => {
+      await ready(42);
+      await fleet.mirror(w.a);
+      expect(await fleetCards()).toHaveLength(1);
+      await leaveQueue('open');
+      await fleet.mirror(w.a);
+
+      expect(await fleetCards()).toHaveLength(0);
+    });
+
+    it('lets a person move a slotless card, while a live slot’s card is still refused', async () => {
+      await ready(42);
+      await fleet.mirror(w.a);
+      const [card] = await fleetCards();
+      const moved = await move(card.number, 'finished');
+      expect(moved.status).toBe(200);
+
+      await dispatch(dispatched('i43', 43), appeared('i43'));
+      const live = (await fleetCards()).find((c) => c.fleetSlot === 'i43');
+      const refused = await move(live?.number ?? 0, 'finished');
+      expect(refused.status).toBe(409);
+      expect(refused.body).toMatchObject({ reason: 'fleet_slot' });
+    });
+  });
+
   describe('a slot that ends without a PR of its own (#424)', () => {
     const ended = (slot = 'i42') => [
       vanished(slot),
