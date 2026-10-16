@@ -20,6 +20,7 @@ import {
   type CardStopResult,
   cardRunPhaseChangedDataSchema,
   cardRunPushedDataSchema,
+  cardRunQuestionDataSchema,
   cardSessionName,
   type UnsequencedEvent,
 } from '@agentdock/shared/protocol';
@@ -53,6 +54,7 @@ import {
 } from './git';
 import { cardLaunchSpec, cardTokenSaver, cardWorktreePath } from './launch';
 import { type PushStep, pushCardHead } from './push';
+import { matchQuestion } from './question';
 import { type CardRecord, CardStore } from './record';
 import {
   heldDetail,
@@ -159,6 +161,8 @@ export class CardExecutor {
   private readonly heldReported = new Map<string, string>();
   /** #447 D7: the held head the worker was last told of, per card. */
   private readonly heldTold = new Map<string, string>();
+  /** #473: the question (`runId:key`) last reported on screen, per card. */
+  private readonly questionShown = new Map<string, string>();
 
   constructor(private readonly options: CardExecutorOptions) {
     this.store = new CardStore(options.cardsDir);
@@ -475,11 +479,13 @@ export class CardExecutor {
       if (record.phase !== 'running' || this.chains.has(record.cardId))
         continue;
       if (await this.tmux.find(record.tmuxSession)) {
+        const pane = await this.capturePane(record);
         // #447 D11: with Steward on, a dialog is the API's to dismiss (its
         // `autoDismiss` switch); Steward observes it.
-        if (!this.steward(record.projectId)) {
-          await this.dismissKnownDialog(record);
+        if (pane && !this.steward(record.projectId)) {
+          await this.dismissKnownDialog(record, pane);
         }
+        this.noticeQuestion(record, pane);
         this.queuePush(record);
         continue;
       }
@@ -727,10 +733,12 @@ export class CardExecutor {
    * `KNOWN_DIALOGS`) with the option that changes nothing. Never fails the
    * poll; permission prompts and unknown dialogs are left alone.
    */
-  private async dismissKnownDialog(record: CardRecord): Promise<void> {
+  private async dismissKnownDialog(
+    record: CardRecord,
+    pane: string,
+  ): Promise<void> {
     try {
-      const pane = await this.tmux.capture(record.tmuxSession);
-      const dialog = pane ? matchKnownDialog(pane) : null;
+      const dialog = matchKnownDialog(pane);
       if (!dialog) return;
       const sent = await answerDialog(
         this.options.deps.exec,
@@ -745,7 +753,64 @@ export class CardExecutor {
         this.options.log.warn('cards: could not dismiss a dialog', fields);
       }
     } catch (error) {
-      this.options.log.warn('cards: checking the pane for a dialog failed', {
+      this.options.log.warn('cards: answering a dialog failed', {
+        cardId: record.cardId,
+        error: errorMessage(error),
+      });
+    }
+  }
+
+  /** The visible pane of a live round; null when it cannot be read. */
+  private async capturePane(record: CardRecord): Promise<string | null> {
+    try {
+      return await this.tmux.capture(record.tmuxSession);
+    } catch (error) {
+      this.options.log.warn('cards: capturing the pane failed', {
+        cardId: record.cardId,
+        error: errorMessage(error),
+      });
+      return null;
+    }
+  }
+
+  /**
+   * #473: the worker asks the person a question (`AskUserQuestion`) —
+   * reported as `card_run.question` once per question, when the poll first
+   * sees it on screen. A pane without one forgets it, so the next question
+   * is reported again; an unreadable pane changes nothing.
+   */
+  private noticeQuestion(record: CardRecord, pane: string | null): void {
+    if (pane === null) return;
+    const question = matchQuestion(pane);
+    if (!question) {
+      this.questionShown.delete(record.cardId);
+      return;
+    }
+    const key = `${record.runId}:${question.key}`;
+    if (this.questionShown.get(record.cardId) === key) return;
+    this.questionShown.set(record.cardId, key);
+    const at = isoNow(this.options.deps.clock);
+    try {
+      this.options.emit({
+        v: 1,
+        ts: at,
+        type: 'card_run.question',
+        source: 'runner',
+        project: { repo: record.repo, root: record.root },
+        data: cardRunQuestionDataSchema.parse({
+          cardId: record.cardId,
+          runId: record.runId,
+          projectId: record.projectId,
+          at,
+        }),
+      });
+      this.options.log.info('cards: the worker asks a question', {
+        cardId: record.cardId,
+        runId: record.runId,
+      });
+    } catch (error) {
+      this.questionShown.delete(record.cardId);
+      this.options.log.warn('cards: reporting a question failed', {
         cardId: record.cardId,
         error: errorMessage(error),
       });
