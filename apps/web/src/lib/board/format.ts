@@ -27,6 +27,7 @@ import {
   RUNNER_STATUS_COMMAND,
   SETUP_CLAUDE_COMMAND,
 } from '../runners/install';
+import { noPrText } from './pull-request';
 
 export const COLUMN_TITLE: Record<BoardColumn, string> = {
   inbox: 'Inbox',
@@ -560,6 +561,34 @@ export const hooksNotice = (
     guide: false,
   };
 };
+
+/** #395: the plain sentence for a collect that found no worktree on the runner. */
+export const WORKTREE_GONE_TEXT =
+  "The card's worktree no longer exists on the runner, so a pull request cannot be created from it.";
+
+/** #395: the runner's `not_found` for a card whose worktree is gone (it names internal ids). */
+export const isWorktreeGoneError = (error: string | null): boolean =>
+  /not found on the runner.*has no worktree/.test(error ?? '');
+
+/**
+ * #395: the line above Create pull request. A vanished worktree gets a plain
+ * sentence and no button; every other failure keeps `noPrText`'s wording.
+ */
+export function noPrBanner(
+  card: Pick<BoardCardView, 'collectState' | 'collectError'>,
+): { tone: 'warn' | 'info'; text: string; canCreate: boolean } {
+  if (
+    card.collectState === 'failed' &&
+    isWorktreeGoneError(card.collectError)
+  ) {
+    return {
+      tone: 'warn',
+      text: `No pull request: ${WORKTREE_GONE_TEXT}`,
+      canCreate: false,
+    };
+  }
+  return { ...noPrText(card), canCreate: true };
+}
 
 /** The link text after the hint: what the checklist holds. */
 export const HOOKS_GUIDE_LABEL = 'See the exact command for each profile';

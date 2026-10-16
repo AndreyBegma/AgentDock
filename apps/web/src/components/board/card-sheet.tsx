@@ -52,6 +52,7 @@ import {
   hooksNotice,
   isFleetCard,
   isTerminalCard,
+  noPrBanner,
   phaseLabel,
   roundPill,
   SLOT_GONE_TEXT,
@@ -60,11 +61,7 @@ import {
   trackedSessionHref,
   trackedStatusText,
 } from '../../lib/board/format';
-import {
-  canCreatePr,
-  noPrText,
-  prChipText,
-} from '../../lib/board/pull-request';
+import { canCreatePr, prChipText } from '../../lib/board/pull-request';
 import { ciBanner, pullRequestRows } from '../../lib/board/shipping';
 import { formatCost } from '../../lib/format';
 import { Time } from '../../lib/format/time';
@@ -394,6 +391,7 @@ function CardDetailBody({
 
   const offer = approveRunOffer(card);
   const failure = card.autoRunFailure;
+  const noPr = noPrBanner(card);
 
   return (
     <SheetContent
@@ -442,8 +440,8 @@ function CardDetailBody({
           <CiStoppedBanner card={card} />
           {canCreatePr(card) ? (
             <div className="flex flex-col gap-2">
-              <Banner tone={noPrText(card).tone}>{noPrText(card).text}</Banner>
-              {canOperate ? (
+              <Banner tone={noPr.tone}>{noPr.text}</Banner>
+              {canOperate && noPr.canCreate ? (
                 <div>
                   <Button
                     variant="glass"
