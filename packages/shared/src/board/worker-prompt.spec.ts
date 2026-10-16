@@ -6,6 +6,7 @@ import {
   type CardAttachmentBrief,
 } from '../attachments';
 import { DESIGN_HTML_MAX_BYTES, DESIGN_RATIONALE_MAX } from '../design';
+import { HANDOFF_SECTIONS } from '../handoff/note';
 import {
   CARD_RUN_FILE_MAX_BYTES,
   CARD_RUN_FILES_MAX,
@@ -30,6 +31,7 @@ import {
   cardFeedbackPrompt,
   cardNextRoundPrompt,
   cardWorkerPrompt,
+  HANDOFF_NOTE_PATH,
 } from './worker-prompt';
 
 const bytes = (text: string): number => new TextEncoder().encode(text).length;
@@ -213,6 +215,18 @@ describe('worker prompt v9 — Token saver (#445 D7, D9, D10, D14)', () => {
     expect(on).toContain('`AGENTDOCK_RAW=1 <command>`');
   });
 
+  it('asks for the handoff note only when Token saver is on (#449 D2, D5, D7)', () => {
+    expect(cardWorkerPrompt(plain)).not.toContain('## Handoff note');
+    const on = cardWorkerPrompt({ ...plain, tokenSaver: true });
+    const section = on.indexOf('## Handoff note');
+    expect(section).toBeGreaterThan(on.indexOf('## Reading the codebase'));
+    expect(section).toBeLessThan(on.indexOf('## When you are done'));
+    expect(on).toContain(`\`${HANDOFF_NOTE_PATH}\``);
+    for (const heading of HANDOFF_SECTIONS) expect(on).toContain(heading);
+    expect(on).toContain('<!-- person -->');
+    expect(on).toContain('Never add that mark yourself');
+  });
+
   it('forbids a Claude attribution trailer in the stable part (#447 D7)', () => {
     const prompt = cardWorkerPrompt(card);
     const rule = prompt.indexOf('Never add a Claude attribution trailer');
@@ -318,8 +332,8 @@ describe('next round prompt — card edits reach the worker (#273 D1–D4)', () 
     kind: 'feature',
   };
 
-  it('is version 10', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(10);
+  it('is version 11', () => {
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(11);
   });
 
   it('cardChange is null for identical text, whitespace around it aside', () => {

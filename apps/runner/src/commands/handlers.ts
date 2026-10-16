@@ -23,6 +23,7 @@ import {
 } from '../control/orchestrator';
 import { messageSlot, stopSlot } from '../control/slot';
 import type { Exec } from '../detect/exec';
+import type { HandoffHandlers } from '../handoff';
 import type { NormalizeHandlers } from '../normalize';
 import type { PlannerHandlers } from '../planner';
 import type { ProjectFs } from '../projects/fs';
@@ -84,7 +85,16 @@ export interface HandlerContext {
   assess?: AssessHandlers;
   /** Steward's actions (#447); absent means this runner does not serve them. */
   steward?: StewardHandlers;
+  /** Context handoff (#449); absent means this runner does not serve it. */
+  handoff?: HandoffHandlers;
 }
+
+const noHandoff = (): never => {
+  throw new CommandFailure(
+    'unsupported',
+    'this runner does not serve Context handoff',
+  );
+};
 
 const noSteward = (): never => {
   throw new CommandFailure('unsupported', 'this runner does not serve Steward');
@@ -260,5 +270,7 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
       context.steward?.['session.dismiss'](args) ?? noSteward(),
     'card.resume': (args) =>
       context.steward?.['card.resume'](args) ?? noSteward(),
+    'card.handoff.set': (args) =>
+      context.handoff?.['card.handoff.set'](args) ?? noHandoff(),
   };
 };

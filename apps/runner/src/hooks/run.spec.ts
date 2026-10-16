@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ActionRequestSummary } from '@agentdock/shared';
+import { CardStore } from '../cards/record';
+import { HandoffStateStore } from '../handoff/state';
+import { validNote } from '../handoff/testing';
 import { type LocalHandler, LocalSocketServer } from '../local/server';
 import type { LocalResult } from '../local/types';
 import { fakeExec, memoryLogger, tempDir } from '../testing/fixtures';
@@ -98,6 +101,8 @@ describe('agentdock-runner hook (spec 201 D11–D17)', () => {
       clock += ms;
     },
     now: () => clock,
+    // Never the real card store of the machine running the tests.
+    cardsDir: join(dir, 'no-cards'),
     ...overrides,
   });
 
@@ -157,6 +162,97 @@ describe('agentdock-runner hook (spec 201 D11–D17)', () => {
         hookEventName: 'SessionStart',
         additionalContext: 'Project app, base develop.',
       },
+    });
+  });
+
+  describe('the card note at session start (#449 D6, D8)', () => {
+    const cardSetup = () => {
+      const worktree = join(dir, '.wt-app-card-ab12cd34');
+      const cardsDir = join(dir, 'cards');
+      mkdirSync(join(worktree, '.agentdock'), { recursive: true });
+      const store = new CardStore(cardsDir);
+      store.save({
+        cardId: 'cmcard01',
+        projectId: 'p1',
+        root: join(dir, 'app'),
+        repo: 'acme/app',
+        shortId: 'ab12cd34',
+        worktree,
+        branch: 'card/c12-add-login',
+        base: 'main',
+        tmuxSession: 'agentdock-card-ab12cd34',
+        runId: 'run_1',
+        phase: 'ended',
+        startedAt: '2026-10-16T10:00:00.000Z',
+      });
+      new HandoffStateStore((id) => store.dir(id)).save('cmcard01', {
+        note: {
+          content: validNote('Ship the login page.'),
+          personLines: [],
+          updatedBy: 'agent',
+          updatedAt: '2026-10-16T11:00:00.000Z',
+        },
+        number: 12,
+        asked: [],
+        sessions: [],
+      });
+      const input = (source: string) =>
+        JSON.stringify({
+          ...JSON.parse(fixture('session-start')),
+          cwd: worktree,
+          source,
+        });
+      return { worktree, cardsDir, input };
+    };
+    const context = () =>
+      JSON.parse(stdout.join('')).hookSpecificOutput.additionalContext;
+
+    it('adds the note after the project context for a person’s session', async () => {
+      const c = cardSetup();
+      daemon(({ op }) =>
+        op === 'request'
+          ? { ok: true, data: { text: 'Project app, base develop.' } }
+          : { ok: true, data: { queued: true } },
+      );
+      await runHook(
+        ['session-start'],
+        deps(c.input('startup'), { cwd: c.worktree, cardsDir: c.cardsDir }),
+      );
+      expect(context()).toStartWith('Project app, base develop.\n\n');
+      expect(context()).toContain('AgentDock card C-12');
+      expect(context()).toContain('Ship the login page.');
+    });
+
+    it('reaches the session with the daemon down', async () => {
+      const c = cardSetup();
+      await runHook(
+        ['session-start'],
+        deps(c.input('resume'), { cwd: c.worktree, cardsDir: c.cardsDir }),
+      );
+      expect(context()).toContain('Ship the login page.');
+    });
+
+    it('gives the card’s own worker the note only after a compaction', async () => {
+      const c = cardSetup();
+      const env = { AGENTDOCK_CARD: 'ab12cd34' };
+      await runHook(
+        ['session-start'],
+        deps(c.input('startup'), {
+          env,
+          cwd: c.worktree,
+          cardsDir: c.cardsDir,
+        }),
+      );
+      expect(stdout).toEqual([]);
+      await runHook(
+        ['session-start'],
+        deps(c.input('compact'), {
+          env,
+          cwd: c.worktree,
+          cardsDir: c.cardsDir,
+        }),
+      );
+      expect(context()).toContain('Ship the login page.');
     });
   });
 

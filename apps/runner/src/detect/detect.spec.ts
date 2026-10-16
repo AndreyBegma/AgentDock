@@ -159,6 +159,7 @@ describe('capability detection', () => {
       otlp: null,
       tokenSaver: true,
       steward: true,
+      handoff: true,
     });
   });
 

@@ -10,6 +10,7 @@ import {
 } from './commands/cards';
 import { controlCommands } from './commands/control';
 import { githubCommands } from './commands/github';
+import { handoffCommands } from './commands/handoff';
 import { plannerCommands } from './commands/planner';
 import { queueCommands } from './commands/queue';
 import { skillCommands } from './commands/skills';
@@ -158,6 +159,7 @@ export const commands = {
   ...textCommands,
   ...assessCommands,
   ...stewardCommands,
+  ...handoffCommands,
 } as const satisfies Record<string, CommandDefinition>;
 
 export type CommandName = keyof typeof commands;

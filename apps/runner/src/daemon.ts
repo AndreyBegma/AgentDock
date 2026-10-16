@@ -38,6 +38,13 @@ import type { Env } from './env';
 import { FILTER_ORCHESTRATOR_DIR } from './filter/env';
 import { FilterStatsReader } from './filter/stats-reader';
 import { GitAuth } from './git-auth';
+import {
+  createHandoffHandlers,
+  HandoffService,
+  HandoffStateStore,
+  HandoffWriter,
+  RunNotes,
+} from './handoff';
 import { LocalSocketServer } from './local/server';
 import { LocalService } from './local/service';
 import { HookSessions } from './local/sessions';
@@ -295,6 +302,15 @@ export const runDaemon = async (
       otlpPort: () => otlp?.port ?? null,
       attachmentSource: { server: config.server, token: config.token },
     });
+    // #449 D2: haiku writes the notes of dead sessions and interrupted runs.
+    const handoffDir = join(dirname(options.spoolDir), 'handoff');
+    const handoffWriter = new HandoffWriter({
+      dir: join(handoffDir, 'haiku'),
+      env: process.env,
+      clock,
+      log,
+      otlpPort: () => otlp?.port ?? null,
+    });
     const uiProfiles = new UiProfileBuildExecutor({
       deps: skillsDeps,
       buildsDir:
@@ -304,12 +320,36 @@ export const runDaemon = async (
       emit: (event) => connection?.emit(event),
       log,
       otlpPort: () => otlp?.port ?? null,
+      runNotes: new RunNotes({
+        dir: join(handoffDir, 'runs'),
+        writer: handoffWriter,
+        profiles: () => config.profiles,
+        watchedProjects: () => watchList.current,
+        emit: (event) => connection?.emit(event),
+        clock,
+        log,
+      }),
+    });
+    // Context handoff (#449): the card notes, the restart decision and the
+    // warm-up. `cards` is built right below; nothing here runs before it.
+    const cardsDir =
+      options.cardsDir ?? join(dirname(options.spoolDir), 'cards');
+    const handoff: HandoffService = new HandoffService({
+      deps: skillsDeps,
+      state: new HandoffStateStore((cardId) => join(cardsDir, cardId)),
+      record: (cardId) => cards.store.load(cardId),
+      records: () => cards.store.all(),
+      typeAtPrompt: (session, text) => cards.typeAtPrompt(session, text),
+      writer: handoffWriter,
+      emit: (event) => connection?.emit(event),
+      log,
     });
     // Board card workers (#242): interactive, outside the shared run cap —
     // the API limits running cards per project.
-    const cards = new CardExecutor({
+    const cards: CardExecutor = new CardExecutor({
+      handoff,
       deps: skillsDeps,
-      cardsDir: options.cardsDir ?? join(dirname(options.spoolDir), 'cards'),
+      cardsDir,
       selfCommand,
       attachmentSource: { server: config.server, token: config.token },
       emit: (event) => connection?.emit(event),
@@ -440,6 +480,7 @@ export const runDaemon = async (
       normalize: createNormalizeHandlers(normalize),
       assess: createAssessHandlers(assess),
       steward: stewardActions.handlers(),
+      handoff: createHandoffHandlers(handoff),
     });
     const dispatch = createDispatcher({
       handlers: builtHandlers,
@@ -561,6 +602,8 @@ export const runDaemon = async (
       emit: (event) => {
         // #447 D6: a hook event is the session's activity, for silence.
         steward.hookSeen(event);
+        // #449 D8, D9: a stop checks the round's note; a first edit ends its warm-up.
+        handoff.hookSeen(event);
         live.emit(event);
       },
       relay: (request) => live.request(request),

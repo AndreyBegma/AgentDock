@@ -1,6 +1,7 @@
 import { LOCAL_REQUEST_TIMEOUT_MS } from '@agentdock/shared/protocol';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { FinishGuard, parseFinishGuardArgs } from '../cards/finish-guard';
+import { cardsDirOf, sessionCardNote } from '../handoff/context';
 import { localRequest } from '../local/client';
 import type { LocalCommandDeps } from '../local/subcommand';
 import { LOCAL_RETRY_METHODS, LOCAL_RETRY_WINDOW_MS } from '../local/types';
@@ -36,7 +37,9 @@ export const runMcp = async (
       { via: 'mcp', cwd, ppid: deps.ppid },
       LOCAL_RETRY_METHODS.has(method) ? { callTimeoutMs: RETRY_CALL_MS } : {},
     );
-  const server = buildMcpServer(request, { finishGuard });
+  // #449 D6: the session's card note, from the daemon's store on disk.
+  const cardNote = () => sessionCardNote(cardsDirOf(deps.env), cwd, deps.exec);
+  const server = buildMcpServer(request, { finishGuard, cardNote });
   const closed = new Promise<void>((resolve) => {
     server.server.onclose = resolve;
   });

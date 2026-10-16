@@ -25,9 +25,15 @@ import {
 } from '@agentdock/shared/protocol';
 import { type Cancel, isoNow } from '../clock';
 import { CommandFailure } from '../commands/failure';
+import type { ConfigProfile } from '../config';
 import { projectCheckout, watchedProject } from '../control/target';
 import { TmuxControl } from '../control/tmux';
 import { resolveFleetProject } from '../fleet/project';
+import {
+  type HandoffService,
+  handoffOn,
+  type PreparedRound,
+} from '../handoff/service';
 import { errorMessage, type Logger } from '../log';
 import { profileOf, type SkillsDeps } from '../skills/deps';
 import { RUN_FILES, writeJsonAtomic } from '../skills/run/record';
@@ -79,6 +85,8 @@ export interface CardExecutorOptions {
   attachmentSource: AttachmentSource;
   /** #447 D10: a running round's session was found gone (Steward observes it). */
   onSessionEnded?: (record: CardRecord, exitCode: number | null) => void;
+  /** #449: Context handoff; absent, every round launches as the API asked. */
+  handoff?: HandoffService;
 }
 
 /**
@@ -233,6 +241,7 @@ export class CardExecutor {
       };
       this.setPhase(record, 'starting');
       let wiring: CardWiring;
+      let prepared: PreparedRound | null = null;
       try {
         // #359 D8: the follow-up branch, from the updated base, first.
         if (args.newBranch) await startFollowUpBranch(deps, record);
@@ -268,10 +277,14 @@ export class CardExecutor {
             reason: wiring.wiringReason,
           });
         }
+        // #449 D3: with Token saver on, resume or a fresh seeded session.
+        prepared = await this.prepareHandoff(record, args, profile);
+        const launch = prepared ? { ...args, ...prepared.launch } : args;
+        record.sessionId = launch.session.id;
         // #445: off or absent launches exactly as before.
         const tokenSaver = cardTokenSaver(
           profile,
-          args,
+          launch,
           deps.home,
           roundDir,
           this.options.selfCommand,
@@ -281,7 +294,7 @@ export class CardExecutor {
           `${roundDir}/${RUN_FILES.launch}`,
           cardLaunchSpec(
             profile,
-            args,
+            launch,
             record.worktree,
             this.options.otlpPort?.() ?? null,
             wiring.files,
@@ -312,8 +325,32 @@ export class CardExecutor {
         wiring: wiring.wiring,
         ...(wiring.wiringReason ? { wiringReason: wiring.wiringReason } : {}),
       });
+      if (prepared) this.options.handoff?.reportRestart(record, prepared);
       return { phase: 'running', tmuxSession };
     });
+  }
+
+  /**
+   * #449 D3: how a round with Context handoff on launches. Never fails the
+   * round: a decision that cannot be made launches as the API asked.
+   */
+  private async prepareHandoff(
+    record: CardRecord,
+    args: CardRunArgs,
+    profile: ConfigProfile,
+  ): Promise<PreparedRound | null> {
+    const { handoff } = this.options;
+    if (!handoff || !handoffOn(args)) return null;
+    try {
+      return await handoff.prepareRound(record, args, profile);
+    } catch (error) {
+      this.options.log.warn('cards: the handoff restart decision failed', {
+        cardId: record.cardId,
+        runId: record.runId,
+        error: errorMessage(error),
+      });
+      return null;
+    }
   }
 
   /** `card.stop`: kills the card's session; its round is the API's to close. */
@@ -461,6 +498,8 @@ export class CardExecutor {
           : {},
       );
       this.options.onSessionEnded?.(current, exit?.code ?? null);
+      // #449 D2: haiku writes a stale note of a dead session (off the poll).
+      void this.options.handoff?.sessionEnded(current);
     }
   }
 
