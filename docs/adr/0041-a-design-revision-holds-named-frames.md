@@ -1,4 +1,4 @@
-# ADR-0039: A design revision holds any number of named frames
+# ADR-0041: A design revision holds any number of named frames
 
 Status: accepted · Date: 2026-10-16 ·
 Issue: [#441](https://github.com/AndreyBegma/AgentDock/issues/441) ·
