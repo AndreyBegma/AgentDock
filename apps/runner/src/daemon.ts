@@ -61,11 +61,11 @@ import {
   PlanTurnExecutor,
   SharedRunSlots,
 } from './planner';
-import { WatchList } from './projects/watch-list';
 import { watchedRootRefusal } from './policy/check';
 import { nodeRealpath, type Realpath } from './policy/roots';
 import { reportedPolicy } from './policy/schema';
 import { PolicyStore } from './policy/store';
+import { WatchList } from './projects/watch-list';
 import { SessionMessenger } from './session';
 import {
   createSkillHandlers,

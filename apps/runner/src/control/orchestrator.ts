@@ -23,16 +23,16 @@ import { resolvePaths } from '../env';
 import { removeRawDir } from '../filter/raw-store';
 import { resolveFleetProject } from '../fleet/project';
 import {
+  defaultSelfCommand,
+  type TokenSaverLaunch,
+  tokenSaverLaunch,
+} from '../launch/token-saver';
+import {
   permissionModeRefusal,
   policyFailure,
   rootRefusal,
 } from '../policy/check';
 import { nodeRealpath } from '../policy/roots';
-import {
-  defaultSelfCommand,
-  type TokenSaverLaunch,
-  tokenSaverLaunch,
-} from '../launch/token-saver';
 import type { ControlDeps } from './deps';
 import { messageFileContent, writeAtomically } from './slot';
 import { watchedProject } from './target';

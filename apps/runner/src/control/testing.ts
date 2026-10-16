@@ -1,10 +1,10 @@
 import type { WatchedProject } from '@agentdock/shared/protocol';
 import type { ConfigProfile } from '../config';
 import type { Exec, ExecResult } from '../detect/exec';
-import { FakeClock } from '../testing/fake-clock';
-import type { ControlDeps } from './deps';
 import type { PolicyConfig } from '../policy/schema';
 import { permissivePolicy, sameRealpath } from '../policy/testing';
+import { FakeClock } from '../testing/fake-clock';
+import type { ControlDeps } from './deps';
 
 /** 2026-10-08T09:00:00Z, as tmux prints `session_created`. */
 export const CREATED = 1_791_450_000;

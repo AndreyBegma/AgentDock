@@ -16,6 +16,7 @@ import {
   FILTER_RUN_KIND_ENV,
 } from '../filter/env';
 import { planTurnLaunchSpec, planTurnTokenSaver } from '../planner/launch';
+import { permissivePolicy } from '../policy/testing';
 import { launchSpec, skillTokenSaver } from '../skills/run/launch';
 import { FakeClock } from '../testing/fake-clock';
 import { fakeExec, tempDir } from '../testing/fixtures';
@@ -24,7 +25,6 @@ import {
   uiProfileTokenSaver,
 } from '../uiprofile/executor';
 import { AUTOCOMPACT_ENV, type TokenSaverLaunch } from './token-saver';
-import { permissivePolicy } from '../policy/testing';
 
 /**
  * #445 acceptance: every launch passes `--settings` and `--strict-mcp-config`

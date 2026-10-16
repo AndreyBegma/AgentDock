@@ -15,6 +15,7 @@ import { FILTER_RUN_FILE, FILTER_STATS_FILE } from './filter/env';
 import { type HookDeps, runHook } from './hooks/run';
 import { localRequest } from './local/client';
 import { FORBIDDEN, fixtureProtobuf, PROTOBUF_SESSION } from './otlp/testing';
+import { reportedPolicy } from './policy/schema';
 import {
   permissivePolicy,
   sameRealpath,
@@ -126,6 +127,10 @@ describe('daemon — OTLP receiver (spec 13)', () => {
         (await server.waitFor('hello', hellos)) as HelloMessage[]
       ).at(-1);
       expect(hello?.capabilities.gitAuth).toEqual({ github });
+      // ADR-0046: the policy as runner.json holds it, values only.
+      expect(hello?.capabilities.policy).toEqual(
+        reportedPolicy(permissivePolicy()),
+      );
       expect(hello?.capabilities.commands).toContain('card.prClose');
       await live();
       controller.abort();
@@ -342,7 +347,10 @@ describe('daemon — local socket (spec 201)', () => {
       spoolDir: join(dir, 'spool'),
       offsetsFile: join(dir, 'offsets.json'),
       host,
-      exec: withMainCheckouts(machineWithoutCodex(), [ROOT, join(dir, 'fixture')]),
+      exec: withMainCheckouts(machineWithoutCodex(), [
+        ROOT,
+        join(dir, 'fixture'),
+      ]),
       realpath: sameRealpath,
       env: {},
       clock: new FakeClock(),
@@ -580,7 +588,10 @@ describe('daemon — filter stats (#445 amendment 5)', () => {
       spoolDir: join(dir, 'spool'),
       offsetsFile: join(dir, 'offsets.json'),
       host,
-      exec: withMainCheckouts(machineWithoutCodex(), [ROOT, join(dir, 'fixture')]),
+      exec: withMainCheckouts(machineWithoutCodex(), [
+        ROOT,
+        join(dir, 'fixture'),
+      ]),
       realpath: sameRealpath,
       env: {},
       clock: new FakeClock(),
@@ -656,7 +667,10 @@ describe('daemon — filter stats (#445 amendment 5)', () => {
       spoolDir: join(dir, 'spool'),
       offsetsFile: join(dir, 'offsets.json'),
       host,
-      exec: withMainCheckouts(machineWithoutCodex(), [ROOT, join(dir, 'fixture')]),
+      exec: withMainCheckouts(machineWithoutCodex(), [
+        ROOT,
+        join(dir, 'fixture'),
+      ]),
       realpath: sameRealpath,
       env: {},
       clock: new FakeClock(),

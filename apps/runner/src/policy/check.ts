@@ -87,18 +87,17 @@ export const commandRefusal = (
   realpath: Realpath,
 ): PolicyRefusal | null => {
   if (!policyAllowsCommand(policy, name)) {
-    return policyRefusal(
-      'commands',
-      `${name} is off on this runner`,
-      name,
-    );
+    return policyRefusal('commands', `${name} is off on this runner`, name);
   }
   if (!isRecord(args)) return null;
   const mode = permissionModeRefusal(name, args.permissionMode, policy);
   if (mode) return mode;
   if (name === 'terminal.attach' && args.mode === 'write') {
     if (!policy.terminal.write) {
-      return policyRefusal('terminal.write', 'a write attach is off on this runner');
+      return policyRefusal(
+        'terminal.write',
+        'a write attach is off on this runner',
+      );
     }
   }
   if (

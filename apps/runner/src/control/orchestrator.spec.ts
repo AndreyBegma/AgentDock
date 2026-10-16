@@ -12,6 +12,7 @@ import type { OrchestratorState } from '@agentdock/shared/protocol';
 import { createDispatcher } from '../commands/dispatcher';
 import { createHandlers } from '../commands/handlers';
 import type { ConfigProfile } from '../config';
+import { permissivePolicy, sameRealpath } from '../policy/testing';
 import { FakeClock } from '../testing/fake-clock';
 import { memoryLogger, tempDir } from '../testing/fixtures';
 import {
@@ -24,7 +25,6 @@ import {
   stopOrchestrator,
 } from './orchestrator';
 import { CREATED, fakeTmux } from './testing';
-import { permissivePolicy, sameRealpath } from '../policy/testing';
 
 const SESSION = 'agentdock-orch-acme-widget';
 const target = { projectId: 'prj_1', root: '/srv/widget' };
@@ -368,10 +368,10 @@ describe('orchestrator.message', () => {
     const fake = fakeTmux({ sessions: { [SESSION]: '> ' } });
     const clock = new FakeClock();
     const dispatch = createDispatcher({
- policy: permissivePolicy,
- realpath: sameRealpath,
+      policy: permissivePolicy,
+      realpath: sameRealpath,
       handlers: createHandlers({
- policy: permissivePolicy,
+        policy: permissivePolicy,
         clock,
         runnerVersion: '0.0.0-test',
         host: { hostname: 'h', os: 'linux', arch: 'x64' },

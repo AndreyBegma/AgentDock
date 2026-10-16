@@ -8,12 +8,12 @@ import {
   SKILL_TIMEOUTS_MS,
   TERMINAL_ATTACH_TIMEOUT_MS,
 } from '@agentdock/shared/protocol';
+import { permissivePolicy, sameRealpath } from '../policy/testing';
 import { FakeClock } from '../testing/fake-clock';
 import { fakeExec, memoryLogger } from '../testing/fixtures';
 import { type CommandHandlers, createDispatcher } from './dispatcher';
 import { CommandFailure } from './failure';
 import { createHandlers } from './handlers';
-import { permissivePolicy, sameRealpath } from '../policy/testing';
 
 const host = { hostname: 'test-host', os: 'linux', arch: 'x64' };
 
@@ -25,7 +25,7 @@ const setup = (
   const { log, lines } = memoryLogger();
   const handlers: CommandHandlers = {
     ...createHandlers({
- policy: permissivePolicy,
+      policy: permissivePolicy,
       clock,
       runnerVersion: '0.1.0',
       host,
