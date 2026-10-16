@@ -1,4 +1,4 @@
-make[1]: Entering directory '/home/archi/dev/legacy-svc'
+make[1]: Entering directory '/home/dev/src/legacy-svc'
 cc -O2 -Wall -Iinclude -c src/alloc.c -o build/alloc.o
 cc -O2 -Wall -Iinclude -c src/arena.c -o build/arena.o
 cc -O2 -Wall -Iinclude -c src/buffer.c -o build/buffer.o
@@ -53,5 +53,5 @@ src/main.c:41:5: error: implicit declaration of function ‘daemonize’ [-Wimpl
    41 |     daemonize(cfg);
       |     ^~~~~~~~~
 make[1]: *** [Makefile:37: build/main.o] Error 1
-make[1]: Leaving directory '/home/archi/dev/legacy-svc'
+make[1]: Leaving directory '/home/dev/src/legacy-svc'
 make: *** [Makefile:12: all] Error 2

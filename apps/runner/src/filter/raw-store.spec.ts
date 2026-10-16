@@ -9,6 +9,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { CardStore } from '../cards/record';
 import { FILTER_RAW_DIR, FILTER_STATS_FILE } from './env';
 import { RawFile, removeRawDir } from './raw-store';
 
@@ -49,6 +50,20 @@ describe('raw store (#445 amendment 6, DR-07)', () => {
     writeFileSync(join(raw(), '1.log'), 'x'.repeat(10));
     RawFile.create(dir, 100, 400).close();
     expect(logs()).toEqual(['1.log', '2.log']);
+  });
+
+  it('drops the earlier rounds’ raw outputs when a card starts a round', () => {
+    const store = new CardStore(join(dir, 'cards'));
+    const first = store.createRound('card_1', 'run_1');
+    RawFile.create(first).close();
+    writeFileSync(join(first, FILTER_STATS_FILE), '');
+    const second = store.createRound('card_1', 'run_2');
+    RawFile.create(second).close();
+    expect(existsSync(join(first, FILTER_RAW_DIR))).toBe(false);
+    expect(existsSync(join(first, FILTER_STATS_FILE))).toBe(true);
+    // Reusing the current round keeps its own raw outputs.
+    store.createRound('card_1', 'run_2');
+    expect(existsSync(join(second, FILTER_RAW_DIR, '1.log'))).toBe(true);
   });
 
   it('removes the raw outputs with the run, and nothing else', () => {

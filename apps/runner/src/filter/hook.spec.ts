@@ -174,18 +174,21 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
     expect(stats()[0]?.row.passedThrough).toBe(true);
   });
 
-  it.each(['default', 'acceptEdits', 'auto', 'plan', 'dontAsk'])(
-    'never rewrites in %s mode, whatever the allow rules say (amendment 9)',
-    (mode) => {
-      const input = JSON.stringify(preToolUse('bun run test', {}, mode));
-      const out = runFilterHook(input, {
-        ...deps,
-        rules: () => ({ ...NO_RULES, allow: ['Bash', 'Bash(bun run test:*)'] }),
-      });
-      expect(out).toBe('');
-      expect(stats()[0]?.row.passedThrough).toBe(true);
-    },
-  );
+  it.each([
+    'default',
+    'acceptEdits',
+    'auto',
+    'plan',
+    'dontAsk',
+  ])('never rewrites in %s mode, whatever the allow rules say (amendment 9)', (mode) => {
+    const input = JSON.stringify(preToolUse('bun run test', {}, mode));
+    const out = runFilterHook(input, {
+      ...deps,
+      rules: () => ({ ...NO_RULES, allow: ['Bash', 'Bash(bun run test:*)'] }),
+    });
+    expect(out).toBe('');
+    expect(stats()[0]?.row.passedThrough).toBe(true);
+  });
 
   it('builds the rewrite from the words, never from the text (DR-01)', () => {
     const out = runFilterHook(

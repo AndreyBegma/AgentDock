@@ -66,10 +66,7 @@ describe('filter stats reader (#445 amendment 5)', () => {
   };
 
   /** A run dir as a launch leaves it: with its identity (DR-05). */
-  const launched = (
-    identity: RunIdentity,
-    ...parts: string[]
-  ): string => {
+  const launched = (identity: RunIdentity, ...parts: string[]): string => {
     const dir = runDir(...parts);
     writeFileSync(join(dir, FILTER_RUN_FILE), JSON.stringify(identity));
     return join(dir, FILTER_STATS_FILE);
@@ -110,18 +107,20 @@ describe('filter stats reader (#445 amendment 5)', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('finds stats files one or two levels down, not in raw dirs', () => {
+  it('finds stats files one to three levels down, not in raw dirs', () => {
     const a = runDir('cards', 'c1');
     const b = runDir('cards', 'c2', 'round-1');
+    // A card's round: `<cards>/<card>/rounds/<run>`.
+    const round = runDir('cards', 'c5', 'rounds', 'run_1');
     const raw = runDir('cards', 'c3', 'raw');
-    const deep = runDir('cards', 'c4', 'x', 'y');
-    for (const dir of [a, b, raw, deep]) {
+    const deep = runDir('cards', 'c4', 'x', 'y', 'z');
+    for (const dir of [a, b, round, raw, deep]) {
       writeFileSync(join(dir, FILTER_STATS_FILE), '');
     }
     writeFileSync(join(root, 'cards', FILTER_STATS_FILE), '');
     const found = findStatsFiles([join(root, 'cards'), join(root, 'nope')]);
     expect(found.sort()).toEqual(
-      [join(a, FILTER_STATS_FILE), join(b, FILTER_STATS_FILE)].sort(),
+      [a, b, round].map((d) => join(d, FILTER_STATS_FILE)).sort(),
     );
   });
 

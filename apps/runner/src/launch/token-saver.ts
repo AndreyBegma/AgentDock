@@ -3,7 +3,6 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { TokenSaverConfig, TokenSaverRunKind } from '@agentdock/shared';
 import type { ConfigProfile } from '../config';
-import { writeJsonAtomic } from '../skills/run/record';
 import {
   FILTER_RAW_DIR,
   FILTER_RUN_FILE,
@@ -12,6 +11,7 @@ import {
   filterEnv,
   LAUNCH_SETTINGS_ENV,
 } from '../filter/env';
+import { writeJsonAtomic } from '../skills/run/record';
 import { readProfileMcpServers } from './profile-mcp';
 
 /** #445: the launch's own files, in its run dir. */

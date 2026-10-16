@@ -5,7 +5,13 @@ import { parseSimpleCommand, quoteAssignment, shellQuote } from './shell';
 /** The words bash itself makes of `text`, through a function that prints its args. */
 const bashWords = (text: string): string[] => {
   const result = Bun.spawnSync(
-    ['bash', '--noprofile', '--norc', '-c', `a() { printf '%s\\0' "$@"; }; a ${text}`],
+    [
+      'bash',
+      '--noprofile',
+      '--norc',
+      '-c',
+      `a() { printf '%s\\0' "$@"; }; a ${text}`,
+    ],
     { stdout: 'pipe', stderr: 'pipe', env: { PATH: process.env.PATH } },
   );
   if (result.exitCode !== 0) {
@@ -24,9 +30,7 @@ describe('parseSimpleCommand (#445 amendment 3)', () => {
   });
 
   it('takes leading assignments apart, unquoted', () => {
-    expect(
-      parseSimpleCommand(`AGENTDOCK_RAW=1 CI='a b'  bun test`),
-    ).toEqual({
+    expect(parseSimpleCommand(`AGENTDOCK_RAW=1 CI='a b'  bun test`)).toEqual({
       assignments: [
         { name: 'AGENTDOCK_RAW', value: '1' },
         { name: 'CI', value: 'a b' },
@@ -74,6 +78,7 @@ describe('parseSimpleCommand (#445 amendment 3)', () => {
     `git log $"a"`,
     'git log "$HOME"',
     'git log $FILE',
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: shell text, not a template
     'git log ${X}',
     // DR-09 / DR-11: a newline or a comment anywhere
     'bun test\nbun lint',

@@ -8,7 +8,6 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import type { ConfigProfile } from '../config';
-import { tempDir } from '../testing/fixtures';
 import {
   FILTER_PROJECT_ENV,
   FILTER_RUN_ENV,
@@ -17,6 +16,7 @@ import {
   FILTER_STATS_ENV,
   LAUNCH_SETTINGS_ENV,
 } from '../filter/env';
+import { tempDir } from '../testing/fixtures';
 import { profileClaudeJson, profileMcpServerNames } from './profile-mcp';
 import {
   AUTOCOMPACT_ENV,

@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import type { OrchestratorState } from '@agentdock/shared/protocol';
 import { createDispatcher } from '../commands/dispatcher';
@@ -202,6 +209,22 @@ describe('orchestrator.stop', () => {
     expect(
       fake.calls.filter((c) => c[0] === 'git' && c.includes('worktree')),
     ).toEqual([]);
+  });
+
+  it('removes the session’s raw outputs, and keeps its other files (#445)', async () => {
+    const { dir, cleanup } = tempDir();
+    try {
+      const fake = fakeTmux({ sessions: { [SESSION]: '' } });
+      const sessionDir = join(dir, SESSION);
+      mkdirSync(join(sessionDir, 'raw'), { recursive: true });
+      writeFileSync(join(sessionDir, 'raw', '1.log'), 'secret output');
+      writeFileSync(join(sessionDir, 'filter-stats.jsonl'), '');
+      await stopOrchestrator(target, { ...fake.deps, orchestratorDir: dir });
+      expect(existsSync(join(sessionDir, 'raw'))).toBe(false);
+      expect(existsSync(join(sessionDir, 'filter-stats.jsonl'))).toBe(true);
+    } finally {
+      cleanup();
+    }
   });
 
   it('answers stopped: false when it is not running', async () => {

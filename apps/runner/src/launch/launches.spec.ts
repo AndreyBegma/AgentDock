@@ -10,6 +10,11 @@ import {
   orchestratorArgv,
   orchestratorTokenSaver,
 } from '../control/orchestrator';
+import {
+  FILTER_PROJECT_ENV,
+  FILTER_RUN_ENV,
+  FILTER_RUN_KIND_ENV,
+} from '../filter/env';
 import { planTurnLaunchSpec, planTurnTokenSaver } from '../planner/launch';
 import { launchSpec, skillTokenSaver } from '../skills/run/launch';
 import { FakeClock } from '../testing/fake-clock';
@@ -18,11 +23,6 @@ import {
   uiProfileLaunchSpec,
   uiProfileTokenSaver,
 } from '../uiprofile/executor';
-import {
-  FILTER_PROJECT_ENV,
-  FILTER_RUN_ENV,
-  FILTER_RUN_KIND_ENV,
-} from '../filter/env';
 import { AUTOCOMPACT_ENV, type TokenSaverLaunch } from './token-saver';
 
 /**

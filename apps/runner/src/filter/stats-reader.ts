@@ -40,8 +40,11 @@ export const FILTER_STATS_OFFSET_FILE = 'filter-stats.offset';
 export const FILTER_STATS_POLL_MS = 5_000;
 /** Bytes read from one file per pass; the rest waits for the next pass. */
 const READ_CHUNK_BYTES = 1024 * 1024;
-/** Run dirs sit at most this deep under a root (`<root>/<id>[/<round>]`). */
-const MAX_DEPTH = 2;
+/**
+ * Run dirs sit at most this deep under a root: `<root>/<id>`, and a card's
+ * rounds at `<cards>/<card>/rounds/<run>`.
+ */
+const MAX_DEPTH = 3;
 
 const projectIdSchema = z.string().min(1).max(64);
 
@@ -145,7 +148,9 @@ export type RunIdentity = z.infer<typeof identitySchema>;
 export const readIdentity = (statsFile: string): RunIdentity | null => {
   try {
     const parsed = identitySchema.safeParse(
-      JSON.parse(readFileSync(join(dirname(statsFile), FILTER_RUN_FILE), 'utf8')),
+      JSON.parse(
+        readFileSync(join(dirname(statsFile), FILTER_RUN_FILE), 'utf8'),
+      ),
     );
     return parsed.success ? parsed.data : null;
   } catch {
@@ -240,10 +245,13 @@ export class FilterStatsReader {
     if (lines.length > 0) {
       const { rows, rejected } = parseLines(lines, identity);
       if (rejected > 0) {
-        this.options.log.warn('filter stats: skipped malformed or foreign rows', {
-          file,
-          rejected,
-        });
+        this.options.log.warn(
+          'filter stats: skipped malformed or foreign rows',
+          {
+            file,
+            rejected,
+          },
+        );
       }
       const project = (await this.options.resolve([identity.projectId])).get(
         identity.projectId,
