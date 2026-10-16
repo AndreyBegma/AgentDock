@@ -15,6 +15,12 @@ import { FILTER_RUN_FILE, FILTER_STATS_FILE } from './filter/env';
 import { type HookDeps, runHook } from './hooks/run';
 import { localRequest } from './local/client';
 import { FORBIDDEN, fixtureProtobuf, PROTOBUF_SESSION } from './otlp/testing';
+import {
+  permissivePolicy,
+  sameRealpath,
+  withMainCheckouts,
+  writePolicy,
+} from './policy/testing';
 import { FakeClock } from './testing/fake-clock';
 import {
   machineWithoutCodex,
@@ -65,6 +71,7 @@ describe('daemon — OTLP receiver (spec 13)', () => {
     queue: { pollSeconds: 60 },
     sessions: { enabled: false },
     skills: { maxConcurrentRuns: 2, maxTimeoutSec: 21_600 },
+    policy: permissivePolicy(),
   });
 
   const start = (
@@ -75,6 +82,7 @@ describe('daemon — OTLP receiver (spec 13)', () => {
     const controller = new AbortController();
     const { log, lines } = memoryLogger();
     let connection: RunnerConnection | null = null;
+    writePolicy(join(dir, 'runner.json'));
     const done = runDaemon({
       config: config(otlp, disabledCommands),
       configFile: join(dir, 'runner.json'),
@@ -82,7 +90,8 @@ describe('daemon — OTLP receiver (spec 13)', () => {
       spoolDir: join(dir, 'spool'),
       offsetsFile: join(dir, 'offsets.json'),
       host,
-      exec,
+      exec: withMainCheckouts(exec, [ROOT]),
+      realpath: sameRealpath,
       // Not the test process's: it may run under a systemd unit (#327).
       env: {},
       clock: new FakeClock(),
@@ -312,6 +321,7 @@ describe('daemon — local socket (spec 201)', () => {
   const start = () => {
     const controller = new AbortController();
     let connection: RunnerConnection | null = null;
+    writePolicy(join(dir, 'runner.json'));
     const done = runDaemon({
       config: {
         server: server.origin,
@@ -325,13 +335,15 @@ describe('daemon — local socket (spec 201)', () => {
         queue: { pollSeconds: 60 },
         sessions: { enabled: false },
         skills: { maxConcurrentRuns: 2, maxTimeoutSec: 21_600 },
+        policy: permissivePolicy(),
       },
       configFile: join(dir, 'runner.json'),
       home: dir,
       spoolDir: join(dir, 'spool'),
       offsetsFile: join(dir, 'offsets.json'),
       host,
-      exec: machineWithoutCodex(),
+      exec: withMainCheckouts(machineWithoutCodex(), [ROOT, join(dir, 'fixture')]),
+      realpath: sameRealpath,
       env: {},
       clock: new FakeClock(),
       log: memoryLogger().log,
@@ -546,6 +558,7 @@ describe('daemon — filter stats (#445 amendment 5)', () => {
     );
 
     const controller = new AbortController();
+    writePolicy(join(dir, 'runner.json'));
     const done = runDaemon({
       config: {
         server: server.origin,
@@ -559,6 +572,7 @@ describe('daemon — filter stats (#445 amendment 5)', () => {
         queue: { pollSeconds: 60 },
         sessions: { enabled: false },
         skills: { maxConcurrentRuns: 2, maxTimeoutSec: 21_600 },
+        policy: permissivePolicy(),
       },
       configFile: join(dir, 'runner.json'),
       localSocket: null,
@@ -566,7 +580,8 @@ describe('daemon — filter stats (#445 amendment 5)', () => {
       spoolDir: join(dir, 'spool'),
       offsetsFile: join(dir, 'offsets.json'),
       host,
-      exec: machineWithoutCodex(),
+      exec: withMainCheckouts(machineWithoutCodex(), [ROOT, join(dir, 'fixture')]),
+      realpath: sameRealpath,
       env: {},
       clock: new FakeClock(),
       log: memoryLogger().log,
@@ -619,6 +634,7 @@ describe('daemon — filter stats (#445 amendment 5)', () => {
     );
 
     const controller = new AbortController();
+    writePolicy(join(dir, 'runner.json'));
     const done = runDaemon({
       config: {
         server: server.origin,
@@ -632,6 +648,7 @@ describe('daemon — filter stats (#445 amendment 5)', () => {
         queue: { pollSeconds: 60 },
         sessions: { enabled: false },
         skills: { maxConcurrentRuns: 2, maxTimeoutSec: 21_600 },
+        policy: permissivePolicy(),
       },
       configFile: join(dir, 'runner.json'),
       localSocket: null,
@@ -639,7 +656,8 @@ describe('daemon — filter stats (#445 amendment 5)', () => {
       spoolDir: join(dir, 'spool'),
       offsetsFile: join(dir, 'offsets.json'),
       host,
-      exec: machineWithoutCodex(),
+      exec: withMainCheckouts(machineWithoutCodex(), [ROOT, join(dir, 'fixture')]),
+      realpath: sameRealpath,
       env: {},
       clock: new FakeClock(),
       log: memoryLogger().log,

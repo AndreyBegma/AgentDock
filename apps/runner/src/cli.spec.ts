@@ -325,6 +325,7 @@ describe('agentdock-runner CLI', () => {
         projects: [],
         disabledCommands,
         otlp: null,
+        policy: { allowedRoots: ['/'] },
       });
 
     const start = (exec: Exec = machineWithoutCodex()) => {
@@ -506,6 +507,7 @@ describe('agentdock-runner CLI', () => {
         projects: [],
         disabledCommands: [],
         otlp: null,
+        policy: { allowedRoots: ['/'] },
       });
       const { controller, exit, live } = start();
       await live();

@@ -18,6 +18,7 @@ import {
   SKILL_RUN_MIN_TIMEOUT_SEC,
 } from '@agentdock/shared/protocol';
 import { z } from 'zod';
+import { policyConfigSchema } from './policy/schema';
 
 /** D11: skill runs per runner before the next one queues. */
 export const SKILL_RUNS_DEFAULT_MAX_CONCURRENT = 2;
@@ -111,6 +112,12 @@ export const runnerConfigSchema = z.object({
         .default(SKILL_RUN_MAX_TIMEOUT_SEC),
     })
     .prefault({}),
+  /**
+   * The runner-local security policy (ADR-0046). Written only by
+   * `agentdock-runner policy …` and `pair --allow-root`; the daemon reads it
+   * and keeps it as it is when it rewrites the file (`updateConfig`).
+   */
+  policy: policyConfigSchema,
 });
 export type RunnerConfig = z.infer<typeof runnerConfigSchema>;
 
@@ -167,4 +174,21 @@ export const saveConfig = (
   closeSync(fd);
   chmodSync(tmp, 0o600);
   renameSync(tmp, path);
+};
+
+/** What the daemon may rewrite in the file: never the policy (ADR-0046). */
+export type DaemonConfigPatch = Partial<
+  Omit<z.input<typeof runnerConfigSchema>, 'policy'>
+>;
+
+/**
+ * The daemon's one way to rewrite `runner.json`: re-reads the file and
+ * applies `patch` on top, so the policy on disk — whatever the CLI last
+ * wrote — is kept as is.
+ */
+export const updateConfig = (path: string, patch: DaemonConfigPatch): void => {
+  const { policy: _ignored, ...safe } = patch as DaemonConfigPatch & {
+    policy?: unknown;
+  };
+  saveConfig(path, { ...loadConfig(path), ...safe });
 };

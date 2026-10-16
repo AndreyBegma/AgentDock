@@ -5,6 +5,7 @@ import { FakeClock } from '../testing/fake-clock';
 import { fakeExec } from '../testing/fixtures';
 import { CommandFailure } from './failure';
 import { createHandlers, type HandlerContext } from './handlers';
+import { permissivePolicy } from '../policy/testing';
 
 const context = (over: Partial<HandlerContext> = {}): HandlerContext => ({
   clock: new FakeClock(),
@@ -22,6 +23,7 @@ const context = (over: Partial<HandlerContext> = {}): HandlerContext => ({
   exec: fakeExec({}),
   watchedProjects: () => [],
   profiles: () => [],
+  policy: permissivePolicy,
   ...over,
 });
 

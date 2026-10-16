@@ -8,6 +8,13 @@ export interface WatchListOptions {
   registry: CollectorRegistry;
   /** Writes the list to the runner config as the next boot's cache. */
   persist: (projects: WatchedProject[]) => void;
+  /**
+   * ADR-0046: why the runner-local policy refuses a project's root (outside
+   * `allowedRoots`, a symlink out of them, not a git main checkout), or null
+   * to watch it. Every list — the cached one and each the server sends — goes
+   * through it; a refused project is left out, not watched.
+   */
+  admit: (project: WatchedProject) => Promise<string | null>;
   log: Logger;
 }
 
@@ -17,27 +24,58 @@ const same = (a: readonly WatchedProject[], b: readonly WatchedProject[]) =>
 
 /**
  * The projects this runner watches (D9). The server's list — `welcome` on
- * every connect, `config` after — is authoritative; the config file only
- * caches it so collectors run before the first connect.
+ * every connect, `config` after — is authoritative within the runner-local
+ * policy (ADR-0046): a root the policy refuses is never watched. The config
+ * file only caches the admitted list so collectors run before the first
+ * connect.
  */
 export class WatchList {
-  private projects: WatchedProject[];
+  private projects: WatchedProject[] = [];
+  /** The last list asked for, before the policy: `reapply` re-checks it. */
+  private requested: WatchedProject[];
 
   constructor(private readonly options: WatchListOptions) {
-    this.projects = options.initial.map((p) => ({ ...p }));
+    this.requested = options.initial.map((p) => ({ ...p }));
   }
 
   get current(): readonly WatchedProject[] {
     return this.projects;
   }
 
-  /** Starts collectors for the cached list. */
-  start(): Promise<void> {
-    return this.options.registry.setProjects(this.projects);
+  /** Starts collectors for the cached list, as far as the policy admits it. */
+  async start(): Promise<void> {
+    this.projects = await this.admitted(this.requested);
+    await this.options.registry.setProjects(this.projects);
+  }
+
+  /** The policy changed: the last list asked for is checked again. */
+  reapply(): Promise<void> {
+    return this.apply(this.requested);
+  }
+
+  private async admitted(
+    projects: readonly WatchedProject[],
+  ): Promise<WatchedProject[]> {
+    const verdicts = await Promise.all(
+      projects.map((p) =>
+        this.options.admit(p).catch((error) => errorMessage(error)),
+      ),
+    );
+    return projects.filter((p, i) => {
+      const refused = verdicts[i];
+      if (refused === null) return true;
+      this.options.log.warn('watch list: project refused by policy', {
+        projectId: p.id,
+        reason: refused,
+      });
+      return false;
+    });
   }
 
   /** Applies the server's list: collectors follow it, the cache is rewritten when it changed. */
   async apply(projects: readonly WatchedProject[]): Promise<void> {
+    this.requested = projects.map((p) => ({ ...p }));
+    projects = await this.admitted(projects);
     // The App health (spec 27 D12) and the content flag (spec 201 D13) live
     // in memory only: the config cache must not make a restarted runner trust
     // a health, or ship content, the server has not confirmed.

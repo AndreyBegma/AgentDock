@@ -13,6 +13,9 @@ import {
 } from '@agentdock/shared/protocol';
 import type { Clock } from '../clock';
 import { errorMessage, type Logger } from '../log';
+import { commandRefusal } from '../policy/check';
+import { nodeRealpath, type Realpath } from '../policy/roots';
+import type { PolicyConfig } from '../policy/schema';
 import { CommandFailure } from './failure';
 
 /** One handler per allowlisted command; the compiler refuses a missing one. */
@@ -25,6 +28,10 @@ export type CommandHandlers = {
 export interface DispatcherOptions {
   handlers: CommandHandlers;
   disabledCommands: readonly string[];
+  /** The runner-local policy as it is now (ADR-0046); read per command. */
+  policy: () => PolicyConfig;
+  /** Resolves a root for the policy; the filesystem's by default. */
+  realpath?: Realpath;
   clock: Clock;
   log: Logger;
 }
@@ -48,11 +55,13 @@ class CommandTimeout extends Error {}
 
 /**
  * Typed command dispatch (ADR-0010, D8). Order: unknown → disabled →
- * invalid args → handler under a timeout → result checked against its schema.
- * Every outcome is a `command.result`; nothing here throws.
+ * invalid args → the runner-local policy (ADR-0046) → handler under a
+ * timeout → result checked against its schema. Every outcome is a
+ * `command.result`; nothing here throws.
  */
 export const createDispatcher = (options: DispatcherOptions): Dispatch => {
   const { handlers, clock, log } = options;
+  const realpath = options.realpath ?? nodeRealpath;
   const disabled = new Set(options.disabledCommands);
 
   const invoke = <N extends CommandName>(name: N, args: unknown) =>
@@ -85,6 +94,16 @@ export const createDispatcher = (options: DispatcherOptions): Dispatch => {
     if (!parsed.ok) {
       log.warn('command: rejected', { id, name, code: parsed.error.code });
       return failure(id, parsed.error.code, parsed.error.message);
+    }
+    const refused = commandRefusal(
+      name,
+      parsed.args,
+      options.policy(),
+      realpath,
+    );
+    if (refused) {
+      log.warn('command: refused by policy', { id, name, rule: refused.rule });
+      return failure(id, 'policy_refused', refused.message);
     }
 
     const definition: CommandDefinition = commands[name];

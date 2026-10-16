@@ -7,6 +7,7 @@ import { createDispatcher } from '../dispatcher';
 import { CommandFailure } from '../failure';
 import { createHandlers } from '../handlers';
 import { collectorPoll } from './collector-poll';
+import { permissivePolicy, sameRealpath } from '../../policy/testing';
 
 const PROJECT = { id: 'prj_a', root: '/dev/a' };
 
@@ -64,7 +65,10 @@ describe('collector.poll', () => {
     });
     await registry.setProjects([PROJECT]);
     const dispatch = createDispatcher({
+ policy: permissivePolicy,
+ realpath: sameRealpath,
       handlers: createHandlers({
+ policy: permissivePolicy,
         clock,
         runnerVersion: '0.1.0',
         host: { hostname: 'test-host', os: 'linux', arch: 'x64' },

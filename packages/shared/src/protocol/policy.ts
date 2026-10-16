@@ -1,0 +1,93 @@
+import { z } from 'zod';
+// Type-only: `./commands` imports this module through `./capabilities`.
+import type { CommandName } from './commands';
+import {
+  type OrchestratorPermissionMode,
+  orchestratorPermissionModeSchema,
+} from './commands/control';
+import { absolutePathSchema } from './projects';
+
+/**
+ * The runner-local security policy (ADR-0046). It lives in the runner's own
+ * `runner.json`, written only by `agentdock-runner policy …` on the machine;
+ * no server command or `hello` response changes it. The runner reports it in
+ * `hello` so the UI can explain a refusal before the person asks.
+ */
+
+/**
+ * Commands that type free text into a live agent session whose permission
+ * mode the policy may not have set (a fleet slot, the orchestrator, a card
+ * round). Off until the person turns one on with `policy set commands.<name>`.
+ */
+export const POLICY_GATED_COMMANDS = [
+  'orchestrator.message',
+  'slot.message',
+  'session.message',
+] as const satisfies readonly CommandName[];
+export type PolicyGatedCommand = (typeof POLICY_GATED_COMMANDS)[number];
+
+/** The rule a `policy_refused` failure names. */
+export const policyRuleSchema = z.enum([
+  'allowedRoots',
+  'maxPermissionMode',
+  'terminal.write',
+  'skills.profileInstall',
+  'commands',
+]);
+export type PolicyRule = z.infer<typeof policyRuleSchema>;
+
+/** Least to most permissive; `maxPermissionMode` caps a launch at its rank. */
+export const PERMISSION_MODE_RANK: Record<OrchestratorPermissionMode, number> =
+  { manual: 0, acceptEdits: 1, auto: 2, bypassPermissions: 3 };
+
+/** The default cap: every mode below `bypassPermissions`. */
+export const POLICY_DEFAULT_MAX_PERMISSION_MODE: OrchestratorPermissionMode =
+  'auto';
+
+export const permissionModeAllowed = (
+  mode: OrchestratorPermissionMode,
+  max: OrchestratorPermissionMode,
+): boolean => PERMISSION_MODE_RANK[mode] <= PERMISSION_MODE_RANK[max];
+
+/** At most this many allowed roots; a person lists directories, not projects. */
+export const POLICY_ALLOWED_ROOTS_MAX = 64;
+
+/** The effective policy as `hello` reports it: values only, no other paths. */
+export const runnerPolicySchema = z.object({
+  /** Real paths; a watched root must be inside one of them. */
+  allowedRoots: z.array(absolutePathSchema).max(POLICY_ALLOWED_ROOTS_MAX),
+  maxPermissionMode: orchestratorPermissionModeSchema,
+  terminal: z.object({ write: z.boolean() }),
+  skills: z.object({ profileInstall: z.boolean() }),
+  /**
+   * One entry per gated command this runner knows. Plain string keys, not
+   * `POLICY_GATED_COMMANDS`: a newer runner may gate a command the API does
+   * not know, and an enum would fail its whole hello.
+   */
+  commands: z.record(z.string().min(1), z.boolean()),
+});
+export type RunnerPolicy = z.infer<typeof runnerPolicySchema>;
+
+/** Whether the policy lets `name` run; a command it does not gate always may. */
+export const policyAllowsCommand = (
+  policy: Pick<RunnerPolicy, 'commands'>,
+  name: string,
+): boolean =>
+  !(POLICY_GATED_COMMANDS as readonly string[]).includes(name) ||
+  policy.commands[name] === true;
+
+/** The CLI line that lifts `rule`, for a refusal message and the UI. */
+export const policyFixHint = (rule: PolicyRule, detail?: string): string => {
+  switch (rule) {
+    case 'allowedRoots':
+      return 'agentdock-runner policy allow-root <dir>';
+    case 'maxPermissionMode':
+      return `agentdock-runner policy set maxPermissionMode ${detail ?? '<mode>'}`;
+    case 'terminal.write':
+      return 'agentdock-runner policy set terminal.write true';
+    case 'skills.profileInstall':
+      return 'agentdock-runner policy set skills.profileInstall true';
+    case 'commands':
+      return `agentdock-runner policy set commands.${detail ?? '<command>'} true`;
+  }
+};

@@ -24,6 +24,7 @@ import {
   stopOrchestrator,
 } from './orchestrator';
 import { CREATED, fakeTmux } from './testing';
+import { permissivePolicy, sameRealpath } from '../policy/testing';
 
 const SESSION = 'agentdock-orch-acme-widget';
 const target = { projectId: 'prj_1', root: '/srv/widget' };
@@ -367,7 +368,10 @@ describe('orchestrator.message', () => {
     const fake = fakeTmux({ sessions: { [SESSION]: '> ' } });
     const clock = new FakeClock();
     const dispatch = createDispatcher({
+ policy: permissivePolicy,
+ realpath: sameRealpath,
       handlers: createHandlers({
+ policy: permissivePolicy,
         clock,
         runnerVersion: '0.0.0-test',
         host: { hostname: 'h', os: 'linux', arch: 'x64' },

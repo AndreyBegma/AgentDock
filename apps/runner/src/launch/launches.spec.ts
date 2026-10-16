@@ -24,6 +24,7 @@ import {
   uiProfileTokenSaver,
 } from '../uiprofile/executor';
 import { AUTOCOMPACT_ENV, type TokenSaverLaunch } from './token-saver';
+import { permissivePolicy } from '../policy/testing';
 
 /**
  * #445 acceptance: every launch passes `--settings` and `--strict-mcp-config`
@@ -318,6 +319,7 @@ describe('orchestrator session launch (#445)', () => {
     clock: new FakeClock(),
     watchedProjects: () => [],
     profiles: () => [profile],
+    policy: permissivePolicy,
     home,
     selfCommand: SELF,
     orchestratorDir: join(dir, 'orchestrator'),

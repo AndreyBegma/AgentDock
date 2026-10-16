@@ -21,6 +21,7 @@ import {
   stopOrchestrator,
 } from './orchestrator';
 import { MESSAGE_FILE, messageSlot, stopSlot } from './slot';
+import { permissivePolicy } from '../policy/testing';
 
 setDefaultTimeout(REAL_PROCESS_TIMEOUT_MS);
 
@@ -112,6 +113,7 @@ const fixture = async () => {
     clock: new FakeClock(),
     watchedProjects: () => [{ id: 'prj_1', root }],
     profiles: () => [profile],
+    policy: permissivePolicy,
     tmuxServer: server,
   };
   const sessions = async () =>

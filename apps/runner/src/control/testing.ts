@@ -3,6 +3,8 @@ import type { ConfigProfile } from '../config';
 import type { Exec, ExecResult } from '../detect/exec';
 import { FakeClock } from '../testing/fake-clock';
 import type { ControlDeps } from './deps';
+import type { PolicyConfig } from '../policy/schema';
+import { permissivePolicy, sameRealpath } from '../policy/testing';
 
 /** 2026-10-08T09:00:00Z, as tmux prints `session_created`. */
 export const CREATED = 1_791_450_000;
@@ -20,6 +22,8 @@ export interface FakeTmuxOptions {
   profiles?: ConfigProfile[];
   /** `new-session` answers this failure instead of creating the session. */
   newSessionFails?: ExecResult;
+  /** The runner-local policy; one that refuses nothing by default. */
+  policy?: () => PolicyConfig;
 }
 
 const ok = (stdout = ''): ExecResult => ({ code: 0, stdout, stderr: '' });
@@ -104,6 +108,8 @@ export const fakeTmux = (options: FakeTmuxOptions = {}) => {
     clock: new FakeClock(Date.parse('2026-10-08T10:00:00.000Z')),
     watchedProjects: () => [project],
     profiles: () => options.profiles ?? [],
+    policy: options.policy ?? permissivePolicy,
+    realpath: sameRealpath,
   };
   return {
     project,

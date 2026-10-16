@@ -4,6 +4,7 @@ import { FakeClock } from '../testing/fake-clock';
 import { fakeExec, memoryLogger } from '../testing/fixtures';
 import { createDispatcher } from './dispatcher';
 import { createHandlers } from './handlers';
+import { permissivePolicy, sameRealpath } from '../policy/testing';
 
 const ACME = { id: 'prj_acme', root: '/srv/dev/acme' };
 const SINCE = '2026-09-01T00:00:00.000Z';
@@ -16,7 +17,10 @@ const setup = (
   const clock = new FakeClock();
   const { log } = memoryLogger();
   return createDispatcher({
+ policy: permissivePolicy,
+ realpath: sameRealpath,
     handlers: createHandlers({
+ policy: permissivePolicy,
       clock,
       runnerVersion: '0.0.0-test',
       host: { hostname: 'h', os: 'linux', arch: 'x64' },

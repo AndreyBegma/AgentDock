@@ -25,6 +25,7 @@ import {
   testEvent,
 } from './testing/fixtures';
 import { MockServer, until } from './testing/mock-server';
+import { permissivePolicy, sameRealpath } from './policy/testing';
 
 const host = { hostname: 'test-host', os: 'linux', arch: 'x64' };
 const capabilities = {
@@ -98,7 +99,10 @@ describe('RunnerConnection', () => {
         collectors: {},
       }),
       dispatch: createDispatcher({
+ policy: permissivePolicy,
+ realpath: sameRealpath,
         handlers: createHandlers({
+ policy: permissivePolicy,
           clock,
           runnerVersion: '0.1.0',
           host,
