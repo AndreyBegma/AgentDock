@@ -5,14 +5,16 @@ import type { SimpleCommand } from './shell';
 
 /**
  * The hook must never change what a session allows, asks or denies (#445,
- * decision on the hook's permissions, narrowed by amendment 9). Claude Code
- * matches its permission rules against the command a PreToolUse hook
- * returns, so a rewritten `agentdock-runner filter -- git push` would slip
- * past `Bash(git push:*)`. The hook therefore rewrites only when:
+ * decision on the hook's permissions, narrowed by amendment 9, widened to
+ * auto mode by amendment 10). Claude Code matches its permission rules
+ * against the command a PreToolUse hook returns, so a rewritten
+ * `agentdock-runner filter -- git push` would slip past `Bash(git push:*)`.
+ * The hook therefore rewrites only when:
  *
- * - the session is in `bypassPermissions` — in every other mode Claude Code
- *   (its prompt, its auto-mode classifier, plan mode) decides, and a hook
- *   `allow` would skip that; and
+ * - the session is in `bypassPermissions`, or in `auto`, where the hook
+ *   returns no decision and the classifier judges the wrapped command. In
+ *   every other mode Claude Code (its prompt, plan mode) decides and the
+ *   command is left as written; and
  * - no `deny` or `ask` `Bash(…)` rule matches the command, at any word.
  *
  * Rules are read best-effort from the files Claude loads; any doubt (a file
@@ -132,8 +134,8 @@ export const permissionFor = (
   original: string,
   parsed: SimpleCommand,
 ): PermissionVerdict => {
-  if (permissionMode !== 'bypassPermissions') {
-    return { rewrite: false, reason: 'not bypassPermissions' };
+  if (permissionMode !== 'bypassPermissions' && permissionMode !== 'auto') {
+    return { rewrite: false, reason: 'not bypassPermissions or auto' };
   }
   const candidates = ruleCandidates(original, parsed);
   for (const list of ['deny', 'ask'] as const) {
