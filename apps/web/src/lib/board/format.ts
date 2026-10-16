@@ -527,9 +527,36 @@ export interface HooksNotice {
  */
 export const hooksNotice = (
   card: Pick<BoardCardView, 'source'> & { profileKey?: string | null },
-  round: Pick<CardRoundBrief, 'wiring' | 'wiringReason'>,
+  round: Pick<CardRoundBrief, 'wiring' | 'wiringReason'> &
+    Pick<Partial<CardRoundBrief>, 'hooksCause' | 'hooksProfile'>,
 ): HooksNotice => {
-  const { wiring = null, wiringReason = null } = round;
+  const { wiring = null, wiringReason = null, hooksCause = null } = round;
+  // #348 D1/D2: the plugin state of the round's profile. Launch facts the
+  // runner reported (no hooks, or its own injected settings) outrank it.
+  const profile = round.hooksProfile ?? card.profileKey ?? null;
+  if (profile && wiring !== 'none' && wiring !== 'injected') {
+    if (hooksCause === 'no_plugin') {
+      return {
+        text: `No hook events from this card's session: the agentdock plugin is not set up for the profile ${profile}, so ${HOOKS_CONSEQUENCE}`,
+        chip: 'hooks not set up',
+        commands: [
+          {
+            label: 'Set up the profile, then restart its sessions',
+            code: SETUP_CLAUDE_COMMAND.replace(PROFILE_PLACEHOLDER, profile),
+          },
+        ],
+        guide: true,
+      };
+    }
+    if (hooksCause === 'session_predates') {
+      return {
+        text: `The agentdock plugin is set up for ${profile}, but this session sent no hook events — it started before the setup. Stop the card and run it again to get live status.`,
+        chip: 'restart session',
+        commands: [],
+        guide: false,
+      };
+    }
+  }
   if (isMirroredCardSource(card.source)) {
     return {
       text: `No hook events from this card's session: the agentdock plugin is not set up for the profile it runs in, so ${HOOKS_CONSEQUENCE}`,
