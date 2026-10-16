@@ -44,6 +44,16 @@ round="\${OTEL_RESOURCE_ATTRIBUTES##*agentdock.run=}"
 printf '%s\\n' "$@" > "$RECORD_DIR/argv-$round"
 pwd >> "$RECORD_DIR/argv-$round"
 if [ "$FAKE_MODE" = sleep ]; then sleep 60; fi
+if [ "$FAKE_MODE" = dialog ]; then
+  printf 'Teach auto mode about your environment?\\n 1. Yes\\n 2. Not now\\n 3. Don'"'"'t show again\\n'
+  stty raw -echo
+  dd bs=1 count=1 2>/dev/null | od -An -tx1 > "$RECORD_DIR/key-$round"
+  exit 0
+fi
+if [ "$FAKE_MODE" = permission ]; then
+  printf 'Do you want to proceed?\\n 1. Yes\\n 2. No\\n'
+  sleep 60
+fi
 exit 3
 `;
 
@@ -76,6 +86,8 @@ const setup = async () => {
   const profiles: ConfigProfile[] = [
     profile('claude-quick', 'quick'),
     profile('claude-slow', 'sleep'),
+    profile('claude-dialog', 'dialog'),
+    profile('claude-permission', 'permission'),
     { id: 'codex-default', runtime: 'codex', env: {}, args: [] },
   ];
 
@@ -170,6 +182,41 @@ const failure = async (promise: Promise<unknown>) =>
 describe.skipIf(!tmuxInstalled)(
   'card worker executor (#242 D5, D6, D9)',
   () => {
+    it('answers the Teach auto mode dialog with Escape within one poll (#435)', async () => {
+      const t = await setup();
+      await t.executor.run(
+        t.args({
+          cardId: 'card_d',
+          runId: 'run_d',
+          profileKey: 'claude-dialog',
+        }),
+      );
+      const keyFile = join(t.f.ws, 'key-run_d');
+      const key = () =>
+        existsSync(keyFile) ? readFileSync(keyFile, 'utf8') : '';
+      for (let i = 0; i < 400 && !key().trim(); i++) {
+        await t.executor.poll();
+        await Bun.sleep(25);
+      }
+      expect(readFileSync(keyFile, 'utf8').trim()).toBe('1b');
+    });
+
+    it('never answers a permission prompt (#435)', async () => {
+      const t = await setup();
+      await t.executor.run(
+        t.args({
+          cardId: 'card_p',
+          runId: 'run_p',
+          profileKey: 'claude-permission',
+        }),
+      );
+      await t.argvOf('run_p');
+      await Bun.sleep(300);
+      for (let i = 0; i < 3; i++) await t.executor.poll();
+      expect(t.tmuxCalls.some((c) => c.includes('send-keys'))).toBe(false);
+      await t.tmux('kill-session', '-t', '=agentdock-card-ab12cd34');
+    });
+
     it('creates .wt-<repo>-card-<shortid> and tmux agentdock-card-<shortid>, commits files first, launches argv only, emits ended when tmux exits', async () => {
       const t = await setup();
       const spec = '# C-12 Export as CSV\n\nAcceptance: a CSV.\n';
