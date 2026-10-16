@@ -29,6 +29,7 @@ import { writeJsonAtomic } from '../skills/run/record';
 import {
   planTurnLaunchSpec,
   planTurnSessionName,
+  planTurnTokenSaver,
   planWorktreePath,
 } from './launch';
 import {
@@ -466,6 +467,13 @@ export class PlanTurnExecutor {
           plan.worktree,
           this.store.promptFile(turn),
           this.options.otlpPort?.() ?? null,
+          planTurnTokenSaver(
+            profile,
+            turn,
+            deps.home,
+            this.store.turnDir(turn.planId, turn.turnId),
+            this.options.selfCommand,
+          ),
         ),
       );
       turn.startedAt = isoNow(deps.clock);

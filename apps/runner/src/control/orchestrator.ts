@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { homedir } from 'node:os';
+import { dirname, join } from 'node:path';
 import {
   type OrchestratorMessageArgs,
   type OrchestratorMessageResult,
@@ -18,7 +19,13 @@ import { ORCHESTRATOR_SKILL } from '../collectors/orchestrator/orchestrator';
 import { classifyPane } from '../collectors/tmux/classify';
 import { CommandFailure } from '../commands/failure';
 import type { ConfigProfile } from '../config';
+import { resolvePaths } from '../env';
 import { resolveFleetProject } from '../fleet/project';
+import {
+  defaultSelfCommand,
+  type TokenSaverLaunch,
+  tokenSaverLaunch,
+} from '../launch/token-saver';
 import type { ControlDeps } from './deps';
 import { messageFileContent, writeAtomically } from './slot';
 import { watchedProject } from './target';
@@ -40,9 +47,12 @@ export const orchestratorArgv = (
   profile: ConfigProfile,
   session: string,
   args: Pick<OrchestratorStartArgs, 'model' | 'permissionMode' | 'mode'>,
+  tokenSaver?: TokenSaverLaunch | null,
 ): string[] => [
   profile.binary ?? profile.runtime,
   ...profile.args,
+  // #445: before a flag, so `--mcp-config <configs...>` takes only its file.
+  ...(tokenSaver?.args ?? []),
   '--remote-control',
   session,
   '-n',
@@ -53,6 +63,41 @@ export const orchestratorArgv = (
   CLI_PERMISSION_MODE[args.permissionMode],
   `/${ORCHESTRATOR_SKILL} ${args.mode}`,
 ];
+
+/** #445: `<state>/agentdock/orchestrator`, beside the spool. */
+export const defaultOrchestratorDir = (): string =>
+  join(dirname(resolvePaths(process.env).spoolDir), 'orchestrator');
+
+/**
+ * #445: the orchestrator session's Token saver — `agentdock` and the scout,
+ * its files in a directory of the session's own (it has no run). `null` when
+ * off: the session starts as before.
+ */
+export const orchestratorTokenSaver = async (
+  args: Pick<OrchestratorStartArgs, 'tokenSaver'>,
+  deps: ControlDeps,
+  profile: ConfigProfile,
+  session: string,
+): Promise<TokenSaverLaunch | null> => {
+  if (!args.tokenSaver?.enabled) return null;
+  const dir = join(deps.orchestratorDir ?? defaultOrchestratorDir(), session);
+  try {
+    await mkdir(dir, { recursive: true, mode: 0o700 });
+  } catch {
+    return null;
+  }
+  return tokenSaverLaunch({
+    config: args.tokenSaver,
+    profile,
+    home: deps.home ?? homedir(),
+    dir,
+    selfCommand: deps.selfCommand ?? defaultSelfCommand(),
+    runKind: 'orchestrator',
+    runId: null,
+    agentdock: [],
+    scout: true,
+  });
+};
 
 const sessionOf = async (
   deps: ControlDeps,
@@ -97,11 +142,12 @@ export const startOrchestrator = async (
     new CommandFailure('already_running', `${session} is already running`);
   if (await tmux.find(session)) throw alreadyRunning();
 
+  const tokenSaver = await orchestratorTokenSaver(args, deps, profile, session);
   const created = await tmux.newSession(
     session,
     project.root,
-    profile.env,
-    orchestratorArgv(profile, session, args),
+    { ...profile.env, ...(tokenSaver?.env ?? {}) },
+    orchestratorArgv(profile, session, args, tokenSaver),
   );
   // Lost a race with a concurrent start: the other one holds the name.
   if (!created.ok && (await tmux.find(session))) throw alreadyRunning();

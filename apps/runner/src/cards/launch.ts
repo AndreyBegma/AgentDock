@@ -6,9 +6,15 @@ import type {
   OrchestratorPermissionMode,
 } from '@agentdock/shared/protocol';
 import type { ConfigProfile } from '../config';
+import { type TokenSaverLaunch, tokenSaverLaunch } from '../launch/token-saver';
 import { runEnv } from '../skills/run/launch';
 import type { LaunchSpec } from '../skills/run/record';
-import type { CardWiringFiles } from './wiring';
+import { cardIssueNumber, finishGuardArgs } from './finish-guard';
+import {
+  type CardWiring,
+  type CardWiringFiles,
+  cardHooksSettings,
+} from './wiring';
 
 /** The Claude CLI's `--permission-mode` value for each protocol mode (as spec 17 D3). */
 const CLI_PERMISSION_MODE: Record<OrchestratorPermissionMode, string> = {
@@ -69,6 +75,7 @@ export const cardArgv = (
   profile: ConfigProfile,
   args: Pick<CardRunArgs, 'session' | 'model' | 'permissionMode' | 'prompt'>,
   wiring?: CardWiringFiles,
+  tokenSaver?: TokenSaverLaunch | null,
 ): { binary: string; args: string[] } => ({
   binary: profile.binary ?? profile.runtime,
   args: [
@@ -76,10 +83,13 @@ export const cardArgv = (
     ...cardSessionFlags(args.session),
     // #367 D1: the round's hooks and MCP server, when the profile has no
     // plugin. Checked against Claude Code 2.1.301: both load on
-    // `--session-id` and on `--resume`.
-    ...(wiring
-      ? ['--settings', wiring.settings, '--mcp-config', wiring.mcp]
-      : []),
+    // `--session-id` and on `--resume`. #445: with Token saver on, its
+    // files carry those hooks and that server instead.
+    ...(tokenSaver
+      ? tokenSaver.args
+      : wiring
+        ? ['--settings', wiring.settings, '--mcp-config', wiring.mcp]
+        : []),
     '--model',
     args.model,
     '--permission-mode',
@@ -110,9 +120,42 @@ export const cardLaunchSpec = (
   worktree: string,
   otlpPort: number | null,
   wiring?: CardWiringFiles,
+  tokenSaver?: TokenSaverLaunch | null,
 ): LaunchSpec => ({
-  ...cardArgv(profile, args, wiring),
-  env: { ...runEnv(profile, args, otlpPort), ...cardEnv(args.shortId) },
+  ...cardArgv(profile, args, wiring, tokenSaver),
+  env: {
+    ...runEnv(profile, args, otlpPort),
+    ...cardEnv(args.shortId),
+    ...(tokenSaver?.env ?? {}),
+  },
   cwd: worktree,
   interactive: true,
 });
+
+/**
+ * #445: the card round's Token saver — the filter hook over the injected
+ * hooks (a plugin profile keeps its own), `agentdock` with the artifact
+ * guard (D8), the scout, and the round dir for the filter's files. `null`
+ * when it is off: the round launches as before.
+ */
+export const cardTokenSaver = (
+  profile: ConfigProfile,
+  args: Pick<CardRunArgs, 'tokenSaver' | 'runId' | 'pullRequest' | 'prompt'>,
+  home: string,
+  roundDir: string,
+  selfCommand: readonly string[],
+  wiring: CardWiring,
+): TokenSaverLaunch | null =>
+  tokenSaverLaunch({
+    config: args.tokenSaver,
+    profile,
+    home,
+    dir: roundDir,
+    selfCommand,
+    runKind: 'card',
+    runId: args.runId,
+    agentdock: finishGuardArgs(cardIssueNumber(args)),
+    scout: true,
+    baseSettings:
+      wiring.wiring === 'injected' ? cardHooksSettings(selfCommand) : undefined,
+  });

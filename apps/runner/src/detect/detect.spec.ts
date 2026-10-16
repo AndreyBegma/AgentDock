@@ -157,7 +157,44 @@ describe('capability detection', () => {
       profiles: [],
       codeSentinel: null,
       otlp: null,
+      tokenSaver: true,
     });
+  });
+
+  it('reports each Claude profile’s MCP server names, never their definitions (#445)', async () => {
+    const dir = join(home, '.claude-profiles', 'mcp');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, '.claude.json'),
+      JSON.stringify({
+        mcpServers: {
+          woodpecker: { command: 'wp', env: { TOKEN: 'secret' } },
+          playwright: { command: 'npx', args: ['@playwright/mcp'] },
+          'bad name!': { command: 'x' },
+        },
+      }),
+    );
+    const capabilities = await detectCapabilities({
+      exec: fakeExec({}),
+      home,
+      config: {
+        profiles: [
+          {
+            id: 'claude-mcp',
+            runtime: 'claude',
+            env: { CLAUDE_CONFIG_DIR: dir },
+            args: [],
+          },
+          { id: 'codex', runtime: 'codex', env: {}, args: [] },
+        ],
+        otlp: null,
+      },
+    });
+    const parsed = capabilitiesSchema.parse(capabilities);
+    expect(parsed.profiles[0].mcpServers).toEqual(['playwright', 'woodpecker']);
+    expect(parsed.profiles[1].mcpServers).toBeUndefined();
+    expect(JSON.stringify(parsed)).not.toContain('secret');
+    expect(parsed.tokenSaver).toBe(true);
   });
 
   it('reports gh unauthenticated without a user', async () => {

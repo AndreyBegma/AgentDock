@@ -31,7 +31,7 @@ import {
 import { findRunnableSkill } from '../inventory';
 import { type Collected, collectRun, type EndReason } from './collect';
 import { finishedData } from './finished';
-import { launchSpec, runWorktreePath } from './launch';
+import { launchSpec, runWorktreePath, skillTokenSaver } from './launch';
 import { type RunRecord, RunStore, writeJsonAtomic } from './record';
 
 /** How often running sessions are checked for an exit, a vanish or a timeout. */
@@ -394,6 +394,13 @@ export class SkillRunExecutor {
           record,
           record.worktree,
           this.options.otlpPort?.() ?? null,
+          skillTokenSaver(
+            profile,
+            record,
+            deps.home,
+            this.store.dir(record.runId),
+            this.options.selfCommand,
+          ),
         ),
       );
       record.startedAt = isoNow(deps.clock);

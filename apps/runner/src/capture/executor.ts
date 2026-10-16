@@ -16,6 +16,10 @@ import { type Cancel, isoNow } from '../clock';
 import { CommandFailure } from '../commands/failure';
 import type { Env } from '../env';
 import { resolveFleetProject } from '../fleet/project';
+import {
+  type TextCallLaunchOptions,
+  textCallTokenSaver,
+} from '../launch/token-saver';
 import { errorMessage, type Logger } from '../log';
 import { redact } from '../pane/redact';
 import { cutBytes } from '../planner/result';
@@ -75,7 +79,7 @@ export const bunSpawn: CaptureSpawn = ({ command, cwd, env, stdinFile }) => {
   };
 };
 
-export interface CaptureExecutorOptions {
+export interface CaptureExecutorOptions extends TextCallLaunchOptions {
   deps: Pick<SkillsDeps, 'exec' | 'clock' | 'profiles' | 'watchedProjects'>;
   /** `$XDG_STATE_HOME/agentdock/capture`: one directory per extraction, deleted at its end. */
   capturesDir: string;
@@ -195,6 +199,15 @@ export class CaptureExecutor {
       runEnv(profile, args, this.options.otlpPort?.() ?? null),
     );
     env[AGENTDOCK_HOOKS_ENV] = AGENTDOCK_HOOKS_OFF;
+    // #445: off or absent launches exactly as before.
+    const tokenSaver = textCallTokenSaver(
+      this.options,
+      profile,
+      args,
+      dir,
+      'card_capture',
+    );
+    Object.assign(env, tokenSaver?.env ?? {});
 
     let proc: CaptureProcess;
     try {
@@ -202,6 +215,7 @@ export class CaptureExecutor {
         command: [
           profile.binary ?? profile.runtime,
           ...profile.args,
+          ...(tokenSaver?.args ?? []),
           ...CAPTURE_CLAUDE_FLAGS,
           '--model',
           args.model,

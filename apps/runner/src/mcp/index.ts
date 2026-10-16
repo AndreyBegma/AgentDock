@@ -1,5 +1,6 @@
 import { LOCAL_REQUEST_TIMEOUT_MS } from '@agentdock/shared/protocol';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { FinishGuard, parseFinishGuardArgs } from '../cards/finish-guard';
 import { localRequest } from '../local/client';
 import type { LocalCommandDeps } from '../local/subcommand';
 import { LOCAL_RETRY_METHODS, LOCAL_RETRY_WINDOW_MS } from '../local/types';
@@ -17,10 +18,15 @@ const RETRY_CALL_MS =
  * (`daemon_unavailable`), never a crash: Claude keeps its other tools.
  */
 export const runMcp = async (
-  _args: readonly string[],
+  args: readonly string[],
   deps: LocalCommandDeps,
 ): Promise<number> => {
   const cwd = deps.env.CLAUDE_PROJECT_DIR || deps.cwd;
+  // #445 D8: a card round with Token saver on guards `finish_card`.
+  const guard = parseFinishGuardArgs(args);
+  const finishGuard = guard
+    ? new FinishGuard({ ...guard, worktree: cwd })
+    : undefined;
   const request: McpRequest = (method, args) =>
     // The daemon and the server check `args` against the method's schema.
     localRequest(
@@ -30,7 +36,7 @@ export const runMcp = async (
       { via: 'mcp', cwd, ppid: deps.ppid },
       LOCAL_RETRY_METHODS.has(method) ? { callTimeoutMs: RETRY_CALL_MS } : {},
     );
-  const server = buildMcpServer(request);
+  const server = buildMcpServer(request, { finishGuard });
   const closed = new Promise<void>((resolve) => {
     server.server.onclose = resolve;
   });

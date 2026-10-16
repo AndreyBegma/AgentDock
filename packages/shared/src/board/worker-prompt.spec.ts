@@ -60,7 +60,7 @@ const card: CardWorkerPromptInput = {
 
 const sectionOf = (prompt: string): string => {
   const start = prompt.indexOf('## Design');
-  return prompt.slice(start, prompt.indexOf('## How to work', start));
+  return prompt.slice(start, prompt.indexOf('\n## ', start + 1));
 };
 
 describe('worker prompt — ## Design (#243 D7)', () => {
@@ -177,6 +177,83 @@ describe('worker prompt — ## Design (#243 D7)', () => {
   });
 });
 
+describe('worker prompt v9 — Token saver (#445 D7, D9, D10, D14)', () => {
+  const plain: CardWorkerPromptInput = { ...card, design: null };
+  const other: CardWorkerPromptInput = {
+    ...plain,
+    number: 99,
+    title: 'Fix the export',
+    body: 'The CSV export drops the last row.',
+    kind: 'bug',
+    branch: 'card/c99-fix-the-export',
+    issueNumber: 7,
+  };
+
+  it('carries the working and the audience register', () => {
+    const prompt = cardWorkerPrompt(plain);
+    expect(prompt).toContain('## How to write');
+    expect(prompt).toContain('- Working register —');
+    expect(prompt).toContain('do not restate the plan');
+    expect(prompt).toContain('- Audience register —');
+    expect(prompt).toContain('every required section, and leave nothing out');
+  });
+
+  it('asks for offset/limit on big files and Grep/Glob first', () => {
+    const prompt = cardWorkerPrompt(plain);
+    expect(prompt).toContain('## Reading the codebase');
+    expect(prompt).toContain('`offset` and `limit`');
+  });
+
+  it('names the scout and the bypass only when Token saver is on', () => {
+    const off = cardWorkerPrompt(plain);
+    expect(off).not.toContain('scout');
+    expect(off).not.toContain('AGENTDOCK_RAW=1');
+    const on = cardWorkerPrompt({ ...plain, tokenSaver: true });
+    expect(on).toContain('use the `scout` subagent');
+    expect(on).toContain('`AGENTDOCK_RAW=1 <command>`');
+  });
+
+  it('puts every stable section before the card’s own', () => {
+    const prompt = cardWorkerPrompt(card);
+    const theCard = prompt.indexOf('## Card C-12');
+    for (const stable of [
+      '## How to work',
+      '## How to write',
+      '## Reading the codebase',
+      '## When you are done',
+    ]) {
+      expect(prompt.indexOf(stable)).toBeGreaterThan(-1);
+      expect(prompt.indexOf(stable)).toBeLessThan(theCard);
+    }
+    for (const variable of [
+      '## The card',
+      '## Design',
+      '## Pull request description',
+    ]) {
+      expect(prompt.indexOf(variable)).toBeGreaterThan(theCard);
+    }
+  });
+
+  it('is the same up to the card for two different cards — the cache prefix', () => {
+    for (const tokenSaver of [false, true]) {
+      const a = cardWorkerPrompt({ ...plain, tokenSaver });
+      const b = cardWorkerPrompt({ ...other, tokenSaver });
+      const prefix = a.slice(0, a.indexOf('## Card C-12'));
+      expect(prefix.length).toBeGreaterThan(1000);
+      expect(b.startsWith(prefix)).toBe(true);
+      expect(prefix).not.toContain('Add login');
+    }
+  });
+
+  it('asks for a summary of at least two sentences, as the guard checks', () => {
+    expect(cardWorkerPrompt(plain)).toContain('in at least two full sentences');
+  });
+
+  it('keeps the `GitHub issue: #n` line the runner reads', () => {
+    expect(cardWorkerPrompt(other)).toContain('\nGitHub issue: #7\n');
+  });
+});
+
 describe('worker prompt v5 — the pull request description (#359 D3)', () => {
   const plain: CardWorkerPromptInput = { ...card, design: null };
   const blob = 'https://github.com/<owner>/<repo>/blob/card/c12-add-login/';
@@ -185,8 +262,15 @@ describe('worker prompt v5 — the pull request description (#359 D3)', () => {
     const prompt = cardWorkerPrompt(plain);
     expect(CARD_PR_DESCRIPTION_FILE).toBe('.agentdock/pull-request.md');
     const at = prompt.indexOf(`\`${CARD_PR_DESCRIPTION_FILE}\``);
-    expect(at).toBeGreaterThan(prompt.indexOf('## When you are done'));
-    expect(at).toBeLessThan(prompt.indexOf('Then call the `finish_card` tool'));
+    // #445 D10: the card-specific list is the last section; the stable
+    // "When you are done" points at it.
+    expect(at).toBeGreaterThan(prompt.indexOf('## Pull request description'));
+    expect(prompt.indexOf('## Pull request description')).toBeGreaterThan(
+      prompt.indexOf('## The card'),
+    );
+    expect(prompt).toContain(
+      'Write the pull request description the last section of this prompt asks for. Then call the `finish_card` tool',
+    );
     expect(prompt).toContain('git-excluded — do not commit it');
     expect(prompt).toContain('`## What changed and why`');
     expect(prompt).toContain('`## Acceptance criteria`');
@@ -220,8 +304,8 @@ describe('next round prompt — card edits reach the worker (#273 D1–D4)', () 
     kind: 'feature',
   };
 
-  it('is version 8', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(8);
+  it('is version 9', () => {
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(9);
   });
 
   it('cardChange is null for identical text, whitespace around it aside', () => {
@@ -398,7 +482,7 @@ describe('worker prompt v4 — attachments (#309 D10)', () => {
       prompt.indexOf('## Attachments'),
     );
     expect(prompt.indexOf('## Attachments')).toBeLessThan(
-      prompt.indexOf('## How to work'),
+      prompt.indexOf('## Pull request description'),
     );
   });
 

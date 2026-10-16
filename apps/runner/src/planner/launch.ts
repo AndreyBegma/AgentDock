@@ -1,6 +1,7 @@
 import { basename, dirname, join } from 'node:path';
 import type { PlanTurnArgs, PlanTurnSession } from '@agentdock/shared/protocol';
 import type { ConfigProfile } from '../config';
+import { type TokenSaverLaunch, tokenSaverLaunch } from '../launch/token-saver';
 import { runEnv } from '../skills/run/launch';
 import type { LaunchSpec } from '../skills/run/record';
 
@@ -44,10 +45,13 @@ export const sessionFlags = (session: PlanTurnSession): string[] => {
 export const planTurnArgv = (
   profile: ConfigProfile,
   args: Pick<PlanTurnArgs, 'session' | 'model'>,
+  tokenSaver?: TokenSaverLaunch | null,
 ): { binary: string; args: string[] } => ({
   binary: profile.binary ?? profile.runtime,
   args: [
     ...profile.args,
+    // #445: before a flag, so `--mcp-config <configs...>` takes only its file.
+    ...(tokenSaver?.args ?? []),
     '-p',
     ...sessionFlags(args.session),
     '--model',
@@ -66,9 +70,30 @@ export const planTurnLaunchSpec = (
   worktree: string,
   promptFile: string,
   otlpPort: number | null,
+  tokenSaver?: TokenSaverLaunch | null,
 ): LaunchSpec => ({
-  ...planTurnArgv(profile, args),
-  env: runEnv(profile, args, otlpPort),
+  ...planTurnArgv(profile, args, tokenSaver),
+  env: { ...runEnv(profile, args, otlpPort), ...(tokenSaver?.env ?? {}) },
   cwd: worktree,
   stdin: promptFile,
 });
+
+/** #445: a plan turn's Token saver — `agentdock` and the scout; `null` when off. */
+export const planTurnTokenSaver = (
+  profile: ConfigProfile,
+  args: Pick<PlanTurnArgs, 'tokenSaver' | 'runId'>,
+  home: string,
+  turnDir: string,
+  selfCommand: readonly string[],
+): TokenSaverLaunch | null =>
+  tokenSaverLaunch({
+    config: args.tokenSaver,
+    profile,
+    home,
+    dir: turnDir,
+    selfCommand,
+    runKind: 'plan',
+    runId: args.runId,
+    agentdock: [],
+    scout: true,
+  });
