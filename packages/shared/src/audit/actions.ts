@@ -140,6 +140,11 @@ export const AUDIT_ACTIONS = [
    * #443: nor did Auto-run when ready (`after: { code, after }`).
    */
   'card.auto_run_failed',
+  /**
+   * #484: a card PR's head got no checks, and its pull-request event was sent
+   * again — closed and reopened (`after: { number, pr, headSha, error? }`).
+   */
+  'card.ci_retriggered',
   /** #443: the card's Auto-run when ready switch (`after: { autoRunWhenReady }`). */
   'card.auto_run_toggled',
   /** #309 D7: an upload stored, pending (`after: { name, mime, size }`). */

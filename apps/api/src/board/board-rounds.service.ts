@@ -652,6 +652,8 @@ export class BoardRoundsService {
                 ciHeadSha: null,
                 ciCheckedAt: null,
                 ciFixAttempts: 0,
+                ciNoneSince: null,
+                ciRetriggeredSha: null,
               }
             : {}),
         },

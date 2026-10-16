@@ -45,6 +45,8 @@ export const CARD_TIMEOUTS_MS = {
   prClose: 60_000,
   /** #359 D5: `gh pr view` and `gh pr checks`. */
   checks: 30_000,
+  /** #484: `gh pr view`, `gh pr close`, then `gh pr reopen`. */
+  ciRetrigger: 45_000,
 } as const;
 
 /** `card.run` prompt: one argv element read from `launch.json`, never a shell string (D5). */
@@ -613,3 +615,66 @@ export const cardChecksCommands = {
 } as const satisfies Record<string, CommandDefinition>;
 
 export type CardChecksCommandName = keyof typeof cardChecksCommands;
+
+// card.ciRetrigger
+
+/**
+ * #484 (ADR-0043, ADR-0010, advertised per ADR-0023): asks the forge to send
+ * a card PR's pull-request event again, so a CI whose webhook delivery was
+ * lost creates its pipeline — `gh pr view <pr> --json state,headRefOid`, then
+ * `gh pr close <pr>` and `gh pr reopen <pr>`, argument arrays only, in the
+ * project root. A reopened PR is an event every CI that runs on pull
+ * requests listens to, and it adds no commit.
+ *
+ * Only an open (or draft) PR whose head is still `headSha` is closed: a
+ * merged or closed PR, or one that moved on, is refused and left alone.
+ */
+export const cardCiRetriggerArgsSchema = z.strictObject({
+  ...cardTarget,
+  root: absolutePathSchema,
+  pr: z.number().int().positive(),
+  /** The head the API saw without checks. */
+  headSha: headShaSchema,
+});
+export type CardCiRetriggerArgs = z.infer<typeof cardCiRetriggerArgsSchema>;
+
+/**
+ * Why nothing was retriggered: `not_open` — merged or closed; `head_moved` —
+ * a newer head, which has its own event; `gh_failed` — `gh` could not view
+ * or close it; `reopen_failed` — the PR was closed and stays closed.
+ */
+export const cardCiRetriggerFailReasonSchema = z.enum([
+  'not_open',
+  'head_moved',
+  'gh_failed',
+  'reopen_failed',
+]);
+export type CardCiRetriggerFailReason = z.infer<
+  typeof cardCiRetriggerFailReasonSchema
+>;
+
+/** A refusal is a result, not a command error. */
+export const cardCiRetriggerResultSchema = z.discriminatedUnion('retriggered', [
+  z.object({ retriggered: z.literal(true) }),
+  z.object({
+    retriggered: z.literal(false),
+    error: cardCiRetriggerFailReasonSchema,
+    message: stepErrorSchema,
+  }),
+]);
+export type CardCiRetriggerResult = z.infer<typeof cardCiRetriggerResultSchema>;
+
+/**
+ * #484: `card.ciRetrigger`, an operator command, in the `commands` allowlist
+ * beside `card.checks`.
+ */
+export const cardCiRetriggerCommands = {
+  'card.ciRetrigger': {
+    args: cardCiRetriggerArgsSchema,
+    result: cardCiRetriggerResultSchema,
+    minRole: 'operator',
+    timeoutMs: CARD_TIMEOUTS_MS.ciRetrigger,
+  },
+} as const satisfies Record<string, CommandDefinition>;
+
+export type CardCiRetriggerCommandName = keyof typeof cardCiRetriggerCommands;

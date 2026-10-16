@@ -5,6 +5,7 @@ import { assessCommands } from './commands/assess';
 import { captureCommands } from './commands/capture';
 import {
   cardChecksCommands,
+  cardCiRetriggerCommands,
   cardCommands,
   cardPrCloseCommands,
 } from './commands/cards';
@@ -155,6 +156,7 @@ export const commands = {
   ...cardCommands,
   ...cardPrCloseCommands,
   ...cardChecksCommands,
+  ...cardCiRetriggerCommands,
   ...captureCommands,
   ...textCommands,
   ...assessCommands,

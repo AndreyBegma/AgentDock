@@ -28,6 +28,13 @@ export function ciDot(card: Pick<BoardCardView, 'ciState'>): CiDot | null {
 /** #359 D6: the text of the budget stop, also the sheet banner's headline. */
 export const CI_STILL_FAILING_TEXT = `CI still failing after ${CARD_CI_FIX_ATTEMPTS_MAX} fixes`;
 
+/** #484: the budget stop's text when CI never reported on the head. */
+export const CI_NOT_REPORTED_TEXT = 'CI reported no checks';
+
+/** Why automation stopped: no checks at all (#484), or red ones (#359 D6). */
+const needsPersonText = (card: Pick<BoardCardView, 'ciState'>): string =>
+  card.ciState === 'none' ? CI_NOT_REPORTED_TEXT : CI_STILL_FAILING_TEXT;
+
 /** #359 D7/D8: a sub-state badge on the card face. */
 export interface ShippingBadge {
   tone: 'ok' | 'warn' | 'danger' | 'neutral';
@@ -47,7 +54,7 @@ export function shippingBadge(
     'column' | 'ciState' | 'ciFixAttempts' | 'needsPerson' | 'mergedAt'
   >,
 ): ShippingBadge | null {
-  if (card.needsPerson) return { tone: 'danger', label: CI_STILL_FAILING_TEXT };
+  if (card.needsPerson) return { tone: 'danger', label: needsPersonText(card) };
   if (card.mergedAt !== null) return { tone: 'ok', label: 'Merged' };
   if (card.column !== 'in_progress') return null;
   if (card.ciState === 'red' && card.ciFixAttempts > 0) {
@@ -63,13 +70,16 @@ export function shippingBadge(
   return null;
 }
 
-/** The sheet's banner when automation stopped on a red CI (#359 D6); `null` otherwise. */
+/**
+ * The sheet's banner when automation stopped on a red CI (#359 D6) or on a
+ * head CI never reported on, even after a retrigger (#484); `null` otherwise.
+ */
 export function ciBanner(
-  card: Pick<BoardCardView, 'needsPerson' | 'ciChecks'>,
+  card: Pick<BoardCardView, 'needsPerson' | 'ciChecks' | 'ciState'>,
 ): { title: string; checks: CardCiCheck[]; hint: string } | null {
   if (!card.needsPerson) return null;
   return {
-    title: CI_STILL_FAILING_TEXT,
+    title: needsPersonText(card),
     checks: card.ciChecks,
     hint: 'Nothing runs on its own now. Send feedback, Run again, or Accept.',
   };

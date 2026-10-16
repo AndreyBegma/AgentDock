@@ -45,6 +45,11 @@ describe('shippingBadge (#359 D6–D8)', () => {
     });
     expect(shippingBadge(c)?.label).toBe('CI still failing after 3 fixes');
   });
+  test('needsPerson on a head CI never reported on says so (#484)', () => {
+    const c = card(1, 'finished', { needsPerson: true, ciState: 'none' });
+    expect(shippingBadge(c)?.label).toBe('CI reported no checks');
+    expect(ciBanner(c)?.title).toBe('CI reported no checks');
+  });
   test('a plain card has no badge', () => {
     expect(shippingBadge(card(1, 'in_progress'))).toBeNull();
   });
