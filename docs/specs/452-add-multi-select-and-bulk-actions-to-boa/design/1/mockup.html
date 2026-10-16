@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-scale="desk" data-palette="navy">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Board — bulk selection (C-87)</title>
+<style>
+:root{
+  --font-sans:'SF Pro Text','SF Pro Display',Inter,system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  --radius-control:6px;--radius-surface:8px;--radius-sheet:12px;
+  --size-row:32px;--size-control:28px;--size-field:28px;--size-nav:28px;--size-tap:44px;
+  --dur-fast:100ms;--dur-base:150ms;--dur-sheet:260ms;
+  --ease-sheet:cubic-bezier(.32,.72,0,1);
+  --blur-scrim:2px;--glass-blur:26px;--glass-blur-strong:40px;
+}
+:root,:root[data-theme="dark"]{
+  color-scheme:dark;
+  --color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-canvas:#0a1022;--color-paper:#1b2647;
+  --color-content:rgb(27 38 71/.96);
+  --color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246/.62);--color-ink-3:rgb(242 242 246/.53);
+  --color-line:rgb(255 255 255/.1);--color-line-strong:rgb(255 255 255/.18);--color-hover:rgb(255 255 255/.06);
+  --color-focus:#b4b2ff;--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-soft:rgb(91 91 246/.2);--color-accent-ink:#b4b2ff;
+  --color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;--color-info:#5fb4f0;--color-info-soft:rgb(95 180 240/.16);
+  --color-scrim:rgb(10 16 34/.3);
+  --color-hue-1:#5b9cf6;--color-hue-1-soft:rgb(91 156 246/.18);--color-hue-1-line:rgb(91 156 246/.5);--color-hue-1-ink:#a4c8ff;--color-hue-1-glow:rgb(91 156 246/.45);
+  --color-hue-2:#2fbf94;--color-hue-2-soft:rgb(47 191 148/.18);--color-hue-2-line:rgb(47 191 148/.5);--color-hue-2-ink:#7ee0c0;--color-hue-2-glow:rgb(47 191 148/.45);
+  --color-hue-3:#7cc95a;--color-hue-3-soft:rgb(124 201 90/.18);--color-hue-3-line:rgb(124 201 90/.5);--color-hue-3-ink:#ade58f;--color-hue-3-glow:rgb(124 201 90/.45);
+  --color-hue-4:#e69f00;--color-hue-4-soft:rgb(230 159 0/.18);--color-hue-4-line:rgb(230 159 0/.5);--color-hue-4-ink:#f5c25c;--color-hue-4-glow:rgb(230 159 0/.45);
+  --color-hue-5:#e8743b;--color-hue-5-soft:rgb(232 116 59/.18);--color-hue-5-line:rgb(232 116 59/.5);--color-hue-5-ink:#f9a77c;--color-hue-5-glow:rgb(232 116 59/.45);
+  --color-hue-6:#f0606e;--color-hue-6-soft:rgb(240 96 110/.18);--color-hue-6-line:rgb(240 96 110/.5);--color-hue-6-ink:#ff9da5;--color-hue-6-glow:rgb(240 96 110/.45);
+  --color-hue-7:#a68bfa;--color-hue-7-soft:rgb(166 139 250/.18);--color-hue-7-line:rgb(166 139 250/.5);--color-hue-7-ink:#cbbcff;--color-hue-7-glow:rgb(166 139 250/.45);
+  --color-hue-8:#cc79a7;--color-hue-8-soft:rgb(204 121 167/.18);--color-hue-8-line:rgb(204 121 167/.5);--color-hue-8-ink:#efabd1;--color-hue-8-glow:rgb(204 121 167/.45);
+  --canvas-glow:18%;
+  --glass-sheen:rgb(255 255 255/.06);--glass-scrim:rgb(9 9 12/.55);--glass-scrim-strong:rgb(9 9 12/.64);
+  --glass-brightness:.85;--glass-brightness-strong:.7;
+  --glass-edge:rgb(255 255 255/.14);--glass-spec:rgb(255 255 255/.2);
+  --glass-rim:rgb(242 242 246/.8);--glass-rim-shade:rgb(9 9 12/.5);--glass-meniscus:rgb(9 9 12/.55);--glass-refract:rgb(242 242 246/.35);
+  --glass-shadow:rgb(0 0 0/.35);--glass-shadow-strong:rgb(0 0 0/.45);--glass-shadow-clear:rgb(0 0 0/.15);
+}
+:root[data-theme="light"]{
+  color-scheme:light;
+  --color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-canvas:#e9eef8;--color-paper:#fff;
+  --color-content:rgb(255 255 255/.96);
+  --color-ink:#18181b;--color-ink-2:rgb(24 24 27/.72);--color-ink-3:rgb(24 24 27/.64);
+  --color-line:rgb(0 0 0/.1);--color-line-strong:rgb(0 0 0/.23);--color-hover:rgb(0 0 0/.06);
+  --color-focus:#4f46e5;--color-accent:#4f46e5;--color-on-accent:#fff;--color-accent-soft:rgb(79 70 229/.12);--color-accent-ink:#4338ca;
+  --color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;--color-info:#03629a;--color-info-soft:rgb(3 98 154/.12);
+  --color-scrim:rgb(10 16 34/.22);
+  --color-hue-1:#1f64d6;--color-hue-1-soft:rgb(31 100 214/.12);--color-hue-1-line:rgb(31 100 214/.45);--color-hue-1-ink:#1550b0;--color-hue-1-glow:rgb(31 100 214/.28);
+  --color-hue-2:#00805e;--color-hue-2-soft:rgb(0 128 94/.12);--color-hue-2-line:rgb(0 128 94/.45);--color-hue-2-ink:#006a4e;--color-hue-2-glow:rgb(0 128 94/.28);
+  --color-hue-3:#3a7d1c;--color-hue-3-soft:rgb(58 125 28/.12);--color-hue-3-line:rgb(58 125 28/.45);--color-hue-3-ink:#2f6617;--color-hue-3-glow:rgb(58 125 28/.28);
+  --color-hue-4:#b36b00;--color-hue-4-soft:rgb(179 107 0/.12);--color-hue-4-line:rgb(179 107 0/.45);--color-hue-4-ink:#8a5200;--color-hue-4-glow:rgb(179 107 0/.28);
+  --color-hue-5:#c24e00;--color-hue-5-soft:rgb(194 78 0/.12);--color-hue-5-line:rgb(194 78 0/.45);--color-hue-5-ink:#9c3d00;--color-hue-5-glow:rgb(194 78 0/.28);
+  --color-hue-6:#d02a3e;--color-hue-6-soft:rgb(208 42 62/.12);--color-hue-6-line:rgb(208 42 62/.45);--color-hue-6-ink:#ad1f31;--color-hue-6-glow:rgb(208 42 62/.28);
+  --color-hue-7:#7244e0;--color-hue-7-soft:rgb(114 68 224/.12);--color-hue-7-line:rgb(114 68 224/.45);--color-hue-7-ink:#5b30c4;--color-hue-7-glow:rgb(114 68 224/.28);
+  --color-hue-8:#b0457f;--color-hue-8-soft:rgb(176 69 127/.12);--color-hue-8-line:rgb(176 69 127/.45);--color-hue-8-ink:#933668;--color-hue-8-glow:rgb(176 69 127/.28);
+  --canvas-glow:10%;
+  --glass-sheen:rgb(0 0 0/.06);--glass-scrim:rgb(255 255 255/.52);--glass-scrim-strong:rgb(255 255 255/.64);
+  --glass-brightness:1.15;--glass-brightness-strong:1.3;
+  --glass-edge:rgb(0 0 0/.18);--glass-spec:rgb(0 0 0/.2);
+  --glass-rim:rgb(255 255 255/.9);--glass-rim-shade:rgb(24 24 27/.18);--glass-meniscus:rgb(24 24 27/.12);--glass-refract:rgb(255 255 255/.5);
+  --glass-shadow:rgb(0 0 0/.12);--glass-shadow-strong:rgb(0 0 0/.16);--glass-shadow-clear:rgb(0 0 0/.08);
+}
+:root{
+  --color-status-running:var(--color-hue-2);--color-status-running-soft:var(--color-hue-2-soft);--color-status-running-ink:var(--color-hue-2-ink);
+  --color-status-waiting:var(--color-hue-1);--color-status-waiting-soft:var(--color-hue-1-soft);--color-status-waiting-ink:var(--color-hue-1-ink);
+  --color-status-paused:var(--color-hue-4);--color-status-paused-soft:var(--color-hue-4-soft);--color-status-paused-ink:var(--color-hue-4-ink);
+  --color-status-blocked:var(--color-hue-5);--color-status-blocked-soft:var(--color-hue-5-soft);--color-status-blocked-ink:var(--color-hue-5-ink);
+  --color-status-done:var(--color-hue-3);--color-status-done-soft:var(--color-hue-3-soft);--color-status-done-ink:var(--color-hue-3-ink);
+  --color-status-error:var(--color-hue-6);--color-status-error-soft:var(--color-hue-6-soft);--color-status-error-ink:var(--color-hue-6-ink);
+  --glass-filter:blur(var(--glass-blur)) saturate(180%) brightness(var(--glass-brightness));
+  --glass-filter-strong:blur(var(--glass-blur-strong)) saturate(180%) brightness(var(--glass-brightness-strong));
+}
+*,*::before,*::after{box-sizing:border-box}
+html{font-size:16px;background:var(--color-ground);color:var(--color-ink);scrollbar-gutter:stable}
+body{margin:0;min-height:100vh;font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+h1,h2,h3,h4,p{margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}
+input:focus-visible,select:focus-visible{outline:none}
+.num{font-variant-numeric:tabular-nums}
+.mono{font-family:var(--font-mono)}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.text-sm{font-size:13px;line-height:20px}.text-xs{font-size:12px;line-height:16px}.text-label{font-size:12px;line-height:16px;font-weight:500}
+.ink{color:var(--color-ink)}.ink-2{color:var(--color-ink-2)}.ink-3{color:var(--color-ink-3)}
+.tone-ok{color:var(--color-ok)}.tone-warn{color:var(--color-warn)}.tone-danger{color:var(--color-danger)}
+.icon{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.icon.xs{width:12px;height:12px}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:
+  radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),
+  radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%),
+  radial-gradient(70vmax 50vmax at 45% 110%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%)}
+.glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);backdrop-filter:var(--glass-filter);-webkit-backdrop-filter:var(--glass-filter);border:1px solid var(--glass-edge);
+  box-shadow:inset 0 1px 0 var(--glass-spec),inset 1px 1px 0 var(--glass-rim),inset -1px -1px 0 var(--glass-rim-shade),inset 0 -3px 3px -1px var(--glass-meniscus),inset 0 0 18px -4px var(--glass-refract),0 12px 32px var(--glass-shadow)}
+.glass-strong{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim-strong);backdrop-filter:var(--glass-filter-strong);-webkit-backdrop-filter:var(--glass-filter-strong);border:1px solid var(--glass-edge);
+  box-shadow:inset 0 1px 0 var(--glass-spec),inset -1px -1px 0 var(--glass-rim-shade),inset 0 -3px 3px -1px var(--glass-meniscus),inset 0 0 18px -4px var(--glass-refract),0 20px 48px var(--glass-shadow-strong)}
+.surface-content{background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.app-shell{display:flex;gap:12px;padding:12px;min-height:100vh}
+.app-rail-wrap{position:sticky;top:12px;height:calc(100vh - 24px);flex:none}
+.app-column{display:flex;flex-direction:column;gap:12px;flex:1;min-width:0}
+.topbar{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;border-radius:var(--radius-surface);flex:none}
+.main{margin:0 auto;width:100%;max-width:80rem;padding-bottom:96px;display:flex;flex-direction:column;gap:16px;min-width:0}
+.breadcrumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--color-ink-3)}
+.breadcrumb a{color:var(--color-ink-2);text-decoration:none}
+.breadcrumb [aria-current]{color:var(--color-ink);font-weight:500}
+.nav-rail{display:flex;flex-direction:column;gap:8px;padding:8px;width:240px;height:100%;border-radius:var(--radius-surface)}
+.nav-rail-head{display:flex;align-items:center;gap:8px;padding:6px 8px 8px;font-weight:600}
+.nav-group{display:flex;flex-direction:column;gap:2px}
+.nav-group-label{padding:8px 8px 4px;font-size:12px;line-height:16px;font-weight:500;color:var(--color-ink-3)}
+.nav-item{display:flex;align-items:center;gap:10px;height:var(--size-nav);padding:0 8px;border-radius:var(--radius-control);font-size:13px;font-weight:500;color:var(--color-ink-2);text-decoration:none}
+.nav-item:hover{background:var(--color-hover);color:var(--color-ink)}
+.nav-item[aria-current="page"]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.nav-item .badge{margin-left:auto}
+.btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font-weight:600;user-select:none;cursor:pointer;border:1px solid transparent;
+  height:var(--size-control);padding:0 16px;font-size:14px;border-radius:var(--radius-control);transition:background-color var(--dur-fast),border-color var(--dur-fast),color var(--dur-fast),transform var(--dur-fast) var(--ease-sheet)}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.4;pointer-events:none}
+.btn-solid{background:var(--color-accent);color:var(--color-on-accent)}
+.btn-solid:hover{background:color-mix(in oklab,var(--color-accent) 88%,var(--color-on-accent))}
+.btn-glass{background:var(--color-raised);color:var(--color-ink);border-color:var(--color-line-strong)}
+.btn-glass:hover{background:linear-gradient(var(--color-hover),var(--color-hover)),var(--color-raised)}
+.btn-ghost{background:transparent;color:var(--color-ink-2)}
+.btn-ghost:hover{background:var(--color-hover);color:var(--color-ink)}
+.btn-danger{background:color-mix(in oklab,var(--color-danger) 12%,transparent);color:var(--color-danger);border-color:color-mix(in oklab,var(--color-danger) 30%,transparent)}
+.btn-danger:hover{background:color-mix(in oklab,var(--color-danger) 20%,transparent)}
+.btn-sm{height:28px;padding:0 10px;font-size:12px;gap:6px}
+.btn-icon{padding:0;aspect-ratio:1}
+.input,.select{height:var(--size-field);padding:0 12px;width:100%;background:var(--color-surface);color:var(--color-ink);border:1px solid var(--color-line-strong);border-radius:var(--radius-control);font-size:13px}
+.input::placeholder{color:var(--color-ink-3)}
+.input:focus,.select:focus{outline:none;border-color:color-mix(in oklab,var(--color-ink) 70%,transparent);box-shadow:0 0 0 2px color-mix(in oklab,var(--color-ink) 22%,transparent)}
+.select{appearance:none;padding-right:32px;cursor:pointer;background-image:linear-gradient(45deg,transparent 50%,var(--color-ink-3) 50%),linear-gradient(135deg,var(--color-ink-3) 50%,transparent 50%);
+  background-position:calc(100% - 15px) 50%,calc(100% - 10px) 50%;background-size:5px 5px;background-repeat:no-repeat}
+.search{position:relative;display:flex;align-items:center}
+.search .icon{position:absolute;left:10px;color:var(--color-ink-3);pointer-events:none}
+.search .input{padding-left:32px}
+.checkbox{appearance:none;width:16px;height:16px;margin:0;border-radius:4px;border:1px solid var(--color-line-strong);background:var(--color-surface);display:inline-grid;place-content:center;cursor:pointer;flex:none}
+.checkbox:checked,.checkbox:indeterminate{background:var(--color-accent);border-color:var(--color-accent)}
+.checkbox:checked::after{content:'';width:8px;height:4px;border:2px solid var(--color-on-accent);border-top:0;border-right:0;transform:translateY(-1px) rotate(-45deg)}
+.checkbox:indeterminate::after{content:'';width:8px;height:2px;background:var(--color-on-accent);border-radius:1px}
+.checkbox:focus-visible{outline:2px solid var(--color-focus);outline-offset:2px}
+.badge{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;font-weight:600;line-height:1;font-variant-numeric:tabular-nums;border-radius:999px;height:18px;min-width:18px;padding:0 4px;font-size:10px;background:var(--color-hover);color:var(--color-ink-2)}
+.badge-md{height:20px;min-width:20px;padding:0 6px;font-size:12px}
+.badge-ok{background:color-mix(in oklab,var(--color-ok) 14%,transparent);color:var(--color-ok)}
+.badge-warn{background:color-mix(in oklab,var(--color-warn) 14%,transparent);color:var(--color-warn)}
+.badge-danger{background:color-mix(in oklab,var(--color-danger) 14%,transparent);color:var(--color-danger)}
+.badge-accent{background:var(--color-accent);color:var(--color-on-accent)}
+.badge-solid.badge-warn{background:var(--color-warn);color:var(--color-ground)}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:2px;flex:none}
+.swatch[data-hue="7"]{background:var(--color-hue-7)}
+.status-pill{display:inline-flex;flex:none;align-items:center;white-space:nowrap;border-radius:999px;font-weight:500;line-height:1;height:20px;gap:6px;padding:0 8px;font-size:11px;background:var(--color-hover);color:var(--color-ink-2)}
+.status-dot{position:relative;display:inline-flex;width:6px;height:6px;flex:none}
+.status-dot::before{content:'';position:absolute;inset:0;border-radius:999px;background:var(--color-ink-3)}
+.topbar .status-dot{width:8px;height:8px}
+[data-status="running"]{background:var(--color-status-running-soft);color:var(--color-status-running-ink)}
+[data-status="running"] .status-dot::before,.status-dot[data-status="running"]::before{background:var(--color-status-running)}
+[data-status="running"] .status-dot::after,.status-dot[data-status="running"]::after{content:'';position:absolute;inset:0;border-radius:999px;background:var(--color-status-running);opacity:.6;animation:ping 1s cubic-bezier(0,0,.2,1) infinite}
+[data-status="waiting"]{background:var(--color-status-waiting-soft);color:var(--color-status-waiting-ink)}
+[data-status="waiting"] .status-dot::before{background:var(--color-status-waiting)}
+[data-status="done"]{background:var(--color-status-done-soft);color:var(--color-status-done-ink)}
+[data-status="done"] .status-dot::before{background:var(--color-status-done)}
+.status-dot[data-status]{background:none}
+@keyframes ping{75%,100%{transform:scale(2);opacity:0}}
+.chip{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;font-weight:500;line-height:1;height:16px;padding:0 6px;font-size:11px;border-radius:4px;background:var(--color-hover);color:var(--color-ink-2)}
+.chip-danger{background:color-mix(in oklab,var(--color-danger) 14%,transparent);color:var(--color-danger)}
+.kbd{display:inline-flex;align-items:center;height:18px;padding:0 5px;border-radius:4px;border:1px solid var(--color-line-strong);font-family:var(--font-mono);font-size:11px;color:var(--color-ink-3);font-weight:500}
+.avatar{display:inline-grid;place-content:center;width:28px;height:28px;border-radius:999px;background:var(--color-accent-soft);color:var(--color-accent-ink);font-size:12px;font-weight:600;flex:none}
+.page-header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px}
+.page-header-text{display:flex;flex-direction:column;gap:4px;min-width:0}
+.page-header-eyebrow{font-size:12px;font-weight:500;color:var(--color-ink-3)}
+.page-header h1{font-size:28px;line-height:32px;letter-spacing:-.02em;font-weight:600}
+.page-header-desc{max-width:65ch;font-size:13px;color:var(--color-ink-2)}
+.meta-bar{display:flex;flex-wrap:wrap;gap:16px;font-size:12px;color:var(--color-ink-3)}
+.meta-bar b{color:var(--color-ink);font-weight:600;font-variant-numeric:tabular-nums}
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0}
+.toolbar .search{width:240px}.toolbar .select{width:150px}
+.toolbar-hint{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--color-ink-3)}
+
+/* Board */
+.board{display:flex;gap:12px;overflow-x:auto;align-items:flex-start;padding-bottom:4px}
+.board-col{flex:none;width:272px;display:flex;flex-direction:column;gap:8px;padding:8px 10px 10px;border-radius:var(--radius-surface);background:color-mix(in oklab,var(--color-surface) 82%,transparent);border:1px solid var(--color-line)}
+.board-col-head{display:flex;align-items:center;gap:8px;height:28px;padding:0 2px;font-size:13px;font-weight:600}
+.col-select{margin-left:auto;display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 6px;border-radius:var(--radius-control);font-size:12px;font-weight:500;color:var(--color-ink-3);cursor:pointer;user-select:none}
+.col-select:hover{background:var(--color-hover);color:var(--color-ink-2)}
+.col-select[data-active="true"]{color:var(--color-accent-ink)}
+.col-select[aria-disabled="true"]{opacity:.4;pointer-events:none}
+.col-list{display:flex;flex-direction:column;gap:8px;max-height:calc(100vh - 330px);min-height:80px;overflow-y:auto;padding:2px 0 2px 10px;margin-left:-10px;scrollbar-width:thin}
+.col-empty{padding:16px 8px;text-align:center;font-size:12px;color:var(--color-ink-3);border:1px dashed var(--color-line);border-radius:var(--radius-control)}
+.board-card{position:relative;display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-radius:var(--radius-control);cursor:grab;transition:border-color var(--dur-fast),background-color var(--dur-fast),box-shadow var(--dur-fast)}
+.board-card:hover{border-color:var(--color-line-strong)}
+.board[data-selecting="true"] .board-card[data-selectable="true"]{cursor:pointer}
+.board-card[aria-selected="true"]{border-color:var(--color-accent);background:linear-gradient(var(--color-accent-soft),var(--color-accent-soft)),var(--color-content);box-shadow:0 0 0 1px var(--color-accent),0 4px 16px -6px var(--color-accent)}
+.card-check{position:absolute;left:-9px;top:10px;display:grid;place-items:center;width:20px;height:20px;border-radius:6px;background:var(--color-surface);opacity:0;transform:scale(.85);transition:opacity var(--dur-fast),transform var(--dur-fast) var(--ease-sheet)}
+.board-card:hover .card-check,.board-card:focus-within .card-check,.board[data-selecting="true"] .card-check{opacity:1;transform:none}
+.card-head{display:flex;align-items:center;gap:6px;height:16px;font-size:12px;line-height:16px;color:var(--color-ink-2);white-space:nowrap;min-width:0}
+.card-head .cost{margin-left:auto;font-variant-numeric:tabular-nums}
+.card-title{font-size:13.5px;line-height:19px;font-weight:500;color:var(--color-ink);overflow-wrap:anywhere}
+.card-status{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px}
+.card-foot{display:flex;align-items:center;gap:10px;padding-top:6px;border-top:1px solid var(--color-line);font-size:12px;color:var(--color-ink-3)}
+.card-foot span{display:inline-flex;align-items:center;gap:4px}
+.board-card.plan{border-style:dashed;cursor:default;background:transparent}
+.board-card.suggestion{cursor:default}
+.lock{margin-left:auto;color:var(--color-ink-3)}
+
+/* Selection bar — proposed glass-ui component */
+.selbar{position:fixed;left:50%;bottom:20px;z-index:50;display:flex;align-items:center;gap:6px;padding:6px;border-radius:var(--radius-sheet);transform:translate(-50%,0);transition:opacity var(--dur-sheet) var(--ease-sheet),transform var(--dur-sheet) var(--ease-sheet);max-width:calc(100vw - 32px);overflow-x:auto}
+.selbar[data-open="false"]{opacity:0;transform:translate(-50%,24px);pointer-events:none}
+.selbar-count{display:flex;align-items:center;gap:8px;padding:0 8px 0 6px;font-size:13px;font-weight:600;white-space:nowrap}
+.selbar-sep{width:1px;align-self:stretch;margin:4px 4px;background:var(--color-line-strong)}
+.selbar .btn .applies{font-weight:500;color:var(--color-ink-3);font-variant-numeric:tabular-nums}
+.selbar .btn-danger .applies{color:color-mix(in oklab,var(--color-danger) 70%,var(--color-ink-3))}
+
+/* Overlays */
+.scrim{position:fixed;inset:0;background:var(--color-scrim);backdrop-filter:blur(var(--blur-scrim));-webkit-backdrop-filter:blur(var(--blur-scrim));display:grid;place-items:center;z-index:60}
+.scrim[hidden]{display:none}
+.dialog{width:min(460px,calc(100vw - 32px));border-radius:var(--radius-sheet);padding:20px;display:flex;flex-direction:column;gap:14px}
+.dialog-title{font-size:16px;line-height:24px;font-weight:600}
+.dialog-body{font-size:13px;color:var(--color-ink-2);display:flex;flex-direction:column;gap:10px}
+.dialog-body b{color:var(--color-ink);font-weight:600}
+.dialog-actions{display:flex;justify-content:space-between;gap:8px;margin-top:4px}
+.banner{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:var(--radius-surface);border:1px solid var(--color-line);background:var(--color-hover);font-size:13px;color:var(--color-ink)}
+.banner .icon{margin-top:2px}
+.banner-warn{border-color:color-mix(in oklab,var(--color-warn) 30%,transparent);background:color-mix(in oklab,var(--color-warn) 10%,transparent)}
+.banner-warn .icon{color:var(--color-warn)}
+.skip-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;font-size:12px}
+.skip-list li{display:flex;gap:8px}
+.skip-list .mono{color:var(--color-ink);min-width:44px}
+.toasts{position:fixed;right:20px;bottom:20px;z-index:70;display:flex;flex-direction:column;gap:8px}
+.toast{display:flex;align-items:flex-start;gap:12px;width:360px;padding:12px 14px;border-radius:var(--radius-surface);font-size:13px;animation:tin var(--dur-sheet) var(--ease-sheet)}
+.toast .t-title{font-weight:600}
+@keyframes tin{from{opacity:0;transform:translateY(12px)}}
+.tooltip{position:fixed;z-index:80;padding:4px 8px;border-radius:var(--radius-control);font-size:12px;line-height:16px;color:var(--color-ink);pointer-events:none;max-width:240px}
+.tooltip[hidden]{display:none}
+@media (max-width:1023px){.app-shell{padding:8px 16px}.app-rail-wrap{display:none}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<div class="canvas"></div>
+<div class="app-shell">
+  <aside class="app-rail-wrap">
+    <nav class="nav-rail glass" aria-label="Main">
+      <div class="nav-rail-head"><span class="swatch" data-hue="7" style="width:20px;height:20px;border-radius:6px"></span>AgentDock</div>
+      <div class="nav-group">
+        <div class="nav-group-label">Workspace</div>
+        <a class="nav-item" href="#"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>Overview</a>
+        <a class="nav-item" href="#"><svg class="icon" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01"/></svg>Fleet<span class="badge">5</span></a>
+        <a class="nav-item" href="#"><svg class="icon" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Approvals</a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-group-label">agentdock</div>
+        <a class="nav-item" href="#" aria-current="page"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18"/></svg>Board</a>
+        <a class="nav-item" href="#"><svg class="icon" viewBox="0 0 24 24"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>Activity</a>
+        <a class="nav-item" href="#"><svg class="icon" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>Queue</a>
+      </div>
+    </nav>
+  </aside>
+  <div class="app-column">
+    <header class="topbar glass">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="#">agentdock</a><span>/</span><span aria-current="page">Board</span></nav>
+      <span style="margin-left:auto" class="status-dot" data-status="running" title="Live"></span>
+      <button class="btn btn-ghost btn-icon" id="themeBtn" aria-label="Switch theme"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button>
+      <button class="btn btn-ghost btn-icon" aria-label="Notifications"><svg class="icon" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></button>
+      <span class="avatar">AB</span>
+    </header>
+    <main id="main-content" class="main">
+      <header class="page-header">
+        <div class="page-header-text">
+          <div class="page-header-eyebrow">agentdock</div>
+          <h1>Board</h1>
+          <p class="page-header-desc">Every card of the project, from a suggestion to a completed pull request.</p>
+          <div class="meta-bar" id="meta"></div>
+        </div>
+        <div class="page-header-actions"><button class="btn btn-solid"><svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New card</button></div>
+      </header>
+      <div class="toolbar">
+        <div class="search"><svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input class="input" id="q" type="search" placeholder="Filter cards" aria-label="Filter cards"></div>
+        <select class="select" id="kind" aria-label="Kind"><option value="">Any kind</option><option value="feature">Feature</option><option value="bug">Bug</option></select>
+        <div class="toolbar-hint"><span class="kbd">⌘</span>click to select · <span class="kbd">⇧</span>click for a range · <span class="kbd">⌘A</span> column · <span class="kbd">Esc</span> clears</div>
+      </div>
+      <div class="board" id="board" data-selecting="false"></div>
+    </main>
+  </div>
+</div>
+
+<!-- SelectionBar: proposed glass-ui component (ADR-0011) -->
+<div class="selbar glass-strong" id="selbar" role="toolbar" aria-label="Bulk actions" data-open="false">
+  <div class="selbar-count"><span class="badge badge-md badge-accent" id="selN">0</span><span>selected</span></div>
+  <button class="btn btn-ghost btn-sm" id="clearBtn">Clear <span class="kbd">Esc</span></button>
+  <span class="selbar-sep" aria-hidden="true"></span>
+  <button class="btn btn-glass btn-sm" data-action="complete"><svg class="icon" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Move to Completed <span class="applies"></span></button>
+  <button class="btn btn-glass btn-sm" data-action="todo"><svg class="icon" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>Back to To Do <span class="applies"></span></button>
+  <button class="btn btn-glass btn-sm" data-action="finished"><svg class="icon" viewBox="0 0 24 24"><path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.33 2q2 0 3.67-1.33a1 1 0 0 1 1 .8v9.53a1 1 0 0 1-.4.8A6 6 0 0 1 16 14c-3 0-5-2-8-2a6 6 0 0 0-4 1.53"/></svg>Mark Finished <span class="applies"></span></button>
+  <button class="btn btn-danger btn-sm" data-action="delete"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete <span class="applies"></span></button>
+</div>
+
+<div class="scrim" id="scrim" hidden>
+  <div class="dialog glass-strong" role="alertdialog" aria-modal="true" aria-labelledby="dlgT" aria-describedby="dlgB">
+    <div class="dialog-title" id="dlgT"></div>
+    <div class="dialog-body" id="dlgB"></div>
+    <div class="dialog-actions"><button class="btn btn-ghost" id="dlgCancel">Cancel</button><button class="btn" id="dlgOk"></button></div>
+  </div>
+</div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<div class="tooltip glass-strong" id="tip" hidden></div>
+
+<script>
+(function(){
+  var COLS=[{id:'inbox',name:'Inbox'},{id:'todo',name:'To Do'},{id:'in_progress',name:'In progress'},{id:'finished',name:'Finished'},{id:'completed',name:'Completed'}];
+  var finishedTitles=['Fleet todo card after issue leaves queue','Finish card retries when runner is offline','Teach auto-mode dialog in card session','Runner 0.11.2 release notes','Activity feed pagination','Queue: show dispatch reason','Budget alert threshold per project','Sheet keeps scroll on refetch','Telegram approval deep link','Plan panel empty state','Profile picker in launch popover','Hooks guide link on card face','Dependency chip truncation','Approvals count in rail','Card cost rounding','Terminal resize on sheet open','Board compact density toggle','Session list sort by activity'];
+  var cards=[], n=300;
+  function add(o){o.n=o.n||(++n);cards.push(o);return o}
+  add({n:120,col:'inbox',title:'Retry button on failed webhook deliveries',src:'suggestion',kind:'feature'});
+  add({n:121,col:'inbox',title:'Inline diff stats on PR chip',src:'suggestion',kind:'feature'});
+  add({n:101,col:'todo',title:'Export activity as CSV',src:'person',kind:'feature'});
+  add({n:102,col:'todo',title:'Runner reconnect backoff caps at 30 s',src:'person',kind:'bug'});
+  add({n:103,col:'todo',title:'Telegram digest for away mode',src:'person',kind:'feature',cost:'$0.12'});
+  add({n:0,col:'todo',title:'t2 · Selection state in the web Board',src:'plan',kind:'feature',plan:'C-87 plan'});
+  add({n:91,col:'in_progress',title:'Accept dialog: remember the cleanup choice',src:'person',kind:'feature',run:true,cost:'$2.14'});
+  add({n:95,col:'in_progress',title:'Board column scroll restore',src:'fleet',kind:'bug',run:true,slot:'slot-2',cost:'$1.08'});
+  add({n:97,col:'in_progress',title:'Sheet focus trap on nested dialogs',src:'person',kind:'bug',waiting:true,cost:'$0.66'});
+  finishedTitles.forEach(function(t,i){
+    var fleet=(i===10||i===14), open=(i===2||i===6||i===9||i===16);
+    add({n:240-i*3,col:'finished',title:t,src:fleet?'fleet':'person',kind:(i%5===1)?'bug':'feature',pr:open?'open':'merged',prN:438-i*2,issue:433-i*2,cost:'$'+(0.4+((i*37)%30)/10).toFixed(2),slot:fleet?'slot-'+(1+i%4):null});
+  });
+  add({n:88,col:'completed',title:'Card worker collects on Finished',src:'person',kind:'feature',pr:'merged',prN:401,issue:398,cost:'$3.40'});
+  add({n:84,col:'completed',title:'Inbox suggestions from terminal sessions',src:'person',kind:'feature',pr:'merged',prN:395,issue:390,cost:'$5.02'});
+  add({n:80,col:'completed',title:'Run dialog warns on dirty worktree',src:'person',kind:'bug',pr:'merged',prN:388,issue:381,cost:'$1.71'});
+  cards.forEach(function(c){c.label=c.src==='plan'?'t2':'C-'+c.n; if(c.src==='plan')c.n=-1});
+  cards.forEach(function(c,i){if(c.src==='suggestion')c.n=-100-i});
+
+  var sel=new Set(), anchor=null, hoverCol=null, q='', kind='';
+  // Initial state: ten Finished cards, one running card and one fleet card selected.
+  cards.filter(function(c){return c.col==='finished'}).slice(0,10).forEach(function(c){sel.add(c.n)});
+  sel.add(91); sel.add(cards.filter(function(c){return c.col==='finished'&&c.src==='fleet'})[0].n);
+
+  var byN=function(x){return cards.find(function(c){return c.n===x})};
+  var selectable=function(c){return c.src!=='plan'&&c.src!=='suggestion'};
+  var visible=function(c){return (!q||(c.title+' '+c.label).toLowerCase().indexOf(q)>=0)&&(!kind||c.kind===kind)};
+
+  // Client mirror of boardMoveRule for the counts (simplified for the mockup).
+  var TARGET={complete:'completed',todo:'todo',finished:'finished'};
+  function rule(c,a){
+    if(c.run) return 'card_running';
+    if(a==='delete') return null;
+    if(c.col===TARGET[a]) return 'already_there';
+    if(c.col==='completed') return 'card_completed';
+    if(a==='complete') return c.col==='finished'?null:'not_finished';
+    if(c.src==='fleet') return 'fleet_slot';
+    return null;
+  }
+  var REASON={card_running:'running',already_there:'already there',card_completed:'completed',not_finished:'not finished',fleet_slot:'its fleet slot owns the move'};
+
+  var I={
+    check:'<svg class="icon xs" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>',
+    pr:'<svg class="icon xs" viewBox="0 0 24 24"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>',
+    prOpen:'<svg class="icon xs" viewBox="0 0 24 24"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7M6 9v12"/></svg>',
+    issue:'<svg class="icon xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="1"/></svg>',
+    lock:'<svg class="icon xs" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+    more:'<svg class="icon xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>',
+    ok:'<svg class="icon tone-ok" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>',
+    warn:'<svg class="icon tone-warn" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/></svg>'
+  };
+  function esc(s){return String(s).replace(/[&<>"]/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]})}
+
+  function cardHtml(c){
+    var s=sel.has(c.n), able=selectable(c);
+    var status='';
+    if(c.run) status+='<span class="status-pill" data-status="running"><span class="status-dot"></span>Running</span>';
+    if(c.waiting) status+='<span class="status-pill" data-status="waiting"><span class="status-dot"></span>Waiting on you</span>';
+    if(c.slot) status+='<span class="chip">'+c.slot+'</span>';
+    if(c.pr==='merged') status+='<span class="badge badge-md badge-ok">Merged</span>';
+    if(c.pr==='open') status+='<span class="badge badge-md badge-warn">PR open</span>';
+    if(c.col==='completed') status+='<span class="status-pill" data-status="done"><span class="status-dot"></span>Done</span>';
+    if(c.src==='suggestion') status+='<span class="chip">Suggested</span><span class="text-xs ink-3">from a terminal session</span>';
+    if(c.src==='plan') status+='<span class="chip">Plan task</span><span class="text-xs ink-3">'+c.plan+'</span>';
+    var foot=(c.prN||c.issue)?'<div class="card-foot">'+(c.prN?'<span>'+(c.pr==='open'?I.prOpen:I.pr)+'PR #'+c.prN+'</span>':'')+(c.issue?'<span>'+I.issue+'Issue #'+c.issue+'</span>':'')+'</div>':'';
+    var why=c.src==='plan'?'Plan tasks follow their plan and cannot be selected':'Suggestions are accepted or dismissed one by one';
+    return '<article class="board-card surface-content'+(c.src==='plan'?' plan':'')+(c.src==='suggestion'?' suggestion':'')+'" data-n="'+c.n+'" data-col="'+c.col+'" data-selectable="'+able+'"'+(able?' aria-selected="'+s+'"':'')+'>'+
+      (able?'<label class="card-check"><input type="checkbox" class="checkbox" data-check="'+c.n+'"'+(s?' checked':'')+' aria-label="Select '+c.label+'"></label>':'')+
+      '<div class="card-head"><span class="mono">'+c.label+'</span>'+(c.kind==='bug'?'<span class="chip chip-danger">Bug</span>':'')+
+      (able?'<span class="cost">'+(c.cost||'')+'</span><span class="ink-3" style="display:inline-flex">'+I.more+'</span>':'<span class="lock" data-tip="'+why+'">'+I.lock+'</span>')+'</div>'+
+      '<div class="card-title">'+esc(c.title)+'</div>'+
+      (status?'<div class="card-status">'+status+'</div>':'')+foot+'</article>';
+  }
+
+  function render(){
+    var board=document.getElementById('board');
+    var scrolls={}; board.querySelectorAll('.col-list').forEach(function(l){scrolls[l.dataset.col]=l.scrollTop});
+    board.dataset.selecting=sel.size>0;
+    board.innerHTML=COLS.map(function(col){
+      var all=cards.filter(function(c){return c.col===col.id});
+      var vis=all.filter(visible), pick=vis.filter(selectable);
+      var on=pick.filter(function(c){return sel.has(c.n)}).length;
+      var label=on===0?'Select all':(on===pick.length?'All '+pick.length:on+' of '+pick.length);
+      var ctl=pick.length?'<label class="col-select" data-active="'+(on>0)+'" title="Selects the '+pick.length+' selectable cards the filter shows"><input type="checkbox" class="checkbox" data-colall="'+col.id+'"'+(on&&on===pick.length?' checked':'')+' aria-label="Select all in '+col.name+'"><span>'+label+'</span></label>':'';
+      return '<section class="board-col" data-colid="'+col.id+'" aria-label="'+col.name+'"><div class="board-col-head">'+col.name+'<span class="badge">'+vis.length+(vis.length!==all.length?' / '+all.length:'')+'</span>'+ctl+'</div>'+
+        '<div class="col-list" data-col="'+col.id+'">'+(vis.length?vis.map(cardHtml).join(''):'<div class="col-empty">'+(all.length?'No card matches the filter':'Nothing here')+'</div>')+'</div></section>';
+    }).join('');
+    COLS.forEach(function(col){
+      var pick=cards.filter(function(c){return c.col===col.id&&visible(c)&&selectable(c)});
+      var on=pick.filter(function(c){return sel.has(c.n)}).length;
+      var box=board.querySelector('[data-colall="'+col.id+'"]'); if(box) box.indeterminate=on>0&&on<pick.length;
+      var l=board.querySelector('.col-list[data-col="'+col.id+'"]'); if(l&&scrolls[col.id]) l.scrollTop=scrolls[col.id];
+    });
+    var fin=cards.filter(function(c){return c.col==='finished'});
+    document.getElementById('meta').innerHTML='<span><b>'+cards.filter(function(c){return c.src!=='plan'&&c.src!=='suggestion'}).length+'</b> cards</span><span><b>'+cards.filter(function(c){return c.run}).length+'</b> running</span><span><b>'+fin.length+'</b> finished, <b>'+fin.filter(function(c){return c.pr==='merged'}).length+'</b> with a merged PR</span>';
+    renderBar();
+  }
+
+  function renderBar(){
+    var bar=document.getElementById('selbar'), list=[...sel].map(byN).filter(Boolean);
+    bar.dataset.open=list.length>0;
+    document.getElementById('selN').textContent=list.length;
+    bar.querySelectorAll('[data-action]').forEach(function(b){
+      var a=b.dataset.action, k=list.filter(function(c){return !rule(c,a)}).length;
+      b.querySelector('.applies').textContent='· '+k+' of '+list.length;
+      b.disabled=k===0;
+      b.title=k===0?'None of the selected cards can make this move':'';
+    });
+  }
+
+  function toggle(x,force){var on=force===undefined?!sel.has(x):force; on?sel.add(x):sel.delete(x)}
+  function colCards(col){return cards.filter(function(c){return c.col===col&&visible(c)&&selectable(c)})}
+
+  var board=document.getElementById('board');
+  board.addEventListener('click',function(e){
+    var colall=e.target.closest('[data-colall]');
+    if(colall){var pick=colCards(colall.dataset.colall), allOn=pick.every(function(c){return sel.has(c.n)});pick.forEach(function(c){toggle(c.n,!allOn)});render();return}
+    if(e.target.closest('.col-select')) return;
+    var chk=e.target.closest('[data-check]');
+    if(chk){var x=+chk.dataset.check; if(e.shiftKey&&range(x)){}else{toggle(x)} anchor=x; render(); return}
+    var card=e.target.closest('.board-card'); if(!card||card.dataset.selectable!=='true') return;
+    var x=+card.dataset.n;
+    if(e.shiftKey&&range(x)){anchor=x;render();return}
+    if(e.metaKey||e.ctrlKey||sel.size>0){toggle(x);anchor=x;render();return}
+    toast(I.ok,'Opens the card sheet','With nothing selected, a click opens '+byN(x).label+' as before.');
+  });
+  function range(x){
+    var a=anchor!==null&&byN(anchor), c=byN(x); if(!a||a.col!==c.col) return false;
+    var list=colCards(c.col), i=list.indexOf(a), j=list.indexOf(c); if(i<0||j<0) return false;
+    list.slice(Math.min(i,j),Math.max(i,j)+1).forEach(function(k){sel.add(k.n)}); return true;
+  }
+  board.addEventListener('mouseover',function(e){var s=e.target.closest('[data-colid]');if(s)hoverCol=s.dataset.colid;
+    var t=e.target.closest('[data-tip]');var tip=document.getElementById('tip');if(t){var r=t.getBoundingClientRect();tip.textContent=t.dataset.tip;tip.hidden=false;tip.style.left=Math.max(8,r.right-240)+'px';tip.style.top=(r.bottom+6)+'px'}else tip.hidden=true});
+  board.addEventListener('mousedown',function(e){if(e.shiftKey&&e.target.closest('.board-card'))e.preventDefault()});
+
+  document.addEventListener('keydown',function(e){
+    var typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)&&document.activeElement.type!=='checkbox';
+    if(!document.getElementById('scrim').hidden){if(e.key==='Escape')closeDlg();return}
+    if(e.key==='Escape'&&sel.size&&!typing){sel.clear();render()}
+    if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='a'&&!typing){
+      var f=document.activeElement.closest&&document.activeElement.closest('[data-colid]');
+      var col=(f&&f.dataset.colid)||hoverCol; if(!col) return;
+      e.preventDefault(); colCards(col).forEach(function(c){sel.add(c.n)}); render();
+    }
+  });
+  document.getElementById('clearBtn').onclick=function(){sel.clear();render()};
+  document.getElementById('q').oninput=function(e){q=e.target.value.trim().toLowerCase();render()};
+  document.getElementById('kind').onchange=function(e){kind=e.target.value;render()};
+  document.getElementById('themeBtn').onclick=function(){var r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark'};
+
+  // Actions
+  var pending=null;
+  document.getElementById('selbar').addEventListener('click',function(e){
+    var b=e.target.closest('[data-action]'); if(!b) return;
+    var a=b.dataset.action, list=[...sel].map(byN);
+    var go=list.filter(function(c){return !rule(c,a)}), skip=list.filter(function(c){return rule(c,a)});
+    if(a==='complete'||a==='delete') openDlg(a,go,skip); else run(a,go,skip);
+  });
+  function skipHtml(skip){
+    if(!skip.length) return '';
+    return '<div><div class="text-label ink-3" style="margin-bottom:6px">Skipped ('+skip.length+')</div><ul class="skip-list">'+skip.slice(0,4).map(function(c){return '<li><span class="mono">'+c.label+'</span><span>'+REASON[rule(c,pending.a)]+'</span></li>'}).join('')+(skip.length>4?'<li class="ink-3">and '+(skip.length-4)+' more</li>':'')+'</ul></div>';
+  }
+  function openDlg(a,go,skip){
+    pending={a:a,go:go,skip:skip};
+    var t=document.getElementById('dlgT'), body=document.getElementById('dlgB'), ok=document.getElementById('dlgOk');
+    var nn=go.length+' card'+(go.length===1?'':'s');
+    if(a==='complete'){
+      var open=go.filter(function(c){return c.pr==='open'}).length;
+      t.textContent='Move '+nn+' to Completed?';
+      body.innerHTML='<p>Each card is accepted without merging or closing anything — the same as Accept with both options off.</p>'+
+        (open?'<div class="banner banner-warn">'+I.warn+'<span><b>'+open+' of them still '+(open===1?'has an':'have an')+' open pull request.</b> Their PRs stay open on GitHub.</span></div>':'<p>All of their pull requests are already merged.</p>')+skipHtml(skip);
+      ok.className='btn btn-solid'; ok.textContent='Move '+nn;
+    } else {
+      t.textContent='Delete '+nn+'?';
+      body.innerHTML='<p>The cards and their history leave the board. Issues and pull requests on GitHub are not touched.</p>'+(skip.length?'<p>Running cards are never stopped from a bulk action.</p>':'')+skipHtml(skip);
+      ok.className='btn btn-danger'; ok.textContent='Delete '+nn;
+    }
+    document.getElementById('scrim').hidden=false; ok.focus();
+  }
+  function closeDlg(){document.getElementById('scrim').hidden=true;pending=null}
+  document.getElementById('dlgCancel').onclick=closeDlg;
+  document.getElementById('scrim').addEventListener('click',function(e){if(e.target.id==='scrim')closeDlg()});
+  document.getElementById('dlgOk').onclick=function(){var p=pending;closeDlg();run(p.a,p.go,p.skip)};
+
+  function run(a,go,skip){
+    go.forEach(function(c){
+      if(a==='delete'){cards.splice(cards.indexOf(c),1)}
+      else {c.col=TARGET[a]; if(a==='todo'){c.pr=null;c.prN=null}}
+    });
+    sel=new Set(skip.map(function(c){return c.n}));
+    var verb={complete:'Moved '+go.length+' to Completed',todo:'Moved '+go.length+' back to To Do',finished:'Marked '+go.length+' Finished',delete:'Deleted '+go.length}[a];
+    var groups={}; skip.forEach(function(c){var r=REASON[rule(c,a)]||'skipped';(groups[r]=groups[r]||[]).push(c.label)});
+    var detail=skip.length?skip.length+' skipped — '+Object.keys(groups).map(function(r){return groups[r].join(', ')+': '+r}).join('; ')+'. They stay selected.':(a==='complete'?'No pull request was merged or closed.':'Nothing was skipped.');
+    toast(skip.length?I.warn:I.ok,verb,detail);
+    render();
+  }
+  function toast(icon,title,body){
+    var el=document.createElement('div'); el.className='toast glass-strong'; el.setAttribute('role','status');
+    el.innerHTML=icon+'<div style="display:flex;flex-direction:column;gap:2px"><span class="t-title">'+esc(title)+'</span><span class="ink-2">'+esc(body)+'</span></div>';
+    var box=document.getElementById('toasts'); box.appendChild(el); setTimeout(function(){el.remove()},6000);
+  }
+  render();
+})();
+</script>
+</body>
+</html>
