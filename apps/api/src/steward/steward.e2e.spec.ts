@@ -185,7 +185,8 @@ describe('Steward (e2e)', () => {
         'silent',
         'waiting at the prompt',
       );
-      for (const path of [settingsPath(), incidentsPath()]) {
+      const digest = `${settingsPath()}/digest/latest`;
+      for (const path of [settingsPath(), incidentsPath(), digest]) {
         expect((await w.operatorOfB.get(path)).status).toBe(404);
         expect((await w.outsider.get(path)).status).toBe(404);
       }
