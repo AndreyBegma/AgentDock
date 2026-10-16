@@ -76,6 +76,7 @@ export function PlanPanel({
         title="New plan"
         description="The planner splits a brief into tasks. End with cards on the Board, or send the tasks to the fleet."
         className={PANEL_CLASS}
+        footer={<PlanPanelFooter onClose={() => onOpenChange(false)} />}
       >
         {open ? (
           planId ? (
@@ -98,6 +99,17 @@ export function PlanPanel({
         ) : null}
       </SheetContent>
     </SheetRoot>
+  );
+}
+
+/** A visible, keyboard-reachable way out, like New card's Cancel (#398). */
+export function PlanPanelFooter({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="flex items-center justify-end">
+      <Button type="button" variant="glass" onClick={onClose}>
+        Close
+      </Button>
+    </div>
   );
 }
 
