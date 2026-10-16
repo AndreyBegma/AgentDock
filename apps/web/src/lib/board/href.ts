@@ -5,6 +5,10 @@ export const boardHref = (projectId: string): string =>
 export const boardCardHref = (projectId: string, number: number): string =>
   `${boardHref(projectId)}?card=${number}`;
 
+/** #431: one card on its own page. */
+export const boardCardPageHref = (projectId: string, number: number): string =>
+  `${boardHref(projectId)}/cards/${number}`;
+
 /**
  * #409: the board with New work open; `brief` prefills What to do (the
  * Fleet canvas's "Plan this", #160). The Board still reads the older

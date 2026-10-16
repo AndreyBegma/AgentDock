@@ -2,7 +2,6 @@
 
 import {
   type AttachmentView,
-  BOARD_CARD_BODY_MAX,
   BOARD_CARD_KINDS,
   BOARD_CARD_TITLE_MAX,
   type BoardCardDetail,
@@ -12,7 +11,8 @@ import {
 } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
-import { Button } from '@andrewbehma/glass-ui/button';
+import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
+import { Card } from '@andrewbehma/glass-ui/card';
 import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
 import { Field, Input, Select, Textarea } from '@andrewbehma/glass-ui/field';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
@@ -21,8 +21,9 @@ import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Timeline, type TimelineItem } from '@andrewbehma/glass-ui/timeline';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import { ExternalLink } from 'lucide-react';
 import NextLink from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { ApiError } from '../../lib/api';
 import {
   describeUploadFailure,
@@ -61,6 +62,7 @@ import {
   trackedSessionHref,
   trackedStatusText,
 } from '../../lib/board/format';
+import { boardCardPageHref } from '../../lib/board/href';
 import { canCreatePr, prChipText } from '../../lib/board/pull-request';
 import { ciBanner, pullRequestRows } from '../../lib/board/shipping';
 import { formatCost } from '../../lib/format';
@@ -72,11 +74,12 @@ import { AttachmentDropzone } from '../attachments/attachment-dropzone';
 import { AttachmentList } from '../attachments/attachment-list';
 import { CardAttachmentsSection } from '../attachments/card-attachments-section';
 import { useRemoveAttachment } from '../attachments/use-remove-attachment';
-import { Markdown } from '../markdown/markdown';
+import { PageHeader } from '../page-header/page-header';
 import { ReadinessNotice } from '../readiness/readiness-notice';
 import { useCurrentUser } from '../shell/user-context';
 import { NormalizedNote } from '../text/normalized-note';
 import { CardDependenciesSection } from './card-dependencies';
+import { CardDescription } from './card-description';
 import { ApproveRunLink, CardDesignSection } from './card-design';
 import { AutoCollectToggle, CardOptionToggles } from './card-options';
 import { LaunchPopover } from './launch-popover';
@@ -296,8 +299,13 @@ function InitialFocus() {
 
 const FORM_ID = 'board-card-form';
 
-/** The sheet of one card (#273 D17): Run, Design, Rounds, then the Card form with Save pinned. */
-function CardDetailBody({
+/**
+ * One card's detail (#273 D17, #431): Run, Design, Rounds, then the Card form.
+ * `sheet` is the side sheet's one column with Save pinned; `page` is the full
+ * page, two columns at full width with Save in the header. Same sections.
+ */
+export function CardDetailBody({
+  layout = 'sheet',
   sheetTitle,
   projectId,
   card,
@@ -306,6 +314,7 @@ function CardDetailBody({
   terminal,
   onSaved,
 }: {
+  layout?: 'sheet' | 'page';
   sheetTitle: string;
   projectId: string;
   card: BoardCardDetail;
@@ -322,7 +331,7 @@ function CardDetailBody({
   const [issueOnRun, setIssueOnRun] = useState(card.issueOnRun);
   const [specOnRun, setSpecOnRun] = useState(card.specOnRun);
   const [autoCollect, setAutoCollect] = useState(card.autoCollect);
-  const [preview, setPreview] = useState(false);
+  const [editing, setEditing] = useState(false);
   const fleet = isFleetCard(card);
   const terminalCard = isTerminalCard(card);
   const [saving, setSaving] = useState(false);
@@ -423,6 +432,473 @@ function CardDetailBody({
   const failure = card.autoRunFailure;
   const noPr = noPrBanner(card);
 
+  const pageHref = boardCardPageHref(projectId, card.number);
+  const runSection = (
+    <section aria-label="Run" className="flex flex-col gap-4">
+      <SectionHeader title="Run" headingLevel={3} />
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="font-medium">{COLUMN_TITLE[card.column]}</span>
+        {pill ? (
+          <StatusPill size="sm" status={pill.status} label={pill.label} />
+        ) : null}
+        {total ? (
+          <span className="ml-auto tabular-nums text-ink-2">{total}</span>
+        ) : null}
+      </div>
+      <Links card={card} />
+      <PullRequestList card={card} />
+      <CiStoppedBanner card={card} />
+      {canCreatePr(card) ? (
+        <div className="flex flex-col gap-2">
+          <Banner tone={noPr.tone}>{noPr.text}</Banner>
+          {canOperate && noPr.canCreate ? (
+            <div>
+              <Button
+                variant="glass"
+                disabled={actions.busy || card.collectState === 'pending'}
+                onClick={() => void actions.createPullRequest(card)}
+              >
+                Create pull request
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+      {card.source === 'captured' && sessionHref(card.sourceSessionId) ? (
+        <p className="text-xs text-ink-2">
+          Suggested from{' '}
+          <NextLink
+            href={sessionHref(card.sourceSessionId) ?? '#'}
+            className="text-accent-ink underline-offset-2 hover:underline"
+          >
+            a Claude Code session
+          </NextLink>
+          .
+        </p>
+      ) : null}
+      {card.tracking ? (
+        <div className="flex flex-col gap-1 text-xs text-ink-2">
+          <p>
+            {TRACKED_TEXT}
+            {trackedSessionHref(card) ? (
+              <>
+                {' · '}
+                <NextLink
+                  href={trackedSessionHref(card) ?? '#'}
+                  className="text-accent-ink underline-offset-2 hover:underline"
+                >
+                  Open the session
+                </NextLink>
+              </>
+            ) : null}
+          </p>
+          <p>{trackedStatusText(card)}</p>
+        </div>
+      ) : null}
+      {card.fleet ? (
+        <div className="flex flex-col gap-1 text-xs text-ink-2">
+          <p>
+            Fleet · issue #{card.fleet.issue} · {fleetSummary(card.fleet)}
+            {fleetHref(projectId, card) ? (
+              <>
+                {' · '}
+                <NextLink
+                  href={fleetHref(projectId, card) ?? '#'}
+                  className="text-accent-ink underline-offset-2 hover:underline"
+                >
+                  Open in Fleet
+                </NextLink>
+              </>
+            ) : null}
+          </p>
+          {card.fleet.slotGone ? (
+            <Badge tone="warn" label={SLOT_GONE_TEXT} />
+          ) : null}
+        </div>
+      ) : null}
+      {card.branch ? (
+        <p className="break-all font-mono text-xs text-ink-2">{card.branch}</p>
+      ) : null}
+      {card.round?.hooksMissing
+        ? (() => {
+            const notice = hooksNotice(card, card.round);
+            return (
+              <div className="flex flex-col gap-2 text-xs text-ink-2">
+                <p>{notice.text}</p>
+                {notice.commands.map((item) => (
+                  <div key={item.code} className="flex flex-col gap-1">
+                    <span>{item.label}</span>
+                    <CodeBlock code={item.code} defaultWrap />
+                  </div>
+                ))}
+                {notice.guide ? (
+                  <NextLink
+                    href={hooksGuideHref(projectId)}
+                    className="text-accent-ink underline-offset-2 hover:underline"
+                  >
+                    {HOOKS_GUIDE_LABEL}
+                  </NextLink>
+                ) : null}
+              </div>
+            );
+          })()
+        : null}
+
+      {failure ? (
+        <Banner tone="warn">
+          Design approved — the worker did not start: {autoRunReason(failure)}.
+        </Banner>
+      ) : null}
+
+      {canOperate ? (
+        <div className="flex flex-wrap gap-2">
+          {canAccept(card) ? (
+            <Button
+              variant="solid"
+              disabled={actions.busy}
+              onClick={() => actions.accept(card)}
+            >
+              Accept
+            </Button>
+          ) : null}
+          {canRun(card) || canRetry(card) ? (
+            <LaunchPopover
+              projectId={projectId}
+              card={card}
+              kind="work"
+              label={canRetry(card) ? 'Run again' : 'Run'}
+              variant={card.column === 'todo' ? 'solid' : 'glass'}
+              disabled={actions.busy || runBlocked}
+              describedBy={runBlocked ? 'board-run-reason' : undefined}
+              onLaunch={async (request) => {
+                // The toast says why; a refusal keeps the popover open.
+                if (!(await actions.run(card, request))) {
+                  throw new Error('run refused');
+                }
+              }}
+            />
+          ) : null}
+          {offer ? (
+            <ApproveRunLink
+              projectId={projectId}
+              card={card}
+              offer={offer}
+              variant={card.column === 'todo' ? 'solid' : 'glass'}
+              describedBy="board-approve-run-reason"
+            />
+          ) : null}
+          {canMarkFinished(card) ? (
+            <Button
+              variant="glass"
+              disabled={actions.busy}
+              onClick={() => actions.markFinished(card)}
+            >
+              Mark finished
+            </Button>
+          ) : null}
+          {canStop(card) ? (
+            <Button
+              variant="glass"
+              disabled={actions.busy}
+              onClick={() => actions.askStop(card)}
+            >
+              Stop
+            </Button>
+          ) : null}
+          {card.sessionId ? (
+            terminal.state === 'available' ? (
+              <Button variant="glass" onClick={terminal.open}>
+                Open terminal
+              </Button>
+            ) : (
+              <Button variant="glass" disabled title={terminal.reason}>
+                Open terminal
+              </Button>
+            )
+          ) : null}
+        </div>
+      ) : null}
+      {canOperate && (canRun(card) || canRetry(card)) ? (
+        <div className="-mt-3">
+          <ReadinessNotice
+            id="board-run-reason"
+            projectId={projectId}
+            action="run"
+            readiness={readiness}
+          />
+        </div>
+      ) : null}
+      {canOperate && offer?.reason ? (
+        <p id="board-approve-run-reason" className="-mt-3 text-xs text-ink-3">
+          {offer.reason}
+        </p>
+      ) : null}
+      {canOperate && card.sessionId && terminal.state === 'disabled' ? (
+        <p className="-mt-3 text-xs text-ink-3">{terminal.reason}</p>
+      ) : null}
+
+      {canGiveFeedback(card) && canOperate ? (
+        <Field
+          label="Send back with feedback"
+          htmlFor="board-feedback"
+          hint="Resumes the same Claude session in the same worktree. The card returns to In progress."
+        >
+          <Textarea
+            id="board-feedback"
+            rows={4}
+            value={feedback}
+            maxLength={CARD_FEEDBACK_MAX}
+            onChange={(e) => setFeedback(e.target.value)}
+          />
+          <div className="mt-2">
+            <AttachmentDropzone
+              uploads={feedbackFiles}
+              label="Attach files to the feedback"
+            />
+          </div>
+          <div className="mt-2">
+            <Button
+              variant="glass"
+              disabled={sending || feedbackFiles.busy || feedback.trim() === ''}
+              onClick={sendBack}
+            >
+              {sending ? 'Sending…' : 'Send back'}
+            </Button>
+          </div>
+        </Field>
+      ) : null}
+    </section>
+  );
+  const designSection = fleet ? null : (
+    <CardDesignSection
+      projectId={projectId}
+      card={card}
+      canOperate={canOperate}
+      onChanged={onSaved}
+    />
+  );
+
+  const dependenciesSection = (
+    <CardDependenciesSection
+      projectId={projectId}
+      card={card}
+      canOperate={canOperate}
+      onChanged={onSaved}
+    />
+  );
+  const roundsSection = (
+    <section aria-label="Rounds" className="flex flex-col gap-2">
+      <SectionHeader title="Rounds" headingLevel={3} />
+      <Timeline
+        items={roundItems(card.rounds, notes, canOperate, {
+          byRound,
+          user,
+          canRemove: filesEditable,
+          removing,
+          onRemove: (a) => void remove(a),
+        })}
+        empty={<p className="text-sm text-ink-3">No worker has run yet.</p>}
+      />
+    </section>
+  );
+  const attachmentsSection = (
+    <CardAttachmentsSection
+      projectId={projectId}
+      number={card.number}
+      attachments={cardFiles}
+      user={user}
+      canOperate={canOperate}
+      completed={card.column === 'completed'}
+      removing={removing}
+      onRemove={(a) => void remove(a)}
+      onChanged={onSaved}
+    />
+  );
+  const cardForm = (
+    <form
+      id={FORM_ID}
+      aria-label="Card"
+      className="flex flex-col gap-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (dirty && title.trim() !== '' && !saving) void save();
+      }}
+    >
+      <SectionHeader title="Card" headingLevel={3} />
+      {fleet ? (
+        <p className="-mt-2 text-xs text-ink-3">{FLEET_EDIT_HINT}</p>
+      ) : card.sessionId ? (
+        <p className="-mt-2 text-xs text-ink-3">
+          Changes go to the worker with the next round.
+        </p>
+      ) : null}
+      <Field label="Title" htmlFor="board-card-title">
+        <Input
+          id="board-card-title"
+          value={title}
+          maxLength={BOARD_CARD_TITLE_MAX}
+          disabled={!canOperate}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+        <NormalizedNote
+          view={notes.view('board_card', card.id, 'title')}
+          canOperate={canOperate}
+          onRetry={notes.retry}
+        />
+      </Field>
+      <Field label="What to do" htmlFor="board-card-body">
+        <CardDescription
+          body={body}
+          editing={editing}
+          canOperate={canOperate}
+          rows={layout === 'page' ? 14 : 8}
+          onChange={setBody}
+          onToggle={() => setEditing((e) => !e)}
+        />
+        <NormalizedNote
+          view={notes.view('board_card', card.id, 'body')}
+          canOperate={canOperate}
+          onRetry={notes.retry}
+        />
+      </Field>
+      <Field
+        label="Kind"
+        htmlFor="board-card-kind"
+        hint={
+          autoKind
+            ? 'Set automatically from the text. Change it to pin it.'
+            : undefined
+        }
+      >
+        <Select
+          id="board-card-kind"
+          value={kind}
+          disabled={!canOperate || fleet}
+          onChange={(e) =>
+            setKind(BOARD_CARD_KINDS.find((k) => k === e.target.value) ?? kind)
+          }
+        >
+          {BOARD_CARD_KINDS.map((k) => (
+            <option key={k} value={k}>
+              {KIND_LABEL[k]}
+            </option>
+          ))}
+        </Select>
+        {autoKind ? (
+          <div className="mt-2">
+            <Badge tone="neutral" label="Auto" />
+          </div>
+        ) : null}
+      </Field>
+      {fleet ? null : (
+        <CardOptionToggles
+          projectId={projectId}
+          idPrefix="board-card"
+          issueOnRun={issueOnRun}
+          specOnRun={specOnRun}
+          disabled={!canOperate || card.round !== null}
+          onIssueOnRun={setIssueOnRun}
+          onSpecOnRun={setSpecOnRun}
+        />
+      )}
+      {terminalCard ? (
+        <AutoCollectToggle
+          id="board-card-auto-collect"
+          checked={autoCollect}
+          disabled={!canOperate}
+          label={AUTO_COLLECT_LABEL}
+          hint={AUTO_COLLECT_HINT}
+          onChange={setAutoCollect}
+        />
+      ) : null}
+      {card.specPath ? (
+        <p className="break-all font-mono text-xs text-ink-2">
+          Spec: {card.specPath}
+        </p>
+      ) : null}
+      <span className="text-xs text-ink-3">
+        Created <Time value={card.createdAt} />
+        {card.createdBy ? ` by ${card.createdBy.email}` : ''}
+      </span>
+    </form>
+  );
+
+  const actionButtons = canOperate ? (
+    <>
+      {canDelete(card) ? (
+        <Button
+          variant="ghost"
+          type="button"
+          disabled={actions.busy}
+          onClick={() => actions.askDelete(card)}
+        >
+          Delete
+        </Button>
+      ) : null}
+      <Button
+        variant="solid"
+        type="submit"
+        form={FORM_ID}
+        disabled={saving || !dirty || title.trim() === ''}
+      >
+        {saving ? 'Saving…' : 'Save'}
+      </Button>
+    </>
+  ) : null;
+
+  if (layout === 'page') {
+    const panel = (node: ReactNode) =>
+      node ? <Card pad="md">{node}</Card> : null;
+    return (
+      <div className="flex flex-col gap-6">
+        <PageHeader
+          className="mb-0"
+          eyebrow={`Board card · ${card.label} · ${KIND_LABEL[card.kind]}`}
+          title={card.title}
+          status={
+            pill ? (
+              <StatusPill status={pill.status} label={pill.label} />
+            ) : undefined
+          }
+          meta={
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-2">
+              <span>{COLUMN_TITLE[card.column]}</span>
+              {card.round ? <span>Round {card.rounds.length}</span> : null}
+              {total ? (
+                <span className="tabular-nums">{total} spent</span>
+              ) : null}
+              <span>
+                Created <Time value={card.createdAt} />
+              </span>
+            </div>
+          }
+          actions={
+            canOperate ? (
+              <div className="flex items-center gap-2">{actionButtons}</div>
+            ) : (
+              <Badge tone="neutral" label="Read-only · viewer" />
+            )
+          }
+        />
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+          <div className="flex min-w-0 flex-col gap-6">
+            {panel(cardForm)}
+            {panel(roundsSection)}
+          </div>
+          <aside
+            aria-label="Card status"
+            className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-4"
+          >
+            {panel(runSection)}
+            {panel(designSection)}
+            {panel(dependenciesSection)}
+            {panel(attachmentsSection)}
+          </aside>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <SheetContent
       side="right"
@@ -431,439 +907,28 @@ function CardDetailBody({
       footer={
         canOperate ? (
           <div className="flex items-center justify-end gap-2">
-            {canDelete(card) ? (
-              <Button
-                variant="ghost"
-                type="button"
-                disabled={actions.busy}
-                onClick={() => actions.askDelete(card)}
-              >
-                Delete
-              </Button>
-            ) : null}
-            <Button
-              variant="solid"
-              type="submit"
-              form={FORM_ID}
-              disabled={saving || !dirty || title.trim() === ''}
-            >
-              {saving ? 'Saving…' : 'Save'}
-            </Button>
+            {actionButtons}
           </div>
         ) : undefined
       }
     >
       <InitialFocus />
       <div className="flex flex-col gap-6">
-        <section aria-label="Run" className="flex flex-col gap-4">
-          <SectionHeader title="Run" headingLevel={3} />
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="font-medium">{COLUMN_TITLE[card.column]}</span>
-            {pill ? (
-              <StatusPill size="sm" status={pill.status} label={pill.label} />
-            ) : null}
-            {total ? (
-              <span className="ml-auto tabular-nums text-ink-2">{total}</span>
-            ) : null}
-          </div>
-          <Links card={card} />
-          <PullRequestList card={card} />
-          <CiStoppedBanner card={card} />
-          {canCreatePr(card) ? (
-            <div className="flex flex-col gap-2">
-              <Banner tone={noPr.tone}>{noPr.text}</Banner>
-              {canOperate && noPr.canCreate ? (
-                <div>
-                  <Button
-                    variant="glass"
-                    disabled={actions.busy || card.collectState === 'pending'}
-                    onClick={() => void actions.createPullRequest(card)}
-                  >
-                    Create pull request
-                  </Button>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-          {card.source === 'captured' && sessionHref(card.sourceSessionId) ? (
-            <p className="text-xs text-ink-2">
-              Suggested from{' '}
-              <NextLink
-                href={sessionHref(card.sourceSessionId) ?? '#'}
-                className="text-accent-ink underline-offset-2 hover:underline"
-              >
-                a Claude Code session
-              </NextLink>
-              .
-            </p>
-          ) : null}
-          {card.tracking ? (
-            <div className="flex flex-col gap-1 text-xs text-ink-2">
-              <p>
-                {TRACKED_TEXT}
-                {trackedSessionHref(card) ? (
-                  <>
-                    {' · '}
-                    <NextLink
-                      href={trackedSessionHref(card) ?? '#'}
-                      className="text-accent-ink underline-offset-2 hover:underline"
-                    >
-                      Open the session
-                    </NextLink>
-                  </>
-                ) : null}
-              </p>
-              <p>{trackedStatusText(card)}</p>
-            </div>
-          ) : null}
-          {card.fleet ? (
-            <div className="flex flex-col gap-1 text-xs text-ink-2">
-              <p>
-                Fleet · issue #{card.fleet.issue} · {fleetSummary(card.fleet)}
-                {fleetHref(projectId, card) ? (
-                  <>
-                    {' · '}
-                    <NextLink
-                      href={fleetHref(projectId, card) ?? '#'}
-                      className="text-accent-ink underline-offset-2 hover:underline"
-                    >
-                      Open in Fleet
-                    </NextLink>
-                  </>
-                ) : null}
-              </p>
-              {card.fleet.slotGone ? (
-                <Badge tone="warn" label={SLOT_GONE_TEXT} />
-              ) : null}
-            </div>
-          ) : null}
-          {card.branch ? (
-            <p className="break-all font-mono text-xs text-ink-2">
-              {card.branch}
-            </p>
-          ) : null}
-          {card.round?.hooksMissing
-            ? (() => {
-                const notice = hooksNotice(card, card.round);
-                return (
-                  <div className="flex flex-col gap-2 text-xs text-ink-2">
-                    <p>{notice.text}</p>
-                    {notice.commands.map((item) => (
-                      <div key={item.code} className="flex flex-col gap-1">
-                        <span>{item.label}</span>
-                        <CodeBlock code={item.code} defaultWrap />
-                      </div>
-                    ))}
-                    {notice.guide ? (
-                      <NextLink
-                        href={hooksGuideHref(projectId)}
-                        className="text-accent-ink underline-offset-2 hover:underline"
-                      >
-                        {HOOKS_GUIDE_LABEL}
-                      </NextLink>
-                    ) : null}
-                  </div>
-                );
-              })()
-            : null}
-
-          {failure ? (
-            <Banner tone="warn">
-              Design approved — the worker did not start:{' '}
-              {autoRunReason(failure)}.
-            </Banner>
-          ) : null}
-
-          {canOperate ? (
-            <div className="flex flex-wrap gap-2">
-              {canAccept(card) ? (
-                <Button
-                  variant="solid"
-                  disabled={actions.busy}
-                  onClick={() => actions.accept(card)}
-                >
-                  Accept
-                </Button>
-              ) : null}
-              {canRun(card) || canRetry(card) ? (
-                <LaunchPopover
-                  projectId={projectId}
-                  card={card}
-                  kind="work"
-                  label={canRetry(card) ? 'Run again' : 'Run'}
-                  variant={card.column === 'todo' ? 'solid' : 'glass'}
-                  disabled={actions.busy || runBlocked}
-                  describedBy={runBlocked ? 'board-run-reason' : undefined}
-                  onLaunch={async (request) => {
-                    // The toast says why; a refusal keeps the popover open.
-                    if (!(await actions.run(card, request))) {
-                      throw new Error('run refused');
-                    }
-                  }}
-                />
-              ) : null}
-              {offer ? (
-                <ApproveRunLink
-                  projectId={projectId}
-                  card={card}
-                  offer={offer}
-                  variant={card.column === 'todo' ? 'solid' : 'glass'}
-                  describedBy="board-approve-run-reason"
-                />
-              ) : null}
-              {canMarkFinished(card) ? (
-                <Button
-                  variant="glass"
-                  disabled={actions.busy}
-                  onClick={() => actions.markFinished(card)}
-                >
-                  Mark finished
-                </Button>
-              ) : null}
-              {canStop(card) ? (
-                <Button
-                  variant="glass"
-                  disabled={actions.busy}
-                  onClick={() => actions.askStop(card)}
-                >
-                  Stop
-                </Button>
-              ) : null}
-              {card.sessionId ? (
-                terminal.state === 'available' ? (
-                  <Button variant="glass" onClick={terminal.open}>
-                    Open terminal
-                  </Button>
-                ) : (
-                  <Button variant="glass" disabled title={terminal.reason}>
-                    Open terminal
-                  </Button>
-                )
-              ) : null}
-            </div>
-          ) : null}
-          {canOperate && (canRun(card) || canRetry(card)) ? (
-            <div className="-mt-3">
-              <ReadinessNotice
-                id="board-run-reason"
-                projectId={projectId}
-                action="run"
-                readiness={readiness}
-              />
-            </div>
-          ) : null}
-          {canOperate && offer?.reason ? (
-            <p
-              id="board-approve-run-reason"
-              className="-mt-3 text-xs text-ink-3"
-            >
-              {offer.reason}
-            </p>
-          ) : null}
-          {canOperate && card.sessionId && terminal.state === 'disabled' ? (
-            <p className="-mt-3 text-xs text-ink-3">{terminal.reason}</p>
-          ) : null}
-
-          {canGiveFeedback(card) && canOperate ? (
-            <Field
-              label="Send back with feedback"
-              htmlFor="board-feedback"
-              hint="Resumes the same Claude session in the same worktree. The card returns to In progress."
-            >
-              <Textarea
-                id="board-feedback"
-                rows={4}
-                value={feedback}
-                maxLength={CARD_FEEDBACK_MAX}
-                onChange={(e) => setFeedback(e.target.value)}
-              />
-              <div className="mt-2">
-                <AttachmentDropzone
-                  uploads={feedbackFiles}
-                  label="Attach files to the feedback"
-                />
-              </div>
-              <div className="mt-2">
-                <Button
-                  variant="glass"
-                  disabled={
-                    sending || feedbackFiles.busy || feedback.trim() === ''
-                  }
-                  onClick={sendBack}
-                >
-                  {sending ? 'Sending…' : 'Send back'}
-                </Button>
-              </div>
-            </Field>
-          ) : null}
-        </section>
-
-        {fleet ? null : (
-          <CardDesignSection
-            projectId={projectId}
-            card={card}
-            canOperate={canOperate}
-            onChanged={onSaved}
-          />
-        )}
-
-        <CardDependenciesSection
-          projectId={projectId}
-          card={card}
-          canOperate={canOperate}
-          onChanged={onSaved}
-        />
-
-        <section aria-label="Rounds" className="flex flex-col gap-2">
-          <SectionHeader title="Rounds" headingLevel={3} />
-          <Timeline
-            items={roundItems(card.rounds, notes, canOperate, {
-              byRound,
-              user,
-              canRemove: filesEditable,
-              removing,
-              onRemove: (a) => void remove(a),
-            })}
-            empty={<p className="text-sm text-ink-3">No worker has run yet.</p>}
-          />
-        </section>
-
-        <CardAttachmentsSection
-          projectId={projectId}
-          number={card.number}
-          attachments={cardFiles}
-          user={user}
-          canOperate={canOperate}
-          completed={card.column === 'completed'}
-          removing={removing}
-          onRemove={(a) => void remove(a)}
-          onChanged={onSaved}
-        />
-
-        <form
-          id={FORM_ID}
-          aria-label="Card"
-          className="flex flex-col gap-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (dirty && title.trim() !== '' && !saving) void save();
-          }}
-        >
-          <SectionHeader title="Card" headingLevel={3} />
-          {fleet ? (
-            <p className="-mt-2 text-xs text-ink-3">{FLEET_EDIT_HINT}</p>
-          ) : card.sessionId ? (
-            <p className="-mt-2 text-xs text-ink-3">
-              Changes go to the worker with the next round.
-            </p>
-          ) : null}
-          <Field label="Title" htmlFor="board-card-title">
-            <Input
-              id="board-card-title"
-              value={title}
-              maxLength={BOARD_CARD_TITLE_MAX}
-              disabled={!canOperate}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-            <NormalizedNote
-              view={notes.view('board_card', card.id, 'title')}
-              canOperate={canOperate}
-              onRetry={notes.retry}
-            />
-          </Field>
-          <Field label="What to do" htmlFor="board-card-body">
-            {preview ? (
-              <div className="rounded-control bg-surface p-3">
-                <Markdown>{body || '*Nothing written yet.*'}</Markdown>
-              </div>
-            ) : (
-              <Textarea
-                id="board-card-body"
-                rows={8}
-                value={body}
-                maxLength={BOARD_CARD_BODY_MAX}
-                disabled={!canOperate}
-                onChange={(e) => setBody(e.target.value)}
-              />
-            )}
-            <div className="mt-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                type="button"
-                onClick={() => setPreview((p) => !p)}
-              >
-                {preview ? 'Edit' : 'Preview'}
-              </Button>
-            </div>
-            <NormalizedNote
-              view={notes.view('board_card', card.id, 'body')}
-              canOperate={canOperate}
-              onRetry={notes.retry}
-            />
-          </Field>
-          <Field
-            label="Kind"
-            htmlFor="board-card-kind"
-            hint={
-              autoKind
-                ? 'Set automatically from the text. Change it to pin it.'
-                : undefined
-            }
+        <div className="flex justify-end">
+          <NextLink
+            href={pageHref}
+            className={buttonClassName({ variant: 'ghost', size: 'sm' })}
           >
-            <Select
-              id="board-card-kind"
-              value={kind}
-              disabled={!canOperate || fleet}
-              onChange={(e) =>
-                setKind(
-                  BOARD_CARD_KINDS.find((k) => k === e.target.value) ?? kind,
-                )
-              }
-            >
-              {BOARD_CARD_KINDS.map((k) => (
-                <option key={k} value={k}>
-                  {KIND_LABEL[k]}
-                </option>
-              ))}
-            </Select>
-            {autoKind ? (
-              <div className="mt-2">
-                <Badge tone="neutral" label="Auto" />
-              </div>
-            ) : null}
-          </Field>
-          {fleet ? null : (
-            <CardOptionToggles
-              projectId={projectId}
-              idPrefix="board-card"
-              issueOnRun={issueOnRun}
-              specOnRun={specOnRun}
-              disabled={!canOperate || card.round !== null}
-              onIssueOnRun={setIssueOnRun}
-              onSpecOnRun={setSpecOnRun}
-            />
-          )}
-          {terminalCard ? (
-            <AutoCollectToggle
-              id="board-card-auto-collect"
-              checked={autoCollect}
-              disabled={!canOperate}
-              label={AUTO_COLLECT_LABEL}
-              hint={AUTO_COLLECT_HINT}
-              onChange={setAutoCollect}
-            />
-          ) : null}
-          {card.specPath ? (
-            <p className="break-all font-mono text-xs text-ink-2">
-              Spec: {card.specPath}
-            </p>
-          ) : null}
-          <span className="text-xs text-ink-3">
-            Created <Time value={card.createdAt} />
-            {card.createdBy ? ` by ${card.createdBy.email}` : ''}
-          </span>
-        </form>
+            Open as page
+            <ExternalLink aria-hidden="true" className="size-4" />
+          </NextLink>
+        </div>
+        {runSection}
+        {designSection}
+        {dependenciesSection}
+        {roundsSection}
+        {attachmentsSection}
+        {cardForm}
       </div>
     </SheetContent>
   );
