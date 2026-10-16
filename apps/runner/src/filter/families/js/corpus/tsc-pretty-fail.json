@@ -1,0 +1,7 @@
+{
+  "argv": ["bunx", "tsc", "--noEmit", "--pretty"],
+  "exitCode": 2,
+  "category": "typecheck",
+  "outcome": "failing",
+  "expect": "filtered"
+}

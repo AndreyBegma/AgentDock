@@ -1,0 +1,7 @@
+{
+  "argv": ["eslint", "src"],
+  "exitCode": 1,
+  "category": "other",
+  "outcome": "failing",
+  "expect": "any"
+}

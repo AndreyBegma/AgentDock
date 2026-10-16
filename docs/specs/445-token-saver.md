@@ -107,7 +107,7 @@ The parts:
   - the raw file exists and matches the original byte for byte;
   - `AGENTDOCK_RAW=1` returns the original.
 - [ ] **Filter, pass-through:** an uncovered command, or output the filter cannot classify, is returned unchanged and counted as `passedThrough`.
-- [ ] **Filter, savings:** on the corpus, the median `keptBytes/rawBytes` for test runners and type checkers with failures is ≤ 0.3, and for passing runs ≤ 0.1.
+- [ ] **Filter, savings:** on the corpus, the median `keptBytes/rawBytes` for test runners with failures is ≤ 0.3, for type checkers and linters with failures ≤ 0.8 (amendment 8), and for passing runs ≤ 0.1.
 - [ ] **Overhead:** p95 added latency per command ≤ 50 ms on the CI runner, measured by a benchmark test.
 - [ ] **Hook:** with Token saver on, a Bash tool call `bun run test` is executed as `agentdock-runner filter -- bun run test` (hook unit test with Claude Code's PreToolUse input shape). With it off, nothing is rewritten.
 - [ ] **All eight launches:** each passes `--settings` (hook, scout, compaction) and `--strict-mcp-config` with the allowed servers when on, and each launches exactly as today when off (runner unit tests per launch).
@@ -193,6 +193,7 @@ Settled by the person (1–3) and by the orchestrator (4–7) while the contract
    - i445-launch reports `mcpServers` per profile and the capability.
    - i445-api sets `runs.tokenSaver`, ingests the stats and gates on the capability.
    - i445-web shows the checkboxes from `mcpServers`.
+8. **Savings ceilings by category.** The failing-run ceiling is split: test runners ≤ 0.3, type checkers and linters ≤ 0.8. D4b keeps every error line, and a type-check or lint failure report is almost entirely error lines, so it cannot shrink to 0.3. Only the source snippets, underlines, notes and fix diffs go. Measured on the JS corpus: `tsc` 0.98 (plain) and 0.67 (`--pretty`), `biome check` 0.61. The passing ceiling (≤ 0.1) is unchanged.
 
 ## Open questions
 

@@ -1,0 +1,69 @@
+bun test v1.3.9 (9b6ba1b2)
+
+src/spool/rotate.test.ts:
+(pass) rotate > rotates a full segment [0.18ms]
+(pass) rotate > keeps the newest segment open [0.05ms]
+(pass) rotate > names segments by sequence [0.04ms]
+(pass) rotate > survives a torn last line [0.11ms]
+(pass) rotate > drops the oldest segment at the cap [0.09ms]
+(pass) rotate > never drops an unacked segment [0.07ms]
+
+src/spool/ack.test.ts:
+(pass) ack > acks up to a seq [0.05ms]
+(pass) ack > ignores an ack below the floor [0.03ms]
+(pass) ack > deletes fully acked segments [0.09ms]
+(pass) ack > keeps a partly acked segment [0.04ms]
+(pass) ack > persists the floor across a restart [0.21ms]
+
+src/spool/meta.test.ts:
+(pass) meta > reads the spool's meta [0.04ms]
+(pass) meta > refuses a corrupt meta file [0.07ms]
+(pass) meta > writes atomically [0.12ms]
+(pass) meta > migrates a v1 meta [0.06ms]
+
+src/events/envelope.test.ts:
+(pass) envelope > stamps a seq [0.03ms]
+(pass) envelope > stamps a monotonic time [0.02ms]
+(pass) envelope > rejects an unknown kind [0.04ms]
+(pass) envelope > round-trips through JSON [0.05ms]
+(pass) envelope > keeps the payload byte for byte [0.03ms]
+
+src/events/batch.test.ts:
+(pass) batch > flushes at the size cap [0.07ms]
+(pass) batch > flushes at the age cap [0.31ms]
+(pass) batch > never splits an envelope [0.04ms]
+(pass) batch > resumes after a failed send [0.15ms]
+(pass) batch > backs off with jitter [0.09ms]
+(pass) batch > stops at shutdown [0.06ms]
+
+src/config/profile.test.ts:
+(pass) profile > expands the home directory [0.02ms]
+(pass) profile > resolves XDG paths [0.02ms]
+(pass) profile > keeps an absolute path [0.01ms]
+(pass) profile > rejects an unknown key [0.03ms]
+(pass) profile > parses an empty config [0.02ms]
+(pass) profile > parses a config with profiles [0.04ms]
+
+src/launch/argv.test.ts:
+(pass) argv > quotes a path with spaces [0.02ms]
+(pass) argv > leaves a plain word alone [0.01ms]
+(pass) argv > escapes a single quote [0.02ms]
+(pass) argv > joins a command [0.02ms]
+(pass) argv > refuses a NUL byte [0.03ms]
+
+src/launch/env.test.ts:
+(pass) env > passes the allowlist through [0.03ms]
+(pass) env > drops everything else [0.02ms]
+(pass) env > adds the run variables [0.04ms]
+(pass) env > never forwards a token [0.03ms]
+
+src/pane/chunks.test.ts:
+(pass) chunks > splits at a newline [0.04ms]
+(pass) chunks > splits a long line [0.05ms]
+(pass) chunks > keeps an escape sequence whole [0.06ms]
+(pass) chunks > flushes the tail [0.02ms]
+
+ 71 pass
+ 0 fail
+ 142 expect() calls
+Ran 71 tests across 9 files. [31.00ms]

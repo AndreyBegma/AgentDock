@@ -1,0 +1,84 @@
+
+ RUN  v3.2.4 /home/dev/shop/web
+
+ ✓ src/lib/money.test.ts (14 tests) 6ms
+ ✓ src/lib/slug.test.ts (9 tests) 4ms
+ ✓ src/lib/dates.test.ts (22 tests) 11ms
+ ✓ src/lib/cn.test.ts (4 tests) 2ms
+ ✓ src/lib/validators.test.ts (31 tests) 15ms
+ ✓ src/lib/url.test.ts (12 tests) 5ms
+ ✓ src/hooks/use-debounce.test.ts (6 tests) 41ms
+ ✓ src/hooks/use-media-query.test.ts (5 tests) 18ms
+ ✓ src/hooks/use-local-storage.test.ts (8 tests) 22ms
+ ✓ src/store/cart.test.ts (17 tests) 9ms
+ ✓ src/store/session.test.ts (11 tests) 7ms
+ ✓ src/components/Button.test.tsx (7 tests) 64ms
+ ✓ src/components/Input.test.tsx (9 tests) 71ms
+ ✓ src/components/Modal.test.tsx (6 tests) 88ms
+ ✓ src/components/Tabs.test.tsx (8 tests) 77ms
+ ✓ src/components/Table.test.tsx (13 tests) 120ms
+ ✓ src/components/Toast.test.tsx (5 tests) 52ms
+ ✓ src/components/Select.test.tsx (10 tests) 93ms
+ ✓ src/features/search/search.test.ts (12 tests) 14ms
+ ✓ src/features/auth/login-form.test.tsx (9 tests) 133ms
+ ✓ src/features/orders/order-list.test.tsx (6 tests) 101ms
+ ❯ src/features/cart/checkout.test.tsx (8 tests | 2 failed) 148ms
+   ✓ renders the line items
+   ✓ shows the subtotal
+   × applies a percentage coupon 12ms
+   × rejects an expired coupon 4ms
+   ✓ disables the pay button while submitting
+ ✓ src/features/cart/cart-badge.test.tsx (4 tests) 38ms
+ ✓ src/features/profile/profile-form.test.tsx (11 tests) 119ms
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/features/cart/checkout.test.tsx > checkout > applies a percentage coupon
+AssertionError: expected '€90.00' to be '€85.50' // Object.is equality
+
+- Expected
++ Received
+
+- €85.50
++ €90.00
+
+ ❯ src/features/cart/checkout.test.tsx:58:38
+     56|     render(<Checkout cart={cartOf(100)} />);
+     57|     await user.type(screen.getByLabelText('Coupon'), 'SAVE10');
+     58|     expect(screen.getByTestId('total')).toHaveTextContent('€85.50');
+       |                                          ^
+     59|   });
+     60|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/features/cart/checkout.test.tsx > checkout > rejects an expired coupon
+Error: Unable to find an element by: [data-testid="coupon-error"]
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <form>
+      <label for="coupon">Coupon</label>
+      <input id="coupon" value="OLD2020" />
+    </form>
+  </div>
+</body>
+
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ src/features/cart/checkout.test.tsx:71:19
+     69|     render(<Checkout cart={cartOf(100)} />);
+     70|     await user.type(screen.getByLabelText('Coupon'), 'OLD2020');
+     71|     expect(screen.getByTestId('coupon-error')).toBeVisible();
+       |                   ^
+     72|   });
+     73|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed | 25 passed (26)
+      Tests  2 failed | 262 passed (264)
+   Start at  14:02:31
+   Duration  3.12s (transform 1.4s, setup 0ms, collect 4.1s, tests 1.5s, environment 6.2s, prepare 2.3s)
+

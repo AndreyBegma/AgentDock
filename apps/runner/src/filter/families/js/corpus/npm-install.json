@@ -1,0 +1,7 @@
+{
+  "argv": ["npm", "install"],
+  "exitCode": 0,
+  "category": "other",
+  "outcome": "passing",
+  "expect": "filtered"
+}

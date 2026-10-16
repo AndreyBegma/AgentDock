@@ -115,25 +115,40 @@ export const median = (values: readonly number[]): number => {
     : ((sorted[mid - 1] ?? 0) + (sorted[mid] ?? 0)) / 2;
 };
 
-/** The savings ceilings (acceptance criteria): median kept/raw. */
-export const SAVINGS_CEILING: Record<CorpusOutcome, number> = {
-  failing: 0.3,
-  passing: 0.1,
+/**
+ * The savings ceilings (acceptance criteria, amendment 8): median kept/raw,
+ * per category and outcome. A type-check failure report is mostly error
+ * lines, which D4b keeps, so its failing ceiling is looser.
+ */
+export const SAVINGS_CEILINGS: Record<
+  'test' | 'typecheck',
+  Record<CorpusOutcome, number>
+> = {
+  test: { failing: 0.3, passing: 0.1 },
+  typecheck: { failing: 0.8, passing: 0.1 },
 };
 
+/** The test-runner ceilings; kept for callers that predate the split. */
+export const SAVINGS_CEILING: Record<CorpusOutcome, number> =
+  SAVINGS_CEILINGS.test;
+
 /**
- * The median kept/raw of the test-runner and type-checker cases with one
- * outcome, or `null` when there are none.
+ * The median kept/raw of the cases with one outcome, or `null` when there
+ * are none. With a `category` only that category counts; without one, the
+ * test-runner and type-checker cases together.
  */
 export const savingsMedian = (
   results: readonly CorpusResult[],
   outcome: CorpusOutcome,
+  category?: 'test' | 'typecheck',
 ): number | null => {
   const ratios = results
     .filter(
       (r) =>
         r.case.outcome === outcome &&
-        (r.case.category === 'test' || r.case.category === 'typecheck'),
+        (category === undefined
+          ? r.case.category === 'test' || r.case.category === 'typecheck'
+          : r.case.category === category),
     )
     .map((r) => r.ratio);
   return ratios.length === 0 ? null : median(ratios);

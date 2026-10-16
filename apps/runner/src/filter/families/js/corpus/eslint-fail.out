@@ -1,0 +1,10 @@
+
+/home/dev/shop/web/src/api/orders.ts
+  12:5   error    'currency' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  27:31  warning  Unexpected any. Specify a different type       @typescript-eslint/no-explicit-any
+
+/home/dev/shop/web/src/features/cart/checkout.tsx
+  64:13  error  React Hook "useCoupon" is called conditionally  react-hooks/rules-of-hooks
+
+✖ 3 problems (2 errors, 1 warning)
+

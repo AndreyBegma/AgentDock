@@ -1,0 +1,11 @@
+bun test v1.4.0 (34cbb9a40)
+
+src/filter/bench.spec.ts:
+filter overhead: p50 27.6 ms, p95 35.5 ms (40 runs)
+on-the-pane
+
+ 1091 pass
+ 7 skip
+ 0 fail
+ 3654 expect() calls
+Ran 1098 tests across 116 files. [37.99s]
