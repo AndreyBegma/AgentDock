@@ -481,7 +481,8 @@ export class BoardWork implements OnModuleInit {
       cardSource: card.source,
       autoCollect: card.autoCollect,
       // #424: a gone slot no longer moves its card, so a person may.
-      slotGone: card.fleetSlotGone,
+      // #433: a card with no slot at all has nothing to follow either.
+      slotGone: card.fleetSlotGone || card.fleetSlot === null,
     });
   }
 

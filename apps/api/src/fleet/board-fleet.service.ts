@@ -49,7 +49,8 @@ export const cardFleetView = (
         issue: card.fleetIssue,
         slot: card.fleetSlot,
         stage: isFleetStage(card.fleetStage) ? card.fleetStage : null,
-        slotGone: card.fleetSlotGone,
+        // #433: a slotless card has no slot to follow, so a person may move it.
+        slotGone: card.fleetSlotGone || card.fleetSlot === null,
       }
     : null;
 
@@ -382,6 +383,40 @@ export class BoardFleetService
       });
       created.push(card);
       touched.push(card.id);
+    }
+
+    // #433: a slotless To Do card whose issue left the ready set is no longer
+    // "Waiting for a slot". Closed issue → Finished; open (unlabelled) → the
+    // card leaves the Board. A card a person already moved on stays put.
+    const readySet = new Set(ready.map((r) => r.issueNumber));
+    const orphans = [...byKey.values()].filter(
+      (c) =>
+        c.fleetSlot === null &&
+        c.column === 'todo' &&
+        c.fleetIssue !== null &&
+        !readySet.has(c.fleetIssue),
+    );
+    if (orphans.length > 0) {
+      const closedOrphans = new Set(
+        (
+          await tx.issueCache.findMany({
+            where: {
+              projectId,
+              number: { in: orphans.map((c) => c.fleetIssue as number) },
+              state: 'closed',
+            },
+            select: { number: true },
+          })
+        ).map((r) => r.number),
+      );
+      for (const card of orphans) {
+        if (closedOrphans.has(card.fleetIssue as number)) {
+          moves.push({ number: card.number, to: 'finished' });
+        } else {
+          await tx.boardCard.delete({ where: { id: card.id } });
+          touched.push(card.id);
+        }
+      }
     }
     return { created, moves, touched };
   }
