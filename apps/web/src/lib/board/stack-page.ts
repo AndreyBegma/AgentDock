@@ -87,3 +87,18 @@ export function addableCards(view: BoardView | undefined): BoardCardView[] {
     .filter((c) => !c.stack && c.column !== 'inbox' && c.column !== 'completed')
     .sort((a, b) => a.number - b.number);
 }
+
+/**
+ * #502: the stack page's "Stack design required" switch — on while the
+ * stack's design is needed, locked while a design turn runs (Stop it first).
+ */
+export function designSwitch(stack: Pick<BoardStackDetail, 'design'>): {
+  required: boolean;
+  locked: boolean;
+} {
+  const status = stack.design?.status;
+  return {
+    required: stack.design !== null,
+    locked: status === 'generating' || status === 'revising',
+  };
+}
