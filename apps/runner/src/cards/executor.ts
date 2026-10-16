@@ -29,6 +29,7 @@ import { errorMessage, type Logger } from '../log';
 import { profileOf, type SkillsDeps } from '../skills/deps';
 import { RUN_FILES, writeJsonAtomic } from '../skills/run/record';
 import { type AttachmentSource, syncAttachments } from './attachments';
+import { answerDialog, matchKnownDialog } from './dialogs';
 import {
   collectBranch,
   collectCard,
@@ -393,6 +394,7 @@ export class CardExecutor {
       if (record.phase !== 'running' || this.chains.has(record.cardId))
         continue;
       if (await this.tmux.find(record.tmuxSession)) {
+        await this.dismissKnownDialog(record);
         this.queuePush(record);
         continue;
       }
@@ -410,6 +412,36 @@ export class CardExecutor {
           ? { exitCode: exit.code }
           : {},
       );
+    }
+  }
+
+  /**
+   * #435: answers a known blocking dialog that needs no decision (see
+   * `KNOWN_DIALOGS`) with the option that changes nothing. Never fails the
+   * poll; permission prompts and unknown dialogs are left alone.
+   */
+  private async dismissKnownDialog(record: CardRecord): Promise<void> {
+    try {
+      const pane = await this.tmux.capture(record.tmuxSession);
+      const dialog = pane ? matchKnownDialog(pane) : null;
+      if (!dialog) return;
+      const sent = await answerDialog(
+        this.options.deps.exec,
+        this.options.tmuxServer ?? [],
+        record.tmuxSession,
+        dialog,
+      );
+      const fields = { cardId: record.cardId, dialog: dialog.name };
+      if (sent) {
+        this.options.log.info('cards: dismissed a blocking dialog', fields);
+      } else {
+        this.options.log.warn('cards: could not dismiss a dialog', fields);
+      }
+    } catch (error) {
+      this.options.log.warn('cards: checking the pane for a dialog failed', {
+        cardId: record.cardId,
+        error: errorMessage(error),
+      });
     }
   }
 
