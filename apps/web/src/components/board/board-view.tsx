@@ -57,11 +57,21 @@ import type { CardActions } from './use-card-actions';
 
 type Asking = Extract<DropDecision, { kind: 'confirm-stop' | 'offer-run' }>;
 
+/** C-29: Completed starts folded to a strip; the work in flight gets the width. */
+const FOLDED_AT_START = ['completed'];
+
+/** Older Completed pages, fetched by the page; offered in Completed's footer. */
+export interface OlderCompleted {
+  loading: boolean;
+  onLoad: () => void;
+}
+
 /**
  * The Board (D7). It is controlled: a drop is checked with `boardMoveRule`,
  * shown at once, and sent; a refusal from the server rolls it back with a toast.
  * glass-ui's `Board` has no `canDrop`, so a drop that is not allowed is
- * declined here, in `onMove`.
+ * declined here, in `onMove`. A plan task is `movable: false`, so neither the
+ * drag nor the menu can produce a move for it (C-44).
  */
 export function BoardColumns({
   projectId,
@@ -73,6 +83,7 @@ export function BoardColumns({
   actions,
   filter,
   compact,
+  olderCompleted,
   onOpen,
   onOpenPlanTask,
   onOpenTerminal,
@@ -89,6 +100,8 @@ export function BoardColumns({
   /** C-29: what the toolbar hides; a hidden card is still in the column. */
   filter: BoardFilter;
   compact: boolean;
+  /** Set while the server has older Completed cards than the board holds. */
+  olderCompleted?: OlderCompleted;
   onOpen: (card: BoardCardView) => void;
   onOpenPlanTask: (task: BoardPlanTaskView) => void;
   onOpenTerminal: (card: BoardCardView) => void;
@@ -99,6 +112,7 @@ export function BoardColumns({
   const [optimistic, setOptimistic] = useState<BoardView>();
   const [asking, setAsking] = useState<Asking>();
   const [busy, setBusy] = useState(false);
+  const [collapsed, setCollapsed] = useState<string[]>(FOLDED_AT_START);
   const shown = optimistic ?? view;
 
   const phone = usePhone();
@@ -110,19 +124,32 @@ export function BoardColumns({
     const cards = filtering
       ? all.filter((item) => matchesFilter(item, filter))
       : all;
+    const older = c.column === 'completed' ? olderCompleted : undefined;
     return {
       id: c.column,
       title: COLUMN_TITLE[c.column],
       // `shown/total` while a filter hides some of the column.
-      header: filtering ? (
-        <span className="text-xs text-ink-3 tabular-nums">of {all.length}</span>
-      ) : undefined,
+      count: filtering ? `${cards.length}/${all.length}` : undefined,
       cards,
       footer:
-        all.length === 0 ? (
-          <p className="px-1 text-xs text-ink-3">{COLUMN_HINT[c.column]}</p>
-        ) : cards.length === 0 ? (
-          <p className="px-1 text-xs text-ink-3">No cards match.</p>
+        cards.length === 0 || older ? (
+          <>
+            {all.length === 0 ? (
+              <p className="px-1 text-xs text-ink-3">{COLUMN_HINT[c.column]}</p>
+            ) : cards.length === 0 ? (
+              <p className="px-1 text-xs text-ink-3">No cards match.</p>
+            ) : null}
+            {older ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={older.loading}
+                onClick={older.onLoad}
+              >
+                {older.loading ? 'Loading…' : 'Show older completed cards'}
+              </Button>
+            ) : null}
+          </>
         ) : c.column === 'inbox' && canOperate && !filtering ? (
           <Button
             variant="ghost"
@@ -137,6 +164,7 @@ export function BoardColumns({
   });
 
   const columns = visibleColumns(allColumns, phone);
+  const folded = columns.filter((c) => collapsed.includes(c.id)).length;
 
   /** Resolves `true` when the move landed. */
   const send = async (
@@ -230,7 +258,7 @@ export function BoardColumns({
         className="flex min-h-0 flex-1 flex-col [&_[data-board-card]]:shrink-0"
         style={
           {
-            '--board-column': boardColumnWidth(columns.length),
+            '--board-column': boardColumnWidth(columns.length - folded, folded),
           } as CSSProperties
         }
       >
@@ -238,6 +266,9 @@ export function BoardColumns({
           className="flex-1 pb-0.5"
           aria-label="Project board"
           columns={columns}
+          collapsible
+          collapsed={collapsed}
+          onCollapsedChange={setCollapsed}
           onMove={onMove}
           renderCard={(item) =>
             isPlanItem(item) ? (
@@ -255,9 +286,9 @@ export function BoardColumns({
           renderCardMenu={(item) => {
             if (isPlanItem(item)) {
               const task = item.planTask;
+              // Not movable: no move entries above, so no separator either.
               return (
                 <>
-                  <MenuSeparator />
                   <MenuItem onSelect={() => onOpenPlanTask(task)}>
                     Open
                   </MenuItem>
