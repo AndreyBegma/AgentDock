@@ -66,7 +66,6 @@ import { boardColumnWidth, usePhone, visibleColumns } from './board-layout';
 import { BulkActionBar } from './bulk-action-bar';
 import { CardFace } from './card-face';
 import { PlanTaskFace } from './plan-task-face';
-import { SelectionBar } from './selection-bar';
 import { useBulkActions } from './use-bulk-actions';
 import type { CardActions } from './use-card-actions';
 
@@ -539,17 +538,14 @@ export function BoardColumns({
       </div>
 
       {bulk.dialogs}
-      <SelectionBar
-        open={canOperate && selectedCards.length > 0}
-        aria-label="Bulk actions"
-      >
+      {canOperate ? (
         <BulkActionBar
           selected={selectedCards}
           busy={bulk.busy || busy}
           onClear={clearSelection}
           onAction={(action) => bulk.run(action, selectedCards)}
         />
-      </SelectionBar>
+      ) : null}
 
       <DialogRoot
         open={asking?.kind === 'offer-run'}
