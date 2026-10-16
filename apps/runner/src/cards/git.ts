@@ -366,7 +366,8 @@ export const pullRequestBodyOf = (
 
 /**
  * #359 D3: without the worker's file, the API's body led by the links to the
- * spec (`.md`) and the design (`.html`) `card.run` committed on the branch.
+ * spec (`.md`) and the design `card.run` committed on the branch — every
+ * frame of it (`.html`, #441).
  */
 export const fallbackPullRequestBody = (
   apiBody: string,
@@ -381,10 +382,12 @@ export const fallbackPullRequestBody = (
       .join('/')}`;
   const link = (path: string) => `[${path}](${url(path)})`;
   const spec = specFiles.find((p) => p.endsWith('.md'));
-  const design = specFiles.find((p) => p.endsWith('.html'));
+  const design = specFiles.filter((p) => p.endsWith('.html'));
   const parts = [
     ...(spec ? [`Spec: ${link(spec)}`] : []),
-    ...(design ? [`approved design: ${link(design)}`] : []),
+    ...(design.length > 0
+      ? [`approved design: ${design.map(link).join(', ')}`]
+      : []),
   ];
   return parts.length > 0 ? `${parts.join(' · ')}\n\n${apiBody}` : apiBody;
 };
