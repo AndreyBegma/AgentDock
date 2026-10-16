@@ -27,16 +27,18 @@ import { DisabledReason } from '../prerequisites/disabled-reason';
 import { IntakeView } from './intake-view';
 
 /**
- * New Card (#337 D2): one field, **What to do**, in any language, with
+ * New work (#337 D2, #409): one field, **What to do**, in any language, with
  * attachments and the planning model. **Start** creates a `card`-mode plan
  * and its first intake turn; the dialog then becomes the interview
- * (`IntakeView`). Closing it keeps the intake as a draft on the Board.
+ * (`IntakeView`), which ends in one card or a split into several. Closing it
+ * keeps the intake as a draft on the Board.
  */
 export function NewCardDialog({
   projectId,
   project,
   open,
   planId: controlledId,
+  initialBrief,
   board,
   onOpenChange,
   onStarted,
@@ -51,6 +53,8 @@ export function NewCardDialog({
    * Drafts Resume). Without it the dialog keeps the one it started.
    */
   planId?: string;
+  /** What to do, prefilled (the Board's `?brief=`, "Plan this"). */
+  initialBrief?: string;
   /** Where the generated card is found by its `planId`; fetched when absent. */
   board?: BoardView;
   /**
@@ -76,11 +80,11 @@ export function NewCardDialog({
       }}
     >
       <DialogContent
-        title="New card"
+        title="New work"
         description={
           planId
-            ? 'The planner asks until the task is clear, then writes the card in English. Close this to keep it as a draft.'
-            : 'Say what to do, in any language. The planner asks what it needs, then writes the card.'
+            ? 'The planner asks until the work is clear, then writes it in English — one card, or several if it splits. Close this to keep it as a draft.'
+            : 'Say what to do, in any language — one task or several. The planner asks what it needs, then writes the cards.'
         }
         className="sm:max-w-2xl"
       >
@@ -103,6 +107,7 @@ export function NewCardDialog({
             projectId={projectId}
             project={project}
             open={open}
+            initialBrief={initialBrief}
             busy={busy}
             setBusy={setBusy}
             onCancel={() => onOpenChange(false)}
@@ -121,6 +126,7 @@ function StartForm({
   projectId,
   project,
   open,
+  initialBrief,
   busy,
   setBusy,
   onCancel,
@@ -129,13 +135,18 @@ function StartForm({
   projectId: string;
   project?: ProjectDetail;
   open: boolean;
+  initialBrief?: string;
   busy: boolean;
   setBusy: (busy: boolean) => void;
   onCancel: () => void;
   onStarted: (planId: string) => void;
 }) {
   const settings = useUserSettings(open);
-  const [what, setWhat] = useState('');
+  const [what, setWhat] = useState(initialBrief ?? '');
+  // A prefilled brief arrives with the link that opens the dialog.
+  useEffect(() => {
+    if (open && initialBrief) setWhat(initialBrief);
+  }, [open, initialBrief]);
   const [model, setModel] = useState<string>();
   const [error, setError] = useState<string>();
   const uploads = useAttachmentUploads(projectId);
@@ -194,7 +205,7 @@ function StartForm({
       <Field
         label="What to do"
         htmlFor="board-new-what"
-        hint="In your own words and your own language. No title: the card gets one."
+        hint="In your own words and your own language — one task or several. No title: each card gets one."
       >
         <Textarea
           id="board-new-what"
@@ -209,13 +220,13 @@ function StartForm({
         <span className="text-sm font-medium">Attachments</span>
         <AttachmentDropzone
           uploads={uploads}
-          label="Attach files for the planner and the card"
+          label="Attach files for the planner and the cards"
         />
       </section>
       <Field
         label="Model"
         htmlFor="board-new-model"
-        hint="Your planning model from Account settings; this pick is for this card only."
+        hint="Your planning model from Account settings; this pick is for this request only."
       >
         <Select
           id="board-new-model"

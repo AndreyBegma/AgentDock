@@ -1,17 +1,22 @@
 import type {
   BoardCardView,
   BoardView,
+  ConfirmSplitCard,
   PlanDetail,
+  PlanIntakeSplitView,
   PlanSummary,
+  PlanTaskKind,
   PlanTurnView,
 } from '@agentdock/shared';
+import { CARD_DRAFT_TITLE_MAX } from '@agentdock/shared';
 import { pluralize } from '../format';
 import { activeTurn, failedTurn } from '../planner/format';
 
 /**
- * New Card is an interview (#337 D2–D6): a `card`-mode plan whose turns
- * open question rounds until the model writes the card. These helpers say
- * where an intake stands — for its dialog and for the Drafts strip.
+ * New work is an interview (#337 D2–D6, #409): a `card`-mode plan whose
+ * turns open question rounds until the model writes the card — or proposes
+ * to split the request into several. These helpers say where an intake
+ * stands — for its dialog and for the Drafts strip.
  */
 
 /** What to do, as typed: the API's brief limit (`BRIEF_MAX_LENGTH`). */
@@ -24,28 +29,31 @@ export type IntakePhase =
   | { kind: 'failed'; turn: PlanTurnView }
   /** A round is open. `round` is 1-based. */
   | { kind: 'round'; round: number; maxRounds: number }
-  /** The card exists; `card` once the board shows it. */
-  | { kind: 'done'; card: BoardCardView | null }
+  /** #409: the intake proposes several cards; the person confirms or declines. */
+  | { kind: 'split'; split: PlanIntakeSplitView }
+  /** The cards exist; `cards` are those the board shows so far. */
+  | { kind: 'done'; cards: BoardCardView[] }
   /** Discarded (archived) or sent: no card will come. */
   | { kind: 'closed' }
   /** Nothing open and nothing running: only Enough — generate moves it on. */
   | { kind: 'idle' };
 
-/** The board card a plan made: its origin (`planId`, #337 D6). */
-export const cardOfPlan = (
+/**
+ * The board cards a plan made: their origin (`planId`, #337 D6) — one, or
+ * every card of a confirmed split (#409) — by number, the order they were
+ * made in.
+ */
+export const cardsOfPlan = (
   view: BoardView | undefined,
   planId: string,
-): BoardCardView | null => {
-  for (const column of view?.columns ?? []) {
-    const card = column.cards.find((c) => c.planId === planId);
-    if (card) return card;
-  }
-  return null;
-};
+): BoardCardView[] =>
+  (view?.columns ?? [])
+    .flatMap((column) => column.cards.filter((c) => c.planId === planId))
+    .sort((a, b) => a.number - b.number);
 
 export function intakePhase(plan: PlanDetail, board?: BoardView): IntakePhase {
   if (plan.status === 'done') {
-    return { kind: 'done', card: cardOfPlan(board, plan.id) };
+    return { kind: 'done', cards: cardsOfPlan(board, plan.id) };
   }
   if (plan.status === 'archived' || plan.status === 'sent') {
     return { kind: 'closed' };
@@ -62,8 +70,50 @@ export function intakePhase(plan: PlanDetail, board?: BoardView): IntakePhase {
       maxRounds: plan.intake?.maxRounds ?? asked,
     };
   }
+  if (plan.intake?.split) return { kind: 'split', split: plan.intake.split };
   return { kind: 'idle' };
 }
+
+/** #409: one row of the split the person edits before Confirm. */
+export interface SplitRow {
+  index: number;
+  title: string;
+  kind: PlanTaskKind;
+  summary: string;
+}
+
+/** #409: the proposal as editable rows, in its order. */
+export const splitRows = (split: PlanIntakeSplitView): SplitRow[] =>
+  split.cards.map((c) => ({ ...c }));
+
+const NON_ASCII_LETTER = /[^\p{ASCII}]/u;
+
+/**
+ * #409: why a row cannot be confirmed — the API's rule, said before the
+ * round trip: a title, at most `CARD_DRAFT_TITLE_MAX` characters, in English
+ * (no letter outside ASCII). Null when it can.
+ */
+export function splitRowProblem(row: Pick<SplitRow, 'title'>): string | null {
+  const title = row.title.trim();
+  if (title === '') return 'A card needs a title.';
+  if (title.length > CARD_DRAFT_TITLE_MAX) {
+    return `At most ${CARD_DRAFT_TITLE_MAX} characters.`;
+  }
+  if ([...title].some((ch) => /\p{L}/u.test(ch) && NON_ASCII_LETTER.test(ch))) {
+    return 'Write the title in English — cards are stored in English.';
+  }
+  return null;
+}
+
+/** #409: Confirm's body for the rows kept, in their order. */
+export const confirmSplitCards = (
+  rows: readonly SplitRow[],
+): ConfirmSplitCard[] =>
+  rows.map((r) => ({ index: r.index, title: r.title.trim(), kind: r.kind }));
+
+/** "Create 3 cards" — Confirm's label. */
+export const confirmSplitText = (count: number): string =>
+  `Create ${pluralize(count, 'card')}`;
 
 /** "Round 2 of at most 4". */
 export const roundText = (round: number, maxRounds: number): string =>
@@ -73,9 +123,10 @@ export const roundText = (round: number, maxRounds: number): string =>
 export const DRAFTS_SHOWN_MAX = 8;
 
 /**
- * An open draft (#337 D2): the person's own intake that has not made its
- * card, or their own New Plan still being shaped — so closing the dialog
- * or the panel never loses it. Newest first.
+ * An open draft (#337 D2): the person's own New work intake that has not
+ * made its cards, or their own plan still being shaped (one started before
+ * New Plan went away, #409) — so closing the dialog or the panel never
+ * loses it. Newest first.
  */
 export function openDrafts(
   plans: readonly PlanSummary[],
@@ -112,6 +163,8 @@ export function draftStateText(plan: PlanDetail | undefined): string | null {
       return 'failed — retry';
     case 'round':
       return `${pluralize(plan.questions.length, 'question')} waiting`;
+    case 'split':
+      return `split into ${pluralize(phase.split.cards.length, 'card')}?`;
     case 'idle':
       return 'ready to generate';
     case 'done':

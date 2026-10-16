@@ -8,9 +8,13 @@ import {
   CARD_DRAFT_SECTIONS,
   CARD_DRAFT_TITLE_MAX,
   type CardDraft,
+  INTAKE_SPLIT_MAX,
+  INTAKE_SPLIT_MIN,
   intakeCardOutputSchema,
   intakeRoundOutputSchema,
+  intakeSplitOutputSchema,
   isIntakeCard,
+  isIntakeSplit,
   isPlannedTask,
   PLANNER_BLOCK_TAG,
   PLANNER_CONTRACT_VERSION,
@@ -92,6 +96,8 @@ export const PLANNER_VIOLATION_REASONS = [
   'missing_card_section',
   /** Intake (#337 D5, ADR-0027 §6): the card's title or body is not English. */
   'not_english',
+  /** Intake (#409): a split proposed after the person chose Keep one card. */
+  'split_declined',
 ] as const;
 export type PlannerViolationReason = (typeof PLANNER_VIOLATION_REASONS)[number];
 
@@ -144,12 +150,14 @@ export interface PlannerParseContexts {
  * question rounds its earlier turns opened. `generate`: the person pressed
  * Enough — generate. `acceptNonEnglish`: the one re-ask of a non-English card
  * is over — the card is taken and shown with a "Not English" warning (spec
- * "Risks").
+ * "Risks"). `keepOne` (#409): the person declined the split — the turn
+ * writes one card, neither a round nor another split.
  */
 export interface IntakeTurnState {
   roundsAsked: number;
   generate: boolean;
   acceptNonEnglish?: boolean;
+  keepOne?: boolean;
 }
 
 /**
@@ -164,10 +172,16 @@ export const intakeRoundsAsked = (
       t.action === 'intake' && t.phase === 'succeeded' && t.rounds.length > 0,
   ).length;
 
-/** #337 D4: the next intake turn must write the card — no fifth round, and none after Enough. */
+/**
+ * #337 D4: the next intake turn must write the card — no fifth round, and
+ * none after Enough or after Keep one card (#409).
+ */
 export const intakeMustGenerate = (
-  state: Pick<IntakeTurnState, 'roundsAsked' | 'generate'>,
-): boolean => state.generate || state.roundsAsked >= PLANNER_INTAKE_MAX_ROUNDS;
+  state: Pick<IntakeTurnState, 'roundsAsked' | 'generate' | 'keepOne'>,
+): boolean =>
+  state.generate ||
+  state.keepOne === true ||
+  state.roundsAsked >= PLANNER_INTAKE_MAX_ROUNDS;
 
 type ContextArgs<A extends PlanTurnAction> =
   // biome-ignore lint/complexity/noBannedTypes: an empty context is optional
@@ -338,6 +352,40 @@ export const isCardDraftEnglish = (draft: Pick<CardDraft, 'title' | 'body'>) =>
   isReliablyEnglish(draft.title) &&
   isReliablyEnglish(draft.body.replace(SECTION_LINE, ''));
 
+/**
+ * #337 D5, D6; #409: a written card — the single one or one of a split —
+ * carries the four sections and is English. `what` names it in the message.
+ */
+const checkCardDraft = (
+  draft: Pick<CardDraft, 'title' | 'body'>,
+  ctx: PlannerParseContexts['intake'],
+  what: string,
+) => {
+  const missing = missingCardSections(draft.body);
+  if (missing.length > 0) {
+    return violation(
+      'missing_card_section',
+      `${what}'s body needs ${missing.map((s) => `"## ${s}"`).join(', ')}`,
+    );
+  }
+  if (ctx.acceptNonEnglish !== true && !isCardDraftEnglish(draft)) {
+    return violation(
+      'not_english',
+      `${what}'s title and body must be written in English`,
+    );
+  }
+  return null;
+};
+
+/** #337, #409: the intake branch an output names by its key. */
+const intakeBranchSchema = (json: unknown) => {
+  if (typeof json === 'object' && json !== null) {
+    if ('cardDraft' in json) return intakeCardOutputSchema;
+    if ('split' in json) return intakeSplitOutputSchema;
+  }
+  return intakeRoundOutputSchema;
+};
+
 /** Spec 223 D7: the one design block, its HTML validated against D6. */
 const parseDesignBlock = (
   text: string,
@@ -423,9 +471,7 @@ export function parsePlannerOutput(
   // card's error rather than the round's "unknown key cardDraft".
   const schema =
     action === 'intake'
-      ? typeof json === 'object' && json !== null && 'cardDraft' in json
-        ? intakeCardOutputSchema
-        : intakeRoundOutputSchema
+      ? intakeBranchSchema(json)
       : plannerOutputSchemasFor(version)[action];
   const parsed = schema.safeParse(json);
   if (!parsed.success) return shapeViolation(parsed.error.issues);
@@ -532,34 +578,38 @@ export function parsePlannerOutput(
     }
     case 'intake': {
       const ctx = context as PlannerParseContexts['intake'];
+      if (isIntakeSplit(output)) {
+        if (ctx.keepOne === true) {
+          return violation(
+            'split_declined',
+            'the person chose to keep one card: write one card for the whole request',
+          );
+        }
+        for (const [i, card] of output.split.cards.entries()) {
+          const bad = checkCardDraft(card, ctx, `split card ${i + 1}`);
+          if (bad) return bad;
+        }
+        return { ok: true, output };
+      }
       if (!isIntakeCard(output)) {
         if (intakeMustGenerate(ctx)) {
           return violation(
             'must_generate',
-            ctx.generate
-              ? 'the person asked to generate: write the card now'
-              : `${PLANNER_INTAKE_MAX_ROUNDS} rounds were asked: write the card now`,
+            ctx.keepOne === true
+              ? 'the person chose to keep one card: write it now'
+              : ctx.generate
+                ? 'the person asked to generate: write the card now'
+                : `${PLANNER_INTAKE_MAX_ROUNDS} rounds were asked: write the card now`,
           );
         }
         return { ok: true, output };
       }
-      const missing = missingCardSections(output.cardDraft.body);
-      if (missing.length > 0) {
-        return violation(
-          'missing_card_section',
-          `the card body needs ${missing.map((s) => `"## ${s}"`).join(', ')}`,
-        );
-      }
-      if (
-        ctx.acceptNonEnglish !== true &&
-        !isCardDraftEnglish(output.cardDraft)
-      ) {
-        return violation(
-          'not_english',
-          'the card title and body must be written in English',
-        );
-      }
-      return { ok: true, output };
+      return (
+        checkCardDraft(output.cardDraft, ctx, 'the card') ?? {
+          ok: true,
+          output,
+        }
+      );
     }
   }
 }
@@ -725,6 +775,16 @@ CardDraft = {
   "kind": "bug" | "feature",
   "body": markdown           // the four sections below, in this order
 }
+SplitCard = {
+  "title": string,           // as CardDraft
+  "kind": "bug" | "feature",
+  "summary": string,         // one line the person reads in the proposal
+  "body": markdown           // as CardDraft
+}
+Split = {
+  "reason": string,          // why several cards, in the person's language
+  "cards": [ SplitCard ]     // ${INTAKE_SPLIT_MIN}–${INTAKE_SPLIT_MAX}, independent of each other
+}
 \`\`\`
 
 Every intake turn answers with one of:
@@ -732,16 +792,19 @@ Every intake turn answers with one of:
 \`\`\`
 intake → { "action": "intake", "questions": [ Question ] }   // a round: 1–${PLANNER_MAX_QUESTIONS} questions
 intake → { "action": "intake", "cardDraft": CardDraft }      // the card
+intake → { "action": "intake", "split": Split }              // a proposal of several cards
 \`\`\`
 
 Rules:
 
 - \`action\` is \`intake\`.
 - Ask a round only while something material is unknown; write the card as soon as nothing is.
-- At most ${PLANNER_INTAKE_MAX_ROUNDS} rounds. After the ${PLANNER_INTAKE_MAX_ROUNDS}th, or when the turn says the person asked to generate, write the card — a round then fails the turn.
+- At most ${PLANNER_INTAKE_MAX_ROUNDS} rounds. After the ${PLANNER_INTAKE_MAX_ROUNDS}th, or when the turn says the person asked to generate, write the card or the split — a round then fails the turn.
+- Propose a \`split\` only when the request is several independent tasks, or one task too big for a single agent. Each card stands alone: no card depends on another. One clear task is one \`cardDraft\`.
+- When the turn says the person chose to keep one card, write one \`cardDraft\` covering the whole request — a round or a split then fails the turn.
 - Questions, options and anything you say outside the block are in the language of the person's latest text.
-- The card — \`title\`, \`body\` — is in English, whatever language the person wrote in.
-- The \`body\` has exactly these \`##\` sections: ${CARD_DRAFT_SECTIONS.map((s) => `\`## ${s}\``).join(', ')}. Acceptance criteria are checkable bullets; each open question names the default taken.
+- Every card — \`title\`, \`summary\`, \`body\` — is in English, whatever language the person wrote in.
+- Every \`body\` has exactly these \`##\` sections: ${CARD_DRAFT_SECTIONS.map((s) => `\`## ${s}\``).join(', ')}. Acceptance criteria are checkable bullets; each open question names the default taken.
 - \`recommendation.optionId\`, when present, is the id of one of that question's options.
 ${MULTIPLE_RULE}
 - The \`body\` is a JSON string: newlines are \`\\n\`.

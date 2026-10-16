@@ -87,6 +87,12 @@ const assertAnswers = (
   }
 };
 
+/** #337 D3, D10, #409: the inputs only a card intake takes. */
+const intakeOnly = (input: PlanTurnInput): boolean =>
+  input.generate !== undefined ||
+  input.keepOne !== undefined ||
+  input.attachmentIds !== undefined;
+
 const turnInProgress = () =>
   plannerError(
     409,
@@ -132,11 +138,11 @@ export class PlanTurnService {
   ): Promise<string> {
     this.store.assertOpen(plan);
     if (plan.mode === 'card') return this.intakeTurn(plan, input, caller);
-    if (input.generate !== undefined || input.attachmentIds !== undefined) {
+    if (intakeOnly(input)) {
       throw plannerError(
         409,
         PLANNER_ERROR.wrongMode,
-        'Enough — generate and attachments belong to a card intake',
+        'Enough — generate, Keep one card and attachments belong to a card intake',
       );
     }
     let action: PlanTurnAction;
@@ -248,11 +254,11 @@ export class PlanTurnService {
     caller: PlanCaller,
   ): Promise<string> {
     this.store.assertOpen(plan);
-    if (input.generate !== undefined || input.attachmentIds !== undefined) {
+    if (intakeOnly(input)) {
       throw plannerError(
         409,
         PLANNER_ERROR.wrongMode,
-        'Enough — generate and attachments belong to a card intake',
+        'Enough — generate, Keep one card and attachments belong to a card intake',
       );
     }
     const task = await this.store.task(plan, key);
@@ -498,6 +504,7 @@ export class PlanTurnService {
                   maxRounds: PLANNER_INTAKE_MAX_ROUNDS,
                   generate: intakeState.generate,
                   mustGenerate: intakeMustGenerate(intakeState),
+                  keepOne: intakeState.keepOne === true,
                 }
               : undefined,
             attachments: (files ?? []).map((f) =>

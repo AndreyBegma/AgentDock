@@ -104,7 +104,7 @@ function WorkView() {
     }
   };
 
-  // The project New card and the empty state's Planner link point to: the
+  // The project New work and the empty state's Planner link point to: the
   // filtered one, else the only one.
   const target =
     projects.find((p) => p.id === filters.projectId) ??
@@ -139,7 +139,7 @@ function WorkView() {
             {canCreate ? (
               <Button onClick={() => setNewCardOpen(true)}>
                 <Plus aria-hidden="true" className="size-4" />
-                New card
+                New work
               </Button>
             ) : null}
           </>

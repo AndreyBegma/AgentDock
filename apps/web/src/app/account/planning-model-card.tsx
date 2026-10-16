@@ -16,8 +16,8 @@ import {
 } from '../../lib/settings/user-settings';
 
 /**
- * #337 D9: the model New Card interviews and New Plan plans run on unless
- * the person picks another at the start. The catalog's aliases (#322 D4);
+ * #337 D9: the model New work interviews run on (#409) unless the person
+ * picks another at the start. The catalog's aliases (#322 D4);
  * Reset goes back to the default.
  */
 export function PlanningModelCard() {
@@ -54,13 +54,13 @@ export function PlanningModelCard() {
       <SectionHeader
         className="mb-4"
         title="Planning model"
-        description="New Card interviews and New Plan start on this model. You can pick another for one card or plan when you start it."
+        description="New work interviews start on this model. You can pick another for one request when you start it."
       />
       <AsyncSection
         section={settings}
         unavailable={{
           title: 'Your settings could not be loaded',
-          stillWorks: 'New cards and plans still start, on the default model.',
+          stillWorks: 'New work still starts, on the default model.',
         }}
         empty={null}
         isEmpty={() => false}

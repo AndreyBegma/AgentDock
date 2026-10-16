@@ -1,6 +1,10 @@
 import {
   ATTACHMENTS_PER_CARD_MAX,
+  CARD_DRAFT_TITLE_MAX,
+  type ConfirmSplitCard,
+  type ConfirmSplitRequest,
   type CreatePlanRequest,
+  INTAKE_SPLIT_MAX,
   PLAN_MODES,
   PLAN_REVIEW_DECISIONS,
   PLAN_TASK_KINDS,
@@ -32,11 +36,14 @@ import {
   IsArray,
   IsBoolean,
   IsIn,
+  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
   Matches,
+  Max,
   MaxLength,
+  Min,
   ValidateNested,
 } from 'class-validator';
 
@@ -142,6 +149,11 @@ export class PlanTurnDto {
   @IsBoolean()
   generate?: boolean;
 
+  /** #409: Keep one card — the person declined the split. */
+  @IsOptional()
+  @IsBoolean()
+  keepOne?: boolean;
+
   /** #337 D10: files that came with the answer. */
   @IsOptional()
   @IsArray()
@@ -152,6 +164,37 @@ export class PlanTurnDto {
     message: 'attachmentIds must be attachment ids',
   })
   attachmentIds?: string[];
+}
+
+/** One kept card of a confirmed split (#409). */
+export class ConfirmSplitCardDto implements ConfirmSplitCard {
+  @IsInt()
+  @Min(0)
+  @Max(INTAKE_SPLIT_MAX - 1)
+  index!: number;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(CARD_DRAFT_TITLE_MAX)
+  title!: string;
+
+  @IsIn(PLAN_TASK_KINDS)
+  kind!: PlanTaskKind;
+}
+
+/** `POST …/plans/:planId/split` (#409): Confirm a split. */
+export class ConfirmSplitDto implements ConfirmSplitRequest {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(ID_MAX_LENGTH)
+  turnId!: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(INTAKE_SPLIT_MAX)
+  @ValidateNested({ each: true })
+  @Type(() => ConfirmSplitCardDto)
+  cards!: ConfirmSplitCardDto[];
 }
 
 /** `POST …/tasks/:key/review`. */

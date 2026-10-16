@@ -60,6 +60,15 @@ export const PLANNER_INTAKE_MAX_ROUNDS = 4;
 export const CARD_DRAFT_TITLE_MAX = 80;
 /** #337 D6: a generated card's body — the board's card body limit. */
 export const CARD_DRAFT_BODY_MAX = LOCAL_CARD_BODY_MAX;
+/**
+ * #409: the cards a split proposal names — at least two (one is a card), at
+ * most as many as a round has questions.
+ */
+export const INTAKE_SPLIT_MIN = 2;
+export const INTAKE_SPLIT_MAX = 8;
+/** #409: a split card's one-line summary, and the proposal's reason. */
+export const INTAKE_SPLIT_SUMMARY_MAX = 300;
+export const INTAKE_SPLIT_REASON_MAX = 1000;
 /** #337 D6: the `##` sections a generated card's body carries, in order. */
 export const CARD_DRAFT_SECTIONS = [
   'What to do',
@@ -70,7 +79,10 @@ export const CARD_DRAFT_SECTIONS = [
 
 // Plans
 
-/** D2; `card` is #337 D1: a New Card intake, ending in exactly one card. */
+/**
+ * D2; `card` is #337 D1: a New work intake, ending in one card — or, after a
+ * confirmed split, several independent ones (#409).
+ */
 export const PLAN_MODES = ['batch', 'dialogue', 'card'] as const;
 export const planModeSchema = z.enum(PLAN_MODES);
 export type PlanMode = z.infer<typeof planModeSchema>;
@@ -280,12 +292,15 @@ export type PlanAnswer = z.infer<typeof planAnswerSchema>;
 /**
  * A turn's input as the API stores it (`plan_turns.input`). #337: `generate`
  * is Enough — generate (D3): the turn must write the card; `attachmentIds`
- * are the files that came with it, passed to `plan.turn` (D10).
+ * are the files that came with it, passed to `plan.turn` (D10). #409:
+ * `keepOne` is Keep one card — the person declined the split, and the turn
+ * must write one card for the whole request.
  */
 export const planTurnInputSchema = z.strictObject({
   message: text(PLANNER_SUMMARY_MAX).optional(),
   answers: z.array(planAnswerSchema).max(PLANNER_MAX_QUESTIONS).optional(),
   generate: z.boolean().optional(),
+  keepOne: z.boolean().optional(),
   attachmentIds: z
     .array(attachmentIdSchema)
     .max(ATTACHMENTS_PER_CARD_MAX)
@@ -419,18 +434,57 @@ export const intakeCardOutputSchema = z.strictObject({
   action: z.literal('intake'),
   cardDraft: cardDraftSchema,
 });
+/**
+ * #409: one card of a split proposal — a full card, written like the single
+ * one, and a one-line summary the person reads in the proposal.
+ */
+export const splitCardDraftSchema = z.strictObject({
+  title: text(CARD_DRAFT_TITLE_MAX),
+  kind: planTaskKindSchema,
+  summary: text(INTAKE_SPLIT_SUMMARY_MAX),
+  body: text(CARD_DRAFT_BODY_MAX),
+});
+export type SplitCardDraft = z.infer<typeof splitCardDraftSchema>;
+
+/**
+ * #409: the intake proposes several independent cards — the request was
+ * several tasks, or one too big for one agent. Nothing is made until the
+ * person confirms; they may decline and keep one card.
+ */
+export const intakeSplitOutputSchema = z.strictObject({
+  action: z.literal('intake'),
+  split: z.strictObject({
+    reason: text(INTAKE_SPLIT_REASON_MAX),
+    cards: z
+      .array(splitCardDraftSchema)
+      .min(INTAKE_SPLIT_MIN)
+      .max(INTAKE_SPLIT_MAX),
+  }),
+});
 export const intakeOutputSchema = z.union([
   intakeRoundOutputSchema,
   intakeCardOutputSchema,
+  intakeSplitOutputSchema,
 ]);
 export type IntakeOutput = z.infer<typeof intakeOutputSchema>;
 export type IntakeRoundOutput = z.infer<typeof intakeRoundOutputSchema>;
 export type IntakeCardOutput = z.infer<typeof intakeCardOutputSchema>;
+export type IntakeSplitOutput = z.infer<typeof intakeSplitOutputSchema>;
 
 /** An intake output that wrote the card. */
 export const isIntakeCard = (
   output: IntakeOutput,
 ): output is IntakeCardOutput => 'cardDraft' in output;
+
+/** #409: an intake output that proposed a split. */
+export const isIntakeSplit = (
+  output: IntakeOutput,
+): output is IntakeSplitOutput => 'split' in output;
+
+/** An intake output that opened a question round. */
+export const isIntakeRound = (
+  output: IntakeOutput,
+): output is IntakeRoundOutput => 'questions' in output;
 
 /**
  * What a v1 plan's turns are validated against. `intake` is listed under
