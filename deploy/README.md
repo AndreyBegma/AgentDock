@@ -110,44 +110,78 @@ Nothing is published on the host. The stack runs on its own compose network
 
 ## Releasing the runner
 
-Decision: [ADR-0017](../docs/adr/0017-runner-distribution-homebrew-and-npm.md).
+Decisions: [ADR-0017](../docs/adr/0017-runner-distribution-homebrew-and-npm.md),
+[ADR-0046](../docs/adr/0046-runner-releases-are-signed-and-cut-only-from-protected-tags.md).
 A tag `runner-v<version>` runs `.woodpecker/release-runner.yml`. The workflow
-tests the runner, builds the four binaries and creates the GitHub Release with
-the tarballs and `SHA256SUMS`. It then publishes the npm packages, the four
-platform packages before `agentdock-runner`. Last, it pushes
-`Formula/agentdock-runner.rb` to `AndreyBegma/homebrew-tap`.
+tests the runner, builds the four binaries, signs `SHA256SUMS` and creates the
+GitHub Release with the tarballs, `SHA256SUMS` and `SHA256SUMS.sig`. It then
+publishes the npm packages, the four platform packages before
+`agentdock-runner`. Last, it pushes `Formula/agentdock-runner.rb` to
+`AndreyBegma/homebrew-tap`. The npm shim and the formula refuse a binary whose
+checksum is not in a `SHA256SUMS` signed by `apps/runner/release-key.pub`.
+
+The workflow file is not what keeps the secrets safe: anyone who pushes a
+commit can edit it. Two settings that only an administrator can change do
+that, and both must be in place before the first release.
 
 ### One-time setup
 
 1. Create the public repository `AndreyBegma/homebrew-tap` with a `Formula/`
    directory.
-2. Add two Woodpecker secrets to `AndreyBegma/AgentDock`, each restricted to the
-   **tag** and **manual** events:
+2. **Signing key.** The key pair is Ed25519, and its public half is
+   `apps/runner/release-key.pub`. Keep the private half offline, outside the
+   repository, with mode 600. To rotate it, generate a new pair with
+   `openssl genpkey -algorithm ed25519 -out runner-release-signing-key.pem` and
+   `openssl pkey -in runner-release-signing-key.pem -pubout`. Put the public half in
+   `release-key.pub` and in the copies the npm shim and the formula template
+   embed, which the runner's tests keep equal. The change lands in a pull
+   request before the next tag.
+3. **Woodpecker secrets (P-02).** Add three secrets to `AndreyBegma/AgentDock`,
+   each restricted to the **tag** event only. Do not tick **manual** or any
+   other event; a manual run is a dry run and gets no secret.
    - `github_release_token`: a GitHub token with *contents: write* on
      `AgentDock` and on `homebrew-tap`;
    - `npm_token`: an npm automation token for the account that owns
-     `agentdock-runner` and `agentdock-runner-{darwin,linux}-{arm64,x64}`.
+     `agentdock-runner` and `agentdock-runner-{darwin,linux}-{arm64,x64}`;
+   - `runner_signing_key`: the PEM private key whose public half is
+     `apps/runner/release-key.pub`. A tag run without it fails in
+     `build-release`, and a different key is refused.
+4. **GitHub tag ruleset (P-03).** In `AndreyBegma/AgentDock` → Settings →
+   Rules → Rulesets, add a tag ruleset, *Active*, that targets the tag pattern
+   `runner-v*`. Turn on *Restrict creations*, *Restrict updates* and *Restrict
+   deletions*, and give the bypass list only the repository administrators.
+   Collaborators and fleet identities then cannot push a `runner-v*` tag, so
+   they cannot start a run that sees the secrets.
 
 ### Each release
 
-1. **Bump** `version` in `apps/runner/package.json` and merge it. The tag must
-   match it exactly, or `build-release` fails.
+1. **Bump** `version` in `apps/runner/package.json` and merge it into `main`.
+   The tag must match it exactly, or `build-release` fails.
 2. **Rehearse** (optional). Run the pipeline by hand with a message that
    contains `[runner-release]`, for example `runner dry run [runner-release]`.
-   It builds everything and stops before every publish step. Without that
-   marker in the message, a manual run does not start the release workflow.
-   Use a branch other than `develop`: a manual run on `develop` also deploys
-   staging through `pipeline.yml`. The marker is in the message, not a
-   variable, because Woodpecker 3.x does not pass a manual run's variables to
-   a workflow's `when`. Locally, `sh apps/runner/scripts/build-release.sh` does
-   the same.
-3. **Tag and push** the merged commit:
+   It builds everything, signs `SHA256SUMS` with a throwaway key and stops
+   before every publish step. It sees no secret. Without that marker in the
+   message, a manual run does not start the release workflow. Use a branch
+   other than `develop`: a manual run on `develop` also deploys staging
+   through `pipeline.yml`. The marker is in the message, not a variable,
+   because Woodpecker 3.x does not pass a manual run's variables to a
+   workflow's `when`. Locally, `sh apps/runner/scripts/build-release.sh` does
+   the same; with `RUNNER_SIGNING_KEY` set to the private key it signs with
+   the release key.
+3. **Tag and push** a commit on `main`, as an administrator:
    ```sh
-   git tag runner-v0.1.0 <commit>
+   git fetch origin main
+   git merge-base --is-ancestor <commit> origin/main && git tag runner-v0.1.0 <commit>
    git push origin runner-v0.1.0
    ```
 4. **Verify:**
-   - the Release `runner-v<version>` has four tarballs and `SHA256SUMS`;
+   - the Release `runner-v<version>` has four tarballs, `SHA256SUMS` and
+     `SHA256SUMS.sig`, and the signature verifies:
+     ```sh
+     openssl pkeyutl -verify -pubin -inkey apps/runner/release-key.pub \
+       -rawin -in SHA256SUMS -sigfile SHA256SUMS.sig
+     sha256sum -c --ignore-missing SHA256SUMS
+     ```
    - `npm view agentdock-runner@<version> optionalDependencies` names the four
      platform packages at that version;
    - `brew update && brew install andreybegma/tap/agentdock-runner` then
@@ -158,4 +192,4 @@ platform packages before `agentdock-runner`. Last, it pushes
 A step that fails can be re-run. The Release assets are replaced, a version
 already on npm is skipped, and an unchanged formula is not committed again.
 `RUNNER_RELEASE_DRY_RUN=1` in the environment stops a tag run before it
-publishes.
+publishes; it is the way to rehearse the signature with the real key.

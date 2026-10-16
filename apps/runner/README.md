@@ -39,8 +39,10 @@ apps/runner/dist/agentdock-runner version
 ```
 
 `sh apps/runner/scripts/build-release.sh` builds all four targets, the
-tarballs, `SHA256SUMS`, the npm packages and the Homebrew formula into
-`apps/runner/release/`, and publishes nothing. It builds `@agentdock/shared`
+tarballs, `SHA256SUMS` and its signature `SHA256SUMS.sig`, the npm packages
+and the Homebrew formula into `apps/runner/release/`, and publishes nothing.
+Without `RUNNER_SIGNING_KEY` it signs with a throwaway key, so what it builds
+does not install ([ADR-0046](../../docs/adr/0046-runner-releases-are-signed-and-cut-only-from-protected-tags.md)). It builds `@agentdock/shared`
 first, so it works on a clean checkout. Releasing is in
 [deploy/README.md](../../deploy/README.md#releasing-the-runner).
 
