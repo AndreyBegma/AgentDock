@@ -364,6 +364,8 @@ function BoardScreen() {
         }}
         empty={null}
         isEmpty={() => false}
+        // The board's height chain runs through this wrapper (#384).
+        className="min-h-0 flex-1"
       >
         {() =>
           view ? (
