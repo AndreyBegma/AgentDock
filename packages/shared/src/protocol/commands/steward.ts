@@ -1,8 +1,15 @@
 import { z } from 'zod';
 import {
+  STEWARD_DIGEST_TRIGGERS,
   STEWARD_NUDGE_TEXT,
   stewardDialogIdSchema,
 } from '../../steward/contracts';
+import {
+  DIGEST_PROSE_MAX,
+  DIGEST_REASON_MAX,
+  DIGEST_TITLE_MAX,
+  isOneLine,
+} from '../../steward/digest';
 import { stewardActableSubjectSchema } from '../../steward/events';
 import { tokenSaverConfigSchema } from '../../token-saver/contracts';
 import type { CommandDefinition } from '../commands';
@@ -36,7 +43,8 @@ import { gitRefSchema, profileKeySchema, skillRunIdSchema } from './skills';
  *
  * No argument names a tmux session or a path the runner trusts as given: the
  * session is resolved from the subject, the worktree from `shortId`, and
- * `root` is checked against the watched project.
+ * `root` is checked against the watched project. `digest.compose` (#491)
+ * writes the digest prose; the API also checks that the runner advertises it.
  */
 
 export const STEWARD_COMMAND_TIMEOUT_MS = 15_000;
@@ -121,6 +129,77 @@ export const cardResumeResultSchema = z
   );
 export type CardResumeResult = z.infer<typeof cardResumeResultSchema>;
 
+// digest.compose
+
+/** D3: the digest prose is always haiku's. */
+export const DIGEST_COMPOSE_MODEL = 'haiku';
+/** At most this many lines of a section are given to the model; `total` counts them all. */
+export const DIGEST_COMPOSE_ITEMS_MAX = 20;
+/** The runner gives the call up after this long. */
+export const DIGEST_COMPOSE_TIMEOUT_SEC = 60;
+/** The API waits for the answer this long: the call, plus the start of `claude`. */
+export const DIGEST_COMPOSE_COMMAND_TIMEOUT_MS =
+  (DIGEST_COMPOSE_TIMEOUT_SEC + 15) * 1000;
+
+/** A bounded single line: what `oneLine(text, max)` leaves unchanged. */
+const digestLineSchema = (max: number) =>
+  z
+    .string()
+    .min(1)
+    .refine((t) => isOneLine(t, max), {
+      message: `must be one line of at most ${max} characters`,
+    });
+
+export const digestComposeItemSchema = z.strictObject({
+  label: digestLineSchema(DIGEST_TITLE_MAX),
+  title: digestLineSchema(DIGEST_TITLE_MAX),
+  reason: digestLineSchema(DIGEST_REASON_MAX).nullable(),
+});
+export type DigestComposeItem = z.infer<typeof digestComposeItemSchema>;
+
+export const digestComposeSectionSchema = z
+  .strictObject({
+    /** How many lines the stored section holds. */
+    total: z.number().int().min(0).max(10_000),
+    items: z.array(digestComposeItemSchema).max(DIGEST_COMPOSE_ITEMS_MAX),
+  })
+  .refine((s) => s.items.length <= s.total, {
+    message: 'more items than the total',
+    path: ['items'],
+  });
+export type DigestComposeSection = z.infer<typeof digestComposeSectionSchema>;
+
+/**
+ * #491 (D3, D14): haiku writes the digest's one-paragraph summary on the
+ * project's runner, through `profileKey`, as one headless `claude -p` with no
+ * tools — as the stall classifier does. The input is the digest's own stored
+ * content and nothing else: card and run titles, one-line reasons, counts and
+ * the spend, each already one bounded line (DA-13). No pane text, transcript
+ * or path can be named here. `runId` is the API's `steward` run that books
+ * the call's spend (D16); `sessionId` is the Claude session it picks.
+ */
+export const digestComposeArgsSchema = z.strictObject({
+  runId: skillRunIdSchema,
+  projectId: z.string().min(1),
+  sessionId: z.uuid(),
+  profileKey: profileKeySchema,
+  model: z.literal(DIGEST_COMPOSE_MODEL),
+  trigger: z.enum(STEWARD_DIGEST_TRIGGERS),
+  projectName: digestLineSchema(DIGEST_TITLE_MAX),
+  done: digestComposeSectionSchema,
+  stuck: digestComposeSectionSchema,
+  waiting: digestComposeSectionSchema,
+  /** A decimal string, as every `costUsd`. */
+  spendUsd: z.string().regex(/^\d{1,12}\.\d{2}$/),
+});
+export type DigestComposeArgs = z.infer<typeof digestComposeArgsSchema>;
+
+/** One paragraph on one line, at most `DIGEST_PROSE_MAX` characters. */
+export const digestComposeResultSchema = z.object({
+  prose: digestLineSchema(DIGEST_PROSE_MAX),
+});
+export type DigestComposeResult = z.infer<typeof digestComposeResultSchema>;
+
 export const stewardCommands = {
   'session.nudge': {
     args: sessionNudgeArgsSchema,
@@ -139,6 +218,12 @@ export const stewardCommands = {
     result: cardResumeResultSchema,
     minRole: 'operator',
     timeoutMs: CARD_TIMEOUTS_MS.run,
+  },
+  'digest.compose': {
+    args: digestComposeArgsSchema,
+    result: digestComposeResultSchema,
+    minRole: 'operator',
+    timeoutMs: DIGEST_COMPOSE_COMMAND_TIMEOUT_MS,
   },
 } as const satisfies Record<string, CommandDefinition>;
 
