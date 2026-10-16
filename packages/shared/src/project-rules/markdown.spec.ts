@@ -153,12 +153,12 @@ describe('parseRulesMarkdown (#528)', () => {
     });
 
     it('keeps indented paragraphs after a blank line in the item', () => {
-      expect(parseRulesMarkdown('- One\n\n  more about one\n- Two').rules).toEqual(
-        [
-          { title: 'One', description: 'One\n\nmore about one' },
-          { title: 'Two', description: 'Two' },
-        ],
-      );
+      expect(
+        parseRulesMarkdown('- One\n\n  more about one\n- Two').rules,
+      ).toEqual([
+        { title: 'One', description: 'One\n\nmore about one' },
+        { title: 'Two', description: 'Two' },
+      ]);
     });
 
     it('takes the least indented items as top level', () => {

@@ -129,7 +129,10 @@ const fromListItems = (
     if (current === null) return;
     const title = cleanTitle(current.first);
     if (title !== '') {
-      rules.push({ title, description: block([current.first, ...current.rest]) });
+      rules.push({
+        title,
+        description: block([current.first, ...current.rest]),
+      });
     }
     current = null;
   };
