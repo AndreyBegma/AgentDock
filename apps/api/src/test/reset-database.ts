@@ -1,4 +1,5 @@
-import { Client } from 'pg';
+import type { Client } from 'pg';
+import { connectOrExplain } from './connection-budget';
 
 /** #389: how long `DROP SCHEMA` waits for a lock before the setup gives up. */
 export const RESET_LOCK_TIMEOUT_MS = 10_000;
@@ -53,8 +54,7 @@ export const resetTestDatabase = async (
   lockTimeoutMs = RESET_LOCK_TIMEOUT_MS,
 ): Promise<void> => {
   const name = databaseName(url);
-  const admin = new Client({ connectionString: withoutParams(serverUrl(url)) });
-  await admin.connect();
+  const admin = await connectOrExplain(withoutParams(serverUrl(url)));
   try {
     const { rowCount } = await admin.query(
       'SELECT 1 FROM pg_database WHERE datname = $1',
@@ -69,8 +69,7 @@ export const resetTestDatabase = async (
     await admin.end();
   }
 
-  const db = new Client({ connectionString: withoutParams(url) });
-  await db.connect();
+  const db = await connectOrExplain(withoutParams(url));
   try {
     await db.query(
       `SET lock_timeout = ${Math.max(1, Math.trunc(lockTimeoutMs))}`,

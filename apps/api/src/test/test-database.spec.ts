@@ -1,4 +1,6 @@
 import {
+  CARD_CONNECTION_LIMIT,
+  CARD_POOL_TIMEOUT_S,
   cardTestDatabaseUrl,
   testDatabaseUrl,
   workerDatabaseUrl,
@@ -31,6 +33,32 @@ describe('test databases of a board card (#389)', () => {
     expect(url.pathname).toBe('/agentdock_card_h74ymwpx_test');
     expect(url.host).toBe('localhost:5421');
     expect(url.searchParams.get('schema')).toBe('public');
+  });
+
+  // #487: three cards' e2e runs at once exhausted the dev server's
+  // connections — a card's pools are bounded, its workers' databases too.
+  it("bounds a card's pool, on its database and every worker's", () => {
+    process.env.TEST_DATABASE_URL = BASE;
+    process.env.AGENTDOCK_CARD = 'h74ymwpx';
+    for (const url of [testDatabaseUrl(), workerDatabaseUrl(1)]) {
+      const params = new URL(url).searchParams;
+      expect(params.get('connection_limit')).toBe(
+        String(CARD_CONNECTION_LIMIT),
+      );
+      expect(params.get('pool_timeout')).toBe(String(CARD_POOL_TIMEOUT_S));
+      expect(params.get('schema')).toBe('public');
+    }
+  });
+
+  it("keeps a card URL's own pool parameters", () => {
+    const url = new URL(
+      cardTestDatabaseUrl(
+        `${BASE}&connection_limit=2&pool_timeout=3`,
+        'h74ymwpx',
+      ),
+    );
+    expect(url.searchParams.get('connection_limit')).toBe('2');
+    expect(url.searchParams.get('pool_timeout')).toBe('3');
   });
 
   it('refuses a card id that is not a short id', () => {
