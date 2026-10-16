@@ -19,6 +19,7 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   'runner.rename': 'Renamed a runner',
   'runner.revoke': 'Revoked a runner',
   'runner.update': "Changed a runner's settings",
+  'runner.connection_replaced': "Replaced a runner's live connection",
   'local.request': 'A Claude Code session asked the server',
   'runner.command': 'Sent a command to a runner',
   'runner.command.result': 'Runner answered a command',
