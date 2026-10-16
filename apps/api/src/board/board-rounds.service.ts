@@ -229,6 +229,93 @@ export class BoardRoundsService {
     await this.start(card, 'ci_fix', {}, null, BOARD_SYSTEM_ACTOR, [], input);
   }
 
+  /**
+   * #447 D10: makes a round whose session died resumable again, before
+   * Steward sends `card.resume`. Still active: nothing to undo (`active`).
+   * Ended by its session alone (`finishedBy: session_end`) while the card is
+   * still In progress — a shipping card finishes in place — it is `starting`
+   * again with its run live (`reopened`), so the runner's `running` moves it
+   * on. Anything else is `refused`: a newer round, a person's stop
+   * (`cancelled`), a worker's or a person's finish, a card the work moved on.
+   */
+  async reopenForResume(
+    roundId: string,
+  ): Promise<'active' | 'reopened' | 'refused'> {
+    const found = await this.prisma.boardCardRound.findUnique({
+      where: { id: roundId },
+      select: { cardId: true, runId: true },
+    });
+    if (!found) return 'refused';
+    const outcome = await this.prisma.$transaction(async (tx) => {
+      const card = await this.work.lock(tx, found.cardId);
+      const latest = card.rounds[0];
+      if (!latest || latest.id !== roundId) return 'refused';
+      if (isActiveRoundPhase(latest.phase)) return 'active';
+      if (
+        latest.phase !== 'finished' ||
+        latest.finishedBy !== 'session_end' ||
+        card.column !== 'in_progress'
+      ) {
+        return 'refused';
+      }
+      const { count } = await tx.boardCardRound.updateMany({
+        where: { id: roundId, phase: 'finished', finishedBy: 'session_end' },
+        data: {
+          phase: 'starting',
+          finishedAt: null,
+          finishedBy: null,
+          endedAt: null,
+          exitCode: null,
+        },
+      });
+      if (count === 0) return 'refused';
+      await tx.run.update({
+        where: { id: latest.runId },
+        data: {
+          status: 'running',
+          endedAt: null,
+          durationMs: null,
+          updatedAt: new Date(),
+        },
+      });
+      return 'reopened';
+    });
+    if (outcome === 'reopened') {
+      const card = await this.prisma.boardCard.findUniqueOrThrow({
+        where: { id: found.cardId },
+        select: { projectId: true },
+      });
+      this.work.publishRun(card.projectId, found.runId, 'running');
+      this.work.publish(card.projectId, found.cardId);
+    }
+    return outcome;
+  }
+
+  /**
+   * #447 D10: a reopened round whose resume did not start goes back to how
+   * its session left it — finished by the session's end.
+   */
+  async revertResume(roundId: string): Promise<void> {
+    const round = await this.prisma.boardCardRound.findUnique({
+      where: { id: roundId },
+      select: { runId: true, card: { select: { id: true, projectId: true } } },
+    });
+    if (!round) return;
+    const ended = await this.prisma.$transaction(async (tx) => {
+      const now = new Date();
+      const done = await this.work.endRound(tx, roundId, 'finished', now, {
+        finishedBy: 'session_end',
+        endedAt: now,
+      });
+      if (done) await this.work.closeRun(tx, round.runId, 'succeeded');
+      return done;
+    });
+    if (ended) {
+      this.work.publishRun(round.card.projectId, round.runId, 'succeeded');
+      this.work.publish(round.card.projectId, round.card.id);
+    }
+  }
+
   private running(): BoardFailure {
     return boardError(
       409,
@@ -494,6 +581,8 @@ export class BoardRoundsService {
             round: next,
             trigger,
             promptVersion: CARD_WORKER_PROMPT_VERSION,
+            // #447 DA-15: Steward resumes the round in the mode it started in.
+            permissionMode,
           },
           tokenSaver: saver.on,
           status: 'running',

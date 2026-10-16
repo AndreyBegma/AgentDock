@@ -1,7 +1,12 @@
-import { CARD_HOOKS_GRACE_MS } from '@agentdock/shared';
+import { CARD_HOOKS_GRACE_MS, type StewardCardChip } from '@agentdock/shared';
 import type { ProfileAgentdock } from '@agentdock/shared/protocol';
 import type { BoardCard, BoardCardRound } from '@prisma/client';
-import { type CardFacts, hooksCauseOf } from './board-mapper';
+import {
+  type CardFacts,
+  type CardWithRounds,
+  hooksCauseOf,
+  stewardChipOf,
+} from './board-mapper';
 
 const now = new Date('2026-10-16T12:00:00.000Z');
 
@@ -95,5 +100,34 @@ describe('hooksCauseOf (#348 D1)', () => {
       ]),
     };
     expect(hooksCauseOf(card(), round(), other).hooksCause).toBe('unknown');
+  });
+});
+
+describe('stewardChipOf (#447 D15)', () => {
+  const chip: StewardCardChip = {
+    incidentId: 'inc1',
+    kind: 'api_error',
+    status: 'open',
+    actions: [{ action: 'nudge', at: now.toISOString(), result: 'ok' }],
+  };
+  const withRounds = (...ids: string[]): CardWithRounds =>
+    ({
+      ...card(),
+      rounds: ids.map((id) => round({ id })),
+    }) as CardWithRounds;
+
+  it("is the latest round's live incident", () => {
+    const steward = new Map([['r2', chip]]);
+    expect(stewardChipOf(withRounds('r2', 'r1'), { steward })).toEqual(chip);
+  });
+
+  it("never shows an earlier round's incident", () => {
+    const steward = new Map([['r1', chip]]);
+    expect(stewardChipOf(withRounds('r2', 'r1'), { steward })).toBeNull();
+  });
+
+  it('is null without rounds or without the facts', () => {
+    expect(stewardChipOf(withRounds(), { steward: new Map() })).toBeNull();
+    expect(stewardChipOf(withRounds('r1'), {})).toBeNull();
   });
 });
