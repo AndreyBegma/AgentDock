@@ -1,11 +1,12 @@
 'use client';
 
 import type { BoardCardDetail, CardDependenciesView } from '@agentdock/shared';
+import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
-import { Chip } from '@andrewbehma/glass-ui/chip';
 import { Field, Input } from '@andrewbehma/glass-ui/field';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { X } from 'lucide-react';
 import { useState } from 'react';
 import {
@@ -21,8 +22,8 @@ import { COLUMN_TITLE, describeBoardError } from '../../lib/board/format';
 import { useSection } from '../../lib/section/use-section';
 
 /**
- * The cards this one runs after (#337 D8), each with its column — open ones
- * marked. An operator adds one by its number and removes one; a cycle or a
+ * The cards this one runs after (#337 D8), each accepted (in Completed) or
+ * open with its column (#443) — the header counts the open ones. An operator adds one by its number and removes one; a cycle or a
  * card of another project is refused by the API and said here. Dependencies
  * warn on Run; they never block a move or Accept.
  */
@@ -33,14 +34,19 @@ export function CardDependenciesSection({
   onChanged,
 }: {
   projectId: string;
-  card: Pick<BoardCardDetail, 'number' | 'label'>;
+  card: Pick<BoardCardDetail, 'number' | 'label' | 'dependsOn'>;
   canOperate: boolean;
   /** The board's faces show the chip: refetch them after a change. */
   onChanged: () => void;
 }) {
+  // #443: a dependency accepted elsewhere reaches the card by a live push;
+  // its columns are the refetch key, so the list follows.
+  const columns = (card.dependsOn ?? [])
+    .map((d) => `${d.number}:${d.column}`)
+    .join(',');
   const section = useSection(
     () => fetchDependencies(projectId, card.number),
-    [projectId, card.number],
+    [projectId, card.number, columns],
   );
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -78,10 +84,21 @@ export function CardDependenciesSection({
   };
 
   const list = section.data?.dependsOn ?? [];
+  const open = list.filter((d) => isOpenDependency(d.column)).length;
 
   return (
     <section aria-label="Depends on" className="flex flex-col gap-2">
-      <SectionHeader title="Depends on" headingLevel={3} />
+      <SectionHeader
+        title="Depends on"
+        headingLevel={3}
+        actions={
+          list.length === 0 ? undefined : open > 0 ? (
+            <Badge size="md" tone="warn" label={`${open} open`} />
+          ) : (
+            <Badge size="md" tone="ok" label="All accepted" />
+          )
+        }
+      />
       {section.data === undefined && !section.error ? (
         <Skeleton className="h-10 w-full" />
       ) : section.error && section.data === undefined ? (
@@ -113,9 +130,15 @@ export function CardDependenciesSection({
               >
                 {d.title}
               </span>
-              <Chip size="sm" tone={isOpenDependency(d.column) ? 'warn' : 'ok'}>
-                {COLUMN_TITLE[d.column]}
-              </Chip>
+              {isOpenDependency(d.column) ? (
+                <StatusPill
+                  size="sm"
+                  status="waiting"
+                  label={COLUMN_TITLE[d.column]}
+                />
+              ) : (
+                <StatusPill size="sm" status="done" label="Accepted" />
+              )}
               {canOperate ? (
                 <Button
                   size="sm"
@@ -135,6 +158,11 @@ export function CardDependenciesSection({
           ))}
         </ul>
       )}
+      {list.length > 0 ? (
+        <p className="text-xs text-ink-3">
+          Accepted means the card is in {COLUMN_TITLE.completed}.
+        </p>
+      ) : null}
       {canOperate ? (
         <form
           className="flex items-end gap-2"
