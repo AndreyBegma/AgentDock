@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { type CardStackRef, STACK_GATE_REASON } from '@agentdock/shared';
 import {
   anchorLabel,
   approveBlock,
@@ -9,6 +10,7 @@ import {
   pinMarkers,
   pinNumbers,
   reviseBlock,
+  stackDrawBlock,
 } from './comments';
 import { comment, design } from './fixtures';
 
@@ -148,5 +150,39 @@ describe('what the design takes now', () => {
   test('Approve needs a revision', () => {
     expect(approveBlock(design(), true)).toBeNull();
     expect(approveBlock(design({ revisions: [] }), true)).toMatch(/Generate/);
+  });
+});
+
+describe('stackDrawBlock (#527)', () => {
+  const stack = (gate: string | null): CardStackRef => ({
+    number: 1,
+    label: 'S-1',
+    title: 'Redesign the Settings page',
+    stage: 1,
+    stageTitle: 'Page',
+    gate,
+  });
+
+  test('a stack card waits for the stack design, naming the stack', () => {
+    const block = stackDrawBlock(stack(STACK_GATE_REASON));
+    expect(block).toContain(STACK_GATE_REASON);
+    expect(block).toContain('S-1 “Redesign the Settings page”');
+  });
+
+  test('a card in no stack, or one its stack lets draw, is not held', () => {
+    expect(stackDrawBlock(undefined)).toBeNull();
+    expect(stackDrawBlock(null)).toBeNull();
+    expect(stackDrawBlock(stack(null))).toBeNull();
+  });
+
+  test('Revise waits for the stack design before asking for a comment', () => {
+    const block = stackDrawBlock(stack(STACK_GATE_REASON));
+    expect(reviseBlock(design(), true, block)).toBe(block);
+    expect(reviseBlock(design({ comments: [comment()] }), true, block)).toBe(
+      block,
+    );
+    expect(reviseBlock(design({ comments: [comment()] }), true, null)).toBe(
+      null,
+    );
   });
 });

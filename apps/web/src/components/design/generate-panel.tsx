@@ -54,6 +54,8 @@ export function GeneratePanel({
   projectId,
   design,
   writeBlock,
+  stackBlock = null,
+  stackHref,
   busy,
   onPatch,
   onGenerate,
@@ -62,6 +64,10 @@ export function GeneratePanel({
   projectId: string;
   design: TaskDesignView;
   writeBlock: string | null;
+  /** #527: a stack card's own design waits for the stack's approved one. */
+  stackBlock?: string | null;
+  /** With `stackBlock`: the stack design's viewer. */
+  stackHref?: string;
   busy: boolean;
   onPatch: (body: TaskDesignPatchRequest) => Promise<unknown>;
   onGenerate: (body?: CardDesignLaunchRequest) => Promise<unknown>;
@@ -109,15 +115,21 @@ export function GeneratePanel({
     count !== design.variantCount ||
     skills.join('\n') !== design.skills.join('\n');
 
-  const blocked = writeBlock !== null || runnerCopy !== null || notReady;
+  const blocked =
+    writeBlock !== null ||
+    stackBlock !== null ||
+    runnerCopy !== null ||
+    notReady;
   const describedBy =
     writeBlock !== null
       ? undefined
-      : runnerCopy
-        ? 'design-runner-reason'
-        : notReady
-          ? 'design-readiness-reason'
-          : undefined;
+      : stackBlock !== null
+        ? 'design-stack-reason'
+        : runnerCopy
+          ? 'design-runner-reason'
+          : notReady
+            ? 'design-readiness-reason'
+            : undefined;
 
   const generate = async () => {
     try {
@@ -233,6 +245,14 @@ export function GeneratePanel({
 
       {writeBlock ? (
         <p className="text-xs text-ink-3">{writeBlock}</p>
+      ) : stackBlock ? (
+        <DisabledReason
+          id="design-stack-reason"
+          href={stackHref}
+          cta="Open the stack design"
+        >
+          {stackBlock}
+        </DisabledReason>
       ) : runnerCopy ? (
         <DisabledReason
           id="design-runner-reason"
