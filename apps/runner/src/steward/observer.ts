@@ -243,8 +243,13 @@ export class StewardObserver {
     );
     const threshold = config.silenceMinutes * 60_000;
     const now = this.options.clock.now();
-    // #390: a live background task is work, not silence.
-    if ((hook?.backgroundTasks ?? 0) > 0 || now - since < threshold) {
+    // #390: a live background task is work, not silence; #473: a question
+    // waits for the person, whom the Board tells.
+    if (
+      (hook?.backgroundTasks ?? 0) > 0 ||
+      reading.state === 'question' ||
+      now - since < threshold
+    ) {
       this.clear(key);
       return;
     }

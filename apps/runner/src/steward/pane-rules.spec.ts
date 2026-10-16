@@ -138,6 +138,20 @@ describe('readPane (#447 D6, D9, D11)', () => {
     expect(readPane(both).signal?.kind).toBe('permission_prompt');
   });
 
+  it('a question the worker asks is no signal: the Board tells the person (#473)', () => {
+    const question = readFileSync(
+      join(
+        import.meta.dir,
+        '..',
+        'cards',
+        '__fixtures__',
+        'ask-user-question.txt',
+      ),
+      'utf8',
+    );
+    expect(readPane(question)).toEqual({ state: 'question', signal: null });
+  });
+
   it('a worker asking "Do you want to proceed?" in its own text is not a permission prompt', () => {
     const reading = readPane(
       pane(['● The plan is ready. Do you want to proceed?']),

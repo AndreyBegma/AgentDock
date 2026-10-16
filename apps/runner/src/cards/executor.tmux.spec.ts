@@ -75,11 +75,11 @@ if [ "$FAKE_MODE" = prompt ]; then
   sleep 60
 fi
 if [ "$FAKE_MODE" = question ]; then
-  printf '\033[2J\033[H'; cat "$FIXTURES/ask-user-question.txt"
+  printf '\\033[2J\\033[H'; cat "$FIXTURES/ask-user-question.txt"
   IFS= read -r line
-  printf '\033[2J\033[H'; cat "$FIXTURES/ask-user-question-answered.txt"
+  printf '\\033[2J\\033[H'; cat "$FIXTURES/ask-user-question-answered.txt"
   IFS= read -r line
-  printf '\033[2J\033[H'; cat "$FIXTURES/ask-user-questions-two.txt"
+  printf '\\033[2J\\033[H'; cat "$FIXTURES/ask-user-questions-two.txt"
   sleep 60
 fi
 if [ "$FAKE_MODE" = permission ]; then
