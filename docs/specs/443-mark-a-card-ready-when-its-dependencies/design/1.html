@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>C-85 — Ready / Waiting and Auto-run</title>
+<style>
+:root{
+  --font-sans:'SF Pro Text','SF Pro Display',Inter,system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  --radius-control:6px;--radius-surface:8px;--radius-sheet:12px;
+  --size-row:32px;--size-control:28px;--size-nav:28px;
+  --dur-fast:100ms;--ease-sheet:cubic-bezier(.32,.72,0,1);
+  --glass-blur:26px;--glass-blur-strong:40px;
+}
+:root,:root[data-theme="dark"]{
+  color-scheme:dark;
+  --color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;
+  --color-content:rgb(27 38 71/.96);
+  --color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246/.62);--color-ink-3:rgb(242 242 246/.53);
+  --color-line:rgb(255 255 255/.1);--color-line-strong:rgb(255 255 255/.18);--color-hover:rgb(255 255 255/.06);
+  --color-focus:#b4b2ff;--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-soft:rgb(91 91 246/.2);--color-accent-ink:#b4b2ff;
+  --color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;
+  --color-scrim:rgb(10 16 34/.3);
+  --color-hue-1:#5b9cf6;--color-hue-1-soft:rgb(91 156 246/.18);--color-hue-1-ink:#a4c8ff;
+  --color-hue-2:#2fbf94;--color-hue-2-soft:rgb(47 191 148/.18);--color-hue-2-ink:#7ee0c0;
+  --color-hue-3:#7cc95a;--color-hue-3-soft:rgb(124 201 90/.18);--color-hue-3-ink:#ade58f;
+  --color-hue-4:#e69f00;--color-hue-4-soft:rgb(230 159 0/.18);--color-hue-4-ink:#f5c25c;
+  --color-hue-5:#e8743b;--color-hue-5-soft:rgb(232 116 59/.18);--color-hue-5-ink:#f9a77c;
+  --color-hue-7:#a68bfa;
+  --canvas-glow:18%;
+  --glass-sheen:rgb(255 255 255/.06);--glass-scrim:rgb(9 9 12/.55);--glass-scrim-strong:rgb(9 9 12/.64);
+  --glass-brightness:.85;--glass-brightness-strong:.7;
+  --glass-edge:rgb(255 255 255/.14);--glass-spec:rgb(255 255 255/.2);
+  --glass-rim:rgb(242 242 246/.8);--glass-rim-shade:rgb(9 9 12/.5);--glass-meniscus:rgb(9 9 12/.55);--glass-refract:rgb(242 242 246/.35);
+  --glass-shadow:rgb(0 0 0/.35);--glass-shadow-strong:rgb(0 0 0/.45);--glass-shadow-clear:rgb(0 0 0/.15);
+}
+:root[data-theme="light"]{
+  color-scheme:light;
+  --color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;
+  --color-content:rgb(255 255 255/.96);
+  --color-ink:#18181b;--color-ink-2:rgb(24 24 27/.72);--color-ink-3:rgb(24 24 27/.64);
+  --color-line:rgb(0 0 0/.1);--color-line-strong:rgb(0 0 0/.23);--color-hover:rgb(0 0 0/.06);
+  --color-focus:#4f46e5;--color-accent:#4f46e5;--color-on-accent:#fff;--color-accent-soft:rgb(79 70 229/.12);--color-accent-ink:#4338ca;
+  --color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;
+  --color-scrim:rgb(10 16 34/.22);
+  --color-hue-1:#1f64d6;--color-hue-1-soft:rgb(31 100 214/.12);--color-hue-1-ink:#1550b0;
+  --color-hue-2:#00805e;--color-hue-2-soft:rgb(0 128 94/.12);--color-hue-2-ink:#006a4e;
+  --color-hue-3:#3a7d1c;--color-hue-3-soft:rgb(58 125 28/.12);--color-hue-3-ink:#2f6617;
+  --color-hue-4:#b36b00;--color-hue-4-soft:rgb(179 107 0/.12);--color-hue-4-ink:#8a5200;
+  --color-hue-5:#c24e00;--color-hue-5-soft:rgb(194 78 0/.12);--color-hue-5-ink:#9c3d00;
+  --color-hue-7:#7244e0;
+  --canvas-glow:10%;
+  --glass-sheen:rgb(0 0 0/.06);--glass-scrim:rgb(255 255 255/.52);--glass-scrim-strong:rgb(255 255 255/.64);
+  --glass-brightness:1.15;--glass-brightness-strong:1.3;
+  --glass-edge:rgb(0 0 0/.18);--glass-spec:rgb(0 0 0/.2);
+  --glass-rim:rgb(255 255 255/.9);--glass-rim-shade:rgb(24 24 27/.18);--glass-meniscus:rgb(24 24 27/.12);--glass-refract:rgb(255 255 255/.5);
+  --glass-shadow:rgb(0 0 0/.12);--glass-shadow-strong:rgb(0 0 0/.16);--glass-shadow-clear:rgb(0 0 0/.08);
+}
+:root{
+  --color-status-running:var(--color-hue-2);--color-status-running-soft:var(--color-hue-2-soft);--color-status-running-ink:var(--color-hue-2-ink);
+  --color-status-waiting:var(--color-hue-1);--color-status-waiting-soft:var(--color-hue-1-soft);--color-status-waiting-ink:var(--color-hue-1-ink);
+  --color-status-paused:var(--color-hue-4);--color-status-paused-soft:var(--color-hue-4-soft);--color-status-paused-ink:var(--color-hue-4-ink);
+  --color-status-done:var(--color-hue-3);--color-status-done-soft:var(--color-hue-3-soft);--color-status-done-ink:var(--color-hue-3-ink);
+  --glass-filter:blur(var(--glass-blur)) saturate(180%) brightness(var(--glass-brightness));
+  --glass-filter-strong:blur(var(--glass-blur-strong)) saturate(180%) brightness(var(--glass-brightness-strong));
+}
+*,*::before,*::after{box-sizing:border-box}
+html{font-size:16px;background:var(--color-ground);color:var(--color-ink)}
+body{margin:0;min-height:100vh;font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+h1,h2,h3,p{margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}
+code,.mono{font-family:var(--font-mono)}
+.num{font-variant-numeric:tabular-nums}
+.icon{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.icon-xs{width:12px;height:12px}
+.text-section{font-size:15px;line-height:22px;font-weight:600}
+.text-sm{font-size:13px;line-height:20px}
+.text-xs{font-size:12px;line-height:16px}
+.text-label{font-size:12px;line-height:16px;font-weight:500}
+.ink{color:var(--color-ink)}.ink-2{color:var(--color-ink-2)}.ink-3{color:var(--color-ink-3)}
+.tone-ok{color:var(--color-ok)}.tone-warn{color:var(--color-warn)}
+
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:
+  radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),
+  radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%),
+  radial-gradient(70vmax 50vmax at 45% 110%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%)}
+.glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);backdrop-filter:var(--glass-filter);-webkit-backdrop-filter:var(--glass-filter);border:1px solid var(--glass-edge);
+  box-shadow:inset 0 1px 0 var(--glass-spec),inset 1px 1px 0 var(--glass-rim),inset -1px -1px 0 var(--glass-rim-shade),inset 0 -3px 3px -1px var(--glass-meniscus),inset 0 0 18px -4px var(--glass-refract),0 12px 32px var(--glass-shadow)}
+.glass-strong{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim-strong);backdrop-filter:var(--glass-filter-strong);-webkit-backdrop-filter:var(--glass-filter-strong);border:1px solid var(--glass-edge);
+  box-shadow:inset 0 1px 0 var(--glass-spec),inset -1px -1px 0 var(--glass-rim-shade),inset 0 -3px 3px -1px var(--glass-meniscus),inset 0 0 18px -4px var(--glass-refract),0 20px 48px var(--glass-shadow-strong)}
+.surface-content{background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:2px;flex:none;background:var(--color-hue-7)}
+
+.app-shell{display:flex;gap:12px;padding:12px;min-height:100vh}
+.app-column{display:flex;flex-direction:column;gap:12px;flex:1;min-width:0}
+.topbar{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;border-radius:var(--radius-surface)}
+.breadcrumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--color-ink-3)}
+.breadcrumb a{color:var(--color-ink-2);text-decoration:none}
+.breadcrumb [aria-current]{color:var(--color-ink);font-weight:500}
+.main{width:100%;max-width:80rem;margin:0 auto;display:flex;flex-direction:column;gap:20px;padding-bottom:24px}
+.page-header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px}
+.page-header h1{font-size:28px;line-height:32px;letter-spacing:-.02em;font-weight:600}
+.eyebrow{font-size:12px;font-weight:500;color:var(--color-ink-3)}
+.page-desc{max-width:65ch;font-size:13px;color:var(--color-ink-2);margin-top:4px}
+.avatar{display:inline-grid;place-content:center;width:28px;height:28px;border-radius:999px;background:var(--color-accent-soft);color:var(--color-accent-ink);font-size:12px;font-weight:600}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font-weight:600;cursor:pointer;border:1px solid transparent;height:var(--size-control);padding:0 16px;font-size:14px;border-radius:var(--radius-control);transition:background-color var(--dur-fast)}
+.btn-solid{background:var(--color-accent);color:var(--color-on-accent)}
+.btn-glass{background:var(--color-raised);border-color:var(--color-line-strong)}
+.btn-ghost{background:transparent;color:var(--color-ink-2)}
+.btn-ghost:hover{background:var(--color-hover);color:var(--color-ink)}
+.btn-icon{padding:0;aspect-ratio:1}
+.btn-sm{height:32px;padding:0 12px;font-size:12px}
+
+.badge{display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;font-weight:600;line-height:1;border-radius:999px;height:20px;min-width:20px;padding:0 6px;font-size:12px;background:var(--color-hover);color:var(--color-ink-2);font-variant-numeric:tabular-nums}
+.badge-ok{background:color-mix(in oklab,var(--color-ok) 14%,transparent);color:var(--color-ok)}
+.badge-warn{background:color-mix(in oklab,var(--color-warn) 14%,transparent);color:var(--color-warn)}
+.badge-accent{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.status-pill{display:inline-flex;align-items:center;white-space:nowrap;border-radius:999px;font-weight:500;line-height:1;height:20px;gap:6px;padding:0 8px;font-size:11px;background:var(--color-hover);color:var(--color-ink-2)}
+.status-dot{display:inline-block;width:6px;height:6px;border-radius:999px;background:var(--color-ink-3)}
+[data-status="done"]{background:var(--color-status-done-soft);color:var(--color-status-done-ink)}
+[data-status="done"] .status-dot{background:var(--color-status-done)}
+[data-status="paused"]{background:var(--color-status-paused-soft);color:var(--color-status-paused-ink)}
+[data-status="paused"] .status-dot{background:var(--color-status-paused)}
+[data-status="running"]{background:var(--color-status-running-soft);color:var(--color-status-running-ink)}
+[data-status="running"] .status-dot{background:var(--color-status-running)}
+[data-status="waiting"]{background:var(--color-status-waiting-soft);color:var(--color-status-waiting-ink)}
+[data-status="waiting"] .status-dot{background:var(--color-status-waiting)}
+.status-dot[data-status]{background:none}
+
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+.segmented{display:inline-flex;gap:4px;padding:2px;height:var(--size-control);border-radius:999px;list-style:none;margin:0}
+.segmented button{height:100%;padding:0 12px;border:0;background:none;border-radius:999px;font-size:13px;font-weight:500;color:var(--color-ink-2);cursor:pointer}
+.segmented button[aria-pressed="true"]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;font-size:12px;font-weight:500;border-radius:calc(var(--radius-control) - 4px);background:var(--color-hover);color:var(--color-ink-2);border:0}
+
+.layout{display:flex;gap:12px;align-items:flex-start}
+.board{display:flex;gap:12px;overflow-x:auto;align-items:flex-start;flex:1;min-width:0}
+.board-col{flex:none;width:296px;display:flex;flex-direction:column;gap:8px;padding:8px;border-radius:var(--radius-surface);background:var(--color-surface);border:1px solid var(--color-line)}
+.board-col-head{display:flex;align-items:center;gap:8px;padding:4px 4px 0;font-size:13px;font-weight:600}
+.board-card{display:flex;flex-direction:column;gap:8px;padding:10px 12px;border-radius:var(--radius-control);cursor:pointer;text-align:left;width:100%}
+.board-card[aria-selected="true"]{border-color:var(--color-accent);box-shadow:0 0 0 1px var(--color-accent)}
+.card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.card-id{font-family:var(--font-mono);font-size:11px;color:var(--color-ink-3)}
+.card-title{font-size:13px;line-height:18px;font-weight:500;color:var(--color-ink)}
+.card-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:var(--color-ink-3)}
+.card-badges{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.card-note{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--color-ink-3)}
+
+.sheet{width:min(440px,100%);flex:none;border-radius:var(--radius-sheet);display:flex;flex-direction:column;position:sticky;top:12px}
+.sheet-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:16px;border-bottom:1px solid var(--color-line)}
+.sheet-body{padding:16px;display:flex;flex-direction:column;gap:20px}
+.sheet-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 16px;border-top:1px solid var(--color-line)}
+.sec-title{font-size:13px;line-height:20px;font-weight:600;color:var(--color-ink);display:flex;align-items:center;gap:8px}
+.sec-title .badge{margin-left:auto}
+
+.dep-list{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.dep{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--radius-control);background:var(--color-surface);border:1px solid var(--color-line)}
+.dep-main{min-width:0;flex:1}
+.dep-title{font-size:13px;font-weight:500;color:var(--color-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dep-sub{font-size:12px;color:var(--color-ink-3)}
+.dep-icon{width:20px;height:20px;border-radius:999px;display:grid;place-content:center;flex:none}
+.dep-icon.ok{background:color-mix(in oklab,var(--color-ok) 16%,transparent);color:var(--color-ok)}
+.dep-icon.open{background:color-mix(in oklab,var(--color-warn) 16%,transparent);color:var(--color-warn)}
+
+.option-row{display:flex;align-items:flex-start;gap:12px;padding:12px;border-radius:var(--radius-surface);background:var(--color-surface);border:1px solid var(--color-line)}
+.option-row .grow{flex:1;min-width:0}
+.option-label{font-size:13px;font-weight:600;color:var(--color-ink)}
+.option-hint{font-size:12px;line-height:16px;color:var(--color-ink-3);margin-top:2px}
+.toggle{position:relative;display:inline-flex;align-items:center;width:44px;height:24px;flex:none;border-radius:999px;border:0;padding:0;cursor:pointer;background:var(--color-line-strong);transition:background-color var(--dur-fast)}
+.toggle::after{content:'';width:16px;height:16px;border-radius:999px;background:var(--color-ink);transform:translateX(4px);transition:transform var(--dur-fast);box-shadow:0 1px 2px rgb(0 0 0/.3)}
+.toggle[aria-checked="true"]{background:var(--color-accent)}
+.toggle[aria-checked="true"]::after{background:var(--color-on-accent);transform:translateX(24px)}
+
+.banner{display:flex;align-items:flex-start;gap:12px;padding:12px;border-radius:var(--radius-surface);border:1px solid var(--color-line);font-size:13px}
+.banner .icon{margin-top:2px}
+.banner-warn{border-color:color-mix(in oklab,var(--color-warn) 30%,transparent);background:color-mix(in oklab,var(--color-warn) 10%,transparent)}
+.banner-warn .icon{color:var(--color-warn)}
+.banner-info{background:var(--color-hover)}
+.banner-body{flex:1;display:flex;flex-direction:column;gap:2px}
+.banner-title{font-weight:600}
+
+.timeline{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column}
+.timeline li{position:relative;display:flex;gap:12px;padding:0 0 14px 0}
+.timeline li::before{content:'';position:absolute;left:2.5px;top:14px;bottom:0;width:1px;background:var(--color-line)}
+.timeline li:last-child::before{display:none}
+.timeline .status-dot{margin-top:7px}
+.timeline-time{margin-left:auto;font-size:12px;color:var(--color-ink-3);white-space:nowrap}
+.legend{display:flex;flex-wrap:wrap;gap:16px;font-size:12px;color:var(--color-ink-3)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.hidden{display:none!important}
+
+@media (max-width:1023px){.layout{flex-direction:column}.sheet{position:static;width:100%}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<div class="canvas"></div>
+<div class="app-shell">
+  <div class="app-column">
+    <header class="topbar glass">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="#">agentdock</a><span>/</span><span aria-current="page">Board</span></nav>
+      <button id="theme" class="btn btn-ghost btn-sm" style="margin-left:auto" aria-label="Toggle theme">Light / dark</button>
+      <span class="avatar">AB</span>
+    </header>
+
+    <main id="main-content" class="main">
+      <header class="page-header">
+        <div>
+          <div class="eyebrow">agentdock</div>
+          <h1>Board</h1>
+          <p class="page-desc">Cards ready to run are marked as soon as everything they depend on is accepted.</p>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-solid"><svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New card</button>
+        </div>
+      </header>
+
+      <div class="toolbar">
+        <ul class="segmented glass"><li><button aria-pressed="true">All</button></li><li><button aria-pressed="false">Ready</button></li><li><button aria-pressed="false">Waiting</button></li></ul>
+        <div class="legend">
+          <span><span class="badge badge-ok"><svg class="icon icon-xs" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Ready</span> every dependency accepted</span>
+          <span><span class="badge badge-warn"><svg class="icon icon-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>Waiting</span> open dependencies</span>
+          <span><svg class="icon icon-xs tone-ok" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg> Auto-run on</span>
+        </div>
+      </div>
+
+      <div class="layout">
+        <div class="board">
+          <section class="board-col" aria-label="To Do">
+            <div class="board-col-head">To Do<span class="badge">4</span></div>
+
+            <button class="board-card surface-content" aria-selected="false">
+              <div class="card-top"><span class="card-title">Mark a card ready when dependencies are accepted</span><span class="card-id">C-85</span></div>
+              <div class="card-badges">
+                <span class="badge badge-warn"><svg class="icon icon-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>Waiting · 1 of 2</span>
+                <span class="badge badge-accent" title="Auto-run when ready is on"><svg class="icon icon-xs" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg>Auto-run</span>
+              </div>
+              <div class="card-foot"><span style="display:inline-flex;align-items:center;gap:6px"><span class="swatch"></span>agentdock</span><span>Waits for C-84</span></div>
+            </button>
+
+            <button class="board-card surface-content" aria-selected="false">
+              <div class="card-top"><span class="card-title">Fleet slot budget banner</span><span class="card-id">C-81</span></div>
+              <div class="card-badges">
+                <span class="badge badge-ok"><svg class="icon icon-xs" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Ready</span>
+              </div>
+              <div class="card-foot"><span style="display:inline-flex;align-items:center;gap:6px"><span class="swatch"></span>agentdock</span><span>2 of 2 accepted</span></div>
+            </button>
+
+            <button class="board-card surface-content" aria-selected="false">
+              <div class="card-top"><span class="card-title">Release notes for runner 0.12</span><span class="card-id">C-79</span></div>
+              <div class="card-badges">
+                <span class="badge badge-ok"><svg class="icon icon-xs" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Ready</span>
+                <span class="badge badge-accent"><svg class="icon icon-xs" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg>Auto-run</span>
+              </div>
+              <div class="card-note"><svg class="icon icon-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>Queued, no free slot</div>
+            </button>
+
+            <button class="board-card surface-content" aria-selected="false">
+              <div class="card-top"><span class="card-title">Tidy intake empty state</span><span class="card-id">C-77</span></div>
+              <div class="card-foot"><span style="display:inline-flex;align-items:center;gap:6px"><span class="swatch"></span>agentdock</span><span>No dependencies</span></div>
+            </button>
+          </section>
+
+          <section class="board-col" aria-label="In progress">
+            <div class="board-col-head">In progress<span class="badge">1</span></div>
+            <article class="board-card surface-content">
+              <div class="card-top"><span class="card-title">Design frames</span><span class="card-id">C-84</span></div>
+              <div class="card-foot"><span class="status-pill" data-status="running"><span class="status-dot"></span>Running</span><span>slot-2</span></div>
+            </article>
+          </section>
+
+          <section class="board-col" aria-label="Done">
+            <div class="board-col-head">Done<span class="badge">2</span></div>
+            <article class="board-card surface-content">
+              <div class="card-top"><span class="card-title">Card round background</span><span class="card-id">C-83</span></div>
+              <div class="card-foot"><span class="status-pill" data-status="done"><span class="status-dot"></span>Accepted</span><span>PR #441</span></div>
+            </article>
+          </section>
+        </div>
+
+        <aside class="sheet glass-strong" role="dialog" aria-label="Card C-85">
+          <div class="sheet-head">
+            <div>
+              <div class="card-id">C-85</div>
+              <div class="text-section">Mark a card ready when dependencies are accepted</div>
+              <div class="card-badges" style="margin-top:8px">
+                <span id="readiness" class="badge badge-warn"><svg class="icon icon-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>Waiting · 1 of 2</span>
+                <span class="status-pill"><span class="status-dot"></span>To Do</span>
+              </div>
+            </div>
+            <button class="btn btn-ghost btn-icon" aria-label="Close"><svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+          </div>
+
+          <div class="sheet-body">
+            <section>
+              <div class="sec-title">Dependencies<span class="badge">1 open</span></div>
+              <ul class="dep-list">
+                <li class="dep">
+                  <span class="dep-icon ok"><svg class="icon icon-xs" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></span>
+                  <div class="dep-main"><div class="dep-title">Card round background</div><div class="dep-sub"><span class="mono">C-83</span> · PR #441 merged</div></div>
+                  <span class="status-pill" data-status="done"><span class="status-dot"></span>Accepted</span>
+                </li>
+                <li class="dep">
+                  <span class="dep-icon open"><svg class="icon icon-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span>
+                  <div class="dep-main"><div class="dep-title">Design frames</div><div class="dep-sub"><span class="mono">C-84</span> · PR #446 in review</div></div>
+                  <span class="status-pill" data-status="running"><span class="status-dot"></span>In progress</span>
+                </li>
+              </ul>
+              <p class="text-xs ink-3" style="margin-top:8px">Accepted means the card is in Done.</p>
+            </section>
+
+            <section>
+              <div class="sec-title">Run options</div>
+              <div class="option-row" style="margin-top:8px">
+                <div class="grow">
+                  <div class="option-label" id="ar-label">Auto-run when ready</div>
+                  <div class="option-hint">Starts the Run when the last open dependency is accepted. It follows the same slot and budget rules as pressing Run.</div>
+                </div>
+                <button id="ar" class="toggle" role="switch" aria-checked="true" aria-labelledby="ar-label"></button>
+              </div>
+              <div id="ar-note" class="banner banner-info" style="margin-top:8px">
+                <svg class="icon ink-3" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+                <div class="banner-body">Will start automatically after <span class="mono">C-84</span> is accepted.</div>
+              </div>
+              <div id="ar-off" class="banner banner-info hidden" style="margin-top:8px">
+                <svg class="icon ink-3" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+                <div class="banner-body">Nothing starts on its own. Press Run when you are ready.</div>
+              </div>
+            </section>
+
+            <section>
+              <div class="sec-title">Activity</div>
+              <ol class="timeline">
+                <li><span class="status-dot" data-status="waiting"></span><div><div class="text-sm ink">Auto-run turned on</div><div class="text-xs ink-3">Archi</div></div><span class="timeline-time">09:58</span></li>
+                <li><span class="status-dot" data-status="done"></span><div><div class="text-sm ink"><span class="mono">C-83</span> accepted</div><div class="text-xs ink-3">1 of 2 dependencies done</div></div><span class="timeline-time">09:41</span></li>
+                <li><span class="status-dot"></span><div><div class="text-sm ink">Card created</div><div class="text-xs ink-3">Planner</div></div><span class="timeline-time">09:12</span></li>
+              </ol>
+
+              <p class="text-xs ink-3" style="margin:4px 0 8px">After the last dependency is accepted:</p>
+              <ol class="timeline" style="margin-top:0">
+                <li><span class="status-dot" data-status="running"></span><div><div class="text-sm ink">Run started <span class="badge badge-accent" style="margin-left:4px"><svg class="icon icon-xs" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg>Auto-run</span></div><div class="text-xs ink-3">Triggered by <span class="mono">C-84</span> accepted · slot-3</div></div><span class="timeline-time">now</span></li>
+              </ol>
+              <div class="banner banner-warn" role="status" style="margin-top:4px">
+                <svg class="icon" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/></svg>
+                <div class="banner-body"><span class="banner-title">Auto-run could not start</span><span class="ink-2">Monthly budget reached — the same reason a manual Run would give. Raise the budget, then press Run.</span></div>
+              </div>
+              <p class="text-xs ink-3" style="margin-top:6px">Alternative outcomes shown for review: started, or refused with the reason.</p>
+            </section>
+          </div>
+
+          <div class="sheet-foot">
+            <span class="text-xs ink-3">Run still works while waiting; it only warns.</span>
+            <button class="btn btn-solid"><svg class="icon" viewBox="0 0 24 24"><path d="m6 4 14 8-14 8z"/></svg>Run</button>
+          </div>
+        </aside>
+      </div>
+    </main>
+  </div>
+</div>
+<script>
+(function(){
+  var r=document.documentElement;
+  document.getElementById('theme').addEventListener('click',function(){
+    r.setAttribute('data-theme',r.getAttribute('data-theme')==='dark'?'light':'dark');
+  });
+  var t=document.getElementById('ar'),on=document.getElementById('ar-note'),off=document.getElementById('ar-off');
+  t.addEventListener('click',function(){
+    var v=t.getAttribute('aria-checked')!=='true';
+    t.setAttribute('aria-checked',String(v));
+    on.classList.toggle('hidden',!v);
+    off.classList.toggle('hidden',v);
+  });
+})();
+</script>
+</body>
+</html>

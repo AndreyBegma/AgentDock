@@ -135,8 +135,13 @@ export const AUDIT_ACTIONS = [
   'card.pr_close_failed',
   /** #329 D5: a person's Create pull request (`after: { state, pr? }`, result error when it failed). */
   'card.collect_requested',
-  /** #273 D9: approving the design did not start the worker (`after: { code }`). */
+  /**
+   * #273 D9: approving the design did not start the worker (`after: { code }`).
+   * #443: nor did Auto-run when ready (`after: { code, after }`).
+   */
   'card.auto_run_failed',
+  /** #443: the card's Auto-run when ready switch (`after: { autoRunWhenReady }`). */
+  'card.auto_run_toggled',
   /** #309 D7: an upload stored, pending (`after: { name, mime, size }`). */
   'attachment.added',
   /** #309 D7: pending uploads claimed onto a card (`after: { cardId, roundId?, attachmentIds }`). */

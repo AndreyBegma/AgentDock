@@ -13,6 +13,7 @@ import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
+import { Chip } from '@andrewbehma/glass-ui/chip';
 import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
 import { Field, Input, Select, Textarea } from '@andrewbehma/glass-ui/field';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
@@ -21,7 +22,7 @@ import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Timeline, type TimelineItem } from '@andrewbehma/glass-ui/timeline';
 import { toast } from '@andrewbehma/glass-ui/toast';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Zap } from 'lucide-react';
 import NextLink from 'next/link';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { ApiError } from '../../lib/api';
@@ -54,6 +55,7 @@ import {
   isFleetCard,
   isTerminalCard,
   noPrBanner,
+  ownsWorker,
   phaseLabel,
   roundPill,
   SLOT_GONE_TEXT,
@@ -81,7 +83,11 @@ import { NormalizedNote } from '../text/normalized-note';
 import { CardDependenciesSection } from './card-dependencies';
 import { CardDescription } from './card-description';
 import { ApproveRunLink, CardDesignSection } from './card-design';
-import { AutoCollectToggle, CardOptionToggles } from './card-options';
+import {
+  AutoCollectToggle,
+  AutoRunSection,
+  CardOptionToggles,
+} from './card-options';
 import { LaunchPopover } from './launch-popover';
 import { SuggestionSheetBody } from './suggestion-sheet';
 import type { CardActions } from './use-card-actions';
@@ -126,14 +132,30 @@ function roundItems(
       tone: roundTone(round),
       actor: round.author ? { name: round.author.email } : undefined,
       title: (
-        <span>
-          Round {round.round} ·{' '}
-          {round.trigger === 'feedback' ? 'feedback' : 'run'} ·{' '}
-          {phaseLabel(round.phase)}
+        <span className="inline-flex flex-wrap items-center gap-1.5">
+          <span>
+            Round {round.round} ·{' '}
+            {round.trigger === 'feedback' ? 'feedback' : 'run'} ·{' '}
+            {phaseLabel(round.phase)}
+          </span>
+          {round.autoRunAfter != null ? (
+            // #443: Auto-run when ready started it, not a person's Run.
+            <Chip size="sm" className="gap-1">
+              <Zap aria-hidden="true" className="size-3" />
+              Auto-run
+            </Chip>
+          ) : null}
         </span>
       ),
       meta: (
         <span className="flex flex-col gap-1 text-xs">
+          {round.autoRunAfter != null ? (
+            <span>
+              Started after{' '}
+              <span className="font-mono">C-{round.autoRunAfter}</span> was
+              accepted
+            </span>
+          ) : null}
           {round.feedback ? (
             <span className="whitespace-pre-wrap break-words">
               “{round.feedback}”
@@ -544,7 +566,14 @@ export function CardDetailBody({
           })()
         : null}
 
-      {failure ? (
+      {failure && failure.after != null ? (
+        // #443: the reason a manual Run in the same state gets.
+        <Banner tone="warn" title="Auto-run could not start">
+          After <span className="font-mono">C-{failure.after}</span> was
+          accepted: {autoRunReason(failure)} — the same reason a manual Run
+          would give. Press Run once that is fixed.
+        </Banner>
+      ) : failure ? (
         <Banner tone="warn">
           Design approved — the worker did not start: {autoRunReason(failure)}.
         </Banner>
@@ -628,6 +657,11 @@ export function CardDetailBody({
           />
         </div>
       ) : null}
+      {canOperate && canRun(card) && card.readiness?.state === 'waiting' ? (
+        <p className="-mt-3 text-xs text-ink-3">
+          Run still works while waiting; it only warns.
+        </p>
+      ) : null}
       {canOperate && offer?.reason ? (
         <p id="board-approve-run-reason" className="-mt-3 text-xs text-ink-3">
           {offer.reason}
@@ -686,6 +720,16 @@ export function CardDetailBody({
       onChanged={onSaved}
     />
   );
+  // #443: a To Do card the board runs can start itself when it is ready.
+  const autoRunSection =
+    card.column === 'todo' && ownsWorker(card) ? (
+      <AutoRunSection
+        projectId={projectId}
+        card={card}
+        canOperate={canOperate}
+        onChanged={onSaved}
+      />
+    ) : null;
   const roundsSection = (
     <section aria-label="Rounds" className="flex flex-col gap-2">
       <SectionHeader title="Rounds" headingLevel={3} />
@@ -892,6 +936,7 @@ export function CardDetailBody({
             {panel(runSection)}
             {panel(designSection)}
             {panel(dependenciesSection)}
+            {panel(autoRunSection)}
             {panel(attachmentsSection)}
           </aside>
         </div>
@@ -926,6 +971,7 @@ export function CardDetailBody({
         {runSection}
         {designSection}
         {dependenciesSection}
+        {autoRunSection}
         {roundsSection}
         {attachmentsSection}
         {cardForm}

@@ -96,6 +96,17 @@ export type RoundCollectedHook = (
   outcome: CardCollectOutcome | null,
 ) => Promise<void>;
 
+/**
+ * #443: what follows a card's acceptance — Auto-run when ready of the cards
+ * that depend on it. `BoardAutoRun` registers it; `BoardWork` cannot depend
+ * on it (it starts rounds, which move cards through here).
+ */
+export type CardAcceptedHook = (
+  projectId: string,
+  card: Pick<BoardCard, 'id' | 'number'>,
+  actor: BoardActor,
+) => Promise<void>;
+
 export const ACTIVE_PHASES = [...ACTIVE_CARD_ROUND_PHASES];
 
 const SHORT_ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -217,6 +228,7 @@ export class BoardWork implements OnModuleInit {
   private readonly logger = new Logger(BoardWork.name);
   private readonly pending = new Set<Promise<void>>();
   private roundCollected: RoundCollectedHook | null = null;
+  private cardAccepted: CardAcceptedHook | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -458,6 +470,21 @@ export class BoardWork implements OnModuleInit {
     }
     for (const run of ended) this.publishRun(project.id, run.runId, run.status);
     this.publish(project.id, fresh.id);
+    // #443: the cards that wait for this one change Ready / Waiting.
+    if (effects.includes('accept') || effects.includes('reopen')) {
+      await this.publishDependants(project.id, fresh.id);
+    }
+    if (effects.includes('accept') && this.cardAccepted) {
+      const hook = this.cardAccepted;
+      this.track(
+        hook(project.id, fresh, actor).catch((error: unknown) => {
+          this.logger.error(
+            `the auto-run after ${cardLabel(fresh.number)} failed`,
+            error instanceof Error ? error.stack : String(error),
+          );
+        }),
+      );
+    }
     if (effects.includes('collect') && request.collect !== false) {
       this.collect(fresh.id);
     }
@@ -501,6 +528,11 @@ export class BoardWork implements OnModuleInit {
       card.branch !== null &&
       this.commands.servesChecks(project.runnerId)
     );
+  }
+
+  /** #443: `BoardAutoRun` registers what follows a card's acceptance. */
+  onAccepted(hook: CardAcceptedHook): void {
+    this.cardAccepted = hook;
   }
 
   /** #359: `BoardShipping` registers what follows a round's collect. */
@@ -1231,6 +1263,15 @@ export class BoardWork implements OnModuleInit {
         `board.changed ${cardId} not published: ${(error as Error).message}`,
       );
     }
+  }
+
+  /** #443: `board.changed` for every card that depends on `cardId`. */
+  async publishDependants(projectId: string, cardId: string): Promise<void> {
+    const rows = await this.prisma.boardCardDependency.findMany({
+      where: { dependsOnId: cardId },
+      select: { cardId: true },
+    });
+    for (const row of rows) this.publish(projectId, row.cardId);
   }
 
   publishRun(projectId: string, runId: string, status: RunStatus): void {

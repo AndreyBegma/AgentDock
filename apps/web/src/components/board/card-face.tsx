@@ -3,14 +3,14 @@ import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Chip } from '@andrewbehma/glass-ui/chip';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
-import { GitMerge, Paperclip } from 'lucide-react';
+import { Check, Clock, GitMerge, Paperclip, Zap } from 'lucide-react';
 import NextLink from 'next/link';
 import type { ReactNode } from 'react';
 import { attachmentCountLabel } from '../../lib/attachments/format';
-import { dependencyChip } from '../../lib/board/dependencies';
+import { dependencyChip, readinessChip } from '../../lib/board/dependencies';
 import {
   approveRunOffer,
-  autoRunReason,
+  autoRunFailureText,
   confidenceLabel,
   fleetHref,
   fleetSummary,
@@ -66,6 +66,8 @@ export function CardFace({
   const cost = formatCost(card.costUsd);
   // #337 D8: "after C-12", warning while it is not completed.
   const after = dependencyChip(card.dependsOn);
+  // #443: Ready / Waiting of a To Do card with dependencies.
+  const ready = readinessChip(card.readiness);
   const suggestion = isSuggestion(card);
   const note = `break-words text-xs text-ink-2${compact ? ' line-clamp-1' : ''}`;
   return (
@@ -124,6 +126,30 @@ export function CardFace({
         data-card-row="status"
         className="flex flex-wrap items-center gap-x-1.5 gap-y-1 empty:hidden"
       >
+        {ready ? (
+          <Chip
+            size="sm"
+            tone={ready.tone}
+            title={ready.title}
+            className="gap-1"
+          >
+            {ready.tone === 'ok' ? (
+              <Check aria-hidden="true" className="size-3" />
+            ) : (
+              <Clock aria-hidden="true" className="size-3" />
+            )}
+            {ready.text}
+          </Chip>
+        ) : null}
+        {card.autoRunWhenReady ? (
+          <Chip size="sm" title="Auto-run when ready is on" className="gap-1">
+            <Zap aria-hidden="true" className="size-3" />
+            Auto-run
+          </Chip>
+        ) : null}
+        {ready?.waitsFor ? (
+          <span className="text-xs text-ink-3">{ready.waitsFor}</span>
+        ) : null}
         {card.tracking ? <TerminalBadges card={card} /> : null}
         {card.fleet ? <FleetBadges card={card} /> : null}
         {suggestion ? <SuggestionBadges card={card} /> : null}
@@ -143,7 +169,7 @@ export function CardFace({
           <HooksChip projectId={projectId} card={card} round={card.round} />
         ) : null}
         {card.autoRunFailure ? (
-          <Tooltip content={autoRunReason(card.autoRunFailure)}>
+          <Tooltip content={autoRunFailureText(card.autoRunFailure)}>
             <span>
               <Badge tone="warn" size="md" label="Didn’t start" />
             </span>

@@ -399,6 +399,19 @@ export function autoRunReason(
   }
 }
 
+/**
+ * #273 D9, #443: what the face's "Didn’t start" says — the design approval's
+ * start, or Auto-run when ready's after a dependency was accepted.
+ */
+export function autoRunFailureText(
+  failure: NonNullable<BoardCardView['autoRunFailure']>,
+): string {
+  const reason = autoRunReason(failure);
+  return failure.after != null
+    ? `Auto-run after C-${failure.after} was accepted could not start: ${reason}`
+    : `Design approved — the worker did not start: ${reason}`;
+}
+
 /** Every board error as a sentence for the person; the server's text last. */
 export function describeBoardError(
   error: unknown,

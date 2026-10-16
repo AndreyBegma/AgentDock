@@ -519,13 +519,22 @@ export class BoardService implements OnModuleInit {
     actor: BoardActor,
   ): Promise<BoardCardDetail> {
     const card = await this.work.card(projectId, number);
-    const { continueAfterDesign, autoCollect, ...fields } = dto;
+    const { continueAfterDesign, autoCollect, autoRunWhenReady, ...fields } =
+      dto;
     // #282 D3: Automatic work is a terminal card's; refused before anything is written.
     if (autoCollect !== undefined && card.source !== 'terminal') {
       throw boardError(
         422,
         BOARD_ERROR.notTracked,
         'Automatic work is set on a card tracked from a terminal session only',
+      );
+    }
+    // #443: a card waits for its dependencies in To Do; off is always allowed.
+    if (autoRunWhenReady === true && card.column !== 'todo') {
+      throw boardError(
+        409,
+        BOARD_ERROR.wrongColumn,
+        'Auto-run when ready is set on a card in To Do only',
       );
     }
     // #322 D9: a remembered profile is a Claude profile of the project's runner.
@@ -543,9 +552,14 @@ export class BoardService implements OnModuleInit {
     if (autoCollect !== undefined) {
       await this.toggleAutoCollect(card, autoCollect, actor);
     }
+    if (autoRunWhenReady !== undefined) {
+      await this.toggleAutoRun(card, autoRunWhenReady, actor);
+    }
     // A switch alone is its own audit record, not a card edit.
     if (
-      (continueAfterDesign !== undefined || autoCollect !== undefined) &&
+      (continueAfterDesign !== undefined ||
+        autoCollect !== undefined ||
+        autoRunWhenReady !== undefined) &&
       Object.values(fields).every((v) => v === undefined)
     ) {
       this.work.publish(projectId, card.id);
@@ -683,6 +697,32 @@ export class BoardService implements OnModuleInit {
       projectId: card.projectId,
       before: { number: card.number, autoCollect: !on },
       after: { number: card.number, autoCollect: on },
+      result: 'ok',
+    });
+  }
+
+  /**
+   * #443: Auto-run when ready — accepting the last open dependency starts the
+   * Run (`BoardAutoRun`). Turning it on does not start a card that is
+   * already ready; that one is run by hand.
+   */
+  private async toggleAutoRun(
+    card: CardWithRounds,
+    on: boolean,
+    actor: BoardActor,
+  ): Promise<void> {
+    if (card.autoRunWhenReady === on) return;
+    await this.prisma.boardCard.update({
+      where: { id: card.id },
+      data: { autoRunWhenReady: on },
+    });
+    await this.audit.record({
+      ...actor.ctx,
+      action: 'card.auto_run_toggled',
+      target: { type: 'board_card', id: card.id },
+      projectId: card.projectId,
+      before: { number: card.number, autoRunWhenReady: !on },
+      after: { number: card.number, autoRunWhenReady: on },
       result: 'ok',
     });
   }

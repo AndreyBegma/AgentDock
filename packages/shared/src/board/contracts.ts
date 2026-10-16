@@ -85,6 +85,12 @@ export interface CardRoundBrief {
   wiring?: CardRunWiring | null;
   /** #367 D3: with `wiring: 'none'`, why. */
   wiringReason?: CardRunWiringReason | null;
+  /**
+   * #443: Auto-run when ready started the round, after this dependency's
+   * number was accepted; `null` for a round a person or AgentDock started.
+   * Optional so older fixtures stay valid.
+   */
+  autoRunAfter?: number | null;
 }
 
 /**
@@ -188,8 +194,21 @@ export interface BoardCardView {
    * session is gone.
    */
   sourceSessionId: string | null;
-  /** #273 D9: approving the design did not start the worker; `null` otherwise. */
+  /**
+   * #273 D9: approving the design did not start the worker; #443: or
+   * Auto-run when ready did not (`after` set). `null` otherwise.
+   */
   autoRunFailure: CardAutoRunFailure | null;
+  /**
+   * #443: Auto-run when ready — accepting the last open dependency starts
+   * the Run. Off by default; it turns itself off when it fires.
+   */
+  autoRunWhenReady: boolean;
+  /**
+   * #443: Ready / Waiting of a card in To Do with a dependency; `null` for
+   * any other card. Optional like `dependsOn`; absent reads as null.
+   */
+  readiness?: CardReadiness | null;
   /** #282 D1: set for a `terminal` card, `null` for any other source. */
   tracking: CardTrackingView | null;
   /** #282 D4: set for a `fleet` card, `null` for any other source. */
@@ -225,6 +244,19 @@ export interface CardDependencyRef {
   label: string;
   /** Open while not `completed`. */
   column: BoardColumn;
+}
+
+/**
+ * #443: a To Do card with dependencies is `ready` once every one is accepted
+ * (in Completed, whatever PRs it had), `waiting` while one is open.
+ */
+export interface CardReadiness {
+  state: 'ready' | 'waiting';
+  /** Dependencies in Completed. */
+  accepted: number;
+  total: number;
+  /** The open ones, in number order: "Waits for C-84". */
+  open: CardDependencyRef[];
 }
 
 /** #337 D8: one dependency as the card sheet lists it. */
@@ -284,6 +316,11 @@ export interface CardRoundView {
   round: number;
   runId: string;
   trigger: CardRoundTrigger;
+  /**
+   * #443: Auto-run when ready started the round, after this dependency's
+   * number was accepted; `null` otherwise. Optional so older fixtures stay valid.
+   */
+  autoRunAfter?: number | null;
   /** The person's text, for a `feedback` round. */
   feedback: string | null;
   author: BoardUserRef | null;
@@ -464,6 +501,8 @@ export interface UpdateBoardCardRequest {
   continueAfterDesign?: boolean;
   /** #282 D3: a `terminal` card only; any other card is refused `not_tracked`. */
   autoCollect?: boolean;
+  /** #443: Auto-run when ready; a card that is not in To Do is refused `wrong_column`. */
+  autoRunWhenReady?: boolean;
 }
 
 /** `POST /board/cards/:number/move` (D7). `index` is the drop index in `column`. */
@@ -651,13 +690,22 @@ export interface BoardErrorBody {
   dependencies?: CardDependencyRef[];
 }
 
-/** #273 D9: why approving the design did not start round 1. */
+/**
+ * #273 D9: why approving the design did not start round 1; #443: or why
+ * Auto-run when ready did not start the Run — the reason a manual Run gets.
+ */
 export interface CardAutoRunFailure {
   /** The refusal's `BoardErrorCode`, or `unknown` for any other exception. */
   code: BoardErrorCode | 'unknown';
   /** At most 500 characters. */
   message: string;
   at: string;
+  /**
+   * #443: the accepted dependency's number when Auto-run when ready tried
+   * the start; `null` when approving the design did. Optional so older
+   * fixtures stay valid.
+   */
+  after?: number | null;
 }
 
 const BOARD_ERROR_CODES: ReadonlySet<string> = new Set(
