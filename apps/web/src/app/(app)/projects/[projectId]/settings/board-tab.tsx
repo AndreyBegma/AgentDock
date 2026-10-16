@@ -4,6 +4,8 @@ import {
   BOARD_MAX_RUNNING_MAX,
   BOARD_MAX_RUNNING_MIN,
   type BoardSettingsView,
+  CARD_BACKGROUND_STALL_MINUTES_MAX,
+  CARD_BACKGROUND_STALL_MINUTES_MIN,
   type CaptureModel,
 } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
@@ -25,6 +27,7 @@ import {
   AUTO_COLLECT_DEFAULT_LABEL,
   describeBoardError,
   parseMaxRunning,
+  parseStallMinutes,
 } from '../../../../../lib/board/format';
 import {
   AUTO_MERGE_LABEL,
@@ -54,6 +57,7 @@ export function BoardTab({
   const [autoCollectTracked, setAutoCollectTracked] = useState(false);
   const [autoMerge, setAutoMerge] = useState(false);
   const [maxRunning, setMaxRunning] = useState('3');
+  const [stallMinutes, setStallMinutes] = useState('30');
   const [captureEnabled, setCaptureEnabled] = useState(false);
   const [captureModel, setCaptureModel] = useState<CaptureModel>('haiku');
   const [busy, setBusy] = useState(false);
@@ -68,6 +72,7 @@ export function BoardTab({
       setAutoCollectTracked(view.autoCollectTracked);
       setAutoMerge(effectiveAutoMerge(view));
       setMaxRunning(String(view.maxRunning));
+      setStallMinutes(String(view.backgroundStallMinutes));
       setCaptureEnabled(view.captureEnabled);
       setCaptureModel(view.captureModel);
     } catch (err) {
@@ -82,18 +87,20 @@ export function BoardTab({
   if (!settings) return <Skeleton className="h-64 w-full" />;
 
   const limit = parseMaxRunning(maxRunning);
+  const stall = parseStallMinutes(stallMinutes);
   const dirty =
     issueOnRun !== settings.issueOnRun ||
     specOnRun !== settings.specOnRun ||
     autoCollectTracked !== settings.autoCollectTracked ||
     autoMerge !== effectiveAutoMerge(settings) ||
     limit !== settings.maxRunning ||
+    stall !== settings.backgroundStallMinutes ||
     captureEnabled !== settings.captureEnabled ||
     captureModel !== settings.captureModel;
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
-    if (limit === null) return;
+    if (limit === null || stall === null) return;
     setBusy(true);
     try {
       await saveBoardSettings(projectId, {
@@ -105,6 +112,7 @@ export function BoardTab({
           ? { autoMergeCards: autoMerge }
           : {}),
         maxRunning: limit,
+        backgroundStallMinutes: stall,
         captureEnabled: captureEnabled && contentOn,
         captureModel,
       });
@@ -174,6 +182,24 @@ export function BoardTab({
                 onChange={(e) => setMaxRunning(e.target.value)}
               />
             </Field>
+            <Field
+              label="Background wait warning, minutes"
+              htmlFor="board-set-stall"
+              hint="A worker that ended its turn waiting on its own background task this long raises a warning and a notification."
+              error={
+                stall === null
+                  ? `Enter a whole number from ${CARD_BACKGROUND_STALL_MINUTES_MIN} to ${CARD_BACKGROUND_STALL_MINUTES_MAX}.`
+                  : undefined
+              }
+            >
+              <Input
+                id="board-set-stall"
+                inputMode="numeric"
+                value={stallMinutes}
+                disabled={!isAdmin}
+                onChange={(e) => setStallMinutes(e.target.value)}
+              />
+            </Field>
           </div>
           <CaptureFields
             projectId={projectId}
@@ -198,7 +224,7 @@ export function BoardTab({
               <Button
                 variant="solid"
                 type="submit"
-                disabled={busy || !dirty || limit === null}
+                disabled={busy || !dirty || limit === null || stall === null}
               >
                 Save
               </Button>

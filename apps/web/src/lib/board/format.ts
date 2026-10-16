@@ -7,6 +7,8 @@ import {
   type BoardColumn,
   type BoardMoveRefusal,
   type BoardView,
+  CARD_BACKGROUND_STALL_MINUTES_MAX,
+  CARD_BACKGROUND_STALL_MINUTES_MIN,
   type CaptureModel,
   type CaptureSkipReason,
   type CaptureStatus,
@@ -55,6 +57,8 @@ const PHASE_PILL: Record<CardRoundPhase, RoundPill> = {
   starting: { status: 'running', label: 'Starting' },
   running: { status: 'running', label: 'Running' },
   waiting: { status: 'waiting', label: 'Waiting for you' },
+  // #390: the worker waits on its own background task, not on the person.
+  background: { status: 'running', label: 'Running in background' },
   finished: { status: 'done', label: 'Finished' },
   ended: { status: 'blocked', label: 'Ended' },
   failed: { status: 'error', label: 'Failed' },
@@ -472,6 +476,16 @@ export function parseMaxRunning(raw: string): number | null {
   if (!/^\d{1,3}$/.test(raw.trim())) return null;
   const n = Number(raw.trim());
   return n >= BOARD_MAX_RUNNING_MIN && n <= BOARD_MAX_RUNNING_MAX ? n : null;
+}
+
+/** #390: the background stall threshold field, in minutes; null when out of range. */
+export function parseStallMinutes(raw: string): number | null {
+  if (!/^\d{1,4}$/.test(raw.trim())) return null;
+  const n = Number(raw.trim());
+  return n >= CARD_BACKGROUND_STALL_MINUTES_MIN &&
+    n <= CARD_BACKGROUND_STALL_MINUTES_MAX
+    ? n
+    : null;
 }
 
 const HOOKS_CONSEQUENCE =

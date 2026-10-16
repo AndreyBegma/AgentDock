@@ -106,7 +106,9 @@ const toolUsesOf = (line: Json, into: Map<string, ToolUse>): void => {
 };
 
 /** Running background tasks, oldest first. */
-export const runningBackgroundTasks = (transcript: string): BackgroundTask[] => {
+export const runningBackgroundTasks = (
+  transcript: string,
+): BackgroundTask[] => {
   const uses = new Map<string, ToolUse>();
   const started = new Map<string, ToolUse | undefined>();
   const done = new Set<string>();

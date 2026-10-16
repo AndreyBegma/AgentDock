@@ -77,6 +77,13 @@ describe('roundPill', () => {
     expect(roundPill(round('failed'))?.status).toBe('error');
     expect(roundPill(round('cancelled'))?.label).toBe('Stopped');
   });
+
+  test('a worker waiting on its own background task is running, not waiting (#390)', () => {
+    expect(roundPill(round('background'))).toEqual({
+      status: 'running',
+      label: 'Running in background',
+    });
+  });
 });
 
 describe('what a card offers', () => {

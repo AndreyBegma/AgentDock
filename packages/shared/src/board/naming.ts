@@ -16,9 +16,7 @@ export const cardBackgroundStalledTitle = (
   minutes: number,
 ): string =>
   `${cardLabel(number)} has been waiting on its own background task for ${
-    minutes % 60 === 0 && minutes >= 60
-      ? `${minutes / 60} h`
-      : `${minutes} min`
+    minutes % 60 === 0 && minutes >= 60 ? `${minutes / 60} h` : `${minutes} min`
   }`;
 
 /** D8: the line every card PR body carries, so a PR is traced back to its card. */

@@ -1,12 +1,12 @@
 import {
   type AttachmentView,
   BOARD_MAX_RUNNING_DEFAULT,
-  CARD_BACKGROUND_STALL_MINUTES_DEFAULT,
   type BoardCardDetail,
   type BoardCardView,
   type BoardSettingsView,
   type BoardUserRef,
   CAPTURE_MODEL_DEFAULT,
+  CARD_BACKGROUND_STALL_MINUTES_DEFAULT,
   CARD_HOOKS_GRACE_MS,
   type CardDependencyRef,
   type CardEvidenceView,

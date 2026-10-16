@@ -181,6 +181,66 @@ describe('agentdock-runner hook (spec 201 D11–D17)', () => {
     expect(stdout).toEqual([]);
   });
 
+  it('stop reports the background tasks its transcript says still run (#390)', async () => {
+    daemon(() => ({ ok: true, data: { queued: true } }));
+    const transcript = join(dir, 'session.jsonl');
+    await Bun.write(
+      transcript,
+      [
+        JSON.stringify({
+          type: 'assistant',
+          message: {
+            content: [
+              {
+                type: 'tool_use',
+                id: 'tu_1',
+                name: 'Bash',
+                input: {
+                  command: 'bunx jest --selectProjects e2e',
+                  run_in_background: true,
+                },
+              },
+            ],
+          },
+        }),
+        JSON.stringify({
+          type: 'user',
+          message: { content: [{ tool_use_id: 'tu_1', type: 'tool_result' }] },
+          toolUseResult: { backgroundTaskId: 'b1' },
+        }),
+      ].join('\n'),
+    );
+    const input = {
+      ...JSON.parse(fixture('stop')),
+      transcript_path: transcript,
+    };
+    await runHook(
+      ['stop'],
+      deps(JSON.stringify(input), {
+        readFile: (path) => readFileSync(path, 'utf8'),
+      }),
+    );
+    expect(calls[0]?.args).toMatchObject({
+      type: 'hook.stopped',
+      data: { backgroundTasks: 1 },
+      content: {
+        background: {
+          text: 'bunx jest --selectProjects e2e',
+          truncated: false,
+        },
+      },
+    });
+  });
+
+  it('stop without a readable transcript reports no background count', async () => {
+    daemon(() => ({ ok: true, data: { queued: true } }));
+    await runHook(['stop'], deps(fixture('stop')));
+    expect(calls[0]?.args).toMatchObject({ type: 'hook.stopped', data: {} });
+    expect(
+      (calls[0]?.args.data as Record<string, unknown>).backgroundTasks,
+    ).toBeUndefined();
+  });
+
   it('an unknown hook name or bad stdin exits 0 silently', async () => {
     daemon(() => ({ ok: true, data: null }));
     expect(await runHook(['pre-compact'], deps('{}'))).toBe(0);

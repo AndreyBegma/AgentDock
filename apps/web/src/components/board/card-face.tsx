@@ -126,6 +126,15 @@ export function CardFace({
           {pill ? (
             <StatusPill size="sm" status={pill.status} label={pill.label} />
           ) : null}
+          {card.round?.phase === 'background' &&
+          card.round.backgroundCommand ? (
+            <span
+              className="min-w-0 truncate font-mono text-xs text-ink-2"
+              title={card.round.backgroundCommand}
+            >
+              {card.round.backgroundCommand}
+            </span>
+          ) : null}
           {card.round?.hooksMissing ? (
             <HooksChip projectId={projectId} card={card} round={card.round} />
           ) : null}

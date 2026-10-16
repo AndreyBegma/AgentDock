@@ -2,6 +2,7 @@ import type { BoardCardDetail } from '@agentdock/shared';
 import type { LocalCall } from '../local/local-call';
 import { LocalError } from '../local/local-error';
 import { LocalHandlers } from '../local/local-handlers';
+import { BoardBackgroundStall } from './board-background-stall';
 import { BoardWorld, ROOT_A } from './testing/board-e2e';
 
 describe('board sink (e2e)', () => {
@@ -168,6 +169,145 @@ describe('board sink (e2e)', () => {
       await w.hook('hook.prompt_submitted', sessionId, { chars: 12 });
       after = await w.card(1);
       expect(after.rounds[0].phase).toBe('running');
+    });
+
+    describe('a turn that stops with its own background tasks running (#390)', () => {
+      const runStatus = async (runId: string) =>
+        (await w.ctx.prisma.run.findUniqueOrThrow({ where: { id: runId } }))
+          .status;
+      const stall = () => w.ctx.app.get(BoardBackgroundStall);
+      const minutesAfter = (at: Date | null, minutes: number) =>
+        new Date((at as Date).getTime() + minutes * 60_000);
+
+      it('is background, not waiting, and raises no card.waiting', async () => {
+        const { round, sessionId } = await running();
+        await w.hook('hook.stopped', sessionId, { backgroundTasks: 2 });
+        const after = (await w.card(1)).rounds[0];
+        expect(after.phase).toBe('background');
+        expect(after.backgroundAt).not.toBeNull();
+        expect(after.backgroundTasks).toBe(2);
+        expect(after.waitingAt).toBeNull();
+        expect(await runStatus(round.runId)).toBe('running');
+        expect(await serverEvents('card.waiting')).toEqual([]);
+      });
+
+      it('keeps the command only for a project that ships content', async () => {
+        const { sessionId } = await running();
+        const background = {
+          text: 'bunx jest --selectProjects e2e',
+          truncated: false,
+        };
+        await w.hook('hook.stopped', sessionId, {
+          backgroundTasks: 1,
+          background,
+        });
+        expect((await w.card(1)).rounds[0].backgroundCommand).toBeNull();
+
+        await w.ctx.prisma.project.update({
+          where: { id: w.a },
+          data: { shipSessionContent: true },
+        });
+        await w.hook('hook.stopped', sessionId, {
+          backgroundTasks: 1,
+          background,
+        });
+        expect((await w.card(1)).rounds[0].backgroundCommand).toBe(
+          'bunx jest --selectProjects e2e',
+        );
+      });
+
+      it('a stop with no background work still waits for the person', async () => {
+        const { sessionId } = await running();
+        await w.hook('hook.stopped', sessionId, { backgroundTasks: 0 });
+        expect((await w.card(1)).rounds[0].phase).toBe('waiting');
+        expect(await serverEvents('card.waiting')).toHaveLength(1);
+      });
+
+      it('tool activity after a stop is running again, without a prompt', async () => {
+        const { round, sessionId } = await running();
+        const tool = { toolUseId: 'tu_1', toolName: 'Bash', ok: true };
+        await w.hook('hook.stopped', sessionId, { backgroundTasks: 1 });
+        await w.hook('hook.tool_finished', sessionId, tool);
+        let after = (await w.card(1)).rounds[0];
+        expect(after.phase).toBe('running');
+        expect(after.backgroundAt).toBeNull();
+        expect(after.backgroundTasks).toBeNull();
+
+        // From Waiting for you too: a task notification woke the worker.
+        await w.hook('hook.stopped', sessionId);
+        expect(await runStatus(round.runId)).toBe('waiting_person');
+        await w.hook('hook.tool_finished', sessionId, tool);
+        after = (await w.card(1)).rounds[0];
+        expect(after.phase).toBe('running');
+        expect(await runStatus(round.runId)).toBe('running');
+      });
+
+      it('the background work done, the next stop waits for the person', async () => {
+        const { sessionId } = await running();
+        await w.hook('hook.stopped', sessionId, { backgroundTasks: 1 });
+        await w.hook('hook.stopped', sessionId, { backgroundTasks: 0 });
+        const after = (await w.card(1)).rounds[0];
+        expect(after.phase).toBe('waiting');
+        expect(after.backgroundAt).toBeNull();
+        expect(await serverEvents('card.waiting')).toHaveLength(1);
+      });
+
+      it('a stall past the threshold warns once, and again after a resume', async () => {
+        const { card, sessionId } = await running({ title: 'Add login' });
+        await w.hook('hook.stopped', sessionId, { backgroundTasks: 1 });
+        const first = (await w.card(1)).rounds[0];
+
+        expect(await stall().tick(minutesAfter(first.backgroundAt, 29))).toBe(
+          0,
+        );
+        expect(await stall().tick(minutesAfter(first.backgroundAt, 30))).toBe(
+          1,
+        );
+        expect(await stall().tick(minutesAfter(first.backgroundAt, 31))).toBe(
+          0,
+        );
+        // Another stop while still in the background is the same stall.
+        await w.hook('hook.stopped', sessionId, { backgroundTasks: 2 });
+        expect(await stall().tick(minutesAfter(first.backgroundAt, 90))).toBe(
+          0,
+        );
+
+        const [stalled] = await serverEvents('card.background_stalled');
+        expect(stalled).toMatchObject({ source: 'api' });
+        expect(stalled.data).toEqual({
+          cardId: card.id,
+          number: 1,
+          title: 'Add login',
+          round: 1,
+          minutes: 30,
+        });
+
+        await w.hook('hook.tool_finished', sessionId, {
+          toolUseId: 'tu_2',
+          toolName: 'Bash',
+          ok: true,
+        });
+        await w.hook('hook.stopped', sessionId, { backgroundTasks: 1 });
+        const second = (await w.card(1)).rounds[0];
+        expect(second.backgroundStalledAt).toBeNull();
+        expect(await stall().tick(minutesAfter(second.backgroundAt, 30))).toBe(
+          1,
+        );
+        expect(await serverEvents('card.background_stalled')).toHaveLength(2);
+      });
+
+      it('follows the board setting', async () => {
+        const { sessionId } = await running();
+        await w.ctx.prisma.boardSettings.create({
+          data: { projectId: w.a, backgroundStallMinutes: 10 },
+        });
+        await w.hook('hook.stopped', sessionId, { backgroundTasks: 1 });
+        const { backgroundAt } = (await w.card(1)).rounds[0];
+        expect(await stall().tick(minutesAfter(backgroundAt, 9))).toBe(0);
+        expect(await stall().tick(minutesAfter(backgroundAt, 10))).toBe(1);
+        const [stalled] = await serverEvents('card.background_stalled');
+        expect(stalled.data).toMatchObject({ minutes: 10 });
+      });
     });
 
     it('claims the card session as origin run, and keeps it', async () => {

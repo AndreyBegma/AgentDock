@@ -75,7 +75,9 @@ export const boardView = (cards: BoardCardView[]): BoardView => ({
   running: cards.filter(
     (c) =>
       c.round !== null &&
-      ['queued', 'starting', 'running', 'waiting'].includes(c.round.phase),
+      ['queued', 'starting', 'running', 'waiting', 'background'].includes(
+        c.round.phase,
+      ),
   ).length,
   settings: {
     projectId: 'p1',
@@ -87,6 +89,7 @@ export const boardView = (cards: BoardCardView[]): BoardView => ({
     autoCollectTracked: false,
     autoMergeCards: null,
     autoMergeCardsDefault: true,
+    backgroundStallMinutes: 30,
     isDefault: true,
     updatedAt: null,
   },

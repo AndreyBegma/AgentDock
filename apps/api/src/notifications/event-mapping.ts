@@ -1,9 +1,9 @@
 import {
-  CARD_FINISHED_EVENT,
   CARD_BACKGROUND_STALLED_EVENT,
+  CARD_FINISHED_EVENT,
   CARD_WAITING_EVENT,
-  cardBackgroundStalledTitle,
   CARDS_SUGGESTED_EVENT,
+  cardBackgroundStalledTitle,
   cardLabel,
   type NotificationKind,
   SCHEDULE_DISABLED_LIVE_EVENT,
