@@ -32,6 +32,7 @@ import { safeHttpsUrl } from '../../lib/queue/format';
 import { StewardChip } from '../steward/steward-chip';
 import { SavedBadge } from '../token-saver/saved-badge';
 import { ApproveRunLink, CardFaceDesign } from './card-design';
+import { RestartChip } from './handoff/restart-chip';
 import {
   type FaceSelection,
   SelectedTint,
@@ -196,6 +197,7 @@ export function CardFace({
             <HooksChip projectId={projectId} card={card} round={card.round} />
           ) : null}
           {card.steward ? <StewardChip chip={card.steward} /> : null}
+          <RestartChip card={card} />
           {card.autoRunFailure ? (
             <Tooltip content={autoRunFailureText(card.autoRunFailure)}>
               <span>
