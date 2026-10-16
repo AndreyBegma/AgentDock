@@ -24,6 +24,8 @@ import type {
 import { CommandFailure } from '../commands/failure';
 import type { ConfigProfile } from '../config';
 import type { Exec } from '../detect/exec';
+import { HandoffService, HandoffStateStore, HandoffWriter } from '../handoff';
+import { assistantLine, validNote } from '../handoff/testing';
 import { FakeClock } from '../testing/fake-clock';
 import { memoryLogger } from '../testing/fixtures';
 import { REAL_PROCESS_TIMEOUT_MS } from '../testing/projects';
@@ -82,7 +84,9 @@ exit 3
 const SESSION_ID = '3bb1739e-1a1c-4baa-b8b4-a4b1e6700361';
 const PROMPT = 'Work on card C-12; $(touch pwned) `id` "quoted" -- --model x';
 
-const setup = async (options: { steward?: StewardRunnerConfig } = {}) => {
+const setup = async (
+  options: { steward?: StewardRunnerConfig; handoff?: boolean } = {},
+) => {
   const f = await cardsWorkspace();
   const server = `agentdock-test-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
   const tmuxServer = ['-L', server];
@@ -123,18 +127,37 @@ const setup = async (options: { steward?: StewardRunnerConfig } = {}) => {
   const events: UnsequencedEvent[] = [];
   const cardsDir = join(f.ws, 'state', 'cards');
   const clock = new FakeClock(Date.parse('2026-10-14T12:00:00.000Z'));
-  const make = () =>
-    new CardExecutor({
-      deps: f.deps(exec, {
-        clock,
-        profiles: () => profiles,
-        // #447: Steward on for the project when the test asks for it.
-        watchedProjects: () => [
-          options.steward
-            ? { ...f.project, steward: options.steward }
-            : f.project,
-        ],
-      }),
+  const deps = f.deps(exec, {
+    clock,
+    profiles: () => profiles,
+    // #447: Steward on for the project when the test asks for it.
+    watchedProjects: () => [
+      options.steward ? { ...f.project, steward: options.steward } : f.project,
+    ],
+  });
+  // #449: Context handoff when the test asks for it.
+  let current: CardExecutor | null = null;
+  const handoff = options.handoff
+    ? new HandoffService({
+        deps,
+        state: new HandoffStateStore((id) => join(cardsDir, id)),
+        record: (id) => current?.store.load(id) ?? null,
+        records: () => current?.store.all() ?? [],
+        typeAtPrompt: async () => false,
+        writer: new HandoffWriter({
+          dir: join(f.ws, 'state', 'handoff'),
+          env: {},
+          clock,
+          log: memoryLogger().log,
+        }),
+        emit: (event) => events.push(event),
+        log: memoryLogger().log,
+      })
+    : undefined;
+  const make = () => {
+    current = new CardExecutor({
+      deps,
+      handoff,
       cardsDir,
       selfCommand: [process.execPath, MAIN],
       tmuxServer,
@@ -142,6 +165,8 @@ const setup = async (options: { steward?: StewardRunnerConfig } = {}) => {
       emit: (event) => events.push(event),
       log: memoryLogger().log,
     });
+    return current;
+  };
   const executor = make();
   await executor.start();
   teardown.push(async () => executor.stop());
@@ -489,6 +514,73 @@ describe.skipIf(!tmuxInstalled)(
           projectId: t.f.project.id,
         }),
       ).toEqual({ stopped: false });
+    });
+
+    it('#449 D3: with Token saver on, a cold long session restarts fresh from the note; the old session stays recorded', async () => {
+      const t = await setup({ handoff: true });
+      const tokenSaver = { enabled: true, mcpAllow: [] };
+      const cardPrompt = `Intro.\n\n## Card C-12: Export CSV\n\n${PROMPT}`;
+      await t.executor.run(
+        t.args({ profileKey: 'claude-slow', prompt: cardPrompt, tokenSaver }),
+      );
+      expect((await t.argvOf('run_1')).slice(1, 3)).toEqual([
+        '--session-id',
+        SESSION_ID,
+      ]);
+      const worktree = join(t.f.ws, '.wt-widget-card-ab12cd34');
+      mkdirSync(join(worktree, '.agentdock'), { recursive: true });
+      await Bun.write(
+        join(worktree, '.agentdock', 'handoff.md'),
+        validNote('Export the table as CSV.', '1. Quote the commas.'),
+      );
+      const projects = join(t.f.profileDir, 'projects', '-wt');
+      mkdirSync(projects, { recursive: true });
+      await Bun.write(
+        join(projects, `${SESSION_ID}.jsonl`),
+        `${assistantLine({ at: '2026-10-14T08:00:00.000Z', id: 'm1', cacheRead: 150_000 })}\n`,
+      );
+
+      await t.executor.run(
+        t.args({
+          runId: 'run_2',
+          profileKey: 'claude-slow',
+          session: { id: SESSION_ID, resume: true },
+          prompt: 'continue',
+          tokenSaver,
+        }),
+      );
+      const argv = await t.argvOf('run_2');
+      expect(argv[1]).toBe('--session-id');
+      const fresh = argv[2] ?? '';
+      expect(fresh).not.toBe(SESSION_ID);
+      expect(argv.join('\n')).toContain('1. Quote the commas.');
+      expect(t.executor.store.load('card_1')?.sessionId).toBe(fresh);
+      const restarts = t.events
+        .filter((e) => e.type === 'round.restart')
+        .map((e) => e.data);
+      expect(restarts).toEqual([
+        expect.objectContaining({ runId: 'run_1', mode: 'first' }),
+        expect.objectContaining({
+          runId: 'run_2',
+          mode: 'fresh',
+          sessionId: fresh,
+          previousSessionId: SESSION_ID,
+          estimate: expect.objectContaining({
+            resumeTokens: 150_000,
+            cacheWarm: false,
+          }),
+        }),
+      ]);
+    });
+
+    it('#449: without Token saver a round launches as the API asked, with no restart event', async () => {
+      const t = await setup({ handoff: true });
+      await t.executor.run(t.args({ profileKey: 'claude-slow' }));
+      expect((await t.argvOf('run_1')).slice(1, 3)).toEqual([
+        '--session-id',
+        SESSION_ID,
+      ]);
+      expect(t.events.some((e) => e.type === 'round.restart')).toBe(false);
     });
 
     it('a restarted runner keeps watching a live session and reports its end', async () => {

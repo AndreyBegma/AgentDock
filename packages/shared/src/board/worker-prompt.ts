@@ -2,6 +2,7 @@ import type { CardAttachmentBrief } from '../attachments/contracts';
 import { ATTACHMENTS_WORKTREE_DIR } from '../attachments/limits';
 import { attachmentWorktreePath } from '../attachments/names';
 import { attachmentKindLabel } from '../attachments/types';
+import { HANDOFF_NOTE_MAX_TOKENS, HANDOFF_SECTIONS } from '../handoff/note';
 import { CARD_RUN_PROMPT_MAX_BYTES } from '../protocol/commands/cards';
 import { cardLabel } from './naming';
 import type { CardCiCheck } from './shipping';
@@ -19,9 +20,11 @@ import type { BoardCardKind } from './types';
  * Version 9 (#445 D7, D10, D14): the stable sections first and the card
  * last; the working and audience registers; Read/Grep guidance; with Token
  * saver, the scout and the `AGENTDOCK_RAW=1` bypass. Version 10 (#447 D7):
- * no Claude attribution trailer on a commit.
+ * no Claude attribution trailer on a commit. Version 11 (#449 D2, D5, D7):
+ * with Token saver (Context handoff rides on it), the `## Handoff note`
+ * section.
  */
-export const CARD_WORKER_PROMPT_VERSION = 10;
+export const CARD_WORKER_PROMPT_VERSION = 11;
 
 /** #389: the env the runner sets in the card's session — its short id. */
 export const CARD_ENV_ID = 'AGENTDOCK_CARD';
@@ -55,6 +58,9 @@ export const FINISH_CARD_TOOL = 'finish_card';
  * PR body.
  */
 export const CARD_PR_DESCRIPTION_FILE = '.agentdock/pull-request.md';
+
+/** #449 D4: the card's handoff note, worktree-relative; git-excluded like the PR description. */
+export const HANDOFF_NOTE_PATH = '.agentdock/handoff.md';
 
 /** #243 D7: the addressed comment bodies the `## Design` section carries, in UTF-8 bytes. */
 export const CARD_DESIGN_COMMENTS_MAX_BYTES = 4 * 1024;
@@ -330,6 +336,20 @@ const TOKEN_SAVER_LINES = [
 ];
 
 /**
+ * #449 D2, D5, D7: the note the next round or session starts from. Exists
+ * only with Token saver on, like the scout — Context handoff is on with it.
+ */
+const HANDOFF_LINES = [
+  '## Handoff note',
+  '',
+  `Keep a short handoff note in \`${HANDOFF_NOTE_PATH}\` (git-excluded — do not commit it): what the next session needs to continue without re-learning the task. A later round may start a fresh session from it instead of this one.`,
+  `- Update it after you settle the plan, after a decision, after each commit, and before you stop or call \`${FINISH_CARD_TOOL}\`.`,
+  `- Use exactly these \`## \` sections, in this order, each with short bullet points or "none": ${HANDOFF_SECTIONS.join(', ')}. "Next" is an ordered list; "Dead ends" says what you tried and why it did not work; "How to verify" lists commands. At most about ${HANDOFF_NOTE_MAX_TOKENS} tokens.`,
+  '- A line ending with `<!-- person -->` is an instruction from a person: keep it word for word, mark included, and follow it. Never add that mark yourself.',
+  '- If AgentDock answers that the note was not accepted, fix what it names.',
+];
+
+/**
  * #445 D10: the stable sections — the same for every card — come first, so
  * the prompt cache hits; the card's own sections come last.
  */
@@ -359,6 +379,7 @@ const assemblePrompt = (
     ...READING_LINES,
     ...(card.tokenSaver ? TOKEN_SAVER_LINES : []),
     '',
+    ...(card.tokenSaver ? [...HANDOFF_LINES, ''] : []),
     '## When you are done',
     '',
     `Write the pull request description the last section of this prompt asks for. Then call the \`${FINISH_CARD_TOOL}\` tool with a summary of what you changed and how you checked it, in at least two full sentences. If it answers with what is missing, write that and call it again.`,

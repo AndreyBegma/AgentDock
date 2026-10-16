@@ -8,6 +8,8 @@ import type {
 } from '@agentdock/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import type { ConfigProfile } from '../config';
+import { HandoffWriter, RunNotes } from '../handoff';
+import { validNote } from '../handoff/testing';
 import { SharedRunSlots } from '../planner/slots';
 import { skillsWorkspace } from '../skills/testing';
 import { FakeClock } from '../testing/fake-clock';
@@ -43,6 +45,9 @@ echo '{"type":"system","subtype":"init","session_id":"11111111-1111-4111-8111-11
 case "$FAKE_MODE" in
   sleep) sleep 60 ;;
   fail) echo 'Error: boom' >&2; exit 2 ;;
+  talkfail)
+    echo '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"The tokens live in theme.ts."}]}}'
+    exit 2 ;;
 esac
 echo '{"type":"result","subtype":"success","is_error":false,"result":"Profiled.\\n\`\`\`agentdock-design\\n{}\\n\`\`\`"}'
 `;
@@ -76,8 +81,37 @@ const setup = async () => {
     profile('claude-work', 'quick'),
     profile('claude-slow', 'sleep'),
     profile('claude-fail', 'fail'),
+    profile('claude-talkfail', 'talkfail'),
     { id: 'codex-default', runtime: 'codex', env: {}, args: [] },
   ];
+  // #449: haiku's note of an interrupted build, from a fake `claude -p`.
+  const haikuPrompts: string[] = [];
+  const notesDir = join(f.ws, 'state', 'handoff', 'runs');
+  const runNotes = new RunNotes({
+    dir: notesDir,
+    writer: new HandoffWriter({
+      dir: join(f.ws, 'state', 'handoff', 'haiku'),
+      env: {},
+      clock: new FakeClock(),
+      log: memoryLogger().log,
+      spawn: ({ stdinFile }) => {
+        haikuPrompts.push(readFileSync(stdinFile, 'utf8'));
+        return {
+          exited: Promise.resolve(0),
+          stdout: Promise.resolve(
+            `${JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: validNote('Profile the UI.', '1. Read theme.ts.') })}\n`,
+          ),
+          stderr: Promise.resolve(''),
+          kill: () => {},
+        };
+      },
+    }),
+    profiles: () => profiles,
+    watchedProjects: () => [f.project],
+    emit: () => {},
+    clock: new FakeClock(),
+    log: memoryLogger().log,
+  });
 
   const clock = new FakeClock(Date.parse('2026-10-14T12:00:00.000Z'));
   const events: UnsequencedEvent[] = [];
@@ -103,6 +137,7 @@ const setup = async () => {
     emit: (event) => events.push(event),
     log: memoryLogger().log,
     tickMs: never,
+    runNotes,
   });
   await executor.start();
   teardown.push(() => executor.stop());
@@ -167,6 +202,8 @@ const setup = async () => {
     worktree,
     recordDir,
     slots,
+    haikuPrompts,
+    notesDir,
   };
 };
 
@@ -249,6 +286,37 @@ describe.skipIf(!tmuxInstalled)(
         error: 'Error: boom',
       });
       expect(existsSync(t.worktree)).toBe(false);
+    });
+
+    it('#449: an interrupted build of the same work restarts from its note (Token saver on)', async () => {
+      const t = await setup();
+      const tokenSaver = { enabled: true, mcpAllow: [] };
+      await t.executor.run(
+        t.args({ profileKey: 'claude-talkfail', tokenSaver }),
+      );
+      expect((await t.until('run_b1')).phase).toBe('failed');
+      const note = join(t.f.ws, 'state', 'uiprofile', 'run_b1', 'handoff.md');
+      for (let i = 0; i < 200 && !existsSync(note); i++) await Bun.sleep(25);
+      expect(readFileSync(note, 'utf8')).toContain('1. Read theme.ts.');
+      expect(t.haikuPrompts[0]).toContain('The tokens live in theme.ts.');
+
+      await t.executor.run(t.args({ runId: 'run_b2', tokenSaver }));
+      expect((await t.until('run_b2')).phase).toBe('succeeded');
+      const second = t.call(1);
+      expect(second.stdin.startsWith(t.args().prompt.trimEnd())).toBe(true);
+      expect(second.stdin).toContain('## Handoff from an interrupted attempt');
+      expect(second.stdin).toContain('1. Read theme.ts.');
+      // Succeeded: the work's note is gone; the next build starts clean.
+      expect(readdirSync(t.notesDir)).toEqual([]);
+    });
+
+    it('#449: without Token saver an interrupted build leaves no note', async () => {
+      const t = await setup();
+      await t.executor.run(t.args({ profileKey: 'claude-talkfail' }));
+      await t.until('run_b1');
+      await Bun.sleep(50);
+      expect(t.haikuPrompts).toEqual([]);
+      expect(existsSync(t.notesDir)).toBe(false);
     });
 
     it('kills a build over its timeout', async () => {
