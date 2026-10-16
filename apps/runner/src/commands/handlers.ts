@@ -29,6 +29,7 @@ import type { NormalizeHandlers } from '../normalize';
 import type { PlannerHandlers } from '../planner';
 import type { ProjectFs } from '../projects/fs';
 import { inspectProject, refreshProject } from '../projects/inspect';
+import type { SessionMessenger } from '../session';
 import type { SkillHandlers } from '../skills';
 import type { StewardHandlers } from '../steward';
 import type { UiProfileHandlers } from '../uiprofile';
@@ -88,6 +89,8 @@ export interface HandlerContext {
   steward?: StewardHandlers;
   /** Context handoff (#449); absent means this runner does not serve it. */
   handoff?: HandoffHandlers;
+  /** A person's messages to sessions (#489); absent means this runner does not serve them. */
+  sessionMessage?: SessionMessenger;
 }
 
 const noHandoff = (): never => {
@@ -280,5 +283,14 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
       context.steward?.['card.resume'](args) ?? noSteward(),
     'card.handoff.set': (args) =>
       context.handoff?.['card.handoff.set'](args) ?? noHandoff(),
+    'session.message': (args) => {
+      if (!context.sessionMessage) {
+        throw new CommandFailure(
+          'unsupported',
+          'this runner does not serve session messages',
+        );
+      }
+      return context.sessionMessage.message(args);
+    },
   };
 };

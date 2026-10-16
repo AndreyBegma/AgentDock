@@ -160,6 +160,7 @@ describe('capability detection', () => {
       tokenSaver: true,
       steward: true,
       handoff: true,
+      sessionMessage: true,
     });
   });
 

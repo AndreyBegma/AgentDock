@@ -83,6 +83,15 @@ if [ "$FAKE_MODE" = question ]; then
   printf '\\033[2J\\033[H'; cat "$FIXTURES/ask-user-questions-two.txt"
   sleep 60
 fi
+if [ "$FAKE_MODE" = question-tall ]; then
+  draw() { printf '\\033[2J\\033[H'; cat "$FIXTURES/ask-user-question.txt"; }
+  trap draw WINCH
+  draw
+  until IFS= read -r line; do :; done
+  trap - WINCH
+  printf '\\033[2J\\033[H'; cat "$FIXTURES/ask-user-question-answered.txt"
+  sleep 60
+fi
 if [ "$FAKE_MODE" = permission ]; then
   printf 'Do you want to proceed?\\n 1. Yes\\n 2. No\\n'
   sleep 60
@@ -94,7 +103,11 @@ const SESSION_ID = '3bb1739e-1a1c-4baa-b8b4-a4b1e6700361';
 const PROMPT = 'Work on card C-12; $(touch pwned) `id` "quoted" -- --model x';
 
 const setup = async (
-  options: { steward?: StewardRunnerConfig; handoff?: boolean } = {},
+  options: {
+    steward?: StewardRunnerConfig;
+    handoff?: boolean;
+    shipContent?: boolean;
+  } = {},
 ) => {
   const f = await cardsWorkspace();
   const server = `agentdock-test-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
@@ -127,6 +140,7 @@ const setup = async (
     profile('claude-prompt', 'prompt'),
     profile('claude-quoted', 'quoted'),
     profile('claude-question', 'question'),
+    profile('claude-question-tall', 'question-tall'),
     { id: 'codex-default', runtime: 'codex', env: {}, args: [] },
   ];
 
@@ -143,7 +157,11 @@ const setup = async (
     profiles: () => profiles,
     // #447: Steward on for the project when the test asks for it.
     watchedProjects: () => [
-      options.steward ? { ...f.project, steward: options.steward } : f.project,
+      {
+        ...f.project,
+        ...(options.steward ? { steward: options.steward } : {}),
+        ...(options.shipContent ? { shipContent: true } : {}),
+      },
     ],
   });
   // #449: Context handoff when the test asks for it.
@@ -340,6 +358,60 @@ describe.skipIf(!tmuxInstalled)(
       for (let i = 0; i < 3; i++) await t.executor.poll();
       expect(questions()).toHaveLength(2);
       await t.tmux('kill-session', '-t', `=${session}:`);
+    });
+
+    it('#489: reports the question screen with its options, only with content shipped, and null once answered', async () => {
+      for (const shipContent of [false, true]) {
+        const t = await setup({ shipContent });
+        await t.executor.run(
+          t.args({
+            cardId: 'card_a',
+            runId: 'run_a',
+            profileKey: 'claude-question-tall',
+          }),
+        );
+        const session = 'agentdock-card-ab12cd34';
+        const screens = () =>
+          t.events
+            .filter((e) => e.type === 'card_run.pending_question')
+            .map((e) => (e.data as { question: unknown }).question);
+        await t.paneShows(session, 'Enter to select');
+        // The whole selector fits: the fake redraws it on the resize.
+        await t.tmux(
+          'resize-window',
+          '-t',
+          `=${session}:`,
+          '-x',
+          '120',
+          '-y',
+          '50',
+        );
+        await t.paneShows(session, 'glass-ui');
+        for (let i = 0; i < 3; i++) await t.executor.poll();
+        if (!shipContent) {
+          expect(screens()).toEqual([]);
+          await t.tmux('kill-session', '-t', `=${session}:`);
+          continue;
+        }
+        expect(screens()).toEqual([
+          expect.objectContaining({
+            header: 'glass-ui',
+            text: 'SelectionBar is missing in glass-ui — what now?',
+            other: true,
+          }),
+        ]);
+        // The question event follows the screen it names.
+        const types = t.events.map((e) => e.type);
+        expect(types.indexOf('card_run.pending_question')).toBeLessThan(
+          types.indexOf('card_run.question'),
+        );
+        await t.tmux('send-keys', '-t', `=${session}:`, 'Enter');
+        await t.paneShows(session, 'auto mode on');
+        for (let i = 0; i < 3; i++) await t.executor.poll();
+        expect(screens()).toHaveLength(2);
+        expect(screens()[1]).toBeNull();
+        await t.tmux('kill-session', '-t', `=${session}:`);
+      }
     });
 
     it('never answers a permission prompt (#435)', async () => {

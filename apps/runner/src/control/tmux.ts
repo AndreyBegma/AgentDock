@@ -117,6 +117,11 @@ export class TmuxControl {
     await this.sendKeys(name, ['-l', text]);
   }
 
+  /** One named key of a question selector (#489 M4); never a key from args. */
+  async sendKey(name: string, key: 'Up' | 'Down' | 'Enter'): Promise<void> {
+    await this.sendKeys(name, [key]);
+  }
+
   async sendEnter(name: string): Promise<void> {
     await this.sendKeys(name, ['Enter']);
   }

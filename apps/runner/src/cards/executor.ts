@@ -18,6 +18,7 @@ import {
   type CardRunResult,
   type CardStopArgs,
   type CardStopResult,
+  cardRunPendingQuestionDataSchema,
   cardRunPhaseChangedDataSchema,
   cardRunPushedDataSchema,
   cardRunQuestionDataSchema,
@@ -36,6 +37,7 @@ import {
   type PreparedRound,
 } from '../handoff/service';
 import { errorMessage, type Logger } from '../log';
+import { type DeliveryTmux, deliverText } from '../session/deliver';
 import { profileOf, type SkillsDeps } from '../skills/deps';
 import { RUN_FILES, writeJsonAtomic } from '../skills/run/record';
 import { type StewardProjectConfig, stewardConfigOf } from '../steward/config';
@@ -54,7 +56,7 @@ import {
 } from './git';
 import { cardLaunchSpec, cardTokenSaver, cardWorktreePath } from './launch';
 import { type PushStep, pushCardHead } from './push';
-import { matchQuestion } from './question';
+import { matchQuestion, readQuestion } from './question';
 import { type CardRecord, CardStore } from './record';
 import {
   heldDetail,
@@ -163,6 +165,8 @@ export class CardExecutor {
   private readonly heldTold = new Map<string, string>();
   /** #473: the question (`runId:key`) last reported on screen, per card. */
   private readonly questionShown = new Map<string, string>();
+  /** #489: the selector screen (`runId:key`) last reported, per card. */
+  private readonly pendingShown = new Map<string, string>();
 
   constructor(private readonly options: CardExecutorOptions) {
     this.store = new CardStore(options.cardsDir);
@@ -485,6 +489,7 @@ export class CardExecutor {
         if (pane && !this.steward(record.projectId)) {
           await this.dismissKnownDialog(record, pane);
         }
+        this.noticePendingQuestion(record, pane);
         this.noticeQuestion(record, pane);
         this.queuePush(record);
         continue;
@@ -642,11 +647,15 @@ export class CardExecutor {
    * or the session is gone: nothing was typed.
    */
   async typeAtPrompt(session: string, text: string): Promise<boolean> {
-    const pane = await this.tmux.capture(session);
-    if (pane === null || readPane(pane).state !== 'idle') return false;
-    await this.tmux.sendLiteral(session, text);
-    await this.tmux.sendSubmit(session);
-    return true;
+    return (
+      (await deliverText(this.tmux, session, text, { idleOnly: true })) ===
+      'sent'
+    );
+  }
+
+  /** #489: the tmux calls a person's message to a card session makes. */
+  get sessionTmux(): DeliveryTmux {
+    return this.tmux;
   }
 
   /**
@@ -770,6 +779,55 @@ export class CardExecutor {
         error: errorMessage(error),
       });
       return null;
+    }
+  }
+
+  /**
+   * #489 M4: what the round's question selector shows — reported as
+   * `card_run.pending_question` whenever the screen changes, and with
+   * `question: null` once it is gone, so the Board can offer its options.
+   * Content (ADR-0021): only for a project that ships it.
+   */
+  private noticePendingQuestion(record: CardRecord, pane: string | null): void {
+    if (pane === null) return;
+    const project = this.options.deps
+      .watchedProjects()
+      .find((p) => p.id === record.projectId);
+    if (project?.shipContent !== true) return;
+    const screen = readQuestion(pane);
+    const shown = this.pendingShown.get(record.cardId);
+    const key = screen ? `${record.runId}:${screen.question.key}` : null;
+    if (
+      key === null &&
+      (shown === undefined || !shown.startsWith(`${record.runId}:`))
+    ) {
+      this.pendingShown.delete(record.cardId);
+      return;
+    }
+    if (key !== null && shown === key) return;
+    const at = isoNow(this.options.deps.clock);
+    try {
+      this.options.emit({
+        v: 1,
+        ts: at,
+        type: 'card_run.pending_question',
+        source: 'runner',
+        project: { repo: record.repo, root: record.root },
+        data: cardRunPendingQuestionDataSchema.parse({
+          cardId: record.cardId,
+          runId: record.runId,
+          projectId: record.projectId,
+          at,
+          question: screen?.question ?? null,
+        }),
+      });
+      if (key === null) this.pendingShown.delete(record.cardId);
+      else this.pendingShown.set(record.cardId, key);
+    } catch (error) {
+      this.options.log.warn('cards: reporting a question screen failed', {
+        cardId: record.cardId,
+        error: errorMessage(error),
+      });
     }
   }
 
