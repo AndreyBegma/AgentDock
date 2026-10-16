@@ -25,6 +25,7 @@ import { MembersTab } from './members-tab';
 import { OrchestratorTab } from './orchestrator-tab';
 import { PlannerTab } from './planner-tab';
 import { SessionsTab } from './sessions-tab';
+import { TokenSaverTab } from './token-saver-tab';
 
 /** What a tab's panel needs from the page. */
 interface TabContext {
@@ -118,6 +119,17 @@ const TABS: readonly {
     ),
   },
   {
+    id: 'token-saver',
+    label: 'Token saver',
+    render: ({ project, isAdmin, canOperate }) => (
+      <TokenSaverTab
+        projectId={project.id}
+        isAdmin={isAdmin}
+        canOperate={canOperate}
+      />
+    ),
+  },
+  {
     id: 'sessions',
     label: 'Sessions',
     render: ({ project, isAdmin, reload }) => (
@@ -191,7 +203,7 @@ export default function ProjectSettingsPage() {
       />
 
       <TabGroup value={tab} onValueChange={setTab}>
-        {/* Nine tabs do not fit a phone: the strip scrolls inside its box. */}
+        {/* Ten tabs do not fit a phone: the strip scrolls inside its box. */}
         <ScrollX>
           <TabList aria-label="Project settings" className="min-w-max">
             {TABS.map(({ id, label }) => (

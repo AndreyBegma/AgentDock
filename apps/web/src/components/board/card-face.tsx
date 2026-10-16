@@ -29,6 +29,7 @@ import { prChipText } from '../../lib/board/pull-request';
 import { ciDot, shippingBadge } from '../../lib/board/shipping';
 import { formatCost } from '../../lib/format';
 import { safeHttpsUrl } from '../../lib/queue/format';
+import { SavedBadge } from '../token-saver/saved-badge';
 import { ApproveRunLink, CardFaceDesign } from './card-design';
 
 /** A chip on the header's 16 px line (C-35). */
@@ -106,9 +107,10 @@ export function CardFace({
             <span className="truncate">{after.text}</span>
           </Chip>
         ) : null}
-        {cost || menu ? (
+        {cost || menu || card.tokenSaved ? (
           <span className="ms-auto flex shrink-0 items-center gap-1">
             {cost ? <span className="tabular-nums">{cost}</span> : null}
+            <SavedBadge saved={card.tokenSaved} />
             {menu}
           </span>
         ) : null}
