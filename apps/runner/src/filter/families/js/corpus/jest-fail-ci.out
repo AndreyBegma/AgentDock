@@ -1,0 +1,110 @@
+PASS unit src/activity/event-frontier.spec.ts
+PASS unit src/activity/resolve-project.spec.ts
+PASS unit src/approvals/approval-rules.spec.ts
+PASS unit src/assess/assess-input.spec.ts
+PASS unit src/attachments/attachment-store.spec.ts
+PASS unit src/audit/canonical.spec.ts
+PASS unit src/board/board-mapper.spec.ts
+PASS unit src/board/launch-choice.spec.ts
+PASS unit src/bullmq/bullmq-options.spec.ts
+PASS unit src/capture/capture-apply.spec.ts
+PASS unit src/capture/capture-input.spec.ts
+PASS unit src/cli/create-admin.spec.ts
+PASS unit src/common/crypto/secret-cipher.spec.ts
+PASS unit src/control/control-outcome.spec.ts
+PASS unit src/design/design-prompt.spec.ts
+PASS unit src/design/design-rules.spec.ts
+PASS unit src/design/ui-profile-mapper.spec.ts
+PASS unit src/fleet/slot-status.spec.ts
+PASS unit src/github-app/collector-poll-sender.spec.ts
+PASS unit src/github-app/github-health.spec.ts
+PASS unit src/github-app/github-jwt.spec.ts
+PASS unit src/github-app/github-routing.spec.ts
+PASS unit src/github-app/github-signature.spec.ts
+PASS unit src/github-app/poll-debouncer.spec.ts
+PASS unit src/health.controller.spec.ts
+PASS unit src/history/run-projection.spec.ts
+PASS unit src/live/live.spec.ts
+PASS unit src/local/action-request-expiry.job.spec.ts
+PASS unit src/local/local-request-router.spec.ts
+PASS unit src/notifications/event-mapping.spec.ts
+PASS unit src/notifications/periodic-jobs.spec.ts
+PASS unit src/notifications/telegram-delivery-plan.spec.ts
+PASS unit src/pane/pane-chunks.spec.ts
+PASS unit src/planner/plan-apply.spec.ts
+PASS unit src/planner/plan-intake.spec.ts
+PASS unit src/planner/plan-mapper.spec.ts
+PASS unit src/planner/planner-instructions.service.spec.ts
+PASS unit src/planner/plan-prompt.spec.ts
+PASS unit src/planner/plan-send.spec.ts
+PASS unit src/planner/plan-status.spec.ts
+PASS unit src/planner/task-status.spec.ts
+PASS unit src/prices/langfuse.spec.ts
+PASS unit src/prices/pricing.spec.ts
+PASS unit src/projects/project-access.guard.spec.ts
+PASS unit src/queue/queue-state.spec.ts
+PASS unit src/runners/pure.spec.ts
+PASS unit src/runners/runner-command.service.spec.ts
+PASS unit src/runners/runner-connect-hooks.spec.ts
+PASS unit src/runners/runner-event-sinks.spec.ts
+PASS unit src/runners/runner-ingest.service.spec.ts
+PASS unit src/runners/runner-presence.spec.ts
+PASS unit src/schedules/before-fire.spec.ts
+PASS unit src/schedules/cron.spec.ts
+PASS unit src/schedules/schedule-reconciler.spec.ts
+FAIL unit src/planner/plan-versions.spec.ts
+  ● plan versions › keeps the newest 20 versions
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 20
+    Received: 21
+
+      38 |     for (let n = 1; n <= 25; n++) store.save(plan, `v${n}`);
+      39 |     store.prune(plan);
+    > 40 |     expect(store.list(plan)).toHaveLength(20);
+         |                              ^
+      41 |   });
+      42 | });
+      43 |
+
+      at Object.<anonymous> (planner/plan-versions.spec.ts:40:30)
+
+  ● plan versions › refuses a version of another plan
+
+    TypeError: Cannot read properties of undefined (reading 'planId')
+
+      52 |     const other = makePlan('other');
+      53 |     store.save(other, 'v1');
+      54 |     expect(() => store.restore(plan, other.versions[0].planId)).toThrow('not found');
+         |                                                       ^
+      55 |   });
+      56 | });
+
+      at Object.<anonymous> (planner/plan-versions.spec.ts:54:56)
+
+FAIL unit src/schedules/schedule-fire.processor.spec.ts
+  ● schedule fire processor › skips a fire past the grace window
+
+    expect(jest.fn()).not.toHaveBeenCalled()
+
+    Expected number of calls: 0
+    Received number of calls: 1
+
+    1: "sched_01", 1760000000000
+
+      61 |     await processor.process(job({ scheduledFor: STALE }));
+      62 |
+    > 63 |     expect(launch).not.toHaveBeenCalled();
+         |                        ^
+      64 |   });
+      65 | });
+      66 |
+
+      at Object.<anonymous> (schedules/schedule-fire.processor.spec.ts:63:24)
+
+Test Suites: 2 failed, 52 passed, 54 total
+Tests:       3 failed, 417 passed, 420 total
+Snapshots:   0 total
+Time:        9.874 s
+Ran all test suites.

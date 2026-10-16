@@ -1,0 +1,9 @@
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+Datasource "db": PostgreSQL database "agentdock", schema "public" at "localhost:5421"
+
+Error: P3009
+
+migrate found failed migrations in the target database, new migrations will not be applied. Read more about how to resolve migration issues in a production database: https://pris.ly/d/migrate-resolve
+The `20260921094405_project_token_saver_flag` migration started at 2026-09-21 09:44:05.114 UTC failed

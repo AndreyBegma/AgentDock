@@ -1,0 +1,7 @@
+{
+  "argv": ["git", "log", "-n", "5"],
+  "exitCode": 0,
+  "category": "other",
+  "outcome": "passing",
+  "expect": "filtered"
+}

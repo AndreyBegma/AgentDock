@@ -1,0 +1,7 @@
+{
+  "argv": ["git", "push", "origin", "develop"],
+  "exitCode": 1,
+  "category": "other",
+  "outcome": "failing",
+  "expect": "filtered"
+}

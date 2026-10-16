@@ -1,0 +1,7 @@
+{
+  "argv": ["bundle", "exec", "rspec"],
+  "exitCode": 0,
+  "category": "test",
+  "outcome": "passing",
+  "expect": "filtered"
+}

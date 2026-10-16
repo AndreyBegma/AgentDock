@@ -1,0 +1,26 @@
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+Datasource "db": PostgreSQL database "agentdock", schema "public" at "localhost:5421"
+
+Applying migration `20260918101500_token_saver_stats`
+Applying migration `20260919083012_filter_stat_rows`
+Applying migration `20260920121740_filter_stat_index`
+Applying migration `20260921094405_project_token_saver_flag`
+
+The following migration(s) have been created and applied from new schema changes:
+
+prisma/migrations/
+  └─ 20260918101500_token_saver_stats/
+    └─ migration.sql
+  └─ 20260919083012_filter_stat_rows/
+    └─ migration.sql
+  └─ 20260920121740_filter_stat_index/
+    └─ migration.sql
+  └─ 20260921094405_project_token_saver_flag/
+    └─ migration.sql
+
+Your database is now in sync with your schema.
+
+✔ Generated Prisma Client (v7.7.0) to ./../../node_modules/@prisma/client in 790ms
+

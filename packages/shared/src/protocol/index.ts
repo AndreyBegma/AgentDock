@@ -6,6 +6,7 @@ export * from './commands/capture';
 export * from './commands/cards';
 export * from './commands/control';
 export * from './commands/github';
+export * from './commands/handoff';
 export * from './commands/planner';
 export * from './commands/queue';
 export * from './commands/skills';

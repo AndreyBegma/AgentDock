@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "curl",
+    "--connect-timeout",
+    "3",
+    "-o",
+    "/tmp/out.bin",
+    "https://10.255.255.1/artifact.bin"
+  ],
+  "exitCode": 28,
+  "category": "other",
+  "outcome": "failing",
+  "expect": "any"
+}

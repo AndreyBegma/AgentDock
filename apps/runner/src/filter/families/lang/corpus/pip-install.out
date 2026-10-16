@@ -1,0 +1,40 @@
+Collecting requests==2.32.3
+  Downloading requests-2.32.3-py3-none-any.whl.metadata (4.6 kB)
+Collecting charset-normalizer<4,>=2 (from requests==2.32.3)
+  Downloading charset_normalizer-3.3.2-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (33 kB)
+Collecting idna<4,>=2.5 (from requests==2.32.3)
+  Downloading idna-3.7-py3-none-any.whl.metadata (9.9 kB)
+Collecting urllib3<3,>=1.21.1 (from requests==2.32.3)
+  Downloading urllib3-2.2.2-py3-none-any.whl.metadata (6.4 kB)
+Collecting certifi>=2017.4.17 (from requests==2.32.3)
+  Downloading certifi-2024.7.4-py3-none-any.whl.metadata (2.2 kB)
+Collecting pydantic==2.8.2
+  Downloading pydantic-2.8.2-py3-none-any.whl.metadata (125 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 125.2/125.2 kB 4.1 MB/s eta 0:00:00
+Collecting annotated-types>=0.4.0 (from pydantic==2.8.2)
+  Downloading annotated_types-0.7.0-py3-none-any.whl.metadata (15 kB)
+Collecting pydantic-core==2.20.1 (from pydantic==2.8.2)
+  Downloading pydantic_core-2.20.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (6.6 kB)
+Collecting typing-extensions>=4.6.1 (from pydantic==2.8.2)
+  Using cached typing_extensions-4.12.2-py3-none-any.whl.metadata (3.0 kB)
+Requirement already satisfied: setuptools in ./.venv/lib/python3.12/site-packages (from -r requirements.txt (line 9)) (70.3.0)
+Downloading requests-2.32.3-py3-none-any.whl (64 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 64.9/64.9 kB 7.3 MB/s eta 0:00:00
+Downloading pydantic-2.8.2-py3-none-any.whl (423 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 423.9/423.9 kB 9.8 MB/s eta 0:00:00
+Downloading pydantic_core-2.20.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (2.1 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.1/2.1 MB 14.2 MB/s eta 0:00:00
+Downloading charset_normalizer-3.3.2-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (141 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 141.9/141.9 kB 8.7 MB/s eta 0:00:00
+Downloading idna-3.7-py3-none-any.whl (66 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 66.8/66.8 kB 10.2 MB/s eta 0:00:00
+Downloading urllib3-2.2.2-py3-none-any.whl (121 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 121.4/121.4 kB 11.9 MB/s eta 0:00:00
+Downloading certifi-2024.7.4-py3-none-any.whl (162 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 163.0/163.0 kB 12.0 MB/s eta 0:00:00
+Downloading annotated_types-0.7.0-py3-none-any.whl (13 kB)
+Installing collected packages: urllib3, typing-extensions, idna, charset-normalizer, certifi, annotated-types, requests, pydantic-core, pydantic
+Successfully installed annotated-types-0.7.0 certifi-2024.7.4 charset-normalizer-3.3.2 idna-3.7 pydantic-2.8.2 pydantic-core-2.20.1 requests-2.32.3 typing-extensions-4.12.2 urllib3-2.2.2
+
+[notice] A new release of pip is available: 24.0 -> 24.2
+[notice] To update, run: pip install --upgrade pip

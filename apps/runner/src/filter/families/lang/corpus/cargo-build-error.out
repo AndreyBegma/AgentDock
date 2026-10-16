@@ -1,0 +1,38 @@
+   Compiling libc v0.2.155
+   Compiling cfg-if v1.0.0
+   Compiling once_cell v1.19.0
+   Compiling memchr v2.7.4
+   Compiling bytes v1.6.1
+   Compiling relay-core v0.4.0 (/home/dev/relay/crates/core)
+error[E0382]: borrow of moved value: `job`
+  --> crates/core/src/scheduler.rs:131:24
+   |
+127|     fn dispatch(&mut self, job: Job) {
+   |                            --- move occurs because `job` has type `Job`, which does not implement the `Copy` trait
+128|         self.ready.push(job);
+   |                         --- value moved here
+129|
+130|         self.metrics.record(job.id);
+   |                             ^^^^^^ value borrowed here after move
+   |
+help: consider cloning the value if the performance cost is acceptable
+   |
+128|         self.ready.push(job.clone());
+   |                            ++++++++
+
+error[E0308]: mismatched types
+  --> crates/core/src/store.rs:52:21
+   |
+52 |         let count: u32 = self.segments.len();
+   |                    ---   ^^^^^^^^^^^^^^^^^^^ expected `u32`, found `usize`
+   |                    |
+   |                    expected due to this
+   |
+help: you can convert a `usize` to a `u32` and panic if the converted value doesn't fit
+   |
+52 |         let count: u32 = self.segments.len().try_into().unwrap();
+   |                                             ++++++++++++++++++++
+
+Some errors have detailed explanations: E0308, E0382.
+For more information about an error, try `rustc --explain E0308`.
+error: could not compile `relay-core` (lib) due to 2 previous errors

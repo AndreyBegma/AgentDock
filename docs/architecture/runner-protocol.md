@@ -145,6 +145,12 @@ commands. An absent `tokenSaver` means `false`; read it with
 `session.nudge`, `session.dismiss` and `card.resume`. An absent `steward` means
 `false`; read it with `stewardAvailable()`. See [Steward](#steward).
 
+`handoff` (#449) says whether the runner serves Context handoff: it keeps the
+handoff notes, picks how each round starts, sends `handoff.updated`,
+`round.restart` and `round.warmup`, and handles `card.handoff.set`. An absent
+`handoff` means `false`; read it with `handoffAvailable()`. See
+[Context handoff](#context-handoff).
+
 `commands` lists every command the runner build serves — its handler keys,
 sorted — and `disabledCommands` the subset its config switches off (#233,
 ADR-0023). Both are plain strings, not an enum of the allowlist: a runner newer
@@ -1491,6 +1497,125 @@ the API records `steward_incident.opened`, `.acted`, `.escalated` and
 under the **Steward** filter (`STEWARD_ACTIVITY_TYPES`). An escalation sends
 one `steward.incident` notification; a changed reason sends another
 (`notifiedReason`); recovery writes `.resolved` and pushes nothing (D13).
+
+### Context handoff
+
+Schemas in `packages/shared/src/handoff/` (the note, person lines, the events,
+the `resume_context` tool) and `packages/shared/src/protocol/commands/handoff.ts`
+(the command); the rules are [spec 449](../specs/449-context-handoff.md) and
+[ADR-0042](../adr/0042-context-handoff.md). Every card and every design or
+planner run keeps a short **handoff note**; the runner starts the next round or
+session from `--resume` or from the note, whichever costs less on its first
+turn. **Context handoff is on with Token saver**: a launch command's
+`tokenSaver.enabled` is the switch — no field of its own.
+
+**The note (D5).** Markdown with these `## ` sections, each once, in this
+order: Goal; Done; Next; Decisions and why; Dead ends; Files touched; How to
+verify; Checklist status; Open questions. Headings match case-insensitively; a
+`# ` title above them is allowed; only the Goal must have text. At most
+`HANDOFF_NOTE_MAX_TOKENS` (3 000, estimated at 4 characters a token —
+`HANDOFF_NOTE_MAX_CHARS`). `validateHandoffNote` returns every reason at once;
+the runner sends a refused note back to the agent with `handoffRejectionText`.
+
+The note lives on the machine always — `.agentdock/handoff.md` in the card's
+worktree (git-excluded), `<run dir>/handoff.md` for a run (D4). Its content
+reaches the API only when `projects[].shipContent` is true (ADR-0021).
+
+**Person lines (D7).** The lines a person wrote are instructions: the agent
+never rewrites them. They travel as `personLines`, sorted 1-based inclusive
+`{ from, to }` ranges of `content.split('\n')` that never touch, never covering
+a blank line. On disk each carries the suffix ` <!-- person -->`
+(`markPersonLines` / `splitPersonMarks`). The runner refuses an agent rewrite
+that drops or changes one (`personLinesKept`); the API marks a person's edit
+with `markPersonEdit` against the note it holds.
+
+**The `handoff.updated` event.** In the ordinary `events` stream,
+`source: "runner"`, sent **only** when the project ships content. The whole
+note, not a diff:
+
+| Field | Meaning |
+|---|---|
+| `projectId` | the project, repeated from the envelope |
+| `at` | when the note changed (ISO) |
+| `subject` | `{ kind: "card", cardId }` or `{ kind: "run", runId }` (a design or planner run) |
+| `updatedBy` | `agent` (the session), `haiku` (from a dead session's transcript, run locally) or `person` (applied from `card.handoff.set`) |
+| `content`, `personLines` | the note, valid as above |
+
+**The `round.restart` event (D3).** Sent once when a card round's session
+launches:
+
+| Field | Meaning |
+|---|---|
+| `projectId`, `cardId`, `runId` | the round, resolved from its run |
+| `at` | the launch (ISO) |
+| `mode` | `resume` (`--resume`), `fresh` (a new session seeded with the note, the diff summary and the checklist status), `first` (the card's first round) |
+| `estimate` | `{ resumeTokens, freshTokens, cacheWarm }` — the estimated first-turn input of each; `null` exactly for `first` |
+| `sessionId` | the session the round runs in |
+| `previousSessionId` | with `fresh` only: the session not resumed |
+
+A fresh start never discards the old session. The API records `sessionId` on
+the round and moves the card to it, so `finish_card`, the hooks and the next
+`--resume` follow the new session; the earlier round keeps the old one, which
+can still be resumed.
+
+**The `round.warmup` event (D9).** Sent once, at a round's first file edit:
+`projectId`, `cardId`, `runId`, `at`, `tokens` (input tokens since the round
+started) and `ms`. A round that never edits sends none.
+
+```json
+{
+  "type": "events",
+  "events": [
+    {
+      "v": 1, "seq": 31002, "ts": "2026-12-04T08:02:11.000Z",
+      "type": "round.restart", "source": "runner",
+      "project": { "repo": "AndreyBegma/AgentDock", "root": "/home/archi/dev/AgentDock" },
+      "data": {
+        "projectId": "prj_agentdock", "cardId": "cmcard0001", "runId": "cmrun0002",
+        "at": "2026-12-04T08:02:10.000Z", "mode": "fresh",
+        "estimate": { "resumeTokens": 182000, "freshTokens": 6400, "cacheWarm": false },
+        "sessionId": "22222222-2222-4222-8222-222222222222",
+        "previousSessionId": "11111111-1111-4111-8111-111111111111"
+      }
+    },
+    {
+      "v": 1, "seq": 31007, "ts": "2026-12-04T08:03:40.000Z",
+      "type": "round.warmup", "source": "runner",
+      "project": { "repo": "AndreyBegma/AgentDock", "root": "/home/archi/dev/AgentDock" },
+      "data": {
+        "projectId": "prj_agentdock", "cardId": "cmcard0001", "runId": "cmrun0002",
+        "at": "2026-12-04T08:03:39.000Z", "tokens": 9100, "ms": 89000
+      }
+    }
+  ]
+}
+```
+
+An event whose `data` fails its schema (`handoffEventDataSchemas`) is logged
+and skipped, like any bad sink input.
+
+**The command.** Sent only to a runner whose capabilities say
+`handoff: true`, needs `operator`, and is entered in the allowlist together
+with its runner handler.
+
+| Command | Args | Result |
+|---|---|---|
+| `card.handoff.set` | `projectId`, `cardId`, `shortId`, `content`, `personLines` | `{ outcome: "applied" \| "no_worktree" }` |
+
+The runner writes the note, person lines marked, to the worktree resolved from
+`shortId` and reports it as `handoff.updated` with `updatedBy: "person"`. With
+no worktree on the machine nothing is written.
+
+**The `resume_context` MCP tool (D6).** A tool of the agentdock MCP server for
+a person's own terminal session; the runner answers it from the note on the
+machine, without asking the API, so it works with session content off. The
+card is resolved from the session — its worktree, or a checkout on the card's
+branch — and the tool takes no argument (`resumeContextArgsSchema`). It
+returns `{ found: true, card: { number, label }, content, personLines,
+updatedBy, updatedAt }`, or `{ found: false, reason }` with
+`not_a_card_session` or `no_note` (`resumeContextResultSchema`). The plugin's
+`SessionStart` hook and `track_card` hand the same note to a session in a
+card's worktree or branch.
 
 ## Delivery guarantees
 

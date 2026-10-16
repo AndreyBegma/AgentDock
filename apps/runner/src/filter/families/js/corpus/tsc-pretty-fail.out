@@ -1,0 +1,37 @@
+bad.ts:9:14 - error TS2339: Property 'size' does not exist on type 'Segment'.
+
+9     sum += s.size;
+               ~~~~
+
+bad.ts:14:55 - error TS2322: Type 'Segment' is not assignable to type 'string'.
+
+14 export const first = (segments: Segment[]): string => segments[0];
+                                                         ~~~~~~~~~~~
+
+bad.ts:17:9 - error TS2322: Type 'number' is not assignable to type 'string'.
+
+17   const name: string = s.seq;
+           ~~~~
+
+bad.ts:18:17 - error TS2552: Cannot find name 'undefinedVar'. Did you mean 'undefined'?
+
+18   return name + undefinedVar;
+                   ~~~~~~~~~~~~
+
+bad.ts:21:7 - error TS2322: Type 'string' is not assignable to type 'number'.
+
+21 const x: number = 'nope';
+         ~
+
+bad.ts:22:23 - error TS2741: Property 'bytes' is missing in type '{ seq: number; }' but required in type 'Segment'.
+
+22 console.log(x, total([{ seq: 1 }]));
+                         ~~~~~~~~~~
+
+  bad.ts:3:3
+    3   bytes: number;
+        ~~~~~
+    'bytes' is declared here.
+
+
+Found 6 errors in the same file, starting at: bad.ts:9

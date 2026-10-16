@@ -1,0 +1,18 @@
+▲ Next.js 16.2.3 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 11.9s
+  Running TypeScript ...
+Failed to compile.
+
+./src/app/projects/[projectId]/board/page.tsx:42:11
+Type error: Property 'cards' does not exist on type 'BoardResponse'.
+
+  40 |   const board = await getBoard(params.projectId);
+  41 |
+> 42 |   return <BoardView cards={board.cards} />;
+     |           ^
+  43 | }
+  44 |
+
+Next.js build worker exited with code: 1 and signal: null

@@ -1,0 +1,139 @@
+PASS ./c.test.js
+  paths
+    ✓ resolves path 0 (1 ms)
+    ✓ resolves path 1
+    ✓ resolves path 2
+    ✓ resolves path 3
+    ✓ resolves path 4
+    ✓ resolves path 5
+    ✓ resolves path 6
+    ✓ resolves path 7
+    ✓ resolves path 8
+    ✓ resolves path 9
+    ✓ resolves path 10
+    ✓ resolves path 11
+    ✓ resolves path 12
+    ✓ resolves path 13
+    ✓ resolves path 14
+
+PASS src/schedules/cron.spec.ts
+  cron
+    parse
+      ✓ accepts a five-field expression (2 ms)
+      ✓ accepts a step in the minute field
+      ✓ accepts a range with a step
+      ✓ accepts month names
+      ✓ accepts weekday names
+      ✓ rejects six fields
+      ✓ rejects an empty string
+      ✓ rejects a minute above 59
+      ✓ rejects an hour above 23
+    next
+      ✓ returns the next minute for * * * * *
+      ✓ rolls over the hour
+      ✓ rolls over the day
+      ✓ rolls over the month
+      ✓ skips a leap day outside a leap year
+      ✓ lands on a leap day in a leap year
+      ✓ honours the time zone
+      ✓ is stable across a DST gap
+      ✓ is stable across a DST overlap
+    describe
+      ✓ prints every minute
+      ✓ prints a daily time
+      ✓ prints a weekday range
+
+PASS src/queue/queue-state.spec.ts
+  queue state
+    ✓ starts empty
+    ✓ adds a card to the end
+    ✓ moves a card up
+    ✓ moves a card down
+    ✓ does not move the first card up
+    ✓ does not move the last card down
+    ✓ removes a card
+    ✓ ignores a card that is not queued
+    ✓ pauses and resumes
+    ✓ counts the ready cards
+    ✓ keeps the order after a reload
+    ✓ reports a dependency that is not merged
+    ✓ releases a card once its dependency merges
+    ✓ never queues a card twice
+
+PASS ./b.test.js
+  config
+    ✓ parses profile 0 (1 ms)
+    ✓ parses profile 1
+    ✓ parses profile 2
+    ✓ parses profile 3
+    ✓ parses profile 4
+    ✓ parses profile 5
+    ✓ parses profile 6
+    ✓ parses profile 7
+    ✓ parses profile 8
+    ✓ parses profile 9
+
+FAIL ./a.test.js
+  sum
+    ✓ adds 0 and 1 (1 ms)
+    ✓ adds 1 and 2
+    ✓ adds 2 and 3
+    ✓ adds 3 and 4
+    ✓ adds 4 and 5
+    ✓ adds 5 and 6
+    ✓ adds 6 and 7
+    ✓ adds 7 and 8
+    ✓ adds 8 and 9
+    ✓ adds 9 and 10
+  spool
+    ✕ drops the oldest segment at the cap (3 ms)
+    ✕ keeps order (1 ms)
+
+  ● spool › drops the oldest segment at the cap
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 3
+    Received: 4
+
+      10 |   it('drops the oldest segment at the cap', () => {
+      11 |     const segments = [1, 2, 3, 4];
+    > 12 |     expect(segments.length).toBe(3);
+         |                             ^
+      13 |   });
+      14 |   it('keeps order', () => {
+      15 |     expect({ a: 1, b: [1, 2] }).toEqual({ a: 1, b: [1, 3] });
+
+      at Object.toBe (a.test.js:12:29)
+
+  ● spool › keeps order
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 1
+
+      Object {
+        "a": 1,
+        "b": Array [
+          1,
+    -     3,
+    +     2,
+        ],
+      }
+
+      13 |   });
+      14 |   it('keeps order', () => {
+    > 15 |     expect({ a: 1, b: [1, 2] }).toEqual({ a: 1, b: [1, 3] });
+         |                                 ^
+      16 |   });
+      17 | });
+      18 |
+
+      at Object.toEqual (a.test.js:15:33)
+
+Test Suites: 1 failed, 2 passed, 3 total
+Tests:       2 failed, 35 passed, 37 total
+Snapshots:   0 total
+Time:        0.486 s, estimated 1 s
+Ran all test suites.

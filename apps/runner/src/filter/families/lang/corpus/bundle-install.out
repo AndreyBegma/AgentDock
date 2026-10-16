@@ -1,0 +1,29 @@
+Fetching gem metadata from https://rubygems.org/.........
+Resolving dependencies...
+Using rake 13.2.1
+Using base64 0.2.0
+Using bigdecimal 3.1.8
+Using concurrent-ruby 1.3.3
+Using connection_pool 2.4.1
+Using drb 2.2.1
+Using i18n 1.14.5
+Using minitest 5.24.1
+Using mutex_m 0.2.0
+Using tzinfo 2.0.6
+Using activesupport 7.1.3.4
+Fetching rack 3.1.7
+Installing rack 3.1.7
+Fetching nokogiri 1.16.7 (x86_64-linux)
+Installing nokogiri 1.16.7 (x86_64-linux)
+Fetching pg 1.5.7
+Installing pg 1.5.7 with native extensions
+Fetching puma 6.4.2
+Installing puma 6.4.2 with native extensions
+Fetching rspec-support 3.13.1
+Installing rspec-support 3.13.1
+Fetching rspec-core 3.13.0
+Installing rspec-core 3.13.0
+Fetching rubocop 1.65.1
+Installing rubocop 1.65.1
+Bundle complete! 24 Gemfile dependencies, 71 gems now installed.
+Use `bundle info [gemname]` to see where a bundled gem is installed.

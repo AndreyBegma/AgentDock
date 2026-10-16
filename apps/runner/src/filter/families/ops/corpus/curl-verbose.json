@@ -1,0 +1,7 @@
+{
+  "argv": ["curl", "-v", "https://example.com/"],
+  "exitCode": 0,
+  "category": "other",
+  "outcome": "passing",
+  "expect": "filtered"
+}
