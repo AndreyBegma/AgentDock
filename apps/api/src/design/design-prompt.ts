@@ -5,6 +5,7 @@ import {
   designBytes,
   PLANNER_BLOCK_TAG,
   plannerOutputContract,
+  stackLabel,
   type UiProfileSnippet,
 } from '@agentdock/shared';
 import { PLAN_TURN_PROMPT_MAX_BYTES } from '@agentdock/shared/protocol';
@@ -234,6 +235,21 @@ export const approvedDesignSections = (d: ApprovedDesignContext): string[] => [
 /** #243 D4: a card's design turns always answer contract version 2. */
 export const CARD_DESIGN_CONTRACT_VERSION = 2;
 
+/**
+ * #480 (ADR-0044): the approved design of the stack a card belongs to — the
+ * whole result. A card's design turn reads it as reference; the card's own
+ * design stays its own.
+ */
+export interface StackDesignReference {
+  /** `S-<number>`. */
+  label: string;
+  title: string;
+  /** The approved revision's title and rationale. */
+  revisionTitle: string;
+  rationale: string;
+  frames: { name: string; html: string }[];
+}
+
 /** What a board card's design turn carries besides the design (#243 D4). */
 export interface CardDesignPromptInput {
   /** The project's effective planner instructions. */
@@ -242,27 +258,100 @@ export interface CardDesignPromptInput {
   /** The key the turn's `agentdock-plan` block repeats (`cardDesignTaskKey`). */
   taskKey: string;
   design: DesignPromptContext;
+  /** #480: the card's stack's approved design; absent or null without one. */
+  stackDesign?: StackDesignReference | null;
 }
 
-const cardDesignPromptWith = (
-  input: CardDesignPromptInput,
+/** #480: a stack's design turn — the whole result, before any card of it runs. */
+export interface StackDesignPromptInput {
+  instructions: string;
+  stack: {
+    number: number;
+    title: string;
+    body: string;
+    /** In order: each stage's name and its cards' labels and titles. */
+    stages: { title: string; cards: string[] }[];
+  };
+  taskKey: string;
+  design: DesignPromptContext;
+}
+
+/** What one design turn's prompt is built from, whoever owns the design. */
+interface DesignTurnHost {
+  instructions: string;
+  taskKey: string;
+  /** "board card C-12", "stack S-3". */
+  subject: string;
+  /** The owner's own section: its heading and fenced text. */
+  ownSections: string[];
+  design: DesignPromptContext;
+}
+
+const designTurnPromptWith = (
+  host: DesignTurnHost,
   design: string[],
+  reference: string[],
 ): string => {
-  const label = cardLabel(input.card.number);
   const sections = [
-    input.instructions.trim(),
+    host.instructions.trim(),
     plannerOutputContract(CARD_DESIGN_CONTRACT_VERSION).trim(),
     '# This turn',
-    `Action: \`design\`. ${designWhat(`board card ${label} (\`${input.taskKey}\`)`, input.design)}`,
-    `Answer with exactly one \`${PLANNER_BLOCK_TAG}\` block whose \`action\` is \`design\` and whose \`taskKey\` is \`${input.taskKey}\`.`,
-    '## The card',
-    fence(
-      'text',
-      `${label}: ${input.card.title}\n\n${input.card.body.trim() || '(no description)'}`,
-    ),
+    `Action: \`design\`. ${designWhat(`${host.subject} (\`${host.taskKey}\`)`, host.design)}`,
+    `Answer with exactly one \`${PLANNER_BLOCK_TAG}\` block whose \`action\` is \`design\` and whose \`taskKey\` is \`${host.taskKey}\`.`,
+    ...host.ownSections,
+    ...reference,
     ...design,
   ];
   return `${sections.join('\n\n')}\n`;
+};
+
+/**
+ * #480: the stack's approved design as a card's design turn reads it — with
+ * every frame's HTML while the prompt has room, else named only.
+ */
+const stackReferenceSections = (
+  ref: StackDesignReference,
+  withHtml: boolean,
+): string[] => [
+  `## The stack's approved design (${ref.label}, reference)`,
+  [
+    `This card is part of stack ${ref.label} "${ref.title}". Its approved design, "${ref.revisionTitle}", shows the whole result. Draw this card's mockup so it fits that design: the same look, tokens and layout where they meet. Do not redraw the whole result.`,
+    `Its rationale: ${ref.rationale}`,
+  ].join('\n'),
+  ...(withHtml
+    ? ref.frames.map((f) => `### ${f.name}\n${fence('html', f.html)}`)
+    : [
+        `Its frames (${ref.frames.map((f) => `"${f.name}"`).join(', ')}) are too large to include here.`,
+      ]),
+];
+
+/**
+ * A design turn's prompt under the `plan.turn` cap: a large kit's snippets
+ * are trimmed from the end first, then a reference design's HTML.
+ */
+const fittedDesignPrompt = (
+  host: DesignTurnHost,
+  reference: StackDesignReference | null,
+): string => {
+  const count = host.design.profile?.snippets.length ?? 0;
+  const build = (keep: number, withHtml: boolean) =>
+    designTurnPromptWith(
+      host,
+      designSections(host.design, keep),
+      reference ? stackReferenceSections(reference, withHtml) : [],
+    );
+  let prompt = build(count, true);
+  for (
+    let keep = count - 1;
+    keep >= 0 && designBytes(prompt) > PLAN_TURN_PROMPT_MAX_BYTES;
+    keep -= 1
+  ) {
+    prompt = build(keep, true);
+  }
+  if (reference && designBytes(prompt) > PLAN_TURN_PROMPT_MAX_BYTES) {
+    prompt = build(0, false);
+  }
+  return prompt;
 };
 
 /**
@@ -270,17 +359,57 @@ const cardDesignPromptWith = (
  * v2 contract, the `design` action, the card's title and body, then the
  * design sections (profile, kit, skills, variant, open comments). A large
  * kit's snippets are trimmed from the end until it fits the `plan.turn` cap,
- * as a plan task's design turn does.
+ * as a plan task's design turn does. #480: a card of a stack whose design is
+ * approved reads that design as reference.
  */
 export const cardDesignPrompt = (input: CardDesignPromptInput): string => {
-  const count = input.design.profile?.snippets.length ?? 0;
-  let prompt = cardDesignPromptWith(input, designSections(input.design));
-  for (
-    let keep = count - 1;
-    keep >= 0 && designBytes(prompt) > PLAN_TURN_PROMPT_MAX_BYTES;
-    keep -= 1
-  ) {
-    prompt = cardDesignPromptWith(input, designSections(input.design, keep));
-  }
-  return prompt;
+  const label = cardLabel(input.card.number);
+  return fittedDesignPrompt(
+    {
+      instructions: input.instructions,
+      taskKey: input.taskKey,
+      subject: `board card ${label}`,
+      ownSections: [
+        '## The card',
+        fence(
+          'text',
+          `${label}: ${input.card.title}\n\n${input.card.body.trim() || '(no description)'}`,
+        ),
+      ],
+      design: input.design,
+    },
+    input.stackDesign ?? null,
+  );
+};
+
+/**
+ * #480 (ADR-0044): the prompt of a stack's design turn — one design of the
+ * whole result (the full page, say) that every card of the stack builds a
+ * part of. Each card may still have its own design, kept apart.
+ */
+export const stackDesignPrompt = (input: StackDesignPromptInput): string => {
+  const label = stackLabel(input.stack.number);
+  const stages = input.stack.stages
+    .map(
+      (stage, i) =>
+        `Stage ${i + 1}${stage.title.trim() ? ` · ${stage.title.trim()}` : ''}:\n${stage.cards.map((c) => `- ${c}`).join('\n')}`,
+    )
+    .join('\n\n');
+  return fittedDesignPrompt(
+    {
+      instructions: input.instructions,
+      taskKey: input.taskKey,
+      subject: `stack ${label}`,
+      ownSections: [
+        '## The stack',
+        "A stack is one larger piece of work built by several cards in ordered stages. Draw the whole result — the full page or flow the stack delivers — not one card's part.",
+        fence(
+          'text',
+          `${label}: ${input.stack.title}\n\n${input.stack.body.trim() || '(no description)'}\n\n${stages}`,
+        ),
+      ],
+      design: input.design,
+    },
+    null,
+  );
 };

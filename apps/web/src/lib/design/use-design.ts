@@ -17,7 +17,7 @@ import { useLive } from '../live/use-live';
 import { useErrorToast } from '../section/use-error-toast';
 import { useSection } from '../section/use-section';
 import { describeDesignError } from './format';
-import { cardDesignApi, designApi } from './href';
+import { cardDesignApi, designApi, stackDesignApi } from './href';
 
 /** Pushes come in bursts (a phase change, then the result); one refetch covers them. */
 const REFETCH_DEBOUNCE_MS = 250;
@@ -91,6 +91,37 @@ export function useCardDesign(projectId: string, number: number) {
   );
   const owner = design.data?.owner;
   cardId.current = owner?.kind === 'card' ? owner.cardId : undefined;
+  return design;
+}
+
+/**
+ * Whether a push concerns a stack's design (#480): a `design` push or a
+ * `board.changed` one carrying the stack's id; any stack's until it loads.
+ */
+export function isStackDesignChange(
+  event: string,
+  data: unknown,
+  stackId: string | undefined,
+): boolean {
+  if (event !== DESIGN_LIVE_EVENT && event !== BOARD_CHANGED_EVENT) {
+    return false;
+  }
+  if (typeof data !== 'object' || data === null) return false;
+  const change = data as { stackId?: unknown };
+  if (typeof change.stackId !== 'string') return false;
+  return stackId === undefined || change.stackId === stackId;
+}
+
+/** A stack's shared design (#480): the same viewer, at the stack's base. */
+export function useStackDesign(projectId: string, number: number) {
+  const stackId = useRef<string | undefined>(undefined);
+  const design = useDesignAt(
+    projectId,
+    stackDesignApi(projectId, number),
+    (event, data) => isStackDesignChange(event, data, stackId.current),
+  );
+  const owner = design.data?.owner;
+  stackId.current = owner?.kind === 'stack' ? owner.stackId : undefined;
   return design;
 }
 

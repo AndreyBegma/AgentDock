@@ -1,4 +1,4 @@
-# ADR-0044: A person may message a running session; a fleet worker's message is recorded for the orchestrator
+# ADR-0045: A person may message a running session; a fleet worker's message is recorded for the orchestrator
 
 Status: accepted · Date: 2026-10-16 ·
 Issue: [#489](https://github.com/AndreyBegma/AgentDock/issues/489) ·

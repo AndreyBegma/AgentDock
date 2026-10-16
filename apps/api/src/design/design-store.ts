@@ -14,6 +14,7 @@ import {
   type ApprovedDesignContext,
   anchorOf,
   type DesignPromptContext,
+  type StackDesignReference,
 } from './design-prompt';
 import {
   type DesignGate,
@@ -37,7 +38,9 @@ export type Db = Prisma.TransactionClient | PrismaService;
  */
 export type DesignKey =
   | { planId: string; taskKey: string }
-  | { cardId: string };
+  | { cardId: string }
+  /** #480 (ADR-0044): a stack's shared design. */
+  | { stackId: string };
 
 /** The unique `task_designs` lookup of an owner. */
 export const designWhere = (
@@ -45,10 +48,15 @@ export const designWhere = (
 ): Prisma.TaskDesignWhereUniqueInput =>
   'cardId' in key
     ? { cardId: key.cardId }
-    : { planId_taskKey: { planId: key.planId, taskKey: key.taskKey } };
+    : 'stackId' in key
+      ? { stackId: key.stackId }
+      : { planId_taskKey: { planId: key.planId, taskKey: key.taskKey } };
 
 /** #243 D2: a card's design turns answer the contract under this `taskKey`. */
 export const cardDesignTaskKey = (number: number): string => `card-${number}`;
+
+/** #480: a stack's design turns answer the contract under this `taskKey`. */
+export const stackDesignTaskKey = (number: number): string => `stack-${number}`;
 
 /** The project's current profile version: the highest. */
 export const currentProfile = (
@@ -391,5 +399,58 @@ export const loadApprovedDesign = async (
         anchor: anchorOf(c),
         body: c.body,
       })),
+  };
+};
+
+/**
+ * #480 (ADR-0044): the approved design of the stack a card belongs to, as the
+ * card's design turn reads it for reference. Null when the card is in no
+ * stack, or its stack's design is off or not approved.
+ */
+export const loadStackReference = async (
+  db: Db,
+  cardId: string,
+): Promise<StackDesignReference | null> => {
+  const card = await db.boardCard.findUnique({
+    where: { id: cardId },
+    select: {
+      stage: {
+        select: {
+          stack: {
+            select: {
+              number: true,
+              title: true,
+              design: {
+                select: {
+                  needed: true,
+                  status: true,
+                  approvedRevision: {
+                    select: { id: true, title: true, rationale: true },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+  const stack = card?.stage?.stack;
+  const approved = stack?.design?.approvedRevision;
+  if (
+    !stack ||
+    !approved ||
+    !stack.design?.needed ||
+    stack.design.status !== 'approved'
+  ) {
+    return null;
+  }
+  const frames = await revisionFrames(db, approved.id);
+  return {
+    label: `S-${stack.number}`,
+    title: stack.title,
+    revisionTitle: approved.title,
+    rationale: approved.rationale,
+    frames: frames.map((f) => ({ name: f.name, html: f.html })),
   };
 };

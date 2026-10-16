@@ -48,6 +48,7 @@ import {
   canStop,
   describeBoardError,
   FLEET_EDIT_HINT,
+  finishRefusedText,
   fleetHref,
   fleetSummary,
   HOOKS_GUIDE_LABEL,
@@ -65,7 +66,7 @@ import {
   trackedSessionHref,
   trackedStatusText,
 } from '../../lib/board/format';
-import { boardCardPageHref } from '../../lib/board/href';
+import { boardCardPageHref, boardStackPageHref } from '../../lib/board/href';
 import { canCreatePr, prChipText } from '../../lib/board/pull-request';
 import { ciBanner, pullRequestRows } from '../../lib/board/shipping';
 import { formatCost } from '../../lib/format';
@@ -189,6 +190,11 @@ function roundItems(
           ) : null}
           {round.error ? (
             <span className="text-danger">{round.error}</span>
+          ) : null}
+          {round.finishRefused ? (
+            <span className="text-danger">
+              {finishRefusedText(round.finishRefused)}
+            </span>
           ) : null}
           {round.phase === 'background' && round.backgroundCommand ? (
             <span className="break-words font-mono">
@@ -356,6 +362,8 @@ export function CardDetailBody({
 }) {
   const readiness = useReadiness(projectId);
   const runBlocked = readiness.blockers('run').length > 0;
+  // #480: the card's stack holds Run until its design is approved.
+  const stackGate = card.stack?.gate ?? null;
   const [title, setTitle] = useState(card.title);
   const [body, setBody] = useState(card.body);
   const [kind, setKind] = useState(card.kind);
@@ -495,6 +503,19 @@ export function CardDetailBody({
           ) : null}
         </div>
       ) : null}
+      {card.stack ? (
+        <p className="text-xs text-ink-2">
+          Part of{' '}
+          <NextLink
+            href={boardStackPageHref(projectId, card.stack.number)}
+            className="text-accent-ink underline-offset-2 hover:underline"
+          >
+            {card.stack.label} {card.stack.title}
+          </NextLink>
+          , stage {card.stack.stage + 1}
+          {card.stack.stageTitle ? ` · ${card.stack.stageTitle}` : ''}.
+        </p>
+      ) : null}
       {card.source === 'captured' && sessionHref(card.sourceSessionId) ? (
         <p className="text-xs text-ink-2">
           Suggested from{' '}
@@ -606,8 +627,14 @@ export function CardDetailBody({
               kind="work"
               label={canRetry(card) ? 'Run again' : 'Run'}
               variant={card.column === 'todo' ? 'solid' : 'glass'}
-              disabled={actions.busy || runBlocked}
-              describedBy={runBlocked ? 'board-run-reason' : undefined}
+              disabled={actions.busy || runBlocked || stackGate !== null}
+              describedBy={
+                stackGate
+                  ? 'board-stack-gate'
+                  : runBlocked
+                    ? 'board-run-reason'
+                    : undefined
+              }
               onLaunch={async (request) => {
                 // The toast says why; a refusal keeps the popover open.
                 if (!(await actions.run(card, request))) {
@@ -665,6 +692,12 @@ export function CardDetailBody({
             readiness={readiness}
           />
         </div>
+      ) : null}
+      {canOperate && stackGate && (canRun(card) || canRetry(card)) ? (
+        <p id="board-stack-gate" className="-mt-3 text-xs text-ink-3">
+          {stackGate}: {card.stack?.label} “{card.stack?.title}”. Nothing writes
+          project code before it is.
+        </p>
       ) : null}
       {canOperate && canRun(card) && card.readiness?.state === 'waiting' ? (
         <p className="-mt-3 text-xs text-ink-3">

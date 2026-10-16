@@ -1,6 +1,6 @@
 # ADR-0005: Drive the cs-orchestrator skill, do not reimplement it
 
-Status: accepted · Date: 2026-10-07 · Scoped by [ADR-0019](0019-planner-instructions-live-in-agentdock.md) · Amended by [ADR-0044](0044-a-person-may-message-a-running-session-the-orchestrator-is-told.md)
+Status: accepted · Date: 2026-10-07 · Scoped by [ADR-0019](0019-planner-instructions-live-in-agentdock.md) · Amended by [ADR-0045](0045-a-person-may-message-a-running-session-the-orchestrator-is-told.md)
 
 ## Context
 

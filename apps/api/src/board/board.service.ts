@@ -52,6 +52,7 @@ import {
   toCardView,
   toSettingsView,
 } from './board-mapper';
+import { BoardStacks } from './board-stacks';
 import {
   ACTIVE_PHASES,
   BOARD_SYSTEM_ACTOR,
@@ -119,6 +120,7 @@ export class BoardService implements OnModuleInit {
     private readonly assessor: CardAssessor,
     private readonly profiles: RuntimeProfileResolver,
     private readonly dependencies: BoardDependencies,
+    private readonly stacks: BoardStacks,
   ) {}
 
   /**
@@ -245,10 +247,14 @@ export class BoardService implements OnModuleInit {
             hasMore: false,
           },
     );
-    const project = await this.work.project(projectId);
+    const [project, stacks] = await Promise.all([
+      this.work.project(projectId),
+      this.stacks.views(projectId),
+    ]);
     return {
       projectId,
       columns,
+      stacks,
       running,
       settings: toSettingsView(
         projectId,
@@ -317,41 +323,50 @@ export class BoardService implements OnModuleInit {
           .map((c) => c.projectId),
       ),
     ];
-    const [usage, hooked, alive, attachmentCounts, deps, runs, projects] =
-      await Promise.all([
-        usageByRun(this.prisma, runIds),
-        sessionIds.length === 0
-          ? Promise.resolve([])
-          : this.prisma.agentSession.findMany({
-              where: {
-                runtime: 'claude',
-                origin: 'run',
-                externalId: { in: sessionIds },
-              },
-              select: { externalId: true },
-            }),
-        // #282 D2: alive = not ended (no stale detection for manual sessions).
-        trackedIds.length === 0
-          ? Promise.resolve([])
-          : this.prisma.agentSession.findMany({
-              where: { id: { in: trackedIds }, endedAt: null },
-              select: { id: true },
-            }),
-        this.attachments.counts(cards.map((c) => c.id)),
-        this.dependencies.refsOf(cards.map((c) => c.id)),
-        activeRuns.length === 0
-          ? Promise.resolve([])
-          : this.prisma.run.findMany({
-              where: { id: { in: activeRuns }, profileKey: { not: null } },
-              select: { id: true, profileKey: true },
-            }),
-        projectIds.length === 0
-          ? Promise.resolve([])
-          : this.prisma.project.findMany({
-              where: { id: { in: projectIds } },
-              select: { id: true, runner: { select: { capabilities: true } } },
-            }),
-      ]);
+    const [
+      usage,
+      hooked,
+      alive,
+      attachmentCounts,
+      deps,
+      runs,
+      projects,
+      stacks,
+    ] = await Promise.all([
+      usageByRun(this.prisma, runIds),
+      sessionIds.length === 0
+        ? Promise.resolve([])
+        : this.prisma.agentSession.findMany({
+            where: {
+              runtime: 'claude',
+              origin: 'run',
+              externalId: { in: sessionIds },
+            },
+            select: { externalId: true },
+          }),
+      // #282 D2: alive = not ended (no stale detection for manual sessions).
+      trackedIds.length === 0
+        ? Promise.resolve([])
+        : this.prisma.agentSession.findMany({
+            where: { id: { in: trackedIds }, endedAt: null },
+            select: { id: true },
+          }),
+      this.attachments.counts(cards.map((c) => c.id)),
+      this.dependencies.refsOf(cards.map((c) => c.id)),
+      activeRuns.length === 0
+        ? Promise.resolve([])
+        : this.prisma.run.findMany({
+            where: { id: { in: activeRuns }, profileKey: { not: null } },
+            select: { id: true, profileKey: true },
+          }),
+      projectIds.length === 0
+        ? Promise.resolve([])
+        : this.prisma.project.findMany({
+            where: { id: { in: projectIds } },
+            select: { id: true, runner: { select: { capabilities: true } } },
+          }),
+      this.stacks.refsOf(cards.map((c) => c.id)),
+    ]);
     const runProfileKeys = new Map<string, string>();
     for (const run of runs) {
       if (run.profileKey !== null) runProfileKeys.set(run.id, run.profileKey);
@@ -371,6 +386,7 @@ export class BoardService implements OnModuleInit {
       profileAgentdock,
       attachmentCounts,
       dependencies: deps,
+      stacks,
       // #445: each round run's savings and artifact-guard flag.
       tokenSaver: await tokenSaverFactsOf(this.prisma, runIds),
       // #447 D15: the live Steward incident of each card's latest round.

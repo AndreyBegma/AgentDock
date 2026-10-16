@@ -6,10 +6,12 @@ import {
   isActiveRoundPhase,
 } from '@agentdock/shared';
 import {
+  type CardRunFinishRefusedData,
   type CardRunPendingQuestionData,
   type CardRunPhaseChangedData,
   type CardRunPushedData,
   type CardRunQuestionData,
+  cardFinishRefusedEventDataSchemas,
   cardPendingQuestionEventDataSchemas,
   cardPushEventDataSchemas,
   cardQuestionEventDataSchemas,
@@ -19,6 +21,7 @@ import {
   HOOK_STOPPED_EVENT,
   HOOK_TOOL_FINISHED_EVENT,
   type HookEvent,
+  isCardFinishRefusedEventType,
   isCardPendingQuestionEventType,
   isCardPushEventType,
   isCardQuestionEventType,
@@ -135,6 +138,19 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
           continue;
         }
         await this.pendingQuestion(runnerId, parsed.data);
+        continue;
+      }
+      if (isCardFinishRefusedEventType(event.type)) {
+        const parsed = cardFinishRefusedEventDataSchemas[event.type].safeParse(
+          event.data,
+        );
+        if (!parsed.success) {
+          this.logger.warn(
+            `runner ${runnerId}: malformed ${event.type} (seq ${event.seq}), skipped`,
+          );
+          continue;
+        }
+        await this.finishRefused(runnerId, parsed.data);
         continue;
       }
       const hook = parseHookEvent(event);
@@ -271,6 +287,41 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
       data: { pendingQuestion: data.question ?? Prisma.DbNull },
     });
     if (count > 0) this.work.publish(data.projectId, round.cardId);
+  }
+
+  /**
+   * #482: the API refused the worker's `finish_card` — the round needs
+   * attention, with the reason, instead of waiting in silence. Only an active
+   * round of the card's current run is marked; a later refusal replaces the
+   * reason, and a finish that is taken leaves the active phases behind it.
+   */
+  private async finishRefused(
+    runnerId: string,
+    data: CardRunFinishRefusedData,
+  ): Promise<void> {
+    const card = await this.prisma.boardCard.findFirst({
+      where: {
+        id: data.cardId,
+        projectId: data.projectId,
+        project: { runnerId },
+      },
+      include: { rounds: { orderBy: { round: 'desc' }, take: 1 } },
+    });
+    const round = card?.rounds[0];
+    if (!card || !round || round.runId !== data.runId) {
+      this.logger.warn(
+        `runner ${runnerId}: refused finish for unknown card round ${data.runId}, skipped`,
+      );
+      return;
+    }
+    const { count } = await this.prisma.boardCardRound.updateMany({
+      where: { id: round.id, phase: { in: ACTIVE_PHASES } },
+      data: {
+        finishRefusedCode: data.code,
+        finishRefusedAt: new Date(data.at),
+      },
+    });
+    if (count > 0) this.work.publish(card.projectId, card.id);
   }
 
   private async phaseChanged(

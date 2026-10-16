@@ -109,6 +109,10 @@ export const AUDIT_ACTIONS = [
   'session_content.purged',
   'card.created',
   'card.updated',
+  /** #480: a stack made from a confirmed intake (`after: { number, title, stages, cards, design }`). */
+  'stack.created',
+  /** #480: a stack's title or body, or the cards of its stages, changed. */
+  'stack.updated',
   'card.deleted',
   'card.moved',
   'card.run_started',

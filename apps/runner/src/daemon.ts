@@ -47,6 +47,7 @@ import {
   HandoffWriter,
   RunNotes,
 } from './handoff';
+import { cardAtWorktree } from './handoff/context';
 import { LocalSocketServer } from './local/server';
 import { LocalService } from './local/service';
 import { HookSessions } from './local/sessions';
@@ -72,6 +73,7 @@ import { Spool } from './spool';
 import {
   StewardActions,
   StewardClassifier,
+  StewardDigestWriter,
   StewardObserver,
   type StewardRun,
 } from './steward';
@@ -427,6 +429,16 @@ export const runDaemon = async (
       log,
       onResumed: (subject) => steward.forget(subject),
     });
+    // #491: haiku writes the digest prose; the API books it as a `steward` run.
+    const stewardDigest = new StewardDigestWriter({
+      dir: join(dirname(options.spoolDir), 'steward'),
+      env: process.env,
+      clock,
+      log,
+      profiles: () => config.profiles,
+      watchedProjects: () => watchList.current,
+      otlpPort: () => otlp?.port ?? null,
+    });
     // Card capture (#244): headless, one per project; the API limits the rest.
     const capture = new CaptureExecutor({
       deps: skillsDeps,
@@ -484,7 +496,7 @@ export const runDaemon = async (
       capture: createCaptureHandlers(capture),
       normalize: createNormalizeHandlers(normalize),
       assess: createAssessHandlers(assess),
-      steward: stewardActions.handlers(),
+      steward: { ...stewardActions.handlers(), ...stewardDigest.handlers() },
       handoff: createHandoffHandlers(handoff),
       sessionMessage: new SessionMessenger({
         cards: {
@@ -644,6 +656,14 @@ export const runDaemon = async (
       envelope: async (projectId) =>
         (await directory.resolve([projectId])).get(projectId),
       sessions: hookSessions,
+      // #482: a round's session is known from its record after a restart.
+      liveRound: (cwd) =>
+        cardAtWorktree(
+          cards.store
+            .all()
+            .filter((r) => r.phase === 'starting' || r.phase === 'running'),
+          cwd,
+        ),
       now: () => new Date(clock.now()).toISOString(),
       log,
     });

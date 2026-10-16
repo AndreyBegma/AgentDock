@@ -3,6 +3,7 @@ import { pendingQuestionSchema } from '../../session-message/contracts';
 import { headShaSchema } from '../commands/approvals';
 import { cardIdSchema, cardTmuxSessionSchema } from '../commands/cards';
 import { gitRefSchema, skillRunIdSchema } from '../commands/skills';
+import { localErrorCodeSchema } from '../local';
 
 /**
  * Card worker events (issue #242 "Runner"). A round outlives the `card.run`
@@ -194,3 +195,37 @@ export const isCardPendingQuestionEventType = (
   type: string,
 ): type is CardPendingQuestionEventType =>
   Object.hasOwn(cardPendingQuestionEventDataSchemas, type);
+
+/**
+ * #482: the API refused the round's `finish_card` — `code` is the local
+ * error it answered (`not_a_card_session`, `runner_offline`, …). Sent by the
+ * runner's local socket for a refused `card.finish` from a session in the
+ * worktree of a live round; the API marks the round as needing attention,
+ * with the reason, until a later `finish_card` is taken. Never carries the
+ * summary: it is content.
+ *
+ * Its own map, outside `cardRunEventDataSchemas`: the board sink enters it
+ * together with its handler.
+ */
+export const cardRunFinishRefusedDataSchema = z.object({
+  cardId: cardIdSchema,
+  runId: skillRunIdSchema,
+  projectId: z.string().min(1),
+  at: z.iso.datetime(),
+  code: localErrorCodeSchema,
+});
+export type CardRunFinishRefusedData = z.infer<
+  typeof cardRunFinishRefusedDataSchema
+>;
+
+export const cardFinishRefusedEventDataSchemas = {
+  'card_run.finish_refused': cardRunFinishRefusedDataSchema,
+} as const;
+
+export type CardFinishRefusedEventType =
+  keyof typeof cardFinishRefusedEventDataSchemas;
+
+export const isCardFinishRefusedEventType = (
+  type: string,
+): type is CardFinishRefusedEventType =>
+  Object.hasOwn(cardFinishRefusedEventDataSchemas, type);

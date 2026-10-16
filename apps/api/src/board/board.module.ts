@@ -18,6 +18,7 @@ import { BoardRoundsService } from './board-rounds.service';
 import { BoardSessionMessages } from './board-session-message.service';
 import { BoardShipping } from './board-shipping';
 import { BoardSink } from './board-sink';
+import { BoardStacks } from './board-stacks';
 import { BoardTerminalService } from './board-terminal.service';
 import { BoardWork } from './board-work';
 import { CollectRetryTimer } from './collect-retry-timer';
@@ -58,6 +59,8 @@ import { CollectRetryTimer } from './collect-retry-timer';
     // #359: a card ships itself — CI watched, fixed, merged.
     BoardShipping,
     BoardSink,
+    // #480: stacks — staged cards under one shared design.
+    BoardStacks,
     BoardTerminalService,
     BoardWork,
     CollectRetryTimer,
@@ -67,11 +70,13 @@ import { CollectRetryTimer } from './collect-retry-timer';
   // `BoardWork`: card capture puts suggestions in the Inbox (#244).
   // `BoardPlanCards`: a card intake and Create cards make cards (#337 D6, D7).
   // `BoardSessionMessages`: Telegram answers a card's question (#489).
+  // `BoardStacks`: a confirmed intake makes a stack (#480).
   exports: [
     BoardPlanCards,
     BoardRoundsService,
     BoardSessionMessages,
     BoardService,
+    BoardStacks,
     BoardTerminalService,
     BoardWork,
     FleetCardEditsRef,

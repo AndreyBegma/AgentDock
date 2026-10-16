@@ -44,11 +44,8 @@ import {
   describeBoardError,
   isSuggestion,
 } from '../../lib/board/format';
-import {
-  boardItems,
-  isPlanItem,
-  type WorkBoardItem,
-} from '../../lib/board/plan-tasks';
+import { boardStackPageHref } from '../../lib/board/href';
+import { boardItems, isPlanItem } from '../../lib/board/plan-tasks';
 import {
   type CardSelection,
   columnSelection,
@@ -60,12 +57,19 @@ import {
   withAll,
   withRange,
 } from '../../lib/board/selection';
+import {
+  type ColumnItem,
+  foldStacks,
+  isStackItem,
+  withoutStacks,
+} from '../../lib/board/stacks';
 import { cardDesignHref } from '../../lib/design/href';
 import { planHref } from '../../lib/planner/href';
 import { boardColumnWidth, usePhone, visibleColumns } from './board-layout';
 import { BulkActionBar } from './bulk-action-bar';
 import { CardFace } from './card-face';
 import { PlanTaskFace } from './plan-task-face';
+import { StackFace } from './stack-face';
 import { useBulkActions } from './use-bulk-actions';
 import type { CardActions } from './use-card-actions';
 
@@ -205,7 +209,7 @@ export function BoardColumns({
         if (!column) return;
         event.preventDefault();
         setSelection((current) =>
-          withAll(current, selectableNumbers(column.cards)),
+          withAll(current, selectableNumbers(withoutStacks(column.cards))),
         );
       }
     };
@@ -215,7 +219,7 @@ export function BoardColumns({
 
   const toggleCard = (card: BoardCardView, range: boolean) => {
     const order = selectableNumbers(
-      allColumns.find((c) => c.id === card.column)?.cards ?? [],
+      withoutStacks(allColumns.find((c) => c.id === card.column)?.cards ?? []),
     );
     const from = anchor.current;
     setSelection((current) =>
@@ -228,11 +232,13 @@ export function BoardColumns({
 
   const items = boardItems(shown, planTasks);
   const filtering = isFiltering(filter);
-  const allColumns: BoardColumn<WorkBoardItem>[] = columnsOf(shown).map((c) => {
+  const allColumns: BoardColumn<ColumnItem>[] = columnsOf(shown).map((c) => {
     const all = items.get(c.column) ?? [];
-    const cards = filtering
+    const matching = filtering
       ? all.filter((item) => matchesFilter(item, filter))
       : all;
+    // #480: a stack's cards in its column fold into the stack's face.
+    const cards = foldStacks(matching, c.column, shown, filtering);
     const older = c.column === 'completed' ? olderCompleted : undefined;
     return {
       id: c.column,
@@ -243,7 +249,7 @@ export function BoardColumns({
         <ColumnSelectAll
           column={c.column}
           title={COLUMN_TITLE[c.column]}
-          order={selectableNumbers(cards)}
+          order={selectableNumbers(withoutStacks(cards))}
           selection={selection}
           onToggle={(order) => setSelection((cur) => toggledColumn(cur, order))}
         />
@@ -310,17 +316,21 @@ export function BoardColumns({
     }
   };
 
-  /** Under a filter the board reports an index among the visible cards. */
+  /**
+   * Under a filter — or beside a folded stack (#480) — the board reports an
+   * index among the visible items; a stack stands for its first folded card.
+   */
   const withFullIndex = (dropped: DropMove): DropMove => {
-    if (!filtering) return dropped;
+    const target = allColumns.find((c) => c.id === dropped.toColumnId);
+    const stacked = target?.cards.some(isStackItem) ?? false;
+    if (!filtering && !stacked) return dropped;
     const full = view.columns
       .find((c) => c.column === dropped.toColumnId)
       ?.cards.filter((c) => c.id !== dropped.id)
       .map((c) => c.id);
-    const visible = allColumns
-      .find((c) => c.id === dropped.toColumnId)
-      ?.cards.filter((c) => c.id !== dropped.id)
-      .map((c) => c.id);
+    const visible = target?.cards
+      .filter((c) => c.id !== dropped.id)
+      .flatMap((c) => (isStackItem(c) ? c.foldedIds.slice(0, 1) : [c.id]));
     if (!full || !visible) return dropped;
     return { ...dropped, index: unfilteredIndex(full, visible, dropped.index) };
   };
@@ -388,7 +398,7 @@ export function BoardColumns({
           } as CSSProperties
         }
       >
-        <Board<WorkBoardItem>
+        <Board<ColumnItem>
           className="flex-1 pb-0.5"
           aria-label="Project board"
           columns={columns}
@@ -400,7 +410,16 @@ export function BoardColumns({
           // instead of taking a column; every face must place `menu`.
           menuPlacement="inline"
           renderCard={(item, _column, { menu }) =>
-            isPlanItem(item) ? (
+            isStackItem(item) ? (
+              <StackFace
+                projectId={projectId}
+                item={item}
+                canOperate={canOperate}
+                actions={actions}
+                menu={menu}
+                onOpenCard={onOpen}
+              />
+            ) : isPlanItem(item) ? (
               <PlanTaskFace
                 task={item.planTask}
                 menu={menu}
@@ -428,6 +447,20 @@ export function BoardColumns({
             )
           }
           renderCardMenu={(item) => {
+            if (isStackItem(item)) {
+              // Not movable: the stack follows its cards.
+              return (
+                <MenuItem
+                  onSelect={() =>
+                    router.push(
+                      boardStackPageHref(projectId, item.stack.number),
+                    )
+                  }
+                >
+                  Open stack
+                </MenuItem>
+              );
+            }
             if (isPlanItem(item)) {
               const task = item.planTask;
               // Not movable: no move entries above, so no separator either.
@@ -481,10 +514,14 @@ export function BoardColumns({
                 <MenuItem onSelect={() => onOpen(card)}>Open</MenuItem>
                 {canOperate && (canRun(card) || canRetry(card)) ? (
                   <MenuItem
-                    disabled={actions.busy || busy}
+                    // #480: the stack's design holds Run; the label says why.
+                    disabled={actions.busy || busy || !!card.stack?.gate}
                     onSelect={() => actions.run(card)}
                   >
                     {canRetry(card) ? 'Run again' : 'Run'}
+                    {card.stack?.gate
+                      ? ` — ${card.stack.gate.toLowerCase()}`
+                      : ''}
                   </MenuItem>
                 ) : null}
                 {canOperate && approveRunOffer(card) ? (

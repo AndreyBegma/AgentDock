@@ -94,6 +94,7 @@ export const toCommentView = (row: CommentRow): DesignCommentView => ({
 export const designInclude = {
   approvedBy: userSelect,
   card: { select: { id: true, number: true } },
+  stack: { select: { id: true, number: true } },
   revisions: {
     select: revisionSelect,
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
@@ -127,6 +128,9 @@ export const skillWarnings = (
 export const ownerOf = (row: DesignRow): DesignOwnerView => {
   if (row.card) {
     return { kind: 'card', cardId: row.card.id, number: row.card.number };
+  }
+  if (row.stack) {
+    return { kind: 'stack', stackId: row.stack.id, number: row.stack.number };
   }
   if (row.planId === null || row.taskKey === null) {
     throw new Error(`design ${row.id} has no owner`);

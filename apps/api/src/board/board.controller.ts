@@ -1,14 +1,16 @@
-import type {
-  AcceptBoardCardResponse,
-  BoardCardDetail,
-  BoardSettingsView,
-  BoardView,
-  BulkBoardCardsResponse,
-  CardDependenciesView,
-  CardPullRequestView,
-  CollectBoardCardResponse,
-  DismissAllResult,
-  SessionMessageView,
+import {
+  type AcceptBoardCardResponse,
+  BOARD_ERROR,
+  type BoardCardDetail,
+  type BoardSettingsView,
+  type BoardStackDetail,
+  type BoardView,
+  type BulkBoardCardsResponse,
+  type CardDependenciesView,
+  type CardPullRequestView,
+  type CollectBoardCardResponse,
+  type DismissAllResult,
+  type SessionMessageView,
 } from '@agentdock/shared';
 import {
   Body,
@@ -36,15 +38,17 @@ import { SessionMessageDto, sessionMessageInput } from '../session-message/dto';
 import { BoardService } from './board.service';
 import { BoardBulk } from './board-bulk';
 import { BoardDependencies } from './board-dependencies.service';
-import { cardNotFound } from './board-error';
+import { boardError, cardNotFound } from './board-error';
 import { BoardInboxService } from './board-inbox.service';
 import { BoardRoundsService } from './board-rounds.service';
 import { BoardSessionMessages } from './board-session-message.service';
+import { BoardStacks } from './board-stacks';
 import type { BoardActor } from './board-work';
 import {
   AcceptBoardCardDto,
   AcceptSuggestionDto,
   AddCardDependencyDto,
+  AddStackCardDto,
   BoardQueryDto,
   BulkBoardCardsDto,
   CardFeedbackDto,
@@ -53,11 +57,20 @@ import {
   RunBoardCardDto,
   UpdateBoardCardDto,
   UpdateBoardSettingsDto,
+  UpdateBoardStackDto,
 } from './dto';
 
 /** A card's per-project number from the path; anything else is no card. */
 export const cardNumber = (value: string): number => {
   if (!/^[1-9]\d{0,8}$/.test(value)) throw cardNotFound();
+  return Number(value);
+};
+
+/** #480: a stack's per-project number from the path; anything else is no stack. */
+export const stackNumber = (value: string): number => {
+  if (!/^[1-9]\d{0,8}$/.test(value)) {
+    throw boardError(404, BOARD_ERROR.notFound, 'Stack not found');
+  }
   return Number(value);
 };
 
@@ -83,7 +96,69 @@ export class BoardController {
     private readonly deps: BoardDependencies,
     private readonly bulk: BoardBulk,
     private readonly messages: BoardSessionMessages,
+    private readonly stacks: BoardStacks,
   ) {}
+
+  // ─── Stacks (#480, ADR-0044) ───────────────────────────────────────────────
+
+  @Get('board/stacks/:number')
+  stack(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @Param('number') number: string,
+  ): Promise<BoardStackDetail> {
+    return this.stacks.detail(access.projectId, stackNumber(number));
+  }
+
+  @Patch('board/stacks/:number')
+  @ProjectRole('operator')
+  updateStack(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Param('number') number: string,
+    @Body() dto: UpdateBoardStackDto,
+  ): Promise<BoardStackDetail> {
+    return this.stacks.update(
+      access.projectId,
+      stackNumber(number),
+      dto,
+      actorOf(access, user, ctx),
+    );
+  }
+
+  @Post('board/stacks/:number/cards')
+  @ProjectRole('operator')
+  addStackCard(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Param('number') number: string,
+    @Body() dto: AddStackCardDto,
+  ): Promise<BoardStackDetail> {
+    return this.stacks.addCard(
+      access.projectId,
+      stackNumber(number),
+      dto,
+      actorOf(access, user, ctx),
+    );
+  }
+
+  @Delete('board/stacks/:number/cards/:card')
+  @ProjectRole('operator')
+  removeStackCard(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Param('number') number: string,
+    @Param('card') card: string,
+  ): Promise<BoardStackDetail> {
+    return this.stacks.removeCard(
+      access.projectId,
+      stackNumber(number),
+      cardNumber(card),
+      actorOf(access, user, ctx),
+    );
+  }
 
   @Get('board')
   view(

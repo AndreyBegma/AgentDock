@@ -6,8 +6,10 @@ import {
   intakeOutputSchema,
   isIntakeRound,
   isIntakeSplit,
+  isIntakeStack,
   type PlanIntakeSplitView,
   type PlanQuestion,
+  type SplitCardDraft,
 } from '@agentdock/shared';
 import type { Prisma } from '@prisma/client';
 import { inputOf } from './plan-mapper';
@@ -68,10 +70,23 @@ export const intakeRound = async (
   return last && isIntakeRound(last.output) ? last.output.questions : [];
 };
 
-/** #409: the split proposal open now, with the turn that made it. */
+/**
+ * #409: the split proposal open now, with the turn that made it. #480: a
+ * stack proposal reads as its cards in stage order, with the stack beside.
+ */
 export interface OpenSplit {
   turnId: string;
   split: IntakeSplitOutput['split'];
+  /** #480: set when the intake proposed a stack; stages name cards by index. */
+  stack: OpenStack | null;
+}
+
+/** #480: a stack proposal, its stages naming `split.cards` by index. */
+export interface OpenStack {
+  title: string;
+  body: string;
+  design: boolean;
+  stages: { title: string; cards: number[] }[];
 }
 
 /**
@@ -84,12 +99,30 @@ export const intakeSplit = async (
   planId: string,
 ): Promise<OpenSplit | null> => {
   const last = await lastIntake(db, planId);
-  return last && isIntakeSplit(last.output)
-    ? { turnId: last.turnId, split: last.output.split }
-    : null;
+  if (!last) return null;
+  if (isIntakeSplit(last.output)) {
+    return { turnId: last.turnId, split: last.output.split, stack: null };
+  }
+  if (isIntakeStack(last.output)) {
+    const { reason, title, body, design, stages } = last.output.stack;
+    const cards: SplitCardDraft[] = [];
+    const named = stages.map((stage) => ({
+      title: stage.title,
+      cards: stage.cards.map((card) => cards.push(card) - 1),
+    }));
+    return {
+      turnId: last.turnId,
+      split: { reason, cards },
+      stack: { title, body, design, stages: named },
+    };
+  }
+  return null;
 };
 
-/** #409: the proposal as the person reviews it — no bodies, by index. */
+/**
+ * #409: the proposal as the person reviews it — no card bodies, by index.
+ * #480: a stack's title, body, design switch and stages come with it.
+ */
 export const toSplitView = (open: OpenSplit): PlanIntakeSplitView => ({
   turnId: open.turnId,
   reason: open.split.reason,
@@ -99,6 +132,7 @@ export const toSplitView = (open: OpenSplit): PlanIntakeSplitView => ({
     kind: c.kind,
     summary: c.summary,
   })),
+  stack: open.stack,
 });
 
 /** The contract's "not English" refusal, as a failed turn stores it. */

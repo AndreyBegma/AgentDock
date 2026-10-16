@@ -9,7 +9,7 @@ import { SessionMessageService } from '../session-message/session-message.servic
 import type { ControlCaller } from './control.service';
 
 /**
- * #489 M5, ADR-0044: a person's text or answer typed into a fleet worker's
+ * #489 M5, ADR-0045: a person's text or answer typed into a fleet worker's
  * `cs-*` pane. The runner also appends it to the orchestrator's
  * `events.jsonl` as `slot.message_sent` with `by: person`, so the
  * orchestrator still knows what each of its workers was told.

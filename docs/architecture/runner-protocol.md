@@ -142,7 +142,8 @@ commands. An absent `tokenSaver` means `false`; read it with
 
 `steward` (#447) says whether the runner serves Steward: it reads
 `projects[].steward`, sends `steward.observed` and `steward.acted`, and handles
-`session.nudge`, `session.dismiss` and `card.resume`. An absent `steward` means
+`session.nudge`, `session.dismiss`, `card.resume` and `digest.compose` (#491;
+the API also checks it is in `commands`). An absent `steward` means
 `false`; read it with `stewardAvailable()`. See [Steward](#steward).
 
 `handoff` (#449) says whether the runner serves Context handoff: it keeps the
@@ -771,7 +772,7 @@ daemon relays their request. Schemas are in `local.ts`.
 | `handoff.create` | operator | `title, body, branch` | an issue queued for the fleet, plus `manual.handoff` |
 | `action.request` | operator | `kind, args, summary` | a pending action request (spec 201 D18) |
 | `away.set` | operator | `on` | the runner's away mode; needs no project |
-| `card.finish` | operator | `summary` (≤ 4 000), `artifactIncomplete?` (#445 D8, set by the runner's artifact guard) | `{ number, finished: true }`; the card is the one whose session uuid is the request's `session.id`, else `not_a_card_session` (issue #242 D6) |
+| `card.finish` | operator | `summary` (≤ 4 000), `artifactIncomplete?` (#445 D8, set by the runner's artifact guard) | `{ number, finished: true }`; the card is the one whose session uuid is the request's `session.id`, else `not_a_card_session` (issue #242 D6). An MCP caller's session is the one whose `claude` pid a `SessionStart` reported, else (#482) the session of the live card round whose worktree holds the caller's cwd — read from the card store on disk, so it survives a daemon restart — else the one live session in that cwd. A refused `card.finish` from a live round's worktree is also sent as `card_run.finish_refused` |
 
 ```json
 {
@@ -1483,6 +1484,7 @@ with its runner handler.
 | `session.nudge` | `projectId`, `subject` (card round or run), `text` — exactly `STEWARD_NUDGE_TEXT` | `{ sent }`; `false` when the pane shows no idle prompt or the session is gone — nothing is typed |
 | `session.dismiss` | `projectId`, `subject`, `dialogId` from `STEWARD_DIALOG_IDS` | `{ dismissed }`; `false` when the pane no longer shows that dialog |
 | `card.resume` | `cardId`, `projectId`, `runId`, `root`, `base`, `shortId`, `branch`, `sessionId`, `profileKey`, `model`, `permissionMode`, `pullRequest?`, `tokenSaver?` — the round's `card.run` facts | `{ outcome: "resumed" \| "alive" \| "no_worktree", tmuxSession? }` |
+| `digest.compose` | `runId` (the API's `steward` run), `projectId`, `sessionId`, `profileKey`, `model` — always `haiku`, `trigger`, `projectName`, `done` / `stuck` / `waiting` — each `{ total, items }` with at most `DIGEST_COMPOSE_ITEMS_MAX` (20) items of `{ label, title, reason }`, `spendUsd` | `{ prose }` — one line, at most `DIGEST_PROSE_MAX` (600) characters |
 
 - **Nudge (D9).** The text is "The previous response was cut off by an
   API/network error. Continue from where you stopped." At most 2 per round
@@ -1491,6 +1493,16 @@ with its runner handler.
 - **Dismiss (D11).** Only the dialogs on the #435 list, with the key that
   changes nothing. An unlisted dialog or a permission prompt is never
   answered: it escalates at once with "open the terminal".
+- **Digest prose (#491, D3, D14).** haiku writes the digest's one-paragraph
+  summary as one headless `claude -p --tools "" --permission-mode plan` on
+  `profileKey`, in a directory of its own with `AGENTDOCK_HOOKS=off`; the
+  call's telemetry carries `runId`, so its spend counts against the project
+  budget (D16). The args are the digest's stored content only: every string
+  is one line within the digest bounds (`isOneLine`), the schema is strict,
+  and nothing names a pane, a transcript or a path (DA-12). The runner cuts
+  the answer to one bounded line (DA-13), and the API stores it through the
+  same bound again. Any failure is a command error, and the API keeps the
+  template digest; it times out after `DIGEST_COMPOSE_COMMAND_TIMEOUT_MS`.
 - **Resume (D10).** `claude --resume <sessionId>` in the card's existing
   worktree (`<parent>/.wt-<repo>-card-<shortId>`) with the prompt "The session
   was restarted after a crash. Continue from where you stopped."
@@ -1628,7 +1640,7 @@ card's worktree or branch.
 
 ### Session messages
 
-#489, ADR-0044: a person's text to a running session, or the answer to the
+#489, ADR-0045: a person's text to a running session, or the answer to the
 question selector it shows. It is sent only to a runner whose capabilities say
 `sessionMessage: true`, and it needs `operator`.
 

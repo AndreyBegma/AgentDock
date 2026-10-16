@@ -108,8 +108,9 @@ export const capabilitiesSchema = z.object({
   /**
    * #447: the runner serves Steward — it reads `watchedProjectSchema.steward`,
    * sends `steward.observed` / `steward.acted`, and handles `session.nudge`,
-   * `session.dismiss` and `card.resume`. The API sends those commands only
-   * when this is `true`. Absent means `false` — a runner older than Steward.
+   * `session.dismiss`, `card.resume` and — when `commands` lists it —
+   * `digest.compose` (#491). The API sends those commands only when this is
+   * `true`. Absent means `false` — a runner older than Steward.
    */
   steward: z.boolean().optional(),
   /**

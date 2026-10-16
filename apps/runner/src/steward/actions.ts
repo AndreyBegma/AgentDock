@@ -89,7 +89,7 @@ export class StewardActions {
 
   constructor(private readonly options: StewardActionsOptions) {}
 
-  handlers(): StewardHandlers {
+  handlers(): Omit<StewardHandlers, 'digest.compose'> {
     return {
       'session.nudge': (args) => this.nudge(args),
       'session.dismiss': (args) => this.dismiss(args),
