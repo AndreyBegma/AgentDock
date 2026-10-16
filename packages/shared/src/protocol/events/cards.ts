@@ -1,7 +1,7 @@
 import { z } from 'zod';
+import { pendingQuestionSchema } from '../../session-message/contracts';
 import { headShaSchema } from '../commands/approvals';
 import { cardIdSchema, cardTmuxSessionSchema } from '../commands/cards';
-import { pendingQuestionSchema } from '../../session-message/contracts';
 import { gitRefSchema, skillRunIdSchema } from '../commands/skills';
 
 /**

@@ -16,8 +16,9 @@ export const PENDING_QUESTION_TEXT_MAX_CHARS = 2000;
 export const PENDING_QUESTION_LABEL_MAX_CHARS = 300;
 
 /** CSI (`ESC [ … final`), OSC (`ESC ] … BEL|ESC \`), DCS/SOS/PM/APC strings, then any other `ESC x`. */
-// biome-ignore lint/suspicious/noControlCharactersInRegex: escape sequences are what this strips
-const ESCAPE_SEQUENCE = /\u001b\[[0-?]*[ -/]*[@-~]|\u001b\][^\u0007\u001b]*(?:\u0007|\u001b\\)?|\u001b[PX^_][^\u001b]*(?:\u001b\\)?|\u009b[0-?]*[ -/]*[@-~]|\u001b[\s\S]?/g;
+const ESCAPE_SEQUENCE =
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: escape sequences are what this strips
+  /\u001b\[[0-?]*[ -/]*[@-~]|\u001b\][^\u0007\u001b]*(?:\u0007|\u001b\\)?|\u001b[PX^_][^\u001b]*(?:\u001b\\)?|\u009b[0-?]*[ -/]*[@-~]|\u001b[\s\S]?/g;
 /** C0 and C1 controls and DEL; line breaks and tabs are handled before. */
 // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what this strips
 const CONTROL = /[\u0000-\u001f\u007f-\u009f]/g;
