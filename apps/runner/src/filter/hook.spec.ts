@@ -145,6 +145,7 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
     ['a watch mode', 'bun test --watch', {}, 'js/bun-test'],
     ['a family long-running mode', 'demo-test --forever', {}, 'fixture/demo'],
     ['an uncovered command', 'cd apps/runner', {}, 'none'],
+    ['an uncovered command after cd', 'cd apps && ls', {}, 'none'],
   ])('leaves %s alone and counts it passedThrough', (_, command, extra, filter) => {
     const input = JSON.stringify(preToolUse(command, extra));
     expect(runFilterHook(input, deps)).toBe('');
@@ -280,6 +281,70 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
     ).toBe(
       `FOO='a b' /opt/agentdock/agentdock-runner filter -- bun test 'x y' ';'`,
     );
+  });
+
+  describe('`cd <path> &&` and a trailing `2>&1` (amendment 11)', () => {
+    const rewritten = (command: string, mode = 'bypassPermissions') =>
+      (
+        JSON.parse(
+          runFilterHook(JSON.stringify(preToolUse(command, {}, mode)), deps),
+        ) as HookOutput
+      ).hookSpecificOutput.updatedInput.command;
+
+    it.each([
+      [
+        'cd apps/runner && bun test',
+        'cd apps/runner && /opt/agentdock/agentdock-runner filter -- bun test',
+      ],
+      [
+        `cd  "/repo/a b"   &&  CI=1 bun run test 'x y'`,
+        `cd '/repo/a b' && CI=1 /opt/agentdock/agentdock-runner filter -- bun run test 'x y'`,
+      ],
+      [
+        'bun test 2>&1',
+        '/opt/agentdock/agentdock-runner filter -- bun test 2>&1',
+      ],
+      [
+        `cd 'it'\\''s' && bun test\t2>&1  `,
+        `cd 'it'\\''s' && /opt/agentdock/agentdock-runner filter -- bun test 2>&1`,
+      ],
+    ])('rewrites %p from its words', (command, expected) => {
+      expect(rewritten(command)).toBe(expected);
+      expect(rewritten(command, 'auto')).toBe(expected);
+    });
+
+    it.each([
+      ['cd a b && bun test', 'none'],
+      ['cd -- x && bun test', 'none'],
+      ['cd $HOME && bun test', 'none'],
+      ['cd x && bun test && bun test', 'none'],
+      ['cd x; bun test', 'none'],
+      ['cd x && bun test | tail -5', 'none'],
+      ['bun test 2>&1 > out.log', 'none'],
+      ['bun test 2>&3', 'none'],
+      ['bun test &> out.log', 'none'],
+      ['bun test 1>&2', 'none'],
+      ['cd x && bun test 2>&1\ntouch /tmp/pwned', 'none'],
+      ['cd x && cd y', 'none'],
+      ['cd x && bun test --watch 2>&1', 'js/bun-test'],
+    ])('leaves %p alone', (command, filter) => {
+      expect(runFilterHook(JSON.stringify(preToolUse(command)), deps)).toBe('');
+      expect(stats()[0]?.row).toMatchObject({ filter, passedThrough: true });
+    });
+
+    it('matches deny and ask rules on the inner command', () => {
+      for (const rule of [
+        { deny: ['Bash(bun test:*)'] },
+        { ask: ['Bash(bun test)'] },
+        { deny: ['Bash(cd:*)'] },
+      ]) {
+        const out = runFilterHook(
+          JSON.stringify(preToolUse('cd apps/api && bun test 2>&1')),
+          { ...deps, rules: () => ({ ...NO_RULES, ...rule }) },
+        );
+        expect(out).toBe('');
+      }
+    });
   });
 
   it.each([

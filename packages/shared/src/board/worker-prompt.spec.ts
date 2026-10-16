@@ -241,6 +241,17 @@ describe('worker prompt v9 — Token saver (#445 D7, D9, D10, D14)', () => {
     }
   });
 
+  it('asks for one command per Bash call in How to work, with Token saver on (#445 amendment 11)', () => {
+    const prompt = cardWorkerPrompt({ ...card, tokenSaver: true });
+    const rule = prompt.indexOf('Run one command per Bash call');
+    expect(rule).toBeGreaterThan(prompt.indexOf('## How to work'));
+    expect(rule).toBeLessThan(prompt.indexOf('## How to write'));
+    expect(prompt).toContain('a single `cd <path> && <command>`');
+    expect(cardWorkerPrompt({ ...card, tokenSaver: false })).not.toContain(
+      'Run one command per Bash call',
+    );
+  });
+
   it('puts every stable section before the card’s own', () => {
     const prompt = cardWorkerPrompt(card);
     const theCard = prompt.indexOf('## Card C-12');
@@ -332,8 +343,8 @@ describe('next round prompt — card edits reach the worker (#273 D1–D4)', () 
     kind: 'feature',
   };
 
-  it('is version 11', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(11);
+  it('is version 12', () => {
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(12);
   });
 
   it('cardChange is null for identical text, whitespace around it aside', () => {

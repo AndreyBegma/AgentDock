@@ -7,9 +7,9 @@ import {
   settingsFiles,
 } from './permissions';
 import {
-  parseSimpleCommand,
+  type HookCommand,
+  parseHookCommand,
   quoteAssignment,
-  type SimpleCommand,
   shellQuote,
 } from './shell';
 import { statsTarget, writeStat } from './stats';
@@ -19,7 +19,8 @@ import type { Filter } from './types';
  * `agentdock-runner filter-hook` (#445 D3): Claude Code's PreToolUse hook for
  * Bash. It turns `bun run test` into `<runner> filter -- bun run test` when —
  * and only when — the session is in `bypassPermissions` (amendment 9) or
- * `auto` (amendment 10), the call is a single simple command a filter covers,
+ * `auto` (amendment 10), the call is a single simple command a filter covers
+ * (optionally after `cd <path> &&` and before `2>&1`, amendment 11),
  * not a background call or a dev/watch mode, and the rewrite changes nothing
  * about what the session asks or denies (see `permissions.ts`). Every other
  * Bash call is left alone and counted `passedThrough`.
@@ -105,9 +106,11 @@ export const decideHook = (
   const command = toolInput.command;
   if (typeof command !== 'string') return null;
 
-  const parsed = parseSimpleCommand(command);
-  const argv = parsed ? commandArgv(parsed.argv) : [];
-  const filter = parsed ? findFilter(deps.filters, parsed.argv) : null;
+  // Amendment 11: the filter, the long-running check and the rules all look
+  // at the inner command, past any `cd <path> &&`.
+  const parsed = parseHookCommand(command);
+  const argv = parsed ? commandArgv(parsed.command.argv) : [];
+  const filter = parsed ? findFilter(deps.filters, parsed.command.argv) : null;
   const id = filter?.id ?? FILTER_NONE;
   const leave = (reason: string): HookDecision => ({
     passThrough: reason,
@@ -168,17 +171,25 @@ export const decideHook = (
 /**
  * The rewrite, built from the parsed words and re-quoted — never from the
  * original text, so bash runs exactly the argv the parser saw (DR-01).
+ *
+ * Amendment 11: a `cd` target is re-quoted the same way. A trailing `2>&1` is
+ * kept, as a constant: the filter forwards the child's stdout and stderr
+ * separately whenever it does not compress (the bypass, streaming past the
+ * buffer, no filter), so dropping it would move stderr on exactly those paths.
+ * Kept, the wrapped command has the fd table the original had.
  */
 export const wrappedCommand = (
-  parsed: SimpleCommand,
+  parsed: HookCommand,
   selfCommand: readonly string[],
 ): string =>
   [
-    ...parsed.assignments.map(quoteAssignment),
+    ...(parsed.cd === null ? [] : ['cd', shellQuote(parsed.cd), '&&']),
+    ...parsed.command.assignments.map(quoteAssignment),
     ...selfCommand.map(shellQuote),
     'filter',
     '--',
-    ...parsed.argv.map(shellQuote),
+    ...parsed.command.argv.map(shellQuote),
+    ...(parsed.mergeStderr ? ['2>&1'] : []),
   ].join(' ');
 
 /**
