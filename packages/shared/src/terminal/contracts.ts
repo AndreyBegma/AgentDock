@@ -106,6 +106,8 @@ export const TERMINAL_CLOSE_CODES = {
   unsupported: 4501,
   /** The runner is offline or did not answer the attach in time. */
   runnerUnavailable: 4503,
+  /** ADR-0046: the runner's local policy refuses a write attach; the `error` frame says how to lift it. */
+  policyRefused: 4407,
 } as const;
 export type TerminalCloseCode =
   (typeof TERMINAL_CLOSE_CODES)[keyof typeof TERMINAL_CLOSE_CODES];
@@ -118,6 +120,8 @@ export const terminalRefusalCodeSchema = z.enum([
   'unsupported',
   'disabled',
   'runner_unavailable',
+  /** ADR-0046: the runner's local security policy refused it (`terminal.write`). */
+  'policy_refused',
 ]);
 export type TerminalRefusalCode = z.infer<typeof terminalRefusalCodeSchema>;
 
