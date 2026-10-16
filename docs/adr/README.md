@@ -42,3 +42,4 @@ Numbered, never rewritten. A changed decision gets a new ADR that supersedes the
 | [0037](0037-new-work-is-one-intake-that-can-split.md) | New work is one intake that can split: one button replaces New Card and New Plan, a confirmed split makes independent cards (amends ADR-0034 §1, §2) |
 | [0038](0038-a-round-waiting-on-its-own-background-tasks-is-not-waiting-for-the-person.md) | A round waiting on its own background tasks is not waiting for the person: a `background` phase from the transcript, activity is running, one stall warning (amends ADR-0024) |
 | [0039](0039-token-saver.md) | Token saver: the runner compresses what agents read (own command filter, strict MCP, scout, earlier compaction), never what people read |
+| [0040](0040-steward.md) | Steward: the runner watches agent sessions and does the safe fixes (nudge, known dialogs, resume), the API decides and reports; the fleet is observe-only |
