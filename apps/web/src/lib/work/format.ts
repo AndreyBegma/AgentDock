@@ -47,6 +47,7 @@ export const WORK_SOURCE_LABEL: Record<WorkSource, string> = {
   card: 'Card',
   plan: 'Plan',
   inbox: 'Suggested',
+  fleet: 'Fleet',
 };
 
 export const WORK_KIND_LABEL: Record<BoardCardKind, string> = {
