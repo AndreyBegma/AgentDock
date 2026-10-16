@@ -535,6 +535,37 @@ describe('agentdock-runner CLI', () => {
       server.close(4401, 'revoked');
       expect(await exit).toBe(EXIT.terminalClose);
     });
+
+    it('a replaced connection (4409) leaves the status `status` prints, then exits 78 (C-108)', async () => {
+      paired();
+      const { exit, live } = start();
+      await live();
+      server.close(4409, 'replaced by a newer connection');
+      expect(await exit).toBe(EXIT.terminalClose);
+      const expected =
+        'replaced by another connection at 2026-10-07T18:00:00.000Z, re-pair if this was not you';
+      expect(stderr.join('')).toContain(`stopped: ${expected}`);
+
+      stdout = [];
+      expect(await runCli(['status'], deps())).toBe(EXIT.ok);
+      expect(stdout.join('')).toContain(`stopped:  ${expected}\n`);
+    });
+
+    it('a new run clears the last stop from `status`', async () => {
+      paired();
+      const first = start();
+      await first.live();
+      server.close(4409, 'replaced');
+      expect(await first.exit).toBe(EXIT.terminalClose);
+
+      const second = start();
+      await second.live();
+      stdout = [];
+      await runCli(['status'], deps());
+      expect(stdout.join('')).not.toContain('stopped:');
+      second.controller.abort();
+      expect(await second.exit).toBe(EXIT.ok);
+    });
   });
 
   describe('Claude Code integration subcommands (spec 201)', () => {

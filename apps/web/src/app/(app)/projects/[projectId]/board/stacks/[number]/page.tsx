@@ -19,6 +19,7 @@ import { PageHeader } from '@andrewbehma/glass-ui/page-header';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
+import { Toggle } from '@andrewbehma/glass-ui/toggle';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import { ArrowDown, ArrowLeft, Layers, X } from 'lucide-react';
 import Link from 'next/link';
@@ -48,6 +49,7 @@ import {
   addableCards,
   approvableRevision,
   currentStageText,
+  designSwitch,
   gateNote,
   isGated,
   openComments,
@@ -327,7 +329,7 @@ function StackDetail({
           design={design}
           canOperate={canOperate}
           busy={busy}
-          run={run}
+          onChanged={onChanged}
         />
       </div>
     </div>
@@ -638,27 +640,18 @@ function StackDesignAside({
   design,
   canOperate,
   busy,
-  run,
+  onChanged,
 }: {
   projectId: string;
   stack: BoardStackDetail;
   design: TaskDesignView | undefined;
   canOperate: boolean;
   busy: boolean;
-  run: (job: () => Promise<unknown>, design?: boolean) => Promise<void>;
+  onChanged: () => void;
 }) {
   const viewer = stackDesignHref(projectId, stack.number);
   const preview = design ? previewRevision(design) : null;
   const frame = preview?.frames[0];
-  const setNeeded = (needed: boolean) =>
-    run(
-      () =>
-        api(stackDesignApi(projectId, stack.number), {
-          method: 'PATCH',
-          body: { needed },
-        }),
-      true,
-    );
   return (
     <aside
       aria-label="Stack design"
@@ -669,25 +662,18 @@ function StackDesignAside({
         description="The whole result. Each card’s own design is kept separately."
       />
       <div className="flex flex-col gap-3 rounded-surface bg-surface p-3">
+        <DesignSwitch
+          projectId={projectId}
+          stack={stack}
+          canOperate={canOperate}
+          busy={busy}
+          onChanged={onChanged}
+        />
         {stack.design === null ? (
-          <>
-            <p className="text-sm text-ink-2">
-              This stack has no shared design: its cards run without waiting for
-              one.
-            </p>
-            {canOperate && stack.design === null ? (
-              <div>
-                <Button
-                  size="sm"
-                  variant="glass"
-                  disabled={busy}
-                  onClick={() => setNeeded(true)}
-                >
-                  Draw a stack design first
-                </Button>
-              </div>
-            ) : null}
-          </>
+          <p className="text-sm text-ink-2">
+            This stack has no shared design: its cards run without waiting for
+            one.
+          </p>
         ) : (
           <>
             <div className="aspect-[4/3] overflow-hidden rounded-control border border-line">
@@ -746,20 +732,78 @@ function StackDesignAside({
               >
                 Open full size
               </Link>
-              {canOperate && stack.design.status !== 'approved' ? (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={busy}
-                  onClick={() => setNeeded(false)}
-                >
-                  Turn the design off
-                </Button>
-              ) : null}
             </div>
           </>
         )}
       </div>
     </aside>
+  );
+}
+
+/**
+ * #502: "Stack design required" — off lifts the design-first gate, on holds
+ * it until the design is approved. Revisions and the approval are kept
+ * either way. It flips at once and returns if the request fails; it is
+ * locked while a design turn runs, and read-only to a viewer.
+ */
+function DesignSwitch({
+  projectId,
+  stack,
+  canOperate,
+  busy,
+  onChanged,
+}: {
+  projectId: string;
+  stack: BoardStackDetail;
+  canOperate: boolean;
+  busy: boolean;
+  onChanged: () => void;
+}) {
+  const showError = useErrorToast();
+  const { required, locked } = designSwitch(stack);
+  const [pending, setPending] = useState<boolean | null>(null);
+  // A fresh stack carries the outcome; the optimistic value has done its job.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset on every refetch
+  useEffect(() => setPending(null), [stack]);
+  const disabled = !canOperate || locked || busy || pending !== null;
+  const toggle = async (needed: boolean) => {
+    setPending(needed);
+    try {
+      await api(stackDesignApi(projectId, stack.number), {
+        method: 'PATCH',
+        body: { needed },
+      });
+      onChanged();
+    } catch (error) {
+      setPending(null);
+      showError(describeDesignError(error, projectId));
+    }
+  };
+  return (
+    <div className="flex items-center gap-3 rounded-control bg-hover px-3 py-2">
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span
+          id="stack-design-required"
+          className="text-sm font-medium text-ink"
+        >
+          Stack design required
+        </span>
+        <span className="text-xs text-ink-3">
+          {locked
+            ? 'A design turn is running. Stop it first.'
+            : 'No card of the stack runs until the design is approved.'}
+        </span>
+      </span>
+      <span
+        inert={disabled || undefined}
+        className={disabled ? 'opacity-60' : undefined}
+      >
+        <Toggle
+          labelledBy="stack-design-required"
+          checked={pending ?? required}
+          onChange={toggle}
+        />
+      </span>
+    </div>
   );
 }

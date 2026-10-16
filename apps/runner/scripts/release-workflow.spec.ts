@@ -66,7 +66,7 @@ describe('release-runner.yml', () => {
     });
   });
 
-  // ADR-0046: the secrets are scoped to the tag event in Woodpecker; a step
+  // ADR-0047: the secrets are scoped to the tag event in Woodpecker; a step
   // that reads one must not run on any other event, or a manual run fails on
   // a secret it may not have.
   it('reads secrets only in steps that run on a runner-v* tag alone', () => {

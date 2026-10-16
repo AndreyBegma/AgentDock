@@ -2,7 +2,7 @@
 
 Issue: [#22](https://github.com/AndreyBegma/AgentDock/issues/22) · Roadmap: M2.7 ·
 Decisions: [ADR-0005](../adr/0005-drive-the-cs-orchestrator-skill-do-not-reimplement-it.md),
-[ADR-0007](../adr/0007-postgresql-only.md), [security.md](../architecture/security.md),
+[ADR-0007](../adr/0007-postgresql-only.md), [ADR-0046](../adr/0046-the-telegram-bot-acts-on-the-board-through-a-command-router.md), [security.md](../architecture/security.md),
 [PRD — notifications](../product/prd.md)
 
 ## Summary
@@ -236,6 +236,13 @@ i22-telegram, decided with the orchestrator on 2026-10-08:
     - **Delayed.** The blocked-checkpoint sweep runs every minute beside the runner watcher, single-flight under its own advisory lock. A blocked checkpoint notifies only if it is still its slot's latest 15 min after it arrived (`BLOCKED_CHECKPOINT_DELAY_MS`; its `at`, or when the sweep first saw a new heading at that position) and the slot is not `ended`. If the orchestrator answers and the worker moves on, nothing is sent. `issue.blocked` with `kind = person` stays immediate, from the matcher.
     - **State.** `blocked_checkpoint_notices`, one row per blocked checkpoint the sweep has looked at: the heading it is about, `since`, `notifiedAt`. Rows are cascaded with the checkpoint. The migration backfills every blocked checkpoint that existed before as already notified, so the first sweep fires nothing old.
     - **Content (D10).** The body is the heading's first line (≤ 200 characters); a heading that is just "blocked" keeps "The worker reported a blocked checkpoint." The summary is still never copied. The item is not folded (D6) — the notice already makes it one per checkpoint.
+
+24. **The bot acts on the Board (ADR-0046), built by #500.** This widens the scope above: the bot is no longer only a notification channel. Board commands from stack S-1 (`/new`, `/board`, card actions) are in scope, each delivered by its own card. D7 (long polling), D10 (no pane text, prompts, code or secrets in messages) and D12 (typed actions through the web app's services, a role re-check per press, an audit row) still hold for every one of them.
+    - **Router.** `TelegramRouter` routes commands (`/cmd args`, `/cmd@Bot args`), `callback_data` prefixes and replies to the bot's prompts. The `/start`, `/stop`, D12, spec 201 D18 and #489 handlers moved onto it unchanged. An unknown command in a private chat gets a pointer to `/help`; other text is still ignored.
+    - **Callback data.** New buttons use `callbackCodec`, which refuses at definition a payload that could pass 64 bytes and decodes malformed data to null. `a`, `r`, `x`, `y` and `q` stay reserved for the existing buttons.
+    - **Current project.** `telegram_links.currentProjectId` is set by `/project` (buttons, one per project the linked user is an active member of, with their role), by `/project <name>`, or automatically for a user with one project. Every choice is audited as `telegram.project`. Board replies name their project first. Buttons carry their own project and never read the current one.
+    - **Guard.** `TelegramGuard` checks the linked user, that the user is active, membership (spec 10 D11) and role: a read needs any active member, a write needs operator or higher. D12's buttons, spec 201's buttons and #489's buttons and replies use it.
+    - **Menu.** `/help` and `setMyCommands` (private chats) come from one list, `BOT_COMMANDS`. The menu is set when the bot is configured, and once more by the poller for a bot it has not set it for.
 
 Depends on #9
 

@@ -3,7 +3,7 @@
 // binary, so this shim only finds the platform package npm installed from
 // optionalDependencies and runs its binary with the same arguments and stdio.
 // It runs a binary only when its checksum is in the SHA256SUMS this package
-// ships and that file is signed by the AgentDock release key (ADR-0046).
+// ships and that file is signed by the AgentDock release key (ADR-0047).
 
 const { execFileSync } = require('node:child_process');
 const { createHash, verify } = require('node:crypto');

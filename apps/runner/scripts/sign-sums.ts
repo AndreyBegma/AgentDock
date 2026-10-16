@@ -1,4 +1,4 @@
-// Signs a runner release's SHA256SUMS (ADR-0046): writes
+// Signs a runner release's SHA256SUMS (ADR-0047): writes
 // `<release>/SHA256SUMS.sig`, the raw 64-byte Ed25519 signature of the file.
 // The npm shim and the Homebrew formula refuse a binary whose checksum is not
 // in a SHA256SUMS signed by apps/runner/release-key.pub.

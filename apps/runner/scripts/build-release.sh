@@ -4,7 +4,7 @@
 #   bin/<os>-<arch>/agentdock-runner                  one binary per target
 #   agentdock-runner-<version>-<os>-<arch>.tar.gz     what the GitHub Release carries
 #   SHA256SUMS                                        checksums of the tarballs and binaries
-#   SHA256SUMS.sig                                    its Ed25519 signature (ADR-0046)
+#   SHA256SUMS.sig                                    its Ed25519 signature (ADR-0047)
 #   npm/agentdock-runner{,-<os>-<arch>}/              the packages npm publishes
 #   agentdock-runner.rb                               the Homebrew formula
 #

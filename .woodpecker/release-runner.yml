@@ -1,7 +1,7 @@
 # Releases agentdock-runner (ADR-0017).
 #
 # Pushing the tag runner-v<version> builds the four binaries, signs SHA256SUMS
-# (ADR-0046), creates the GitHub Release with the tarballs, SHA256SUMS and
+# (ADR-0047), creates the GitHub Release with the tarballs, SHA256SUMS and
 # SHA256SUMS.sig, publishes the npm packages
 # (the four platform packages before the wrapper) and pushes the Homebrew
 # formula to AndreyBegma/homebrew-tap. The tag must equal the version in

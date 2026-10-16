@@ -111,7 +111,7 @@ Nothing is published on the host. The stack runs on its own compose network
 ## Releasing the runner
 
 Decisions: [ADR-0017](../docs/adr/0017-runner-distribution-homebrew-and-npm.md),
-[ADR-0046](../docs/adr/0046-runner-releases-are-signed-and-cut-only-from-protected-tags.md).
+[ADR-0047](../docs/adr/0047-runner-releases-are-signed-and-cut-only-from-protected-tags.md).
 A tag `runner-v<version>` runs `.woodpecker/release-runner.yml`. The workflow
 tests the runner, builds the four binaries, signs `SHA256SUMS` and creates the
 GitHub Release with the tarballs, `SHA256SUMS` and `SHA256SUMS.sig`. It then

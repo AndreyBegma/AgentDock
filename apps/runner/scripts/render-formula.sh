@@ -2,7 +2,7 @@
 # Prints the Homebrew formula of a runner release (ADR-0017): the template in
 # apps/runner/homebrew/ with the version, each target's checksum, and the
 # checksums of SHA256SUMS and SHA256SUMS.sig filled in. The formula checks the
-# signature itself at install time (ADR-0046).
+# signature itself at install time (ADR-0047).
 #
 #   sh scripts/render-formula.sh <version> <SHA256SUMS> <SHA256SUMS.sig> > agentdock-runner.rb
 #

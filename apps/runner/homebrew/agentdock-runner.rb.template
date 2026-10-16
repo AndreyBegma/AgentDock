@@ -32,7 +32,7 @@ class AgentdockRunner < Formula
     end
   end
 
-  # SHA256SUMS of the release and its Ed25519 signature (ADR-0046).
+  # SHA256SUMS of the release and its Ed25519 signature (ADR-0047).
   resource "SHA256SUMS" do
     url "https://github.com/AndreyBegma/AgentDock/releases/download/runner-v@VERSION@/SHA256SUMS"
     sha256 "@SHA256_SUMS@"
