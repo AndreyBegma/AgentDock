@@ -3,6 +3,7 @@ import {
   ATTACHMENTS_PER_CARD_MAX,
   attachmentRefSchema,
 } from '../../attachments';
+import { tokenSaverConfigSchema } from '../../token-saver/contracts';
 import type { CommandDefinition } from '../commands';
 import { absolutePathSchema } from '../projects';
 import { orchestratorModelSchema } from './control';
@@ -195,6 +196,8 @@ export const planTurnArgsSchema = z.strictObject({
     .int()
     .min(PLAN_TURN_MIN_TIMEOUT_SEC)
     .max(PLAN_TURN_MAX_TIMEOUT_SEC),
+  /** #445 D11: as on `card.run`. */
+  tokenSaver: tokenSaverConfigSchema.optional(),
 });
 export type PlanTurnArgs = z.infer<typeof planTurnArgsSchema>;
 

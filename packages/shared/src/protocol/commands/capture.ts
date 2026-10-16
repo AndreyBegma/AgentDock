@@ -4,6 +4,7 @@ import {
   CAPTURE_MIN_TIMEOUT_SEC,
   CAPTURE_MODELS,
 } from '../../board/capture-limits';
+import { tokenSaverConfigSchema } from '../../token-saver/contracts';
 import type { CommandDefinition } from '../commands';
 import { profileKeySchema, skillRunIdSchema } from './skills';
 
@@ -74,6 +75,8 @@ export const cardsExtractArgsSchema = z.strictObject({
     .int()
     .min(CAPTURE_MIN_TIMEOUT_SEC)
     .max(CAPTURE_MAX_TIMEOUT_SEC),
+  /** #445 D11: as on `card.run`. */
+  tokenSaver: tokenSaverConfigSchema.optional(),
 });
 export type CardsExtractArgs = z.infer<typeof cardsExtractArgsSchema>;
 

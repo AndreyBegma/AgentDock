@@ -86,6 +86,12 @@ export const capabilitiesSchema = z.object({
    * runner older than the field. Next to `git`, which stays the version.
    */
   gitAuth: z.object({ github: z.enum(['gh', 'native']) }).optional(),
+  /**
+   * #445: the runner takes `tokenSaver` on its launch commands. Every launch
+   * args schema is strict, so the API sends the field only when this is
+   * `true`. Absent means `false` — a runner older than the feature.
+   */
+  tokenSaver: z.boolean().optional(),
 });
 export type Capabilities = z.infer<typeof capabilitiesSchema>;
 
@@ -99,6 +105,10 @@ export type GitGithubAuth = NonNullable<Capabilities['gitAuth']>['github'];
 /** Whether the UI may offer an attach on this runner; absent `terminal` is `false`. */
 export const terminalAvailable = (capabilities: Capabilities): boolean =>
   capabilities.terminal === true;
+
+/** Whether the API may send `tokenSaver` on launch commands; absent is `false`. */
+export const tokenSaverAvailable = (capabilities: Capabilities): boolean =>
+  capabilities.tokenSaver === true;
 
 /** What a runner said it serves (#233, ADR-0023): names only, never paths or versions. */
 export interface RunnerCommands {

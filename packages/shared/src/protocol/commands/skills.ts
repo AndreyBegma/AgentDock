@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { RunStatus } from '../../history/contracts';
+import { tokenSaverConfigSchema } from '../../token-saver/contracts';
 import { runtimeSchema } from '../capabilities';
 import type { CommandDefinition, Role } from '../commands';
 import { absolutePathSchema } from '../projects';
@@ -525,6 +526,8 @@ export const skillRunArgsSchema = z.strictObject({
   permissionMode: orchestratorPermissionModeSchema,
   output: skillRunOutputSchema,
   timeoutSec: skillTimeoutSecSchema,
+  /** #445 D11: as on `card.run`. */
+  tokenSaver: tokenSaverConfigSchema.optional(),
 });
 export type SkillRunArgs = z.infer<typeof skillRunArgsSchema>;
 

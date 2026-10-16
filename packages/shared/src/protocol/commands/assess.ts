@@ -5,6 +5,7 @@ import {
   CARD_ASSESS_MODEL,
   CARD_ASSESS_PROMPT_MAX_BYTES,
 } from '../../assess/limits';
+import { tokenSaverConfigSchema } from '../../token-saver/contracts';
 import type { CommandDefinition } from '../commands';
 import { profileKeySchema, skillRunIdSchema } from './skills';
 
@@ -56,6 +57,8 @@ export const cardAssessArgsSchema = z.strictObject({
     .int()
     .min(CARD_ASSESS_MIN_TIMEOUT_SEC)
     .max(CARD_ASSESS_MAX_TIMEOUT_SEC),
+  /** #445 D11: as on `card.run`. */
+  tokenSaver: tokenSaverConfigSchema.optional(),
 });
 export type CardAssessArgs = z.infer<typeof cardAssessArgsSchema>;
 
