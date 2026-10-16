@@ -62,6 +62,22 @@ describe('steward.observed (#447 D6, D12)', () => {
     ).toBe(false);
   });
 
+  it('takes haiku’s session with an unknown stall only (D16)', () => {
+    const classifierSessionId = '0f8fad5b-d9cb-469f-a165-70867728950e';
+    expect(
+      stewardObservedDataSchema.safeParse({
+        ...observed,
+        kind: 'unknown',
+        reason: 'Waiting on a long migration with no output',
+        classifierSessionId,
+      }).success,
+    ).toBe(true);
+    expect(
+      stewardObservedDataSchema.safeParse({ ...observed, classifierSessionId })
+        .success,
+    ).toBe(false);
+  });
+
   it('bounds the pane tail and keeps the reason to one line', () => {
     expect(
       stewardObservedDataSchema.safeParse({ ...observed, paneTail: '❯ ' })

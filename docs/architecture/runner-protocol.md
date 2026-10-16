@@ -1416,6 +1416,7 @@ not on every poll.
 | `reason` | one line, ≤ 200 characters: the rule's, or for `unknown` the one line from haiku, run locally through the launch profile (D3) |
 | `dialogId` | with `kind: "dialog"` only, when the dialog is on the #435 list (`STEWARD_DIALOG_IDS`) |
 | `paneTail` | the pane's last lines, ≤ 4 KiB — **only** when `projects[].shipContent` is true (D12) |
+| `classifierSessionId` | with `kind: "unknown"` only: the Claude session of haiku's classification. The API records it as a run of kind `steward`, so the spend counts against the project budget (D16, ADR-0009) |
 
 With `shipContent` off, no pane or transcript text reaches the API: the
 reason is the only text, and a rule's reason quotes no pane content.

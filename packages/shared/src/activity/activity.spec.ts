@@ -6,6 +6,7 @@ import {
   eventSourceSchema,
 } from '../protocol';
 import { SCHEDULE_EVENT_TYPES } from '../schedules';
+import { STEWARD_ACTIVITY_TYPES } from '../steward';
 import { ACTIVITY_DATA_MAX_BYTES } from './contracts';
 import {
   ACTIVITY_AUDIT_ACTIONS,
@@ -57,6 +58,7 @@ const API_ONLY = new Set<string>([
   'manual.note',
   'manual.handoff',
   'card.background_stalled',
+  ...STEWARD_ACTIVITY_TYPES,
 ]);
 
 describe('the curated event map (spec 21 D3)', () => {
@@ -103,6 +105,10 @@ describe('the curated event map (spec 21 D3)', () => {
         'manual.note',
         'manual.handoff',
         'card.background_stalled',
+        'steward_incident.opened',
+        'steward_incident.acted',
+        'steward_incident.escalated',
+        'steward_incident.resolved',
       ].sort(),
     );
   });

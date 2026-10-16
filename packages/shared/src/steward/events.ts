@@ -77,6 +77,16 @@ export const stewardObservedDataSchema = z
     /** With `kind: 'dialog'` only, when the dialog is on the D11 list. */
     dialogId: stewardDialogIdSchema.optional(),
     paneTail: stewardPaneTailSchema.optional(),
+    /**
+     * D16: the Claude session of haiku's classification, with `kind:
+     * 'unknown'` only — the API records it as a `steward` run, so the spend
+     * counts against the project budget (ADR-0009).
+     */
+    classifierSessionId: z.uuid().optional(),
+  })
+  .refine((d) => d.classifierSessionId === undefined || d.kind === 'unknown', {
+    message: 'classifierSessionId goes with kind: unknown',
+    path: ['classifierSessionId'],
   })
   .refine((d) => d.dialogId === undefined || d.kind === 'dialog', {
     message: 'dialogId goes with kind: dialog',

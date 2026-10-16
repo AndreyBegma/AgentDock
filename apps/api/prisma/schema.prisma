@@ -409,6 +409,7 @@ model Project {
   tokenSaverStats      TokenSaverStat[]
   stewardSettings      StewardSettings?
   stewardIncidents     StewardIncident[]
+  stewardDigests       StewardDigest[]
 
   @@unique([runnerId, rootPath])
   @@map("projects")
@@ -1538,6 +1539,9 @@ enum RunKind {
   text_normalize
   /// A card's model assessment (issue #322 D5, ADR-0032).
   card_assess
+  /// Steward's local haiku: a stall's classification or the digest prose
+  /// (issue #447 D3, D16).
+  steward
 }
 
 enum RunStatus {
@@ -3409,4 +3413,31 @@ model StewardIncident {
   @@index([projectId, openedAt])
   @@index([subjectKind, subjectId, status])
   @@map("steward_incidents")
+}
+
+/// Mirrors `STEWARD_DIGEST_TRIGGERS` (D14).
+enum StewardDigestTrigger {
+  daily
+  away_off
+}
+
+/// One delivered digest (D14) — `GET …/steward/digest/latest` reads the newest.
+/// Stored because haiku's prose cannot be recomputed.
+model StewardDigest {
+  id        String               @id @default(cuid())
+  projectId String
+  trigger   StewardDigestTrigger
+  /// The period covered.
+  from      DateTime
+  to        DateTime
+  /// `{ done, stuck, waiting, spendUsd }` of `StewardDigestView`.
+  content   Json
+  /// haiku's summary; null when the template was used (runner offline).
+  prose     String?
+  createdAt DateTime             @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt])
+  @@map("steward_digests")
 }

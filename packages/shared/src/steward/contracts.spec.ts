@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { RUN_KINDS } from '../history/contracts';
 import {
   capabilitiesSchema,
   stewardAvailable,
@@ -9,6 +10,7 @@ import {
 import {
   hasClaudeTrailer,
   STEWARD_DEFAULTS,
+  STEWARD_DIGEST_TRIGGERS,
   STEWARD_INCIDENT_KINDS,
   STEWARD_INCIDENT_STATUSES,
   STEWARD_SUBJECT_KINDS,
@@ -191,6 +193,8 @@ describe('the Prisma enums mirror the shared ones', () => {
     ['StewardSubjectKind', STEWARD_SUBJECT_KINDS],
     ['StewardIncidentKind', STEWARD_INCIDENT_KINDS],
     ['StewardIncidentStatus', STEWARD_INCIDENT_STATUSES],
+    ['StewardDigestTrigger', STEWARD_DIGEST_TRIGGERS],
+    ['RunKind', RUN_KINDS],
   ] as const)('%s', (name, values) => {
     expect(enumValues(name)).toEqual([...values]);
   });
