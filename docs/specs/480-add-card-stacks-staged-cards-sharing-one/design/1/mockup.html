@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-scale="desk" data-palette="navy">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>C-86 Stacks — mockup</title>
+<style>
+:root{
+  --font-sans:'SF Pro Text','SF Pro Display',Inter,system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  --radius-control:6px;--radius-surface:8px;--radius-sheet:12px;
+  --size-row:32px;--size-control:28px;--size-field:28px;--size-nav:28px;--size-tap:44px;
+  --dur-fast:100ms;--dur-base:150ms;--dur-sheet:260ms;
+  --ease-sheet:cubic-bezier(.32,.72,0,1);
+  --blur-scrim:2px;--glass-blur:26px;--glass-blur-strong:40px;
+}
+:root,:root[data-theme="dark"]{
+  color-scheme:dark;
+  --color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-canvas:#0a1022;--color-paper:#1b2647;
+  --color-content:rgb(27 38 71/.96);
+  --color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246/.62);--color-ink-3:rgb(242 242 246/.53);
+  --color-line:rgb(255 255 255/.1);--color-line-strong:rgb(255 255 255/.18);--color-hover:rgb(255 255 255/.06);
+  --color-focus:#b4b2ff;--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-soft:rgb(91 91 246/.2);--color-accent-ink:#b4b2ff;
+  --color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;--color-info:#5fb4f0;--color-info-soft:rgb(95 180 240/.16);
+  --color-scrim:rgb(10 16 34/.3);
+  --color-hue-1:#5b9cf6;--color-hue-1-soft:rgb(91 156 246/.18);--color-hue-1-line:rgb(91 156 246/.5);--color-hue-1-ink:#a4c8ff;--color-hue-1-glow:rgb(91 156 246/.45);
+  --color-hue-2:#2fbf94;--color-hue-2-soft:rgb(47 191 148/.18);--color-hue-2-line:rgb(47 191 148/.5);--color-hue-2-ink:#7ee0c0;--color-hue-2-glow:rgb(47 191 148/.45);
+  --color-hue-3:#7cc95a;--color-hue-3-soft:rgb(124 201 90/.18);--color-hue-3-line:rgb(124 201 90/.5);--color-hue-3-ink:#ade58f;--color-hue-3-glow:rgb(124 201 90/.45);
+  --color-hue-4:#e69f00;--color-hue-4-soft:rgb(230 159 0/.18);--color-hue-4-line:rgb(230 159 0/.5);--color-hue-4-ink:#f5c25c;--color-hue-4-glow:rgb(230 159 0/.45);
+  --color-hue-5:#e8743b;--color-hue-5-soft:rgb(232 116 59/.18);--color-hue-5-line:rgb(232 116 59/.5);--color-hue-5-ink:#f9a77c;--color-hue-5-glow:rgb(232 116 59/.45);
+  --color-hue-6:#f0606e;--color-hue-6-soft:rgb(240 96 110/.18);--color-hue-6-line:rgb(240 96 110/.5);--color-hue-6-ink:#ff9da5;--color-hue-6-glow:rgb(240 96 110/.45);
+  --color-hue-7:#a68bfa;--color-hue-7-soft:rgb(166 139 250/.18);--color-hue-7-line:rgb(166 139 250/.5);--color-hue-7-ink:#cbbcff;--color-hue-7-glow:rgb(166 139 250/.45);
+  --color-hue-8:#cc79a7;--color-hue-8-soft:rgb(204 121 167/.18);--color-hue-8-line:rgb(204 121 167/.5);--color-hue-8-ink:#efabd1;--color-hue-8-glow:rgb(204 121 167/.45);
+  --canvas-glow:18%;
+  --glass-sheen:rgb(255 255 255/.06);--glass-scrim:rgb(9 9 12/.55);--glass-scrim-strong:rgb(9 9 12/.64);
+  --glass-brightness:.85;--glass-brightness-strong:.7;
+  --glass-edge:rgb(255 255 255/.14);--glass-spec:rgb(255 255 255/.2);
+  --glass-rim:rgb(242 242 246/.8);--glass-rim-shade:rgb(9 9 12/.5);--glass-meniscus:rgb(9 9 12/.55);--glass-refract:rgb(242 242 246/.35);
+  --glass-shadow:rgb(0 0 0/.35);--glass-shadow-strong:rgb(0 0 0/.45);--glass-shadow-clear:rgb(0 0 0/.15);
+}
+:root[data-theme="light"]{
+  color-scheme:light;
+  --color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-canvas:#e9eef8;--color-paper:#fff;
+  --color-content:rgb(255 255 255/.96);
+  --color-ink:#18181b;--color-ink-2:rgb(24 24 27/.72);--color-ink-3:rgb(24 24 27/.64);
+  --color-line:rgb(0 0 0/.1);--color-line-strong:rgb(0 0 0/.23);--color-hover:rgb(0 0 0/.06);
+  --color-focus:#4f46e5;--color-accent:#4f46e5;--color-on-accent:#fff;--color-accent-soft:rgb(79 70 229/.12);--color-accent-ink:#4338ca;
+  --color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;--color-info:#03629a;--color-info-soft:rgb(3 98 154/.12);
+  --color-scrim:rgb(10 16 34/.22);
+  --color-hue-1:#1f64d6;--color-hue-1-soft:rgb(31 100 214/.12);--color-hue-1-line:rgb(31 100 214/.45);--color-hue-1-ink:#1550b0;--color-hue-1-glow:rgb(31 100 214/.28);
+  --color-hue-2:#00805e;--color-hue-2-soft:rgb(0 128 94/.12);--color-hue-2-line:rgb(0 128 94/.45);--color-hue-2-ink:#006a4e;--color-hue-2-glow:rgb(0 128 94/.28);
+  --color-hue-3:#3a7d1c;--color-hue-3-soft:rgb(58 125 28/.12);--color-hue-3-line:rgb(58 125 28/.45);--color-hue-3-ink:#2f6617;--color-hue-3-glow:rgb(58 125 28/.28);
+  --color-hue-4:#b36b00;--color-hue-4-soft:rgb(179 107 0/.12);--color-hue-4-line:rgb(179 107 0/.45);--color-hue-4-ink:#8a5200;--color-hue-4-glow:rgb(179 107 0/.28);
+  --color-hue-5:#c24e00;--color-hue-5-soft:rgb(194 78 0/.12);--color-hue-5-line:rgb(194 78 0/.45);--color-hue-5-ink:#9c3d00;--color-hue-5-glow:rgb(194 78 0/.28);
+  --color-hue-6:#d02a3e;--color-hue-6-soft:rgb(208 42 62/.12);--color-hue-6-line:rgb(208 42 62/.45);--color-hue-6-ink:#ad1f31;--color-hue-6-glow:rgb(208 42 62/.28);
+  --color-hue-7:#7244e0;--color-hue-7-soft:rgb(114 68 224/.12);--color-hue-7-line:rgb(114 68 224/.45);--color-hue-7-ink:#5b30c4;--color-hue-7-glow:rgb(114 68 224/.28);
+  --color-hue-8:#b0457f;--color-hue-8-soft:rgb(176 69 127/.12);--color-hue-8-line:rgb(176 69 127/.45);--color-hue-8-ink:#933668;--color-hue-8-glow:rgb(176 69 127/.28);
+  --canvas-glow:10%;
+  --glass-sheen:rgb(0 0 0/.06);--glass-scrim:rgb(255 255 255/.52);--glass-scrim-strong:rgb(255 255 255/.64);
+  --glass-brightness:1.15;--glass-brightness-strong:1.3;
+  --glass-edge:rgb(0 0 0/.18);--glass-spec:rgb(0 0 0/.2);
+  --glass-rim:rgb(255 255 255/.9);--glass-rim-shade:rgb(24 24 27/.18);--glass-meniscus:rgb(24 24 27/.12);--glass-refract:rgb(255 255 255/.5);
+  --glass-shadow:rgb(0 0 0/.12);--glass-shadow-strong:rgb(0 0 0/.16);--glass-shadow-clear:rgb(0 0 0/.08);
+}
+:root{
+  --color-status-running:var(--color-hue-2);--color-status-running-soft:var(--color-hue-2-soft);--color-status-running-ink:var(--color-hue-2-ink);
+  --color-status-waiting:var(--color-hue-1);--color-status-waiting-soft:var(--color-hue-1-soft);--color-status-waiting-ink:var(--color-hue-1-ink);
+  --color-status-paused:var(--color-hue-4);--color-status-paused-soft:var(--color-hue-4-soft);--color-status-paused-ink:var(--color-hue-4-ink);
+  --color-status-blocked:var(--color-hue-5);--color-status-blocked-soft:var(--color-hue-5-soft);--color-status-blocked-ink:var(--color-hue-5-ink);
+  --color-status-done:var(--color-hue-3);--color-status-done-soft:var(--color-hue-3-soft);--color-status-done-ink:var(--color-hue-3-ink);
+  --color-status-error:var(--color-hue-6);--color-status-error-soft:var(--color-hue-6-soft);--color-status-error-ink:var(--color-hue-6-ink);
+  --glass-filter:blur(var(--glass-blur)) saturate(180%) brightness(var(--glass-brightness));
+  --glass-filter-strong:blur(var(--glass-blur-strong)) saturate(180%) brightness(var(--glass-brightness-strong));
+}
+*,*::before,*::after{box-sizing:border-box}
+html{font-size:16px;background:var(--color-ground);color:var(--color-ink);scrollbar-gutter:stable}
+body{margin:0;min-height:100vh;font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+h1,h2,h3,h4,p{margin:0}
+ul,ol{margin:0;padding:0;list-style:none}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}
+input:focus-visible,select:focus-visible,textarea:focus-visible{outline:none}
+table,time,output,.num{font-variant-numeric:tabular-nums}
+code,pre,kbd,.mono{font-family:var(--font-mono)}
+.text-sm{font-size:13px;line-height:20px}.text-xs{font-size:12px;line-height:16px}.text-label{font-size:12px;line-height:16px;font-weight:500}.text-section{font-size:15px;line-height:22px;font-weight:600}
+.ink{color:var(--color-ink)}.ink-2{color:var(--color-ink-2)}.ink-3{color:var(--color-ink-3)}.accent-ink{color:var(--color-accent-ink)}
+.icon{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.icon.s12{width:12px;height:12px}.icon.s14{width:14px;height:14px}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:
+  radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),
+  radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%),
+  radial-gradient(70vmax 50vmax at 45% 110%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%)}
+.glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);backdrop-filter:var(--glass-filter);-webkit-backdrop-filter:var(--glass-filter);border:1px solid var(--glass-edge);
+  box-shadow:inset 0 1px 0 var(--glass-spec),inset 1px 1px 0 var(--glass-rim),inset -1px -1px 0 var(--glass-rim-shade),inset 0 -3px 3px -1px var(--glass-meniscus),inset 0 0 18px -4px var(--glass-refract),0 12px 32px var(--glass-shadow)}
+.glass-strong{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim-strong);backdrop-filter:var(--glass-filter-strong);-webkit-backdrop-filter:var(--glass-filter-strong);border:1px solid var(--glass-edge);
+  box-shadow:inset 0 1px 0 var(--glass-spec),inset -1px -1px 0 var(--glass-rim-shade),inset 0 -3px 3px -1px var(--glass-meniscus),inset 0 0 18px -4px var(--glass-refract),0 20px 48px var(--glass-shadow-strong)}
+.surface-content{background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.app-shell{display:flex;gap:12px;padding:12px;min-height:100vh}
+.app-rail-wrap{position:sticky;top:12px;height:calc(100vh - 24px);flex:none}
+.app-column{display:flex;flex-direction:column;gap:12px;flex:1;min-width:0}
+.topbar{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;border-radius:var(--radius-surface);flex:none}
+.main{margin:0 auto;width:100%;max-width:64rem;padding-bottom:24px;display:flex;flex-direction:column;gap:24px}
+.main.wide{max-width:80rem}
+.breadcrumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--color-ink-3);min-width:0}
+.breadcrumb a{color:var(--color-ink-2);text-decoration:none}
+.breadcrumb [aria-current]{color:var(--color-ink);font-weight:500}
+.nav-rail{display:flex;flex-direction:column;gap:8px;padding:8px;width:240px;height:100%;border-radius:var(--radius-surface)}
+.nav-rail-head{display:flex;align-items:center;gap:8px;padding:6px 8px 8px;font-weight:600}
+.nav-group{display:flex;flex-direction:column;gap:2px}
+.nav-group-label{padding:8px 8px 4px;font-size:12px;line-height:16px;font-weight:500;color:var(--color-ink-3)}
+.nav-item{position:relative;display:flex;align-items:center;gap:10px;height:var(--size-nav);padding:0 8px;border-radius:var(--radius-control);font-size:13px;font-weight:500;color:var(--color-ink-2);text-decoration:none}
+.nav-item:hover{background:var(--color-hover);color:var(--color-ink)}
+.nav-item[aria-current="page"]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.nav-item .badge{margin-left:auto}
+.btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font-weight:600;user-select:none;cursor:pointer;border:1px solid transparent;
+  height:var(--size-control);padding:0 16px;font-size:14px;border-radius:var(--radius-control);text-decoration:none;transition:background-color var(--dur-fast),border-color var(--dur-fast),color var(--dur-fast),transform var(--dur-fast) var(--ease-sheet)}
+.btn:active{transform:scale(.97)}
+.btn:disabled,.btn[aria-disabled="true"]{opacity:.4;cursor:not-allowed}
+.btn-solid{background:var(--color-accent);color:var(--color-on-accent)}
+.btn-solid:hover{background:color-mix(in oklab,var(--color-accent) 88%,var(--color-on-accent))}
+.btn-glass{background:var(--color-raised);color:var(--color-ink);border-color:var(--color-line-strong)}
+.btn-glass:hover{background:linear-gradient(var(--color-hover),var(--color-hover)),var(--color-raised)}
+.btn-ghost{background:transparent;color:var(--color-ink-2)}
+.btn-ghost:hover{background:var(--color-hover);color:var(--color-ink)}
+.btn-sm{height:24px;padding:0 10px;font-size:12px;border-radius:4px}
+.btn-icon{padding:0;aspect-ratio:1}
+.btn-icon.btn-sm{width:24px}
+.field{display:flex;flex-direction:column;gap:4px}
+.field-label{font-size:12px;line-height:16px;font-weight:500;color:var(--color-ink-2)}
+.field-hint{font-size:12px;line-height:16px;color:var(--color-ink-3)}
+.input,.select,.textarea{width:100%;background:var(--color-surface);color:var(--color-ink);border:1px solid var(--color-line-strong);border-radius:var(--radius-control);font-size:13px}
+.input,.select{height:var(--size-field);padding:0 12px}
+.textarea{padding:8px 12px;min-height:64px;resize:vertical;line-height:20px}
+.input:focus,.select:focus,.textarea:focus{outline:none;border-color:color-mix(in oklab,var(--color-ink) 70%,transparent);box-shadow:0 0 0 2px color-mix(in oklab,var(--color-ink) 22%,transparent)}
+.select{appearance:none;padding-right:28px;cursor:pointer;background-image:linear-gradient(45deg,transparent 50%,var(--color-ink-3) 50%),linear-gradient(135deg,var(--color-ink-3) 50%,transparent 50%);
+  background-position:calc(100% - 15px) 50%,calc(100% - 10px) 50%;background-size:5px 5px;background-repeat:no-repeat}
+.toggle{position:relative;display:inline-flex;align-items:center;width:44px;height:24px;flex:none;border-radius:999px;border:0;padding:0;cursor:pointer;background:var(--color-line-strong)}
+.toggle::after{content:'';width:16px;height:16px;border-radius:999px;background:var(--color-ink);transform:translateX(4px);transition:transform var(--dur-fast)}
+.toggle[aria-checked="true"]{background:var(--color-accent)}
+.toggle[aria-checked="true"]::after{background:var(--color-on-accent);transform:translateX(24px)}
+.card{border-radius:var(--radius-surface);padding:16px}
+.card-flush{padding:0;overflow:hidden}
+.page-header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px}
+.page-header-text{display:flex;flex-direction:column;gap:4px;min-width:0}
+.page-header-eyebrow{font-size:12px;font-weight:500;color:var(--color-ink-3);display:flex;align-items:center;gap:6px}
+.page-header-title{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px}
+.page-header-title h1{font-size:28px;line-height:32px;letter-spacing:-.02em;font-weight:600}
+.page-header-desc{max-width:65ch;font-size:13px;color:var(--color-ink-2)}
+.page-header-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.meta-bar{display:flex;flex-wrap:wrap;gap:16px;font-size:12px;color:var(--color-ink-3)}
+.meta-bar b{color:var(--color-ink);font-weight:600;font-variant-numeric:tabular-nums}
+.section{display:flex;flex-direction:column;gap:12px}
+.section-header{display:flex;align-items:center;justify-content:space-between;gap:16px;min-width:0}
+.section-header h2{font-size:16px;line-height:24px;font-weight:600}
+.section-header p{font-size:13px;line-height:20px;color:var(--color-ink-2)}
+.section-header-actions{display:flex;align-items:center;gap:8px}
+.badge{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;font-weight:600;line-height:1;font-variant-numeric:tabular-nums;border-radius:999px;height:18px;min-width:18px;padding:0 4px;font-size:10px;background:var(--color-hover);color:var(--color-ink-2)}
+.badge-md{height:20px;min-width:20px;padding:0 6px;font-size:12px}
+.badge-ok{background:color-mix(in oklab,var(--color-ok) 14%,transparent);color:var(--color-ok)}
+.badge-warn{background:color-mix(in oklab,var(--color-warn) 14%,transparent);color:var(--color-warn)}
+.badge-solid.badge-warn{background:var(--color-warn);color:var(--color-ground)}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:2px;flex:none}
+.swatch[data-hue="7"]{background:var(--color-hue-7)}
+.status-pill{display:inline-flex;flex:none;align-items:center;white-space:nowrap;border-radius:999px;font-weight:500;line-height:1;height:24px;gap:8px;padding:0 10px;font-size:12px;background:var(--color-hover);color:var(--color-ink-2)}
+.status-pill.sm{height:20px;gap:6px;padding:0 8px;font-size:11px}
+.status-dot{position:relative;display:inline-flex;width:8px;height:8px;flex:none}
+.status-dot::before{content:'';position:absolute;inset:0;border-radius:999px;background:var(--color-ink-3)}
+.status-pill.sm .status-dot{width:6px;height:6px}
+[data-status="running"]{background:var(--color-status-running-soft);color:var(--color-status-running-ink)}
+[data-status="running"] .status-dot::before,.status-dot[data-status="running"]::before{background:var(--color-status-running)}
+[data-status="running"] .status-dot::after,.status-dot[data-status="running"]::after{content:'';position:absolute;inset:0;border-radius:999px;background:var(--color-status-running);opacity:.6;animation:ping 1s cubic-bezier(0,0,.2,1) infinite}
+[data-status="waiting"]{background:var(--color-status-waiting-soft);color:var(--color-status-waiting-ink)}
+[data-status="waiting"] .status-dot::before{background:var(--color-status-waiting)}
+[data-status="paused"]{background:var(--color-status-paused-soft);color:var(--color-status-paused-ink)}
+[data-status="paused"] .status-dot::before{background:var(--color-status-paused)}
+[data-status="blocked"]{background:var(--color-status-blocked-soft);color:var(--color-status-blocked-ink)}
+[data-status="blocked"] .status-dot::before{background:var(--color-status-blocked)}
+[data-status="done"]{background:var(--color-status-done-soft);color:var(--color-status-done-ink)}
+[data-status="done"] .status-dot::before{background:var(--color-status-done)}
+.status-dot[data-status]{background:none}
+@keyframes ping{75%,100%{transform:scale(2);opacity:0}}
+.chip{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;font-weight:500;line-height:1;height:20px;padding:0 6px;font-size:11px;border-radius:4px;background:var(--color-hover);color:var(--color-ink-2);border:0}
+.chip.warn{background:color-mix(in oklab,var(--color-warn) 14%,transparent);color:var(--color-warn)}
+.chip.ok{background:color-mix(in oklab,var(--color-ok) 14%,transparent);color:var(--color-ok)}
+.chip.accent{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.segmented{display:inline-flex;gap:4px;padding:4px;border-radius:999px;list-style:none;margin:0}
+.segmented.sm{height:var(--size-control);padding:2px}
+.segmented button{position:relative;flex:1;min-width:max-content;height:100%;padding:0 12px;border:0;background:none;border-radius:999px;font-size:13px;font-weight:500;color:var(--color-ink-2);cursor:pointer}
+.segmented button:hover{color:var(--color-ink)}
+.segmented button[aria-pressed="true"]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.banner{display:flex;width:100%;align-items:flex-start;gap:12px;padding:12px;border-radius:var(--radius-surface);border:1px solid var(--color-line);background:var(--color-hover);font-size:13px}
+.banner .icon{margin-top:2px}
+.banner-warn{border-color:color-mix(in oklab,var(--color-warn) 30%,transparent);background:color-mix(in oklab,var(--color-warn) 10%,transparent)}.banner-warn>.icon{color:var(--color-warn)}
+.banner-body{flex:1;display:flex;flex-direction:column;gap:2px}
+.banner-title{font-weight:600}
+.progress{height:4px;width:100%;border-radius:999px;background:var(--color-hover);overflow:hidden}
+.progress>span{display:block;height:100%;border-radius:inherit;background:var(--color-accent)}
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:8px 24px;margin:0;font-size:13px}
+.kv dt{color:var(--color-ink-3)}.kv dd{margin:0}
+.avatar{display:inline-grid;place-content:center;width:28px;height:28px;border-radius:999px;background:var(--color-accent-soft);color:var(--color-accent-ink);font-size:12px;font-weight:600;flex:none}
+.tooltip{position:absolute;z-index:5;padding:4px 8px;border-radius:var(--radius-control);font-size:12px;line-height:16px;color:var(--color-ink);white-space:nowrap}
+.board{display:flex;gap:12px;overflow-x:auto;align-items:flex-start;padding-bottom:8px}
+.board-col{flex:none;width:280px;display:flex;flex-direction:column;gap:8px;padding:8px;border-radius:var(--radius-surface);background:var(--color-surface);border:1px solid var(--color-line)}
+.board-col-head{display:flex;align-items:center;gap:8px;padding:4px 4px 0;font-size:13px;font-weight:600}
+.board-col-hint{padding:0 4px;font-size:12px;color:var(--color-ink-3);font-weight:400}
+.board-card{display:flex;flex-direction:column;gap:6px;min-height:var(--size-row);padding:10px 12px;border-radius:var(--radius-control)}
+.card-head{display:flex;align-items:center;gap:6px;height:16px;font-size:12px;line-height:16px;color:var(--color-ink-2)}
+.card-head .mono{flex:none}
+.card-head .end{margin-left:auto;display:flex;align-items:center;gap:4px}
+.card-title{font-size:14px;font-weight:500;color:var(--color-ink)}
+.card-status{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.sheet{border-radius:var(--radius-sheet);display:flex;flex-direction:column}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px;border-bottom:1px solid var(--color-line)}
+.sheet-body{padding:16px;display:flex;flex-direction:column;gap:16px}
+.sheet-foot{display:flex;align-items:center;gap:8px;padding:12px 16px;border-top:1px solid var(--color-line)}
+
+/* Mockup-only switcher */
+.mock-bar{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:12px;padding:8px 12px;margin:0 12px;border-radius:0 0 var(--radius-surface) var(--radius-surface)}
+.mock-bar .label{font-size:12px;color:var(--color-ink-3);font-weight:500}
+[data-screen]{display:none}
+[data-screen].on{display:flex}
+
+/* Stack face */
+.stack{position:relative;display:flex;flex-direction:column;border-radius:var(--radius-control)}
+.stack-face{position:relative;display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-radius:var(--radius-control);border-top:2px solid var(--color-accent)}
+.stack-layers{position:relative;padding-bottom:6px}
+.stack-layers::before,.stack-layers::after{content:'';position:absolute;left:6px;right:6px;bottom:3px;height:6px;border-radius:0 0 var(--radius-control) var(--radius-control);background:var(--color-content);border:1px solid var(--color-line);border-top:0}
+.stack-layers::after{left:12px;right:12px;bottom:0;opacity:.7}
+.stack-layers>.stack-face{z-index:1}
+.stack[data-open="true"] .stack-layers{padding-bottom:0}
+.stack[data-open="true"] .stack-layers::before,.stack[data-open="true"] .stack-layers::after{display:none}
+.stack[data-open="true"] .stack-face{border-radius:var(--radius-control) var(--radius-control) 0 0}
+.stack-label{display:inline-flex;align-items:center;gap:4px;font-family:var(--font-mono);color:var(--color-accent-ink)}
+.stack-progress{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--color-ink-2)}
+.stack-progress .progress{flex:1}
+.stack-body{display:none;flex-direction:column;gap:10px;padding:10px 8px 8px;border:1px solid var(--color-line);border-top:0;border-radius:0 0 var(--radius-control) var(--radius-control);background:color-mix(in oklab,var(--color-accent) 5%,var(--color-surface))}
+.stack[data-open="true"] .stack-body{display:flex}
+.stage{display:flex;flex-direction:column;gap:6px}
+.stage-head{display:flex;align-items:center;gap:6px;padding:0 4px;font-size:12px;font-weight:600;color:var(--color-ink-2)}
+.stage-head .stage-num{display:inline-grid;place-content:center;width:16px;height:16px;border-radius:4px;background:var(--color-hover);font-size:10px;font-variant-numeric:tabular-nums}
+.stage-head.current .stage-num{background:var(--color-accent);color:var(--color-on-accent)}
+.stage-head .end{margin-left:auto;font-weight:500;color:var(--color-ink-3)}
+.stage-link{display:flex;align-items:center;gap:6px;padding:0 4px;font-size:11px;color:var(--color-ink-3)}
+.stage-link::before,.stage-link::after{content:'';flex:1;height:1px;background:var(--color-line)}
+.mini{padding:8px 10px;gap:4px}
+.mini .card-title{font-size:13px;line-height:18px}
+.col-chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--color-ink-3)}
+.col-chip::before{content:'';width:6px;height:6px;border-radius:2px;border:1px solid var(--color-line-strong)}
+.run-wrap{position:relative;display:inline-flex}
+.run-wrap .tooltip{display:none;bottom:calc(100% + 6px);right:0}
+.run-wrap:hover .tooltip,.run-wrap:focus-within .tooltip{display:block}
+
+/* Review */
+.review-row{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-radius:var(--radius-control);background:var(--color-hover)}
+.review-row .grow{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.review-stage{display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:var(--radius-surface);border:1px dashed var(--color-line-strong)}
+.review-stage .stage-head{padding:0}
+.move-btns{display:flex;gap:2px}
+
+/* Stack page */
+.grid-2{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:24px;align-items:start}
+.prose{font-size:14px;line-height:22px;color:var(--color-ink)}
+.prose p+p,.prose p+ul,.prose ul+p,.prose h3+p{margin-top:8px}
+.prose h3{font-size:14px;font-weight:600;margin-top:14px}
+.prose ul{list-style:disc;padding-left:20px;color:var(--color-ink-2)}
+.prose code{padding:1px 5px;border-radius:4px;background:var(--color-hover);font-size:12px}
+.stage-block{display:flex;flex-direction:column}
+.stage-block-head{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--color-line)}
+.stage-row{display:grid;grid-template-columns:72px minmax(0,1fr) auto auto;gap:12px;align-items:center;padding:0 16px;min-height:40px;border-bottom:1px solid var(--color-line);font-size:13px}
+.stage-row:last-child{border-bottom:0}
+.stage-row:hover{background:var(--color-hover)}
+.stage-connector{display:flex;align-items:center;gap:8px;padding:8px 16px;font-size:12px;color:var(--color-ink-3)}
+.stage-connector .rule{width:1px;height:20px;background:var(--color-line-strong);margin-left:28px}
+.design-frame{border-radius:var(--radius-control);border:1px solid var(--color-line);background:var(--color-surface);overflow:hidden}
+.design-frame-bar{display:flex;align-items:center;gap:6px;height:24px;padding:0 8px;border-bottom:1px solid var(--color-line);font-size:11px;color:var(--color-ink-3)}
+.design-frame-bar i{width:6px;height:6px;border-radius:999px;background:var(--color-line-strong)}
+.wire{padding:12px;display:flex;flex-direction:column;gap:8px}
+.wire b{display:block;height:8px;border-radius:3px;background:var(--color-line-strong)}
+.wire .row{display:flex;gap:8px}
+.wire .box{flex:1;height:44px;border-radius:4px;background:var(--color-hover);border:1px solid var(--color-line)}
+.wire .acc{background:var(--color-accent-soft);border-color:var(--color-accent)}
+@media (max-width:1100px){.grid-2{grid-template-columns:1fr}}
+@media (max-width:1023px){.app-shell{padding:8px 16px;gap:8px}.app-rail-wrap{display:none}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<div class="canvas"></div>
+
+<div class="mock-bar glass" role="toolbar" aria-label="Mockup controls">
+  <span class="label">Mockup · C-86 Stacks</span>
+  <ul class="segmented sm" id="screens">
+    <li><button aria-pressed="true" data-go="board">Board</button></li>
+    <li><button aria-pressed="false" data-go="review">Intake review</button></li>
+    <li><button aria-pressed="false" data-go="page">Stack page</button></li>
+  </ul>
+  <button class="btn btn-ghost btn-sm" id="theme" style="margin-left:auto">Toggle theme</button>
+</div>
+
+<div class="app-shell">
+  <aside class="app-rail-wrap">
+    <nav class="nav-rail glass" aria-label="Main">
+      <div class="nav-rail-head"><span class="swatch" data-hue="7" style="width:20px;height:20px;border-radius:6px"></span>AgentDock</div>
+      <div class="nav-group">
+        <div class="nav-group-label">Workspace</div>
+        <a class="nav-item" href="#"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>Overview</a>
+        <a class="nav-item" href="#"><svg class="icon" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01"/></svg>Fleet<span class="badge">8</span></a>
+        <a class="nav-item" href="#"><svg class="icon" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Approvals</a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-group-label">agentdock</div>
+        <a class="nav-item" href="#" aria-current="page"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18"/></svg>Board</a>
+        <a class="nav-item" href="#"><svg class="icon" viewBox="0 0 24 24"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>Activity</a>
+      </div>
+    </nav>
+  </aside>
+
+  <div class="app-column">
+    <header class="topbar glass">
+      <nav class="breadcrumb" aria-label="Breadcrumb" id="crumbs"><a href="#">agentdock</a><span>/</span><span aria-current="page">Board</span></nav>
+      <span style="margin-left:auto" class="status-dot" data-status="running" title="Live"></span>
+      <button class="btn btn-ghost btn-icon" aria-label="Notifications"><svg class="icon" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></button>
+      <span class="avatar">AB</span>
+    </header>
+
+    <!-- ============ BOARD ============ -->
+    <main id="main-content" class="main wide on" data-screen="board" style="flex-direction:column">
+      <header class="page-header">
+        <div class="page-header-text">
+          <div class="page-header-eyebrow">agentdock</div>
+          <div class="page-header-title"><h1>Board</h1></div>
+          <div class="meta-bar"><span><b>11</b> cards</span><span><b>1</b> stack</span><span><b>2</b> running</span></div>
+        </div>
+        <div class="page-header-actions">
+          <ul class="segmented sm glass"><li><button aria-pressed="true">Comfortable</button></li><li><button aria-pressed="false">Compact</button></li></ul>
+          <button class="btn btn-solid" data-go="review"><svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New card</button>
+        </div>
+      </header>
+
+      <div class="board">
+        <section class="board-col"><div class="board-col-head">Inbox<span class="badge">1</span></div><div class="board-col-hint">Suggested from your sessions.</div>
+          <article class="board-card surface-content"><div class="card-head"><span class="mono">C-91</span><span class="chip">Suggestion</span></div><div class="card-title">Debounce the fleet live dot</div></article>
+        </section>
+
+        <section class="board-col"><div class="board-col-head">To Do<span class="badge">3</span></div><div class="board-col-hint">Waiting for a worker.</div>
+
+          <!-- THE STACK -->
+          <div class="stack" id="stack" data-open="false">
+            <div class="stack-layers">
+              <div class="stack-face surface-content">
+                <div class="card-head">
+                  <span class="stack-label"><svg class="icon s12" viewBox="0 0 24 24"><path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg>S-3</span>
+                  <span>Stack · 5 cards</span>
+                  <span class="end"><span class="num">$3.84</span><button class="btn btn-ghost btn-icon btn-sm" aria-label="Stack menu"><svg class="icon s14" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button></span>
+                </div>
+                <a class="card-title" href="#" data-go="page" style="text-decoration:none">Redesign the Settings page</a>
+                <div class="stack-progress"><span class="num"><b class="ink">1</b> of 5 accepted</span><div class="progress" role="progressbar" aria-valuenow="1" aria-valuemax="5" aria-label="Accepted cards"><span style="width:20%"></span></div></div>
+                <div class="card-status">
+                  <span class="chip accent">Stage 1 of 2 · Components</span>
+                  <span class="chip warn"><svg class="icon s12" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="10"/></svg>Stack design not approved</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;margin-top:2px">
+                  <button class="btn btn-ghost btn-sm" id="stackToggle" aria-expanded="false" aria-controls="stackBody" style="padding:0 6px"><svg class="icon s14" id="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg><span>Expand</span></button>
+                  <a class="btn btn-ghost btn-sm" href="#" data-go="page" style="margin-left:auto;padding:0 6px">Open stack</a>
+                </div>
+              </div>
+            </div>
+            <div class="stack-body" id="stackBody">
+              <div class="stage">
+                <div class="stage-head current"><span class="stage-num">1</span>Components<span class="end num">1 / 3</span></div>
+                <article class="board-card surface-content mini">
+                  <div class="card-head"><span class="mono">C-87</span><span class="end"><span class="num">$1.20</span></span></div>
+                  <div class="card-title">Settings form section component</div>
+                  <div class="card-status"><span class="col-chip">Completed</span><span class="status-pill sm" data-status="done"><span class="status-dot"></span>Accepted</span></div>
+                </article>
+                <article class="board-card surface-content mini">
+                  <div class="card-head"><span class="mono">C-88</span><span class="end"><span class="num">$2.64</span></span></div>
+                  <div class="card-title">Toggle row with description</div>
+                  <div class="card-status"><span class="col-chip">In progress</span><span class="status-pill sm" data-status="running"><span class="status-dot"></span>Running</span></div>
+                </article>
+                <article class="board-card surface-content mini">
+                  <div class="card-head"><span class="mono">C-89</span><span class="chip">Design</span></div>
+                  <div class="card-title">Danger zone panel</div>
+                  <div class="card-status"><span class="col-chip">To Do</span>
+                    <span class="run-wrap" style="margin-left:auto"><button class="btn btn-glass btn-sm" aria-disabled="true" aria-describedby="tipRun">Run</button><span class="tooltip glass-strong" role="tooltip" id="tipRun">Waits for the stack design to be approved</span></span>
+                  </div>
+                </article>
+              </div>
+              <div class="stage-link">after all of Stage 1</div>
+              <div class="stage">
+                <div class="stage-head"><span class="stage-num">2</span>Page<span class="end num">0 / 2</span></div>
+                <article class="board-card surface-content mini">
+                  <div class="card-head"><span class="mono">C-90</span><span class="chip warn">after C-88, C-89</span></div>
+                  <div class="card-title">Compose the Settings page</div>
+                  <div class="card-status"><span class="col-chip">To Do</span></div>
+                </article>
+                <article class="board-card surface-content mini">
+                  <div class="card-head"><span class="mono">C-92</span><span class="chip warn">after C-88, C-89</span></div>
+                  <div class="card-title">Settings page e2e scenario</div>
+                  <div class="card-status"><span class="col-chip">To Do</span></div>
+                </article>
+              </div>
+            </div>
+          </div>
+
+          <article class="board-card surface-content"><div class="card-head"><span class="mono">C-84</span></div><div class="card-title">Budget alerts per project</div></article>
+          <article class="board-card surface-content"><div class="card-head"><span class="mono">C-85</span><span class="chip" style="background:color-mix(in oklab,var(--color-danger) 14%,transparent);color:var(--color-danger)">Bug</span></div><div class="card-title">Sheet loses focus after Run</div></article>
+        </section>
+
+        <section class="board-col"><div class="board-col-head">In progress<span class="badge">2</span></div><div class="board-col-hint">A worker is on it.</div>
+          <article class="board-card surface-content"><div class="card-head"><span class="mono">C-82</span><span class="end num">$4.12</span></div><div class="card-title">Runner heartbeat backoff</div><div class="card-status"><span class="status-pill sm" data-status="running"><span class="status-dot"></span>Running</span></div></article>
+          <article class="board-card surface-content"><div class="card-head"><span class="stack-label" style="font-size:11px">S-3</span><span class="mono">C-88</span><span class="end num">$2.64</span></div><div class="card-title">Toggle row with description</div><div class="card-status"><span class="status-pill sm" data-status="running"><span class="status-dot"></span>Running</span><span class="text-xs ink-3">part of Redesign the Settings page</span></div></article>
+        </section>
+
+        <section class="board-col"><div class="board-col-head">Finished<span class="badge">1</span></div><div class="board-col-hint">Ready for you to accept.</div>
+          <article class="board-card surface-content"><div class="card-head"><span class="mono">C-80</span><span class="end num">$1.07</span></div><div class="card-title">Spec rendering on card page</div><div class="card-status"><span class="status-pill sm" data-status="waiting"><span class="status-dot"></span>Review</span></div></article>
+        </section>
+
+        <section class="board-col"><div class="board-col-head">Completed<span class="badge">4</span></div>
+          <article class="board-card surface-content"><div class="card-head"><span class="mono">C-79</span></div><div class="card-title">Board card full page</div></article>
+        </section>
+      </div>
+      <p class="text-xs ink-3">A stack’s cards that are in other columns show the stack label on their own face (C-88 in In progress). The collapsed stack face stays in the column of its least advanced unfinished card.</p>
+    </main>
+
+    <!-- ============ INTAKE REVIEW ============ -->
+    <main class="main" data-screen="review" style="flex-direction:column;max-width:44rem">
+      <div class="sheet glass-strong" role="dialog" aria-label="New work">
+        <div class="sheet-head">
+          <div><div class="text-section">New work</div><div class="text-xs ink-3">agentdock · Intake turn 2</div></div>
+          <button class="btn btn-ghost btn-icon" aria-label="Close"><svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+        </div>
+        <div class="sheet-body">
+          <div class="review-row" style="background:none;padding:0"><div class="grow"><span class="text-xs ink-3">Your request</span><span class="text-sm ink-2">Redesign the Settings page: new form section, toggle rows and a danger zone, then the page itself, all in the new look.</span></div></div>
+
+          <section aria-label="Proposal" style="display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;align-items:flex-start;gap:12px">
+              <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+                <h3 class="text-sm" style="font-weight:600">The planner proposes a stack of 5 cards in 2 stages</h3>
+                <p class="text-sm ink-2">One page redesign. Its components come first and the page uses them, and every part shares one look, so the parts must run in order under one design.</p>
+              </div>
+              <ul class="segmented sm glass" aria-label="Proposal shape" id="shape">
+                <li><button aria-pressed="false" data-shape="split">Split</button></li>
+                <li><button aria-pressed="true" data-shape="stack">Stack</button></li>
+              </ul>
+            </div>
+
+            <!-- STACK MODE -->
+            <div id="shapeStack" style="display:flex;flex-direction:column;gap:12px">
+              <div class="field"><label class="field-label" for="st-title">Stack title</label><input class="input" id="st-title" value="Redesign the Settings page"></div>
+              <div class="field"><label class="field-label" for="st-body">Stack description</label><textarea class="textarea" id="st-body">Move Settings to the new section layout. Components first, then the page composed from them.</textarea></div>
+              <label class="review-row" style="align-items:center">
+                <span class="grow"><span class="text-sm ink" style="font-weight:500">Draw a stack design first</span><span class="text-xs ink-3">One mockup of the whole page. No card runs until it is approved.</span></span>
+                <button class="toggle" role="switch" aria-checked="true" id="designToggle" aria-label="Draw a stack design first"></button>
+              </label>
+
+              <div id="stages" style="display:flex;flex-direction:column;gap:8px"></div>
+
+              <div style="display:flex;align-items:center;gap:8px">
+                <button class="btn btn-ghost btn-sm" id="addStage"><svg class="icon s14" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add stage</button>
+                <span class="text-xs ink-3" style="margin-left:auto">Every card of a stage waits on all cards of the stage before it.</span>
+              </div>
+            </div>
+
+            <!-- SPLIT MODE -->
+            <div id="shapeSplit" style="display:none;flex-direction:column;gap:8px">
+              <p class="text-xs ink-3">Independent cards: no stages, no shared design, no dependencies between them.</p>
+              <ol style="display:flex;flex-direction:column;gap:8px" id="splitList"></ol>
+            </div>
+          </section>
+        </div>
+        <div class="sheet-foot">
+          <button class="btn btn-ghost">Keep one card</button>
+          <span class="text-xs ink-3" style="margin-left:auto" id="confirmHint">Cards land in To Do.</span>
+          <button class="btn btn-solid" id="confirmBtn">Create stack · 5 cards</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- ============ STACK PAGE ============ -->
+    <main class="main wide" data-screen="page" style="flex-direction:column">
+      <header class="page-header">
+        <div class="page-header-text">
+          <div class="page-header-eyebrow"><span class="stack-label">S-3</span>Stack · agentdock</div>
+          <div class="page-header-title"><h1>Redesign the Settings page</h1><span class="status-pill" data-status="paused"><span class="status-dot"></span>Design in review</span></div>
+          <div class="meta-bar"><span><b>1</b> of <b>5</b> accepted</span><span>Current stage <b>1 · Components</b></span><span><b>$3.84</b> spent</span><span>Created <time>2026-10-14</time></span></div>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn btn-glass">Revise design</button>
+          <button class="btn btn-solid"><svg class="icon" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Approve design</button>
+        </div>
+      </header>
+
+      <div class="banner banner-warn" role="status"><svg class="icon" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/></svg>
+        <div class="banner-body"><span class="banner-title">Run is disabled on every card of this stack</span><span class="ink-2">Nothing writes project code until the stack design is approved. C-88 was started before the design was added and keeps running.</span></div>
+      </div>
+
+      <div class="grid-2">
+        <div style="display:flex;flex-direction:column;gap:24px;min-width:0">
+          <section class="section">
+            <div class="section-header"><h2>Description</h2><div class="section-header-actions"><button class="btn btn-ghost btn-sm">Edit</button></div></div>
+            <div class="card surface-content prose">
+              <p>Move Settings to the new section layout. Components first, then the page composed from them, so every part shares <b>one look</b>.</p>
+              <h3>Done when</h3>
+              <ul><li>Every settings group uses <code>SettingsSection</code>.</li><li>Toggles show their description under the label.</li><li>Destructive actions sit in one danger zone at the bottom.</li></ul>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-header"><div><h2>Stages</h2><p>Cards in a stage may run in parallel.</p></div><div class="section-header-actions"><button class="btn btn-ghost btn-sm"><svg class="icon s14" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add card</button></div></div>
+            <div class="card surface-content card-flush">
+              <div class="stage-block">
+                <div class="stage-block-head"><span class="stage-head current" style="padding:0"><span class="stage-num">1</span></span><span class="text-sm" style="font-weight:600">Components</span><span class="chip accent">Current</span><span class="text-xs ink-3 num" style="margin-left:auto">1 / 3 accepted</span></div>
+                <div class="stage-row"><span class="mono text-xs ink-3">C-87</span><a href="#" class="ink" style="text-decoration:none;font-weight:500">Settings form section component</a><span class="col-chip">Completed</span><span class="status-pill sm" data-status="done"><span class="status-dot"></span>Accepted</span></div>
+                <div class="stage-row"><span class="mono text-xs ink-3">C-88</span><a href="#" class="ink" style="text-decoration:none;font-weight:500">Toggle row with description</a><span class="col-chip">In progress</span><span class="status-pill sm" data-status="running"><span class="status-dot"></span>Running</span></div>
+                <div class="stage-row"><span class="mono text-xs ink-3">C-89</span><a href="#" class="ink" style="text-decoration:none;font-weight:500">Danger zone panel <span class="chip" style="margin-left:4px">Own design</span></a><span class="col-chip">To Do</span><span class="run-wrap"><button class="btn btn-glass btn-sm" aria-disabled="true" aria-describedby="tipRun2">Run</button><span class="tooltip glass-strong" role="tooltip" id="tipRun2">Waits for the stack design to be approved</span></span></div>
+              </div>
+              <div class="stage-connector" style="border-top:1px solid var(--color-line);border-bottom:1px solid var(--color-line);background:var(--color-hover)"><svg class="icon s14" viewBox="0 0 24 24"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>Every card of Stage 2 waits on all of Stage 1 · 6 dependencies</div>
+              <div class="stage-block">
+                <div class="stage-block-head"><span class="stage-head" style="padding:0"><span class="stage-num">2</span></span><span class="text-sm" style="font-weight:600">Page</span><span class="text-xs ink-3 num" style="margin-left:auto">0 / 2 accepted</span></div>
+                <div class="stage-row"><span class="mono text-xs ink-3">C-90</span><a href="#" class="ink" style="text-decoration:none;font-weight:500">Compose the Settings page</a><span class="col-chip">To Do</span><span class="chip warn">after C-88, C-89</span></div>
+                <div class="stage-row"><span class="mono text-xs ink-3">C-92</span><a href="#" class="ink" style="text-decoration:none;font-weight:500">Settings page e2e scenario</a><span class="col-chip">To Do</span><span class="chip warn">after C-88, C-89</span></div>
+              </div>
+            </div>
+            <p class="text-xs ink-3">Stages cannot be reordered once any card of the stack has run. Cards can still be added to or removed from a stage.</p>
+          </section>
+        </div>
+
+        <aside class="section" style="position:sticky;top:64px">
+          <div class="section-header"><div><h2>Stack design</h2><p>The whole page. Each card’s own design is kept separately.</p></div></div>
+          <div class="card surface-content" style="display:flex;flex-direction:column;gap:12px">
+            <div class="design-frame" aria-label="Stack design preview">
+              <div class="design-frame-bar"><i></i><i></i><i></i><span style="margin-left:6px">Settings · variant 1</span></div>
+              <div class="wire">
+                <b style="width:40%;height:12px"></b><b style="width:70%"></b>
+                <div class="row"><div class="box"></div><div class="box"></div></div>
+                <div class="row"><div class="box acc"></div></div>
+                <div class="row"><div class="box" style="height:28px"></div></div>
+                <div class="row"><div class="box" style="height:32px;border-color:var(--color-danger);background:color-mix(in oklab,var(--color-danger) 8%,transparent)"></div></div>
+              </div>
+            </div>
+            <dl class="kv">
+              <dt>State</dt><dd><span class="status-pill sm" data-status="paused"><span class="status-dot"></span>In review</span></dd>
+              <dt>Revisions</dt><dd class="num">2</dd>
+              <dt>Comments</dt><dd class="num">1 open</dd>
+              <dt>Used by</dt><dd class="text-sm ink-2">Each card’s design turn and worker prompt, as reference</dd>
+            </dl>
+            <div style="display:flex;gap:8px"><button class="btn btn-glass btn-sm">Open full size</button><button class="btn btn-ghost btn-sm">Comment</button></div>
+          </div>
+        </aside>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+(function(){
+  var root=document.documentElement;
+  document.getElementById('theme').addEventListener('click',function(){root.setAttribute('data-theme',root.getAttribute('data-theme')==='dark'?'light':'dark');});
+
+  var crumbs={board:'Board',review:'Board',page:'S-3 Redesign the Settings page'};
+  function go(name){
+    document.querySelectorAll('[data-screen]').forEach(function(el){el.classList.toggle('on',el.getAttribute('data-screen')===name);});
+    document.querySelectorAll('#screens button').forEach(function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-go')===name));});
+    document.getElementById('crumbs').innerHTML=name==='page'
+      ?'<a href="#">agentdock</a><span>/</span><a href="#">Board</a><span>/</span><span aria-current="page">'+crumbs.page+'</span>'
+      :'<a href="#">agentdock</a><span>/</span><span aria-current="page">Board</span>';
+    window.scrollTo(0,0);
+  }
+  document.addEventListener('click',function(e){
+    var t=e.target.closest('[data-go]');
+    if(t){e.preventDefault();go(t.getAttribute('data-go'));}
+  });
+
+  var stack=document.getElementById('stack'),tg=document.getElementById('stackToggle');
+  tg.addEventListener('click',function(){
+    var open=stack.getAttribute('data-open')!=='true';
+    stack.setAttribute('data-open',String(open));
+    tg.setAttribute('aria-expanded',String(open));
+    tg.querySelector('span').textContent=open?'Collapse':'Expand';
+    document.getElementById('chev').style.transform=open?'rotate(180deg)':'';
+  });
+
+  var cards=[
+    {t:'Settings form section component',s:'A reusable section with heading, hint and rows.',stage:0},
+    {t:'Toggle row with description',s:'Label, description and switch on one row.',stage:0},
+    {t:'Danger zone panel',s:'Destructive actions grouped with confirmation.',stage:0},
+    {t:'Compose the Settings page',s:'Rebuild the page from the new components.',stage:1},
+    {t:'Settings page e2e scenario',s:'Scenario covering every section.',stage:1}
+  ];
+  var stageNames=['Components','Page'];
+  var chevUp='<svg class="icon s14" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></svg>';
+  var chevDn='<svg class="icon s14" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>';
+  function esc(s){return s.replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+  function render(){
+    var html='';
+    stageNames.forEach(function(name,i){
+      var list=cards.map(function(c,idx){return [c,idx];}).filter(function(p){return p[0].stage===i;});
+      html+='<div class="review-stage"><div class="stage-head"><span class="stage-num">'+(i+1)+'</span>'
+        +'<input class="input" style="height:24px;width:180px;font-weight:600" value="'+esc(name)+'" aria-label="Stage '+(i+1)+' name" data-stage-name="'+i+'">'
+        +'<span class="end num">'+list.length+' card'+(list.length===1?'':'s')+(i>0?' · after Stage '+i:'')+'</span></div>';
+      if(!list.length) html+='<div class="text-xs ink-3" style="padding:6px 0">Empty stage. Move a card here or it is dropped on confirm.</div>';
+      list.forEach(function(p){
+        var c=p[0],idx=p[1];
+        html+='<div class="review-row"><div class="grow"><span class="text-sm ink" style="font-weight:500">'+esc(c.t)+'</span><span class="text-xs ink-3">'+esc(c.s)+'</span></div>'
+          +'<div class="move-btns"><button class="btn btn-ghost btn-icon btn-sm" data-move="'+idx+'" data-dir="-1" aria-label="Move to previous stage"'+(i===0?' disabled':'')+'>'+chevUp+'</button>'
+          +'<button class="btn btn-ghost btn-icon btn-sm" data-move="'+idx+'" data-dir="1" aria-label="Move to next stage"'+(i===stageNames.length-1?' disabled':'')+'>'+chevDn+'</button>'
+          +'<button class="btn btn-ghost btn-icon btn-sm" data-remove="'+idx+'" aria-label="Remove card"><svg class="icon s14" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div></div>';
+      });
+      html+='</div>';
+    });
+    document.getElementById('stages').innerHTML=html;
+    document.getElementById('splitList').innerHTML=cards.map(function(c){return '<li class="review-row"><div class="grow"><span class="text-sm ink" style="font-weight:500">'+esc(c.t)+'</span><span class="text-xs ink-3">'+esc(c.s)+'</span></div><span class="chip">Feature</span></li>';}).join('');
+    updateConfirm();
+  }
+  var shape='stack';
+  function updateConfirm(){
+    var n=cards.length;
+    document.getElementById('confirmBtn').textContent=shape==='stack'?'Create stack · '+n+' cards':'Create '+n+' cards';
+    var on=document.getElementById('designToggle').getAttribute('aria-checked')==='true';
+    document.getElementById('confirmHint').textContent=shape==='stack'?(on?'Cards land in To Do; Run waits for the stack design.':'Cards land in To Do with stage dependencies.'):'Cards land in To Do.';
+  }
+  document.getElementById('stages').addEventListener('click',function(e){
+    var m=e.target.closest('[data-move]'),r=e.target.closest('[data-remove]');
+    if(m){var c=cards[+m.getAttribute('data-move')];c.stage=Math.max(0,Math.min(stageNames.length-1,c.stage+ +m.getAttribute('data-dir')));render();}
+    if(r){cards.splice(+r.getAttribute('data-remove'),1);render();}
+  });
+  document.getElementById('stages').addEventListener('input',function(e){var i=e.target.getAttribute('data-stage-name');if(i!==null)stageNames[+i]=e.target.value;});
+  document.getElementById('addStage').addEventListener('click',function(){if(stageNames.length<4){stageNames.push('Stage '+(stageNames.length+1));render();}});
+  document.getElementById('designToggle').addEventListener('click',function(e){e.preventDefault();var t=e.currentTarget;t.setAttribute('aria-checked',String(t.getAttribute('aria-checked')!=='true'));updateConfirm();});
+  document.getElementById('shape').addEventListener('click',function(e){
+    var b=e.target.closest('[data-shape]');if(!b)return;shape=b.getAttribute('data-shape');
+    document.querySelectorAll('#shape button').forEach(function(x){x.setAttribute('aria-pressed',String(x===b));});
+    document.getElementById('shapeStack').style.display=shape==='stack'?'flex':'none';
+    document.getElementById('shapeSplit').style.display=shape==='split'?'flex':'none';
+    updateConfirm();
+  });
+  render();
+})();
+</script>
+</body>
+</html>
