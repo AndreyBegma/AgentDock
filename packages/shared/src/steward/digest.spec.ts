@@ -1,4 +1,5 @@
-import { oneLine } from './steward-digest-text';
+import { describe, expect, it } from 'bun:test';
+import { isOneLine, oneLine } from './digest';
 
 describe('oneLine (DA-13)', () => {
   it('turns line breaks and control characters into one space', () => {
@@ -31,5 +32,14 @@ describe('oneLine (DA-13)', () => {
 
   it('is empty for text of nothing but breaks', () => {
     expect(oneLine('\n\r\t ', 10)).toBe('');
+  });
+});
+
+describe('isOneLine', () => {
+  it('holds for a bounded single line only', () => {
+    expect(isOneLine('Two cards merged.', 20)).toBe(true);
+    expect(isOneLine('two\nlines', 20)).toBe(false);
+    expect(isOneLine(' padded', 20)).toBe(false);
+    expect(isOneLine('x'.repeat(21), 20)).toBe(false);
   });
 });

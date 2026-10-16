@@ -278,6 +278,8 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
       context.steward?.['session.dismiss'](args) ?? noSteward(),
     'card.resume': (args) =>
       context.steward?.['card.resume'](args) ?? noSteward(),
+    'digest.compose': (args) =>
+      context.steward?.['digest.compose'](args) ?? noSteward(),
     'card.handoff.set': (args) =>
       context.handoff?.['card.handoff.set'](args) ?? noHandoff(),
   };

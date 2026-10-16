@@ -33,6 +33,7 @@ import { StewardSink } from './steward-sink';
   exports: [
     IssueLinkValidator,
     StewardChips,
+    StewardCommands,
     StewardIncidents,
     StewardSettingsService,
   ],
