@@ -15,6 +15,14 @@ import type { Filter } from './types';
 /** The filter id of a command no family covers. Mirrors `FILTER_ID_NONE`. */
 export const FILTER_NONE = 'none';
 
+/**
+ * Amendment 12: why no filter ran, mirroring `FILTER_ID_NONE_*` — not a
+ * single simple command, simple but uncovered, or a mode that never rewrites.
+ */
+export const FILTER_NONE_COMPOUND = 'none:compound';
+export const FILTER_NONE_UNCOVERED = 'none:uncovered';
+export const FILTER_NONE_MODE = 'none:mode';
+
 /** Output past this size is not filtered: it streams through unchanged. */
 export const FILTER_BUFFER_BYTES = RAW_CAP_BYTES;
 
@@ -214,7 +222,7 @@ export const runFilter = async (
   if (bypass || !filter || streaming || !raw) {
     for (const held of chunks.splice(0)) forward(held);
     counts = {
-      filter: filter?.id ?? FILTER_NONE,
+      filter: filter?.id ?? FILTER_NONE_UNCOVERED,
       rawBytes: total,
       keptBytes: total,
       bypassed: bypass,

@@ -1,5 +1,6 @@
 'use client';
 
+import { isUnfilteredId } from '@agentdock/shared';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { SegmentedControl } from '@andrewbehma/glass-ui/segmented-control';
@@ -107,7 +108,7 @@ export default function TokenSaverPage() {
                     label="Savings by filter"
                     passThrough
                     filters={summary.byFilter.filter(
-                      (f) => f.filter !== 'none',
+                      (f) => !isUnfilteredId(f.filter),
                     )}
                     empty={
                       <p className="text-ink-3 text-sm">
