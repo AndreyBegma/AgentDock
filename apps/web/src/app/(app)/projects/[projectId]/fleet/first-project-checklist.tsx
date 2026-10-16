@@ -16,7 +16,7 @@ import Link from 'next/link';
 import { type ReactNode, useEffect, useState } from 'react';
 import { DisabledReason } from '../../../../../components/prerequisites/disabled-reason';
 import { api } from '../../../../../lib/api';
-import { boardNewPlanHref } from '../../../../../lib/board/href';
+import { boardNewWorkHref } from '../../../../../lib/board/href';
 import {
   type ControlReason,
   orchestratorSettingsHref,
@@ -243,12 +243,12 @@ export function FirstProjectChecklist({
         </Step>
         <Step n={3} title="Plan a first brief" done={false}>
           <p className="text-sm text-ink-2">
-            New Plan on the Board turns an intention into cards — or issues the
+            New work on the Board turns an intention into cards — or issues the
             orchestrator can dispatch.
           </p>
           <div>
             <Link
-              href={boardNewPlanHref(projectId, FIRST_BRIEF)}
+              href={boardNewWorkHref(projectId, FIRST_BRIEF)}
               className={buttonClassName({ variant: 'glass', size: 'sm' })}
             >
               Start a plan

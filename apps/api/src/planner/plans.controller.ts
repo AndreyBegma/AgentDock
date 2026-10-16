@@ -1,4 +1,5 @@
 import {
+  type ConfirmSplitResponse,
   type CreatePlanCardsResponse,
   PLANNER_ERROR,
   type PlanDetail,
@@ -29,6 +30,7 @@ import {
   type ResolvedProjectAccess,
 } from '../projects';
 import {
+  ConfirmSplitDto,
   CreatePlanDto,
   PlannerSettingsDto,
   PlanTaskReviewDto,
@@ -45,7 +47,8 @@ import { PlannerInstructionsService } from './planner-instructions.service';
 
 /**
  * A turn's input: a message, answers, or both — never neither (D7); or, on
- * a card intake, Enough — generate on its own (#337 D3).
+ * a card intake, Enough — generate (#337 D3) or Keep one card (#409) on its
+ * own.
  */
 const turnInputOf = (dto: PlanTurnDto): PlanTurnInput => {
   const parsed = planTurnInputSchema.safeParse({
@@ -61,6 +64,7 @@ const turnInputOf = (dto: PlanTurnDto): PlanTurnInput => {
         }
       : {}),
     ...(dto.generate === true ? { generate: true } : {}),
+    ...(dto.keepOne === true ? { keepOne: true } : {}),
     ...(dto.attachmentIds?.length ? { attachmentIds: dto.attachmentIds } : {}),
   });
   if (!parsed.success) {
@@ -73,7 +77,8 @@ const turnInputOf = (dto: PlanTurnDto): PlanTurnInput => {
   if (
     !parsed.data.message &&
     !parsed.data.answers?.length &&
-    !parsed.data.generate
+    !parsed.data.generate &&
+    !parsed.data.keepOne
   ) {
     throw plannerError(
       400,
@@ -267,6 +272,20 @@ export class PlansController {
   ): Promise<CreatePlanCardsResponse> {
     const plan = await this.writable(user.id, access.projectId, planId);
     return this.planCards.create(plan, actorOf(access, user, ctx));
+  }
+
+  /** #409: Confirm a split — the cards the person kept, all at once. */
+  @Post('plans/:planId/split')
+  @ProjectRole('operator')
+  async split(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Param('planId') planId: string,
+    @Body() body: ConfirmSplitDto,
+  ): Promise<ConfirmSplitResponse> {
+    const plan = await this.writable(user.id, access.projectId, planId);
+    return this.planCards.confirmSplit(plan, body, actorOf(access, user, ctx));
   }
 
   @Post('plans/:planId/archive')

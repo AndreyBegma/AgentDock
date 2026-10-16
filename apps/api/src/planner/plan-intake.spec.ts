@@ -35,4 +35,18 @@ describe('the card-mode instructions', () => {
       expect(body).toContain(rule);
     }
   });
+
+  it('propose a split instead of sending the rest to New Plan (#409)', () => {
+    const body = readCardInstructions();
+    expect(body).not.toContain('New Plan');
+    for (const rule of [
+      '## One card or several',
+      'propose a `split`',
+      '2 to 8',
+      '**independent**',
+      'keep one card',
+    ]) {
+      expect(body).toContain(rule);
+    }
+  });
 });

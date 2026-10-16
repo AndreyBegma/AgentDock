@@ -1,11 +1,12 @@
 'use client';
 
-import type { BoardView, PlanAnswer } from '@agentdock/shared';
+import type { BoardCardView, BoardView, PlanAnswer } from '@agentdock/shared';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { fetchBoard } from '../../lib/board/actions';
 import { intakePhase, roundText } from '../../lib/board/intake';
+import { pluralize } from '../../lib/format';
 import { roundKey } from '../../lib/planner/answers';
 import { describePlannerError } from '../../lib/planner/format';
 import { usePlan } from '../../lib/planner/use-plan';
@@ -13,13 +14,15 @@ import { useSection } from '../../lib/section/use-section';
 import { FailedTurn } from '../planner/failed-turn';
 import { QuestionStepper } from '../planner/question-stepper';
 import { RunningTurn } from '../planner/running-turn';
+import { SplitReview } from './split-review';
 
 /**
- * The interview of a New Card (#337 D2–D4): what the person asked, then
- * the model thinking, the open round one question at a time, or the failed
- * turn to retry. **Enough — generate** is there whenever no turn runs — with
- * a round open it answers the rest with their recommendations. Once the
- * card exists, it opens.
+ * The interview of New work (#337 D2–D4, #409): what the person asked, then
+ * the model thinking, the open round one question at a time, the failed turn
+ * to retry, or a proposal to split the request into several cards.
+ * **Enough — generate** is there whenever no turn runs and nothing is
+ * proposed — with a round open it answers the rest with their
+ * recommendations. Once the cards exist, each opens.
  */
 export function IntakeView({
   projectId,
@@ -119,6 +122,18 @@ export function IntakeView({
         </section>
       ) : null}
 
+      {phase.kind === 'split' ? (
+        <SplitReview
+          key={phase.split.turnId}
+          split={phase.split}
+          disabled={busy !== null}
+          onKeepOne={() =>
+            void actions.planTurn({ keepOne: true }).catch(() => {})
+          }
+          onConfirm={actions.confirmSplit}
+        />
+      ) : null}
+
       {phase.kind === 'idle' || phase.kind === 'failed' ? (
         <div className="flex flex-wrap items-center justify-end gap-3">
           <span className="text-sm text-ink-3">
@@ -142,32 +157,19 @@ export function IntakeView({
       ) : null}
 
       {phase.kind === 'done' ? (
-        <Banner
-          tone="ok"
-          title={
-            phase.card
-              ? `${phase.card.label} is in Todo`
-              : 'The card is written'
-          }
-          action={
-            phase.card ? (
-              <Button
-                size="sm"
-                onClick={() => phase.card && onOpenCard(phase.card.number)}
-              >
-                Open the card
-              </Button>
-            ) : undefined
-          }
-        >
-          {phase.card ? phase.card.title : 'It appears in Todo in a moment.'}
-        </Banner>
+        <DoneBanner cards={phase.cards} onOpenCard={onOpenCard} />
       ) : null}
 
       {phase.kind === 'closed' ? (
         <Banner tone="info" title="This draft was discarded">
           No card was made from it.
         </Banner>
+      ) : null}
+
+      {phase.kind === 'split' ? (
+        <p className="text-sm text-ink-3">
+          You can close this: the proposal stays in Drafts until you decide.
+        </p>
       ) : null}
 
       {phase.kind === 'done' || phase.kind === 'closed' ? (
@@ -178,5 +180,53 @@ export function IntakeView({
         </div>
       ) : null}
     </div>
+  );
+}
+
+/** The intake's cards are in Todo: one opens from the banner, several from a list (#409). */
+function DoneBanner({
+  cards,
+  onOpenCard,
+}: {
+  cards: readonly BoardCardView[];
+  onOpenCard: (number: number) => void;
+}) {
+  const [only] = cards;
+  if (cards.length <= 1) {
+    return (
+      <Banner
+        tone="ok"
+        title={only ? `${only.label} is in Todo` : 'The card is written'}
+        action={
+          only ? (
+            <Button size="sm" onClick={() => onOpenCard(only.number)}>
+              Open the card
+            </Button>
+          ) : undefined
+        }
+      >
+        {only ? only.title : 'It appears in Todo in a moment.'}
+      </Banner>
+    );
+  }
+  return (
+    <Banner tone="ok" title={`${pluralize(cards.length, 'card')} are in Todo`}>
+      <ul className="mt-1 flex flex-col gap-1">
+        {cards.map((card) => (
+          <li key={card.id} className="flex min-w-0 items-center gap-2">
+            <span className="min-w-0 flex-1 truncate" title={card.title}>
+              {card.label} · {card.title}
+            </span>
+            <Button
+              size="sm"
+              variant="glass"
+              onClick={() => onOpenCard(card.number)}
+            >
+              Open
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </Banner>
   );
 }

@@ -1,6 +1,8 @@
 'use client';
 
 import {
+  type ConfirmSplitRequest,
+  type ConfirmSplitResponse,
   type CreatePlanCardsResponse,
   DESIGN_LIVE_EVENT,
   PLANNER_LIVE_EVENT,
@@ -141,6 +143,11 @@ export function usePlan(projectId: string, planId: string) {
     createCards: () =>
       run({ kind: 'cards' }, () =>
         api<CreatePlanCardsResponse>(`${base}/cards`, { method: 'POST' }),
+      ),
+    /** #409: Confirm a New work split — every kept card, at once. */
+    confirmSplit: (body: ConfirmSplitRequest) =>
+      run({ kind: 'cards' }, () =>
+        api<ConfirmSplitResponse>(`${base}/split`, { method: 'POST', body }),
       ),
     archive: () =>
       run({ kind: 'archive' }, () =>

@@ -19,10 +19,11 @@ import { planApi } from '../../lib/planner/href';
 import { useSection } from '../../lib/section/use-section';
 
 /**
- * Drafts (#337 D2), above the columns: the person's open New Card intakes
- * and New Plans, each with where it stands — "2 questions waiting",
- * "thinking…" — and **Resume** / **Discard**. Discard closes the plan
- * (archive); no card is made. Hidden when there is none.
+ * Drafts (#337 D2), above the columns: the person's open New work intakes
+ * and earlier plans, each with where it stands — "2 questions waiting",
+ * "thinking…", "split into 3 cards?" (#409) — and **Resume** / **Discard**.
+ * Discard closes the plan (archive); no card is made. Hidden when there is
+ * none.
  */
 export function DraftsStrip({
   projectId,
@@ -88,7 +89,7 @@ export function DraftsStrip({
             >
               <div className="flex min-w-0 items-center gap-2">
                 <Chip size="sm">
-                  {summary.mode === 'card' ? 'Card' : 'Plan'}
+                  {summary.mode === 'card' ? 'New work' : 'Plan'}
                 </Chip>
                 <span className="truncate text-sm font-medium text-ink">
                   {draftTitle(summary)}

@@ -120,7 +120,7 @@ describe('card intake (e2e, #337)', () => {
     expect(args.model).toBe('sonnet');
     expect(args).not.toHaveProperty('attachments');
     const prompt = String(args.prompt);
-    expect(prompt.startsWith('# Card intake instructions')).toBe(true);
+    expect(prompt.startsWith('# New work intake instructions')).toBe(true);
     expect(prompt).toContain(PLANNER_INTAKE_CONTRACT.trim());
     expect(prompt).toContain(RUSSIAN_BRIEF);
     expect(prompt).toContain('Rounds asked so far: 0 of 4.');

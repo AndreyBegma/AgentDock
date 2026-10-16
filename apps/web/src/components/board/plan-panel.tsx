@@ -41,11 +41,12 @@ import { PrerequisiteBanner } from '../prerequisites/prerequisite-banner';
 const PANEL_CLASS = 'w-[min(72rem,100vw)]';
 
 /**
- * New Plan on the Board (#337 D7): a full-height panel. Before the plan
- * exists it is the composer — brief, mode, the planning model (D9) and the
- * profile; then the Planner conversation, task cards and graph, ending in
- * **Create cards** (one Todo card per task, with Depends on links) or **Send
- * to fleet**. Closing it keeps an unfinished plan in Drafts.
+ * A plan on the Board (#337 D7): a full-height panel — the Planner
+ * conversation, task cards and graph, ending in **Create cards** (one Todo
+ * card per task, with Depends on links) or **Send to fleet**. Closing it
+ * keeps an unfinished plan in Drafts. #409: New Plan is gone — the Board
+ * opens this panel only for a plan that exists (`?planPanel=`); without a
+ * plan it is still the composer, which nothing links to any more.
  */
 export function PlanPanel({
   projectId,
@@ -73,8 +74,8 @@ export function PlanPanel({
     <SheetRoot open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        title="New plan"
-        description="The planner splits a brief into tasks. End with cards on the Board, or send the tasks to the fleet."
+        title="Plan"
+        description="A plan started before New work: the planner splits a brief into tasks. End with cards on the Board, or send the tasks to the fleet."
         className={PANEL_CLASS}
         footer={<PlanPanelFooter onClose={() => onOpenChange(false)} />}
       >
@@ -102,7 +103,7 @@ export function PlanPanel({
   );
 }
 
-/** A visible, keyboard-reachable way out, like New card's Cancel (#398). */
+/** A visible, keyboard-reachable way out, like New work's Cancel (#398). */
 export function PlanPanelFooter({ onClose }: { onClose: () => void }) {
   return (
     <div className="flex items-center justify-end">

@@ -31,12 +31,12 @@ type Plan = ReturnType<typeof usePlan>;
 
 /** #337 D11: why the retired Planner page does not take a turn. */
 export const READ_ONLY_REASON =
-  'This plan is read-only here. New plans start on the Board, with New Plan.';
+  'This plan is read-only here. New work starts on the Board.';
 
 /**
  * A plan (spec 172 UI): the task cards, the plan graph — or, in dialogue
  * mode before decomposition, the plan-level question rounds — and the
- * selected task's panel. It is the Board's New Plan panel (#337 D7), where it
+ * selected task's panel. It is the Board's plan panel (#337 D7), where it
  * ends in **Create cards** or **Send to fleet**, and the retired Planner
  * page, where it is `readOnly` (D11). `compact` stacks everything in one
  * column, for the panel.

@@ -182,8 +182,9 @@ export interface BoardCardView {
    */
   dependsOn?: CardDependencyRef[];
   /**
-   * #337 D6, D7: the plan the card came from (a New Card intake or Create
-   * cards). Optional like `dependsOn`; absent reads as null.
+   * #337 D6, D7: the plan the card came from (a New work intake — one card,
+   * or each card of a confirmed split, #409 — or Create cards). Optional
+   * like `dependsOn`; absent reads as null.
    */
   planId?: string | null;
   movedAt: string;

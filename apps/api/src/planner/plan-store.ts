@@ -192,7 +192,7 @@ export class PlanStore {
       throw plannerError(
         409,
         PLANNER_ERROR.planClosed,
-        'This plan predates the Board planner and is read-only; start a New Plan on the Board',
+        'This plan predates the Board planner and is read-only; start New work on the Board',
       );
     }
   }

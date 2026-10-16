@@ -1,13 +1,17 @@
 import { describe, expect, test } from 'bun:test';
-import type { PlanSummary } from '@agentdock/shared';
+import type { PlanIntakeSplitView, PlanSummary } from '@agentdock/shared';
 import { plan, question, turn } from '../planner/fixtures';
 import { boardView, card } from './fixtures';
 import {
-  cardOfPlan,
+  cardsOfPlan,
+  confirmSplitCards,
+  confirmSplitText,
   draftStateText,
   intakePhase,
   openDrafts,
   roundText,
+  splitRowProblem,
+  splitRows,
 } from './intake';
 
 const intake = (over: Parameters<typeof plan>[0] = {}) =>
@@ -21,7 +25,7 @@ const intake = (over: Parameters<typeof plan>[0] = {}) =>
     ...over,
   });
 
-describe('where a card intake stands (#337 D2–D6)', () => {
+describe('where a New work intake stands (#337 D2–D6)', () => {
   test('a running turn is thinking', () => {
     const running = turn({ id: 'turn-2', action: 'intake', phase: 'running' });
     const phase = intakePhase(
@@ -56,18 +60,104 @@ describe('where a card intake stands (#337 D2–D6)', () => {
     const board = boardView([card(3, 'todo'), made]);
     expect(intakePhase(intake({ status: 'done' }), board)).toEqual({
       kind: 'done',
-      card: made,
+      cards: [made],
     });
-    expect(cardOfPlan(board, 'other')).toBeNull();
+    expect(cardsOfPlan(board, 'other')).toEqual([]);
     // Before the board refetch shows it, the card is not known yet.
     expect(intakePhase(intake({ status: 'done' }))).toEqual({
       kind: 'done',
-      card: null,
+      cards: [],
     });
+  });
+
+  test('a single clear task has no split proposal: done with one card (#409)', () => {
+    const p = intake({ intake: { roundsAsked: 0, maxRounds: 4, split: null } });
+    expect(intakePhase(p).kind).toBe('idle');
   });
 
   test('a discarded intake is closed', () => {
     expect(intakePhase(intake({ status: 'archived' })).kind).toBe('closed');
+  });
+});
+
+describe('a split proposal (#409)', () => {
+  const split: PlanIntakeSplitView = {
+    turnId: 'turn-1',
+    reason: 'Это две независимые задачи.',
+    cards: [
+      {
+        index: 0,
+        title: 'Export the board as CSV',
+        kind: 'feature',
+        summary: 'A CSV export from the board menu.',
+      },
+      {
+        index: 1,
+        title: 'Fix the sign-in button on mobile',
+        kind: 'bug',
+        summary: 'The button does nothing on a phone.',
+      },
+    ],
+  };
+  const proposing = intake({
+    intake: { roundsAsked: 1, maxRounds: 4, split },
+  });
+
+  test('is its own phase, and the Drafts strip says so', () => {
+    expect(intakePhase(proposing)).toEqual({ kind: 'split', split });
+    expect(draftStateText(proposing)).toBe('split into 2 cards?');
+  });
+
+  test('a running Keep one card or a failed turn comes first', () => {
+    const running = turn({ id: 'turn-2', action: 'intake', phase: 'running' });
+    expect(
+      intakePhase({
+        ...proposing,
+        turns: [turn(), running],
+        activeTurnId: 'turn-2',
+      }).kind,
+    ).toBe('thinking');
+    expect(
+      intakePhase({
+        ...proposing,
+        turns: [turn({ action: 'intake', phase: 'failed', error: 'x' })],
+      }).kind,
+    ).toBe('failed');
+  });
+
+  test('the rows the person edits become Confirm’s cards, in their order', () => {
+    const rows = splitRows(split);
+    expect(rows.map((r) => r.index)).toEqual([0, 1]);
+    const edited = [
+      { ...rows[1], title: '  Fix mobile sign-in ', kind: 'feature' as const },
+    ];
+    expect(confirmSplitCards(edited)).toEqual([
+      { index: 1, title: 'Fix mobile sign-in', kind: 'feature' },
+    ]);
+    // Editing a row leaves the proposal as it was.
+    expect(split.cards[1].title).toBe('Fix the sign-in button on mobile');
+    expect(confirmSplitText(1)).toBe('Create 1 card');
+    expect(confirmSplitText(3)).toBe('Create 3 cards');
+  });
+
+  test('a row needs an English title of at most 80 characters', () => {
+    expect(splitRowProblem({ title: 'Fix login' })).toBeNull();
+    expect(splitRowProblem({ title: '   ' })).toBe('A card needs a title.');
+    expect(splitRowProblem({ title: 'x'.repeat(81) })).toBe(
+      'At most 80 characters.',
+    );
+    expect(splitRowProblem({ title: 'Починить вход' })).toContain('English');
+  });
+
+  test('done lists every card of the confirmed split', () => {
+    const a = card(7, 'todo', { planId: 'plan-1' });
+    const b = card(5, 'todo', { planId: 'plan-1' });
+    expect(
+      intakePhase(
+        intake({ status: 'done' }),
+        boardView([a, card(2, 'todo'), b]),
+      ),
+    ).toEqual({ kind: 'done', cards: [b, a] });
   });
 });
 
