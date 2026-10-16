@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C-218 · Phone viewer — review flow</title>
+<style>
+:root,:root[data-theme="dark"]{color-scheme:dark;--color-ground:#0a1022;--color-canvas:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-paper:#1b2647;--color-content:rgb(27 38 71 / 0.96);--color-scrim:rgb(10 16 34 / 0.3);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246 / 0.62);--color-ink-3:rgb(242 242 246 / 0.53);--color-line:rgb(255 255 255 / 0.1);--color-line-strong:rgb(255 255 255 / 0.18);--color-hover:rgb(255 255 255 / 0.06);--color-accent:#5b5bf6;--color-on-accent:#ffffff;--color-accent-soft:rgb(91 91 246 / 0.2);--color-accent-ink:#b4b2ff;--color-focus:#b4b2ff;--color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;--color-info:#5fb4f0;--color-hue-1:#5b9cf6;--color-hue-1-soft:rgb(91 156 246 / 0.18);--color-hue-1-ink:#a4c8ff;--color-hue-2:#2fbf94;--color-hue-2-soft:rgb(47 191 148 / 0.18);--color-hue-2-ink:#7ee0c0;--color-hue-3:#7cc95a;--color-hue-3-soft:rgb(124 201 90 / 0.18);--color-hue-3-ink:#ade58f;--color-hue-7:#a68bfa;--glass-sheen:rgb(255 255 255 / 0.06);--glass-scrim:rgb(9 9 12 / 0.55);--glass-scrim-strong:rgb(9 9 12 / 0.64);--glass-brightness:0.85;--glass-brightness-strong:0.7;--glass-edge:rgb(255 255 255 / 0.14);--glass-spec:rgb(255 255 255 / 0.2);--glass-rim:rgb(242 242 246 / 0.8);--glass-rim-shade:rgb(9 9 12 / 0.5);--glass-rim-strong:rgb(242 242 246 / 0.22);--glass-rim-shade-strong:rgb(9 9 12 / 0.2);--glass-meniscus:rgb(9 9 12 / 0.55);--glass-refract:rgb(242 242 246 / 0.35);--glass-shadow:rgb(0 0 0 / 0.35);--glass-shadow-strong:rgb(0 0 0 / 0.45);--glass-shadow-clear:rgb(0 0 0 / 0.15);--canvas-glow:18%}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#ffffff;--color-canvas:#e9eef8;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-paper:#ffffff;--color-content:rgb(255 255 255 / 0.96);--color-scrim:rgb(24 24 27 / 0.22);--color-ink:#18181b;--color-ink-2:rgb(24 24 27 / 0.72);--color-ink-3:rgb(24 24 27 / 0.64);--color-line:rgb(0 0 0 / 0.1);--color-line-strong:rgb(0 0 0 / 0.23);--color-hover:rgb(0 0 0 / 0.1);--color-accent:#4f46e5;--color-on-accent:#ffffff;--color-accent-soft:rgb(79 70 229 / 0.12);--color-accent-ink:#4338ca;--color-focus:#4f46e5;--color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;--color-info:#03629a;--color-hue-1:#1f64d6;--color-hue-1-soft:rgb(31 100 214 / 0.12);--color-hue-1-ink:#1550b0;--color-hue-2:#00805e;--color-hue-2-soft:rgb(0 128 94 / 0.12);--color-hue-2-ink:#006a4e;--color-hue-3:#3a7d1c;--color-hue-3-soft:rgb(58 125 28 / 0.12);--color-hue-3-ink:#2f6617;--color-hue-7:#7244e0;--glass-sheen:rgb(0 0 0 / 0.06);--glass-scrim:rgb(255 255 255 / 0.52);--glass-scrim-strong:rgb(255 255 255 / 0.64);--glass-brightness:1.15;--glass-brightness-strong:1.3;--glass-edge:rgb(0 0 0 / 0.18);--glass-spec:rgb(0 0 0 / 0.2);--glass-rim:rgb(255 255 255 / 0.9);--glass-rim-shade:rgb(24 24 27 / 0.18);--glass-rim-strong:rgb(255 255 255 / 0.3);--glass-rim-shade-strong:rgb(24 24 27 / 0.08);--glass-meniscus:rgb(24 24 27 / 0.12);--glass-refract:rgb(255 255 255 / 0.5);--glass-shadow:rgb(0 0 0 / 0.12);--glass-shadow-strong:rgb(0 0 0 / 0.16);--glass-shadow-clear:rgb(0 0 0 / 0.08);--canvas-glow:10%}
+:root{--color-status-running:var(--color-hue-2);--color-status-running-soft:var(--color-hue-2-soft);--color-status-running-ink:var(--color-hue-2-ink);--color-status-waiting:var(--color-hue-1);--color-status-waiting-soft:var(--color-hue-1-soft);--color-status-waiting-ink:var(--color-hue-1-ink);--color-status-done:var(--color-hue-3);--color-status-done-soft:var(--color-hue-3-soft);--color-status-done-ink:var(--color-hue-3-ink);--canvas-aurora-1:var(--color-hue-1);--canvas-aurora-2:var(--color-hue-7);--canvas-aurora-3:var(--color-hue-1);--glass-blur:26px;--glass-blur-strong:40px;--glass-filter:blur(var(--glass-blur)) saturate(180%) brightness(var(--glass-brightness));--glass-filter-strong:blur(var(--glass-blur-strong)) saturate(180%) brightness(var(--glass-brightness-strong));--radius-control:6px;--radius-surface:8px;--radius-sheet:12px;--size-row:32px;--size-control:28px;--size-field:28px;--size-tap:44px;--dur-fast:100ms;--dur-base:150ms;--dur-sheet:260ms;--ease-sheet:cubic-bezier(0.32,0.72,0,1);--press-scale:0.97;--font-sans:"SF Pro Text","SF Pro Display",Inter,system-ui,-apple-system,"Segoe UI",sans-serif;--font-mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground);color:var(--color-ink)}
+body{margin:0;min-height:100vh;font-family:var(--font-sans);font-size:14px;line-height:20px;color:var(--color-ink);-webkit-font-smoothing:antialiased}
+h1,h2,h3,p{margin:0}
+.text-ink-2{color:var(--color-ink-2)}.text-ink-3{color:var(--color-ink-3)}
+.mono{font-family:var(--font-mono)}
+:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}
+.icon{width:16px;height:16px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.icon-sm{width:14px;height:14px}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--canvas-aurora-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--canvas-aurora-2) var(--canvas-glow),transparent),transparent 70%),radial-gradient(70vmax 50vmax at 45% 110%,color-mix(in oklab,var(--canvas-aurora-3) var(--canvas-glow),transparent),transparent 70%)}
+.glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);backdrop-filter:var(--glass-filter);-webkit-backdrop-filter:var(--glass-filter);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),inset 1px 1px 0 var(--glass-rim),inset -1px -1px 0 var(--glass-rim-shade),inset 0 -3px 3px -1px var(--glass-meniscus),inset 0 0 18px -4px var(--glass-refract),0 12px 32px var(--glass-shadow)}
+.glass-strong{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim-strong);backdrop-filter:var(--glass-filter-strong);-webkit-backdrop-filter:var(--glass-filter-strong);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),inset 1px 1px 0 var(--glass-rim-strong),inset -1px -1px 0 var(--glass-rim-shade-strong),inset 0 -3px 3px -1px var(--glass-meniscus),inset 0 0 18px -4px var(--glass-refract),0 20px 48px var(--glass-shadow-strong)}
+.surface-content{background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font-family:inherit;font-weight:600;user-select:none;cursor:pointer;border:1px solid transparent;background:none;color:var(--color-ink);height:var(--size-control);padding:0 16px;font-size:14px;border-radius:var(--radius-control);transition:background-color var(--dur-fast),transform var(--dur-fast) var(--ease-sheet)}
+.btn:active{transform:scale(var(--press-scale))}
+.btn-icon{padding:0;aspect-ratio:1}
+.btn-solid{background:var(--color-accent);color:var(--color-on-accent)}
+.btn-glass{background:var(--color-raised);border-color:var(--color-line-strong);color:var(--color-ink)}
+.btn-ghost{color:var(--color-ink-2)}
+.btn-ghost:hover{color:var(--color-ink);background:var(--color-hover)}
+.badge{display:inline-flex;align-items:center;justify-content:center;font-weight:600;line-height:1;font-variant-numeric:tabular-nums;border-radius:999px;height:18px;min-width:18px;padding:0 4px;font-size:10px;background:var(--color-hover);color:var(--color-ink-2)}
+.badge-md{height:20px;padding:0 8px;font-size:12px;font-weight:500}
+.pill{display:inline-flex;align-items:center;gap:6px;height:20px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:500;background:var(--s-soft);color:var(--s-ink)}
+.dot{width:6px;height:6px;border-radius:999px;background:var(--s)}
+[data-status="running"]{--s:var(--color-status-running);--s-soft:var(--color-status-running-soft);--s-ink:var(--color-status-running-ink)}
+[data-status="waiting"]{--s:var(--color-status-waiting);--s-soft:var(--color-status-waiting-soft);--s-ink:var(--color-status-waiting-ink)}
+[data-status="done"]{--s:var(--color-status-done);--s-soft:var(--color-status-done-soft);--s-ink:var(--color-status-done-ink)}
+.field{display:flex;flex-direction:column;gap:4px}
+.field-label{font-size:12px;font-weight:500;color:var(--color-ink-2)}
+.select,.textarea{width:100%;font-family:inherit;font-size:16px;color:var(--color-ink);background:var(--color-surface);border:1px solid var(--color-line-strong);border-radius:var(--radius-control)}
+.select{appearance:none;height:var(--size-tap);padding:0 28px 0 12px;background-image:linear-gradient(45deg,transparent 50%,var(--color-ink-3) 50%),linear-gradient(135deg,var(--color-ink-3) 50%,transparent 50%);background-position:calc(100% - 16px) 50%,calc(100% - 12px) 50%;background-size:4px 4px;background-repeat:no-repeat}
+.textarea{padding:10px 12px;line-height:22px;resize:none;border-color:color-mix(in oklab,var(--color-ink) 70%,transparent);box-shadow:0 0 0 2px color-mix(in oklab,var(--color-ink) 22%,transparent)}
+.textarea::placeholder{color:var(--color-ink-3)}
+.segmented{display:inline-flex;gap:4px;padding:2px;border-radius:999px}
+.segmented button{border:0;background:none;padding:0 12px;border-radius:999px;font-family:inherit;font-weight:500;color:var(--color-ink-2);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.segmented button[aria-pressed="true"]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.tab{position:relative;padding:0 12px;border:0;background:none;font-family:inherit;font-size:14px;font-weight:500;color:var(--color-ink-2);cursor:pointer}
+.tab[aria-selected="true"]{color:var(--color-accent-ink)}
+.tab[aria-selected="true"]::after{content:"";position:absolute;left:8px;right:8px;bottom:-1px;height:2px;border-radius:2px;background:var(--color-accent)}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+/* ---------- mockup page ---------- */
+body{padding:32px 32px 48px}
+.page-top{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;max-width:1640px;margin-bottom:24px}
+.page-top .eyebrow{font-size:12px;font-weight:500;color:var(--color-ink-3)}
+.page-top h1{font-size:28px;line-height:32px;font-weight:600;letter-spacing:-.02em;margin-top:4px}
+.page-top p{font-size:14px;color:var(--color-ink-2);max-width:72ch;margin-top:4px}
+.theme-btn{height:var(--size-control)}
+.row{display:flex;gap:32px;flex-wrap:wrap;align-items:flex-start}
+.state{width:375px;display:flex;flex-direction:column;gap:12px}
+.cap{font-size:12px;line-height:16px;color:var(--color-ink-2)}
+.cap b{display:flex;align-items:center;gap:8px;font-size:14px;line-height:20px;color:var(--color-ink);margin-bottom:4px}
+.cap b .n{display:inline-grid;place-content:center;width:20px;height:20px;border-radius:999px;background:var(--color-hover);font-size:11px}
+.cap ul{margin:6px 0 0;padding-left:16px}
+.phone{position:relative;width:375px;height:812px;border-radius:44px;overflow:hidden;border:1px solid var(--color-line-strong);background:var(--color-ground);box-shadow:0 24px 60px var(--glass-shadow-strong);display:flex;flex-direction:column;isolation:isolate}
+.phone>.canvas{position:absolute;z-index:-1}
+.sbar{height:44px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 30px;font-size:14px;font-weight:600}
+.sbar .r{display:flex;gap:6px;align-items:center}
+.sbar .bat{width:24px;height:11px;border:1.5px solid var(--color-ink);border-radius:3px;padding:1px}
+.sbar .bat i{display:block;height:100%;width:70%;background:var(--color-ink);border-radius:1px}
+.touch .btn{height:var(--size-tap);font-size:15px}
+.touch .btn-icon{width:var(--size-tap)}
+.vbar{display:flex;align-items:center;gap:4px;height:56px;margin:0 8px;padding:0 6px;border-radius:var(--radius-surface);flex-shrink:0}
+.vbar .t{flex:1;min-width:0}
+.vbar .nm{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vbar .sub{font-size:11px;line-height:14px;color:var(--color-ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tb{display:flex;align-items:center;gap:8px;padding:8px 8px 6px;flex-shrink:0}
+.tb .segmented{height:var(--size-tap);padding:3px}
+.tb .segmented button{font-size:13px;padding:0 12px}
+.zoom{display:flex;align-items:center;margin-left:auto;gap:0;height:var(--size-tap);border-radius:999px;padding:0}
+.zoom .btn{border-radius:999px;height:42px;width:42px;color:var(--color-ink-2)}
+.zoom .fit{font-size:13px;font-weight:500;font-variant-numeric:tabular-nums;padding:0 4px;color:var(--color-accent-ink)}
+.strip{display:flex;align-items:center;gap:8px;padding:0 0 0 12px;border-bottom:1px solid var(--color-line);flex-shrink:0;height:45px}
+.strip .lbl{font-size:12px;color:var(--color-ink-3);flex-shrink:0}
+.strip .tabs{display:flex;gap:2px;overflow:hidden;min-width:0;flex:1;-webkit-mask-image:linear-gradient(90deg,black 82%,transparent);mask-image:linear-gradient(90deg,black 82%,transparent)}
+.strip .tab{height:44px;flex:none;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.strip .tab .pos{color:var(--color-ink-3);font-variant-numeric:tabular-nums}
+.strip .pd{width:6px;height:6px;border-radius:999px;background:var(--color-accent)}
+.stage{flex:1;min-height:0;position:relative;overflow:hidden;display:flex;justify-content:center;padding-top:14px}
+.hint{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:3;display:flex;align-items:center;gap:8px;height:32px;padding:0 12px;border-radius:999px;font-size:12px;font-weight:500;white-space:nowrap}
+.hint .icon{color:var(--color-accent-ink)}
+.mock{position:relative;width:300px;height:650px;border-radius:10px;background:var(--color-paper);border:1px solid var(--color-line);box-shadow:0 8px 28px var(--glass-shadow);overflow:visible;flex-shrink:0}
+.mock.armed{outline:2px dashed color-mix(in oklab,var(--color-accent) 55%,transparent);outline-offset:3px;cursor:crosshair}
+.mk-in{position:absolute;inset:0;overflow:hidden;border-radius:10px;padding:14px 12px;display:flex;flex-direction:column;gap:10px}
+.mk-top{display:flex;align-items:center;justify-content:space-between}
+.mk-bar{height:8px;border-radius:4px;background:var(--color-line-strong)}
+.mk-av{width:20px;height:20px;border-radius:999px;background:var(--color-accent-soft)}
+.mk-h{font-size:17px;line-height:22px;font-weight:600}
+.mk-seg{display:flex;gap:4px;padding:2px;border-radius:999px;background:var(--color-hover);font-size:10px}
+.mk-seg span{flex:1;text-align:center;padding:3px 0;border-radius:999px;color:var(--color-ink-2)}
+.mk-seg span:first-child{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.mk-card{border-radius:8px;padding:9px 10px;display:flex;flex-direction:column;gap:6px}
+.mk-card .ttl{font-size:12px;font-weight:600;line-height:16px}
+.mk-card .meta{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--color-ink-3)}
+.mk-tabbar{position:absolute;left:0;right:0;bottom:0;height:44px;border-top:1px solid var(--color-line);display:flex;justify-content:space-around;align-items:center;background:var(--color-paper)}
+.mk-tabbar i{width:18px;height:18px;border-radius:5px;background:var(--color-line-strong)}
+.mk-tabbar i:first-child{background:var(--color-accent-soft)}
+/* pins: 28px marker inside a 44px target */
+.pin{position:absolute;width:44px;height:44px;margin:-44px 0 0 -6px;display:grid;place-items:center;border:0;background:none;padding:0;cursor:pointer;z-index:2}
+.pin i{display:grid;place-content:center;width:28px;height:28px;border-radius:999px 999px 999px 3px;background:var(--color-accent);color:var(--color-on-accent);font-style:normal;font-size:12px;font-weight:700;box-shadow:0 0 0 2px var(--color-paper),0 4px 10px var(--glass-shadow-strong)}
+.pin.draft i{background:var(--color-paper);color:var(--color-accent-ink);box-shadow:0 0 0 2px var(--color-accent),0 0 0 6px var(--color-accent-soft)}
+.pin.measure::before{content:"";position:absolute;inset:0;border:1px dashed var(--color-accent-ink);border-radius:8px}
+.pin.measure::after{content:"44 × 44 target";position:absolute;left:48px;top:12px;font-size:10px;font-weight:600;white-space:nowrap;color:var(--color-accent-ink);background:var(--color-paper);padding:1px 5px;border-radius:4px;border:1px solid var(--color-line)}
+.act{display:flex;gap:8px;margin:0 8px;padding:8px;border-radius:var(--radius-sheet);flex-shrink:0}
+.act .btn-solid{flex:1}
+.act [aria-pressed="true"]{outline:2px solid var(--color-accent);outline-offset:1px;color:var(--color-accent-ink)}
+.home{height:22px;flex-shrink:0;display:grid;place-items:center}
+.home i{width:134px;height:5px;border-radius:999px;background:var(--color-ink)}
+/* overlays inside a phone */
+.p-scrim{position:absolute;inset:0;z-index:5;background:var(--color-scrim);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+.p-sheet{position:absolute;left:0;right:0;z-index:6;border-radius:var(--radius-sheet) var(--radius-sheet) 0 0;border-bottom:0;display:flex;flex-direction:column}
+.grab{width:36px;height:5px;border-radius:999px;background:var(--color-line-strong);margin:8px auto 2px}
+.sh-head{display:flex;align-items:flex-start;gap:8px;padding:4px 8px 0 16px}
+.sh-head .tt{flex:1;min-width:0;padding-top:8px}
+.sh-head h2{font-size:16px;line-height:24px;font-weight:600;display:flex;align-items:center;gap:8px}
+.sh-head p{font-size:12px;line-height:16px;color:var(--color-ink-2);margin-top:2px}
+.pin-chip{display:inline-grid;place-content:center;width:22px;height:22px;border-radius:999px 999px 999px 3px;background:var(--color-accent);color:var(--color-on-accent);font-size:11px;font-weight:700}
+.composer{padding:12px 16px 12px;display:flex;flex-direction:column;gap:10px}
+.compose-row{display:flex;gap:8px;align-items:flex-end}
+.compose-row .textarea{flex:1;height:88px}
+.compose-foot{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--color-ink-3)}
+.kb{position:absolute;left:0;right:0;bottom:0;height:291px;z-index:7;background:var(--color-raised);border-top:1px solid var(--color-line);padding:8px 3px 30px;display:flex;flex-direction:column;gap:11px}
+.kb-sug{display:flex;justify-content:space-around;font-size:15px;color:var(--color-ink-2);height:30px;align-items:center;border-bottom:1px solid var(--color-line)}
+.kb-row{display:flex;gap:6px;justify-content:center;padding:0 3px}
+.kb-row span{flex:1;max-width:32px;height:42px;border-radius:5px;background:var(--color-paper);box-shadow:0 1px 0 var(--color-line-strong);display:grid;place-content:center;font-size:18px}
+.kb-row span.w{max-width:none;flex:0 0 42px;background:var(--color-surface);font-size:13px}
+.kb-row span.sp{max-width:none;flex:1 1 auto;font-size:14px;color:var(--color-ink-3)}
+.kb-row span.go{max-width:none;flex:0 0 88px;background:var(--color-surface);font-size:14px}
+.kb-tag{position:absolute;right:10px;top:-22px;font-size:10px;font-weight:600;color:var(--color-ink-3);text-transform:uppercase;letter-spacing:.1em}
+/* review sheet */
+.rv{overflow:hidden;padding:12px 16px 16px;display:flex;flex-direction:column;gap:16px}
+.rv-actions{display:flex;gap:8px}
+.rv-actions .btn{flex:1}
+.rv h3{font-size:12px;font-weight:600;color:var(--color-ink-2);text-transform:uppercase;letter-spacing:.08em;font-size:10px}
+.rv .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.rv .segmented{height:var(--size-tap);padding:3px;display:flex}
+.rv .segmented button{flex:1;font-size:13px}
+.cm{display:flex;gap:10px;padding:12px 0;border-top:1px solid var(--color-line)}
+.cm .body{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.cm .who{font-size:12px;color:var(--color-ink-3);display:flex;gap:6px;align-items:center}
+.cm .txt{font-size:14px;line-height:20px}
+.cm .btn{height:var(--size-tap);flex-shrink:0;font-size:13px;padding:0 10px}
+/* approve dialog */
+.p-dialog{position:absolute;left:16px;right:16px;top:50%;transform:translateY(-50%);z-index:6;border-radius:var(--radius-sheet);padding:20px;display:flex;flex-direction:column;gap:14px}
+.p-dialog h2{font-size:20px;line-height:28px;font-weight:600;letter-spacing:-.01em}
+.p-dialog p{font-size:14px;color:var(--color-ink-2)}
+.radio{display:flex;gap:12px;padding:12px;border-radius:var(--radius-surface);border:1px solid var(--color-line);min-height:var(--size-tap);cursor:pointer}
+.radio[aria-checked="true"]{border-color:var(--color-accent);background:var(--color-accent-soft)}
+.radio .o{width:20px;height:20px;border-radius:999px;border:1.5px solid var(--color-line-strong);flex-shrink:0;display:grid;place-content:center;margin-top:1px}
+.radio[aria-checked="true"] .o{border-color:var(--color-accent)}
+.radio[aria-checked="true"] .o::after{content:"";width:10px;height:10px;border-radius:999px;background:var(--color-accent)}
+.radio .l{font-size:14px;font-weight:500}
+.radio .h{font-size:12px;color:var(--color-ink-3);margin-top:2px}
+.stack{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+.stack .btn{width:100%}
+</style>
+</head>
+<body>
+<div class="canvas" aria-hidden="true"></div>
+
+<header class="page-top">
+  <div>
+    <div class="eyebrow">C-218 · Design viewer below <code class="mono">lg</code> · 375 × 812, touch</div>
+    <h1>Review, pin and approve on a phone</h1>
+    <p>The viewer is still one full-screen layer. On touch it stacks: the title bar, a toolbar with only the viewport presets and zoom, the frame strip, the mockup at Fit, and a bottom action bar with Pin, Comments and Approve. Every control and pin is at least 44 × 44.</p>
+  </div>
+  <button class="btn btn-glass theme-btn" type="button" onclick="var r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark'">
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>Theme
+  </button>
+</header>
+
+<div class="row">
+
+<!-- ============ 1. Mockup with pins, pin mode on ============ -->
+<section class="state">
+  <div class="phone touch" aria-label="Phone: mockup with pins">
+    <div class="canvas" aria-hidden="true"></div>
+    <div class="sbar"><span>9:41</span><span class="r"><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.86a10 10 0 0 1 14 0"/><path d="M8.5 16.43a5 5 0 0 1 7 0"/></svg><span class="bat"><i></i></span></span></div>
+    <div class="vbar glass">
+      <button class="btn btn-ghost btn-icon" aria-label="Close the viewer"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      <div class="t"><div class="nm">Board card C-218 · design</div><div class="sub">V1 r2 (latest) · Dark</div></div>
+      <span class="pill" data-status="waiting"><span class="dot"></span>In review</span>
+    </div>
+    <div class="tb" role="toolbar" aria-label="Mockup view">
+      <div class="segmented glass" role="group" aria-label="Viewport">
+        <button aria-pressed="false"><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>Desktop</button>
+        <button aria-pressed="true"><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/></svg>Mobile</button>
+      </div>
+      <fieldset class="zoom glass" style="border:1px solid var(--glass-edge);margin-left:auto">
+        <legend class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Zoom</legend>
+        <button class="btn btn-icon" aria-label="Zoom out"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+        <span class="fit" aria-live="polite">Fit · 77%</span>
+        <button class="btn btn-icon" aria-label="Zoom in"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button>
+      </fieldset>
+    </div>
+    <div class="strip">
+      <span class="lbl">Frames · 3</span>
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" aria-selected="true"><span class="pos">1</span>Board page<span class="badge">3</span><span class="pd" aria-label="Has open pins"></span></button>
+        <button class="tab" role="tab" aria-selected="false"><span class="pos">2</span>Card tile<span class="badge">1</span></button>
+        <button class="tab" role="tab" aria-selected="false"><span class="pos">3</span>Empty board</button>
+      </div>
+    </div>
+    <div class="stage">
+      <div class="hint glass-strong" role="status"><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M22 12h-4M6 12H2M12 6V2M12 22v-4"/></svg>Tap the mockup to place a pin</div>
+      <div class="mock armed">
+        <div class="mk-in">
+          <div class="mk-top"><span class="mk-bar" style="width:70px"></span><span class="mk-av"></span></div>
+          <div class="mk-h">Board</div>
+          <div class="mk-seg"><span>Ready</span><span>In progress</span><span>Done</span></div>
+          <div class="mk-card surface-content"><span class="ttl">Planner run notes</span><span class="meta"><span class="pill" data-status="running"><span class="dot"></span>Running</span>#494</span></div>
+          <div class="mk-card surface-content"><span class="ttl">UI profile for mockups</span><span class="meta">#497 · slot-2</span><span class="mk-bar" style="width:80%;height:6px"></span></div>
+          <div class="mk-card surface-content"><span class="ttl">Message a running session</span><span class="meta"><span class="pill" data-status="done"><span class="dot"></span>Done</span>#489</span></div>
+          <div class="mk-card surface-content"><span class="ttl">Context handoff</span><span class="meta">#495</span><span class="mk-bar" style="width:60%;height:6px"></span></div>
+          <div class="mk-tabbar"><i></i><i></i><i></i><i></i></div>
+        </div>
+        <button class="pin" style="left:62px;top:72px" aria-label="Pin 1: Title too small"><i>1</i></button>
+        <button class="pin measure" style="left:196px;top:150px" aria-label="Pin 2"><i>2</i></button>
+        <button class="pin" style="left:248px;top:290px" aria-label="Pin 3"><i>3</i></button>
+      </div>
+    </div>
+    <div class="act glass">
+      <button class="btn btn-glass" aria-pressed="true"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M22 12h-4M6 12H2M12 6V2M12 22v-4"/></svg>Pin</button>
+      <button class="btn btn-glass"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Comments<span class="badge">4</span></button>
+      <button class="btn btn-solid">Approve</button>
+    </div>
+    <div class="home"><i></i></div>
+  </div>
+  <div class="cap"><b><span class="n">1</span>Mockup with pins: pin mode on</b>
+    The toolbar keeps only the Desktop and Mobile presets (or the project's own) and zoom: −, Fit and +, each 44 px. The typed width and the resize edges are gone. Pin, Comments and Approve move to a bottom bar, so the screen's one solid button stays in reach of a thumb.
+    <ul><li>Each pin is a 28 px marker inside a 44 × 44 hit area. The dashed box on pin 2 shows the size.</li><li>When pin mode is on, the mockup gets a dashed outline and a hint chip.</li></ul>
+  </div>
+</section>
+
+<!-- ============ 2. Pin composer as a bottom sheet over the keyboard ============ -->
+<section class="state">
+  <div class="phone touch" aria-label="Phone: pin composer">
+    <div class="canvas" aria-hidden="true"></div>
+    <div class="sbar"><span>9:41</span><span class="r"><span class="bat"><i></i></span></span></div>
+    <div class="vbar glass">
+      <button class="btn btn-ghost btn-icon" aria-label="Close the viewer"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      <div class="t"><div class="nm">Board card C-218 · design</div><div class="sub">V1 r2 (latest) · Dark</div></div>
+    </div>
+    <div class="stage" style="padding-top:8px">
+      <div class="mock" style="margin-top:-108px">
+        <div class="mk-in">
+          <div class="mk-top"><span class="mk-bar" style="width:70px"></span><span class="mk-av"></span></div>
+          <div class="mk-h">Board</div>
+          <div class="mk-seg"><span>Ready</span><span>In progress</span><span>Done</span></div>
+          <div class="mk-card surface-content"><span class="ttl">Planner run notes</span><span class="meta"><span class="pill" data-status="running"><span class="dot"></span>Running</span>#494</span></div>
+          <div class="mk-card surface-content"><span class="ttl">UI profile for mockups</span><span class="meta">#497 · slot-2</span><span class="mk-bar" style="width:80%;height:6px"></span></div>
+          <div class="mk-card surface-content"><span class="ttl">Message a running session</span><span class="meta">#489</span></div>
+        </div>
+        <button class="pin" style="left:196px;top:150px" aria-label="Pin 2"><i>2</i></button>
+      </div>
+    </div>
+    <div class="p-scrim" aria-hidden="true"></div>
+    <!-- draft pin stays above the scrim so you can see where it is -->
+    <div style="position:absolute;left:0;right:0;top:100px;display:flex;justify-content:center;z-index:6;pointer-events:none">
+      <div style="position:relative;width:300px;height:1px"><span class="pin draft" style="left:118px;top:112px"><i>5</i></span></div>
+    </div>
+    <div class="p-sheet glass-strong" style="bottom:291px" role="dialog" aria-modal="true" aria-labelledby="pc-t">
+      <div class="grab" aria-hidden="true"></div>
+      <div class="sh-head">
+        <div class="tt">
+          <h2 id="pc-t"><span class="pin-chip" aria-hidden="true">5</span>Pin 5</h2>
+          <p>On frame 1 “Board page” · shows at Mobile · dark</p>
+        </div>
+        <button class="btn btn-ghost btn-icon" aria-label="Cancel the pin"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+      <div class="composer">
+        <div class="compose-row">
+          <textarea class="textarea" aria-label="Comment on pin 5" placeholder="What should change here?">The status pill wraps under the title here — keep it on one line</textarea>
+          <button class="btn btn-solid btn-icon" aria-label="Comment"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></svg></button>
+        </div>
+        <div class="compose-foot"><span>62 / 2000</span><button class="btn btn-ghost" style="height:var(--size-tap)">Cancel</button></div>
+      </div>
+    </div>
+    <div class="kb" aria-hidden="true">
+      <span class="kb-tag">System keyboard</span>
+      <div class="kb-sug"><span>line</span><span>|</span><span>lines</span><span>|</span><span>lined</span></div>
+      <div class="kb-row" data-k="qwertyuiop"></div>
+      <div class="kb-row" data-k="asdfghjkl" style="padding:0 20px"></div>
+      <div class="kb-row" data-k="⇧zxcvbnm⌫"></div>
+      <div class="kb-row"><span class="w">123</span><span class="w">☺</span><span class="sp">space</span><span class="go">return</span></div>
+    </div>
+  </div>
+  <div class="cap"><b><span class="n">2</span>Comment box: a bottom sheet, not a popover</b>
+    Below <code class="mono">lg</code>, the comment box opens in a glass-ui <code class="mono">Sheet side="bottom"</code> that sits on top of the keyboard (it follows <code class="mono">visualViewport</code>). The text box and the Comment button are on one row, so both stay visible while you type.
+    <ul><li>The header shows the pin number, its frame and where it will show.</li><li>The mockup scrolls so the draft pin (5) stays visible above the sheet.</li><li>A 16 px font in the text box stops iOS from zooming in. Cancel, the ×, or swiping down drops the draft.</li></ul>
+  </div>
+</section>
+
+<!-- ============ 3. Comments and review sheet ============ -->
+<section class="state">
+  <div class="phone touch" aria-label="Phone: comments and review sheet">
+    <div class="canvas" aria-hidden="true"></div>
+    <div class="sbar"><span>9:41</span><span class="r"><span class="bat"><i></i></span></span></div>
+    <div class="vbar glass">
+      <button class="btn btn-ghost btn-icon" aria-label="Close the viewer"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      <div class="t"><div class="nm">Board card C-218 · design</div><div class="sub">V1 r2 (latest) · Dark</div></div>
+    </div>
+    <div class="tb">
+      <div class="segmented glass"><button aria-pressed="false">Desktop</button><button aria-pressed="true">Mobile</button></div>
+      <div class="zoom glass" style="border:1px solid var(--glass-edge)"><span class="btn btn-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></span><span class="fit">Fit · 77%</span><span class="btn btn-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></span></div>
+    </div>
+    <div class="p-scrim" aria-hidden="true"></div>
+    <div class="p-sheet glass-strong" style="top:120px;bottom:0" role="dialog" aria-modal="true" aria-labelledby="rv-t">
+      <div class="grab" aria-hidden="true"></div>
+      <div class="sh-head">
+        <div class="tt"><h2 id="rv-t">Comments and review</h2><p>4 open · 1 resolved</p></div>
+        <button class="btn btn-ghost btn-icon" aria-label="Close"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+      <div class="rv">
+        <div class="rv-actions">
+          <button class="btn btn-glass">Revise design (4)</button>
+          <button class="btn btn-solid">Approve</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <h3>View</h3>
+          <div class="segmented glass" role="group" aria-label="Theme"><button aria-pressed="false">Light</button><button aria-pressed="true">Dark</button></div>
+          <div class="grid2">
+            <label class="field"><span class="field-label">Variant</span><select class="select" aria-label="Variant"><option>Variant 1</option><option>Variant 2</option></select></label>
+            <label class="field"><span class="field-label">Revision</span><select class="select" aria-label="Revision"><option>V1 r2 (latest)</option><option>V1 r1</option></select></label>
+          </div>
+        </div>
+        <div>
+          <div class="cm"><span class="pin-chip">1</span><div class="body"><span class="who">Board page · Archi · 4 min</span><span class="txt">The page title is too small next to the segmented control.</span></div><button class="btn btn-ghost">Resolve</button></div>
+          <div class="cm"><span class="pin-chip">2</span><div class="body"><span class="who">Board page · Archi · 3 min</span><span class="txt">Running pill should sit on the same line as the number.</span></div><button class="btn btn-ghost">Resolve</button></div>
+          <div class="cm"><span class="pin-chip">3</span><div class="body"><span class="who">Board page · Archi · 1 min</span><span class="txt">Progress bar needs a label.</span></div><button class="btn btn-ghost">Resolve</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="cap"><b><span class="n">3</span>Comments and review: the existing bottom sheet</b>
+    The bottom bar's Comments button opens the existing <code class="mono">Sheet</code> with the review panel's content unchanged. The theme, variant and revision choices, taken out of the phone toolbar, sit in a "View" group here with 44 px controls.
+    <ul><li>Tapping a comment closes the sheet and scrolls to its pin on its frame.</li></ul>
+  </div>
+</section>
+
+<!-- ============ 4. Approve ============ -->
+<section class="state">
+  <div class="phone touch" aria-label="Phone: approve dialog">
+    <div class="canvas" aria-hidden="true"></div>
+    <div class="sbar"><span>9:41</span><span class="r"><span class="bat"><i></i></span></span></div>
+    <div class="vbar glass">
+      <button class="btn btn-ghost btn-icon" aria-label="Close the viewer"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      <div class="t"><div class="nm">Board card C-218 · design</div><div class="sub">V1 r2 (latest) · Dark</div></div>
+    </div>
+    <div class="stage"><div class="mock"><div class="mk-in"><div class="mk-top"><span class="mk-bar" style="width:70px"></span><span class="mk-av"></span></div><div class="mk-h">Board</div><div class="mk-seg"><span>Ready</span><span>In progress</span><span>Done</span></div><div class="mk-card surface-content"><span class="ttl">Planner run notes</span></div></div></div></div>
+    <div class="p-scrim" aria-hidden="true"></div>
+    <div class="p-dialog glass-strong" role="dialog" aria-modal="true" aria-labelledby="ap-t">
+      <h2 id="ap-t">Which variant do you approve?</h2>
+      <p>The other variants are archived: still readable, never published. Approving publishes the frames to the card's spec.</p>
+      <div role="radiogroup" aria-label="Variant" style="display:flex;flex-direction:column;gap:8px">
+        <div class="radio" role="radio" aria-checked="true" tabindex="0"><span class="o"></span><div><div class="l">V1 r2 — Board with status pills</div><div class="h">3 frames · stacks columns as segments</div></div></div>
+        <div class="radio" role="radio" aria-checked="false" tabindex="-1"><span class="o"></span><div><div class="l">V2 r1 — Swipeable columns</div><div class="h">2 frames · one column per screen</div></div></div>
+      </div>
+      <div class="stack">
+        <button class="btn btn-solid">Approve &amp; run</button>
+        <button class="btn btn-glass">Approve</button>
+        <button class="btn btn-ghost">Cancel</button>
+      </div>
+    </div>
+  </div>
+  <div class="cap"><b><span class="n">4</span>Approve: the existing flow, fitted to 375 px</b>
+    Same <code class="mono">ApproveDialog</code>, same choices. Below <code class="mono">sm</code>, its footer stacks into full-width 44 px rows: the solid action on top, Cancel at the bottom. On wider screens it keeps today's order, Cancel on the left and the actions on the right.
+    <ul><li>Each variant choice is a 44 px row you tap anywhere on.</li></ul>
+  </div>
+</section>
+
+</div>
+<script>
+document.querySelectorAll('.kb-row[data-k]').forEach(function(r){
+  Array.from(r.dataset.k).forEach(function(c){var s=document.createElement('span');s.textContent=c;if(c==='⇧'||c==='⌫'){s.className='w';}r.appendChild(s);});
+});
+</script>
+</body>
+</html>
