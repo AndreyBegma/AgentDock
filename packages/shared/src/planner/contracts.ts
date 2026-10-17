@@ -1,3 +1,4 @@
+import type { AttachmentView } from '../attachments/contracts';
 import type { TaskDesignSummary } from '../design/contracts';
 import type {
   DiscussProposal,
@@ -302,18 +303,23 @@ export interface PlanIntakeView {
    */
   split?: PlanIntakeSplitView | null;
   /**
-   * #592 (ADR-0057): the cards the intake wrote, waiting for the person in
+   * #594: the files the plan holds so far, oldest first — the web dialog's
+   * and those a Telegram `/new` sent (optional: absent reads as none).
+   */
+  attachments?: AttachmentView[];
+  /**
+   * #592 (ADR-0058): the cards the intake wrote, waiting for the person in
    * Drafts, in the proposal's order — decided ones too, until none is
    * pending (optional: absent reads as none).
    */
   candidates?: PlanCandidateView[];
   /** #592: the stack the intake proposed; candidates name its stages by index. */
   candidateStack?: PlanCandidateStack | null;
-  /** #592: the intake's attachments no card has taken yet. */
-  attachments?: number;
+  /** #592: how many of the intake's attachments no card has taken yet. */
+  attachmentsLeft?: number;
 }
 
-/** #592 (ADR-0057): a card the intake wrote, before the person decides it. */
+/** #592 (ADR-0058): a card the intake wrote, before the person decides it. */
 export interface PlanCandidateView {
   id: string;
   planId: string;
@@ -358,7 +364,7 @@ export const ACCEPT_CANDIDATES_AS = ['cards', 'stack'] as const;
 export type AcceptCandidatesAs = (typeof ACCEPT_CANDIDATES_AS)[number];
 
 /**
- * `POST /projects/:projectId/candidates/accept` (#592, ADR-0057 §3): pending
+ * `POST /projects/:projectId/candidates/accept` (#592, ADR-0058 §3): pending
  * candidates of the caller's intakes — of one intake or several — made into
  * cards in Todo at once: independent (`cards`, in the listed order), or one
  * stack (`stack`), each candidate in the 0-based `stage` the person chose.
@@ -462,7 +468,7 @@ export interface ConfirmSplitCard {
 }
 
 /**
- * #592 (ADR-0057): Confirm writes candidates, not cards — in the confirmed
+ * #592 (ADR-0058): Confirm writes candidates, not cards — in the confirmed
  * order (stage order for a stack); they wait in Drafts.
  */
 export interface ConfirmSplitResponse {

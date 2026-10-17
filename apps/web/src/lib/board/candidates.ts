@@ -11,7 +11,7 @@ import { pluralize } from '../format';
 import { draftTitle, splitRowProblem } from './intake';
 
 /**
- * New work candidates (#592, ADR-0057): the cards an intake wrote wait in
+ * New work candidates (#592, ADR-0058): the cards an intake wrote wait in
  * Drafts until the person accepts them — alone, all at once, as independent
  * cards or as one stack — or rejects them. What the Drafts strip, the
  * candidate sheet and the accept dialogs share about them. Pure.
@@ -143,7 +143,7 @@ export function attachmentsText(
   if (candidate.attachments > 0) {
     return `${candidate.attachments} — went to this card`;
   }
-  const left = plan.intake?.attachments ?? 0;
+  const left = plan.intake?.attachmentsLeft ?? 0;
   if (left === 0) return null;
   return pendingOf(plan).length === 1
     ? `${left} — ${left === 1 ? 'goes' : 'go'} to this card on accept`
@@ -279,7 +279,7 @@ export function attachmentNotes(
         `${draftTitle(plan)} already gave its attachments to ${given.card.label}.`,
       ];
     }
-    const left = plan.intake?.attachments ?? 0;
+    const left = plan.intake?.attachmentsLeft ?? 0;
     if (left === 0) return [];
     const files = pluralize(left, 'attachment');
     return [

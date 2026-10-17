@@ -7,7 +7,7 @@ import { block, PlannerHarness } from './testing/planner-e2e';
 
 /**
  * #592 (docs/specs/592-make-new-work-cards-candidates-the-perso.md,
- * ADR-0057): New work writes candidates; the person edits, rejects or
+ * ADR-0058): New work writes candidates; the person edits, rejects or
  * accepts them — alone, as independent cards, or as one stack — and only
  * Accept makes board cards.
  */
@@ -197,7 +197,7 @@ describe('New work candidates (e2e, #592)', () => {
   it('edits title, kind and body; Accept makes the card in Todo with the edited text, the plan as origin and the attachments', async () => {
     const shot = await attachment();
     const plan = await oneCard([shot.id]);
-    expect(plan.intake?.attachments).toBe(1);
+    expect(plan.intake?.attachmentsLeft).toBe(1);
     const [candidate] = candidates(plan);
 
     const edited = await edit(candidate, {

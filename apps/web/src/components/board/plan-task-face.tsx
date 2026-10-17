@@ -34,11 +34,14 @@ export function PlanTaskFace({
   const prHref = task.issue?.prUrl ? safeHttpsUrl(task.issue.prUrl) : null;
   return (
     <SelectionFrame>
-      {selecting ? (
-        <UnselectableMark text="Plan tasks follow their plan and cannot be selected" />
-      ) : null}
       <div className="flex min-w-0 flex-col gap-1.5 text-sm">
         <div className="flex items-start gap-2">
+          <span className="flex h-4 shrink-0 items-center pointer-coarse:h-(--size-tap)">
+            <UnselectableMark
+              shown={selecting}
+              text="Plan tasks follow their plan and cannot be selected"
+            />
+          </span>
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-2">
             <Badge size="sm" label="Plan" />
             <span className="min-w-0 break-words font-mono">

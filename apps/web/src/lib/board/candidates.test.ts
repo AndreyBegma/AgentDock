@@ -72,7 +72,7 @@ const stacked = () =>
       candidate('c', { stage: 2, position: 2, title: 'Dashboard page' }),
     ],
     {},
-    { candidateStack: STACK, attachments: 2 },
+    { candidateStack: STACK, attachmentsLeft: 2 },
   );
 
 describe('New work candidates in Drafts (#592)', () => {
@@ -133,7 +133,7 @@ describe('New work candidates in Drafts (#592)', () => {
     expect(attachmentsText(p, b)).toBe(
       '2 — go to the first card you accept from this intake',
     );
-    const single = review([candidate('a')], {}, { attachments: 1 });
+    const single = review([candidate('a')], {}, { attachmentsLeft: 1 });
     expect(attachmentsText(single, candidate('a'))).toBe(
       '1 — goes to this card on accept',
     );

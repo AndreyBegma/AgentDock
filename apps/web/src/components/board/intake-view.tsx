@@ -13,6 +13,7 @@ import { roundKey } from '../../lib/planner/answers';
 import { describePlannerError } from '../../lib/planner/format';
 import { usePlan } from '../../lib/planner/use-plan';
 import { useSection } from '../../lib/section/use-section';
+import { AttachmentList } from '../attachments/attachment-list';
 import { FailedTurn } from '../planner/failed-turn';
 import { QuestionStepper } from '../planner/question-stepper';
 import { RunningTurn } from '../planner/running-turn';
@@ -20,6 +21,7 @@ import { SplitReview } from './split-review';
 
 /**
  * The interview of New work (#337 D2–D4, #409): what the person asked, then
+ * the files it holds (#594: from the dialog, or sent to the Telegram bot),
  * the model thinking, the open round one question at a time, the failed turn
  * to retry, or a proposal to split the request into several cards.
  * **Enough — generate** is there whenever no turn runs and nothing is
@@ -86,6 +88,16 @@ export function IntakeView({
           {plan.brief}
         </p>
       </div>
+
+      {plan.intake?.attachments?.length ? (
+        <section aria-label="Attachments" className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-ink-3">Attachments</span>
+          <AttachmentList
+            attachments={plan.intake.attachments}
+            canRemove={false}
+          />
+        </section>
+      ) : null}
 
       {phase.kind === 'thinking' ? (
         <RunningTurn

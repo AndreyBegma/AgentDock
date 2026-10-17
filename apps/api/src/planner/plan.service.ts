@@ -320,21 +320,26 @@ export class PlanService implements OnModuleInit {
             pendingAttachments(this.prisma, planId),
           ])
         : Promise.resolve(null);
-    const [tasks, turns, questions, split, reviewed] = await Promise.all([
-      this.store.currentTasks(this.prisma, plan),
-      this.prisma.planTurn.findMany({
-        where: { planId },
-        include: turnInclude,
-        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-      }),
-      plan.status !== 'clarifying'
-        ? Promise.resolve([])
-        : plan.mode === 'card'
-          ? intakeRound(this.prisma, planId)
-          : this.store.planRound(planId),
-      intakeOpen ? intakeSplit(this.prisma, planId) : Promise.resolve(null),
-      review,
-    ]);
+    const [tasks, turns, questions, split, attachments, reviewed] =
+      await Promise.all([
+        this.store.currentTasks(this.prisma, plan),
+        this.prisma.planTurn.findMany({
+          where: { planId },
+          include: turnInclude,
+          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        }),
+        plan.status !== 'clarifying'
+          ? Promise.resolve([])
+          : plan.mode === 'card'
+            ? intakeRound(this.prisma, planId)
+            : this.store.planRound(planId),
+        intakeOpen ? intakeSplit(this.prisma, planId) : Promise.resolve(null),
+        // #594: what the intake holds, from the web dialog or Telegram.
+        plan.mode === 'card'
+          ? this.attachments.planViews(planId)
+          : Promise.resolve([]),
+        review,
+      ]);
     const [issueOf, designs] = await Promise.all([
       loadIssueViews(this.prisma, projectId, tasks),
       designSummaries(this.prisma, planId),
@@ -349,11 +354,12 @@ export class PlanService implements OnModuleInit {
       latestTurn: turns.at(-1) ?? null,
       questions,
       split: split ? toSplitView(split) : null,
+      attachments,
       review: reviewed
         ? {
             candidates: reviewed[0].map(toCandidateView),
             candidateStack: candidateStackOf(plan.candidateStack),
-            attachments: reviewed[1],
+            attachmentsLeft: reviewed[1],
           }
         : null,
     });
@@ -556,6 +562,57 @@ export class PlanService implements OnModuleInit {
       result: 'ok',
     });
     this.store.publish(plan.projectId, plan.id);
+  }
+
+  /**
+   * #594: pending uploads of the author join their open card intake between
+   * turns — a photo sent to the Telegram intake. The plan holds them as a
+   * turn's claim does (#337 D10): each later turn carries them, and the
+   * generated card takes them.
+   */
+  async attach(
+    plan: Plan,
+    actor: PlanActor,
+    ids: readonly string[],
+  ): Promise<void> {
+    if (plan.mode !== 'card') {
+      throw plannerError(
+        409,
+        PLANNER_ERROR.wrongMode,
+        'Attachments belong to a card intake',
+      );
+    }
+    if (plan.authorId !== actor.userId) {
+      throw plannerError(
+        403,
+        PLANNER_ERROR.forbidden,
+        'Only the author adds files to an intake',
+      );
+    }
+    const closed = (status: string) =>
+      plannerError(409, PLANNER_ERROR.planClosed, `The intake is ${status}`);
+    if (plan.status !== 'clarifying') throw closed(plan.status);
+    await this.attachments.assertPlanClaimable(
+      plan.projectId,
+      plan.id,
+      ids,
+      actor,
+    );
+    await this.prisma.$transaction(async (tx) => {
+      // As a turn start does: one claim at a time per plan.
+      await tx.$queryRaw`SELECT id FROM plans WHERE id = ${plan.id} FOR UPDATE`;
+      const { status } = await tx.plan.findUniqueOrThrow({
+        where: { id: plan.id },
+        select: { status: true },
+      });
+      if (status !== 'clarifying') throw closed(status);
+      await this.attachments.claimForPlan(
+        tx,
+        { projectId: plan.projectId, planId: plan.id },
+        ids,
+        actor,
+      );
+    });
   }
 
   /**

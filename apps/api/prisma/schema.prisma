@@ -1469,6 +1469,8 @@ model TelegramIntake {
   questionMessages  Json     @default("{}")
   /// `{ "<question id>": { optionId?, optionIds?, text? } }` picked so far.
   answers           Json     @default("{}")
+  /// #594: photos sent before the description, pending until the plan claims them.
+  attachmentIds     String[] @default([])
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -2452,7 +2454,7 @@ model Plan {
   /// #379: when each PR was seen merged; the issues waiting on it queue then.
   docsPrMergedAt   DateTime?
   designPrMergedAt DateTime?
-  /// #592 (ADR-0057): the stack the intake proposed — `{title, body, design,
+  /// #592 (ADR-0058): the stack the intake proposed — `{title, body, design,
   /// stages: string[]}` (shared `planCandidateStackSchema`); its candidates
   /// name their stage by index. Null for one card or a split.
   candidateStack   Json?
@@ -2478,7 +2480,7 @@ model Plan {
   stacks             BoardStack[]
   /// #574: the Telegram chat running this intake.
   telegramIntake     TelegramIntake?
-  /// #592 (ADR-0057): the cards the intake wrote, waiting for the person.
+  /// #592 (ADR-0058): the cards the intake wrote, waiting for the person.
   candidates         PlanCandidate[]
 
   @@index([projectId, updatedAt])
@@ -2528,14 +2530,14 @@ model PlanTask {
 
 /// One headless turn (D3, D17): a `runs` row of kind `plan` (D14). A turn
 /// whose output fails the contract keeps `resultText` and applies nothing.
-/// Shared `PLAN_CANDIDATE_STATUSES` (#592, ADR-0057).
+/// Shared `PLAN_CANDIDATE_STATUSES` (#592, ADR-0058).
 enum PlanCandidateStatus {
   pending
   accepted
   rejected
 }
 
-/// #592 (ADR-0057): a card a New work intake wrote, waiting in Drafts until
+/// #592 (ADR-0058): a card a New work intake wrote, waiting in Drafts until
 /// the person accepts it (a board card is made) or rejects it.
 model PlanCandidate {
   id          String              @id @default(cuid())

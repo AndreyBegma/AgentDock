@@ -320,3 +320,61 @@ describe('CardFace touch targets (#497)', () => {
     );
   });
 });
+
+describe('the selection slot (#596)', () => {
+  const selected = (
+    column: BoardColumn,
+    extra: Partial<BoardCardView>,
+    selecting: boolean,
+  ) =>
+    renderToStaticMarkup(
+      <CardFace
+        projectId="p1"
+        canOperate
+        menu={MENU}
+        onOpen={() => undefined}
+        selection={{ selected: false, selecting, onToggle: () => undefined }}
+        card={fixtureCard(7, column, extra)}
+      />,
+    );
+
+  test('the box sits in the header row, inside the card, not over its border', () => {
+    const html = selected('todo', {}, false);
+    const header = row(html, 'header') ?? '';
+    expect(header).toContain('data-selection-box');
+    expect(header.indexOf('data-selection-box')).toBeLessThan(
+      header.indexOf('C-7'),
+    );
+    expect(html).not.toMatch(/-start-\[|-top-\[/);
+  });
+
+  test('a suggestion keeps the same slot, empty until something is selected', () => {
+    const idle = row(selected('inbox', {}, false), 'header');
+    const busy = row(selected('inbox', {}, true), 'header');
+    expect(idle).toContain('invisible');
+    expect(busy).not.toContain('invisible');
+    expect(busy).toContain('<svg');
+  });
+
+  test('a plan task reserves the slot in its header', () => {
+    const task: BoardPlanTaskView = {
+      planId: 'plan-1',
+      planTitle: 'Onboarding v2',
+      taskId: 'task-t1',
+      key: 't1',
+      title: 'Task t1',
+      kind: 'feature',
+      column: 'todo',
+      status: 'draft',
+      issue: null,
+      design: null,
+      summary: '',
+      updatedAt: '2026-10-14T10:00:00.000Z',
+    };
+    const html = renderToStaticMarkup(
+      <PlanTaskFace task={task} selecting onOpen={() => undefined} />,
+    );
+    expect(html).toContain('size-4');
+    expect(html).not.toContain('invisible');
+  });
+});

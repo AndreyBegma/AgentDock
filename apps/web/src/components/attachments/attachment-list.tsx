@@ -23,12 +23,13 @@ export function AttachmentList({
   onRemove,
 }: {
   attachments: readonly AttachmentView[];
-  user: { id: string; role: string };
+  /** Absent: the list is read-only (#594, a New work draft). */
+  user?: { id: string; role: string };
   /** False for a viewer and for a card in Completed. */
   canRemove: boolean;
   /** The id being removed. */
   removing?: string;
-  onRemove: (attachment: AttachmentView) => void;
+  onRemove?: (attachment: AttachmentView) => void;
 }) {
   if (attachments.length === 0) return null;
   return (
@@ -55,7 +56,10 @@ export function AttachmentList({
                   >
                     {image ? 'Open' : 'Download'}
                   </a>
-                  {canRemove && canRemoveAttachment(a, user) ? (
+                  {canRemove &&
+                  user &&
+                  onRemove &&
+                  canRemoveAttachment(a, user) ? (
                     <Button
                       variant="ghost"
                       size="sm"
