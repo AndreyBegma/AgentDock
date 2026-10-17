@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { missingProtectedLines } from './classify';
-import { filterFooter, findFilter, judge } from './engine';
+import { filterFooter, findFilter, judge, linePart } from './engine';
 import type { Filter } from './types';
 
 /**
@@ -101,7 +101,11 @@ export const runCorpusCase = (
     filter: filter?.id ?? null,
     kept,
     filtered: verdict?.kind === 'filtered',
-    missing: missingProtectedLines(c.output, kept),
+    missing: missingProtectedLines(
+      c.output,
+      kept,
+      filter ? linePart(filter) : undefined,
+    ),
     ratio: raw === 0 ? 1 : Buffer.byteLength(kept) / raw,
   };
 };

@@ -3,6 +3,8 @@ import { join } from 'node:path';
 import { loadCorpus, runCorpusCase } from '../../corpus';
 import type { Filter } from '../../types';
 import { opsFilters } from '.';
+import { GH_MIN_BYTES } from './forge';
+import { GIT_MIN_BYTES } from './git';
 
 const run = (argv: string[], output: string, exitCode = 0) => {
   const filter = opsFilters.find((f) => f.matches(argv));
@@ -95,10 +97,30 @@ describe('ops filters: long-running modes', () => {
 });
 
 describe('ops filters: unclassified output passes through', () => {
-  it('git log in an unknown shape comes back as it was', () => {
-    // never reformatted by guesswork; the engine then counts it passedThrough
-    const output = 'commit abc1234\nsomething unexpected\n';
-    expect(run(['git', 'log'], output)).toBe(output);
+  it('git log in an unknown shape is never reformatted by guesswork', () => {
+    // a long one is only capped; the engine counts a short one passedThrough
+    const output = `commit abc1234\n${'something unexpected\n'.repeat(40)}`;
+    expect(run(['git', 'log'], output)).toBe(
+      'commit abc1234\nsomething unexpected  [×40]\n',
+    );
+  });
+
+  it('output below each threshold is left alone', () => {
+    // one byte short of each threshold, newline included
+    const below = (n: number) => `${'x'.repeat(n - 2)}\n`;
+    expect(run(['git', 'status'], below(GIT_MIN_BYTES))).toBe(null);
+    expect(run(['git', 'diff'], below(GIT_MIN_BYTES))).toBe(null);
+    expect(run(['gh', 'pr', 'view', '1'], below(GH_MIN_BYTES))).toBe(null);
+  });
+
+  it('porcelain status and gh json are never reshaped', () => {
+    const porcelain = ' M src/a.ts\n'.repeat(200);
+    expect(run(['git', 'status', '--porcelain'], porcelain)).toBe(null);
+    const json = `[${'{"name":"a","state":"SUCCESS"},'.repeat(40)}{}]\n`;
+    expect(run(['gh', 'pr', 'checks', '--json', 'name,state'], json)).toBe(
+      null,
+    );
+    expect(run(['gh', 'pr', 'view', '1'], json)).toBe(null);
   });
 
   it('a BuildKit build is not shortened: its `#N` lines read as frames', () => {
@@ -154,6 +176,10 @@ describe('ops filters: what stays', () => {
       '',
       '    The error was a missing await.',
       '    Unrelated prose.',
+      ...Array.from(
+        { length: 10 },
+        (_, i) => `    More prose about why this changed, line ${i}.`,
+      ),
       '',
     ].join('\n');
     const result = run(['git', 'log'], output);
@@ -163,7 +189,10 @@ describe('ops filters: what stays', () => {
     expect(result).not.toContain('Unrelated prose.');
   });
 
-  it('git diff keeps changed lines and the line numbers of hunks', () => {
+  it('git diff: a stat header, the hunks, one line of context', () => {
+    const body = Array.from({ length: 20 }, (_, i) => ` line ${i}`);
+    body.push(...Array.from({ length: 30 }, (_, i) => ` tail ${i}`));
+    body.splice(10, 0, '-old ten', '+new ten');
     const result = run(
       ['git', 'diff'],
       [
@@ -171,32 +200,104 @@ describe('ops filters: what stays', () => {
         'index 1111111..2222222 100644',
         '--- a/x.ts',
         '+++ b/x.ts',
-        '@@ -1,9 +1,9 @@',
-        ' one',
-        ' two',
-        ' three',
-        '-four',
-        '+FOUR',
-        ' five',
-        ' six',
-        ' seven',
-        ' eight',
+        '@@ -1,51 +1,51 @@ export const x = () => {',
+        ...body,
         '',
       ].join('\n'),
     );
     expect(result).toBe(
       [
+        '1 file changed, +1 -1',
+        ' x.ts | +1 -1',
+        '',
         'diff --git a/x.ts b/x.ts',
-        '--- a/x.ts',
-        '+++ b/x.ts',
-        '@@ -1,9 +1,9 @@',
-        ' three',
-        '-four',
-        '+FOUR',
-        ' five',
+        '@@ -1,51 +1,51 @@ export const x = () => {',
+        '… 9 unchanged lines',
+        ' line 9',
+        '-old ten',
+        '+new ten',
+        ' line 10',
+        '… 39 unchanged lines',
         '',
       ].join('\n'),
     );
+  });
+
+  it('git diff caps a long hunk but keeps its error lines', () => {
+    const added = Array.from({ length: 300 }, (_, i) => `+const v${i} = ${i};`);
+    added[150] = "+throw new Error('boom');";
+    const result =
+      run(
+        ['git', 'diff'],
+        [
+          'diff --git a/new.ts b/new.ts',
+          'new file mode 100644',
+          'index 0000000..2222222',
+          '--- /dev/null',
+          '+++ b/new.ts',
+          '@@ -0,0 +1,300 @@',
+          ...added,
+          '',
+        ].join('\n'),
+      ) ?? '';
+    expect(result).toContain(' new.ts | +300 -0 (new)');
+    expect(result).toContain("+throw new Error('boom');");
+    expect(result).toContain('+const v299 = 299;');
+    expect(result).not.toContain('+const v100 = 100;');
+    expect(result).toContain('lines omitted');
+  });
+
+  it('git diff keeps a header line the classifier protects', () => {
+    const result =
+      run(
+        ['git', 'diff'],
+        [
+          'diff --git a/src/errors.ts b/src/errors.ts',
+          'index 1111111..2222222 100644',
+          '--- a/src/errors.ts',
+          '+++ b/src/errors.ts',
+          '@@ -1,3 +1,3 @@',
+          ...Array.from(
+            { length: 30 },
+            (_, i) => `+export const e${i} = ${i};`,
+          ),
+          '',
+        ].join('\n'),
+      ) ?? '';
+    expect(result).toContain('--- a/src/errors.ts');
+    expect(result).toContain('+++ b/src/errors.ts');
+    expect(result).not.toContain('index 1111111');
+  });
+
+  it('git status becomes a summary per section, capped', () => {
+    const output = [
+      'On branch feat/x',
+      "Your branch is ahead of 'origin/feat/x' by 2 commits.",
+      '',
+      'Changes to be committed:',
+      '  (use "git restore --staged <file>..." to unstage)',
+      '\tmodified:   src/a.ts',
+      '\tnew file:   src/b.ts',
+      '',
+      'Changes not staged for commit:',
+      '  (use "git add <file>..." to update what will be committed)',
+      '\tmodified:   src/errors.ts',
+      '',
+      'Untracked files:',
+      '  (use "git add <file>..." to include in what will be committed)',
+      ...Array.from({ length: 30 }, (_, i) => `\tgen/file${i}.ts`),
+      '',
+      'no changes added to commit (use "git add" and/or "git commit -a")',
+      '',
+    ].join('\n');
+    const result = run(['git', 'status'], output) ?? '';
+    expect(result).toContain('On branch feat/x');
+    expect(result).toContain('Staged (2):\n  M src/a.ts\n  A src/b.ts\n');
+    expect(result).toContain('Not staged (1):\n  modified:   src/errors.ts\n');
+    expect(result).toContain('Untracked (30):\n  ? gen/file0.ts\n');
+    expect(result).toContain('  ? gen/file19.ts\n  … 10 more\n');
+    expect(result).not.toContain('gen/file20.ts');
+    expect(result).not.toContain('  (use "git');
   });
 
   it('terraform keeps the plan and drops the refresh noise', () => {
@@ -222,11 +323,15 @@ describe('ops filters: what stays', () => {
       'c\tpass\t1s\thttps://x/3',
       'd\tpending\t0\thttps://x/4',
       'e\tfail\t9s\thttps://x/5',
+      ...Array.from(
+        { length: 20 },
+        (_, i) => `p${i}\tpass\t1s\thttps://x/p${i}`,
+      ),
     ];
     const result = run(['gh', 'pr', 'checks'], `${rows.join('\n')}\n`);
     expect(result).toContain('d\tpending');
     expect(result).toContain('e\tfail');
-    expect(result).toContain('3 checks passing or skipped');
+    expect(result).toContain('23 checks passing or skipped');
   });
 
   it('kubectl apply counts unchanged objects', () => {
@@ -277,7 +382,7 @@ describe('ops filters: what stays', () => {
   it('a carriage-return progress meter keeps its last state', () => {
     const result = run(
       ['git', 'fetch'],
-      'Receiving objects:  10% (1/10)\rReceiving objects: 100% (10/10), done.\nFrom github.com:a/b\n * branch main -> FETCH_HEAD\n',
+      `Receiving objects:  10% (1/10)\rReceiving objects: 100% (10/10), done.\nFrom github.com:a/b\n${' * [new branch]      feat/some-branch -> origin/feat/some-branch\n'.repeat(10)}`,
     );
     expect(result).not.toContain('Receiving objects');
     expect(result).toContain('From github.com:a/b');

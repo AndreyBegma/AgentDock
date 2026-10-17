@@ -1,7 +1,7 @@
 import { constants } from 'node:os';
 import { basename, dirname } from 'node:path';
 import { redact } from '../pane/redact';
-import { missingProtectedLines } from './classify';
+import { type LinePart, missingProtectedLines } from './classify';
 import { RAW_ENV } from './env';
 import { RAW_CAP_BYTES, RawFile } from './raw-store';
 import {
@@ -100,7 +100,12 @@ export const judge = (
     return { kind: 'original', reason: 'threw' };
   }
   if (result === null) return { kind: 'original', reason: 'unclassified' };
-  const missing = missingProtectedLines(output, result);
+  let missing: string[];
+  try {
+    missing = missingProtectedLines(output, result, linePart(filter));
+  } catch {
+    return { kind: 'original', reason: 'threw' };
+  }
   if (missing.length > 0) return { kind: 'original', reason: 'lost a line' };
   const body =
     result.length === 0 || result.endsWith('\n') ? result : `${result}\n`;
@@ -111,6 +116,12 @@ export const judge = (
   }
   return { kind: 'filtered', text };
 };
+
+/** How the classifier reads a line of this filter's command (`Filter.protectedPart`). */
+export const linePart =
+  (filter: Filter): LinePart =>
+  (line) =>
+    filter.protectedPart?.(line) ?? line;
 
 /**
  * The compressed output, redacted by the runner's one redactor

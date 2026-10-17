@@ -15,6 +15,16 @@ const GIT_VALUE_FLAGS = ['-C', '-c', '--git-dir', '--work-tree', '--namespace'];
 const gitCommand = (argv: readonly string[]): string | undefined =>
   subcommand(argv, GIT_VALUE_FLAGS);
 
+/** `git diff` modes that print a summary, not hunks: only capped when long. */
+const DIFF_SUMMARIES = [
+  '--stat',
+  '--shortstat',
+  '--numstat',
+  '--name-only',
+  '--name-status',
+  '--summary',
+];
+
 const COMMANDS = new Set([
   'status',
   'log',
@@ -37,11 +47,99 @@ const COMMANDS = new Set([
 const TRANSFER_PROGRESS =
   /^(remote: )?(Enumerating|Counting|Compressing|Writing|Receiving|Resolving|Unpacking|Checking out|Updating|Delta compression|Total \d+)\b.*(objects|deltas|files|threads|objects\b.*\d+%|\d+%)/;
 
+/**
+ * Below this, git output goes through unchanged: a short status, a few
+ * commits or a one-hunk diff fit on a screen, and the footer that points to
+ * the raw output (~150 bytes) would eat most of what a summary saves.
+ */
+export const GIT_MIN_BYTES = 512;
+
+/** Files listed per `git status` section; the rest are counted. */
+export const GIT_STATUS_FILES = 20;
+
+/** `git status` section headers, and the short name each is listed under. */
+const STATUS_SECTIONS: Record<string, { name: string; capped: boolean }> = {
+  'Changes to be committed:': { name: 'Staged', capped: true },
+  'Changes not staged for commit:': { name: 'Not staged', capped: true },
+  'Untracked files:': { name: 'Untracked', capped: true },
+  'Unmerged paths:': { name: 'Unmerged', capped: false },
+  'Ignored files:': { name: 'Ignored', capped: true },
+};
+
+/** `<kind>:   <path>` entries of a status section, as porcelain-like codes. */
+const STATUS_CODES: Record<string, string> = {
+  modified: 'M',
+  'new file': 'A',
+  deleted: 'D',
+  renamed: 'R',
+  copied: 'C',
+  typechange: 'T',
+  'both modified': 'UU',
+  'both added': 'AA',
+  'both deleted': 'DD',
+  'added by us': 'AU',
+  'added by them': 'UA',
+  'deleted by us': 'DU',
+  'deleted by them': 'UD',
+};
+
+const STATUS_ENTRY = /^\t(?:([a-z ]+):\s+)?(.+)$/;
+
+interface StatusSection {
+  name: string;
+  capped: boolean;
+  entries: string[];
+  /** Entries the classifier protects: never capped. */
+  kept: Set<number>;
+}
+
+/**
+ * `git status` in its long form, summarised (rtk's strategy): each section
+ * becomes `Staged (N):` and one short line per file, capped at
+ * `GIT_STATUS_FILES`; the `(use "git …")` hints go. The branch lines and
+ * anything unrecognised stay as they were.
+ */
 const statusFilter = (output: string): string | null => {
-  const lines = cleanLines(output).filter(
-    (line) => !/^\s+\(use "git /.test(line),
-  );
-  return joinLines(squeezeBlanks(lines));
+  const out: string[] = [];
+  let section: StatusSection | null = null;
+  const flush = () => {
+    if (!section) return;
+    const { name, capped, entries, kept } = section;
+    out.push(`${name} (${entries.length}):`);
+    let hidden = 0;
+    entries.forEach((entry, i) => {
+      if (!capped || i < GIT_STATUS_FILES || kept.has(i)) out.push(entry);
+      else hidden++;
+    });
+    if (hidden > 0) out.push(`  … ${hidden} more`);
+    section = null;
+  };
+  for (const line of cleanLines(output)) {
+    const header = STATUS_SECTIONS[line.trim()];
+    if (header && !line.startsWith('\t')) {
+      flush();
+      section = { ...header, entries: [], kept: new Set() };
+      continue;
+    }
+    if (/^\s+\(use "git /.test(line)) continue;
+    const entry = section ? STATUS_ENTRY.exec(line) : null;
+    if (section && entry) {
+      const [, kind, path = ''] = entry;
+      const code = kind ? STATUS_CODES[kind] : '?';
+      if (isProtectedLine(line)) {
+        section.kept.add(section.entries.length);
+        section.entries.push(`  ${line.trim()}`);
+      } else {
+        section.entries.push(code ? `  ${code} ${path}` : `  ${kind}: ${path}`);
+      }
+      continue;
+    }
+    if (line.trim() === '') continue;
+    flush();
+    out.push(line);
+  }
+  flush();
+  return joinLines(out);
 };
 
 interface Commit {
@@ -112,33 +210,116 @@ const logFilter = (output: string): string | null => {
   return joinLines(out);
 };
 
+/** Header lines of a file in a diff that say nothing the stat does not. */
 const DIFF_META =
-  /^(index [0-9a-f]+\.\.[0-9a-f]+|similarity index|new file mode|deleted file mode|old mode|new mode)/;
+  /^(index [0-9a-f]+\.\.[0-9a-f]+|similarity index|old mode|new mode|--- (a\/|\/dev\/null)|\+\+\+ (b\/|\/dev\/null))/;
 
-/** A unified diff: no `index` lines, and one line of context around changes. */
+/** Context lines kept on each side of a change; git prints three. */
+const DIFF_CONTEXT = 1;
+
+/** A run of context this long is replaced by a marker; a shorter one just goes. */
+const DIFF_CONTEXT_MARKER = 4;
+
+/** A hunk longer than this keeps its head and tail (a new or rewritten file). */
+export const DIFF_HUNK_LINES = 80;
+const DIFF_HUNK_HEAD = 60;
+const DIFF_HUNK_TAIL = 10;
+
+interface DiffFile {
+  path: string;
+  added: number;
+  removed: number;
+  note: string;
+}
+
+const isChange = (line: string | undefined): boolean =>
+  line !== undefined && /^[-+\\]/.test(line);
+
+/** One hunk's body: context trimmed to `DIFF_CONTEXT`, then capped. */
+const hunkBody = (lines: readonly string[]): string[] => {
+  const trimmed: string[] = [];
+  let dropped = 0;
+  const flushDropped = () => {
+    if (dropped >= DIFF_CONTEXT_MARKER) {
+      trimmed.push(`… ${dropped} unchanged lines`);
+    }
+    dropped = 0;
+  };
+  lines.forEach((line, i) => {
+    const near = lines
+      .slice(Math.max(0, i - DIFF_CONTEXT), i + DIFF_CONTEXT + 1)
+      .some(isChange);
+    if (isChange(line) || near || isProtectedLine(line)) {
+      flushDropped();
+      trimmed.push(line);
+    } else {
+      dropped++;
+    }
+  });
+  flushDropped();
+  if (trimmed.length <= DIFF_HUNK_LINES) return trimmed;
+  return elide(trimmed, { head: DIFF_HUNK_HEAD, tail: DIFF_HUNK_TAIL });
+};
+
+/**
+ * A unified diff (rtk's strategy): a stat header, then each hunk with its
+ * context trimmed to one line around the changes and long hunks capped. The
+ * `index` and `---` / `+++` lines go; everything outside the hunks (a commit
+ * header of `git show` or `log -p`) stays.
+ */
 const diffFilter = (output: string): string | null => {
   const lines = cleanLines(output);
-  if (!lines.some((l) => l.startsWith('diff --git ') || l.startsWith('@@ '))) {
-    return null;
-  }
-  const isContext = (l: string) => l.startsWith(' ') || l === '';
-  const changed = (l: string | undefined) =>
-    l !== undefined && (l.startsWith('+') || l.startsWith('-'));
+  if (!lines.some((l) => l.startsWith('diff --git '))) return null;
+  const files: DiffFile[] = [];
   const out: string[] = [];
-  let inHunk = false;
-  lines.forEach((line, i) => {
-    if (line.startsWith('diff --git ') || line.startsWith('commit ')) {
-      inHunk = false;
+  let file: DiffFile | null = null;
+  let hunk: string[] | null = null;
+  const endHunk = () => {
+    if (hunk) out.push(...hunkBody(hunk));
+    hunk = null;
+  };
+  for (const line of lines) {
+    const start = /^diff --git a\/.+ b\/(.+)$/.exec(line);
+    if (start) {
+      endHunk();
+      file = { path: start[1] ?? '', added: 0, removed: 0, note: '' };
+      files.push(file);
+      out.push(line);
+      continue;
     }
-    if (line.startsWith('@@ ')) inHunk = true;
-    if (DIFF_META.test(line)) return;
-    if (inHunk && isContext(line) && !isProtectedLine(line)) {
-      const near = changed(lines[i - 1]) || changed(lines[i + 1]);
-      if (!near) return;
+    if (line.startsWith('@@')) {
+      endHunk();
+      hunk = [];
+      out.push(line);
+      continue;
     }
+    if (hunk && file && (/^[-+ \\]/.test(line) || line === '')) {
+      if (line.startsWith('+')) file.added++;
+      if (line.startsWith('-')) file.removed++;
+      hunk.push(line);
+      continue;
+    }
+    endHunk();
+    if (file && /^new file mode/.test(line)) file.note = ' (new)';
+    if (file && /^deleted file mode/.test(line)) file.note = ' (deleted)';
+    if (/^(new|deleted) file mode/.test(line) && !isProtectedLine(line)) {
+      continue;
+    }
+    if (DIFF_META.test(line) && !isProtectedLine(line)) continue;
     out.push(line);
-  });
-  return joinLines(out);
+  }
+  endHunk();
+  const added = files.reduce((n, f) => n + f.added, 0);
+  const removed = files.reduce((n, f) => n + f.removed, 0);
+  const width = Math.max(...files.map((f) => f.path.length));
+  const stat = [
+    `${files.length} ${files.length === 1 ? 'file' : 'files'} changed, +${added} -${removed}`,
+    ...files.map(
+      (f) => ` ${f.path.padEnd(width)} | +${f.added} -${f.removed}${f.note}`,
+    ),
+    '',
+  ];
+  return joinLines([...stat, ...out]);
 };
 
 const transferFilter = (output: string): string | null => {
@@ -156,9 +337,12 @@ export const gitFilter: Filter = {
   id: 'ops/git',
   matches: (argv) => argv[0] === 'git' && COMMANDS.has(gitCommand(argv) ?? ''),
   apply: ({ argv, output }) => {
+    if (Buffer.byteLength(output) < GIT_MIN_BYTES) return null;
     switch (gitCommand(argv)) {
       case 'status':
-        return hasFlag(argv, '--short', '-s', '--porcelain')
+        // Porcelain is for scripts to parse: never reshaped.
+        if (hasFlag(argv, '--porcelain', '-z')) return null;
+        return hasFlag(argv, '--short', '-s')
           ? longFilter(output)
           : statusFilter(output);
       case 'log':
@@ -170,6 +354,7 @@ export const gitFilter: Filter = {
           : (logFilter(output) ?? longFilter(output));
       case 'diff':
       case 'show':
+        if (hasFlag(argv, ...DIFF_SUMMARIES)) return longFilter(output);
         return diffFilter(output) ?? longFilter(output);
       case 'fetch':
       case 'pull':
