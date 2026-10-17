@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import {
   AGENTDOCK_WORKTREE_DIR,
+  CARD_DIALOG_WAIT_MS,
   CARD_PUSH_MIN_INTERVAL_MS,
   CARD_SESSION_POLL_MS,
   STEWARD_RESUME_TEXT,
@@ -18,14 +19,17 @@ import {
   type CardRunResult,
   type CardStopArgs,
   type CardStopResult,
+  cardRunDialogDataSchema,
   cardRunPendingQuestionDataSchema,
   cardRunPhaseChangedDataSchema,
   cardRunPushedDataSchema,
   cardRunQuestionDataSchema,
   cardSessionName,
+  type PaneDialog,
   type UnsequencedEvent,
 } from '@agentdock/shared/protocol';
 import { type Cancel, isoNow } from '../clock';
+import { DIALOG_PATTERNS } from '../collectors/tmux/classify';
 import { CommandFailure } from '../commands/failure';
 import type { ConfigProfile } from '../config';
 import { projectCheckout, watchedProject } from '../control/target';
@@ -65,6 +69,7 @@ import {
   TrailerHeld,
   trailerMessage,
 } from './trailer-guard';
+import { trustWorktree } from './trust';
 import { type CardWiring, wireCardRound } from './wiring';
 
 export interface CardExecutorOptions {
@@ -82,6 +87,8 @@ export interface CardExecutorOptions {
   pollMs?: number;
   /** #359 D1: `CARD_PUSH_MIN_INTERVAL_MS` unless a test sets it. */
   pushIntervalMs?: number;
+  /** #624: `CARD_DIALOG_WAIT_MS` unless a test sets it. */
+  dialogWaitMs?: number;
   /**
    * Where `card.run` downloads attachments from (#309 D9): the API and the
    * runner token. Required: without it every card with an attachment fails
@@ -136,6 +143,19 @@ const pushStateOf = (
   };
 };
 
+/**
+ * #624: the dialog that blocks a card pane and waits for the person, or
+ * null: a permission prompt, the question selector and a dialog the runner
+ * answers itself (`KNOWN_DIALOGS`) are reported elsewhere.
+ */
+const blockingDialogOf = (pane: string): PaneDialog | null => {
+  const { signal } = readPane(pane);
+  if (signal?.kind !== 'dialog' || signal.dialogId !== undefined) return null;
+  return (
+    DIALOG_PATTERNS.find(([pattern]) => pattern.test(pane))?.[1] ?? 'other'
+  );
+};
+
 /** An event's `error`: one line, at most 500 characters, no stack. */
 const eventError = (error: unknown): string =>
   (errorMessage(error).split('\n')[0] || 'the round could not start').slice(
@@ -170,6 +190,11 @@ export class CardExecutor {
   private readonly questionShown = new Map<string, string>();
   /** #489: the selector screen (`runId:key`) last reported, per card. */
   private readonly pendingShown = new Map<string, string>();
+  /** #624: the blocking dialog (`runId:dialog`) on screen, since when, per card. */
+  private readonly dialogShown = new Map<
+    string,
+    { key: string; since: number; reported: boolean }
+  >();
 
   constructor(private readonly options: CardExecutorOptions) {
     this.store = new CardStore(options.cardsDir);
@@ -257,6 +282,7 @@ export class CardExecutor {
         // #359 D8: the follow-up branch, from the updated base, first.
         if (args.newBranch) await startFollowUpBranch(deps, record);
         await ensureWorktree(deps, record);
+        this.trust(profile, record);
         // #359 D3: the worker's PR description goes under `.agentdock/`,
         // excluded whether or not the card has attachments.
         await excludeFromGit(
@@ -494,6 +520,7 @@ export class CardExecutor {
         // `autoDismiss` switch); Steward observes it.
         if (pane && !this.steward(record.projectId)) {
           await this.dismissKnownDialog(record, pane);
+          this.noticeBlockingDialog(record, pane);
         }
         this.noticePendingQuestion(record, pane);
         this.noticeQuestion(record, pane);
@@ -571,6 +598,7 @@ export class CardExecutor {
         session: { id: args.sessionId, resume: true },
         prompt: STEWARD_RESUME_TEXT,
       };
+      this.trust(profile, record);
       try {
         const roundDir = this.store.createRound(record.cardId, record.runId);
         const wiring = wireCardRound(
@@ -747,6 +775,28 @@ export class CardExecutor {
   }
 
   /**
+   * #624: trusts the worktree the runner made, so Claude Code does not stop
+   * on its workspace trust dialog. Never fails the round: a dialog left on
+   * screen is reported by the poll (`noticeBlockingDialog`).
+   */
+  private trust(profile: ConfigProfile, record: CardRecord): void {
+    let trusted = false;
+    let error: string | undefined;
+    try {
+      trusted = trustWorktree(profile, this.options.deps.home, record.worktree);
+    } catch (e) {
+      error = errorMessage(e);
+    }
+    if (!trusted) {
+      this.options.log.warn('cards: could not trust the worktree', {
+        cardId: record.cardId,
+        profile: profile.id,
+        ...(error ? { error } : {}),
+      });
+    }
+  }
+
+  /**
    * #435: answers a known blocking dialog that needs no decision (see
    * `KNOWN_DIALOGS`) with the option that changes nothing. Never fails the
    * poll; permission prompts and unknown dialogs are left alone.
@@ -772,6 +822,63 @@ export class CardExecutor {
       }
     } catch (error) {
       this.options.log.warn('cards: answering a dialog failed', {
+        cardId: record.cardId,
+        error: errorMessage(error),
+      });
+    }
+  }
+
+  /**
+   * #624: a dialog the runner does not answer — the workspace trust dialog,
+   * any other launch dialog, an unlisted modal — reported as
+   * `card_run.dialog` once it has blocked the session for
+   * `CARD_DIALOG_WAIT_MS`, once per dialog shown. A pane without one forgets
+   * it. Steward, when on, observes dialogs instead.
+   */
+  private noticeBlockingDialog(record: CardRecord, pane: string): void {
+    const dialog = blockingDialogOf(pane);
+    if (dialog === null) {
+      this.dialogShown.delete(record.cardId);
+      return;
+    }
+    const { clock } = this.options.deps;
+    const key = `${record.runId}:${dialog}`;
+    const shown = this.dialogShown.get(record.cardId);
+    if (shown?.key !== key) {
+      this.dialogShown.set(record.cardId, {
+        key,
+        since: clock.now(),
+        reported: false,
+      });
+      return;
+    }
+    const wait = this.options.dialogWaitMs ?? CARD_DIALOG_WAIT_MS;
+    if (shown.reported || clock.now() - shown.since < wait) return;
+    shown.reported = true;
+    const at = isoNow(clock);
+    try {
+      this.options.emit({
+        v: 1,
+        ts: at,
+        type: 'card_run.dialog',
+        source: 'runner',
+        project: { repo: record.repo, root: record.root },
+        data: cardRunDialogDataSchema.parse({
+          cardId: record.cardId,
+          runId: record.runId,
+          projectId: record.projectId,
+          at,
+          dialog,
+        }),
+      });
+      this.options.log.warn('cards: a dialog blocks the session', {
+        cardId: record.cardId,
+        runId: record.runId,
+        dialog,
+      });
+    } catch (error) {
+      shown.reported = false;
+      this.options.log.warn('cards: reporting a blocking dialog failed', {
         cardId: record.cardId,
         error: errorMessage(error),
       });

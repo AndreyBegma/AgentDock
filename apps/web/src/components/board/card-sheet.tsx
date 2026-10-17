@@ -39,6 +39,7 @@ import {
   AUTO_COLLECT_LABEL,
   approveRunOffer,
   autoRunReason,
+  blockingDialogText,
   COLUMN_TITLE,
   canAccept,
   canDelete,
@@ -192,6 +193,11 @@ function roundItems(
             </span>
           ) : null}
           {round.error ? <PolicyRefusalText text={round.error} /> : null}
+          {round.blockingDialog ? (
+            <span className="text-warn">
+              {blockingDialogText(round.blockingDialog)}
+            </span>
+          ) : null}
           {round.finishRefused ? (
             <span className="text-danger">
               {finishRefusedText(round.finishRefused)}

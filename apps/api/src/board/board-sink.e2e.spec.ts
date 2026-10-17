@@ -213,6 +213,72 @@ describe('board sink (e2e)', () => {
     });
   });
 
+  describe('card_run.dialog (#624)', () => {
+    const dialog = (
+      card: { id: string },
+      runId: string,
+      name = 'trust',
+      projectId = w.a,
+    ) =>
+      w.deliver('card_run.dialog', {
+        cardId: card.id,
+        runId,
+        projectId,
+        at: new Date().toISOString(),
+        dialog: name,
+      });
+    const views = async () => {
+      const board = (await w.viewer.get(`${w.path()}/board`)).body as BoardView;
+      const brief = board.columns.flatMap((c) => c.cards)[0]?.round;
+      const detail = (await w.operator.get(`${w.path()}/board/cards/1`))
+        .body as BoardCardDetail;
+      return { brief, round: detail.rounds[detail.rounds.length - 1] };
+    };
+
+    it('a blocking dialog waits for the person with the dialog named, notified once; the answer runs again', async () => {
+      const { card, round, sessionId } = await running({ title: 'Add login' });
+      await phase(card, round.runId, { phase: 'running' });
+      await dialog(card, round.runId);
+      expect((await w.card(1)).rounds[0].phase).toBe('waiting');
+      expect(await runStatus(round.runId)).toBe('waiting_person');
+      let seen = await views();
+      expect(seen.brief?.blockingDialog).toBe('trust');
+      expect(seen.round?.blockingDialog).toBe('trust');
+      const [waiting] = await serverEvents('card.waiting');
+      expect(waiting).toMatchObject({ source: 'api' });
+      expect(waiting.data).toEqual({
+        cardId: card.id,
+        number: 1,
+        title: 'Add login',
+        round: 1,
+        reason: 'dialog',
+        dialog: 'trust',
+      });
+
+      await dialog(card, round.runId);
+      expect(await serverEvents('card.waiting')).toHaveLength(1);
+
+      // Answered: Claude Code submits the round's prompt.
+      await w.hook('hook.prompt_submitted', sessionId, { chars: 12 });
+      expect((await w.card(1)).rounds[0].phase).toBe('running');
+      seen = await views();
+      expect(seen.brief?.blockingDialog).toBeNull();
+      expect((await w.card(1)).rounds[0].blockingDialog).toBeNull();
+    });
+
+    it('ignores a dialog of an old run, another project or an ended round', async () => {
+      const { card, round } = await running();
+      await dialog(card, 'cm1run00000000000000000999');
+      await dialog(card, round.runId, 'trust', w.b);
+      expect((await w.card(1)).rounds[0].phase).toBe('starting');
+
+      await phase(card, round.runId, { phase: 'failed', error: 'gone' });
+      await dialog(card, round.runId);
+      expect((await w.card(1)).rounds[0].phase).toBe('failed');
+      expect(await serverEvents('card.waiting')).toEqual([]);
+    });
+  });
+
   describe('hooks of the card session (D6, D14)', () => {
     it('hook.stopped → waiting and card.waiting; hook.prompt_submitted → running', async () => {
       const { round, sessionId } = await running({ title: 'Add login' });

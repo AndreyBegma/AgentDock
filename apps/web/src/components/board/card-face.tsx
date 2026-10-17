@@ -11,6 +11,7 @@ import { dependencyChip, readinessChip } from '../../lib/board/dependencies';
 import {
   approveRunOffer,
   autoRunFailureText,
+  blockingDialogText,
   confidenceLabel,
   finishRefusedText,
   fleetHref,
@@ -209,6 +210,13 @@ export function CardFace({
             >
               {card.round.backgroundCommand}
             </span>
+          ) : null}
+          {card.round?.blockingDialog ? (
+            <Tooltip content={blockingDialogText(card.round.blockingDialog)}>
+              <span>
+                <Badge tone="warn" size="md" label="Dialog open" />
+              </span>
+            </Tooltip>
           ) : null}
           {card.round?.finishRefused ? (
             <Tooltip content={finishRefusedText(card.round.finishRefused)}>

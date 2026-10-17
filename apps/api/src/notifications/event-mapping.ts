@@ -1,4 +1,5 @@
 import {
+  blockingDialogText,
   CARD_BACKGROUND_STALLED_EVENT,
   CARD_FINISHED_EVENT,
   CARD_WAITING_EVENT,
@@ -15,6 +16,7 @@ import {
 import {
   API_EVENT_SOURCE,
   EVENTS_DUPLICATE_EVENT,
+  paneDialogSchema,
   parseFleetEvent,
   type RunnerEvent,
 } from '@agentdock/shared/protocol';
@@ -85,6 +87,18 @@ const asRecord = (value: unknown): Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
+
+/** Why a `card.waiting` round waits (#473, #624); a stop when unsaid. */
+const cardWaitingBody = (data: Record<string, unknown>): string => {
+  if (data.reason === 'question') {
+    return 'Its worker asks you a question in its session.';
+  }
+  if (data.reason === 'dialog') {
+    const dialog = paneDialogSchema.safeParse(data.dialog);
+    return blockingDialogText(dialog.success ? dialog.data : 'other');
+  }
+  return 'Its worker stopped and waits for a reply in its session.';
+};
 
 const positiveInt = (value: unknown): number | null => {
   if (typeof value === 'number' && Number.isInteger(value) && value > 0) {
@@ -265,11 +279,9 @@ export const draftFor = (event: MatchableEvent): NotificationDraft | null => {
           slot: null,
           issue: null,
           title: `${card} is waiting for you`,
-          // #473: a question the worker asks, or a stop.
-          body:
-            data.reason === 'question'
-              ? 'Its worker asks you a question in its session.'
-              : 'Its worker stopped and waits for a reply in its session.',
+          // #473: a question the worker asks, (#624) a dialog that blocks
+          // its session, or a stop.
+          body: cardWaitingBody(data),
           page: 'board',
           card: number,
         };
