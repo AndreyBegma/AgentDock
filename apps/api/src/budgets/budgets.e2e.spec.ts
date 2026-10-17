@@ -676,16 +676,14 @@ describe('budgets (e2e)', () => {
           principalId: operatorId,
         },
       });
-      const requestedAt = (
-        await ctx.prisma.commandRun.findUniqueOrThrow({
-          where: { id: fired.id },
-        })
-      ).requestedAt.getTime();
+      // The start is stamped with the wall clock; move it into the budget's day.
+      await ctx.prisma.commandRun.update({
+        where: { id: fired.id },
+        data: { requestedAt: new Date(NOW) },
+      });
       await arrive(
-        feed.session('orch', ROOT_A, iso(requestedAt + 5_000), {
-          projectId: a,
-        }),
-        feed.spend('orch', 'o1', iso(requestedAt + 6_000)),
+        feed.session('orch', ROOT_A, at(5), { projectId: a }),
+        feed.spend('orch', 'o1', at(6)),
       );
       const [row] = await period(budget.id);
       expect(row.spentUsd.toFixed(6)).toBe('1.500000');
