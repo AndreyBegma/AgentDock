@@ -8,10 +8,10 @@ import {
 } from './content';
 
 describe('canReadContent', () => {
-  test('operators and admins read; viewers and unknown do not', () => {
+  test('every member reads (ADR-0049); an unknown role does not', () => {
     expect(canReadContent('operator')).toBe(true);
     expect(canReadContent('admin')).toBe(true);
-    expect(canReadContent('viewer')).toBe(false);
+    expect(canReadContent('viewer')).toBe(true);
     expect(canReadContent(undefined)).toBe(false);
   });
 });

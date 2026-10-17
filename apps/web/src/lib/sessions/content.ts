@@ -14,11 +14,11 @@ export const CONTENT_KIND_LABEL: Record<SessionContentKind, string> = {
 };
 
 /**
- * Content is read by operators and admins only (ADR-0021); the API answers
- * 403 to a viewer, so the page does not ask.
+ * Every project member reads content (ADR-0049); the API answers 404 to a
+ * non-member, so the page does not ask without a role.
  */
 export const canReadContent = (role: Role | undefined): boolean =>
-  role === 'operator' || role === 'admin';
+  role !== undefined;
 
 /** `GET /projects/:projectId/sessions/:id/content`, with the cursor when paging. */
 export const contentPath = (
@@ -64,9 +64,6 @@ export const ownerLabel = (
 
 export function describeContentError(error: unknown): string {
   if (error instanceof ApiError) {
-    if (error.status === 403) {
-      return 'Only operators and admins can read session content.';
-    }
     if (error.status === 404) {
       return 'This session, or its project, does not exist for you.';
     }

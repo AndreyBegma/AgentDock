@@ -204,6 +204,15 @@ describe('action requests (e2e)', () => {
       expect((list.body as ActionRequestView[]).map((r) => r.id)).toEqual([
         request.id,
       ]);
+      const toolUse = await create('tool_use', {
+        toolName: 'Bash',
+        input: 'ls -la',
+      });
+      const all = await viewer.get(`/projects/${projectId}/action-requests`);
+      expect(
+        (all.body as ActionRequestView[]).find((r) => r.id === toolUse.id)?.args
+          .input,
+      ).toBe('ls -la');
 
       expect((await decide(viewer, request.id, 'approve')).status).toBe(403);
       expect((await decide(viewer, request.id, 'deny')).status).toBe(403);
@@ -347,6 +356,35 @@ describe('action requests (e2e)', () => {
       expect((await requests.status(projectId, request.id)).status).toBe(
         'denied',
       );
+    });
+
+    it("a viewer's list changes no rows and shows a due request as expired", async () => {
+      const request = await create('orchestrator_start', { mode: 'start' });
+      await ctx.prisma.actionRequest.update({
+        where: { id: request.id },
+        data: { expiresAt: new Date(Date.now() - 1_000) },
+      });
+      const before = await ctx.prisma.actionRequest.findMany({
+        orderBy: { id: 'asc' },
+      });
+      const base = `/projects/${projectId}/action-requests`;
+      const seen = async (query: string) =>
+        ((await viewer.get(`${base}${query}`)).body as ActionRequestView[])
+          .filter((r) => r.id === request.id)
+          .map((r) => r.status);
+      expect(await seen('')).toEqual(['expired']);
+      expect(await seen('?status=pending')).toEqual([]);
+      expect(await seen('?status=expired')).toEqual(['expired']);
+      expect((await requests.status(projectId, request.id)).status).toBe(
+        'expired',
+      );
+
+      const after = await ctx.prisma.actionRequest.findMany({
+        orderBy: { id: 'asc' },
+      });
+      expect(after).toEqual(before);
+      expect(after.find((r) => r.id === request.id)?.status).toBe('pending');
+      expect(await ctx.app.get(ActionRequestExpiryJob).sweep()).toBe(1);
     });
 
     it('expires pending requests past their deadline', async () => {

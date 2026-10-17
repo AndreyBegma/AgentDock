@@ -265,7 +265,7 @@ directories and never touch `cli.ts`.
 |---|---|---|
 | Each hook spawns the 70–85 MB Bun binary, adding latency | medium | Only `SessionStart` and `PermissionRequest` are sync. Measure cold start in the `runner-local` PR. If it exceeds 150 ms, a follow-up issue adds a small shell client for async hooks |
 | The `PermissionRequest` output schema differs from `PreToolUse` | medium | D17 marks it [Unknown]; `runner-local` is `opus` and pins a fixture test |
-| Redaction misses a secret and it lands in PostgreSQL | high | Opt-in per project; operator-only reads; retention; purge; plain warning in the UI (ADR-0021) |
+| Redaction misses a secret and it lands in PostgreSQL | high | Opt-in per project; member reads (ADR-0049); retention; purge; plain warning in the UI (ADR-0021) |
 | The pid ancestry walk fails on some shells or macOS versions | low | Cwd fallback (D10); MCP calls work without a session |
 | Settings `env` written by `setup` collides with the env of managed launches | low | `setup` writes only exporter keys whose values match the runner's own; never resource attributes |
 | OTel and transcript both deliver one request | medium | Acceptance criterion 9; if the API does not dedupe today, `api-sessions` adds a dedupe on `(sessionId, requestId)` |
