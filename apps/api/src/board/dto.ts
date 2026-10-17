@@ -22,7 +22,9 @@ import {
   type CaptureModel,
   type CardFeedbackRequest,
   type CreateBoardCardRequest,
+  type CreateBoardStackRequest,
   INTAKE_SPLIT_MAX,
+  MANUAL_STACK_CARDS_MIN,
   type MoveBoardCardRequest,
   type RunBoardCardRequest,
   STACK_BODY_MAX,
@@ -255,6 +257,33 @@ export class UpdateBoardStackDto implements UpdateBoardStackRequest {
   @IsString()
   @MaxLength(STACK_BODY_MAX)
   body?: string;
+}
+
+/** `POST /board/stacks` (#588): cards grouped by hand into one stage. */
+export class CreateBoardStackDto implements CreateBoardStackRequest {
+  @IsString()
+  @Matches(/\S/, { message: 'title must not be blank' })
+  @Matches(/^[^\r\n]*$/, { message: 'title must be one line' })
+  @MaxLength(STACK_TITLE_MAX)
+  title!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(STACK_BODY_MAX)
+  body?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  design?: boolean;
+
+  @IsArray()
+  @ArrayMinSize(MANUAL_STACK_CARDS_MIN)
+  @ArrayMaxSize(BULK_CARDS_MAX)
+  @ArrayUnique()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  @Max(999_999_999, { each: true })
+  cards!: number[];
 }
 
 /** `POST /board/stacks/:number/cards` (#480). */

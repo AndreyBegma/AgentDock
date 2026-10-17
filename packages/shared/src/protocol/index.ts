@@ -10,6 +10,7 @@ export * from './commands/docs';
 export * from './commands/github';
 export * from './commands/handoff';
 export * from './commands/planner';
+export * from './commands/project-rules';
 export * from './commands/queue';
 export * from './commands/session-message';
 export * from './commands/skills';

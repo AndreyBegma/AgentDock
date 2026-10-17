@@ -8,7 +8,7 @@ import { formatRelative, pluralize } from '../format';
 import { activeTurn, isActiveTurn } from '../planner/format';
 
 /**
- * A discussion (#590, ADR-0054): a `discuss`-mode plan — the person asks
+ * A discussion (#590, ADR-0055): a `discuss`-mode plan — the person asks
  * about the code or for an analysis, the planner replies, maybe with cards
  * worth making. No round limit and no required result. These helpers say
  * what its dialog shows and where it stands on the Drafts strip.

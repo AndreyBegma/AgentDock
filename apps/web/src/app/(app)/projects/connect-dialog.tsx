@@ -5,13 +5,16 @@ import type {
   ConnectProjectRequest,
   InspectProjectRequest,
   ProjectDetail,
+  ProjectRuleAcceptRequest,
+  ProjectRuleScanRequest,
+  ProjectRuleScanResult,
 } from '@agentdock/shared';
 import type { ProjectInspection } from '@agentdock/shared/protocol';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
 import { toast } from '@andrewbehma/glass-ui/toast';
-import { type FormEvent, useEffect, useState } from 'react';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { InstallGuideLink } from '../../../components/onboarding/runner-commands';
 import { DisabledReason } from '../../../components/prerequisites/disabled-reason';
 import { PrerequisiteBanner } from '../../../components/prerequisites/prerequisite-banner';
@@ -22,6 +25,11 @@ import {
   runnersFact,
 } from '../../../lib/prerequisites/facts';
 import {
+  initialCandidateSelection,
+  selectedCandidates,
+  withRuleCount,
+} from '../../../lib/project-rules/format';
+import {
   BASE_SOURCE_LABEL,
   connectBlocker,
   describeProjectError,
@@ -29,6 +37,7 @@ import {
   suggestedPathOf,
 } from '../../../lib/projects/format';
 import { DocsDetails } from './docs-details';
+import { RuleCandidateList } from './rule-candidates';
 
 const yesNo = (value: boolean) => (value ? 'found' : 'not found');
 
@@ -36,6 +45,70 @@ const yesNo = (value: boolean) => (value ? 'found' : 'not found');
 const RUNNERS_POLL_MS = 10_000;
 
 const REASON_ID = 'connect-project-reason';
+
+/** #584: the coding-rule scan that follows a successful Inspect. */
+type RuleScan =
+  | { status: 'idle' }
+  | { status: 'scanning' }
+  | { status: 'done'; result: ProjectRuleScanResult }
+  | { status: 'failed'; message: string };
+
+/**
+ * The scan's part of the preview. Nothing is stored here: the checked
+ * candidates become rules only once the project is connected.
+ */
+function RuleCandidates({
+  scan,
+  selected,
+  onSelect,
+  disabled,
+}: {
+  scan: RuleScan;
+  selected: ReadonlySet<number>;
+  onSelect: (next: Set<number>) => void;
+  disabled: boolean;
+}) {
+  switch (scan.status) {
+    case 'idle':
+      return null;
+    case 'scanning':
+      return (
+        <p role="status" className="text-sm text-ink-2">
+          Reading CLAUDE.md, AGENTS.md, CONTRIBUTING.md and linter configs…
+        </p>
+      );
+    case 'failed':
+      return (
+        <p role="status" className="text-sm text-ink-2">
+          The rule scan didn't finish, so you can still connect. Run it again
+          from Settings → Coding rules. ({scan.message})
+        </p>
+      );
+    case 'done':
+      if (scan.result.candidates.length === 0) {
+        return (
+          <p className="text-sm text-ink-2">
+            No coding rules found in this repository. Add them after connecting,
+            or import a Markdown file.
+          </p>
+        );
+      }
+      return (
+        <div className="flex flex-col gap-2" data-testid="rule-candidates">
+          <RuleCandidateList
+            candidates={scan.result.candidates}
+            selected={selected}
+            onChange={onSelect}
+            disabled={disabled}
+          />
+          <p className="text-xs text-ink-3">
+            Checked rules are created, enabled, when you connect. Unchecked ones
+            are not stored; scan again any time from Settings → Coding rules.
+          </p>
+        </div>
+      );
+  }
+}
 
 /** Above the form: why the runner list is empty, and the fix. */
 function NoOnlineRunner({ fleet }: { fleet: RunnersFact }) {
@@ -139,11 +212,24 @@ export function ConnectDialog({
   const [error, setError] = useState<string>();
   const [suggested, setSuggested] = useState<string>();
   const [busy, setBusy] = useState(false);
+  const [scan, setScan] = useState<RuleScan>({ status: 'idle' });
+  const [checked, setChecked] = useState<Set<number>>(new Set());
+  /** Only the newest scan may land: a path edit makes an older one stale. */
+  const scanSeq = useRef(0);
+
+  const resetScan = () => {
+    scanSeq.current += 1;
+    setScan({ status: 'idle' });
+    setChecked(new Set());
+  };
 
   useEffect(() => {
     if (!open) return;
     setPath('');
     setInspection(undefined);
+    scanSeq.current += 1;
+    setScan({ status: 'idle' });
+    setChecked(new Set());
     setError(undefined);
     setSuggested(undefined);
     let current = true;
@@ -189,14 +275,15 @@ export function ConnectDialog({
     setError(undefined);
     setSuggested(undefined);
     setInspection(undefined);
+    resetScan();
     try {
       const body: InspectProjectRequest = { runnerId, path: trimmed };
-      setInspection(
-        await api<ProjectInspection>('/admin/projects/inspect', {
-          method: 'POST',
-          body,
-        }),
-      );
+      const found = await api<ProjectInspection>('/admin/projects/inspect', {
+        method: 'POST',
+        body,
+      });
+      setInspection(found);
+      if (found.isMainCheckout) void scanRules(found.root);
     } catch (err) {
       setError(describeProjectError(err));
       setSuggested(suggestedPathOf(err));
@@ -205,18 +292,58 @@ export function ConnectDialog({
     }
   };
 
+  /** #584: candidates for the preview; a failure never blocks connecting. */
+  const scanRules = async (root: string) => {
+    const seq = ++scanSeq.current;
+    setScan({ status: 'scanning' });
+    try {
+      const body: ProjectRuleScanRequest = { runnerId, path: root };
+      const result = await api<ProjectRuleScanResult>(
+        '/admin/projects/rule-candidates',
+        { method: 'POST', body },
+      );
+      if (seq !== scanSeq.current) return;
+      setScan({ status: 'done', result });
+      setChecked(initialCandidateSelection(result.candidates));
+    } catch (err) {
+      if (seq !== scanSeq.current) return;
+      setScan({ status: 'failed', message: describeProjectError(err) });
+    }
+  };
+
+  const accepted =
+    scan.status === 'done'
+      ? selectedCandidates(scan.result.candidates, checked)
+      : [];
+
   const connect = async () => {
     if (!inspection) return;
     setBusy(true);
     try {
       const body: ConnectProjectRequest = { runnerId, path: inspection.root };
-      onConnected(
-        await api<ProjectDetail>('/admin/projects', { method: 'POST', body }),
-      );
+      const project = await api<ProjectDetail>('/admin/projects', {
+        method: 'POST',
+        body,
+      });
+      if (accepted.length > 0) {
+        try {
+          await api(`/projects/${project.id}/rules/accept`, {
+            method: 'POST',
+            body: { candidates: accepted } satisfies ProjectRuleAcceptRequest,
+          });
+        } catch (err) {
+          // The project is connected either way; the rules can be added later.
+          toast.error(
+            `The project is connected, but its coding rules were not added: ${describeProjectError(err)} Scan again from Settings → Coding rules.`,
+          );
+        }
+      }
+      onConnected(project);
     } catch (err) {
       setError(describeProjectError(err));
       setSuggested(suggestedPathOf(err));
       setInspection(undefined);
+      resetScan();
     } finally {
       setBusy(false);
     }
@@ -231,7 +358,9 @@ export function ConnectDialog({
       ? 'Pick a runner and enter a path, then Inspect.'
       : !inspection
         ? 'Inspect the path first; Connect uses what it finds.'
-        : null;
+        : scan.status === 'scanning'
+          ? 'Reading the coding rules the repository documents…'
+          : null;
 
   return (
     <DialogRoot
@@ -260,10 +389,17 @@ export function ConnectDialog({
             <Button
               variant="solid"
               onClick={connect}
-              disabled={busy || !inspection || blocker !== null}
+              disabled={
+                busy ||
+                !inspection ||
+                blocker !== null ||
+                scan.status === 'scanning'
+              }
               aria-describedby={reason ? REASON_ID : undefined}
             >
-              Connect
+              {accepted.length > 0
+                ? withRuleCount('Connect with', accepted.length)
+                : 'Connect'}
             </Button>
           </>
         }
@@ -282,6 +418,7 @@ export function ConnectDialog({
                 onChange={(e) => {
                   setRunnerId(e.target.value);
                   setInspection(undefined);
+                  resetScan();
                 }}
                 disabled={runners.length === 0}
               >
@@ -309,6 +446,7 @@ export function ConnectDialog({
                 onChange={(e) => {
                   setPath(e.target.value);
                   setInspection(undefined);
+                  resetScan();
                 }}
               />
             </Field>
@@ -361,6 +499,12 @@ export function ConnectDialog({
                 </div>
               ) : null}
               <Preview inspection={inspection} />
+              <RuleCandidates
+                scan={scan}
+                selected={checked}
+                onSelect={setChecked}
+                disabled={busy}
+              />
             </>
           ) : null}
 

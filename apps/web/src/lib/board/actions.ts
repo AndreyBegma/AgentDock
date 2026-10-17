@@ -18,6 +18,7 @@ import type {
   ClaimAttachmentsRequest,
   CollectBoardCardResponse,
   CreateBoardCardRequest,
+  CreateBoardStackRequest,
   DismissAllResult,
   MoveBoardCardRequest,
   RunBoardCardRequest,
@@ -185,6 +186,10 @@ export const saveBoardSettings = (
 
 const stackPath = (projectId: string, number: number) =>
   `${base(projectId)}/stacks/${number}`;
+
+/** #588: cards grouped by hand into a new one-stage stack. */
+export const createStack = (projectId: string, body: CreateBoardStackRequest) =>
+  api<BoardStackDetail>(`${base(projectId)}/stacks`, { method: 'POST', body });
 
 export const fetchStack = (projectId: string, number: number) =>
   api<BoardStackDetail>(stackPath(projectId, number));

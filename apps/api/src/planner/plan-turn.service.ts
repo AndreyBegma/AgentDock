@@ -223,7 +223,7 @@ export class PlanTurnService {
   }
 
   /**
-   * #590 (ADR-0054): a discussion turn answers the person's message — any
+   * #590 (ADR-0055): a discussion turn answers the person's message — any
    * number of them, none required to end in a card. The first turn, started
    * with the discussion, answers its opening (the brief) and takes no
    * message; every later one needs one. Answers, Enough, Keep one card and

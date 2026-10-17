@@ -2305,7 +2305,7 @@ model GitHubProjectHealth {
 // ─── Planner (spec 172) ─────────────────────────────────────────────────────
 
 /// Shared `PLAN_MODES` (D2; `card`: #337 D1, a New Card intake; `discuss`:
-/// #590, a discussion, ADR-0054).
+/// #590, a discussion, ADR-0055).
 enum PlanMode {
   batch
   dialogue
@@ -3393,6 +3393,8 @@ enum TextOwnerType {
   plan
   plan_task
   plan_turn
+  /// #584: a rule created from a scanned candidate.
+  project_rule
 }
 
 /// Shared `TEXT_NORMALIZATION_STATUSES`.
@@ -3437,6 +3439,7 @@ model TextNormalization {
   planId        String?
   taskId        String?
   turnId        String?
+  ruleId        String?
   /// `[{field, original, sourceHash, english?, outcome?}]` (shared `textFieldsSchema`).
   fields        Json
   /// D9: the request also asks for the card's kind.
@@ -3469,6 +3472,7 @@ model TextNormalization {
   plan    Plan?           @relation(fields: [planId], references: [id], onDelete: Cascade)
   task    PlanTask?       @relation(fields: [taskId], references: [id], onDelete: Cascade)
   turn    PlanTurn?       @relation(fields: [turnId], references: [id], onDelete: Cascade)
+  rule    ProjectRule?    @relation(fields: [ruleId], references: [id], onDelete: Cascade)
   run     Run?            @relation(fields: [runId], references: [id], onDelete: SetNull)
   author  User?           @relation(fields: [authorId], references: [id], onDelete: SetNull)
 
@@ -3478,6 +3482,7 @@ model TextNormalization {
   @@index([planId, createdAt])
   @@index([taskId, createdAt])
   @@index([turnId, createdAt])
+  @@index([ruleId, createdAt])
   @@index([projectId, status])
   @@map("text_normalizations")
 }
@@ -3721,7 +3726,8 @@ model ProjectRule {
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project            Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  textNormalizations TextNormalization[]
 
   @@index([projectId, position])
   @@map("project_rules")

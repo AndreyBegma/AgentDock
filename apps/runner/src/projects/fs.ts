@@ -19,8 +19,10 @@ export interface DirEntry {
  * `null` / `[]` for a path that cannot be read, never throws.
  */
 export interface ProjectFs {
-  /** Follows symlinks. */
-  stat(path: string): { isDirectory: boolean; isFile: boolean } | null;
+  /** Follows symlinks. `size` is in bytes. */
+  stat(
+    path: string,
+  ): { isDirectory: boolean; isFile: boolean; size?: number } | null;
   /** Does not follow symlinks. */
   isSymbolicLink(path: string): boolean;
   realpath(path: string): string | null;
@@ -40,7 +42,11 @@ export const nodeFs: ProjectFs = {
   stat: (path) =>
     orNull(() => {
       const s = statSync(path);
-      return { isDirectory: s.isDirectory(), isFile: s.isFile() };
+      return {
+        isDirectory: s.isDirectory(),
+        isFile: s.isFile(),
+        size: s.size,
+      };
     }),
   isSymbolicLink: (path) =>
     orNull(() => lstatSync(path).isSymbolicLink()) ?? false,

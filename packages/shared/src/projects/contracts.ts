@@ -21,6 +21,8 @@ export const PROJECT_ERROR = {
   runnerTimeout: 'runner_timeout',
   /** The runner answered with an error not mapped to its own code. */
   runnerError: 'runner_error',
+  /** The runner's hello says it does not serve the command (ADR-0023). */
+  runnerOutdated: 'runner_outdated',
   /** The path does not exist, or is not a directory. */
   pathNotFound: 'path_not_found',
   /** The path is not inside a git working tree. */

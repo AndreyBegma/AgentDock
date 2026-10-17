@@ -24,7 +24,7 @@ import { ProjectsService } from './projects.service';
   ],
   // #11–#13 import this module and put `@UseGuards(ProjectAccessGuard)` and
   // `@ProjectRole()` on their `:projectId` routes (spec 10 D12).
-  exports: [ProjectAccessService, ProjectAccessGuard],
+  exports: [ProjectAccessService, ProjectAccessGuard, ProjectInspector],
 })
 export class ProjectsModule implements OnModuleInit {
   constructor(

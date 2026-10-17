@@ -62,6 +62,7 @@ import { planHref } from '../../lib/planner/href';
 import { boardColumnWidth, usePhone, visibleColumns } from './board-layout';
 import { BulkActionBar } from './bulk-action-bar';
 import { CardFace } from './card-face';
+import { GroupStackDialog } from './group-stack-dialog';
 import { MovePicker } from './move-picker';
 import { PlanTaskFace } from './plan-task-face';
 import { StackFace } from './stack-face';
@@ -144,6 +145,8 @@ export function BoardColumns({
 
   // #452: cards selected for a bulk action, across columns.
   const [selection, setSelection] = useState<CardSelection>(NO_SELECTION);
+  // #588: the Group into stack dialog, over the selection.
+  const [grouping, setGrouping] = useState(false);
   const anchor = useRef<{ number: number; column: string } | undefined>(
     undefined,
   );
@@ -537,8 +540,28 @@ export function BoardColumns({
           busy={bulk.busy || busy}
           onClear={clearSelection}
           onAction={(action) => bulk.run(action, selectedCards)}
+          onGroup={() => setGrouping(true)}
         />
       ) : null}
+      <GroupStackDialog
+        projectId={projectId}
+        cards={selectedCards}
+        open={grouping}
+        onOpenChange={setGrouping}
+        onGrouped={(stack) => {
+          setGrouping(false);
+          clearSelection();
+          onReload();
+          toast.success(`Grouped ${stack.total} cards into ${stack.label}`, {
+            description: `${stack.title} · one stage, ${stack.design ? 'shared design waits for approval' : 'no shared design'}. Each card still runs on its own.`,
+            action: {
+              label: 'Open stack',
+              onClick: () =>
+                router.push(boardStackPageHref(projectId, stack.number)),
+            },
+          });
+        }}
+      />
 
       {move.dialogs}
       {moving ? (

@@ -67,6 +67,59 @@ export interface ProjectRuleImportResult {
   skippedTitles: string[];
 }
 
+/**
+ * A coding-rule candidate the scan found (#584), not stored: it becomes a
+ * rule only when a person accepts it. `duplicate` marks a title already on
+ * the project — as it is now, or as it was typed before its translation to
+ * English — so a rescan never offers it checked.
+ */
+export interface ProjectRuleCandidateView {
+  title: string;
+  description: string;
+  /** The file it was read from, relative to the project root. */
+  source: string;
+  duplicate: boolean;
+}
+
+/**
+ * `POST /admin/projects/rule-candidates` (before connect) and
+ * `POST /projects/:id/rules/scan` (a rescan).
+ */
+export interface ProjectRuleScanResult {
+  candidates: ProjectRuleCandidateView[];
+  /** The files read, relative to the root. */
+  scanned: string[];
+  /** Files skipped and why. */
+  warnings: string[];
+}
+
+/** `POST /admin/projects/rule-candidates`: the same fields as an inspect. */
+export interface ProjectRuleScanRequest {
+  runnerId: string;
+  path: string;
+}
+
+/** One candidate a person accepted. */
+export interface ProjectRuleCandidateInput {
+  title: string;
+  description: string;
+  source: string;
+}
+
+/**
+ * `POST /projects/:id/rules/accept`: the accepted candidates become enabled
+ * rules with source `scanned`, in this order; a title already on the project
+ * is skipped. The answer is shaped like an import's.
+ */
+export interface ProjectRuleAcceptRequest {
+  candidates: ProjectRuleCandidateInput[];
+}
+
+/** An accept carries at most what one scan can answer. */
+export const PROJECT_RULE_ACCEPT_MAX = 100;
+/** `ProjectRuleCandidateInput.source`, in characters. */
+export const PROJECT_RULE_SOURCE_MAX = 200;
+
 export const PROJECT_RULE_ERROR = {
   notFound: 'not_found',
   /** A reorder that does not list every rule of the project exactly once. */

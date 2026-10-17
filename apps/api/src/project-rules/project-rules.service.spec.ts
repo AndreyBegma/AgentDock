@@ -1,3 +1,4 @@
+import { textSourceHash } from '@agentdock/shared';
 import type { HttpException } from '@nestjs/common';
 import type { ProjectRule } from '@prisma/client';
 import type { AuditService } from '../audit/audit.service';
@@ -89,11 +90,19 @@ const fakePrisma = () => {
       },
     ),
   };
+  /** `project_rule` normalization rows: their project and title originals. */
+  const normalizations: { projectId: string; fields: unknown }[] = [];
+  const textNormalization = {
+    findMany: jest.fn(async ({ where }: { where: { projectId: string } }) =>
+      normalizations.filter((n) => n.projectId === where.projectId),
+    ),
+  };
   const prisma = {
     projectRule,
+    textNormalization,
     $transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
   };
-  return { prisma, rows: () => sorted(rows) };
+  return { prisma, rows: () => sorted(rows), normalizations };
 };
 
 const setup = () => {
@@ -372,6 +381,98 @@ describe('ProjectRulesService (#528)', () => {
         skippedTitles: [],
       });
       expect(db.prisma.$transaction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('addScanned (#584)', () => {
+    const scanned = (title: string, description = '') => ({
+      title,
+      description,
+      source: 'CLAUDE.md',
+    });
+
+    it('appends the accepted candidates as enabled scanned rules, in order', async () => {
+      const { service, audit } = setup();
+      await service.create(A, { title: 'Existing', enabled: false }, ctx);
+
+      const result = await service.addScanned(
+        A,
+        [scanned('Use Bun', 'Never npm.'), scanned('Biome only')],
+        ctx,
+      );
+
+      expect(result).toMatchObject({ created: 2, skipped: 0 });
+      expect(
+        (await service.list(A)).map((r) => [
+          r.title,
+          r.enabled,
+          r.position,
+          r.source,
+        ]),
+      ).toEqual([
+        ['Existing', false, 0, 'manual'],
+        ['Use Bun', true, 1, 'scanned'],
+        ['Biome only', true, 2, 'scanned'],
+      ]);
+      expect(audit.record).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          action: 'project.update',
+          meta: { rules: 'scan', skipped: 0, sources: ['CLAUDE.md'] },
+        }),
+      );
+    });
+
+    it('never duplicates a rule: a taken title, its pre-translation original, or a repeat', async () => {
+      const { service, db } = setup();
+      await service.create(A, { title: 'Use Bun' }, ctx);
+      await service.create(B, { title: 'Biome only' }, ctx);
+      db.normalizations.push({
+        projectId: A,
+        fields: [
+          {
+            field: 'title',
+            original: 'Только pnpm',
+            sourceHash: textSourceHash('Только pnpm'),
+          },
+        ],
+      });
+
+      const result = await service.addScanned(
+        A,
+        [
+          scanned('use  BUN'),
+          scanned('только PNPM'),
+          scanned('Biome only'),
+          scanned('biome ONLY'),
+        ],
+        ctx,
+      );
+
+      expect(result.created).toBe(1);
+      expect(result.skippedTitles).toEqual([
+        'use  BUN',
+        'только PNPM',
+        'biome ONLY',
+      ]);
+      expect((await service.list(A)).map((r) => r.title)).toEqual([
+        'Use Bun',
+        'Biome only',
+      ]);
+    });
+
+    it('writes and audits nothing when every candidate is taken', async () => {
+      const { service, db, audit } = setup();
+      await service.create(A, { title: 'Use Bun' }, ctx);
+      audit.record.mockClear();
+
+      expect(await service.addScanned(A, [scanned('Use Bun')], ctx)).toEqual({
+        created: 0,
+        skipped: 1,
+        rules: [],
+        skippedTitles: ['Use Bun'],
+      });
+      expect(db.prisma.$transaction).not.toHaveBeenCalled();
+      expect(audit.record).not.toHaveBeenCalled();
     });
   });
 });

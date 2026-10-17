@@ -1,15 +1,20 @@
 import {
+  PROJECT_RULE_ACCEPT_MAX,
   PROJECT_RULE_DESCRIPTION_MAX,
   PROJECT_RULE_IMPORT_MAX,
+  PROJECT_RULE_SOURCE_MAX,
   PROJECT_RULE_TITLE_MAX,
+  type ProjectRuleAcceptRequest,
+  type ProjectRuleCandidateInput,
   type ProjectRuleCreateRequest,
   type ProjectRuleImportRequest,
   type ProjectRuleReorderRequest,
   type ProjectRuleUpdateRequest,
 } from '@agentdock/shared';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
+  ArrayMinSize,
   ArrayUnique,
   IsArray,
   IsBoolean,
@@ -17,6 +22,7 @@ import {
   IsOptional,
   IsString,
   MaxLength,
+  ValidateNested,
 } from 'class-validator';
 
 /** A project has far fewer rules; the cap only bounds the request. */
@@ -82,4 +88,33 @@ export class ProjectRuleImportDto implements ProjectRuleImportRequest {
   @IsString()
   @MaxLength(PROJECT_RULE_IMPORT_MAX)
   markdown!: string;
+}
+
+/** One accepted scan candidate (#584). */
+export class ProjectRuleCandidateDto implements ProjectRuleCandidateInput {
+  @IsString()
+  @Transform(trim)
+  @IsNotEmpty()
+  @MaxLength(PROJECT_RULE_TITLE_MAX)
+  title!: string;
+
+  @IsString()
+  @Transform(trim)
+  @MaxLength(PROJECT_RULE_DESCRIPTION_MAX)
+  description!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(PROJECT_RULE_SOURCE_MAX)
+  source!: string;
+}
+
+/** `POST /projects/:id/rules/accept`. */
+export class ProjectRuleAcceptDto implements ProjectRuleAcceptRequest {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(PROJECT_RULE_ACCEPT_MAX)
+  @ValidateNested({ each: true })
+  @Type(() => ProjectRuleCandidateDto)
+  candidates!: ProjectRuleCandidateDto[];
 }

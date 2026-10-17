@@ -1,4 +1,4 @@
-# ADR-0054: A discussion is a plan that never makes a card
+# ADR-0055: A discussion is a plan that never makes a card
 
 Status: accepted · Date: 2026-10-17 · Extends [ADR-0034](0034-the-planner-lives-on-the-board-and-makes-cards.md), [ADR-0037](0037-new-work-is-one-intake-that-can-split.md) ·
 Issue: [#590](https://github.com/AndreyBegma/AgentDock/issues/590) ·
