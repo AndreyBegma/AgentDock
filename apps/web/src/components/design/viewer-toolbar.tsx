@@ -185,7 +185,7 @@ export function ViewerToolbar({
                   type="button"
                   aria-pressed={active}
                   title={`${vp.width} × ${vp.height}`}
-                  className="inline-flex min-h-(--size-tap) items-center gap-1.5 px-3 text-sm whitespace-nowrap"
+                  className="inline-flex min-h-(--size-tap) items-center gap-1.5 px-2 text-sm whitespace-nowrap"
                   onClick={() =>
                     onChange({ kind: 'viewport', viewport: vp, fit: true })
                   }
@@ -211,7 +211,7 @@ export function ViewerToolbar({
           </Button>
           <Button
             variant="ghost"
-            className="h-11 px-1 tabular-nums"
+            className="h-11 px-0 tabular-nums"
             aria-label="Fit to screen"
             aria-pressed={state.zoom === 'fit'}
             onClick={() => onChange({ kind: 'zoom', zoom: 'fit' })}
