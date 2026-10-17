@@ -6,8 +6,8 @@ import {
 } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
-import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Field, Textarea } from '@andrewbehma/glass-ui/field';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
@@ -33,10 +33,15 @@ import {
   STATUS_LABEL,
   STATUS_TONE,
   secondsLeft,
-  toolUseArgs,
 } from '../../lib/approvals/action-requests';
+import {
+  reviewToolUse,
+  stepFor,
+  toolUseConfirmable,
+} from '../../lib/approvals/tool-use-review';
 import { Time } from '../../lib/format/time';
 import { useErrorToast } from '../../lib/section/use-error-toast';
+import { RevealedInput, ToolUseDialogBody } from './tool-use-review';
 
 type Decision = 'approve' | 'deny';
 
@@ -44,7 +49,7 @@ type Decision = 'approve' | 'deny';
 const TICK_MS = 1_000;
 
 function RequestCell({ request }: { request: ActionRequestSummary }) {
-  const tool = toolUseArgs(request);
+  const review = reviewToolUse(request);
   const pr = prApproveArgs(request);
   const issue = issueQueueArgs(request);
   return (
@@ -87,9 +92,9 @@ function RequestCell({ request }: { request: ActionRequestSummary }) {
           {request.summary}
         </span>
       ) : null}
-      {/* Redacted by the runner, still untrusted: shown as text. */}
-      {tool?.input ? (
-        <CodeBlock code={tool.input} wrap maxHeight={120} copy={false} />
+      {/* Redacted by the runner, still untrusted: shown as text, odd characters marked. */}
+      {review && review.segments.length > 0 ? (
+        <RevealedInput segments={review.segments} className="max-h-32" />
       ) : null}
     </div>
   );
@@ -142,6 +147,7 @@ export function ActionRequestsPanel({
     decision: Decision;
   }>();
   const [note, setNote] = useState('');
+  const [typed, setTyped] = useState('');
   const [busy, setBusy] = useState(false);
   const showError = useErrorToast();
 
@@ -176,21 +182,28 @@ export function ActionRequestsPanel({
       setBusy(false);
       setAsking(undefined);
       setNote('');
+      setTyped('');
       // A refusal such as "already decided" leaves the list stale too.
       onChanged();
     }
   };
 
   const ask = (request: ActionRequestSummary, decision: Decision) => {
-    // A tool answer is cheap and time-boxed (5 min): approving it is one click.
-    if (decision === 'approve' && request.kind === 'tool_use') {
+    // Denying a tool is one click; approving one is not, see the tool dialog.
+    if (stepFor(request, decision) === 'decide') {
       void decide(request, decision, '');
       return;
     }
     setNote('');
+    setTyped('');
     setAsking({ request, decision });
   };
 
+  const toolAsk =
+    asking?.decision === 'approve' && asking.request.kind === 'tool_use'
+      ? asking.request
+      : undefined;
+  const toolReview = toolAsk ? reviewToolUse(toolAsk) : null;
   const verb = asking?.decision === 'approve' ? 'Approve' : 'Deny';
 
   return (
@@ -296,8 +309,55 @@ export function ActionRequestsPanel({
         </section>
       ) : null}
 
+      {/* C-115: a tool is approved only here, with its whole input in view. */}
+      <DialogRoot
+        open={toolAsk !== undefined}
+        onOpenChange={(open) => {
+          if (!open && !busy) setAsking(undefined);
+        }}
+      >
+        <DialogContent
+          title={toolReview?.title ?? 'Approve this tool call?'}
+          dismissible={!busy}
+          footer={
+            <>
+              <Button
+                variant="ghost"
+                disabled={busy}
+                onClick={() => setAsking(undefined)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="solid"
+                disabled={
+                  busy || !toolReview || !toolUseConfirmable(toolReview, typed)
+                }
+                onClick={() => {
+                  if (toolAsk) void decide(toolAsk, 'approve', '');
+                }}
+              >
+                Approve
+              </Button>
+            </>
+          }
+        >
+          {toolReview ? (
+            <ToolUseDialogBody
+              review={toolReview}
+              typed={typed}
+              onTyped={setTyped}
+            />
+          ) : (
+            <p>
+              This request’s input could not be read, so it cannot be approved.
+            </p>
+          )}
+        </DialogContent>
+      </DialogRoot>
+
       <ConfirmDialog
-        open={asking !== undefined}
+        open={asking !== undefined && toolAsk === undefined}
         onOpenChange={(open) => {
           if (!open) setAsking(undefined);
         }}

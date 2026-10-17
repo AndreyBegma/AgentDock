@@ -54,10 +54,18 @@ describe('toolUseArgs', () => {
   test('reads the tool and the redacted input', () => {
     expect(
       toolUseArgs(row({ args: { toolName: 'Bash', input: 'ls -la' } })),
-    ).toEqual({ toolName: 'Bash', input: 'ls -la' });
+    ).toEqual({ toolName: 'Bash', input: 'ls -la', truncated: false });
     expect(toolUseArgs(row({ args: { toolName: 'Read' } }))).toEqual({
       toolName: 'Read',
+      truncated: false,
     });
+  });
+  test('reads the runner’s truncated flag apart from the strict schema', () => {
+    expect(
+      toolUseArgs(
+        row({ args: { toolName: 'Bash', input: 'ls', truncated: true } }),
+      )?.truncated,
+    ).toBe(true);
   });
   test('is null for other kinds and for malformed args', () => {
     expect(
