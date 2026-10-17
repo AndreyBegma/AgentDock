@@ -29,7 +29,10 @@ import {
   ProjectAccessGuard,
   type ResolvedProjectAccess,
 } from '../projects';
-import type { RawBodyRequest } from '../webhooks/common';
+import {
+  HookFailureThrottleGuard,
+  type RawBodyRequest,
+} from '../webhooks/common';
 import {
   GitHubAppCredentialsDto,
   GitHubCallbackQuery,
@@ -44,6 +47,7 @@ import { GitHubRegistrationService } from './github-registration.service';
  * any poll is sent (D6); the polls and resyncs run after the response.
  */
 @Controller('hooks/github')
+@UseGuards(HookFailureThrottleGuard)
 export class GitHubHookController {
   constructor(private readonly hooks: GitHubHookService) {}
 

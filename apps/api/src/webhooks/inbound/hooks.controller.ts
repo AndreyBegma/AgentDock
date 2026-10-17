@@ -1,8 +1,16 @@
 import { type InboundHookAccepted, WEBHOOK_HEADERS } from '@agentdock/shared';
-import { Controller, HttpCode, Param, Post, Req, Res } from '@nestjs/common';
+import {
+  Controller,
+  HttpCode,
+  Param,
+  Post,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { Public } from '../../auth';
-import type { RawBodyRequest } from '../common';
+import { HookFailureThrottleGuard, type RawBodyRequest } from '../common';
 import { InboundHookService } from './inbound-hook.service';
 import { TriggerFirer } from './trigger-firer';
 
@@ -11,6 +19,7 @@ import { TriggerFirer } from './trigger-firer';
  * Signed, rate limited, and answered 202 before anything is sent to a runner.
  */
 @Controller('hooks')
+@UseGuards(HookFailureThrottleGuard)
 export class HooksController {
   constructor(
     private readonly hooks: InboundHookService,

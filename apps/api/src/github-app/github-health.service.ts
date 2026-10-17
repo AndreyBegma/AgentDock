@@ -18,6 +18,7 @@ import {
 } from './github-app-options';
 import { GitHubAppStore } from './github-app-store';
 import { computeProjectHealth, type HealthInstallation } from './github-health';
+import { SignatureFailureTracker } from './signature-failure-tracker';
 
 /** Deliveries ask for a recompute; requests within this window share one. */
 const RECOMPUTE_COALESCE_MS = 1_000;
@@ -43,6 +44,7 @@ export class GitHubHealthService
     private readonly prisma: PrismaService,
     private readonly store: GitHubAppStore,
     private readonly watchList: RunnerWatchList,
+    private readonly failures: SignatureFailureTracker,
     private readonly scheduler: SchedulerRegistry,
     @Inject(GITHUB_APP_OPTIONS) private readonly options: GitHubAppOptions,
   ) {}
@@ -113,7 +115,7 @@ export class GitHubHealthService
   }
 
   private async recomputeNow(now: Date): Promise<void> {
-    const [app, projects, repos, deliveries, stored] = await Promise.all([
+    const [row, projects, repos, deliveries, stored] = await Promise.all([
       this.store.load(),
       this.prisma.project.findMany({
         select: { id: true, repo: true, runnerId: true },
@@ -134,6 +136,12 @@ export class GitHubHealthService
       this.prisma.gitHubProjectHealth.findMany(),
     ]);
 
+    const failed = this.failures.snapshot(now);
+    const app = row && {
+      ...row,
+      recentSignatureFailures: failed.recent,
+      lastSignatureFailureAt: failed.lastAt ?? row.lastSignatureFailureAt,
+    };
     const lastDelivery = new Map<number, Date | null>(
       deliveries.map((d) => [d.installationId ?? -1, d._max.receivedAt]),
     );

@@ -19,6 +19,7 @@ import { GitHubHookService } from './github-hook.service';
 import { GitHubInstallationsService } from './github-installations.service';
 import { GitHubRegistrationService } from './github-registration.service';
 import { GitHubRetentionJob } from './github-retention.job';
+import { SignatureFailureTracker } from './signature-failure-tracker';
 
 /**
  * The instance's read-only GitHub App (docs/specs/27-github-app.md): turns
@@ -46,6 +47,7 @@ import { GitHubRetentionJob } from './github-retention.job';
     GitHubInstallationsService,
     GitHubRegistrationService,
     GitHubRetentionJob,
+    SignatureFailureTracker,
   ],
 })
 export class GitHubAppModule {}
