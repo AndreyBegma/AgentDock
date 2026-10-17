@@ -498,10 +498,11 @@ export class BoardStacks {
   }
 
   /**
-   * Run's check (ADR-0044): a card of a stack whose design is needed and not
-   * approved does not run — nothing writes project code before it is.
+   * ADR-0044: a card of a stack whose design is needed and not approved does
+   * not run — nothing writes project code before it is — and does not draw
+   * its own design, whose turn builds on the stack's approved one (#527).
    */
-  async assertRunnable(cardId: string): Promise<void> {
+  async assertStackApproved(cardId: string): Promise<void> {
     const ref = (await this.refsOf([cardId])).get(cardId);
     if (!ref?.gate) return;
     throw boardError(

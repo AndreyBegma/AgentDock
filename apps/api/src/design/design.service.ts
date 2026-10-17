@@ -21,6 +21,7 @@ import { CardAssessor } from '../assess/card-assessor';
 import { AuditService } from '../audit/audit.service';
 import { autoRunFailureOf, cardNotFound } from '../board/board-error';
 import { BoardRoundsService } from '../board/board-rounds.service';
+import { BoardStacks } from '../board/board-stacks';
 import { PrismaService } from '../database/prisma.service';
 import { CardDesignTurnService } from '../planner/card-design-turn.service';
 import { callerOf, type PlanActor } from '../planner/plan.service';
@@ -85,6 +86,7 @@ export class DesignService implements OnModuleInit {
     private readonly cardTurns: CardDesignTurnService,
     private readonly stackTurns: StackDesignTurnService,
     private readonly rounds: BoardRoundsService,
+    private readonly stacks: BoardStacks,
     private readonly profiles: UiProfileService,
     private readonly audit: AuditService,
     private readonly commands: DesignCommands,
@@ -227,6 +229,7 @@ export class DesignService implements OnModuleInit {
     launch: CardDesignLaunchRequest = {},
   ): Promise<void> {
     const owner = await this.cardOwner(projectId, number);
+    await this.stacks.assertStackApproved(owner.target.id);
     await this.rememberLaunch(owner, projectId, number, launch);
     await this.generateOf(owner, actor);
   }
@@ -238,6 +241,7 @@ export class DesignService implements OnModuleInit {
     launch: CardDesignLaunchRequest = {},
   ): Promise<void> {
     const owner = await this.cardOwner(projectId, number);
+    await this.stacks.assertStackApproved(owner.target.id);
     await this.rememberLaunch(owner, projectId, number, launch);
     await this.reviseOf(owner, actor);
   }

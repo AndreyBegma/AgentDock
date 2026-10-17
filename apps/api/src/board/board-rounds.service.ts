@@ -201,7 +201,7 @@ export class BoardRoundsService {
       );
     }
     // #480 (ADR-0044): no card of a stack runs before its design is approved.
-    await this.stacks.assertRunnable(card.id);
+    await this.stacks.assertStackApproved(card.id);
     // #337 D8: an open dependency warns; the person may run anyway.
     await this.dependencies.assertRunnable(
       card.id,
