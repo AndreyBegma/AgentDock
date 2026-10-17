@@ -1,4 +1,3 @@
-import { ACTION_REQUEST_TOOL_INPUT_MAX } from '@agentdock/shared';
 import {
   cardRunFinishRefusedDataSchema,
   EVENT_SCHEMA_VERSION,
@@ -18,7 +17,7 @@ import { correlateCwd } from '../adapters/correlate';
 import type { CardRecord } from '../cards/record';
 import { errorMessage, type Logger } from '../log';
 import type { EnvelopeProject } from '../otlp/map';
-import { toHookContent } from './redact';
+import { toHookContent, toToolInputPreview } from './redact';
 import {
   cwdWithin,
   type SessionBinding,
@@ -99,7 +98,13 @@ const shipsContent = (
 
 const toolUseArgsSchema = z.looseObject({
   kind: z.literal('tool_use'),
-  args: z.looseObject({ input: z.unknown().optional() }),
+  args: z.looseObject({
+    input: z.unknown().optional(),
+    truncated: z.unknown().optional(),
+    fullLength: z.unknown().optional(),
+    sha256: z.unknown().optional(),
+    preview: z.unknown().optional(),
+  }),
 });
 
 /** A caller the daemon will not act for (#113). */
@@ -109,12 +114,6 @@ const refused = (
   ok: false,
   error: { code: 'forbidden', message },
 });
-
-/** Cuts a redacted tool input to the action request's limit (D17). */
-const capToolInput = (text: string): string =>
-  text.length > ACTION_REQUEST_TOOL_INPUT_MAX
-    ? `${text.slice(0, ACTION_REQUEST_TOOL_INPUT_MAX - 1)}…`
-    : text;
 
 /**
  * The daemon's side of the local socket (spec 201 D5, D6, D9, D10, D13).
@@ -369,7 +368,7 @@ export class LocalService {
     const projectId = correlateCwd(binding.cwd, projects).projectId;
     const result = await this.deps.relay({
       method: input.method,
-      args: this.gate(input, shipsContent(projectId, projects)),
+      args: this.gate(input),
       ...(projectId ? { projectId } : {}),
       session: { runtime: 'claude', id: binding.sessionId },
       via: input.via,
@@ -412,25 +411,32 @@ export class LocalService {
   }
 
   /**
-   * A `tool_use` action request carries the tool input only for a project
-   * that ships content, redacted and cut to 500 characters (D17).
+   * A `tool_use` action request always carries the redacted tool input —
+   * a security control, not content, so independent of content shipping
+   * (C-114, D-08): whole, or head and tail with `fullLength` and `sha256`
+   * of the full redacted input. Without one it is marked `preview: 'none'`.
+   * What the caller claims about the preview is dropped and recomputed.
    */
-  private gate(input: LocalRequestArgs, ships: boolean): unknown {
+  private gate(input: LocalRequestArgs): unknown {
     if (input.method !== 'action.request') return input.args;
     const toolUse = toolUseArgsSchema.safeParse(input.args);
     if (!toolUse.success) return input.args;
-    const { input: raw, ...rest } = toolUse.data.args;
-    const keep =
-      ships && typeof raw === 'string' && raw.length > 0
-        ? { input: capToolInput(toolHookText(raw)) }
-        : {};
-    return { ...toolUse.data, args: { ...rest, ...keep } };
+    const {
+      input: raw,
+      truncated: _truncated,
+      fullLength: _fullLength,
+      sha256: _sha256,
+      preview: _preview,
+      ...rest
+    } = toolUse.data.args;
+    const preview =
+      typeof raw === 'string' && raw.length > 0
+        ? toToolInputPreview(raw)
+        : { preview: 'none' as const };
+    return { ...toolUse.data, args: { ...rest, ...preview } };
   }
 }
 
 /** A method that acts for the runner, not a project or a session (D17). */
 const runnerWide = (method: string): boolean =>
   isLocalMethodName(method) && !localMethods[method].needsProject;
-
-const toolHookText = (raw: string): string =>
-  toHookContent(raw, false, ACTION_REQUEST_TOOL_INPUT_MAX * 4).text;
