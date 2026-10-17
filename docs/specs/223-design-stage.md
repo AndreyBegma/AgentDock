@@ -328,5 +328,168 @@ release, and it says so in its reply.
   toward the 160 KiB of each mockup; a profile whose kit is over 64 KiB fails
   the build with a violation that asks for a smaller kit.
 
+## Review of design generation (#606, 2026-10-17)
+
+The design stage was reviewed end to end against ADR-0022, ADR-0025,
+ADR-0041, ADR-0044, this spec, and the later design specs (#275 progress and
+Stop, #322 launch choice, #441 frames, #480 stacks, #519/#526 viewer and phone
+work, #527 stack gate). Decisions those records already made — one variant
+per turn, the HTML-mockup approach, the stack's lack of a launch choice, the
+CDN allowlist — are not re-proposed. Line numbers are as of the review commit.
+
+### What was reviewed, and what was found
+
+- **Prompt assembly** (`apps/api/src/design/design-prompt.ts`,
+  `apps/api/src/planner/plan-prompt.ts`, `apps/api/src/design/design-store.ts`).
+  The profile summary, the style kit, the snippets, the installed skills only
+  (D15), the variant, the previous revision's frames on a revise (#441) and
+  every open comment with its anchor are all carried. Free text is fenced with
+  a fence longer than any backtick run inside it. An over-long prompt is
+  fitted by dropping snippets from the end, then a stack reference's HTML
+  (#480), and says which were left out. The open comments are never trimmed,
+  so the fitting does not guarantee the cap — see proposal 4.
+- **Turn flow** (`card-design-turn.service.ts`, `plan-turn-design.ts`,
+  `stack-design-turn.service.ts`, `design.service.ts` `start`, the projector's
+  design paths). One turn per variant, chained by the projector; a contract
+  violation fails the turn and stores no revision; `variant` and `addressed`
+  are checked against the batch. Two defects were found and fixed (below). A
+  chained turn that does not start still ends the batch silently — proposal 1.
+- **The UI profile build and its fingerprint** (`ui-profile.service.ts`,
+  `ui-profile-projector.ts`). The wait is visible (#275: "Step 1/2 · Building
+  the UI profile", the run log, Stop); a failed build ends cleanly and shows
+  as the design's last failure; a build is skipped while the fingerprint of
+  `fingerprintGlobs` on `origin/<base>` is unchanged. A failed stale rebuild
+  is retried on every Generate and blocks the design although an older
+  profile exists — proposal 2.
+- **The launch panel** (`apps/web/src/components/design/generate-panel.tsx`).
+  Variants, skills and (for a card) profile and model are chosen before
+  Generate; runner and readiness blockers are said before the click. The
+  "builds the profile first" note was wrong for every design not drawn yet —
+  fixed below. A busy design with nothing running showed this panel — fixed
+  below.
+- **Result handling.** Every frame is validated (D6) and the frames together
+  are held to 160 KiB (`packages/shared/src/planner/contract.ts:743`, checked
+  in `parseDesignBlocks`), under the 192 KiB result event. The mockup endpoint
+  serves each frame with `sandbox allow-scripts` and `connect-src 'none'`; the
+  viewer's iframe has `sandbox="allow-scripts"` and trusts a message by its
+  source window only (`apps/web/src/lib/design/frame-messages.ts:20`).
+  Comments record the frame and revision they were left on; the first
+  revision to list a comment addresses it. No defect was found here; the size
+  budget and the frame endpoint are proposals 3, 6 and 8.
+
+### Fixed in #606
+
+| Defect | Evidence | Fix | Test |
+|---|---|---|---|
+| Two Generates at once both passed the idle check. The loser's turn start was refused (`turn_in_progress`) and its error path settled the design, so the winner's turn ran while the design read idle, with no progress and no Stop. | `design.service.ts` `start`: the status was read in `drawable` and written after `ensureFresh` | The busy status is claimed with a conditional update from the status read at rest, before the profile check; the loser gets 409 `design_busy`. A profile check that throws puts the design back to rest. | `card-design.e2e.spec.ts` "#606: of two Generates at once…" |
+| A design left `generating` / `revising` with no turn and no build (a batch whose next turn never started, e.g. the API stopped between two) refused Generate as busy and Stop as not running — no way out. | `design-stop.service.ts` `stopOf`: `if (!build) throw notRunning()` | Stop puts such a design back to rest and audits `design.stopped` with `stage: null`. | `design-stop.e2e.spec.ts` "puts a design left busy with nothing running back to rest" |
+| The generate panel said "This project has no UI profile yet: Generate builds it first" for every design not drawn yet, because it read the design's `profileId`, which stays null until a revision is stored. | `generate-panel.tsx` (`design.profileId === null`) | The note comes from the project's profile status (`GET /projects/:id/ui-profile`): missing, a failed rebuild, or a build running. | `generate-panel.test.tsx`, `format.test.ts` "#606" |
+| A busy design between two turns (D1's `null` progress, documented as "Starting the next variant…") showed the Generate panel, with no progress and no Stop. | `design-viewer.tsx`: `design.progress ? null : <GeneratePanel>` | The viewer shows a "Starting the next turn…" status with Stop. | `progress.test.ts`, `design-progress.test.tsx` "#606" |
+
+No architecture changed, so no ADR was needed.
+
+### Proposed improvements
+
+Ordered by value. Sizes: XS (under an hour), S (a small pull request), M (a
+pull request with schema or contract work), L (needs an ADR). None of these
+is started in the code.
+
+1. **Say why a batch stopped when its next turn did not start.** When the
+   next variant's turn, or the first turn after a profile build, cannot start
+   (budget hard stop, runner offline, prompt over the cap), the design is put
+   back to rest and the reason is only logged. No turn row exists, so
+   `lastFailure` shows nothing and the person sees fewer variants than they
+   asked for, without a word.
+   *Evidence:* `apps/api/src/planner/card-design-turn.service.ts:299-320`,
+   `stack-design-turn.service.ts:230`, `plan-turn.service.ts:409`,
+   `plan-turn-projector.ts:419` and `:535`, `design.service.ts:609-612`;
+   `design-progress.ts:136-157` reads only turns and builds.
+   *Benefit:* every ended batch explains itself and offers Retry.
+   *Size:* M — store the refusal (a failed `plan_turns` row for the variant,
+   or a `lastStartError` on the design) and read it in `lastFailureOf`.
+2. **Let a design proceed on the current profile when its stale rebuild
+   fails.** A changed fingerprint rebuilds the profile before the turn; when
+   that build fails, the waiting design rests, and the next Generate
+   fingerprints again, rebuilds again (a 20-minute opus run) and can fail
+   again. A project with a working older profile cannot get a mockup until
+   the build succeeds.
+   *Evidence:* `apps/api/src/design/ui-profile.service.ts:292-296`,
+   `ui-profile-projector.ts:118-123` (`afterBuild(waiting, undefined)`).
+   *Benefit:* a broken rebuild degrades to a slightly stale style instead of
+   blocking the stage; cost stops repeating.
+   *Size:* S–M — on a failed `stale` build, start the waiting designs with
+   the current version and a warning; skip the rebuild for that fingerprint
+   until the files change again. Amends D13.
+3. **Stop copying the style kit into every frame.** The prompt tells the
+   model to include the kit in a `<style>` (`design-prompt.ts:179`), the kit
+   may be 64 KiB (`packages/shared/src/design/limits.ts:17`) and all frames
+   together may be 160 KiB (`limits.ts:10`, `contract.ts:743`). A large kit
+   leaves under 100 KiB for the mockup itself, and three frames with a 50 KiB
+   kit fail as `design_too_large` before drawing anything.
+   *Benefit:* multi-frame designs (#441) fit; turns spend fewer output tokens.
+   *Size:* L — the API would inject the profile version's kit when it serves
+   and publishes a frame, so a mockup is no longer self-contained on its own
+   (ADR-0022, ADR-0041 amendment).
+4. **Fit the open comments into the prompt cap.** A revise carries up to 100
+   open comments (`limits.ts:40-41`, documented as keeping the prompt under
+   its cap) of up to 4 000 characters plus a 1 000-character selector each,
+   i.e. well over the 256 KiB `plan.turn` cap. The fitting trims only
+   snippets and the stack reference (`design-prompt.ts:332-355`,
+   `plan-prompt.ts:207-221`), so such a revise fails with a raw
+   `invalid_args` schema message.
+   *Benefit:* a large review round still revises; the rest stay open for the
+   next round.
+   *Size:* S — drop the newest comments last-in-first-out until the prompt
+   fits, say how many were left open, and fix the limit's comment.
+5. **Send each variant's turn only its own comments (and the general
+   ones).** Revise gives every variant's turn every open comment
+   (`design-rules.ts:183-189`), and the first revision to list a comment
+   addresses it (`design-apply.ts:60-70`). A comment left on variant 2 can be
+   marked addressed by variant 1's revision, and variant 2 never answers it.
+   *Benefit:* comments are answered where they were left; prompts shrink.
+   *Size:* S–M — filter by `leftOn.variant` per turn; amends D10.
+6. **Tell the model the result's size budget, and name the remedy on
+   truncation.** The contract limits the HTML to 160 KiB but says nothing
+   about prose outside the blocks; a turn whose whole message passes 192 KiB
+   fails as `result_truncated: the result was cut at the event size limit`
+   (`plan-turn-projector.ts:320`, `:482`), which tells neither the model nor
+   the person what to change.
+   *Benefit:* fewer wasted turns near the limit.
+   *Size:* S — a contract line ("keep text outside the blocks short") and a
+   failure message that names the limit and suggests fewer frames.
+7. **Serve one frame without reading every frame.** The mockup endpoint
+   loads every frame's HTML of the revision to answer one
+   (`design-mockup.controller.ts:78-81`, `design-store.ts:253-269`); a viewer
+   with N frames reads N × the revision.
+   *Benefit:* less database traffic per view.
+   *Size:* S — select the frame by `position`, keep the legacy fallback.
+8. **Start one profile build at a time.** `ensureFresh` reads the latest
+   build and starts a new one without a lock
+   (`ui-profile.service.ts:266-275`), so two designs that Generate at the
+   same moment in a project without a profile can start two builds.
+   *Benefit:* no doubled opus cost; both designs wait on one build.
+   *Size:* S — take the project row lock (as `update` does) around the check
+   and the run's creation.
+9. **Keep a profile without fingerprint globs, or without a fingerprint,
+   honest.** A profile with no `fingerprintGlobs` is never checked again
+   (`ui-profile.service.ts:276-278`); one stored without a fingerprint adopts
+   whatever the next check returns (`:284-291`), which hides a change made in
+   between.
+   *Benefit:* the profile status means what it says.
+   *Size:* S — show "never refreshed automatically" in Settings → Design, and
+   fingerprint at the build's base commit rather than at check time.
+10. **Disable the panel's choices while Generate is starting.** The variant
+    buttons, skills and "Runs on" are disabled only by `writeBlock`
+    (`generate-panel.tsx:185`, `:209`, `:242`), so they can change between
+    the patch and the generate call.
+    *Benefit:* what starts is what the person saw.
+    *Size:* XS.
+11. **Decide the trimming order for a card in a stack.** A card's prompt
+    drops every snippet before it drops the stack design's HTML
+    (`design-prompt.ts:343-353`). The stack design already shows the shared
+    look, so the order may be right; it is not recorded anywhere.
+    *Benefit:* a deliberate, documented trade-off.
+    *Size:* XS — a line in #480's spec, or swap the order.
+
 Depends on #172
 Depends on #24
