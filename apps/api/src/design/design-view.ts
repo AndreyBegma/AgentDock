@@ -12,7 +12,12 @@ import {
   viewportsOf,
 } from './design-mapper';
 import { loadDesignProgress } from './design-progress';
-import { type DesignKey, designWhere, installedOf } from './design-store';
+import {
+  type DesignKey,
+  designSkillsOf,
+  designWhere,
+  installedOf,
+} from './design-store';
 
 /**
  * `GET …/tasks/:key/design` once the plan is known readable (D17), and
@@ -33,16 +38,21 @@ export const loadDesignView = async (
   if (!row) {
     throw designError(404, DESIGN_ERROR.notFound, 'Design not found');
   }
-  const [installed, settings, progress] = await Promise.all([
-    installedOf(prisma, project, row.skills),
+  const [settings, progress] = await Promise.all([
     prisma.designSettings.findUnique({
       where: { projectId: project.id },
-      select: { viewports: true },
+      select: { viewports: true, defaultSkills: true },
     }),
     loadDesignProgress(prisma, project.id, owner, row),
   ]);
+  // #604: a design that follows the default shows today's default.
+  const defaultSkills = settings?.defaultSkills ?? [];
+  const skills = designSkillsOf(row, row.revisions.length > 0, defaultSkills);
+  const installed = await installedOf(prisma, project, skills);
   return toDesignView(row, {
-    warnings: skillWarnings(row.skills, installed),
+    skills,
+    defaultSkills,
+    warnings: skillWarnings(skills, installed),
     viewports: settings
       ? viewportsOf(settings.viewports)
       : [...DEFAULT_VIEWPORTS],

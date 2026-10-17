@@ -891,6 +891,21 @@ describe('design stage (e2e)', () => {
     expect(view.warnings).toEqual([
       expect.objectContaining({ skill: 'gone-skill' }),
     ]);
+    // #604: a plan task's design follows a later change of the default.
+    await h.admin.send('put', `/projects/${h.projectId}/design-settings`, {
+      viewports: [{ name: 'Desktop', width: 1440, height: 900 }],
+      defaultSkills: ['design-kit:frontend-design', 'gone-skill', 'gone-too'],
+    });
+    const followed = await design(plan.id);
+    expect(followed.skills).toEqual([
+      'design-kit:frontend-design',
+      'gone-skill',
+      'gone-too',
+    ]);
+    expect(followed.warnings.map((w) => w.skill)).toEqual([
+      'gone-skill',
+      'gone-too',
+    ]);
     await generate(plan.id);
     const prompt = h.turnPrompts().at(-1) ?? '';
     expect(prompt).toContain('`design-kit:frontend-design`');

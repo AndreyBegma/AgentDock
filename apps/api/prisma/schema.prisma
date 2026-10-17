@@ -2710,7 +2710,13 @@ model TaskDesign {
   suggestionWhy      String?
   /// 1–3 (D4), checked by the DTO and the contract.
   variantCount       Int              @default(1)
+  /// What the latest turns applied, or the project default when it was
+  /// copied. While `skillsEdited` is false and nothing is drawn, the design
+  /// follows `design_settings.defaultSkills` instead (#604).
   skills             String[]         @default([])
+  /// #604: the skills were chosen by hand on this design's panel; a change of
+  /// the project default no longer reaches it.
+  skillsEdited       Boolean          @default(false)
   /// The profile version the latest revisions were drawn from.
   profileId          String?
   status             TaskDesignStatus @default(idle)

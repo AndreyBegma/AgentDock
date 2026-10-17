@@ -141,6 +141,8 @@ export const ownerOf = (row: DesignRow): DesignOwnerView => {
 export const toDesignView = (
   row: DesignRow,
   extra: {
+    skills: string[];
+    defaultSkills: string[];
     warnings: DesignSkillWarning[];
     viewports: ViewportPreset[];
     activeTurnId: string | null;
@@ -158,7 +160,9 @@ export const toDesignView = (
   variantCount: row.variantCount,
   status: row.status,
   approvedRevisionId: row.approvedRevisionId,
-  skills: row.skills,
+  skills: extra.skills,
+  skillsEdited: row.skillsEdited,
+  defaultSkills: extra.defaultSkills,
   profileId: row.profileId,
   approvedBy: row.approvedBy ? userRef(row.approvedBy) : null,
   approvedAt: row.approvedAt?.toISOString() ?? null,
