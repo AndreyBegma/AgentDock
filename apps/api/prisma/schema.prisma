@@ -28,8 +28,6 @@ model User {
   status           UserStatus @default(pending)
   approvedById     String?
   approvedAt       DateTime?
-  failedLoginCount Int        @default(0)
-  lockedUntil      DateTime?
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
@@ -101,6 +99,22 @@ model UserSettings {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_settings")
+}
+
+/// Failed password checks of one source against one account (C-109, D-05):
+/// keyed by the email as typed, so an unknown address is throttled exactly
+/// like a real one. A source waits only for its own failures; no row, no wait.
+model LoginThrottle {
+  email         String
+  ip            String
+  failures      Int
+  lastFailureAt DateTime
+  /// The source may not try again before this.
+  blockedUntil  DateTime?
+
+  @@id([email, ip])
+  @@index([lastFailureAt])
+  @@map("login_throttles")
 }
 
 /// A login session. Named `UserSession` because `Session` is reserved for agent
@@ -310,6 +324,30 @@ model AuditRecord {
   @@map("audit_records")
 }
 
+/// Repeats of one audit record within a minute (C-109): the first is written
+/// at once, the rest are counted here and written as one record when the
+/// minute is over. Not part of the chain; rows are deleted once written.
+model AuditFold {
+  action    String
+  targetType String
+  /// `''` for no target id.
+  targetId  String
+  /// `''` for no address.
+  ip        String
+  minute    DateTime
+  actor     Json
+  result    AuditResult
+  userAgent String?
+  /// Repeats after the first.
+  count     Int        @default(0)
+  /// `meta.reason` of each repeat → how many.
+  reasons   Json       @default("{}")
+
+  @@id([action, targetType, targetId, ip, minute])
+  @@index([minute])
+  @@map("audit_folds")
+}
+
 /// Where a project's base branch came from (docs/specs/10 D4).
 enum BaseSource {
   config
@@ -413,6 +451,8 @@ model Project {
   stewardIncidents     StewardIncident[]
   stewardDigests       StewardDigest[]
   handoffNotes         HandoffNote[]
+  rules                ProjectRule[]
+  telegramLinks        TelegramLink[]
 
   @@unique([runnerId, rootPath])
   @@map("projects")
@@ -452,6 +492,9 @@ model DocsSource {
   classified Json
   candidates Json
   manual     Boolean        @default(false)
+  /// #379: where specs go, relative to the docs root. Set in Settings ›
+  /// Docs source; detection and a refresh leave it alone.
+  specDir    String?
   updatedAt  DateTime       @updatedAt
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -1390,9 +1433,14 @@ model TelegramLink {
   chatId   BigInt   @unique
   username String?
   linkedAt DateTime @default(now())
+  /// #500: the project the chat's Board commands act on (`/project`). Null
+  /// until chosen; a deleted project clears it.
+  currentProjectId String?
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentProject Project? @relation(fields: [currentProjectId], references: [id], onDelete: SetNull)
 
+  @@index([currentProjectId])
   @@map("telegram_links")
 }
 
@@ -2330,29 +2378,39 @@ model PlannerSettings {
 /// A plan: a brief and its tasks, across versions (D1, D9). One Claude
 /// session per plan (`sessionId`, D3); its read-only worktree (D15).
 model Plan {
-  id              String         @id @default(cuid())
-  projectId       String
+  id               String         @id @default(cuid())
+  projectId        String
   /// Nullable so deleting the author keeps a sent plan's record; a private
   /// plan without an author is readable by nobody (D12).
-  authorId        String?
-  title           String
-  brief           String
-  mode            PlanMode
-  visibility      PlanVisibility @default(private)
-  status          PlanStatus
-  version         Int            @default(1)
-  sessionId       String         @db.Uuid
+  authorId         String?
+  title            String
+  brief            String
+  mode             PlanMode
+  visibility       PlanVisibility @default(private)
+  status           PlanStatus
+  version          Int            @default(1)
+  sessionId        String         @db.Uuid
   /// The instructions version the plan runs with (D11).
-  instructionsId  String
-  contractVersion Int
-  profileKey      String
-  model           String
-  worktree        String?
-  docsPrNumber    Int?
-  docsPrUrl       String?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  sentAt          DateTime?
+  instructionsId   String
+  contractVersion  Int
+  profileKey       String
+  model            String
+  worktree         String?
+  docsPrNumber     Int?
+  docsPrUrl        String?
+  /// #379: `owner/name` of the docs repository the docs PR is in; null when
+  /// it is the project's own repository.
+  docsPrRepo       String?
+  /// #379: with an external docs repository, the approved designs stay in the
+  /// code repository, in a PR of their own (spec 223 D16 fallback directory).
+  designPrNumber   Int?
+  designPrUrl      String?
+  /// #379: when each PR was seen merged; the issues waiting on it queue then.
+  docsPrMergedAt   DateTime?
+  designPrMergedAt DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  sentAt           DateTime?
 
   project            Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
   author             User?               @relation(fields: [authorId], references: [id], onDelete: SetNull)
@@ -2818,6 +2876,11 @@ model BoardCard {
   issueNumber             Int?
   issueUrl                String?
   specPath                String?
+  /// #379: a spec written to an external docs repository — its `owner/name`
+  /// and pull request. Null when the spec is on the card's branch.
+  specRepo                String?
+  specPrNumber            Int?
+  specPrUrl               String?
   prNumber                Int?
   prUrl                   String?
   /// #329 D6: from the PR poll, else the last `card.collect` / `card.merge`;
@@ -3578,4 +3641,33 @@ model HandoffNote {
   @@unique([subjectKind, subjectId])
   @@index([projectId])
   @@map("handoff_notes")
+}
+
+/// Mirrors `PROJECT_RULE_SOURCES` of the shared contract (#528).
+enum ProjectRuleSource {
+  manual
+  imported
+  scanned
+}
+
+/// A per-project coding rule a card worker follows (#528, stack S-2). Stored
+/// here, never in a file of the project's repository. `position` orders the
+/// list, 0-based and dense; a reorder rewrites it.
+model ProjectRule {
+  id          String            @id @default(cuid())
+  projectId   String
+  /// At most `PROJECT_RULE_TITLE_MAX` characters, checked by the DTO.
+  title       String
+  /// At most `PROJECT_RULE_DESCRIPTION_MAX` characters, checked by the DTO.
+  description String            @default("")
+  enabled     Boolean           @default(true)
+  position    Int
+  source      ProjectRuleSource @default(manual)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, position])
+  @@map("project_rules")
 }

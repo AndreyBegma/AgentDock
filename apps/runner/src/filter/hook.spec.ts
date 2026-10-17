@@ -132,10 +132,10 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
   });
 
   it.each([
-    ['a pipe', 'bun test | tail -5', {}, 'none'],
-    ['a list', 'bun test && echo ok', {}, 'none'],
-    ['a redirect', 'bun test > out.log', {}, 'none'],
-    ['a substitution', 'bun test $(git diff --name-only)', {}, 'none'],
+    ['a pipe', 'bun test | tail -5', {}, 'none:compound'],
+    ['a list', 'bun test && echo ok', {}, 'none:compound'],
+    ['a redirect', 'bun test > out.log', {}, 'none:compound'],
+    ['a substitution', 'bun test $(git diff --name-only)', {}, 'none:compound'],
     [
       'a background call',
       'bun test',
@@ -144,8 +144,8 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
     ],
     ['a watch mode', 'bun test --watch', {}, 'js/bun-test'],
     ['a family long-running mode', 'demo-test --forever', {}, 'fixture/demo'],
-    ['an uncovered command', 'cd apps/runner', {}, 'none'],
-    ['an uncovered command after cd', 'cd apps && ls', {}, 'none'],
+    ['an uncovered command', 'cd apps/runner', {}, 'none:uncovered'],
+    ['an uncovered command after cd', 'cd apps && ls', {}, 'none:uncovered'],
   ])('leaves %s alone and counts it passedThrough', (_, command, extra, filter) => {
     const input = JSON.stringify(preToolUse(command, extra));
     expect(runFilterHook(input, deps)).toBe('');
@@ -161,8 +161,34 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
       passedThrough: true,
       at: '2026-10-16T12:00:00.000Z',
     });
-    // The filter that matched a simple command, else `none`.
+    // The filter that matched a simple command, else why none did.
     expect(rows[0]?.row.filter).toBe(filter);
+  });
+
+  describe('the reason no filter ran (amendment 12)', () => {
+    const filterOf = (command: string, mode?: string) => {
+      runFilterHook(JSON.stringify(preToolUse(command, {}, mode)), deps);
+      return stats().at(-1)?.row.filter;
+    };
+
+    it('is the mode in a mode that never rewrites, whatever the command', () => {
+      for (const mode of ['default', 'acceptEdits', 'plan', 'dontAsk']) {
+        expect(filterOf('bun test | tail -5', mode)).toBe('none:mode');
+        expect(filterOf('ls', mode)).toBe('none:mode');
+      }
+    });
+
+    it('is compound or uncovered in bypass and auto', () => {
+      for (const mode of ['bypassPermissions', 'auto']) {
+        expect(filterOf('bun test; ls', mode)).toBe('none:compound');
+        expect(filterOf('ls -la', mode)).toBe('none:uncovered');
+      }
+    });
+
+    it('keeps a matched filter’s id in any mode', () => {
+      expect(filterOf('bun test', 'default')).toBe('js/bun-test');
+      expect(filterOf('bun test --watch', 'auto')).toBe('js/bun-test');
+    });
   });
 
   it('leaves the command alone when a deny rule matches it, even in bypass mode', () => {
@@ -314,18 +340,18 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
     });
 
     it.each([
-      ['cd a b && bun test', 'none'],
-      ['cd -- x && bun test', 'none'],
-      ['cd $HOME && bun test', 'none'],
-      ['cd x && bun test && bun test', 'none'],
-      ['cd x; bun test', 'none'],
-      ['cd x && bun test | tail -5', 'none'],
-      ['bun test 2>&1 > out.log', 'none'],
-      ['bun test 2>&3', 'none'],
-      ['bun test &> out.log', 'none'],
-      ['bun test 1>&2', 'none'],
-      ['cd x && bun test 2>&1\ntouch /tmp/pwned', 'none'],
-      ['cd x && cd y', 'none'],
+      ['cd a b && bun test', 'none:compound'],
+      ['cd -- x && bun test', 'none:compound'],
+      ['cd $HOME && bun test', 'none:compound'],
+      ['cd x && bun test && bun test', 'none:compound'],
+      ['cd x; bun test', 'none:compound'],
+      ['cd x && bun test | tail -5', 'none:compound'],
+      ['bun test 2>&1 > out.log', 'none:compound'],
+      ['bun test 2>&3', 'none:compound'],
+      ['bun test &> out.log', 'none:compound'],
+      ['bun test 1>&2', 'none:compound'],
+      ['cd x && bun test 2>&1\ntouch /tmp/pwned', 'none:compound'],
+      ['cd x && cd y', 'none:uncovered'],
       ['cd x && bun test --watch 2>&1', 'js/bun-test'],
     ])('leaves %p alone', (command, filter) => {
       expect(runFilterHook(JSON.stringify(preToolUse(command)), deps)).toBe('');
@@ -354,7 +380,7 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
   ])('leaves %p alone (DR-01, DR-09)', (command) => {
     expect(runFilterHook(JSON.stringify(preToolUse(command)), deps)).toBe('');
     expect(stats()[0]?.row).toMatchObject({
-      filter: 'none',
+      filter: 'none:compound',
       passedThrough: true,
     });
   });

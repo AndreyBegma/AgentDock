@@ -12,6 +12,7 @@ import {
 import { join } from 'node:path';
 import { createDispatcher } from '../commands/dispatcher';
 import { createHandlers } from '../commands/handlers';
+import { permissivePolicy, sameRealpath } from '../policy/testing';
 import { FakeClock } from '../testing/fake-clock';
 import { memoryLogger, tempDir } from '../testing/fixtures';
 import {
@@ -216,7 +217,10 @@ describe('slot commands through the dispatcher', () => {
     const fake = fakeTmux({ worktrees: ['/srv/.wt-widget-i42'] });
     const clock = new FakeClock();
     const dispatch = createDispatcher({
+      policy: permissivePolicy,
+      realpath: sameRealpath,
       handlers: createHandlers({
+        policy: permissivePolicy,
         clock,
         runnerVersion: '0.0.0-test',
         host: { hostname: 'h', os: 'linux', arch: 'x64' },

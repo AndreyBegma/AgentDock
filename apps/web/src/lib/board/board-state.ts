@@ -1,4 +1,5 @@
 import {
+  BOARD_COLUMNS,
   type BoardCardView,
   type BoardColumn,
   type BoardMoveRefusal,
@@ -61,11 +62,16 @@ export function decideDrop(
         };
   }
   const card = findCard(view, move.id);
-  if (
-    !card ||
-    !isBoardColumn(move.fromColumnId) ||
-    !isBoardColumn(move.toColumnId)
-  ) {
+  return card ? decideCardMove(card, move, options) : { kind: 'ignore' };
+}
+
+/** `decideDrop` for a card already in hand — the card page has no board view. */
+export function decideCardMove(
+  card: BoardCardView,
+  move: DropMove,
+  options: { stopWorker?: boolean; skipRunOffer?: boolean } = {},
+): DropDecision {
+  if (!isBoardColumn(move.fromColumnId) || !isBoardColumn(move.toColumnId)) {
     return { kind: 'ignore' };
   }
   const decision = boardMoveRule({
@@ -92,6 +98,27 @@ export function decideDrop(
     return { kind: 'offer-run', card, move };
   }
   return { kind: 'move', card, move };
+}
+
+/** The index of "last in the column"; the API clamps it, as the menu's own move does. */
+export const MOVE_TO_END = 1_000_000;
+
+/**
+ * The columns the card's Move picker offers: every other column the board
+ * rule does not refuse. Leaving In progress is offered — it asks to stop the
+ * worker, as a drag does.
+ */
+export function moveTargets(card: BoardCardView): BoardColumn[] {
+  return BOARD_COLUMNS.filter((to) => {
+    if (to === card.column) return false;
+    const { kind } = decideCardMove(card, {
+      id: card.id,
+      fromColumnId: card.column,
+      toColumnId: to,
+      index: MOVE_TO_END,
+    });
+    return kind !== 'ignore' && kind !== 'refused';
+  });
 }
 
 /**

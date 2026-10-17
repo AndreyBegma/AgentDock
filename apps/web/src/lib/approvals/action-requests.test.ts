@@ -5,6 +5,7 @@ import {
   describeActionRequestError,
   formatCountdown,
   pendingRequests,
+  prApproveArgs,
   recentRequests,
   requestTitle,
   resultMessage,
@@ -63,6 +64,51 @@ describe('toolUseArgs', () => {
       toolUseArgs(row({ kind: 'pr_approve', args: { pr: 1 } })),
     ).toBeNull();
     expect(toolUseArgs(row({ args: { extra: 1 } }))).toBeNull();
+  });
+});
+
+describe('prApproveArgs (C-110)', () => {
+  const HEAD = '0b6445a1'.padEnd(40, 'c');
+  test('reads the bound head, its short form and the diff', () => {
+    expect(
+      prApproveArgs(
+        row({
+          kind: 'pr_approve',
+          args: {
+            pr: 12,
+            headSha: HEAD,
+            title: 'feat: widget',
+            url: 'https://github.com/acme/widget/pull/12',
+          },
+        }),
+      ),
+    ).toEqual({
+      pr: 12,
+      headSha: HEAD,
+      title: 'feat: widget',
+      url: 'https://github.com/acme/widget/pull/12',
+      shortHead: '0b6445a',
+      diffUrl: `https://github.com/acme/widget/pull/12/files/${HEAD}`,
+    });
+  });
+  test('is null without a head, for other kinds, and for a non-http url', () => {
+    expect(
+      prApproveArgs(row({ kind: 'pr_approve', args: { pr: 12 } })),
+    ).toBeNull();
+    expect(prApproveArgs(row({}))).toBeNull();
+    expect(
+      prApproveArgs(
+        row({
+          kind: 'pr_approve',
+          args: {
+            pr: 12,
+            headSha: HEAD,
+            title: 't',
+            url: 'javascript:alert(1)',
+          },
+        }),
+      ),
+    ).toBeNull();
   });
 });
 

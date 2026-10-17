@@ -51,6 +51,13 @@ describe('readinessCopy (#272 D5)', () => {
     expect(readinessCopy({ code: 'no_spec_dir' }, operator).href).toBe(
       '/projects/p1/settings?tab=docs',
     );
+    expect(readinessCopy({ code: 'no_spec_dir' }, operator).text).toContain(
+      'Spec folder',
+    );
+    // #379: a remote docs repository without a local clone.
+    const clone = readinessCopy({ code: 'no_docs_clone' }, operator);
+    expect(clone.href).toBe('/projects/p1/settings?tab=docs');
+    expect(clone.text).toContain('local clone');
     expect(readinessCopy({ code: 'content_off' }, operator).href).toBe(
       '/projects/p1/settings?tab=sessions',
     );

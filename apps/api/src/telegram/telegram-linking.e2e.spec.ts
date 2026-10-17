@@ -3,6 +3,7 @@ import { SYSTEM_ACTOR } from '../audit/audit.types';
 import { BotTokenStore } from '../notifications';
 import { seedUser } from '../notifications/testing/notifications-e2e';
 import { login, type Session } from '../test/e2e-app';
+import { HELP_TEXT, UNKNOWN_COMMAND_TEXT } from './telegram-commands';
 import { hashLinkCode, LINK_REPLIES } from './telegram-linking.service';
 import { TelegramPoller } from './telegram-poller';
 import {
@@ -306,9 +307,15 @@ describe('Telegram linking (e2e)', () => {
       expect(await ctx.prisma.telegramLink.count()).toBe(0);
     });
 
-    it('ignores anything that is not /start or /stop', async () => {
+    it('ignores text that is not a command', async () => {
       expect(await say(fromChat(555, 'hello'))).toBeUndefined();
-      expect(await say(fromChat(555, '/help'))).toBeUndefined();
+    });
+
+    it('#500: answers /help, and an unknown command with a pointer to it', async () => {
+      expect(await say(fromChat(555, '/help'))).toBe(HELP_TEXT);
+      expect(await say(fromChat(555, '/frobnicate now'))).toBe(
+        UNKNOWN_COMMAND_TEXT,
+      );
     });
   });
 

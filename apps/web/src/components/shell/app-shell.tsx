@@ -34,6 +34,7 @@ import { api, describeError } from '../../lib/api';
 import { useLiveStatus } from '../../lib/live/use-live';
 import { Capsule } from './capsule';
 import { crumbsFor, pageTitleOf } from './crumbs';
+import { useKeyboardOpen } from './keyboard';
 import {
   liveDotLabel,
   RESTARTING_BANNER_TEXT,
@@ -114,6 +115,8 @@ export function AppShell({
   const router = useRouter();
   const pathname = usePathname();
   const narrow = useNarrow();
+  // #526: the soft keyboard replaces the capsule, so a docked action stays above it.
+  const keyboard = useKeyboardOpen();
   const [theme, setTheme] = useTheme();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const projectId = projectIdOf(pathname);
@@ -356,9 +359,9 @@ export function AppShell({
               {children}
             </main>
 
-            {narrow ? (
+            {narrow && !keyboard ? (
               // Below `lg` the capsule replaces the rail; its spacer keeps the
-              // page's end clear of it.
+              // page's end clear of it. #526: the soft keyboard hides it.
               <Capsule
                 tabs={tabs}
                 more={more}

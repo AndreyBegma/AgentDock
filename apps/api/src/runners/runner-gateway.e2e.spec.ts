@@ -47,8 +47,8 @@ describe('/runner gateway (e2e)', () => {
   let admin: Session;
   const sockets: TestRunnerSocket[] = [];
 
-  const open = (token: string | null) => {
-    const socket = new TestRunnerSocket(ctx.origin, token);
+  const open = (token: string | null, headers?: Record<string, string>) => {
+    const socket = new TestRunnerSocket(ctx.origin, token, headers);
     sockets.push(socket);
     return socket;
   };
@@ -147,6 +147,76 @@ describe('/runner gateway (e2e)', () => {
       await second.connect();
       expect((await first.closed).code).toBe(RUNNER_CLOSE_CODES.replaced);
       expect(second.socket.readyState).toBe(second.socket.OPEN);
+    });
+
+    it('C-108: replacing a live socket is audited with both peers and told to admins', async () => {
+      const { runnerId, token } = await pairedRunner(ctx, admin);
+      const first = open(token, { 'User-Agent': 'agentdock-runner/1 (real)' });
+      await first.connect();
+      const second = open(token, { 'User-Agent': 'impostor/0.1' });
+      await second.connect();
+      expect((await first.closed).code).toBe(RUNNER_CLOSE_CODES.replaced);
+
+      const record = await eventually('the audit row', () =>
+        ctx.prisma.auditRecord
+          .findFirst({
+            // Audit rows outlive the reset: append-only.
+            where: { action: 'runner.connection_replaced', targetId: runnerId },
+          })
+          .then((r) => r ?? undefined),
+      );
+      expect(record).toMatchObject({
+        actorType: 'runner',
+        actorRunnerId: runnerId,
+        targetType: 'runner',
+        targetId: runnerId,
+        result: 'ok',
+        meta: {
+          ip: '127.0.0.1',
+          userAgent: 'impostor/0.1',
+          previousIp: '127.0.0.1',
+          previousUserAgent: 'agentdock-runner/1 (real)',
+        },
+      });
+      const notification = await eventually('the admin notification', () =>
+        ctx.prisma.notification
+          .findFirst({
+            where: { kind: 'runner.connection_replaced' },
+            include: { user: { select: { role: true } } },
+          })
+          .then((n) => n ?? undefined),
+      );
+      expect(notification).toMatchObject({
+        runnerId,
+        projectId: null,
+        user: { role: 'admin' },
+      });
+      expect(notification?.body).toContain('127.0.0.1');
+    });
+
+    it('C-108: a reconnect after the old socket closed on its own is not reported', async () => {
+      const { runnerId, token } = await pairedRunner(ctx, admin);
+      const first = open(token);
+      await first.connect();
+      first.socket.close(1000);
+      await first.closed;
+      // The server has let go of it before the runner dials again.
+      await eventually('the old socket detached', async () =>
+        ctx.app.get(RunnerPresence).isConnected(runnerId) ? undefined : true,
+      );
+      await open(token).connect();
+      // Give a wrongly fired report the time it would take.
+      await new Promise((r) => setTimeout(r, 300));
+      expect(
+        await ctx.prisma.auditRecord.count({
+          where: { action: 'runner.connection_replaced', targetId: runnerId },
+        }),
+      ).toBe(0);
+      expect(
+        await ctx.prisma.notification.count({
+          where: { kind: 'runner.connection_replaced' },
+        }),
+      ).toBe(0);
     });
   });
 

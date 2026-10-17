@@ -1,5 +1,5 @@
 import type { Clock } from '../clock';
-import { loadConfig, type RunnerConfig, saveConfig } from '../config';
+import { loadConfig, type RunnerConfig, updateConfig } from '../config';
 import { errorMessage, type Logger } from '../log';
 
 /**
@@ -17,8 +17,7 @@ export const resolveIngestSince = (
   const now = new Date(clock.now());
   try {
     const current = loadConfig(configFile);
-    saveConfig(configFile, {
-      ...current,
+    updateConfig(configFile, {
       sessions: { ...current.sessions, ingestSince: now.toISOString() },
     });
   } catch (error) {

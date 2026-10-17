@@ -880,7 +880,7 @@ SplitCard = {
 }
 Split = {
   "reason": string,          // why several cards, in the person's language
-  "cards": [ SplitCard ]     // ${INTAKE_SPLIT_MIN}–${INTAKE_SPLIT_MAX}, independent of each other
+  "cards": [ SplitCard ]     // ${INTAKE_SPLIT_MIN}–${INTAKE_SPLIT_MAX}, independent of each other, never UI cards for one surface
 }
 StackStage = {
   "title": string,           // short English name of the stage, e.g. "Components"
@@ -909,8 +909,9 @@ Rules:
 - \`action\` is \`intake\`.
 - Ask a round only while something material is unknown; write the card as soon as nothing is.
 - At most ${PLANNER_INTAKE_MAX_ROUNDS} rounds. After the ${PLANNER_INTAKE_MAX_ROUNDS}th, or when the turn says the person asked to generate, write the card, the split or the stack — a round then fails the turn.
-- Propose a \`split\` only when the request is several independent tasks, or one task too big for a single agent. Each card stands alone: no card depends on another. One clear task is one \`cardDraft\`.
+- Propose a \`split\` only when the request is several independent tasks — unrelated changes, UI changes to different surfaces, or work with no UI — or one task too big for a single agent. Each card stands alone: no card depends on another, and none has to look like another. One clear task is one \`cardDraft\`.
 - Propose a \`stack\` instead when the request is one larger piece of work whose parts must happen in order and share one look — for example a page redesign: its components first, then the page built from them. Group the cards into stages in that order. Set \`design\` to true when the result is UI.
+- Several UI changes to one surface or form factor — one screen, one page, "the board on phones" — share one look: propose a \`stack\` with \`design: true\`, never a split, even when the changes have no natural order. Stage it foundations first: the shared pieces the other cards reuse (layout, primitives) in the first stage, the per-feature cards after them.
 - When the turn says the person chose to keep one card, write one \`cardDraft\` covering the whole request — a round, a split or a stack then fails the turn.
 - Questions, options and anything you say outside the block are in the language of the person's latest text.
 - Every card — \`title\`, \`summary\`, \`body\` — and a stack's \`title\`, \`body\` and stage titles are in English, whatever language the person wrote in.

@@ -15,6 +15,7 @@ import {
   cardPullRequestBody,
   cardSlug,
   cardSpecPath,
+  cardSpecPrBody,
   cardWipCommitMessage,
 } from './naming';
 import {
@@ -144,6 +145,29 @@ describe('naming', () => {
     ).toBe('Work of AgentDock board card C-12.\n\nAgentDock-Card: C-12');
   });
 
+  it('links the spec pull request of a docs repository (#379)', () => {
+    expect(
+      cardPullRequestBody({
+        number: 12,
+        summary: 'Added login.',
+        issueNumber: 41,
+        specPrUrl: 'https://github.com/acme/app-documentation/pull/3',
+      }),
+    ).toBe(
+      `Added login.\n\nSpec: https://github.com/acme/app-documentation/pull/3\n\nCloses #41\n\n${CARD_PR_MARKER}: C-12`,
+    );
+    expect(
+      cardSpecPrBody({
+        number: 12,
+        title: 'Add login',
+        repo: 'acme/app',
+        issueNumber: 41,
+      }),
+    ).toBe(
+      `Specification of AgentDock board card C-12: Add login\n\nCode: acme/app#41\n\n${CARD_PR_MARKER}: C-12\n`,
+    );
+  });
+
   it('names the leftovers commit', () => {
     expect(cardWipCommitMessage(12)).toBe('chore: card C-12 work in progress');
   });
@@ -218,7 +242,7 @@ describe('worker prompt', () => {
   };
 
   it('is versioned', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(13);
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(14);
   });
 
   it('names the card, branch, base and spec, and how to finish', () => {

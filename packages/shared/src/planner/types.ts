@@ -463,7 +463,8 @@ export type SplitCardDraft = z.infer<typeof splitCardDraftSchema>;
 
 /**
  * #409: the intake proposes several independent cards — the request was
- * several tasks, or one too big for one agent. Nothing is made until the
+ * several tasks, or one too big for one agent. Never UI cards for one surface:
+ * those share one look and are a stack (#524). Nothing is made until the
  * person confirms; they may decline and keep one card.
  */
 export const intakeSplitOutputSchema = z.strictObject({
@@ -488,7 +489,8 @@ export type StackStageDraft = z.infer<typeof stackStageDraftSchema>;
 
 /**
  * #480 (ADR-0044): the intake proposes a stack — one larger piece of work
- * whose parts must happen in order and share one look. `design` suggests a
+ * whose parts must happen in order and share one look, or several UI changes
+ * to one surface, staged foundations first (#524). `design` suggests a
  * shared design of the whole result, drawn and approved before any card runs.
  * 2–8 cards in all, in 2 or more stages.
  */

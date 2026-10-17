@@ -470,6 +470,7 @@ function BoardScreen() {
         canOperate={canOperate}
         actions={actions}
         terminal={terminal}
+        runnerName={project?.runnerName}
         onChanged={reload}
         onClose={() => select(undefined)}
       />

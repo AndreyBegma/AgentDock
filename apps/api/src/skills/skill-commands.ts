@@ -126,6 +126,7 @@ const MAPPED: Partial<
     code: SKILLS_ERROR.upstreamUnavailable,
   },
   timeout: { status: 504, code: SKILLS_ERROR.runnerTimeout },
+  policy_refused: { status: 403, code: SKILLS_ERROR.policyRefused },
 };
 
 export const skillFailureOf = (

@@ -14,6 +14,7 @@ import {
   moveToStage,
   proposalTitle,
   proposedShape,
+  SPLIT_HINT,
   splitRows,
   stackDraft,
   stackProblem,
@@ -22,6 +23,7 @@ import { boardItems } from './plan-tasks';
 import {
   addableCards,
   approvableRevision,
+  designSwitch,
   gateNote,
   stageLinkText,
 } from './stack-page';
@@ -150,10 +152,25 @@ describe('the intake review switches between Split and Stack (#480)', () => {
     expect(proposalTitle(split)).toBe(
       'The planner proposes a stack of 3 cards in 2 stages',
     );
-    // A split turned into a stack starts as one stage to order.
-    expect(stackDraft({ ...split, stack: null }).stages).toEqual([
-      { title: 'Stage 1', cards: [0, 1, 2] },
+    // #524: a split turned into a stack starts foundations first, with one
+    // shared design — the person moves the shared pieces up a stage.
+    const turned = stackDraft({ ...split, stack: null });
+    expect(turned.design).toBe(true);
+    expect(turned.stages).toEqual([
+      { title: 'Foundations', cards: [] },
+      { title: 'Features', cards: [0, 1, 2] },
     ]);
+    expect(moveToStage(turned, 0, -1).stages).toEqual([
+      { title: 'Foundations', cards: [0] },
+      { title: 'Features', cards: [1, 2] },
+    ]);
+  });
+
+  test('the split view says UI cards for one surface are a stack (#524)', () => {
+    expect(SPLIT_HINT).toContain('Independent cards');
+    expect(SPLIT_HINT).toContain(
+      'UI changes to one surface share one look — switch to Stack',
+    );
   });
 
   test('moves a card between stages, adds a stage, and drops a removed card', () => {
@@ -270,5 +287,19 @@ describe('the stack page (#480)', () => {
       card(5, 'in_progress'),
     ]);
     expect(addableCards(view).map((c) => c.number)).toEqual([2, 5]);
+  });
+
+  test('#502: the design switch is on while the design is needed and locked while a turn runs', () => {
+    const design = (status: string) => ({ design: { status } }) as never;
+    expect(designSwitch({ design: null })).toEqual({
+      required: false,
+      locked: false,
+    });
+    expect(designSwitch(design('approved'))).toEqual({
+      required: true,
+      locked: false,
+    });
+    expect(designSwitch(design('generating')).locked).toBe(true);
+    expect(designSwitch(design('revising')).locked).toBe(true);
   });
 });

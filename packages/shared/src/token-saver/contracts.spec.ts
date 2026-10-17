@@ -13,11 +13,16 @@ import {
   tokenSaverAvailable,
 } from '../protocol';
 import {
+  FILTER_ID_NONE,
+  FILTER_ID_NONE_COMPOUND,
+  FILTER_ID_NONE_MODE,
+  FILTER_ID_NONE_UNCOVERED,
   FILTER_STATS_EVENT,
   FILTER_STATS_MAX_ROWS,
   type FilterStatRow,
   filterStatRowSchema,
   filterStatsDataSchema,
+  isUnfilteredId,
   TOKEN_SAVER_DEFAULT,
   TOKEN_SAVER_MCP_ALLOW_MAX,
   tokenSaverConfigSchema,
@@ -214,6 +219,27 @@ describe('filter.stats rows (#445 D12)', () => {
         passedThrough: true,
       }).success,
     ).toBe(true);
+  });
+
+  it('accepts the hook’s pass-through reasons, and no other `none:*` (amendment 12)', () => {
+    const passed = { ...row, rawBytes: 0, keptBytes: 0, passedThrough: true };
+    for (const filter of [
+      FILTER_ID_NONE,
+      FILTER_ID_NONE_COMPOUND,
+      FILTER_ID_NONE_UNCOVERED,
+      FILTER_ID_NONE_MODE,
+    ]) {
+      expect(filterStatRowSchema.safeParse({ ...passed, filter }).success).toBe(
+        true,
+      );
+      expect(isUnfilteredId(filter)).toBe(true);
+    }
+    for (const filter of ['none:other', 'none:', 'js:jest', 'none:Mode']) {
+      expect(filterStatRowSchema.safeParse({ ...passed, filter }).success).toBe(
+        false,
+      );
+    }
+    expect(isUnfilteredId('js/jest')).toBe(false);
   });
 
   it('accepts the orchestrator and manual sessions without a run', () => {

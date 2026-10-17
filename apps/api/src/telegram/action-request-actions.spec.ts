@@ -3,6 +3,7 @@ import {
   actionRequestLink,
 } from '../local/action-request-mapper';
 import {
+  actionRequestDecidedText,
   decodeActionRequestCallback,
   encodeActionRequestCallback,
   isActionRequestCallback,
@@ -50,5 +51,14 @@ describe('action-request buttons (spec 201 D18)', () => {
     expect(actionRequestIdOfLink(link)).toBe(ID);
     expect(actionRequestIdOfLink('/projects/prj_1/fleet')).toBeNull();
     expect(actionRequestIdOfLink(null)).toBeNull();
+  });
+
+  it('says a moved head approved nothing (C-110)', () => {
+    expect(actionRequestDecidedText('approve', 'failed', 'head_moved')).toBe(
+      'Not approved: the pull request has new commits since this request. Ask for a new one.',
+    );
+    expect(actionRequestDecidedText('approve', 'failed', 'pr_not_open')).toBe(
+      'Approved, but it could not be carried out: pr_not_open.',
+    );
   });
 });

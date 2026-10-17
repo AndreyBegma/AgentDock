@@ -3,7 +3,7 @@
 Status: accepted · Date: 2026-10-16 ·
 Issue: [#489](https://github.com/AndreyBegma/AgentDock/issues/489) ·
 Spec: [`docs/specs/489-message-a-running-session-and-answer-its.md`](../specs/489-message-a-running-session-and-answer-its.md) ·
-Amends [ADR-0005](0005-drive-the-cs-orchestrator-skill-do-not-reimplement-it.md) · Scopes [ADR-0040](0040-steward.md) §4
+Amends [ADR-0005](0005-drive-the-cs-orchestrator-skill-do-not-reimplement-it.md) · Scopes [ADR-0040](0040-steward.md) §4 · Scoped by [ADR-0047](0047-a-runner-local-security-policy-the-server-cannot-change.md) §6
 
 ## Context
 

@@ -14,6 +14,8 @@ import {
   DOCS_KIND_LABEL,
   describeProjectError,
   docsOverrideRequest,
+  specFolderError,
+  specFolderOf,
 } from '../../../../../lib/projects/format';
 import { useErrorToast } from '../../../../../lib/section/use-error-toast';
 import { DocsDetails } from '../../docs-details';
@@ -34,6 +36,7 @@ function OverrideDialog({
   const [kind, setKind] = useState<DocsSourceKind>('in_repo');
   const [localPath, setLocalPath] = useState('');
   const [repo, setRepo] = useState('');
+  const [specDir, setSpecDir] = useState('');
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
 
@@ -43,12 +46,13 @@ function OverrideDialog({
     setKind(docs?.kind ?? 'in_repo');
     setLocalPath(docs?.localPath ?? '');
     setRepo(docs?.repo ?? '');
+    setSpecDir(specFolderOf(docs));
     setError(undefined);
   }, [open, project.docsSource]);
 
   const submit = async () => {
     const request = docsOverrideRequest(
-      { kind, localPath, repo },
+      { kind, localPath, repo, specDir },
       project.rootPath,
     );
     if (!request.ok) {
@@ -72,6 +76,8 @@ function OverrideDialog({
 
   const needsPath = kind === 'in_repo' || kind === 'sibling_repo';
   const needsRepo = kind === 'remote_repo' || kind === 'sibling_repo';
+  // #379: a remote docs repository takes the path of a local clone.
+  const takesPath = needsPath || kind === 'remote_repo';
 
   return (
     <DialogRoot
@@ -111,15 +117,17 @@ function OverrideDialog({
               ))}
             </Select>
           </Field>
-          {needsPath ? (
+          {takesPath ? (
             <Field
-              label="Path"
+              label={kind === 'remote_repo' ? 'Local clone' : 'Path'}
               htmlFor="docs-path"
-              required
+              required={needsPath}
               hint={
                 kind === 'in_repo'
                   ? `Absolute, inside ${project.rootPath}.`
-                  : 'Absolute path on the runner.'
+                  : kind === 'remote_repo'
+                    ? 'Absolute path of a clone on the runner. Specs are written there; without it a spec cannot be written.'
+                    : 'Absolute path on the runner.'
               }
             >
               <Input
@@ -143,6 +151,20 @@ function OverrideDialog({
               />
             </Field>
           ) : null}
+          {kind !== 'none' ? (
+            <Field
+              label="Spec folder"
+              htmlFor="docs-spec-dir"
+              hint="Relative to the docs root. Card and plan specs are written here."
+            >
+              <Input
+                id="docs-spec-dir"
+                value={specDir}
+                placeholder="specs"
+                onChange={(e) => setSpecDir(e.target.value)}
+              />
+            </Field>
+          ) : null}
           {error ? (
             <p role="alert" className="text-danger text-sm">
               {error}
@@ -151,6 +173,114 @@ function OverrideDialog({
         </div>
       </DialogContent>
     </DialogRoot>
+  );
+}
+
+/**
+ * #379: the Spec folder on its own — where card and plan specs are written,
+ * relative to the docs root. Saving it keeps the source as it is: a detected
+ * source stays detected.
+ */
+function SpecFolderForm({
+  project,
+  onSaved,
+}: {
+  project: ProjectDetail;
+  onSaved: () => void;
+}) {
+  const docs = project.docsSource;
+  const [specDir, setSpecDir] = useState(specFolderOf(docs));
+  const [error, setError] = useState<string>();
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setSpecDir(specFolderOf(docs));
+    setError(undefined);
+  }, [docs]);
+
+  if (!docs || docs.kind === 'none') return null;
+  const suggested = docs.specDir === null && specDir !== '';
+
+  const save = async () => {
+    const request = docsOverrideRequest(
+      {
+        kind: docs.kind,
+        localPath: docs.localPath ?? '',
+        repo: docs.repo ?? '',
+        specDir,
+      },
+      project.rootPath,
+    );
+    if (!request.ok) {
+      setError(request.error);
+      return;
+    }
+    setBusy(true);
+    try {
+      await api(`/projects/${project.id}/docs-source`, {
+        method: 'PUT',
+        body: request.body,
+      });
+      toast.success('Spec folder saved.');
+      onSaved();
+    } catch (err) {
+      setError(describeProjectError(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form
+      className="flex flex-col gap-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void save();
+      }}
+    >
+      <Field
+        label="Spec folder"
+        htmlFor="docs-spec-folder"
+        hint={
+          docs.kind === 'in_repo'
+            ? 'Relative to the docs root. Card and plan specs are committed here, in this repository.'
+            : `Relative to the docs root. Card and plan specs go into ${docs.repo ?? 'the docs repository'} through a pull request there.${
+                docs.localPath ? '' : ' Set a local clone with Override first.'
+              }`
+        }
+      >
+        <div className="flex flex-wrap gap-2">
+          <Input
+            id="docs-spec-folder"
+            className="min-w-0 flex-1"
+            value={specDir}
+            placeholder="specs"
+            onChange={(e) => {
+              setSpecDir(e.target.value);
+              setError(specFolderError(e.target.value) ?? undefined);
+            }}
+          />
+          <Button
+            type="submit"
+            variant="glass"
+            size="sm"
+            disabled={busy || (!suggested && specDir === (docs.specDir ?? ''))}
+          >
+            Save
+          </Button>
+        </div>
+      </Field>
+      {suggested ? (
+        <p className="text-sm text-ink-3">
+          Detected from the docs source; save it to use it.
+        </p>
+      ) : null}
+      {error ? (
+        <p role="alert" className="text-danger text-sm">
+          {error}
+        </p>
+      ) : null}
+    </form>
   );
 }
 
@@ -244,7 +374,17 @@ export function DocsTab({
       </div>
 
       {docs ? (
-        <DocsDetails docs={docs} />
+        <>
+          <DocsDetails docs={docs} />
+          {isAdmin ? (
+            <SpecFolderForm project={project} onSaved={onChanged} />
+          ) : docs.specDir ? (
+            <p className="text-sm">
+              <span className="text-ink-3">Spec folder: </span>
+              <code>{docs.specDir}</code>
+            </p>
+          ) : null}
+        </>
       ) : (
         <EmptyState
           title="No docs source"
