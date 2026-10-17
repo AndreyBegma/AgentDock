@@ -116,6 +116,44 @@ const asProfileReason = (
 ): UiProfileViolationReason =>
   reason === 'design_too_large' ? 'kit_too_large' : reason;
 
+export type UiProfileContentCheck =
+  | { ok: true }
+  | { ok: false; reason: UiProfileViolationReason; message: string };
+
+/**
+ * The mockup rules (D6) over a profile's kit and snippets. A build's output
+ * and a person's `PUT /ui-profile` edit both pass through it: every mockup
+ * reuses them, so one that breaks a rule breaks every design turn after it.
+ */
+export const validateProfileContent = (
+  kit: string,
+  snippets: readonly { name: string; html: string }[],
+): UiProfileContentCheck => {
+  const kitCheck = validateMockup(`<style>${kit}</style>`, {
+    maxBytes: UI_PROFILE_KIT_MAX_BYTES + 16,
+  });
+  if (!kitCheck.ok) {
+    return {
+      ok: false,
+      reason: asProfileReason(kitCheck.reason),
+      message: `kit: ${kitCheck.message}`,
+    };
+  }
+  for (const snippet of snippets) {
+    const check = validateMockup(snippet.html, {
+      maxBytes: UI_PROFILE_SNIPPET_MAX_BYTES,
+    });
+    if (!check.ok) {
+      return {
+        ok: false,
+        reason: asProfileReason(check.reason),
+        message: `snippet ${snippet.name}: ${check.message}`,
+      };
+    }
+  }
+  return { ok: true };
+};
+
 /**
  * Validates a profile build's final message. The kit and every snippet go
  * through the mockup rules (D6) too: every mockup reuses them, so a profile
@@ -181,22 +219,7 @@ export const parseUiProfileOutput = (text: string): UiProfileParseResult => {
       `the kit is ${kitBytes} bytes; at most ${UI_PROFILE_KIT_MAX_BYTES} — every mockup carries it, so keep it to tokens, typography and the key components`,
     );
   }
-  const kit = validateMockup(`<style>${output.kit}</style>`, {
-    maxBytes: UI_PROFILE_KIT_MAX_BYTES + 16,
-  });
-  if (!kit.ok) {
-    return violation(asProfileReason(kit.reason), `kit: ${kit.message}`);
-  }
-  for (const snippet of output.snippets) {
-    const check = validateMockup(snippet.html, {
-      maxBytes: UI_PROFILE_SNIPPET_MAX_BYTES,
-    });
-    if (!check.ok) {
-      return violation(
-        asProfileReason(check.reason),
-        `snippet ${snippet.name}: ${check.message}`,
-      );
-    }
-  }
+  const content = validateProfileContent(output.kit, output.snippets);
+  if (!content.ok) return violation(content.reason, content.message);
   return { ok: true, output };
 };

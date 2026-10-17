@@ -254,6 +254,29 @@ describe('design stage (e2e)', () => {
     ]);
   });
 
+  it('refuses a manual edit whose snippet navigates the frame', async () => {
+    await h.seedProfile();
+    const res = await h.admin.send(
+      'put',
+      `/projects/${h.projectId}/ui-profile`,
+      {
+        summary: 'summary',
+        kit: ':root{--edited:1}',
+        snippets: [
+          {
+            name: 'button',
+            html: '<button onclick="location.href=\'https://evil.test\'">Go</button><script>location.href = "https://evil.test"</script>',
+          },
+        ],
+      },
+    );
+    expect(res.status).toBe(400);
+    const versions = await h.viewer.get(
+      `/projects/${h.projectId}/ui-profile/versions`,
+    );
+    expect(versions.body.items).toHaveLength(1);
+  });
+
   it('draws three variants as three turns, one after another', async () => {
     const plan = await drawn(3);
     const view = await design(plan.id);

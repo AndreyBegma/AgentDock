@@ -6,12 +6,22 @@ import type {
   MockupPinMarker,
 } from '@agentdock/shared';
 import { useEffect, useRef, useState } from 'react';
-import { frameSync, readMockupMessage } from '../../lib/design/frame-messages';
+import {
+  acceptPin,
+  type FrameLoads,
+  frameEscaped,
+  frameLoaded,
+  frameSync,
+  PointerGate,
+  readMockupMessage,
+} from '../../lib/design/frame-messages';
 
 /** A click in pin mode, with the frame's box to anchor a comment to. */
 export type FramePin = Extract<MockupMessage, { type: 'pin' }> & {
   frame: DOMRect;
 };
+
+export const MOCKUP_ESCAPED_NOTICE = 'The mockup tried to leave this page';
 
 /**
  * The mockup (spec 223 D6, D9, D11): an `iframe sandbox="allow-scripts"` on
@@ -49,6 +59,11 @@ export function MockupFrame({
   onWheel: (deltaY: number) => void;
 }) {
   const frame = useRef<HTMLIFrameElement>(null);
+  const pointer = useRef(new PointerGate());
+  // Every `MockupFrame` is one frame of one document: a second `load` of the
+  // same `src` is the mockup navigating itself somewhere else (C-130).
+  const [loads, setLoads] = useState<FrameLoads>({ src, loads: 0 });
+  const escaped = frameEscaped(loads, src);
   // Which document said `ready`: a new `src` loads a new one.
   const [readySrc, setReadySrc] = useState<string | null>(null);
   const ready = readySrc === src;
@@ -74,6 +89,9 @@ export function MockupFrame({
     };
   });
 
+  const wheelDelta = useRef(0);
+  const wheelFrame = useRef<number | null>(null);
+
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       const element = frame.current;
@@ -89,11 +107,31 @@ export function MockupFrame({
         return;
       }
       if (message.type === 'wheel') {
-        latest.current.onWheel(message.deltaY);
+        // A wheel needs a hand on the frame, and arrives once per frame.
+        if (!pointer.current.active(performance.now())) return;
+        wheelDelta.current += message.deltaY;
+        if (wheelFrame.current === null) {
+          wheelFrame.current = requestAnimationFrame(() => {
+            wheelFrame.current = null;
+            const delta = wheelDelta.current;
+            wheelDelta.current = 0;
+            if (delta !== 0) latest.current.onWheel(delta);
+          });
+        }
         return;
       }
       if (message.type === 'pin-open') {
         latest.current.onPinOpen?.(message.n);
+        return;
+      }
+      const { pinMode: on } = latest.current;
+      if (
+        !acceptPin(message, {
+          pinMode: on,
+          pointer: pointer.current,
+          now: performance.now(),
+        })
+      ) {
         return;
       }
       latest.current.onPin({
@@ -102,7 +140,12 @@ export function MockupFrame({
       });
     };
     window.addEventListener('message', onMessage);
-    return () => window.removeEventListener('message', onMessage);
+    return () => {
+      window.removeEventListener('message', onMessage);
+      if (wheelFrame.current !== null) cancelAnimationFrame(wheelFrame.current);
+      wheelFrame.current = null;
+      wheelDelta.current = 0;
+    };
   }, [src]);
 
   useEffect(() => {
@@ -115,8 +158,52 @@ export function MockupFrame({
   }, [ready, theme, pinMode, pins, touchScale]);
 
   return (
+    <MockupFrameShell
+      escaped={escaped}
+      src={src}
+      title={title}
+      frameRef={frame}
+      onLoad={() => setLoads((state) => frameLoaded(state, src))}
+      onPointerEnter={() => pointer.current.enter()}
+      onPointerLeave={() => pointer.current.leave(performance.now())}
+    />
+  );
+}
+
+/** The iframe, or — once the mockup has navigated it away — a notice in its place. */
+export function MockupFrameShell({
+  escaped,
+  src,
+  title,
+  frameRef,
+  onLoad,
+  onPointerEnter,
+  onPointerLeave,
+}: {
+  escaped: boolean;
+  src: string;
+  title: string;
+  frameRef?: React.Ref<HTMLIFrameElement>;
+  onLoad?: () => void;
+  onPointerEnter?: () => void;
+  onPointerLeave?: () => void;
+}) {
+  if (escaped) {
+    return (
+      <div
+        role="alert"
+        className="flex size-full items-center justify-center bg-white p-6 text-center text-neutral-900"
+      >
+        {MOCKUP_ESCAPED_NOTICE}
+      </div>
+    );
+  }
+  return (
     <iframe
-      ref={frame}
+      ref={frameRef}
+      onLoad={onLoad}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
       key={src}
       src={src}
       title={title}

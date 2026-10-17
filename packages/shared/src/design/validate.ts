@@ -59,6 +59,16 @@ const FORBIDDEN_SCRIPT: readonly { pattern: RegExp; what: string }[] = [
     what: 'top or parent navigation or messaging',
   },
   { pattern: /\bwindow\s*\.\s*(?:top|parent)\b/, what: 'window.top/parent' },
+  // Tripwire, not a wall: the viewer also resets a frame that loads twice.
+  {
+    pattern: /\b(?:self|window|document|globalThis|this)\s*\.\s*location\b/,
+    what: 'location (navigates the frame)',
+  },
+  {
+    pattern:
+      /(?<![\w$])(?<!\b(?:const|let|var)\s)location\s*(?:\.\s*(?:assign|replace|href)\b|=(?![=>]))/,
+    what: 'location (navigates the frame)',
+  },
 ];
 
 const findForbiddenScript = (code: string): string | null =>

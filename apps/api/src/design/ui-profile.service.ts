@@ -7,6 +7,7 @@ import {
   type UiProfileVersionView,
   type UiProfileView,
   uiProfileSnippetSchema,
+  validateProfileContent,
 } from '@agentdock/shared';
 import { uiProfileBuildArgsSchema } from '@agentdock/shared/protocol';
 import { Injectable, Optional } from '@nestjs/common';
@@ -198,6 +199,12 @@ export class UiProfileService {
         DESIGN_ERROR.invalidArgs,
         z.prettifyError(snippets.error),
       );
+    }
+    // A person's edit skips the build's contract check: run the mockup rules
+    // here, or a snippet could navigate the frame of every later mockup.
+    const content = validateProfileContent(request.kit, snippets.data);
+    if (!content.ok) {
+      throw designError(400, DESIGN_ERROR.invalidArgs, content.message);
     }
     const created = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM projects WHERE id = ${projectId} FOR UPDATE`;

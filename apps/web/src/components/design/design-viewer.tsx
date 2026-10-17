@@ -477,7 +477,8 @@ export function DesignViewer({
                         touchScale={phone ? zoom : undefined}
                         onPinOpen={() => setSheetOpen(true)}
                         onPin={(pin) => {
-                          if (writeBlock === null) setDraft({ ...pin, zoom });
+                          if (writeBlock === null && pinMode)
+                            setDraft({ ...pin, zoom });
                         }}
                       />
                     </div>
