@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>C-247 icon-only rail</title>
+<style>
+:root,:root[data-theme="dark"]{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246 / 0.62);--color-ink-3:rgb(242 242 246 / 0.53);--color-line:rgb(255 255 255 / 0.1);--color-line-strong:rgb(255 255 255 / 0.18);--color-hover:rgb(255 255 255 / 0.06);--color-focus:#b4b2ff;--color-accent-soft:rgb(91 91 246 / 0.2);--color-accent-ink:#b4b2ff;--color-warn:#e3b341;--color-danger:#ff6b60;--color-hue-2:#2fbf94;--color-hue-1:#5b9cf6;--color-hue-7:#a68bfa;--glass-sheen:rgb(255 255 255 / 0.06);--glass-scrim:rgb(9 9 12 / 0.55);--glass-edge:rgb(255 255 255 / 0.14);--glass-spec:rgb(255 255 255 / 0.2);--glass-shadow:rgb(0 0 0 / 0.35);--canvas-glow:18%;--radius-control:6px;--radius-surface:8px}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-ink:#18181b;--color-ink-2:rgb(24 24 27 / 0.72);--color-ink-3:rgb(24 24 27 / 0.64);--color-line:rgb(0 0 0 / 0.1);--color-line-strong:rgb(0 0 0 / 0.23);--color-hover:rgb(0 0 0 / 0.06);--color-focus:#4f46e5;--color-accent-soft:rgb(79 70 229 / 0.12);--color-accent-ink:#4338ca;--color-warn:#b45309;--color-danger:#dc2626;--color-hue-2:#00805e;--color-hue-1:#1f64d6;--color-hue-7:#7244e0;--glass-sheen:rgb(0 0 0 / 0.06);--glass-scrim:rgb(255 255 255 / 0.52);--glass-edge:rgb(0 0 0 / 0.18);--glass-spec:rgb(0 0 0 / 0.2);--glass-shadow:rgb(0 0 0 / 0.12);--canvas-glow:10%}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;font-family:'SF Pro Text',Inter,system-ui,sans-serif;font-size:14px;line-height:20px;color:var(--color-ink);background:var(--color-ground);-webkit-font-smoothing:antialiased}
+.canvas{position:fixed;inset:0;z-index:-1;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);backdrop-filter:blur(26px) saturate(180%);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),0 12px 32px var(--glass-shadow)}
+.wrap{padding:20px;display:flex;flex-direction:column;gap:16px}
+h1{margin:0;font-size:15px;font-weight:600}
+.sub0{margin:2px 0 0;font-size:12px;color:var(--color-ink-3)}
+.row{display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start}
+.col{display:flex;flex-direction:column;gap:8px;width:200px}
+.cap{font-size:12px;font-weight:600}
+.cap span{display:block;font-weight:400;color:var(--color-ink-3);margin-top:2px}
+.rail{width:56px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 8px;border-radius:var(--radius-surface)}
+.sw{width:24px;height:24px;border-radius:6px;background:var(--color-hue-2);margin:4px 0 6px}
+.sep{height:1px;width:28px;background:var(--color-line);margin:6px 0}
+.ib{position:relative;display:flex;align-items:center;justify-content:center;width:40px;height:36px;border-radius:var(--radius-control);color:var(--color-ink-2);border:0;background:transparent;cursor:pointer}
+.ib:hover{background:var(--color-hover)}
+.ib[aria-current=page]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.ib[aria-expanded=true]{color:var(--color-ink);background:var(--color-hover)}
+.ib:focus-visible{outline:3px solid var(--color-focus);outline-offset:-2px}
+.dot{position:absolute;top:5px;right:6px;width:8px;height:8px;border-radius:999px;background:var(--color-warn);box-shadow:0 0 0 2px var(--color-surface)}
+.dot.d{background:var(--color-danger)}
+.grp{display:flex;flex-direction:column;align-items:center;gap:2px;width:100%}
+.grp[hidden]{display:none}
+.grp.in{padding:2px 0;border-radius:var(--radius-control);background:color-mix(in oklab,var(--color-ink) 4%,transparent)}
+.chip{position:absolute;right:4px;bottom:4px;width:6px;height:6px;border-top:1.5px solid currentColor;border-right:1.5px solid currentColor;transform:rotate(135deg);opacity:.6;transition:transform 150ms}
+.ib[aria-expanded=true] .chip{transform:rotate(-45deg)}
+svg.i{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tip{display:inline-block;padding:4px 8px;border-radius:var(--radius-control);font-size:12px;background:var(--color-ink);color:var(--color-ground);margin-left:8px;white-space:nowrap}
+.pair{display:flex;align-items:flex-start}
+.btn{height:28px;padding:0 12px;border-radius:var(--radius-control);border:1px solid var(--color-line-strong);background:var(--color-raised);color:var(--color-ink);font:inherit;font-size:12px;font-weight:600;cursor:pointer;align-self:flex-start}
+.top{display:flex;justify-content:space-between}
+</style>
+</head>
+<body>
+<div class="canvas"></div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="project" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></symbol>
+<symbol id="work" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M8 7v7M12 7v4M16 7v9"/></symbol>
+<symbol id="activity" viewBox="0 0 24 24"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></symbol>
+<symbol id="fleet" viewBox="0 0 24 24"><rect width="20" height="8" x="2" y="2" rx="2"/><rect width="20" height="8" x="2" y="14" rx="2"/><path d="M6 6h.01M6 18h.01"/></symbol>
+<symbol id="queue" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+<symbol id="approvals" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></symbol>
+<symbol id="history" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+<symbol id="saver" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></symbol>
+<symbol id="skills" viewBox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></symbol>
+<symbol id="sched" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+<symbol id="settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></symbol>
+<symbol id="workspace" viewBox="0 0 24 24"><path d="m12 2 10 5-10 5L2 7zM2 12l10 5 10-5M2 17l10 5 10-5"/></symbol>
+<symbol id="admin" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
+<symbol id="more" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+</defs></svg>
+
+<div class="wrap">
+  <div class="top"><div><h1>C-247 · Icon-only rail (C-14)</h1><p class="sub0">Each group becomes one toggle icon with a chevron corner mark. Its entries appear inline as icons when open; the Fleet attention dot shows on the folded toggle.</p></div><button class="btn" id="theme" type="button">Toggle theme</button></div>
+  <div class="row" id="r"></div>
+</div>
+
+<script>
+const I=n=>`<svg class="i" aria-hidden="true"><use href="#${n}"/></svg>`;
+const ib=(n,l,a)=>`<button class="ib" type="button" aria-label="${l}" title="${l}" ${a?'aria-current="page"':''}>${I(n)}${a==='fleet'?'':''}</button>`;
+let u=0;
+const tog=(n,l,open,inner,dot)=>{const id='k'+(u++);return `<button class="ib" type="button" aria-label="${l}" aria-expanded="${open}" aria-controls="${id}" data-t="${id}">${I(n)}<span class="chip"></span>${dot?`<span class="dot" data-d ${open?'hidden':''}></span>`:''}</button><div class="grp in" id="${id}" ${open?'':'hidden'}>${inner}</div>`;};
+const moreInner=(a)=>`<button class="ib" type="button" aria-label="Fleet — 1 needs attention">${I('fleet')}<span class="dot"></span></button>`+ib('queue','Queue')+`<button class="ib" type="button" aria-label="Approvals — 2 waiting">${I('approvals')}<span class="dot d"></span></button>`+ib('history','History',a==='history')+ib('saver','Token saver')+ib('skills','Skills')+ib('sched','Schedules')+ib('settings','Settings');
+const base=(open,a)=>`<span class="sw"></span>`+ib('project','Project')+ib('work','Work')+ib('activity','Activity')+tog('more','More',open,moreInner(a),true)+`<div class="sep"></div>`+tog('workspace','Workspace',false,ib('project','Overview')+ib('activity','Sessions'))+`<div class="sep"></div>`+tog('admin','Admin',false,ib('settings','Users'));
+const cols=[['Folded (default)','Only the three working pages plus one toggle per group. Dot = something in More needs attention.',base(false)],
+['More open, History active','Auto-opened. Entries are icons with labels in aria-label and native tooltips; dots sit on Fleet and Approvals.',base(true,'history')]];
+document.getElementById('r').innerHTML=cols.map(c=>`<div class="col"><div class="cap">${c[0]}<span>${c[1]}</span></div><nav class="rail glass" aria-label="Navigation">${c[2]}</nav></div>`).join('');
+document.addEventListener('click',e=>{const b=e.target.closest('[data-t]');if(!b)return;const o=b.getAttribute('aria-expanded')!=='true';b.setAttribute('aria-expanded',o);document.getElementById(b.dataset.t).hidden=!o;const d=b.querySelector('[data-d]');if(d)d.hidden=o;});
+document.getElementById('theme').onclick=()=>{const r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark'};
+</script>
+</body>
+</html>

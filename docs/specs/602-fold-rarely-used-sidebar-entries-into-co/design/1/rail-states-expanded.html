@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>C-247 rail states</title>
+<style>
+:root,:root[data-theme="dark"]{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246 / 0.62);--color-ink-3:rgb(242 242 246 / 0.53);--color-line:rgb(255 255 255 / 0.1);--color-line-strong:rgb(255 255 255 / 0.18);--color-hover:rgb(255 255 255 / 0.06);--color-focus:#b4b2ff;--color-accent:#5b5bf6;--color-accent-soft:rgb(91 91 246 / 0.2);--color-accent-ink:#b4b2ff;--color-warn:#e3b341;--color-danger:#ff6b60;--color-hue-2:#2fbf94;--color-hue-1:#5b9cf6;--color-hue-7:#a68bfa;--glass-sheen:rgb(255 255 255 / 0.06);--glass-scrim:rgb(9 9 12 / 0.55);--glass-edge:rgb(255 255 255 / 0.14);--glass-spec:rgb(255 255 255 / 0.2);--glass-shadow:rgb(0 0 0 / 0.35);--canvas-glow:18%;--radius-control:6px;--radius-surface:8px}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-ink:#18181b;--color-ink-2:rgb(24 24 27 / 0.72);--color-ink-3:rgb(24 24 27 / 0.64);--color-line:rgb(0 0 0 / 0.1);--color-line-strong:rgb(0 0 0 / 0.23);--color-hover:rgb(0 0 0 / 0.06);--color-focus:#4f46e5;--color-accent:#4f46e5;--color-accent-soft:rgb(79 70 229 / 0.12);--color-accent-ink:#4338ca;--color-warn:#b45309;--color-danger:#dc2626;--color-hue-2:#00805e;--color-hue-1:#1f64d6;--color-hue-7:#7244e0;--glass-sheen:rgb(0 0 0 / 0.06);--glass-scrim:rgb(255 255 255 / 0.52);--glass-edge:rgb(0 0 0 / 0.18);--glass-spec:rgb(0 0 0 / 0.2);--glass-shadow:rgb(0 0 0 / 0.12);--canvas-glow:10%}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;font-family:'SF Pro Text',Inter,system-ui,sans-serif;font-size:14px;line-height:20px;color:var(--color-ink);background:var(--color-ground);-webkit-font-smoothing:antialiased}
+.canvas{position:fixed;inset:0;z-index:-1;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);backdrop-filter:blur(26px) saturate(180%);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),0 12px 32px var(--glass-shadow)}
+.wrap{padding:20px;display:flex;flex-direction:column;gap:16px}
+.bar{display:flex;justify-content:space-between;align-items:center}
+.bar h1{margin:0;font-size:15px;font-weight:600}
+.bar p{margin:2px 0 0;font-size:12px;color:var(--color-ink-3)}
+.btn{height:28px;padding:0 12px;border-radius:var(--radius-control);border:1px solid var(--color-line-strong);background:var(--color-raised);color:var(--color-ink);font:inherit;font-size:12px;font-weight:600;cursor:pointer}
+.row{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+.col{display:flex;flex-direction:column;gap:8px;width:240px}
+.cap{font-size:12px;font-weight:600}
+.cap span{display:block;font-weight:400;color:var(--color-ink-3);margin-top:2px}
+.rail{width:240px;display:flex;flex-direction:column;gap:2px;padding:8px;border-radius:var(--radius-surface)}
+.rail.icon{width:56px;align-items:center}
+.head{display:flex;align-items:center;gap:8px;padding:8px 12px;font-weight:600}
+.sw{width:10px;height:10px;border-radius:2px;background:var(--color-hue-2);flex-shrink:0}
+.sec{padding:8px 12px 4px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--color-ink-3)}
+.item,.tog{position:relative;display:flex;align-items:center;gap:12px;width:100%;padding:8px 12px;border-radius:var(--radius-control);font:inherit;font-size:14px;color:var(--color-ink-2);text-decoration:none;border:0;background:transparent;cursor:pointer;text-align:left}
+.item:hover,.tog:hover{background:var(--color-hover)}
+.item[aria-current=page]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.item .l,.tog .l{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tog{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--color-ink-3);padding:8px 12px}
+.tog .chev{transition:transform 150ms}
+.tog[aria-expanded=true] .chev{transform:rotate(180deg)}
+.tog[aria-expanded=true]{color:var(--color-ink-2)}
+.tog:focus-visible,.item:focus-visible{outline:3px solid var(--color-focus);outline-offset:-2px}
+.sub{display:flex;flex-direction:column;gap:2px;margin-left:18px;padding-left:6px;border-left:1px solid var(--color-line)}
+.sub[hidden]{display:none}
+.rail.icon .sub{margin-left:0;padding-left:0;border-left:0;align-items:center}
+.sep{height:1px;background:var(--color-line);margin:6px 4px}
+.badge{display:inline-flex;align-items:center;justify-content:center;height:18px;min-width:18px;padding:0 5px;border-radius:999px;font-size:10px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--color-ground)}
+.b-warn{background:var(--color-warn)}.b-danger{background:var(--color-danger)}
+.tog .badge{letter-spacing:0}
+svg.i{width:16px;height:16px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+svg.i.s{width:14px;height:14px}
+.ib{position:relative;display:flex;align-items:center;justify-content:center;width:40px;height:36px;border-radius:var(--radius-control);color:var(--color-ink-2);border:0;background:transparent;cursor:pointer}
+.ib:hover{background:var(--color-hover)}
+.ib[aria-current=page]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.ib .dot{position:absolute;top:5px;right:7px;width:8px;height:8px;border-radius:999px;background:var(--color-warn);box-shadow:0 0 0 2px var(--color-surface)}
+.ib[aria-expanded=true]{color:var(--color-ink)}
+.note{font-size:12px;color:var(--color-ink-3);max-width:240px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
+</head>
+<body>
+<div class="canvas"></div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<symbol id="project" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></symbol>
+<symbol id="work" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M8 7v7M12 7v4M16 7v9"/></symbol>
+<symbol id="activity" viewBox="0 0 24 24"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></symbol>
+<symbol id="fleet" viewBox="0 0 24 24"><rect width="20" height="8" x="2" y="2" rx="2"/><rect width="20" height="8" x="2" y="14" rx="2"/><path d="M6 6h.01M6 18h.01"/></symbol>
+<symbol id="queue" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+<symbol id="approvals" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></symbol>
+<symbol id="history" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+<symbol id="saver" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></symbol>
+<symbol id="skills" viewBox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></symbol>
+<symbol id="sched" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+<symbol id="settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></symbol>
+<symbol id="overview" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></symbol>
+<symbol id="sessions" viewBox="0 0 24 24"><path d="m4 17 6-6-6-6M12 19h8"/></symbol>
+<symbol id="users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+<symbol id="runners" viewBox="0 0 24 24"><rect width="18" height="12" x="3" y="4" rx="2"/><path d="M2 20h20M12 16v4"/></symbol>
+<symbol id="workspace" viewBox="0 0 24 24"><path d="m12 2 10 5-10 5L2 7zM2 12l10 5 10-5M2 17l10 5 10-5"/></symbol>
+<symbol id="admin" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
+<symbol id="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="more" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+</defs>
+</svg>
+
+<div class="wrap">
+  <div class="bar">
+    <div><h1>C-247 · Project rail states</h1><p>Group headers are clickable. Folded state is the default; a group opens itself when the active page lives in it.</p></div>
+    <button class="btn" id="theme" type="button">Toggle theme</button>
+  </div>
+  <div class="row" id="expanded"></div>
+</div>
+
+<script>
+const I=(n,c='')=>`<svg class="i ${c}" aria-hidden="true"><use href="#${n}"/></svg>`;
+const item=(ic,l,o={})=>`<a class="item" href="#" ${o.a?'aria-current="page"':''}>${I(ic)}<span class="l">${l}</span>${o.b?`<span class="badge b-${o.bt||'warn'}">${o.b}</span>`:''}</a>`;
+let uid=0;
+const group=(title,ic,open,inner,o={})=>{const id='g'+(uid++);
+ return `<div><button class="tog" type="button" aria-expanded="${open}" aria-controls="${id}" data-t="${id}">${I(ic,'s')}<span class="l">${title}</span><span class="badge b-warn" data-fb ${o.fb&&!open?'':'hidden'}>${o.fb||''}</span>${I('chev','s chev')}</button><div class="sub" id="${id}" ${open?'':'hidden'}>${inner}</div></div>`;};
+const more=(open,active)=>group('More','more',open,
+ item('fleet','Fleet',{b:1})+item('queue','Queue')+item('approvals','Approvals',{b:2,bt:'danger'})+item('history','History',{a:active==='history'})+item('saver','Token saver')+item('skills','Skills')+item('sched','Schedules')+item('settings','Settings'),{fb:1});
+const wsItems=(a)=>item('overview','Overview')+item('project','Projects')+item('sessions','Sessions',{a:a==='sessions'})+item('activity','Activity');
+const admin=(open)=>`<div class="sep"></div>`+group('Admin','admin',open,item('users','Users')+item('runners','Runners')+item('settings','System'));
+const head=`<div class="head"><span class="sw"></span>AgentDock</div>`;
+const proj=(m,a)=>`<div class="sec">Project</div>`+item('project','Project',{a:a==='project'})+item('work','Work')+item('activity','Activity')+m;
+const rails=[
+ ['A · Inside a project, everything folded','Default. Fleet’s warn badge rides on the More header.',
+  head+proj(more(false))+`<div class="sep"></div>`+group('Workspace','workspace',false,wsItems())+admin(false)],
+ ['B · /projects/:id/history','More auto-opens, History active. Badge moves onto Fleet.',
+  head+proj(more(true,'history'))+`<div class="sep"></div>`+group('Workspace','workspace',false,wsItems())+admin(false)],
+ ['C · /sessions while inside a project','Workspace auto-opens; More stays folded and independent.',
+  head+proj(more(false))+`<div class="sep"></div>`+group('Workspace','workspace',true,wsItems('sessions'))+admin(false)],
+ ['D · Outside a project','Workspace is a plain section, not collapsible. Admin as today.',
+  `<div class="sec">Workspace</div>`+wsItems('x').replace('Overview','Overview').replace('<a class="item" href="#">','<a class="item" href="#" aria-current="page">')+admin(false)]
+];
+document.getElementById('expanded').innerHTML=rails.map(r=>`<div class="col"><div class="cap">${r[0]}<span>${r[1]}</span></div><nav class="rail glass" aria-label="Navigation">${r[2]}</nav></div>`).join('');
+document.addEventListener('click',e=>{const b=e.target.closest('.tog');if(!b)return;const open=b.getAttribute('aria-expanded')!=='true';b.setAttribute('aria-expanded',open);document.getElementById(b.dataset.t).hidden=!open;const fb=b.querySelector('[data-fb]');if(fb&&fb.textContent)fb.hidden=open;});
+document.getElementById('theme').onclick=()=>{const r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark'};
+</script>
+</body>
+</html>
