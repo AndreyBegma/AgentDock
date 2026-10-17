@@ -207,6 +207,9 @@ const idSchema = z
   .regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$/, 'must be a short id');
 
 const text = (max: number) => z.string().trim().min(1).max(max);
+/** A title is one line: a newline would start a section of a prompt. */
+const lineText = (max: number) =>
+  text(max).refine((title) => !/[\r\n]/.test(title), 'title must be one line');
 
 export const planQuestionOptionSchema = z.strictObject({
   id: idSchema,
@@ -431,7 +434,7 @@ export type DesignOutput = z.infer<typeof designOutputSchema>;
  * parser. It lands in Todo with `kindSource = auto`.
  */
 export const cardDraftSchema = z.strictObject({
-  title: text(CARD_DRAFT_TITLE_MAX),
+  title: lineText(CARD_DRAFT_TITLE_MAX),
   kind: planTaskKindSchema,
   body: text(CARD_DRAFT_BODY_MAX),
 });
@@ -454,7 +457,7 @@ export const intakeCardOutputSchema = z.strictObject({
  * one, and a one-line summary the person reads in the proposal.
  */
 export const splitCardDraftSchema = z.strictObject({
-  title: text(CARD_DRAFT_TITLE_MAX),
+  title: lineText(CARD_DRAFT_TITLE_MAX),
   kind: planTaskKindSchema,
   summary: text(INTAKE_SPLIT_SUMMARY_MAX),
   body: text(CARD_DRAFT_BODY_MAX),

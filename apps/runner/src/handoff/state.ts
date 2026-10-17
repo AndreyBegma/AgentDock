@@ -132,8 +132,8 @@ export const keepSession = (state: HandoffState, sessionId: string): void => {
   if (!state.sessions.includes(sessionId)) state.sessions.push(sessionId);
 };
 
-/** `## Card C-<n>: <title>` — the header `cardWorkerPrompt` writes. */
-const CARD_HEADER = /^## Card C-(\d{1,9}): /m;
+/** `## Card C-<n>` — the header `cardWorkerPrompt` writes (older prompts add `: <title>`). */
+const CARD_HEADER = /^## Card C-(\d{1,9})(?::|$)/m;
 
 /** The card's number from round 1's prompt; null when it has no header. */
 export const cardNumberOfPrompt = (prompt: string): number | null => {

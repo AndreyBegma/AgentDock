@@ -247,7 +247,12 @@ export const LOCAL_CARD_KINDS = ['feature', 'bug'] as const;
  * `not_a_manual_session`.
  */
 export const localCardTrackArgsSchema = z.strictObject({
-  title: z.string().trim().min(1).max(LOCAL_CARD_TITLE_MAX),
+  title: z
+    .string()
+    .trim()
+    .min(1)
+    .max(LOCAL_CARD_TITLE_MAX)
+    .refine((title) => !/[\r\n]/.test(title), 'title must be one line'),
   body: z.string().max(LOCAL_CARD_BODY_MAX).optional(),
   /** Only when it is obvious; absent leaves it to the normalization (#271 D9). */
   kind: z.enum(LOCAL_CARD_KINDS).optional(),

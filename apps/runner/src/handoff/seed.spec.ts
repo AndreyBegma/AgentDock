@@ -65,6 +65,7 @@ describe('the fresh seed (#449 D3)', () => {
 
   it('reads the card number from round 1’s header', () => {
     expect(cardNumberOfPrompt('intro\n\n## Card C-12: Add login\n')).toBe(12);
+    expect(cardNumberOfPrompt('intro\n\n## Card C-12\n\nKind: bug')).toBe(12);
     expect(cardNumberOfPrompt('continue')).toBeNull();
   });
 });

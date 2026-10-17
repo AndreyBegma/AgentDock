@@ -2,6 +2,7 @@ import {
   type BoardCardDetail,
   CARD_CONTINUE_PROMPT,
   CARD_WORKER_PROMPT_VERSION,
+  cardFeedbackPrompt,
 } from '@agentdock/shared';
 import { BudgetGate } from '../budgets/budget-gate';
 import { Feed } from '../budgets/testing/budgets-e2e';
@@ -261,8 +262,7 @@ describe('board rounds (e2e)', () => {
       expect(w.sent('card.run')[1]).toMatchObject({
         session: { id: card.sessionId, resume: true },
         branch: card.branch,
-        prompt:
-          'Review feedback: Rename the button.\n\nAddress it on the same branch, commit, then call finish_card.',
+        prompt: cardFeedbackPrompt('Rename the button.'),
       });
       expect(w.sent('card.run')[1]).not.toHaveProperty('files');
     });
@@ -302,8 +302,10 @@ describe('board rounds (e2e)', () => {
       const prompt = promptOf(1);
       expect(prompt).toContain('## Card changed');
       expect(prompt).toContain('Title: Add SSO (was: Add login)');
-      expect(prompt).toContain('### What to do\n\nSign in with Google.');
-      expect(prompt).toContain('## Review feedback\n\nRename the button.');
+      expect(prompt).toContain('### What to do\n\n');
+      expect(prompt).toContain('<card>\nSign in with Google.\n</card>');
+      expect(prompt).toContain('## Review feedback\n\n');
+      expect(prompt).toContain('<card>\nRename the button.\n</card>');
 
       const card = await w.card(1);
       expect(card.rounds[0]).toMatchObject({
@@ -326,9 +328,7 @@ describe('board rounds (e2e)', () => {
       // A second feedback without edits: the plain feedback prompt.
       await post(1, 'finish');
       await post(1, 'feedback', { text: 'Now the colour.' });
-      expect(promptOf(2)).toBe(
-        'Review feedback: Now the colour.\n\nAddress it on the same branch, commit, then call finish_card.',
-      );
+      expect(promptOf(2)).toBe(cardFeedbackPrompt('Now the colour.'));
     });
 
     it('edits made while a round runs reach the round after it', async () => {
