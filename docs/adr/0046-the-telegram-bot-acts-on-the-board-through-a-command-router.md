@@ -3,7 +3,8 @@
 Status: accepted · Date: 2026-10-16 ·
 Issue: [#500](https://github.com/AndreyBegma/AgentDock/issues/500) ·
 Spec: [`docs/specs/500-add-a-telegram-command-router-and-per-ch.md`](../specs/500-add-a-telegram-command-router-and-per-ch.md) ·
-Widens [spec 22](../specs/22-notifications-and-telegram.md) scope · Keeps spec 22 D7, D10 and D12
+Widens [spec 22](../specs/22-notifications-and-telegram.md) scope · Keeps spec 22 D7, D10 and D12 ·
+Amended by [ADR-0061](0061-telegram-free-text-goes-to-the-api-assistant.md) (free text goes to the API assistant, never to a runner)
 
 ## Context
 

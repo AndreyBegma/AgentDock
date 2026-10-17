@@ -12,6 +12,10 @@ export const BOT_COMMANDS: readonly BotCommand[] = [
   { command: 'board', description: 'Browse the Board: columns and cards' },
   { command: 'card', description: 'Show a card by its number' },
   { command: 'new', description: 'Start new work: the intake interview' },
+  {
+    command: 'newchat',
+    description: 'Start a new conversation with the AI assistant',
+  },
   { command: 'help', description: 'List the commands' },
   { command: 'stop', description: 'Unlink this chat from AgentDock' },
 ];
@@ -25,6 +29,7 @@ export const HELP_TEXT = [
   '/card <number> — Show one card; Move, Run and Stop are on it',
   '/new <description> — Start new work with the description in one message',
   'With /new, send a photo or screenshot to attach it, or a voice message instead of typing.',
+  'Any other message goes to the AI assistant, which continues this chat’s conversation until /newchat. A photo with a caption is attached to it.',
   '/start <code> — Link this chat; the link comes from AgentDock → Account → Notifications',
   'Buttons on notifications act on their own project, whatever this chat works on.',
 ].join('\n');

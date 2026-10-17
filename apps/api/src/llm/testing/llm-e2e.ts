@@ -1,6 +1,6 @@
 import type { LlmProviderId } from '@agentdock/shared';
 import { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
+import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import type { Prisma } from '@prisma/client';
 import request from 'supertest';
 import type { App } from 'supertest/types';
@@ -27,11 +27,16 @@ export interface LlmE2eContext extends E2eContext {
   clock: { now: Date | null };
 }
 
+/** What every provider's HTTP answers, and the gateway's clock; set per test. */
+export type LlmMock = Pick<LlmE2eContext, 'providerFetch' | 'clock'>;
+
 /**
- * The app with the real adapters on a mocked `fetch` and a settable clock.
- * `LLM_SECRETS_KEY` is read at start-up: set it before calling.
+ * `builder` with the real adapters on a mocked `fetch` and a settable clock;
+ * the mock to drive them with.
  */
-export const createLlmE2eApp = async (): Promise<LlmE2eContext> => {
+export const mockLlm = (
+  builder: TestingModuleBuilder,
+): { builder: TestingModuleBuilder; mock: LlmMock } => {
   const providerFetch = jest.fn<ReturnType<Fetch>, Parameters<Fetch>>(
     async () => {
       throw new Error('no provider answer set for this test');
@@ -39,17 +44,30 @@ export const createLlmE2eApp = async (): Promise<LlmE2eContext> => {
   );
   const clock: { now: Date | null } = { now: null };
   const viaMock: Fetch = (...args) => providerFetch(...args);
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
-    .overrideProvider(LLM_ADAPTERS)
-    .useValue({
-      anthropic: new AnthropicAdapter({ fetch: viaMock }),
-      openai: new OpenAiCompatibleAdapter(OPENAI_PROFILE, viaMock),
-      xai: new OpenAiCompatibleAdapter(XAI_PROFILE, viaMock),
-      openrouter: new OpenAiCompatibleAdapter(OPENROUTER_PROFILE, viaMock),
-    } satisfies Record<LlmProviderId, LlmAdapter>)
-    .overrideProvider(LLM_CLOCK)
-    .useValue(() => clock.now ?? new Date())
-    .compile();
+  return {
+    builder: builder
+      .overrideProvider(LLM_ADAPTERS)
+      .useValue({
+        anthropic: new AnthropicAdapter({ fetch: viaMock }),
+        openai: new OpenAiCompatibleAdapter(OPENAI_PROFILE, viaMock),
+        xai: new OpenAiCompatibleAdapter(XAI_PROFILE, viaMock),
+        openrouter: new OpenAiCompatibleAdapter(OPENROUTER_PROFILE, viaMock),
+      } satisfies Record<LlmProviderId, LlmAdapter>)
+      .overrideProvider(LLM_CLOCK)
+      .useValue(() => clock.now ?? new Date()),
+    mock: { providerFetch, clock },
+  };
+};
+
+/**
+ * The app with the real adapters on a mocked `fetch` and a settable clock.
+ * `LLM_SECRETS_KEY` is read at start-up: set it before calling.
+ */
+export const createLlmE2eApp = async (): Promise<LlmE2eContext> => {
+  const { builder, mock } = mockLlm(
+    Test.createTestingModule({ imports: [AppModule] }),
+  );
+  const moduleRef = await builder.compile();
   const app = moduleRef.createNestApplication<INestApplication<App>>();
   configureApp(app);
   await app.init();
@@ -57,8 +75,7 @@ export const createLlmE2eApp = async (): Promise<LlmE2eContext> => {
     app,
     prisma: app.get(PrismaService),
     http: () => request(app.getHttpServer()),
-    providerFetch,
-    clock,
+    ...mock,
   };
 };
 
