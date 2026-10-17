@@ -6,7 +6,7 @@ import { HttpException } from '@nestjs/common';
 import type { AuditContext } from '../audit/audit.types';
 import type { PrismaService } from '../database/prisma.service';
 import type { ProjectInspector } from '../projects';
-import type { TextNormalizer } from '../text';
+import type { TextNormalizer } from '../text/text-normalizer';
 import { ProjectRuleScanService } from './project-rule-scan.service';
 import type { ProjectRulesService } from './project-rules.service';
 

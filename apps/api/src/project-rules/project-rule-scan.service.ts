@@ -9,7 +9,7 @@ import { Injectable } from '@nestjs/common';
 import type { AuditContext } from '../audit/audit.types';
 import { PrismaService } from '../database/prisma.service';
 import { ProjectInspector, projectNotFound } from '../projects';
-import { TextNormalizer } from '../text';
+import { TextNormalizer } from '../text/text-normalizer';
 import { ProjectRulesService } from './project-rules.service';
 
 /**
