@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { boundedName, TEXT_NAME_MAX } from './bounded';
 
 /** HTTP path, on the API origin, the runner posts its pairing request to. */
 export const PAIRING_PATH = '/runners/pair';
@@ -24,15 +25,15 @@ export const runnerTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
 
 export const pairingRequestSchema = z.object({
   code: pairingCodeSchema,
-  hostname: z.string().min(1),
+  hostname: boundedName(TEXT_NAME_MAX),
   /** Runner version. */
-  version: z.string().min(1),
+  version: boundedName(TEXT_NAME_MAX),
   protocolVersion: z.number().int().positive(),
 });
 export type PairingRequest = z.infer<typeof pairingRequestSchema>;
 
 export const pairingResponseSchema = z.object({
-  runnerId: z.string().min(1),
+  runnerId: boundedName(TEXT_NAME_MAX),
   token: runnerTokenSchema,
 });
 export type PairingResponse = z.infer<typeof pairingResponseSchema>;

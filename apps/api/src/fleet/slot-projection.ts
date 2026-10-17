@@ -1,6 +1,7 @@
 import {
   type CheckpointKind,
   isHttpsGithubUrl,
+  slotNameSchema,
 } from '@agentdock/shared/protocol';
 import { Prisma, type Slot } from '@prisma/client';
 import {
@@ -47,6 +48,9 @@ const prNumberOf = (url: string | undefined): number | undefined => {
   }
 };
 
+const isSlotName = (name: string): boolean =>
+  slotNameSchema.safeParse(name).success;
+
 export type SlotEvent = EventOf<
   | 'session.appeared'
   | 'session.vanished'
@@ -84,6 +88,9 @@ export class SlotProjection {
 
   async apply(applied: Applied<SlotEvent>): Promise<void> {
     const { event } = applied;
+    // The envelope already holds a slot to `slotNameSchema`; an event that
+    // reaches here by another road is skipped, never stored (C-136).
+    if (event.slot !== undefined && !isSlotName(event.slot)) return;
     switch (event.type) {
       case 'session.appeared':
         return this.sessionAppeared(applied as Applied<typeof event>);
@@ -231,6 +238,7 @@ export class SlotProjection {
     options: { patch: SlotPatch; create?: boolean },
   ): Promise<void> {
     const { patch } = options;
+    if (!isSlotName(name)) return;
     const row = await this.covering(name, source.ts);
     if (row && source.seq <= row.lastSeq) return;
     const prior = row

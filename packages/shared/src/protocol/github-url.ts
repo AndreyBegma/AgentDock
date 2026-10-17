@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TEXT_PATH_MAX } from './bounded';
 
 /**
  * Whether `value` is an `https://github.com/…` URL: scheme `https` and the
@@ -24,6 +25,7 @@ export const isHttpsGithubUrl = (value: string): boolean => {
 /** A link a runner reports to GitHub: shown in the web, Telegram and webhooks. */
 export const httpsGithubUrl = z
   .string()
+  .max(TEXT_PATH_MAX)
   .refine(isHttpsGithubUrl, { message: 'must be an https://github.com URL' });
 
 /**
