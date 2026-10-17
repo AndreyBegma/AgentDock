@@ -48,7 +48,7 @@ export class TelegramWebAppService {
     const bot = await this.tokens.read();
     if (!bot.ok) {
       throw authError(
-        503,
+        409,
         AUTH_ERROR.telegramNotConfigured,
         'The Telegram bot is not configured',
       );

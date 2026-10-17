@@ -209,7 +209,7 @@ describe('Telegram Mini App sign-in and buttons (e2e, #580)', () => {
     it('refuses everything while the bot is not configured', async () => {
       await ctx.app.get(BotTokenStore).clear({ actor: SYSTEM_ACTOR });
       const response = await signIn(initDataFor(ADA_CHAT));
-      expect(response.status).toBe(503);
+      expect(response.status).toBe(409);
       expect(response.body).toMatchObject({
         error: AUTH_ERROR.telegramNotConfigured,
       });
