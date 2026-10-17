@@ -190,9 +190,14 @@ export type AuditActorType = (typeof AUDIT_ACTOR_TYPES)[number];
 export const AUDIT_RESULTS = ['ok', 'denied', 'error', 'requested'] as const;
 export type AuditResult = (typeof AUDIT_RESULTS)[number];
 
-/** Why a login was refused — `meta.reason` of a denied `auth.login` (D9). */
+/**
+ * Why a login was refused — `meta.reason` of a denied `auth.login` (D9).
+ * `throttled`: the source must wait after its own failures (C-109). `locked`
+ * only appears in records written before C-109 removed the account lock.
+ */
 export const LOGIN_DENIED_REASONS = [
   'invalid_credentials',
+  'throttled',
   'locked',
   'pending_approval',
 ] as const;

@@ -16,6 +16,7 @@ import {
   Post,
   Req,
   Res,
+  UseFilters,
   UseGuards,
 } from '@nestjs/common';
 import { ThrottlerGuard } from '@nestjs/throttler';
@@ -24,7 +25,7 @@ import { AuditService } from '../audit/audit.service';
 import { auditContextOf, requestOrigin } from '../audit/audit-context';
 import { SettingsService } from '../settings/settings.service';
 import { AuthService } from './auth.service';
-import { authError } from './auth-error';
+import { authError, SourceThrottledFilter } from './auth-error';
 import type { AuthenticatedRequest, AuthUser } from './auth-request';
 import { clearSessionCookies, setSessionCookies } from './cookies';
 import { CurrentUser, Public } from './decorators';
@@ -32,6 +33,7 @@ import { ChangePasswordDto, LoginDto, RegisterDto } from './dto';
 import { SessionService } from './session.service';
 
 @Controller('auth')
+@UseFilters(SourceThrottledFilter)
 export class AuthController {
   constructor(
     private readonly auth: AuthService,
@@ -95,6 +97,8 @@ export class AuthController {
     return user;
   }
 
+  // Per IP, as for login; the wrong-password counter is the login one (C-109).
+  @UseGuards(ThrottlerGuard)
   @Patch('me/password')
   @HttpCode(204)
   async changePassword(

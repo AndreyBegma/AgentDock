@@ -28,8 +28,6 @@ model User {
   status           UserStatus @default(pending)
   approvedById     String?
   approvedAt       DateTime?
-  failedLoginCount Int        @default(0)
-  lockedUntil      DateTime?
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
@@ -101,6 +99,22 @@ model UserSettings {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_settings")
+}
+
+/// Failed password checks of one source against one account (C-109, D-05):
+/// keyed by the email as typed, so an unknown address is throttled exactly
+/// like a real one. A source waits only for its own failures; no row, no wait.
+model LoginThrottle {
+  email         String
+  ip            String
+  failures      Int
+  lastFailureAt DateTime
+  /// The source may not try again before this.
+  blockedUntil  DateTime?
+
+  @@id([email, ip])
+  @@index([lastFailureAt])
+  @@map("login_throttles")
 }
 
 /// A login session. Named `UserSession` because `Session` is reserved for agent
@@ -308,6 +322,30 @@ model AuditRecord {
   @@index([projectId, ts])
   @@index([targetType, targetId])
   @@map("audit_records")
+}
+
+/// Repeats of one audit record within a minute (C-109): the first is written
+/// at once, the rest are counted here and written as one record when the
+/// minute is over. Not part of the chain; rows are deleted once written.
+model AuditFold {
+  action    String
+  targetType String
+  /// `''` for no target id.
+  targetId  String
+  /// `''` for no address.
+  ip        String
+  minute    DateTime
+  actor     Json
+  result    AuditResult
+  userAgent String?
+  /// Repeats after the first.
+  count     Int        @default(0)
+  /// `meta.reason` of each repeat → how many.
+  reasons   Json       @default("{}")
+
+  @@id([action, targetType, targetId, ip, minute])
+  @@index([minute])
+  @@map("audit_folds")
 }
 
 /// Where a project's base branch came from (docs/specs/10 D4).
