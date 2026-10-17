@@ -6,16 +6,17 @@ import type { HookCommand } from './shell';
 /**
  * The hook must never change what a session allows, asks or denies (#445,
  * decision on the hook's permissions, narrowed by amendment 9, widened to
- * auto mode by amendment 10). Claude Code matches its permission rules
+ * auto mode by amendment 10 and plan mode by amendment 14). Claude Code matches its permission rules
  * against the command a PreToolUse hook returns, so a rewritten
  * `agentdock-runner filter -- git push` would slip past `Bash(git push:*)`.
  * The hook therefore rewrites only when:
  *
- * - the session is in `bypassPermissions`, or in `auto`, where the hook
- *   returns no decision and the classifier judges the wrapped command. In
- *   every other mode Claude Code (its prompt, plan mode) decides and the
- *   command is left as written; and
- * - no `deny` or `ask` `Bash(…)` rule matches the command, at any word.
+ * - the session is in `bypassPermissions`, or in `auto` or `plan`, where the
+ *   hook returns no decision and Claude Code's rules (and, in auto, its
+ *   classifier) judge the wrapped command. In every other mode Claude Code
+ *   (its prompt) decides and the command is left as written; and
+ * - no `deny` or `ask` `Bash(…)` rule matches the line, at any word of any
+ *   of its commands (#610), wrapped or not.
  *
  * Rules are read best-effort from the files Claude loads; any doubt (a file
  * that exists but does not parse, a rule this parser does not understand)
@@ -101,24 +102,34 @@ const matchesGenerously = (pattern: Pattern, command: string): boolean => {
  * Every text a deny or ask rule is tried against: the original with
  * whitespace collapsed, and the parsed words — with and without the
  * assignments, the program with and without its directory — each from every
- * word on, so a rule also meets the command wherever it sits. Amendment 11:
- * the inner command after `cd <path> &&` is one of those forms, and so is the
- * whole `cd <path> && …` with quotes dropped.
+ * word on, so a rule also meets the command wherever it sits. #610: that for
+ * every command of every pipeline, wrapped or not, and for the whole line's
+ * words with quotes dropped (amendment 11's `cd <path> && …` is one such
+ * line). A rule that matches any command of the line keeps the whole line as
+ * written.
  */
 export const ruleCandidates = (
   original: string,
   parsed: HookCommand,
 ): string[] => {
-  const { argv, assignments } = parsed.command;
-  const [program = '', ...args] = argv;
-  const withAssignments = [
-    ...assignments.map((a) => `${a.name}=${a.value}`),
-    ...argv,
-  ];
-  const forms = [argv, [basename(program), ...args], withAssignments];
-  if (parsed.cd !== null) {
-    forms.push(['cd', parsed.cd, '&&', ...withAssignments]);
-  }
+  const forms: string[][] = [];
+  const line: string[] = [];
+  parsed.pipelines.forEach((pipeline, i) => {
+    pipeline.forEach(({ command, mergeStderr }, j) => {
+      const { argv, assignments } = command;
+      const [program = '', ...args] = argv;
+      const withAssignments = [
+        ...assignments.map((a) => `${a.name}=${a.value}`),
+        ...argv,
+      ];
+      forms.push(argv, [basename(program), ...args], withAssignments);
+      if (j > 0) line.push('|');
+      line.push(...withAssignments, ...(mergeStderr ? ['2>&1'] : []));
+    });
+    const op = parsed.operators[i];
+    if (op !== undefined) line.push(op);
+  });
+  forms.push(line);
   const out = new Set<string>();
   const text = collapse(original);
   const spaces = text.split(' ');
@@ -140,8 +151,12 @@ export const permissionFor = (
   original: string,
   parsed: HookCommand,
 ): PermissionVerdict => {
-  if (permissionMode !== 'bypassPermissions' && permissionMode !== 'auto') {
-    return { rewrite: false, reason: 'not bypassPermissions or auto' };
+  if (
+    permissionMode !== 'bypassPermissions' &&
+    permissionMode !== 'auto' &&
+    permissionMode !== 'plan'
+  ) {
+    return { rewrite: false, reason: 'not bypassPermissions, auto or plan' };
   }
   const candidates = ruleCandidates(original, parsed);
   for (const list of ['deny', 'ask'] as const) {

@@ -4,6 +4,7 @@ import { ActivityModule } from './activity';
 import { AdminModule } from './admin/admin.module';
 import { ApprovalsModule } from './approvals';
 import { AssessModule } from './assess/assess.module';
+import { AssistantModule } from './assistant';
 import { AttachmentsModule } from './attachments/attachments.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
@@ -20,6 +21,7 @@ import { HandoffModule } from './handoff';
 import { HealthController } from './health.controller';
 import { HistoryModule } from './history';
 import { LiveModule } from './live/live.module';
+import { LlmModule } from './llm/llm.module';
 import { LocalModule } from './local';
 import { NotificationsModule } from './notifications';
 import { PaneModule } from './pane';
@@ -64,6 +66,7 @@ import { WorkflowsModule } from './workflows';
     WorkflowsModule,
     UsageModule,
     PricesModule,
+    LlmModule,
     QueueModule,
     PaneModule,
     ControlModule,
@@ -114,6 +117,8 @@ import { WorkflowsModule } from './workflows';
     // claim `/hooks/github` (spec 27 notes; pinned by an e2e test).
     GitHubAppModule,
     WebhooksModule,
+    // Issue #608: the assistant, on the LLM gateway (ADR-0060).
+    AssistantModule,
   ],
   controllers: [HealthController],
 })

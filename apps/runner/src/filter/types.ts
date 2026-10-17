@@ -24,6 +24,14 @@ export interface Filter {
    * output — the agent then gets it unchanged.
    */
   apply(input: FilterInput): string | null;
+  /**
+   * The part of an output line the classifier judges, for a command whose
+   * lines carry a prefix that reads as a stack frame on its own: a search
+   * hit `src/a.ts:12:  return x;` is a location, not a frame, so it is judged
+   * — and, when protected, has to survive — by its text after `src/a.ts:12:`.
+   * The whole line when absent. The corpus judges the filter the same way.
+   */
+  protectedPart?(line: string): string;
 }
 
 export interface FilterInput {

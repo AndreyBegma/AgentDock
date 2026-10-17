@@ -1,5 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { wrappedCommand } from './hook';
@@ -164,7 +170,7 @@ describe('parseSimpleCommand (#445 amendment 3)', () => {
     expect(bashWords(command)).toEqual(words);
     const self = ['/opt/a b/agentdock-runner'];
     const rewrite = wrappedCommand(
-      { cd: null, command: parsed, mergeStderr: false },
+      { pipelines: [[{ command: parsed, mergeStderr: false }]], operators: [] },
       self,
     );
     expect(bashWords(rewrite)).toEqual([
@@ -177,37 +183,71 @@ describe('parseSimpleCommand (#445 amendment 3)', () => {
   });
 });
 
-describe('parseHookCommand (#445 amendment 11)', () => {
+/** A stage of `parseHookCommand`'s result, for short expectations. */
+const stage = (
+  argv: string[],
+  mergeStderr = false,
+  assignments: Record<string, string> = {},
+) => ({
+  command: {
+    assignments: Object.entries(assignments).map(([name, value]) => ({
+      name,
+      value,
+    })),
+    argv,
+  },
+  mergeStderr,
+});
+
+describe('parseHookCommand (#445 amendment 11, #610)', () => {
   it('takes `cd <path> && <command> 2>&1` apart', () => {
     expect(parseHookCommand(`cd "a b" && CI=1 bun test 2>&1`)).toEqual({
-      cd: 'a b',
-      command: {
-        assignments: [{ name: 'CI', value: '1' }],
-        argv: ['bun', 'test'],
-      },
-      mergeStderr: true,
+      pipelines: [
+        [stage(['cd', 'a b'])],
+        [stage(['bun', 'test'], true, { CI: '1' })],
+      ],
+      operators: ['&&'],
     });
     expect(parseHookCommand('bun test')).toEqual({
-      cd: null,
-      command: { assignments: [], argv: ['bun', 'test'] },
-      mergeStderr: false,
+      pipelines: [[stage(['bun', 'test'])]],
+      operators: [],
     });
   });
 
-  it('leaves `&&` and `2>&1` inside quotes to the command', () => {
-    expect(parseHookCommand(`cd 'a && b' && grep '&&' "2>&1"`)).toEqual({
-      cd: 'a && b',
-      command: { assignments: [], argv: ['grep', '&&', '2>&1'] },
-      mergeStderr: false,
+  it('takes pipelines and lists apart', () => {
+    expect(parseHookCommand('bun run test 2>&1 | tail -50')).toEqual({
+      pipelines: [
+        [stage(['bun', 'run', 'test'], true), stage(['tail', '-50'])],
+      ],
+      operators: [],
+    });
+    expect(
+      parseHookCommand('cd apps/api&&bun run lint ;git status||a|b 2>&1|c'),
+    ).toEqual({
+      pipelines: [
+        [stage(['cd', 'apps/api'])],
+        [stage(['bun', 'run', 'lint'])],
+        [stage(['git', 'status'])],
+        [stage(['a']), stage(['b'], true), stage(['c'])],
+      ],
+      operators: ['&&', ';', '||'],
+    });
+  });
+
+  it('leaves operators and `2>&1` inside quotes to the command', () => {
+    expect(
+      parseHookCommand(`cd 'a && b' && grep '&&' "2>&1" '|' \\; "||"`),
+    ).toEqual({
+      pipelines: [
+        [stage(['cd', 'a && b'])],
+        [stage(['grep', '&&', '2>&1', '|', ';', '||'])],
+      ],
+      operators: ['&&'],
     });
   });
 
   it.each([
-    // the near misses of `cd <literal path> &&`
-    'cd a b && x',
-    'cd -- x && y',
-    'cd - && y',
-    'cd -P x && y',
+    // a stage that is not a simple command
     'cd $HOME && x',
     'cd "$HOME" && x',
     'cd ~ && x',
@@ -215,35 +255,55 @@ describe('parseHookCommand (#445 amendment 11)', () => {
     'cd *.d && y',
     'cd a{b,c} && y',
     'cd `pwd` && y',
-    "cd '' && y",
-    'cd && y',
-    'cd x &&',
-    'cd x && ',
-    '&& y',
-    'cd x && y && z',
-    'cd x; y',
-    'cd x && y; z',
-    'cd x && y | z',
-    'cd x || y',
-    'cd x & y',
-    'cd x &&& y',
     'cd x && (y)',
     'cd x && FOO=1',
     'cd x && exec y',
     'cd x && env y',
+    'a | xargs b',
+    'a && time b',
+    'a | { b; }',
+    'a; if b; then c; fi',
     '"cd" x && y',
     "c'd' x && y",
-    'FOO=1 cd x && y',
-    'y && cd x',
-    'x && y',
+    'a | b $(c)',
+    'a && b `c`',
+    'a | b <(c)',
+    'a | b > f',
+    'a > f | b',
+    'a < f && b',
+    'a | cat <<EOF\nx\nEOF',
+    'a <<<x | b',
+    // an empty stage: a leading, trailing or doubled operator
+    '&& y',
+    'cd x &&',
+    'cd x && ',
+    'a |',
+    '| a',
+    'a ;',
+    'a;',
+    '; a',
+    'a ||',
+    'a && && b',
+    'a | | b',
+    'a ; ; b',
+    // an operator this parser does not know
+    'a & b',
+    'a &',
+    'a && b &',
+    'cd x &&& y',
+    'a |& b',
+    'a ||| b',
+    'a ;; b',
+    'a ;& b',
     // an injected newline, anywhere
     'cd x\n&& y',
     'cd x &&\ny',
     'cd x && y\nz',
     'cd x\ny && z',
     'cd x && y 2>&1\nz',
+    'a | b\nc',
     'y 2>&1\n',
-    // the near misses of a trailing `2>&1`
+    // the near misses of `2>&1`
     'y 2>&1 >f',
     'y >f 2>&1',
     'y 2>&3',
@@ -259,15 +319,18 @@ describe('parseHookCommand (#445 amendment 11)', () => {
     'y 2>&1;',
     'y 2>&1 &',
     'y 2>&1 2>&1',
-    'y 2>&1 | z',
+    'y 2>&1 z',
+    'y 2>&1 | 2>&1 z',
+    'y | 2>&1',
     'y \\ 2>&1',
     "y '2>&1",
     'y "a 2>&1',
-    'cd x 2>&1 && y',
     'cd x && 2>&1',
     '2>&1',
     ' 2>&1',
+    '2>&1 y',
     'FOO=1 2>&1',
+    '',
   ])('refuses %p', (command) => {
     expect(parseHookCommand(command)).toBeNull();
   });
@@ -285,17 +348,29 @@ describe('parseHookCommand (#445 amendment 11)', () => {
     });
 
     /**
-     * Runs `text` in `root`, with `a` a function that prints its working
-     * directory, `$FOO` and its args to stdout, then `E` to stderr.
+     * Runs `text` in `root` and reports its stdout, its stderr, `$?` and
+     * `PIPESTATUS`. `a` prints its working directory, `$FOO` and its args to
+     * stdout, then `E` to stderr. `f N` prints `fN`, then `eN` to stderr, and
+     * returns N. `w`, the stand-in for the runner, logs its args to fd 3 and
+     * runs what follows `filter --`, returning its status — as the filter
+     * does.
      */
     const run = (text: string) => {
+      const log = join(root, 'wrapped.log');
+      rmSync(log, { force: true });
       const result = Bun.spawnSync(
         [
           'bash',
           '--noprofile',
           '--norc',
           '-c',
-          `a() { printf '%s\\0' "$PWD" "\${FOO-unset}" "$@"; printf E >&2; }; ${text}`,
+          [
+            `exec 3>>'${log}'`,
+            `a() { printf '%s\\0' "$PWD" "\${FOO-unset}" "$@"; printf E >&2; }`,
+            `f() { printf 'f%s\\0' "$1"; printf 'e%s\\n' "$1" >&2; return "$1"; }`,
+            `w() { printf '%s\\0' "$@" >&3; shift 2; "$@"; }`,
+            `${text}; printf 'status %s %s' "$?" "\${PIPESTATUS[*]}" >&2`,
+          ].join('\n'),
         ],
         {
           cwd: root,
@@ -304,21 +379,15 @@ describe('parseHookCommand (#445 amendment 11)', () => {
           env: { PATH: process.env.PATH },
         },
       );
-      if (result.exitCode !== 0) {
-        throw new Error(`bash failed on ${text}: ${result.stderr.toString()}`);
-      }
-      return { out: result.stdout.toString(), err: result.stderr.toString() };
-    };
-
-    /** The printed words, and where `E` went. */
-    const observed = (text: string) => {
-      const { out, err } = run(text);
-      const merged = out.endsWith('E');
-      const body = merged ? out.slice(0, -1) : out;
+      let wrapped: string[] = [];
+      try {
+        const text = readFileSync(log, 'utf8');
+        wrapped = text === '' ? [] : text.slice(0, -1).split('\0');
+      } catch {}
       return {
-        words: body.slice(0, -1).split('\0'),
-        stderrInStdout: merged,
-        stderr: err,
+        out: result.stdout.toString(),
+        err: result.stderr.toString(),
+        wrapped,
       };
     };
 
@@ -334,34 +403,66 @@ describe('parseHookCommand (#445 amendment 11)', () => {
       'a x 2>&1',
       'FOO=1 a x 2>&1  ',
       'a x',
+      // #610: lists keep their short-circuits and their status
+      'f 1 && f 2',
+      'f 0 && f 2 || f 0',
+      'f 1 || f 2 && f 0',
+      'f 1; f 0',
+      'f 0; f 3',
+      'cd sub && a x; a y && f 4',
+      // …and pipelines their data flow and their status
+      'f 3 | f 0',
+      'f 0 | f 4',
+      'f 2 2>&1 | cat',
+      'f 2 | cat 2>&1',
+      'a x 2>&1 | tr E e',
+      'f 5 | f 6 | cat; f 7 | cat',
+      'cd sub && FOO=x a "y z" | tr / : && f 1 | cat || f 0',
     ])('on %p and its rewrite', (command) => {
       const parsed = parseHookCommand(command);
       if (!parsed) throw new Error(`expected ${command} to be rewritable`);
-      const foo =
-        parsed.command.assignments.find((a) => a.name === 'FOO')?.value ??
-        'unset';
-      const cwd = parsed.cd === null ? root : join(root, parsed.cd);
+      const original = run(command);
+      const rewrite = run(wrappedCommand(parsed, ['w']));
+      // Same output, same stderr, same `$?` and `PIPESTATUS`…
+      expect(rewrite.out).toBe(original.out);
+      if (command.includes('|')) {
+        // Pipeline stages write stderr at once, so bash orders it by chance:
+        // compare it as a multiset of lines, and the status line exactly.
+        const split = (err: string) => {
+          const at = err.lastIndexOf('status ');
+          return {
+            lines: err.slice(0, at).split('\n').sort(),
+            status: err.slice(at),
+          };
+        };
+        expect(split(rewrite.err)).toEqual(split(original.err));
+      } else {
+        expect(rewrite.err).toBe(original.err);
+      }
+      expect(original.wrapped).toEqual([]);
+      // …and every first stage that ran went through `w filter --`.
+      expect(rewrite.wrapped.length).toBeGreaterThan(0);
+      expect(rewrite.wrapped.slice(0, 2)).toEqual(['filter', '--']);
+    });
 
-      // bash runs the command the parser saw…
-      const original = observed(command);
-      expect(original.words).toEqual([
-        cwd,
-        foo,
-        ...parsed.command.argv.slice(1),
-      ]);
-      expect(original.stderrInStdout).toBe(parsed.mergeStderr);
-
-      // …and the rewrite runs it the same way, behind `filter --`.
-      const rewrite = observed(wrappedCommand(parsed, ['a']));
-      expect(rewrite.words).toEqual([
-        cwd,
-        foo,
+    it('wraps only the first stage of each pipeline, and only those asked for', () => {
+      const parsed = parseHookCommand('f 0 | f 1 && f 2 | f 3; f 4');
+      if (!parsed) throw new Error('expected a rewritable line');
+      const skip = parsed.pipelines[1]?.[0];
+      const rewrite = wrappedCommand(parsed, ['w'], (s) => s !== skip);
+      expect(rewrite).toBe(
+        'w filter -- f 0 | f 1 && f 2 | f 3 ; w filter -- f 4',
+      );
+      expect(run(rewrite).wrapped).toEqual([
         'filter',
         '--',
-        ...parsed.command.argv,
+        'f',
+        '0',
+        'filter',
+        '--',
+        'f',
+        '4',
       ]);
-      expect(rewrite.stderrInStdout).toBe(original.stderrInStdout);
-      expect(rewrite.stderr).toBe(original.stderr);
     });
   });
 });

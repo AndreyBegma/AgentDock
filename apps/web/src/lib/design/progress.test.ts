@@ -4,10 +4,12 @@ import {
   type DesignProgressView,
   STALL_AFTER_MS,
 } from '@agentdock/shared';
+import { design } from './fixtures';
 import {
   failureSentence,
   formatClock,
   isStalled,
+  isStarting,
   lastOutputOf,
   progressLabel,
   WAITING_FOR_SLOT,
@@ -136,5 +138,37 @@ describe('formatClock', () => {
     expect(formatClock(5_000)).toBe('0:05');
     expect(formatClock(-1)).toBe('0:00');
     expect(formatClock(3_600_000)).toBe('60:00');
+  });
+});
+
+describe('a busy design with nothing running (#606)', () => {
+  const running: DesignProgressView = {
+    stage: 'draw',
+    phase: 'running',
+    runId: 'r1',
+    turnId: 't1',
+    variant: 2,
+    variantCount: 2,
+    step: null,
+    startedAt: STARTED,
+  };
+
+  test('reads as starting, not as a design to generate', () => {
+    expect(isStarting(design({ status: 'generating', progress: null }))).toBe(
+      true,
+    );
+    expect(isStarting(design({ status: 'revising', progress: null }))).toBe(
+      true,
+    );
+  });
+
+  test('a running turn, or a design at rest, is not starting', () => {
+    expect(
+      isStarting(design({ status: 'generating', progress: running })),
+    ).toBe(false);
+    expect(isStarting(design({ status: 'idle', progress: null }))).toBe(false);
+    expect(isStarting(design({ status: 'reviewing', progress: null }))).toBe(
+      false,
+    );
   });
 });

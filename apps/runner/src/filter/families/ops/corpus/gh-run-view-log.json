@@ -1,0 +1,8 @@
+{
+  "argv": ["gh", "run", "view", "11400072192", "--log"],
+  "exitCode": 0,
+  "category": "other",
+  "outcome": "passing",
+  "expect": "filtered",
+  "maxRatio": 0.5
+}

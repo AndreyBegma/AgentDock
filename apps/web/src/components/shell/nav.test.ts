@@ -47,6 +47,7 @@ describe('visibleNav', () => {
       'admin/Budgets',
       'admin/Planner instructions',
       'admin/Audit',
+      'admin/AI providers',
       'admin/Prices',
       'admin/Integrations',
       'admin/Settings',
@@ -209,7 +210,7 @@ describe('tabBarSplit', () => {
       tabs: ['Overview', 'Projects', 'Activity'],
       more: [
         'workspace: Work, Sessions, Usage, Workflows, Skills',
-        'admin: Runners, Users, Schedules, Budgets, Planner instructions, Audit, Prices, Integrations, Settings',
+        'admin: Runners, Users, Schedules, Budgets, Planner instructions, Audit, AI providers, Prices, Integrations, Settings',
       ],
     });
   });
@@ -220,7 +221,7 @@ describe('tabBarSplit', () => {
       more: [
         'project: Project, Queue, Activity, History, Token saver, Skills, Schedules, Settings',
         'workspace: Overview, Projects, Activity, Work, Sessions, Usage, Workflows, Skills',
-        'admin: Runners, Users, Schedules, Budgets, Planner instructions, Audit, Prices, Integrations, Settings',
+        'admin: Runners, Users, Schedules, Budgets, Planner instructions, Audit, AI providers, Prices, Integrations, Settings',
       ],
     });
   });

@@ -165,7 +165,7 @@ describe('tokenSaverLaunch (#445)', () => {
     expect(launch?.env).toEqual({
       [AUTOCOMPACT_WINDOW_ENV]: '183000',
       [AUTOCOMPACT_PCT_ENV]: '100',
-      [CS_ECO_ENV]: 'on',
+      [CS_ECO_ENV]: 'off',
       [LAUNCH_SETTINGS_ENV]: join(dir, 'token-saver-settings.json'),
       [FILTER_STATS_ENV]: join(dir, 'filter-stats.jsonl'),
       [FILTER_PROJECT_ENV]: 'prj_a',
@@ -206,8 +206,19 @@ describe('tokenSaverLaunch (#445)', () => {
     expect(tokenSaverLaunch(input({ dir: notADir }))).toBeNull();
   });
 
-  it('turns the plugin’s eco hooks on (amendment 12)', () => {
-    expect(tokenSaverLaunch(input())?.env[CS_ECO_ENV]).toBe('on');
+  it('turns the plugin’s eco hooks off: the runner guards reads (#616)', () => {
+    expect(tokenSaverLaunch(input())?.env[CS_ECO_ENV]).toBe('off');
+  });
+
+  it('writes the read guard into the launch settings (#616)', () => {
+    const launch = tokenSaverLaunch(input());
+    const settings = JSON.parse(
+      readFileSync(launch?.settingsFile ?? '', 'utf8'),
+    );
+    const read = `${SELF[0]} read-hook || true`;
+    expect(settings.hooks.PreToolUse[1].matcher).toBe('Read');
+    expect(settings.hooks.PreToolUse[1].hooks[0].command).toBe(read);
+    expect(settings.hooks.PostToolUse[0].hooks[0].command).toBe(read);
   });
 
   describe('early compaction (amendment 12)', () => {
@@ -250,21 +261,22 @@ describe('tokenSaverLaunch (#445)', () => {
 });
 
 describe('filterHookSettings (#445 D3)', () => {
-  it('rewrites Bash through `filter-hook`, failing open', () => {
+  it('rewrites Bash through `filter-hook` and guards Read, failing open', () => {
+    const hook = (subcommand: string) => [
+      {
+        type: 'command' as const,
+        command: `/usr/bin/bun '/my dir/cli.ts' ${subcommand} || true`,
+        timeout: 10,
+      },
+    ];
     expect(filterHookSettings(['/usr/bin/bun', '/my dir/cli.ts'])).toEqual({
       hooks: {
         PreToolUse: [
-          {
-            matcher: 'Bash',
-            hooks: [
-              {
-                type: 'command',
-                command: "/usr/bin/bun '/my dir/cli.ts' filter-hook || true",
-                timeout: 10,
-              },
-            ],
-          },
+          { matcher: 'Bash', hooks: hook('filter-hook') },
+          { matcher: 'Read', hooks: hook('read-hook') },
         ],
+        PostToolUse: [{ matcher: 'Read', hooks: hook('read-hook') }],
+        PreCompact: [{ hooks: hook('read-hook') }],
       },
     });
   });

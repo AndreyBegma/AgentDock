@@ -18,7 +18,7 @@ const render = (stackBlock: string | null) =>
     >
       <GeneratePanel
         projectId="p1"
-        design={design({ revisions: [], status: 'idle' })}
+        design={design({ revisions: [], status: 'idle', profileId: null })}
         writeBlock={null}
         stackBlock={stackBlock}
         stackHref="/projects/p1/board/stacks/1/design"
@@ -43,5 +43,14 @@ describe('GeneratePanel (#527)', () => {
     const html = render(null);
     expect(html).not.toContain('design-stack-reason');
     expect(html).not.toContain(STACK_GATE_REASON);
+  });
+});
+
+describe('GeneratePanel (#606)', () => {
+  test('a design not drawn yet does not claim the project has no UI profile', () => {
+    // `profileId` is the design's, null until a revision is drawn; the
+    // project's profile status is what says a build comes first.
+    const html = render(null);
+    expect(html).not.toContain('no UI profile yet');
   });
 });

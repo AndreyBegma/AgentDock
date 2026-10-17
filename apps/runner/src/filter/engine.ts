@@ -1,7 +1,7 @@
 import { constants } from 'node:os';
 import { basename, dirname } from 'node:path';
 import { redact } from '../pane/redact';
-import { missingProtectedLines } from './classify';
+import { type LinePart, missingProtectedLines } from './classify';
 import { RAW_ENV } from './env';
 import { RAW_CAP_BYTES, RawFile } from './raw-store';
 import {
@@ -17,7 +17,8 @@ export const FILTER_NONE = 'none';
 
 /**
  * Amendment 12: why no filter ran, mirroring `FILTER_ID_NONE_*` — not a
- * single simple command, simple but uncovered, or a mode that never rewrites.
+ * line the hook parses (amendment 13), no pipeline head covered, or a mode
+ * that never rewrites.
  */
 export const FILTER_NONE_COMPOUND = 'none:compound';
 export const FILTER_NONE_UNCOVERED = 'none:uncovered';
@@ -35,6 +36,12 @@ export interface FilterDeps {
   random?: () => number;
   /** Signals forwarded to the child; the process's own by default. */
   onSignal?: (handler: (signal: NodeJS.Signals) => void) => () => void;
+  /**
+   * Calls `handler` once stdout is closed — `| head` has read all it wants
+   * (#610). The child then gets the SIGPIPE it would have got writing there
+   * itself.
+   */
+  onStdoutClosed?: (handler: () => void) => void;
 }
 
 type Stream = 'out' | 'err';
@@ -93,7 +100,12 @@ export const judge = (
     return { kind: 'original', reason: 'threw' };
   }
   if (result === null) return { kind: 'original', reason: 'unclassified' };
-  const missing = missingProtectedLines(output, result);
+  let missing: string[];
+  try {
+    missing = missingProtectedLines(output, result, linePart(filter));
+  } catch {
+    return { kind: 'original', reason: 'threw' };
+  }
   if (missing.length > 0) return { kind: 'original', reason: 'lost a line' };
   const body =
     result.length === 0 || result.endsWith('\n') ? result : `${result}\n`;
@@ -104,6 +116,12 @@ export const judge = (
   }
   return { kind: 'filtered', text };
 };
+
+/** How the classifier reads a line of this filter's command (`Filter.protectedPart`). */
+export const linePart =
+  (filter: Filter): LinePart =>
+  (line) =>
+    filter.protectedPart?.(line) ?? line;
 
 /**
  * The compressed output, redacted by the runner's one redactor
@@ -176,6 +194,9 @@ export const runFilter = async (
   }
   const unhook = (deps.onSignal ?? processSignals)((signal) => {
     child.kill(signal);
+  });
+  deps.onStdoutClosed?.(() => {
+    child.kill('SIGPIPE');
   });
 
   // Without a target there is nowhere to keep the raw output: stay out of the way.

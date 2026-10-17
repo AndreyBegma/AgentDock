@@ -95,6 +95,9 @@ Used by the runner's launches (Token saver):
                                            AGENTDOCK_RAW=1 leaves it unfiltered
   filter-hook                              the PreToolUse hook that routes Bash
                                            calls through filter (JSON on stdin)
+  read-hook                                the Read hook that refuses a whole read
+                                           of a big file and a repeated read once
+                                           (JSON on stdin)
 `;
 
 class UsageError extends Error {}
@@ -533,7 +536,11 @@ export const runCli = async (
   }
   // `main.ts` serves these before loading the CLI (#445 D3); this path is for
   // callers of `runCli` itself.
-  if (command === 'filter' || command === 'filter-hook') {
+  if (
+    command === 'filter' ||
+    command === 'filter-hook' ||
+    command === 'read-hook'
+  ) {
     const { runFilterCommand } = await import('./filter/main');
     // One decoder per stream: a character may span two chunks.
     const writer = (write: (text: string) => void) => {

@@ -1,0 +1,6 @@
+{
+  "argv": ["rg", "-n", "FILTER_NONE", "apps/runner/src"],
+  "exitCode": 0,
+  "category": "other",
+  "outcome": "passing"
+}

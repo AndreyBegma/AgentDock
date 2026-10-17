@@ -1,0 +1,35 @@
+CI / test (18.x, ubuntu-latest) (pull_request)	pass	3m37s	https://github.com/acme/storefront/actions/runs/11400071333/job/31700017094	
+CI / test (18.x, macos-latest) (pull_request)	pass	5m58s	https://github.com/acme/storefront/actions/runs/11400079157/job/31700062135	
+CI / test (18.x, windows-latest) (pull_request)	pass	9m4s	https://github.com/acme/storefront/actions/runs/11400079377/job/31700001725	
+CI / test (20.x, ubuntu-latest) (pull_request)	fail	7m16s	https://github.com/acme/storefront/actions/runs/11400072192/job/31700030714	
+CI / test (20.x, macos-latest) (pull_request)	pass	3m45s	https://github.com/acme/storefront/actions/runs/11400061638/job/31700070906	
+CI / test (20.x, windows-latest) (pull_request)	pass	8m30s	https://github.com/acme/storefront/actions/runs/11400052053/job/31700083763	
+CI / test (22.x, ubuntu-latest) (pull_request)	pass	2m14s	https://github.com/acme/storefront/actions/runs/11400083212/job/31700019873	
+CI / test (22.x, macos-latest) (pull_request)	pass	8m24s	https://github.com/acme/storefront/actions/runs/11400097157/job/31700001985	
+CI / test (22.x, windows-latest) (pull_request)	pass	1m10s	https://github.com/acme/storefront/actions/runs/11400099382/job/31700077476	
+CI / lint (pull_request)	pass	0m19s	https://github.com/acme/storefront/actions/runs/11400004064/job/31700035314	
+CI / typecheck (pull_request)	pass	7m38s	https://github.com/acme/storefront/actions/runs/11400094217/job/31700050804	
+CI / build (pull_request)	pass	6m25s	https://github.com/acme/storefront/actions/runs/11400095436/job/31700075616	
+CI / e2e (chromium) (pull_request)	pass	7m59s	https://github.com/acme/storefront/actions/runs/11400017583/job/31700047909	
+CI / e2e (firefox) (pull_request)	pass	1m2s	https://github.com/acme/storefront/actions/runs/11400017821/job/31700064865	
+CI / e2e (webkit) (pull_request)	fail	3m16s	https://github.com/acme/storefront/actions/runs/11400088085/job/31700057168	
+CodeQL / Analyze (javascript-typescript) (pull_request)	pass	4m26s	https://github.com/acme/storefront/actions/runs/11400066485/job/31700050576	
+CodeQL / Analyze (actions) (pull_request)	pass	9m22s	https://github.com/acme/storefront/actions/runs/11400070005/job/31700076686	
+Docs / links (pull_request)	pass	6m37s	https://github.com/acme/storefront/actions/runs/11400030459/job/31700044140	
+Docs / build (pull_request)	pass	0m54s	https://github.com/acme/storefront/actions/runs/11400036658/job/31700079405	
+Release / changeset (pull_request)	skipping	0	https://github.com/acme/storefront/actions/runs/11400087985/job/31700091169	
+Storybook / chromatic (pull_request)	pending	0	https://github.com/acme/storefront/actions/runs/11400021377/job/31700091568	
+Storybook / build (pull_request)	pass	5m34s	https://github.com/acme/storefront/actions/runs/11400074967/job/31700074594	
+Vercel – storefront	pass	1m45s	https://github.com/acme/storefront/actions/runs/11400085919/job/31700027672	Deployment has completed
+Vercel – storefront-admin	pass	9m17s	https://github.com/acme/storefront/actions/runs/11400037349/job/31700016309	Deployment has completed
+Vercel Preview Comments	pass	1m30s	https://github.com/acme/storefront/actions/runs/11400083723/job/31700063374	Deployment has completed
+codecov/patch	pass	1m22s	https://github.com/acme/storefront/actions/runs/11400008730/job/31700053800	87.50% of diff hit (target 80.00%)
+codecov/project	pass	2m1s	https://github.com/acme/storefront/actions/runs/11400038520/job/31700055986	81.42% (+0.05%) compared to 1a2b3c4
+SonarCloud Code Analysis	pass	6m55s	https://github.com/acme/storefront/actions/runs/11400015586/job/31700005792	Quality Gate passed
+Socket Security: Pull Request Alerts	pass	9m39s	https://github.com/acme/storefront/actions/runs/11400099828/job/31700005890	
+Socket Security: Project Report	pass	6m45s	https://github.com/acme/storefront/actions/runs/11400076857/job/31700043378	
+license/cla	pass	8m56s	https://github.com/acme/storefront/actions/runs/11400036578/job/31700066246	
+Dependency Review / review (pull_request)	pass	3m2s	https://github.com/acme/storefront/actions/runs/11400040589/job/31700000948	
+Bundle size / analyze (pull_request)	pass	1m6s	https://github.com/acme/storefront/actions/runs/11400078612/job/31700070199	
+Lighthouse / audit (/) (pull_request)	pass	0m12s	https://github.com/acme/storefront/actions/runs/11400053469/job/31700038222	
+Lighthouse / audit (/checkout) (pull_request)	pass	9m16s	https://github.com/acme/storefront/actions/runs/11400020473/job/31700090404	

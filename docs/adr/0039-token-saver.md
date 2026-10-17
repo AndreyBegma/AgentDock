@@ -33,7 +33,8 @@ Only the card launch passes `--settings` and `--mcp-config` today. The other sev
 4. **Two registers for card workers.** Work is terse. Anything a person reads is written in full: questions, PR description, `finish_card` summary, specs, reply files, design. A guard on `finish_card` returns an incomplete artifact up to twice, then accepts it with a visible **Description incomplete** flag.
 5. **A project setting, on by default.** Off means exactly today's launches.
 6. **Savings are shown honestly:** the filter's estimate (labelled ≈) next to the measured cost per round before and after (ADR-0003, ADR-0009), on the card, on Usage and on a Token saver dashboard.
-7. **Fleet slots stay the plugin's (ADR-0005).** A follow-up in the plugin repository wires the same hook when the runner is installed.
+7. **The hook rewrites only where it cannot widen a decision.** In `bypassPermissions` it allows the wrapped command; in `auto` and `plan` it returns no decision, so Claude Code's own rules (and classifier) judge the wrapped command; in `default`, `acceptEdits` and `dontAsk` it never rewrites, because a person would see the wrapped command in a prompt (spec #445, amendments 9, 10 and 14).
+8. **Fleet slots stay the plugin's (ADR-0005).** A follow-up in the plugin repository wires the same hook when the runner is installed.
 
 ## Consequences
 

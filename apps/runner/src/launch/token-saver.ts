@@ -76,9 +76,11 @@ export const compactThreshold = (
 };
 
 /**
- * Amendment 12: the code-sentinel plugin's `/cs-eco` switch. Its hooks then
- * guard whole reads, drop repeated ones and cut large MCP results; its Bash
- * hook stands down, since `AGENTDOCK_FILTER_STATS` says the runner filters.
+ * The code-sentinel plugin's `/cs-eco` switch. Amendment 12 turned it on;
+ * #616 turns it off: the runner guards reads itself (`read-hook`), whether or
+ * not the plugin is in the profile, and the plugin's hooks would refuse the
+ * same read a second time. `off` rather than unset, so a machine default of
+ * `on` cannot bring them back.
  */
 export const CS_ECO_ENV = 'CS_ECO';
 
@@ -163,27 +165,34 @@ export interface LaunchSettings {
 
 /**
  * D3: the PreToolUse hook that rewrites a Bash call into
- * `agentdock-runner filter -- <argv…>`, by the runner's absolute argv.
- * `|| true`: the hook fails open — an exit code 2 would block the tool.
+ * `agentdock-runner filter -- <argv…>`, by the runner's absolute argv; and
+ * #616's `read-hook` on `Read` (before and after) and on compaction, which
+ * guards whole reads of big files and repeated reads.
+ * `|| true`: the hooks fail open — an exit code 2 would block the tool.
  */
 export const filterHookSettings = (
   selfCommand: readonly string[],
   base?: LaunchSettings,
 ): LaunchSettings => {
   const self = selfCommand.map(shellQuote).join(' ');
+  const hook = (subcommand: string): LaunchHookCommand => ({
+    type: 'command',
+    command: `${self} ${subcommand} || true`,
+    timeout: 10,
+  });
   const hooks = { ...(base?.hooks ?? {}) };
   hooks.PreToolUse = [
     ...(hooks.PreToolUse ?? []),
-    {
-      matcher: 'Bash',
-      hooks: [
-        {
-          type: 'command',
-          command: `${self} filter-hook || true`,
-          timeout: 10,
-        },
-      ],
-    },
+    { matcher: 'Bash', hooks: [hook('filter-hook')] },
+    { matcher: 'Read', hooks: [hook('read-hook')] },
+  ];
+  hooks.PostToolUse = [
+    ...(hooks.PostToolUse ?? []),
+    { matcher: 'Read', hooks: [hook('read-hook')] },
+  ];
+  hooks.PreCompact = [
+    ...(hooks.PreCompact ?? []),
+    { hooks: [hook('read-hook')] },
   ];
   return { hooks };
 };
@@ -232,7 +241,7 @@ export interface TokenSaverLaunch {
  * On: `--settings` (the filter hook), `--strict-mcp-config` with
  * `agentdock` (where the launch uses it) and the allowed servers copied
  * from the profile's own config (D6), the scout on `--agents` (D9), and the
- * env for compaction (D10), the plugin's eco hooks (amendment 12) and the
+ * env for compaction (D10), the plugin's eco hooks off (#616) and the
  * filter's stats and raw files.
  */
 export const tokenSaverLaunch = (
@@ -298,7 +307,7 @@ export const tokenSaverLaunch = (
     env: {
       [AUTOCOMPACT_WINDOW_ENV]: String(autoCompactWindowFor(COMPACT_AT_TOKENS)),
       [AUTOCOMPACT_PCT_ENV]: '100',
-      [CS_ECO_ENV]: 'on',
+      [CS_ECO_ENV]: 'off',
       [LAUNCH_SETTINGS_ENV]: settingsFile,
       ...filterEnv(run),
     },

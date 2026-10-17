@@ -60,7 +60,8 @@ const table: Row[] = [
   { name: 'auto with an unknown deny syntax', rules: { deny: ['Bash(git push'] }, mode: 'auto', command: 'bun test', rewrite: false },
   { name: 'default mode with an allow rule', rules: { allow: ['Bash(bun test:*)'] }, mode: 'default', command: 'bun test', rewrite: false },
   { name: 'acceptEdits with an allow rule', rules: { allow: ['Bash'] }, mode: 'acceptEdits', command: 'bun test', rewrite: false },
-  { name: 'plan mode with an allow rule', rules: { allow: ['Bash(*)'] }, mode: 'plan', command: 'bun test', rewrite: false },
+  { name: 'plan mode with an allow rule', rules: { allow: ['Bash(*)'] }, mode: 'plan', command: 'bun test', rewrite: true },
+  { name: 'plan mode with a deny rule', rules: { deny: ['Bash(git push:*)'] }, mode: 'plan', command: 'git push', rewrite: false },
   { name: 'dontAsk mode with an allow rule', rules: { allow: ['Bash'] }, mode: 'dontAsk', command: 'bun test', rewrite: false },
   { name: 'an unknown mode', rules: {}, mode: 'Auto', command: 'bun test', rewrite: false },
   { name: 'no mode given', rules: { allow: ['Bash'] }, command: 'bun test', rewrite: false },
@@ -80,9 +81,22 @@ const table: Row[] = [
   { name: 'deny on the line with 2>&1', rules: { deny: ['Bash(bun test 2>&1)'] }, mode: BYPASS, command: 'bun test 2>&1', rewrite: false },
   { name: 'deny on the command behind 2>&1', rules: { deny: ['Bash(bun test:*)'] }, mode: 'auto', command: 'bun test 2>&1', rewrite: false },
   { name: 'unrelated deny with cd and 2>&1', rules: { deny: ['Bash(git push:*)'] }, mode: BYPASS, command: 'cd x && bun test 2>&1', rewrite: true },
+  // #610: pipelines and lists — a rule on any command of the line, wrapped or not, keeps it as written
+  { name: 'pipe, no rules', rules: {}, mode: 'auto', command: 'bun run test 2>&1 | tail -50', rewrite: true },
+  { name: 'list, every command allowed', rules: { allow: ['Bash(cd:*)', 'Bash(bun run lint:*)', 'Bash(git status:*)'] }, mode: 'auto', command: 'cd apps/api && bun run lint && git status', rewrite: true },
+  { name: 'list, one allowed and one denied', rules: { allow: ['Bash(bun run test:*)'], deny: ['Bash(git push:*)'] }, mode: BYPASS, command: 'bun run test && git push', rewrite: false },
+  { name: 'list, the wrapped command denied, the next allowed', rules: { allow: ['Bash(git status:*)'], deny: ['Bash(bun run test:*)'] }, mode: 'auto', command: 'git status; bun run test', rewrite: false },
+  { name: 'list, an ask on an uncovered command after ||', rules: { ask: ['Bash(rm:*)'] }, mode: 'auto', command: 'bun test || rm -rf dist', rewrite: false },
+  { name: 'pipe, a deny on the tail of the pipe', rules: { deny: ['Bash(tee:*)'] }, mode: BYPASS, command: 'bun test | tee out.log', rewrite: false },
+  { name: 'pipe, an ask on the first command by path', rules: { ask: ['Bash(bun test:*)'] }, mode: BYPASS, command: 'git status && /usr/bin/bun test | head', rewrite: false },
+  { name: 'deny exact on a later command with its own assignments', rules: { deny: ['Bash(git push)'] }, mode: 'auto', command: 'bun test && GIT_TRACE=1 git  push', rewrite: false },
+  { name: 'deny glob across the line', rules: { deny: ['Bash(bun test * git push)'] }, mode: BYPASS, command: 'bun test && git push', rewrite: false },
+  { name: 'deny on the line from a later word, quotes dropped', rules: { deny: ['Bash(lint && git push:*)'] }, mode: BYPASS, command: "bun run 'lint' && git push", rewrite: false },
+  { name: 'unrelated deny with a list and a pipe', rules: { deny: ['Bash(git push:*)'] }, mode: BYPASS, command: 'cd x && bun test 2>&1 | tail -5; git status', rewrite: true },
+  { name: 'list in a mode that never rewrites', rules: { allow: ['Bash'] }, mode: 'default', command: 'bun test && git status', rewrite: false },
 ];
 
-describe('permissionFor (#445 hook decision (a), amendments 9, 10 and 11)', () => {
+describe('permissionFor (#445 hook decision (a), amendments 9, 10 and 11, #610)', () => {
   it.each(table)('$name', (row) => {
     const parsed = parseHookCommand(row.command);
     if (!parsed) throw new Error(`not simple: ${row.command}`);

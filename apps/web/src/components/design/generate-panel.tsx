@@ -10,6 +10,7 @@ import {
   type ProjectDetail,
   type TaskDesignPatchRequest,
   type TaskDesignView,
+  type UiProfileView,
 } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Field } from '@andrewbehma/glass-ui/field';
@@ -32,9 +33,14 @@ import {
 } from '../../lib/board/launch';
 import {
   describeDesignError,
+  generateProfileNote,
   generateRunnerGate,
 } from '../../lib/design/format';
-import { designSettingsApi, installedSkillsApi } from '../../lib/design/href';
+import {
+  designSettingsApi,
+  installedSkillsApi,
+  uiProfileApi,
+} from '../../lib/design/href';
 import {
   type SkillsForm,
   skillsFormOf,
@@ -54,10 +60,11 @@ const VARIANT_COUNTS = Array.from(
 );
 
 /**
- * Before the first revision (spec 223 D4, D15): how many variants, which
- * design skills — the project's default until edited here (#604), which a
- * project admin can save as the default — and **Generate**. The first design in a project builds the UI
- * profile first, and says so.
+ * Before the first revision (spec 223 D4, D15): how many variants (the
+ * planner's suggestion pre-filled), which design skills — the project's
+ * default until edited here (#604), which a project admin can save as the
+ * default — and **Generate**. When Generate builds the UI profile first, it
+ * says so.
  */
 export function GeneratePanel({
   projectId,
@@ -126,6 +133,13 @@ export function GeneratePanel({
   // #604: the Settings → Design write, offered here to a project admin.
   const isAdmin = project.data?.role === 'admin';
   const runnerCopy = gate ? runnerGateCopy('design', gate) : null;
+  // #606: what Generate does with the UI profile first, from the profile's
+  // own status; one that does not load says nothing.
+  const uiProfile = useSection(
+    () => api<UiProfileView>(uiProfileApi(projectId)),
+    [projectId],
+  );
+  const profileNote = generateProfileNote(uiProfile.data?.status ?? null);
   // #272: no usable profile (or an offline runner) is said before Generate.
   const readiness = useReadiness(projectId);
   const notReady = readiness
@@ -202,11 +216,8 @@ export function GeneratePanel({
             ? `Planner: ${design.suggestionWhy}`
             : 'The planner draws the task as a self-contained HTML mockup in the project’s style.'}
         </p>
-        {design.profileId === null ? (
-          <p className="text-xs text-ink-3">
-            This project has no UI profile yet: Generate builds it first, which
-            takes a few minutes.
-          </p>
+        {profileNote ? (
+          <p className="text-xs text-ink-3">{profileNote}</p>
         ) : null}
       </div>
 

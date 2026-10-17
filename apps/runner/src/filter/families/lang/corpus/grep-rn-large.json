@@ -1,0 +1,8 @@
+{
+  "argv": ["grep", "-rn", "Filter", "apps/runner/src/filter", "--include=*.ts"],
+  "exitCode": 0,
+  "category": "other",
+  "outcome": "passing",
+  "expect": "filtered",
+  "maxRatio": 0.5
+}

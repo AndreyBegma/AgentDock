@@ -33,5 +33,6 @@ import { SessionsQueryService } from './sessions-query.service';
     SessionContentService,
     SessionContentRetentionJob,
   ],
+  exports: [SessionsQueryService],
 })
 export class SessionsModule {}

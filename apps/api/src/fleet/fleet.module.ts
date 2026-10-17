@@ -40,6 +40,6 @@ import {
       useValue: defaultFleetWorkspaceOptions,
     },
   ],
-  exports: [FleetProjector],
+  exports: [FleetProjector, FleetQueryService],
 })
 export class FleetModule {}

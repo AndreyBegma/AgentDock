@@ -18,6 +18,7 @@ import {
   DESIGN_STATUS_PILL,
   describeDesignError,
   designChipState,
+  generateProfileNote,
   generateRunnerGate,
   opensCardDesign,
   opensDesign,
@@ -275,5 +276,15 @@ describe('describeDesignError', () => {
     expect(describeDesignError(refused(403))).toMatch(/role/);
     expect(describeDesignError(refused(500))).toBe('raw');
     expect(describeDesignError(new Error('x'))).toMatch(/connection/);
+  });
+});
+
+describe('what Generate says it does with the UI profile first (#606)', () => {
+  test('a build only when the profile is missing, failed its rebuild or is building', () => {
+    expect(generateProfileNote('none')).toContain('builds it first');
+    expect(generateProfileNote('stale')).toContain('tries it again first');
+    expect(generateProfileNote('building')).toContain('waits for it');
+    expect(generateProfileNote('fresh')).toBeNull();
+    expect(generateProfileNote(null)).toBeNull();
   });
 });

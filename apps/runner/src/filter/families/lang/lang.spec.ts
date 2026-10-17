@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 import { langFilters } from '.';
+import {
+  SEARCH_LINES_PER_FILE,
+  SEARCH_MIN_BYTES,
+  searchHitText,
+} from './files';
 
 const find = (argv: string[]) => langFilters.find((f) => f.matches(argv));
 const run = (argv: string[], output: string, exitCode = 0) =>
@@ -277,14 +282,68 @@ describe('lang filters: what stays', () => {
     expect(result).not.toContain('src/file250.txt');
   });
 
-  it('a long search keeps every file:line hit', () => {
+  it('a long search keeps every error hit, wherever it is', () => {
     const lines = Array.from(
       { length: 600 },
       (_, i) => `docs/notes${i}.md: remark ${i}`,
     );
-    lines.splice(300, 0, 'src/app.ts:42:  const needle = 1;');
+    lines.splice(300, 0, "src/app.ts:42:  throw new Error('needle');");
     const result = run(['rg', 'needle'], `${lines.join('\n')}\n`) ?? '';
-    expect(result).toContain('src/app.ts:42:  const needle = 1;');
+    expect(result).toContain("src/app.ts:42:  throw new Error('needle');");
     expect(result).toContain('lines omitted');
+    expect(result).not.toContain('docs/notes200.md');
+  });
+
+  it('search hits are grouped by file and capped per file', () => {
+    const lines = [
+      ...Array.from(
+        { length: 30 },
+        (_, i) => `src/store.ts:${i + 1}:  const value${i} = useState(${i});`,
+      ),
+      'src/store.ts:99:  // TODO: this fails when the cache is empty',
+      'src/one.ts:7:const x = useState(0);',
+      ...Array.from(
+        { length: 5 },
+        (_, i) => `src/two.ts:${i + 10}:  useState(${i}),`,
+      ),
+    ];
+    const result = run(
+      ['grep', '-rn', 'useState', 'src'],
+      `${lines.join('\n')}\n`,
+    );
+    expect(result).toBe(
+      [
+        'src/store.ts (31 hits)',
+        ...Array.from(
+          { length: SEARCH_LINES_PER_FILE },
+          (_, i) => `  ${i + 1}:  const value${i} = useState(${i});`,
+        ),
+        '  99:  // TODO: this fails when the cache is empty',
+        `  … ${30 - SEARCH_LINES_PER_FILE} more lines`,
+        'src/one.ts:7:const x = useState(0);',
+        'src/two.ts (5 hits)',
+        ...Array.from({ length: 5 }, (_, i) => `  ${i + 10}:  useState(${i}),`),
+        '',
+      ].join('\n'),
+    );
+  });
+
+  it('a hit is judged by its text, not by its file:line prefix', () => {
+    expect(searchHitText('src/a.ts:12:  return x;')).toBe('  return x;');
+    expect(searchHitText('src/a-1.ts-12-  ctx')).toBe('  ctx');
+    expect(searchHitText('src/a.ts:  return x;')).toBe('  return x;');
+    expect(searchHitText('grep: dir: Is a directory')).toBe(
+      'grep: dir: Is a directory',
+    );
+  });
+
+  it('a short search, a count and a file list are not grouped', () => {
+    const short = 'src/a.ts:1:x\nsrc/a.ts:2:y\n';
+    expect(run(['rg', '-n', 'x'], short)).toBe(null);
+    const counts = Array.from({ length: 100 }, (_, i) => `src/f${i}.ts:3`);
+    expect(run(['rg', '-c', 'x'], `${counts.join('\n')}\n`)).toBe(null);
+    const below = `${'src/a.ts:1:x\n'.repeat(Math.floor((SEARCH_MIN_BYTES - 1) / 13))}`;
+    expect(Buffer.byteLength(below)).toBeLessThan(SEARCH_MIN_BYTES);
+    expect(run(['rg', '-n', 'x'], below)).toBe(null);
   });
 });

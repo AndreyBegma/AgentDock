@@ -16,6 +16,7 @@ import {
   type HookCommand,
   parseHookCommand,
   quoteAssignment,
+  type Stage,
   shellQuote,
 } from './shell';
 import { statsTarget, writeStat } from './stats';
@@ -24,17 +25,20 @@ import type { Filter } from './types';
 /**
  * `agentdock-runner filter-hook` (#445 D3): Claude Code's PreToolUse hook for
  * Bash. It turns `bun run test` into `<runner> filter -- bun run test` when —
- * and only when — the session is in `bypassPermissions` (amendment 9) or
- * `auto` (amendment 10), the call is a single simple command a filter covers
- * (optionally after `cd <path> &&` and before `2>&1`, amendment 11),
- * not a background call or a dev/watch mode, and the rewrite changes nothing
- * about what the session asks or denies (see `permissions.ts`). Every other
- * Bash call is left alone and counted `passedThrough`.
+ * and only when — the session is in `bypassPermissions` (amendment 9),
+ * `auto` (amendment 10) or `plan` (amendment 14), the call is a list of pipelines of simple commands
+ * (#610) and a filter covers the first command of at least one pipeline, the
+ * call is not in the background, that command is not a dev/watch mode, and
+ * the rewrite changes nothing about what the session asks or denies (see
+ * `permissions.ts`). Only those first commands are wrapped: the rest of a
+ * pipe (`| tail -50`) reads the filtered output, and every other command runs
+ * as written. Every other Bash call is left alone and counted
+ * `passedThrough`.
  *
  * In bypass mode the rewrite carries `permissionDecision: "allow"`. In auto
- * mode it carries no decision at all: Claude Code's own permission rules and
- * auto-mode classifier judge the wrapped command, so the hook never skips
- * them.
+ * and plan mode it carries no decision at all: Claude Code's own permission
+ * rules (and, in auto, its classifier) judge the wrapped command, so the hook
+ * never skips them.
  *
  * It fails open: any error prints nothing and exits 0, which Claude Code
  * reads as "no decision" — the command runs as written.
@@ -51,7 +55,7 @@ interface HookInput {
 export interface HookOutput {
   hookSpecificOutput: {
     hookEventName: 'PreToolUse';
-    /** Bypass mode only; in auto mode Claude Code decides (amendment 10). */
+    /** Bypass mode only; in auto and plan mode Claude Code decides (amendments 10, 14). */
     permissionDecision?: 'allow';
     permissionDecisionReason?: string;
     updatedInput: Record<string, unknown>;
@@ -112,21 +116,30 @@ export const decideHook = (
   const command = toolInput.command;
   if (typeof command !== 'string') return null;
 
-  // Amendment 11: the filter, the long-running check and the rules all look
-  // at the inner command, past any `cd <path> &&`.
+  // #610: only the first command of each pipeline is ever wrapped, so the
+  // filter and the long-running check look at those, past any `cd <path> &&`.
   const parsed = parseHookCommand(command);
-  const argv = parsed ? commandArgv(parsed.command.argv) : [];
-  const filter = parsed ? findFilter(deps.filters, parsed.command.argv) : null;
+  const covered = parsed ? coveredStages(parsed, deps.filters) : [];
+  const first = covered[0]?.filter;
+  const wrapped = new Set(
+    covered
+      .filter(
+        (c) => !isLongRunning(commandArgv(c.stage.command.argv), c.filter),
+      )
+      .map((c) => c.stage),
+  );
   const mode =
     typeof input.permission_mode === 'string'
       ? input.permission_mode
       : undefined;
-  // Amendments 9 and 10: only bypass and auto rewrite; elsewhere, never.
-  const rewrites = mode === 'bypassPermissions' || mode === 'auto';
+  // Amendments 9, 10 and 14: only bypass, auto and plan rewrite; elsewhere,
+  // never.
+  const rewrites =
+    mode === 'bypassPermissions' || mode === 'auto' || mode === 'plan';
   // Amendment 12: a matched filter keeps its id; otherwise the row says why
   // none ran — the mode first, since in it nothing would ever be rewritten.
   const id =
-    filter?.id ??
+    first?.id ??
     (!rewrites
       ? FILTER_NONE_MODE
       : parsed
@@ -139,9 +152,9 @@ export const decideHook = (
 
   if (!parsed) return leave('not a simple command');
   if (toolInput.run_in_background === true) return leave('background');
-  if (!filter) return leave('no filter');
-  if (isLongRunning(argv, filter)) return leave('long-running');
-  if (!rewrites) return leave('not bypassPermissions or auto');
+  if (!first) return leave('no filter');
+  if (wrapped.size === 0) return leave('long-running');
+  if (!rewrites) return leave('not bypassPermissions, auto or plan');
 
   const cwd = typeof input.cwd === 'string' ? input.cwd : process.cwd();
   const sources: SettingsSources = {
@@ -157,11 +170,13 @@ export const decideHook = (
 
   const updatedInput = {
     ...toolInput,
-    command: wrappedCommand(parsed, deps.selfCommand),
+    command: wrappedCommand(parsed, deps.selfCommand, (stage) =>
+      wrapped.has(stage),
+    ),
   };
-  // Amendment 10: in auto mode no decision, so the classifier and the rules
-  // judge the wrapped command exactly as they would any other.
-  if (mode === 'auto') {
+  // Amendments 10 and 14: in auto and plan mode no decision, so the rules (and
+  // the classifier) judge the wrapped command exactly as any other.
+  if (mode === 'auto' || mode === 'plan') {
     return {
       rewrite: {
         hookSpecificOutput: { hookEventName: 'PreToolUse', updatedInput },
@@ -181,29 +196,63 @@ export const decideHook = (
   };
 };
 
+/** The first command of each pipeline that a filter covers, with its filter. */
+const coveredStages = (
+  parsed: HookCommand,
+  filters: readonly Filter[],
+): { stage: Stage; filter: Filter }[] =>
+  parsed.pipelines.flatMap(([stage]) => {
+    const filter = stage ? findFilter(filters, stage.command.argv) : null;
+    return stage && filter ? [{ stage, filter }] : [];
+  });
+
+/** One stage as bash words, behind `filter --` when it is wrapped. */
+const stageWords = (
+  stage: Stage,
+  selfCommand: readonly string[],
+  wrap: boolean,
+): string[] => [
+  ...stage.command.assignments.map(quoteAssignment),
+  ...(wrap ? [...selfCommand.map(shellQuote), 'filter', '--'] : []),
+  ...stage.command.argv.map(shellQuote),
+  ...(stage.mergeStderr ? ['2>&1'] : []),
+];
+
 /**
  * The rewrite, built from the parsed words and re-quoted — never from the
  * original text, so bash runs exactly the argv the parser saw (DR-01).
  *
- * Amendment 11: a `cd` target is re-quoted the same way. A trailing `2>&1` is
- * kept, as a constant: the filter forwards the child's stdout and stderr
- * separately whenever it does not compress (the bypass, streaming past the
- * buffer, no filter), so dropping it would move stderr on exactly those paths.
- * Kept, the wrapped command has the fd table the original had.
+ * #610: the line keeps its shape — the same pipelines joined by the same
+ * operators, each a constant the hook writes. A wrapped stage is still one
+ * simple command, so bash groups the line exactly as it grouped the
+ * original, and the filter returns its command's exit code, so `&&`, `||`
+ * and a pipeline's status come out the same. Only the first stage of a
+ * pipeline is ever wrapped (`wrap` picks which; all of them by default), so
+ * `| tail -50` reads the filtered output; every other stage is re-quoted and
+ * runs as written.
+ *
+ * Amendment 11: a `2>&1` is kept, as a constant: the filter forwards the
+ * child's stdout and stderr separately whenever it does not compress (the
+ * bypass, streaming past the buffer, no filter), so dropping it would move
+ * stderr on exactly those paths. Kept, the wrapped command has the fd table
+ * the original had.
  */
 export const wrappedCommand = (
   parsed: HookCommand,
   selfCommand: readonly string[],
+  wrap: (stage: Stage) => boolean = () => true,
 ): string =>
-  [
-    ...(parsed.cd === null ? [] : ['cd', shellQuote(parsed.cd), '&&']),
-    ...parsed.command.assignments.map(quoteAssignment),
-    ...selfCommand.map(shellQuote),
-    'filter',
-    '--',
-    ...parsed.command.argv.map(shellQuote),
-    ...(parsed.mergeStderr ? ['2>&1'] : []),
-  ].join(' ');
+  parsed.pipelines
+    .map((pipeline, i) => {
+      const text = pipeline
+        .map((stage, j) =>
+          stageWords(stage, selfCommand, j === 0 && wrap(stage)).join(' '),
+        )
+        .join(' | ');
+      const op = parsed.operators[i];
+      return op === undefined ? text : `${text} ${op}`;
+    })
+    .join(' ');
 
 /**
  * Runs the hook on one stdin payload and returns what to print (empty for

@@ -13,9 +13,11 @@ import { join } from 'node:path';
 import { filterStatRowSchema } from '@agentdock/shared';
 import { type FilterDeps, judge, runFilter } from './engine';
 import { filterEnv, RAW_ENV } from './env';
+import { searchFilter } from './families/lang/files';
 import { RAW_CAP_BYTES, RAW_TRUNCATED_MARKER } from './raw-store';
 import type { StatsLine } from './stats';
 import { demoFilter, lossyFilter, tapOutput, throwingFilter } from './testing';
+import type { Filter } from './types';
 
 const FAILURES = [
   'not ok 201 - drops the oldest segment at the cap',
@@ -211,6 +213,20 @@ describe('filter -- <argv> (#445 D3, D4)', () => {
     expect(stats()[0]?.row.passedThrough).toBe(true);
   });
 
+  it('counts an output below a filter threshold honestly: raw == kept', async () => {
+    // A real filter (#614): `rg` with two hits is under SEARCH_MIN_BYTES.
+    const hits = 'src/a.ts:1:const a = 1;\nsrc/a.ts:2:const b = 2;\n';
+    const rg = script('rg', `printf '${hits.replaceAll('\n', '\\n')}'`);
+    await runFilter([rg, '-n', 'const'], { ...deps, filters: [searchFilter] });
+    expect(printed()).toBe(hits);
+    expect(stats()[0]?.row).toMatchObject({
+      filter: 'lang/search',
+      rawBytes: Buffer.byteLength(hits),
+      keptBytes: Buffer.byteLength(hits),
+      passedThrough: true,
+    });
+  });
+
   it('stays out of the way without the launch env: no stats, no raw files', async () => {
     const demo = script('demo.sh', `printf 'ok 1 - a\\nok 2 - b\\n'`);
     const code = await runFilter([demo], {
@@ -264,6 +280,54 @@ describe('filter -- <argv> (#445 D3, D4)', () => {
 
 describe('judge (D4b)', () => {
   const footer = () => '[footer]\n';
+
+  // #614: a filter that judges only the text after a `file:line:` prefix.
+  const hitsFilter: Filter = {
+    id: 'fixture/hits',
+    matches: () => true,
+    protectedPart: (line) => line.replace(/^[^:]+:\d+:/, ''),
+    apply: ({ output }) =>
+      output
+        .split('\n')
+        .filter((l) => l.includes('Error'))
+        .join('\n'),
+  };
+  const hits = [
+    ...Array.from(
+      { length: 40 },
+      (_, i) => `src/a.ts:${i}:const v${i} = ${i};`,
+    ),
+    "src/b.ts:7:throw new Error('boom');",
+  ].join('\n');
+
+  it('judges a line by the part the filter names', () => {
+    const verdict = judge(hitsFilter, ['rg'], hits, 0, footer);
+    expect(verdict).toEqual({
+      kind: 'filtered',
+      text: "src/b.ts:7:throw new Error('boom');\n[footer]\n",
+    });
+  });
+
+  it('still refuses a result that loses a protected part', () => {
+    const dropsAll = { ...hitsFilter, apply: () => 'nothing' };
+    expect(judge(dropsAll, ['rg'], hits, 0, footer).kind).toBe('original');
+    // Without `protectedPart`, every `file:line` hit is a frame to keep.
+    const whole = { ...hitsFilter, protectedPart: undefined };
+    expect(judge(whole, ['rg'], hits, 0, footer).kind).toBe('original');
+  });
+
+  it('returns the original when `protectedPart` throws', () => {
+    const throwing = {
+      ...hitsFilter,
+      protectedPart: () => {
+        throw new Error('x');
+      },
+    };
+    expect(judge(throwing, ['rg'], hits, 0, footer)).toEqual({
+      kind: 'original',
+      reason: 'threw',
+    });
+  });
 
   it('refuses a result that is not shorter, footer included', () => {
     const verdict = judge(demoFilter, ['demo-test'], 'ok 1 - a\n', 0, footer);

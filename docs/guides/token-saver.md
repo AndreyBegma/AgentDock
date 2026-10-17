@@ -23,11 +23,13 @@ For every Claude launch the runner makes, with the project's setting on:
 - **The history is compacted at about 150k tokens**, on every model. On a 1M
   window a session used to grow to about 600k before compacting, and every
   turn re-reads what it holds.
-- **Reads are trimmed too.** The launch turns on the code-sentinel plugin's
-  `/cs-eco` (`CS_ECO=on`): whole reads of large files are guarded, a repeated
-  read of an unchanged file is refused once, and large MCP results are cut to
-  their head and tail. The runner's filter still handles Bash, so nothing is
-  counted twice.
+- **Reads are trimmed too.** The runner guards `Read` itself, whatever
+  plugins the profile has: a whole read of a file over 64 KB or 1,500 lines is
+  refused once with a hint (read a range with `offset`/`limit`, find the line
+  with `Grep`, or ask the `scout` agent), and a repeated read of an unchanged
+  range is refused once with a reminder. Repeating the same call reads the
+  file. The launch sets `CS_ECO=off`, so the code-sentinel plugin's `/cs-eco`
+  hooks never guard the same read a second time.
 - **Broad searches go to a cheaper helper**, and the worker prompt is ordered
   so the model's cache hits.
 
@@ -50,12 +52,17 @@ the session is allowed to run. Claude Code checks permission rules against the
 command a hook *returns*, so a rewrite could hide `git push` from a
 `Bash(git push:*)` rule. The runner therefore rewrites only when:
 
-- the session runs in `bypassPermissions`, or in `auto` (Board card sessions
-  do). In `auto` the hook makes no decision, and Claude Code's classifier
-  still judges the wrapped command; **and**
+- the session runs in `bypassPermissions`, in `auto` (Board card sessions do)
+  or in `plan` (planner and design runs do). In `auto` and `plan` the hook
+  makes no decision, and Claude Code's own rules still judge the wrapped
+  command; **and**
 - no `deny` or `ask` rule matches it; **and**
-- the call is a single simple command — no pipe, `&&`, redirect or subshell —
-  that is not in the background, a dev server or a watch mode.
+- the call is made of simple commands joined by `|`, `&&`, `||` or `;` — no
+  redirect other than `2>&1`, no subshell, heredoc or substitution — and is
+  not in the background. In a pipeline only the first command is filtered
+  (`bun run test 2>&1 | tail -50` filters `bun run test`, and `tail` reads the
+  filtered output); in a list each covered command is filtered on its own. A
+  dev server or a watch mode runs as written.
 
 In any other session the command runs unfiltered, and the dashboard counts it
 as "returned the original". When no filter matched, the dashboard and the card
@@ -63,9 +70,9 @@ sheet say why:
 
 | Label | Means |
 |---|---|
-| Compound command (not filtered) | a pipe, a list, a redirect or a substitution — not a single simple command |
-| No filter for this command | a simple command no filter family covers |
-| Not filtered in this permission mode | the session's mode is neither `bypassPermissions` nor `auto` |
+| Compound command (not filtered) | a redirect, a subshell, a heredoc, a substitution or a background `&` — something other than simple commands joined by `\|`, `&&`, `\|\|` or `;` |
+| No filter for this command | no filter family covers the first command of any of its pipelines |
+| Not filtered in this permission mode | the session's mode is not `bypassPermissions`, `auto` or `plan` |
 | No filter (uncovered command) | recorded before the reasons above existed |
 
 The exact rules are in

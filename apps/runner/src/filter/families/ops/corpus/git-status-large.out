@@ -1,0 +1,108 @@
+On branch feat/618-migrate-to-glass-ui-tokens
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+	modified:   apps/web/src/components/approvals/action-requests-panel.test.tsx
+	modified:   apps/web/src/components/approvals/action-requests-panel.tsx
+	modified:   apps/web/src/components/approvals/tool-use-review.tsx
+	modified:   apps/web/src/components/attachments/attachment-dropzone.tsx
+	modified:   apps/web/src/components/attachments/attachment-list.tsx
+	modified:   apps/web/src/components/attachments/card-attachments-section.tsx
+	modified:   apps/web/src/components/auth-card.tsx
+	modified:   apps/web/src/components/board/accept-candidates-dialog.tsx
+	modified:   apps/web/src/components/board/accept-dialog.tsx
+	modified:   apps/web/src/components/board/board-movable.test.tsx
+	modified:   apps/web/src/components/board/board-toolbar.tsx
+	modified:   apps/web/src/components/board/board-view.tsx
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   apps/web/src/app/(app)/activity/feed-entries.test.tsx
+	modified:   apps/web/src/app/(app)/activity/feed-entries.tsx
+	modified:   apps/web/src/app/(app)/activity/feed-toolbar.tsx
+	modified:   apps/web/src/app/(app)/activity/feed.tsx
+	modified:   apps/web/src/app/(app)/activity/layout.tsx
+	modified:   apps/web/src/app/(app)/activity/page.tsx
+	modified:   apps/web/src/components/board/bulk-action-bar.test.tsx
+	modified:   apps/web/src/components/board/bulk-action-bar.tsx
+	modified:   apps/web/src/components/board/candidate-group.test.tsx
+	modified:   apps/web/src/components/board/candidate-group.tsx
+	modified:   apps/web/src/components/board/candidate-sheet.tsx
+	modified:   apps/web/src/components/board/card-dependencies.tsx
+	modified:   apps/web/src/components/board/card-description.test.tsx
+	modified:   apps/web/src/components/board/card-description.tsx
+	modified:   apps/web/src/components/board/card-design.tsx
+	modified:   apps/web/src/components/board/card-face.test.tsx
+	modified:   apps/web/src/components/board/card-face.tsx
+	modified:   apps/web/src/components/board/card-not-found.tsx
+	modified:   apps/web/src/components/board/card-options.tsx
+	modified:   apps/web/src/components/board/card-sheet.test.tsx
+	modified:   apps/web/src/components/board/card-sheet.tsx
+	modified:   apps/web/src/components/board/discuss-dialog.tsx
+	modified:   apps/web/src/components/board/drafts-strip.tsx
+	modified:   apps/web/src/components/board/group-stack-dialog.test.tsx
+	modified:   apps/web/src/components/board/group-stack-dialog.tsx
+	modified:   apps/web/src/components/board/handoff/card-handoff-section.tsx
+	modified:   apps/web/src/components/board/handoff/restart-chip.test.tsx
+	modified:   apps/web/src/components/board/handoff/restart-chip.tsx
+	modified:   apps/web/src/components/board/intake-view.tsx
+	modified:   apps/web/src/components/board/launch-popover.tsx
+	modified:   apps/web/src/components/board/move-picker.tsx
+	modified:   apps/web/src/components/board/new-card-dialog.tsx
+	modified:   apps/web/src/components/board/plan-panel.test.tsx
+	modified:   apps/web/src/components/board/plan-panel.tsx
+	modified:   apps/web/src/components/board/plan-task-face.tsx
+	modified:   apps/web/src/components/board/plan-task-sheet.tsx
+	modified:   apps/web/src/components/board/selection-box.tsx
+	modified:   apps/web/src/components/board/split-review.tsx
+	modified:   apps/web/src/components/board/stack-face.test.tsx
+	modified:   apps/web/src/components/board/stack-face.tsx
+	modified:   apps/web/src/components/board/suggestion-sheet.tsx
+	modified:   apps/web/src/components/board/use-bulk-actions.tsx
+	modified:   apps/web/src/components/board/use-card-actions.tsx
+	modified:   apps/web/src/components/board/use-card-move.tsx
+	modified:   apps/web/src/components/brand/logomark.tsx
+	modified:   apps/web/src/components/brand/site-link.tsx
+	modified:   apps/web/src/components/brand/wordmark.tsx
+	modified:   apps/web/src/components/budgets/budget-card.tsx
+	modified:   apps/web/src/components/budgets/budget-chip.tsx
+	modified:   apps/web/src/components/budgets/budget-form-dialog.tsx
+	modified:   apps/web/src/components/budgets/exceeded-banner.tsx
+	modified:   apps/web/src/components/budgets/override-dialog.tsx
+	modified:   apps/web/src/components/design/approve-dialog.tsx
+	modified:   apps/web/src/components/design/comments-panel.tsx
+	modified:   apps/web/src/components/design/design-chip.tsx
+	modified:   apps/web/src/components/design/design-failure.tsx
+	modified:   apps/web/src/components/design/design-progress.test.tsx
+	modified:   apps/web/src/components/design/design-progress.tsx
+	modified:   apps/web/src/components/design/design-viewer.tsx
+	modified:   apps/web/src/components/design/frame-strip.test.tsx
+	modified:   apps/web/src/components/design/frame-strip.tsx
+	modified:   apps/web/src/components/design/full-screen-layer.tsx
+	modified:   apps/web/src/components/design/generate-panel.test.tsx
+	modified:   apps/web/src/components/design/generate-panel.tsx
+	modified:   apps/web/src/components/design/mockup-banner.tsx
+	modified:   apps/web/src/components/design/mockup-frame.test.tsx
+	modified:   apps/web/src/components/design/mockup-frame.tsx
+	modified:   apps/web/src/components/design/pin-composer.tsx
+	modified:   apps/web/src/components/design/scaled-preview.tsx
+	modified:   apps/web/src/components/design/viewer-toolbar.test.tsx
+	modified:   apps/web/src/components/design/viewer-toolbar.tsx
+	modified:   apps/web/src/components/markdown/markdown.test.tsx
+	modified:   apps/web/src/components/markdown/markdown.tsx
+	modified:   apps/web/src/components/onboarding/getting-started.tsx
+	modified:   apps/web/src/components/onboarding/runner-commands.tsx
+	modified:   apps/web/src/components/overview/dashboard.tsx
+	modified:   apps/web/src/components/page-header/page-header.tsx
+	modified:   apps/web/src/components/planner/composer.tsx
+	modified:   apps/web/src/components/planner/conversation.tsx
+	modified:   apps/web/src/components/planner/failed-turn.tsx
+	modified:   apps/web/src/components/planner/issue-links.tsx
+	modified:   apps/web/src/components/planner/past-round.tsx
+	modified:   apps/web/src/components/planner/plan-graph.tsx
+	modified:   apps/web/src/components/planner/plan-header.tsx
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	apps/web/src/styles/
+
