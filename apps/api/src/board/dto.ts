@@ -76,6 +76,7 @@ export class BoardQueryDto {
 export class CreateBoardCardDto implements CreateBoardCardRequest {
   @IsString()
   @Matches(/\S/, { message: 'title must not be blank' })
+  @Matches(/^[^\r\n]*$/, { message: 'title must be one line' })
   @MaxLength(BOARD_CARD_TITLE_MAX)
   title!: string;
 
@@ -107,6 +108,7 @@ export class UpdateBoardCardDto implements UpdateBoardCardRequest {
   @IsOptional()
   @IsString()
   @Matches(/\S/, { message: 'title must not be blank' })
+  @Matches(/^[^\r\n]*$/, { message: 'title must be one line' })
   @MaxLength(BOARD_CARD_TITLE_MAX)
   title?: string;
 
@@ -245,6 +247,7 @@ export class UpdateBoardStackDto implements UpdateBoardStackRequest {
   @IsOptional()
   @IsString()
   @Matches(/\S/, { message: 'title must not be blank' })
+  @Matches(/^[^\r\n]*$/, { message: 'title must be one line' })
   @MaxLength(STACK_TITLE_MAX)
   title?: string;
 
@@ -364,6 +367,7 @@ export class AcceptSuggestionDto implements AcceptSuggestionRequest {
   @IsOptional()
   @IsString()
   @Matches(/\S/, { message: 'title must not be blank' })
+  @Matches(/^[^\r\n]*$/, { message: 'title must be one line' })
   @MaxLength(BOARD_CARD_TITLE_MAX)
   title?: string;
 

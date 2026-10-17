@@ -37,6 +37,7 @@ import {
   isCardPrState,
 } from './types';
 import {
+  CARD_DATA_LINE,
   CARD_ENV_ID,
   CARD_ENV_PORT,
   CARD_WORKER_PROMPT_VERSION,
@@ -242,7 +243,7 @@ describe('worker prompt', () => {
   };
 
   it('is versioned', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(14);
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(15);
   });
 
   it('names the card, branch, base and spec, and how to finish', () => {
@@ -304,7 +305,7 @@ describe('worker prompt', () => {
 
   it('builds the feedback prompt of D9', () => {
     expect(cardFeedbackPrompt('  Rename the button. ')).toBe(
-      'Review feedback: Rename the button.\n\nAddress it on the same branch, commit, then call finish_card.',
+      `Review feedback (${CARD_DATA_LINE})\n\n<card>\nRename the button.\n</card>\n\nAddress it on the same branch, commit, then call finish_card.`,
     );
     expect(
       cardPromptSchema.safeParse(

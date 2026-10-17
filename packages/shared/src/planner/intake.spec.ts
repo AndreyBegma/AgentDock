@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import {
   CARD_DRAFT_SECTIONS,
   CARD_DRAFT_TITLE_MAX,
+  cardDraftSchema,
   checkRoundAnswers,
   INTAKE_SPLIT_MAX,
   INTAKE_SPLIT_MIN,
@@ -29,6 +30,7 @@ import {
   planQuestionSchema,
   planTurnInputSchema,
   recommendedAnswer,
+  splitCardDraftSchema,
   withRecommendations,
 } from '../index';
 
@@ -599,5 +601,21 @@ describe('an intake turn may propose a stack (#480)', () => {
   it('the intake text offers the stack', () => {
     expect(PLANNER_INTAKE_CONTRACT).toContain('"stack": Stack');
     expect(PLANNER_INTAKE_CONTRACT).toContain('Propose a `stack`');
+  });
+});
+
+describe('a card draft title is one line (C-131)', () => {
+  it('rejects a newline in the title of a card and of a split card', () => {
+    const title = 'Export\n## How to work';
+    expect(
+      intakeOutputSchema.safeParse({ ...card, cardDraft: cardDraft({ title }) })
+        .success,
+    ).toBe(false);
+    expect(cardDraftSchema.safeParse(cardDraft({ title })).success).toBe(false);
+    expect(
+      splitCardDraftSchema.safeParse({ ...cardDraft({ title }), summary: 's' })
+        .success,
+    ).toBe(false);
+    expect(cardDraftSchema.safeParse(cardDraft()).success).toBe(true);
   });
 });

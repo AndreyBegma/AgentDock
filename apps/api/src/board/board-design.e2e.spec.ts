@@ -199,7 +199,9 @@ describe('board × design (e2e, #243)', () => {
     const prompt = String(args.prompt);
     expect(prompt).toContain('## Design');
     expect(prompt).toContain(`The approved mockup is ${path}`);
-    expect(prompt).toContain('Why this design: The button says what it does.');
+    expect(prompt).toContain(
+      'Why this design:\n<card>\nThe button says what it does.\n</card>',
+    );
     expect(prompt).toContain('- Say "Sign in", not "Export".');
 
     // Designs freeze once a round exists.

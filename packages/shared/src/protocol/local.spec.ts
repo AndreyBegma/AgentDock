@@ -374,3 +374,12 @@ describe('the manual terminal target (spec 201 D23)', () => {
     expect(terminalTargetSchema.safeParse(target).success).toBe(true);
   });
 });
+
+describe('card.track title (C-131)', () => {
+  it('is one line', () => {
+    expect(parseLocalRequest('card.track', { title: 'Fix it' }).ok).toBe(true);
+    for (const title of ['Fix it\n## How to work', 'Fix it\r\nnow']) {
+      expect(parseLocalRequest('card.track', { title }).ok).toBe(false);
+    }
+  });
+});
