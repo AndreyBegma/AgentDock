@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>Group dialog — states</title>
+<style>
+:root{--radius-control:6px;--radius-surface:8px;--radius-sheet:12px;--size-control:28px;--dur-fast:100ms;--dur-base:150ms;--ease-sheet:cubic-bezier(.32,.72,0,1);--press-scale:.97;--font-sans:'SF Pro Text','Inter',system-ui,-apple-system,'Segoe UI',sans-serif;--font-mono:'JetBrains Mono',ui-monospace,Menlo,monospace;--glass-filter-strong:blur(40px) saturate(180%) brightness(var(--glass-brightness-strong));--color-hue-1-soft:color-mix(in srgb,var(--color-hue-1) var(--a-soft),transparent);--color-hue-6-soft:color-mix(in srgb,var(--color-hue-6) var(--a-soft),transparent);--color-hue-7-soft:color-mix(in srgb,var(--color-hue-7) var(--a-soft),transparent)}
+:root,:root[data-theme="dark"]{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-content:rgb(27 38 71/.96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246/.62);--color-ink-3:rgb(242 242 246/.53);--color-warn:#e3b341;--color-danger:#ff6b60;--color-info:#5fb4f0;--color-line:rgb(255 255 255/.1);--color-line-strong:rgb(255 255 255/.18);--color-hover:rgb(255 255 255/.06);--color-focus:#b4b2ff;--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-soft:rgb(91 91 246/.2);--color-accent-ink:#b4b2ff;--color-scrim:rgb(10 16 34/.3);--color-hue-1:#5b9cf6;--color-hue-1-ink:#a4c8ff;--color-hue-6:#f0606e;--color-hue-6-ink:#ff9da5;--color-hue-7:#a68bfa;--a-soft:18%;--canvas-glow:18%;--glass-sheen:rgb(255 255 255/.06);--glass-scrim-strong:rgb(9 9 12/.64);--glass-brightness-strong:.7;--glass-edge:rgb(255 255 255/.14);--glass-spec:rgb(255 255 255/.2);--glass-rim-strong:rgb(242 242 246/.22);--glass-rim-shade-strong:rgb(9 9 12/.2);--glass-meniscus:rgb(9 9 12/.55);--glass-refract:rgb(242 242 246/.35);--glass-shadow-strong:rgb(0 0 0/.45)}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-content:rgb(255 255 255/.96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27/.72);--color-ink-3:rgb(24 24 27/.64);--color-warn:#b45309;--color-danger:#dc2626;--color-info:#03629a;--color-line:rgb(0 0 0/.1);--color-line-strong:rgb(0 0 0/.23);--color-hover:rgb(0 0 0/.06);--color-focus:#4f46e5;--color-accent:#4f46e5;--color-on-accent:#fff;--color-accent-soft:rgb(79 70 229/.12);--color-accent-ink:#4338ca;--color-scrim:rgb(10 16 34/.22);--color-hue-1:#1f64d6;--color-hue-1-ink:#1550b0;--color-hue-6:#d02a3e;--color-hue-6-ink:#ad1f31;--color-hue-7:#7244e0;--a-soft:12%;--canvas-glow:10%;--glass-sheen:rgb(0 0 0/.06);--glass-scrim-strong:rgb(255 255 255/.64);--glass-brightness-strong:1.3;--glass-edge:rgb(0 0 0/.18);--glass-spec:rgb(0 0 0/.2);--glass-rim-strong:rgb(255 255 255/.3);--glass-rim-shade-strong:rgb(24 24 27/.08);--glass-meniscus:rgb(24 24 27/.12);--glass-refract:rgb(255 255 255/.5);--glass-shadow-strong:rgb(0 0 0/.16)}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground);color:var(--color-ink)}
+body{margin:0;min-height:100vh;font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased}
+h1,h2,h3,p{margin:0}.mono{font-family:var(--font-mono)}
+:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}
+.ink-2{color:var(--color-ink-2)}.ink-3{color:var(--color-ink-3)}
+svg.i{width:16px;height:16px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+svg.s3{width:12px;height:12px}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.glass-strong{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim-strong);backdrop-filter:var(--glass-filter-strong);-webkit-backdrop-filter:var(--glass-filter-strong);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),inset 1px 1px 0 var(--glass-rim-strong),inset -1px -1px 0 var(--glass-rim-shade-strong),inset 0 -3px 3px -1px var(--glass-meniscus),inset 0 0 18px -4px var(--glass-refract),0 20px 48px var(--glass-shadow-strong)}
+.page{max-width:1320px;margin:0 auto;padding:24px;display:flex;flex-direction:column;gap:16px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.top h1{font-size:20px;line-height:28px;font-weight:600}
+.states{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px}
+.state{display:flex;flex-direction:column;gap:8px}
+.state-label{font-size:12px;font-weight:500;color:var(--color-ink-3)}
+.stage{position:relative;min-height:600px;border-radius:var(--radius-surface);border:1px dashed var(--color-line-strong);display:grid;place-items:center;padding:24px 12px;overflow:hidden;background:repeating-linear-gradient(0deg,transparent 0 47px,var(--color-hover) 47px 48px),var(--color-surface)}
+.scrim{position:absolute;inset:0;background:var(--color-scrim);backdrop-filter:blur(2px)}
+.dialog{position:relative;width:min(28rem,100%);padding:20px;border-radius:var(--radius-sheet);display:flex;flex-direction:column;gap:14px}
+.dialog-head{display:flex;align-items:flex-start;gap:12px}
+.dialog-head h2{font-size:16px;line-height:24px;font-weight:600;flex:1}
+.dialog .consequence{color:var(--color-ink-2);margin-top:-8px}
+.dialog-actions{display:flex;justify-content:space-between;gap:8px;margin-top:4px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;height:var(--size-control);padding:0 16px;border:1px solid transparent;border-radius:var(--radius-control);font:inherit;font-size:14px;font-weight:600;cursor:pointer;color:inherit;transition:background-color var(--dur-fast),transform var(--dur-fast) var(--ease-sheet)}
+.btn:active{transform:scale(var(--press-scale))}
+.btn:disabled{opacity:.4;pointer-events:none}
+.btn-glass{background:var(--color-raised);color:var(--color-ink);border-color:var(--color-line-strong)}
+.btn-solid{background:var(--color-accent);color:var(--color-on-accent)}
+.btn-ghost{background:transparent;color:var(--color-ink-2)}
+.btn-ghost:hover{background:var(--color-hover);color:var(--color-ink)}
+.btn-icon{padding:0;aspect-ratio:1}
+.spinner{width:14px;height:14px;border-radius:999px;border:2px solid color-mix(in srgb,var(--color-on-accent) 35%,transparent);border-top-color:var(--color-on-accent);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.field{display:flex;flex-direction:column;gap:6px}
+.field-label{font-size:12px;line-height:16px;font-weight:500;color:var(--color-ink-2)}
+.field-label .opt{color:var(--color-ink-3);font-weight:400}
+.field-hint{font-size:12px;color:var(--color-ink-3)}
+.input,.textarea{width:100%;height:28px;padding:0 10px;background:var(--color-surface);color:var(--color-ink);border:1px solid var(--color-line-strong);border-radius:var(--radius-control);font:inherit;font-size:14px}
+.input::placeholder,.textarea::placeholder{color:var(--color-ink-3)}
+.input:focus,.textarea:focus,.input.is-focus{outline:none;border-color:color-mix(in srgb,var(--color-ink) 70%,transparent);box-shadow:0 0 0 2px color-mix(in srgb,var(--color-ink) 22%,transparent)}
+.textarea{height:auto;min-height:64px;padding:6px 10px;resize:vertical}
+.toggle-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:10px 12px;border-radius:var(--radius-surface);background:var(--color-raised);border:1px solid var(--color-line)}
+.toggle-row .t{font-weight:500}
+.toggle-row .d{font-size:12px;line-height:16px;color:var(--color-ink-3);margin-top:2px}
+.toggle{position:relative;width:44px;height:24px;border-radius:999px;background:var(--color-line-strong);border:0;cursor:pointer;flex-shrink:0;transition:background-color var(--dur-base)}
+.toggle::after{content:'';position:absolute;top:4px;left:0;width:16px;height:16px;border-radius:999px;background:var(--color-ink);transform:translateX(4px);transition:transform var(--dur-base) var(--ease-sheet)}
+.toggle[aria-checked=true]{background:var(--color-accent)}
+.toggle[aria-checked=true]::after{background:var(--color-on-accent);transform:translateX(24px)}
+.cards{border:1px solid var(--color-line);border-radius:var(--radius-surface);overflow:hidden}
+.cards-head{display:flex;justify-content:space-between;padding:6px 10px;font-size:12px;font-weight:500;color:var(--color-ink-3);background:var(--color-raised);border-bottom:1px solid var(--color-line)}
+.crow{display:grid;grid-template-columns:52px 1fr auto;gap:8px;align-items:center;height:32px;padding:0 10px;border-bottom:1px solid var(--color-line);font-size:13px}
+.crow:last-child{border-bottom:0}
+.crow .lbl{font-family:var(--font-mono);font-size:12px;color:var(--color-ink-2)}
+.crow .ttl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crow .col{font-size:12px;color:var(--color-ink-3)}
+.crow.out{color:var(--color-ink-3)}.crow.out .ttl{text-decoration:line-through;text-decoration-color:var(--color-line-strong)}
+.crow.bad{background:color-mix(in srgb,var(--color-danger) 8%,transparent)}
+.chip{display:inline-flex;align-items:center;gap:4px;height:16px;padding:0 5px;border-radius:4px;background:var(--color-hover);color:var(--color-ink-2);font-size:11px;font-weight:500;white-space:nowrap}
+.chip.danger{background:color-mix(in srgb,var(--color-danger) 14%,transparent);color:var(--color-danger)}
+.banner{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:var(--radius-surface);border:1px solid;font-size:13px;line-height:18px}
+.banner svg{margin-top:1px}
+.banner-info{background:color-mix(in srgb,var(--color-info) 12%,transparent);border-color:color-mix(in srgb,var(--color-info) 30%,transparent)}
+.banner-info svg{color:var(--color-info)}
+.banner-danger{background:color-mix(in srgb,var(--color-danger) 12%,transparent);border-color:color-mix(in srgb,var(--color-danger) 30%,transparent)}
+.banner-danger svg{color:var(--color-danger)}
+.banner-body{flex:1;display:flex;flex-direction:column;gap:2px}
+.notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;font-size:13px;color:var(--color-ink-2)}
+.notes b{color:var(--color-ink);font-weight:600}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+@media (prefers-reduced-transparency:reduce){.glass-strong{background:var(--color-raised);backdrop-filter:none}.canvas{display:none}}
+</style>
+</head>
+<body>
+<div class="canvas"></div>
+<div class="page">
+  <div class="top">
+    <h1>Group into stack: dialog states</h1>
+    <button class="btn btn-ghost btn-icon" aria-label="Switch theme" onclick="var r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark'"><svg class="i" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg></button>
+  </div>
+
+  <div class="states">
+    <!-- A: default -->
+    <section class="state">
+      <div class="state-label">1 · Opened from the bar: title empty, Group disabled</div>
+      <div class="stage">
+        <div class="scrim"></div>
+        <div class="dialog glass-strong" role="dialog" aria-modal="true" aria-labelledby="a-t">
+          <div class="dialog-head"><h2 id="a-t">Group 4 cards into a stack?</h2><button class="btn btn-ghost btn-icon" aria-label="Close"><svg class="i" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+          <p class="consequence">The cards fold into one stack face on the Board. Each card still runs on its own.</p>
+          <label class="field"><span class="field-label">Title</span><input class="input is-focus" placeholder="e.g. Security hardening" aria-required="true"></label>
+          <label class="field"><span class="field-label">Description <span class="opt">optional</span></span><textarea class="textarea" placeholder="What ties these cards together"></textarea></label>
+          <div class="toggle-row">
+            <div><div class="t">Shared design</div><div class="d">Draws one mockup for the whole stack first. Run is held until you approve it.</div></div>
+            <button class="toggle" role="switch" aria-checked="false" aria-label="Shared design" onclick="this.setAttribute('aria-checked',this.getAttribute('aria-checked')!=='true')"></button>
+          </div>
+          <div class="cards">
+            <div class="cards-head"><span>Joining</span><span>4 cards</span></div>
+            <div class="crow"><span class="lbl">C-211</span><span class="ttl">Rate-limit the login endpoint per IP and account</span><span class="col">To Do</span></div>
+            <div class="crow"><span class="lbl">C-214</span><span class="ttl">Session cookie is missing SameSite=strict</span><span class="col">To Do</span></div>
+            <div class="crow"><span class="lbl">C-219</span><span class="ttl">Redact secrets from runner command logs</span><span class="col">To Do</span></div>
+            <div class="crow"><span class="lbl">C-207</span><span class="ttl">CSP header for the web app</span><span class="col">In progress</span></div>
+          </div>
+          <div class="banner banner-info"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div class="banner-body"><span><span class="mono">C-140</span> is left out: it is already in <span class="mono">S-3</span>.</span></div></div>
+          <div class="dialog-actions"><button class="btn btn-ghost">Cancel</button><button class="btn btn-solid" disabled>Group 4 cards</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- B: filled, design on, submitting -->
+    <section class="state">
+      <div class="state-label">2 · Title given, shared design on, submitting</div>
+      <div class="stage">
+        <div class="scrim"></div>
+        <div class="dialog glass-strong" role="dialog" aria-modal="true" aria-labelledby="b-t" aria-busy="true">
+          <div class="dialog-head"><h2 id="b-t">Group 4 cards into a stack?</h2><button class="btn btn-ghost btn-icon" aria-label="Close"><svg class="i" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+          <p class="consequence">The cards fold into one stack face on the Board. Each card still runs on its own.</p>
+          <label class="field"><span class="field-label">Title</span><input class="input" value="Security hardening"></label>
+          <label class="field"><span class="field-label">Description <span class="opt">optional</span></span><textarea class="textarea">Close the gaps from the October audit before the public beta.</textarea></label>
+          <div class="toggle-row">
+            <div><div class="t">Shared design</div><div class="d">Draws one mockup for the whole stack first. Run is held until you approve it.</div></div>
+            <button class="toggle" role="switch" aria-checked="true" aria-label="Shared design" onclick="this.setAttribute('aria-checked',this.getAttribute('aria-checked')!=='true')"></button>
+          </div>
+          <div class="cards">
+            <div class="cards-head"><span>Joining</span><span>4 cards</span></div>
+            <div class="crow"><span class="lbl">C-211</span><span class="ttl">Rate-limit the login endpoint per IP and account</span><span class="col">To Do</span></div>
+            <div class="crow"><span class="lbl">C-214</span><span class="ttl">Session cookie is missing SameSite=strict</span><span class="col">To Do</span></div>
+            <div class="crow"><span class="lbl">C-219</span><span class="ttl">Redact secrets from runner command logs</span><span class="col">To Do</span></div>
+            <div class="crow"><span class="lbl">C-207</span><span class="ttl">CSP header for the web app</span><span class="col">In progress</span></div>
+          </div>
+          <div class="dialog-actions"><button class="btn btn-ghost" disabled>Cancel</button><button class="btn btn-solid" aria-disabled="true"><span class="spinner" aria-hidden="true"></span>Grouping…</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- C: refused 409 -->
+    <section class="state">
+      <div class="state-label">3 · Refused (409 stackRefused): nothing was created</div>
+      <div class="stage">
+        <div class="scrim"></div>
+        <div class="dialog glass-strong" role="dialog" aria-modal="true" aria-labelledby="c-t">
+          <div class="dialog-head"><h2 id="c-t">Group 4 cards into a stack?</h2><button class="btn btn-ghost btn-icon" aria-label="Close"><svg class="i" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+          <div class="banner banner-danger" role="alert"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg><div class="banner-body"><strong>Nothing was grouped</strong><span class="ink-2"><span class="mono">C-219</span> joined stack <span class="mono">S-11</span> while this was open. Group the other 3, or cancel.</span></div></div>
+          <label class="field"><span class="field-label">Title</span><input class="input" value="Security hardening"></label>
+          <label class="field"><span class="field-label">Description <span class="opt">optional</span></span><textarea class="textarea">Close the gaps from the October audit before the public beta.</textarea></label>
+          <div class="toggle-row">
+            <div><div class="t">Shared design</div><div class="d">Draws one mockup for the whole stack first. Run is held until you approve it.</div></div>
+            <button class="toggle" role="switch" aria-checked="false" aria-label="Shared design" onclick="this.setAttribute('aria-checked',this.getAttribute('aria-checked')!=='true')"></button>
+          </div>
+          <div class="cards">
+            <div class="cards-head"><span>Joining</span><span>3 cards</span></div>
+            <div class="crow"><span class="lbl">C-211</span><span class="ttl">Rate-limit the login endpoint per IP and account</span><span class="col">To Do</span></div>
+            <div class="crow"><span class="lbl">C-214</span><span class="ttl">Session cookie is missing SameSite=strict</span><span class="col">To Do</span></div>
+            <div class="crow out bad"><span class="lbl">C-219</span><span class="ttl">Redact secrets from runner command logs</span><span class="chip danger">In S-11</span></div>
+            <div class="crow"><span class="lbl">C-207</span><span class="ttl">CSP header for the web app</span><span class="col">In progress</span></div>
+          </div>
+          <div class="dialog-actions"><button class="btn btn-ghost">Cancel</button><button class="btn btn-solid">Group 3 cards</button></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="notes">
+    <p><b>Who can join.</b> The bar counts the cards that can join (not in a stack, not in Inbox) and disables Group below 2. The server checks again and refuses the whole request.</p>
+    <p><b>Shared design is off by default.</b> When it is on, the stack gets the same design row and Run gating as an intake stack (ADR-0044 §4, §6).</p>
+    <p><b>After a refusal.</b> The title and description stay as typed. The card that broke a rule is marked and left out, so a second press groups the rest.</p>
+  </div>
+</div>
+</body>
+</html>

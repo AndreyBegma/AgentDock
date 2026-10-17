@@ -1,4 +1,4 @@
-# ADR-0054: A Telegram Mini App signs in with its `initData`
+# ADR-0055: A Telegram Mini App signs in with its `initData`
 
 Status: accepted · Date: 2026-10-17 ·
 Card: C-213 (stack S-1) ·

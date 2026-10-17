@@ -833,6 +833,8 @@ export interface BoardErrorBody {
   code?: AttachmentRefusal;
   /** `dependency_open` (#337 D8): the open dependencies — "C-12 is not completed yet". */
   dependencies?: CardDependencyRef[];
+  /** `stack_refused` of a grouping (#588): the cards that cannot join, by number. */
+  cards?: number[];
 }
 
 /**

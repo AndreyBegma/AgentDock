@@ -112,6 +112,26 @@ export interface AddStackCardRequest {
   stage: number;
 }
 
+/**
+ * `POST …/board/stacks` (operator, #588): groups cards of the project into a
+ * new stack by hand — one stage, no dependencies between its cards, so each
+ * still runs on its own. Refused whole with `stack_refused` (409, the cards
+ * that broke a rule in `cards`) when any is in Inbox, in a stack already or
+ * not a card of the project.
+ */
+export interface CreateBoardStackRequest {
+  title: string;
+  /** Markdown; empty when left out. */
+  body?: string;
+  /** A shared design holds Run of every card until it is approved; off by default. */
+  design?: boolean;
+  /** Card numbers, at least `MANUAL_STACK_CARDS_MIN`. */
+  cards: number[];
+}
+
+/** A stack made by hand groups two cards or more. */
+export const MANUAL_STACK_CARDS_MIN = 2;
+
 /** `BOARD_COLUMNS` order: how far a card is. */
 const columnRank = (column: BoardColumn): number =>
   BOARD_COLUMNS.indexOf(column);
