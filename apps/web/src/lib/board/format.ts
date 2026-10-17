@@ -622,6 +622,23 @@ export function noPrBanner(
   return { ...noPrText(card), canCreate: true };
 }
 
+/**
+ * #630: a failed collect on the card face — a badge whose tooltip is the
+ * sheet's line. A diverged branch already shows as needing a person.
+ */
+export function collectFailedBadge(
+  card: Pick<
+    BoardCardView,
+    'collectState' | 'collectError' | 'needsPerson' | 'needsPersonReason'
+  >,
+): { label: string; text: string } | null {
+  if (card.collectState !== 'failed') return null;
+  if (card.needsPerson && card.needsPersonReason === 'branch_diverged') {
+    return null;
+  }
+  return { label: 'Not pushed', text: noPrBanner(card).text };
+}
+
 /** The link text after the hint: what the checklist holds. */
 export const HOOKS_GUIDE_LABEL = 'See the exact command for each profile';
 
