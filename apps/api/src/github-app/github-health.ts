@@ -3,12 +3,15 @@ import {
   type GitHubHealthReason,
 } from '@agentdock/shared';
 import type { GitHubAppHealth } from '@agentdock/shared/protocol';
+import { SIGNATURE_FAILURE_THRESHOLD } from './signature-failure-tracker';
 
 /** What D11 reads about the App. */
 export interface HealthApp {
   hookActive: boolean;
   lastDeliveryAt: Date | null;
   lastSignatureFailureAt: Date | null;
+  /** Refused deliveries inside the failure window (C-116). */
+  recentSignatureFailures: number;
   hookCheckedAt: Date | null;
   hookCheckOk: boolean | null;
 }
@@ -34,8 +37,9 @@ const within = (at: Date | null, now: Date): boolean =>
  * D10/D11 for one project. `installations`: every installation listing the
  * project's repo. Healthy needs (a) covered by an active installation,
  * (b) a verified delivery for that installation, or a resync with a good
- * hook-deliveries check, within the last 60 minutes, and (c) no signature
- * failure since the last verified delivery. The first failing rule is the
+ * hook-deliveries check, within the last 60 minutes, and (c) not more than
+ * `SIGNATURE_FAILURE_THRESHOLD` signature failures in the failure window
+ * with no verified delivery since. The first failing rule is the
  * reason.
  */
 export const computeProjectHealth = (
@@ -55,6 +59,7 @@ export const computeProjectHealth = (
   if (installations.length === 0) return unhealthy('not_covered');
   if (active.length === 0) return unhealthy('installation_suspended');
   if (
+    app.recentSignatureFailures > SIGNATURE_FAILURE_THRESHOLD &&
     app.lastSignatureFailureAt !== null &&
     (app.lastDeliveryAt === null ||
       app.lastSignatureFailureAt > app.lastDeliveryAt)

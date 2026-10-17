@@ -10,7 +10,7 @@ import {
   login,
   type Session,
 } from '../../test/e2e-app';
-import { signInbound } from '../common';
+import { HookFailureThrottle, signInbound } from '../common';
 import {
   auditSince,
   createInboundApp,
@@ -105,6 +105,7 @@ describe('POST /hooks/:publicId (e2e, spec 26 D1–D7)', () => {
     ({ projectId } = await seedSkillProject(ctx.prisma));
     adminId = (await createUser(ctx.prisma, 'admin@example.com', 'admin')).id;
     admin = await login(ctx, 'admin@example.com');
+    new HookFailureThrottle().reset();
     runner = fakeRunner(ctx);
     auditOf = await auditSince(ctx.prisma);
   });
@@ -270,6 +271,18 @@ describe('POST /hooks/:publicId (e2e, spec 26 D1–D7)', () => {
         .send('ref=x');
       expect(form.status).toBe(415);
       expect(await deliveries(trigger.id)).toEqual([]);
+    });
+  });
+
+  describe('pre-signature rate limit (C-116)', () => {
+    it('the 11th refused delivery in a minute from one address is 429', async () => {
+      const trigger = await createTrigger();
+      for (let i = 0; i < 10; i += 1) {
+        const res = await deliver(trigger, { secret: 'wrong-secret' });
+        expect(res.status).toBe(401);
+      }
+      const eleventh = await deliver(trigger, { secret: 'wrong-secret' });
+      expect(eleventh.status).toBe(429);
     });
   });
 

@@ -1,4 +1,10 @@
 export {
+  HOOK_FAILURE_LIMIT,
+  HOOK_FAILURE_WINDOW_MS,
+  HookFailureThrottle,
+  HookFailureThrottleGuard,
+} from './hook-failure-throttle.guard';
+export {
   parseRawJson,
   RAW_BODY_ROUTES,
   type RawBodyRequest,

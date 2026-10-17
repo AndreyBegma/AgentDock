@@ -1,4 +1,5 @@
 import { computeProjectHealth, type HealthApp } from './github-health';
+import { SIGNATURE_FAILURE_THRESHOLD } from './signature-failure-tracker';
 
 const NOW = new Date('2026-10-10T12:00:00Z');
 const ago = (minutes: number) => new Date(NOW.getTime() - minutes * 60_000);
@@ -7,6 +8,7 @@ const app = (over: Partial<HealthApp> = {}): HealthApp => ({
   hookActive: true,
   lastDeliveryAt: ago(5),
   lastSignatureFailureAt: null,
+  recentSignatureFailures: 0,
   hookCheckedAt: null,
   hookCheckOk: null,
   ...over,
@@ -50,6 +52,7 @@ describe('project App health (spec 27 D10, D11)', () => {
     const failed = app({
       lastDeliveryAt: ago(10),
       lastSignatureFailureAt: ago(2),
+      recentSignatureFailures: SIGNATURE_FAILURE_THRESHOLD + 1,
     });
     expect(computeProjectHealth(failed, [installation()], NOW).reason).toBe(
       'signature_failure',
@@ -57,8 +60,20 @@ describe('project App health (spec 27 D10, D11)', () => {
     const recovered = app({
       lastDeliveryAt: ago(1),
       lastSignatureFailureAt: ago(2),
+      recentSignatureFailures: SIGNATURE_FAILURE_THRESHOLD + 1,
     });
     expect(computeProjectHealth(recovered, [installation()], NOW).state).toBe(
+      'healthy',
+    );
+  });
+
+  it('ignores signature failures at or below the threshold', () => {
+    const few = app({
+      lastDeliveryAt: ago(10),
+      lastSignatureFailureAt: ago(2),
+      recentSignatureFailures: SIGNATURE_FAILURE_THRESHOLD,
+    });
+    expect(computeProjectHealth(few, [installation()], NOW).state).toBe(
       'healthy',
     );
   });

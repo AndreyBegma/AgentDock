@@ -7,6 +7,7 @@ import { BudgetSweep } from '../budgets/budget-sweep';
 import type { PrismaService } from '../database/prisma.service';
 import type { GitHubAppOptions } from '../github-app/github-app-options';
 import { GitHubHealthService } from '../github-app/github-health.service';
+import { SignatureFailureTracker } from '../github-app/signature-failure-tracker';
 import { RunsProjector } from '../history/runs-projector.service';
 import type { WebhooksOptions } from '../webhooks/common';
 import { WebhookDeliveryWorker } from '../webhooks/outbound/webhook-delivery-worker';
@@ -64,6 +65,7 @@ const jobs = (registry: SchedulerRegistry, on: boolean): Job[] => {
     stub(),
     stub(),
     stub(),
+    new SignatureFailureTracker(),
     registry,
     options<GitHubAppOptions>({ autoStart: on, healthIntervalMs: 60_000 }),
   );
