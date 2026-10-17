@@ -13,6 +13,8 @@ export interface PlanCardDraft {
   title: string;
   body: string;
   kind: BoardCardKind;
+  /** #592: the card's own origin when it is not `PlanCardsInput.planId`. */
+  planId?: string;
 }
 
 export interface PlanCardsInput {
@@ -73,7 +75,7 @@ export class BoardPlanCards {
             position,
             issueOnRun: settings.issueOnRun,
             specOnRun: settings.specOnRun,
-            planId: input.planId,
+            planId: draft.planId ?? input.planId,
             createdById: input.authorId,
             movedById: input.authorId,
             movedAt: now,

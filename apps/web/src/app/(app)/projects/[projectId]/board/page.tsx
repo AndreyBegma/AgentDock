@@ -391,6 +391,7 @@ function BoardScreen() {
             userId={user.id}
             version={version}
             onResume={resumeDraft}
+            onOpenCard={select}
             onDiscarded={(plan) => {
               if (plan.id === intakeId) setParams({ intake: undefined });
               if (plan.id === discussionId) {

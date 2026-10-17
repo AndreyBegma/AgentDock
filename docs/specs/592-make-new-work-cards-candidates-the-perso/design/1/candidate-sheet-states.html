@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Candidate sheet — states</title>
+<style>
+:root{--radius-control:6px;--radius-surface:8px;--radius-sheet:12px;--size-control:28px;--dur-fast:100ms;--ease-sheet:cubic-bezier(0.32,0.72,0,1);--font-sans:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;--font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;--glass-filter-strong:blur(40px) saturate(180%) brightness(var(--glass-brightness-strong))}
+:root[data-theme="dark"],:root:not([data-theme]){color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-content:rgb(27 38 71/0.96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246/0.62);--color-ink-3:rgb(242 242 246/0.53);--color-line:rgb(255 255 255/0.1);--color-line-strong:rgb(255 255 255/0.18);--color-hover:rgb(255 255 255/0.06);--color-focus:#b4b2ff;--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-soft:rgb(91 91 246/0.2);--color-accent-ink:#b4b2ff;--color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;--color-hue-1:#5b9cf6;--color-hue-7:#a68bfa;--canvas-glow:18%;--glass-sheen:rgb(255 255 255/0.06);--glass-scrim-strong:rgb(9 9 12/0.64);--glass-brightness-strong:0.7;--glass-edge:rgb(255 255 255/0.14);--glass-spec:rgb(255 255 255/0.2);--glass-rim-strong:rgb(242 242 246/0.22);--glass-rim-shade-strong:rgb(9 9 12/0.2);--glass-meniscus:rgb(9 9 12/0.55);--glass-refract:rgb(242 242 246/0.35);--glass-shadow-strong:rgb(0 0 0/0.45);--control-spec:rgb(255 255 255/0.05)}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-content:rgb(255 255 255/0.96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27/0.72);--color-ink-3:rgb(24 24 27/0.64);--color-line:rgb(0 0 0/0.1);--color-line-strong:rgb(0 0 0/0.23);--color-hover:rgb(0 0 0/0.06);--color-focus:#4f46e5;--color-accent:#4f46e5;--color-on-accent:#fff;--color-accent-soft:rgb(79 70 229/0.12);--color-accent-ink:#4338ca;--color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;--color-hue-1:#1f64d6;--color-hue-7:#7244e0;--canvas-glow:10%;--glass-sheen:rgb(0 0 0/0.06);--glass-scrim-strong:rgb(255 255 255/0.64);--glass-brightness-strong:1.3;--glass-edge:rgb(0 0 0/0.18);--glass-spec:rgb(0 0 0/0.2);--glass-rim-strong:rgb(255 255 255/0.3);--glass-rim-shade-strong:rgb(24 24 27/0.08);--glass-meniscus:rgb(24 24 27/0.12);--glass-refract:rgb(255 255 255/0.5);--glass-shadow-strong:rgb(0 0 0/0.16);--control-spec:rgb(255 255 255/0.05)}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground);color:var(--color-ink)}
+body{margin:0;min-height:100vh;font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased;padding:24px}
+h1,h2,h3,p{margin:0}
+:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}
+.ad-canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.ad-glass-strong{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim-strong);backdrop-filter:var(--glass-filter-strong);-webkit-backdrop-filter:var(--glass-filter-strong);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),inset 1px 1px 0 var(--glass-rim-strong),inset -1px -1px 0 var(--glass-rim-shade-strong),inset 0 -3px 3px -1px var(--glass-meniscus),inset 0 0 18px -4px var(--glass-refract),0 20px 48px var(--glass-shadow-strong)}
+.ad-icon{width:16px;height:16px;flex-shrink:0}
+.ad-row{display:flex;align-items:center;gap:8px}
+.ad-ink-2{color:var(--color-ink-2)}.ad-ink-3{color:var(--color-ink-3)}
+.ad-mono{font-family:var(--font-mono);font-size:12px}
+.ad-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;font:inherit;font-weight:600;font-size:14px;height:var(--size-control);padding:0 14px;border-radius:var(--radius-control);border:1px solid transparent;background:none;color:var(--color-ink);cursor:pointer}
+.ad-btn:disabled{opacity:.4;pointer-events:none}
+.ad-btn--solid{background:var(--color-accent);color:var(--color-on-accent)}
+.ad-btn--glass{background:var(--color-raised);border-color:var(--color-line-strong);box-shadow:inset 0 1px 0 var(--control-spec)}
+.ad-btn--ghost{color:var(--color-ink-2)}
+.ad-btn--ghost:hover{color:var(--color-ink);background:var(--color-hover)}
+.ad-btn--danger{background:color-mix(in oklab,var(--color-danger) 12%,transparent);color:var(--color-danger);border-color:color-mix(in oklab,var(--color-danger) 30%,transparent)}
+.ad-btn--icon{padding:0;aspect-ratio:1}
+.ad-field{display:flex;flex-direction:column;gap:4px}
+.ad-field__label{font-size:12px;line-height:16px;font-weight:500;color:var(--color-ink-2)}
+.ad-field__hint{font-size:12px;line-height:16px;color:var(--color-ink-3)}
+.ad-field__error{font-size:12px;line-height:16px;color:var(--color-danger)}
+.ad-input,.ad-textarea{width:100%;font:inherit;color:var(--color-ink);background:var(--color-surface);border:1px solid var(--color-line-strong);border-radius:var(--radius-control)}
+.ad-input{height:28px;padding:0 12px}
+.ad-textarea{padding:10px 12px;resize:vertical;font-family:var(--font-mono);font-size:12px;line-height:18px}
+.ad-input:focus,.ad-textarea:focus{outline:none;border-color:color-mix(in oklab,var(--color-ink) 70%,transparent);box-shadow:0 0 0 2px color-mix(in oklab,var(--color-ink) 22%,transparent)}
+.ad-input[aria-invalid="true"]{border-color:var(--color-danger);box-shadow:0 0 0 2px color-mix(in oklab,var(--color-danger) 22%,transparent)}
+.ad-input:disabled,.ad-textarea:disabled{opacity:.6}
+.ad-seg{display:inline-flex;gap:2px;padding:2px;height:28px;border:1px solid var(--color-line);border-radius:var(--radius-control)}
+.ad-seg button{padding:0 12px;border:0;border-radius:4px;background:none;font:inherit;font-size:12px;font-weight:500;color:var(--color-ink-2);cursor:pointer}
+.ad-seg button[aria-pressed="true"]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.ad-seg button:disabled{opacity:.5;cursor:default}
+.ad-chip{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:9999px;border:1px solid var(--color-line-strong);background:var(--color-hover);font-size:11px;font-weight:500;color:var(--color-ink-2);white-space:nowrap}
+.ad-badge{display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:9999px;font-size:10px;font-weight:600;background:var(--color-hover);color:var(--color-ink-2)}
+.ad-banner{display:flex;align-items:flex-start;gap:10px;padding:12px;border-radius:var(--radius-surface);border:1px solid color-mix(in oklab,var(--color-warn) 30%,transparent);background:color-mix(in oklab,var(--color-warn) 10%,transparent)}
+.ad-banner .ad-icon{color:var(--color-warn);margin-top:2px}
+.ad-kv{display:grid;grid-template-columns:max-content 1fr;gap:6px 16px;margin:0;font-size:12px}
+.ad-kv dt{color:var(--color-ink-3)}.ad-kv dd{margin:0}
+.ad-link{color:var(--color-accent-ink)}
+.states{display:flex;gap:20px;align-items:flex-start;overflow-x:auto;padding-bottom:8px}
+.state{display:flex;flex-direction:column;gap:8px;flex:0 0 460px}
+.state__label{font-size:12px;font-weight:500;color:var(--color-ink-3)}
+.sheet{display:flex;flex-direction:column;height:720px;border-radius:var(--radius-sheet);overflow:hidden}
+.sheet__head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:16px 16px 12px;border-bottom:1px solid var(--color-line)}
+.sheet__eyebrow{font-size:12px;color:var(--color-ink-3);display:flex;gap:6px;align-items:center}
+.sheet__title{font-size:16px;line-height:24px;font-weight:600;margin-top:2px}
+.sheet__body{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:16px}
+.sheet__foot{display:flex;align-items:center;gap:8px;padding:12px 16px;border-top:1px solid var(--color-line)}
+.sheet__foot .spacer{flex:1}
+.dirty{font-size:12px;color:var(--color-ink-3);display:flex;align-items:center;gap:6px}
+.dirty::before{content:'';width:6px;height:6px;border-radius:9999px;background:var(--color-warn)}
+.theme-toggle{position:fixed;right:16px;bottom:16px}
+</style>
+</head>
+<body>
+<div class="ad-canvas"></div>
+<div class="states">
+
+  <!-- State 1: editing -->
+  <div class="state">
+    <span class="state__label">Editing — unsaved changes</span>
+    <aside class="sheet ad-glass-strong" role="dialog" aria-labelledby="s1">
+      <div class="sheet__head">
+        <div>
+          <div class="sheet__eyebrow"><span class="ad-chip">Candidate</span>Cost dashboard per project · stage 2 of 3</div>
+          <h2 class="sheet__title" id="s1">Expose the cost rollup API</h2>
+        </div>
+        <button class="ad-btn ad-btn--ghost ad-btn--icon" type="button" aria-label="Close"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+      <div class="sheet__body">
+        <div class="ad-field">
+          <label class="ad-field__label" for="t1">Title</label>
+          <input class="ad-input" id="t1" value="Expose the cost rollup API">
+          <span class="ad-field__hint">English, ASCII letters only, as card titles are.</span>
+        </div>
+        <div class="ad-field">
+          <span class="ad-field__label" id="k1">Kind</span>
+          <div class="ad-seg" role="group" aria-labelledby="k1" style="align-self:flex-start"><button type="button" aria-pressed="true">Feature</button><button type="button" aria-pressed="false">Bug</button></div>
+        </div>
+        <div class="ad-field" style="flex:1">
+          <label class="ad-field__label" for="b1">Body</label>
+          <textarea class="ad-textarea" id="b1" rows="14">## Summary
+Expose daily cost rollups so the dashboard can chart
+spend per project and model.
+
+## API
+GET /projects/:id/costs?from&amp;to&amp;groupBy=model|slot
+- scoped to projects the caller belongs to
+- 404 for a project the caller cannot see
+
+## Acceptance criteria
+- [ ] Returns rollups for the range, grouped as asked
+- [ ] Another user's project returns 404
+- [ ] Range over 92 days is refused with 400</textarea>
+          <span class="ad-field__hint">Markdown. This becomes the issue body.</span>
+        </div>
+        <dl class="ad-kv">
+          <dt>Origin</dt><dd>Intake plan · Cost dashboard per project</dd>
+          <dt>Depends on</dt><dd>Stage 1 · Store per-session cost rollups</dd>
+          <dt>Attachments</dt><dd>2 — go to the first card you accept from this intake</dd>
+        </dl>
+      </div>
+      <div class="sheet__foot">
+        <button class="ad-btn ad-btn--danger" type="button">Reject</button>
+        <span class="spacer"></span>
+        <span class="dirty">Unsaved</span>
+        <button class="ad-btn ad-btn--glass" type="button">Save</button>
+        <button class="ad-btn ad-btn--solid" type="button">Accept to Todo</button>
+      </div>
+    </aside>
+  </div>
+
+  <!-- State 2: non-ASCII title refused -->
+  <div class="state">
+    <span class="state__label">Title refused</span>
+    <aside class="sheet ad-glass-strong" role="dialog" aria-labelledby="s2">
+      <div class="sheet__head">
+        <div>
+          <div class="sheet__eyebrow"><span class="ad-chip">Candidate</span>Throttle password checks</div>
+          <h2 class="sheet__title" id="s2">Rate-limit the password check endpoint</h2>
+        </div>
+        <button class="ad-btn ad-btn--ghost ad-btn--icon" type="button" aria-label="Close"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+      <div class="sheet__body">
+        <div class="ad-field">
+          <label class="ad-field__label" for="t2">Title</label>
+          <input class="ad-input" id="t2" value="Ограничить проверку пароля" aria-invalid="true" aria-describedby="e2">
+          <span class="ad-field__error" id="e2" role="alert">The title has non-ASCII letters. Write it in English. Card titles become branch names.</span>
+        </div>
+        <div class="ad-field">
+          <span class="ad-field__label" id="k2">Kind</span>
+          <div class="ad-seg" role="group" aria-labelledby="k2" style="align-self:flex-start"><button type="button" aria-pressed="false">Feature</button><button type="button" aria-pressed="true">Bug</button></div>
+        </div>
+        <div class="ad-field" style="flex:1">
+          <label class="ad-field__label" for="b2">Body</label>
+          <textarea class="ad-textarea" id="b2" rows="14">## Reproduction
+1. POST /auth/check-password 500 times with a wrong
+   password for one account.
+2. Every request answers 401; none is throttled.
+
+## Expected
+After 10 failures in 15 minutes: 429 with Retry-After.
+
+## Actual
+Unlimited attempts.
+
+## Acceptance criteria
+- [ ] Spec: the 11th attempt answers 429</textarea>
+        </div>
+        <dl class="ad-kv">
+          <dt>Origin</dt><dd>Intake plan · Throttle password checks</dd>
+          <dt>Attachments</dt><dd>1 — goes to this card on accept</dd>
+        </dl>
+      </div>
+      <div class="sheet__foot">
+        <button class="ad-btn ad-btn--danger" type="button">Reject</button>
+        <span class="spacer"></span>
+        <button class="ad-btn ad-btn--glass" type="button" disabled>Save</button>
+        <button class="ad-btn ad-btn--solid" type="button" disabled>Accept to Todo</button>
+      </div>
+    </aside>
+  </div>
+
+  <!-- State 3: stale / decided elsewhere -->
+  <div class="state">
+    <span class="state__label">Already decided — stale or concurrent</span>
+    <aside class="sheet ad-glass-strong" role="dialog" aria-labelledby="s3">
+      <div class="sheet__head">
+        <div>
+          <div class="sheet__eyebrow"><span class="ad-chip">Candidate</span>Webhook reliability</div>
+          <h2 class="sheet__title" id="s3">Retry webhook deliveries</h2>
+        </div>
+        <button class="ad-btn ad-btn--ghost ad-btn--icon" type="button" aria-label="Close"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+      <div class="sheet__body">
+        <div class="ad-banner" role="status">
+          <svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+          <div><div style="font-weight:600">This candidate was accepted in another tab</div><div class="ad-ink-2">It is card <a class="ad-link ad-mono" href="#">C-241</a> in Todo now. Your edits here were not saved. Edit the card instead.</div></div>
+        </div>
+        <div class="ad-field">
+          <label class="ad-field__label" for="t3">Title</label>
+          <input class="ad-input" id="t3" value="Retry webhook deliveries" disabled>
+        </div>
+        <div class="ad-field">
+          <span class="ad-field__label">Kind</span>
+          <div class="ad-seg" style="align-self:flex-start"><button type="button" aria-pressed="true" disabled>Feature</button><button type="button" aria-pressed="false" disabled>Bug</button></div>
+        </div>
+        <div class="ad-field" style="flex:1">
+          <label class="ad-field__label" for="b3">Body</label>
+          <textarea class="ad-textarea" id="b3" rows="10" disabled>## Summary
+Retry failed webhook deliveries with exponential
+backoff, up to 8 attempts over 24 hours.</textarea>
+        </div>
+      </div>
+      <div class="sheet__foot">
+        <span class="spacer"></span>
+        <button class="ad-btn ad-btn--ghost" type="button">Close</button>
+        <button class="ad-btn ad-btn--glass" type="button">Open C-241</button>
+      </div>
+    </aside>
+  </div>
+</div>
+<button class="ad-btn ad-btn--glass theme-toggle" type="button" id="tt">Toggle theme</button>
+<script>document.getElementById('tt').addEventListener('click',function(){var r=document.documentElement;r.setAttribute('data-theme',r.getAttribute('data-theme')==='dark'?'light':'dark');});</script>
+</body>
+</html>

@@ -102,7 +102,7 @@ export const DISCUSS_SKILLS_MAX = 12;
 /**
  * D2; `card` is #337 D1: a New work intake, ending in one card — or, after a
  * confirmed split, several independent ones (#409). `discuss` is #590
- * (ADR-0056): a free conversation about the project, with no round limit and
+ * (ADR-0058): a free conversation about the project, with no round limit and
  * no required result — it never makes a card.
  */
 export const PLAN_MODES = ['batch', 'dialogue', 'card', 'discuss'] as const;
@@ -532,6 +532,26 @@ export const intakeStackOutputSchema = z.strictObject({
       },
     ),
 });
+/**
+ * #592 (ADR-0058): a stack proposal as its candidates keep it on the plan
+ * (`plans.candidateStack`) — the candidates name a stage by its index.
+ */
+export const planCandidateStackSchema = z.strictObject({
+  title: z.string(),
+  body: z.string(),
+  design: z.boolean(),
+  stages: z.array(z.string()),
+});
+export type PlanCandidateStack = z.infer<typeof planCandidateStackSchema>;
+
+/** #592: a candidate is decided once — accepted (a card is made) or rejected. */
+export const PLAN_CANDIDATE_STATUSES = [
+  'pending',
+  'accepted',
+  'rejected',
+] as const;
+export type PlanCandidateStatus = (typeof PLAN_CANDIDATE_STATUSES)[number];
+
 export const intakeOutputSchema = z.union([
   intakeRoundOutputSchema,
   intakeCardOutputSchema,

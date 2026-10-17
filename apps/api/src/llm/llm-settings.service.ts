@@ -34,7 +34,7 @@ const isPriced = (pricer: Pricer, model: string): boolean =>
   pricer.price(model, emptyUsage()).costSource !== null;
 
 /**
- * The AI providers page (ADR-0058): keys, caps, enabled models, the default
+ * The AI providers page (ADR-0059): keys, caps, enabled models, the default
  * model and this month's spend. Keys are write-only — no method returns one,
  * only its last four characters — and every change is audited without it.
  */

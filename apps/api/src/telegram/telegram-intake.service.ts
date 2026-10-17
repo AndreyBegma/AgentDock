@@ -35,6 +35,7 @@ import { plannerError } from '../planner/planner-error';
 import {
   type ChatAnswers,
   CLOSED_TEXT,
+  candidatesMessage,
   cardsMessage,
   chatAnswers,
   failedMessage,
@@ -779,12 +780,8 @@ export class TelegramIntakeService implements OnModuleInit, OnModuleDestroy {
         return 'Keeping one card.';
       case 'create_all': {
         if (phase.kind !== 'split') return null;
-        await this.planCards.confirmSplit(
-          plan,
-          confirmAll(phase.split),
-          ready.actor,
-        );
-        return 'Creating the cards.';
+        await this.planCards.confirmSplit(plan, confirmAll(phase.split));
+        return 'Sending the cards to Drafts.';
       }
       case 'retry':
         if (phase.kind !== 'failed') return null;
@@ -924,6 +921,13 @@ export class TelegramIntakeService implements OnModuleInit, OnModuleDestroy {
         await this.prisma.telegramIntake.deleteMany({ where: { planId } });
         return;
       }
+      case 'review':
+        await send.replace(
+          row.thinkingMessageId,
+          candidatesMessage(phase.candidates, row.projectId, appUrl),
+        );
+        await this.prisma.telegramIntake.deleteMany({ where: { planId } });
+        return;
       case 'closed':
         await send.replace(row.thinkingMessageId, CLOSED_TEXT);
         await this.prisma.telegramIntake.deleteMany({ where: { planId } });

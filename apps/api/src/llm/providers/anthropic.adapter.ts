@@ -110,7 +110,7 @@ export const toAnthropicMessages = (
   return out;
 };
 
-/** Anthropic through `@anthropic-ai/sdk` (ADR-0058). */
+/** Anthropic through `@anthropic-ai/sdk` (ADR-0059). */
 export class AnthropicAdapter implements LlmAdapter {
   readonly provider = 'anthropic' as const;
 

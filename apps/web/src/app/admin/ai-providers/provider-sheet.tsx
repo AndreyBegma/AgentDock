@@ -27,7 +27,7 @@ import { useErrorToast } from '../../../lib/section/use-error-toast';
 
 const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._:/@-]*$/;
 
-/** One provider's key, cap and models (ADR-0058). */
+/** One provider's key, cap and models (ADR-0059). */
 export function ProviderSheet({
   provider,
   gatewayAvailable,

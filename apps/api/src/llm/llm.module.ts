@@ -23,7 +23,7 @@ import {
 import type { LlmAdapter } from './types';
 
 /**
- * The LLM gateway (ADR-0058): the API's direct calls to model providers.
+ * The LLM gateway (ADR-0059): the API's direct calls to model providers.
  * Without a well-formed `LLM_SECRETS_KEY` the gateway does not start — every
  * call and every key route answers `llm_gateway_unavailable` — and the rest
  * of the API runs on, so a missing AI key never takes the control plane down.

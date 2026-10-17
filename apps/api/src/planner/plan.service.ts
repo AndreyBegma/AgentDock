@@ -29,6 +29,12 @@ import { UserSettingsService } from '../settings/user-settings.service';
 import { TextNormalizer } from '../text/text-normalizer';
 import { TextOwners } from '../text/text-owners';
 import { readablePlanWhere } from './plan-access';
+import {
+  candidateStackOf,
+  candidatesOf,
+  pendingAttachments,
+  toCandidateView,
+} from './plan-candidates.service';
 import { intakeRound, intakeSplit, toSplitView } from './plan-intake';
 import {
   blockingOpen,
@@ -307,24 +313,33 @@ export class PlanService implements OnModuleInit {
       include: { ...planInclude, instructions: { select: { version: true } } },
     });
     const intakeOpen = plan.mode === 'card' && plan.status === 'clarifying';
-    const [tasks, turns, questions, split, attachments] = await Promise.all([
-      this.store.currentTasks(this.prisma, plan),
-      this.prisma.planTurn.findMany({
-        where: { planId },
-        include: turnInclude,
-        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-      }),
-      plan.status !== 'clarifying'
-        ? Promise.resolve([])
-        : plan.mode === 'card'
-          ? intakeRound(this.prisma, planId)
-          : this.store.planRound(planId),
-      intakeOpen ? intakeSplit(this.prisma, planId) : Promise.resolve(null),
-      // #594: what the intake holds, from the web dialog or Telegram.
+    const review =
       plan.mode === 'card'
-        ? this.attachments.planViews(planId)
-        : Promise.resolve([]),
-    ]);
+        ? Promise.all([
+            candidatesOf(this.prisma, planId),
+            pendingAttachments(this.prisma, planId),
+          ])
+        : Promise.resolve(null);
+    const [tasks, turns, questions, split, attachments, reviewed] =
+      await Promise.all([
+        this.store.currentTasks(this.prisma, plan),
+        this.prisma.planTurn.findMany({
+          where: { planId },
+          include: turnInclude,
+          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        }),
+        plan.status !== 'clarifying'
+          ? Promise.resolve([])
+          : plan.mode === 'card'
+            ? intakeRound(this.prisma, planId)
+            : this.store.planRound(planId),
+        intakeOpen ? intakeSplit(this.prisma, planId) : Promise.resolve(null),
+        // #594: what the intake holds, from the web dialog or Telegram.
+        plan.mode === 'card'
+          ? this.attachments.planViews(planId)
+          : Promise.resolve([]),
+        review,
+      ]);
     const [issueOf, designs] = await Promise.all([
       loadIssueViews(this.prisma, projectId, tasks),
       designSummaries(this.prisma, planId),
@@ -340,6 +355,13 @@ export class PlanService implements OnModuleInit {
       questions,
       split: split ? toSplitView(split) : null,
       attachments,
+      review: reviewed
+        ? {
+            candidates: reviewed[0].map(toCandidateView),
+            candidateStack: candidateStackOf(plan.candidateStack),
+            attachmentsLeft: reviewed[1],
+          }
+        : null,
     });
   }
 

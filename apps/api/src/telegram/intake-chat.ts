@@ -1,6 +1,7 @@
 import {
   cardLabel,
   type PlanAnswer,
+  type PlanCandidateView,
   type PlanDetail,
   type PlanIntakeSplitView,
   type PlanQuestion,
@@ -25,12 +26,17 @@ export type IntakeChatPhase =
   | { kind: 'failed'; turnId: string }
   | { kind: 'round'; turnId: string; round: number; maxRounds: number }
   | { kind: 'split'; split: PlanIntakeSplitView }
+  | { kind: 'review'; candidates: PlanCandidateView[] }
   | { kind: 'done' }
   | { kind: 'closed' }
   | { kind: 'idle'; turnId: string | null };
 
 export const intakeChatPhase = (plan: PlanDetail): IntakeChatPhase => {
   if (plan.status === 'done') return { kind: 'done' };
+  // #592 (ADR-0058): the cards wait in Drafts as candidates.
+  if (plan.status === 'reviewing') {
+    return { kind: 'review', candidates: plan.intake?.candidates ?? [] };
+  }
   if (plan.status === 'archived' || plan.status === 'sent') {
     return { kind: 'closed' };
   }
@@ -55,6 +61,7 @@ export const phaseKey = (phase: IntakeChatPhase): string => {
   switch (phase.kind) {
     case 'split':
       return `split:${phase.split.turnId}`;
+    case 'review':
     case 'done':
     case 'closed':
       return phase.kind;
@@ -315,8 +322,8 @@ export const splitMessage = (
       ...body,
       escapeMarkdownV2(
         stack
-          ? 'Create all makes the stack and its cards. Edit them first in the app.'
-          : 'Create all makes every card. Edit them first in the app.',
+          ? 'Create all sends the stack’s cards to Drafts, where you accept them.'
+          : 'Create all sends every card to Drafts, where you accept them.',
       ),
       ...openInApp(appUrl, ids.projectId, ids.planId),
     ].join('\n'),
@@ -372,6 +379,32 @@ export const cardsMessage = (
       return url ? `[${line}](${escapeLinkUrl(url)})` : line;
     }),
   ].join('\n');
+
+/**
+ * #592 (ADR-0058): the intake wrote candidates — no card exists until the
+ * person accepts them in Drafts on the Board.
+ */
+export const candidatesMessage = (
+  candidates: readonly Pick<PlanCandidateView, 'title' | 'kind'>[],
+  projectId: string,
+  appUrl: string | null,
+): string => {
+  const url = appLink(appUrl, `/projects/${projectId}/board`);
+  const where = escapeMarkdownV2(
+    'Accept or reject them in Drafts on the Board.',
+  );
+  return [
+    `*${escapeMarkdownV2(
+      candidates.length === 1
+        ? 'A card waits for you'
+        : `${candidates.length} cards wait for you`,
+    )}*`,
+    ...candidates.map((c) =>
+      escapeMarkdownV2(`${clip(c.title, TITLE_MAX)} · ${c.kind}`),
+    ),
+    url ? `[${where}](${escapeLinkUrl(url)})` : where,
+  ].join('\n');
+};
 
 export const CLOSED_TEXT = escapeMarkdownV2(
   'This intake is discarded; no card was made.',

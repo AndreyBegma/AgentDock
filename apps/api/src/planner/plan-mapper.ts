@@ -10,6 +10,7 @@ import {
   type PlanDiscussReply,
   type PlanGraphView,
   type PlanIntakeSplitView,
+  type PlanIntakeView,
   type PlannedTask,
   type PlannerInstructionsVersion,
   type PlanQuestion,
@@ -247,6 +248,11 @@ export interface DetailParts {
   split?: PlanIntakeSplitView | null;
   /** #594: an intake's attachments, oldest first. */
   attachments?: AttachmentView[];
+  /** #592: an intake's candidates, the stack they came in, its attachments left. */
+  review?: Pick<
+    PlanIntakeView,
+    'candidates' | 'candidateStack' | 'attachmentsLeft'
+  > | null;
 }
 
 export const toDetail = ({
@@ -257,6 +263,7 @@ export const toDetail = ({
   questions,
   split,
   attachments,
+  review,
 }: DetailParts): PlanDetail => ({
   ...toSummary(plan, tasks, latestTurn),
   brief: plan.brief,
@@ -281,6 +288,9 @@ export const toDetail = ({
           maxRounds: PLANNER_INTAKE_MAX_ROUNDS,
           split: split ?? null,
           attachments: attachments ?? [],
+          candidates: review?.candidates ?? [],
+          candidateStack: review?.candidateStack ?? null,
+          attachmentsLeft: review?.attachmentsLeft ?? 0,
         }
       : null,
   discussion: plan.mode === 'discuss' ? { skills: plan.skills } : null,

@@ -1,7 +1,9 @@
 import {
+  type AcceptCandidatesResponse,
   type ConfirmSplitResponse,
   type CreatePlanCardsResponse,
   PLANNER_ERROR,
+  type PlanCandidateView,
   type PlanDetail,
   type PlanListView,
   type PlannerSettingsView,
@@ -15,6 +17,7 @@ import {
   Get,
   HttpCode,
   Param,
+  Patch,
   Post,
   Put,
   UseGuards,
@@ -30,14 +33,17 @@ import {
   type ResolvedProjectAccess,
 } from '../projects';
 import {
+  AcceptCandidatesDto,
   ConfirmSplitDto,
   CreatePlanDto,
   PlannerSettingsDto,
   PlanTaskReviewDto,
   PlanTurnDto,
   PlanVisibilityDto,
+  UpdatePlanCandidateDto,
 } from './dto';
 import { callerOf, type PlanActor, PlanService } from './plan.service';
+import { PlanCandidatesService } from './plan-candidates.service';
 import { PlanCardsService } from './plan-cards.service';
 import { PlanSendService } from './plan-send.service';
 import { PlanStore } from './plan-store';
@@ -112,6 +118,7 @@ export class PlansController {
     private readonly store: PlanStore,
     private readonly instructions: PlannerInstructionsService,
     private readonly planCards: PlanCardsService,
+    private readonly candidates: PlanCandidatesService,
   ) {}
 
   /**
@@ -274,18 +281,77 @@ export class PlansController {
     return this.planCards.create(plan, actorOf(access, user, ctx));
   }
 
-  /** #409: Confirm a split — the cards the person kept, all at once. */
+  /**
+   * #409: Confirm a split — the cards the person kept, all at once. #592:
+   * they become candidates in Drafts.
+   */
   @Post('plans/:planId/split')
   @ProjectRole('operator')
   async split(
     @ProjectAccess() access: ResolvedProjectAccess,
     @CurrentUser() user: AuthUser,
-    @AuditCtx() ctx: AuditContext,
     @Param('planId') planId: string,
     @Body() body: ConfirmSplitDto,
   ): Promise<ConfirmSplitResponse> {
     const plan = await this.writable(user.id, access.projectId, planId);
-    return this.planCards.confirmSplit(plan, body, actorOf(access, user, ctx));
+    return this.planCards.confirmSplit(plan, body);
+  }
+
+  /** #592 (ADR-0058): the person edits a candidate by hand. */
+  @Patch('plans/:planId/candidates/:candidateId')
+  @ProjectRole('operator')
+  async updateCandidate(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Param('planId') planId: string,
+    @Param('candidateId') candidateId: string,
+    @Body() body: UpdatePlanCandidateDto,
+  ): Promise<PlanCandidateView> {
+    const plan = await this.writable(user.id, access.projectId, planId);
+    return this.candidates.update(
+      plan,
+      candidateId,
+      body,
+      actorOf(access, user, ctx),
+    );
+  }
+
+  /** #592: Reject — no card is made. */
+  @Post('plans/:planId/candidates/:candidateId/reject')
+  @HttpCode(200)
+  @ProjectRole('operator')
+  async rejectCandidate(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Param('planId') planId: string,
+    @Param('candidateId') candidateId: string,
+  ): Promise<PlanCandidateView> {
+    const plan = await this.writable(user.id, access.projectId, planId);
+    return this.candidates.reject(
+      plan,
+      candidateId,
+      actorOf(access, user, ctx),
+    );
+  }
+
+  /** #592: Accept — candidates of one intake or several, as cards or one stack. */
+  @Post('candidates/accept')
+  @HttpCode(200)
+  @ProjectRole('operator')
+  acceptCandidates(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Body() body: AcceptCandidatesDto,
+  ): Promise<AcceptCandidatesResponse> {
+    return this.candidates.accept(
+      access.projectId,
+      user.id,
+      body,
+      actorOf(access, user, ctx),
+    );
   }
 
   @Post('plans/:planId/archive')

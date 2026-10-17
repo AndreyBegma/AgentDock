@@ -1,7 +1,7 @@
 import { SecretCipher } from '../common/crypto';
 
 /**
- * The master key provider keys are sealed with (ADR-0058 §3): 32 random
+ * The master key provider keys are sealed with (ADR-0059 §3): 32 random
  * bytes, base64. Separate from `APP_ENCRYPTION_KEY`, so it can be rotated and
  * kept out of the backups of every other secret on its own.
  */

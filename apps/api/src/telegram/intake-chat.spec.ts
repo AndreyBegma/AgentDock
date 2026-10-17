@@ -102,6 +102,11 @@ describe('intake chat (#574)', () => {
     );
     expect(phaseKey(round)).toBe('round:t1');
     expect(intakeChatPhase(plan({ status: 'done' }))).toEqual({ kind: 'done' });
+    // #592: candidates wait in Drafts.
+    expect(intakeChatPhase(plan({ status: 'reviewing' }))).toEqual({
+      kind: 'review',
+      candidates: [],
+    });
     expect(intakeChatPhase(plan({ status: 'archived' }))).toEqual({
       kind: 'closed',
     });

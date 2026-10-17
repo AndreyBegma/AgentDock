@@ -34,7 +34,7 @@ const addUsage = (a: TokenBuckets, b: TokenBuckets): TokenBuckets => ({
 });
 
 /**
- * The one way the API calls a model (ADR-0058). A call is refused before it
+ * The one way the API calls a model (ADR-0059). A call is refused before it
  * reaches the provider when the gateway did not start, the provider is
  * disabled (cap 0), the model is not enabled or not priced, no key is set, or
  * this month's spend reached the cap. Every call that reaches the provider
