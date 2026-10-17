@@ -2,7 +2,7 @@ name: agentdock
 
 services:
   postgres:
-    image: postgres:16.5-alpine
+    image: postgres:16.5-alpine@sha256:0366402213df5db03c47ff80bcc697e92c8be0c213d03c941df1fc42d1ba9560
     container_name: agentdock-postgres
     restart: unless-stopped
     environment:
@@ -23,7 +23,7 @@ services:
   # a restart; `noeviction` is required by BullMQ. Not backed up: PostgreSQL is
   # the source of truth and the reconciler rebuilds lost timers.
   redis:
-    image: redis:7.4.11-alpine
+    image: redis:7.4.11-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
     container_name: agentdock-redis
     restart: unless-stopped
     environment:

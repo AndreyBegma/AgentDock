@@ -9,11 +9,17 @@
 # built. Bump it together with deploy/ci-image/Dockerfile and the app
 # Dockerfiles: `docker buildx imagetools inspect node:<version>-bookworm-slim`.
 ARG NODE_IMAGE=node:24.20.0-bookworm-slim@sha256:ba849c60be29959425b8734d57b8b4b7d56f98edd9504c9af091d5281095a71e
+# bun comes from the official image, pinned by digest, not from an install
+# script (its own stage: `COPY --from` takes no variable): `docker buildx
+# imagetools inspect oven/bun:<version>`.
+ARG BUN_IMAGE=oven/bun:1.4.0@sha256:5ff609364c049b54eb0ff560ec96319729a972078ef2c755d758f0c6ef89c2d6
+
+FROM ${BUN_IMAGE} AS bun
 FROM ${NODE_IMAGE}
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl unzip git \
     && rm -rf /var/lib/apt/lists/*
 
-RUN curl -fsSL https://bun.sh/install | bash -s "bun-v1.4.0"
-ENV PATH=/root/.bun/bin:$PATH
+COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
+RUN ln -s /usr/local/bin/bun /usr/local/bin/bunx
