@@ -1,5 +1,5 @@
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { join, posix } from 'node:path';
 import {
   AGENTDOCK_HOOKS_ENV,
   AGENTDOCK_HOOKS_OFF,
@@ -72,9 +72,52 @@ export const codeAskDenyRules = (policy: PolicyConfig): string[] => {
   return [...rules];
 };
 
+/** What `outsideCheckoutRules` lists a directory with; tests pass a fake. */
+export type ListDir = (dir: string) => readonly string[];
+
+const listDir: ListDir = (dir) => readdirSync(dir);
+
+/** A name the permission-rule parser may misread is escaped or left out. */
+const ruleName = (name: string): string | null =>
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: the point is to leave them out
+  /[()\u0000-\u001f]/.test(name) ? null : name.replace(/([*?[\]\\])/g, '\\$1');
+
+/**
+ * Claude Code's Read, Grep and Glob read any path the user can, plan mode
+ * or not. These rules refuse everything beside the checkout: at each
+ * directory from `/` down to the checkout's parent, every entry but the one
+ * the checkout is under. A path created there after the launch is not
+ * covered; the session is short and asks in the checkout only.
+ */
+export const outsideCheckoutRules = (
+  root: string,
+  list: ListDir = listDir,
+): string[] => {
+  const parts = root.split('/').filter((p) => p !== '');
+  const rules: string[] = [];
+  for (let i = 0; i < parts.length; i++) {
+    const dir = `/${parts.slice(0, i).join('/')}`;
+    let entries: readonly string[];
+    try {
+      entries = list(dir);
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      if (entry === parts[i]) continue;
+      const name = ruleName(entry);
+      if (name === null) continue;
+      const path = posix.join(dir, name);
+      rules.push(`Read(/${path})`, `Read(/${path}/**)`);
+    }
+  }
+  return rules;
+};
+
 /**
  * The headless flags (ADR-0019's Planner turn, made stricter): plan mode,
- * only `CODE_ASK_TOOLS`, the write tools and secret reads refused, no MCP
+ * only `CODE_ASK_TOOLS`, the write tools, secret reads and reads outside the
+ * checkout refused, no MCP
  * server, and only the person's own settings — a checkout's
  * `.claude/settings.json` cannot add a hook, an MCP server or a tool.
  */
@@ -82,6 +125,8 @@ export const codeAskArgv = (
   profile: ConfigProfile,
   args: Pick<CodeAskArgs, 'model' | 'sessionId'>,
   policy: PolicyConfig,
+  root: string,
+  list: ListDir = listDir,
 ): string[] => [
   profile.binary ?? profile.runtime,
   ...profile.args,
@@ -96,6 +141,7 @@ export const codeAskArgv = (
   CODE_ASK_TOOLS.join(','),
   '--disallowedTools',
   ...codeAskDenyRules(policy),
+  ...outsideCheckoutRules(root, list),
   '--strict-mcp-config',
   '--setting-sources',
   'user',
@@ -173,7 +219,7 @@ export class CodeAsker {
       );
       env[AGENTDOCK_HOOKS_ENV] = AGENTDOCK_HOOKS_OFF;
       const proc = (this.options.spawn ?? bunSpawn)({
-        command: codeAskArgv(profile, args, policy),
+        command: codeAskArgv(profile, args, policy, root),
         cwd: root,
         env,
         stdinFile: promptFile,

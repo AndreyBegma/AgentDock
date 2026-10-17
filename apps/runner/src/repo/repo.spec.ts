@@ -33,7 +33,12 @@ import { isolatedGit } from '../skills/testing';
 import { FakeClock } from '../testing/fake-clock';
 import { memoryLogger, tempDir } from '../testing/fixtures';
 import { REAL_PROCESS_TIMEOUT_MS } from '../testing/projects';
-import { CodeAsker, codeAskArgv, codeAskDenyRules } from './ask';
+import {
+  CodeAsker,
+  codeAskArgv,
+  codeAskDenyRules,
+  outsideCheckoutRules,
+} from './ask';
 import { createRepoHandlers } from './index';
 import { deniedBy, isSecretPath } from './paths';
 import { repoRead } from './read';
@@ -423,6 +428,8 @@ describe('code.ask (#622)', () => {
       PROFILES[0],
       { model: 'sonnet', sessionId: '4f7c1a52-9a0b-4f0e-8a51-6f9e0b8c1d2e' },
       { ...permissivePolicy(), code: { deny: [] } },
+      '/srv/widget',
+      () => [],
     );
     const after = (flag: string) => argv[argv.indexOf(flag) + 1];
     expect(after('--permission-mode')).toBe('plan');
@@ -455,6 +462,27 @@ describe('code.ask (#622)', () => {
     ]) {
       expect(rules).toContain(rule);
     }
+  });
+
+  it('refuses every read beside the checkout, at each level up to /', () => {
+    const tree: Record<string, string[]> = {
+      '/': ['etc', 'home', 'srv', 'tmp'],
+      '/srv': ['widget', 'other-repo', 'odd(name)', 'star*'],
+    };
+    const rules = outsideCheckoutRules('/srv/widget', (dir) => tree[dir] ?? []);
+    expect(rules).toEqual([
+      'Read(//etc)',
+      'Read(//etc/**)',
+      'Read(//home)',
+      'Read(//home/**)',
+      'Read(//tmp)',
+      'Read(//tmp/**)',
+      'Read(//srv/other-repo)',
+      'Read(//srv/other-repo/**)',
+      'Read(//srv/star\\*)',
+      'Read(//srv/star\\*/**)',
+    ]);
+    expect(rules.join(' ')).not.toContain('widget');
   });
 
   it('cuts a long answer, and fails on no answer or a codex profile', async () => {
