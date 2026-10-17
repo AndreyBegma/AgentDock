@@ -24,6 +24,7 @@ import { LocalModule } from './local';
 import { NotificationsModule } from './notifications';
 import { PaneModule } from './pane';
 import { PlannerModule } from './planner';
+import { LlmModule } from './llm/llm.module';
 import { PricesModule } from './prices/prices.module';
 import { ProjectRulesModule } from './project-rules';
 import { ProjectsModule } from './projects/projects.module';
@@ -64,6 +65,7 @@ import { WorkflowsModule } from './workflows';
     WorkflowsModule,
     UsageModule,
     PricesModule,
+    LlmModule,
     QueueModule,
     PaneModule,
     ControlModule,
