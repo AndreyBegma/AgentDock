@@ -17,6 +17,7 @@ import {
 } from '@andrewbehma/glass-ui/segmented-control';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import { SquarePen } from 'lucide-react';
 import Link from 'next/link';
 import {
   useParams,
@@ -52,6 +53,7 @@ import { RunnerOfflineBanner } from '../../../../../components/prerequisites/pre
 import { ReadinessBanner } from '../../../../../components/readiness/readiness-banner';
 import { useLivePaused } from '../../../../../components/shell/live-status';
 import { LiveStatusBadge } from '../../../../../components/shell/live-status-badge';
+import { usePageActions } from '../../../../../components/shell/use-page-actions';
 import { useCurrentUser } from '../../../../../components/shell/user-context';
 import { TerminalSheet } from '../../../../../components/terminal/terminal-sheet';
 import { fetchBoard } from '../../../../../lib/board/actions';
@@ -145,6 +147,17 @@ function BoardScreen() {
   const canOperate = role !== 'viewer';
   const isAdmin = role === 'admin';
   const canAttach = useTerminalAvailable(project?.runnerId, isAdmin);
+
+  // The capsule's `+` below `lg` (#521) opens what the header's button opens.
+  usePageActions([
+    {
+      id: 'new-work',
+      label: 'New work',
+      icon: SquarePen,
+      onSelect: () => setCreating(true),
+      operatorOnly: true,
+    },
+  ]);
 
   const board = useSection(() => fetchBoard(projectId), [projectId, version]);
   const planTasks = useSection(

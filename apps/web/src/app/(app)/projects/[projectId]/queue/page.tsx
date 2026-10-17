@@ -19,7 +19,7 @@ import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { Toolbar } from '@andrewbehma/glass-ui/toolbar';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
-import { RefreshCw } from 'lucide-react';
+import { CirclePlus, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
@@ -31,6 +31,7 @@ import {
 } from '../../../../../components/prerequisites/prerequisite-banner';
 import { useLivePaused } from '../../../../../components/shell/live-status';
 import { LiveStatusBadge } from '../../../../../components/shell/live-status-badge';
+import { usePageActions } from '../../../../../components/shell/use-page-actions';
 import { api } from '../../../../../lib/api';
 import { useUrlFilters } from '../../../../../lib/filters/use-url-filters';
 import { Time } from '../../../../../lib/format/time';
@@ -112,6 +113,17 @@ function QueueScreen() {
   const role = project?.role ?? 'viewer';
   const canOperate = role !== 'viewer';
   const isAdmin = role === 'admin';
+
+  // The capsule's `+` below `lg` (#521) opens what the header's button opens.
+  usePageActions([
+    {
+      id: 'new-issue',
+      label: 'New issue',
+      icon: CirclePlus,
+      onSelect: () => setCreating(true),
+      operatorOnly: true,
+    },
+  ]);
 
   const queue = useSection(
     () => api<QueueView>(`/projects/${projectId}/queue?include=open`),

@@ -13,12 +13,14 @@ import { Button } from '@andrewbehma/glass-ui/button';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import { CalendarPlus } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PageHeader } from '../../../../../components/page-header/page-header';
 import { AsyncSection } from '../../../../../components/prerequisites/async-section';
 import { RunnerOfflineBanner } from '../../../../../components/prerequisites/prerequisite-banner';
+import { usePageActions } from '../../../../../components/shell/use-page-actions';
 import { api } from '../../../../../lib/api';
 import { useLive } from '../../../../../lib/live/use-live';
 import {
@@ -96,6 +98,17 @@ export default function ProjectSchedulesPage() {
 
   const canOperate = project !== undefined && project.role !== 'viewer';
   const isAdmin = project?.role === 'admin';
+
+  // The capsule's `+` below `lg` (#521) opens what the header's button opens.
+  usePageActions([
+    {
+      id: 'new-schedule',
+      label: 'New schedule',
+      icon: CalendarPlus,
+      onSelect: () => setCreating(true),
+      operatorOnly: true,
+    },
+  ]);
   const runnerId = project?.runnerId;
 
   // Skill suggestions for the dialog; a failure only costs the suggestions.

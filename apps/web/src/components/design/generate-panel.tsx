@@ -145,7 +145,7 @@ export function GeneratePanel({
       aria-label="Generate the design"
       // #526: below `lg` every control is 44px (the tokens glass-ui reads), the
       // text inputs are 16px so iOS does not zoom on focus, and Generate sits
-      // in a dock that stays at the foot of the stage.
+      // in a dock above the capsule (#521), or above the keyboard while it is up.
       className="mx-auto flex w-full max-w-md flex-col gap-4 rounded-lg border border-line bg-content p-4 max-lg:[--size-control:44px] max-lg:[--size-field:44px] max-lg:[&_input]:text-base max-lg:[&_select]:text-base lg:p-6"
     >
       <div className="flex flex-col gap-1">
@@ -276,7 +276,7 @@ export function GeneratePanel({
         />
       ) : null}
       <div aria-hidden="true" className="h-14 lg:hidden" />
-      <div className="max-lg:glass-strong max-lg:fixed max-lg:inset-x-4 max-lg:bottom-[calc(var(--keyboard-inset)+env(safe-area-inset-bottom)+0.5rem)] max-lg:z-chrome max-lg:rounded-sheet max-lg:p-2">
+      <div className="max-lg:glass-strong max-lg:fixed max-lg:inset-x-4 max-lg:bottom-[calc(var(--dock-bottom)+0.5rem)] max-lg:z-chrome max-lg:rounded-sheet max-lg:p-2">
         <Button
           variant="solid"
           full

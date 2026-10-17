@@ -23,7 +23,7 @@ const typesText = (element: Element | null) =>
 
 /**
  * #526: whether a soft keyboard covers the foot of the screen. The shell hides
- * its tab bar then, and `--keyboard-inset` (how much of the layout viewport
+ * its capsule then, and `--keyboard-inset` (how much of the layout viewport
  * the keyboard covers, which iOS does not shrink) is set, so a docked action
  * such as Generate sits right above the keyboard.
  */
