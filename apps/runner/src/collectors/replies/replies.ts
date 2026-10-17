@@ -11,6 +11,7 @@ import {
   AGENT_FILE_MAX_BYTES,
   readRegularFileInside,
 } from '../../fs/safe-read';
+import { redactText } from '../../pane/redact';
 import { REPLY_FILE } from '../tmux/sessions';
 
 export interface ReplySection {
@@ -53,17 +54,21 @@ export const parseReply = (text: string): ReplySection[] => {
   }));
 };
 
-/** The `slot.checkpoint` data of one section at its position. */
+/** The `slot.checkpoint` data of one section at its position, redacted (C-128). */
 export const checkpointData = (
   section: ReplySection,
   position: number,
 ): SlotCheckpointData => {
-  const heading = truncateBytes(section.heading, HEADING_MAX);
-  const { checkpoint, prUrl } = checkpointFromHeading(section.heading);
+  const redacted = redactText(section.heading);
+  const heading = truncateBytes(redacted, HEADING_MAX);
+  const { checkpoint, prUrl } = checkpointFromHeading(redacted);
   return {
     checkpoint,
     heading,
-    summary: truncateBytes(section.body, CHECKPOINT_SUMMARY_MAX_BYTES),
+    summary: truncateBytes(
+      redactText(section.body),
+      CHECKPOINT_SUMMARY_MAX_BYTES,
+    ),
     position,
     ...(prUrl && URL.canParse(prUrl) ? { prUrl } : {}),
   };

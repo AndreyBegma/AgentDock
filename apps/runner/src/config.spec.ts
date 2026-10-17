@@ -31,7 +31,11 @@ describe('config', () => {
       fleet: { pollSeconds: 15, prPollSeconds: 60, eventsPollSeconds: 5 },
       queue: { pollSeconds: 60 },
       sessions: { enabled: true },
-      skills: { maxConcurrentRuns: 2, maxTimeoutSec: 21_600 },
+      skills: {
+        maxConcurrentRuns: 2,
+        maxTimeoutSec: 21_600,
+        keepPatchesLocal: false,
+      },
       policy: {
         allowedRoots: [],
         maxPermissionMode: 'auto',
@@ -71,6 +75,17 @@ describe('config', () => {
     expect(loadConfig(path).insecureServer).toBe(true);
   });
 
+  it('never lets the daemon rewrite skills.keepPatchesLocal (C-128)', () => {
+    saveConfig(path, { skills: { keepPatchesLocal: true } });
+    updateConfig(path, {
+      projects: [{ id: 'prj_a', root: '/srv/dev/a' }],
+      skills: { keepPatchesLocal: false },
+    } as never);
+    const config = loadConfig(path);
+    expect(config.projects).toEqual([{ id: 'prj_a', root: '/srv/dev/a' }]);
+    expect(config.skills.keepPatchesLocal).toBe(true);
+  });
+
   it('refuses a relative allowed root and an unknown gated command', () => {
     expect(() =>
       saveConfig(path, { policy: { allowedRoots: ['dev'] } }),
@@ -88,6 +103,7 @@ describe('config', () => {
     expect(loadConfig(path).skills).toEqual({
       maxConcurrentRuns: 1,
       maxTimeoutSec: 21_600,
+      keepPatchesLocal: false,
     });
     expect(() =>
       saveConfig(path, { skills: { maxConcurrentRuns: 0 } }),

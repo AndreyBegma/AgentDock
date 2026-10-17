@@ -1163,7 +1163,7 @@ A run outlives `skill.run`. Its progress is two event types (`source: "runner"`)
 | Type | `data` | Sent |
 |---|---|---|
 | `skill_run.phase_changed` | `runId, projectId, phase, at, tmuxSession?, worktree?, branch?` | on every phase transition, `queued` included |
-| `skill_run.finished` | `runId, projectId, phase (terminal), finishedAt, exitCode, reportText?, reportTruncated, changedFiles[] { status, path }, changedFilesTotal, patch?, patchTruncated, prNumber?, prUrl?, error?` | once, at a terminal phase |
+| `skill_run.finished` | `runId, projectId, phase (terminal), finishedAt, exitCode, reportText?, reportTruncated, changedFiles[] { status, path }, changedFilesTotal, patch?, patchTruncated, patchSha256?, prNumber?, prUrl?, error?` | once, at a terminal phase |
 
 `skill_run.finished` must fit an `events` batch:
 
@@ -1207,7 +1207,9 @@ How the runner serves them:
 - **Run log.** `run_log` subscriptions are refused `not_found` for a run of
   another project. Each one replays at most `RUN_LOG_BACKLOG_LINES` and
   then tails `stream.jsonl` every 500 ms. Lines are redacted like pane
-  frames, and so is `reportText`.
+  frames, and so are `reportText` and `patch` (C-128: one redactor for every
+  runner-to-server text). With the runner-local `skills.keepPatchesLocal`,
+  `patch` is never sent: `patchSha256` names the patch kept on the runner.
 
 ### Board cards
 

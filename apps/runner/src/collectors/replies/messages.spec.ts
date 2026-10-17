@@ -199,4 +199,17 @@ describe('MessageWatcher', () => {
       SLOT_MESSAGE_SEEN_MAX_BYTES,
     );
   });
+
+  it('redacts the body (C-128)', () => {
+    const { watcher, events, file } = setup();
+    writeFileSync(
+      file,
+      `# From the orchestrator\n\nuse token ghp_${'a'.repeat(36)} and\nDATABASE_URL=postgres://u:pw@h/db\n`,
+    );
+    watcher.scan();
+    const [event] = events.take();
+    const data = event.data as { body: string };
+    expect(data.body).not.toContain('ghp_');
+    expect(data.body).not.toContain('pw@h');
+  });
 });

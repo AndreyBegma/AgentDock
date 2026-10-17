@@ -72,7 +72,11 @@ describe('daemon — OTLP receiver (spec 13)', () => {
     fleet: { pollSeconds: 15, prPollSeconds: 60, eventsPollSeconds: 5 },
     queue: { pollSeconds: 60 },
     sessions: { enabled: false },
-    skills: { maxConcurrentRuns: 2, maxTimeoutSec: 21_600 },
+    skills: {
+      maxConcurrentRuns: 2,
+      maxTimeoutSec: 21_600,
+      keepPatchesLocal: false,
+    },
     policy: permissivePolicy(),
   });
 
@@ -341,7 +345,11 @@ describe('daemon — local socket (spec 201)', () => {
         fleet: { pollSeconds: 15, prPollSeconds: 60, eventsPollSeconds: 5 },
         queue: { pollSeconds: 60 },
         sessions: { enabled: false },
-        skills: { maxConcurrentRuns: 2, maxTimeoutSec: 21_600 },
+        skills: {
+          maxConcurrentRuns: 2,
+          maxTimeoutSec: 21_600,
+          keepPatchesLocal: false,
+        },
         policy: permissivePolicy(),
       },
       configFile: join(dir, 'runner.json'),
@@ -590,7 +598,11 @@ describe('daemon — filter stats (#445 amendment 5)', () => {
         fleet: { pollSeconds: 15, prPollSeconds: 60, eventsPollSeconds: 5 },
         queue: { pollSeconds: 60 },
         sessions: { enabled: false },
-        skills: { maxConcurrentRuns: 2, maxTimeoutSec: 21_600 },
+        skills: {
+          maxConcurrentRuns: 2,
+          maxTimeoutSec: 21_600,
+          keepPatchesLocal: false,
+        },
         policy: permissivePolicy(),
       },
       configFile: join(dir, 'runner.json'),
@@ -669,7 +681,11 @@ describe('daemon — filter stats (#445 amendment 5)', () => {
         fleet: { pollSeconds: 15, prPollSeconds: 60, eventsPollSeconds: 5 },
         queue: { pollSeconds: 60 },
         sessions: { enabled: false },
-        skills: { maxConcurrentRuns: 2, maxTimeoutSec: 21_600 },
+        skills: {
+          maxConcurrentRuns: 2,
+          maxTimeoutSec: 21_600,
+          keepPatchesLocal: false,
+        },
         policy: permissivePolicy(),
       },
       configFile: join(dir, 'runner.json'),
