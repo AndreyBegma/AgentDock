@@ -242,9 +242,7 @@ describe('runner-local policy (ADR-0047)', () => {
       'config/prod/**',
     ]);
     expect(cli('allow-path', 'internal').code).toBe(0);
-    expect(loadConfig(configFile).policy.code.deny).toEqual([
-      'config/prod/**',
-    ]);
+    expect(loadConfig(configFile).policy.code.deny).toEqual(['config/prod/**']);
     expect(cli('deny-path').code).not.toBe(0);
   });
 
