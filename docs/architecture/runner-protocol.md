@@ -609,7 +609,7 @@ runners that send it.
 (amends ADR-0010). The allowlist says *which* commands exist; it is not a
 boundary against a server that sends a dangerous instance of one. The runner
 therefore keeps a `policy` block in its own `runner.json`. Only the CLI on the
-machine writes it — `agentdock-runner policy show|set|allow-root|deny-root` and
+machine writes it — `agentdock-runner policy show|set|allow-root|deny-root|deny-path|allow-path` and
 `pair --allow-root <dir>` — and no message from the server (`welcome`,
 `config`, any command) can change it. A running daemon re-reads it within 5 s.
 
@@ -620,6 +620,7 @@ machine writes it — `agentdock-runner policy show|set|allow-root|deny-root` an
 | `terminal.write` | `false` | `terminal.attach` with `mode: "write"`, and the input of a write attach already open once it is turned off |
 | `skills.profileInstall` | `false` | `skill.install` with `target.scope: "profile"` |
 | `commands.<name>` | `false` | `orchestrator.message`, `slot.message`, `session.message` — free text into a live agent session whose permission mode the policy may not have set |
+| `code.deny` | `[]` | `repo.read` of a path matching a pattern (a glob over checkout paths; no `/` matches a name at any depth), as `policy_refused`; `repo.search` withholds such matches and `code.ask` gets a `Read(…)` deny rule for each (#622, ADR-0061). Edited with `policy deny-path` / `allow-path`. Secrets (`.env*`, keys, credential files, `.git`) are refused on top of it, always |
 
 The dispatcher checks the policy after the args parse and before any handler;
 `orchestrator.start` checks it again itself, and the terminal manager checks
@@ -950,6 +951,9 @@ handler.
 | `session.backfill` | `projectId?, since` | admin | implemented: → `{ files, events }`, timeout 600 s |
 | `terminal.attach` | `id, target: { kind: slot\|orchestrator\|skill_run\|manual\|card, projectId, root, slot?\|runId?\|sessionId?\|cardId? }, mode: read\|write, cols, rows` | admin | implemented: → `{ attached: true, session }`, timeout 10 s; `skill_run` answers `unsupported` until #24's runner lands |
 | `worktree.status` | `projectId, root, slot, base?` | viewer | implemented (`commands/worktree.ts`): → `{ slot, branch, head, base, ahead, behind, changed, untracked, files (≤ 200), filesTruncated, commits (≤ 5) }`, timeout 10 s |
+| `repo.search` | `projectId, root, query, regex?, caseSensitive?, path?, maxResults?` | viewer | implemented (#622, `commands/repo.ts`, [ADR-0061](../adr/0061-the-assistant-reads-code-only-through-the-project-runner.md)): `git grep` over the files git knows → `{ matches: [{ path, line, text }] (≤ 100, lines ≤ 300 chars), truncated, withheld }`, timeout 20 s |
+| `repo.read` | `projectId, root, path, startLine?, endLine?` | viewer | implemented (#622): one file git knows → `{ path, content (≤ 400 lines, ≤ 24,000 chars), startLine, endLine, totalLines, truncated }`, timeout 15 s |
+| `code.ask` | `projectId, root, runId, sessionId, profileKey, model, question (≤ 4,000)` | viewer | implemented (#622): one read-only headless Claude Code session in the checkout → `{ answer (≤ 12,000 chars), truncated }`, timeout 260 s |
 
 Arguments are validated by schema on both sides (`parseCommand`). Commands
 without arguments take `{}` and reject any field. Paths are resolved and must
