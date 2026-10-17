@@ -8,6 +8,7 @@ import type {
   StoppedResult,
 } from '@agentdock/shared/protocol';
 import { isoNow } from '../clock';
+import { appendSlotMessage } from '../session/messenger';
 import type { ControlDeps } from './deps';
 import { resolveSlot, watchedProject } from './target';
 import { TmuxControl } from './tmux';
@@ -86,5 +87,14 @@ export const messageSlot = async (
   if (!session) return { written: true, delivered: false };
   await tmux.sendLiteral(session, MESSAGE_PROMPT);
   await tmux.sendEnter(session);
+  // #489 M5: the orchestrator's own log learns what its worker was told. The
+  // worker has been told by now, whether or not the log can be written.
+  await appendSlotMessage(
+    deps.exec,
+    watchedProject(args, deps.watchedProjects()),
+    args.slot,
+    args.text,
+    isoNow(deps.clock),
+  ).catch(() => {});
   return { written: true, delivered: true };
 };

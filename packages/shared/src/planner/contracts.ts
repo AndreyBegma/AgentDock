@@ -26,7 +26,7 @@ import type {
  * `POST /projects/:projectId/plans`. Defaults: the caller's planning model
  * (#337 D9, `GET /me/settings`), the project's default profile (D14).
  *
- * #337 D2: `mode: 'card'` is New Card — `brief` is What to do, as typed, and
+ * #337 D2: `mode: 'card'` is New work (#409) — `brief` is What to do, as typed, and
  * the first intake turn starts at once. `attachmentIds` (D10): pending
  * uploads of the caller in this project, claimed by the plan and passed to
  * `plan.turn`; the generated card claims them in turn.
@@ -261,6 +261,92 @@ export interface PlanIntakeView {
   roundsAsked: number;
   /** `PLANNER_INTAKE_MAX_ROUNDS`: after this many, the next turn writes the card. */
   maxRounds: number;
+  /**
+   * #409: the split the intake proposes, waiting for the person — the last
+   * succeeded intake turn's. Null when none is open (optional: absent reads
+   * as null).
+   */
+  split?: PlanIntakeSplitView | null;
+}
+
+/** #409: a split proposal as the person reviews it. */
+export interface PlanIntakeSplitView {
+  /** The turn that proposed it: Confirm names it, so a stale list is refused. */
+  turnId: string;
+  /** Why several cards, in the person's language. */
+  reason: string;
+  /** In the proposal's order; `index` is what Confirm refers to. */
+  cards: PlanIntakeSplitCard[];
+  /**
+   * #480 (ADR-0044): set when the intake proposed a stack — `cards` then
+   * lists every card of it in stage order, and the stages name them by
+   * `index`. Null (or absent) for a plain split.
+   */
+  stack?: PlanIntakeStackView | null;
+}
+
+/** #480: a stack proposal's shape as the person reviews it. */
+export interface PlanIntakeStackView {
+  title: string;
+  /** Markdown, English. */
+  body: string;
+  /** The intake suggests a shared design of the whole result. */
+  design: boolean;
+  /** In order; each names its cards by `PlanIntakeSplitCard.index`. */
+  stages: { title: string; cards: number[] }[];
+}
+
+export interface PlanIntakeSplitCard {
+  index: number;
+  title: string;
+  kind: PlanTaskKind;
+  summary: string;
+}
+
+/**
+ * `POST /projects/:projectId/plans/:planId/split` (#409): Confirm a split —
+ * the cards the person kept, in their order, each with its title and kind as
+ * they left it. All are created at once in Todo, independent of each other;
+ * the intake is then done. 409 `split_stale` when `turnId` is not the open
+ * proposal; 409 `wrong_mode` on a plan that is not an intake.
+ */
+export interface ConfirmSplitRequest {
+  turnId: string;
+  cards: ConfirmSplitCard[];
+  /**
+   * #480 (ADR-0044): confirm the cards as a stack instead of independent
+   * cards — whichever the intake proposed. Every kept card is in exactly one
+   * stage; every card of a stage gets a dependency on every card of the stage
+   * before it. Absent: independent cards, as before.
+   */
+  stack?: ConfirmStackRequest;
+}
+
+/** #480: the stack the person confirms. */
+export interface ConfirmStackRequest {
+  /** English, at most `STACK_TITLE_MAX` characters. */
+  title: string;
+  /** Markdown, at most `STACK_BODY_MAX` characters; may be empty. */
+  body: string;
+  /** Draw a stack design first: no card of the stack runs until it is approved. */
+  design: boolean;
+  /** In order, at least one, none empty; cards by `ConfirmSplitCard.index`. */
+  stages: { title: string; cards: number[] }[];
+}
+
+export interface ConfirmSplitCard {
+  /** `PlanIntakeSplitCard.index`; each at most once. */
+  index: number;
+  /** English, at most `CARD_DRAFT_TITLE_MAX` characters. */
+  title: string;
+  kind: PlanTaskKind;
+}
+
+export interface ConfirmSplitResponse {
+  /** In the confirmed order. */
+  cards: { number: number; label: string }[];
+  /** #480: the stack made, when the request named one. */
+  stack?: { number: number; label: string } | null;
 }
 
 /** `GET /tasks` query. */
@@ -389,6 +475,11 @@ export const PLANNER_ERROR = {
   noDocsClone: 'no_docs_clone',
   /** 409 (#337 D7): Create cards on a plan whose cards exist. */
   cardsExist: 'cards_exist',
+  /**
+   * 409 (#409): Confirm a split that is no longer the intake's open
+   * proposal — a later turn replaced it, or none was proposed.
+   */
+  splitStale: 'split_stale',
   /**
    * 409 (#337): a route that does not fit the plan's mode — Create cards or
    * Send on a `card` plan, an intake turn on any other.

@@ -64,3 +64,14 @@ export const runHref = (projectId: string, runId: string): string =>
 /** The project's installed skills (#24): the choices for design skills. */
 export const installedSkillsApi = (projectId: string): string =>
   `/projects/${projectId}/skills`;
+
+/** #480: a stack's shared design — the same routes as a card's, at its number. */
+export const stackDesignApi = (projectId: string, number: number): string =>
+  `/projects/${projectId}/board/stacks/${number}/design`;
+
+/** #480: the stack's design viewer. */
+export const stackDesignHref = (
+  projectId: string,
+  number: number,
+  search = '',
+): string => `/projects/${projectId}/board/stacks/${number}/design${search}`;

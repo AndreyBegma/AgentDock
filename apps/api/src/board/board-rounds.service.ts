@@ -5,12 +5,16 @@ import {
   CARD_WORKER_PROMPT_VERSION,
   type CardAttachmentBrief,
   type CardChange,
+  type CardCiFixInput,
   type CardRoundPhase,
   type CardRoundTrigger,
   cardAttachmentSnapshotSchema,
   cardBranch,
   cardChange,
+  cardCiFixPrompt,
   cardDesignPath,
+  cardDraftPullRequest,
+  cardFollowUpBranch,
   cardIssueBody,
   cardLabel,
   cardNextRoundPrompt,
@@ -19,6 +23,8 @@ import {
   cardSpecPrBody,
   cardWorkerPrompt,
   isActiveRoundPhase,
+  stackDesignPath,
+  stackLabel,
 } from '@agentdock/shared';
 import {
   type CardRunArgs,
@@ -35,7 +41,7 @@ import {
   Injectable,
   Optional,
 } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import {
   AttachmentsService,
@@ -45,15 +51,23 @@ import {
 import { AuditService } from '../audit/audit.service';
 import { BudgetGate } from '../budgets/budget-gate';
 import { PrismaService } from '../database/prisma.service';
+import {
+  type FrameFile,
+  frameNameSelect,
+  frameNamesOf,
+  revisionFrames,
+} from '../design/design-store';
 import { resolveSpecTarget, type SpecTarget } from '../planner/spec-target';
 import { RuntimeProfileResolver } from '../readiness';
 import { TextNormalizer } from '../text/text-normalizer';
+import { TokenSaverService } from '../token-saver/token-saver.service';
 import { BoardService } from './board.service';
 import { BoardCommands, boardOutput } from './board-commands';
 import { BoardDependencies } from './board-dependencies.service';
 import { BoardFailure, boardError } from './board-error';
 import type { CardWithRounds } from './board-mapper';
 import { toSettingsView } from './board-mapper';
+import { BoardStacks } from './board-stacks';
 import {
   ACTIVE_PHASES,
   BOARD_SYSTEM_ACTOR,
@@ -154,15 +168,22 @@ export class BoardRoundsService {
     private readonly text: TextNormalizer,
     private readonly attachments: AttachmentsService,
     private readonly dependencies: BoardDependencies,
+    private readonly stacks: BoardStacks,
+    private readonly tokenSaver: TokenSaverService,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
 
-  /** `POST …/run`: round 1, or a retry after failed / ended / cancelled. */
+  /**
+   * `POST …/run`: round 1, or a retry after failed / ended / cancelled.
+   * #443: Auto-run when ready calls it too, as the person who accepted the
+   * last open dependency, with `autoRunAfter` that dependency's number.
+   */
   async run(
     projectId: string,
     number: number,
     dto: RunBoardCardDto,
     actor: BoardActor,
+    autoRunAfter: number | null = null,
   ): Promise<BoardCardDetail> {
     const card = await this.work.card(projectId, number);
     if (card.column === 'completed') {
@@ -179,12 +200,14 @@ export class BoardRoundsService {
         'A suggestion runs once it is accepted',
       );
     }
+    // #480 (ADR-0044): no card of a stack runs before its design is approved.
+    await this.stacks.assertRunnable(card.id);
     // #337 D8: an open dependency warns; the person may run anyway.
     await this.dependencies.assertRunnable(
       card.id,
       dto.ignoreDependencies === true,
     );
-    await this.start(card, 'run', dto, null, actor);
+    await this.start(card, 'run', dto, null, actor, [], null, autoRunAfter);
     return this.board.detail(projectId, number);
   }
 
@@ -217,6 +240,115 @@ export class BoardRoundsService {
     return this.board.detail(projectId, number);
   }
 
+  /**
+   * #359 D6: AgentDock's own round for a red check or a merge conflict on
+   * the card's PR — the system actor, the card's session resumed, the
+   * `ci_fix` prompt. Counts one of the PR's `ci_fix` attempts. Refused like
+   * any round (running, no room, budget); the poller tries again.
+   */
+  async ciFix(
+    projectId: string,
+    number: number,
+    input: CardCiFixInput,
+  ): Promise<void> {
+    const card = await this.work.card(projectId, number);
+    if (card.sessionId === null) {
+      throw boardError(
+        409,
+        BOARD_ERROR.wrongColumn,
+        'A CI fix resumes the card worker, which has not run',
+      );
+    }
+    await this.start(card, 'ci_fix', {}, null, BOARD_SYSTEM_ACTOR, [], input);
+  }
+
+  /**
+   * #447 D10: makes a round whose session died resumable again, before
+   * Steward sends `card.resume`. Still active: nothing to undo (`active`).
+   * Ended by its session alone (`finishedBy: session_end`) while the card is
+   * still In progress — a shipping card finishes in place — it is `starting`
+   * again with its run live (`reopened`), so the runner's `running` moves it
+   * on. Anything else is `refused`: a newer round, a person's stop
+   * (`cancelled`), a worker's or a person's finish, a card the work moved on.
+   */
+  async reopenForResume(
+    roundId: string,
+  ): Promise<'active' | 'reopened' | 'refused'> {
+    const found = await this.prisma.boardCardRound.findUnique({
+      where: { id: roundId },
+      select: { cardId: true, runId: true },
+    });
+    if (!found) return 'refused';
+    const outcome = await this.prisma.$transaction(async (tx) => {
+      const card = await this.work.lock(tx, found.cardId);
+      const latest = card.rounds[0];
+      if (!latest || latest.id !== roundId) return 'refused';
+      if (isActiveRoundPhase(latest.phase)) return 'active';
+      if (
+        latest.phase !== 'finished' ||
+        latest.finishedBy !== 'session_end' ||
+        card.column !== 'in_progress'
+      ) {
+        return 'refused';
+      }
+      const { count } = await tx.boardCardRound.updateMany({
+        where: { id: roundId, phase: 'finished', finishedBy: 'session_end' },
+        data: {
+          phase: 'starting',
+          finishedAt: null,
+          finishedBy: null,
+          endedAt: null,
+          exitCode: null,
+        },
+      });
+      if (count === 0) return 'refused';
+      await tx.run.update({
+        where: { id: latest.runId },
+        data: {
+          status: 'running',
+          endedAt: null,
+          durationMs: null,
+          updatedAt: new Date(),
+        },
+      });
+      return 'reopened';
+    });
+    if (outcome === 'reopened') {
+      const card = await this.prisma.boardCard.findUniqueOrThrow({
+        where: { id: found.cardId },
+        select: { projectId: true },
+      });
+      this.work.publishRun(card.projectId, found.runId, 'running');
+      this.work.publish(card.projectId, found.cardId);
+    }
+    return outcome;
+  }
+
+  /**
+   * #447 D10: a reopened round whose resume did not start goes back to how
+   * its session left it — finished by the session's end.
+   */
+  async revertResume(roundId: string): Promise<void> {
+    const round = await this.prisma.boardCardRound.findUnique({
+      where: { id: roundId },
+      select: { runId: true, card: { select: { id: true, projectId: true } } },
+    });
+    if (!round) return;
+    const ended = await this.prisma.$transaction(async (tx) => {
+      const now = new Date();
+      const done = await this.work.endRound(tx, roundId, 'finished', now, {
+        finishedBy: 'session_end',
+        endedAt: now,
+      });
+      if (done) await this.work.closeRun(tx, round.runId, 'succeeded');
+      return done;
+    });
+    if (ended) {
+      this.work.publishRun(round.card.projectId, round.runId, 'succeeded');
+      this.work.publish(round.card.projectId, round.card.id);
+    }
+  }
+
   private running(): BoardFailure {
     return boardError(
       409,
@@ -233,9 +365,18 @@ export class BoardRoundsService {
     actor: BoardActor,
     /** #309 D3: pending uploads that come with the feedback. */
     claimIds: readonly string[] = [],
+    /** #359 D6: why a `ci_fix` round starts. */
+    ciFix: CardCiFixInput | null = null,
+    /** #443: the accepted dependency an Auto-run when ready round starts after. */
+    autoRunAfter: number | null = null,
   ): Promise<void> {
     const project = await this.work.project(card.projectId);
     if (isActiveRoundPhase(card.rounds[0]?.phase)) throw this.running();
+    // #359: the runner pushes during the round and opens a draft PR (D1).
+    const ships =
+      card.source !== 'fleet' &&
+      card.source !== 'terminal' &&
+      this.commands.servesChecks(project.runnerId);
 
     const settings = await this.prisma.projectOrchestratorSettings.findUnique({
       where: { projectId: project.id },
@@ -253,7 +394,12 @@ export class BoardRoundsService {
       dto.permissionMode ??
       settings?.permissionMode ??
       ORCHESTRATOR_DEFAULTS.permissionMode;
-    if (permissionMode === 'bypassPermissions' && actor.role !== 'admin') {
+    // #359 D6: a `ci_fix` round runs as the project's admin configured it.
+    if (
+      permissionMode === 'bypassPermissions' &&
+      actor.role !== 'admin' &&
+      trigger !== 'ci_fix'
+    ) {
       throw new ForbiddenException(
         '`bypassPermissions` needs the admin role on the project',
       );
@@ -286,21 +432,12 @@ export class BoardRoundsService {
     const firstStart = !resume;
     // #243 D6: a needed design is approved before the worker starts.
     const design = trigger === 'run' ? await this.approvedDesign(card) : null;
-    const writesSpec = firstStart && card.specOnRun && card.specPath === null;
-    if (writesSpec && target.kind === 'no_spec_dir') {
-      throw boardError(
-        422,
-        BOARD_ERROR.noSpecDir,
-        'The project has no spec folder: set the Spec folder in Settings › Docs source, or turn off the spec',
-      );
-    }
-    if (writesSpec && target.kind === 'no_docs_clone') {
-      throw boardError(
-        422,
-        BOARD_ERROR.noDocsClone,
-        `The docs repository${target.repo ? ` ${target.repo}` : ''} has no local clone: set its local clone path in Settings › Docs source, or turn off the spec`,
-      );
-    }
+    // #480: the card's stack — its place, and its approved design as reference.
+    const stack = firstStart ? await this.stacks.contextOf(card.id) : null;
+    // #359 D4: every card gets its spec file where there is a place for it;
+    // without one (#379: no Spec folder, or a remote docs repository with no
+    // local clone) it runs without, as readiness says.
+    const writesSpec = firstStart && card.specPath === null;
     if (writesSpec && target.kind === 'docs_repo') {
       this.commands.assertReady(project.runnerId, 'docs.publish_specs');
     }
@@ -319,9 +456,13 @@ export class BoardRoundsService {
       userId: actor.userId,
     });
 
-    // D2: the issue first, so the branch can name it (D5).
+    // D2: the issue first, so the branch can name it (D5). #359 D4: a bug
+    // gets one — also when the model chose the kind; a feature none. Without
+    // a spec directory there is no spec file, and an issue holds the spec.
     let issue = { number: card.issueNumber, url: card.issueUrl };
-    if (firstStart && card.issueOnRun && issue.number === null) {
+    const wantsIssue =
+      card.issueOnRun || (card.kindSource === 'auto' && card.kind === 'bug');
+    if (firstStart && wantsIssue && issue.number === null) {
       const created = boardOutput(
         'issue.create',
         await this.commands.createIssue(
@@ -343,14 +484,18 @@ export class BoardRoundsService {
       });
     }
 
-    const branch =
-      card.branch ??
-      cardBranch({
-        kind: card.kind,
-        number: card.number,
-        title: card.title,
-        issueNumber: issue.number,
-      });
+    // #359 D8: after a merge, the round works on a fresh branch from the
+    // updated base, and opens the card's next PR.
+    const followUp = ships && resume && card.mergedAt !== null;
+    const branch = followUp
+      ? await this.followUpBranch(card)
+      : (card.branch ??
+        cardBranch({
+          kind: card.kind,
+          number: card.number,
+          title: card.title,
+          issueNumber: issue.number,
+        }));
     // #379: a spec in an external docs repository goes in through its own
     // pull request, before the worker starts; the card's branch never holds it.
     let specPr = cardSpecPrOf(card);
@@ -360,18 +505,20 @@ export class BoardRoundsService {
     const specPath =
       specPr?.path ??
       card.specPath ??
-      (card.specOnRun && specDir
+      (specDir
         ? cardSpecPath(specDir, {
             number: card.number,
             title: card.title,
             issueNumber: issue.number,
           })
         : null);
-    // #243 D7: round 1 commits the approved mockup into the card's branch,
-    // as stored — without the viewer's pin helper, which is never stored.
-    const designFile: CardRunFile | null =
+    // #243 D7, #441: round 1 commits every frame of the approved variant
+    // into the card's branch, as stored — without the viewer's pin helper,
+    // which is never stored.
+    const designFrames: (CardRunFile & { name: string })[] =
       firstStart && design
-        ? {
+        ? design.frames.map((f) => ({
+            name: f.name,
             path: cardDesignPath(
               specDir,
               {
@@ -380,17 +527,32 @@ export class BoardRoundsService {
                 issueNumber: issue.number,
               },
               design.variant,
+              f.slug,
             ),
-            content: design.html,
-          }
-        : null;
+            content: f.html,
+          }))
+        : [];
+    // #480: round 1 commits the stack's approved design beside the card's own.
+    const stackFrames: (CardRunFile & { name: string })[] = stack?.design
+      ? stack.design.frames.map((f) => ({
+          name: f.name,
+          path: stackDesignPath(
+            specDir,
+            stack,
+            stack.design?.variant ?? 1,
+            f.slug,
+          ),
+          content: f.html,
+        }))
+      : [];
     const sessionId = card.sessionId ?? randomUUID();
     // #309 D9, D10: what the card holds once this round's claim is made.
     const attached = await this.attachments.withClaim(card.id, claimIds);
     const attachmentRefs = attached.map(toAttachmentRef);
     const attachmentBriefs = attached.map(toAttachmentBrief);
-    const prompt =
-      resume || (trigger === 'feedback' && feedback !== null)
+    const prompt = ciFix
+      ? cardCiFixPrompt(ciFix)
+      : resume || (trigger === 'feedback' && feedback !== null)
         ? cardNextRoundPrompt({
             label: cardLabel(card.number),
             change: changeSinceLastRound(card, attachmentBriefs),
@@ -409,21 +571,46 @@ export class BoardRoundsService {
               : null,
             issueNumber: issue.number,
             design:
-              designFile && design
+              designFrames.length > 0 && design
                 ? {
-                    path: designFile.path,
+                    frames: designFrames.map((f) => ({
+                      name: f.name,
+                      path: f.path,
+                    })),
                     rationale: design.rationale,
                     comments: design.comments,
                   }
                 : null,
+            stack: stack
+              ? {
+                  label: stackLabel(stack.number),
+                  title: stack.title,
+                  stage: stack.stage,
+                  stageTitle: stack.stageTitle,
+                  stageCount: stack.stageCount,
+                  design:
+                    stack.design && stackFrames.length > 0
+                      ? {
+                          frames: stackFrames.map((f) => ({
+                            name: f.name,
+                            path: f.path,
+                          })),
+                          rationale: stack.design.rationale,
+                        }
+                      : null,
+                }
+              : null,
             attachments: attachmentBriefs,
           });
     const files: CardRunFile[] = [
       ...(firstStart && specPath !== null && specPr === null
         ? [{ path: specPath, content: specContent(card, issue.number) }]
         : []),
-      ...(designFile ? [designFile] : []),
+      ...designFrames.map((f) => ({ path: f.path, content: f.content })),
+      ...stackFrames.map((f) => ({ path: f.path, content: f.content })),
     ];
+    // #445 D11: only a runner that advertises the token saver gets the field.
+    const saver = await this.tokenSaver.launch(project.id);
     const draft: Omit<CardRunArgs, 'runId'> = {
       cardId: card.id,
       projectId: project.id,
@@ -439,6 +626,17 @@ export class BoardRoundsService {
       profileKey: profile.key,
       model,
       permissionMode,
+      ...(ships
+        ? {
+            pullRequest: cardDraftPullRequest({
+              number: card.number,
+              title: card.title,
+              issueNumber: issue.number,
+            }),
+          }
+        : {}),
+      ...(followUp ? { newBranch: true } : {}),
+      ...saver.args,
     };
     const valid = cardRunArgsSchema.safeParse({ ...draft, runId: 'pending' });
     if (!valid.success) {
@@ -469,7 +667,10 @@ export class BoardRoundsService {
             round: next,
             trigger,
             promptVersion: CARD_WORKER_PROMPT_VERSION,
+            // #447 DA-15: Steward resumes the round in the mode it started in.
+            permissionMode,
           },
+          tokenSaver: saver.on,
           status: 'running',
           triggeredByType: 'user',
           triggeredById: actor.userId,
@@ -484,6 +685,7 @@ export class BoardRoundsService {
           round: next,
           runId: run.id,
           trigger,
+          autoRunAfter,
           feedback,
           cardTitle: card.title,
           cardBody: card.body,
@@ -492,6 +694,9 @@ export class BoardRoundsService {
           authorId: actor.userId,
           phase: 'queued',
           startedAt: now,
+          // #449 D3: the session it launches with; a `fresh` start replaces
+          // it (`round.restart`), and the earlier rounds keep theirs.
+          sessionId,
         },
       });
       await this.attachments.claim(
@@ -516,6 +721,27 @@ export class BoardRoundsService {
           autoRunError: null,
           autoRunMessage: null,
           autoRunFailedAt: null,
+          // #359 D6: one of the PR's fix attempts; a person's round is the
+          // person acting, so automation resumes.
+          ...(trigger === 'ci_fix'
+            ? { ciFixAttempts: { increment: 1 } }
+            : { needsPerson: false }),
+          // #359 D8: the next PR starts with nothing of the merged one.
+          ...(followUp
+            ? {
+                prNumber: null,
+                prUrl: null,
+                prState: null,
+                mergedAt: null,
+                ciState: 'none' as const,
+                ciChecks: Prisma.DbNull,
+                ciHeadSha: null,
+                ciCheckedAt: null,
+                ciFixAttempts: 0,
+                ciNoneSince: null,
+                ciRetriggeredSha: null,
+              }
+            : {}),
         },
       });
       return created;
@@ -552,7 +778,11 @@ export class BoardRoundsService {
       number: card.number,
       round: round.round,
       runId: round.runId,
+      trigger,
+      ...(ciFix ? { ciFix: ciFix.reason } : {}),
+      ...(autoRunAfter !== null ? { autoRunAfter } : {}),
       branch,
+      ...(followUp ? { newBranch: true } : {}),
       resume,
       profileKey: profile.key,
       model,
@@ -628,8 +858,10 @@ export class BoardRoundsService {
   /**
    * #243 D6, D7: the card's approved design for round 1 — `null` when the
    * card has none or it is off; 409 `design_not_approved` while a needed
-   * design is not approved. The comments are the bodies the approved
-   * variant's revisions addressed, oldest first: the review's decisions.
+   * design is not approved. #441: every frame of it, in order. The comments
+   * are the bodies the approved variant's revisions addressed, oldest first
+   * — the review's decisions — each led by its frame's name when the design
+   * has several.
    */
   /**
    * #379: `docs.publish_specs` — the card's spec on `docs/card-<shortId>` of
@@ -696,7 +928,7 @@ export class BoardRoundsService {
 
   private async approvedDesign(card: CardWithRounds): Promise<{
     variant: number;
-    html: string;
+    frames: FrameFile[];
     rationale: string;
     comments: string[];
   } | null> {
@@ -707,7 +939,7 @@ export class BoardRoundsService {
         needed: true,
         status: true,
         approvedRevision: {
-          select: { variant: true, html: true, rationale: true },
+          select: { id: true, variant: true, rationale: true },
         },
       },
     });
@@ -726,9 +958,45 @@ export class BoardRoundsService {
         addressedIn: { variant: approved.variant },
       },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-      select: { body: true },
+      select: {
+        body: true,
+        frame: true,
+        revision: { select: { frames: frameNameSelect } },
+      },
     });
-    return { ...approved, comments: comments.map((c) => c.body) };
+    const frames = await revisionFrames(this.prisma, approved.id);
+    return {
+      variant: approved.variant,
+      rationale: approved.rationale,
+      frames,
+      comments: comments.map((c) => {
+        if (frames.length === 1) return c.body;
+        const frame = frameNamesOf(c.revision.frames)[c.frame];
+        return frame ? `${frame.name}: ${c.body}` : c.body;
+      }),
+    };
+  }
+
+  /**
+   * #359 D8: the branch of the card's next PR — `cardFollowUpBranch` of its
+   * first PR's branch (the card's own), `k` one past the PRs it has.
+   */
+  private async followUpBranch(card: CardWithRounds): Promise<string> {
+    const prs = await this.prisma.boardCardPullRequest.findMany({
+      where: { cardId: card.id },
+      orderBy: { createdAt: 'asc' },
+      select: { branch: true },
+    });
+    const first =
+      prs[0]?.branch ??
+      card.branch ??
+      cardBranch({
+        kind: card.kind,
+        number: card.number,
+        title: card.title,
+        issueNumber: card.issueNumber,
+      });
+    return cardFollowUpBranch(first, Math.max(prs.length, 1) + 1);
   }
 
   /** #322 D3: the profile #272 D1 picks without a card or launch key. */

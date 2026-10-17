@@ -405,6 +405,30 @@ describe('orchestrator and slot control (e2e)', () => {
       expect(first.data).not.toHaveProperty('args');
     });
 
+    it('#445: carries the token saver for a runner that advertises it', async () => {
+      const stored = await ctx.prisma.runner.findUniqueOrThrow({
+        where: { id: runnerId },
+      });
+      await ctx.prisma.runner.update({
+        where: { id: runnerId },
+        data: {
+          capabilities: {
+            ...(stored.capabilities as object),
+            tokenSaver: true,
+          },
+        },
+      });
+      await admin.send('put', `/projects/${a}/token-saver`, {
+        enabled: true,
+        mcpAllow: ['playwright'],
+      });
+      expect((await start(operatorOfA)).status).toBe(201);
+      expect(runner.control()[0].args).toMatchObject({
+        mode: 'start',
+        tokenSaver: { enabled: true, mcpAllow: ['playwright'] },
+      });
+    });
+
     it('takes the project settings, then the request overrides', async () => {
       await admin.send('put', `/projects/${a}/orchestrator/settings`, {
         model: 'sonnet',

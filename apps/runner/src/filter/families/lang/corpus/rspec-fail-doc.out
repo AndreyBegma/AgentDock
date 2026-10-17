@@ -1,0 +1,85 @@
+Run options: exclude {:slow=>true}
+
+Randomized with seed 9120
+
+Account
+  #initialize
+    sets the owner
+    defaults the currency to USD
+    rejects a negative balance
+  #deposit
+    increases the balance
+    records a ledger entry
+    rejects zero amounts
+    rejects amounts over the daily limit
+  #withdraw
+    decreases the balance
+    records a ledger entry
+    refuses to overdraw
+    allows overdraft on premium accounts
+  #close
+    requires a zero balance
+    archives the ledger
+
+Invoice
+  #total
+    sums the line items
+    applies the tax rate
+    rounds half up (FAILED - 1)
+    ignores cancelled lines
+  #paid?
+    is false until fully paid
+    is true after the last payment
+  #send_reminder
+    emails the billing contact
+    skips paid invoices
+    does not email more than once a day
+
+Order
+  .create
+    reserves stock for every line
+    rolls back when stock is short
+    assigns the next order number
+  #ship
+    marks the order as shipped
+    sends the tracking email
+    refuses to ship an unpaid order
+  #cancel
+    releases reserved stock
+    refunds a captured payment
+    is idempotent
+
+Api::V1::OrdersController
+  GET /api/v1/orders
+    returns the current user's orders
+    paginates
+    filters by status
+    requires authentication
+  POST /api/v1/orders
+    creates an order
+    returns 422 for an empty cart
+    returns 403 for a suspended account
+  DELETE /api/v1/orders/:id
+    cancels the order
+    returns 404 for someone else's order
+
+Failures:
+
+  1) Invoice#total rounds half up
+     Failure/Error: expect(invoice.total).to eq(BigDecimal("0.13"))
+
+       expected: 0.13e0
+            got: 0.12e0
+
+       (compared using ==)
+     # ./spec/models/invoice_spec.rb:28:in `block (3 levels) in <top (required)>'
+
+Finished in 3.71 seconds (files took 1.88 seconds to load)
+47 examples, 1 failure
+
+Failed examples:
+
+rspec ./spec/models/invoice_spec.rb:25 # Invoice#total rounds half up
+
+Randomized with seed 9120
+

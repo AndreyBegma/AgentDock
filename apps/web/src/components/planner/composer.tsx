@@ -35,7 +35,8 @@ const MODES: { value: PlanMode; label: string; hint: string }[] = [
 ];
 
 /**
- * The brief composer (spec 172 UI), New Plan on the Board (#337 D7): a large
+ * The brief composer (spec 172 UI), the Board's plan panel (#337 D7; no link
+ * opens it since New Plan went away, #409): a large
  * text box, the mode, and the model and runtime profile every turn of the
  * plan will use. The model starts on the person's planning model (#337 D9)
  * and the pick is for this plan only. **Plan** is the one solid action. The profile starts on the project default or the

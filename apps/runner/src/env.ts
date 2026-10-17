@@ -14,6 +14,8 @@ export interface Paths {
   spoolDir: string;
   /** `~/.local/state/agentdock/offsets.json`: transcript read positions (spec 12 D5). */
   offsetsFile: string;
+  /** `~/.local/state/agentdock/stopped.json`: why the daemon last stopped for good (C-108). */
+  stopStatusFile: string;
   /** `~/.config/systemd/user/agentdock-runner.service` (D11). */
   serviceFile: string;
   /** `~/Library/LaunchAgents/com.agentdock.runner.plist` on macOS (ADR-0017). */
@@ -36,6 +38,7 @@ export const resolvePaths = (env: Env): Paths => {
     configFile: join(configHome, 'agentdock', 'runner.json'),
     spoolDir: join(stateHome, 'agentdock', 'spool'),
     offsetsFile: join(stateHome, 'agentdock', 'offsets.json'),
+    stopStatusFile: join(stateHome, 'agentdock', 'stopped.json'),
     serviceFile: join(
       configHome,
       'systemd',

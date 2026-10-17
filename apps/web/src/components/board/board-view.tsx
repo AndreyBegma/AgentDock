@@ -7,20 +7,16 @@ import type {
 } from '@agentdock/shared';
 import { Board, type BoardColumn } from '@andrewbehma/glass-ui/board';
 import { Button } from '@andrewbehma/glass-ui/button';
-import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
-import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { Checkbox } from '@andrewbehma/glass-ui/checkbox';
 import { MenuItem, MenuSeparator } from '@andrewbehma/glass-ui/menu';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { useRouter } from 'next/navigation';
-import { type CSSProperties, useState } from 'react';
-import { moveCard } from '../../lib/board/actions';
+import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import {
   applyDrop,
   clampDropIndex,
-  type DropDecision,
   type DropMove,
   decideDrop,
-  moveRequest,
 } from '../../lib/board/board-state';
 import {
   type BoardFilter,
@@ -40,28 +36,54 @@ import {
   canRun,
   canStop,
   columnsOf,
-  describeBoardError,
   isSuggestion,
 } from '../../lib/board/format';
+import { boardStackPageHref } from '../../lib/board/href';
+import { boardItems, isPlanItem } from '../../lib/board/plan-tasks';
 import {
-  boardItems,
-  isPlanItem,
-  type WorkBoardItem,
-} from '../../lib/board/plan-tasks';
+  type CardSelection,
+  columnSelection,
+  NO_SELECTION,
+  pruned,
+  selectableNumbers,
+  toggled,
+  toggledColumn,
+  withAll,
+  withRange,
+} from '../../lib/board/selection';
+import {
+  type ColumnItem,
+  foldStacks,
+  isStackItem,
+  withoutStacks,
+} from '../../lib/board/stacks';
 import { cardDesignHref } from '../../lib/design/href';
 import { planHref } from '../../lib/planner/href';
 import { boardColumnWidth, usePhone, visibleColumns } from './board-layout';
+import { BulkActionBar } from './bulk-action-bar';
 import { CardFace } from './card-face';
+import { MovePicker } from './move-picker';
 import { PlanTaskFace } from './plan-task-face';
+import { StackFace } from './stack-face';
+import { useBulkActions } from './use-bulk-actions';
 import type { CardActions } from './use-card-actions';
+import { useCardMove } from './use-card-move';
 
-type Asking = Extract<DropDecision, { kind: 'confirm-stop' | 'offer-run' }>;
+/** C-29: Completed starts folded to a strip; the work in flight gets the width. */
+const FOLDED_AT_START = ['completed'];
+
+/** Older Completed pages, fetched by the page; offered in Completed's footer. */
+export interface OlderCompleted {
+  loading: boolean;
+  onLoad: () => void;
+}
 
 /**
  * The Board (D7). It is controlled: a drop is checked with `boardMoveRule`,
  * shown at once, and sent; a refusal from the server rolls it back with a toast.
  * glass-ui's `Board` has no `canDrop`, so a drop that is not allowed is
- * declined here, in `onMove`.
+ * declined here, in `onMove`. A plan task is `movable: false`, so neither the
+ * drag nor the menu can produce a move for it (C-44).
  */
 export function BoardColumns({
   projectId,
@@ -73,6 +95,7 @@ export function BoardColumns({
   actions,
   filter,
   compact,
+  olderCompleted,
   onOpen,
   onOpenPlanTask,
   onOpenTerminal,
@@ -89,6 +112,8 @@ export function BoardColumns({
   /** C-29: what the toolbar hides; a hidden card is still in the column. */
   filter: BoardFilter;
   compact: boolean;
+  /** Set while the server has older Completed cards than the board holds. */
+  olderCompleted?: OlderCompleted;
   onOpen: (card: BoardCardView) => void;
   onOpenPlanTask: (task: BoardPlanTaskView) => void;
   onOpenTerminal: (card: BoardCardView) => void;
@@ -97,32 +122,165 @@ export function BoardColumns({
   const router = useRouter();
   // The drop shown before the server answers.
   const [optimistic, setOptimistic] = useState<BoardView>();
-  const [asking, setAsking] = useState<Asking>();
-  const [busy, setBusy] = useState(false);
+  const [moving, setMoving] = useState<BoardCardView>();
+  const [collapsed, setCollapsed] = useState<string[]>(FOLDED_AT_START);
   const shown = optimistic ?? view;
+
+  const move = useCardMove({
+    projectId,
+    runnerName,
+    canOperate,
+    actions,
+    onStart: (m) => setOptimistic(applyDrop(view, m)),
+    // Server truth either way: on a refusal this is the rollback.
+    onSettled: () => {
+      setOptimistic(undefined);
+      onReload();
+    },
+  });
+  const busy = move.busy;
 
   const phone = usePhone();
 
+  // #452: cards selected for a bulk action, across columns.
+  const [selection, setSelection] = useState<CardSelection>(NO_SELECTION);
+  const anchor = useRef<{ number: number; column: string } | undefined>(
+    undefined,
+  );
+  const pointerColumn = useRef<string | undefined>(undefined);
+  const bulk = useBulkActions({
+    projectId,
+    runnerName,
+    onSettled: (results) => {
+      // What is left selected: the cards that were not done.
+      const left = new Set(
+        results.filter((r) => r.status !== 'done').map((r) => r.number),
+      );
+      setSelection(
+        (current) => new Set([...current].filter((n) => left.has(n))),
+      );
+      onReload();
+    },
+  });
+  const selectedCards = view.columns.flatMap((c) =>
+    c.cards.filter((card) => selection.has(card.number)),
+  );
+
+  // A selected card that leaves the board drops out of the selection.
+  useEffect(() => {
+    const onBoard = new Set(
+      view.columns.flatMap((c) => c.cards.map((x) => x.number)),
+    );
+    setSelection((current) => pruned(current, onBoard));
+  }, [view]);
+
+  const clearSelection = () => {
+    setSelection(NO_SELECTION);
+    anchor.current = undefined;
+  };
+
+  // Esc clears the selection; ⌘/Ctrl+A selects the column under the pointer or
+  // focus, unless the person is typing.
+  const hasSelection = selection.size > 0;
+  useEffect(() => {
+    if (!canOperate) return;
+    const typing = (target: EventTarget | null) =>
+      target instanceof HTMLElement &&
+      (target.isContentEditable ||
+        ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
+    const overlay = () =>
+      document.querySelector(
+        '[role="dialog"], [role="alertdialog"], [role="menu"]',
+      ) !== null;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && hasSelection) {
+        if (overlay() || event.defaultPrevented) return;
+        clearSelection();
+        return;
+      }
+      if (
+        (event.key === 'a' || event.key === 'A') &&
+        (event.metaKey || event.ctrlKey) &&
+        !event.shiftKey &&
+        !event.altKey
+      ) {
+        if (typing(event.target) || overlay()) return;
+        const focused =
+          document.activeElement instanceof HTMLElement
+            ? document.activeElement.closest<HTMLElement>(
+                '[data-select-column]',
+              )?.dataset.selectColumn
+            : undefined;
+        const id = pointerColumn.current ?? focused;
+        const column = allColumns.find((c) => c.id === id);
+        if (!column) return;
+        event.preventDefault();
+        setSelection((current) =>
+          withAll(current, selectableNumbers(withoutStacks(column.cards))),
+        );
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  });
+
+  const toggleCard = (card: BoardCardView, range: boolean) => {
+    const order = selectableNumbers(
+      withoutStacks(allColumns.find((c) => c.id === card.column)?.cards ?? []),
+    );
+    const from = anchor.current;
+    setSelection((current) =>
+      range && from?.column === card.column
+        ? withRange(current, order, from.number, card.number)
+        : toggled(current, card.number),
+    );
+    anchor.current = { number: card.number, column: card.column };
+  };
+
   const items = boardItems(shown, planTasks);
   const filtering = isFiltering(filter);
-  const allColumns: BoardColumn<WorkBoardItem>[] = columnsOf(shown).map((c) => {
+  const allColumns: BoardColumn<ColumnItem>[] = columnsOf(shown).map((c) => {
     const all = items.get(c.column) ?? [];
-    const cards = filtering
+    const matching = filtering
       ? all.filter((item) => matchesFilter(item, filter))
       : all;
+    // #480: a stack's cards in its column fold into the stack's face.
+    const cards = foldStacks(matching, c.column, shown, filtering);
+    const older = c.column === 'completed' ? olderCompleted : undefined;
     return {
       id: c.column,
       title: COLUMN_TITLE[c.column],
       // `shown/total` while a filter hides some of the column.
-      header: filtering ? (
-        <span className="text-xs text-ink-3 tabular-nums">of {all.length}</span>
+      count: filtering ? `${cards.length}/${all.length}` : undefined,
+      header: canOperate ? (
+        <ColumnSelectAll
+          column={c.column}
+          title={COLUMN_TITLE[c.column]}
+          order={selectableNumbers(withoutStacks(cards))}
+          selection={selection}
+          onToggle={(order) => setSelection((cur) => toggledColumn(cur, order))}
+        />
       ) : undefined,
       cards,
       footer:
-        all.length === 0 ? (
-          <p className="px-1 text-xs text-ink-3">{COLUMN_HINT[c.column]}</p>
-        ) : cards.length === 0 ? (
-          <p className="px-1 text-xs text-ink-3">No cards match.</p>
+        cards.length === 0 || older ? (
+          <>
+            {all.length === 0 ? (
+              <p className="px-1 text-xs text-ink-3">{COLUMN_HINT[c.column]}</p>
+            ) : cards.length === 0 ? (
+              <p className="px-1 text-xs text-ink-3">No cards match.</p>
+            ) : null}
+            {older ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={older.loading}
+                onClick={older.onLoad}
+              >
+                {older.loading ? 'Loading…' : 'Show older completed cards'}
+              </Button>
+            ) : null}
+          </>
         ) : c.column === 'inbox' && canOperate && !filtering ? (
           <Button
             variant="ghost"
@@ -136,45 +294,27 @@ export function BoardColumns({
     };
   });
 
+  const columnCounts = Object.fromEntries(
+    shown.columns.map((c) => [c.column, c.cards.length]),
+  );
   const columns = visibleColumns(allColumns, phone);
+  const folded = columns.filter((c) => collapsed.includes(c.id)).length;
 
-  /** Resolves `true` when the move landed. */
-  const send = async (
-    move: DropMove,
-    number: number,
-    options: { stopWorker?: boolean } = {},
-  ): Promise<boolean> => {
-    setOptimistic(applyDrop(view, move));
-    setBusy(true);
-    try {
-      await moveCard(
-        projectId,
-        number,
-        moveRequest(move, options.stopWorker === true),
-      );
-      return true;
-    } catch (err) {
-      toast.error(describeBoardError(err, runnerName));
-      return false;
-    } finally {
-      // Server truth either way: on a refusal this is the rollback.
-      setOptimistic(undefined);
-      setBusy(false);
-      onReload();
-    }
-  };
-
-  /** Under a filter the board reports an index among the visible cards. */
+  /**
+   * Under a filter — or beside a folded stack (#480) — the board reports an
+   * index among the visible items; a stack stands for its first folded card.
+   */
   const withFullIndex = (dropped: DropMove): DropMove => {
-    if (!filtering) return dropped;
+    const target = allColumns.find((c) => c.id === dropped.toColumnId);
+    const stacked = target?.cards.some(isStackItem) ?? false;
+    if (!filtering && !stacked) return dropped;
     const full = view.columns
       .find((c) => c.column === dropped.toColumnId)
       ?.cards.filter((c) => c.id !== dropped.id)
       .map((c) => c.id);
-    const visible = allColumns
-      .find((c) => c.id === dropped.toColumnId)
-      ?.cards.filter((c) => c.id !== dropped.id)
-      .map((c) => c.id);
+    const visible = target?.cards
+      .filter((c) => c.id !== dropped.id)
+      .flatMap((c) => (isStackItem(c) ? c.foldedIds.slice(0, 1) : [c.id]));
     if (!full || !visible) return dropped;
     return { ...dropped, index: unfilteredIndex(full, visible, dropped.index) };
   };
@@ -184,38 +324,7 @@ export function BoardColumns({
       toast.error('Only operators can move cards.');
       return;
     }
-    const move = clampDropIndex(view, withFullIndex(dropped));
-    const decision = decideDrop(view, move);
-    switch (decision.kind) {
-      case 'ignore':
-        return;
-      case 'refused':
-        toast.error(decision.text);
-        return;
-      case 'confirm-stop':
-      case 'offer-run':
-        setAsking(decision);
-        return;
-      case 'move':
-        void send(move, decision.card.number);
-    }
-  };
-
-  const answerRun = (run: boolean) => {
-    if (asking?.kind !== 'offer-run') return;
-    const { move, card } = asking;
-    setAsking(undefined);
-    // Run goes through the card actions, so an open dependency asks first (#337 D8).
-    void send(move, card.number).then((moved) => {
-      if (moved && run) void actions.run(card);
-    });
-  };
-
-  const confirmStop = () => {
-    if (asking?.kind !== 'confirm-stop') return;
-    const { move, card } = asking;
-    setAsking(undefined);
-    void send(move, card.number, { stopWorker: true });
+    move.decide(decideDrop(view, clampDropIndex(view, withFullIndex(dropped))));
   };
 
   return (
@@ -228,36 +337,88 @@ export function BoardColumns({
        */}
       <div
         className="flex min-h-0 flex-1 flex-col [&_[data-board-card]]:shrink-0"
+        onPointerOver={(event) => {
+          pointerColumn.current = (
+            event.target as HTMLElement
+          ).closest<HTMLElement>('[data-select-column]')?.dataset.selectColumn;
+        }}
+        onPointerLeave={() => {
+          pointerColumn.current = undefined;
+        }}
         style={
           {
-            '--board-column': boardColumnWidth(columns.length),
+            '--board-column': boardColumnWidth(columns.length - folded, folded),
           } as CSSProperties
         }
       >
-        <Board<WorkBoardItem>
+        <Board<ColumnItem>
           className="flex-1 pb-0.5"
           aria-label="Project board"
           columns={columns}
+          collapsible
+          collapsed={collapsed}
+          onCollapsedChange={setCollapsed}
           onMove={onMove}
-          renderCard={(item) =>
-            isPlanItem(item) ? (
-              <PlanTaskFace task={item.planTask} onOpen={onOpenPlanTask} />
+          // C-35: the menu trigger sits at the end of the face's header row
+          // instead of taking a column; every face must place `menu`.
+          menuPlacement="inline"
+          renderCard={(item, _column, { menu }) =>
+            isStackItem(item) ? (
+              <StackFace
+                projectId={projectId}
+                item={item}
+                canOperate={canOperate}
+                actions={actions}
+                menu={menu}
+                onOpenCard={onOpen}
+              />
+            ) : isPlanItem(item) ? (
+              <PlanTaskFace
+                task={item.planTask}
+                menu={menu}
+                selecting={canOperate && selection.size > 0}
+                onOpen={onOpenPlanTask}
+              />
             ) : (
               <CardFace
                 projectId={projectId}
                 card={item.card}
                 canOperate={canOperate}
                 compact={compact}
+                menu={menu}
+                selection={
+                  canOperate
+                    ? {
+                        selected: selection.has(item.card.number),
+                        selecting: selection.size > 0,
+                        onToggle: (range) => toggleCard(item.card, range),
+                      }
+                    : undefined
+                }
                 onOpen={onOpen}
               />
             )
           }
           renderCardMenu={(item) => {
+            if (isStackItem(item)) {
+              // Not movable: the stack follows its cards.
+              return (
+                <MenuItem
+                  onSelect={() =>
+                    router.push(
+                      boardStackPageHref(projectId, item.stack.number),
+                    )
+                  }
+                >
+                  Open stack
+                </MenuItem>
+              );
+            }
             if (isPlanItem(item)) {
               const task = item.planTask;
+              // Not movable: no move entries above, so no separator either.
               return (
                 <>
-                  <MenuSeparator />
                   <MenuItem onSelect={() => onOpenPlanTask(task)}>
                     Open
                   </MenuItem>
@@ -304,12 +465,19 @@ export function BoardColumns({
               <>
                 <MenuSeparator />
                 <MenuItem onSelect={() => onOpen(card)}>Open</MenuItem>
+                {canOperate ? (
+                  <MenuItem onSelect={() => setMoving(card)}>Move…</MenuItem>
+                ) : null}
                 {canOperate && (canRun(card) || canRetry(card)) ? (
                   <MenuItem
-                    disabled={actions.busy || busy}
+                    // #480: the stack's design holds Run; the label says why.
+                    disabled={actions.busy || busy || !!card.stack?.gate}
                     onSelect={() => actions.run(card)}
                   >
                     {canRetry(card) ? 'Run again' : 'Run'}
+                    {card.stack?.gate
+                      ? ` — ${card.stack.gate.toLowerCase()}`
+                      : ''}
                   </MenuItem>
                 ) : null}
                 {canOperate && approveRunOffer(card) ? (
@@ -362,45 +530,65 @@ export function BoardColumns({
         />
       </div>
 
-      <DialogRoot
-        open={asking?.kind === 'offer-run'}
-        onOpenChange={(open) => {
-          if (!open) setAsking(undefined);
-        }}
-      >
-        <DialogContent
-          title="Run the worker?"
-          description={`${asking?.card.label ?? 'The card'} is moving to In progress. A drag never starts a worker by itself.`}
-          footer={
-            <>
-              <Button variant="glass" onClick={() => setAsking(undefined)}>
-                Cancel
-              </Button>
-              <Button variant="glass" onClick={() => answerRun(false)}>
-                Just move
-              </Button>
-              <Button onClick={() => answerRun(true)}>Run</Button>
-            </>
-          }
-        >
-          <p className="text-sm text-ink-2">
-            Run starts a dedicated Claude Code worker in its own worktree. “Just
-            move” only changes the column.
-          </p>
-        </DialogContent>
-      </DialogRoot>
+      {bulk.dialogs}
+      {canOperate ? (
+        <BulkActionBar
+          selected={selectedCards}
+          busy={bulk.busy || busy}
+          onClear={clearSelection}
+          onAction={(action) => bulk.run(action, selectedCards)}
+        />
+      ) : null}
 
-      <ConfirmDialog
-        open={asking?.kind === 'confirm-stop'}
-        onOpenChange={(open) => {
-          if (!open) setAsking(undefined);
-        }}
-        title={`Stop the worker of ${asking?.card.label ?? 'the card'}?`}
-        consequence="Moving the card out of In progress kills its tmux session. What it committed stays in the worktree."
-        verb="Stop worker and move"
-        tone="danger"
-        onConfirm={confirmStop}
-      />
+      {move.dialogs}
+      {moving ? (
+        <MovePicker
+          card={moving}
+          counts={columnCounts}
+          open
+          onOpenChange={(open) => {
+            if (!open) setMoving(undefined);
+          }}
+          onPick={(column) => move.moveTo(moving, column)}
+        />
+      ) : null}
     </>
+  );
+}
+
+/**
+ * #452: a column header's "Select all". It takes only the cards the filter
+ * shows and reads "n of m" while the column is partly selected.
+ */
+function ColumnSelectAll({
+  column,
+  title,
+  order,
+  selection,
+  onToggle,
+}: {
+  column: string;
+  title: string;
+  /** The selectable cards the column shows, in order. */
+  order: readonly number[];
+  selection: CardSelection;
+  onToggle: (order: readonly number[]) => void;
+}) {
+  if (order.length === 0) return null;
+  const { selected, total, state } = columnSelection(order, selection);
+  return (
+    <span
+      data-select-column={column}
+      className="ms-auto flex items-center text-xs text-ink-3"
+      title={`Selects the ${total} selectable card${total === 1 ? '' : 's'} shown in ${title}`}
+    >
+      <Checkbox
+        aria-label={`Select all in ${title}`}
+        label={state === 'some' ? `${selected} of ${total}` : 'Select all'}
+        checked={state === 'all'}
+        indeterminate={state === 'some'}
+        onChange={() => onToggle(order)}
+      />
+    </span>
   );
 }

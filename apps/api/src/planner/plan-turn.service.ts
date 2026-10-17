@@ -30,6 +30,7 @@ import { BudgetGate } from '../budgets/budget-gate';
 import { PrismaService } from '../database/prisma.service';
 import type { DesignTurnPlan } from '../design/design-rules';
 import { TextNormalizer } from '../text/text-normalizer';
+import { TokenSaverService } from '../token-saver/token-saver.service';
 import { TALKABLE_STATUSES } from './plan-apply';
 import {
   intakeRound,
@@ -87,6 +88,12 @@ const assertAnswers = (
   }
 };
 
+/** #337 D3, D10, #409: the inputs only a card intake takes. */
+const intakeOnly = (input: PlanTurnInput): boolean =>
+  input.generate !== undefined ||
+  input.keepOne !== undefined ||
+  input.attachmentIds !== undefined;
+
 const turnInProgress = () =>
   plannerError(
     409,
@@ -118,6 +125,7 @@ export class PlanTurnService {
     private readonly audit: AuditService,
     private readonly text: TextNormalizer,
     private readonly attachments: AttachmentsService,
+    private readonly tokenSaver: TokenSaverService,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
 
@@ -132,11 +140,11 @@ export class PlanTurnService {
   ): Promise<string> {
     this.store.assertOpen(plan);
     if (plan.mode === 'card') return this.intakeTurn(plan, input, caller);
-    if (input.generate !== undefined || input.attachmentIds !== undefined) {
+    if (intakeOnly(input)) {
       throw plannerError(
         409,
         PLANNER_ERROR.wrongMode,
-        'Enough — generate and attachments belong to a card intake',
+        'Enough — generate, Keep one card and attachments belong to a card intake',
       );
     }
     let action: PlanTurnAction;
@@ -248,11 +256,11 @@ export class PlanTurnService {
     caller: PlanCaller,
   ): Promise<string> {
     this.store.assertOpen(plan);
-    if (input.generate !== undefined || input.attachmentIds !== undefined) {
+    if (intakeOnly(input)) {
       throw plannerError(
         409,
         PLANNER_ERROR.wrongMode,
-        'Enough — generate and attachments belong to a card intake',
+        'Enough — generate, Keep one card and attachments belong to a card intake',
       );
     }
     const task = await this.store.task(plan, key);
@@ -498,6 +506,7 @@ export class PlanTurnService {
                   maxRounds: PLANNER_INTAKE_MAX_ROUNDS,
                   generate: intakeState.generate,
                   mustGenerate: intakeMustGenerate(intakeState),
+                  keepOne: intakeState.keepOne === true,
                 }
               : undefined,
             attachments: (files ?? []).map((f) =>
@@ -531,6 +540,8 @@ export class PlanTurnService {
               : [],
       input: spec.input,
     });
+    // #445 D11: only a runner that advertises the token saver gets the field.
+    const saver = await this.tokenSaver.launch(plan.projectId);
     const draft = {
       planId: plan.id,
       projectId: plan.projectId,
@@ -542,6 +553,7 @@ export class PlanTurnService {
       profileKey: profile.key,
       model: plan.model,
       timeoutSec: PLAN_TURN_DEFAULT_TIMEOUT_SEC,
+      ...saver.args,
     };
     // The ids are not known yet; any valid id checks the rest.
     const valid = planTurnArgsSchema.safeParse({
@@ -603,6 +615,7 @@ export class PlanTurnService {
             ...(spec.task ? { taskKey: spec.task.key } : {}),
             ...(spec.design ? { design: spec.design } : {}),
           },
+          tokenSaver: saver.on,
           status: 'running',
           triggeredByType: 'user',
           triggeredById: caller.userId,

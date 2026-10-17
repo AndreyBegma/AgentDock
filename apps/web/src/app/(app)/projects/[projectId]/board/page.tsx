@@ -77,6 +77,7 @@ import { useUrlFilters } from '../../../../../lib/filters/use-url-filters';
 import { useLive } from '../../../../../lib/live/use-live';
 import { useReadiness } from '../../../../../lib/readiness/use-readiness';
 import { useSection } from '../../../../../lib/section/use-section';
+import { cardSessionMessenger } from '../../../../../lib/session-message/actions';
 import { useTerminalAvailable } from '../../../../../lib/terminal/use-terminal-available';
 import { useProjectDetail } from '../use-project-detail';
 
@@ -102,12 +103,14 @@ function BoardScreen() {
     params.get('plan'),
     params.get('task'),
   );
-  // #337: the New Card intake (`?intake=`) and the New Plan panel
-  // (`?newPlan=1`, then `?planPanel=`) live in the URL, so a reload or a
-  // Drafts Resume lands on them.
+  // #337, #409: the New work intake (`?newWork=1&brief=…`, then
+  // `?intake=`) and an earlier plan's panel (`?planPanel=`) live in the URL,
+  // so a reload or a Drafts Resume lands on them. The old `?newPlan=1`
+  // opens New work: New Plan is gone.
   const intakeId = params.get('intake') ?? undefined;
   const planPanelId = params.get('planPanel') ?? undefined;
-  const planPanelOpen = planPanelId !== undefined || params.has('newPlan');
+  const planPanelOpen = planPanelId !== undefined;
+  const newWorkLinked = params.has('newWork') || params.has('newPlan');
   const user = useCurrentUser();
   /** Bumped by a live push or a mutation; the board and the sheet depend on it. */
   const [version, setVersion] = useState(0);
@@ -218,13 +221,19 @@ function BoardScreen() {
   const select = (number: number | undefined) =>
     setParams({ card: number === undefined ? undefined : String(number) });
 
-  const closePlanPanel = () =>
-    setParams({ newPlan: undefined, planPanel: undefined, brief: undefined });
+  const closePlanPanel = () => setParams({ planPanel: undefined });
+
+  /** The New work link's own params, gone once the dialog closes or starts. */
+  const NEW_WORK_LINK = {
+    newWork: undefined,
+    newPlan: undefined,
+    brief: undefined,
+  } as const;
 
   const resumeDraft = (plan: PlanSummary) =>
     plan.mode === 'card'
       ? setParams({ intake: plan.id })
-      : setParams({ newPlan: undefined, planPanel: plan.id });
+      : setParams({ planPanel: plan.id });
 
   const selectPlanTask = (task: BoardPlanTaskView | undefined) => {
     const next = new URLSearchParams(params.toString());
@@ -315,17 +324,9 @@ function BoardScreen() {
                 </SegmentedControlItem>
               </SegmentedControl>
               {canOperate ? (
-                <>
-                  <Button
-                    variant="glass"
-                    onClick={() => setParams({ newPlan: '1' })}
-                  >
-                    New plan
-                  </Button>
-                  <Button variant="solid" onClick={() => setCreating(true)}>
-                    New card
-                  </Button>
-                </>
+                <Button variant="solid" onClick={() => setCreating(true)}>
+                  New work
+                </Button>
               ) : null}
             </>
           }
@@ -369,34 +370,26 @@ function BoardScreen() {
       >
         {() =>
           view ? (
-            <>
-              <BoardColumns
-                projectId={projectId}
-                view={view}
-                planTasks={planTaskItems}
-                runnerName={project?.runnerName}
-                canOperate={canOperate}
-                canTerminal={canAttach}
-                actions={actions}
-                filter={url.filters}
-                compact={density === 'compact'}
-                onOpen={(card) => select(card.number)}
-                onOpenPlanTask={selectPlanTask}
-                onOpenTerminal={setAttaching}
-                onReload={reload}
-              />
-              {hasMoreOlder && lastCompleted?.completedAt ? (
-                <div className="shrink-0">
-                  <Button
-                    variant="glass"
-                    disabled={loadingOlder}
-                    onClick={() => void loadOlder()}
-                  >
-                    {loadingOlder ? 'Loading…' : 'Show older completed cards'}
-                  </Button>
-                </div>
-              ) : null}
-            </>
+            <BoardColumns
+              projectId={projectId}
+              view={view}
+              planTasks={planTaskItems}
+              runnerName={project?.runnerName}
+              canOperate={canOperate}
+              canTerminal={canAttach}
+              actions={actions}
+              filter={url.filters}
+              compact={density === 'compact'}
+              olderCompleted={
+                hasMoreOlder && lastCompleted?.completedAt
+                  ? { loading: loadingOlder, onLoad: () => void loadOlder() }
+                  : undefined
+              }
+              onOpen={(card) => select(card.number)}
+              onOpenPlanTask={selectPlanTask}
+              onOpenTerminal={setAttaching}
+              onReload={reload}
+            />
           ) : null
         }
       </AsyncSection>
@@ -406,17 +399,22 @@ function BoardScreen() {
           <NewCardDialog
             projectId={projectId}
             project={project}
-            open={creating || intakeId !== undefined}
+            open={creating || newWorkLinked || intakeId !== undefined}
             planId={intakeId}
+            initialBrief={
+              newWorkLinked ? (params.get('brief') ?? undefined) : undefined
+            }
             board={board.data}
             onOpenChange={(open) => {
               setCreating(open);
               // Closing keeps the intake as a draft (D2).
-              if (!open && intakeId) setParams({ intake: undefined });
+              if (!open && (intakeId || newWorkLinked)) {
+                setParams({ ...NEW_WORK_LINK, intake: undefined });
+              }
             }}
             onStarted={(planId) => {
               setCreating(false);
-              setParams({ intake: planId });
+              setParams({ ...NEW_WORK_LINK, intake: planId });
               reload();
             }}
             onCreated={(number) => {
@@ -435,11 +433,7 @@ function BoardScreen() {
               if (!open) closePlanPanel();
             }}
             onStarted={(planId) => {
-              setParams({
-                newPlan: undefined,
-                brief: undefined,
-                planPanel: planId,
-              });
+              setParams({ planPanel: planId });
               reload();
             }}
             onCardsCreated={(created) => {
@@ -463,6 +457,7 @@ function BoardScreen() {
         canOperate={canOperate}
         actions={actions}
         terminal={terminal}
+        runnerName={project?.runnerName}
         onChanged={reload}
         onClose={() => select(undefined)}
       />
@@ -490,6 +485,17 @@ function BoardScreen() {
         target={attaching ? { kind: 'card', cardId: attaching.id } : undefined}
         title={attaching ? `${attaching.label} ${attaching.title}` : 'Card'}
         onClose={() => setAttaching(undefined)}
+        message={
+          canOperate && attaching
+            ? {
+                send: cardSessionMessenger(projectId, attaching.number),
+                // The board's live copy: the question moves as it is answered.
+                question:
+                  (view ? cardByNumber(view, attaching.number) : attaching)
+                    ?.round?.pendingQuestion ?? null,
+              }
+            : undefined
+        }
       />
     </div>
   );

@@ -49,6 +49,14 @@ export const notificationInputSchema = z.looseObject({
 export const stopInputSchema = z.looseObject({
   ...common,
   last_assistant_message: z.string().optional(),
+  /** #390: the session's JSONL transcript, read for running background tasks. */
+  transcript_path: z.string().optional(),
+});
+
+/** #494: `custom_instructions` is a person's text and is never read. */
+export const preCompactInputSchema = z.looseObject({
+  ...common,
+  trigger: z.string().optional(),
 });
 
 export const sessionEndInputSchema = z.looseObject({

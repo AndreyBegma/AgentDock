@@ -22,6 +22,11 @@ import type { Backoff } from './backoff';
 import { type Cancel, type Clock, isoNow } from './clock';
 import type { Dispatch } from './commands/dispatcher';
 import {
+  LOCAL_RETRY_EXHAUSTED_MESSAGE,
+  LOCAL_RETRY_FIRST_DELAY_MS,
+  LOCAL_RETRY_MAX_DELAY_MS,
+  LOCAL_RETRY_METHODS,
+  LOCAL_RETRY_WINDOW_MS,
   type LocalRelayRequest,
   type LocalResult,
   localFail,
@@ -181,10 +186,43 @@ export class RunnerConnection {
   /**
    * Relays a `local.request` (spec 201 D6). Never spooled: with the socket
    * down it answers `runner_offline` at once, so a write is never replayed
-   * later. Gives up after `LOCAL_REQUEST_TIMEOUT_MS` with `timeout`; a drop
+   * later — except idempotent methods, which wait and retry (#434). Gives up after `LOCAL_REQUEST_TIMEOUT_MS` with `timeout`; a drop
    * while waiting is `runner_offline`. Always resolves.
    */
   request(request: LocalRelayRequest): Promise<LocalResult<unknown>> {
+    return LOCAL_RETRY_METHODS.has(request.method)
+      ? this.requestWithRetry(request)
+      : this.requestOnce(request);
+  }
+
+  /**
+   * An idempotent method (`LOCAL_RETRY_METHODS`) waits for the connection and
+   * is sent again, with backoff, for up to `LOCAL_RETRY_WINDOW_MS`. Only
+   * `runner_offline` is retried; a `timeout` is not (the server may have
+   * answered later), and the caller repeats the tool call after the window.
+   */
+  private async requestWithRetry(
+    request: LocalRelayRequest,
+  ): Promise<LocalResult<unknown>> {
+    const { clock } = this.options;
+    const deadline = clock.now() + LOCAL_RETRY_WINDOW_MS;
+    let delay = LOCAL_RETRY_FIRST_DELAY_MS;
+    for (;;) {
+      const result = await this.requestOnce(request);
+      if (result.ok || result.error.code !== 'runner_offline') return result;
+      if (this.state === 'stopped' || clock.now() + delay > deadline) {
+        return localFail('runner_offline', LOCAL_RETRY_EXHAUSTED_MESSAGE);
+      }
+      await new Promise<void>((resolve) => {
+        clock.setTimeout(resolve, delay);
+      });
+      delay = Math.min(delay * 2, LOCAL_RETRY_MAX_DELAY_MS);
+    }
+  }
+
+  private requestOnce(
+    request: LocalRelayRequest,
+  ): Promise<LocalResult<unknown>> {
     if (this.state !== 'live') {
       return Promise.resolve(
         localFail('runner_offline', 'the runner is not connected'),

@@ -20,6 +20,11 @@ export const AUDIT_ACTIONS = [
   'runner.rename',
   'runner.revoke',
   'runner.update',
+  /**
+   * C-108: a runner's live socket was closed 4409 by a newer connection with
+   * its token — `meta` holds both peers' IP and user agent.
+   */
+  'runner.connection_replaced',
   'local.request',
   'runner.command',
   'runner.command.result',
@@ -52,6 +57,7 @@ export const AUDIT_ACTIONS = [
   'telegram.link',
   'telegram.unlink',
   'telegram.approval',
+  'telegram.project',
   'terminal.attached',
   'terminal.detached',
   'skill.installed',
@@ -109,6 +115,10 @@ export const AUDIT_ACTIONS = [
   'session_content.purged',
   'card.created',
   'card.updated',
+  /** #480: a stack made from a confirmed intake (`after: { number, title, stages, cards, design }`). */
+  'stack.created',
+  /** #480: a stack's title or body, or the cards of its stages, changed. */
+  'stack.updated',
   'card.deleted',
   'card.moved',
   'card.run_started',
@@ -135,8 +145,26 @@ export const AUDIT_ACTIONS = [
   'card.pr_close_failed',
   /** #329 D5: a person's Create pull request (`after: { state, pr? }`, result error when it failed). */
   'card.collect_requested',
-  /** #273 D9: approving the design did not start the worker (`after: { code }`). */
+  /**
+   * #273 D9: approving the design did not start the worker (`after: { code }`).
+   * #443: nor did Auto-run when ready (`after: { code, after }`).
+   */
   'card.auto_run_failed',
+  /**
+   * #484: a card PR's head got no checks, and its pull-request event was sent
+   * again — closed and reopened (`after: { number, pr, headSha, error? }`).
+   */
+  'card.ci_retriggered',
+  /** #443: the card's Auto-run when ready switch (`after: { autoRunWhenReady }`). */
+  'card.auto_run_toggled',
+  /**
+   * #489 M1: a person's message to a running session, or an answer to its
+   * question selector (`after: { target, kind, index?, textSha256?, textChars?, via, outcome? }`;
+   * the text itself never). `card.message` for a card round, `slot.session_message`
+   * for a fleet slot.
+   */
+  'card.message',
+  'slot.session_message',
   /** #309 D7: an upload stored, pending (`after: { name, mime, size }`). */
   'attachment.added',
   /** #309 D7: pending uploads claimed onto a card (`after: { cardId, roundId?, attachmentIds }`). */

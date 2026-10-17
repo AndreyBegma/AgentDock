@@ -5,6 +5,7 @@ import { TelegramActionRequestService } from './telegram-action-request.service'
 import { TelegramApprovalService } from './telegram-approval.service';
 import { TelegramApiError, TelegramClient } from './telegram-client';
 import { TELEGRAM_OPTIONS, type TelegramOptions } from './telegram-options';
+import { TelegramSessionMessageService } from './telegram-session-message.service';
 
 /** What one pass did; the e2e suites assert on it. */
 export interface DeliveryPass {
@@ -52,6 +53,7 @@ export class TelegramDeliveryService {
     private readonly client: TelegramClient,
     private readonly approvals: TelegramApprovalService,
     private readonly actionRequests: TelegramActionRequestService,
+    private readonly sessions: TelegramSessionMessageService,
     @Inject(TELEGRAM_OPTIONS) private readonly options: TelegramOptions,
   ) {}
 
@@ -79,6 +81,12 @@ export class TelegramDeliveryService {
               .offer(message.notificationId)
               .catch(() => null)
           : null;
+      // #489 M2: a card waiting on its session goes out with the question's
+      // options and takes a reply as a message to the session.
+      const session =
+        message.content.kind === 'card.waiting'
+          ? await this.sessions.offer(message.notificationId)
+          : null;
       try {
         await this.client.sendMessage(
           bot.token,
@@ -87,9 +95,12 @@ export class TelegramDeliveryService {
             message.content,
             this.options.appUrl,
             offer?.headSha ?? null,
-          ),
+          ) + (session?.footer ?? ''),
           false,
-          offer?.replyMarkup ?? actionMarkup ?? undefined,
+          offer?.replyMarkup ??
+            actionMarkup ??
+            session?.replyMarkup ??
+            undefined,
         );
         await this.ledger.markSent(message.id, now);
         pass.sent += 1;

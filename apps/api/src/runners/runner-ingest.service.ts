@@ -1,7 +1,9 @@
 import {
   EVENTS_DUPLICATE_EVENT,
   type HelloMessage,
+  type ProfileAgentdock,
   pluginEventIdOf,
+  profileAgentdockSchema,
   type RunnerEvent,
   SPOOL_TRUNCATED_EVENT,
   spoolTruncatedDataSchema,
@@ -9,6 +11,8 @@ import {
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
+import { stripHandoffContent } from '../handoff/handoff-content';
+import { stripHookContent } from '../sessions/session-hook-content';
 import { advanceCursor, type SeqRange } from './ack-cursor';
 import { tokenPrefix, verifyRunnerToken } from './credentials';
 import { RunnerEventSinks } from './runner-event-sinks';
@@ -19,6 +23,51 @@ const json = (
   value === undefined || value === null
     ? Prisma.JsonNull
     : (value as Prisma.InputJsonValue);
+
+const sameAgentdock = (a: unknown, b: ProfileAgentdock): boolean => {
+  const parsed = profileAgentdockSchema.safeParse(a);
+  return (
+    parsed.success &&
+    parsed.data.plugin === b.plugin &&
+    parsed.data.telemetry === b.telemetry
+  );
+};
+
+/**
+ * #348 D6: the stored capabilities with each reported `agentdock` merged into
+ * the profile of that id, or `null` when nothing differs. A reported id that is
+ * not stored is ignored — `hello` owns the profile list. Values are compared
+ * parsed, so key order never causes a write.
+ */
+export const mergeProfileAgentdock = (
+  capabilities: unknown,
+  reported: Record<string, ProfileAgentdock>,
+): Record<string, unknown> | null => {
+  if (
+    typeof capabilities !== 'object' ||
+    capabilities === null ||
+    Array.isArray(capabilities)
+  ) {
+    return null;
+  }
+  const stored = (capabilities as { profiles?: unknown }).profiles;
+  if (!Array.isArray(stored)) return null;
+  let changed = false;
+  const profiles = stored.map((entry: unknown) => {
+    if (typeof entry !== 'object' || entry === null) return entry;
+    const id = (entry as { id?: unknown }).id;
+    if (typeof id !== 'string' || !Object.hasOwn(reported, id)) return entry;
+    const next = reported[id];
+    if (sameAgentdock((entry as { agentdock?: unknown }).agentdock, next)) {
+      return entry;
+    }
+    changed = true;
+    return { ...entry, agentdock: next };
+  });
+  return changed
+    ? { ...(capabilities as Record<string, unknown>), profiles }
+    : null;
+};
 
 /** What the gateway persists from a runner's socket (spec D5–D7). */
 @Injectable()
@@ -98,15 +147,40 @@ export class RunnerIngestService {
     });
   }
 
-  async heartbeat(runnerId: string): Promise<void> {
+  /**
+   * Stamps the runner as seen and, when the beat carries `profiles`, folds the
+   * reported plugin state into the stored capabilities (#348 D6) in the same
+   * update — and only when a value differs.
+   */
+  async heartbeat(
+    runnerId: string,
+    profiles?: Record<string, ProfileAgentdock>,
+  ): Promise<void> {
+    const lastSeenAt = new Date();
+    if (profiles === undefined) {
+      await this.prisma.runner.update({
+        where: { id: runnerId },
+        data: { lastSeenAt },
+      });
+      return;
+    }
+    const stored = await this.prisma.runner.findUnique({
+      where: { id: runnerId },
+      select: { capabilities: true },
+    });
+    const merged = mergeProfileAgentdock(stored?.capabilities, profiles);
     await this.prisma.runner.update({
       where: { id: runnerId },
-      data: { lastSeenAt: new Date() },
+      data:
+        merged === null
+          ? { lastSeenAt }
+          : { lastSeenAt, capabilities: merged as Prisma.InputJsonValue },
     });
   }
 
   /**
-   * Hands a batch to the registered sinks, then stores it — a `(runnerId, seq)`
+   * Hands a batch to the registered sinks, then stores it without hook
+   * content — a `(runnerId, seq)`
    * already stored is skipped, so a resend after a reconnect changes nothing
    * (D6) — and returns the new ack cursor. A throwing sink fails the batch
    * before anything is stored: the ack holds and the runner resends it.
@@ -114,6 +188,12 @@ export class RunnerIngestService {
   async events(runnerId: string, events: RunnerEvent[]): Promise<bigint> {
     const { fresh, duplicate } = await this.splitPluginDuplicates(events);
     if (fresh.length > 0) await this.sinks.dispatch(runnerId, fresh);
+    // ADR-0021: the sinks read hook content; `events.data` never holds it.
+    // #449 DA-12: nor a handoff note's text.
+    for (const event of fresh) {
+      stripHookContent(event);
+      stripHandoffContent(event);
+    }
     const row = (event: RunnerEvent) => ({
       runnerId,
       seq: BigInt(event.seq),

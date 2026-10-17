@@ -1,0 +1,7 @@
+{
+  "argv": ["pytest"],
+  "exitCode": 0,
+  "category": "test",
+  "outcome": "passing",
+  "expect": "filtered"
+}

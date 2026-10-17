@@ -16,7 +16,10 @@ export const hash = (char: string): string => char.repeat(64);
 export const MOCKUP =
   '<!doctype html><html lang="en" data-theme="light"><head><style>:root[data-theme="dark"]{color-scheme:dark}</style></head><body><main id="app"><button>Export</button></main></body></html>';
 
-/** A design turn's final message: the plan block and one design block (D7). */
+/**
+ * A design turn's final message: the plan block and one design block (D7) —
+ * or, given `frames` (#441), one block per named frame, in order.
+ */
 export const designResult = (
   output: {
     taskKey: string;
@@ -25,16 +28,22 @@ export const designResult = (
     rationale?: string;
     addressed?: string[];
   },
-  html: string = MOCKUP,
-): string =>
-  `${block({
+  html: string | readonly { name: string; html: string }[] = MOCKUP,
+): string => {
+  const frames = typeof html === 'string' ? null : html;
+  const bodies = frames ? frames.map((f) => f.html) : [html as string];
+  return `${block({
     action: 'design',
     taskKey: output.taskKey,
     variant: output.variant,
     title: output.title ?? `Variant ${output.variant}`,
     rationale: output.rationale ?? 'A single column.',
     addressed: output.addressed ?? [],
-  })}\n\`\`\`\`${PLANNER_DESIGN_BLOCK_TAG}\n${html}\n\`\`\`\`\n`;
+    ...(frames ? { frames: frames.map((f) => f.name) } : {}),
+  })}\n${bodies
+    .map((b) => `\`\`\`\`${PLANNER_DESIGN_BLOCK_TAG}\n${b}\n\`\`\`\``)
+    .join('\n\n')}\n`;
+};
 
 /** A profile build's final message (`profile` action). */
 export const profileResult = (over: Record<string, unknown> = {}): string =>

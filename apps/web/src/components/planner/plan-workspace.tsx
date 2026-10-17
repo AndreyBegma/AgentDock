@@ -19,6 +19,7 @@ import {
 import { approvableDrafts } from '../../lib/planner/header';
 import { pastRounds } from '../../lib/planner/rounds';
 import type { usePlan } from '../../lib/planner/use-plan';
+import { NARROW_QUERY } from '../shell/narrow';
 import { Conversation } from './conversation';
 import { PlanGraph } from './plan-graph';
 import { PlanHeader } from './plan-header';
@@ -31,12 +32,12 @@ type Plan = ReturnType<typeof usePlan>;
 
 /** #337 D11: why the retired Planner page does not take a turn. */
 export const READ_ONLY_REASON =
-  'This plan is read-only here. New plans start on the Board, with New Plan.';
+  'This plan is read-only here. New work starts on the Board.';
 
 /**
  * A plan (spec 172 UI): the task cards, the plan graph — or, in dialogue
  * mode before decomposition, the plan-level question rounds — and the
- * selected task's panel. It is the Board's New Plan panel (#337 D7), where it
+ * selected task's panel. It is the Board's plan panel (#337 D7), where it
  * ends in **Create cards** or **Send to fleet**, and the retired Planner
  * page, where it is `readOnly` (D11). `compact` stacks everything in one
  * column, for the panel.
@@ -93,10 +94,7 @@ export function PlanWorkspace({
 
   // On a phone the panel stacks below the cards: bring it into view.
   useEffect(() => {
-    if (
-      selectedKey &&
-      (compact || window.matchMedia('(max-width: 1023px)').matches)
-    ) {
+    if (selectedKey && (compact || window.matchMedia(NARROW_QUERY).matches)) {
       panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }, [selectedKey, compact]);

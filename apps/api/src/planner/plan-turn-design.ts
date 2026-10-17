@@ -12,7 +12,7 @@ import {
   profileHasUi,
 } from '../design/design-store';
 import type { PromptInput } from './plan-prompt';
-import { designFilePath, ISSUE_PLACEHOLDER } from './plan-send';
+import { designDirPath, ISSUE_PLACEHOLDER } from './plan-send';
 import type { PlanProject } from './plan-store';
 import { plannerError } from './planner-error';
 import { codeSpecDirOf, resolveSpecTarget } from './spec-target';
@@ -92,15 +92,20 @@ export const designPromptParts = async (
   if (spec.action === 'write' && spec.task) {
     const approved = await loadApprovedDesign(prisma, plan.id, spec.task.key);
     if (!approved) return {};
+    const dir = designDirPath(
+      codeSpecDirOf(resolveSpecTarget(project)),
+      ISSUE_PLACEHOLDER,
+      spec.task.title,
+      approved.variant,
+    );
     return {
       approvedDesign: {
         ...approved,
-        path: designFilePath(
-          codeSpecDirOf(resolveSpecTarget(project)),
-          ISSUE_PLACEHOLDER,
-          spec.task.title,
-          approved.variant,
-        ),
+        dir,
+        frames: approved.frames.map((f) => ({
+          name: f.name,
+          path: `${dir}/${f.slug}.html`,
+        })),
       },
     };
   }

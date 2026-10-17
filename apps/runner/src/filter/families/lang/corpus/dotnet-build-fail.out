@@ -1,0 +1,15 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+/home/dev/shop/src/Shop.Application/Orders/OrderService.cs(42,17): warning CS8618: Non-nullable property 'Reference' must contain a non-null value when exiting constructor. Consider declaring the property as nullable. [/home/dev/shop/src/Shop.Application/Shop.Application.csproj]
+/home/dev/shop/src/Shop.Application/Orders/OrderService.cs(88,24): error CS1061: 'Order' does not contain a definition for 'Totl' and no accessible extension method 'Totl' accepting a first argument of type 'Order' could be found (are you missing a using directive or an assembly reference?) [/home/dev/shop/src/Shop.Application/Shop.Application.csproj]
+/home/dev/shop/src/Shop.Application/Orders/OrderService.cs(101,9): error CS0103: The name 'logger' does not exist in the current context [/home/dev/shop/src/Shop.Application/Shop.Application.csproj]
+
+Build FAILED.
+
+/home/dev/shop/src/Shop.Application/Orders/OrderService.cs(42,17): warning CS8618: Non-nullable property 'Reference' must contain a non-null value when exiting constructor. Consider declaring the property as nullable. [/home/dev/shop/src/Shop.Application/Shop.Application.csproj]
+/home/dev/shop/src/Shop.Application/Orders/OrderService.cs(88,24): error CS1061: 'Order' does not contain a definition for 'Totl' and no accessible extension method 'Totl' accepting a first argument of type 'Order' could be found (are you missing a using directive or an assembly reference?) [/home/dev/shop/src/Shop.Application/Shop.Application.csproj]
+/home/dev/shop/src/Shop.Application/Orders/OrderService.cs(101,9): error CS0103: The name 'logger' does not exist in the current context [/home/dev/shop/src/Shop.Application/Shop.Application.csproj]
+    1 Warning(s)
+    2 Error(s)
+
+Time Elapsed 00:00:04.87

@@ -21,6 +21,14 @@ describe('readMockupMessage', () => {
     );
   });
 
+  test('reads a Ctrl/⌘ + wheel forwarded by the helper', () => {
+    const wheel = { source: MOCKUP_MESSAGE_SOURCE, type: 'wheel', deltaY: -80 };
+    expect(readMockupMessage({ source: frame, data: wheel }, frame)).toEqual(
+      wheel as never,
+    );
+    expect(readMockupMessage({ source: other, data: wheel }, frame)).toBeNull();
+  });
+
   test('ignores another window, a missing frame and a malformed message', () => {
     expect(readMockupMessage({ source: other, data: pin }, frame)).toBeNull();
     expect(readMockupMessage({ source: frame, data: pin }, null)).toBeNull();

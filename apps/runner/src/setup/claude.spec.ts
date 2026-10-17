@@ -181,6 +181,32 @@ describe('agentdock-runner setup claude (spec 201 D21)', () => {
     expect(calls()).toHaveLength(2);
   });
 
+  it('prints when the change shows up, after a successful setup only (#348 D7)', async () => {
+    const line = 'A running agentdock-runner reports this within 15 seconds.';
+    expect(await run()).toBe(0);
+    expect(stdout.join('')).toContain(line);
+
+    stdout = [];
+    await run({ dryRun: true });
+    expect(stdout.join('')).not.toContain(line);
+
+    stdout = [];
+    await run({ uninstall: true });
+    expect(stdout.join('')).not.toContain(line);
+
+    stdout = [];
+    expect(
+      await run({
+        env: {
+          PATH: join(dir, 'bin'),
+          HOME: dir,
+          FAKE_CLAUDE_FAIL: 'network down',
+        },
+      }),
+    ).toBe(1);
+    expect(stdout.join('')).not.toContain(line);
+  });
+
   it('fails on a real plugin error', async () => {
     const result = await run({
       env: {

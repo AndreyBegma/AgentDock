@@ -8,10 +8,18 @@ import type { Role } from '../auth';
  * budgets (spec 28 D6) and have no project for a user budget.
  * `schedule.disabled` comes from an automatic schedule disable (spec 25 D10)
  * and goes to project admins and active admins only. `card.finished` and
- * `card.waiting` come from board card workers (issue #242 D15).
+ * `card.waiting` come from board card workers (issue #242 D15);
+ * `card.background_stalled` from a card round waiting on its own background
+ * task too long (#390).
  * `cards.suggested` comes from card capture (issue #244 D11): suggestions are
  * content-derived, so it goes to operators and admins only, and never quotes
  * content.
+ * `steward.incident` comes from Steward escalating an incident (issue #447
+ * D13): once per incident and again on a changed reason. Its reason can be
+ * haiku's reading of the pane, so it goes to operators and admins only.
+ * `runner.connection_replaced` comes from a runner's live socket being
+ * replaced by another connection with its token (C-108): possibly a stolen
+ * token, so it goes to admins on both channels.
  */
 export const NOTIFICATION_KINDS = [
   'person.needed',
@@ -22,13 +30,16 @@ export const NOTIFICATION_KINDS = [
   'pr.awaiting_approval',
   'runner.offline',
   'runner.online',
+  'runner.connection_replaced',
   'budget.exceeded',
   'budget.threshold',
   'schedule.disabled',
   'action.requested',
   'card.finished',
   'card.waiting',
+  'card.background_stalled',
   'cards.suggested',
+  'steward.incident',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -123,6 +134,12 @@ export const NOTIFICATION_KIND_SPECS: Record<
     channels: ['inApp'],
     defaults: ON_OFF,
   },
+  'runner.connection_replaced': {
+    scope: 'admin',
+    source: 'runner connection replaced (C-108)',
+    channels: BOTH,
+    defaults: ON_ON,
+  },
   'budget.exceeded': {
     scope: 'project',
     source: 'budgets (100 %)',
@@ -162,11 +179,25 @@ export const NOTIFICATION_KIND_SPECS: Record<
     channels: BOTH,
     defaults: ON_OFF,
   },
+  'card.background_stalled': {
+    scope: 'project',
+    source: 'card.background_stalled (#390)',
+    channels: BOTH,
+    defaults: ON_OFF,
+  },
   'cards.suggested': {
     scope: 'project',
     source: 'cards.suggested (issue #244 D11)',
     channels: BOTH,
     defaults: ON_OFF,
+    viewerDefaults: { inApp: false, telegram: false },
+    operatorsOnly: true,
+  },
+  'steward.incident': {
+    scope: 'project',
+    source: 'steward incident escalated (issue #447 D13)',
+    channels: BOTH,
+    defaults: ON_ON,
     viewerDefaults: { inApp: false, telegram: false },
     operatorsOnly: true,
   },

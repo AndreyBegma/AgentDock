@@ -1,0 +1,7 @@
+{
+  "argv": ["kubectl", "apply", "-f", "k8s/", "-n", "agentdock"],
+  "exitCode": 1,
+  "category": "other",
+  "outcome": "failing",
+  "expect": "filtered"
+}

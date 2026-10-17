@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { attachmentIdSchema } from '../attachments/contracts';
 import { ATTACHMENTS_PER_CARD_MAX } from '../attachments/limits';
+import { DESIGN_FRAME_NAME_MAX } from '../design/frames';
 import { DESIGN_RATIONALE_MAX, DESIGN_TITLE_MAX } from '../design/limits';
 import { designSuggestionSchema, designVariantSchema } from '../design/types';
 import { LOCAL_CARD_BODY_MAX } from '../protocol/local';
@@ -60,6 +61,26 @@ export const PLANNER_INTAKE_MAX_ROUNDS = 4;
 export const CARD_DRAFT_TITLE_MAX = 80;
 /** #337 D6: a generated card's body — the board's card body limit. */
 export const CARD_DRAFT_BODY_MAX = LOCAL_CARD_BODY_MAX;
+/**
+ * #409: the cards a split proposal names — at least two (one is a card), at
+ * most as many as a round has questions.
+ */
+export const INTAKE_SPLIT_MIN = 2;
+export const INTAKE_SPLIT_MAX = 8;
+/** #409: a split card's one-line summary, and the proposal's reason. */
+export const INTAKE_SPLIT_SUMMARY_MAX = 300;
+export const INTAKE_SPLIT_REASON_MAX = 1000;
+/**
+ * #480 (ADR-0044): a stack proposal's stages — at least two (one stage is a
+ * split), at most one per card. Its cards together keep the split's limits.
+ */
+export const INTAKE_STACK_STAGES_MIN = 2;
+export const INTAKE_STACK_STAGES_MAX = INTAKE_SPLIT_MAX;
+/** #480: a stack's title, as a card's; a stage's title. */
+export const STACK_TITLE_MAX = CARD_DRAFT_TITLE_MAX;
+export const STACK_STAGE_TITLE_MAX = 80;
+/** #480: a stack's description, as a card body. */
+export const STACK_BODY_MAX = LOCAL_CARD_BODY_MAX;
 /** #337 D6: the `##` sections a generated card's body carries, in order. */
 export const CARD_DRAFT_SECTIONS = [
   'What to do',
@@ -70,7 +91,10 @@ export const CARD_DRAFT_SECTIONS = [
 
 // Plans
 
-/** D2; `card` is #337 D1: a New Card intake, ending in exactly one card. */
+/**
+ * D2; `card` is #337 D1: a New work intake, ending in one card — or, after a
+ * confirmed split, several independent ones (#409).
+ */
 export const PLAN_MODES = ['batch', 'dialogue', 'card'] as const;
 export const planModeSchema = z.enum(PLAN_MODES);
 export type PlanMode = z.infer<typeof planModeSchema>;
@@ -280,12 +304,15 @@ export type PlanAnswer = z.infer<typeof planAnswerSchema>;
 /**
  * A turn's input as the API stores it (`plan_turns.input`). #337: `generate`
  * is Enough — generate (D3): the turn must write the card; `attachmentIds`
- * are the files that came with it, passed to `plan.turn` (D10).
+ * are the files that came with it, passed to `plan.turn` (D10). #409:
+ * `keepOne` is Keep one card — the person declined the split, and the turn
+ * must write one card for the whole request.
  */
 export const planTurnInputSchema = z.strictObject({
   message: text(PLANNER_SUMMARY_MAX).optional(),
   answers: z.array(planAnswerSchema).max(PLANNER_MAX_QUESTIONS).optional(),
   generate: z.boolean().optional(),
+  keepOne: z.boolean().optional(),
   attachmentIds: z
     .array(attachmentIdSchema)
     .max(ATTACHMENTS_PER_CARD_MAX)
@@ -380,10 +407,12 @@ export const reviseOutputSchema = reviseOf(plannedTaskSchema);
 export type ReviseOutput = z.infer<typeof reviseOutputSchema>;
 
 /**
- * Spec 223 D7: a design turn's plan block; the HTML travels in the one
- * `agentdock-design` block beside it. `addressed` lists the ids of the open
- * comments this revision answers (D10). The same shape under every contract
- * version: a v1 plan's design is switched on by hand.
+ * Spec 223 D7: a design turn's plan block; the HTML travels in the
+ * `agentdock-design` blocks beside it. `addressed` lists the ids of the open
+ * comments this revision answers (D10). #441: `frames` names the frames, one
+ * per design block in order — no upper limit but the HTML's byte cap;
+ * without it the one block is a frame named `Mockup`. The same shape under
+ * every contract version: a v1 plan's design is switched on by hand.
  */
 export const designOutputSchema = z.strictObject({
   action: z.literal('design'),
@@ -392,6 +421,7 @@ export const designOutputSchema = z.strictObject({
   title: text(DESIGN_TITLE_MAX),
   rationale: text(DESIGN_RATIONALE_MAX),
   addressed: z.array(z.string().min(1).max(64)).max(100),
+  frames: z.array(text(DESIGN_FRAME_NAME_MAX)).min(1).optional(),
 });
 export type DesignOutput = z.infer<typeof designOutputSchema>;
 
@@ -419,18 +449,103 @@ export const intakeCardOutputSchema = z.strictObject({
   action: z.literal('intake'),
   cardDraft: cardDraftSchema,
 });
+/**
+ * #409: one card of a split proposal — a full card, written like the single
+ * one, and a one-line summary the person reads in the proposal.
+ */
+export const splitCardDraftSchema = z.strictObject({
+  title: text(CARD_DRAFT_TITLE_MAX),
+  kind: planTaskKindSchema,
+  summary: text(INTAKE_SPLIT_SUMMARY_MAX),
+  body: text(CARD_DRAFT_BODY_MAX),
+});
+export type SplitCardDraft = z.infer<typeof splitCardDraftSchema>;
+
+/**
+ * #409: the intake proposes several independent cards — the request was
+ * several tasks, or one too big for one agent. Nothing is made until the
+ * person confirms; they may decline and keep one card.
+ */
+export const intakeSplitOutputSchema = z.strictObject({
+  action: z.literal('intake'),
+  split: z.strictObject({
+    reason: text(INTAKE_SPLIT_REASON_MAX),
+    cards: z
+      .array(splitCardDraftSchema)
+      .min(INTAKE_SPLIT_MIN)
+      .max(INTAKE_SPLIT_MAX),
+  }),
+});
+/**
+ * #480 (ADR-0044): one stage of a stack proposal — its cards may run in
+ * parallel, and each waits on every card of the stage before it.
+ */
+export const stackStageDraftSchema = z.strictObject({
+  title: text(STACK_STAGE_TITLE_MAX),
+  cards: z.array(splitCardDraftSchema).min(1).max(INTAKE_SPLIT_MAX),
+});
+export type StackStageDraft = z.infer<typeof stackStageDraftSchema>;
+
+/**
+ * #480 (ADR-0044): the intake proposes a stack — one larger piece of work
+ * whose parts must happen in order and share one look. `design` suggests a
+ * shared design of the whole result, drawn and approved before any card runs.
+ * 2–8 cards in all, in 2 or more stages.
+ */
+export const intakeStackOutputSchema = z.strictObject({
+  action: z.literal('intake'),
+  stack: z
+    .strictObject({
+      reason: text(INTAKE_SPLIT_REASON_MAX),
+      title: text(STACK_TITLE_MAX),
+      body: text(STACK_BODY_MAX),
+      design: z.boolean(),
+      stages: z
+        .array(stackStageDraftSchema)
+        .min(INTAKE_STACK_STAGES_MIN)
+        .max(INTAKE_STACK_STAGES_MAX),
+    })
+    .refine(
+      (stack) => {
+        const cards = stack.stages.reduce((n, s) => n + s.cards.length, 0);
+        return cards >= INTAKE_SPLIT_MIN && cards <= INTAKE_SPLIT_MAX;
+      },
+      {
+        message: `a stack holds ${INTAKE_SPLIT_MIN}–${INTAKE_SPLIT_MAX} cards in all`,
+      },
+    ),
+});
 export const intakeOutputSchema = z.union([
   intakeRoundOutputSchema,
   intakeCardOutputSchema,
+  intakeSplitOutputSchema,
+  intakeStackOutputSchema,
 ]);
 export type IntakeOutput = z.infer<typeof intakeOutputSchema>;
 export type IntakeRoundOutput = z.infer<typeof intakeRoundOutputSchema>;
 export type IntakeCardOutput = z.infer<typeof intakeCardOutputSchema>;
+export type IntakeSplitOutput = z.infer<typeof intakeSplitOutputSchema>;
+export type IntakeStackOutput = z.infer<typeof intakeStackOutputSchema>;
 
 /** An intake output that wrote the card. */
 export const isIntakeCard = (
   output: IntakeOutput,
 ): output is IntakeCardOutput => 'cardDraft' in output;
+
+/** #409: an intake output that proposed a split. */
+export const isIntakeSplit = (
+  output: IntakeOutput,
+): output is IntakeSplitOutput => 'split' in output;
+
+/** #480: an intake output that proposed a stack. */
+export const isIntakeStack = (
+  output: IntakeOutput,
+): output is IntakeStackOutput => 'stack' in output;
+
+/** An intake output that opened a question round. */
+export const isIntakeRound = (
+  output: IntakeOutput,
+): output is IntakeRoundOutput => 'questions' in output;
 
 /**
  * What a v1 plan's turns are validated against. `intake` is listed under

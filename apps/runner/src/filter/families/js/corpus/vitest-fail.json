@@ -1,0 +1,7 @@
+{
+  "argv": ["vitest", "run"],
+  "exitCode": 1,
+  "category": "test",
+  "outcome": "failing",
+  "expect": "filtered"
+}

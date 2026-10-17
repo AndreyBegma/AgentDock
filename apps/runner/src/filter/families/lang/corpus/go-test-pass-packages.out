@@ -1,0 +1,16 @@
+?   	github.com/acme/relay/cmd/relayd	[no test files]
+?   	github.com/acme/relay/cmd/relayctl	[no test files]
+?   	github.com/acme/relay/internal/buildinfo	[no test files]
+ok  	github.com/acme/relay/internal/auth	0.318s
+ok  	github.com/acme/relay/internal/cache	(cached)
+ok  	github.com/acme/relay/internal/config	(cached)
+ok  	github.com/acme/relay/internal/core	0.412s
+?   	github.com/acme/relay/internal/fixtures	[no test files]
+ok  	github.com/acme/relay/internal/httpapi	1.207s
+ok  	github.com/acme/relay/internal/metrics	(cached)
+ok  	github.com/acme/relay/internal/queue	0.644s
+ok  	github.com/acme/relay/internal/store	2.031s
+ok  	github.com/acme/relay/internal/telemetry	(cached)
+ok  	github.com/acme/relay/internal/wire	0.097s
+?   	github.com/acme/relay/pkg/client	[no test files]
+ok  	github.com/acme/relay/pkg/protocol	0.021s

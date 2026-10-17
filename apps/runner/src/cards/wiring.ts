@@ -6,6 +6,7 @@ import type {
 import type { ConfigProfile } from '../config';
 import { readProfileAgentdock } from '../detect/capabilities';
 import { claudeConfigDir } from '../detect/profiles';
+import { shellQuote } from '../launch/token-saver';
 import { writeJsonAtomic } from '../skills/run/record';
 
 /** #367 D1: the round's files, beside `run.json`. */
@@ -44,14 +45,9 @@ const HOOKS: readonly HookEntry[] = [
   },
   { event: 'Notification', subcommand: 'notification', async: true },
   { event: 'Stop', subcommand: 'stop', async: true },
+  { event: 'PreCompact', subcommand: 'pre-compact', async: true },
   { event: 'SessionEnd', subcommand: 'session-end', async: true },
 ];
-
-/** One argument for `sh -c`: bare when it is safe, else single-quoted. */
-const shellQuote = (arg: string): string =>
-  /^[A-Za-z0-9_@%+=:,./-]+$/.test(arg)
-    ? arg
-    : `'${arg.replace(/'/g, `'\\''`)}'`;
 
 export interface CardHookCommand {
   type: 'command';

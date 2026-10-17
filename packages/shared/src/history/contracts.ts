@@ -26,6 +26,11 @@ export const RUN_KINDS = [
   'text_normalize',
   /** A card's model assessment (issue #322 D5, ADR-0032). */
   'card_assess',
+  /**
+   * Steward's local haiku (issue #447 D3, D16): an unknown stall's
+   * classification or the digest prose, priced so it counts in the budget.
+   */
+  'steward',
 ] as const;
 export type RunKind = (typeof RUN_KINDS)[number];
 

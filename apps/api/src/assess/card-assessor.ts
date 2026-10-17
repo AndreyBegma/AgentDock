@@ -22,6 +22,7 @@ import { BudgetGate } from '../budgets/budget-gate';
 import { PrismaService } from '../database/prisma.service';
 import { LiveService } from '../live/live.service';
 import { RuntimeProfileResolver } from '../readiness';
+import { TokenSaverService } from '../token-saver/token-saver.service';
 import { AssessCommands } from './assess-commands';
 import {
   buildCardAssessPrompt,
@@ -88,6 +89,7 @@ export class CardAssessor {
     private readonly queue: AssessQueue,
     private readonly live: LiveService,
     private readonly profiles: RuntimeProfileResolver,
+    private readonly tokenSaver: TokenSaverService,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
 
@@ -168,6 +170,8 @@ export class CardAssessor {
       return { kind: 'none', why: (error as Error).message };
     }
     const sessionId = randomUUID();
+    // #445 D11: only a runner that advertises the token saver gets the field.
+    const saver = await this.tokenSaver.launch(project.id);
     const runId = await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`card-assess:${project.id}`}))`;
       const fresh = await this.read(tx, card.id);
@@ -188,6 +192,7 @@ export class CardAssessor {
           model: CARD_ASSESS_MODEL,
           profileKey: pick.profile.key,
           args: { cardId: card.id, hash },
+          tokenSaver: saver.on,
           status: 'running',
           triggeredByType: 'user',
           triggeredById: null,
@@ -220,6 +225,7 @@ export class CardAssessor {
       profileKey: pick.profile.key,
       model: CARD_ASSESS_MODEL,
       timeoutSec: CARD_ASSESS_TIMEOUT_SEC,
+      ...saver.args,
     };
     let sent: Awaited<ReturnType<AssessCommands['assess']>>;
     try {

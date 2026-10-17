@@ -1,7 +1,9 @@
 import { z } from 'zod';
+import { pendingQuestionSchema } from '../../session-message/contracts';
 import { headShaSchema } from '../commands/approvals';
 import { cardIdSchema, cardTmuxSessionSchema } from '../commands/cards';
 import { gitRefSchema, skillRunIdSchema } from '../commands/skills';
+import { localErrorCodeSchema } from '../local';
 
 /**
  * Card worker events (issue #242 "Runner"). A round outlives the `card.run`
@@ -133,3 +135,97 @@ export type CardPushEventType = keyof typeof cardPushEventDataSchemas;
 
 export const isCardPushEventType = (type: string): type is CardPushEventType =>
   Object.hasOwn(cardPushEventDataSchemas, type);
+
+/**
+ * #473: the round's pane shows Claude Code's question selector — the worker
+ * asked the person a question (`AskUserQuestion`) and waits for the answer.
+ * Sent once per question, when the runner's session poll first sees it; the
+ * API moves the round to `waiting` and tells the person. The answer ends the
+ * tool call, and its `hook.tool_finished` moves the round back to `running`.
+ * Never carries the question: it is content.
+ *
+ * Its own map, outside `cardRunEventDataSchemas`: the board sink enters it
+ * together with its handler.
+ */
+export const cardRunQuestionDataSchema = z.object({
+  cardId: cardIdSchema,
+  runId: skillRunIdSchema,
+  projectId: z.string().min(1),
+  at: z.iso.datetime(),
+});
+export type CardRunQuestionData = z.infer<typeof cardRunQuestionDataSchema>;
+
+export const cardQuestionEventDataSchemas = {
+  'card_run.question': cardRunQuestionDataSchema,
+} as const;
+
+export type CardQuestionEventType = keyof typeof cardQuestionEventDataSchemas;
+
+export const isCardQuestionEventType = (
+  type: string,
+): type is CardQuestionEventType =>
+  Object.hasOwn(cardQuestionEventDataSchemas, type);
+
+/**
+ * #489 M4: the question selector a round's pane shows now — its text and
+ * options, so the Board and Telegram can answer it — or `null` once it is
+ * gone. Sent when what the pane shows changes, before the `card_run.question`
+ * of a new question. It is session content (ADR-0021): a runner sends it
+ * only for a project that ships content.
+ */
+export const cardRunPendingQuestionDataSchema = z.object({
+  cardId: cardIdSchema,
+  runId: skillRunIdSchema,
+  projectId: z.string().min(1),
+  at: z.iso.datetime(),
+  question: pendingQuestionSchema.nullable(),
+});
+export type CardRunPendingQuestionData = z.infer<
+  typeof cardRunPendingQuestionDataSchema
+>;
+
+export const cardPendingQuestionEventDataSchemas = {
+  'card_run.pending_question': cardRunPendingQuestionDataSchema,
+} as const;
+
+export type CardPendingQuestionEventType =
+  keyof typeof cardPendingQuestionEventDataSchemas;
+
+export const isCardPendingQuestionEventType = (
+  type: string,
+): type is CardPendingQuestionEventType =>
+  Object.hasOwn(cardPendingQuestionEventDataSchemas, type);
+
+/**
+ * #482: the API refused the round's `finish_card` — `code` is the local
+ * error it answered (`not_a_card_session`, `runner_offline`, …). Sent by the
+ * runner's local socket for a refused `card.finish` from a session in the
+ * worktree of a live round; the API marks the round as needing attention,
+ * with the reason, until a later `finish_card` is taken. Never carries the
+ * summary: it is content.
+ *
+ * Its own map, outside `cardRunEventDataSchemas`: the board sink enters it
+ * together with its handler.
+ */
+export const cardRunFinishRefusedDataSchema = z.object({
+  cardId: cardIdSchema,
+  runId: skillRunIdSchema,
+  projectId: z.string().min(1),
+  at: z.iso.datetime(),
+  code: localErrorCodeSchema,
+});
+export type CardRunFinishRefusedData = z.infer<
+  typeof cardRunFinishRefusedDataSchema
+>;
+
+export const cardFinishRefusedEventDataSchemas = {
+  'card_run.finish_refused': cardRunFinishRefusedDataSchema,
+} as const;
+
+export type CardFinishRefusedEventType =
+  keyof typeof cardFinishRefusedEventDataSchemas;
+
+export const isCardFinishRefusedEventType = (
+  type: string,
+): type is CardFinishRefusedEventType =>
+  Object.hasOwn(cardFinishRefusedEventDataSchemas, type);

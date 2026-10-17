@@ -37,11 +37,11 @@ export const PLAN_STATUS_LABEL: Record<PlanStatus, string> = {
   done: 'Done',
 };
 
-/** A plan's mode, as a list row names it; `card` is a New Card intake (#337). */
+/** A plan's mode, as a list row names it; `card` is a New work intake (#337, #409). */
 export const PLAN_MODE_LABEL: Record<PlanMode, string> = {
   batch: 'Batch',
   dialogue: 'Dialogue',
-  card: 'Card',
+  card: 'New work',
 };
 
 export const PLAN_STATUS_PILL: Record<PlanStatus, Status> = {
@@ -443,6 +443,8 @@ const ERROR_TEXT: Partial<Record<PlannerErrorCode, string>> = {
   runner_timeout: 'The runner did not answer in time.',
   cards_exist: 'This plan already made its cards. Find them in Todo.',
   wrong_mode: 'This does not apply to this kind of plan.',
+  split_stale:
+    'The planner changed its proposal meanwhile. Review the new one, then confirm again.',
 };
 
 /** A sentence for a failed planner request. */

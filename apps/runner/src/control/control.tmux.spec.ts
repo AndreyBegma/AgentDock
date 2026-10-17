@@ -11,6 +11,7 @@ import type { ConfigProfile } from '../config';
 import { createExec, type Exec } from '../detect/exec';
 import { FakeClock } from '../testing/fake-clock';
 import { REAL_PROCESS_TIMEOUT_MS, workspace } from '../testing/projects';
+import { releaseTmuxServer } from '../testing/tmux';
 import type { ControlDeps } from './deps';
 import {
   messageOrchestrator,
@@ -87,7 +88,7 @@ const fixture = async () => {
   const server = ['-L', `agentdock-test-${process.pid}-${Date.now()}`];
   const tmuxExec = createExec({ PATH: process.env.PATH, HOME: ws.ws });
   const tmux = (...args: string[]) => tmuxExec('tmux', [...server, ...args]);
-  killServer = () => tmux('kill-server');
+  killServer = () => releaseTmuxServer(server);
   const git = ws.git;
   const exec: Exec = (bin, args) =>
     bin === 'git' ? git(bin, args) : tmuxExec(bin, args);

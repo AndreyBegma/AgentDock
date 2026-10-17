@@ -144,6 +144,34 @@ describe('slot.message', () => {
     expect(readdirSync(wt)).toEqual([MESSAGE_FILE]);
   });
 
+  it('#489 M5: a delivered message is a slot.message_sent by a person in events.jsonl', async () => {
+    const { ws, root: projectRoot, wt } = workspace();
+    const gitDir = join(ws, 'git');
+    const fake = fakeTmux({
+      project: { id: 'prj_1', root: projectRoot },
+      worktrees: [wt],
+      sessions: { 'cs-i42': '' },
+      gitDir,
+    });
+    await messageSlot(message(projectRoot), fake.deps);
+    const [line, ...rest] = readFileSync(
+      join(gitDir, 'cs-orchestrator', 'events.jsonl'),
+      'utf8',
+    )
+      .trimEnd()
+      .split('\n');
+    expect(rest).toEqual([]);
+    expect(JSON.parse(line ?? '')).toMatchObject({
+      type: 'slot.message_sent',
+      slot: 'i42',
+      data: {
+        slot: 'i42',
+        text: 'Rebase on develop, then rerun the checks.',
+        by: 'person',
+      },
+    });
+  });
+
   it('writes the file but reports undelivered when the session is gone', async () => {
     const { root: projectRoot, wt } = workspace();
     const fake = fakeTmux({

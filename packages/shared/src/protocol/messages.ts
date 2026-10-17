@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { capabilitiesSchema } from './capabilities';
+import { capabilitiesSchema, profileAgentdockSchema } from './capabilities';
 import { commandErrorCodeSchema } from './commands';
 import { eventSchema, seqCursorSchema } from './envelope';
 import { localRequestMessageSchema, localResponseMessageSchema } from './local';
@@ -52,6 +52,8 @@ export const heartbeatMessageSchema = z.object({
     z.string().min(1),
     z.object({ ok: z.boolean(), error: z.string().optional() }),
   ),
+  /** #348 D4: each Claude profile's agentdock state, read this heartbeat. */
+  profiles: z.record(z.string().min(1), profileAgentdockSchema).optional(),
 });
 
 export const eventsMessageSchema = z.object({

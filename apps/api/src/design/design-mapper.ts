@@ -2,6 +2,7 @@ import {
   DEFAULT_VIEWPORTS,
   type DesignCommentView,
   type DesignFailureView,
+  type DesignFrameView,
   type DesignOwnerView,
   type DesignProgressView,
   type DesignRevisionView,
@@ -12,6 +13,7 @@ import {
 } from '@agentdock/shared';
 import type { Prisma } from '@prisma/client';
 import { userRef, userSelect } from '../planner/plan-mapper';
+import { frameNameSelect, frameNamesOf } from './design-store';
 
 /**
  * The design views (docs/specs/223-design-stage.md "API"). Pure.
@@ -20,6 +22,10 @@ import { userRef, userSelect } from '../planner/plan-mapper';
 /** The mockup as the web reaches it: through its same-origin `/api` rewrite. */
 export const mockupUrl = (revisionId: string): string =>
   `/api/design-revisions/${revisionId}/html`;
+
+/** #441: one frame's mockup, by its position in the revision. */
+export const frameUrl = (revisionId: string, position: number): string =>
+  `/api/design-revisions/${revisionId}/frames/${position}/html`;
 
 /** A stored viewport list; one that no longer parses reads as the defaults (D11). */
 export const viewportsOf = (value: Prisma.JsonValue): ViewportPreset[] => {
@@ -36,6 +42,7 @@ export const revisionSelect = {
   turnId: true,
   archived: true,
   createdAt: true,
+  frames: frameNameSelect,
 } as const;
 
 type RevisionRow = Prisma.DesignRevisionGetPayload<{
@@ -51,6 +58,14 @@ export const toRevisionView = (row: RevisionRow): DesignRevisionView => ({
   turnId: row.turnId,
   archived: row.archived,
   htmlUrl: mockupUrl(row.id),
+  frames: frameNamesOf(row.frames).map(
+    (f, position): DesignFrameView => ({
+      position,
+      name: f.name,
+      slug: f.slug,
+      htmlUrl: frameUrl(row.id, position),
+    }),
+  ),
   createdAt: row.createdAt.toISOString(),
 });
 
@@ -63,6 +78,7 @@ type CommentRow = Prisma.DesignCommentGetPayload<{
 export const toCommentView = (row: CommentRow): DesignCommentView => ({
   id: row.id,
   revisionId: row.revisionId,
+  frame: row.frame,
   kind: row.kind,
   viewport: row.viewport,
   theme: row.theme,
@@ -78,6 +94,7 @@ export const toCommentView = (row: CommentRow): DesignCommentView => ({
 export const designInclude = {
   approvedBy: userSelect,
   card: { select: { id: true, number: true } },
+  stack: { select: { id: true, number: true } },
   revisions: {
     select: revisionSelect,
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
@@ -111,6 +128,9 @@ export const skillWarnings = (
 export const ownerOf = (row: DesignRow): DesignOwnerView => {
   if (row.card) {
     return { kind: 'card', cardId: row.card.id, number: row.card.number };
+  }
+  if (row.stack) {
+    return { kind: 'stack', stackId: row.stack.id, number: row.stack.number };
   }
   if (row.planId === null || row.taskKey === null) {
     throw new Error(`design ${row.id} has no owner`);

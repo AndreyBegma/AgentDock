@@ -17,9 +17,12 @@ import {
 import { z } from 'zod';
 import { type Cancel, isoNow } from '../clock';
 import { CommandFailure } from '../commands/failure';
+import type { ConfigProfile } from '../config';
 import { watchedProject } from '../control/target';
 import { TmuxControl } from '../control/tmux';
 import { resolveFleetProject } from '../fleet/project';
+import { type RunNotes, runWorkKey } from '../handoff/runs';
+import { type TokenSaverLaunch, tokenSaverLaunch } from '../launch/token-saver';
 import { errorMessage, type Logger } from '../log';
 import {
   readTail,
@@ -65,6 +68,60 @@ export const uiProfileWorktreePath = (
 export const uiProfileSessionName = (shortId: string): string =>
   `agentdock-uiprofile-${shortId}`;
 
+/**
+ * What `exec-run` starts for a build: headless, read-only (`plan`), the
+ * prompt on stdin. #445: the Token saver's flags before the first flag.
+ */
+export const uiProfileLaunchSpec = (
+  profile: ConfigProfile,
+  build: Pick<UiProfileBuildArgs, 'model' | 'projectId' | 'runId'>,
+  worktree: string,
+  promptFile: string,
+  otlpPort: number | null,
+  tokenSaver?: TokenSaverLaunch | null,
+): LaunchSpec => ({
+  binary: profile.binary ?? profile.runtime,
+  args: [
+    ...profile.args,
+    ...(tokenSaver?.args ?? []),
+    '-p',
+    '--model',
+    build.model,
+    '--permission-mode',
+    'plan',
+    '--output-format',
+    'stream-json',
+    '--verbose',
+  ],
+  env: { ...runEnv(profile, build, otlpPort), ...(tokenSaver?.env ?? {}) },
+  cwd: worktree,
+  stdin: promptFile,
+});
+
+/**
+ * #445: a build's Token saver — the scout, no `agentdock` (a design build
+ * does not use it); `null` when off.
+ */
+export const uiProfileTokenSaver = (
+  profile: ConfigProfile,
+  build: Pick<UiProfileBuildArgs, 'tokenSaver' | 'runId' | 'projectId'>,
+  home: string,
+  runDir: string,
+  selfCommand: readonly string[],
+): TokenSaverLaunch | null =>
+  tokenSaverLaunch({
+    config: build.tokenSaver,
+    profile,
+    home,
+    dir: runDir,
+    selfCommand,
+    runKind: 'ui_profile',
+    projectId: build.projectId,
+    runId: build.runId,
+    agentdock: false,
+    scout: true,
+  });
+
 /** A build as the executor keeps it. The prompt is in `prompt.md`, never here. */
 const buildRecordSchema = uiProfileBuildArgsSchema
   .omit({ prompt: true })
@@ -78,6 +135,11 @@ const buildRecordSchema = uiProfileBuildArgsSchema
     startedAt: z.iso.datetime().optional(),
     finishedAt: z.iso.datetime().optional(),
     cancelRequested: z.boolean().optional(),
+    /** #449: the work's key, when the build runs with Context handoff. */
+    handoffKey: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/)
+      .optional(),
   });
 type BuildRecord = z.infer<typeof buildRecordSchema>;
 
@@ -95,6 +157,11 @@ export interface UiProfileExecutorOptions {
   log: Logger;
   otlpPort?: () => number | null;
   tickMs?: number;
+  /**
+   * #449: notes of interrupted builds. With Token saver on, a build of the
+   * same work picks up the last interrupted attempt's note.
+   */
+  runNotes?: RunNotes;
 }
 
 const slotId = (build: BuildRecord): string => `uiprofile:${build.runId}`;
@@ -194,8 +261,15 @@ export class UiProfileBuildExecutor {
     }
     const fleet = await resolveFleetProject(deps.exec, project);
     const shortId = (deps.shortId ?? randomShortId)();
+    // #449: Context handoff is on with Token saver.
+    const { runNotes } = this.options;
+    const handoffKey =
+      runNotes && args.tokenSaver?.enabled
+        ? runWorkKey(args.projectId, prompt)
+        : undefined;
     const build: BuildRecord = {
       ...args,
+      ...(handoffKey ? { handoffKey } : {}),
       shortId,
       repo: fleet.repo,
       worktree: uiProfileWorktreePath(project.root, shortId),
@@ -213,7 +287,11 @@ export class UiProfileBuildExecutor {
         `build ${args.runId} already exists`,
       );
     }
-    writeFileSync(join(dir, PROMPT_FILE), prompt, { mode: 0o600 });
+    writeFileSync(
+      join(dir, PROMPT_FILE),
+      runNotes && handoffKey ? runNotes.seed(handoffKey, prompt) : prompt,
+      { mode: 0o600 },
+    );
     this.save(build);
     this.active.set(build.runId, build);
     this.queue.push(build.runId);
@@ -328,23 +406,20 @@ export class UiProfileBuildExecutor {
         base.stdout.trim(),
       ]);
       const profile = profileOf(deps, build.profileKey);
-      const spec: LaunchSpec = {
-        binary: profile.binary ?? profile.runtime,
-        args: [
-          ...profile.args,
-          '-p',
-          '--model',
-          build.model,
-          '--permission-mode',
-          'plan',
-          '--output-format',
-          'stream-json',
-          '--verbose',
-        ],
-        env: runEnv(profile, build, this.options.otlpPort?.() ?? null),
-        cwd: build.worktree,
-        stdin: join(this.dir(build.runId), PROMPT_FILE),
-      };
+      const spec = uiProfileLaunchSpec(
+        profile,
+        build,
+        build.worktree,
+        join(this.dir(build.runId), PROMPT_FILE),
+        this.options.otlpPort?.() ?? null,
+        uiProfileTokenSaver(
+          profile,
+          build,
+          deps.home,
+          this.dir(build.runId),
+          this.options.selfCommand,
+        ),
+      );
       if (build.cancelRequested) {
         await this.finish(build, {
           phase: 'cancelled',
@@ -435,6 +510,27 @@ export class UiProfileBuildExecutor {
     this.emitEvent(build, 'uiprofile_build.finished', data);
     // Released after the event, so the API hears the end before the next start.
     this.options.slots.release(slotId(build));
+    this.keepNote(build, outcome.phase);
+  }
+
+  /**
+   * #449 D2: a build that started and did not succeed leaves a note (haiku,
+   * off the slot) for the next attempt at the same work; a success clears it.
+   */
+  private keepNote(build: BuildRecord, phase: PlanTurnPhase): void {
+    const { runNotes } = this.options;
+    if (!runNotes || !build.handoffKey) return;
+    if (phase === 'succeeded') {
+      runNotes.succeeded(build.handoffKey);
+      return;
+    }
+    if (!build.startedAt) return;
+    void runNotes.interrupted(
+      build,
+      build.handoffKey,
+      this.dir(build.runId),
+      this.file(build.runId, 'stream'),
+    );
   }
 
   private async removeWorktree(build: BuildRecord): Promise<void> {

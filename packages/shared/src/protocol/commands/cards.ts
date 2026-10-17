@@ -3,6 +3,7 @@ import {
   ATTACHMENTS_PER_CARD_MAX,
   attachmentRefSchema,
 } from '../../attachments';
+import { tokenSaverConfigSchema } from '../../token-saver/contracts';
 import type { CommandDefinition } from '../commands';
 import { absolutePathSchema } from '../projects';
 import { headShaSchema } from './approvals';
@@ -44,12 +45,18 @@ export const CARD_TIMEOUTS_MS = {
   prClose: 60_000,
   /** #359 D5: `gh pr view` and `gh pr checks`. */
   checks: 30_000,
+  /** #484: `gh pr view`, `gh pr close`, then `gh pr reopen`. */
+  ciRetrigger: 45_000,
 } as const;
 
 /** `card.run` prompt: one argv element read from `launch.json`, never a shell string (D5). */
 export const CARD_RUN_PROMPT_MAX_BYTES = 64 * 1024;
-/** Files `card.run` commits as the branch's first commit (the D2 spec). */
-export const CARD_RUN_FILES_MAX = 4;
+/**
+ * Files `card.run` commits as the branch's first commit: the D2 spec and
+ * every frame of the approved design (#441). A design's frames share one
+ * `DESIGN_HTML_MAX_BYTES`, so this bounds the command, not the frames.
+ */
+export const CARD_RUN_FILES_MAX = 256;
 export const CARD_RUN_FILE_MAX_BYTES = 192 * 1024;
 /** `card.collect` PR body. */
 export const CARD_COLLECT_BODY_MAX_BYTES = 16 * 1024;
@@ -196,6 +203,8 @@ export const cardRunArgsSchema = z
     pullRequest: cardDraftPullRequestSchema.optional(),
     /** #359 D8: create `branch` from the updated `origin/<base>` first. */
     newBranch: z.boolean().optional(),
+    /** #445 D11: the project's Token saver; absent is off (a runner without the `tokenSaver` capability refuses it). */
+    tokenSaver: tokenSaverConfigSchema.optional(),
   })
   .refine(
     (a) =>
@@ -606,3 +615,66 @@ export const cardChecksCommands = {
 } as const satisfies Record<string, CommandDefinition>;
 
 export type CardChecksCommandName = keyof typeof cardChecksCommands;
+
+// card.ciRetrigger
+
+/**
+ * #484 (ADR-0043, ADR-0010, advertised per ADR-0023): asks the forge to send
+ * a card PR's pull-request event again, so a CI whose webhook delivery was
+ * lost creates its pipeline — `gh pr view <pr> --json state,headRefOid`, then
+ * `gh pr close <pr>` and `gh pr reopen <pr>`, argument arrays only, in the
+ * project root. A reopened PR is an event every CI that runs on pull
+ * requests listens to, and it adds no commit.
+ *
+ * Only an open (or draft) PR whose head is still `headSha` is closed: a
+ * merged or closed PR, or one that moved on, is refused and left alone.
+ */
+export const cardCiRetriggerArgsSchema = z.strictObject({
+  ...cardTarget,
+  root: absolutePathSchema,
+  pr: z.number().int().positive(),
+  /** The head the API saw without checks. */
+  headSha: headShaSchema,
+});
+export type CardCiRetriggerArgs = z.infer<typeof cardCiRetriggerArgsSchema>;
+
+/**
+ * Why nothing was retriggered: `not_open` — merged or closed; `head_moved` —
+ * a newer head, which has its own event; `gh_failed` — `gh` could not view
+ * or close it; `reopen_failed` — the PR was closed and stays closed.
+ */
+export const cardCiRetriggerFailReasonSchema = z.enum([
+  'not_open',
+  'head_moved',
+  'gh_failed',
+  'reopen_failed',
+]);
+export type CardCiRetriggerFailReason = z.infer<
+  typeof cardCiRetriggerFailReasonSchema
+>;
+
+/** A refusal is a result, not a command error. */
+export const cardCiRetriggerResultSchema = z.discriminatedUnion('retriggered', [
+  z.object({ retriggered: z.literal(true) }),
+  z.object({
+    retriggered: z.literal(false),
+    error: cardCiRetriggerFailReasonSchema,
+    message: stepErrorSchema,
+  }),
+]);
+export type CardCiRetriggerResult = z.infer<typeof cardCiRetriggerResultSchema>;
+
+/**
+ * #484: `card.ciRetrigger`, an operator command, in the `commands` allowlist
+ * beside `card.checks`.
+ */
+export const cardCiRetriggerCommands = {
+  'card.ciRetrigger': {
+    args: cardCiRetriggerArgsSchema,
+    result: cardCiRetriggerResultSchema,
+    minRole: 'operator',
+    timeoutMs: CARD_TIMEOUTS_MS.ciRetrigger,
+  },
+} as const satisfies Record<string, CommandDefinition>;
+
+export type CardCiRetriggerCommandName = keyof typeof cardCiRetriggerCommands;

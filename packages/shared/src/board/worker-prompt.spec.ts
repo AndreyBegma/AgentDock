@@ -6,6 +6,7 @@ import {
   type CardAttachmentBrief,
 } from '../attachments';
 import { DESIGN_HTML_MAX_BYTES, DESIGN_RATIONALE_MAX } from '../design';
+import { HANDOFF_SECTIONS } from '../handoff/note';
 import {
   CARD_RUN_FILE_MAX_BYTES,
   CARD_RUN_FILES_MAX,
@@ -30,6 +31,7 @@ import {
   cardFeedbackPrompt,
   cardNextRoundPrompt,
   cardWorkerPrompt,
+  HANDOFF_NOTE_PATH,
 } from './worker-prompt';
 
 const bytes = (text: string): number => new TextEncoder().encode(text).length;
@@ -38,7 +40,9 @@ const path = cardDesignPath(
   'docs/specs',
   { number: 12, title: 'Add login', issueNumber: null },
   2,
+  'login-form',
 );
+const frames = [{ name: 'Login form', path }];
 
 const card: CardWorkerPromptInput = {
   number: 12,
@@ -50,7 +54,7 @@ const card: CardWorkerPromptInput = {
   specPath: 'docs/specs/card-12-add-login.md',
   issueNumber: null,
   design: {
-    path,
+    frames,
     rationale: 'One column keeps the form readable on a phone.',
     comments: ['Make the button full width.', 'Say "Sign in",\nnot "Log in".'],
   },
@@ -58,7 +62,7 @@ const card: CardWorkerPromptInput = {
 
 const sectionOf = (prompt: string): string => {
   const start = prompt.indexOf('## Design');
-  return prompt.slice(start, prompt.indexOf('## How to work', start));
+  return prompt.slice(start, prompt.indexOf('\n## ', start + 1));
 };
 
 describe('worker prompt — ## Design (#243 D7)', () => {
@@ -72,7 +76,7 @@ describe('worker prompt — ## Design (#243 D7)', () => {
     const prompt = cardWorkerPrompt(card);
     const section = sectionOf(prompt);
     expect(section).toContain(
-      'docs/specs/card-12-add-login/design/2.html (already committed on this branch',
+      'docs/specs/card-12-add-login/design/2/login-form.html (already committed on this branch',
     );
     expect(section).toContain('binds the layout, the states and the copy');
     expect(section).toContain('not code to copy');
@@ -91,7 +95,7 @@ describe('worker prompt — ## Design (#243 D7)', () => {
     const section = sectionOf(
       cardWorkerPrompt({
         ...card,
-        design: { path, rationale: '  ', comments: [] },
+        design: { frames, rationale: '  ', comments: [] },
       }),
     );
     expect(section).not.toContain('Why this design');
@@ -103,7 +107,7 @@ describe('worker prompt — ## Design (#243 D7)', () => {
     const section = sectionOf(
       cardWorkerPrompt({
         ...card,
-        design: { path, rationale: '', comments: Array(6).fill(comment) },
+        design: { frames, rationale: '', comments: Array(6).fill(comment) },
       }),
     );
     const shown = section.split('\n').filter((l) => l === `- ${comment}`);
@@ -123,7 +127,12 @@ describe('worker prompt — ## Design (#243 D7)', () => {
       branch: `card/c999999-${'a'.repeat(40)}`,
       specPath: `${'d/'.repeat(100)}card-999999-${'a'.repeat(40)}.md`,
       design: {
-        path: `${'d/'.repeat(100)}card-999999-${'a'.repeat(40)}/design/3.html`,
+        frames: [
+          {
+            name: 'Mockup',
+            path: `${'d/'.repeat(100)}card-999999-${'a'.repeat(40)}/design/3/mockup.html`,
+          },
+        ],
         rationale: '語'.repeat(DESIGN_RATIONALE_MAX),
         comments: Array(20).fill('語'.repeat(500)),
       },
@@ -131,7 +140,7 @@ describe('worker prompt — ## Design (#243 D7)', () => {
     expect(bytes(prompt)).toBeLessThanOrEqual(CARD_RUN_PROMPT_MAX_BYTES);
     expect(cardPromptSchema.safeParse(prompt).success).toBe(true);
     expect(prompt).toContain(body);
-    expect(prompt).toContain('/design/3.html');
+    expect(prompt).toContain('/design/3/mockup.html');
     expect(prompt).toContain('more not shown');
   });
 
@@ -139,9 +148,27 @@ describe('worker prompt — ## Design (#243 D7)', () => {
     const rationale = '語'.repeat(DESIGN_RATIONALE_MAX);
     const prompt = cardWorkerPrompt({
       ...card,
-      design: { path, rationale, comments: [] },
+      design: { frames, rationale, comments: [] },
     });
     expect(prompt).toContain(`Why this design: ${rationale}`);
+  });
+
+  it('lists every frame of the approved variant with its name (#441)', () => {
+    const many = ['Board page', 'Card page', 'Frame tabs'].map((name, i) => ({
+      name,
+      path: `docs/specs/card-12-add-login/design/2/f${i}.html`,
+    }));
+    const prompt = cardWorkerPrompt({
+      ...card,
+      design: { frames: many, rationale: '', comments: [] },
+    });
+    const section = sectionOf(prompt);
+    expect(section).toContain('The approved design has 3 frames');
+    expect(section).toContain('open them first');
+    for (const f of many) expect(section).toContain(`- ${f.path} — ${f.name}`);
+    expect(prompt).toContain(
+      'Design: https://github.com/<owner>/<repo>/tree/card/c12-add-login/docs/specs/card-12-add-login/design/2`',
+    );
   });
 
   it('leaves room in card.run for the spec and the approved mockup', () => {
@@ -149,6 +176,120 @@ describe('worker prompt — ## Design (#243 D7)', () => {
     expect(CARD_RUN_FILE_MAX_BYTES).toBeGreaterThanOrEqual(
       DESIGN_HTML_MAX_BYTES,
     );
+  });
+});
+
+describe('worker prompt v9 — Token saver (#445 D7, D9, D10, D14)', () => {
+  const plain: CardWorkerPromptInput = { ...card, design: null };
+  const other: CardWorkerPromptInput = {
+    ...plain,
+    number: 99,
+    title: 'Fix the export',
+    body: 'The CSV export drops the last row.',
+    kind: 'bug',
+    branch: 'card/c99-fix-the-export',
+    issueNumber: 7,
+  };
+
+  it('carries the working and the audience register', () => {
+    const prompt = cardWorkerPrompt(plain);
+    expect(prompt).toContain('## How to write');
+    expect(prompt).toContain('- Working register —');
+    expect(prompt).toContain('do not restate the plan');
+    expect(prompt).toContain('- Audience register —');
+    expect(prompt).toContain('every required section, and leave nothing out');
+  });
+
+  it('asks for offset/limit on big files and Grep/Glob first', () => {
+    const prompt = cardWorkerPrompt(plain);
+    expect(prompt).toContain('## Reading the codebase');
+    expect(prompt).toContain('`offset` and `limit`');
+  });
+
+  it('names the scout and the bypass only when Token saver is on', () => {
+    const off = cardWorkerPrompt(plain);
+    expect(off).not.toContain('scout');
+    expect(off).not.toContain('AGENTDOCK_RAW=1');
+    const on = cardWorkerPrompt({ ...plain, tokenSaver: true });
+    expect(on).toContain('use the `scout` subagent');
+    expect(on).toContain('`AGENTDOCK_RAW=1 <command>`');
+  });
+
+  it('asks for the handoff note only when Token saver is on (#449 D2, D5, D7)', () => {
+    expect(cardWorkerPrompt(plain)).not.toContain('## Handoff note');
+    const on = cardWorkerPrompt({ ...plain, tokenSaver: true });
+    const section = on.indexOf('## Handoff note');
+    expect(section).toBeGreaterThan(on.indexOf('## Reading the codebase'));
+    expect(section).toBeLessThan(on.indexOf('## When you are done'));
+    expect(on).toContain(`\`${HANDOFF_NOTE_PATH}\``);
+    for (const heading of HANDOFF_SECTIONS) expect(on).toContain(heading);
+    expect(on).toContain('<!-- person -->');
+    expect(on).toContain('Never add that mark yourself');
+  });
+
+  it('forbids a Claude attribution trailer in the stable part (#447 D7)', () => {
+    const prompt = cardWorkerPrompt(card);
+    const rule = prompt.indexOf('Never add a Claude attribution trailer');
+    expect(rule).toBeGreaterThan(prompt.indexOf('## How to work'));
+    expect(rule).toBeLessThan(prompt.indexOf('## Card C-12'));
+    for (const trailer of [
+      'Co-Authored-By: Claude',
+      'Claude-Session:',
+      'Generated with Claude Code',
+    ]) {
+      expect(prompt).toContain(trailer);
+    }
+  });
+
+  it('asks for one command per Bash call in How to work, with Token saver on (#445 amendment 11)', () => {
+    const prompt = cardWorkerPrompt({ ...card, tokenSaver: true });
+    const rule = prompt.indexOf('Run one command per Bash call');
+    expect(rule).toBeGreaterThan(prompt.indexOf('## How to work'));
+    expect(rule).toBeLessThan(prompt.indexOf('## How to write'));
+    expect(prompt).toContain('a single `cd <path> && <command>`');
+    expect(cardWorkerPrompt({ ...card, tokenSaver: false })).not.toContain(
+      'Run one command per Bash call',
+    );
+  });
+
+  it('puts every stable section before the card’s own', () => {
+    const prompt = cardWorkerPrompt(card);
+    const theCard = prompt.indexOf('## Card C-12');
+    for (const stable of [
+      '## How to work',
+      '## How to write',
+      '## Reading the codebase',
+      '## When you are done',
+    ]) {
+      expect(prompt.indexOf(stable)).toBeGreaterThan(-1);
+      expect(prompt.indexOf(stable)).toBeLessThan(theCard);
+    }
+    for (const variable of [
+      '## The card',
+      '## Design',
+      '## Pull request description',
+    ]) {
+      expect(prompt.indexOf(variable)).toBeGreaterThan(theCard);
+    }
+  });
+
+  it('is the same up to the card for two different cards — the cache prefix', () => {
+    for (const tokenSaver of [false, true]) {
+      const a = cardWorkerPrompt({ ...plain, tokenSaver });
+      const b = cardWorkerPrompt({ ...other, tokenSaver });
+      const prefix = a.slice(0, a.indexOf('## Card C-12'));
+      expect(prefix.length).toBeGreaterThan(1000);
+      expect(b.startsWith(prefix)).toBe(true);
+      expect(prefix).not.toContain('Add login');
+    }
+  });
+
+  it('asks for a summary of at least two sentences, as the guard checks', () => {
+    expect(cardWorkerPrompt(plain)).toContain('in at least two full sentences');
+  });
+
+  it('keeps the `GitHub issue: #n` line the runner reads', () => {
+    expect(cardWorkerPrompt(other)).toContain('\nGitHub issue: #7\n');
   });
 });
 
@@ -160,8 +301,15 @@ describe('worker prompt v5 — the pull request description (#359 D3)', () => {
     const prompt = cardWorkerPrompt(plain);
     expect(CARD_PR_DESCRIPTION_FILE).toBe('.agentdock/pull-request.md');
     const at = prompt.indexOf(`\`${CARD_PR_DESCRIPTION_FILE}\``);
-    expect(at).toBeGreaterThan(prompt.indexOf('## When you are done'));
-    expect(at).toBeLessThan(prompt.indexOf('Then call the `finish_card` tool'));
+    // #445 D10: the card-specific list is the last section; the stable
+    // "When you are done" points at it.
+    expect(at).toBeGreaterThan(prompt.indexOf('## Pull request description'));
+    expect(prompt.indexOf('## Pull request description')).toBeGreaterThan(
+      prompt.indexOf('## The card'),
+    );
+    expect(prompt).toContain(
+      'Write the pull request description the last section of this prompt asks for. Then call the `finish_card` tool',
+    );
     expect(prompt).toContain('git-excluded — do not commit it');
     expect(prompt).toContain('`## What changed and why`');
     expect(prompt).toContain('`## Acceptance criteria`');
@@ -217,8 +365,8 @@ describe('next round prompt — card edits reach the worker (#273 D1–D4)', () 
     kind: 'feature',
   };
 
-  it('is version 7', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(7);
+  it('is version 14', () => {
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(14);
   });
 
   it('cardChange is null for identical text, whitespace around it aside', () => {
@@ -395,7 +543,7 @@ describe('worker prompt v4 — attachments (#309 D10)', () => {
       prompt.indexOf('## Attachments'),
     );
     expect(prompt.indexOf('## Attachments')).toBeLessThan(
-      prompt.indexOf('## How to work'),
+      prompt.indexOf('## Pull request description'),
     );
   });
 
@@ -523,6 +671,59 @@ describe('worker prompt v4 — attachments (#309 D10)', () => {
     expect(prompt).toContain(feedback);
     for (const a of attachments) {
       expect(prompt).toContain(attachmentWorktreePath(a.id, a.name));
+    }
+  });
+});
+
+describe('worker prompt — ## Stack (#480)', () => {
+  const stackPath = 'docs/specs/stacks/S-3-redesign/design/1/mockup.html';
+  const stack = {
+    label: 'S-3',
+    title: 'Redesign the Settings page',
+    stage: 1,
+    stageTitle: 'Page',
+    stageCount: 2,
+    design: {
+      frames: [{ name: 'Mockup', path: stackPath }],
+      rationale: 'One look.',
+    },
+  };
+
+  it('names the stack and its stage, and the stack design as reference', () => {
+    const prompt = cardWorkerPrompt({ ...card, stack });
+    expect(prompt).toContain('## Stack');
+    expect(prompt).toContain(
+      'This card is part of stack S-3 "Redesign the Settings page", stage 2 of 2 (Page).',
+    );
+    expect(prompt).toContain(stackPath);
+    expect(prompt).toContain(
+      'Where this card has its own design (## Design), that one binds this card.',
+    );
+    // The card's own design stays its own section.
+    expect(prompt).toContain('## Design');
+  });
+
+  it('a stack without a design names the stage only; a card in none has no section', () => {
+    expect(
+      cardWorkerPrompt({ ...card, stack: { ...stack, design: null } }),
+    ).not.toContain(stackPath);
+    expect(cardWorkerPrompt(card)).not.toContain('## Stack');
+  });
+});
+
+// #487: three card workers ran api e2e suites at once — one of them the whole
+// project — and the shared dev Postgres refused every new connection.
+describe('worker prompt v13 — only the e2e suites the card touched (#487)', () => {
+  it('forbids a whole e2e run locally in the stable section, with or without Token saver', () => {
+    for (const tokenSaver of [false, true]) {
+      const prompt = cardWorkerPrompt({ ...card, tokenSaver });
+      const work = prompt.slice(
+        prompt.indexOf('## How to work'),
+        prompt.indexOf('## Card C-'),
+      );
+      expect(work).toContain(
+        'only the e2e suites you touched (`--testPathPatterns`); CI runs the rest.',
+      );
     }
   });
 });

@@ -1,0 +1,7 @@
+{
+  "argv": ["make", "all"],
+  "exitCode": 2,
+  "category": "other",
+  "outcome": "failing",
+  "expect": "filtered"
+}

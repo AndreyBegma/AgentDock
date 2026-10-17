@@ -208,6 +208,12 @@ export const LOCAL_CARD_SUMMARY_MAX = 4_000;
  */
 export const localCardFinishArgsSchema = z.strictObject({
   summary: z.string().trim().min(1).max(LOCAL_CARD_SUMMARY_MAX),
+  /**
+   * #445 D8: set by the runner's artifact guard when it accepts a finish after
+   * 2 rejections in the round; stored as `runs.artifactIncomplete`. Absent is
+   * `false`. The worker never sets it — the guard does.
+   */
+  artifactIncomplete: z.boolean().optional(),
 });
 export const localCardFinishResultSchema = z.object({
   /** The card's per-project number (`C-<number>`). */

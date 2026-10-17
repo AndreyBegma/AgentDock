@@ -16,7 +16,7 @@ import { PageHeader } from '../../../../../components/page-header/page-header';
 import { PlanList } from '../../../../../components/planner/plan-list';
 import { AsyncSection } from '../../../../../components/prerequisites/async-section';
 import { api } from '../../../../../lib/api';
-import { boardHref, boardNewPlanHref } from '../../../../../lib/board/href';
+import { boardHref, boardNewWorkHref } from '../../../../../lib/board/href';
 import { useLive } from '../../../../../lib/live/use-live';
 import { useSection } from '../../../../../lib/section/use-section';
 import { useProjectDetail } from '../use-project-detail';
@@ -26,8 +26,7 @@ const REFETCH_DEBOUNCE_MS = 300;
 
 /**
  * The retired Planner page (#337 D11): out of the navigation, kept so the
- * plans made here stay readable. New plans start on the Board (New Plan,
- * New Card).
+ * plans made here stay readable. New work starts on the Board (#409).
  */
 export default function PlannerPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -62,20 +61,20 @@ export default function PlannerPage() {
       />
       <Banner
         tone="info"
-        title="New plans start on the Board"
+        title="New work starts on the Board"
         action={
           <Link
             href={
-              canOperate ? boardNewPlanHref(projectId) : boardHref(projectId)
+              canOperate ? boardNewWorkHref(projectId) : boardHref(projectId)
             }
             className={buttonClassName({ variant: 'glass', size: 'sm' })}
           >
-            {canOperate ? 'New Plan on the Board' : 'Open the Board'}
+            {canOperate ? 'New work on the Board' : 'Open the Board'}
           </Link>
         }
       >
-        New Card interviews you and writes one card; New Plan makes several
-        cards, or sends them to the fleet.
+        New work interviews you and writes one card — or, when you ask for
+        several things at once, proposes several cards.
       </Banner>
 
       <section aria-labelledby="plans" className="flex flex-col gap-3">

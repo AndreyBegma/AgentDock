@@ -26,6 +26,7 @@ const card = (over: Partial<BoardCardView>): BoardCardView =>
 
 const running = { phase: 'running' } as BoardCardView['round'];
 const waiting = { phase: 'waiting' } as BoardCardView['round'];
+const background = { phase: 'background' } as BoardCardView['round'];
 
 describe('matchesFilter', () => {
   test('no filter keeps everything', () => {
@@ -47,6 +48,13 @@ describe('matchesFilter', () => {
     expect(matchesFilter(bug, { ...NO_FILTER, kind: 'bug' })).toBe(true);
     expect(matchesFilter(bug, { ...NO_FILTER, state: 'running' })).toBe(true);
     expect(matchesFilter(bug, { ...NO_FILTER, state: 'waiting' })).toBe(false);
+  });
+
+  test('Waiting for you leaves out a card running in background (#390)', () => {
+    const item = toItem(card({ round: background }));
+    expect(matchesFilter(item, { ...NO_FILTER, state: 'waiting' })).toBe(false);
+    expect(matchesFilter(item, { ...NO_FILTER, state: 'running' })).toBe(true);
+    expect(boardMeta([item])).toEqual({ running: 1, waiting: 0 });
   });
 });
 

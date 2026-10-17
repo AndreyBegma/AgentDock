@@ -1,10 +1,16 @@
 import {
+  CARD_BACKGROUND_STALLED_EVENT,
   CARD_FINISHED_EVENT,
   CARD_WAITING_EVENT,
   CARDS_SUGGESTED_EVENT,
+  cardBackgroundStalledTitle,
   cardLabel,
   type NotificationKind,
   SCHEDULE_DISABLED_LIVE_EVENT,
+  STEWARD_INCIDENT_EVENTS,
+  STEWARD_KIND_LABEL,
+  STEWARD_NOTIFICATION_KIND,
+  stewardIncidentEventDataSchema,
 } from '@agentdock/shared';
 import {
   API_EVENT_SOURCE,
@@ -259,7 +265,11 @@ export const draftFor = (event: MatchableEvent): NotificationDraft | null => {
           slot: null,
           issue: null,
           title: `${card} is waiting for you`,
-          body: 'Its worker stopped and waits for a reply in its session.',
+          // #473: a question the worker asks, or a stop.
+          body:
+            data.reason === 'question'
+              ? 'Its worker asks you a question in its session.'
+              : 'Its worker stopped and waits for a reply in its session.',
           page: 'board',
           card: number,
         };
@@ -273,6 +283,22 @@ export const draftFor = (event: MatchableEvent): NotificationDraft | null => {
         body: pr
           ? `PR #${pr} is ready for review.`
           : 'Review it on the board: accept it, or send feedback.',
+        page: 'board',
+        card: number,
+      };
+    }
+    // #390: only the API records it; it names the card, never the command.
+    case CARD_BACKGROUND_STALLED_EVENT: {
+      if (event.source !== API_EVENT_SOURCE) return null;
+      const number = positiveInt(data.number);
+      const minutes = positiveInt(data.minutes);
+      if (!number || !minutes) return null;
+      return {
+        kind: 'card.background_stalled',
+        slot: null,
+        issue: null,
+        title: cardBackgroundStalledTitle(number, minutes),
+        body: 'Its worker ended its turn waiting on a background task that has not finished. Check the task in its session.',
         page: 'board',
         card: number,
       };
@@ -293,6 +319,29 @@ export const draftFor = (event: MatchableEvent): NotificationDraft | null => {
             : `${count} cards were suggested`,
         body: 'Capture found follow-up work in a session; review it in the Inbox.',
         page: 'board',
+      };
+    }
+    // #447 D13: only the API records it, once per incident and reason —
+    // the dedupe is the incident's. The reason is one sanitized line
+    // (DA-13); no pane text ever (D12). A resolved incident notifies nobody.
+    case STEWARD_INCIDENT_EVENTS.escalated: {
+      if (event.source !== API_EVENT_SOURCE) return null;
+      const parsed = stewardIncidentEventDataSchema.safeParse(data);
+      if (!parsed.success) return null;
+      const incident = parsed.data;
+      const subject =
+        oneLine(incident.subjectLabel, 80) ??
+        (incident.subjectKind === 'fleet_slot' ? incident.subjectId : 'A run');
+      const fleet = incident.subjectKind === 'fleet_slot';
+      return {
+        kind: STEWARD_NOTIFICATION_KIND,
+        slot: fleet ? incident.subjectId : null,
+        issue: null,
+        title: `${subject} needs you: ${STEWARD_KIND_LABEL[incident.kind]}`,
+        body:
+          oneLine(incident.reason) ?? 'Steward needs a person to look at it.',
+        page: incident.cardNumber ? 'board' : fleet ? 'fleet' : 'overview',
+        ...(incident.cardNumber ? { card: incident.cardNumber } : {}),
       };
     }
     default:

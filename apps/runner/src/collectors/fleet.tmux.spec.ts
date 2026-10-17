@@ -5,6 +5,7 @@ import { brief, recorder } from '../fleet/testing';
 import { FakeClock } from '../testing/fake-clock';
 import { memoryLogger } from '../testing/fixtures';
 import { REAL_PROCESS_TIMEOUT_MS, workspace } from '../testing/projects';
+import { releaseTmuxServer } from '../testing/tmux';
 import { FleetCollector } from './fleet';
 import { DEFAULT_FLEET_SETTINGS } from './registry';
 
@@ -37,7 +38,7 @@ describe.skipIf(!tmuxInstalled)('FleetCollector on a real tmux', () => {
     const server = ['-L', `agentdock-test-${process.pid}-${Date.now()}`];
     const tmux = createExec({ PATH: process.env.PATH, HOME: ws.ws });
     const run = (...args: string[]) => tmux('tmux', [...server, ...args]);
-    killServer = () => run('kill-server');
+    killServer = () => releaseTmuxServer(server);
     const exec: Exec = (binary, args) =>
       binary === 'git'
         ? (ws as NonNullable<typeof ws>).git(binary, args)

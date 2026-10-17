@@ -23,10 +23,10 @@ import { type BuildArgs, buildArgsOf } from './ui-profile-mapper';
 interface StopOwner {
   key: DesignKey;
   projectId: string;
-  /** The `planId` its turns run under on the runner: the plan's, or the card's. */
+  /** The `planId` its turns run under on the runner: the plan's, the card's or the stack's. */
   hostId: string;
-  target: { type: 'plan' | 'board_card'; id: string };
-  label: { key: string } | { number: number };
+  target: { type: 'plan' | 'board_card' | 'board_stack'; id: string };
+  label: { key: string } | { number: number } | { stack: number };
   publish(): void;
 }
 
@@ -92,6 +92,32 @@ export class DesignStopService {
         target: { type: 'board_card', id: card.id },
         label: { number },
         publish: () => this.store.publishCardDesign(projectId, card.id),
+      },
+      actor,
+    );
+  }
+
+  /** `POST …/board/stacks/:number/design/stop` (#480). */
+  async stackStop(
+    projectId: string,
+    number: number,
+    actor: PlanActor,
+  ): Promise<void> {
+    const stack = await this.prisma.boardStack.findUnique({
+      where: { projectId_number: { projectId, number } },
+      select: { id: true },
+    });
+    if (!stack) {
+      throw designError(404, DESIGN_ERROR.notFound, 'Stack not found');
+    }
+    await this.stopOf(
+      {
+        key: { stackId: stack.id },
+        projectId,
+        hostId: stack.id,
+        target: { type: 'board_stack', id: stack.id },
+        label: { stack: number },
+        publish: () => this.store.publishStackDesign(projectId, stack.id),
       },
       actor,
     );

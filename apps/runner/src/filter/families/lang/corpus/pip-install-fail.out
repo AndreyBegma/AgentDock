@@ -1,0 +1,9 @@
+Collecting requests==2.32.3
+  Using cached requests-2.32.3-py3-none-any.whl.metadata (4.6 kB)
+Collecting charset-normalizer<4,>=2 (from requests==2.32.3)
+  Using cached charset_normalizer-3.3.2-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (33 kB)
+Collecting idna<4,>=2.5 (from requests==2.32.3)
+  Using cached idna-3.7-py3-none-any.whl.metadata (9.9 kB)
+Collecting pydantic==9.9.9
+ERROR: Could not find a version that satisfies the requirement pydantic==9.9.9 (from versions: 0.1, 0.2, 1.0, 1.10.17, 2.0, 2.8.2)
+ERROR: No matching distribution found for pydantic==9.9.9

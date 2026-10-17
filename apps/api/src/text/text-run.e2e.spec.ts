@@ -29,6 +29,29 @@ describe('text normalization runs (e2e)', () => {
     expect(views.get('board_card:title')?.status).toBe('english');
   });
 
+  it('#445: sends the token saver only to a runner that advertises it', async () => {
+    await w.createCard({ title: RU_TITLE, kind: 'feature' });
+    const off = await w.start((await w.latest()).id);
+    expect(w.normalized()[0]).not.toHaveProperty('tokenSaver');
+    expect(
+      (await w.ctx.prisma.run.findUniqueOrThrow({ where: { id: off } }))
+        .tokenSaver,
+    ).toBe(false);
+    await w.finish(off, textBlock([{ id: 'title', english: 'Add login' }]));
+
+    await w.advertiseTokenSaver();
+    await w.createCard({ title: RU_TITLE, kind: 'feature' });
+    const on = await w.start((await w.latest()).id);
+    expect(w.normalized()[1].tokenSaver).toEqual({
+      enabled: true,
+      mcpAllow: [],
+    });
+    expect(
+      (await w.ctx.prisma.run.findUniqueOrThrow({ where: { id: on } }))
+        .tokenSaver,
+    ).toBe(true);
+  });
+
   it('a non-English save makes exactly one run, priced in History', async () => {
     await w.createCard({ title: RU_TITLE, body: RU_BODY, kind: 'feature' });
     const row = await w.latest();

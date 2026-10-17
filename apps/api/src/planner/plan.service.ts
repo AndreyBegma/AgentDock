@@ -29,7 +29,7 @@ import { UserSettingsService } from '../settings/user-settings.service';
 import { TextNormalizer } from '../text/text-normalizer';
 import { TextOwners } from '../text/text-owners';
 import { readablePlanWhere } from './plan-access';
-import { intakeRound } from './plan-intake';
+import { intakeRound, intakeSplit, toSplitView } from './plan-intake';
 import {
   blockingOpen,
   planInclude,
@@ -293,7 +293,8 @@ export class PlanService implements OnModuleInit {
       where: { id: readable.id },
       include: { ...planInclude, instructions: { select: { version: true } } },
     });
-    const [tasks, turns, questions] = await Promise.all([
+    const intakeOpen = plan.mode === 'card' && plan.status === 'clarifying';
+    const [tasks, turns, questions, split] = await Promise.all([
       this.store.currentTasks(this.prisma, plan),
       this.prisma.planTurn.findMany({
         where: { planId },
@@ -305,6 +306,7 @@ export class PlanService implements OnModuleInit {
         : plan.mode === 'card'
           ? intakeRound(this.prisma, planId)
           : this.store.planRound(planId),
+      intakeOpen ? intakeSplit(this.prisma, planId) : Promise.resolve(null),
     ]);
     const [issueOf, designs] = await Promise.all([
       loadIssueViews(this.prisma, projectId, tasks),
@@ -319,6 +321,7 @@ export class PlanService implements OnModuleInit {
       // Oldest first: the last is the newest (#213).
       latestTurn: turns.at(-1) ?? null,
       questions,
+      split: split ? toSplitView(split) : null,
     });
   }
 

@@ -14,6 +14,7 @@ import {
   type ProjectInspection,
   projectInspectionSchema,
   runnerCommandsOf,
+  runtimeProfileSchema,
 } from '@agentdock/shared/protocol';
 import type {
   DocsSource,
@@ -23,6 +24,7 @@ import type {
   RuntimeProfile,
   User,
 } from '@prisma/client';
+import { z } from 'zod';
 
 export const EMPTY_CLASSIFIED: DocsClassified = {
   specs: [],
@@ -146,6 +148,32 @@ export const toMemberView = (
   createdAt: member.createdAt.toISOString(),
 });
 
+const profilesAdvertSchema = z.object({ profiles: z.array(z.unknown()) });
+
+const profileMcpAdvertSchema = runtimeProfileSchema
+  .pick({ id: true, mcpServers: true })
+  .required({ mcpServers: true });
+
+/**
+ * #445 D6: each profile's MCP server names from stored capabilities JSON, by
+ * profile key. Read per profile, like `profileAgentdockOf`: a profile without
+ * a valid list is left out — unknown, never "none".
+ */
+export const profileMcpServersOf = (
+  capabilities: unknown,
+): ReadonlyMap<string, string[]> => {
+  const parsed = profilesAdvertSchema.safeParse(capabilities);
+  const out = new Map<string, string[]>();
+  if (!parsed.success) return out;
+  for (const entry of parsed.data.profiles) {
+    const profile = profileMcpAdvertSchema.safeParse(entry);
+    if (profile.success && !out.has(profile.data.id)) {
+      out.set(profile.data.id, profile.data.mcpServers);
+    }
+  }
+  return out;
+};
+
 /** Field by field on purpose: binary, env and args carry machine paths. */
 export const toProjectRuntimeProfile = (
   profile: Pick<
@@ -153,10 +181,12 @@ export const toProjectRuntimeProfile = (
     'id' | 'key' | 'runtime' | 'label' | 'authenticated'
   >,
   defaultProfileId: string | null,
+  mcpServers?: string[],
 ): ProjectRuntimeProfile => ({
   key: profile.key,
   runtime: profile.runtime,
   label: profile.label,
   authenticated: profile.authenticated,
   isDefault: profile.id === defaultProfileId,
+  ...(mcpServers ? { mcpServers } : {}),
 });

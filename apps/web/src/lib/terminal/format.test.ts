@@ -22,6 +22,31 @@ describe('terminalSocketUrl', () => {
     expect(url.searchParams.get('rows')).toBe('30');
     expect(url.searchParams.has('x')).toBe(false);
   });
+
+  const size = { cols: 80, rows: 24 };
+
+  test('keeps the /api prefix of a proxied live URL', () => {
+    const url = new URL(
+      terminalSocketUrl('x', size, 'wss://host.example/api/live'),
+    );
+    expect(url.origin).toBe('wss://host.example');
+    expect(url.pathname).toBe('/api/terminal');
+  });
+
+  test('keeps the localhost URL unprefixed', () => {
+    expect(terminalSocketUrl('x', size, 'ws://localhost:8180/live')).toBe(
+      'ws://localhost:8180/terminal?ticket=x&cols=80&rows=24',
+    );
+  });
+
+  test('tolerates trailing slashes and a bare host', () => {
+    expect(
+      new URL(terminalSocketUrl('x', size, 'wss://h/api/live/')).pathname,
+    ).toBe('/api/terminal');
+    expect(new URL(terminalSocketUrl('x', size, 'wss://h')).pathname).toBe(
+      '/terminal',
+    );
+  });
 });
 
 describe('clampSize', () => {

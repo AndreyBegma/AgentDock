@@ -8,6 +8,7 @@ import type {
   TaskPage,
 } from '@agentdock/shared';
 import { BudgetGate } from '../budgets/budget-gate';
+import { capabilities } from '../runners/testing/runner-e2e';
 import { PlanDocsSink } from './plan-docs-sink';
 import {
   block,
@@ -81,6 +82,32 @@ describe('planner (e2e)', () => {
       decision,
       ...(comment ? { comment } : {}),
     });
+
+  describe('#445 token saver on plan.turn', () => {
+    const runOf = async (planId: string) =>
+      h.ctx.prisma.run.findUniqueOrThrow({
+        where: { id: (await h.activeTurn(planId)).runId },
+      });
+
+    it('is absent for a runner that does not advertise it', async () => {
+      const plan = await h.createPlan('batch');
+      expect(h.sentOf('plan.turn')[0]).not.toHaveProperty('tokenSaver');
+      expect((await runOf(plan.id)).tokenSaver).toBe(false);
+    });
+
+    it('carries the setting for a runner that advertises it', async () => {
+      await h.ctx.prisma.runner.update({
+        where: { id: h.runnerId },
+        data: { capabilities: { ...capabilities, tokenSaver: true } },
+      });
+      const plan = await h.createPlan('batch');
+      expect(h.sentOf('plan.turn')[0].tokenSaver).toEqual({
+        enabled: true,
+        mcpAllow: [],
+      });
+      expect((await runOf(plan.id)).tokenSaver).toBe(true);
+    });
+  });
 
   describe('the batch flow (D1–D8)', () => {
     it('creates, decomposes, refuses needs_talk, grills, writes, reviews and sends with issue_body', async () => {

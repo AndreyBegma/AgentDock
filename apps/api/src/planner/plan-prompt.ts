@@ -77,6 +77,8 @@ export interface IntakePromptState {
   generate: boolean;
   /** No fifth round, and none after Enough (`intakeMustGenerate`). */
   mustGenerate: boolean;
+  /** #409: the person declined the split — one card, for the whole request. */
+  keepOne?: boolean;
 }
 
 /** Actions whose output carries design suggestions under contract v2. */
@@ -100,16 +102,19 @@ const WHAT: Record<PlanTurnAction, (input: PromptInput) => string> = {
   intake: (i) => {
     const state = i.intake;
     if (!state) {
-      return 'Interview the person about the card they asked for: ask the next round of questions, or write the card when nothing material is unknown.';
+      return 'Interview the person about the work they asked for: ask the next round of questions, or — when nothing material is unknown — write the card, or propose a split if it is several independent tasks or too big for one agent, or a stack if it is one larger piece of work whose parts must happen in order and share one look.';
     }
     const asked = `Rounds asked so far: ${state.roundsAsked} of ${state.maxRounds}.`;
+    if (state.keepOne) {
+      return `${asked} The person declined the split and keeps one card: write one \`cardDraft\` now that covers the whole request. Record every default you took under \`## Open questions\`.`;
+    }
     if (state.generate) {
-      return `${asked} The person asked to generate: write the card now. Every question they left unanswered takes its recommendation — record those under \`## Open questions\`.`;
+      return `${asked} The person asked to generate: write the card now — or the split if the request is several independent tasks or too big for one agent, or the stack if it is one larger piece of work whose parts must happen in order. Every question they left unanswered takes its recommendation — record those under \`## Open questions\`.`;
     }
     if (state.mustGenerate) {
-      return `${asked} No more rounds may be asked: write the card now, recording every default you took under \`## Open questions\`.`;
+      return `${asked} No more rounds may be asked: write the card now — or the split if the request is several independent tasks or too big for one agent, or the stack if it is one larger piece of work whose parts must happen in order — recording every default you took under \`## Open questions\`.`;
     }
-    return `${asked} Ask the next round of questions only if something material is still unknown; otherwise write the card now.`;
+    return `${asked} Ask the next round of questions only if something material is still unknown; otherwise write the card now — or propose the split, if the request is several independent tasks or too big for one agent, or the stack, if it is one larger piece of work whose parts must happen in order and share one look.`;
   },
 };
 
@@ -199,7 +204,7 @@ const assembleIntake = (input: PromptInput): string => {
     ...(input.projectInstructions?.trim()
       ? [
           '# Project instructions',
-          "The project's own Planner instructions. Where they speak about splitting plans or writing documents, they do not apply to a card intake; everything they say about the project does.",
+          "The project's own Planner instructions. Where they speak about splitting plans or writing documents, they do not apply to a New work intake; everything they say about the project does.",
           input.projectInstructions.trim(),
         ]
       : []),

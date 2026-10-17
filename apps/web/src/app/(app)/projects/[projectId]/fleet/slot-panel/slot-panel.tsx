@@ -20,6 +20,7 @@ import {
   SLOT_STATUS_LABEL,
 } from '../../../../../../lib/fleet/format';
 import { slotHue } from '../../../../../../lib/hue';
+import { slotSessionMessenger } from '../../../../../../lib/session-message/actions';
 import {
   NODE_PILL_LABEL,
   NODE_PILL_STATUS,
@@ -281,6 +282,9 @@ function SlotPanelBody({
                 conversation={conversation}
                 control={control}
                 writeReason={writeReason}
+                sessionSend={
+                  canOperate ? slotSessionMessenger(projectId, slot) : undefined
+                }
               />
             </TabPanel>
             <TabPanel value="context" className="pt-5">
@@ -341,6 +345,11 @@ function SlotPanelBody({
         target={attaching ? { kind: 'slot', slot } : undefined}
         title={slot}
         onClose={() => setAttaching(false)}
+        message={
+          canOperate
+            ? { send: slotSessionMessenger(projectId, slot) }
+            : undefined
+        }
       />
     </div>
   );

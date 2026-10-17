@@ -249,6 +249,12 @@ export const setupClaude = async (
     }
   }
   if (options.dryRun) out('Dry run: nothing was run or written.');
+  else if (!failed && !options.uninstall) {
+    // #348 D7: setup does not talk to the daemon; its next heartbeat sees it.
+    out(
+      'A running agentdock-runner reports this within 15 seconds. Sessions started before now need a restart to load the plugin.',
+    );
+  }
   return failed ? 1 : 0;
 };
 

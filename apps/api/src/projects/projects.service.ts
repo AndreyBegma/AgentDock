@@ -26,6 +26,7 @@ import {
   detectedDocsData,
   EMPTY_CLASSIFIED,
   type ProjectWithRelations,
+  profileMcpServersOf,
   toProjectDetail,
   toProjectRuntimeProfile,
   toProjectSummary,
@@ -214,9 +215,14 @@ export class ProjectsService {
   async runtimeProfiles(projectId: string): Promise<ProjectRuntimeProfile[]> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
-      select: { runnerId: true, defaultProfileId: true },
+      select: {
+        runnerId: true,
+        defaultProfileId: true,
+        runner: { select: { capabilities: true } },
+      },
     });
     if (!project) throw projectNotFound();
+    const mcpServers = profileMcpServersOf(project.runner.capabilities);
     const profiles = await this.prisma.runtimeProfile.findMany({
       where: { runnerId: project.runnerId, missing: false },
       select: {
@@ -229,7 +235,11 @@ export class ProjectsService {
       orderBy: { key: 'asc' },
     });
     return profiles.map((profile) =>
-      toProjectRuntimeProfile(profile, project.defaultProfileId),
+      toProjectRuntimeProfile(
+        profile,
+        project.defaultProfileId,
+        mcpServers.get(profile.key),
+      ),
     );
   }
 

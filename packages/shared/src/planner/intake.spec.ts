@@ -3,10 +3,17 @@ import {
   CARD_DRAFT_SECTIONS,
   CARD_DRAFT_TITLE_MAX,
   checkRoundAnswers,
+  INTAKE_SPLIT_MAX,
+  INTAKE_SPLIT_MIN,
   type IntakeTurnState,
   intakeMustGenerate,
+  intakeOutputSchema,
   intakeRoundsAsked,
   isCardDraftEnglish,
+  isIntakeCard,
+  isIntakeRound,
+  isIntakeSplit,
+  isIntakeStack,
   PLAN_MODES,
   PLAN_STATUSES,
   PLANNER_CONTRACT_VERSION,
@@ -398,5 +405,199 @@ describe('the contract text', () => {
     expect(PLANNER_INTAKE_CONTRACT).toContain('in English');
     expect(PLANNER_INTAKE_CONTRACT).toContain('"multiple"?: boolean');
     expect(PLANNER_INTAKE_CONTRACT).toContain('"cardDraft": CardDraft');
+  });
+
+  it('the intake text offers the split and keep-one rules (#409)', () => {
+    expect(PLANNER_INTAKE_CONTRACT).toContain('"split": Split');
+    expect(PLANNER_INTAKE_CONTRACT).toContain(
+      `${INTAKE_SPLIT_MIN}–${INTAKE_SPLIT_MAX}`,
+    );
+    expect(PLANNER_INTAKE_CONTRACT).toContain('keep one card');
+    expect(PLANNER_INTAKE_CONTRACT).not.toContain('New Plan');
+  });
+});
+
+/** #409 (docs/specs/409-new-work-intake-can-split.md): the split proposal. */
+describe('an intake turn may propose a split (#409)', () => {
+  const splitCard = (title: string, over: Record<string, unknown> = {}) => ({
+    ...cardDraft({ title }),
+    summary: `${title}, on its own card.`,
+    ...over,
+  });
+  const split = (cards: unknown[]) => ({
+    action: 'intake',
+    split: { reason: 'Это две независимые задачи.', cards },
+  });
+  const two = [
+    splitCard('Export the board as CSV'),
+    splitCard('Import the board from CSV'),
+  ];
+
+  it('takes two to eight independent cards', () => {
+    const result = parsePlannerOutput(fence(split(two)), 'intake', fresh);
+    expect(result.ok).toBe(true);
+    if (result.ok && 'split' in result.output) {
+      expect(result.output.split.cards.map((c) => c.title)).toEqual([
+        'Export the board as CSV',
+        'Import the board from CSV',
+      ]);
+    }
+    const eight = Array.from({ length: INTAKE_SPLIT_MAX }, (_, i) =>
+      splitCard(`Export the board as CSV, part ${i + 1}`),
+    );
+    expect(reasonOf(split(eight))).toBeNull();
+  });
+
+  it('refuses one card, more than eight, or a card without its summary', () => {
+    expect(reasonOf(split([two[0]]))).toBe('invalid_shape');
+    const nine = Array.from({ length: INTAKE_SPLIT_MAX + 1 }, (_, i) =>
+      splitCard(`Export part ${i + 1}`),
+    );
+    expect(reasonOf(split(nine))).toBe('invalid_shape');
+    const { summary: _summary, ...bare } = two[0];
+    expect(reasonOf(split([bare, two[1]]))).toBe('invalid_shape');
+  });
+
+  it('holds every card to the card rules: the sections and English', () => {
+    expect(
+      reasonOf(
+        split([
+          two[0],
+          splitCard('Import the board from CSV', { body: 'Just do it.' }),
+        ]),
+      ),
+    ).toBe('missing_card_section');
+    expect(reasonOf(split([two[0], splitCard('Импорт доски из CSV')]))).toBe(
+      'not_english',
+    );
+    expect(
+      reasonOf(split([two[0], splitCard('Импорт доски из CSV')]), {
+        ...fresh,
+        acceptNonEnglish: true,
+      }),
+    ).toBeNull();
+  });
+
+  it('may answer Enough — generate or the last round', () => {
+    expect(reasonOf(split(two), { roundsAsked: 0, generate: true })).toBeNull();
+    expect(
+      reasonOf(split(two), {
+        roundsAsked: PLANNER_INTAKE_MAX_ROUNDS,
+        generate: false,
+      }),
+    ).toBeNull();
+  });
+
+  it('after Keep one card, only the one card passes', () => {
+    const keepOne: IntakeTurnState = { ...fresh, keepOne: true };
+    expect(intakeMustGenerate(keepOne)).toBe(true);
+    expect(reasonOf(split(two), keepOne)).toBe('split_declined');
+    expect(reasonOf(round, keepOne)).toBe('must_generate');
+    expect(reasonOf(card, keepOne)).toBeNull();
+  });
+
+  it('is told apart from a round and a card', () => {
+    const output = intakeOutputSchema.parse(split(two));
+    expect(isIntakeSplit(output)).toBe(true);
+    expect(isIntakeCard(output)).toBe(false);
+    expect(isIntakeRound(output)).toBe(false);
+    expect(isIntakeSplit(intakeOutputSchema.parse(card))).toBe(false);
+  });
+
+  it('a turn input carries Keep one card', () => {
+    expect(planTurnInputSchema.parse({ keepOne: true })).toEqual({
+      keepOne: true,
+    });
+  });
+});
+
+/** #480 (ADR-0044): the stack proposal — cards in ordered stages. */
+describe('an intake turn may propose a stack (#480)', () => {
+  const stackCard = (title: string, over: Record<string, unknown> = {}) => ({
+    ...cardDraft({ title }),
+    summary: `${title}, as one part of the page.`,
+    ...over,
+  });
+  const stack = (stages: unknown[], over: Record<string, unknown> = {}) => ({
+    action: 'intake',
+    stack: {
+      reason: 'Одна страница: сначала компоненты, потом страница.',
+      title: 'Redesign the settings page',
+      body: 'Move the settings page to the new layout: the components come first, then the page that is built from them.',
+      design: true,
+      stages,
+      ...over,
+    },
+  });
+  const twoStages = [
+    {
+      title: 'Components',
+      cards: [stackCard('Add the toggle row to the kit')],
+    },
+    { title: 'Page', cards: [stackCard('Compose the settings page')] },
+  ];
+
+  it('takes cards in two or more stages and is told apart from a split', () => {
+    const result = parsePlannerOutput(fence(stack(twoStages)), 'intake', fresh);
+    expect(result.ok).toBe(true);
+    const output = intakeOutputSchema.parse(stack(twoStages));
+    expect(isIntakeStack(output)).toBe(true);
+    expect(isIntakeSplit(output)).toBe(false);
+    expect(isIntakeCard(output)).toBe(false);
+  });
+
+  it('refuses one stage, fewer than two or more than eight cards in all', () => {
+    expect(
+      reasonOf(
+        stack([{ title: 'All', cards: twoStages.flatMap((s) => s.cards) }]),
+      ),
+    ).toBe('invalid_shape');
+    const nine = Array.from({ length: INTAKE_SPLIT_MAX + 1 }, (_, i) =>
+      stackCard(`Add the part ${i + 1} of the page`),
+    );
+    expect(
+      reasonOf(
+        stack([
+          { title: 'One', cards: nine.slice(0, 5) },
+          { title: 'Two', cards: nine.slice(5) },
+        ]),
+      ),
+    ).toBe('invalid_shape');
+    expect(reasonOf(stack([{ title: 'One', cards: [] }, twoStages[1]]))).toBe(
+      'invalid_shape',
+    );
+  });
+
+  it('holds every card to the card rules, and the stack to English', () => {
+    expect(
+      reasonOf(
+        stack([
+          twoStages[0],
+          {
+            title: 'Page',
+            cards: [stackCard('Compose the page', { body: 'Just do it.' })],
+          },
+        ]),
+      ),
+    ).toBe('missing_card_section');
+    expect(
+      reasonOf(
+        stack(twoStages, {
+          title: 'Новая страница настроек',
+          body: 'Сначала компоненты, потом страница из них.',
+        }),
+      ),
+    ).toBe('not_english');
+  });
+
+  it('after Keep one card, a stack is refused like a split', () => {
+    expect(reasonOf(stack(twoStages), { ...fresh, keepOne: true })).toBe(
+      'split_declined',
+    );
+  });
+
+  it('the intake text offers the stack', () => {
+    expect(PLANNER_INTAKE_CONTRACT).toContain('"stack": Stack');
+    expect(PLANNER_INTAKE_CONTRACT).toContain('Propose a `stack`');
   });
 });

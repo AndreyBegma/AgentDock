@@ -1,21 +1,25 @@
 import {
   type CardAutoRun,
-  type CardAutoRunFailure,
   type CardDesignLaunchRequest,
   DESIGN_COMMENTS_PER_TURN_MAX,
   DESIGN_ERROR,
   type DesignCommentRequest,
-  isCardAutoRunCode,
   PLANNER_ERROR,
   type TaskDesignPatchRequest,
   type TaskDesignView,
 } from '@agentdock/shared';
 import { RUNNER_FEATURE_COMMANDS } from '@agentdock/shared/protocol';
-import { HttpException, Injectable, type OnModuleInit } from '@nestjs/common';
-import type { BoardCard, Plan, PlanTask, TaskDesign } from '@prisma/client';
+import { Injectable, type OnModuleInit } from '@nestjs/common';
+import type {
+  BoardCard,
+  BoardStack,
+  Plan,
+  PlanTask,
+  TaskDesign,
+} from '@prisma/client';
 import { CardAssessor } from '../assess/card-assessor';
 import { AuditService } from '../audit/audit.service';
-import { cardNotFound } from '../board/board-error';
+import { autoRunFailureOf, cardNotFound } from '../board/board-error';
 import { BoardRoundsService } from '../board/board-rounds.service';
 import { PrismaService } from '../database/prisma.service';
 import { CardDesignTurnService } from '../planner/card-design-turn.service';
@@ -24,6 +28,7 @@ import { blockingOpen, questionsOf } from '../planner/plan-mapper';
 import { PlanStore } from '../planner/plan-store';
 import { type PlanCaller, PlanTurnService } from '../planner/plan-turn.service';
 import { plannerError } from '../planner/planner-error';
+import { StackDesignTurnService } from '../planner/stack-design-turn.service';
 import { TextNormalizer } from '../text/text-normalizer';
 import { TextOwners } from '../text/text-owners';
 import { settleDesign } from './design-apply';
@@ -60,30 +65,6 @@ const busy = () =>
 const approvedAlready = (what = 'The design is approved') =>
   designError(409, DESIGN_ERROR.designApproved, what);
 
-/** #273 D8: `CardAutoRun.message` is at most this many characters. */
-const AUTO_RUN_MESSAGE_MAX = 500;
-
-/**
- * #273 D8: why a start was refused — the refusal's `error` when it is a
- * board code (`max_running`, `budget_exceeded`, `command_unavailable`, …),
- * else `unknown`, with its message.
- */
-const autoRunFailureOf = (
-  error: unknown,
-): { code: CardAutoRunFailure['code']; message: string } => {
-  const body = error instanceof HttpException ? error.getResponse() : null;
-  const code =
-    body !== null &&
-    typeof body === 'object' &&
-    'error' in body &&
-    typeof body.error === 'string' &&
-    isCardAutoRunCode(body.error)
-      ? body.error
-      : 'unknown';
-  const message = error instanceof Error ? error.message : String(error);
-  return { code, message: message.slice(0, AUTO_RUN_MESSAGE_MAX) };
-};
-
 /** How strictly a task owner is checked: any change, or only a comment. */
 type TaskCheck = 'change' | 'comment';
 
@@ -102,6 +83,7 @@ export class DesignService implements OnModuleInit {
     private readonly store: PlanStore,
     private readonly turns: PlanTurnService,
     private readonly cardTurns: CardDesignTurnService,
+    private readonly stackTurns: StackDesignTurnService,
     private readonly rounds: BoardRoundsService,
     private readonly profiles: UiProfileService,
     private readonly audit: AuditService,
@@ -118,12 +100,21 @@ export class DesignService implements OnModuleInit {
         const comment = await this.prisma.designComment.findUnique({
           where: { id: commentId },
           select: {
-            design: { select: { planId: true, taskKey: true, cardId: true } },
+            design: {
+              select: {
+                planId: true,
+                taskKey: true,
+                cardId: true,
+                stackId: true,
+              },
+            },
           },
         });
         const design = comment?.design;
         if (design?.cardId) {
           this.store.publishCardDesign(projectId, design.cardId);
+        } else if (design?.stackId) {
+          this.store.publishStackDesign(projectId, design.stackId);
         } else if (design?.planId) {
           this.store.publishDesign(projectId, design.planId, design.taskKey);
         }
@@ -306,6 +297,71 @@ export class DesignService implements OnModuleInit {
     return run;
   }
 
+  // ─── Stack (#480, ADR-0044) ────────────────────────────────────────────────
+
+  /** `GET …/board/stacks/:number/design`: any project viewer. */
+  async stackView(projectId: string, number: number): Promise<TaskDesignView> {
+    const stack = await this.stack(projectId, number);
+    const project = await this.store.project(projectId);
+    return loadDesignView(this.prisma, project, { stackId: stack.id });
+  }
+
+  async stackPatch(
+    projectId: string,
+    number: number,
+    request: TaskDesignPatchRequest,
+    actor: PlanActor,
+  ): Promise<void> {
+    await this.patchOf(
+      await this.stackOwner(projectId, number),
+      request,
+      actor,
+    );
+  }
+
+  async stackGenerate(
+    projectId: string,
+    number: number,
+    actor: PlanActor,
+  ): Promise<void> {
+    await this.generateOf(await this.stackOwner(projectId, number), actor);
+  }
+
+  async stackRevise(
+    projectId: string,
+    number: number,
+    actor: PlanActor,
+  ): Promise<void> {
+    await this.reviseOf(await this.stackOwner(projectId, number), actor);
+  }
+
+  async stackComment(
+    projectId: string,
+    number: number,
+    request: DesignCommentRequest,
+    actor: PlanActor,
+  ): Promise<void> {
+    await this.commentOf(
+      await this.stackOwner(projectId, number),
+      request,
+      actor,
+    );
+  }
+
+  /** Approving lifts the design-first gate: the stack's cards may run. */
+  async stackApprove(
+    projectId: string,
+    number: number,
+    revisionId: string,
+    actor: PlanActor,
+  ): Promise<void> {
+    await this.approveOf(
+      await this.stackOwner(projectId, number),
+      revisionId,
+      actor,
+    );
+  }
+
   // ─── Both owners ───────────────────────────────────────────────────────────
 
   /**
@@ -418,13 +474,22 @@ export class DesignService implements OnModuleInit {
     }
     const revision = await this.prisma.designRevision.findFirst({
       where: { id: request.revisionId, designId: design.id },
-      select: { id: true },
+      select: { id: true, _count: { select: { frames: true } } },
     });
     if (!revision) {
       throw designError(
         400,
         DESIGN_ERROR.invalidArgs,
         'The revision is not a revision of this design',
+      );
+    }
+    // #441: a revision stored before frames has one, its `html`.
+    const frame = request.frame ?? 0;
+    if (frame >= Math.max(revision._count.frames, 1)) {
+      throw designError(
+        400,
+        DESIGN_ERROR.invalidArgs,
+        'The frame is not a frame of this revision',
       );
     }
     const anchor = commentAnchor(request);
@@ -435,6 +500,7 @@ export class DesignService implements OnModuleInit {
       data: {
         designId: design.id,
         revisionId: revision.id,
+        frame,
         authorId: actor.userId,
         kind: request.kind,
         ...anchor,
@@ -530,6 +596,7 @@ export class DesignService implements OnModuleInit {
         include: {
           plan: true,
           card: { include: { _count: { select: { rounds: true } } } },
+          stack: true,
         },
       });
       if (!design || !isBusy(design)) continue;
@@ -543,6 +610,10 @@ export class DesignService implements OnModuleInit {
         if (design.card) {
           this.store.publishCardDesign(design.card.projectId, key.cardId);
         }
+      } else if ('stackId' in key) {
+        if (design.stack) {
+          this.store.publishStackDesign(design.stack.projectId, key.stackId);
+        }
       } else if (design.plan) {
         this.store.publishDesign(
           design.plan.projectId,
@@ -554,9 +625,10 @@ export class DesignService implements OnModuleInit {
   }
 
   private keyOf(
-    design: Pick<TaskDesign, 'planId' | 'taskKey' | 'cardId'>,
+    design: Pick<TaskDesign, 'planId' | 'taskKey' | 'cardId' | 'stackId'>,
   ): DesignKey | null {
     if (design.cardId !== null) return { cardId: design.cardId };
+    if (design.stackId !== null) return { stackId: design.stackId };
     if (design.planId !== null && design.taskKey !== null) {
       return { planId: design.planId, taskKey: design.taskKey };
     }
@@ -567,6 +639,7 @@ export class DesignService implements OnModuleInit {
     design: TaskDesign & {
       plan: Plan | null;
       card: (BoardCard & { _count: { rounds: number } }) | null;
+      stack: BoardStack | null;
     },
     key: DesignKey,
     w: WaitingDesign,
@@ -582,6 +655,10 @@ export class DesignService implements OnModuleInit {
       // Designs freeze once a round exists (#243 "Out of scope").
       if (!design.card || design.card._count.rounds > 0) return false;
       return this.cardTurns.chain(key.cardId, batch, w.userId);
+    }
+    if ('stackId' in key) {
+      if (!design.stack) return false;
+      return this.stackTurns.chain(key.stackId, batch, w.userId);
     }
     const plan = design.plan;
     if (!plan || plan.status === 'sent' || plan.status === 'archived') {
@@ -827,6 +904,54 @@ export class DesignService implements OnModuleInit {
   }
 
   /**
+   * #480: a stack's shared design. It changes until it is approved; approving
+   * closes its design worktree and lifts the gate on the stack's cards.
+   */
+  private async stackOwner(
+    projectId: string,
+    number: number,
+  ): Promise<DesignOwner> {
+    const stack = await this.stack(projectId, number);
+    return {
+      kind: 'stack',
+      key: { stackId: stack.id },
+      projectId,
+      target: { type: 'board_stack', id: stack.id },
+      label: { stack: number },
+      gate: async () => {},
+      assertIdle: async () => {
+        const active = await this.prisma.planTurn.count({
+          where: { stackId: stack.id, phase: { in: ['queued', 'running'] } },
+        });
+        if (active > 0) {
+          throw plannerError(
+            409,
+            PLANNER_ERROR.turnInProgress,
+            'A design turn of this stack is queued or running',
+          );
+        }
+      },
+      runTurn: (batch, caller) => this.stackTurns.start(stack, batch, caller),
+      onApproved: async (_design, actor) => {
+        await this.stackTurns.close(stack, actor);
+        // Every card of the stack may run now: their faces change.
+        this.store.publishStackDesign(projectId, stack.id);
+      },
+      publish: () => this.store.publishStackDesign(projectId, stack.id),
+    };
+  }
+
+  private async stack(projectId: string, number: number): Promise<BoardStack> {
+    const stack = await this.prisma.boardStack.findUnique({
+      where: { projectId_number: { projectId, number } },
+    });
+    if (!stack) {
+      throw designError(404, DESIGN_ERROR.notFound, 'Stack not found');
+    }
+    return stack;
+  }
+
+  /**
    * #273 D8, D9: round 1 as the approver. A refused start never fails the
    * approval, which has committed: it is stored on the card, audited and
    * answered as `run_failed`.
@@ -852,6 +977,8 @@ export class DesignService implements OnModuleInit {
           autoRunError: code,
           autoRunMessage: message,
           autoRunFailedAt: at,
+          // #443: this failure is the design's, not Auto-run when ready's.
+          autoRunAfter: null,
         },
       });
       await this.audit.record({

@@ -21,7 +21,7 @@ import { useProjectDetail } from '../../use-project-detail';
 /**
  * A plan on the retired Planner page (#337 D11): read-only — no turns, no
  * reviews, no send. Its tasks keep projecting onto the Board until it is
- * closed, and Archive closes it. New plans start on the Board.
+ * closed, and Archive closes it. New work starts on the Board (#409).
  * `?task=<key>` selects a task; it is the deep link `/tasks` rows open.
  */
 export default function PlanPage() {
@@ -81,8 +81,8 @@ export default function PlanPage() {
           </Link>
         }
       >
-        The Planner moved onto the Board: New Card and New Plan start there.
-        This plan’s tasks still show on the Board until it is archived.
+        The Planner moved onto the Board: New work starts there. This plan’s
+        tasks still show on the Board until it is archived.
       </Banner>
       <AsyncSection
         section={section}

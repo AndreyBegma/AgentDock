@@ -1,0 +1,7 @@
+{
+  "argv": ["cargo", "test"],
+  "exitCode": 101,
+  "category": "test",
+  "outcome": "failing",
+  "expect": "filtered"
+}

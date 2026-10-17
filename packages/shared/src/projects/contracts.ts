@@ -164,6 +164,12 @@ export interface ProjectRuntimeProfile {
   authenticated: boolean;
   /** The project's `defaultProfileId` points at this profile. */
   isDefault: boolean;
+  /**
+   * #445 D6: the MCP servers in the profile's own Claude config, by name —
+   * what the Token saver allowlist picks from. Absent means unknown: a runner
+   * older than the field, or a Codex profile.
+   */
+  mcpServers?: string[];
 }
 
 /** `POST /admin/projects/inspect`. Answers a `ProjectInspection`. */

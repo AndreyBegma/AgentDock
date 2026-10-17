@@ -1,6 +1,10 @@
 import { z } from 'zod';
+import { mcpServerNameSchema } from '../token-saver/contracts';
 // Type-only: `./commands` imports this module's schemas.
 import type { CommandName } from './commands';
+
+/** At most this many MCP server names on one runtime profile (#445). */
+export const PROFILE_MCP_SERVERS_MAX = 64;
 
 export const runtimeSchema = z.enum(['claude', 'codex']);
 export type Runtime = z.infer<typeof runtimeSchema>;
@@ -36,6 +40,15 @@ export const runtimeProfileSchema = z.object({
    * the field, or a Codex profile — never "not installed".
    */
   agentdock: profileAgentdockSchema.optional(),
+  /**
+   * #445 D6: the names of the MCP servers in this profile's own Claude config —
+   * names only, never a command, env or secret. Absent means unknown: a runner
+   * older than the field, or a Codex profile.
+   */
+  mcpServers: z
+    .array(mcpServerNameSchema)
+    .max(PROFILE_MCP_SERVERS_MAX)
+    .optional(),
 });
 export type RuntimeProfile = z.infer<typeof runtimeProfileSchema>;
 
@@ -86,6 +99,34 @@ export const capabilitiesSchema = z.object({
    * runner older than the field. Next to `git`, which stays the version.
    */
   gitAuth: z.object({ github: z.enum(['gh', 'native']) }).optional(),
+  /**
+   * #445: the runner takes `tokenSaver` on its launch commands. Every launch
+   * args schema is strict, so the API sends the field only when this is
+   * `true`. Absent means `false` — a runner older than the feature.
+   */
+  tokenSaver: z.boolean().optional(),
+  /**
+   * #447: the runner serves Steward — it reads `watchedProjectSchema.steward`,
+   * sends `steward.observed` / `steward.acted`, and handles `session.nudge`,
+   * `session.dismiss`, `card.resume` and — when `commands` lists it —
+   * `digest.compose` (#491). The API sends those commands only when this is
+   * `true`. Absent means `false` — a runner older than Steward.
+   */
+  steward: z.boolean().optional(),
+  /**
+   * #449: the runner serves Context handoff — it keeps notes, picks the
+   * restart, sends `handoff.updated` / `round.restart` / `round.warmup`, and
+   * handles `card.handoff.set`. The API sends that command only when this is
+   * `true`. Absent means `false` — a runner older than Context handoff.
+   */
+  handoff: z.boolean().optional(),
+  /**
+   * #489: the runner handles `session.message` — a person's text or answer
+   * typed into a card round's or a fleet slot's session — and reports a
+   * card round's question selector as `card_run.pending_question`. The API
+   * sends the command only when this is `true`. Absent means `false`.
+   */
+  sessionMessage: z.boolean().optional(),
 });
 export type Capabilities = z.infer<typeof capabilitiesSchema>;
 
@@ -99,6 +140,22 @@ export type GitGithubAuth = NonNullable<Capabilities['gitAuth']>['github'];
 /** Whether the UI may offer an attach on this runner; absent `terminal` is `false`. */
 export const terminalAvailable = (capabilities: Capabilities): boolean =>
   capabilities.terminal === true;
+
+/** Whether the API may send `tokenSaver` on launch commands; absent is `false`. */
+export const tokenSaverAvailable = (capabilities: Capabilities): boolean =>
+  capabilities.tokenSaver === true;
+
+/** Whether the API may send Steward's commands (#447); absent is `false`. */
+export const stewardAvailable = (capabilities: Capabilities): boolean =>
+  capabilities.steward === true;
+
+/** Whether the API may send `card.handoff.set` (#449); absent is `false`. */
+export const handoffAvailable = (capabilities: Capabilities): boolean =>
+  capabilities.handoff === true;
+
+/** Whether the API may send `session.message` (#489); absent is `false`. */
+export const sessionMessageAvailable = (capabilities: Capabilities): boolean =>
+  capabilities.sessionMessage === true;
 
 /** What a runner said it serves (#233, ADR-0023): names only, never paths or versions. */
 export interface RunnerCommands {

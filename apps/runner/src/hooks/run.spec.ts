@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ActionRequestSummary } from '@agentdock/shared';
+import { CardStore } from '../cards/record';
+import { HandoffStateStore } from '../handoff/state';
+import { validNote } from '../handoff/testing';
 import { type LocalHandler, LocalSocketServer } from '../local/server';
 import type { LocalResult } from '../local/types';
 import { fakeExec, memoryLogger, tempDir } from '../testing/fixtures';
@@ -98,6 +101,8 @@ describe('agentdock-runner hook (spec 201 D11–D17)', () => {
       clock += ms;
     },
     now: () => clock,
+    // Never the real card store of the machine running the tests.
+    cardsDir: join(dir, 'no-cards'),
     ...overrides,
   });
 
@@ -160,6 +165,135 @@ describe('agentdock-runner hook (spec 201 D11–D17)', () => {
     });
   });
 
+  describe('the card note at session start (#449 D6, D8)', () => {
+    const cardSetup = () => {
+      const worktree = join(dir, '.wt-app-card-ab12cd34');
+      const cardsDir = join(dir, 'cards');
+      mkdirSync(join(worktree, '.agentdock'), { recursive: true });
+      const store = new CardStore(cardsDir);
+      store.save({
+        cardId: 'cmcard01',
+        projectId: 'p1',
+        root: join(dir, 'app'),
+        repo: 'acme/app',
+        shortId: 'ab12cd34',
+        worktree,
+        branch: 'card/c12-add-login',
+        base: 'main',
+        tmuxSession: 'agentdock-card-ab12cd34',
+        runId: 'run_1',
+        phase: 'ended',
+        startedAt: '2026-10-16T10:00:00.000Z',
+      });
+      new HandoffStateStore((id) => store.dir(id)).save('cmcard01', {
+        note: {
+          content: validNote('Ship the login page.'),
+          personLines: [],
+          updatedBy: 'agent',
+          updatedAt: '2026-10-16T11:00:00.000Z',
+        },
+        number: 12,
+        asked: [],
+        sessions: [],
+      });
+      const input = (source: string) =>
+        JSON.stringify({
+          ...JSON.parse(fixture('session-start')),
+          cwd: worktree,
+          source,
+        });
+      return { worktree, cardsDir, input };
+    };
+    const context = () =>
+      JSON.parse(stdout.join('')).hookSpecificOutput.additionalContext;
+
+    it('adds the note after the project context for a person’s session', async () => {
+      const c = cardSetup();
+      daemon(({ op }) =>
+        op === 'request'
+          ? { ok: true, data: { text: 'Project app, base develop.' } }
+          : { ok: true, data: { queued: true } },
+      );
+      await runHook(
+        ['session-start'],
+        deps(c.input('startup'), { cwd: c.worktree, cardsDir: c.cardsDir }),
+      );
+      expect(context()).toStartWith('Project app, base develop.\n\n');
+      expect(context()).toContain('AgentDock card C-12');
+      expect(context()).toContain('Ship the login page.');
+    });
+
+    it('reaches the session with the daemon down', async () => {
+      const c = cardSetup();
+      await runHook(
+        ['session-start'],
+        deps(c.input('resume'), { cwd: c.worktree, cardsDir: c.cardsDir }),
+      );
+      expect(context()).toContain('Ship the login page.');
+    });
+
+    it('gives the card’s own worker the note only after a compaction', async () => {
+      const c = cardSetup();
+      const env = { AGENTDOCK_CARD: 'ab12cd34' };
+      await runHook(
+        ['session-start'],
+        deps(c.input('startup'), {
+          env,
+          cwd: c.worktree,
+          cardsDir: c.cardsDir,
+        }),
+      );
+      expect(stdout).toEqual([]);
+      await runHook(
+        ['session-start'],
+        deps(c.input('compact'), {
+          env,
+          cwd: c.worktree,
+          cardsDir: c.cardsDir,
+        }),
+      );
+      expect(context()).toContain('Ship the login page.');
+      expect(context()).not.toContain('older than the last commit');
+    });
+
+    it('#494: the worker’s start after a compaction carries the request owed before it', async () => {
+      const c = cardSetup();
+      const env = { AGENTDOCK_CARD: 'ab12cd34' };
+      const state = new HandoffStateStore((id) =>
+        new CardStore(c.cardsDir).dir(id),
+      );
+      state.update('cmcard01', (s) => {
+        s.compactAsk = 'run_1';
+      });
+      await runHook(
+        ['session-start'],
+        deps(c.input('compact'), {
+          env,
+          cwd: c.worktree,
+          cardsDir: c.cardsDir,
+        }),
+      );
+      expect(context()).toContain(
+        'The note is older than the last commit: update it first',
+      );
+      expect(context()).toContain('Ship the login page.');
+      // Owed to an older round: not this one's request.
+      stdout = [];
+      state.update('cmcard01', (s) => {
+        s.compactAsk = 'run_0';
+      });
+      await runHook(
+        ['session-start'],
+        deps(c.input('compact'), {
+          env,
+          cwd: c.worktree,
+          cardsDir: c.cardsDir,
+        }),
+      );
+      expect(context()).not.toContain('older than the last commit');
+    });
+  });
+
   it('session-start prints nothing when the context is empty or refused', async () => {
     daemon(({ op }) =>
       op === 'request'
@@ -179,6 +313,66 @@ describe('agentdock-runner hook (spec 201 D11–D17)', () => {
       content: { input: { truncated: false }, output: { truncated: false } },
     });
     expect(stdout).toEqual([]);
+  });
+
+  it('stop reports the background tasks its transcript says still run (#390)', async () => {
+    daemon(() => ({ ok: true, data: { queued: true } }));
+    const transcript = join(dir, 'session.jsonl');
+    await Bun.write(
+      transcript,
+      [
+        JSON.stringify({
+          type: 'assistant',
+          message: {
+            content: [
+              {
+                type: 'tool_use',
+                id: 'tu_1',
+                name: 'Bash',
+                input: {
+                  command: 'bunx jest --selectProjects e2e',
+                  run_in_background: true,
+                },
+              },
+            ],
+          },
+        }),
+        JSON.stringify({
+          type: 'user',
+          message: { content: [{ tool_use_id: 'tu_1', type: 'tool_result' }] },
+          toolUseResult: { backgroundTaskId: 'b1' },
+        }),
+      ].join('\n'),
+    );
+    const input = {
+      ...JSON.parse(fixture('stop')),
+      transcript_path: transcript,
+    };
+    await runHook(
+      ['stop'],
+      deps(JSON.stringify(input), {
+        readFile: (path) => readFileSync(path, 'utf8'),
+      }),
+    );
+    expect(calls[0]?.args).toMatchObject({
+      type: 'hook.stopped',
+      data: { backgroundTasks: 1 },
+      content: {
+        background: {
+          text: 'bunx jest --selectProjects e2e',
+          truncated: false,
+        },
+      },
+    });
+  });
+
+  it('stop without a readable transcript reports no background count', async () => {
+    daemon(() => ({ ok: true, data: { queued: true } }));
+    await runHook(['stop'], deps(fixture('stop')));
+    expect(calls[0]?.args).toMatchObject({ type: 'hook.stopped', data: {} });
+    expect(
+      (calls[0]?.args.data as Record<string, unknown>).backgroundTasks,
+    ).toBeUndefined();
   });
 
   it('an unknown hook name or bad stdin exits 0 silently', async () => {

@@ -8,6 +8,7 @@ import { systemClock } from '../clock';
 import { createExec, type Exec } from '../detect/exec';
 import { memoryLogger } from '../testing/fixtures';
 import { workspace } from '../testing/projects';
+import { releaseTmuxServer } from '../testing/tmux';
 import {
   TerminalManager,
   type TerminalManagerOptions,
@@ -58,7 +59,7 @@ const fixture = async () => {
   const server = ['-L', `agentdock-test-${process.pid}-${Date.now()}`];
   const env = { PATH: process.env.PATH, HOME: ws.ws };
   const tmuxExec = createExec(env);
-  killServer = () => tmuxExec('tmux', [...server, 'kill-server']);
+  killServer = () => releaseTmuxServer(server);
   const exec: Exec = (bin, args) =>
     bin === 'git' ? ws!.git(bin, args) : tmuxExec(bin, args);
   const tmux = (...args: string[]) => tmuxExec('tmux', [...server, ...args]);

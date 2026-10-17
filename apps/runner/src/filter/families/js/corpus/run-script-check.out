@@ -1,0 +1,3 @@
+$ bun run --cwd packages/shared build && biome check
+$ tsc
+Checked 214 files in 61ms. No fixes applied.

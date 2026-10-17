@@ -7,6 +7,7 @@ import {
   type ActivityQuery,
   type ActivitySeverity,
   MAX_LIVE_SUBSCRIPTIONS,
+  STEWARD_ACTIVITY_TYPES,
 } from '@agentdock/shared';
 import type { TimelineItem } from '@andrewbehma/glass-ui/timeline';
 import { ApiError } from '../api';
@@ -170,10 +171,32 @@ export function typeLabel(type: string): string {
     .join(' ');
 }
 
-/** The Type filter's options: every code the feed shows, by readable name. */
+const STEWARD_TYPE_LABEL: Record<string, string> = {
+  'steward_incident.opened': 'Incident opened',
+  'steward_incident.acted': 'Action taken',
+  'steward_incident.escalated': 'Needs you',
+  'steward_incident.resolved': 'Resolved',
+};
+
+/**
+ * #447 D15: the **Steward** group of the Type filter — the incident events
+ * (category Fleet), in the order an incident moves. The feed filters by one
+ * type at a time.
+ */
+export const STEWARD_TYPE_OPTIONS: readonly { value: string; label: string }[] =
+  STEWARD_ACTIVITY_TYPES.map((value) => ({
+    value,
+    label: STEWARD_TYPE_LABEL[value] ?? typeLabel(value),
+  }));
+
+const isStewardType = (value: string): boolean =>
+  (STEWARD_ACTIVITY_TYPES as readonly string[]).includes(value);
+
+/** The Type filter's options: every other code the feed shows, by readable name. */
 export const TYPE_OPTIONS: readonly { value: string; label: string }[] = [
   ...new Set([...ACTIVITY_EVENT_TYPES, ...ACTIVITY_AUDIT_ACTIONS]),
 ]
+  .filter((value) => !isStewardType(value))
   .map((value) => ({ value, label: typeLabel(value) }))
   .sort((a, b) => a.label.localeCompare(b.label));
 

@@ -157,11 +157,21 @@ describe('projects (e2e)', () => {
 
       // Pushed to the connected runner, and listed in every later welcome.
       const pushed = await runner.socket.next('config');
-      expect(pushed.config.projects).toEqual([{ id: project.id, root: ROOT }]);
+      expect(pushed.config.projects).toEqual([
+        {
+          id: project.id,
+          root: ROOT,
+          steward: { enabled: true, silenceMinutes: 10, trailerGuard: true },
+        },
+      ]);
       const fresh = new TestRunnerSocket(ctx.origin, token);
       sockets.push(fresh);
       expect((await fresh.connect()).config.projects).toEqual([
-        { id: project.id, root: ROOT },
+        {
+          id: project.id,
+          root: ROOT,
+          steward: { enabled: true, silenceMinutes: 10, trailerGuard: true },
+        },
       ]);
 
       const list = await admin.get('/projects');
@@ -585,7 +595,11 @@ describe('projects (e2e)', () => {
       expect(refused.status).toBe(403);
       expect(refused.body.error).toBe('path_not_allowed');
       expect((await runner.socket.next('config')).config.projects).toEqual([
-        { id: project.id, root: ROOT },
+        {
+          id: project.id,
+          root: ROOT,
+          steward: { enabled: true, silenceMinutes: 10, trailerGuard: true },
+        },
       ]);
     });
 
@@ -760,6 +774,31 @@ describe('projects (e2e)', () => {
       ]);
       expect(response.text).not.toContain('/home/');
       expect(response.text).not.toContain(main.id);
+    });
+
+    it('#445: carries the MCP server names the runner reports per profile', async () => {
+      const a = await seedProject('/srv/a');
+      await seedProfile(runnerId, 'claude-main');
+      await seedProfile(runnerId, 'codex-main', { runtime: 'codex' });
+      await ctx.prisma.runner.update({
+        where: { id: runnerId },
+        data: {
+          capabilities: {
+            ...capabilities,
+            profiles: [
+              { ...capabilities.profiles[0], mcpServers: ['playwright', 'gh'] },
+              // A malformed entry hides nothing else.
+              { id: 'codex-main', mcpServers: ['not a name'] },
+            ],
+          },
+        },
+      });
+      const response = await admin.get(`/projects/${a.id}/runtime-profiles`);
+      expect(response.status).toBe(200);
+      const [claude, codex] = response.body as Record<string, unknown>[];
+      expect(claude.mcpServers).toEqual(['playwright', 'gh']);
+      // Unknown, never "none".
+      expect(codex).not.toHaveProperty('mcpServers');
     });
   });
 

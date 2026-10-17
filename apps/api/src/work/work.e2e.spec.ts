@@ -206,6 +206,69 @@ describe('work list (e2e)', () => {
     });
   });
 
+  describe('fleet source (#388)', () => {
+    beforeEach(async () => {
+      await w.card({ project: w.a, number: 1, updatedAt: at(1) });
+      await w.card({
+        project: w.a,
+        number: 2,
+        column: 'in_progress',
+        issueNumber: 359,
+        updatedAt: at(2),
+        fleet: { issue: 359, slot: 'i359-api', stage: 'plan_ready' },
+      });
+      await w.card({
+        project: w.a,
+        number: 3,
+        column: 'finished',
+        issueNumber: 359,
+        updatedAt: at(3),
+        fleet: { issue: 359, slot: 'i359-web' },
+      });
+    });
+
+    it('reports a fleet card as fleet, with its slot, and a manual card as card', async () => {
+      const { items } = await list();
+      expect(
+        items.map((i) => [i.source, i.source !== 'plan' && i.label]),
+      ).toEqual([
+        ['fleet', 'C-3'],
+        ['fleet', 'C-2'],
+        ['card', 'C-1'],
+      ]);
+      expect(
+        items.find((i) => i.source === 'fleet' && i.number === 2),
+      ).toMatchObject({
+        fleet: {
+          issue: 359,
+          slot: 'i359-api',
+          stage: 'plan_ready',
+          slotGone: false,
+        },
+      });
+      expect(items.find((i) => i.source === 'card')).not.toHaveProperty(
+        'fleet',
+      );
+    });
+
+    it('filters: fleet returns only fleet cards, card none of them', async () => {
+      expect(ids((await list({ source: 'fleet' })).items)).toEqual([
+        'C-3',
+        'C-2',
+      ]);
+      expect(ids((await list({ source: 'card' })).items)).toEqual(['C-1']);
+      expect(ids((await list({ source: 'inbox' })).items)).toEqual([]);
+    });
+
+    it('narrows fleet by status and finds a slot by label or issue', async () => {
+      expect(
+        ids((await list({ source: 'fleet', status: 'in_progress' })).items),
+      ).toEqual(['C-2']);
+      expect(ids((await list({ q: 'c-3' })).items)).toEqual(['C-3']);
+      expect(ids((await list({ q: '#359' })).items)).toEqual(['C-3', 'C-2']);
+    });
+  });
+
   it('pages both sources by cursor without repeats or gaps, ties included', async () => {
     // Three rows per minute — a card and two plan tasks — so pages cut
     // through rows of one `updatedAt`.

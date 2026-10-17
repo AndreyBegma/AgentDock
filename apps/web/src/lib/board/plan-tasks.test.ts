@@ -4,8 +4,10 @@ import {
   type BoardPlanTaskView,
   PLAN_TASK_MOVE_REFUSAL_TEXT,
 } from '@agentdock/shared';
+import { resolveBoardMove } from '@andrewbehma/glass-ui/board';
 import { decideDrop } from './board-state';
 import { boardView, card } from './fixtures';
+import { columnsOf } from './format';
 import {
   boardItems,
   findPlanTask,
@@ -120,6 +122,62 @@ describe('decideDrop of a plan task (D5)', () => {
       index: 0,
     });
     expect(decision.kind).toBe('move');
+  });
+});
+
+describe('a plan task is not movable (C-44)', () => {
+  const view = boardView([card(1, 'todo')]);
+  const items = boardItems(view, [planTask('t1', 'todo')]);
+  const columns = columnsOf(view).map((c) => ({
+    id: c.column,
+    title: c.column,
+    cards: items.get(c.column) ?? [],
+  }));
+  const planId = toPlanItem(planTask('t1', 'todo')).id;
+
+  test('its item says movable: false; a card item leaves the default', () => {
+    const [cardItem, planItem] = items.get('todo') ?? [];
+    expect(planItem && isPlanItem(planItem) && planItem.movable).toBe(false);
+    expect(cardItem && 'movable' in cardItem).toBe(false);
+  });
+
+  test("glass-ui's reducer refuses a drag and a menu move for it", () => {
+    expect(
+      resolveBoardMove(columns, {
+        kind: 'drop',
+        id: planId,
+        columnId: 'in_progress',
+        index: 0,
+      }),
+    ).toBeNull();
+    for (const command of ['up', 'top', { toColumnId: 'finished' }] as const) {
+      expect(
+        resolveBoardMove(columns, { kind: 'command', id: planId, command }),
+      ).toBeNull();
+    }
+  });
+
+  test('a card still moves, from either input', () => {
+    expect(
+      resolveBoardMove(columns, {
+        kind: 'command',
+        id: 'card-1',
+        command: { toColumnId: 'finished' },
+      }),
+    ).toEqual({
+      id: 'card-1',
+      fromColumnId: 'todo',
+      toColumnId: 'finished',
+      index: 0,
+    });
+    expect(
+      resolveBoardMove(columns, {
+        kind: 'drop',
+        id: 'card-1',
+        columnId: 'in_progress',
+        index: 0,
+      }),
+    ).not.toBeNull();
   });
 });
 

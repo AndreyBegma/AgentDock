@@ -6,6 +6,7 @@ import type {
 } from '@agentdock/shared/protocol';
 import { z } from 'zod';
 import type { ConfigProfile, RunnerConfig } from '../config';
+import { profileMcpServerNames } from '../launch/profile-mcp';
 import type { Exec } from './exec';
 import { claudeConfigDir, withAuthentication } from './profiles';
 
@@ -155,6 +156,25 @@ export const readProfileAgentdock = (
   telemetry: readTelemetry(configDir, otlpPort),
 });
 
+/**
+ * Every Claude profile's agentdock state, by profile id (#348 D4) — the
+ * heartbeat's `profiles`. Reads two JSON files per profile and runs nothing;
+ * a Codex profile is never in it.
+ */
+export const readClaudeProfilesAgentdock = (
+  profiles: readonly ConfigProfile[],
+  home: string,
+  otlpPort: number | null,
+): Record<string, ProfileAgentdock> =>
+  Object.fromEntries(
+    profiles
+      .filter((p) => p.runtime === 'claude')
+      .map((p) => [
+        p.id,
+        readProfileAgentdock(claudeConfigDir(p, home), otlpPort),
+      ]),
+  );
+
 /** `a.b.c` ≥ `min`, comparing the leading numbers; an unparsable version is not. */
 export const versionAtLeast = (
   version: string | null,
@@ -269,10 +289,20 @@ export const detectCapabilities = async (
               claudeConfigDir(profile, home),
               config.otlp?.http ?? null,
             ),
+            // #445 Amendment 2: names only, from the profile's own config.
+            mcpServers: profileMcpServerNames(profile, home),
           }
         : profile,
     ),
     codeSentinel,
     otlp: config.otlp,
+    // #445 Amendment 4: this runner takes `tokenSaver` on launch commands.
+    tokenSaver: true,
+    // #447: this runner observes for Steward and takes its commands.
+    steward: true,
+    // #449: this runner keeps handoff notes and takes `card.handoff.set`.
+    handoff: true,
+    // #489: this runner takes `session.message` and reports question screens.
+    sessionMessage: true,
   };
 };

@@ -217,7 +217,7 @@ describe('tabBarSplit', () => {
     expect(split('admin', '/projects/p1/queue')).toEqual({
       tabs: ['Project', 'Fleet', 'Work', 'Queue', 'Approvals'],
       more: [
-        'project: Activity, History, Skills, Schedules, Settings',
+        'project: Activity, History, Token saver, Skills, Schedules, Settings',
         'workspace: Overview, Projects, Activity, Work, Sessions, Usage, Workflows, Skills',
         'admin: Runners, Users, Schedules, Budgets, Planner instructions, Audit, Prices, Integrations, Settings',
       ],
