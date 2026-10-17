@@ -20,6 +20,7 @@ import { HandoffModule } from './handoff';
 import { HealthController } from './health.controller';
 import { HistoryModule } from './history';
 import { LiveModule } from './live/live.module';
+import { LlmModule } from './llm/llm.module';
 import { LocalModule } from './local';
 import { NotificationsModule } from './notifications';
 import { PaneModule } from './pane';
@@ -64,6 +65,7 @@ import { WorkflowsModule } from './workflows';
     WorkflowsModule,
     UsageModule,
     PricesModule,
+    LlmModule,
     QueueModule,
     PaneModule,
     ControlModule,

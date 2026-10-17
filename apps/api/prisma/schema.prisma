@@ -45,6 +45,8 @@ model User {
   membersAdded                ProjectMember[]               @relation("ProjectMemberAddedBy")
   priceVersions               PriceVersion[]
   priceRecomputes             PriceRecompute[]
+  llmProvidersUpdated         LlmProviderSetting[]
+  llmCalls                    LlmCall[]
   commandRuns                 CommandRun[]
   orchestratorSettingsUpdated ProjectOrchestratorSettings[]
   mergeApprovalsDecided       MergeApproval[]
@@ -3783,4 +3785,83 @@ model ProjectRule {
 
   @@index([projectId, position])
   @@map("project_rules")
+}
+
+// ─── LLM gateway (ADR-0059, #598) ───────────────────────────────────────────
+
+/// Mirrors `LLM_PROVIDERS` of the shared contract.
+enum LlmProvider {
+  anthropic
+  openai
+  xai
+  openrouter
+}
+
+/// Mirrors `LLM_FEATURES` of the shared contract: what a call was for.
+enum LlmFeature {
+  assistant
+  digest
+  summary
+  search
+  triage
+  title
+}
+
+enum LlmCallOutcome {
+  ok
+  error
+  aborted
+}
+
+/// One provider's key, monthly cap and enabled models. The migration writes a
+/// row per provider; the key is never stored in the clear (ADR-0059 §3).
+model LlmProviderSetting {
+  provider      LlmProvider @id
+  /// The key sealed with `LLM_SECRETS_KEY` (`SecretCipher`'s v1 format).
+  keyCiphertext String?
+  /// The key's last four characters — the only part the API returns.
+  keySuffix     String?
+  keyUpdatedAt  DateTime?
+  /// USD per UTC calendar month; 0 disables the provider.
+  capUsd        Decimal     @db.Decimal(12, 2)
+  /// Model ids offered for this provider; each priced by the price table.
+  models        String[]    @default([])
+  updatedAt     DateTime    @updatedAt
+  updatedById   String?
+
+  updatedBy User? @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@map("llm_provider_settings")
+}
+
+/// The usage ledger: one row per gateway call, priced from the price table
+/// (ADR-0009) when it ends. A provider's month spend is the sum of `costUsd`.
+model LlmCall {
+  id           String         @id @default(cuid())
+  ts           DateTime       @default(now()) @db.Timestamptz(3)
+  /// Who the call was made for; null for the system or a deleted user.
+  userId       String?
+  provider     LlmProvider
+  model        String
+  feature      LlmFeature
+  outcome      LlmCallOutcome
+  /// An `LlmErrorCode` when `outcome` is not `ok`.
+  errorCode    String?
+  input        Int            @default(0)
+  output       Int            @default(0)
+  cacheRead    Int            @default(0)
+  cacheWrite5m Int            @default(0)
+  cacheWrite1h Int            @default(0)
+  /// Counted inside `output`, as in `llm_requests`.
+  reasoning    Int            @default(0)
+  costUsd      Decimal        @db.Decimal(14, 6)
+  /// `price_versions.number` the cost was computed with.
+  priceVersion Int
+  durationMs   Int
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([provider, ts])
+  @@index([ts])
+  @@map("llm_calls")
 }

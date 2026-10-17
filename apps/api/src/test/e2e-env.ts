@@ -13,3 +13,6 @@ process.env.APP_ENV = 'test';
 // #324: never the real DeepL from `.env`; a suite that needs it sets a fake
 // key and stubs `fetch` before the app starts.
 process.env.DEEPL_API_KEY = '';
+// ADR-0059: never the real master key from `.env`; the LLM suites set their own
+// before the app starts.
+process.env.LLM_SECRETS_KEY = '';

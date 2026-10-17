@@ -184,6 +184,19 @@ export const AUDIT_ACTIONS = [
   'board.settings_updated',
   /** #271 D13: the per-project "Store text in English" switch (`after: { normalizeEnabled }`). */
   'text.settings_updated',
+  /**
+   * ADR-0059: a provider key set or replaced — `after: { suffix }`, never the
+   * key; `before` holds the replaced key's suffix.
+   */
+  'llm.key_set',
+  /** ADR-0059: a provider key deleted (`before: { suffix }`). */
+  'llm.key_deleted',
+  /** ADR-0059: a stored provider key tested (`result`, `meta.error`). */
+  'llm.key_tested',
+  /** ADR-0059: a provider's cap or enabled models changed. */
+  'llm.provider_updated',
+  /** ADR-0059: the instance default model changed. */
+  'llm.default_model_set',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
