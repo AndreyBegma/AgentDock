@@ -302,8 +302,10 @@ describe('board rounds (e2e)', () => {
       const prompt = promptOf(1);
       expect(prompt).toContain('## Card changed');
       expect(prompt).toContain('Title: Add SSO (was: Add login)');
-      expect(prompt).toContain('### What to do\n\nSign in with Google.');
-      expect(prompt).toContain('## Review feedback\n\nRename the button.');
+      expect(prompt).toContain('### What to do\n\n');
+      expect(prompt).toContain('<card>\nSign in with Google.\n</card>');
+      expect(prompt).toContain('## Review feedback\n\n');
+      expect(prompt).toContain('<card>\nRename the button.\n</card>');
 
       const card = await w.card(1);
       expect(card.rounds[0]).toMatchObject({
