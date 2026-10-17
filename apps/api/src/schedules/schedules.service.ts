@@ -168,6 +168,9 @@ export class SchedulesService {
    * Partial update. A new cron, timezone or enable recomputes `nextRunAt`;
    * re-enabling resets the failure counter. Field changes are
    * `schedule.update`; flipping `enabled` is `schedule.enable` / `.disable`.
+   * D-09: changing what it runs or when (target, cron, timezone, enabled) by
+   * anyone but its owner re-owns it — it fires with the editor's authority
+   * from then on, audited as `schedule.update` with `meta.reowned`.
    */
   async update(
     projectId: string,
@@ -188,6 +191,9 @@ export class SchedulesService {
     const disabling = !enabled && before.enabled;
     const timing =
       cron !== before.cron || timezone !== before.timezone || enabling;
+    const reowned =
+      caller.userId !== before.createdById &&
+      (target !== undefined || timing || disabling);
 
     const data: Prisma.ScheduleUpdateInput = {
       ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
@@ -199,6 +205,7 @@ export class SchedulesService {
       ...(dto.missedPolicy ? { missedPolicy: dto.missedPolicy } : {}),
       enabled,
       updatedBy: { connect: { id: caller.userId } },
+      ...(reowned ? { createdBy: { connect: { id: caller.userId } } } : {}),
       ...(enabling
         ? { disabledReason: null, consecutiveFailures: 0 }
         : disabling
@@ -216,13 +223,16 @@ export class SchedulesService {
       timezone !== before.timezone ||
       (dto.missedPolicy !== undefined &&
         dto.missedPolicy !== before.missedPolicy);
-    if (fieldsChanged) {
+    if (fieldsChanged || reowned) {
       await this.record(
         caller,
         'schedule.update',
         row,
         auditable(before),
         auditable(row),
+        reowned
+          ? { reowned: true, previousOwnerId: before.createdById }
+          : undefined,
       );
     }
     if (enabling || disabling) {
@@ -261,7 +271,10 @@ export class SchedulesService {
     this.live.schedule(projectId, { id, deleted: true });
   }
 
-  /** D15: one occurrence now, as a `manual` firing; `nextRunAt` does not move. */
+  /**
+   * D15: one occurrence now, as a `manual` firing; `nextRunAt` does not move.
+   * D-09: it runs as the caller, with the caller's role — never the owner's.
+   */
   async runNow(
     projectId: string,
     id: string,
@@ -279,7 +292,12 @@ export class SchedulesService {
     await this.record(caller, 'schedule.run_now', row, undefined, {
       firingId: firing.id.toString(),
     });
-    return toFiringView(await this.firer.fire(firing.id));
+    return toFiringView(
+      await this.firer.fire(firing.id, {
+        userId: caller.userId,
+        ctx: caller.ctx,
+      }),
+    );
   }
 
   private async find(projectId: string, id: string): Promise<Schedule> {
@@ -331,6 +349,7 @@ export class SchedulesService {
     row: Schedule,
     before: object | undefined,
     after: object | undefined,
+    meta?: object,
   ) {
     return this.audit.record({
       ...caller.ctx,
@@ -339,6 +358,7 @@ export class SchedulesService {
       projectId: row.projectId,
       ...(before ? { before } : {}),
       ...(after ? { after } : {}),
+      ...(meta ? { meta } : {}),
       result: 'ok',
     });
   }

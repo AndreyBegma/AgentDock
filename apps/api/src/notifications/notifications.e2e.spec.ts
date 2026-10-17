@@ -144,6 +144,10 @@ describe('notifications API (e2e)', () => {
         .send('post', '/notifications/999999999/read')
         .expect(404);
       await ada.session.send('post', '/notifications/abc/read').expect(404);
+      // Past int8: unknown, not a 500 (C-117).
+      await ada.session
+        .send('post', '/notifications/9223372036854775808/read')
+        .expect(404);
       expect(
         (
           await ctx.prisma.notification.findUniqueOrThrow({

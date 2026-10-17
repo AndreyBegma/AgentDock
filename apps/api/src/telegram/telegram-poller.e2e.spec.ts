@@ -6,7 +6,13 @@ import {
   TEST_ENCRYPTION_KEY,
 } from '../notifications/testing/notifications-e2e';
 import { TelegramPoller } from './telegram-poller';
-import { BOT_TOKEN, FakeTelegram } from './testing/fake-telegram';
+import { TelegramRoutes } from './telegram-routes';
+import {
+  BOT_TOKEN,
+  callbackPress,
+  FakeTelegram,
+  privateMessage,
+} from './testing/fake-telegram';
 import {
   createTelegramApp,
   resetTelegram,
@@ -75,5 +81,46 @@ describe('Telegram poller leadership (e2e, D7)', () => {
     expect(polls(fakeB)).toBe(0);
     expect(a.app.get(TelegramPoller).health().polling).toBe(true);
     expect(b.app.get(TelegramPoller).health().polling).toBe(false);
+  });
+});
+
+describe('Telegram poller update isolation (e2e, C-117)', () => {
+  let ctx: TelegramE2e;
+
+  beforeAll(async () => {
+    ctx = await createTelegramApp(cipher());
+  });
+  afterAll(() => ctx.close());
+  afterEach(() => jest.restoreAllMocks());
+
+  it('handles the next update and moves the offset past a failing one', async () => {
+    await resetTelegram(ctx.prisma);
+    ctx.fake.reset();
+    const admin = await seedUser(ctx.prisma, 'root@example.com', 'admin');
+    await ctx.app
+      .get(BotTokenStore)
+      .set(BOT_TOKEN, 'agentdock_bot', admin.id, { actor: SYSTEM_ACTOR });
+    const poller = ctx.app.get(TelegramPoller);
+    const router = ctx.app.get(TelegramRoutes).router;
+    const dispatch = router.dispatch.bind(router);
+    jest.spyOn(router, 'dispatch').mockImplementation(async (update, bot) => {
+      if (update.update_id === 9001) throw new Error('boom');
+      return dispatch(update, bot);
+    });
+
+    ctx.fake.updates = [
+      callbackPress(9001, 777, `a:9999999999999999999:1:${'A'.repeat(27)}`),
+      privateMessage(9002, 777, '/start nope'),
+    ];
+    expect(await poller.pollOnce()).toEqual({ status: 'polled', updates: 2 });
+
+    // The second update was answered, and the next poll asks past both.
+    expect(ctx.fake.sent().filter((c) => c.body.chat_id === 777)).toHaveLength(
+      1,
+    );
+    ctx.fake.updates = [];
+    await poller.pollOnce();
+    const asks = ctx.fake.calls.filter((c) => c.method === 'getUpdates');
+    expect(asks.at(-1)?.body.offset).toBe(9003);
   });
 });

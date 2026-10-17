@@ -7,6 +7,8 @@ import {
 import { resetDatabase, type Session } from '../test/e2e-app';
 import { generateRunnerToken } from './credentials';
 import { RunnerConnectHooks } from './runner-connect-hooks';
+import { RunnerConnections } from './runner-connections';
+import { RunnerIngestService } from './runner-ingest.service';
 import { RunnerPresence } from './runner-presence';
 import {
   adminSession,
@@ -16,6 +18,7 @@ import {
   hello,
   pairedRunner,
   type RunnerE2eContext,
+  repairRunner,
   TestRunnerSocket,
 } from './testing/runner-e2e';
 
@@ -192,6 +195,83 @@ describe('/runner gateway (e2e)', () => {
         user: { role: 'admin' },
       });
       expect(notification?.body).toContain('127.0.0.1');
+    });
+
+    describe('C-118: pre-hello sockets', () => {
+      /** Opens a socket and waits until the server has authenticated it. */
+      const openSilent = async (token: string) => {
+        const admit = jest.spyOn(ctx.app.get(RunnerConnections), 'admit');
+        try {
+          const socket = open(token);
+          await socket.opened();
+          await eventually('the socket authenticated', async () =>
+            admit.mock.calls.length > 0 ? true : undefined,
+          );
+          return socket;
+        } finally {
+          admit.mockRestore();
+        }
+      };
+
+      const row = (id: string) =>
+        ctx.prisma.runner.findUniqueOrThrow({
+          where: { id },
+          select: { hostname: true, capabilities: true, lastSeenAt: true },
+        });
+
+      it('re-pairing closes a socket that upgraded with the old token; its hello changes nothing', async () => {
+        const { runnerId, token: t1 } = await pairedRunner(ctx, admin);
+        const stale = await openSilent(t1);
+
+        const t2 = await repairRunner(ctx, admin, runnerId);
+        const before = await row(runnerId);
+        if (stale.socket.readyState === stale.socket.OPEN) {
+          stale.send(hello({ hostname: 'stale-host' }));
+        }
+        expect((await stale.closed).code).toBe(RUNNER_CLOSE_CODES.unauthorized);
+        await expect(stale.next('welcome', 200)).rejects.toThrow();
+        expect(await row(runnerId)).toEqual(before);
+
+        const fresh = open(t2);
+        await fresh.connect();
+        await new Promise((r) => setTimeout(r, 200));
+        expect(fresh.socket.readyState).toBe(fresh.socket.OPEN);
+        expect(ctx.app.get(RunnerPresence).isConnected(runnerId)).toBe(true);
+      });
+
+      it('a hello verified against a rotated token hash updates no row', async () => {
+        const { runnerId, token: t1 } = await pairedRunner(ctx, admin);
+        const { tokenHash: oldHash } =
+          await ctx.prisma.runner.findUniqueOrThrow({
+            where: { id: runnerId },
+            select: { tokenHash: true },
+          });
+        await repairRunner(ctx, admin, runnerId);
+        const before = await row(runnerId);
+
+        // The race eviction cannot cover: authenticated with T1 just before
+        // the re-pair committed, admitted just after it closed the sockets.
+        const ingest = ctx.app.get(RunnerIngestService);
+        expect(
+          await ingest.hello(
+            runnerId,
+            oldHash as string,
+            hello({ hostname: 'stale-host' }),
+          ),
+        ).toBeNull();
+        expect(await row(runnerId)).toEqual(before);
+        expect((await open(t1).closed).code).toBe(
+          RUNNER_CLOSE_CODES.unauthorized,
+        );
+      });
+
+      it('revoking closes a socket that has not sent hello', async () => {
+        const { runnerId, token } = await pairedRunner(ctx, admin);
+        const stale = await openSilent(token);
+
+        await admin.send('post', `/admin/runners/${runnerId}/revoke`);
+        expect((await stale.closed).code).toBe(RUNNER_CLOSE_CODES.unauthorized);
+      });
     });
 
     it('C-108: a reconnect after the old socket closed on its own is not reported', async () => {

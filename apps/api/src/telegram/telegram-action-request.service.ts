@@ -65,10 +65,18 @@ export class TelegramActionRequestService {
   async offer(notificationId: bigint): Promise<TelegramReplyMarkup | null> {
     const notification = await this.prisma.notification.findUnique({
       where: { id: notificationId },
-      select: { kind: true, projectId: true, link: true },
+      select: { kind: true, userId: true, projectId: true, link: true },
     });
     const actionRequestId = actionRequestIdOfLink(notification?.link ?? null);
     if (notification?.kind !== KIND || !actionRequestId) return null;
+    if (!notification.projectId) return null;
+    // Buttons only for a recipient who could press them: operator or higher.
+    const member = await this.guard.member(
+      notification.userId,
+      notification.projectId,
+      'write',
+    );
+    if (!member.ok) return null;
     const row = await this.prisma.actionRequest.findFirst({
       where: {
         id: actionRequestId,

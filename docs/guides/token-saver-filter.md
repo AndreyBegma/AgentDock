@@ -281,7 +281,8 @@ Measured on a developer machine (Linux x64), median / p95 of 30 runs:
 | `agentdock-runner filter -- true` | — | 21.9 / 25.9 ms |
 | `agentdock-runner filter-hook` | — | 14.4 / 15.8 ms |
 
-`filter/bench.spec.ts` runs in CI before the build. It measures the bun entry
-(`bun src/main.ts filter -- true`) against `true` and fails above 50 ms at p95.
-A sample over the ceiling is measured once more and the faster one counts, so a
-CI host busy with another pipeline does not fail it; a real regression fails both.
+`filter/bench.spec.ts` is a local benchmark: it is skipped unless `RUN_BENCH=1`
+is set (`RUN_BENCH=1 bun test src/filter/bench.spec.ts` in `apps/runner`), because
+a wall-clock gate is not deterministic on a shared CI host. It measures the bun
+entry (`bun src/main.ts filter -- true`) against `true` and fails above 50 ms at
+p95.

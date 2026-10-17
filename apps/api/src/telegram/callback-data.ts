@@ -11,6 +11,12 @@
  * it never depends on the chat's current project.
  */
 
+/** The largest PostgreSQL `int8`; a longer id names no row. */
+const INT8_MAX = 9223372036854775807n;
+
+/** Whether `digits` (1–19 decimal digits) fits a database id. */
+export const fitsInt8 = (digits: string): boolean => BigInt(digits) <= INT8_MAX;
+
 /** Telegram limits `callback_data` to 64 bytes. */
 export const CALLBACK_DATA_MAX = 64;
 

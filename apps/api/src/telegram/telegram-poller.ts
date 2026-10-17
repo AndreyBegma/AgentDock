@@ -207,7 +207,14 @@ export class TelegramPoller implements OnApplicationBootstrap, OnModuleDestroy {
         return { status: 'polled', updates: 0 };
       for (const update of updates) {
         if (generation !== this.generation) break;
-        await this.handle(update, bot.token);
+        // One bad update must not stall the poller: log it and move on.
+        try {
+          await this.handle(update, bot.token);
+        } catch (error) {
+          this.logger.warn(
+            `Telegram update ${update.update_id} failed: ${safeMessage(error, bot.token)}`,
+          );
+        }
         await this.storeOffset(BigInt(update.update_id) + 1n);
       }
       this.lastError = null;
