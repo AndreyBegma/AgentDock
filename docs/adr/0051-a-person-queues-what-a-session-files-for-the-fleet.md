@@ -1,12 +1,12 @@
-# ADR-0050: A person queues what a session files for the fleet
+# ADR-0051: A person queues what a session files for the fleet
 
 Status: accepted · Date: 2026-10-17 ·
 Card: C-112 (security audit 2026-10-16, WI-10, finding F-11, decision D-04) ·
 Spec: [`docs/specs/card-112-security-medium-require-a-person-before.md`](../specs/card-112-security-medium-require-a-person-before.md) ·
 Amends spec 201 D7, D18 and D19 · Builds on [ADR-0020](0020-claude-code-integration-through-the-runner.md)
 
-The audit named this decision ADR-0046. That number (and 0047–0049) was taken
-by the time it landed, so the decision is ADR-0050.
+The audit named this decision ADR-0046. That number (and 0047–0050) was taken
+by the time it landed, so the decision is ADR-0051.
 
 ## Context
 

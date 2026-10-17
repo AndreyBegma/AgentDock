@@ -29,7 +29,7 @@ assets are those machines. The main threats:
 | **Spend** | budgets per project and user with alert or hard stop (M3) |
 | **Terminal attach** | M3, admin only, every attach audited with duration |
 | **Local socket** | hook and MCP processes reach the runner daemon only through a unix socket (`0600`, directory `0700`); the runner token never leaves the daemon; runner-initiated `local.request` methods are a typed allowlist with a minimum role, acting as the runner's local user capped at `operator` ([ADR-0020](../adr/0020-claude-code-integration-through-the-runner.md)) |
-| **Session content** | metadata only by default; per-project opt-in ships hook content redacted on the runner, capped at 16 KiB, kept for a set retention, readable by operators, purgeable by admins ([ADR-0021](../adr/0021-session-content-is-opt-in-per-project.md)) |
+| **Session content** | metadata only by default; per-project opt-in ships hook content redacted on the runner, capped at 16 KiB, kept for a set retention, readable by every project member, purgeable by admins ([ADR-0021](../adr/0021-session-content-is-opt-in-per-project.md), [ADR-0050](../adr/0050-viewers-read-session-content-and-action-request-input.md)) |
 | **Remote approval** | away mode routes permission prompts to action requests; operator to decide; no self-approval of orchestrator or PR actions except admins; every decision audited |
 
 ## Verifying an AgentDock webhook

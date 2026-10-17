@@ -55,6 +55,12 @@ export const actionRequestError = (
 ): HttpException =>
   new HttpException({ statusCode, error, message }, statusCode);
 
+/** A read's view of a row: pending past its deadline is already expired. */
+const asSeen = (row: ActionRequest, now: Date): ActionRequest =>
+  row.status === 'pending' && row.expiresAt <= now
+    ? { ...row, status: 'expired' }
+    : row;
+
 const notFound = () =>
   actionRequestError(
     404,
@@ -236,33 +242,37 @@ export class ActionRequestsService {
     });
   }
 
+  /**
+   * Reads never write: a pending row past `expiresAt` is shown as `expired`
+   * here and moved by the every-minute sweep (`ActionRequestExpiryJob`).
+   */
   async list(
     projectId: string,
     status?: ActionRequestStatus,
   ): Promise<ActionRequestView[]> {
-    await this.expire();
+    const now = new Date();
+    const due = { status: 'pending' as const, expiresAt: { lte: now } };
+    const where: Prisma.ActionRequestWhereInput =
+      status === 'pending'
+        ? { projectId, status, expiresAt: { gt: now } }
+        : status === 'expired'
+          ? { projectId, OR: [{ status }, due] }
+          : { projectId, ...(status ? { status } : {}) };
     const rows = await this.prisma.actionRequest.findMany({
-      where: { projectId, ...(status ? { status } : {}) },
+      where,
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
-    return rows.map(toActionRequestView);
+    return rows.map((row) => toActionRequestView(asSeen(row, now)));
   }
 
-  /** `action.status`: one request of the project, expired on read when due. */
+  /** `action.status`: one request of the project, a due one shown as expired. */
   async status(projectId: string, id: string): Promise<ActionRequestSummary> {
     const row = await this.prisma.actionRequest.findFirst({
       where: { id, projectId },
     });
     if (!row) throw notFound();
-    if (row.status === 'pending' && row.expiresAt <= new Date()) {
-      await this.expire();
-      const fresh = await this.prisma.actionRequest.findUniqueOrThrow({
-        where: { id },
-      });
-      return toActionRequestSummary(fresh);
-    }
-    return toActionRequestSummary(row);
+    return toActionRequestSummary(asSeen(row, new Date()));
   }
 
   /** The pending requests of a project, oldest first (`approvals.list`). */

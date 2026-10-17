@@ -430,7 +430,7 @@ describe('manual sessions: hook ingest (e2e)', () => {
     const url = (projectId: string, sessionId: string, query = '') =>
       `/projects/${projectId}/sessions/${sessionId}/content${query}`;
 
-    it('is 404 for a non-member, 403 for a viewer, and rows for an operator', async () => {
+    it('is 404 for a non-member and rows for a viewer and an operator (ADR-0050)', async () => {
       const { a, sa } = await seed();
       const outsider = await createUser(
         ctx.prisma,
@@ -442,7 +442,11 @@ describe('manual sessions: hook ingest (e2e)', () => {
       expect((await outsiderSession.get(url(a.id, sa.id))).status).toBe(404);
 
       const viewer = await userOn(a.id, 'viewer@example.com');
-      expect((await viewer.session.get(url(a.id, sa.id))).status).toBe(403);
+      const seen = await viewer.session.get(url(a.id, sa.id));
+      expect(seen.status).toBe(200);
+      expect(
+        (seen.body as SessionContentPage).items.map((i) => i.text),
+      ).toEqual(['in alpha']);
 
       const operator = await userOn(a.id, 'op@example.com', 'operator');
       const ok = await operator.session.get(url(a.id, sa.id));

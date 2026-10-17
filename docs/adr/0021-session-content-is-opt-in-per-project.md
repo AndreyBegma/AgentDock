@@ -31,8 +31,9 @@ opt-in per project over shipping content always or never.
    `audit_records`. A daily BullMQ job ([ADR-0015](0015-schedules-run-on-bullmq.md))
    deletes rows past retention. Turning the flag off stops shipping, but stored
    rows stay until their retention ends. An admin can purge a project's content at
-   once; the purge is audited. Reading content needs `operator` on the project.
-   Viewers keep metadata only.
+   once; the purge is audited. Reading content needs membership of the project
+   ([ADR-0050](0050-viewers-read-session-content-and-action-request-input.md)
+   amends this: it first said `operator`, with viewers on metadata only).
 
 ## Consequences
 
