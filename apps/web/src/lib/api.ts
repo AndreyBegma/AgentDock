@@ -31,6 +31,12 @@ const readCookie = (name: string): string | undefined => {
   return undefined;
 };
 
+/** The CSRF header a write carries, for calls that cannot go through `api` (a stream). */
+export const csrfHeaders = (): Record<string, string> => {
+  const csrf = readCookie(CSRF_COOKIE);
+  return csrf ? { [CSRF_HEADER]: csrf } : {};
+};
+
 interface RequestOptions {
   method?: 'GET' | 'HEAD' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   body?: unknown;

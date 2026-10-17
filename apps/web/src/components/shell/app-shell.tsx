@@ -32,6 +32,7 @@ import {
 } from 'react';
 import { api, describeError } from '../../lib/api';
 import { useLiveStatus } from '../../lib/live/use-live';
+import { Assistant } from '../assistant/assistant';
 import { Capsule } from './capsule';
 import { crumbsFor, pageTitleOf } from './crumbs';
 import { useKeyboardOpen } from './keyboard';
@@ -376,6 +377,8 @@ export function AppShell({
             ) : null}
           </div>
         </div>
+
+        <Assistant projects={projects} />
 
         <CommandPalette
           open={paletteOpen}
