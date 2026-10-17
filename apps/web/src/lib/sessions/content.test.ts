@@ -8,7 +8,7 @@ import {
 } from './content';
 
 describe('canReadContent', () => {
-  test('every member reads (ADR-0049); an unknown role does not', () => {
+  test('every member reads (ADR-0050); an unknown role does not', () => {
     expect(canReadContent('operator')).toBe(true);
     expect(canReadContent('admin')).toBe(true);
     expect(canReadContent('viewer')).toBe(true);

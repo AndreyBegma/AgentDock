@@ -14,7 +14,9 @@
   },
   "files": [
     "bin/agentdock-runner.js",
-    "README.md"
+    "README.md",
+    "SHA256SUMS",
+    "SHA256SUMS.sig"
   ],
   "engines": {
     "node": ">=18"

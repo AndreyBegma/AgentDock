@@ -1,4 +1,4 @@
-# ADR-0049: Viewers read session content and action-request input
+# ADR-0050: Viewers read session content and action-request input
 
 Status: accepted · Date: 2026-10-17 ·
 Card: C-111 (security audit 2026-10-16, WI-09, decision D-03) ·

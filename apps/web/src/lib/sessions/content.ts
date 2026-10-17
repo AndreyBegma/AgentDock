@@ -14,7 +14,7 @@ export const CONTENT_KIND_LABEL: Record<SessionContentKind, string> = {
 };
 
 /**
- * Every project member reads content (ADR-0049); the API answers 404 to a
+ * Every project member reads content (ADR-0050); the API answers 404 to a
  * non-member, so the page does not ask without a role.
  */
 export const canReadContent = (role: Role | undefined): boolean =>

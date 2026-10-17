@@ -22,6 +22,8 @@ describe('npm packages of a release', () => {
       `binary ${target}`,
     );
   }
+  writeFileSync(join(release, 'SHA256SUMS'), 'the sums\n');
+  writeFileSync(join(release, 'SHA256SUMS.sig'), 'the signature');
   const dirs = writeNpmPackages(release, '1.2.3');
   const manifest = (name: string) =>
     JSON.parse(
@@ -68,5 +70,18 @@ describe('npm packages of a release', () => {
       'agentdock-runner': 'bin/agentdock-runner.js',
     });
     expect(wrapper).not.toHaveProperty('scripts');
+  });
+
+  it('ships SHA256SUMS and its signature in the wrapper, for the shim to check', () => {
+    const wrapper = join(release, 'npm', 'agentdock-runner');
+    expect(readFileSync(join(wrapper, 'SHA256SUMS'), 'utf8')).toBe(
+      'the sums\n',
+    );
+    expect(readFileSync(join(wrapper, 'SHA256SUMS.sig'), 'utf8')).toBe(
+      'the signature',
+    );
+    expect(manifest('agentdock-runner').files).toEqual(
+      expect.arrayContaining(['SHA256SUMS', 'SHA256SUMS.sig']),
+    );
   });
 });

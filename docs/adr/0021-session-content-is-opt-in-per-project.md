@@ -32,7 +32,7 @@ opt-in per project over shipping content always or never.
    deletes rows past retention. Turning the flag off stops shipping, but stored
    rows stay until their retention ends. An admin can purge a project's content at
    once; the purge is audited. Reading content needs membership of the project
-   ([ADR-0049](0049-viewers-read-session-content-and-action-request-input.md)
+   ([ADR-0050](0050-viewers-read-session-content-and-action-request-input.md)
    amends this: it first said `operator`, with viewers on metadata only).
 
 ## Consequences

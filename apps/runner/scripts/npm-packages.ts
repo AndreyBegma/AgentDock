@@ -1,12 +1,14 @@
 // Writes the npm packages of a runner release (ADR-0017) under
 // `<release>/npm/`: one `agentdock-runner-<os>-<arch>` per target, holding
 // only its binary, and the `agentdock-runner` wrapper whose
-// optionalDependencies pin them at the same exact version.
+// optionalDependencies pin them at the same exact version. The wrapper also
+// carries SHA256SUMS and SHA256SUMS.sig, which its shim checks a binary
+// against before running it (ADR-0049).
 //
 //   bun scripts/npm-packages.ts <release dir>
 //
 // The binaries are read from `<release>/bin/<os>-<arch>/agentdock-runner`,
-// which build-release.sh writes first.
+// and `<release>/SHA256SUMS{,.sig}`, which build-release.sh writes first.
 import {
   chmodSync,
   copyFileSync,
@@ -87,6 +89,9 @@ export const writeNpmPackages = (
     ),
   );
   copyFileSync(join(npmDir, 'README.md'), join(wrapper, 'README.md'));
+  for (const file of ['SHA256SUMS', 'SHA256SUMS.sig']) {
+    copyFileSync(join(release, file), join(wrapper, file));
+  }
   const shim = join(wrapper, 'bin', 'agentdock-runner.js');
   copyFileSync(join(npmDir, 'bin', 'agentdock-runner.js'), shim);
   chmodSync(shim, 0o755);

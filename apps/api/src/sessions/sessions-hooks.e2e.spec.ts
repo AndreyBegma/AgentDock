@@ -430,7 +430,7 @@ describe('manual sessions: hook ingest (e2e)', () => {
     const url = (projectId: string, sessionId: string, query = '') =>
       `/projects/${projectId}/sessions/${sessionId}/content${query}`;
 
-    it('is 404 for a non-member and rows for a viewer and an operator (ADR-0049)', async () => {
+    it('is 404 for a non-member and rows for a viewer and an operator (ADR-0050)', async () => {
       const { a, sa } = await seed();
       const outsider = await createUser(
         ctx.prisma,
