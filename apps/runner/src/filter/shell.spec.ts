@@ -367,7 +367,7 @@ describe('parseHookCommand (#445 amendment 11, #610)', () => {
           [
             `exec 3>>'${log}'`,
             `a() { printf '%s\\0' "$PWD" "\${FOO-unset}" "$@"; printf E >&2; }`,
-            `f() { printf 'f%s\\0' "$1"; printf 'e%s' "$1" >&2; return "$1"; }`,
+            `f() { printf 'f%s\\0' "$1"; printf 'e%s\\n' "$1" >&2; return "$1"; }`,
             `w() { printf '%s\\0' "$@" >&3; shift 2; "$@"; }`,
             `${text}; printf 'status %s %s' "$?" "\${PIPESTATUS[*]}" >&2`,
           ].join('\n'),
@@ -425,7 +425,20 @@ describe('parseHookCommand (#445 amendment 11, #610)', () => {
       const rewrite = run(wrappedCommand(parsed, ['w']));
       // Same output, same stderr, same `$?` and `PIPESTATUS`…
       expect(rewrite.out).toBe(original.out);
-      expect(rewrite.err).toBe(original.err);
+      if (command.includes('|')) {
+        // Pipeline stages write stderr at once, so bash orders it by chance:
+        // compare it as a multiset of lines, and the status line exactly.
+        const split = (err: string) => {
+          const at = err.lastIndexOf('status ');
+          return {
+            lines: err.slice(0, at).split('\n').sort(),
+            status: err.slice(at),
+          };
+        };
+        expect(split(rewrite.err)).toEqual(split(original.err));
+      } else {
+        expect(rewrite.err).toBe(original.err);
+      }
       expect(original.wrapped).toEqual([]);
       // …and every first stage that ran went through `w filter --`.
       expect(rewrite.wrapped.length).toBeGreaterThan(0);

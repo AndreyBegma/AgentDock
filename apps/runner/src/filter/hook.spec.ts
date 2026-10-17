@@ -184,14 +184,14 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
     };
 
     it('is the mode in a mode that never rewrites, whatever the command', () => {
-      for (const mode of ['default', 'acceptEdits', 'plan', 'dontAsk']) {
+      for (const mode of ['default', 'acceptEdits', 'dontAsk']) {
         expect(filterOf('bun test > out.log', mode)).toBe('none:mode');
         expect(filterOf('ls', mode)).toBe('none:mode');
       }
     });
 
-    it('is compound or uncovered in bypass and auto', () => {
-      for (const mode of ['bypassPermissions', 'auto']) {
+    it('is compound or uncovered in bypass, auto and plan', () => {
+      for (const mode of ['bypassPermissions', 'auto', 'plan']) {
         expect(filterOf('bun test > out; ls', mode)).toBe('none:compound');
         expect(filterOf('ls -la', mode)).toBe('none:uncovered');
       }
@@ -269,10 +269,11 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
       ['acceptEdits', covered, null],
       ['acceptEdits', denied, null],
       ['acceptEdits', compound, null],
-      ['plan', covered, null],
+      ['plan', covered, undecided(covered)],
+      ['plan', chain, undecided(chain)],
       ['plan', denied, null],
+      ['plan', asked, null],
       ['plan', compound, null],
-      ['plan', chain, null],
       ['dontAsk', covered, null],
       ['some-later-mode', covered, null],
       ['Auto', covered, null],
