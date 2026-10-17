@@ -451,6 +451,7 @@ model Project {
   stewardIncidents     StewardIncident[]
   stewardDigests       StewardDigest[]
   handoffNotes         HandoffNote[]
+  rules                ProjectRule[]
   telegramLinks        TelegramLink[]
 
   @@unique([runnerId, rootPath])
@@ -3640,4 +3641,33 @@ model HandoffNote {
   @@unique([subjectKind, subjectId])
   @@index([projectId])
   @@map("handoff_notes")
+}
+
+/// Mirrors `PROJECT_RULE_SOURCES` of the shared contract (#528).
+enum ProjectRuleSource {
+  manual
+  imported
+  scanned
+}
+
+/// A per-project coding rule a card worker follows (#528, stack S-2). Stored
+/// here, never in a file of the project's repository. `position` orders the
+/// list, 0-based and dense; a reorder rewrites it.
+model ProjectRule {
+  id          String            @id @default(cuid())
+  projectId   String
+  /// At most `PROJECT_RULE_TITLE_MAX` characters, checked by the DTO.
+  title       String
+  /// At most `PROJECT_RULE_DESCRIPTION_MAX` characters, checked by the DTO.
+  description String            @default("")
+  enabled     Boolean           @default(true)
+  position    Int
+  source      ProjectRuleSource @default(manual)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, position])
+  @@map("project_rules")
 }

@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-scale="desk" data-palette="navy">
+<head>
+<meta charset="utf-8">
+<title>Rule editor sheet</title>
+<style>
+:root,:root[data-theme="dark"]{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-content:rgb(27 38 71/.96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246/.62);--color-ink-3:rgb(242 242 246/.53);--color-line:rgb(255 255 255/.1);--color-line-strong:rgb(255 255 255/.18);--color-hover:rgb(255 255 255/.06);--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-soft:rgb(91 91 246/.2);--color-accent-ink:#b4b2ff;--color-focus:#b4b2ff;--color-danger:#ff6b60;--color-hue-1:#5b9cf6;--color-hue-7:#a68bfa;--glass-sheen:rgb(255 255 255/.06);--glass-scrim-strong:rgb(9 9 12/.64);--glass-brightness-strong:.7;--glass-edge:rgb(255 255 255/.14);--glass-spec:rgb(255 255 255/.2);--glass-rim-strong:rgb(242 242 246/.22);--glass-rim-shade-strong:rgb(9 9 12/.2);--glass-meniscus:rgb(9 9 12/.55);--glass-refract:rgb(242 242 246/.35);--glass-shadow-strong:rgb(0 0 0/.45);--canvas-glow:18%}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-content:rgb(255 255 255/.96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27/.72);--color-ink-3:rgb(24 24 27/.64);--color-line:rgb(0 0 0/.1);--color-line-strong:rgb(0 0 0/.23);--color-hover:rgb(0 0 0/.1);--color-accent:#4f46e5;--color-on-accent:#fff;--color-accent-soft:rgb(79 70 229/.12);--color-accent-ink:#4338ca;--color-focus:#4f46e5;--color-danger:#dc2626;--color-hue-1:#1f64d6;--color-hue-7:#7244e0;--glass-sheen:rgb(0 0 0/.06);--glass-scrim-strong:rgb(255 255 255/.64);--glass-brightness-strong:1.3;--glass-edge:rgb(0 0 0/.18);--glass-spec:rgb(0 0 0/.2);--glass-rim-strong:rgb(255 255 255/.3);--glass-rim-shade-strong:rgb(24 24 27/.08);--glass-meniscus:rgb(24 24 27/.12);--glass-refract:rgb(255 255 255/.5);--glass-shadow-strong:rgb(0 0 0/.16);--canvas-glow:10%}
+:root{--glass-filter-strong:blur(40px) saturate(180%) brightness(var(--glass-brightness-strong));--radius-control:6px;--radius-surface:8px;--radius-sheet:12px;--size-control:28px;--size-field:28px;--dur-base:150ms;--ease-sheet:cubic-bezier(.32,.72,0,1);--font-sans:"SF Pro Text",Inter,system-ui,-apple-system,"Segoe UI",sans-serif;--font-mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+*,*::before,*::after{box-sizing:border-box}html{background:var(--color-ground);color:var(--color-ink)}body{margin:0;min-height:100vh;padding:24px;font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased}h2,h3,p{margin:0}
+.text-xs{font-size:12px;line-height:16px}.text-ink-2{color:var(--color-ink-2)}.text-ink-3{color:var(--color-ink-3)}.mono{font-family:var(--font-mono)}
+:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}
+.icon{width:16px;height:16px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.icon-sm{width:14px;height:14px}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.glass-strong{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim-strong);backdrop-filter:var(--glass-filter-strong);-webkit-backdrop-filter:var(--glass-filter-strong);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),inset 1px 1px 0 var(--glass-rim-strong),inset -1px -1px 0 var(--glass-rim-shade-strong),inset 0 -3px 3px -1px var(--glass-meniscus),inset 0 0 18px -4px var(--glass-refract),0 20px 48px var(--glass-shadow-strong)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font-family:inherit;font-weight:600;cursor:pointer;border:1px solid transparent;background:none;color:var(--color-ink);height:var(--size-control);padding:0 14px;font-size:14px;border-radius:var(--radius-control)}
+.btn-icon{padding:0;aspect-ratio:1}.btn-solid{background:var(--color-accent);color:var(--color-on-accent)}.btn-glass{background:var(--color-raised);border-color:var(--color-line-strong)}.btn-ghost{color:var(--color-ink-2)}.btn-danger{background:color-mix(in oklab,var(--color-danger) 12%,transparent);color:var(--color-danger);border-color:color-mix(in oklab,var(--color-danger) 30%,transparent)}
+.section-header{display:flex;align-items:center;justify-content:space-between;gap:16px}.section-header h2{font-size:16px;line-height:24px;font-weight:600}
+.badge{display:inline-flex;align-items:center;border-radius:999px;height:20px;padding:0 8px;font-size:12px;font-weight:500;background:var(--color-hover);color:var(--color-ink-2)}
+.field{display:flex;flex-direction:column;gap:4px}.field-label{font-size:12px;font-weight:500;color:var(--color-ink-2)}.field-hint{font-size:12px;color:var(--color-ink-3)}.field-error{font-size:12px;color:var(--color-danger)}.field-row{display:flex;justify-content:space-between}
+.input,.textarea{width:100%;height:var(--size-field);padding:0 10px;font-family:inherit;font-size:14px;color:var(--color-ink);background:var(--color-surface);border:1px solid var(--color-line-strong);border-radius:var(--radius-control)}.input[aria-invalid="true"]{border-color:var(--color-danger)}.textarea{height:auto;min-height:120px;padding:6px 10px;resize:vertical;line-height:20px}
+.toggle{position:relative;display:inline-flex;width:44px;height:24px;flex-shrink:0;border-radius:999px;border:0;padding:0;cursor:pointer;background:var(--color-line-strong)}.toggle::after{content:"";position:absolute;top:4px;left:0;width:16px;height:16px;border-radius:999px;background:var(--color-ink);transform:translateX(4px)}.toggle[aria-checked="true"]{background:var(--color-accent)}.toggle[aria-checked="true"]::after{background:var(--color-on-accent);transform:translateX(24px)}
+.check-row{display:flex;align-items:center;gap:8px}
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:6px 24px;margin:0;font-size:13px}.kv dt{color:var(--color-ink-3)}.kv dd{margin:0}
+.states{display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap}
+.state{display:flex;flex-direction:column;gap:8px}.state-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--color-ink-3)}
+.sheet{width:28rem;padding:20px;border-radius:var(--radius-sheet);display:flex;flex-direction:column;gap:16px}
+.sheet-foot{display:flex;justify-content:space-between;gap:8px;padding-top:16px;border-top:1px solid var(--color-line);margin-top:4px}.sheet-foot .r{display:flex;gap:8px}
+.dialog{width:26rem;padding:24px;border-radius:var(--radius-sheet);display:flex;flex-direction:column;gap:16px}.dialog h2{font-size:20px;line-height:28px;font-weight:600}.dialog-actions{display:flex;justify-content:space-between}
+</style>
+</head>
+<body>
+<div class="canvas" aria-hidden="true"></div>
+<div class="states">
+  <div class="state">
+    <span class="state-label">New rule · validation</span>
+    <aside class="sheet glass-strong" role="dialog" aria-label="New rule">
+      <div class="section-header"><h2>New rule</h2><button class="btn btn-ghost btn-icon" aria-label="Close" type="button"><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
+      <div class="field">
+        <div class="field-row"><label class="field-label" for="n-name">Name<span style="color:var(--color-danger);margin-left:2px">*</span></label><span class="text-xs text-ink-3">0 / 40</span></div>
+        <input class="input" id="n-name" aria-invalid="true" value="">
+        <span class="field-error">Give the rule a short name; agents see it in bold.</span>
+      </div>
+      <div class="field">
+        <div class="field-row"><label class="field-label" for="n-desc">Description<span style="color:var(--color-danger);margin-left:2px">*</span></label><span class="text-xs text-ink-3">64 / 1000</span></div>
+        <textarea class="textarea" id="n-desc">Never call fetch from a component; go through the API client.</textarea>
+        <span class="field-hint">Write it as an instruction to the agent. Markdown is allowed.</span>
+      </div>
+      <label class="check-row"><button class="toggle" role="switch" aria-checked="true" aria-label="Enabled" type="button"></button>Enabled — include in agent prompts</label>
+      <div class="sheet-foot"><span></span><div class="r"><button class="btn btn-ghost" type="button">Cancel</button><button class="btn btn-solid" type="button" disabled style="opacity:.4">Add rule</button></div></div>
+    </aside>
+  </div>
+
+  <div class="state">
+    <span class="state-label">Edit rule</span>
+    <aside class="sheet glass-strong" role="dialog" aria-label="Edit rule">
+      <div class="section-header"><h2>Prisma only in the API</h2><button class="btn btn-ghost btn-icon" aria-label="Close" type="button"><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
+      <div class="field">
+        <div class="field-row"><label class="field-label" for="e-name">Name<span style="color:var(--color-danger);margin-left:2px">*</span></label><span class="text-xs text-ink-3">22 / 40</span></div>
+        <input class="input" id="e-name" value="Prisma only in the API">
+      </div>
+      <div class="field">
+        <div class="field-row"><label class="field-label" for="e-desc">Description<span style="color:var(--color-danger);margin-left:2px">*</span></label><span class="text-xs text-ink-3">96 / 1000</span></div>
+        <textarea class="textarea" id="e-desc">Import Prisma only in apps/api, through PrismaService. The web app talks to the API over HTTP.</textarea>
+      </div>
+      <label class="check-row"><button class="toggle" role="switch" aria-checked="true" aria-label="Enabled" type="button"></button>Enabled — include in agent prompts</label>
+      <dl class="kv">
+        <dt>Source</dt><dd><span class="badge">Scanned</span> <span class="mono text-xs text-ink-3">CLAUDE.md</span></dd>
+        <dt>Created</dt><dd><time>2026-10-12</time> by Archi</dd>
+        <dt>Updated</dt><dd><time>2026-10-12</time></dd>
+      </dl>
+      <div class="sheet-foot"><button class="btn btn-danger" type="button">Delete</button><div class="r"><button class="btn btn-ghost" type="button">Cancel</button><button class="btn btn-solid" type="button">Save</button></div></div>
+    </aside>
+  </div>
+
+  <div class="state">
+    <span class="state-label">Delete confirm</span>
+    <div class="dialog glass-strong" role="dialog" aria-modal="true" aria-labelledby="del-t">
+      <h2 id="del-t">Delete “Prisma only in the API”?</h2>
+      <p class="text-ink-2">Agents stop receiving it from their next run. To pause a rule instead, switch it off.</p>
+      <div class="dialog-actions"><button class="btn btn-ghost" type="button">Cancel</button><button class="btn btn-danger" type="button">Delete rule</button></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
