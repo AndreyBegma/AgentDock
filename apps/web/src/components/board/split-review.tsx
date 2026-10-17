@@ -418,7 +418,8 @@ function KindField({
   );
 }
 
-function KindChip({ kind }: { kind: PlanTaskKind }) {
+/** A card's kind as a chip: a bug reads as danger. Also on candidates (#592). */
+export function KindChip({ kind }: { kind: PlanTaskKind }) {
   return (
     <Chip size="sm" tone={kind === 'bug' ? 'danger' : undefined}>
       {KIND_LABEL[kind]}

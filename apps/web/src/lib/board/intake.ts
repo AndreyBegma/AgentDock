@@ -3,6 +3,7 @@ import type {
   BoardView,
   ConfirmSplitCard,
   ConfirmSplitRequest,
+  PlanCandidateView,
   PlanDetail,
   PlanIntakeSplitView,
   PlanSummary,
@@ -37,6 +38,8 @@ export type IntakePhase =
   | { kind: 'round'; round: number; maxRounds: number }
   /** #409: the intake proposes several cards; the person confirms or declines. */
   | { kind: 'split'; split: PlanIntakeSplitView }
+  /** #592 (ADR-0055): the cards wait in Drafts as candidates to accept or reject. */
+  | { kind: 'review'; candidates: PlanCandidateView[] }
   /** The cards exist; `cards` are those the board shows so far. */
   | { kind: 'done'; cards: BoardCardView[] }
   /** Discarded (archived) or sent: no card will come. */
@@ -63,6 +66,9 @@ export function intakePhase(plan: PlanDetail, board?: BoardView): IntakePhase {
   }
   if (plan.status === 'archived' || plan.status === 'sent') {
     return { kind: 'closed' };
+  }
+  if (plan.status === 'reviewing') {
+    return { kind: 'review', candidates: plan.intake?.candidates ?? [] };
   }
   const active = activeTurn(plan);
   if (active) return { kind: 'thinking', turn: active };
@@ -120,9 +126,9 @@ export const confirmSplitCards = (
 ): ConfirmSplitCard[] =>
   rows.map((r) => ({ index: r.index, title: r.title.trim(), kind: r.kind }));
 
-/** "Create 3 cards" — Confirm's label. */
+/** "Send 3 cards to Drafts" — Confirm's label (#592: they wait there as candidates). */
 export const confirmSplitText = (count: number): string =>
-  `Create ${pluralize(count, 'card')}`;
+  `Send ${pluralize(count, 'card')} to Drafts`;
 
 // ─── Stacks (#480, ADR-0044) ─────────────────────────────────────────────────
 
@@ -296,19 +302,22 @@ export function confirmRequest(
   };
 }
 
-/** "Create stack · 5 cards", or a split's "Create 3 cards". */
+/** "Send stack to Drafts · 5 cards", or a split's "Send 3 cards to Drafts". */
 export const confirmText = (shape: ProposalShape, count: number): string =>
   shape === 'stack'
-    ? `Create stack · ${pluralize(count, 'card')}`
+    ? `Send stack to Drafts · ${pluralize(count, 'card')}`
     : confirmSplitText(count);
 
-/** The line beside Confirm: where the cards land, and what holds them. */
+/**
+ * The line beside Confirm: #592, the cards wait in Drafts — nothing reaches
+ * To Do until the person accepts it — and what holds them once accepted.
+ */
 export const confirmHint = (shape: ProposalShape, design: boolean): string =>
   shape === 'split'
-    ? 'Cards land in To Do.'
+    ? 'They wait in Drafts until you accept them.'
     : design
-      ? 'Cards land in To Do; Run waits for the stack design.'
-      : 'Cards land in To Do with stage dependencies.';
+      ? 'They wait in Drafts; once accepted, Run waits for the stack design.'
+      : 'They wait in Drafts; once accepted, stages depend on each other.';
 
 /** "The planner proposes a stack of 5 cards in 2 stages". */
 export function proposalTitle(split: PlanIntakeSplitView): string {
@@ -370,6 +379,10 @@ export function draftStateText(plan: PlanDetail | undefined): string | null {
       return phase.split.stack
         ? `stack of ${pluralize(phase.split.cards.length, 'card')}?`
         : `split into ${pluralize(phase.split.cards.length, 'card')}?`;
+    case 'review': {
+      const pending = phase.candidates.filter((c) => c.status === 'pending');
+      return `${pluralize(pending.length, 'card')} to review`;
+    }
     case 'idle':
       return 'ready to generate';
     case 'done':
