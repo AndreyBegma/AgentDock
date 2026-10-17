@@ -21,7 +21,11 @@ import { Injectable } from '@nestjs/common';
 import { type BoardStack, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
-import { type FrameFile, revisionFrames } from '../design/design-store';
+import {
+  defaultSkillsOf,
+  type FrameFile,
+  revisionFrames,
+} from '../design/design-store';
 import { usageByRun } from '../history/run-usage';
 import { boardError } from './board-error';
 import { cardDesignSelect } from './board-mapper';
@@ -161,16 +165,13 @@ export class BoardStacks {
       });
     }
     if (input.design) {
-      const settings = await tx.designSettings.findUnique({
-        where: { projectId: input.projectId },
-        select: { defaultSkills: true },
-      });
+      // A copy of the default; the design follows it until edited (#604).
       await tx.taskDesign.create({
         data: {
           stackId: stack.id,
           needed: true,
           suggested: true,
-          skills: settings?.defaultSkills ?? [],
+          skills: await defaultSkillsOf(tx, input.projectId),
         },
       });
     }

@@ -260,6 +260,108 @@ describe('card design (e2e, #243)', () => {
     );
   });
 
+  describe('default design skills (#604)', () => {
+    const SKILLS = ['kit:guidelines', 'kit:frontend', 'kit:taste'];
+
+    const setDefault = (defaultSkills: string[], session = h.admin) =>
+      session.send('put', `/projects/${h.projectId}/design-settings`, {
+        viewports: [{ name: 'Desktop', width: 1440, height: 900 }],
+        defaultSkills,
+      });
+
+    beforeEach(async () => {
+      await h.ctx.prisma.installedSkill.createMany({
+        data: SKILLS.map((invocation) => ({
+          runnerId: h.runnerId,
+          scope: 'plugin' as const,
+          runtime: 'claude',
+          name: invocation.split(':')[1],
+          invocation,
+          path: `/home/u/.claude/skills/${invocation}`,
+          seenAt: new Date(),
+        })),
+      });
+    });
+
+    it('a new design opens with the default, follows a later change of it, and generates with it', async () => {
+      expect((await setDefault(SKILLS.slice(0, 2))).status).toBe(200);
+      const card = await h.designedCard(1);
+      expect(await h.cardDesign(card.number)).toMatchObject({
+        skills: SKILLS.slice(0, 2),
+        skillsEdited: false,
+        defaultSkills: SKILLS.slice(0, 2),
+      });
+
+      await setDefault([SKILLS[2]]);
+      expect((await h.cardDesign(card.number)).skills).toEqual([SKILLS[2]]);
+
+      await h.seedProfile();
+      expect((await generate(card.number)).status).toBe(201);
+      const prompt = h.turnPrompts().at(-1) ?? '';
+      expect(prompt).toContain(`\`${SKILLS[2]}\``);
+      expect(prompt).not.toContain(SKILLS[0]);
+      // Generated: a later change of the default no longer reaches it.
+      await setDefault([SKILLS[0]]);
+      await h.finishCard(card.id, designResult({ taskKey: KEY, variant: 1 }));
+      expect((await h.cardDesign(card.number)).skills).toEqual([SKILLS[2]]);
+    });
+
+    it('a hand edit is kept when the default changes, and Use defaults follows it again', async () => {
+      await setDefault([SKILLS[0]]);
+      const card = await h.designedCard(1);
+      const base = h.cardDesignBase(card.number);
+      expect(
+        (await h.author.send('patch', base, { skills: [SKILLS[1]] })).status,
+      ).toBe(200);
+      await setDefault([SKILLS[2]]);
+      expect(await h.cardDesign(card.number)).toMatchObject({
+        skills: [SKILLS[1]],
+        skillsEdited: true,
+        defaultSkills: [SKILLS[2]],
+      });
+      // A switch of the design alone is no hand edit of its skills.
+      await h.author.send('patch', base, { variantCount: 2 });
+      expect((await h.cardDesign(card.number)).skillsEdited).toBe(true);
+
+      const both = await h.author.send('patch', base, {
+        skills: [SKILLS[0]],
+        useDefaultSkills: true,
+      });
+      expect(both.status).toBe(400);
+      expect(
+        (await h.author.send('patch', base, { useDefaultSkills: true })).status,
+      ).toBe(200);
+      expect(await h.cardDesign(card.number)).toMatchObject({
+        skills: [SKILLS[2]],
+        skillsEdited: false,
+      });
+      await setDefault([SKILLS[0]]);
+      expect((await h.cardDesign(card.number)).skills).toEqual([SKILLS[0]]);
+    });
+
+    it('with no default a design has no skills until the default is set', async () => {
+      const card = await h.designedCard(1);
+      expect(await h.cardDesign(card.number)).toMatchObject({
+        skills: [],
+        skillsEdited: false,
+        defaultSkills: [],
+      });
+      await setDefault([SKILLS[0]]);
+      expect((await h.cardDesign(card.number)).skills).toEqual([SKILLS[0]]);
+    });
+
+    it('only a project admin saves the panel set as the default, audited like Settings → Design', async () => {
+      expect((await setDefault(SKILLS, h.author)).status).toBe(403);
+      expect((await setDefault(SKILLS, h.viewer)).status).toBe(403);
+      expect(await h.auditOf('design.settings_updated')).toHaveLength(0);
+
+      expect((await setDefault(SKILLS)).status).toBe(200);
+      const [entry] = await h.auditOf('design.settings_updated');
+      expect(entry.before).toMatchObject({ defaultSkills: [] });
+      expect(entry.after).toMatchObject({ defaultSkills: SKILLS });
+    });
+  });
+
   describe('approve and continue (#273 D8, D9)', () => {
     /** A card whose one-variant design is drawn, with Continue after design `on`. */
     const reviewing = async (on: boolean) => {

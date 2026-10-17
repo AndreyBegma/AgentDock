@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-scale="desk" data-palette="navy">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>C-248 · Draw the mockup panel — skill states</title>
+<style>
+:root{--font-sans:'SF Pro Text','SF Pro Display',Inter,system-ui,-apple-system,'Segoe UI',sans-serif;--font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;--radius-control:6px;--radius-surface:8px;--radius-sheet:12px;--size-row:32px;--size-control:28px;--size-field:28px;--dur-fast:100ms;--dur-base:150ms;}
+:root,:root[data-theme="dark"]{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-paper:#1b2647;--color-content:rgb(27 38 71 / 0.96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246 / 0.62);--color-ink-3:rgb(242 242 246 / 0.53);--color-line:rgb(255 255 255 / 0.1);--color-line-strong:rgb(255 255 255 / 0.18);--color-hover:rgb(255 255 255 / 0.06);--color-focus:#b4b2ff;--color-accent:#5b5bf6;--color-on-accent:#ffffff;--color-accent-soft:rgb(91 91 246 / 0.2);--color-accent-ink:#b4b2ff;--color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;--color-info:#5fb4f0;--color-info-soft:rgb(95 180 240 / 0.16);--color-hue-1:#5b9cf6;--color-hue-7:#a68bfa;--glass-shadow-clear:rgb(0 0 0 / 0.15);--canvas-glow:18%;}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#ffffff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-paper:#ffffff;--color-content:rgb(255 255 255 / 0.96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27 / 0.72);--color-ink-3:rgb(24 24 27 / 0.64);--color-line:rgb(0 0 0 / 0.1);--color-line-strong:rgb(0 0 0 / 0.23);--color-hover:rgb(0 0 0 / 0.06);--color-focus:#4f46e5;--color-accent:#4f46e5;--color-on-accent:#ffffff;--color-accent-soft:rgb(79 70 229 / 0.12);--color-accent-ink:#4338ca;--color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;--color-info:#03629a;--color-info-soft:rgb(3 98 154 / 0.12);--color-hue-1:#1f64d6;--color-hue-7:#7244e0;--glass-shadow-clear:rgb(0 0 0 / 0.08);--canvas-glow:10%;}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground);color:var(--color-ink)}
+body{margin:0;min-height:100vh;font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased}
+h1,h2,h3,p{margin:0}
+.mono,code{font-family:var(--font-mono)}
+:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}
+svg.icon{width:16px;height:16px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+svg.icon.sm{width:14px;height:14px}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font-family:inherit;font-weight:600;cursor:pointer;border:1px solid transparent;background:transparent;color:var(--color-ink);height:var(--size-control);padding:0 16px;font-size:14px;border-radius:var(--radius-control);transition:background-color var(--dur-fast),color var(--dur-fast)}
+.btn:disabled{opacity:0.4;pointer-events:none}
+.btn-solid{background:var(--color-accent);color:var(--color-on-accent)}
+.btn-solid:hover{background:color-mix(in oklab,var(--color-accent) 88%,var(--color-on-accent))}
+.btn-glass{background:var(--color-raised);border-color:var(--color-line-strong);color:var(--color-ink)}
+.btn-glass:hover{background:linear-gradient(var(--color-hover),var(--color-hover)),var(--color-raised)}
+.btn-ghost{color:var(--color-ink-2)}
+.btn-ghost:hover{color:var(--color-ink);background:var(--color-hover)}
+.btn-sm{height:28px;padding:0 10px;font-size:12px;line-height:16px}
+.btn-full{width:100%}
+.badge{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;font-weight:600;line-height:1;border-radius:999px;height:20px;padding:0 8px;font-size:11px;background:var(--color-hover);color:var(--color-ink-2)}
+.badge-accent{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.badge-warn{background:color-mix(in oklab,var(--color-warn) 14%,transparent);color:var(--color-warn)}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.field-label{font-size:12px;line-height:16px;font-weight:500;color:var(--color-ink-2)}
+.field-hint{font-size:12px;line-height:16px;color:var(--color-ink-3)}
+.segmented{display:inline-flex;gap:2px;padding:2px;height:var(--size-control);border-radius:var(--radius-control);border:1px solid var(--color-line)}
+.segmented button{min-width:40px;border:0;background:transparent;font-family:inherit;font-size:12px;font-weight:500;color:var(--color-ink-2);padding:0 12px;border-radius:4px;cursor:pointer}
+.segmented button[aria-pressed='true']{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.select{height:var(--size-field);width:100%;padding:0 12px;font-family:inherit;font-size:14px;color:var(--color-ink);background:var(--color-surface);border:1px solid var(--color-line-strong);border-radius:var(--radius-control);appearance:none}
+
+/* Frame layout */
+.frame{max-width:1240px;margin:0 auto;padding:24px;display:flex;flex-direction:column;gap:20px}
+.frame-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
+.frame-head .eyebrow{font-size:12px;font-weight:500;color:var(--color-ink-3)}
+.frame-head h1{font-size:20px;line-height:28px;font-weight:600;letter-spacing:-0.01em}
+.states{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));align-items:start}
+.state{display:flex;flex-direction:column;gap:8px}
+.state-cap{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:500;color:var(--color-ink-3)}
+.state-cap b{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:999px;background:var(--color-hover);color:var(--color-ink-2);font-size:11px}
+
+/* Panel, as generate-panel.tsx */
+.panel{display:flex;flex-direction:column;gap:16px;padding:20px;border-radius:var(--radius-surface);background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.panel h2{font-size:16px;line-height:24px;font-weight:600}
+.panel .lede{font-size:14px;color:var(--color-ink-2)}
+.group{display:flex;flex-direction:column;gap:10px;min-width:0;margin:0;padding:12px;border:1px solid var(--color-line);border-radius:var(--radius-control)}
+.group-head{display:flex;align-items:center;gap:8px}
+.group-head .t{font-size:14px;font-weight:500}
+.group-head .push{margin-left:auto}
+
+/* Multi-select combobox */
+.combo{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-height:var(--size-field);padding:4px 6px;background:var(--color-surface);border:1px solid var(--color-line-strong);border-radius:var(--radius-control)}
+.combo:focus-within{border-color:color-mix(in oklab,var(--color-ink) 70%,transparent)}
+.tok{display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 4px 0 8px;border-radius:4px;background:var(--color-hover);font-family:var(--font-mono);font-size:12px;color:var(--color-ink)}
+.tok .x{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:0;padding:0;border-radius:999px;background:transparent;color:var(--color-ink-3);cursor:pointer}
+.tok .x:hover{background:var(--color-hover);color:var(--color-ink)}
+.tok.missing{background:color-mix(in oklab,var(--color-warn) 14%,transparent);color:var(--color-warn)}
+.tok.gone{opacity:.55;text-decoration:line-through}
+.combo input{flex:1;min-width:90px;height:22px;border:0;outline:none;background:transparent;font-family:inherit;font-size:13px;color:var(--color-ink)}
+.combo input::placeholder{color:var(--color-ink-3)}
+.warn-line{display:flex;align-items:flex-start;gap:6px;font-size:12px;line-height:16px;color:var(--color-warn)}
+.warn-line .icon{margin-top:1px}
+
+/* Save-as-default row */
+.save-row{display:flex;align-items:center;gap:12px;padding-top:10px;border-top:1px dashed var(--color-line)}
+.save-row .why{flex:1;min-width:0;font-size:12px;line-height:16px;color:var(--color-ink-3)}
+.save-row .why b{color:var(--color-ink-2);font-weight:500}
+.note{display:flex;align-items:flex-start;gap:8px;padding:10px;border-radius:var(--radius-control);background:var(--color-info-soft);font-size:12px;line-height:16px;color:var(--color-ink-2)}
+.note .icon{color:var(--color-info);margin-top:1px}
+.note a{color:var(--color-accent-ink)}
+.foot{text-align:center;font-size:12px;color:var(--color-ink-3)}
+.legend{display:flex;flex-wrap:wrap;gap:16px;padding:12px 14px;border-radius:var(--radius-surface);border:1px solid var(--color-line);background:var(--color-hover);font-size:12px;color:var(--color-ink-2)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+@media (prefers-reduced-motion:reduce){*{transition-duration:0.01ms !important}}
+</style>
+</head>
+<body>
+<div class="canvas"></div>
+<div class="frame">
+  <header class="frame-head">
+    <div>
+      <p class="eyebrow">C-248 · Card → Design tab</p>
+      <h1>Draw the mockup — design skills follow the project default</h1>
+    </div>
+    <div class="segmented" role="group" aria-label="Theme">
+      <button type="button" aria-pressed="true" data-t="dark">Dark</button>
+      <button type="button" aria-pressed="false" data-t="light">Light</button>
+    </div>
+  </header>
+
+  <div class="states">
+    <!-- State 1: following the default, admin -->
+    <div class="state">
+      <p class="state-cap"><b>1</b>Following the project default · admin</p>
+      <section class="panel" aria-label="Generate the design">
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <h2>Draw the mockup</h2>
+          <p class="lede">Planner: the board tile gains a design status chip.</p>
+        </div>
+        <div class="field">
+          <span class="field-label">Variants</span>
+          <div class="segmented" role="group" aria-label="Variants" style="align-self:flex-start">
+            <button type="button" aria-pressed="false">1</button><button type="button" aria-pressed="true">2</button><button type="button" aria-pressed="false">3</button>
+          </div>
+        </div>
+        <fieldset class="group" aria-labelledby="s1-skills">
+          <div class="group-head">
+            <span id="s1-skills" class="t">Design skills</span>
+            <span class="badge badge-accent" title="Follows Settings → Design until edited here">
+              <svg class="icon sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>Project default
+            </span>
+            <button class="btn btn-ghost btn-sm push" type="button" disabled>Use defaults</button>
+          </div>
+          <div class="combo" role="combobox" aria-expanded="false" aria-label="Design skills">
+            <span class="tok">web-design-guidelines<button class="x" type="button" aria-label="Remove web-design-guidelines">×</button></span>
+            <span class="tok">frontend-design<button class="x" type="button" aria-label="Remove frontend-design">×</button></span>
+            <span class="tok">high-end-visual-design<button class="x" type="button" aria-label="Remove high-end-visual-design">×</button></span>
+            <span class="tok">design-taste-frontend<button class="x" type="button" aria-label="Remove design-taste-frontend">×</button></span>
+            <input type="text" placeholder="Add a skill" aria-label="Add a skill">
+          </div>
+          <p class="field-hint">4 of 12. A change to the project default reaches this card until you edit the set here.</p>
+          <div class="save-row">
+            <p class="why"><b>Project default</b> · this is the saved set.</p>
+            <button class="btn btn-glass btn-sm" type="button" disabled>Save as project default</button>
+          </div>
+        </fieldset>
+        <button class="btn btn-solid btn-full" type="button">Generate</button>
+        <p class="foot">2 variants · Opus 5.5 on the default profile</p>
+      </section>
+    </div>
+
+    <!-- State 2: edited by hand, admin -->
+    <div class="state">
+      <p class="state-cap"><b>2</b>Edited on this card · admin</p>
+      <section class="panel" aria-label="Generate the design">
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <h2>Draw the mockup</h2>
+          <p class="lede">Planner: the board tile gains a design status chip.</p>
+        </div>
+        <div class="field">
+          <span class="field-label">Variants</span>
+          <div class="segmented" role="group" aria-label="Variants" style="align-self:flex-start">
+            <button type="button" aria-pressed="false">1</button><button type="button" aria-pressed="true">2</button><button type="button" aria-pressed="false">3</button>
+          </div>
+        </div>
+        <fieldset class="group" aria-labelledby="s2-skills">
+          <div class="group-head">
+            <span id="s2-skills" class="t">Design skills</span>
+            <span class="badge" title="This card keeps its own set">
+              <svg class="icon sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.38 3.62a1 1 0 0 1 3 3L7.37 18.64a2 2 0 0 1-.86.5l-2.87.84a.5.5 0 0 1-.62-.62l.84-2.87a2 2 0 0 1 .5-.86z"/></svg>Edited for this card
+            </span>
+            <button class="btn btn-ghost btn-sm push" type="button">Use defaults</button>
+          </div>
+          <div class="combo" role="combobox" aria-expanded="false" aria-label="Design skills">
+            <span class="tok">web-design-guidelines<button class="x" type="button" aria-label="Remove web-design-guidelines">×</button></span>
+            <span class="tok">frontend-design<button class="x" type="button" aria-label="Remove frontend-design">×</button></span>
+            <span class="tok">ui-ux-pro-max<button class="x" type="button" aria-label="Remove ui-ux-pro-max">×</button></span>
+            <span class="tok missing" title="Not installed — skipped at generation">
+              <svg class="icon sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>brand-motion<button class="x" type="button" aria-label="Remove brand-motion">×</button>
+            </span>
+            <input type="text" placeholder="Add a skill" aria-label="Add a skill">
+          </div>
+          <p class="warn-line" role="status"><svg class="icon sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg><span><code>brand-motion</code> is not installed and is skipped.</span></p>
+          <p class="field-hint">4 of 12. Differs from the default: <span class="mono">+ui-ux-pro-max</span>, <span class="mono">+brand-motion</span>, <span class="mono tok gone" style="height:auto;padding:0 4px">high-end-visual-design</span> +1 more. A change to the default no longer reaches this card.</p>
+          <div class="save-row">
+            <p class="why"><b>Project default</b> · applies to every design not yet generated that follows the default. Audited.</p>
+            <button class="btn btn-glass btn-sm" type="button">
+              <svg class="icon sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></svg>Save as project default
+            </button>
+          </div>
+        </fieldset>
+        <button class="btn btn-solid btn-full" type="button">Generate</button>
+        <p class="foot">2 variants · Opus 5.5 on the default profile</p>
+      </section>
+    </div>
+
+    <!-- State 3: non-admin, empty default -->
+    <div class="state">
+      <p class="state-cap"><b>3</b>No project default yet · member (not admin)</p>
+      <section class="panel" aria-label="Generate the design">
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <h2>Draw the mockup</h2>
+          <p class="lede">The planner draws the task as a self-contained HTML mockup in the project’s style.</p>
+        </div>
+        <div class="field">
+          <span class="field-label">Variants</span>
+          <div class="segmented" role="group" aria-label="Variants" style="align-self:flex-start">
+            <button type="button" aria-pressed="true">1</button><button type="button" aria-pressed="false">2</button><button type="button" aria-pressed="false">3</button>
+          </div>
+        </div>
+        <fieldset class="group" aria-labelledby="s3-skills">
+          <div class="group-head">
+            <span id="s3-skills" class="t">Design skills</span>
+            <span class="badge">No default</span>
+            <button class="btn btn-ghost btn-sm push" type="button" disabled>Use defaults</button>
+          </div>
+          <div class="combo" role="combobox" aria-expanded="false" aria-label="Design skills">
+            <input type="text" placeholder="Add a skill" aria-label="Add a skill">
+          </div>
+          <p class="field-hint">Up to 12. Skills are optional.</p>
+          <div class="note">
+            <svg class="icon sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+            <span>This project has no default skill set. A project admin can save one here or in <a href="#settings-design">Settings → Design</a>, and every card follows it.</span>
+          </div>
+        </fieldset>
+        <div class="field">
+          <label class="field-label" for="s3-model">Model</label>
+          <select id="s3-model" class="select"><option>Project model</option><option>Opus 5.5</option><option>Sonnet 5.5</option></select>
+        </div>
+        <button class="btn btn-solid btn-full" type="button">Generate</button>
+        <p class="foot">1 variant · Project model on the default profile</p>
+      </section>
+    </div>
+  </div>
+
+  <div class="legend" aria-label="Behaviour notes">
+    <span><span class="badge badge-accent">Project default</span> skills resolve from Settings → Design at generation time</span>
+    <span><span class="badge">Edited for this card</span> set is frozen on the design; a default change does not reach it</span>
+    <span><b style="color:var(--color-ink)">Use defaults</b> clears the hand edit and returns to following</span>
+    <span><b style="color:var(--color-ink)">Save as project default</b> admins only, same audit entry as Settings → Design</span>
+  </div>
+</div>
+<script>
+document.querySelectorAll('[data-t]').forEach(function (b) {
+  b.addEventListener('click', function () {
+    document.documentElement.setAttribute('data-theme', b.getAttribute('data-t'));
+    document.querySelectorAll('[data-t]').forEach(function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+  });
+});
+</script>
+</body>
+</html>
