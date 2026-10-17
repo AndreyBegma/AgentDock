@@ -47,6 +47,32 @@ describe('where a New work intake stands (#337 D2–D6)', () => {
     expect(draftStateText(p)).toBe('2 questions waiting');
   });
 
+  test('#592: an intake under review lists its candidates and how many wait', () => {
+    const candidate = {
+      id: 'c1',
+      planId: 'plan-1',
+      position: 0,
+      title: 'Export the board',
+      kind: 'feature' as const,
+      body: '',
+      stage: null,
+      status: 'pending' as const,
+      version: 1,
+      card: null,
+      attachments: 0,
+    };
+    const p = intake({
+      status: 'reviewing',
+      intake: {
+        roundsAsked: 1,
+        maxRounds: 4,
+        candidates: [candidate, { ...candidate, id: 'c2', status: 'rejected' }],
+      },
+    });
+    expect(intakePhase(p)).toMatchObject({ kind: 'review' });
+    expect(draftStateText(p)).toBe('1 card to review');
+  });
+
   test('a failed last turn asks for a retry', () => {
     const p = intake({
       turns: [turn({ action: 'intake', phase: 'failed', error: 'boom' })],
@@ -136,8 +162,8 @@ describe('a split proposal (#409)', () => {
     ]);
     // Editing a row leaves the proposal as it was.
     expect(split.cards[1].title).toBe('Fix the sign-in button on mobile');
-    expect(confirmSplitText(1)).toBe('Create 1 card');
-    expect(confirmSplitText(3)).toBe('Create 3 cards');
+    expect(confirmSplitText(1)).toBe('Send 1 card to Drafts');
+    expect(confirmSplitText(3)).toBe('Send 3 cards to Drafts');
   });
 
   test('a row needs an English title of at most 80 characters', () => {

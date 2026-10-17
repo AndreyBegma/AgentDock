@@ -20,16 +20,16 @@ enum UserStatus {
 }
 
 model User {
-  id               String     @id @default(cuid())
-  email            String     @unique
-  name             String?
-  passwordHash     String
-  role             Role       @default(viewer)
-  status           UserStatus @default(pending)
-  approvedById     String?
-  approvedAt       DateTime?
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
+  id           String     @id @default(cuid())
+  email        String     @unique
+  name         String?
+  passwordHash String
+  role         Role       @default(viewer)
+  status       UserStatus @default(pending)
+  approvedById String?
+  approvedAt   DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
   approvedBy                  User?                         @relation("UserApprovals", fields: [approvedById], references: [id], onDelete: SetNull)
   approvedUsers               User[]                        @relation("UserApprovals")
@@ -85,6 +85,7 @@ model User {
   tokenSaverSettingsUpdated   TokenSaverSettings[]
   stewardSettingsUpdated      StewardSettings[]
   settings                    UserSettings?
+  planCandidatesDecided       PlanCandidate[]               @relation("PlanCandidateDecidedBy")
 
   @@map("users")
 }
@@ -330,20 +331,20 @@ model AuditRecord {
 /// at once, the rest are counted here and written as one record when the
 /// minute is over. Not part of the chain; rows are deleted once written.
 model AuditFold {
-  action    String
+  action     String
   targetType String
   /// `''` for no target id.
-  targetId  String
+  targetId   String
   /// `''` for no address.
-  ip        String
-  minute    DateTime
-  actor     Json
-  result    AuditResult
-  userAgent String?
+  ip         String
+  minute     DateTime
+  actor      Json
+  result     AuditResult
+  userAgent  String?
   /// Repeats after the first.
-  count     Int        @default(0)
+  count      Int         @default(0)
   /// `meta.reason` of each repeat → how many.
-  reasons   Json       @default("{}")
+  reasons    Json        @default("{}")
 
   @@id([action, targetType, targetId, ip, minute])
   @@index([minute])
@@ -1433,10 +1434,10 @@ model NotificationDelivery {
 
 /// The Telegram private chat a user linked (D9). One chat per user, one user per chat.
 model TelegramLink {
-  userId   String   @id
-  chatId   BigInt   @unique
-  username String?
-  linkedAt DateTime @default(now())
+  userId           String   @id
+  chatId           BigInt   @unique
+  username         String?
+  linkedAt         DateTime @default(now())
   /// #500: the project the chat's Board commands act on (`/project`). Null
   /// until chosen; a deleted project clears it.
   currentProjectId String?
@@ -2453,6 +2454,10 @@ model Plan {
   /// #379: when each PR was seen merged; the issues waiting on it queue then.
   docsPrMergedAt   DateTime?
   designPrMergedAt DateTime?
+  /// #592 (ADR-0058): the stack the intake proposed — `{title, body, design,
+  /// stages: string[]}` (shared `planCandidateStackSchema`); its candidates
+  /// name their stage by index. Null for one card or a split.
+  candidateStack   Json?
   /// #590: a discussion's skills, installed invocations every turn applies;
   /// empty for any other mode.
   skills           String[]       @default([])
@@ -2475,6 +2480,8 @@ model Plan {
   stacks             BoardStack[]
   /// #574: the Telegram chat running this intake.
   telegramIntake     TelegramIntake?
+  /// #592 (ADR-0058): the cards the intake wrote, waiting for the person.
+  candidates         PlanCandidate[]
 
   @@index([projectId, updatedAt])
   @@index([authorId])
@@ -2523,6 +2530,47 @@ model PlanTask {
 
 /// One headless turn (D3, D17): a `runs` row of kind `plan` (D14). A turn
 /// whose output fails the contract keeps `resultText` and applies nothing.
+/// Shared `PLAN_CANDIDATE_STATUSES` (#592, ADR-0058).
+enum PlanCandidateStatus {
+  pending
+  accepted
+  rejected
+}
+
+/// #592 (ADR-0058): a card a New work intake wrote, waiting in Drafts until
+/// the person accepts it (a board card is made) or rejects it.
+model PlanCandidate {
+  id          String              @id @default(cuid())
+  planId      String
+  /// 0-based, in the proposal's order (stage order for a stack).
+  position    Int
+  /// English, at most `CARD_DRAFT_TITLE_MAX` characters.
+  title       String
+  kind        PlanTaskKind
+  /// Markdown, at most `CARD_DRAFT_BODY_MAX` characters.
+  body        String
+  /// The 0-based stage of `plans.candidateStack` it was proposed in.
+  stage       Int?
+  status      PlanCandidateStatus @default(pending)
+  /// Bumped by every edit: an edit or accept naming an older one is stale.
+  version     Int                 @default(1)
+  /// The card Accept made.
+  cardId      String?             @unique
+  /// How many of the intake's attachments its card took (ADR-0037 §4).
+  attachments Int                 @default(0)
+  decidedById String?
+  decidedAt   DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  plan      Plan       @relation(fields: [planId], references: [id], onDelete: Cascade)
+  card      BoardCard? @relation(fields: [cardId], references: [id], onDelete: SetNull)
+  decidedBy User?      @relation("PlanCandidateDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+
+  @@unique([planId, position])
+  @@map("plan_candidates")
+}
+
 model PlanTurn {
   id         String         @id @default(cuid())
   /// Exactly one of `planId` / `cardId` / `stackId` (CHECK `plan_turns_owner_check`, ADR-0025, ADR-0044).
@@ -3047,6 +3095,8 @@ model BoardCard {
   dependants         BoardCardDependency[]  @relation("BoardCardDependant")
   /// #359 D8: every PR the card opened; `prUrl` is the latest.
   pullRequests       BoardCardPullRequest[]
+  /// #592: the intake candidate accepted as this card.
+  candidate          PlanCandidate?
 
   @@unique([projectId, number])
   @@unique([projectId, fleetIssue, fleetSlot])

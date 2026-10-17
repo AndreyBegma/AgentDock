@@ -3,6 +3,8 @@ import type { TaskDesignSummary } from '../design/contracts';
 import type {
   DiscussProposal,
   PlanAnswer,
+  PlanCandidateStack,
+  PlanCandidateStatus,
   PlanMode,
   PlannerSpecOutput,
   PlanQuestion,
@@ -305,6 +307,91 @@ export interface PlanIntakeView {
    * and those a Telegram `/new` sent (optional: absent reads as none).
    */
   attachments?: AttachmentView[];
+  /**
+   * #592 (ADR-0058): the cards the intake wrote, waiting for the person in
+   * Drafts, in the proposal's order — decided ones too, until none is
+   * pending (optional: absent reads as none).
+   */
+  candidates?: PlanCandidateView[];
+  /** #592: the stack the intake proposed; candidates name its stages by index. */
+  candidateStack?: PlanCandidateStack | null;
+  /** #592: how many of the intake's attachments no card has taken yet. */
+  attachmentsLeft?: number;
+}
+
+/** #592 (ADR-0058): a card the intake wrote, before the person decides it. */
+export interface PlanCandidateView {
+  id: string;
+  planId: string;
+  /** 0-based, in the proposal's order (stage order for a stack). */
+  position: number;
+  title: string;
+  kind: PlanTaskKind;
+  /** Markdown, the full card body. */
+  body: string;
+  /** The 0-based stage of `candidateStack` it was proposed in; null outside a stack. */
+  stage: number | null;
+  status: PlanCandidateStatus;
+  /** Named by an edit or an accept: an older one is `candidate_stale`. */
+  version: number;
+  /** The card Accept made; null until then, and for a rejected one. */
+  card: { number: number; label: string } | null;
+  /** How many of the intake's attachments its card took. */
+  attachments: number;
+}
+
+/**
+ * `PATCH /projects/:projectId/plans/:planId/candidates/:candidateId` (#592):
+ * the person edits a pending candidate by hand. The title stays English
+ * (ASCII letters only, as a split title). 409 `candidate_stale` when
+ * `version` is not the candidate's; 409 `candidate_decided` once decided.
+ */
+export interface UpdatePlanCandidateRequest {
+  version: number;
+  title?: string;
+  kind?: PlanTaskKind;
+  body?: string;
+}
+
+/**
+ * #592: the candidates one accept names at most — the Drafts strip's
+ * intakes (`DRAFTS_SHOWN_MAX`, 8) of at most `INTAKE_SPLIT_MAX` cards each.
+ */
+export const ACCEPT_CANDIDATES_MAX = 64;
+
+/** #592: how the person accepts several candidates at once. */
+export const ACCEPT_CANDIDATES_AS = ['cards', 'stack'] as const;
+export type AcceptCandidatesAs = (typeof ACCEPT_CANDIDATES_AS)[number];
+
+/**
+ * `POST /projects/:projectId/candidates/accept` (#592, ADR-0058 §3): pending
+ * candidates of the caller's intakes — of one intake or several — made into
+ * cards in Todo at once: independent (`cards`, in the listed order), or one
+ * stack (`stack`), each candidate in the 0-based `stage` the person chose.
+ */
+export interface AcceptCandidatesRequest {
+  as: AcceptCandidatesAs;
+  candidates: AcceptCandidateRef[];
+}
+
+export interface AcceptCandidateRef {
+  id: string;
+  version: number;
+  /** Required with `as: 'stack'`; empty stages close up. */
+  stage?: number;
+}
+
+export interface AcceptCandidatesResponse {
+  /** In the order made: the listed order, or stage order for a stack. */
+  cards: { candidateId: string; number: number; label: string }[];
+  stack: { number: number; label: string } | null;
+}
+
+/** #592: a `candidate_decided` refusal names what the candidate became. */
+export interface CandidateDecidedDetails {
+  candidateId: string;
+  status: PlanCandidateStatus;
+  card: { number: number; label: string } | null;
 }
 
 /** #409: a split proposal as the person reviews it. */
@@ -380,11 +467,12 @@ export interface ConfirmSplitCard {
   kind: PlanTaskKind;
 }
 
+/**
+ * #592 (ADR-0058): Confirm writes candidates, not cards — in the confirmed
+ * order (stage order for a stack); they wait in Drafts.
+ */
 export interface ConfirmSplitResponse {
-  /** In the confirmed order. */
-  cards: { number: number; label: string }[];
-  /** #480: the stack made, when the request named one. */
-  stack?: { number: number; label: string } | null;
+  candidates: PlanCandidateView[];
 }
 
 /** `GET /tasks` query. */
@@ -524,6 +612,16 @@ export const PLANNER_ERROR = {
    * Send or a split on a `discuss` plan, skills on any other.
    */
   wrongMode: 'wrong_mode',
+  /**
+   * 409 (#592): an edit or accept names a candidate version that is no
+   * longer its own — it was edited in another tab.
+   */
+  candidateStale: 'candidate_stale',
+  /**
+   * 409 (#592): the candidate was accepted or rejected already; the body
+   * names it (`CandidateDecidedDetails`).
+   */
+  candidateDecided: 'candidate_decided',
 } as const;
 export type PlannerErrorCode =
   (typeof PLANNER_ERROR)[keyof typeof PLANNER_ERROR];

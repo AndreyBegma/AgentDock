@@ -103,6 +103,10 @@ export const AUDIT_ACTIONS = [
   'plan.revised',
   'plan.sent',
   'plan.task_reviewed',
+  /** #592 (ADR-0058): a New work candidate edited by hand (`meta.candidateId`). */
+  'plan.candidate_edited',
+  /** #592: a New work candidate rejected; no card was made. */
+  'plan.candidate_rejected',
   'planner.instructions_updated',
   'planner.settings_updated',
   'design.toggled',

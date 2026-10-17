@@ -26,7 +26,8 @@ import { SplitReview } from './split-review';
  * to retry, or a proposal to split the request into several cards.
  * **Enough — generate** is there whenever no turn runs and nothing is
  * proposed — with a round open it answers the rest with their
- * recommendations. Once the cards exist, each opens.
+ * recommendations. #592: what it writes waits in Drafts as candidates; once
+ * the person accepted them, each card opens.
  */
 export function IntakeView({
   projectId,
@@ -178,6 +179,13 @@ export function IntakeView({
         />
       ) : null}
 
+      {phase.kind === 'review' ? (
+        <Banner tone="info" title={reviewTitle(phase.candidates.length)}>
+          They wait in Drafts on the Board. Open each to read and edit it, then
+          accept or reject it — nothing reaches Todo until you accept it.
+        </Banner>
+      ) : null}
+
       {phase.kind === 'closed' ? (
         <Banner tone="info" title="This draft was discarded">
           No card was made from it.
@@ -190,7 +198,9 @@ export function IntakeView({
         </p>
       ) : null}
 
-      {phase.kind === 'done' || phase.kind === 'closed' ? (
+      {phase.kind === 'done' ||
+      phase.kind === 'closed' ||
+      phase.kind === 'review' ? (
         <div className="flex justify-end">
           <Button variant="glass" onClick={onClose}>
             Close
@@ -200,6 +210,10 @@ export function IntakeView({
     </div>
   );
 }
+
+/** #592: "The card waits in Drafts", or "3 cards wait in Drafts". */
+const reviewTitle = (count: number): string =>
+  count === 1 ? 'The card waits in Drafts' : `${count} cards wait in Drafts`;
 
 /** The intake's cards are in Todo: one opens from the banner, several from a list (#409). */
 function DoneBanner({

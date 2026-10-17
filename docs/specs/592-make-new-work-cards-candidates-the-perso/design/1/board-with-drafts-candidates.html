@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Board — Drafts with candidates</title>
+<style>
+:root{--radius-control:6px;--radius-surface:8px;--radius-sheet:12px;--size-row:32px;--size-control:28px;--size-field:28px;--dur-fast:100ms;--dur-base:150ms;--ease-sheet:cubic-bezier(0.32,0.72,0,1);--press-scale:0.97;--font-sans:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;--font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;--glass-blur:26px;--glass-blur-strong:40px;--glass-filter:blur(var(--glass-blur)) saturate(180%) brightness(var(--glass-brightness));--glass-filter-strong:blur(var(--glass-blur-strong)) saturate(180%) brightness(var(--glass-brightness-strong));--canvas-aurora-1:var(--color-hue-1);--canvas-aurora-2:var(--color-hue-7);--canvas-aurora-3:var(--color-hue-1)}
+:root[data-theme="dark"],:root:not([data-theme]){color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-paper:#1b2647;--color-content:rgb(27 38 71/0.96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246/0.62);--color-ink-3:rgb(242 242 246/0.53);--color-line:rgb(255 255 255/0.1);--color-line-strong:rgb(255 255 255/0.18);--color-hover:rgb(255 255 255/0.06);--color-focus:#b4b2ff;--color-accent:#5b5bf6;--color-on-accent:#ffffff;--color-accent-soft:rgb(91 91 246/0.2);--color-accent-ink:#b4b2ff;--color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;--color-info:#5fb4f0;--canvas-glow:18%;--color-hue-1:#5b9cf6;--color-hue-1-soft:rgb(91 156 246/0.18);--color-hue-1-ink:#a4c8ff;--color-hue-2:#2fbf94;--color-hue-2-soft:rgb(47 191 148/0.18);--color-hue-2-ink:#7ee0c0;--color-hue-3:#7cc95a;--color-hue-3-soft:rgb(124 201 90/0.18);--color-hue-3-ink:#ade58f;--color-hue-4:#e69f00;--color-hue-4-soft:rgb(230 159 0/0.18);--color-hue-4-ink:#f5c25c;--color-hue-5:#e8743b;--color-hue-6:#f0606e;--color-hue-7:#a68bfa;--color-hue-7-soft:rgb(166 139 250/0.18);--color-hue-7-ink:#cbbcff;--glass-sheen:rgb(255 255 255/0.06);--glass-scrim:rgb(9 9 12/0.55);--glass-scrim-strong:rgb(9 9 12/0.64);--glass-brightness:0.85;--glass-brightness-strong:0.7;--glass-edge:rgb(255 255 255/0.14);--glass-spec:rgb(255 255 255/0.2);--glass-rim:rgb(242 242 246/0.8);--glass-rim-shade:rgb(9 9 12/0.5);--glass-rim-strong:rgb(242 242 246/0.22);--glass-rim-shade-strong:rgb(9 9 12/0.2);--glass-meniscus:rgb(9 9 12/0.55);--glass-refract:rgb(242 242 246/0.35);--glass-shadow:rgb(0 0 0/0.35);--glass-shadow-strong:rgb(0 0 0/0.45);--glass-shadow-clear:rgb(0 0 0/0.15);--control-spec:rgb(255 255 255/0.05)}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#ffffff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-paper:#ffffff;--color-content:rgb(255 255 255/0.96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27/0.72);--color-ink-3:rgb(24 24 27/0.64);--color-line:rgb(0 0 0/0.1);--color-line-strong:rgb(0 0 0/0.23);--color-hover:rgb(0 0 0/0.06);--color-focus:#4f46e5;--color-accent:#4f46e5;--color-on-accent:#ffffff;--color-accent-soft:rgb(79 70 229/0.12);--color-accent-ink:#4338ca;--color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;--color-info:#03629a;--canvas-glow:10%;--color-hue-1:#1f64d6;--color-hue-1-soft:rgb(31 100 214/0.12);--color-hue-1-ink:#1550b0;--color-hue-2:#00805e;--color-hue-2-soft:rgb(0 128 94/0.12);--color-hue-2-ink:#006a4e;--color-hue-3:#3a7d1c;--color-hue-3-soft:rgb(58 125 28/0.12);--color-hue-3-ink:#2f6617;--color-hue-4:#b36b00;--color-hue-4-soft:rgb(179 107 0/0.12);--color-hue-4-ink:#8a5200;--color-hue-5:#c24e00;--color-hue-6:#d02a3e;--color-hue-7:#7244e0;--color-hue-7-soft:rgb(114 68 224/0.12);--color-hue-7-ink:#5b30c4;--glass-sheen:rgb(0 0 0/0.06);--glass-scrim:rgb(255 255 255/0.52);--glass-scrim-strong:rgb(255 255 255/0.64);--glass-brightness:1.15;--glass-brightness-strong:1.3;--glass-edge:rgb(0 0 0/0.18);--glass-spec:rgb(0 0 0/0.2);--glass-rim:rgb(255 255 255/0.9);--glass-rim-shade:rgb(24 24 27/0.18);--glass-rim-strong:rgb(255 255 255/0.3);--glass-rim-shade-strong:rgb(24 24 27/0.08);--glass-meniscus:rgb(24 24 27/0.12);--glass-refract:rgb(255 255 255/0.5);--glass-shadow:rgb(0 0 0/0.12);--glass-shadow-strong:rgb(0 0 0/0.16);--glass-shadow-clear:rgb(0 0 0/0.08);--control-spec:rgb(255 255 255/0.05)}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground);color:var(--color-ink)}
+body{margin:0;min-height:100vh;font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+h1,h2,h3,p{margin:0}
+:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}
+.ad-mono{font-family:var(--font-mono);font-size:12px}
+.ad-ink-2{color:var(--color-ink-2)}.ad-ink-3{color:var(--color-ink-3)}
+.ad-icon{width:16px;height:16px;flex-shrink:0}
+.ad-row{display:flex;align-items:center;gap:8px}
+.ad-canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--canvas-aurora-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--canvas-aurora-2) var(--canvas-glow),transparent),transparent 70%)}
+.ad-glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);backdrop-filter:var(--glass-filter);-webkit-backdrop-filter:var(--glass-filter);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),inset 1px 1px 0 var(--glass-rim),inset -1px -1px 0 var(--glass-rim-shade),inset 0 -3px 3px -1px var(--glass-meniscus),inset 0 0 18px -4px var(--glass-refract),0 12px 32px var(--glass-shadow)}
+.ad-glass-strong{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim-strong);backdrop-filter:var(--glass-filter-strong);-webkit-backdrop-filter:var(--glass-filter-strong);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),inset 1px 1px 0 var(--glass-rim-strong),inset -1px -1px 0 var(--glass-rim-shade-strong),inset 0 -3px 3px -1px var(--glass-meniscus),inset 0 0 18px -4px var(--glass-refract),0 20px 48px var(--glass-shadow-strong)}
+.ad-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;font:inherit;font-weight:600;font-size:14px;height:var(--size-control);padding:0 14px;border-radius:var(--radius-control);border:1px solid transparent;background:none;color:var(--color-ink);cursor:pointer;transition:background-color var(--dur-fast),transform 100ms var(--ease-sheet)}
+.ad-btn:active{transform:scale(var(--press-scale))}
+.ad-btn:disabled{opacity:.4;pointer-events:none}
+.ad-btn--solid{background:var(--color-accent);color:var(--color-on-accent)}
+.ad-btn--glass{background:var(--color-raised);border-color:var(--color-line-strong);box-shadow:inset 0 1px 0 var(--control-spec)}
+.ad-btn--glass:hover{background:linear-gradient(var(--color-hover),var(--color-hover)),var(--color-raised)}
+.ad-btn--ghost{color:var(--color-ink-2)}
+.ad-btn--ghost:hover{color:var(--color-ink);background:var(--color-hover)}
+.ad-btn--sm{height:26px;padding:0 10px;font-size:12px}
+.ad-btn--icon{padding:0;aspect-ratio:1}
+.ad-checkbox{appearance:none;width:16px;height:16px;margin:0;flex-shrink:0;border-radius:4px;border:1px solid var(--color-line-strong);background:var(--color-surface);display:inline-grid;place-content:center;cursor:pointer}
+.ad-checkbox:checked{background:var(--color-ink);border-color:var(--color-ink)}
+.ad-checkbox:checked::after{content:'';width:8px;height:4px;border-left:2px solid var(--color-ground);border-bottom:2px solid var(--color-ground);transform:rotate(-45deg) translate(1px,-1px)}
+.ad-badge{display:inline-flex;align-items:center;white-space:nowrap;font-weight:600;line-height:1;border-radius:9999px;height:18px;min-width:18px;justify-content:center;padding:0 6px;font-size:10px;background:var(--color-hover);color:var(--color-ink-2)}
+.ad-badge--ok{background:color-mix(in oklab,var(--color-ok) 14%,transparent);color:var(--color-ok)}
+.ad-badge--danger{background:color-mix(in oklab,var(--color-danger) 14%,transparent);color:var(--color-danger)}
+.ad-chip{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:9999px;border:1px solid var(--color-line-strong);background:var(--color-hover);font-size:11px;font-weight:500;color:var(--color-ink-2);white-space:nowrap}
+[data-status="running"]{--s:var(--color-hue-2);--s-soft:var(--color-hue-2-soft);--s-ink:var(--color-hue-2-ink)}
+[data-status="waiting"]{--s:var(--color-hue-1);--s-soft:var(--color-hue-1-soft);--s-ink:var(--color-hue-1-ink)}
+[data-status="paused"]{--s:var(--color-hue-4);--s-soft:var(--color-hue-4-soft);--s-ink:var(--color-hue-4-ink)}
+[data-status="done"]{--s:var(--color-hue-3);--s-soft:var(--color-hue-3-soft);--s-ink:var(--color-hue-3-ink)}
+[data-status="idle"]{--s:var(--color-ink-3);--s-soft:var(--color-hover);--s-ink:var(--color-ink-2)}
+.ad-pill{display:inline-flex;align-items:center;gap:6px;height:20px;padding:0 8px;border-radius:9999px;white-space:nowrap;font-size:11px;font-weight:500;background:var(--s-soft);color:var(--s-ink)}
+.ad-dot{width:6px;height:6px;border-radius:9999px;background:var(--s);flex-shrink:0}
+.ad-shell{display:flex;gap:12px;padding:12px;min-height:100vh}
+.ad-rail{position:sticky;top:12px;height:calc(100vh - 24px);width:220px;flex-shrink:0;display:flex;flex-direction:column;gap:2px;padding:8px;border-radius:var(--radius-surface)}
+.ad-rail__brand{display:flex;align-items:center;gap:8px;padding:8px 12px 12px;font-weight:600;font-size:15px}
+.ad-rail__heading{padding:12px 12px 4px;font-size:12px;font-weight:500;color:var(--color-ink-3)}
+.ad-rail__item{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:var(--radius-control);color:var(--color-ink-2);text-decoration:none}
+.ad-rail__item:hover{background:var(--color-hover)}
+.ad-rail__item[aria-current="page"]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.ad-rail__item .ad-icon{width:18px;height:18px}
+.ad-col{display:flex;flex:1;flex-direction:column;gap:12px;min-width:0}
+.ad-topbar{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;border-radius:var(--radius-surface)}
+.ad-crumbs{display:flex;align-items:center;gap:4px;flex:1;color:var(--color-ink-3)}
+.ad-crumbs [aria-current]{color:var(--color-ink);font-weight:600}
+.ad-avatar{display:inline-grid;place-content:center;width:28px;height:28px;border-radius:9999px;background:var(--color-raised);border:1px solid var(--color-line);font-size:12px;font-weight:600;color:var(--color-ink-2)}
+.ad-main{width:100%;max-width:1280px;margin:0 auto;display:flex;flex-direction:column;gap:24px;padding-bottom:24px}
+.ad-page-header{display:flex;align-items:flex-end;justify-content:space-between;gap:24px}
+.ad-page-header h1{font-size:28px;line-height:32px;letter-spacing:-.02em;font-weight:600}
+.ad-page-header p{color:var(--color-ink-2);margin-top:4px}
+.ad-section-header{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.ad-section-header h2{font-size:16px;line-height:24px;font-weight:600}
+.ad-section-header p{font-size:13px;color:var(--color-ink-2)}
+.ad-board{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px}
+.ad-board__col{flex:0 0 260px;display:flex;flex-direction:column;gap:8px;padding:8px;border-radius:var(--radius-surface);background:var(--color-hover)}
+.ad-board__head{display:flex;align-items:center;justify-content:space-between;padding:4px 6px;font-size:12px;font-weight:600;color:var(--color-ink-2)}
+.ad-board__card{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-radius:var(--radius-control);background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.ad-swatch{display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--color-hue-7)}
+
+/* Drafts strip — candidates */
+.drafts{display:flex;gap:12px;overflow-x:auto;padding-bottom:4px;align-items:flex-start}
+.intake{flex:0 0 340px;display:flex;flex-direction:column;border-radius:var(--radius-surface);background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear);min-width:0}
+.intake--wide{flex-basis:400px}
+.intake__head{display:flex;flex-direction:column;gap:4px;padding:12px 12px 10px;border-bottom:1px solid var(--color-line)}
+.intake__title{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.intake__meta{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:var(--color-ink-3)}
+.cands{list-style:none;margin:0;padding:4px;display:flex;flex-direction:column}
+.cand{position:relative;display:grid;grid-template-columns:16px 1fr;gap:10px;padding:10px 8px;border-radius:var(--radius-control);transition:background-color var(--dur-fast)}
+.cand:hover{background:var(--color-hover)}
+.cand[data-selected="true"]{background:var(--color-accent-soft)}
+.cand + .cand{border-top:1px solid var(--color-line)}
+.cand[data-selected="true"] + .cand,.cand + .cand[data-selected="true"]{border-top-color:transparent}
+.cand__check{padding-top:2px}
+.cand__body{display:flex;flex-direction:column;gap:6px;min-width:0}
+.cand__top{display:flex;align-items:center;gap:6px;min-width:0}
+.cand__title{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.cand__excerpt{font-size:12px;line-height:16px;color:var(--color-ink-2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.cand__actions{display:flex;gap:4px;align-items:center}
+.cand__actions .spacer{flex:1}
+.kind{font-family:var(--font-mono);font-size:10px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;color:var(--color-ink-3);border:1px solid var(--color-line-strong);border-radius:4px;padding:1px 5px;line-height:14px}
+.kind--bug{color:var(--color-danger);border-color:color-mix(in oklab,var(--color-danger) 35%,transparent)}
+.stage{display:inline-grid;place-content:center;width:20px;height:20px;border-radius:9999px;border:1px solid var(--color-line-strong);background:var(--color-surface);font-size:11px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--color-ink-2);flex-shrink:0}
+.stack .cand{grid-template-columns:16px 20px 1fr}
+.stack .cand .stage-col{position:relative;display:flex;justify-content:center}
+.stack .cand:not(:last-child) .stage-col::after{content:'';position:absolute;top:24px;bottom:-14px;width:1px;background:var(--color-line-strong)}
+.cand--decided{opacity:.72}
+.cand--decided:hover{background:none}
+.decided{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--color-ink-3)}
+.decided a{color:var(--color-accent-ink);font-family:var(--font-mono);font-size:12px}
+.selbar{position:sticky;bottom:12px;z-index:5;display:flex;align-items:center;gap:12px;padding:8px 8px 8px 16px;border-radius:var(--radius-sheet);margin-top:4px}
+.selbar__count{font-weight:600}
+.selbar .spacer{flex:1}
+.hint{font-size:12px;color:var(--color-ink-3)}
+.theme-toggle{position:fixed;right:16px;bottom:16px;z-index:10}
+@media (max-width:1023px){.ad-rail{display:none}.ad-shell{padding:8px 16px}}
+@media (prefers-reduced-motion:reduce){*{transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<div class="ad-canvas"></div>
+<div class="ad-shell">
+  <nav class="ad-rail ad-glass" aria-label="Main">
+    <div class="ad-rail__brand"><span class="ad-swatch" style="width:18px;height:18px;border-radius:5px;background:var(--color-hue-1)"></span>AgentDock</div>
+    <div class="ad-rail__heading">Workspace</div>
+    <a class="ad-rail__item" href="#"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>Overview</a>
+    <a class="ad-rail__item" href="#"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Approvals</a>
+    <div class="ad-rail__heading">AgentDock</div>
+    <a class="ad-rail__item" href="#" aria-current="page"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>Board</a>
+    <a class="ad-rail__item" href="#"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17 10 11 4 5"/><path d="M12 19h8"/></svg>Sessions</a>
+  </nav>
+  <div class="ad-col">
+    <header class="ad-topbar ad-glass">
+      <nav class="ad-crumbs" aria-label="Breadcrumb"><span>AgentDock</span><svg class="ad-icon" style="width:14px;height:14px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg><span aria-current="page">Board</span></nav>
+      <span class="ad-avatar">AB</span>
+    </header>
+    <main id="main-content" class="ad-main">
+      <header class="ad-page-header">
+        <div><h1>Board</h1><p>What the fleet will work on, is working on, and has shipped.</p></div>
+        <button class="ad-btn ad-btn--solid" type="button"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>New work</button>
+      </header>
+
+      <section aria-labelledby="board-drafts" style="display:flex;flex-direction:column;gap:10px">
+        <div class="ad-section-header">
+          <div><h2 id="board-drafts">Drafts</h2><p>Cards the intake wrote. Nothing reaches Todo until you accept it.</p></div>
+          <span class="hint"><b style="color:var(--color-ink)">6</b> candidates waiting</span>
+        </div>
+
+        <ul class="drafts" role="list" style="list-style:none;margin:0;padding:0">
+          <!-- single card -->
+          <li class="intake">
+            <div class="intake__head">
+              <div class="ad-row" style="min-width:0"><span class="ad-chip">New work</span><span class="intake__title">Throttle password checks</span></div>
+              <div class="intake__meta"><span>1 card to review</span><span class="ad-row" style="gap:4px"><svg class="ad-icon" style="width:12px;height:12px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>1 attachment</span></div>
+            </div>
+            <ul class="cands" role="list">
+              <li class="cand" data-selected="false">
+                <span class="cand__check"><input class="ad-checkbox" type="checkbox" aria-label="Select Rate-limit the password check endpoint"></span>
+                <div class="cand__body">
+                  <div class="cand__top"><span class="kind kind--bug">bug</span><span class="cand__title">Rate-limit the password check endpoint</span></div>
+                  <p class="cand__excerpt">POST /auth/check-password accepts unlimited attempts per account. Add a per-account and per-IP limit with a 429 and Retry-After.</p>
+                  <div class="cand__actions"><button class="ad-btn ad-btn--ghost ad-btn--sm" type="button">Open</button><span class="spacer"></span><button class="ad-btn ad-btn--ghost ad-btn--sm" type="button">Reject</button><button class="ad-btn ad-btn--glass ad-btn--sm" type="button">Accept</button></div>
+                </div>
+              </li>
+            </ul>
+          </li>
+
+          <!-- proposed stack -->
+          <li class="intake intake--wide">
+            <div class="intake__head">
+              <div class="ad-row" style="min-width:0"><span class="ad-chip">New work</span><span class="intake__title">Cost dashboard per project</span></div>
+              <div class="intake__meta"><span>Proposed stack · 3 stages</span><button class="ad-btn ad-btn--glass ad-btn--sm" type="button">Accept all</button></div>
+            </div>
+            <ul class="cands stack" role="list">
+              <li class="cand" data-selected="true">
+                <span class="cand__check"><input class="ad-checkbox" type="checkbox" checked aria-label="Select Store per-session cost rollups"></span>
+                <span class="stage-col"><span class="stage" title="Stage 1">1</span></span>
+                <div class="cand__body">
+                  <div class="cand__top"><span class="kind">feature</span><span class="cand__title">Store per-session cost rollups</span></div>
+                  <p class="cand__excerpt">A daily rollup table keyed by project and model, written by the usage ingester.</p>
+                  <div class="cand__actions"><button class="ad-btn ad-btn--ghost ad-btn--sm" type="button">Open</button><span class="spacer"></span><button class="ad-btn ad-btn--ghost ad-btn--sm" type="button">Reject</button><button class="ad-btn ad-btn--glass ad-btn--sm" type="button">Accept</button></div>
+                </div>
+              </li>
+              <li class="cand" data-selected="true">
+                <span class="cand__check"><input class="ad-checkbox" type="checkbox" checked aria-label="Select Expose the cost rollup API"></span>
+                <span class="stage-col"><span class="stage" title="Stage 2">2</span></span>
+                <div class="cand__body">
+                  <div class="cand__top"><span class="kind">feature</span><span class="cand__title">Expose the cost rollup API</span></div>
+                  <p class="cand__excerpt">GET /projects/:id/costs with range and group-by, scoped to the caller's projects.</p>
+                  <div class="cand__actions"><button class="ad-btn ad-btn--ghost ad-btn--sm" type="button">Open</button><span class="spacer"></span><button class="ad-btn ad-btn--ghost ad-btn--sm" type="button">Reject</button><button class="ad-btn ad-btn--glass ad-btn--sm" type="button">Accept</button></div>
+                </div>
+              </li>
+              <li class="cand" data-selected="false">
+                <span class="cand__check"><input class="ad-checkbox" type="checkbox" aria-label="Select Cost dashboard page"></span>
+                <span class="stage-col"><span class="stage" title="Stage 3">3</span></span>
+                <div class="cand__body">
+                  <div class="cand__top"><span class="kind">feature</span><span class="cand__title">Cost dashboard page</span><span class="ad-badge" title="A design is generated on accept">UI</span></div>
+                  <p class="cand__excerpt">Stat tiles, a spend chart by model and a per-slot table under the project.</p>
+                  <div class="cand__actions"><button class="ad-btn ad-btn--ghost ad-btn--sm" type="button">Open</button><span class="spacer"></span><button class="ad-btn ad-btn--ghost ad-btn--sm" type="button">Reject</button><button class="ad-btn ad-btn--glass ad-btn--sm" type="button">Accept</button></div>
+                </div>
+              </li>
+            </ul>
+          </li>
+
+          <!-- split, partly decided -->
+          <li class="intake">
+            <div class="intake__head">
+              <div class="ad-row" style="min-width:0"><span class="ad-chip">New work</span><span class="intake__title">Webhook reliability</span></div>
+              <div class="intake__meta"><span>Proposed split · 2 of 3 decided</span><button class="ad-btn ad-btn--glass ad-btn--sm" type="button">Accept rest</button></div>
+            </div>
+            <ul class="cands" role="list">
+              <li class="cand cand--decided">
+                <span class="cand__check"><svg class="ad-icon" style="color:var(--color-ok)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+                <div class="cand__body">
+                  <div class="cand__top"><span class="kind">feature</span><span class="cand__title">Retry webhook deliveries</span></div>
+                  <span class="decided">Accepted → <a href="#">C-241</a> · took the attachments</span>
+                </div>
+              </li>
+              <li class="cand cand--decided">
+                <span class="cand__check"><svg class="ad-icon" style="color:var(--color-ink-3)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span>
+                <div class="cand__body">
+                  <div class="cand__top"><span class="kind">feature</span><span class="cand__title" style="text-decoration:line-through">Dead-letter queue viewer</span></div>
+                  <span class="decided">Rejected · no card made</span>
+                </div>
+              </li>
+              <li class="cand" data-selected="false">
+                <span class="cand__check"><input class="ad-checkbox" type="checkbox" aria-label="Select Sign webhook payloads"></span>
+                <div class="cand__body">
+                  <div class="cand__top"><span class="kind">feature</span><span class="cand__title">Sign webhook payloads</span></div>
+                  <p class="cand__excerpt">HMAC-SHA256 signature header with a per-endpoint secret and rotation.</p>
+                  <div class="cand__actions"><button class="ad-btn ad-btn--ghost ad-btn--sm" type="button">Open</button><span class="spacer"></span><button class="ad-btn ad-btn--ghost ad-btn--sm" type="button">Reject</button><button class="ad-btn ad-btn--glass ad-btn--sm" type="button">Accept</button></div>
+                </div>
+              </li>
+            </ul>
+          </li>
+
+          <!-- intake still interviewing -->
+          <li class="intake" style="flex-basis:260px">
+            <div class="intake__head" style="border-bottom:0">
+              <div class="ad-row" style="min-width:0"><span class="ad-chip">New work</span><span class="intake__title">Telegram digest</span></div>
+              <div class="intake__meta"><span class="ad-pill" data-status="waiting"><span class="ad-dot"></span>2 questions waiting</span></div>
+            </div>
+            <div class="cand__actions" style="padding:0 12px 12px"><button class="ad-btn ad-btn--glass ad-btn--sm" type="button">Resume</button><button class="ad-btn ad-btn--ghost ad-btn--sm" type="button">Discard</button></div>
+          </li>
+        </ul>
+
+        <div class="selbar ad-glass-strong" role="region" aria-label="Selected candidates">
+          <span class="selbar__count">2 selected</span>
+          <span class="hint">from Cost dashboard per project</span>
+          <button class="ad-btn ad-btn--ghost ad-btn--sm" type="button">Clear</button>
+          <span class="spacer"></span>
+          <button class="ad-btn ad-btn--glass ad-btn--sm" type="button">Accept as independent cards</button>
+          <button class="ad-btn ad-btn--glass ad-btn--sm" type="button"><svg class="ad-icon" style="width:14px;height:14px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg>Accept as stack…</button>
+        </div>
+      </section>
+
+      <section aria-label="Columns" class="ad-board">
+        <div class="ad-board__col"><div class="ad-board__head"><span>Inbox</span><span class="ad-badge">1</span></div>
+          <article class="ad-board__card"><div class="ad-row"><span class="ad-swatch"></span><span class="ad-mono ad-ink-3">C-238</span><span class="ad-chip" style="margin-left:auto">Suggestion</span></div><div>Show runner version in Fleet</div></article></div>
+        <div class="ad-board__col"><div class="ad-board__head"><span>Todo</span><span class="ad-badge">2</span></div>
+          <article class="ad-board__card" style="border-color:var(--color-line-strong)"><div class="ad-row"><span class="ad-swatch"></span><span class="ad-mono ad-ink-3">C-241</span><span class="ad-row ad-ink-3" style="margin-left:auto;gap:4px;font-size:12px"><svg class="ad-icon" style="width:12px;height:12px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>1</span></div><div>Retry webhook deliveries</div><span class="hint">From intake · Webhook reliability</span></article>
+          <article class="ad-board__card"><div class="ad-row"><span class="ad-swatch"></span><span class="ad-mono ad-ink-3">C-236</span></div><div>Add cost column to sessions</div></article></div>
+        <div class="ad-board__col"><div class="ad-board__head"><span>In progress</span><span class="ad-badge">1</span></div>
+          <article class="ad-board__card"><div class="ad-row" style="justify-content:space-between"><span class="ad-row"><span class="ad-swatch"></span><span class="ad-mono ad-ink-3">C-229</span></span><span class="ad-pill" data-status="running"><span class="ad-dot"></span>slot-1</span></div><div>Bind PR approve action</div></article></div>
+        <div class="ad-board__col"><div class="ad-board__head"><span>Review</span><span class="ad-badge">0</span></div></div>
+      </section>
+    </main>
+  </div>
+</div>
+<button class="ad-btn ad-btn--glass ad-btn--sm theme-toggle" type="button" id="tt">Toggle theme</button>
+<script>
+document.getElementById('tt').addEventListener('click',function(){var r=document.documentElement;r.setAttribute('data-theme',r.getAttribute('data-theme')==='dark'?'light':'dark');});
+document.querySelectorAll('.cand .ad-checkbox').forEach(function(c){c.addEventListener('change',function(){c.closest('.cand').setAttribute('data-selected',c.checked?'true':'false');var n=document.querySelectorAll('.cand .ad-checkbox:checked').length;document.querySelector('.selbar__count').textContent=n+' selected';document.querySelector('.selbar').style.display=n?'flex':'none';});});
+</script>
+</body>
+</html>

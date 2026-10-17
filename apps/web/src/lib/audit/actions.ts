@@ -96,6 +96,8 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   'plan.revised': 'Revised a plan',
   'plan.sent': 'Sent a plan to the fleet',
   'plan.task_reviewed': 'Reviewed a planned task',
+  'plan.candidate_edited': 'Edited a New work candidate',
+  'plan.candidate_rejected': 'Rejected a New work candidate',
   'planner.instructions_updated': 'Changed the planner instructions',
   'planner.settings_updated': 'Changed the planner settings',
   'design.toggled': 'Switched a task design on or off',

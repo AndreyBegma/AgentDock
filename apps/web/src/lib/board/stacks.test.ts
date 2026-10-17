@@ -207,10 +207,10 @@ describe('the intake review switches between Split and Stack (#480)', () => {
     expect(
       confirmRequest('turn-1', 'split', rows, draft).stack,
     ).toBeUndefined();
-    expect(confirmText('stack', 3)).toBe('Create stack · 3 cards');
-    expect(confirmText('split', 3)).toBe('Create 3 cards');
+    expect(confirmText('stack', 3)).toBe('Send stack to Drafts · 3 cards');
+    expect(confirmText('split', 3)).toBe('Send 3 cards to Drafts');
     expect(confirmHint('stack', true)).toBe(
-      'Cards land in To Do; Run waits for the stack design.',
+      'They wait in Drafts; once accepted, Run waits for the stack design.',
     );
   });
 
