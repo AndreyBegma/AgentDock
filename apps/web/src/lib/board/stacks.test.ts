@@ -14,6 +14,7 @@ import {
   moveToStage,
   proposalTitle,
   proposedShape,
+  SPLIT_HINT,
   splitRows,
   stackDraft,
   stackProblem,
@@ -151,10 +152,25 @@ describe('the intake review switches between Split and Stack (#480)', () => {
     expect(proposalTitle(split)).toBe(
       'The planner proposes a stack of 3 cards in 2 stages',
     );
-    // A split turned into a stack starts as one stage to order.
-    expect(stackDraft({ ...split, stack: null }).stages).toEqual([
-      { title: 'Stage 1', cards: [0, 1, 2] },
+    // #524: a split turned into a stack starts foundations first, with one
+    // shared design — the person moves the shared pieces up a stage.
+    const turned = stackDraft({ ...split, stack: null });
+    expect(turned.design).toBe(true);
+    expect(turned.stages).toEqual([
+      { title: 'Foundations', cards: [] },
+      { title: 'Features', cards: [0, 1, 2] },
     ]);
+    expect(moveToStage(turned, 0, -1).stages).toEqual([
+      { title: 'Foundations', cards: [0] },
+      { title: 'Features', cards: [1, 2] },
+    ]);
+  });
+
+  test('the split view says UI cards for one surface are a stack (#524)', () => {
+    expect(SPLIT_HINT).toContain('Independent cards');
+    expect(SPLIT_HINT).toContain(
+      'UI changes to one surface share one look — switch to Stack',
+    );
   });
 
   test('moves a card between stages, adds a stage, and drops a removed card', () => {
