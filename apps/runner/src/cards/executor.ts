@@ -403,7 +403,7 @@ export class CardExecutor {
             branch: args.branch,
           },
           args,
-          guard,
+          { ...guard, trackedOnly: true },
         );
       });
     }

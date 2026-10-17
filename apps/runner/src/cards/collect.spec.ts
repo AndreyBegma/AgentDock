@@ -24,6 +24,7 @@ import {
   collectCard,
   ensureWorktree,
   fallbackPullRequestBody,
+  isSecretPath,
   pullRequestBodyOf,
   readPullRequestDescription,
   removeCardWorktree,
@@ -517,6 +518,51 @@ describe('card.collect — the PR description (#359 D3)', () => {
     } finally {
       rmSync(outside, { recursive: true, force: true });
       rmSync(wt, { recursive: true, force: true });
+    }
+  });
+
+  it('trackedOnly stages tracked changes and leaves an untracked .env.local out (C-127)', async () => {
+    const { f, record, deps, args } = await setup();
+    f.write(record.worktree, { 'src/a.ts': 'one\n' });
+    await f.commitAll(record.worktree, 'feat: a');
+    f.write(record.worktree, { 'src/a.ts': 'two\n' });
+    writeFileSync(join(record.worktree, '.env.local'), 'TOKEN=secret\n');
+    const result = await collectCard(deps, record, args, { trackedOnly: true });
+    expect(result.staged).toEqual(['src/a.ts']);
+    const files = await f.run(
+      record.worktree,
+      'show',
+      '--name-only',
+      '--format=',
+      'HEAD',
+    );
+    expect(files.split('\n')).toEqual(['src/a.ts']);
+    expect(
+      await f.run(record.worktree, 'status', '--porcelain', '--', '.env.local'),
+    ).toBe('?? .env.local');
+  });
+
+  it('trackedOnly refuses a changed tracked file that matches a secret pattern (C-127)', async () => {
+    const { f, record, deps, args } = await setup();
+    f.write(record.worktree, { '.env.production': 'A=1\n' });
+    await f.commitAll(record.worktree, 'chore: env');
+    f.write(record.worktree, { '.env.production': 'A=2\n' });
+    const error = await collectCard(deps, record, args, {
+      trackedOnly: true,
+    }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(CommandFailure);
+    expect((error as Error).message).toContain('.env.production');
+    expect(
+      await f.run(record.worktree, 'diff', '--cached', '--name-only'),
+    ).toBe('');
+  });
+
+  it('isSecretPath matches the secret patterns only', () => {
+    for (const p of ['.env', '.env.local', 'a/b.pem', 'k/id_rsa', 'x.key']) {
+      expect(isSecretPath(p)).toBe(true);
+    }
+    for (const p of ['.env.example', 'src/env.ts', 'README.md']) {
+      expect(isSecretPath(p)).toBe(false);
     }
   });
 

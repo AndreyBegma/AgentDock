@@ -65,11 +65,16 @@ describe('card.collect in a terminal session cwd (#282 D3)', () => {
   it('collects a cwd inside the root: commits leftovers, pushes the branch, opens the PR', async () => {
     const { f, executor, args, originHead } = await setup();
     await f.run(f.root, 'switch', '-q', '-c', BRANCH);
+    f.write(f.root, { 'src/pairing.ts': 'export const fixed = false;\n' });
+    await f.commitAll(f.root, 'chore: seed');
     f.write(f.root, { 'src/pairing.ts': 'export const fixed = true;\n' });
+    // C-127: an untracked file is not the card's — it stays out of the commit.
+    f.write(f.root, { '.env.local': 'TOKEN=secret\n' });
 
     const result = await executor.collect(args(join(f.root, 'src')));
     expect(result).toEqual({
-      ahead: 1,
+      staged: ['src/pairing.ts'],
+      ahead: 2,
       pushed: true,
       prNumber: 7,
       prUrl: 'https://github.com/acme/widget/pull/7',
@@ -78,6 +83,7 @@ describe('card.collect in a terminal session cwd (#282 D3)', () => {
     expect(await f.run(f.root, 'log', '-1', '--format=%s', 'HEAD')).toBe(
       'chore: card C-12 work in progress',
     );
+    expect(await f.run(f.root, 'ls-files', '.env.local')).toBe('');
     expect(await originHead()).toBe(await f.run(f.root, 'rev-parse', 'HEAD'));
     const [create] = f.prCreates();
     expect(f.prCreates()).toHaveLength(1);
