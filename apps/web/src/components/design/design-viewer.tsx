@@ -33,6 +33,7 @@ import {
 } from '../../lib/design/comments';
 import { framePath } from '../../lib/design/frames';
 import { stackDesignHref } from '../../lib/design/href';
+import { isStarting } from '../../lib/design/progress';
 import type { DesignBusy } from '../../lib/design/use-design';
 import { useElementWidth } from '../../lib/design/use-element-width';
 import {
@@ -56,7 +57,7 @@ import { LaunchPopover } from '../board/launch-popover';
 import { ApproveDialog } from './approve-dialog';
 import { CommentsPanel } from './comments-panel';
 import { DesignFailure } from './design-failure';
-import { DesignProgress } from './design-progress';
+import { DesignProgress, DesignStarting } from './design-progress';
 import { FrameStrip, frameKey } from './frame-strip';
 import { GeneratePanel } from './generate-panel';
 import { MockupBanner } from './mockup-banner';
@@ -380,6 +381,12 @@ export function DesignViewer({
             stopping={busy === 'stop'}
             onStop={() => void actions.stop().catch(() => {})}
           />
+        ) : isStarting(design) ? (
+          <DesignStarting
+            canStop={canOperate}
+            stopping={busy === 'stop'}
+            onStop={() => void actions.stop().catch(() => {})}
+          />
         ) : design.lastFailure ? (
           <DesignFailure
             failure={design.lastFailure}
@@ -487,7 +494,7 @@ export function DesignViewer({
               </TabPanel>
             ))}
           </TabGroup>
-        ) : design.progress ? null : (
+        ) : design.progress || isStarting(design) ? null : (
           <GeneratePanel
             projectId={projectId}
             design={design}
