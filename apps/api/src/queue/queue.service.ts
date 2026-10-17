@@ -23,6 +23,16 @@ export interface QueueCaller {
   projectId: string;
   role: Role;
   ctx: AuditContext;
+  /** Extra `meta` on the audit record, e.g. whom a runner acted for (C-112). */
+  meta?: object;
+}
+
+export interface CreateIssueOptions {
+  /**
+   * C-112: checked as a queued issue, but filed without the ready label — a
+   * person queues it later with `queueIssue`.
+   */
+  holdForApproval?: boolean;
 }
 
 /** The queue's writes: filing an issue (D7, D8) and asking for a poll. */
@@ -43,7 +53,9 @@ export class QueueService {
   async createIssue(
     caller: QueueCaller,
     dto: CreateIssueDto,
+    options: CreateIssueOptions = {},
   ): Promise<CreateIssueResult> {
+    const held = dto.queue && options.holdForApproval === true;
     const { projectId } = caller;
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
@@ -65,9 +77,15 @@ export class QueueService {
         action: 'issue.create',
         target: { type: 'project', id: projectId },
         projectId,
-        after: { title: dto.title, labels, queue: dto.queue, ...outcome },
+        after: {
+          title: dto.title,
+          labels,
+          queue: dto.queue,
+          ...(held ? { held } : {}),
+          ...outcome,
+        },
         result,
-        meta,
+        meta: { ...caller.meta, ...meta },
       });
 
     const readyLabel = readyLabelOf(project);
@@ -82,7 +100,7 @@ export class QueueService {
       title: dto.title,
       body: dto.body,
       labels,
-      queue: dto.queue,
+      queue: dto.queue && !held,
       readyLabel,
     });
     if (!args.success) {
@@ -109,6 +127,49 @@ export class QueueService {
             error instanceof HttpException ? error.getResponse() : 'internal',
         },
       );
+      throw error;
+    }
+  }
+
+  /**
+   * C-112: the ready label on an issue filed earlier, through the runner's
+   * `plan.queue_issues` — what an approved `issue_queue` request runs as the
+   * person who approved it. Audited as `issue.queue`.
+   */
+  async queueIssue(caller: QueueCaller, issue: number): Promise<void> {
+    const { projectId } = caller;
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: {
+        runnerId: true,
+        readyLabelOverride: true,
+        codeSentinelConfig: true,
+      },
+    });
+    if (!project) throw projectNotFound();
+    const readyLabel = readyLabelOf(project);
+    const record = (result: AuditResult, meta: object = {}) =>
+      this.audit.record({
+        ...caller.ctx,
+        action: 'issue.queue',
+        target: { type: 'project', id: projectId },
+        projectId,
+        after: { issue, readyLabel },
+        result,
+        meta: { ...caller.meta, ...meta },
+      });
+    try {
+      await this.commands.labelReady(
+        project.runnerId,
+        { projectId, numbers: [issue], readyLabel },
+        { role: caller.role, ctx: caller.ctx },
+      );
+      await record('ok');
+    } catch (error) {
+      await record('error', {
+        error:
+          error instanceof HttpException ? error.getResponse() : 'internal',
+      });
       throw error;
     }
   }

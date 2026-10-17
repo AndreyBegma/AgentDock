@@ -103,7 +103,10 @@ describe('local requests over the runner socket (e2e)', () => {
     }
   };
 
-  /** Answers `issue.create` like the runner's handler, numbering from 100. */
+  /**
+   * Answers `issue.create` like the runner's handler, numbering from 100, and
+   * `plan.queue_issues` by labelling every issue it names.
+   */
   const serveCommands = async () => {
     let number = 100;
     for (;;) {
@@ -116,6 +119,15 @@ describe('local requests over the runner socket (e2e)', () => {
       const args = command.args as Record<string, unknown>;
       commands.push({ name: command.name, args });
       number += 1;
+      if (command.name === 'plan.queue_issues') {
+        socket.send({
+          type: 'command.result',
+          id: command.id,
+          ok: true,
+          output: { labelled: args.numbers },
+        });
+        continue;
+      }
       socket.send(
         command.name === 'issue.create'
           ? {
@@ -311,7 +323,19 @@ describe('local requests over the runner socket (e2e)', () => {
 
     // The writes acted as the local user, through the runner.
     const issueCreates = commands.filter((c) => c.name === 'issue.create');
-    expect(issueCreates.map((c) => c.args.queue)).toEqual([false, true]);
+    // C-112: the handoff is filed unqueued; a person queues it.
+    expect(issueCreates.map((c) => c.args.queue)).toEqual([false, false]);
+    expect(responses.get('handoff.create')?.data).toMatchObject({
+      number: 102,
+      queued: false,
+      actionRequestId: expect.any(String),
+      waiting: expect.stringContaining('waits for a person'),
+    });
+    expect(responses.get('issue.create')?.data).toEqual({
+      number: 101,
+      url: `${ISSUE_URL}/101`,
+      queued: false,
+    });
     const handoffBody = issueCreates[1].args.body as string;
     expect(handoffBody).toContain('## Acceptance criteria');
     expect(handoffBody).toContain('Source branch: `fix/12-pairing`');
@@ -366,6 +390,147 @@ describe('local requests over the runner socket (e2e)', () => {
       orderBy: { seq: 'asc' },
     });
     expect(issueAudit?.actorRunnerId).toBe(runnerId);
+  });
+
+  describe('a session never queues an issue itself (C-112)', () => {
+    const HANDOFF = ARGS['handoff.create'] as { title: string };
+
+    const pendingIssueQueue = () =>
+      ctx.prisma.actionRequest.findMany({
+        where: { projectId, kind: 'issue_queue' },
+      });
+
+    const decide = (id: string, decision: 'approve' | 'deny') =>
+      admin.send(
+        'post',
+        `/projects/${projectId}/action-requests/${id}/${decision}`,
+        {},
+      );
+
+    it('files a handoff without the ready label, with a pending issue_queue request, and names whom it acted for', async () => {
+      const manual = await seedManualSession();
+      const response = await ask('handoff.create', ARGS['handoff.create']);
+      expect(response.ok).toBe(true);
+      expect(response.data).toMatchObject({
+        number: 101,
+        queued: false,
+        waiting: expect.stringContaining('Issue #101 is not queued yet'),
+      });
+
+      const created = commands.filter((c) => c.name === 'issue.create');
+      expect(created.map((c) => c.args.queue)).toEqual([false]);
+      const [request] = await pendingIssueQueue();
+      expect(request).toMatchObject({
+        id: (response.data as { actionRequestId: string }).actionRequestId,
+        status: 'pending',
+        sessionId: manual.id,
+        requestedById: localUserId,
+        args: {
+          issue: 101,
+          title: HANDOFF.title,
+          url: `${ISSUE_URL}/101`,
+          session: manual.id,
+        },
+      });
+
+      const audit = await ctx.prisma.auditRecord.findFirstOrThrow({
+        where: { action: 'issue.create', projectId },
+      });
+      expect(audit.actorRunnerId).toBe(runnerId);
+      expect(audit.after).toMatchObject({ queue: true, held: true });
+      expect(audit.meta).toMatchObject({
+        via: 'mcp',
+        onBehalfOf: {
+          userId: localUserId,
+          runnerId,
+          sessionId: manual.id,
+        },
+      });
+    });
+
+    it('adds the ready label when a person approves, through the queue as the approver', async () => {
+      const response = await ask('handoff.create', ARGS['handoff.create']);
+      const { actionRequestId } = response.data as { actionRequestId: string };
+      expect(commands.some((c) => c.name === 'plan.queue_issues')).toBe(false);
+
+      const approved = await decide(actionRequestId, 'approve');
+      expect(approved.status).toBe(200);
+      expect(approved.body).toMatchObject({
+        status: 'executed',
+        result: { issue: 101 },
+      });
+      expect(
+        commands
+          .filter((c) => c.name === 'plan.queue_issues')
+          .map((c) => c.args),
+      ).toEqual([{ projectId, numbers: [101], readyLabel: 'cs:ready' }]);
+      const queued = await ctx.prisma.auditRecord.findFirstOrThrow({
+        where: { action: 'issue.queue', projectId },
+      });
+      expect(queued.result).toBe('ok');
+      expect(queued.actorUserId).not.toBeNull();
+      expect(queued.meta).toMatchObject({ actionRequestId, via: 'web' });
+    });
+
+    it('leaves the issue unqueued when a person denies, and sends nothing', async () => {
+      const response = await ask('handoff.create', ARGS['handoff.create']);
+      const { actionRequestId } = response.data as { actionRequestId: string };
+      const before = commands.length;
+
+      const denied = await decide(actionRequestId, 'deny');
+      expect(denied.status).toBe(200);
+      expect(denied.body).toMatchObject({ status: 'denied' });
+      expect(commands.slice(before)).toEqual([]);
+      expect(
+        await ctx.prisma.auditRecord.count({
+          where: { action: 'issue.queue', projectId },
+        }),
+      ).toBe(0);
+    });
+
+    it('holds issue.create with queue: true the same way, and asks nothing with queue: false', async () => {
+      const plain = await ask('issue.create', ARGS['issue.create']);
+      expect(plain.data).toEqual({
+        number: 101,
+        url: `${ISSUE_URL}/101`,
+        queued: false,
+      });
+      expect(await pendingIssueQueue()).toEqual([]);
+
+      const asked = await ask('issue.create', {
+        ...(ARGS['issue.create'] as object),
+        queue: true,
+        body: 'Seen twice.\n\n## Acceptance criteria\n\n- [ ] it passes',
+      });
+      expect(asked.data).toMatchObject({ number: 102, queued: false });
+      expect(
+        commands
+          .filter((c) => c.name === 'issue.create')
+          .map((c) => c.args.queue),
+      ).toEqual([false, false]);
+      expect(await pendingIssueQueue()).toHaveLength(1);
+    });
+
+    it('still refuses an incomplete issue a session asks to queue, and asks nothing', async () => {
+      const refused = await ask('issue.create', {
+        ...(ARGS['issue.create'] as object),
+        queue: true,
+      });
+      expect(refused.ok).toBe(false);
+      expect(commands.filter((c) => c.name === 'issue.create')).toEqual([]);
+      expect(await pendingIssueQueue()).toEqual([]);
+    });
+
+    it('refuses an issue_queue request a session asks for directly', async () => {
+      const refused = await ask('action.request', {
+        kind: 'issue_queue',
+        args: { issue: 7, title: 'x', url: `${ISSUE_URL}/7`, session: null },
+        summary: 'Queue it',
+      });
+      expect(refused.ok).toBe(false);
+      expect(refused.error?.code).toBe('invalid_args');
+      expect(await pendingIssueQueue()).toEqual([]);
+    });
   });
 
   it('answers card.finish from a session that is not a card worker with not_a_card_session', async () => {

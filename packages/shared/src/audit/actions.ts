@@ -39,6 +39,7 @@ export const AUDIT_ACTIONS = [
   'prices.version_create',
   'prices.recompute',
   'issue.create',
+  'issue.queue',
   'pane.watch_started',
   'pane.watch_stopped',
   'orchestrator.start',

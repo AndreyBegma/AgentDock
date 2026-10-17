@@ -62,3 +62,21 @@ describe('action-request mapper (C-110)', () => {
     );
   });
 });
+
+describe('action-request mapper (C-112)', () => {
+  const ISSUE_ARGS = {
+    issue: 42,
+    title: 'Fix the widget',
+    url: 'https://github.com/acme/widget/issues/42',
+    session: 'ses_1',
+  };
+
+  it('names the issue number in the title and its title and link in the body', () => {
+    expect(actionRequestTitle('issue_queue', ISSUE_ARGS)).toBe(
+      'A session asks to queue issue #42 for the fleet',
+    );
+    expect(actionRequestBody('issue_queue', ISSUE_ARGS, 'Hand off')).toBe(
+      '#42 Fix the widget · https://github.com/acme/widget/issues/42 · Hand off',
+    );
+  });
+});
