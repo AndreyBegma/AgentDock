@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { mcpServerNameSchema } from '../token-saver/contracts';
+import { boundedName, LIST_MAX, TEXT_NAME_MAX, TEXT_PATH_MAX } from './bounded';
 // Type-only: `./commands` imports this module's schemas.
 import type { CommandName } from './commands';
 import { type RunnerPolicy, runnerPolicySchema } from './policy';
@@ -19,7 +20,7 @@ const portSchema = z.number().int().min(1).max(65_535);
  * points at this runner's OTLP http port.
  */
 export const profileAgentdockSchema = z.object({
-  plugin: z.string().min(1).nullable(),
+  plugin: boundedName(TEXT_NAME_MAX).nullable(),
   telemetry: z.boolean(),
 });
 export type ProfileAgentdock = z.infer<typeof profileAgentdockSchema>;
@@ -153,28 +154,31 @@ export const runtimeProfileSchema = z.object({
 });
 export type RuntimeProfile = z.infer<typeof runtimeProfileSchema>;
 
-const runtimeVersionSchema = z.object({ version: z.string().min(1) });
+const runtimeVersionSchema = z.object({ version: boundedName(TEXT_NAME_MAX) });
 
-const commandListSchema = z.array(z.string().min(1)).max(512);
+const commandListSchema = z.array(boundedName(TEXT_NAME_MAX)).max(512);
 
 /** What the runner found on the machine. A missing tool is `null`, never an error. */
 export const capabilitiesSchema = z.object({
-  tmux: z.string().min(1).nullable(),
-  git: z.string().min(1).nullable(),
+  tmux: boundedName(TEXT_NAME_MAX).nullable(),
+  git: boundedName(TEXT_NAME_MAX).nullable(),
   gh: z
     .object({
-      version: z.string().min(1),
+      version: boundedName(TEXT_NAME_MAX),
       authenticated: z.boolean(),
-      user: z.string().min(1).nullable(),
+      user: boundedName(TEXT_NAME_MAX).nullable(),
     })
     .nullable(),
   runtimes: z.object({
     claude: runtimeVersionSchema.nullable(),
     codex: runtimeVersionSchema.nullable(),
   }),
-  profiles: z.array(runtimeProfileSchema),
+  profiles: z.array(runtimeProfileSchema).max(LIST_MAX),
   codeSentinel: z
-    .object({ version: z.string().min(1), path: z.string().min(1) })
+    .object({
+      version: boundedName(TEXT_NAME_MAX),
+      path: boundedName(TEXT_PATH_MAX),
+    })
     .nullable(),
   /** OTLP receiver ports (reserved until collectors land). */
   otlp: z
@@ -349,8 +353,8 @@ export const RUNNER_FEATURE_COMMANDS = {
 
 /** Facts about the host itself, sent next to the capabilities. */
 export const hostSchema = z.object({
-  hostname: z.string().min(1),
-  os: z.string().min(1),
-  arch: z.string().min(1),
+  hostname: boundedName(TEXT_NAME_MAX),
+  os: boundedName(TEXT_NAME_MAX),
+  arch: boundedName(TEXT_NAME_MAX),
 });
 export type Host = z.infer<typeof hostSchema>;

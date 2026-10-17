@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { boundedName, TEXT_NAME_MAX } from '../bounded';
 import type { CommandDefinition } from '../commands';
 
 /**
@@ -34,7 +35,9 @@ export type CollectorPollArgs = z.infer<typeof collectorPollArgsSchema>;
 
 export const collectorPollResultSchema = z.object({
   /** The collectors actually polled (the name is historical) — one not running is absent. */
-  restarted: z.array(z.string().min(1)),
+  restarted: z
+    .array(boundedName(TEXT_NAME_MAX))
+    .max(POLLABLE_COLLECTORS.length),
 });
 export type CollectorPollResult = z.infer<typeof collectorPollResultSchema>;
 

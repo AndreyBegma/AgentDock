@@ -1,4 +1,14 @@
 import { z } from 'zod';
+import {
+  boundedName,
+  boundedText,
+  LIST_MAX,
+  TEXT_LINE_MAX,
+  TEXT_MESSAGE_MAX,
+  TEXT_NAME_MAX,
+  TEXT_PATH_MAX,
+} from '../bounded';
+import { SLOT_NAME_MAX_LENGTH } from '../commands/control';
 import type { RunnerEvent } from '../envelope';
 
 /**
@@ -21,12 +31,17 @@ export const roundDateSchema = z.iso.date();
 export const roundLabelSchema = z.string().regex(/^\d{4}$/, 'must be HHMM');
 
 const count = z.number().int().nonnegative();
-const glob = z.string().min(1);
+const glob = boundedName(TEXT_LINE_MAX);
+const path = boundedName(TEXT_PATH_MAX);
+const name = boundedName(TEXT_NAME_MAX);
+const line = boundedName(TEXT_LINE_MAX);
+/** A list of globs or table rows: bounded, so a runner cannot grow a row without end. */
+const MAX_ROWS = LIST_MAX;
 
 /** A tmux `cs-*` session appeared or vanished (D1). */
 export const sessionPresenceDataSchema = z.object({
   /** The tmux session name, e.g. `cs-i42-api`. */
-  name: z.string().min(1),
+  name,
   pid: z.number().int().positive().optional(),
 });
 export type SessionPresenceData = z.infer<typeof sessionPresenceDataSchema>;
@@ -64,10 +79,10 @@ export const paneBusyDataSchema = z.object(paneFields);
 
 /** A slot's `.wt-<repo>-<slot>` worktree as git sees it (D1, D8). */
 export const worktreeChangedDataSchema = z.object({
-  path: z.string().min(1),
+  path,
   /** `false` once the directory is gone. The other fields are then absent. */
   exists: z.boolean(),
-  branch: z.string().min(1).optional(),
+  branch: line.optional(),
   /** Commits on the branch that are not on the base. */
   ahead: count.optional(),
   behind: count.optional(),
@@ -80,25 +95,29 @@ export const roundStartedDataSchema = z.object({
   date: roundDateSchema,
   round: roundLabelSchema,
   /** Absent from `events.jsonl`: the projector falls back to the project's base. */
-  base: z.string().min(1).optional(),
+  base: line.optional(),
   occupied: count,
   max: count,
   free: count,
   /** Absolute path of the board file. */
-  boardPath: z.string().min(1),
+  boardPath: path,
 });
 export type RoundStartedData = z.infer<typeof roundStartedDataSchema>;
 
 /** A board table row, keyed by its column header as written. Unknown columns are kept raw. */
-export const boardRowSchema = z.record(z.string(), z.string());
+export const boardRowSchema = z
+  .record(boundedText(TEXT_NAME_MAX), boundedText(TEXT_PATH_MAX))
+  .refine((row) => Object.keys(row).length <= MAX_ROWS, {
+    message: `at most ${MAX_ROWS} columns`,
+  });
 export type BoardRow = z.infer<typeof boardRowSchema>;
 
 /** The four tables of a board (orchestrator Phase 5). A missing table is `[]`. */
 export const roundDecisionsSchema = z.object({
-  dispatching: z.array(boardRowSchema).default([]),
-  heldForLead: z.array(boardRowSchema).default([]),
-  notDispatching: z.array(boardRowSchema).default([]),
-  inFlight: z.array(boardRowSchema).default([]),
+  dispatching: z.array(boardRowSchema).max(MAX_ROWS).default([]),
+  heldForLead: z.array(boardRowSchema).max(MAX_ROWS).default([]),
+  notDispatching: z.array(boardRowSchema).max(MAX_ROWS).default([]),
+  inFlight: z.array(boardRowSchema).max(MAX_ROWS).default([]),
 });
 export type RoundDecisions = z.infer<typeof roundDecisionsSchema>;
 
@@ -115,7 +134,7 @@ export type RoundDecidedData = z.infer<typeof roundDecidedDataSchema>;
 
 /** A board or brief that could not be parsed. Never fatal for the runner (D4). */
 export const boardUnparsedDataSchema = z.object({
-  file: z.string().min(1),
+  file: path,
   /** 1-based line the parser stopped at, when it knows one. */
   line: z.number().int().positive().optional(),
   reason: z.string().min(1).max(500),
@@ -133,15 +152,15 @@ export type SlotRuntime = z.infer<typeof slotRuntimeSchema>;
 export const slotDispatchedDataSchema = z.object({
   date: roundDateSchema.optional(),
   round: roundLabelSchema.optional(),
-  briefPath: z.string().min(1).optional(),
-  branch: z.string().min(1).optional(),
-  worktree: z.string().min(1).optional(),
+  briefPath: path.optional(),
+  branch: line.optional(),
+  worktree: path.optional(),
   runtime: slotRuntimeSchema.default('claude'),
-  model: z.string().min(1).optional(),
+  model: name.optional(),
   /** The reason on the brief's `Model:` line. */
-  modelWhy: z.string().min(1).optional(),
-  owns: z.array(glob).default([]),
-  never: z.array(glob).default([]),
+  modelWhy: boundedName(TEXT_MESSAGE_MAX).optional(),
+  owns: z.array(glob).max(MAX_ROWS).default([]),
+  never: z.array(glob).max(MAX_ROWS).default([]),
   lead: z.boolean().optional(),
 });
 export type SlotDispatchedData = z.infer<typeof slotDispatchedDataSchema>;
@@ -165,9 +184,9 @@ export const CHECKPOINT_SUMMARY_MAX_BYTES = 4096;
 export const slotCheckpointDataSchema = z.object({
   checkpoint: checkpointKindSchema,
   /** The heading as written, without `## `. Absent: the checkpoint's name. */
-  heading: z.string().min(1).max(500).optional(),
+  heading: line.optional(),
   /** The body under the heading, trimmed to `CHECKPOINT_SUMMARY_MAX_BYTES`. */
-  summary: z.string().default(''),
+  summary: boundedText(CHECKPOINT_SUMMARY_MAX_BYTES).default(''),
   /**
    * 0-based index of the heading among the reply file's `##` headings. The
    * file is append-only and has no timestamps, so this identifies a checkpoint
@@ -177,7 +196,7 @@ export const slotCheckpointDataSchema = z.object({
    */
   position: z.number().int().nonnegative().optional(),
   /** With `pr_open`: the URL from `pull request open — <url>`. */
-  prUrl: z.url().optional(),
+  prUrl: z.url().max(TEXT_PATH_MAX).optional(),
   /** The pull request number, when the writer knows it (`events.jsonl`). */
   prNumber: z.number().int().positive().optional(),
 });
@@ -190,7 +209,7 @@ export type PrChecks = z.infer<typeof prChecksSchema>;
 const prFields = {
   number: z.number().int().positive(),
   /** `headRefName`; matches the slot's branch. */
-  branch: z.string().min(1),
+  branch: line,
 };
 
 /**
@@ -204,8 +223,8 @@ const headShaSchema = z
 
 export const prOpenedDataSchema = z.object({
   ...prFields,
-  url: z.url(),
-  title: z.string(),
+  url: z.url().max(TEXT_PATH_MAX),
+  title: boundedText(TEXT_LINE_MAX),
   checks: prChecksSchema,
   /** `MERGEABLE` → true, `CONFLICTING` → false, `UNKNOWN` → absent. */
   mergeable: z.boolean().optional(),
@@ -235,15 +254,15 @@ export type PrClosedData = z.infer<typeof prClosedDataSchema>;
  */
 export const prMergedDataSchema = z.object({
   number: z.number().int().positive(),
-  branch: z.string().min(1).optional(),
-  method: z.string().min(1).optional(),
+  branch: line.optional(),
+  method: name.optional(),
 });
 export type PrMergedData = z.infer<typeof prMergedDataSchema>;
 
 /** The orchestrator relaunched a misclassified slot on another model. */
 export const slotRedispatchedDataSchema = z.object({
-  fromModel: z.string().min(1).optional(),
-  toModel: z.string().min(1),
+  fromModel: name.optional(),
+  toModel: name,
   reason: z.string().max(4096).optional(),
 });
 export type SlotRedispatchedData = z.infer<typeof slotRedispatchedDataSchema>;
@@ -251,7 +270,7 @@ export type SlotRedispatchedData = z.infer<typeof slotRedispatchedDataSchema>;
 /** The orchestrator's tmux pane appeared in the project root (D6). */
 export const orchestratorStartedDataSchema = z.object({
   /** The tmux session it runs in. */
-  session: z.string().min(1),
+  session: name,
 });
 export type OrchestratorStartedData = z.infer<
   typeof orchestratorStartedDataSchema
@@ -259,8 +278,8 @@ export type OrchestratorStartedData = z.infer<
 
 export const orchestratorStoppedDataSchema = z.object({
   /** Absent from `events.jsonl`, which records only the reason. */
-  session: z.string().min(1).optional(),
-  reason: z.string().max(500).optional(),
+  session: name.optional(),
+  reason: boundedText(500).optional(),
 });
 export type OrchestratorStoppedData = z.infer<
   typeof orchestratorStoppedDataSchema
@@ -274,25 +293,25 @@ const isoTs = z.iso.datetime();
  */
 export const codeSentinelStateSlotSchema = z.object({
   issue: z.number().int().positive().nullish(),
-  branch: z.string().min(1).nullish(),
-  worktree: z.string().min(1).nullish(),
-  model: z.string().min(1).nullish(),
-  modelWhy: z.string().min(1).nullish(),
+  branch: line.nullish(),
+  worktree: path.nullish(),
+  model: name.nullish(),
+  modelWhy: boundedName(TEXT_MESSAGE_MAX).nullish(),
   /** `running` · `blocked` · `pr_open` · `merged` · `stopped`, kept open. */
-  status: z.string().min(1).nullish(),
+  status: name.nullish(),
   lastCheckpoint: z
     .object({
       /** A `CheckpointKind`; anything else is projected as `other`. */
-      checkpoint: z.string().min(1),
+      checkpoint: name,
       ts: isoTs.nullish(),
-      summary: z.string().nullish(),
+      summary: boundedText(CHECKPOINT_SUMMARY_MAX_BYTES).nullish(),
     })
     .nullish(),
   pr: z
     .object({
       number: z.number().int().positive().nullish(),
       rollup: prChecksSchema.nullish(),
-      url: z.url().nullish(),
+      url: z.url().max(TEXT_PATH_MAX).nullish(),
       closed: z.boolean().nullish(),
     })
     .nullish(),
@@ -306,28 +325,38 @@ export type CodeSentinelStateSlot = z.infer<typeof codeSentinelStateSlotSchema>;
 export const codeSentinelStateSchema = z.object({
   v: z.literal(1),
   updatedAt: isoTs.nullish(),
-  repo: z.string().nullish(),
+  repo: boundedText(TEXT_NAME_MAX).nullish(),
   orchestrator: z
     .object({
-      session: z.string().nullish(),
+      session: boundedText(TEXT_NAME_MAX).nullish(),
       running: z.boolean().nullish(),
-      config: z.record(z.string(), z.unknown()).nullish(),
+      config: z
+        .record(boundedText(TEXT_NAME_MAX), z.unknown())
+        .refine((c) => Object.keys(c).length <= MAX_ROWS, {
+          message: `at most ${MAX_ROWS} entries`,
+        })
+        .nullish(),
       lastHeartbeat: isoTs.nullish(),
     })
     .nullish(),
   round: z
     .object({
-      label: z.string().nullish(),
+      label: boundedText(TEXT_NAME_MAX).nullish(),
       occupied: count.nullish(),
       max: count.nullish(),
       free: count.nullish(),
-      board: z.string().nullish(),
-      decided: z.array(z.unknown()).nullish(),
+      board: boundedText(TEXT_PATH_MAX).nullish(),
+      decided: z.array(z.unknown()).max(MAX_ROWS).nullish(),
     })
     .nullish(),
   /** Keyed by slot name. */
-  slots: z.record(z.string(), codeSentinelStateSlotSchema).default({}),
-  personNeeded: z.array(z.unknown()).default([]),
+  slots: z
+    .record(z.string().max(SLOT_NAME_MAX_LENGTH), codeSentinelStateSlotSchema)
+    .refine((slots) => Object.keys(slots).length <= MAX_ROWS, {
+      message: `at most ${MAX_ROWS} slots`,
+    })
+    .default({}),
+  personNeeded: z.array(z.unknown()).max(MAX_ROWS).default([]),
 });
 export type CodeSentinelState = z.infer<typeof codeSentinelStateSchema>;
 
@@ -352,7 +381,7 @@ export const UNPARSED_LINE_MAX = 4096;
  */
 export const eventsUnparsedDataSchema = z.object({
   /** Absolute path of the file the line came from. */
-  file: z.string().min(1),
+  file: path,
   /** The line as read, cut to `UNPARSED_LINE_MAX`. */
   line: z.string().max(UNPARSED_LINE_MAX),
   /** Byte offset of the line's start in the file. */
@@ -379,7 +408,7 @@ const sha256Hex = z.string().regex(/^[0-9a-f]{64}$/);
  */
 export const slotMessageSeenDataSchema = z.object({
   /** The message, trimmed and cut to `SLOT_MESSAGE_SEEN_MAX_BYTES`. */
-  body: z.string().min(1),
+  body: boundedName(SLOT_MESSAGE_SEEN_MAX_BYTES),
   /** `From:` of the message header, when it has one. */
   sender: z.string().min(1).max(320).optional(),
   /** `Date:` of the message header, when it parses as a date. */
@@ -461,9 +490,9 @@ export const pluginEventIdOf = (event: {
 export const EVENTS_DUPLICATE_EVENT = 'events.duplicate';
 
 export const eventsDuplicateDataSchema = z.object({
-  pluginEventId: z.string().min(1),
+  pluginEventId: name,
   /** The duplicate's own `type`. */
-  type: z.string().min(1),
+  type: name,
 });
 export type EventsDuplicateData = z.infer<typeof eventsDuplicateDataSchema>;
 

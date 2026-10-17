@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { boundedName, LIST_MAX, TEXT_NAME_MAX } from './bounded';
 // Type-only: `./commands` imports this module through `./capabilities`.
 import type { CommandName } from './commands';
 import {
@@ -64,7 +65,11 @@ export const runnerPolicySchema = z.object({
    * `POLICY_GATED_COMMANDS`: a newer runner may gate a command the API does
    * not know, and an enum would fail its whole hello.
    */
-  commands: z.record(z.string().min(1), z.boolean()),
+  commands: z
+    .record(boundedName(TEXT_NAME_MAX), z.boolean())
+    .refine((c) => Object.keys(c).length <= LIST_MAX, {
+      message: `at most ${LIST_MAX} commands`,
+    }),
 });
 export type RunnerPolicy = z.infer<typeof runnerPolicySchema>;
 

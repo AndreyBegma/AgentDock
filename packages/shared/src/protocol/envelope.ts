@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { boundedName, TEXT_NAME_MAX, TEXT_PATH_MAX } from './bounded';
+import { slotNameSchema } from './commands/control';
 
 /** Version of the event envelope (event-schema.md). */
 export const EVENT_SCHEMA_VERSION = 1;
@@ -32,18 +34,21 @@ export const API_EVENT_SOURCE = 'api';
 const eventFields = {
   v: z.literal(EVENT_SCHEMA_VERSION),
   ts: z.iso.datetime(),
-  type: z.string().min(1),
+  type: boundedName(TEXT_NAME_MAX),
   source: eventSourceSchema,
   project: z
-    .object({ repo: z.string().min(1), root: z.string().min(1) })
+    .object({
+      repo: boundedName(TEXT_NAME_MAX),
+      root: boundedName(TEXT_PATH_MAX),
+    })
     .optional(),
-  slot: z.string().min(1).optional(),
+  slot: slotNameSchema.optional(),
   issue: z.number().int().positive().optional(),
   session: z
     .object({
-      runtime: z.string().min(1),
-      id: z.string().min(1),
-      name: z.string().min(1).optional(),
+      runtime: boundedName(TEXT_NAME_MAX),
+      id: boundedName(TEXT_NAME_MAX),
+      name: boundedName(TEXT_NAME_MAX).optional(),
     })
     .optional(),
   /** Typed per `type` by the consumer; unknown types are stored raw. */

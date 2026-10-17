@@ -65,6 +65,15 @@ describe('fleet projector (e2e)', () => {
     stream = new EventStream();
   });
 
+  it('ignores a fleet event whose slot is not a slot name (C-136)', async () => {
+    const hostile = 'x'.repeat(200 * 1024);
+    await project(
+      stream.next('session.appeared', { name: 'cs-x' }, { slot: hostile }),
+      stream.next('session.appeared', { name: 'cs-X' }, { slot: 'Not/A-Slot' }),
+    );
+    expect(await ctx.prisma.slot.count({ where: { projectId } })).toBe(0);
+  });
+
   it('lists a slot as running, then stale when its session dies with unmerged work', async () => {
     await project(
       appeared(),

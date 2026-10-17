@@ -1,4 +1,12 @@
 import { z } from 'zod';
+import {
+  boundedName,
+  boundedText,
+  TEXT_LINE_MAX,
+  TEXT_MESSAGE_MAX,
+  TEXT_NAME_MAX,
+  TEXT_PATH_MAX,
+} from '../bounded';
 import type { RunnerEvent } from '../envelope';
 
 /**
@@ -19,17 +27,28 @@ export const ISSUES_SNAPSHOT_PART_MAX_BYTES = 192 * 1024;
 
 const issueNumber = z.number().int().positive();
 
+/** Labels or assignees on one issue. */
+const ISSUE_TAGS_MAX = 100;
+/** Open issues and pull requests one snapshot lists (the `open` list is complete in every part). */
+const SNAPSHOT_OPEN_MAX = 50_000;
+/** Issues, or pull requests, in one part; a part is under 192 KB. */
+const SNAPSHOT_PART_ITEMS_MAX = 5_000;
+const SNAPSHOT_PARTS_MAX = 1_000;
+
 /** An open issue as the snapshot carries it (D2). */
 export const snapshotIssueSchema = z.object({
   number: issueNumber,
-  title: z.string(),
-  labels: z.array(z.string().min(1)).default([]),
+  title: boundedText(TEXT_MESSAGE_MAX),
+  labels: z.array(boundedName(TEXT_NAME_MAX)).max(ISSUE_TAGS_MAX).default([]),
   /** GitHub logins. */
-  assignees: z.array(z.string().min(1)).default([]),
+  assignees: z
+    .array(boundedName(TEXT_NAME_MAX))
+    .max(ISSUE_TAGS_MAX)
+    .default([]),
   /** Markdown, trimmed to `ISSUE_BODY_MAX_BYTES`; `null` bodies are sent as `""`. */
-  body: z.string().default(''),
+  body: boundedText(ISSUE_BODY_MAX_BYTES).default(''),
   updatedAt: z.iso.datetime({ offset: true }),
-  url: z.url(),
+  url: z.url().max(TEXT_PATH_MAX),
 });
 export type SnapshotIssue = z.infer<typeof snapshotIssueSchema>;
 
@@ -40,11 +59,11 @@ export type SnapshotIssue = z.infer<typeof snapshotIssueSchema>;
  */
 export const snapshotPullRequestSchema = z.object({
   number: issueNumber,
-  title: z.string(),
+  title: boundedText(TEXT_MESSAGE_MAX),
   /** Trimmed to `PULL_REQUEST_BODY_MAX_BYTES`. */
-  body: z.string().default(''),
+  body: boundedText(PULL_REQUEST_BODY_MAX_BYTES).default(''),
   updatedAt: z.iso.datetime({ offset: true }),
-  url: z.url(),
+  url: z.url().max(TEXT_PATH_MAX),
 });
 export type SnapshotPullRequest = z.infer<typeof snapshotPullRequestSchema>;
 
@@ -63,11 +82,17 @@ export const issuesSnapshotDataSchema = z
     fetchedAt: z.iso.datetime({ offset: true }),
     /** 0-based. */
     part: z.number().int().nonnegative(),
-    parts: z.number().int().positive(),
+    parts: z.number().int().positive().max(SNAPSHOT_PARTS_MAX),
     /** Every open issue and pull request number of the listing, all parts included. */
-    open: z.array(issueNumber),
-    issues: z.array(snapshotIssueSchema).default([]),
-    pullRequests: z.array(snapshotPullRequestSchema).default([]),
+    open: z.array(issueNumber).max(SNAPSHOT_OPEN_MAX),
+    issues: z
+      .array(snapshotIssueSchema)
+      .max(SNAPSHOT_PART_ITEMS_MAX)
+      .default([]),
+    pullRequests: z
+      .array(snapshotPullRequestSchema)
+      .max(SNAPSHOT_PART_ITEMS_MAX)
+      .default([]),
   })
   .refine((d) => d.part < d.parts, { message: 'part must be below parts' });
 export type IssuesSnapshotData = z.infer<typeof issuesSnapshotDataSchema>;
@@ -94,7 +119,7 @@ export type IssueClosedData = z.infer<typeof issueClosedDataSchema>;
 /** The listing could not be read — `gh` missing, unauthenticated, rate limited. */
 export const issuesUnavailableDataSchema = z.object({
   /** The `gh` error, without a stack trace. */
-  reason: z.string().min(1).max(500),
+  reason: boundedName(TEXT_LINE_MAX),
 });
 export type IssuesUnavailableData = z.infer<typeof issuesUnavailableDataSchema>;
 

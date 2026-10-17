@@ -1,10 +1,12 @@
 import { z } from 'zod';
 import { stewardRunnerConfigSchema } from '../steward/contracts';
+import { TEXT_PATH_MAX } from './bounded';
 
 /** An absolute POSIX path. Runners run on Linux and macOS only. */
 export const absolutePathSchema = z
   .string()
   .min(1)
+  .max(TEXT_PATH_MAX)
   .refine((p) => p.startsWith('/'), { message: 'must be an absolute path' });
 
 /**

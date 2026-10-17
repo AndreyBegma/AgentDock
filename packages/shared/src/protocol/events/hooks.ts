@@ -89,6 +89,13 @@ const absolutePath = z
   .max(4096)
   .refine((p) => p.startsWith('/'), { message: 'must be an absolute path' });
 
+/** A branch name: no whitespace, control characters or shell syntax. */
+const gitBranchSchema = z
+  .string()
+  .min(1)
+  .max(255)
+  .regex(/^[A-Za-z0-9._/+@-]+$/, 'must be a git branch name');
+
 /** Redacted text, cut to `HOOK_CONTENT_MAX_CHARS` and marked when it was. */
 export const hookContentSchema = z.strictObject({
   text: z.string().max(HOOK_CONTENT_MAX_CHARS),
@@ -114,7 +121,7 @@ export const manualTmuxSessionSchema = z
 export const hookSessionStartedDataSchema = z.strictObject({
   source: hookStartSourceSchema,
   cwd: absolutePath,
-  gitBranch: z.string().min(1).max(255).optional(),
+  gitBranch: gitBranchSchema.optional(),
   model: name.optional(),
   permissionMode: z.string().min(1).max(32),
   tmuxSession: manualTmuxSessionSchema.optional(),
