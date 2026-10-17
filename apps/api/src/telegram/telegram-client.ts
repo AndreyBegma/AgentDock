@@ -106,6 +106,12 @@ export interface InlineKeyboardButton {
   callback_data: string;
 }
 
+/** #576: a button that opens a link instead of sending a press back. */
+export interface InlineKeyboardUrlButton {
+  text: string;
+  url: string;
+}
+
 /** #580: a button that opens the Mini App at `web_app.url`, an https URL. */
 export interface WebAppButton {
   text: string;
@@ -113,7 +119,12 @@ export interface WebAppButton {
 }
 
 /** Any button of an inline keyboard. */
-export type InlineButton = InlineKeyboardButton | WebAppButton;
+export type InlineButton =
+  | InlineKeyboardButton
+  | InlineKeyboardUrlButton
+  | WebAppButton;
+
+export type InlineKeyboard = InlineButton[][];
 
 /**
  * #580: the button beside the chat's input field — the Mini App, or
@@ -133,7 +144,7 @@ export interface BotCommand {
 
 /** What `sendMessage` may attach: buttons, or a prompt to reply to it. */
 export type TelegramReplyMarkup =
-  | { inline_keyboard: InlineButton[][] }
+  | { inline_keyboard: InlineKeyboard }
   | { force_reply: true; input_field_placeholder?: string };
 
 type ApiResponse =
@@ -299,7 +310,7 @@ export class TelegramClient {
     messageId: number,
     text: string,
     plain = false,
-    inlineKeyboard?: InlineButton[][],
+    inlineKeyboard?: InlineKeyboard,
   ): Promise<void> {
     await this.call(token, 'editMessageText', {
       chat_id: Number(chatId),

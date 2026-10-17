@@ -142,3 +142,46 @@ describe('legacy callback payloads', () => {
     }
   });
 });
+
+describe('callbackCodec board kinds (#576)', () => {
+  it('round-trips a column, a card number and a page', () => {
+    const codec = callbackCodec('tbk', {
+      project: 'project',
+      column: 'column',
+      number: 'number',
+      page: 'page',
+    });
+    const values = {
+      project: 'p'.repeat(32),
+      column: 'in_progress',
+      number: 999_999_999,
+      page: 9999,
+    } as const;
+    const data = codec.encode(values);
+    expect(bytes(data)).toBeLessThanOrEqual(CALLBACK_DATA_MAX);
+    expect(codec.decode(data)).toEqual(values);
+  });
+
+  it('refuses a column, number or page of the wrong shape', () => {
+    const codec = callbackCodec('tbj', {
+      column: 'column',
+      number: 'number',
+      page: 'page',
+    });
+    expect(codec.decode('tbj:todo:12:0')).toEqual({
+      column: 'todo',
+      number: 12,
+      page: 0,
+    });
+    for (const bad of [
+      'tbj:nowhere:12:0',
+      'tbj:todo:0:0',
+      'tbj:todo:012:0',
+      'tbj:todo:1234567890:0',
+      'tbj:todo:12:01',
+      'tbj:todo:12:10000',
+    ]) {
+      expect(codec.decode(bad)).toBeNull();
+    }
+  });
+});

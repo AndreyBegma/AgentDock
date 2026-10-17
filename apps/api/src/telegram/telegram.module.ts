@@ -14,6 +14,7 @@ import {
 } from './telegram.controller';
 import { TelegramActionRequestService } from './telegram-action-request.service';
 import { TelegramApprovalService } from './telegram-approval.service';
+import { TelegramBoardService } from './telegram-board.service';
 import { TelegramClient } from './telegram-client';
 import { TelegramDeliveryService } from './telegram-delivery.service';
 import { TelegramGuard } from './telegram-guard.service';
@@ -67,6 +68,7 @@ import { TelegramWebAppService } from './telegram-web-app.service';
     TelegramActionRequestService,
     TelegramSessionMessageService,
     TelegramProjectService,
+    TelegramBoardService,
     TelegramIntakeService,
     TelegramWebAppService,
     TelegramRoutes,

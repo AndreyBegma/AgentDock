@@ -1,3 +1,5 @@
+import type { BoardColumn } from '@agentdock/shared';
+
 /**
  * #500: the typed `callback_data` of the bot's inline buttons. A codec is a
  * prefix and an ordered list of typed fields, `<prefix>:<field>:<field>…`.
@@ -7,7 +9,8 @@
  * did not put on a button is null.
  *
  * Cards and projects are carried by short ids: a card by its 8-character
- * `shortId`, a project by its id. A button names its own project, so pressing
+ * `shortId` or, on the Board's buttons (#576), by its per-project number; a
+ * project by its id. A button names its own project, so pressing
  * it never depends on the chat's current project.
  */
 
@@ -39,13 +42,30 @@ const FIELDS = {
   int: { shape: /^(0|[1-9]\d{0,14})$/, max: 15 },
   /** A short fixed word: an action, a column. */
   word: { shape: /^[a-z0-9_]{1,16}$/, max: 16 },
+  /** A board column of `BOARD_COLUMNS`. */
+  column: {
+    shape: /^(inbox|todo|in_progress|finished|completed)$/,
+    max: 11,
+  },
+  /** A board card's per-project number, as the API takes it. */
+  number: { shape: /^[1-9]\d{0,8}$/, max: 9 },
+  /** A page of a list, counted from 0. */
+  page: { shape: /^(0|[1-9]\d{0,3})$/, max: 4 },
 } as const;
+
+/** The kinds whose value is a number, not text. */
+const NUMERIC = new Set<CallbackFieldKind>(['int', 'number', 'page']);
 
 export type CallbackFieldKind = keyof typeof FIELDS;
 
-type FieldValue<K extends CallbackFieldKind> = K extends 'int'
+type FieldValue<K extends CallbackFieldKind> = K extends
+  | 'int'
+  | 'number'
+  | 'page'
   ? number
-  : string;
+  : K extends 'column'
+    ? BoardColumn
+    : string;
 
 export type CallbackValues<F extends Record<string, CallbackFieldKind>> = {
   [K in keyof F]: FieldValue<F[K]>;
@@ -93,14 +113,13 @@ export const callbackCodec = <
   taken.add(prefix);
 
   const encodeField = (kind: CallbackFieldKind, value: unknown): string => {
-    const text =
-      kind === 'int'
-        ? Number.isSafeInteger(value)
-          ? String(value)
-          : ''
-        : typeof value === 'string'
-          ? value
-          : '';
+    const text = NUMERIC.has(kind)
+      ? Number.isSafeInteger(value)
+        ? String(value)
+        : ''
+      : typeof value === 'string'
+        ? value
+        : '';
     if (!FIELDS[kind].shape.test(text)) {
       throw new Error(`callback "${prefix}": not a ${kind}`);
     }
@@ -128,7 +147,7 @@ export const callbackCodec = <
         const text = parts[i + 1];
         const kind = kinds[i];
         if (!FIELDS[kind].shape.test(text)) return null;
-        values[name] = kind === 'int' ? Number(text) : text;
+        values[name] = NUMERIC.has(kind) ? Number(text) : text;
       }
       return values as CallbackValues<F>;
     },
