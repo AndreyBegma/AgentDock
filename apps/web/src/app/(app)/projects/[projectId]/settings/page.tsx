@@ -24,6 +24,7 @@ import { GitHubAppRow } from './github-app-row';
 import { MembersTab } from './members-tab';
 import { OrchestratorTab } from './orchestrator-tab';
 import { PlannerTab } from './planner-tab';
+import { RulesTab } from './rules/rules-tab';
 import { SessionsTab } from './sessions-tab';
 import { StewardTab } from './steward-tab';
 import { TokenSaverTab } from './token-saver-tab';
@@ -62,6 +63,13 @@ const TABS: readonly {
         canRefresh={canOperate}
         onChanged={reload}
       />
+    ),
+  },
+  {
+    id: 'rules',
+    label: 'Coding rules',
+    render: ({ project, isAdmin }) => (
+      <RulesTab projectId={project.id} isAdmin={isAdmin} />
     ),
   },
   {
@@ -211,7 +219,7 @@ export default function ProjectSettingsPage() {
       />
 
       <TabGroup value={tab} onValueChange={setTab}>
-        {/* Eleven tabs do not fit a phone: the strip scrolls inside its box. */}
+        {/* Twelve tabs do not fit a phone: the strip scrolls inside its box. */}
         <ScrollX>
           <TabList aria-label="Project settings" className="min-w-max">
             {TABS.map(({ id, label }) => (
