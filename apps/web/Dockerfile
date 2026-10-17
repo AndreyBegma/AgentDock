@@ -7,8 +7,13 @@
 # routes manifest (next.config.ts rewrites run at build time): both are build
 # arguments, and changing either means rebuilding the image.
 
+# The base is pinned by digest (ADR-0053): a moved tag cannot change what is
+# built. Bump it together with deploy/ci-image/Dockerfile and the app
+# Dockerfiles: `docker buildx imagetools inspect node:<version>-bookworm-slim`.
+ARG NODE_IMAGE=node:24.20.0-bookworm-slim@sha256:ba849c60be29959425b8734d57b8b4b7d56f98edd9504c9af091d5281095a71e
+
 # ─── deps ────────────────────────────────────────────────────────────────────
-FROM node:24-bookworm-slim AS deps
+FROM ${NODE_IMAGE} AS deps
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl unzip \
@@ -46,7 +51,7 @@ COPY apps/web/ apps/web/
 RUN bunx turbo run build --filter=@agentdock/web...
 
 # ─── runtime ─────────────────────────────────────────────────────────────────
-FROM node:24-bookworm-slim AS runtime
+FROM ${NODE_IMAGE} AS runtime
 
 WORKDIR /app
 

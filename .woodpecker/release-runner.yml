@@ -19,6 +19,11 @@
 # RUNNER_RELEASE_DRY_RUN=1 also stops a tag run before it publishes. It is read
 # by the step shells, where variables do arrive.
 #
+# Nothing another pipeline wrote reaches the release (ADR-0053): no host cache
+# is mounted, `bun install` starts from an empty cache in the step's container
+# and keeps to bun.lock (--frozen-lockfile), and the release builds ignore
+# turbo's cache. Only `ci-image` mounts the Docker socket.
+#
 # Pull requests never run this workflow. The gating in this file is not the
 # security boundary: whoever pushes a commit can edit it. The boundary is in
 # settings a pusher cannot change (deploy/README.md): the secrets
@@ -36,12 +41,7 @@ when:
 variables:
   - &ci_image agentdock-ci:node-bun
   - &docker_image docker:28-cli
-  - &caches
-    - /home/archi/ci-cache/agentdock/bun:/ci-cache/bun
-    - /home/archi/ci-cache/agentdock/turbo:/ci-cache/turbo
-  - &cache_env
-    BUN_INSTALL_CACHE_DIR: /ci-cache/bun
-    TURBO_CACHE_DIR: /ci-cache/turbo
+  - &turbo_env
     TURBO_TELEMETRY_DISABLED: '1'
   - &publish_when
     - event: tag
@@ -55,27 +55,29 @@ steps:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     commands:
-      - docker build -t agentdock-ci:node-bun deploy/ci-image
+      - docker build --pull -t agentdock-ci:node-bun deploy/ci-image
 
   - name: install
     image: *ci_image
-    volumes: *caches
-    environment: *cache_env
+    environment: *turbo_env
     commands:
       - bun install --frozen-lockfile
 
   - name: test-runner
     image: *ci_image
-    volumes: *caches
-    environment: *cache_env
+    environment: *turbo_env
     commands:
       - bunx turbo run test --filter=@agentdock/runner
 
   # A tag run signs with the release key; build-release.sh fails without it.
+  # TURBO_FORCE: the released binaries are built from source, never restored
+  # from a cache entry.
   - name: build-release
     image: *ci_image
     when: *publish_when
     environment:
+      <<: *turbo_env
+      TURBO_FORCE: 'true'
       RUNNER_SIGNING_KEY:
         from_secret: runner_signing_key
     commands:
@@ -86,6 +88,9 @@ steps:
     image: *ci_image
     when:
       - event: manual
+    environment:
+      <<: *turbo_env
+      TURBO_FORCE: 'true'
     commands:
       - sh apps/runner/scripts/build-release.sh
 

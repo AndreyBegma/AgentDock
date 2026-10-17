@@ -9,14 +9,14 @@ HOST="https://staging-agentdock.luna-realm.com"
 REVISION="${CI_COMMIT_SHA:-$(git rev-parse HEAD 2>/dev/null || echo unknown)}"
 
 echo "Building agentdock-api:staging ($REVISION)"
-docker build \
+docker build --pull \
   --label "org.opencontainers.image.revision=$REVISION" \
   --label agentdock.stage=staging \
   -t agentdock-api:staging \
   -f apps/api/Dockerfile .
 
 echo "Building agentdock-web:staging ($REVISION)"
-docker build \
+docker build --pull \
   --label "org.opencontainers.image.revision=$REVISION" \
   --label agentdock.stage=staging \
   --build-arg "NEXT_PUBLIC_LIVE_URL=wss://${HOST#https://}/api/live" \

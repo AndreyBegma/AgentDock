@@ -5,7 +5,11 @@
 #
 # bun is a literal, the one package.json `packageManager` pins; moving bun is
 # one commit touching it, bun.lock, this file and the app Dockerfiles.
-FROM node:24.20.0-bookworm-slim
+# The base is pinned by digest (ADR-0053): a moved tag cannot change what is
+# built. Bump it together with deploy/ci-image/Dockerfile and the app
+# Dockerfiles: `docker buildx imagetools inspect node:<version>-bookworm-slim`.
+ARG NODE_IMAGE=node:24.20.0-bookworm-slim@sha256:ba849c60be29959425b8734d57b8b4b7d56f98edd9504c9af091d5281095a71e
+FROM ${NODE_IMAGE}
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl unzip git \
