@@ -32,6 +32,7 @@ const trigger = (
     kind: 'skill',
     skill: 'code-sentinel:debug',
     args: 'run {{payload.run.id}}',
+    permissionMode: 'manual',
     output: 'report',
   },
   allowedPaths: ['run.id'],
@@ -126,6 +127,21 @@ describe('trigger form', () => {
     expect(toTriggerUpdateRequest(form, trigger())).toEqual({
       name: 'Renamed',
       allowedPaths: ['run.id', 'sha'],
+    });
+  });
+
+  test('a skill action always carries its own permission mode (C-132)', () => {
+    expect(emptyTriggerForm().permissionMode).toBe('manual');
+    expect(toTriggerCreateRequest(filled()).action).toMatchObject({
+      permissionMode: 'manual',
+    });
+    const bypass = {
+      ...filled(),
+      permissionMode: 'bypassPermissions' as const,
+    };
+    expect(toTriggerUpdateRequest(bypass, trigger()).action).toMatchObject({
+      kind: 'skill',
+      permissionMode: 'bypassPermissions',
     });
   });
 
