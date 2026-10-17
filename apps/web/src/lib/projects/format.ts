@@ -77,6 +77,8 @@ export function describeProjectError(error: unknown): string {
         return `The runner is offline. Start "${RUN_COMMAND}" on its machine (or keep it running as a service), then try again.`;
       case PROJECT_ERROR.runnerTimeout:
         return 'The runner did not answer in time. Try again.';
+      case PROJECT_ERROR.runnerOutdated:
+        return 'The runner is too old for this. Update it, then try again.';
       case PROJECT_ERROR.runnerError: {
         // The API prefixes the command name ("project.inspect: …").
         const detail = error.message.replace(/^[a-z]+(\.[a-z]+)+:\s*/, '');
