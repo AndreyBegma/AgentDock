@@ -10,6 +10,7 @@ import type {
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { AuditCtx } from '../audit';
 import type { AuditContext } from '../audit/audit.types';
+import { RunnerReadThrottle } from '../auth';
 import {
   ProjectAccess,
   ProjectAccessGuard,
@@ -77,6 +78,7 @@ export class FleetController {
 
   /** The slot's worktree, read by the runner (`worktree.status`), cached 10 s. */
   @Get('slots/:slot/worktree')
+  @RunnerReadThrottle()
   worktree(
     @ProjectAccess() access: ResolvedProjectAccess,
     @Param('slot') slot: string,

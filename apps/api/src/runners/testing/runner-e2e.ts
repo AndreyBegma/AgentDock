@@ -9,7 +9,7 @@ import {
   serverMessageSchema,
 } from '@agentdock/shared/protocol';
 import type { INestApplication, LoggerService } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
+import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { WebSocket } from 'ws';
@@ -38,11 +38,14 @@ export interface RunnerE2eContext extends E2eContext {
 export const createRunnerE2eApp = async (
   options: Partial<RunnerOptions> = {},
   logger?: LoggerService,
+  /** Further provider overrides, e.g. another module's timings. */
+  override: (builder: TestingModuleBuilder) => TestingModuleBuilder = (b) => b,
 ): Promise<RunnerE2eContext> => {
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
-    .overrideProvider(RUNNER_OPTIONS)
-    .useValue({ ...defaultRunnerOptions, ...options })
-    .compile();
+  const moduleRef = await override(
+    Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(RUNNER_OPTIONS)
+      .useValue({ ...defaultRunnerOptions, ...options }),
+  ).compile();
   const app = moduleRef.createNestApplication<INestApplication<App>>();
   if (logger) app.useLogger(logger);
   configureApp(app);

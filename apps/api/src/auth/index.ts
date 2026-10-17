@@ -13,4 +13,5 @@ export {
   type AccountThrottled,
   LoginThrottleAlerts,
 } from './login-throttle-alerts';
+export { RunnerReadThrottle } from './runner-read-throttle';
 export { SessionService } from './session.service';
