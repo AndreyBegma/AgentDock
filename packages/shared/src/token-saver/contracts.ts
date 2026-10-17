@@ -103,9 +103,9 @@ export const FILTER_ID_NONE = 'none';
 
 /**
  * Amendment 12: why the hook left a command no filter matched. `compound`
- * — not a single simple command (nor an amendment-11 form); `uncovered` —
- * simple, but no family covers it; `mode` — a permission mode in which the
- * hook never rewrites.
+ * — not simple commands joined by `|`, `&&`, `||` or `;` (amendment 13);
+ * `uncovered` — no family covers the first command of any pipeline; `mode` —
+ * a permission mode in which the hook never rewrites.
  */
 export const FILTER_ID_NONE_COMPOUND = 'none:compound';
 export const FILTER_ID_NONE_UNCOVERED = 'none:uncovered';
