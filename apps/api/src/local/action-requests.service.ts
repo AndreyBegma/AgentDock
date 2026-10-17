@@ -1,10 +1,12 @@
 import {
+  ACTION_REQUEST_PR_TITLE_MAX,
   ACTION_REQUEST_TTL_MS,
   type ActionRequestKind,
   type ActionRequestStatus,
   type ActionRequestSummary,
   actionRequestArgsSchemas,
   mayDecideActionRequest,
+  prApproveBoundArgsSchema,
   type Role,
 } from '@agentdock/shared';
 import { HttpException, Injectable, Logger } from '@nestjs/common';
@@ -23,6 +25,7 @@ import {
   ACTION_REQUESTS_LIVE_EVENT,
   type ActionRequestsLiveChange,
   type ActionRequestView,
+  actionRequestBody,
   actionRequestLink,
   actionRequestTitle,
   toActionRequestSummary,
@@ -36,6 +39,8 @@ export const ACTION_REQUEST_ERROR = {
   invalidArgs: 'invalid_args',
   /** It was already decided, or it expired. */
   notPending: 'not_pending',
+  /** A `pr_approve` for a PR that is merged or closed. */
+  prNotOpen: 'pr_not_open',
   /** The requester may not approve their own non-`tool_use` request (D18). */
   selfApproval: 'self_approval',
 } as const;
@@ -63,6 +68,8 @@ export interface NewActionRequest {
   sessionId: string | null;
   /** The runner's local user. */
   requestedById: string | null;
+  /** Their capped role on the project: what `pr.inspect` runs with. */
+  requesterRole: Role;
   kind: ActionRequestKind;
   args: unknown;
   summary: string;
@@ -128,7 +135,10 @@ export class ActionRequestsService {
         `args: ${z.prettifyError(parsed.error)}`,
       );
     }
-    const args = parsed.data as Record<string, unknown>;
+    const args =
+      input.kind === 'pr_approve'
+        ? await this.bindPr(input, parsed.data as { pr: number }, auditor)
+        : (parsed.data as Record<string, unknown>);
     const now = new Date();
     const { row, written } = await this.prisma.$transaction(async (tx) => {
       const row = await tx.actionRequest.create({
@@ -159,7 +169,9 @@ export class ActionRequestsService {
           slot: null,
           issue: null,
           title: actionRequestTitle(input.kind, args),
-          body: oneLine(input.summary, 300) ?? '',
+          body:
+            oneLine(actionRequestBody(input.kind, args, input.summary), 300) ??
+            '',
           link: actionRequestLink(input.projectId, row.id),
           eventId: null,
           at: now,
@@ -187,6 +199,39 @@ export class ActionRequestsService {
     await this.notifications.publish(written);
     this.publish(row);
     return toActionRequestSummary(row);
+  }
+
+  /**
+   * A `pr_approve` binds to the head `pr.inspect` reads now: the one the
+   * person is shown and, on approval, the only one approved.
+   */
+  private async bindPr(
+    input: NewActionRequest,
+    { pr }: { pr: number },
+    auditor: ActionRequestAuditor,
+  ): Promise<Record<string, unknown>> {
+    const inspection = await this.approvals.inspect(
+      {
+        projectId: input.projectId,
+        role: input.requesterRole,
+        ctx: auditor.ctx,
+      },
+      pr,
+      { fresh: true },
+    );
+    if (inspection.state !== 'open') {
+      throw actionRequestError(
+        409,
+        ACTION_REQUEST_ERROR.prNotOpen,
+        `PR #${pr} is ${inspection.state}`,
+      );
+    }
+    return prApproveBoundArgsSchema.parse({
+      pr,
+      headSha: inspection.headSha,
+      title: inspection.title.slice(0, ACTION_REQUEST_PR_TITLE_MAX),
+      url: inspection.url,
+    });
   }
 
   async list(
@@ -396,27 +441,28 @@ export class ActionRequestsService {
           };
         }
         case 'pr_approve': {
-          const { pr } = actionRequestArgsSchemas.pr_approve.parse(row.args);
+          const bound = prApproveBoundArgsSchema.safeParse(row.args);
+          if (!bound.success) {
+            // Created before requests were bound to a head: nothing to approve.
+            return {
+              ok: false,
+              result: {
+                error: ACTION_REQUEST_ERROR.invalidArgs,
+                message:
+                  'The request names no head; ask for the approval again',
+              },
+            };
+          }
+          const { pr, headSha } = bound.data;
           const approvalsCaller: ApprovalsCaller = {
             projectId: row.projectId,
             role: decider.role,
             ctx: decider.ctx,
           };
-          // The approver did not see a head: the PR's head now is the one approved.
-          const inspection = await this.approvals.inspect(approvalsCaller, pr, {
-            fresh: true,
-          });
-          if (inspection.state !== 'open') {
-            return {
-              ok: false,
-              result: {
-                error: 'pr_not_open',
-                message: `PR #${pr} is ${inspection.state}`,
-              },
-            };
-          }
-          await this.approvals.approve(approvalsCaller, pr, inspection.headSha);
-          return { ok: true, result: { pr, headSha: inspection.headSha } };
+          // Only the head the approver was shown; a moved head is refused
+          // with `head_moved` and approves nothing.
+          await this.approvals.approve(approvalsCaller, pr, headSha);
+          return { ok: true, result: { pr, headSha } };
         }
         case 'tool_use':
           return { ok: true, result: {} };
