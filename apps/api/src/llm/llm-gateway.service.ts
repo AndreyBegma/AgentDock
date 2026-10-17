@@ -72,7 +72,13 @@ export class LlmGateway {
       else if (event.type === 'usage') usage = addUsage(usage, event.usage);
       else stopReason = event.stopReason;
     }
-    return { text, toolCalls, usage, stopReason, costUsd: ledger.costUsd ?? '0' };
+    return {
+      text,
+      toolCalls,
+      usage,
+      stopReason,
+      costUsd: ledger.costUsd ?? '0',
+    };
   }
 
   /** `ledger.costUsd` is set to the cost written once the row is. */
@@ -164,6 +170,4 @@ export class LlmGateway {
       ledger.costUsd = costUsd.toString();
     }
   }
-
 }
-

@@ -1,13 +1,13 @@
-import Anthropic from '@anthropic-ai/sdk';
 import type { TokenBuckets } from '@agentdock/shared/protocol';
+import Anthropic from '@anthropic-ai/sdk';
 import { LlmError } from '../llm-error';
 import {
+  DEFAULT_MAX_TOKENS,
   type LlmAdapter,
   type LlmAdapterCall,
   type LlmMessage,
   type LlmStopReason,
   type LlmStreamEvent,
-  DEFAULT_MAX_TOKENS,
 } from '../types';
 import { providerFailure, rethrowAbort } from './provider-errors';
 
@@ -77,7 +77,8 @@ export const toAnthropicMessages = (
       });
     } else if (message.role === 'assistant') {
       const content: Anthropic.ContentBlockParam[] = [];
-      if (message.content) content.push({ type: 'text', text: message.content });
+      if (message.content)
+        content.push({ type: 'text', text: message.content });
       for (const call of message.toolCalls ?? []) {
         content.push({
           type: 'tool_use',

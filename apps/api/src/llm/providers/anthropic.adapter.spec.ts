@@ -246,7 +246,9 @@ describe('AnthropicAdapter', () => {
     const error = await adapter.testKey(KEY).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(LlmError);
     expect((error as LlmError).code).toBe('llm_key_rejected');
-    expect(JSON.stringify((error as LlmError).getResponse())).not.toContain(KEY);
+    expect(JSON.stringify((error as LlmError).getResponse())).not.toContain(
+      KEY,
+    );
   });
 
   it('redacts a key a provider error echoes back', async () => {
@@ -255,7 +257,10 @@ describe('AnthropicAdapter', () => {
         jsonResponse(
           {
             type: 'error',
-            error: { type: 'invalid_request_error', message: `key ${KEY} is odd` },
+            error: {
+              type: 'invalid_request_error',
+              message: `key ${KEY} is odd`,
+            },
           },
           400,
         ),
@@ -263,7 +268,10 @@ describe('AnthropicAdapter', () => {
     const error = (await collect(
       adapter.stream({
         apiKey: KEY,
-        request: { model: 'claude-opus-5-5', messages: [{ role: 'user', content: 'x' }] },
+        request: {
+          model: 'claude-opus-5-5',
+          messages: [{ role: 'user', content: 'x' }],
+        },
       }),
     ).catch((e: unknown) => e)) as LlmError;
     expect(error.code).toBe('llm_provider_error');
@@ -273,7 +281,12 @@ describe('AnthropicAdapter', () => {
 
   it('tests a key against the models list, which costs nothing', async () => {
     const fetchMock = jest.fn(async () =>
-      jsonResponse({ data: [], has_more: false, first_id: null, last_id: null }),
+      jsonResponse({
+        data: [],
+        has_more: false,
+        first_id: null,
+        last_id: null,
+      }),
     );
     await new AnthropicAdapter({ fetch: fetchMock }).testKey(KEY);
     const [input, init] = fetchMock.mock.calls[0] as unknown as [

@@ -75,9 +75,14 @@ interface ChatChunk {
  * Chat-completions usage in the price table's buckets: cached prompt tokens
  * are a cache read, not input; reasoning stays inside `output` (spec 12).
  */
-export const chatUsage = (usage: ChatUsage | null | undefined): TokenBuckets => {
+export const chatUsage = (
+  usage: ChatUsage | null | undefined,
+): TokenBuckets => {
   const prompt = usage?.prompt_tokens ?? 0;
-  const cached = Math.min(usage?.prompt_tokens_details?.cached_tokens ?? 0, prompt);
+  const cached = Math.min(
+    usage?.prompt_tokens_details?.cached_tokens ?? 0,
+    prompt,
+  );
   return {
     input: prompt - cached,
     output: usage?.completion_tokens ?? 0,
@@ -293,7 +298,9 @@ export class OpenAiCompatibleAdapter implements LlmAdapter {
       throw providerFailure(this.provider, undefined, message, apiKey);
     }
 
-    for (const [index, call] of [...calls.entries()].sort((a, b) => a[0] - b[0])) {
+    for (const [index, call] of [...calls.entries()].sort(
+      (a, b) => a[0] - b[0],
+    )) {
       const toolCall: LlmToolCall = {
         id: call.id || `call_${index}`,
         name: call.name,
@@ -308,10 +315,13 @@ export class OpenAiCompatibleAdapter implements LlmAdapter {
   async testKey(apiKey: string, signal?: AbortSignal): Promise<void> {
     let response: Response;
     try {
-      response = await this.fetchFn(`${this.profile.baseUrl}${this.profile.testPath}`, {
-        headers: this.headers(apiKey),
-        signal,
-      });
+      response = await this.fetchFn(
+        `${this.profile.baseUrl}${this.profile.testPath}`,
+        {
+          headers: this.headers(apiKey),
+          signal,
+        },
+      );
     } catch (error) {
       rethrowAbort(error);
       const message = error instanceof Error ? error.message : String(error);

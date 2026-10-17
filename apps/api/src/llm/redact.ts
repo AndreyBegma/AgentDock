@@ -26,7 +26,9 @@ export const redactSecrets = (
   }
   for (const shape of KEY_SHAPES) {
     out = out.replace(shape, (_match, prefix?: string) =>
-      typeof prefix === 'string' ? `${prefix}${REDACTED_SECRET}` : REDACTED_SECRET,
+      typeof prefix === 'string'
+        ? `${prefix}${REDACTED_SECRET}`
+        : REDACTED_SECRET,
     );
   }
   return out;

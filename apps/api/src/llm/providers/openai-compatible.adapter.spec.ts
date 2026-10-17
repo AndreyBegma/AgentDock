@@ -34,7 +34,9 @@ const STREAM = [
       },
     ],
   }),
-  chunk({ tool_calls: [{ index: 0, function: { arguments: 'ry":"login"}' } }] }),
+  chunk({
+    tool_calls: [{ index: 0, function: { arguments: 'ry":"login"}' } }],
+  }),
   chunk({}, 'tool_calls'),
   {
     data: {
@@ -224,14 +226,22 @@ describe('a plain answer', () => {
     const adapter = new OpenAiCompatibleAdapter(OPENAI_PROFILE, async () =>
       sseResponse([
         chunk({ content: 'Hi' }, 'stop'),
-        { data: { choices: [], usage: { prompt_tokens: 3, completion_tokens: 1 } } },
+        {
+          data: {
+            choices: [],
+            usage: { prompt_tokens: 3, completion_tokens: 1 },
+          },
+        },
         { data: '[DONE]' },
       ]),
     );
     const events = await collect(
       adapter.stream({
         apiKey: KEYS.openai,
-        request: { model: 'gpt-5.1', messages: [{ role: 'user', content: 'Hi' }] },
+        request: {
+          model: 'gpt-5.1',
+          messages: [{ role: 'user', content: 'Hi' }],
+        },
       }),
     );
     expect(events.at(-2)).toEqual({

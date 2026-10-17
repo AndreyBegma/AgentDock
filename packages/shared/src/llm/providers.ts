@@ -2,7 +2,12 @@
  * The LLM providers the API calls directly (ADR-0057). Grok and OpenRouter
  * speak the OpenAI chat-completions protocol.
  */
-export const LLM_PROVIDERS = ['anthropic', 'openai', 'xai', 'openrouter'] as const;
+export const LLM_PROVIDERS = [
+  'anthropic',
+  'openai',
+  'xai',
+  'openrouter',
+] as const;
 export type LlmProviderId = (typeof LLM_PROVIDERS)[number];
 
 export const isLlmProvider = (value: unknown): value is LlmProviderId =>
