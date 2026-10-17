@@ -6,6 +6,7 @@ import type {
 } from '@agentdock/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import type { Exec } from '../detect/exec';
+import { stripUrlCredentials } from '../redact-url';
 import { emptyClassified } from './classify';
 import { detectDocs } from './docs';
 import { isDirectory, isFile, nodeFs, type ProjectFs } from './fs';
@@ -139,14 +140,16 @@ export const inspectProject = async (
   }
 
   const originUrl = await git(exec, toplevel, ['remote', 'get-url', 'origin']);
-  const remote = originUrl
-    ? { url: originUrl, ...parseRemote(originUrl) }
+  const origin = originUrl ? stripUrlCredentials(originUrl) : null;
+  const remote = origin
+    ? { url: origin.url, ...parseRemote(origin.url) }
     : { url: null, forge: 'unsupported' as const, repo: null };
-  if (!originUrl) {
+  if (origin?.stripped) warnings.push('origin_url_had_credentials');
+  if (!origin) {
     warnings.push('The repository has no `origin` remote.');
   } else if (remote.forge === 'unsupported') {
     warnings.push(
-      `origin ${originUrl} is not on GitHub; only GitHub projects can be connected.`,
+      `origin ${origin?.url} is not on GitHub; only GitHub projects can be connected.`,
     );
   }
 

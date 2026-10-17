@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { CommandFailure } from '../commands/failure';
 import { watchedProject } from '../control/target';
 import type { Exec } from '../detect/exec';
+import { redactUrlUserinfo } from '../redact-url';
 import { githubOf } from '../skills/run/collect';
 import { firstLine, ghOf, parsed } from './github';
 
@@ -87,7 +88,10 @@ export const cardChecks = async (
     github = await githubOf(deps, project);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new CommandFailure('not_found', message.split('\n')[0] ?? message);
+    throw new CommandFailure(
+      'not_found',
+      redactUrlUserinfo(message.split('\n')[0] ?? message),
+    );
   }
   const viewed = await gh([
     'pr',

@@ -16,6 +16,7 @@ import { errorMessage, type Logger } from '../log';
 import { commandRefusal } from '../policy/check';
 import { nodeRealpath, type Realpath } from '../policy/roots';
 import type { PolicyConfig } from '../policy/schema';
+import { redactUrlUserinfo } from '../redact-url';
 import { CommandFailure } from './failure';
 
 /** One handler per allowlisted command; the compiler refuses a missing one. */
@@ -125,7 +126,7 @@ export const createDispatcher = (options: DispatcherOptions): Dispatch => {
       }
       if (error instanceof CommandFailure) {
         log.warn('command: refused', { id, name, code: error.code });
-        return failure(id, error.code, error.message);
+        return failure(id, error.code, redactUrlUserinfo(error.message));
       }
       log.error('command: handler failed', {
         id,
