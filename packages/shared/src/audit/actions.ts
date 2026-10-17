@@ -20,6 +20,11 @@ export const AUDIT_ACTIONS = [
   'runner.rename',
   'runner.revoke',
   'runner.update',
+  /**
+   * C-108: a runner's live socket was closed 4409 by a newer connection with
+   * its token — `meta` holds both peers' IP and user agent.
+   */
+  'runner.connection_replaced',
   'local.request',
   'runner.command',
   'runner.command.result',
@@ -52,6 +57,7 @@ export const AUDIT_ACTIONS = [
   'telegram.link',
   'telegram.unlink',
   'telegram.approval',
+  'telegram.project',
   'terminal.attached',
   'terminal.detached',
   'skill.installed',

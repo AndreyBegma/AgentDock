@@ -37,6 +37,7 @@ import { type AuditContext, SYSTEM_ACTOR } from '../audit/audit.types';
 import { PrismaService } from '../database/prisma.service';
 import { LiveService } from '../live/live.service';
 import { mergeMethodOf } from '../planner/planner-instructions.service';
+import type { SpecTargetProject } from '../planner/spec-target';
 import { projectNotFound } from '../projects';
 import { RunnerConnectHooks } from '../runners/runner-connect-hooks';
 import { recordServerEvent } from '../server-events/server-events';
@@ -78,6 +79,8 @@ export interface BoardProject {
   defaultBranch: string | null;
   defaultProfileId: string | null;
   codeSentinelConfig: Prisma.JsonValue;
+  /** #379: where a card's spec goes (`resolveSpecTarget`). */
+  docsSource: SpecTargetProject['docsSource'];
 }
 
 /** #359: the base sources under which `baseBranch` is the repository's default branch. */
@@ -260,6 +263,9 @@ export class BoardWork implements OnModuleInit {
         baseOverride: true,
         defaultProfileId: true,
         codeSentinelConfig: true,
+        docsSource: {
+          select: { kind: true, localPath: true, repo: true, specDir: true },
+        },
       },
     });
     if (!row) throw projectNotFound();
@@ -274,6 +280,7 @@ export class BoardWork implements OnModuleInit {
         : null,
       defaultProfileId: row.defaultProfileId,
       codeSentinelConfig: row.codeSentinelConfig,
+      docsSource: row.docsSource,
     };
   }
 
@@ -1088,6 +1095,7 @@ export class BoardWork implements OnModuleInit {
               number: card.number,
               summary,
               issueNumber: card.issueNumber,
+              specPrUrl: card.specPrUrl,
             }),
           },
           { role: 'operator', ctx: { actor: SYSTEM_ACTOR } },

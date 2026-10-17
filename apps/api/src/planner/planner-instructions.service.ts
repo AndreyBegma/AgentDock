@@ -20,7 +20,8 @@ import type { AuditContext } from '../audit/audit.types';
 import { PrismaService } from '../database/prisma.service';
 import { projectNotFound } from '../projects';
 import { toInstructionsVersion, versionInclude } from './plan-mapper';
-import { plannerError } from './planner-error';
+import { type PlannerFailure, plannerError } from './planner-error';
+import { resolveSpecTarget, type SpecTarget } from './spec-target';
 
 /** The `orchestrator` object of a code-sentinel config, if it is one. */
 const orchestratorOf = (config: Prisma.JsonValue): Prisma.JsonObject | null => {
@@ -64,9 +65,36 @@ export const mergeMethodOf = (
   return parsed.success ? parsed.data : null;
 };
 
-/** D10: the mode a project without a settings row gets. */
-export const defaultSpecOutput = (specDir: string | null): PlannerSpecOutput =>
-  specDir ? 'docs_pr' : 'issue_body';
+/**
+ * D10: the mode a project without a settings row gets — `docs_pr` when its
+ * specs have somewhere to go (#379: the code or an external docs repository).
+ */
+export const defaultSpecOutput = (target: SpecTarget): PlannerSpecOutput =>
+  target.kind === 'code_repo' || target.kind === 'docs_repo'
+    ? 'docs_pr'
+    : 'issue_body';
+
+/**
+ * #379: why `docs_pr` cannot publish for this target, or null when it can —
+ * `no_docs_clone` for a remote docs repository without a local clone.
+ */
+export const docsPrRefusal = (target: SpecTarget): PlannerFailure | null => {
+  if (target.kind === 'no_spec_dir') {
+    return plannerError(
+      422,
+      PLANNER_ERROR.invalidArgs,
+      'docs_pr needs a spec folder: set the Spec folder in Settings › Docs source',
+    );
+  }
+  if (target.kind === 'no_docs_clone') {
+    return plannerError(
+      422,
+      PLANNER_ERROR.noDocsClone,
+      `docs_pr needs a local clone of the docs repository${target.repo ? ` ${target.repo}` : ''}: set its local clone path in Settings › Docs source`,
+    );
+  }
+  return null;
+};
 
 /**
  * The planner's instructions and per-project settings (D10, D11, ADR-0019).
@@ -122,8 +150,7 @@ export class PlannerInstructionsService {
     ]);
     return {
       specOutput:
-        settings?.specOutput ??
-        defaultSpecOutput(specDirOf(project.codeSentinelConfig)),
+        settings?.specOutput ?? defaultSpecOutput(resolveSpecTarget(project)),
       override: settings?.overrideInstructions
         ? toInstructionsVersion(settings.overrideInstructions)
         : null,
@@ -136,7 +163,7 @@ export class PlannerInstructionsService {
   /**
    * `specOutput` is always written. `instructionsOverride`: absent keeps the
    * override, blank clears it, text writes a new project version and points
-   * at it. `docs_pr` needs a repository-relative `specDir` (Q4).
+   * at it. `docs_pr` needs a spec target (Q4, #379).
    */
   async updateSettings(
     ctx: AuditContext,
@@ -145,16 +172,11 @@ export class PlannerInstructionsService {
     request: PlannerSettingsUpdateRequest,
   ): Promise<PlannerSettingsView> {
     const project = await this.project(projectId);
-    if (
-      request.specOutput === 'docs_pr' &&
-      !specDirOf(project.codeSentinelConfig)
-    ) {
-      throw plannerError(
-        422,
-        PLANNER_ERROR.invalidArgs,
-        'docs_pr needs the project to have a specDir inside the repository',
-      );
-    }
+    const refusal =
+      request.specOutput === 'docs_pr'
+        ? docsPrRefusal(resolveSpecTarget(project))
+        : null;
+    if (refusal) throw refusal;
     const before = await this.prisma.plannerSettings.findUnique({
       where: { projectId },
       select: { specOutput: true, overrideInstructionsId: true },
@@ -258,7 +280,13 @@ export class PlannerInstructionsService {
   private async project(projectId: string) {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
-      select: { codeSentinelConfig: true },
+      select: {
+        rootPath: true,
+        codeSentinelConfig: true,
+        docsSource: {
+          select: { kind: true, localPath: true, repo: true, specDir: true },
+        },
+      },
     });
     if (!project) throw projectNotFound();
     return project;

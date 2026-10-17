@@ -487,6 +487,76 @@ describe('card stacks (e2e, #480)', () => {
       expect((await run(1)).status).toBe(200);
     });
 
+    const setNeeded = (needed: boolean) =>
+      h.author.send('patch', `${stackPath()}/design`, { needed });
+
+    it('#502: the design switched off lifts the gate, and switched back on holds it again with its revisions and approval kept', async () => {
+      await confirmedStack();
+      expect((await run(1)).status).toBe(409);
+
+      const off = await setNeeded(false);
+      expect(off.status).toBe(200);
+      expect((off.body as TaskDesignView).needed).toBe(false);
+      expect((await h.author.get(stackPath())).body.design).toBeNull();
+      expect((await run(1)).status).toBe(200);
+
+      const on = await setNeeded(true);
+      expect(on.status).toBe(200);
+      expect((await h.author.get(stackPath())).body.design).toMatchObject({
+        needed: true,
+        status: 'idle',
+      });
+      const refused = await run(2);
+      expect(refused.status).toBe(409);
+      expect(refused.body.error).toBe(BOARD_ERROR.stackDesignNotApproved);
+
+      const { view } = await approveStackDesign();
+      expect((await setNeeded(false)).status).toBe(200);
+      const back = await setNeeded(true);
+      expect(back.status).toBe(200);
+      const kept = back.body as TaskDesignView;
+      expect(kept.status).toBe('approved');
+      expect(kept.approvedRevisionId).toBe(view.approvedRevisionId);
+      expect(kept.revisions).toHaveLength(view.revisions.length);
+      expect((await run(2)).status).toBe(200);
+
+      const audit = await h.auditOf('design.toggled');
+      expect(audit.map((a) => [a.before, a.after])).toEqual([
+        [
+          expect.objectContaining({ needed: true }),
+          expect.objectContaining({ needed: false }),
+        ],
+        [
+          expect.objectContaining({ needed: false }),
+          expect.objectContaining({ needed: true }),
+        ],
+        [
+          expect.objectContaining({ needed: true }),
+          expect.objectContaining({ needed: false }),
+        ],
+        [
+          expect.objectContaining({ needed: false }),
+          expect.objectContaining({ needed: true }),
+        ],
+      ]);
+    });
+
+    it('#502: a stack confirmed without a design can be switched on, which holds its cards', async () => {
+      await confirmedStack(false);
+      expect((await setNeeded(true)).status).toBe(200);
+      const refused = await run(1);
+      expect(refused.status).toBe(409);
+      expect(refused.body.error).toBe(BOARD_ERROR.stackDesignNotApproved);
+    });
+
+    it('#502: a viewer cannot switch the stack design', async () => {
+      await confirmedStack();
+      const denied = await h.viewer.send('patch', `${stackPath()}/design`, {
+        needed: false,
+      });
+      expect(denied.status).toBe(403);
+    });
+
     it('a card keeps its own design beside the stack design, and its design turn reads the approved stack design', async () => {
       await confirmedStack();
       const { stack } = await approveStackDesign();

@@ -24,7 +24,9 @@
 # The repository is public. Host mounts need it "trusted → volumes" in
 # Woodpecker, and pull requests from forks must wait for approval
 # (require_approval: forks) — an unapproved fork would otherwise reach the
-# Docker socket of the host. deploy/README.md lists the repository settings.
+# Docker socket of the host. Pull requests from the repository's own branches,
+# board cards' included, must start at once: pull_requests or all_events gates
+# them too (#504). deploy/README.md lists the repository settings.
 
 when:
   - event: pull_request

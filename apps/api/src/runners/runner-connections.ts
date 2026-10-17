@@ -13,6 +13,14 @@ export type CommandOutcome =
   | { kind: 'result'; message: CommandResultMessage }
   | { kind: 'lost' };
 
+/** Where a runner socket came from: its IP and user agent at upgrade. */
+export interface RunnerPeer {
+  ip: string | null;
+  userAgent: string | null;
+}
+
+const UNKNOWN_PEER: RunnerPeer = { ip: null, userAgent: null };
+
 /** One authenticated runner socket that has completed `hello`. */
 export class LiveConnection {
   lastBeatAt: number;
@@ -25,6 +33,7 @@ export class LiveConnection {
     readonly connectedAt: number,
     /** What its hello advertised (#233); null = unknown, an older runner. */
     readonly commands: RunnerCommands | null = null,
+    readonly peer: RunnerPeer = UNKNOWN_PEER,
   ) {
     this.lastBeatAt = connectedAt;
   }
@@ -81,16 +90,22 @@ export class LiveConnection {
 export class RunnerConnections {
   private readonly live = new Map<string, LiveConnection>();
 
-  /** Makes `connection` the runner's socket; an older one is closed 4409. */
-  attach(connection: LiveConnection): void {
+  /**
+   * Makes `connection` the runner's socket; an older one is closed 4409.
+   * Returns that older one when it was still open — a live socket taken over,
+   * which C-108 reports — and null otherwise: none, or one already closing on
+   * its own (a normal reconnect).
+   */
+  attach(connection: LiveConnection): LiveConnection | null {
     const previous = this.live.get(connection.runnerId);
     this.live.set(connection.runnerId, connection);
-    if (previous && previous !== connection) {
-      previous.close(
-        RUNNER_CLOSE_CODES.replaced,
-        'replaced by a newer connection',
-      );
-    }
+    if (!previous || previous === connection) return null;
+    const wasOpen = previous.isOpen;
+    previous.close(
+      RUNNER_CLOSE_CODES.replaced,
+      'replaced by a newer connection',
+    );
+    return wasOpen ? previous : null;
   }
 
   /** Removes `connection` if it is still the runner's current one. */

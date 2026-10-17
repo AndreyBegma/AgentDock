@@ -16,7 +16,7 @@ import type { Clock } from './clock';
 import { CollectorRegistry, collectors } from './collectors';
 import { type CommandHandlers, createDispatcher } from './commands/dispatcher';
 import { createHandlers } from './commands/handlers';
-import { loadConfig, type PairedConfig, saveConfig } from './config';
+import { type PairedConfig, updateConfig } from './config';
 import {
   type HeartbeatPayload,
   RunnerConnection,
@@ -35,6 +35,7 @@ import {
 } from './detect/capabilities';
 import type { Exec } from './detect/exec';
 import { claudeConfigDir } from './detect/profiles';
+import { createDocsHandlers } from './docs';
 import type { Env } from './env';
 import { ecoSessionsDir, TranscriptCwds } from './filter/eco';
 import { FILTER_ORCHESTRATOR_DIR } from './filter/env';
@@ -61,6 +62,10 @@ import {
   PlanTurnExecutor,
   SharedRunSlots,
 } from './planner';
+import { watchedRootRefusal } from './policy/check';
+import { nodeRealpath, type Realpath } from './policy/roots';
+import { reportedPolicy } from './policy/schema';
+import { PolicyStore } from './policy/store';
 import { WatchList } from './projects/watch-list';
 import { SessionMessenger } from './session';
 import {
@@ -128,6 +133,8 @@ export interface DaemonOptions {
   filterStatsPollMs?: number;
   /** `/cs-eco`'s sessions (#475); `${XDG_STATE_HOME:-~/.local/state}/cs-eco/sessions` by default. */
   ecoSessionsDir?: string;
+  /** Resolves roots for the policy (ADR-0047); the filesystem's by default. */
+  realpath?: Realpath;
   /** Called once the connection exists — tests reach it to emit events. */
   onStart?: (connection: RunnerConnection) => void;
 }
@@ -137,6 +144,9 @@ export const defaultSelfCommand = (): string[] =>
   Bun.main.startsWith('/$bunfs/')
     ? [process.execPath]
     : [process.execPath, Bun.main];
+
+/** How often the daemon looks for a policy the CLI changed (ADR-0047). */
+export const POLICY_REFRESH_MS = 5_000;
 
 /** Counts tmux sessions; no tmux or no server means zero. */
 const countTmuxSessions = async (exec: Exec): Promise<number> => {
@@ -168,6 +178,15 @@ export const runDaemon = async (
     });
     log.info('spool opened', { ...spool.stats() });
 
+    // ADR-0047: the runner-local policy, read from the file the CLI writes.
+    const policy = new PolicyStore({ configFile: options.configFile, log });
+    const realpath = options.realpath ?? nodeRealpath;
+    if (policy.current().allowedRoots.length === 0) {
+      log.warn(
+        'the policy allows no project root: no project is watched. Run `agentdock-runner policy allow-root <dir>`',
+      );
+    }
+
     const redetect = async (): Promise<Capabilities> => {
       const [capabilities, github] = await Promise.all([
         detectCapabilities({
@@ -196,6 +215,7 @@ export const runDaemon = async (
         terminal,
         gitAuth: { github },
         ...commandsCapability(handlers(), config.disabledCommands),
+        policy: reportedPolicy(policy.current()),
       };
     };
 
@@ -222,11 +242,9 @@ export const runDaemon = async (
     const watchList = new WatchList({
       initial: config.projects,
       registry,
-      persist: (projects) =>
-        saveConfig(options.configFile, {
-          ...loadConfig(options.configFile),
-          projects,
-        }),
+      persist: (projects) => updateConfig(options.configFile, { projects }),
+      admit: (project) =>
+        watchedRootRefusal(project.root, policy.current(), exec, realpath),
       log,
     });
 
@@ -259,6 +277,7 @@ export const runDaemon = async (
       watchedProjects: () => watchList.current,
       send: (message) => connection?.sendMessage(message) ?? false,
       spawn: options.spawnPty ?? bunSpawnPty(process.env),
+      writeAllowed: () => policy.current().terminal.write,
       // The executor is built below; it exists by the time a command arrives.
       runSession: (projectId, root, runId) =>
         runs.runSession(projectId, root, runId),
@@ -488,6 +507,8 @@ export const runDaemon = async (
       pollCollectors: (projectId, targets) =>
         registry.pollNow(projectId, targets),
       profiles: () => config.profiles,
+      policy: () => policy.current(),
+      realpath,
       backfillSessions: sessions
         ? (scope) => sessions.backfill(scope)
         : undefined,
@@ -499,6 +520,7 @@ export const runDaemon = async (
       capture: createCaptureHandlers(capture),
       normalize: createNormalizeHandlers(normalize),
       assess: createAssessHandlers(assess),
+      docs: createDocsHandlers(skillsDeps),
       steward: { ...stewardActions.handlers(), ...stewardDigest.handlers() },
       handoff: createHandoffHandlers(handoff),
       sessionMessage: new SessionMessenger({
@@ -516,6 +538,8 @@ export const runDaemon = async (
     const dispatch = createDispatcher({
       handlers: builtHandlers,
       disabledCommands: config.disabledCommands,
+      policy: () => policy.current(),
+      realpath,
       clock,
       log,
     });
@@ -574,12 +598,15 @@ export const runDaemon = async (
       runLog,
       onConfig: (server) => {
         awayMode = server.awayMode === true;
-        sessions?.setProjects(server.projects).catch(() => {});
-        watchList.apply(server.projects).catch((error) => {
-          log.error('cannot apply the watch list', {
-            error: errorMessage(error),
+        // Sessions follow the admitted list only (ADR-0047).
+        watchList
+          .apply(server.projects)
+          .then(() => sessions?.setProjects(watchList.current))
+          .catch((error) => {
+            log.error('cannot apply the watch list', {
+              error: errorMessage(error),
+            });
           });
-        });
       },
       createSocket: options.createSocket,
     });
@@ -723,11 +750,26 @@ export const runDaemon = async (
       log.error('sessions: cannot start', { error: errorMessage(error) });
     });
     steward.start();
+    // A policy the CLI changed takes effect without a restart.
+    let policySeen = policy.version;
+    const cancelPolicyRefresh = clock.setInterval(() => {
+      if (policy.version === policySeen) return;
+      policySeen = policy.version;
+      watchList
+        .reapply()
+        .then(() => sessions?.setProjects(watchList.current))
+        .catch((error) => {
+          log.error('cannot re-apply the watch list', {
+            error: errorMessage(error),
+          });
+        });
+    }, POLICY_REFRESH_MS);
     live.start();
     filterStats.start();
     options.onStart?.(live);
     const reason = await live.done;
     options.signal?.removeEventListener('abort', onAbort);
+    cancelPolicyRefresh();
     filterStats.stop();
     // What the last commands wrote goes to the spool, sent on the next start.
     await filterStats.poll();

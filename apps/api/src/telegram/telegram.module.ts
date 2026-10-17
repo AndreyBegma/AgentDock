@@ -13,10 +13,13 @@ import { TelegramActionRequestService } from './telegram-action-request.service'
 import { TelegramApprovalService } from './telegram-approval.service';
 import { TelegramClient } from './telegram-client';
 import { TelegramDeliveryService } from './telegram-delivery.service';
+import { TelegramGuard } from './telegram-guard.service';
 import { TelegramIntegrationService } from './telegram-integration.service';
 import { TelegramLinkingService } from './telegram-linking.service';
 import { TELEGRAM_OPTIONS, telegramOptionsFromEnv } from './telegram-options';
 import { TelegramPoller } from './telegram-poller';
+import { TelegramProjectService } from './telegram-project.service';
+import { TelegramRoutes } from './telegram-routes';
 import { TelegramSessionMessageService } from './telegram-session-message.service';
 
 /**
@@ -24,7 +27,9 @@ import { TelegramSessionMessageService } from './telegram-session-message.servic
  * leader, account linking, and delivery of what `NotificationsModule`'s ledger
  * hands out, with D12's Approve / Request changes buttons through #20's
  * `ApprovalsService`, and spec 201's Approve / Deny on action requests through
- * the local module's `ActionRequestsService`.
+ * the local module's `ActionRequestsService`. #500: `TelegramRoutes` routes
+ * every update — commands, button prefixes, replies — and `/project` keeps a
+ * current project per chat for the Board commands (ADR-0046).
  */
 @Module({
   imports: [
@@ -40,10 +45,13 @@ import { TelegramSessionMessageService } from './telegram-session-message.servic
   providers: [
     { provide: TELEGRAM_OPTIONS, useFactory: () => telegramOptionsFromEnv() },
     TelegramClient,
+    TelegramGuard,
     TelegramLinkingService,
     TelegramApprovalService,
     TelegramActionRequestService,
     TelegramSessionMessageService,
+    TelegramProjectService,
+    TelegramRoutes,
     TelegramDeliveryService,
     TelegramPoller,
     TelegramIntegrationService,

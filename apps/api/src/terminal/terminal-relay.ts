@@ -134,6 +134,11 @@ const refusal = (
       return { close: TERMINAL_CLOSE_CODES.unsupported, code: 'unsupported' };
     case 'disabled':
       return { close: TERMINAL_CLOSE_CODES.unsupported, code: 'disabled' };
+    case 'policy_refused':
+      return {
+        close: TERMINAL_CLOSE_CODES.policyRefused,
+        code: 'policy_refused',
+      };
     default:
       return {
         close: TERMINAL_CLOSE_CODES.runnerUnavailable,

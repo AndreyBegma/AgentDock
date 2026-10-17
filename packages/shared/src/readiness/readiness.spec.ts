@@ -25,7 +25,7 @@ const ready: ReadinessFacts = {
   profile: usable,
   runnerConnected: true,
   missingCommands: [],
-  specDir: true,
+  specTarget: 'code_repo',
   shipSessionContent: true,
 };
 
@@ -133,9 +133,33 @@ describe('projectReadiness', () => {
   });
 
   it('blocks spec_on_run without a spec directory', () => {
-    expect(projectReadiness({ ...ready, specDir: false })).toEqual({
+    expect(projectReadiness({ ...ready, specTarget: 'no_spec_dir' })).toEqual({
       ...none,
       spec_on_run: [{ code: 'no_spec_dir' }],
+    });
+  });
+
+  it('blocks spec_on_run on a remote docs repository without a clone (#379)', () => {
+    expect(projectReadiness({ ...ready, specTarget: 'no_docs_clone' })).toEqual(
+      { ...none, spec_on_run: [{ code: 'no_docs_clone' }] },
+    );
+  });
+
+  it('lets spec_on_run write to a docs repository the runner serves (#379)', () => {
+    expect(projectReadiness({ ...ready, specTarget: 'docs_repo' })).toEqual(
+      none,
+    );
+    expect(
+      projectReadiness({
+        ...ready,
+        specTarget: 'docs_repo',
+        missingCommands: ['docs.publish_specs'],
+      }),
+    ).toEqual({
+      ...none,
+      spec_on_run: [
+        { code: 'runner_outdated', commands: ['docs.publish_specs'] },
+      ],
     });
   });
 
