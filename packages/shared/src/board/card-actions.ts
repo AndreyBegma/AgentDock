@@ -1,5 +1,5 @@
+import { isRoundActive, ownsWorker } from './card-rules';
 import type { BoardCardDetail, BoardCardView } from './contracts';
-import { isActiveRoundPhase } from './types';
 
 /**
  * #578: which of a card's actions its state allows — the one copy the web's
@@ -10,19 +10,11 @@ import { isActiveRoundPhase } from './types';
 
 type Card = Pick<
   BoardCardView,
-  'column' | 'round' | 'source' | 'tracking' | 'fleet'
+  'column' | 'round' | 'source' | 'tracking' | 'fleet' | 'design'
 >;
 
 const roundActive = (card: Pick<BoardCardView, 'round'>): boolean =>
-  isActiveRoundPhase(card.round?.phase);
-
-/**
- * #282 D1/D4: the board starts, stops and answers a worker only for a card
- * that owns one. A `fleet` card's worker is the orchestrator's; a `terminal`
- * card's is the person's own session while it lives.
- */
-export const ownsWorker = (card: Pick<Card, 'source' | 'tracking'>): boolean =>
-  card.source !== 'fleet' && card.tracking?.alive !== true;
+  isRoundActive(card.round);
 
 /** #244 D9: an Inbox card is accepted or dismissed, never run. */
 export const isSuggestion = (card: Pick<BoardCardView, 'column'>): boolean =>

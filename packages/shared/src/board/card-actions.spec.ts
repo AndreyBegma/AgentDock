@@ -14,6 +14,7 @@ const card = (extra: Partial<Card> = {}): Card => ({
   source: 'manual',
   tracking: null,
   fleet: null,
+  design: null,
   branch: 'agentdock/c-1',
   prUrl: 'https://github.com/acme/widget/pull/7',
   collectState: 'ok',

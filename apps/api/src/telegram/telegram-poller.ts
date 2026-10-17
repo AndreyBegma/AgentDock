@@ -260,32 +260,35 @@ export class TelegramPoller implements OnApplicationBootstrap, OnModuleDestroy {
         answer.notice ?? '',
       );
     }
-    const markup = answer.replyMarkup;
-    if (
-      answer.editMessageId !== undefined &&
-      (markup === undefined || 'inline_keyboard' in markup)
-    ) {
-      // #578: a message too old or unchanged cannot be edited; send it instead.
-      const edited = await this.client
-        .editMessageText(
+    if (answer.text === undefined) return;
+    if (answer.editMessageId !== undefined) {
+      try {
+        await this.client.editMessageText(
           token,
           answer.chatId,
           answer.editMessageId,
           answer.text,
-          markup,
-        )
-        .then(
-          () => true,
-          () => false,
+          true,
+          answer.replyMarkup && 'inline_keyboard' in answer.replyMarkup
+            ? answer.replyMarkup.inline_keyboard
+            : undefined,
         );
-      if (edited) return;
+        return;
+      } catch (error) {
+        if (!(error instanceof TelegramApiError) || error.status !== 400) {
+          throw error;
+        }
+        // The same text again is already what the chat shows; any other 400
+        // (a message too old to edit) falls back to a new message.
+        if (/not modified/i.test(error.message)) return;
+      }
     }
     await this.client.sendMessage(
       token,
       answer.chatId,
       answer.text,
       true,
-      markup,
+      answer.replyMarkup,
     );
   }
 

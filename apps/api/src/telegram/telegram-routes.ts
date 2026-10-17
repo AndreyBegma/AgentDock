@@ -4,10 +4,16 @@ import {
   CARD_CONFIRM_CALLBACK,
   CARD_MERGE_CALLBACK,
 } from './card-actions';
+import { INTAKE_ACTION, INTAKE_DONE, INTAKE_OPTION } from './intake-chat';
 import { TelegramActionRequestService } from './telegram-action-request.service';
 import { TelegramApprovalService } from './telegram-approval.service';
+import {
+  BOARD_CALLBACK_PREFIXES,
+  TelegramBoardService,
+} from './telegram-board.service';
 import { TelegramCardService } from './telegram-card.service';
 import { HELP_TEXT, UNKNOWN_COMMAND_TEXT } from './telegram-commands';
+import { TelegramIntakeService } from './telegram-intake.service';
 import {
   LINK_REPLIES,
   TelegramLinkingService,
@@ -35,11 +41,15 @@ export class TelegramRoutes {
     actionRequests: TelegramActionRequestService,
     sessions: TelegramSessionMessageService,
     projects: TelegramProjectService,
+    board: TelegramBoardService,
+    intake: TelegramIntakeService,
     cards: TelegramCardService,
   ) {
     this.router = new TelegramRouter()
       // Spec 201 D18: `x:`/`y:` are the action-request buttons.
       .callback(['x', 'y'], (query) => actionRequests.handleCallback(query))
+      // #576: the Board's buttons, one prefix per action.
+      .callback(BOARD_CALLBACK_PREFIXES, (query) => board.handleCallback(query))
       // #489: `q:` are a card question's option buttons.
       .callback('q', (query) => sessions.handleCallback(query))
       .callback(PROJECT_CALLBACK.prefix, (query) =>
@@ -54,6 +64,11 @@ export class TelegramRoutes {
         ],
         (query) => cards.handleCallback(query),
       )
+      // #574: the `/new` intake's options, Done and its action buttons.
+      .callback(
+        [INTAKE_OPTION.prefix, INTAKE_DONE.prefix, INTAKE_ACTION.prefix],
+        (query) => intake.handleCallback(query),
+      )
       // #82: `a:`/`r:` Approve / Request changes.
       .fallbackCallback((query) => approvals.handleCallback(query))
       .reply((message, botId) => approvals.handleNoteReply(message, botId))
@@ -61,6 +76,8 @@ export class TelegramRoutes {
       .reply((message, botId) => sessions.handleReply(message, botId))
       // #578: a reply to a Feedback or Message session prompt.
       .reply((message, botId) => cards.handleReply(message, botId))
+      // #574: an answer to an intake question, or the description `/new` waits for.
+      .reply((message, botId) => intake.handleMessage(message, botId))
       .command(['start', 'stop'], async ({ message }) => {
         const reply = await linking.handleMessage(message);
         return (
@@ -68,7 +85,9 @@ export class TelegramRoutes {
         );
       })
       .command('project', (context) => projects.handleCommand(context))
-      .command('card', (context) => cards.handleCommand(context))
+      .command('board', (context) => board.handleBoardCommand(context))
+      .command('card', (context) => board.handleCardCommand(context))
+      .command('new', (context) => intake.handleCommand(context))
       .command('help', async ({ chatId, isPrivate }) =>
         isPrivate ? { chatId, text: HELP_TEXT } : null,
       )

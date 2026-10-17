@@ -8,7 +8,9 @@ import type { BotCommand } from './telegram-client';
  */
 export const BOT_COMMANDS: readonly BotCommand[] = [
   { command: 'project', description: 'Pick the project for this chat' },
-  { command: 'card', description: 'Open a card by its number: /card 12' },
+  { command: 'board', description: 'Browse the Board: columns and cards' },
+  { command: 'card', description: 'Show a card by its number' },
+  { command: 'new', description: 'Start new work: the intake interview' },
   { command: 'help', description: 'List the commands' },
   { command: 'stop', description: 'Unlink this chat from AgentDock' },
 ];
@@ -18,6 +20,9 @@ export const HELP_TEXT = [
   'AgentDock bot commands:',
   ...BOT_COMMANDS.map((c) => `/${c.command} — ${c.description}`),
   '/project <name> — Switch to a project by its repository name',
+  '/board <column> — Jump to a column, for example /board todo',
+  '/card <number> — Show one card; Move, Run and Stop are on it',
+  '/new <description> — Start new work with the description in one message',
   '/start <code> — Link this chat; the link comes from AgentDock → Account → Notifications',
   'Buttons on notifications act on their own project, whatever this chat works on.',
 ].join('\n');

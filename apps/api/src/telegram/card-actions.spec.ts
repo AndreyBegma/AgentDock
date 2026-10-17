@@ -9,10 +9,10 @@ import {
   CARD_ACTION_CALLBACK,
   CARD_CONFIRM_CALLBACK,
   CARD_MERGE_CALLBACK,
-  cardKeyboard,
   feedbackPrompt,
   messagePrompt,
   parseCardPrompt,
+  reviewKeyboard,
 } from './card-actions';
 
 const HEAD = 'abcdef0123456789abcdef0123456789abcdef01';
@@ -48,7 +48,7 @@ describe('Telegram card actions (#578)', () => {
   });
 
   it('every action fits its button, and its word names it back', () => {
-    const rows = cardKeyboard('ab12cd34', [...CARD_REVIEW_ACTIONS]);
+    const rows = reviewKeyboard('ab12cd34', [...CARD_REVIEW_ACTIONS]);
     const decoded = rows
       .flat()
       .map((b) => CARD_ACTION_CALLBACK.decode(b.callback_data)?.action ?? '');
@@ -56,7 +56,7 @@ describe('Telegram card actions (#578)', () => {
   });
 
   it('a keyboard has the allowed actions, two to a row, and round-trips', () => {
-    const rows = cardKeyboard('ab12cd34', ['accept', 'feedback', 'collect']);
+    const rows = reviewKeyboard('ab12cd34', ['accept', 'feedback', 'collect']);
     expect(rows.map((row) => row.map((b) => b.text))).toEqual([
       ['Accept', 'Give feedback'],
       ['Create pull request'],

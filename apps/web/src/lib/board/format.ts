@@ -1,10 +1,12 @@
 import {
+  BOARD_ACTION_ERROR_TEXT,
   BOARD_COLUMNS,
   BOARD_ERROR,
   BOARD_MAX_RUNNING_MAX,
   BOARD_MAX_RUNNING_MIN,
   type BoardCardView,
   type BoardColumn,
+  type BoardErrorCode,
   type BoardMoveRefusal,
   type BoardView,
   CARD_BACKGROUND_STALL_MINUTES_MAX,
@@ -15,11 +17,20 @@ import {
   type CardCaptureView,
   type CardRoundBrief,
   type CardRoundPhase,
+  COLUMN_TITLE,
+  canRetry,
+  canRun,
+  canStop,
+  designBlocksRun,
   isActiveRoundPhase,
+  isFleetCard,
   isMirroredCardSource,
+  isRoundActive,
+  isSessionAlive,
+  isTerminalCard,
   isWorktreeGoneError,
+  MOVE_REFUSAL_TEXT,
   ownsWorker,
-  PLAN_TASK_MOVE_REFUSAL_TEXT,
 } from '@agentdock/shared';
 import type {
   CardRunWiringReason,
@@ -37,22 +48,27 @@ import {
 } from '../runners/install';
 import { noPrText } from './pull-request';
 
-// #578: the action rules live in the shared package; the bot reads them too.
+// #578: the review actions' rules, shared with the bot too.
 export {
   canAccept,
   canGiveFeedback,
   canMarkFinished,
   isSuggestion,
   isWorktreeGoneError,
-  ownsWorker,
 } from '@agentdock/shared';
-
-export const COLUMN_TITLE: Record<BoardColumn, string> = {
-  inbox: 'Inbox',
-  todo: 'To Do',
-  in_progress: 'In progress',
-  finished: 'Finished',
-  completed: 'Completed',
+// The rules the Telegram bot offers its buttons by too live in shared.
+export {
+  COLUMN_TITLE,
+  canRetry,
+  canRun,
+  canStop,
+  designBlocksRun,
+  isFleetCard,
+  isRoundActive,
+  isSessionAlive,
+  isTerminalCard,
+  MOVE_REFUSAL_TEXT,
+  ownsWorker,
 };
 
 export const COLUMN_HINT: Record<BoardColumn, string> = {
@@ -114,9 +130,6 @@ const FINISH_REFUSED_REASON: Partial<Record<LocalErrorCode, string>> = {
 export const finishRefusedText = (code: LocalErrorCode): string =>
   `finish_card was refused: ${FINISH_REFUSED_REASON[code] ?? `${code.replaceAll('_', ' ')}.`} Ask the worker to call it again, or finish the card yourself.`;
 
-export const isRoundActive = (round: CardRoundBrief | null): boolean =>
-  isActiveRoundPhase(round?.phase);
-
 /** One card as glass-ui's `Board` takes it: `label` is the accessible name. */
 export interface BoardItem {
   id: string;
@@ -175,44 +188,6 @@ export const columnsOf = (view: BoardView) =>
         hasMore: false,
       },
   );
-
-export const MOVE_REFUSAL_TEXT: Record<BoardMoveRefusal, string> = {
-  card_running:
-    'A worker is running on this card. Stop it first, or mark the card finished.',
-  automatic_to_completed: 'Only a person completes a card.',
-  card_completed: 'This card is already completed.',
-  invalid_move: 'A suggestion leaves the Inbox only by Accept, into To Do.',
-  plan_task_derived: PLAN_TASK_MOVE_REFUSAL_TEXT,
-  fleet_slot: 'A fleet card follows its slot. Accept it once it is finished.',
-};
-
-/** #273 D7: the card's design is on and not approved, so the server would refuse Run. */
-export const designBlocksRun = (card: BoardCardView): boolean =>
-  card.design?.needed === true && card.design.status !== 'approved';
-
-export const isTerminalCard = (card: BoardCardView): boolean =>
-  card.source === 'terminal';
-
-export const isFleetCard = (card: BoardCardView): boolean =>
-  card.source === 'fleet';
-
-/** #282 D1: the tracked terminal session is alive — it is the worker. */
-export const isSessionAlive = (card: BoardCardView): boolean =>
-  card.tracking?.alive === true;
-
-export const canRun = (card: BoardCardView): boolean =>
-  ownsWorker(card) &&
-  (card.column === 'todo' || card.column === 'finished') &&
-  !isRoundActive(card.round) &&
-  !designBlocksRun(card);
-
-/** A retry after a failed, ended or stopped round resumes the same session. */
-export const canRetry = (card: BoardCardView): boolean =>
-  ownsWorker(card) &&
-  card.column === 'in_progress' &&
-  card.round !== null &&
-  !isRoundActive(card.round) &&
-  !designBlocksRun(card);
 
 /** #282 D4: a `fleet` card follows its slot, so a person cannot delete it. */
 export const canDelete = (card: BoardCardView): boolean => !isFleetCard(card);
@@ -289,9 +264,6 @@ export function approveRunOffer(card: BoardCardView): ApproveRunOffer | null {
     ? { enabled: true, reason: null }
     : { enabled: false, reason: 'The design is being drawn' };
 }
-
-export const canStop = (card: BoardCardView): boolean =>
-  ownsWorker(card) && isRoundActive(card.round);
 
 /** The confidence as a whole percent: `0.74` → `74%`; none for a manual card. */
 export const confidenceLabel = (confidence: number | null): string | null =>
@@ -432,33 +404,24 @@ export function describeBoardError(
   error: unknown,
   runnerName?: string | null,
 ): string {
-  switch (errorCode(error)) {
-    case BOARD_ERROR.cardRunning:
-      return 'A worker is running on this card. Stop it or mark it finished first.';
-    case BOARD_ERROR.maxRunning:
-      return 'This project already runs its limit of workers. Wait for one to finish, or raise the limit in the project settings.';
-    case BOARD_ERROR.budgetExceeded:
-      return 'A budget with a hard stop refuses another round.';
+  const code = errorCode(error);
+  const shared = code
+    ? BOARD_ACTION_ERROR_TEXT[code as BoardErrorCode]
+    : undefined;
+  if (shared) return shared;
+  switch (code) {
     case BOARD_ERROR.moveRefused: {
       const reason = error instanceof ApiError ? error.body?.reason : undefined;
       return typeof reason === 'string' && reason in MOVE_REFUSAL_TEXT
         ? MOVE_REFUSAL_TEXT[reason as BoardMoveRefusal]
         : 'That move is not allowed.';
     }
-    case BOARD_ERROR.notRunning:
-      return 'No worker is running on this card any more.';
-    case BOARD_ERROR.wrongColumn:
-      return 'The card is not in the column this needs. Refresh the board.';
     case BOARD_ERROR.noSpecDir:
       return 'This project has no spec folder, so a spec cannot be written. Set the Spec folder in Settings › Docs source, or turn the spec off.';
     case BOARD_ERROR.noDocsClone:
       return 'The docs repository has no local clone, so a spec cannot be written there. Set its local clone path in Settings › Docs source (Override), or turn the spec off.';
-    case BOARD_ERROR.unsupportedRuntime:
-      return 'The runner refused: card workers run on Claude profiles only.';
     case BOARD_ERROR.noProfile:
       return describeNoProfile(error);
-    case BOARD_ERROR.designNotApproved:
-      return 'This card’s design is on and not approved yet. Open the design and approve it, or approve and run from there.';
     case BOARD_ERROR.designApproved:
       return 'The design is approved, so “Continue after design” can no longer change.';
     case BOARD_ERROR.policyRefused:
@@ -467,8 +430,6 @@ export function describeBoardError(
       );
     case BOARD_ERROR.commandUnavailable:
       return `The runner${runnerName ? ` ${runnerName}` : ''} is offline or too old to run card workers.`;
-    case BOARD_ERROR.invalidMove:
-      return MOVE_REFUSAL_TEXT.invalid_move;
     case BOARD_ERROR.captureNeedsContent:
       return 'Capture reads session content. Turn on “Keep session content” in the Sessions tab first.';
     case BOARD_ERROR.mergeFailed: {
@@ -491,8 +452,6 @@ export function describeBoardError(
       return 'That would make the cards wait for each other in a circle.';
     case BOARD_ERROR.invalidDependency:
       return 'A card cannot depend on itself, or on a number that is no card of this project.';
-    case BOARD_ERROR.dependencyOpen:
-      return 'A card it depends on is not completed yet.';
     default:
       break;
   }

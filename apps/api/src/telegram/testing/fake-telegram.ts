@@ -60,8 +60,8 @@ const readBody = (req: IncomingMessage): Promise<Record<string, unknown>> =>
 /**
  * A stand-in for the Bot API on 127.0.0.1 (spec 22: "Telegram is tested only
  * against the mock base URL"). It records every call, answers `getMe`,
- * `getUpdates`, `sendMessage`, `editMessageText`, `answerCallbackQuery` and
- * `setMyCommands`
+ * `getUpdates`, `sendMessage` (each with a new `message_id`),
+ * `editMessageText`, `answerCallbackQuery` and `setMyCommands`
  * like Telegram does,
  * refuses unknown tokens
  * with 401, and plays scripted replies per method first.
@@ -122,7 +122,7 @@ export class FakeTelegram {
     return this.calls.filter((c) => c.method === 'sendMessage');
   }
 
-  /** #578: the messages edited in place. */
+  /** The messages the bot rewrote in place (#576). */
   edited(): FakeCall[] {
     return this.calls.filter((c) => c.method === 'editMessageText');
   }
@@ -170,8 +170,15 @@ export class FakeTelegram {
           status: 200,
           body: { ok: true, result: { message_id: this.calls.length } },
         };
-      case 'answerCallbackQuery':
       case 'editMessageText':
+        return {
+          status: 200,
+          body: {
+            ok: true,
+            result: { message_id: body.message_id, text: body.text },
+          },
+        };
+      case 'answerCallbackQuery':
       case 'setMyCommands':
         return { status: 200, body: { ok: true, result: true } };
       default:
@@ -205,7 +212,6 @@ export const callbackPress = (
   updateId: number,
   chatId: number,
   data: string,
-  /** #578: the id of the message that carried the button. */
   messageId = 1,
 ) => ({
   update_id: updateId,
@@ -231,6 +237,7 @@ export const replyMessage = (
   text: string | undefined,
   replyTo: string,
   from: { id: number; is_bot: boolean } = { id: BOT.id, is_bot: true },
+  replyToId = 1,
 ) => ({
   update_id: updateId,
   message: {
@@ -240,7 +247,7 @@ export const replyMessage = (
     from: { id: chatId, is_bot: false },
     ...(text === undefined ? { sticker: { file_id: 'x' } } : { text }),
     reply_to_message: {
-      message_id: 1,
+      message_id: replyToId,
       date: 0,
       chat: { id: chatId, type: 'private' },
       from,

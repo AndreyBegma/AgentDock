@@ -261,11 +261,11 @@ describe('Telegram: feedback, accept, finish and message cards (#578, e2e)', () 
     await w.createCard();
     await w.runCard(1);
     const card = await openCard(OPERATOR_CHAT, 1);
-    expect(card.text).toContain('C-1 · In progress');
-    expect(buttons(card.markup).map((b) => b.text)).toEqual([
-      'Message session',
-      'Finish',
-    ]);
+    // #576's card message, with the review actions among its buttons.
+    expect(card.text).toContain('Column: In progress');
+    expect(buttons(card.markup).map((b) => b.text)).toEqual(
+      expect.arrayContaining(['Message session', 'Finish']),
+    );
     await poll(
       callbackPress(
         nextUpdate++,
@@ -303,9 +303,9 @@ describe('Telegram: feedback, accept, finish and message cards (#578, e2e)', () 
       },
     });
     const fleet = await openCard(OPERATOR_CHAT, 2);
-    expect(buttons(fleet.markup).map((b) => b.text)).toEqual([
-      'Message session',
-    ]);
+    const fleetButtons = buttons(fleet.markup).map((b) => b.text);
+    expect(fleetButtons).toContain('Message session');
+    expect(fleetButtons).not.toContain('Finish');
     await poll(
       callbackPress(
         nextUpdate++,
@@ -382,7 +382,7 @@ describe('Telegram: feedback, accept, finish and message cards (#578, e2e)', () 
     const result = last(OPERATOR_CHAT);
     expect(result).toMatchObject({ method: 'editMessageText', messageId: 42 });
     expect(result.text).toMatch(
-      /^C-1 accepted · Completed\. PR #77 is merged\.\n\nwidget · C-1 · Completed/,
+      /^widget · ✓ C-1 accepted · Completed\. PR #77 is merged\.\nC-1 Add login\nKind: feature · Column: Completed/,
     );
     // The web Board shows it.
     const board = await w.operator.get(`${w.path()}/board`);
@@ -451,7 +451,7 @@ describe('Telegram: feedback, accept, finish and message cards (#578, e2e)', () 
     );
     const result = last(OPERATOR_CHAT);
     expect(result).toMatchObject({ method: 'editMessageText', messageId: 51 });
-    expect(result.text).toMatch(/^C-1 marked finished · Finished\./);
+    expect(result.text).toMatch(/^widget · ✓ C-1 marked finished · Finished\./);
     // Create pull request too, until the collect it started is done.
     expect(buttons(result.markup).map((b) => b.text)).toEqual(
       expect.arrayContaining(['Accept', 'Give feedback']),
@@ -505,7 +505,9 @@ describe('Telegram: feedback, accept, finish and message cards (#578, e2e)', () 
       method: 'editMessageText',
       messageId: 60,
     });
-    expect(last(OPERATOR_CHAT).text).toMatch(/^C-1 accepted into To do\./);
+    expect(last(OPERATOR_CHAT).text).toMatch(
+      /^widget · ✓ C-1 accepted into To Do\./,
+    );
     expect((await detail(1)).column).toBe('todo');
 
     await poll(
@@ -541,8 +543,11 @@ describe('Telegram: feedback, accept, finish and message cards (#578, e2e)', () 
 
     // A viewer sees the card without buttons, and a forged press is refused.
     const viewerCard = await openCard(VIEWER_CHAT, 1);
-    expect(viewerCard.text).toContain('C-1 · In progress');
-    expect(viewerCard.markup).toBeUndefined();
+    expect(viewerCard.text).toContain('Column: In progress');
+    const viewerButtons = buttons(viewerCard.markup).map((b) => b.text);
+    for (const review of ['Message session', 'Finish', 'Accept']) {
+      expect(viewerButtons).not.toContain(review);
+    }
     await poll(
       callbackPress(
         nextUpdate++,

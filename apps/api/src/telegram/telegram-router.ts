@@ -5,18 +5,18 @@ import type {
   TelegramUpdate,
 } from './telegram-client';
 
-/** What the poller sends back for an update: plain text, maybe with buttons. */
+/**
+ * What the poller sends back for an update: plain text, maybe with buttons.
+ * No `text`: only the press is answered — the handler sent its own messages.
+ */
 export interface TelegramAnswer {
   chatId: number;
-  text: string;
+  text?: string;
   replyMarkup?: TelegramReplyMarkup;
   /** A press: the callback to answer, with `notice` as its short text. */
   callbackQueryId?: string;
   notice?: string;
-  /**
-   * #578: edit this message of the chat in place instead of sending a new
-   * one; `replyMarkup` must then be an inline keyboard, or none.
-   */
+  /** #576: the bot's own message to rewrite in place instead of a new one. */
   editMessageId?: number;
 }
 

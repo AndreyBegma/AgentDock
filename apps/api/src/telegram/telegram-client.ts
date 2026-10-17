@@ -106,6 +106,17 @@ export interface InlineKeyboardButton {
   callback_data: string;
 }
 
+/** #576: a button that opens a link instead of sending a press back. */
+export interface InlineKeyboardUrlButton {
+  text: string;
+  url: string;
+}
+
+export type InlineKeyboard = (
+  | InlineKeyboardButton
+  | InlineKeyboardUrlButton
+)[][];
+
 /** One entry of the bot's command menu (`setMyCommands`). */
 export interface BotCommand {
   /** 1–32 characters of `a-z`, `0-9` and `_`, without the slash. */
@@ -116,7 +127,7 @@ export interface BotCommand {
 
 /** What `sendMessage` may attach: buttons, or a prompt to reply to it. */
 export type TelegramReplyMarkup =
-  | { inline_keyboard: InlineKeyboardButton[][] }
+  | { inline_keyboard: InlineKeyboard }
   | { force_reply: true; input_field_placeholder?: string };
 
 type ApiResponse =
@@ -193,7 +204,7 @@ const networkError = (error: unknown): TelegramApiError => {
 
 /**
  * The Bot API over HTTPS (spec 22 D7): `getMe`, the `getUpdates` long poll,
- * `sendMessage`, `editMessageText` (#578), `answerCallbackQuery` (D12) and
+ * `sendMessage`, `editMessageText` (#574), `answerCallbackQuery` (D12) and
  * `setMyCommands` (#500). Stateless — the token is passed per call, read from
  * `BotTokenStore` by the caller. The base URL is `TELEGRAM_API_BASE`, which
  * tests point at a fake server: nothing here ever reaches the real API in a
@@ -248,15 +259,18 @@ export class TelegramClient {
     return result.map(toUpdate).filter((u): u is TelegramUpdate => u !== null);
   }
 
-  /** Sends `text`, already escaped for `MarkdownV2` unless `plain`. */
+  /**
+   * Sends `text`, already escaped for `MarkdownV2` unless `plain`. The sent
+   * message's id; null when Telegram's answer does not name one.
+   */
   async sendMessage(
     token: string,
     chatId: bigint | number,
     text: string,
     plain = false,
     replyMarkup?: TelegramReplyMarkup,
-  ): Promise<void> {
-    await this.call(token, 'sendMessage', {
+  ): Promise<number | null> {
+    const result = await this.call(token, 'sendMessage', {
       // A chat id fits a double (Telegram documents 52 significant bits).
       chat_id: Number(chatId),
       text,
@@ -264,26 +278,32 @@ export class TelegramClient {
       link_preview_options: { is_disabled: true },
       ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
     });
+    return isObject(result) && typeof result.message_id === 'number'
+      ? result.message_id
+      : null;
   }
 
   /**
-   * #578: replaces the text and buttons of a message the bot sent — a card
-   * message edited in place to an action's result. Plain text.
+   * #574: replaces the text of a message the bot sent, and its buttons —
+   * none when `inlineKeyboard` is absent. Same escaping as `sendMessage`.
    */
   async editMessageText(
     token: string,
     chatId: bigint | number,
     messageId: number,
     text: string,
-    replyMarkup?: { inline_keyboard: InlineKeyboardButton[][] },
+    plain = false,
+    inlineKeyboard?: InlineKeyboard,
   ): Promise<void> {
     await this.call(token, 'editMessageText', {
       chat_id: Number(chatId),
       message_id: messageId,
       text,
+      ...(plain ? {} : { parse_mode: 'MarkdownV2' }),
       link_preview_options: { is_disabled: true },
-      // Without one, Telegram keeps the old buttons.
-      reply_markup: replyMarkup ?? { inline_keyboard: [] },
+      ...(inlineKeyboard
+        ? { reply_markup: { inline_keyboard: inlineKeyboard } }
+        : {}),
     });
   }
 

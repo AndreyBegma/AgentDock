@@ -1,12 +1,10 @@
 import {
   BOARD_ERROR,
   type BoardCardDetail,
-  type BoardColumn,
   type CardCollectOutcome,
   type CardPullRequestView,
   type CardReviewAction,
   cardLabel,
-  isActiveRoundPhase,
 } from '@agentdock/shared';
 import { callbackCodec } from './callback-data';
 import type { InlineKeyboardButton } from './telegram-client';
@@ -75,7 +73,7 @@ const LABEL: Record<CardReviewAction, string> = {
 };
 
 /** The buttons of `actions`, two to a row. */
-export const cardKeyboard = (
+export const reviewKeyboard = (
   shortId: string,
   actions: readonly CardReviewAction[],
 ): InlineKeyboardButton[][] => {
@@ -112,70 +110,6 @@ export const suggestionRows = (
       }),
     },
   ]);
-
-const COLUMN: Record<BoardColumn, string> = {
-  inbox: 'Inbox',
-  todo: 'To do',
-  in_progress: 'In progress',
-  finished: 'Finished',
-  completed: 'Completed',
-};
-
-const TITLE_MAX = 200;
-const clip = (text: string, max: number): string =>
-  text.length > max ? `${text.slice(0, max - 1)}…` : text;
-
-const stateText = (card: BoardCardDetail): string => {
-  const phase = card.round?.phase;
-  if (phase === 'waiting') return ' · Waiting for you';
-  if (isActiveRoundPhase(phase)) return ' · Running';
-  if (card.fleet?.slot && card.column === 'in_progress') {
-    return ` · ${card.fleet.slot}`;
-  }
-  return '';
-};
-
-/** The card's web page; null without `APP_URL`. */
-export const cardLink = (
-  appUrl: string | null,
-  projectId: string,
-  number: number,
-): string | null =>
-  appUrl
-    ? `${appUrl.replace(/\/+$/, '')}/projects/${projectId}/board?card=${number}`
-    : null;
-
-/**
- * A card as the bot shows it, plain text: its project first (ADR-0046 §4),
- * label, column and state, the title, the PR, and its page.
- */
-export const cardText = (
-  project: { displayName: string },
-  card: BoardCardDetail,
-  link: string | null,
-): string =>
-  [
-    `${project.displayName} · ${card.label} · ${COLUMN[card.column]}${stateText(card)}`,
-    card.column === 'inbox'
-      ? 'A suggestion capture found in a session. Accept it into To do, or dismiss it.'
-      : clip(card.title, TITLE_MAX),
-    ...(card.prNumber !== null
-      ? [
-          `PR #${card.prNumber}${card.prState ? ` · ${card.prState}` : ''}${
-            card.ciState === 'green'
-              ? ' · checks green'
-              : card.ciState === 'red'
-                ? ' · checks failing'
-                : ''
-          }`,
-        ]
-      : []),
-    ...(link ? [`Open in AgentDock: ${link}`] : []),
-  ].join('\n');
-
-/** A service line above the card: what the action did. */
-export const withResult = (line: string, view: string): string =>
-  `${line}\n\n${view}`;
 
 /** The last line of a force-reply prompt: `Ref feedback|message <shortId>`. */
 const REFERENCE = /^Ref (feedback|message) ([a-z0-9]{8})$/m;
@@ -393,7 +327,7 @@ export const resultLine = (
     case 'feedback':
       return `Feedback sent. ${label} is back in progress.`;
     case 'accept_suggestion':
-      return `${label} accepted into To do.`;
+      return `${label} accepted into To Do.`;
     case 'dismiss':
       return `${label} dismissed. Capture will not suggest it again.`;
     case 'collect': {

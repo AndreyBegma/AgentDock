@@ -455,6 +455,7 @@ model Project {
   handoffNotes         HandoffNote[]
   rules                ProjectRule[]
   telegramLinks        TelegramLink[]
+  telegramIntakes      TelegramIntake[]
 
   @@unique([runnerId, rootPath])
   @@map("projects")
@@ -1440,11 +1441,42 @@ model TelegramLink {
   /// until chosen; a deleted project clears it.
   currentProjectId String?
 
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  currentProject Project? @relation(fields: [currentProjectId], references: [id], onDelete: SetNull)
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentProject Project?        @relation(fields: [currentProjectId], references: [id], onDelete: SetNull)
+  intake         TelegramIntake?
 
   @@index([currentProjectId])
   @@map("telegram_links")
+}
+
+/// #574: the New work intake a linked chat runs with `/new` — one per link.
+/// `planId` is null while the bot waits for the description. The rest is
+/// what the chat shows of the plan: `shown` is the last state sent
+/// (`<turn id>:<phase>`), the thinking message edited when a turn ends, and
+/// the open round's question messages and the answers picked on them.
+/// Deleted once the intake made its cards or was discarded.
+model TelegramIntake {
+  userId            String   @id
+  chatId            BigInt
+  projectId         String
+  planId            String?  @unique
+  shown             String?
+  thinkingMessageId Int?
+  /// The message with the open round's or proposal's buttons.
+  controlsMessageId Int?
+  /// `{ "<message id>": "<question id>" }` of the open round.
+  questionMessages  Json     @default("{}")
+  /// `{ "<question id>": { optionId?, optionIds?, text? } }` picked so far.
+  answers           Json     @default("{}")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  link    TelegramLink @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  project Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  plan    Plan?        @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("telegram_intakes")
 }
 
 /// A one-time `/start <code>` link code (D9): 10 minutes, single use. Only the
@@ -2432,6 +2464,8 @@ model Plan {
   attachments        Attachment[]
   /// #480: the stacks a confirmed intake made.
   stacks             BoardStack[]
+  /// #574: the Telegram chat running this intake.
+  telegramIntake     TelegramIntake?
 
   @@index([projectId, updatedAt])
   @@index([authorId])

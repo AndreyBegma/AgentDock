@@ -7,7 +7,6 @@ import {
   CARDS_SUGGESTED_EVENT,
   type CardPullRequestView,
   type CardReviewAction,
-  cardLabel,
   cardReviewActions,
   type Role,
   type SessionMessageInput,
@@ -23,6 +22,7 @@ import type { BoardActor } from '../board/board-work';
 import { SlotSessionMessages } from '../control/slot-session-message.service';
 import { PrismaService } from '../database/prisma.service';
 import { httpErrorBody } from '../local/local-error';
+import { cardKeyboard, cardText } from './board-actions';
 import {
   acceptConfirm,
   actionOfWord,
@@ -32,10 +32,7 @@ import {
   CARD_CONFIRM_CALLBACK,
   CARD_MERGE_CALLBACK,
   type CardRefusal,
-  cardKeyboard,
-  cardLink,
   cardRefusalText,
-  cardText,
   feedbackPrompt,
   finishConfirm,
   HEAD_MOVED_TEXT,
@@ -44,8 +41,8 @@ import {
   messagePrompt,
   parseCardPrompt,
   resultLine,
+  reviewKeyboard,
   suggestionRows,
-  withResult,
 } from './card-actions';
 import {
   sessionErrorText,
@@ -58,13 +55,8 @@ import type {
 } from './telegram-client';
 import { TelegramGuard } from './telegram-guard.service';
 import { TELEGRAM_OPTIONS, type TelegramOptions } from './telegram-options';
-import {
-  boardReply,
-  PROJECT_REPLIES,
-  projectRefusalText,
-  TelegramProjectService,
-} from './telegram-project.service';
-import type { CommandContext, TelegramAnswer } from './telegram-router';
+import { boardReply } from './telegram-project.service';
+import type { TelegramAnswer } from './telegram-router';
 
 /** What the notifications this service adds buttons to are about. */
 const CARD_KINDS = new Set([
@@ -75,7 +67,6 @@ const CARD_KINDS = new Set([
 ]);
 /** A `cards.suggested` message gets a row for at most this many cards. */
 const SUGGESTION_ROWS_MAX = 5;
-const CARD_ARG = /^(?:c-)?([1-9]\d{0,8})$/i;
 
 /** A card a chat may act on, with who acts. */
 interface Acting {
@@ -106,7 +97,7 @@ const record = (value: unknown): Record<string, unknown> | null =>
 /**
  * #578: the review-side card actions from Telegram — Feedback, Message
  * session, Accept, Finish, Create pull request, and Accept or Dismiss on an
- * Inbox suggestion — on a card message (`/card <n>`) and on the card
+ * Inbox suggestion — on #576's card message (`/card <n>`) and on the card
  * notifications. Only the actions the card's state allows are offered
  * (`cardReviewActions`, the web's rules), and only to an operator or higher.
  * Every press and reply is checked from scratch (ADR-0046 §6): the chat's
@@ -122,7 +113,6 @@ export class TelegramCardService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly guard: TelegramGuard,
-    private readonly projects: TelegramProjectService,
     private readonly board: BoardService,
     private readonly rounds: BoardRoundsService,
     private readonly inbox: BoardInboxService,
@@ -198,51 +188,13 @@ export class TelegramCardService {
       if (!row) return null;
       const card = await this.board.detail(projectId, row.number, member.role);
       const actions = cardReviewActions(card);
-      return actions.length > 0 ? cardKeyboard(row.shortId, actions) : null;
+      return actions.length > 0 ? reviewKeyboard(row.shortId, actions) : null;
     } catch (error) {
       this.logger.warn(
         `no card buttons for notification ${notificationId}: ${error instanceof Error ? error.message : String(error)}`,
       );
       return null;
     }
-  }
-
-  /** `/card <n>`: a card of the chat's project, with the actions it allows. */
-  async handleCommand(context: CommandContext): Promise<TelegramAnswer> {
-    const { chatId } = context;
-    const answer = (text: string): TelegramAnswer => ({ chatId, text });
-    if (!context.isPrivate) return answer(PROJECT_REPLIES.invalidButton);
-    const match = CARD_ARG.exec(context.args);
-    if (!match) {
-      return answer('Send /card with a card number, like /card 12.');
-    }
-    const current = await this.projects.current(chatId, 'read');
-    if (!current.ok) return answer(projectRefusalText(current.reason));
-    const { project, user } = current;
-    const number = Number(match[1]);
-    let card: BoardCardDetail;
-    try {
-      // A viewer asking for an Inbox card finds none (#244 D8).
-      card = await this.board.detail(project.id, number, project.role);
-    } catch (error) {
-      if (!(error instanceof HttpException)) throw error;
-      return answer(
-        boardReply(project, `${cardLabel(number)} is not on this Board.`),
-      );
-    }
-    const row = await this.prisma.boardCard.findUniqueOrThrow({
-      where: { id: card.id },
-      select: { shortId: true },
-    });
-    const full = await this.prisma.project.findUniqueOrThrow({
-      where: { id: project.id },
-      select: { id: true, displayName: true, baseBranch: true },
-    });
-    const writes = await this.guard.member(user.id, project.id, 'write');
-    return {
-      chatId,
-      ...this.view(full, row.shortId, card, writes.ok),
-    };
   }
 
   /** A press on a card action, a confirm step or Accept and merge. */
@@ -274,8 +226,10 @@ export class TelegramCardService {
     const confirm = CARD_CONFIRM_CALLBACK.decode(query.data);
     const merge = CARD_MERGE_CALLBACK.decode(query.data);
 
+    // An edit without a keyboard keeps the old buttons: clear them.
+    const cleared = { replyMarkup: { inline_keyboard: [] } };
     if (confirm?.step === 'cancel') {
-      return answer(CANCELLED_TEXT, { editMessageId: messageId });
+      return answer(CANCELLED_TEXT, { ...cleared, editMessageId: messageId });
     }
     const shortId = press?.card ?? confirm?.card ?? merge?.card;
     const action: CardReviewAction | null = press
@@ -345,12 +299,20 @@ export class TelegramCardService {
         await this.record(authorized, 'accept', 'denied', {
           reason: 'head_moved',
         });
-        return answer(HEAD_MOVED_TEXT, { editMessageId: messageId });
+        return answer(HEAD_MOVED_TEXT, {
+          ...cleared,
+          editMessageId: messageId,
+        });
       }
       headSha = pr.headSha;
     }
     const text = await this.act(authorized, action, headSha);
-    return { ...answer(text.notice), ...text.answer, editMessageId: messageId };
+    return {
+      ...answer(text.notice),
+      ...cleared,
+      ...text.answer,
+      editMessageId: messageId,
+    };
   }
 
   /**
@@ -483,10 +445,9 @@ export class TelegramCardService {
     await this.record(acting, action, 'ok', {});
     if (!after)
       return { notice: line, answer: { text: boardReply(project, line) } };
-    const view = this.view(project, acting.shortId, after, true);
     return {
       notice: line,
-      answer: { ...view, text: withResult(line, view.text) },
+      answer: this.view(project, acting.shortId, after, `✓ ${line}`),
     };
   }
 
@@ -557,23 +518,24 @@ export class TelegramCardService {
     }
   }
 
-  /** The card message: its text, and its buttons for one who may press them. */
+  /** #576's card message, with the review actions and `service` on top. */
   private view(
     project: Acting['project'],
     shortId: string,
     card: BoardCardDetail,
-    writes: boolean,
+    service: string,
   ): Pick<TelegramAnswer, 'text' | 'replyMarkup'> {
-    const actions = writes ? cardReviewActions(card) : [];
     return {
-      text: cardText(
-        project,
-        card,
-        cardLink(this.options.appUrl, project.id, card.number),
-      ),
-      ...(actions.length > 0
-        ? { replyMarkup: { inline_keyboard: cardKeyboard(shortId, actions) } }
-        : {}),
+      text: boardReply(project, cardText(card, service)),
+      replyMarkup: {
+        inline_keyboard: cardKeyboard(
+          project.id,
+          card,
+          true,
+          this.options.appUrl,
+          reviewKeyboard(shortId, cardReviewActions(card)),
+        ),
+      },
     };
   }
 
