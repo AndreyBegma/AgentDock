@@ -80,27 +80,35 @@ export class RunnerIngestService {
   /**
    * The runner a token belongs to, or `null` for an unknown, revoked or
    * never-paired one. One argon2 verify at most: the row is found by prefix.
+   * The verified hash comes back so `hello` can insist the token still holds.
    */
-  async authenticate(token: string): Promise<{ id: string } | null> {
+  async authenticate(
+    token: string,
+  ): Promise<{ id: string; tokenHash: string } | null> {
     const runner = await this.prisma.runner.findUnique({
       where: { tokenPrefix: tokenPrefix(token) },
       select: { id: true, tokenHash: true, revokedAt: true },
     });
     if (!runner?.tokenHash || runner.revokedAt) return null;
     return (await verifyRunnerToken(runner.tokenHash, token))
-      ? { id: runner.id }
+      ? { id: runner.id, tokenHash: runner.tokenHash }
       : null;
   }
 
   /**
    * Records the machine as `hello` describes it and mirrors its profiles (D7).
    * Returns the ack cursor for `welcome`, or `null` when the runner was revoked
-   * meanwhile.
+   * or re-paired since `tokenHash` was verified (C-118): a socket that upgraded
+   * with a rotated token never becomes the live one.
    */
-  async hello(runnerId: string, hello: HelloMessage): Promise<bigint | null> {
+  async hello(
+    runnerId: string,
+    tokenHash: string,
+    hello: HelloMessage,
+  ): Promise<bigint | null> {
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.runner.updateMany({
-        where: { id: runnerId, revokedAt: null },
+        where: { id: runnerId, revokedAt: null, tokenHash },
         data: {
           hostname: hello.hostname,
           version: hello.runnerVersion,
