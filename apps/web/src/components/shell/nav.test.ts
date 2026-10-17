@@ -5,6 +5,7 @@ import {
   isFillEntry,
   isWideEntry,
   projectIdOf,
+  railGroups,
   tabBarSplit,
   visibleNav,
 } from './nav';
@@ -288,5 +289,71 @@ describe('isFillEntry', () => {
     expect(fillAt('/projects/p1/board/')).toBe(true);
     expect(fillAt('/projects/p1/board/cards/3/design')).toBe(false);
     expect(fillAt('/projects/p1/fleet')).toBe(false);
+  });
+});
+
+describe('railGroups (C-247)', () => {
+  const groups = (role: 'admin' | 'viewer', path: string) =>
+    railGroups(visibleNav(role, path)).map((group) => ({
+      id: group.id,
+      collapsible: group.collapsible,
+      entries: group.entries.map((entry) => entry.label),
+    }));
+
+  test('inside a project only Project, Work and Activity stay in view', () => {
+    const [, project, more] = groups('viewer', '/projects/p1/fleet');
+    expect(project).toEqual({
+      id: 'project',
+      collapsible: false,
+      entries: ['Project', 'Work', 'Activity'],
+    });
+    expect(more).toEqual({
+      id: 'project-more',
+      collapsible: true,
+      entries: [
+        'Fleet',
+        'Queue',
+        'Approvals',
+        'History',
+        'Token saver',
+        'Skills',
+        'Schedules',
+        'Settings',
+      ],
+    });
+  });
+
+  test('More sits right under the project section; Workspace and Admin fold', () => {
+    expect(
+      groups('admin', '/projects/p1').map((g) => [g.id, g.collapsible]),
+    ).toEqual([
+      ['workspace', true],
+      ['project', false],
+      ['project-more', true],
+      ['admin', true],
+    ]);
+  });
+
+  test('outside a project Workspace is plain and there is no More', () => {
+    expect(
+      groups('admin', '/sessions').map((g) => [g.id, g.collapsible]),
+    ).toEqual([
+      ['workspace', false],
+      ['admin', true],
+    ]);
+  });
+
+  test('a viewer gets no Admin group and no operator-only Workspace entry', () => {
+    const all = groups('viewer', '/projects/p1');
+    expect(all.map((g) => g.id)).not.toContain('admin');
+    expect(all[0]?.entries).not.toContain('Skills');
+  });
+
+  test('every entry stays in exactly one group', () => {
+    const sections = visibleNav('admin', '/projects/p1');
+    const ids = railGroups(sections).flatMap((g) => g.entries.map((e) => e.id));
+    expect(ids.sort()).toEqual(
+      sections.flatMap((s) => s.entries.map((e) => e.id)).sort(),
+    );
   });
 });
