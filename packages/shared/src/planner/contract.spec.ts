@@ -654,11 +654,15 @@ describe('extractPlannerBlocks', () => {
 
 describe('the fixed contract and the default instructions', () => {
   it('the contract text names every action and the block tag', () => {
-    // #337: the intake has its own text, appended to `card` plans instead.
-    for (const action of PLAN_TURN_ACTIONS.filter((a) => a !== 'intake')) {
+    // #337, #590: the intake and the discussion have their own texts,
+    // appended to `card` and `discuss` plans instead.
+    for (const action of PLAN_TURN_ACTIONS.filter(
+      (a) => a !== 'intake' && a !== 'discuss',
+    )) {
       expect(PLANNER_OUTPUT_CONTRACT).toContain(`"action": "${action}"`);
     }
     expect(PLANNER_OUTPUT_CONTRACT).not.toContain('"action": "intake"');
+    expect(PLANNER_OUTPUT_CONTRACT).not.toContain('"action": "discuss"');
     expect(PLANNER_INTAKE_CONTRACT).toContain('"action": "intake"');
     expect(PLANNER_OUTPUT_CONTRACT).toContain('agentdock-plan');
     expect(PLANNER_OUTPUT_CONTRACT).toContain('# Output contract (v3)');

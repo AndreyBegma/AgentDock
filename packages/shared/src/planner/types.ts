@@ -89,13 +89,23 @@ export const CARD_DRAFT_SECTIONS = [
   'Open questions',
 ] as const;
 
+/**
+ * #590: the cards one discussion turn may propose, a proposal's brief, and
+ * the skills a discussion is started with (the design skills' limit).
+ */
+export const DISCUSS_PROPOSALS_MAX = 8;
+export const DISCUSS_PROPOSAL_BRIEF_MAX = PLANNER_SUMMARY_MAX;
+export const DISCUSS_SKILLS_MAX = 12;
+
 // Plans
 
 /**
  * D2; `card` is #337 D1: a New work intake, ending in one card — or, after a
- * confirmed split, several independent ones (#409).
+ * confirmed split, several independent ones (#409). `discuss` is #590
+ * (ADR-0056): a free conversation about the project, with no round limit and
+ * no required result — it never makes a card.
  */
-export const PLAN_MODES = ['batch', 'dialogue', 'card'] as const;
+export const PLAN_MODES = ['batch', 'dialogue', 'card', 'discuss'] as const;
 export const planModeSchema = z.enum(PLAN_MODES);
 export type PlanMode = z.infer<typeof planModeSchema>;
 
@@ -176,7 +186,8 @@ export type PlanTaskKey = z.infer<typeof planTaskKeySchema>;
 
 /**
  * D1, D16; `design` is spec 223 D7; `intake` is #337 D1 — every turn of a
- * `card` plan, which opens a round or writes the card.
+ * `card` plan, which opens a round or writes the card. `discuss` is #590 —
+ * every turn of a `discuss` plan: a reply, and maybe proposed cards.
  */
 export const PLAN_TURN_ACTIONS = [
   'decompose',
@@ -186,6 +197,7 @@ export const PLAN_TURN_ACTIONS = [
   'revise',
   'design',
   'intake',
+  'discuss',
 ] as const;
 export const planTurnActionSchema = z.enum(PLAN_TURN_ACTIONS);
 export type PlanTurnAction = z.infer<typeof planTurnActionSchema>;
@@ -532,6 +544,33 @@ export type IntakeCardOutput = z.infer<typeof intakeCardOutputSchema>;
 export type IntakeSplitOutput = z.infer<typeof intakeSplitOutputSchema>;
 export type IntakeStackOutput = z.infer<typeof intakeStackOutputSchema>;
 
+/**
+ * #590: one card a discussion turn proposes — a short title and a brief, in
+ * the person's language. Nothing is made from it: **Make a card** opens New
+ * work with the brief as What to do, and the intake writes the card.
+ */
+export const discussProposalSchema = z.strictObject({
+  title: lineText(CARD_DRAFT_TITLE_MAX),
+  brief: text(DISCUSS_PROPOSAL_BRIEF_MAX),
+});
+export type DiscussProposal = z.infer<typeof discussProposalSchema>;
+
+/**
+ * #590 (ADR-0056): a discussion turn — a markdown reply and, optionally, the
+ * cards it proposes. `title` names the discussion; the first turn sets it,
+ * a later one may rename it.
+ */
+export const discussOutputSchema = z.strictObject({
+  action: z.literal('discuss'),
+  title: lineText(PLANNER_TITLE_MAX).optional(),
+  reply: text(PLANNER_DOCUMENT_MAX),
+  proposals: z
+    .array(discussProposalSchema)
+    .max(DISCUSS_PROPOSALS_MAX)
+    .optional(),
+});
+export type DiscussOutput = z.infer<typeof discussOutputSchema>;
+
 /** An intake output that wrote the card. */
 export const isIntakeCard = (
   output: IntakeOutput,
@@ -565,6 +604,7 @@ export const plannerOutputSchemasV1 = {
   revise: reviseOutputSchemaV1,
   design: designOutputSchema,
   intake: intakeOutputSchema,
+  discuss: discussOutputSchema,
 } as const satisfies Record<PlanTurnAction, z.ZodType>;
 
 /**
@@ -579,6 +619,7 @@ export const plannerOutputSchemasV2 = {
   revise: reviseOutputSchemaV2,
   design: designOutputSchema,
   intake: intakeOutputSchema,
+  discuss: discussOutputSchema,
 } as const satisfies Record<PlanTurnAction, z.ZodType>;
 
 /** The schemas a turn of a plan of `version` is validated against. */
@@ -594,6 +635,7 @@ export const plannerOutputSchemas = {
   revise: reviseOutputSchema,
   design: designOutputSchema,
   intake: intakeOutputSchema,
+  discuss: discussOutputSchema,
 } as const satisfies Record<PlanTurnAction, z.ZodType>;
 
 export type PlannerOutput<A extends PlanTurnAction = PlanTurnAction> = z.infer<
