@@ -9,6 +9,7 @@ import {
 import { join } from 'node:path';
 import type { ConfigProfile } from '../config';
 import { createExec, type Exec } from '../detect/exec';
+import { permissivePolicy } from '../policy/testing';
 import { FakeClock } from '../testing/fake-clock';
 import { REAL_PROCESS_TIMEOUT_MS, workspace } from '../testing/projects';
 import { releaseTmuxServer } from '../testing/tmux';
@@ -112,6 +113,7 @@ const fixture = async () => {
     clock: new FakeClock(),
     watchedProjects: () => [{ id: 'prj_1', root }],
     profiles: () => [profile],
+    policy: permissivePolicy,
     tmuxServer: server,
   };
   const sessions = async () =>

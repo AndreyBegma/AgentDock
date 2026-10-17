@@ -1,6 +1,8 @@
 import { PLANNER_ERROR } from '@agentdock/shared';
 import {
   type CommandErrorCode,
+  type DocsCommandName,
+  docsCommands,
   type IssueCreateArgs,
   type IssueCreateResult,
   isCommandName,
@@ -53,7 +55,7 @@ export class PlannerCommands {
    */
   assertReady(
     runnerId: string,
-    name: PlannerCommandName | 'issue.create',
+    name: PlannerCommandName | DocsCommandName | 'issue.create',
   ): void {
     const wired: string = name;
     if (!isCommandName(wired)) {
@@ -98,6 +100,29 @@ export class PlannerCommands {
       };
     }
     return { status: 'ok', output: output.data as PlannerCommandOutput<N> };
+  }
+
+  /** #379: `docs.*` — a plan's specs in an external docs repository. */
+  async sendDocs<N extends DocsCommandName>(
+    runnerId: string,
+    name: N,
+    args: z.input<(typeof docsCommands)[N]['args']>,
+    options: SendOptions,
+  ): Promise<PlannerSendResult<z.infer<(typeof docsCommands)[N]['result']>>> {
+    this.assertReady(runnerId, name);
+    const result = await this.commands.send(runnerId, name, args, options);
+    if (result.status !== 'ok') return result;
+    const output = docsCommands[name].result.safeParse(result.output);
+    if (!output.success) {
+      return {
+        status: 'error',
+        error: { code: 'internal', message: 'malformed result' },
+      };
+    }
+    return {
+      status: 'ok',
+      output: output.data as z.infer<(typeof docsCommands)[N]['result']>,
+    };
   }
 
   async createIssue(

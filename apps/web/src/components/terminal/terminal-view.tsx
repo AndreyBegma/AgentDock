@@ -209,7 +209,7 @@ export function TerminalView({
           } else if (value.type === 'error') {
             outcome = {
               phase: 'refused',
-              message: describeRefusal(value.code, value.heldBy),
+              message: describeRefusal(value.code, value.heldBy, value.message),
             };
           } else {
             const reason: TerminalCloseReason = value.reason;

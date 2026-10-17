@@ -413,6 +413,7 @@ model Project {
   stewardIncidents     StewardIncident[]
   stewardDigests       StewardDigest[]
   handoffNotes         HandoffNote[]
+  telegramLinks        TelegramLink[]
 
   @@unique([runnerId, rootPath])
   @@map("projects")
@@ -452,6 +453,9 @@ model DocsSource {
   classified Json
   candidates Json
   manual     Boolean        @default(false)
+  /// #379: where specs go, relative to the docs root. Set in Settings ›
+  /// Docs source; detection and a refresh leave it alone.
+  specDir    String?
   updatedAt  DateTime       @updatedAt
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -1390,9 +1394,14 @@ model TelegramLink {
   chatId   BigInt   @unique
   username String?
   linkedAt DateTime @default(now())
+  /// #500: the project the chat's Board commands act on (`/project`). Null
+  /// until chosen; a deleted project clears it.
+  currentProjectId String?
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentProject Project? @relation(fields: [currentProjectId], references: [id], onDelete: SetNull)
 
+  @@index([currentProjectId])
   @@map("telegram_links")
 }
 
@@ -2330,29 +2339,39 @@ model PlannerSettings {
 /// A plan: a brief and its tasks, across versions (D1, D9). One Claude
 /// session per plan (`sessionId`, D3); its read-only worktree (D15).
 model Plan {
-  id              String         @id @default(cuid())
-  projectId       String
+  id               String         @id @default(cuid())
+  projectId        String
   /// Nullable so deleting the author keeps a sent plan's record; a private
   /// plan without an author is readable by nobody (D12).
-  authorId        String?
-  title           String
-  brief           String
-  mode            PlanMode
-  visibility      PlanVisibility @default(private)
-  status          PlanStatus
-  version         Int            @default(1)
-  sessionId       String         @db.Uuid
+  authorId         String?
+  title            String
+  brief            String
+  mode             PlanMode
+  visibility       PlanVisibility @default(private)
+  status           PlanStatus
+  version          Int            @default(1)
+  sessionId        String         @db.Uuid
   /// The instructions version the plan runs with (D11).
-  instructionsId  String
-  contractVersion Int
-  profileKey      String
-  model           String
-  worktree        String?
-  docsPrNumber    Int?
-  docsPrUrl       String?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  sentAt          DateTime?
+  instructionsId   String
+  contractVersion  Int
+  profileKey       String
+  model            String
+  worktree         String?
+  docsPrNumber     Int?
+  docsPrUrl        String?
+  /// #379: `owner/name` of the docs repository the docs PR is in; null when
+  /// it is the project's own repository.
+  docsPrRepo       String?
+  /// #379: with an external docs repository, the approved designs stay in the
+  /// code repository, in a PR of their own (spec 223 D16 fallback directory).
+  designPrNumber   Int?
+  designPrUrl      String?
+  /// #379: when each PR was seen merged; the issues waiting on it queue then.
+  docsPrMergedAt   DateTime?
+  designPrMergedAt DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  sentAt           DateTime?
 
   project            Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
   author             User?               @relation(fields: [authorId], references: [id], onDelete: SetNull)
@@ -2818,6 +2837,11 @@ model BoardCard {
   issueNumber             Int?
   issueUrl                String?
   specPath                String?
+  /// #379: a spec written to an external docs repository — its `owner/name`
+  /// and pull request. Null when the spec is on the card's branch.
+  specRepo                String?
+  specPrNumber            Int?
+  specPrUrl               String?
   prNumber                Int?
   prUrl                   String?
   /// #329 D6: from the PR poll, else the last `card.collect` / `card.merge`;

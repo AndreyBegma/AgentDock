@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'bun:test';
-import { parseParallelPlan, parseWaveDependencies } from './rules';
+import {
+  parseParallelPlan,
+  parseWaveDependencies,
+  sections,
+  specGap,
+} from './rules';
 
 describe('parseWaveDependencies', () => {
   const body = [
@@ -92,5 +97,27 @@ describe('the Parallel plan table is the first table only (#279)', () => {
 
   it('a plan without a table has no slots', () => {
     expect(parseParallelPlan('## Parallel plan\nTBD')).toEqual([]);
+  });
+});
+
+describe('heading detection is linear (C-103)', () => {
+  it('survives headings followed by long whitespace runs', () => {
+    const line = `# a${' \t'.repeat(32 * 1024)}b`.slice(0, 64 * 1024 + 3);
+    const body = Array(50).fill(line).join('\n');
+    const start = performance.now();
+    specGap(body, ['enhancement']);
+    sections(body);
+    expect(performance.now() - start).toBeLessThan(50);
+  });
+
+  it('never treats a line over 1 KiB as a heading', () => {
+    expect(sections(`## ${'a'.repeat(1030)}\nx`)).toEqual([]);
+    expect(sections(`## ${'a'.repeat(100)}\nx`)).toHaveLength(1);
+  });
+
+  it('drops closing hashes and keeps levels and indentation', () => {
+    expect(sections('   ### Title ##  \nx')[0].title).toBe('Title');
+    expect(sections('    # four spaces')).toEqual([]);
+    expect(sections('####### seven')).toEqual([]);
   });
 });

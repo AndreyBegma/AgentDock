@@ -30,6 +30,7 @@ const setup = (initial: WatchedProject[] = []) => {
     persist: (projects) => {
       persisted.push(projects);
     },
+    admit: async () => null,
     log,
   });
   return { list, registry, started, persisted };
@@ -90,6 +91,7 @@ describe('WatchList', () => {
       persist: () => {
         throw new Error('read-only');
       },
+      admit: async () => null,
       log,
     });
     await list.apply([A]);

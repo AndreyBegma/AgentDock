@@ -1,5 +1,6 @@
 import {
   type DocsSourceOverrideRequest,
+  type DocsSourceView,
   PROJECT_ERROR,
 } from '@agentdock/shared';
 import type {
@@ -8,6 +9,7 @@ import type {
   DocsSourceKind,
   ProjectInspection,
 } from '@agentdock/shared/protocol';
+import { describePolicyRefusal } from '@/lib/runners/policy';
 import { ApiError, describeError } from '../api';
 import { type PrerequisiteCopy, RUNNERS_PAGE } from '../prerequisites/copy';
 import type { RunnersFact } from '../prerequisites/facts';
@@ -88,6 +90,8 @@ export function describeProjectError(error: unknown): string {
         return 'That path is not inside a git repository.';
       case PROJECT_ERROR.pathNotAllowed:
         return pathNotAllowedText(error.message);
+      case PROJECT_ERROR.policyRefused:
+        return describePolicyRefusal(error.message);
       case PROJECT_ERROR.notMainCheckout:
         return 'That is a linked worktree or a subdirectory, not the main checkout.';
       case PROJECT_ERROR.unsupportedForge:
@@ -175,12 +179,56 @@ export interface DocsOverrideForm {
   kind: DocsSourceKind;
   localPath: string;
   repo: string;
+  /** #379: the Spec folder, relative to the docs root; blank clears it. */
+  specDir?: string;
 }
 
 const REPO = /^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/;
 
+/**
+ * #379: why a Spec folder is refused, or null when it is a relative path
+ * inside the docs root — the API checks the same (`repoRelativeDirSchema`).
+ */
+export function specFolderError(specDir: string): string | null {
+  const dir = specDir.trim().replace(/\/+$/, '');
+  if (dir === '') return null;
+  if (
+    dir.startsWith('/') ||
+    dir.includes('\\') ||
+    dir.length > 256 ||
+    dir.split('/').some((seg) => seg === '' || seg === '.' || seg === '..')
+  ) {
+    return 'The spec folder must be a relative path inside the docs root, without "." or "..".';
+  }
+  return null;
+}
+
+/**
+ * #379: what the Spec folder field starts with — the stored folder, else the
+ * specs folder detection classified, else blank.
+ */
+export function specFolderOf(docs: DocsSourceView | null): string {
+  return docs?.specDir ?? docs?.classified.specs[0] ?? '';
+}
+
 /** The override form as a request, or the sentence that says what is wrong. */
 export function docsOverrideRequest(
+  form: DocsOverrideForm,
+  projectRoot: string,
+):
+  | { ok: true; body: DocsSourceOverrideRequest }
+  | { ok: false; error: string } {
+  const result = docsSourceRequest(form, projectRoot);
+  if (!result.ok || form.specDir === undefined || form.kind === 'none') {
+    return result;
+  }
+  const specError = specFolderError(form.specDir);
+  if (specError) return { ok: false, error: specError };
+  const specDir = form.specDir.trim().replace(/\/+$/, '');
+  return { ok: true, body: { ...result.body, specDir: specDir || null } };
+}
+
+function docsSourceRequest(
   form: DocsOverrideForm,
   projectRoot: string,
 ):
@@ -221,6 +269,17 @@ export function docsOverrideRequest(
       if (!REPO.test(repo)) {
         return { ok: false, error: 'The repository must be owner/name.' };
       }
-      return { ok: true, body: { kind: 'remote_repo', repo } };
+      // #379: an optional local clone, where specs are written.
+      if (localPath && !localPath.startsWith('/')) {
+        return { ok: false, error: 'Enter an absolute path.' };
+      }
+      return {
+        ok: true,
+        body: {
+          kind: 'remote_repo',
+          repo,
+          ...(localPath ? { localPath } : {}),
+        },
+      };
   }
 }

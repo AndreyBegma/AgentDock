@@ -1,3 +1,4 @@
+import { BOARD_ERROR } from '@agentdock/shared';
 import type {
   CardCommandName,
   IssueCreateArgs,
@@ -16,6 +17,7 @@ import {
   type Session,
 } from '../../test/e2e-app';
 import { BoardCommands, type BoardSendResult } from '../board-commands';
+import { BoardFailure } from '../board-error';
 import { BoardWork } from '../board-work';
 import { CollectRetryTimer } from '../collect-retry-timer';
 
@@ -30,7 +32,8 @@ type WorldCommand =
   | 'card.ciRetrigger'
   | 'card.prClose'
   | 'issue.create'
-  | 'pr.inspect';
+  | 'pr.inspect'
+  | 'docs.publish_specs';
 
 /** #329 D4: a retry the board scheduled, captured instead of a real timer. */
 export interface ScheduledRetry {
@@ -104,6 +107,8 @@ export class BoardWorld {
   handlers: Partial<Record<WorldCommand, CardHandler>> = {};
   /** Set to make `assertReady` refuse like an offline runner. */
   offline = false;
+  /** #379: commands the runner does not serve — `assertReady` refuses them. */
+  unserved = new Set<string>();
   /** #329 D9: whether the runner advertises `card.prClose`. */
   prCloseAdvertised = true;
   /**
@@ -129,6 +134,19 @@ export class BoardWorld {
       .spyOn(this.commands, 'assertReady')
       .mockImplementation((runnerId, name) => {
         if (this.offline) real(runnerId, name);
+        if (this.unserved.has(name)) {
+          throw new BoardFailure(
+            503,
+            BOARD_ERROR.commandUnavailable,
+            `The runner does not serve ${name}; update it`,
+          );
+        }
+      });
+    jest
+      .spyOn(this.commands, 'publishDocsSpecs')
+      .mockImplementation(async (runnerId, args) => {
+        this.commands.assertReady(runnerId, 'docs.publish_specs');
+        return this.answer('docs.publish_specs', { ...args });
       });
     jest
       .spyOn(this.commands, 'send')
@@ -226,6 +244,11 @@ export class BoardWorld {
         url: 'https://github.com/acme/widget/issues/41',
         queued: false,
       },
+      'docs.publish_specs': {
+        repo: 'acme/widget-documentation',
+        prNumber: 5,
+        prUrl: 'https://github.com/acme/widget-documentation/pull/5',
+      },
     };
     return ok(defaults[name]) as BoardSendResult<never>;
   }
@@ -235,10 +258,12 @@ export class BoardWorld {
     jest.mocked(this.commands.createIssue).mockClear();
     jest.mocked(this.commands.inspectPr).mockClear();
     jest.mocked(this.commands.closePr).mockClear();
+    jest.mocked(this.commands.publishDocsSpecs).mockClear();
     jest.mocked(this.commands.checks).mockClear();
     jest.mocked(this.commands.ciRetrigger).mockClear();
     this.handlers = {};
     this.offline = false;
+    this.unserved = new Set();
     this.prCloseAdvertised = true;
     this.checksServed = false;
     this.ciRetriggerServed = true;
@@ -310,6 +335,13 @@ export class BoardWorld {
       .mocked(this.commands.send)
       .mock.calls.filter(([, n]) => n === name)
       .map(([, , args]) => args as Record<string, unknown>);
+  }
+
+  /** #379: the `docs.publish_specs` commands sent, oldest first. */
+  docsSpecs(): Record<string, unknown>[] {
+    return jest
+      .mocked(this.commands.publishDocsSpecs)
+      .mock.calls.map(([, args]) => args as unknown as Record<string, unknown>);
   }
 
   /** #484: the `card.ciRetrigger` commands sent, oldest first. */

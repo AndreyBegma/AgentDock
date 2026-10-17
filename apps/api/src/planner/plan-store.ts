@@ -23,6 +23,7 @@ import {
 import { readablePlan } from './plan-access';
 import { questionsOf } from './plan-mapper';
 import { planNotFound, plannerError } from './planner-error';
+import type { SpecTargetProject } from './spec-target';
 
 type Db = Prisma.TransactionClient | PrismaService;
 
@@ -58,6 +59,8 @@ export interface PlanProject {
   defaultProfileId: string | null;
   readyLabelOverride: string | null;
   codeSentinelConfig: Prisma.JsonValue;
+  /** #379: where the plan's specs go (`resolveSpecTarget`). */
+  docsSource: SpecTargetProject['docsSource'];
   /** The runner's last hello `runnerVersion`; null before one (#337 D10). */
   runnerVersion: string | null;
 }
@@ -136,6 +139,9 @@ export class PlanStore {
         defaultProfileId: true,
         readyLabelOverride: true,
         codeSentinelConfig: true,
+        docsSource: {
+          select: { kind: true, localPath: true, repo: true, specDir: true },
+        },
         runner: { select: { version: true } },
       },
     });

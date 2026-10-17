@@ -1,6 +1,8 @@
 import { APPROVALS_ERROR } from '@agentdock/shared';
 import type { InlineKeyboardButton } from './telegram-client';
 
+export { CALLBACK_DATA_MAX } from './callback-data';
+
 /**
  * #82 (spec 22 D12): what the Approve / Request changes buttons carry, and the
  * fixed text the bot answers with. Pure — `TelegramApprovalService` does the
@@ -22,8 +24,6 @@ export interface ApprovalPress extends ApprovalTarget {
   action: ApprovalAction;
 }
 
-/** Telegram limits `callback_data` to 64 bytes. */
-export const CALLBACK_DATA_MAX = 64;
 const SHA = /^[0-9a-f]{40}$/;
 const ACTION_CODE: Record<ApprovalAction, string> = {
   approve: 'a',

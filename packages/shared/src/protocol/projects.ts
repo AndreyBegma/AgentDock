@@ -17,7 +17,7 @@ export type GitHubAppHealth = z.infer<typeof githubAppHealthSchema>;
 /** A project the runner watches (`welcome.config.projects`). */
 export const watchedProjectSchema = z.object({
   id: z.string().min(1),
-  root: z.string().min(1),
+  root: absolutePathSchema,
   /** Spec 27 D12. Absent means `unhealthy`: poll every 60 s. */
   githubApp: githubAppHealthSchema.optional(),
   /**
