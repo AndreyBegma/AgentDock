@@ -1,9 +1,16 @@
 import { describe, expect, test } from 'bun:test';
-import type { ProjectRuleView } from '@agentdock/shared';
+import type {
+  ProjectRuleCandidateView,
+  ProjectRuleView,
+} from '@agentdock/shared';
 import {
+  candidateSelectionSummary,
   filterRules,
   importSummary,
+  initialCandidateSelection,
   moveRule,
+  selectedCandidates,
+  withRuleCount,
   workerPromptBlock,
 } from './format';
 
@@ -75,5 +82,47 @@ describe('importSummary', () => {
     expect(importSummary(1, 2)).toBe(
       '1 rule created, 2 skipped as duplicates.',
     );
+  });
+});
+
+describe('rule candidates (#584)', () => {
+  const candidate = (
+    title: string,
+    duplicate = false,
+  ): ProjectRuleCandidateView => ({
+    title,
+    description: `${title}.`,
+    source: 'CLAUDE.md',
+    duplicate,
+  });
+  const candidates = [
+    candidate('Use Bun'),
+    candidate('Biome only', true),
+    candidate('Strict TypeScript'),
+  ];
+
+  test('checks every candidate that is not already a rule', () => {
+    expect([...initialCandidateSelection(candidates)]).toEqual([0, 2]);
+    expect(initialCandidateSelection([])).toEqual(new Set());
+  });
+
+  test('sends the checked candidates in scan order, never a duplicate', () => {
+    expect(selectedCandidates(candidates, new Set([2, 1, 0]))).toEqual([
+      { title: 'Use Bun', description: 'Use Bun.', source: 'CLAUDE.md' },
+      {
+        title: 'Strict TypeScript',
+        description: 'Strict TypeScript.',
+        source: 'CLAUDE.md',
+      },
+    ]);
+    expect(selectedCandidates(candidates, new Set())).toEqual([]);
+  });
+
+  test('counts only candidates that can be added', () => {
+    expect(candidateSelectionSummary(candidates, new Set([0]))).toBe(
+      '1 of 2 selected',
+    );
+    expect(withRuleCount('Add', 1)).toBe('Add 1 rule');
+    expect(withRuleCount('Connect with', 4)).toBe('Connect with 4 rules');
   });
 });

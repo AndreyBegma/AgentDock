@@ -305,6 +305,13 @@ describe('runner-local policy (ADR-0047)', () => {
     );
   });
 
+  it('refuses project.scan_rules of a path outside the allowed roots (#584)', async () => {
+    const { run } = setup();
+    expect(
+      (await run('project.scan_rules', { path: outside })).error?.code,
+    ).toBe('policy_refused');
+  });
+
   it('admits a git main checkout inside the allowed roots, and refuses a worktree, a subdirectory or a plain directory', async () => {
     const ws = workspace();
     try {

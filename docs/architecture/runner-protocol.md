@@ -133,7 +133,7 @@ still connects.
       "orchestrator.message", "orchestrator.start", "orchestrator.status", "orchestrator.stop",
       "plan.cancel", "plan.close", "plan.turn",
       "pr.approve", "pr.inspect", "pr.requestChanges", "pr.voidApproval",
-      "project.inspect", "project.refresh",
+      "project.inspect", "project.refresh", "project.scan_rules",
       "runner.describe", "runner.ping", "session.backfill",
       "skill.cancel", "skill.inspect", "skill.install", "skill.list",
       "skill.run", "skill.search", "skill.uninstall",
@@ -615,7 +615,7 @@ machine writes it — `agentdock-runner policy show|set|allow-root|deny-root` an
 
 | Rule | Default | Refuses |
 |---|---|---|
-| `allowedRoots` | none | a `root` anywhere in a command's args, or `project.inspect`'s `path`, whose real path is outside every allowed root (a symlink out included); and every watch-list root that is outside them or is not a git main checkout — that project is not watched |
+| `allowedRoots` | none | a `root` anywhere in a command's args, or `project.inspect`'s / `project.scan_rules`'s `path`, whose real path is outside every allowed root (a symlink out included); and every watch-list root that is outside them or is not a git main checkout — that project is not watched |
 | `maxPermissionMode` | `auto` | `card.run`, `card.resume`, `skill.run`, `orchestrator.start` with a `permissionMode` above it (`manual` < `acceptEdits` < `auto` < `bypassPermissions`) |
 | `terminal.write` | `false` | `terminal.attach` with `mode: "write"`, and the input of a write attach already open once it is turned off |
 | `skills.profileInstall` | `false` | `skill.install` with `target.scope: "profile"` |
@@ -927,6 +927,7 @@ handler.
 | `runner.describe` | — | viewer | implemented: → `{ runnerVersion, hostname, os, arch, capabilities }` |
 | `project.inspect` | `path` | admin | implemented: → `ProjectInspection`, timeout 45 s |
 | `project.refresh` | `projectId, root` | operator | implemented: → `ProjectInspection`, timeout 45 s |
+| `project.scan_rules` | `path` | admin | implemented (#584, `commands/project-rules.ts`): → `{ candidates: [{ title, description, source }], scanned, warnings }`, timeout 15 s |
 | `orchestrator.start` | `projectId, root, profileId, model, permissionMode, mode: start\|next` | operator | implemented (`commands/control.ts`): → `{ session, startedAt }`, timeout 30 s |
 | `orchestrator.stop` | `projectId, root` | operator | implemented: → `{ stopped }`, timeout 10 s |
 | `orchestrator.status` | `projectId, root` | viewer | implemented: → `{ present, state, session?, startedAt? }`, timeout 5 s |
@@ -967,6 +968,16 @@ D2–D8 and D10.
   `409 not_main_checkout`.
 - `project.refresh { projectId, root }` re-inspects a root only when the
   watch list holds it under that `projectId`.
+- `project.scan_rules { path }` (#584) reads a fixed list of files at the
+  root — `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md` (also under `.github/`
+  and `docs/`), Biome, ESLint and Prettier configs, `.editorconfig`,
+  `tsconfig.json` — and answers coding-rule candidates: one per top-level
+  list item of a guide, and one per tool from a small mapping of well-known
+  config options. No model call. A file over 256 KB, a binary file, or a
+  symlink out of the root is skipped with a warning and never read whole; no
+  other file is read. Admin-only, like `project.inspect`, and checked against
+  the policy's `allowedRoots` the same way. Nothing is stored: the API
+  creates rules only from the candidates a person accepts.
 - `remote.forge` is `github` for an `origin` on github.com, else
   `unsupported` (also when there is no `origin`, `url: null`). The API refuses
   to connect `unsupported` (`422 unsupported_forge`).

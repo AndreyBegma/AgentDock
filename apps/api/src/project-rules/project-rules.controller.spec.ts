@@ -1,4 +1,5 @@
 import {
+  PROJECT_RULE_ACCEPT_MAX,
   PROJECT_RULE_DESCRIPTION_MAX,
   PROJECT_RULE_IMPORT_MAX,
   PROJECT_RULE_TITLE_MAX,
@@ -7,15 +8,22 @@ import { BadRequestException, type Type, ValidationPipe } from '@nestjs/common';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { Reflector } from '@nestjs/core';
 import type { AuditContext } from '../audit/audit.types';
+import type { AuthUser } from '../auth/auth-request';
+import { ROLES_KEY } from '../auth/decorators';
 import { PROJECT_ROLE_KEY, ProjectAccessGuard } from '../projects';
 import type { ResolvedProjectAccess } from '../projects/project-access.service';
 import {
+  ProjectRuleAcceptDto,
   ProjectRuleCreateDto,
   ProjectRuleImportDto,
   ProjectRuleReorderDto,
   ProjectRuleUpdateDto,
 } from './dto';
-import { ProjectRulesController } from './project-rules.controller';
+import type { ProjectRuleScanService } from './project-rule-scan.service';
+import {
+  AdminProjectRulesController,
+  ProjectRulesController,
+} from './project-rules.controller';
 import type { ProjectRulesService } from './project-rules.service';
 
 const access: ResolvedProjectAccess = { projectId: 'prj_a', role: 'admin' };
@@ -35,11 +43,31 @@ const setup = () => {
       skippedTitles: [],
     })),
   };
+  const scans = {
+    scan: jest.fn(async () => ({ candidates: [], scanned: [], warnings: [] })),
+    scanPath: jest.fn(async () => ({
+      candidates: [],
+      scanned: [],
+      warnings: [],
+    })),
+    accept: jest.fn(async () => ({
+      created: 0,
+      skipped: 0,
+      rules: [],
+      skippedTitles: [],
+    })),
+  };
   const controller = new ProjectRulesController(
     service as unknown as ProjectRulesService,
+    scans as unknown as ProjectRuleScanService,
   );
-  return { controller, service };
+  const admin = new AdminProjectRulesController(
+    scans as unknown as ProjectRuleScanService,
+  );
+  return { controller, admin, service, scans };
 };
+
+const candidate = { title: 'Use Bun', description: '', source: 'CLAUDE.md' };
 
 /** The app's global pipe (`configure-app.ts`). */
 const pipe = new ValidationPipe({
@@ -79,12 +107,38 @@ describe('ProjectRulesController (#528)', () => {
       'reorder',
       'update',
       'remove',
+      'scan',
+      'accept',
     ] as const)('needs the project admin role to %s', (name) => {
       expect(reflector.get(PROJECT_ROLE_KEY, handler(name))).toBe('admin');
     });
   });
 
+  it('keeps the pre-connect scan to admins (#584)', () => {
+    expect(new Reflector().get(ROLES_KEY, AdminProjectRulesController)).toEqual(
+      ['admin'],
+    );
+  });
+
   describe('routes', () => {
+    it('scans, accepts and scans a path before connect (#584)', async () => {
+      const { controller, admin, scans } = setup();
+      const user = { id: 'usr_admin' } as AuthUser;
+
+      await controller.scan(access, ctx);
+      await controller.accept(access, user, ctx, { candidates: [candidate] });
+      await admin.candidates({ runnerId: 'run_1', path: '/srv/x' }, ctx);
+
+      expect(scans.scan).toHaveBeenCalledWith('prj_a', ctx);
+      expect(scans.accept).toHaveBeenCalledWith(
+        'prj_a',
+        [candidate],
+        'usr_admin',
+        ctx,
+      );
+      expect(scans.scanPath).toHaveBeenCalledWith('run_1', '/srv/x', ctx);
+    });
+
     it('lists the rules of the resolved project', async () => {
       const { controller, service } = setup();
       await controller.list(access);
@@ -179,6 +233,27 @@ describe('ProjectRulesController (#528)', () => {
       await rejects(ProjectRuleReorderDto, { ruleIds: ['a', 'a'] });
       await rejects(ProjectRuleReorderDto, { ruleIds: ['a', ''] });
       await rejects(ProjectRuleReorderDto, { ruleIds: [1] });
+    });
+
+    it('takes accepted candidates, trimmed, one to the accept limit (#584)', async () => {
+      expect(
+        await validate(ProjectRuleAcceptDto, {
+          candidates: [{ ...candidate, title: ' Use Bun ' }],
+        }),
+      ).toEqual({ candidates: [candidate] });
+      await rejects(ProjectRuleAcceptDto, { candidates: [] });
+      await rejects(ProjectRuleAcceptDto, {
+        candidates: Array(PROJECT_RULE_ACCEPT_MAX + 1).fill(candidate),
+      });
+      await rejects(ProjectRuleAcceptDto, {
+        candidates: [{ ...candidate, title: '' }],
+      });
+      await rejects(ProjectRuleAcceptDto, {
+        candidates: [{ ...candidate, enabled: false }],
+      });
+      await rejects(ProjectRuleAcceptDto, {
+        candidates: [{ title: 'T', description: '' }],
+      });
     });
 
     it('takes Markdown up to the import limit', async () => {

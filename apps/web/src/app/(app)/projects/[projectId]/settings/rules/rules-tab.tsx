@@ -36,6 +36,7 @@ import {
 import { useErrorToast } from '../../../../../../lib/section/use-error-toast';
 import { ImportDialog } from './import-dialog';
 import { type RuleDraft, RuleSheet } from './rule-sheet';
+import { ScanDialog } from './scan-dialog';
 
 const FILTERS: readonly { id: RuleFilter; label: string }[] = [
   { id: 'all', label: 'All' },
@@ -60,6 +61,7 @@ export function RulesTab({
   const [editing, setEditing] = useState<Editing>();
   const [deleting, setDeleting] = useState<ProjectRuleView>();
   const [importing, setImporting] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
   const [busy, setBusy] = useState(false);
   const showError = useErrorToast();
@@ -266,10 +268,13 @@ export function RulesTab({
     rules.length === 0 ? (
       <EmptyState
         title="No coding rules yet"
-        description="Add the conventions agents must follow on this project, or import them from a Markdown file."
+        description="Add the conventions agents must follow on this project, scan the ones its CLAUDE.md, AGENTS.md and linter configs already state, or import them from a Markdown file."
         action={
           isAdmin ? (
             <div className="flex gap-2">
+              <Button variant="glass" onClick={() => setScanning(true)}>
+                Scan project
+              </Button>
               <Button variant="glass" onClick={() => setImporting(true)}>
                 Import Markdown
               </Button>
@@ -334,6 +339,9 @@ export function RulesTab({
           actions={
             isAdmin ? (
               <>
+                <Button variant="glass" onClick={() => setScanning(true)}>
+                  Scan project
+                </Button>
                 <Button variant="glass" onClick={() => setImporting(true)}>
                   Import Markdown
                 </Button>
@@ -396,6 +404,15 @@ export function RulesTab({
         busy={busy}
         onConfirm={() => void remove()}
       />
+
+      {isAdmin ? (
+        <ScanDialog
+          projectId={projectId}
+          open={scanning}
+          onClose={() => setScanning(false)}
+          onAdded={() => void load()}
+        />
+      ) : null}
 
       {isAdmin ? (
         <ImportDialog

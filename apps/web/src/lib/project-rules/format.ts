@@ -1,5 +1,7 @@
 import {
   PROJECT_RULE_ERROR,
+  type ProjectRuleCandidateInput,
+  type ProjectRuleCandidateView,
   type ProjectRuleSource,
   type ProjectRuleView,
 } from '@agentdock/shared';
@@ -70,6 +72,50 @@ export function importSummary(created: number, skipped: number): string {
   return `${created} ${noun(created)} created, ${skipped} skipped as ${
     skipped === 1 ? 'a duplicate' : 'duplicates'
   }.`;
+}
+
+/**
+ * #584: the candidates checked when a scan answers — every one that is not
+ * already a rule, so accepting as offered never duplicates one.
+ */
+export function initialCandidateSelection(
+  candidates: readonly ProjectRuleCandidateView[],
+): Set<number> {
+  return new Set(
+    candidates.flatMap((candidate, i) => (candidate.duplicate ? [] : [i])),
+  );
+}
+
+/** The checked candidates, in scan order, as the accept request takes them. */
+export function selectedCandidates(
+  candidates: readonly ProjectRuleCandidateView[],
+  selected: ReadonlySet<number>,
+): ProjectRuleCandidateInput[] {
+  return candidates.flatMap((candidate, i) =>
+    selected.has(i) && !candidate.duplicate
+      ? [
+          {
+            title: candidate.title,
+            description: candidate.description,
+            source: candidate.source,
+          },
+        ]
+      : [],
+  );
+}
+
+/** "4 of 5 selected"; candidates that are already rules do not count. */
+export function candidateSelectionSummary(
+  candidates: readonly ProjectRuleCandidateView[],
+  selected: ReadonlySet<number>,
+): string {
+  const open = candidates.filter((c) => !c.duplicate).length;
+  return `${selectedCandidates(candidates, selected).length} of ${open} selected`;
+}
+
+/** "Add 3 rules", "Connect with 1 rule". */
+export function withRuleCount(verb: string, count: number): string {
+  return `${verb} ${count} ${count === 1 ? 'rule' : 'rules'}`;
 }
 
 export function describeRuleError(error: unknown): string {

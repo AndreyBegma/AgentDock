@@ -77,7 +77,8 @@ export const permissionModeRefusal = (
  * ADR-0047: why the runner-local policy refuses this command, or null. Runs
  * on validated args, before any handler, whatever the server sent:
  * a gated command, a permission mode above the cap, a terminal write, a
- * profile skill install, a root (or `project.inspect` path) outside
+ * profile skill install, a root (or `project.inspect` / `project.scan_rules`
+ * path) outside
  * `allowedRoots`.
  */
 export const commandRefusal = (
@@ -112,7 +113,10 @@ export const commandRefusal = (
     );
   }
   const roots = rootsIn(args);
-  if (name === 'project.inspect' && typeof args.path === 'string') {
+  if (
+    (name === 'project.inspect' || name === 'project.scan_rules') &&
+    typeof args.path === 'string'
+  ) {
     roots.push(args.path);
   }
   for (const root of roots) {

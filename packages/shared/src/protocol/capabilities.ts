@@ -349,6 +349,8 @@ export const RUNNER_FEATURE_COMMANDS = {
   worktree: ['worktree.status'],
   /** #379: specs written into an external docs repository. */
   docsRepo: ['docs.publish_specs'],
+  /** #584: coding-rule candidates read from the project's own docs. */
+  ruleScan: ['project.scan_rules'],
 } as const satisfies Record<string, readonly CommandName[]>;
 
 /** Facts about the host itself, sent next to the capabilities. */
