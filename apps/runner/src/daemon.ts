@@ -6,6 +6,7 @@ import {
   type Host,
   PROTOCOL_VERSION,
 } from '@agentdock/shared/protocol';
+import { accessHeaders, accessOf } from './access';
 import { adapters, SessionWatcher } from './adapters';
 import { resolveIngestSince } from './adapters/ingest-since';
 import { AssessExecutor, createAssessHandlers } from './assess';
@@ -600,6 +601,7 @@ export const runDaemon = async (
       server: config.server,
       insecureServer: config.insecureServer,
       token: config.token,
+      accessHeaders: accessHeaders(accessOf(config)),
       spool,
       clock,
       backoff: new Backoff({ random: options.random }),

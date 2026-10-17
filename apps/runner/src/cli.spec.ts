@@ -253,6 +253,80 @@ describe('agentdock-runner CLI', () => {
       expect(server.pairingBodies).toEqual([]);
     });
 
+    describe('Cloudflare Access service token', () => {
+      const SECRET = 'cf-secret-value-123';
+      const ID = 'abc.access';
+      const pairAccess = (
+        extra: string[],
+        env: Record<string, string> = {},
+      ) => {
+        server.pairing = () =>
+          Response.json({ runnerId: 'rn_1', token: TOKEN });
+        return runCli(
+          ['pair', '--server', server.origin, '--code', 'ABCD-EFGH', ...extra],
+          deps({
+            env: { HOME: home, PATH: '', AGENTDOCK_LOG: 'debug', ...env },
+          }),
+        );
+      };
+
+      it('sends both headers on pairing, stores them 0600, and never prints the secret', async () => {
+        const code = await pairAccess([
+          '--access-client-id',
+          ID,
+          '--access-client-secret',
+          SECRET,
+        ]);
+        expect(code).toBe(EXIT.ok);
+        expect(server.pairingAccess).toEqual([{ id: ID, secret: SECRET }]);
+        const file = paths().configFile;
+        expect(statSync(file).mode & 0o777).toBe(0o600);
+        expect(JSON.parse(readFileSync(file, 'utf8'))).toMatchObject({
+          accessClientId: ID,
+          accessClientSecret: SECRET,
+        });
+        expect(output()).not.toContain(SECRET);
+
+        stdout.length = 0;
+        stderr.length = 0;
+        await runCli(['status'], deps());
+        expect(stdout.join('')).toContain('access token: set');
+        expect(output()).not.toContain(SECRET);
+      });
+
+      it('reads the secret from stdin or the environment', async () => {
+        const stdin = () =>
+          new Response(`${SECRET}\n`).body as ReadableStream<Uint8Array>;
+        server.pairing = () =>
+          Response.json({ runnerId: 'rn_1', token: TOKEN });
+        await runCli(
+          [
+            'pair',
+            '--server',
+            server.origin,
+            '--code',
+            'ABCD-EFGH',
+            '--access-client-id',
+            ID,
+            '--access-client-secret-stdin',
+          ],
+          deps({ stdin }),
+        );
+        expect(server.pairingAccess).toEqual([{ id: ID, secret: SECRET }]);
+
+        await pairAccess(['--access-client-id', ID], {
+          AGENTDOCK_ACCESS_CLIENT_SECRET: 'from-env',
+        });
+        expect(server.pairingAccess[1]).toEqual({ id: ID, secret: 'from-env' });
+      });
+
+      it('sends neither header without credentials, and rejects half a token', async () => {
+        expect(await pairAccess([])).toBe(EXIT.ok);
+        expect(server.pairingAccess).toEqual([{ id: null, secret: null }]);
+        expect(await pairAccess(['--access-client-id', ID])).toBe(EXIT.usage);
+      });
+    });
+
     it('without --allow-root, says no project root is allowed yet', async () => {
       server.pairing = () => Response.json({ runnerId: 'rn_1', token: TOKEN });
       expect(await pairWith('ABCD-EFGH')).toBe(EXIT.ok);

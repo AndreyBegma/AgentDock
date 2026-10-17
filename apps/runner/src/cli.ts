@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import type { Host } from '@agentdock/shared/protocol';
+import { accessHeaders, accessOf } from './access';
 import { runClaude } from './claude';
 import type { Clock } from './clock';
 import { ConfigError, isPaired, loadConfig, saveConfig } from './config';
@@ -59,11 +60,16 @@ const USAGE = `Usage: agentdock-runner <command>
 
 Commands:
   pair --server <url> --code <XXXX-XXXX> [--no-detect] [--allow-root <dir>]… [--insecure]
+       [--access-client-id <id> (--access-client-secret <secret> | --access-client-secret-stdin)]
                                            pair this machine with an AgentDock server
                                            (detects runtime profiles unless --no-detect;
                                            --allow-root lets projects under <dir> be watched;
                                            --insecure allows plain http to a host that is not
-                                           loopback — cleartext, at your own risk)
+                                           loopback — cleartext, at your own risk;
+                                           --access-client-* store a Cloudflare Access
+                                           service token, sent on pairing and every connect;
+                                           the secret may also come from
+                                           AGENTDOCK_ACCESS_CLIENT_SECRET)
   run                                      run the daemon in the foreground
   status                                   show config, connectivity and spool
   profiles [--detect [--write]]            list runtime profiles, or detect them
@@ -146,14 +152,40 @@ const pairCommand = async ({
     'no-detect': noDetect,
     'allow-root': allowRoot = [],
     insecure = false,
+    'access-client-id': accessClientId,
+    'access-client-secret': secretFlag,
+    'access-client-secret-stdin': secretStdin,
   } = flags(args, {
     server: { type: 'string' },
     code: { type: 'string' },
     'no-detect': { type: 'boolean' },
     'allow-root': { type: 'string', multiple: true },
     insecure: { type: 'boolean' },
+    'access-client-id': { type: 'string' },
+    'access-client-secret': { type: 'string' },
+    'access-client-secret-stdin': { type: 'boolean' },
   });
   if (!server || !code) throw new UsageError('pair needs --server and --code');
+  if (secretFlag !== undefined && secretStdin) {
+    throw new UsageError(
+      'use either --access-client-secret or --access-client-secret-stdin',
+    );
+  }
+  const accessSecret = secretStdin
+    ? (
+        await new Response((deps.stdin ?? (() => Bun.stdin.stream()))()).text()
+      ).trim()
+    : (secretFlag ?? deps.env.AGENTDOCK_ACCESS_CLIENT_SECRET);
+  if (accessSecret) log.addSecret(accessSecret);
+  if (Boolean(accessClientId) !== Boolean(accessSecret)) {
+    throw new UsageError(
+      'a Cloudflare Access service token needs both --access-client-id and the secret',
+    );
+  }
+  const access =
+    accessClientId && accessSecret
+      ? { clientId: accessClientId, clientSecret: accessSecret }
+      : undefined;
   const origin = normalizeServer(server, insecure);
   const cleartext = insecure && origin.startsWith('http:');
   const config = loadConfig(paths.configFile);
@@ -169,6 +201,7 @@ const pairCommand = async ({
     server: origin,
     insecure,
     code,
+    access,
     hostname: deps.host.hostname,
     runnerVersion: RUNNER_VERSION,
     fetch: deps.fetch,
@@ -189,6 +222,9 @@ const pairCommand = async ({
     server: origin,
     // Only `pair` sets it (D-06): a re-pair over https clears it.
     insecureServer: cleartext ? true : undefined,
+    // Only `pair` sets it: a re-pair without a token clears it.
+    accessClientId: access?.clientId,
+    accessClientSecret: access?.clientSecret,
     runnerId: paired.runnerId,
     token: paired.token,
     profiles: detected ?? config.profiles,
@@ -243,6 +279,7 @@ const runCommand = async ({
     return EXIT.failure;
   }
   log.addSecret(config.token);
+  if (config.accessClientSecret) log.addSecret(config.accessClientSecret);
   try {
     normalizeServer(config.server, config.insecureServer);
   } catch (error) {
@@ -306,6 +343,7 @@ const statusCommand = async ({
   flags(args, {});
   const config = loadConfig(paths.configFile);
   if (config.token) log.addSecret(config.token);
+  if (config.accessClientSecret) log.addSecret(config.accessClientSecret);
   const spool = Spool.inspect(paths.spoolDir);
   out(deps, `config:   ${paths.configFile}`);
   out(
@@ -317,6 +355,7 @@ const statusCommand = async ({
     out(deps, insecureWarning(config.server));
   }
   out(deps, `profiles: ${config.profiles.length}`);
+  if (accessOf(config)) out(deps, 'access token: set');
   const stopped = readStopStatus(paths.stopStatusFile);
   if (stopped) out(deps, `stopped:  ${stopMessage(stopped)}`);
   out(
@@ -327,6 +366,7 @@ const statusCommand = async ({
     try {
       const response = await deps.fetch(config.server, {
         method: 'GET',
+        headers: accessHeaders(accessOf(config)),
         redirect: 'manual',
         signal: AbortSignal.timeout(5_000),
       });

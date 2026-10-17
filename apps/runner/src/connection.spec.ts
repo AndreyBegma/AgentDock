@@ -77,12 +77,14 @@ describe('RunnerConnection', () => {
     pane?: PaneHandler,
     terminal?: TerminalHandler,
     runLog?: RunLogHandler,
+    access?: Record<string, string>,
   ) => {
     const { log, lines } = memoryLogger();
     const spool = Spool.open({ dir, log });
     connection = new RunnerConnection({
       server: origin,
       token: TOKEN,
+      accessHeaders: access,
       spool,
       clock,
       backoff: new Backoff({ random: () => 0.5 }),
@@ -130,6 +132,29 @@ describe('RunnerConnection', () => {
     expect(hello.lastAckedSeq).toBe(0);
     expect(s.authorizations).toEqual([`Bearer ${TOKEN}`]);
     await until(() => connection.isLive);
+  });
+
+  it('sends the Cloudflare Access headers on the upgrade only when configured', async () => {
+    const s = server();
+    const { connection } = connect(
+      s.origin,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        'CF-Access-Client-Id': 'id.access',
+        'CF-Access-Client-Secret': 'sekret',
+      },
+    );
+    await until(() => connection.isLive);
+    expect(s.socketAccess).toEqual([{ id: 'id.access', secret: 'sekret' }]);
+    expect(s.authorizations).toEqual([`Bearer ${TOKEN}`]);
+
+    const plain = server();
+    const { connection: other } = connect(plain.origin);
+    await until(() => other.isLive);
+    expect(plain.socketAccess).toEqual([{ id: null, secret: null }]);
   });
 
   it('reconnects with backoff and resends exactly the events above welcome.ackedSeq', async () => {

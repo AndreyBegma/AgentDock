@@ -48,6 +48,13 @@ export const runnerConfigSchema = z.object({
    * is not loopback (D-06). Never written by the daemon or from a server message.
    */
   insecureServer: z.boolean().optional(),
+  /**
+   * Cloudflare Access service token (D-07), set by `pair --access-client-id`.
+   * Sent on the pairing request and every WebSocket connect; the secret is
+   * never printed or logged.
+   */
+  accessClientId: z.string().min(1).optional(),
+  accessClientSecret: z.string().min(1).optional(),
   runnerId: z.string().min(1).optional(),
   token: runnerTokenSchema.optional(),
   profiles: z.array(configProfileSchema).default([]),
