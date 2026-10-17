@@ -32,6 +32,7 @@ export * from './local';
 export * from './messages';
 export * from './pairing';
 export * from './pane';
+export * from './policy';
 export * from './projects';
 export * from './terminal';
 export * from './version';

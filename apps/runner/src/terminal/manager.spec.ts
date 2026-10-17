@@ -68,6 +68,8 @@ const setup = (
     spawnFails?: boolean;
     /** Running skill runs by id; null: the runner has no executor. */
     runs?: Record<string, RunningRun> | null;
+    /** The policy's `terminal.write` (ADR-0047); on unless a test sets it. */
+    writeAllowed?: () => boolean;
   } = {},
 ) => {
   const fake = fakeTmux({
@@ -102,6 +104,7 @@ const setup = (
     clock,
     log,
     watchedProjects: fake.deps.watchedProjects,
+    writeAllowed: () => overrides.writeAllowed?.() ?? true,
     send: (message) => {
       sent.push(message);
       return true;

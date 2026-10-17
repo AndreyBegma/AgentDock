@@ -765,6 +765,11 @@ export const BOARD_ERROR = {
   cardCompleted: 'card_completed',
   /** 502 (#309 D9): the runner could not download or verify an attachment for `card.run`. */
   attachmentsUnavailable: 'attachments_unavailable',
+  /**
+   * 403 (ADR-0047): the runner's local security policy refused the command;
+   * the message names the rule and the CLI line that lifts it.
+   */
+  policyRefused: 'policy_refused',
   /** 409 (#329 D5): Create pull request on a card with no `branch` — it never ran. */
   noBranch: 'no_branch',
   /**

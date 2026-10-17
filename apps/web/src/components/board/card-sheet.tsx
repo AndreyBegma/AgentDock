@@ -23,9 +23,10 @@ import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Timeline, type TimelineItem } from '@andrewbehma/glass-ui/timeline';
 import { toast } from '@andrewbehma/glass-ui/toast';
-import { ExternalLink, Zap } from 'lucide-react';
+import { ExternalLink, Move, Zap } from 'lucide-react';
 import NextLink from 'next/link';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { PolicyRefusalText } from '@/components/runners/policy-refusal';
 import { ApiError } from '../../lib/api';
 import {
   describeUploadFailure,
@@ -97,8 +98,10 @@ import {
 } from './card-options';
 import { CardHandoffSection } from './handoff/card-handoff-section';
 import { LaunchPopover } from './launch-popover';
+import { MovePicker } from './move-picker';
 import { SuggestionSheetBody } from './suggestion-sheet';
 import type { CardActions } from './use-card-actions';
+import { useCardMove } from './use-card-move';
 
 const KIND_LABEL: Record<BoardCardKind, string> = {
   feature: 'Feature',
@@ -188,9 +191,7 @@ function roundItems(
               {round.summary}
             </span>
           ) : null}
-          {round.error ? (
-            <span className="text-danger">{round.error}</span>
-          ) : null}
+          {round.error ? <PolicyRefusalText text={round.error} /> : null}
           {round.finishRefused ? (
             <span className="text-danger">
               {finishRefusedText(round.finishRefused)}
@@ -349,6 +350,7 @@ export function CardDetailBody({
   canOperate,
   actions,
   terminal,
+  runnerName,
   onSaved,
 }: {
   layout?: 'sheet' | 'page';
@@ -358,8 +360,18 @@ export function CardDetailBody({
   canOperate: boolean;
   actions: CardActions;
   terminal: TerminalAccess;
+  runnerName?: string | null;
   onSaved: () => void;
 }) {
+  const [picking, setPicking] = useState(false);
+  // #515: the same move a drag makes; the sheet has no board, so no optimistic drop.
+  const move = useCardMove({
+    projectId,
+    runnerName,
+    canOperate,
+    actions,
+    onSettled: onSaved,
+  });
   const readiness = useReadiness(projectId);
   const runBlocked = readiness.blockers('run').length > 0;
   // #480: the card's stack holds Run until its design is approved.
@@ -945,6 +957,30 @@ export function CardDetailBody({
     </form>
   );
 
+  const moveButton = canOperate ? (
+    <>
+      <Button
+        variant="glass"
+        type="button"
+        disabled={actions.busy || move.busy}
+        className="h-11"
+        onClick={() => setPicking(true)}
+      >
+        <Move aria-hidden="true" className="size-4" />
+        Move
+      </Button>
+      {picking ? (
+        <MovePicker
+          card={card}
+          open
+          onOpenChange={setPicking}
+          onPick={(column) => move.moveTo(card, column)}
+        />
+      ) : null}
+      {move.dialogs}
+    </>
+  ) : null;
+
   const actionButtons = canOperate ? (
     <>
       {canDelete(card) ? (
@@ -996,7 +1032,10 @@ export function CardDetailBody({
           }
           actions={
             canOperate ? (
-              <div className="flex items-center gap-2">{actionButtons}</div>
+              <div className="flex items-center gap-2">
+                {moveButton}
+                {actionButtons}
+              </div>
             ) : (
               <Badge tone="neutral" label="Read-only · viewer" />
             )
@@ -1039,7 +1078,8 @@ export function CardDetailBody({
     >
       <InitialFocus />
       <div className="flex flex-col gap-6">
-        <div className="flex justify-end">
+        <div className="flex items-center justify-between gap-2">
+          {moveButton}
           <NextLink
             href={pageHref}
             className={buttonClassName({ variant: 'ghost', size: 'sm' })}
@@ -1071,6 +1111,7 @@ export function CardSheet({
   canOperate,
   actions,
   terminal,
+  runnerName,
   onChanged,
   onClose,
 }: {
@@ -1081,6 +1122,7 @@ export function CardSheet({
   canOperate: boolean;
   actions: CardActions;
   terminal: TerminalAccess;
+  runnerName?: string | null;
   onChanged: () => void;
   onClose: () => void;
 }) {
@@ -1131,6 +1173,7 @@ export function CardSheet({
             canOperate={canOperate}
             actions={actions}
             terminal={terminal}
+            runnerName={runnerName}
             onSaved={onChanged}
           />
         ) : (

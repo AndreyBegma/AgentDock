@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root,:root[data-theme=dark]{color-scheme:dark;--ground:#0a1022;--surface:#111a33;--raised:#18223f;--content:rgb(27 38 71/.96);--ink:#f2f2f6;--ink2:rgb(242 242 246/.62);--ink3:rgb(242 242 246/.53);--line:rgb(255 255 255/.1);--line2:rgb(255 255 255/.18);--hover:rgb(255 255 255/.06);--accent:#5b5bf6;--onacc:#fff;--accsoft:rgb(91 91 246/.2);--accink:#b4b2ff;--scrim:rgb(10 16 34/.5);--h1:#5b9cf6;--h2:#2fbf94;--h4:#e69f00;--h5:#e8743b;--glass:rgb(24 34 63/.82);--shadow:rgb(0 0 0/.4)}
+:root[data-theme=light]{color-scheme:light;--ground:#fff;--surface:#f8faff;--raised:#f0f4fb;--content:rgb(255 255 255/.96);--ink:#18181b;--ink2:rgb(24 24 27/.72);--ink3:rgb(24 24 27/.64);--line:rgb(0 0 0/.1);--line2:rgb(0 0 0/.23);--hover:rgb(0 0 0/.06);--accent:#4f46e5;--accsoft:rgb(79 70 229/.12);--accink:#4338ca;--scrim:rgb(10 16 34/.3);--h1:#1f64d6;--h2:#00805e;--h4:#b36b00;--h5:#c24e00;--glass:rgb(255 255 255/.86);--shadow:rgb(0 0 0/.16)}
+*{box-sizing:border-box}body{margin:0;padding:24px;background:var(--surface);color:var(--ink);font:14px/20px 'SF Pro Text',Inter,system-ui,sans-serif}
+h1,h2,p{margin:0}.row{display:flex;gap:24px;flex-wrap:wrap;justify-content:center}
+figure{margin:0;display:flex;flex-direction:column;gap:8px;align-items:center}figcaption{font-size:12px;color:var(--ink3);max-width:375px;text-align:center}
+.i{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.phone{position:relative;width:375px;height:700px;overflow:hidden;border-radius:28px;border:1px solid var(--line2);background:radial-gradient(300px 260px at 0 0,color-mix(in oklab,var(--h1) 16%,transparent),transparent 70%),radial-gradient(300px 260px at 100% 40%,color-mix(in oklab,#a68bfa 14%,transparent),transparent 70%),var(--ground)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 16px;border:1px solid transparent;border-radius:6px;font:600 14px inherit;font-family:inherit;cursor:pointer;color:var(--ink)}
+.btn-glass{background:var(--raised);border-color:var(--line2)}.btn-solid{background:var(--accent);color:var(--onacc)}.btn-ghost{background:transparent;color:var(--ink2)}.btn-icon{width:44px;padding:0}
+.badge{display:inline-flex;align-items:center;height:18px;min-width:18px;padding:0 5px;border-radius:99px;font-size:10px;font-weight:600;background:var(--hover);color:var(--ink2);justify-content:center}
+.pill{display:inline-flex;align-items:center;gap:6px;height:20px;padding:0 8px;border-radius:99px;font-size:11px;font-weight:500;background:color-mix(in srgb,var(--h2) 18%,transparent);color:var(--h2)}
+.dot{width:6px;height:6px;border-radius:99px;background:currentColor}
+.glass{background:var(--glass);backdrop-filter:blur(26px) saturate(180%);border:1px solid var(--line2);box-shadow:0 12px 32px var(--shadow)}
+.top{display:flex;align-items:center;gap:8px;height:56px;margin:8px;padding:0 12px;border-radius:8px}
+.top b{font-size:15px;font-weight:600;flex:1}
+.board{display:flex;gap:12px;padding:0 16px;overflow:hidden}
+.col{width:280px;flex-shrink:0;display:flex;flex-direction:column;gap:8px;padding:8px;border-radius:8px;background:var(--surface);border:1px solid var(--line)}
+.col-h{display:flex;align-items:center;gap:8px;padding:2px 4px;font-size:13px;font-weight:600}.col-h .badge{margin-left:auto}
+.card{display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:6px;background:var(--content);border:1px solid var(--line)}
+.card.sel{border-color:var(--accent)}
+.card-top{display:flex;align-items:flex-start;gap:8px}.card-top span{flex:1;font-weight:500}
+.meta{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--ink3)}
+.kebab{width:44px;height:44px;margin:-10px -10px -10px 0;display:inline-flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--ink2)}
+.menu{position:absolute;right:20px;top:176px;width:220px;padding:4px;border-radius:8px;display:flex;flex-direction:column}
+.mi{display:flex;align-items:center;gap:10px;height:44px;padding:0 10px;border:0;background:transparent;border-radius:4px;font:inherit;color:var(--ink);text-align:left}
+.mi.hl{background:var(--accsoft);color:var(--accink);font-weight:600}.mi .chev{margin-left:auto;color:var(--ink3)}.sep{height:1px;background:var(--line);margin:4px 0}.danger{color:#ff6b60}
+.sheet{position:absolute;inset:0 0 0 24px;border-radius:12px 0 0 12px;padding:16px;display:flex;flex-direction:column;gap:14px}
+.sh{display:flex;align-items:center;gap:8px}.sh h2{flex:1;font-size:18px;line-height:24px;font-weight:600}
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:8px 20px;font-size:13px}.kv dt{color:var(--ink3)}.kv dd{margin:0}
+.actions{display:flex;gap:8px;flex-wrap:wrap}.tag{font-size:12px;color:var(--ink3)}
+.scrim{position:absolute;inset:0;background:var(--scrim)}
+</style></head><body>
+<div class="row">
+<figure><div class="phone">
+ <div class="top glass"><b>Work · Board</b><button class="btn btn-ghost btn-icon" aria-label="Filter"><svg class="i" viewBox="0 0 24 24"><path d="M3 5h18M6 12h12M10 19h4"/></svg></button></div>
+ <div class="board"><section class="col">
+  <div class="col-h"><span style="width:8px;height:8px;border-radius:3px;background:var(--h1)"></span>Ready<span class="badge">3</span></div>
+  <article class="card sel"><div class="card-top"><span>Add a prominent Move action with a column picker</span><button class="kebab" aria-label="Card actions"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div><div class="meta">C-216<span class="badge">ui</span></div></article>
+  <article class="card"><div class="card-top"><span>Detect stuck agent work</span></div><div class="meta">C-90</div></article>
+ </section></div>
+ <div class="scrim"></div>
+ <div class="menu glass" role="menu">
+  <button class="mi" role="menuitem"><svg class="i" viewBox="0 0 24 24"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>Open card</button>
+  <button class="mi hl" role="menuitem"><svg class="i" viewBox="0 0 24 24"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></svg>Move…<svg class="i chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+  <button class="mi" role="menuitem"><svg class="i" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Edit</button>
+  <div class="sep"></div>
+  <button class="mi danger" role="menuitem"><svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>Archive</button>
+ </div>
+</div><figcaption>1 · Card menu: the five “Move to <column>” items collapse into one “Move…” item. Tap 1 kebab, tap 2 Move, tap 3 column.</figcaption></figure>
+
+<figure><div class="phone">
+ <div class="scrim"></div>
+ <aside class="sheet glass" role="dialog" aria-label="Card C-216">
+  <div class="sh"><h2>C-216</h2><button class="btn btn-ghost btn-icon" aria-label="Close"><svg class="i" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+  <p style="font-size:16px;font-weight:600;line-height:22px">Add a prominent Move action with a column picker for cards on phones</p>
+  <div class="actions" style="margin-top:-2px">
+   <button class="btn btn-glass"><svg class="i" viewBox="0 0 24 24"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></svg>Move</button>
+   <button class="btn btn-ghost"><svg class="i" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Edit</button>
+  </div>
+  <dl class="kv"><dt>Column</dt><dd><span style="display:inline-flex;gap:6px;align-items:center"><span style="width:8px;height:8px;border-radius:3px;background:var(--h1)"></span>Ready</span></dd><dt>Kind</dt><dd>Feature</dd><dt>Slot</dt><dd>Unassigned</dd><dt>Issue</dt><dd>#503</dd></dl>
+  <p class="tag">Description, activity and runs continue below, unchanged.</p>
+ </aside>
+</div><figcaption>2 · Card detail sheet (and full-page card view, same button, placed in PageHeader actions): a visible, glass-variant “Move” button, 44 px tall. Not solid: the page keeps its own primary action.</figcaption></figure>
+</div></body></html>

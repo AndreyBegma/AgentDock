@@ -27,6 +27,8 @@ import type { Exec } from '../detect/exec';
 import type { HandoffHandlers } from '../handoff';
 import type { NormalizeHandlers } from '../normalize';
 import type { PlannerHandlers } from '../planner';
+import type { Realpath } from '../policy/roots';
+import type { PolicyConfig } from '../policy/schema';
 import type { ProjectFs } from '../projects/fs';
 import { inspectProject, refreshProject } from '../projects/inspect';
 import type { SessionMessenger } from '../session';
@@ -61,6 +63,10 @@ export interface HandlerContext {
   watchedProjects: () => readonly WatchedProject[];
   /** The runtime profiles of the runner config; the orchestrator starts on one. */
   profiles: () => readonly ConfigProfile[];
+  /** The runner-local policy as it is now (ADR-0047). */
+  policy: () => PolicyConfig;
+  /** Resolves a root for the policy; the filesystem's by default. */
+  realpath?: Realpath;
   /** Tests inject a spying filesystem; the daemon uses the real one. */
   fs?: ProjectFs;
   /** The session watcher's backfill; absent when sessions are disabled. */
@@ -152,6 +158,8 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
     clock: context.clock,
     watchedProjects: context.watchedProjects,
     profiles: context.profiles,
+    policy: context.policy,
+    realpath: context.realpath,
   };
   const approvals = {
     exec: context.exec,

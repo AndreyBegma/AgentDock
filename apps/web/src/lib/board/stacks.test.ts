@@ -22,6 +22,7 @@ import { boardItems } from './plan-tasks';
 import {
   addableCards,
   approvableRevision,
+  designSwitch,
   gateNote,
   stageLinkText,
 } from './stack-page';
@@ -270,5 +271,19 @@ describe('the stack page (#480)', () => {
       card(5, 'in_progress'),
     ]);
     expect(addableCards(view).map((c) => c.number)).toEqual([2, 5]);
+  });
+
+  test('#502: the design switch is on while the design is needed and locked while a turn runs', () => {
+    const design = (status: string) => ({ design: { status } }) as never;
+    expect(designSwitch({ design: null })).toEqual({
+      required: false,
+      locked: false,
+    });
+    expect(designSwitch(design('approved'))).toEqual({
+      required: true,
+      locked: false,
+    });
+    expect(designSwitch(design('generating')).locked).toBe(true);
+    expect(designSwitch(design('revising')).locked).toBe(true);
   });
 });

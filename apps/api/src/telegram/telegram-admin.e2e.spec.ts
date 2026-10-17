@@ -10,6 +10,7 @@ import {
   TEST_ENCRYPTION_KEY,
 } from '../notifications/testing/notifications-e2e';
 import { login, type Session } from '../test/e2e-app';
+import { BOT_COMMANDS } from './telegram-commands';
 import { BOT_TOKEN, serverError } from './testing/fake-telegram';
 import {
   createTelegramApp,
@@ -104,7 +105,13 @@ describe('Telegram admin integration (e2e)', () => {
     });
     expect(ctx.fake.calls.map((c) => [c.method, c.token])).toEqual([
       ['getMe', BOT_TOKEN],
+      ['setMyCommands', BOT_TOKEN],
     ]);
+    // #500: the menu is the commands /help lists, for private chats.
+    expect(ctx.fake.calls[1].body).toEqual({
+      commands: BOT_COMMANDS,
+      scope: { type: 'all_private_chats' },
+    });
     expect(text).not.toContain(BOT_TOKEN);
     expect(logs).not.toContain(BOT_TOKEN);
 
