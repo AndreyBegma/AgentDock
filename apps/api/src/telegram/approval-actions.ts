@@ -1,4 +1,5 @@
 import { APPROVALS_ERROR } from '@agentdock/shared';
+import { fitsInt8 } from './callback-data';
 import type { InlineKeyboardButton } from './telegram-client';
 
 export { CALLBACK_DATA_MAX } from './callback-data';
@@ -59,7 +60,7 @@ export const decodeCallback = (
   if (!match) return null;
   const pr = positive(match[3]);
   const headSha = Buffer.from(match[4], 'base64url').toString('hex');
-  if (pr === null || !isHeadSha(headSha)) return null;
+  if (pr === null || !isHeadSha(headSha) || !fitsInt8(match[2])) return null;
   return {
     action: match[1] === 'a' ? 'approve' : 'request_changes',
     notificationId: BigInt(match[2]),
@@ -102,7 +103,7 @@ export const parseNotePrompt = (
   const match = text ? REFERENCE.exec(text) : null;
   if (!match) return null;
   const pr = positive(match[2]);
-  if (pr === null) return null;
+  if (pr === null || !fitsInt8(match[1])) return null;
   return { notificationId: BigInt(match[1]), pr, headSha: match[3] };
 };
 

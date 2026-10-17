@@ -1,3 +1,4 @@
+import { fitsInt8 } from './callback-data';
 import type { InlineKeyboardButton } from './telegram-client';
 
 /**
@@ -30,7 +31,7 @@ export const decodeActionRequestCallback = (
   data: string | undefined,
 ): ActionRequestPress | null => {
   const match = data ? CALLBACK.exec(data) : null;
-  if (!match) return null;
+  if (!match || !fitsInt8(match[2])) return null;
   return {
     action: match[1] === 'x' ? 'approve' : 'deny',
     notificationId: BigInt(match[2]),
