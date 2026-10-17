@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { RunnerEvent } from '../envelope';
+import { droppableGithubUrl } from '../github-url';
 
 /**
  * Queue events (spec 19 D1, D2): what the runner's `issues` collector reads
@@ -29,7 +30,8 @@ export const snapshotIssueSchema = z.object({
   /** Markdown, trimmed to `ISSUE_BODY_MAX_BYTES`; `null` bodies are sent as `""`. */
   body: z.string().default(''),
   updatedAt: z.iso.datetime({ offset: true }),
-  url: z.url(),
+  /** Dropped when it is not an `https://github.com` URL. */
+  url: droppableGithubUrl,
 });
 export type SnapshotIssue = z.infer<typeof snapshotIssueSchema>;
 
@@ -44,7 +46,8 @@ export const snapshotPullRequestSchema = z.object({
   /** Trimmed to `PULL_REQUEST_BODY_MAX_BYTES`. */
   body: z.string().default(''),
   updatedAt: z.iso.datetime({ offset: true }),
-  url: z.url(),
+  /** Dropped when it is not an `https://github.com` URL. */
+  url: droppableGithubUrl,
 });
 export type SnapshotPullRequest = z.infer<typeof snapshotPullRequestSchema>;
 

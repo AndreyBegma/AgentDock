@@ -1,6 +1,7 @@
 import {
   type CodeSentinelStateSlot,
   checkpointKindSchema,
+  isHttpsGithubUrl,
 } from '@agentdock/shared/protocol';
 import type { Applied, EventOf } from './projection';
 import type { SlotPatch, SlotProjection } from './slot-projection';
@@ -47,7 +48,9 @@ const snapshotPatch = (slot: CodeSentinelStateSlot): SlotPatch => {
     patch.lastCheckpoint = kind.success ? kind.data : 'other';
   }
   if (slot.pr?.number) patch.prNumber = slot.pr.number;
-  if (slot.pr?.url) patch.prUrl = slot.pr.url;
+  if (slot.pr?.url && isHttpsGithubUrl(slot.pr.url)) {
+    patch.prUrl = slot.pr.url;
+  }
   if (slot.pr?.rollup) patch.prChecks = slot.pr.rollup;
   if (slot.status === 'merged') patch.prState = 'merged';
   return patch;

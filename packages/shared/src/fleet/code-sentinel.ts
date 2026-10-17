@@ -8,6 +8,7 @@ import {
   type UnsequencedEvent,
   unsequencedEventSchema,
 } from '../protocol';
+import { isHttpsGithubUrl } from '../protocol/github-url';
 
 /**
  * Code Sentinel's `events.jsonl` (spec 16, plugin `EVENTS.md`) → AgentDock's
@@ -40,15 +41,6 @@ const int = (value: unknown): number | undefined => {
 
 const text = (value: unknown): string | undefined =>
   typeof value === 'string' && value.length > 0 ? value : undefined;
-
-const isUrl = (value: string): boolean => {
-  try {
-    new URL(value);
-    return true;
-  } catch {
-    return false;
-  }
-};
 
 /** `<…>/<YYYY-MM-DD>/round-<HHMM>.md`, the board path the orchestrator writes. */
 const BOARD_DATE = /(\d{4}-\d{2}-\d{2})\/round-\d{4}\.md$/;
@@ -134,7 +126,7 @@ const MAPPERS: Record<string, (data: Data, ts: string) => Data> = {
       checkpoint: CHECKPOINTS.has(kind) ? kind : 'other',
       ...(CHECKPOINTS.has(kind) ? {} : { heading: kind.slice(0, 500) }),
       summary: typeof data.summary === 'string' ? data.summary : '',
-      prUrl: url && isUrl(url) ? url : undefined,
+      prUrl: url && isHttpsGithubUrl(url) ? url : undefined,
       prNumber: int(data.pr),
     };
   },
