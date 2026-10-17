@@ -5,10 +5,13 @@ import type {
   TelegramUpdate,
 } from './telegram-client';
 
-/** What the poller sends back for an update: plain text, maybe with buttons. */
+/**
+ * What the poller sends back for an update: plain text, maybe with buttons.
+ * No `text`: only the press is answered — the handler sent its own messages.
+ */
 export interface TelegramAnswer {
   chatId: number;
-  text: string;
+  text?: string;
   replyMarkup?: TelegramReplyMarkup;
   /** A press: the callback to answer, with `notice` as its short text. */
   callbackQueryId?: string;

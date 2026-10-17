@@ -58,8 +58,11 @@ import { TasksQueryService } from './tasks-query.service';
   ],
   // The design stage (spec 223) runs its turns through the planner's — a
   // board card's as well (#243).
+  // #574: the Telegram intake runs plans as the linked user, in-process.
   exports: [
     CardDesignTurnService,
+    PlanCardsService,
+    PlanService,
     PlanStore,
     PlanTurnService,
     PlannerCommands,
