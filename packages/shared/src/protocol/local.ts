@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import {
   ACTION_REQUEST_SUMMARY_MAX,
-  actionRequestKindSchema,
   actionRequestSummarySchema,
+  requestableActionRequestKindSchema,
 } from '../action-requests/contracts';
 import type { Role } from './commands';
 
@@ -163,10 +163,17 @@ export const localIssueCreateArgsSchema = z.strictObject({
   labels: z.array(z.string().min(1).max(50)).max(10).optional(),
   queue: z.boolean(),
 });
+/**
+ * `queued` is never true for a session's issue (C-112): asked to queue, the
+ * API files it unlabelled with an `issue_queue` request a person decides —
+ * `actionRequestId` and `waiting` say so.
+ */
 export const localIssueResultSchema = z.object({
   number: z.number().int().positive(),
   url: z.string().min(1),
   queued: z.boolean(),
+  actionRequestId: z.string().min(1).optional(),
+  waiting: z.string().optional(),
 });
 
 /** Server event types `activity.note` and `handoff.create` record (ADR-0014). */
@@ -186,7 +193,7 @@ export const localHandoffArgsSchema = z.strictObject({
 
 /** `args` is checked against `actionRequestArgsSchemas[kind]` by the server. */
 export const localActionRequestArgsSchema = z.strictObject({
-  kind: actionRequestKindSchema,
+  kind: requestableActionRequestKindSchema,
   args: z.record(z.string(), z.unknown()),
   summary: z.string().min(1).max(ACTION_REQUEST_SUMMARY_MAX),
 });

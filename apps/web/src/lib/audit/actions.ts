@@ -34,6 +34,7 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   'prices.version_create': 'Created a price version',
   'prices.recompute': 'Re-priced requests',
   'issue.create': 'Created an issue',
+  'issue.queue': 'Queued an issue for the fleet',
   'pane.watch_started': 'Started watching a session',
   'pane.watch_stopped': 'Stopped watching a session',
   'orchestrator.start': 'Started the orchestrator',

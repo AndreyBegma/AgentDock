@@ -23,6 +23,7 @@ import { api } from '../../lib/api';
 import {
   describeActionRequestError,
   formatCountdown,
+  issueQueueArgs,
   KIND_LABEL,
   pendingRequests,
   prApproveArgs,
@@ -45,6 +46,7 @@ const TICK_MS = 1_000;
 function RequestCell({ request }: { request: ActionRequestSummary }) {
   const tool = toolUseArgs(request);
   const pr = prApproveArgs(request);
+  const issue = issueQueueArgs(request);
   return (
     <div className="flex min-w-0 flex-col gap-1">
       <span className="font-medium">{requestTitle(request)}</span>
@@ -63,6 +65,20 @@ function RequestCell({ request }: { request: ActionRequestSummary }) {
             className="underline underline-offset-2 hover:text-ink"
           >
             View the diff
+          </a>
+        </span>
+      ) : null}
+      {/* C-112: the issue a session filed, to read before it is queued. */}
+      {issue ? (
+        <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-sm text-ink-2">
+          <span className="break-words">{issue.title}</span>
+          <a
+            href={issue.url}
+            target="_blank"
+            rel="noreferrer"
+            className="underline underline-offset-2 hover:text-ink"
+          >
+            Read the issue
           </a>
         </span>
       ) : null}
@@ -296,7 +312,9 @@ export function ActionRequestsPanel({
               <p>
                 {asking.decision === 'approve'
                   ? 'It runs now, as you: the budget gate and the audit log apply to you, not to the session.'
-                  : 'The session is told no, and the note below goes with it.'}
+                  : asking.request.kind === 'issue_queue'
+                    ? 'The issue stays open and unqueued; nothing is posted on it.'
+                    : 'The session is told no, and the note below goes with it.'}
               </p>
               <Field label="Note (optional)" htmlFor="action-request-note">
                 <Textarea

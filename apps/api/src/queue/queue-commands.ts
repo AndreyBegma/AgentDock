@@ -4,6 +4,8 @@ import type {
   IssueCreateArgs,
   IssueCreateResult,
   IssuesRefreshResult,
+  PlanQueueIssuesArgs,
+  PlanQueueIssuesResult,
   Role,
 } from '@agentdock/shared/protocol';
 import { Injectable } from '@nestjs/common';
@@ -63,6 +65,18 @@ export class QueueCommands {
     return commandOutput(
       'issue.create',
       await this.commands.send(runnerId, 'issue.create', args, options),
+    );
+  }
+
+  /** The ready label on existing issues — the planner's `plan.queue_issues`. */
+  async labelReady(
+    runnerId: string,
+    args: PlanQueueIssuesArgs,
+    options: QueueCommandOptions,
+  ): Promise<PlanQueueIssuesResult> {
+    return commandOutput(
+      'plan.queue_issues',
+      await this.commands.send(runnerId, 'plan.queue_issues', args, options),
     );
   }
 

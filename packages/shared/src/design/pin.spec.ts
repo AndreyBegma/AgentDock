@@ -104,6 +104,16 @@ describe('the pin message', () => {
   });
 });
 
+describe('the pin-open message', () => {
+  it('names the marker that was tapped', () => {
+    const open = { source: MOCKUP_MESSAGE_SOURCE, type: 'pin-open', n: 2 };
+    expect(mockupMessageSchema.safeParse(open).success).toBe(true);
+    expect(mockupMessageSchema.safeParse({ ...open, n: 0 }).success).toBe(
+      false,
+    );
+  });
+});
+
 describe('the wheel message', () => {
   const wheel = { source: MOCKUP_MESSAGE_SOURCE, type: 'wheel', deltaY: -120 };
 

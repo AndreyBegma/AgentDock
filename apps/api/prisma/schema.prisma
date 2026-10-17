@@ -963,6 +963,7 @@ enum ActionRequestKind {
   orchestrator_start
   orchestrator_stop
   pr_approve
+  issue_queue
 }
 
 enum ActionRequestStatus {

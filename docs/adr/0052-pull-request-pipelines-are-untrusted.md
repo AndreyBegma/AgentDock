@@ -1,4 +1,4 @@
-# ADR-0049: Pull-request pipelines are untrusted: no Docker socket, no host volume, no secret
+# ADR-0052: Pull-request pipelines are untrusted: no Docker socket, no host volume, no secret
 
 Status: accepted · Date: 2026-10-16 ·
 Card: C-105 (security audit 2026-10-16, WI-03, findings F-03 and F-04) ·

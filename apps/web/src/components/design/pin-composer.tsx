@@ -8,6 +8,7 @@ import {
   PopoverContent,
   PopoverRoot,
 } from '@andrewbehma/glass-ui/popover';
+import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import { useState } from 'react';
 import { anchorAt } from '../../lib/design/zoom';
 import type { FramePin } from './mockup-frame';
@@ -23,6 +24,8 @@ export function PinComposer({
   number,
   screen,
   busy,
+  phone = false,
+  frameName,
   onSave,
   onCancel,
 }: {
@@ -34,6 +37,10 @@ export function PinComposer({
   /** "Mobile · dark": where the pin will show. */
   screen: string;
   busy: boolean;
+  /** Below `lg` (C-244): a bottom sheet in place of the popover, which a 375px screen clips. */
+  phone?: boolean;
+  /** The frame the pin is on, named in the sheet. */
+  frameName?: string | null;
   onSave: (body: string) => Promise<void>;
   onCancel: () => void;
 }) {
@@ -50,6 +57,63 @@ export function PinComposer({
       // Toasted by the caller; the box keeps the text to try again.
     }
   };
+
+  const cancel = () => {
+    setBody('');
+    onCancel();
+  };
+  const field = (
+    <Textarea
+      aria-label={`Comment on pin ${number}`}
+      rows={phone ? 3 : 4}
+      maxLength={DESIGN_COMMENT_MAX}
+      value={body}
+      placeholder="What should change here?"
+      onChange={(e) => setBody(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void save();
+      }}
+    />
+  );
+
+  if (phone) {
+    return (
+      <SheetRoot
+        open={pin !== null}
+        onOpenChange={(open) => {
+          if (!open) cancel();
+        }}
+      >
+        <SheetContent
+          title={`Pin ${number}`}
+          description={`${frameName ? `On frame “${frameName}” · ` : ''}shows at ${screen}.`}
+          side="bottom"
+          footer={
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-ink-3 tabular-nums">
+                {body.length} / {DESIGN_COMMENT_MAX}
+              </span>
+              <div className="flex gap-2">
+                <Button className="h-11" variant="ghost" onClick={cancel}>
+                  Cancel
+                </Button>
+                <Button
+                  className="h-11"
+                  variant="solid"
+                  disabled={!text || busy}
+                  onClick={() => void save()}
+                >
+                  {busy ? 'Saving…' : 'Comment'}
+                </Button>
+              </div>
+            </div>
+          }
+        >
+          {field}
+        </SheetContent>
+      </SheetRoot>
+    );
+  }
 
   return (
     <PopoverRoot
@@ -97,17 +161,7 @@ export function PinComposer({
           </div>
         }
       >
-        <Textarea
-          aria-label={`Comment on pin ${number}`}
-          rows={4}
-          maxLength={DESIGN_COMMENT_MAX}
-          value={body}
-          placeholder="What should change here?"
-          onChange={(e) => setBody(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void save();
-          }}
-        />
+        {field}
       </PopoverContent>
     </PopoverRoot>
   );

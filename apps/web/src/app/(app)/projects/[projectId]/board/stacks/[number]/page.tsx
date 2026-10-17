@@ -363,7 +363,7 @@ function StackDetail({
 
       {dock ? (
         // #526: Approve design and Open viewer stay in reach on a phone, above
-        // the tab bar (3.5rem and the safe area, as its spacer).
+        // the capsule (`--dock-bottom`: 6rem and the safe area, as its spacer).
         <>
           <div aria-hidden="true" className="h-14 lg:hidden" />
           <section

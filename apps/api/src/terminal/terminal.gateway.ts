@@ -192,6 +192,10 @@ class TerminalSocket implements TerminalBrowser {
       void this.deps.relay.detach(attach);
       return;
     }
+    if (parsed.data.type === 'history') {
+      this.deps.relay.history(attach);
+      return;
+    }
     this.deps.relay.resize(attach, parsed.data.cols, parsed.data.rows);
   }
 

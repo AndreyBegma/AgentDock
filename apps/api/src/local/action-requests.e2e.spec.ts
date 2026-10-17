@@ -32,6 +32,7 @@ const OUTPUTS: Partial<Record<CommandName, unknown>> = {
     startedAt: '2026-10-09T10:00:00.000Z',
   },
   'orchestrator.stop': { stopped: true },
+  'plan.queue_issues': { labelled: [42] },
 };
 
 const PR = 51;
@@ -204,6 +205,15 @@ describe('action requests (e2e)', () => {
       expect((list.body as ActionRequestView[]).map((r) => r.id)).toEqual([
         request.id,
       ]);
+      const toolUse = await create('tool_use', {
+        toolName: 'Bash',
+        input: 'ls -la',
+      });
+      const all = await viewer.get(`/projects/${projectId}/action-requests`);
+      expect(
+        (all.body as ActionRequestView[]).find((r) => r.id === toolUse.id)?.args
+          .input,
+      ).toBe('ls -la');
 
       expect((await decide(viewer, request.id, 'approve')).status).toBe(403);
       expect((await decide(viewer, request.id, 'deny')).status).toBe(403);
@@ -347,6 +357,35 @@ describe('action requests (e2e)', () => {
       expect((await requests.status(projectId, request.id)).status).toBe(
         'denied',
       );
+    });
+
+    it("a viewer's list changes no rows and shows a due request as expired", async () => {
+      const request = await create('orchestrator_start', { mode: 'start' });
+      await ctx.prisma.actionRequest.update({
+        where: { id: request.id },
+        data: { expiresAt: new Date(Date.now() - 1_000) },
+      });
+      const before = await ctx.prisma.actionRequest.findMany({
+        orderBy: { id: 'asc' },
+      });
+      const base = `/projects/${projectId}/action-requests`;
+      const seen = async (query: string) =>
+        ((await viewer.get(`${base}${query}`)).body as ActionRequestView[])
+          .filter((r) => r.id === request.id)
+          .map((r) => r.status);
+      expect(await seen('')).toEqual(['expired']);
+      expect(await seen('?status=pending')).toEqual([]);
+      expect(await seen('?status=expired')).toEqual(['expired']);
+      expect((await requests.status(projectId, request.id)).status).toBe(
+        'expired',
+      );
+
+      const after = await ctx.prisma.actionRequest.findMany({
+        orderBy: { id: 'asc' },
+      });
+      expect(after).toEqual(before);
+      expect(after.find((r) => r.id === request.id)?.status).toBe('pending');
+      expect(await ctx.app.get(ActionRequestExpiryJob).sweep()).toBe(1);
     });
 
     it('expires pending requests past their deadline', async () => {
@@ -598,6 +637,80 @@ describe('action requests (e2e)', () => {
         'Denied.',
       );
       expect(sent).toEqual([]);
+    });
+
+    it('offers Approve and Deny on an issue_queue request with the issue title and number, and queues it as the person (C-112)', async () => {
+      await ctx.prisma.telegramLink.create({
+        data: { userId: requesterId, chatId: BigInt(CHAT) },
+      });
+      const request = await create('issue_queue', {
+        issue: 42,
+        title: 'Fix the flaky pairing test',
+        url: 'https://github.com/acme/widget/issues/42',
+        session: null,
+      });
+      // Operators and admins are told, viewers are not.
+      const rows = await ctx.prisma.notification.findMany({
+        where: { kind: 'action.requested' },
+        select: { userId: true, title: true, body: true },
+      });
+      expect(rows.map((r) => r.userId).sort()).toEqual(
+        [adminId, requesterId, approverId].sort(),
+      );
+      const notification = await notificationOf(requesterId);
+      expect(notification.title).toBe(
+        'A session asks to queue issue #42 for the fleet',
+      );
+      expect(notification.body).toContain('#42 Fix the flaky pairing test');
+      expect(await telegram.offer(notification.id)).toEqual({
+        inline_keyboard: [
+          [
+            {
+              text: 'Approve',
+              callback_data: `x:${notification.id}:${request.id}`,
+            },
+            {
+              text: 'Deny',
+              callback_data: `y:${notification.id}:${request.id}`,
+            },
+          ],
+        ],
+      });
+
+      // The person the session acted for may queue it themselves.
+      expect((await press(`x:${notification.id}:${request.id}`)).text).toBe(
+        'Approved and carried out.',
+      );
+      expect(sent).toEqual([
+        {
+          name: 'plan.queue_issues',
+          args: { projectId, numbers: [42], readyLabel: 'cs:ready' },
+        },
+      ]);
+      const [queued] = await audits('issue.queue');
+      expect(queued).toMatchObject({
+        actorUserId: requesterId,
+        result: 'ok',
+        meta: { actionRequestId: request.id, via: 'telegram' },
+      });
+    });
+
+    it('denies an issue_queue request from Telegram without touching the issue (C-112)', async () => {
+      await ctx.prisma.telegramLink.create({
+        data: { userId: approverId, chatId: BigInt(CHAT) },
+      });
+      const request = await create('issue_queue', {
+        issue: 42,
+        title: 'Fix it',
+        url: 'https://github.com/acme/widget/issues/42',
+        session: null,
+      });
+      const notification = await notificationOf(approverId);
+      expect((await press(`y:${notification.id}:${request.id}`)).text).toBe(
+        'Denied.',
+      );
+      expect(sent).toEqual([]);
+      expect(await audits('issue.queue')).toEqual([]);
     });
   });
 });

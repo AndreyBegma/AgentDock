@@ -126,13 +126,15 @@ describe('agentdock MCP server (spec 201 D20)', () => {
     }
   });
 
-  it('create_issue with queue: true asks for issue.create with queue: true', async () => {
+  it('create_issue with queue: true asks for issue.create and says it waits for a person (C-112)', async () => {
     const { client, calls } = await connect(() => ({
       ok: true,
       data: {
         number: 12,
         url: 'https://github.com/o/r/issues/12',
-        queued: true,
+        queued: false,
+        actionRequestId: 'ar_1',
+        waiting: 'Issue #12 is not queued yet: it waits for a person.',
       },
     }));
     const result = await client.callTool({
@@ -158,9 +160,11 @@ describe('agentdock MCP server (spec 201 D20)', () => {
     expect(result.structuredContent).toEqual({
       number: 12,
       url: 'https://github.com/o/r/issues/12',
-      queued: true,
+      queued: false,
+      actionRequestId: 'ar_1',
+      waiting: 'Issue #12 is not queued yet: it waits for a person.',
     });
-    expect(text(result)).toContain('"queued": true');
+    expect(text(result)).toContain('waits for a person');
   });
 
   it('turns a local error into an MCP tool error carrying its code', async () => {

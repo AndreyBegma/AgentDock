@@ -18,7 +18,7 @@
 # (https://staging-agentdock.luna-realm.com). No registry, no ssh: the agents
 # run on the staging host, and the steps that need it get the Docker socket.
 #
-# Trust levels (ADR-0049). A pull request is untrusted: it runs the pipeline
+# Trust levels (ADR-0052). A pull request is untrusted: it runs the pipeline
 # file and the build scripts of its own branch, and anyone who can push a
 # branch, a card worker included, can open one. So a step that can run on a
 # pull request gets no Docker socket, no host volume and no secret.
@@ -36,7 +36,7 @@
 # a pull request can edit it too. Until pull requests run on an agent without
 # the Docker socket, a same-repository pull request that edits this file can
 # still reach it: only forks wait for approval (#504). That gap is open and
-# recorded in ADR-0049 §7 and deploy/README.md.
+# recorded in ADR-0052 §7 and deploy/README.md.
 #
 # The CI Postgres holds throwaway data. It runs on tmpfs, with fsync,
 # synchronous_commit and full_page_writes off.
@@ -92,7 +92,7 @@ services:
       - redis-server --requirepass ci --maxmemory-policy noeviction
 
 steps:
-  # Never on a pull request: the socket is root on the host (ADR-0049).
+  # Never on a pull request: the socket is root on the host (ADR-0052).
   - name: ci-image
     image: *docker_image
     when:

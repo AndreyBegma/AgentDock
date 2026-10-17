@@ -2,8 +2,10 @@ import { chmodSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { Socket, UnixSocketListener } from 'bun';
 import { errorMessage, type Logger } from '../log';
+import { socketPeerPid } from './peer';
 import {
   LOCAL_LINE_MAX_BYTES,
+  type LocalCaller,
   type LocalOp,
   type LocalReply,
   type LocalResult,
@@ -13,12 +15,15 @@ import {
 export type LocalHandler = (
   op: LocalOp,
   args: unknown,
+  caller: LocalCaller,
 ) => Promise<LocalResult<unknown>>;
 
 export interface LocalSocketServerOptions {
   path: string;
   handle: LocalHandler;
   log: Logger;
+  /** #113: the peer pid of an accepted socket's fd; `socketPeerPid` by default. */
+  peerPid?: (fd: number | undefined) => number | null;
 }
 
 interface Connection {
@@ -27,6 +32,8 @@ interface Connection {
   /** Bytes not yet written, kept until `drain`. */
   outbound: Buffer;
   closed: boolean;
+  /** #113: the connecting process, read once from the kernel. */
+  peerPid: number | null;
 }
 
 const NEWLINE = 0x0a;
@@ -34,8 +41,9 @@ const NEWLINE = 0x0a;
 /**
  * The daemon's unix socket (spec 201 D5). Created after `runner.lock` is
  * held, so a socket file already there is a dead daemon's and is unlinked.
- * The directory is 0700 and the socket 0600: file permissions are the only
- * peer authentication, as for `runner.json`.
+ * The directory is 0700 and the socket 0600, and every caller is
+ * authenticated by its session token and, where the kernel tells, its peer
+ * pid (#113) — a process of the same user can reach the socket.
  */
 export class LocalSocketServer {
   private listener: UnixSocketListener<Connection> | null = null;
@@ -57,10 +65,12 @@ export class LocalSocketServer {
       unix: path,
       socket: {
         open: (socket) => {
+          const peerPid = this.options.peerPid ?? socketPeerPid;
           socket.data = {
             pending: Buffer.alloc(0),
             outbound: Buffer.alloc(0),
             closed: false,
+            peerPid: peerPid(socketFd(socket)),
           };
         },
         data: (socket, chunk) => this.receive(socket, chunk),
@@ -139,8 +149,11 @@ export class LocalSocketServer {
       });
       return;
     }
-    const { id, op, args } = parsed.data;
-    const result = await this.options.handle(op, args);
+    const { id, op, args, token } = parsed.data;
+    const result = await this.options.handle(op, args, {
+      ...(token ? { token } : {}),
+      peerPid: socket.data.peerPid,
+    });
     this.write(
       socket,
       result.ok
@@ -170,3 +183,9 @@ export class LocalSocketServer {
         : Buffer.from(state.outbound.subarray(Math.max(0, written)));
   }
 }
+
+/** Bun's sockets carry their fd, though its types do not say so. */
+const socketFd = (socket: Socket<Connection>): number | undefined => {
+  const fd = (socket as unknown as { fd?: unknown }).fd;
+  return typeof fd === 'number' ? fd : undefined;
+};

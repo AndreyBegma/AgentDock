@@ -21,6 +21,7 @@ import { LiveService } from '../live/live.service';
 import { oneLine } from '../notifications/event-mapping';
 import { NotificationWriter } from '../notifications/notification-writer';
 import { NotificationsService } from '../notifications/notifications.service';
+import { QueueService } from '../queue/queue.service';
 import {
   ACTION_REQUESTS_LIVE_EVENT,
   type ActionRequestsLiveChange,
@@ -53,6 +54,12 @@ export const actionRequestError = (
   message: string,
 ): HttpException =>
   new HttpException({ statusCode, error, message }, statusCode);
+
+/** A read's view of a row: pending past its deadline is already expired. */
+const asSeen = (row: ActionRequest, now: Date): ActionRequest =>
+  row.status === 'pending' && row.expiresAt <= now
+    ? { ...row, status: 'expired' }
+    : row;
 
 const notFound = () =>
   actionRequestError(
@@ -121,6 +128,7 @@ export class ActionRequestsService {
     private readonly notifications: NotificationsService,
     private readonly control: ControlService,
     private readonly approvals: ApprovalsService,
+    private readonly queue: QueueService,
   ) {}
 
   async create(
@@ -234,33 +242,37 @@ export class ActionRequestsService {
     });
   }
 
+  /**
+   * Reads never write: a pending row past `expiresAt` is shown as `expired`
+   * here and moved by the every-minute sweep (`ActionRequestExpiryJob`).
+   */
   async list(
     projectId: string,
     status?: ActionRequestStatus,
   ): Promise<ActionRequestView[]> {
-    await this.expire();
+    const now = new Date();
+    const due = { status: 'pending' as const, expiresAt: { lte: now } };
+    const where: Prisma.ActionRequestWhereInput =
+      status === 'pending'
+        ? { projectId, status, expiresAt: { gt: now } }
+        : status === 'expired'
+          ? { projectId, OR: [{ status }, due] }
+          : { projectId, ...(status ? { status } : {}) };
     const rows = await this.prisma.actionRequest.findMany({
-      where: { projectId, ...(status ? { status } : {}) },
+      where,
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
-    return rows.map(toActionRequestView);
+    return rows.map((row) => toActionRequestView(asSeen(row, now)));
   }
 
-  /** `action.status`: one request of the project, expired on read when due. */
+  /** `action.status`: one request of the project, a due one shown as expired. */
   async status(projectId: string, id: string): Promise<ActionRequestSummary> {
     const row = await this.prisma.actionRequest.findFirst({
       where: { id, projectId },
     });
     if (!row) throw notFound();
-    if (row.status === 'pending' && row.expiresAt <= new Date()) {
-      await this.expire();
-      const fresh = await this.prisma.actionRequest.findUniqueOrThrow({
-        where: { id },
-      });
-      return toActionRequestSummary(fresh);
-    }
-    return toActionRequestSummary(row);
+    return toActionRequestSummary(asSeen(row, new Date()));
   }
 
   /** The pending requests of a project, oldest first (`approvals.list`). */
@@ -463,6 +475,22 @@ export class ActionRequestsService {
           // with `head_moved` and approves nothing.
           await this.approvals.approve(approvalsCaller, pr, headSha);
           return { ok: true, result: { pr, headSha } };
+        }
+        case 'issue_queue': {
+          // C-112: the ready label, through the queue, as the approver.
+          const { issue } = actionRequestArgsSchemas.issue_queue.parse(
+            row.args,
+          );
+          await this.queue.queueIssue(
+            {
+              projectId: row.projectId,
+              role: decider.role,
+              ctx: decider.ctx,
+              meta: { actionRequestId: row.id, via: decider.via },
+            },
+            issue,
+          );
+          return { ok: true, result: { issue } };
         }
         case 'tool_use':
           return { ok: true, result: {} };

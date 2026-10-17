@@ -125,6 +125,22 @@ describe('requestTitle', () => {
       'Stop the orchestrator',
     );
     expect(requestTitle(row({ args: {} }))).toBe('Use a tool');
+    expect(
+      requestTitle(
+        row({
+          kind: 'issue_queue',
+          args: {
+            issue: 42,
+            title: 'Fix it',
+            url: 'https://github.com/o/r/issues/42',
+            session: null,
+          },
+        }),
+      ),
+    ).toBe('Queue issue #42 for the fleet');
+    expect(requestTitle(row({ kind: 'issue_queue', args: {} }))).toBe(
+      'Queue an issue for the fleet',
+    );
   });
 });
 

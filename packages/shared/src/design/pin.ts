@@ -51,6 +51,13 @@ export const viewerMessageSchema = z.discriminatedUnion('type', [
     source: z.literal(VIEWER_MESSAGE_SOURCE),
     type: z.literal('pins'),
     pins: z.array(mockupPinMarkerSchema).max(500),
+    /**
+     * The viewer's zoom, sent on touch screens only. With it the helper draws
+     * each marker at a fixed on-screen size (28px in a 44px tap target) however
+     * far the mockup is scaled down, and a tap on one becomes a `pin-open`.
+     * Without it markers keep their layout size and ignore the pointer.
+     */
+    scale: z.number().finite().min(0.01).max(8).optional(),
   }),
 ]);
 export type ViewerMessage = z.infer<typeof viewerMessageSchema>;
@@ -78,6 +85,12 @@ export const mockupMessageSchema = z.discriminatedUnion('type', [
     clientX: coordinate.optional(),
     clientY: coordinate.optional(),
     selector: z.string().min(1).max(DESIGN_SELECTOR_MAX),
+  }),
+  /** A tap on an existing marker (touch only): the viewer shows its comment. */
+  z.strictObject({
+    source: z.literal(MOCKUP_MESSAGE_SOURCE),
+    type: z.literal('pin-open'),
+    n: z.number().int().min(1).max(10_000),
   }),
   /**
    * Ctrl/⌘ + wheel over the mockup: wheel events never leave the frame, so
@@ -116,7 +129,7 @@ export const MOCKUP_PIN_HELPER_SCRIPT = `(function () {
     var path = parts.join(' > ') || 'html';
     return path.length > MAX ? path.slice(path.length - MAX) : path;
   }
-  function drawPins(pins) {
+  function drawPins(pins, scale) {
     if (layer) layer.remove();
     layer = document.createElement('div');
     layer.setAttribute('data-agentdock-pins', '');
@@ -124,7 +137,18 @@ export const MOCKUP_PIN_HELPER_SCRIPT = `(function () {
     pins.forEach(function (p) {
       var m = document.createElement('div');
       m.textContent = String(p.n);
-      m.style.cssText = 'position:absolute;transform:translate(-50%,-50%);min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:#e5484d;color:#fff;font:600 12px/22px system-ui,sans-serif;text-align:center;box-shadow:0 0 0 2px #fff';
+      if (scale > 0) {
+        var hit = 44 / scale, dot = 28 / scale;
+        m.style.cssText = 'position:absolute;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;pointer-events:auto;cursor:pointer;width:' + hit + 'px;height:' + hit + 'px';
+        var d = document.createElement('div');
+        d.textContent = String(p.n);
+        d.style.cssText = 'min-width:' + dot + 'px;height:' + dot + 'px;padding:0 ' + 6 / scale + 'px;box-sizing:border-box;border-radius:' + dot / 2 + 'px;background:#e5484d;color:#fff;font:600 ' + 14 / scale + 'px/' + dot + 'px system-ui,sans-serif;text-align:center;box-shadow:0 0 0 ' + 2 / scale + 'px #fff';
+        m.textContent = '';
+        m.appendChild(d);
+        m.setAttribute('data-pin', String(p.n));
+      } else {
+        m.style.cssText = 'position:absolute;transform:translate(-50%,-50%);min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:#e5484d;color:#fff;font:600 12px/22px system-ui,sans-serif;text-align:center;box-shadow:0 0 0 2px #fff';
+      }
       m.style.left = p.x + 'px';
       m.style.top = p.y + 'px';
       layer.appendChild(m);
@@ -132,6 +156,13 @@ export const MOCKUP_PIN_HELPER_SCRIPT = `(function () {
     document.body.appendChild(layer);
   }
   document.addEventListener('click', function (e) {
+    var tapped = e.target && e.target.closest ? e.target.closest('[data-pin]') : null;
+    if (tapped) {
+      e.preventDefault();
+      e.stopPropagation();
+      send({ type: 'pin-open', n: Number(tapped.getAttribute('data-pin')) });
+      return;
+    }
     if (!pinMode) return;
     e.preventDefault();
     e.stopPropagation();
@@ -153,7 +184,7 @@ export const MOCKUP_PIN_HELPER_SCRIPT = `(function () {
       pinMode = d.on === true;
       document.documentElement.style.cursor = pinMode ? 'crosshair' : '';
     } else if (d.type === 'pins' && Array.isArray(d.pins)) {
-      drawPins(d.pins);
+      drawPins(d.pins, typeof d.scale === 'number' ? d.scale : 0);
     }
   });
   send({ type: 'ready' });

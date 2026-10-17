@@ -49,8 +49,10 @@ import {
   RunNotes,
 } from './handoff';
 import { cardAtWorktree } from './handoff/context';
+import { readAncestors } from './hooks/ancestors';
 import { LocalSocketServer } from './local/server';
 import { LocalService } from './local/service';
+import { loadSessionTokenSecret, SessionTokens } from './local/session-tokens';
 import { HookSessions } from './local/sessions';
 import { acquireLock } from './lock';
 import { errorMessage, type Logger } from './log';
@@ -363,6 +365,13 @@ export const runDaemon = async (
     // warm-up. `cards` is built right below; nothing here runs before it.
     const cardsDir =
       options.cardsDir ?? join(dirname(options.spoolDir), 'cards');
+    // #113: the capability tokens of the local socket, signed with a secret
+    // kept beside the spool, so a card round's token outlives a restart.
+    const sessionTokens = new SessionTokens(
+      loadSessionTokenSecret(
+        join(dirname(options.spoolDir), 'session-token.key'),
+      ),
+    );
     const handoff: HandoffService = new HandoffService({
       deps: skillsDeps,
       state: new HandoffStateStore((cardId) => join(cardsDir, cardId)),
@@ -384,6 +393,7 @@ export const runDaemon = async (
       emit: (event) => connection?.emit(event),
       log,
       otlpPort: () => otlp?.port ?? null,
+      sessionToken: (binding) => sessionTokens.mint(binding),
       // `steward` is built right below; a poll runs only after `start`.
       onSessionEnded: (record, exitCode) =>
         steward.sessionEnded(record, exitCode),
@@ -686,6 +696,26 @@ export const runDaemon = async (
       envelope: async (projectId) =>
         (await directory.resolve([projectId])).get(projectId),
       sessions: hookSessions,
+      tokens: sessionTokens,
+      // #113: the daemon reads a peer's ancestors itself, never the hook's word.
+      ancestorsOf: (pid) =>
+        readAncestors(pid, { os: process.platform, exec: options.exec }),
+      alive: (pid) => {
+        try {
+          process.kill(pid, 0);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      launchedSession: (sessionId) =>
+        cards.store
+          .all()
+          .some(
+            (r) =>
+              r.sessionId === sessionId &&
+              (r.phase === 'starting' || r.phase === 'running'),
+          ),
       // #482: a round's session is known from its record after a restart.
       liveRound: (cwd) =>
         cardAtWorktree(
@@ -705,7 +735,7 @@ export const runDaemon = async (
     if (socketPath) {
       const server = new LocalSocketServer({
         path: socketPath,
-        handle: (op, args) => localService.handle(op, args),
+        handle: (op, args, caller) => localService.handle(op, args, caller),
         log,
       });
       try {

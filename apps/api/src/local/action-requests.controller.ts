@@ -26,7 +26,7 @@ import {
 import { ActionRequestDecisionDto, ActionRequestsListQuery } from './dto';
 
 /**
- * Action requests (spec 201 D18, "API"). Listing needs membership; deciding
+ * Action requests (spec 201 D18, "API"). Listing needs membership and shows the input to viewers too (ADR-0050); deciding
  * needs operator on the project. A project the caller cannot see is 404.
  */
 @Controller('projects/:projectId/action-requests')

@@ -148,6 +148,17 @@ describe('applyViewerChange', () => {
     ).toBe('?variant=1&rev=rev-1-1&vp=Night&theme=dark');
   });
 
+  test('a preset with fit goes back to Fit, as on a phone', () => {
+    const zoomed = new URLSearchParams('vp=Desktop&zoom=2');
+    expect(
+      applyViewerChange(zoomed, {
+        kind: 'viewport',
+        viewport: { name: 'Mobile', width: 390, height: 844 },
+        fit: true,
+      }),
+    ).toBe('?vp=Mobile');
+  });
+
   test('a width is clamped', () => {
     const empty = new URLSearchParams();
     expect(applyViewerChange(empty, { kind: 'width', width: 1 })).toBe(
