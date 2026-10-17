@@ -89,12 +89,6 @@ export function CardFace({
   return (
     <SelectionFrame>
       {selection?.selected ? <SelectedTint /> : null}
-      {selection && !suggestion ? (
-        <SelectionBox label={card.label} selection={selection} />
-      ) : null}
-      {selection?.selecting && suggestion ? (
-        <UnselectableMark text="Suggestions are accepted or dismissed one by one" />
-      ) : null}
       <div
         data-card-number={card.number}
         data-select-column={card.column}
@@ -107,6 +101,15 @@ export function CardFace({
           // #497: the menu trigger's 44 px touch target stays inside the row.
           className={`flex h-4 min-w-0 items-center gap-1.5 whitespace-nowrap text-xs leading-4 text-ink-2${menu ? ' pointer-coarse:h-(--size-tap)' : ''}`}
         >
+          {selection && !suggestion ? (
+            <SelectionBox label={card.label} selection={selection} />
+          ) : null}
+          {selection && suggestion ? (
+            <UnselectableMark
+              shown={selection.selecting}
+              text="Suggestions are accepted or dismissed one by one"
+            />
+          ) : null}
           <span className="shrink-0 font-mono">{card.label}</span>
           {card.stack ? (
             // #480: the card's stack, wherever the card sits.
