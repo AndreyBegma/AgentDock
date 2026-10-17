@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Accept selected candidates</title>
+<style>
+:root{--radius-control:6px;--radius-surface:8px;--radius-sheet:12px;--font-sans:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;--font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;--glass-filter-strong:blur(40px) saturate(180%) brightness(var(--glass-brightness-strong))}
+:root[data-theme="dark"],:root:not([data-theme]){color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-content:rgb(27 38 71/0.96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246/0.62);--color-ink-3:rgb(242 242 246/0.53);--color-line:rgb(255 255 255/0.1);--color-line-strong:rgb(255 255 255/0.18);--color-hover:rgb(255 255 255/0.06);--color-focus:#b4b2ff;--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-soft:rgb(91 91 246/0.2);--color-accent-ink:#b4b2ff;--color-info:#5fb4f0;--color-hue-1:#5b9cf6;--color-hue-7:#a68bfa;--canvas-glow:18%;--color-scrim:rgb(10 16 34/0.3);--glass-sheen:rgb(255 255 255/0.06);--glass-scrim-strong:rgb(9 9 12/0.64);--glass-brightness-strong:0.7;--glass-edge:rgb(255 255 255/0.14);--glass-spec:rgb(255 255 255/0.2);--glass-rim-strong:rgb(242 242 246/0.22);--glass-rim-shade-strong:rgb(9 9 12/0.2);--glass-meniscus:rgb(9 9 12/0.55);--glass-refract:rgb(242 242 246/0.35);--glass-shadow-strong:rgb(0 0 0/0.45);--control-spec:rgb(255 255 255/0.05)}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-content:rgb(255 255 255/0.96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27/0.72);--color-ink-3:rgb(24 24 27/0.64);--color-line:rgb(0 0 0/0.1);--color-line-strong:rgb(0 0 0/0.23);--color-hover:rgb(0 0 0/0.06);--color-focus:#4f46e5;--color-accent:#4f46e5;--color-on-accent:#fff;--color-accent-soft:rgb(79 70 229/0.12);--color-accent-ink:#4338ca;--color-info:#03629a;--color-hue-1:#1f64d6;--color-hue-7:#7244e0;--canvas-glow:10%;--color-scrim:rgb(10 16 34/0.22);--glass-sheen:rgb(0 0 0/0.06);--glass-scrim-strong:rgb(255 255 255/0.64);--glass-brightness-strong:1.3;--glass-edge:rgb(0 0 0/0.18);--glass-spec:rgb(0 0 0/0.2);--glass-rim-strong:rgb(255 255 255/0.3);--glass-rim-shade-strong:rgb(24 24 27/0.08);--glass-meniscus:rgb(24 24 27/0.12);--glass-refract:rgb(255 255 255/0.5);--glass-shadow-strong:rgb(0 0 0/0.16);--control-spec:rgb(255 255 255/0.05)}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground);color:var(--color-ink)}
+body{margin:0;min-height:100vh;font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased;padding:32px}
+h1,h2,h3,p{margin:0}
+:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}
+.ad-canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.ad-glass-strong{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim-strong);backdrop-filter:var(--glass-filter-strong);-webkit-backdrop-filter:var(--glass-filter-strong);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),inset 1px 1px 0 var(--glass-rim-strong),inset -1px -1px 0 var(--glass-rim-shade-strong),inset 0 -3px 3px -1px var(--glass-meniscus),inset 0 0 18px -4px var(--glass-refract),0 20px 48px var(--glass-shadow-strong)}
+.ad-icon{width:16px;height:16px;flex-shrink:0}
+.ad-row{display:flex;align-items:center;gap:8px}
+.ad-ink-2{color:var(--color-ink-2)}.ad-ink-3{color:var(--color-ink-3)}
+.ad-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;font:inherit;font-weight:600;font-size:14px;height:28px;padding:0 14px;border-radius:var(--radius-control);border:1px solid transparent;background:none;color:var(--color-ink);cursor:pointer}
+.ad-btn:disabled{opacity:.4;pointer-events:none}
+.ad-btn--solid{background:var(--color-accent);color:var(--color-on-accent)}
+.ad-btn--ghost{color:var(--color-ink-2)}
+.ad-btn--ghost:hover{color:var(--color-ink);background:var(--color-hover)}
+.ad-btn--icon{padding:0;width:24px;height:24px}
+.ad-select{appearance:none;height:28px;font:inherit;font-size:12px;color:var(--color-ink);background:var(--color-surface);border:1px solid var(--color-line-strong);border-radius:var(--radius-control);padding:0 28px 0 10px;cursor:pointer;background-image:linear-gradient(45deg,transparent 50%,var(--color-ink-3) 50%),linear-gradient(135deg,var(--color-ink-3) 50%,transparent 50%);background-position:calc(100% - 14px) 55%,calc(100% - 9px) 55%;background-size:5px 5px,5px 5px;background-repeat:no-repeat}
+.ad-select option{background:var(--color-surface);color:var(--color-ink)}
+.ad-badge{display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:9999px;font-size:10px;font-weight:600;background:var(--color-hover);color:var(--color-ink-2)}
+.wrap{display:flex;gap:32px;flex-wrap:wrap;align-items:flex-start}
+.state{display:flex;flex-direction:column;gap:8px}
+.state__label{font-size:12px;font-weight:500;color:var(--color-ink-3)}
+.ad-dialog{width:min(32rem,calc(100vw - 2rem));padding:24px;border-radius:var(--radius-sheet);display:flex;flex-direction:column;gap:16px}
+.ad-dialog__title{font-size:20px;line-height:28px;letter-spacing:-.01em;font-weight:600}
+.ad-dialog__body{color:var(--color-ink-2)}
+.ad-dialog__actions{display:flex;justify-content:space-between;gap:8px}
+.order{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;border:1px solid var(--color-line);border-radius:var(--radius-surface);background:var(--color-content)}
+.order li{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;padding:8px 8px 8px 12px}
+.order li + li{border-top:1px solid var(--color-line)}
+.order__title{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.order__from{font-size:12px;color:var(--color-ink-3)}
+.order__move{display:flex;flex-direction:column}
+.kind{font-family:var(--font-mono);font-size:10px;font-weight:600;text-transform:uppercase;color:var(--color-ink-3);border:1px solid var(--color-line-strong);border-radius:4px;padding:1px 5px;line-height:14px}
+.preview{display:flex;flex-direction:column;gap:6px;padding:12px;border-radius:var(--radius-surface);background:var(--color-hover);font-size:12px;line-height:16px}
+.preview__head{font-weight:600;color:var(--color-ink-2)}
+.preview code{font-family:var(--font-mono);font-size:11px;color:var(--color-ink)}
+.note{display:flex;gap:8px;font-size:12px;line-height:16px;color:var(--color-ink-2)}
+.note .ad-icon{width:14px;height:14px;color:var(--color-info);margin-top:1px}
+.simple{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.simple li{display:flex;align-items:center;gap:8px}
+.theme-toggle{position:fixed;right:16px;bottom:16px;background:var(--color-raised);border-color:var(--color-line-strong)}
+</style>
+</head>
+<body>
+<div class="ad-canvas"></div>
+<div class="wrap">
+
+  <div class="state">
+    <span class="state__label">Accept as stack — choose stage order</span>
+    <div class="ad-dialog ad-glass-strong" role="dialog" aria-labelledby="d1">
+      <h2 class="ad-dialog__title" id="d1">Accept 3 cards as a stack?</h2>
+      <p class="ad-dialog__body">Each stage starts once the one before it is merged. Change the order if the proposal has it wrong.</p>
+      <ol class="order" aria-label="Stage order">
+        <li>
+          <select class="ad-select" aria-label="Stage for Store per-session cost rollups"><option selected>Stage 1</option><option>Stage 2</option><option>Stage 3</option></select>
+          <div style="min-width:0"><div class="ad-row" style="gap:6px;min-width:0"><span class="kind">feature</span><span class="order__title">Store per-session cost rollups</span></div><div class="order__from">Cost dashboard per project</div></div>
+          <div class="order__move"><button class="ad-btn ad-btn--ghost ad-btn--icon" type="button" aria-label="Move up" disabled><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m18 15-6-6-6 6"/></svg></button><button class="ad-btn ad-btn--ghost ad-btn--icon" type="button" aria-label="Move down"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></button></div>
+        </li>
+        <li>
+          <select class="ad-select" aria-label="Stage for Expose the cost rollup API"><option>Stage 1</option><option selected>Stage 2</option><option>Stage 3</option></select>
+          <div style="min-width:0"><div class="ad-row" style="gap:6px;min-width:0"><span class="kind">feature</span><span class="order__title">Expose the cost rollup API</span></div><div class="order__from">Cost dashboard per project</div></div>
+          <div class="order__move"><button class="ad-btn ad-btn--ghost ad-btn--icon" type="button" aria-label="Move up"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m18 15-6-6-6 6"/></svg></button><button class="ad-btn ad-btn--ghost ad-btn--icon" type="button" aria-label="Move down"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></button></div>
+        </li>
+        <li>
+          <select class="ad-select" aria-label="Stage for Sign webhook payloads"><option>Stage 1</option><option>Stage 2</option><option selected>Stage 3</option></select>
+          <div style="min-width:0"><div class="ad-row" style="gap:6px;min-width:0"><span class="kind">feature</span><span class="order__title">Cost dashboard page</span><span class="ad-badge">UI</span></div><div class="order__from">Cost dashboard per project</div></div>
+          <div class="order__move"><button class="ad-btn ad-btn--ghost ad-btn--icon" type="button" aria-label="Move up"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m18 15-6-6-6 6"/></svg></button><button class="ad-btn ad-btn--ghost ad-btn--icon" type="button" aria-label="Move down" disabled><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></button></div>
+        </li>
+      </ol>
+      <div class="preview" aria-label="What gets created">
+        <span class="preview__head">Creates in Todo</span>
+        <span>Stage 1 <code>Store per-session cost rollups</code></span>
+        <span>Stage 2 <code>Expose the cost rollup API</code> · depends on stage 1</span>
+        <span>Stage 3 <code>Cost dashboard page</code> · depends on stage 2</span>
+      </div>
+      <div class="note"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span>The stack ends in UI, so a design is drafted for it, as for a confirmed stack. The intake's 2 attachments go to stage 1.</span></div>
+      <div class="ad-dialog__actions"><button class="ad-btn ad-btn--ghost" type="button">Cancel</button><button class="ad-btn ad-btn--solid" type="button">Accept as stack</button></div>
+    </div>
+  </div>
+
+  <div class="state">
+    <span class="state__label">Accept as independent cards</span>
+    <div class="ad-dialog ad-glass-strong" role="dialog" aria-labelledby="d2">
+      <h2 class="ad-dialog__title" id="d2">Accept 2 cards on their own?</h2>
+      <p class="ad-dialog__body">Each becomes its own card in Todo, with no dependencies between them. The orchestrator may run them in parallel.</p>
+      <ul class="simple">
+        <li><span class="kind">bug</span><span>Rate-limit the password check endpoint</span></li>
+        <li><span class="kind">feature</span><span>Sign webhook payloads</span></li>
+      </ul>
+      <div class="note"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span>Each intake's attachments go to the first card accepted from it. Webhook reliability already gave its attachments to C-241.</span></div>
+      <div class="ad-dialog__actions"><button class="ad-btn ad-btn--ghost" type="button">Cancel</button><button class="ad-btn ad-btn--solid" type="button">Accept 2 cards</button></div>
+    </div>
+  </div>
+</div>
+<button class="ad-btn theme-toggle" type="button" id="tt">Toggle theme</button>
+<script>document.getElementById('tt').addEventListener('click',function(){var r=document.documentElement;r.setAttribute('data-theme',r.getAttribute('data-theme')==='dark'?'light':'dark');});</script>
+</body>
+</html>
