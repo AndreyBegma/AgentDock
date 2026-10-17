@@ -55,7 +55,13 @@ export function DesignProgress({
   const stalled = isStalled(progress, log.lastOutputAt, lastLineAt, now);
 
   const stop = canStop ? (
-    <Button size="sm" variant="ghost" disabled={stopping} onClick={onStop}>
+    <Button
+      size="sm"
+      variant="ghost"
+      className="max-lg:h-11"
+      disabled={stopping}
+      onClick={onStop}
+    >
       {stopping ? 'Stopping…' : 'Stop'}
     </Button>
   ) : null;
@@ -70,7 +76,7 @@ export function DesignProgress({
       <Card
         variant="content"
         pad="md"
-        className="flex min-w-0 flex-wrap items-center gap-3"
+        className="flex min-w-0 flex-wrap items-center gap-3 max-lg:[--size-control:44px]"
         role="status"
       >
         <Spinner size="sm" label={null} />
@@ -83,7 +89,7 @@ export function DesignProgress({
           </span>
           {last ? (
             <span
-              className="truncate text-xs text-ink-3"
+              className="text-xs text-ink-3 [overflow-wrap:anywhere] max-lg:line-clamp-3 lg:truncate"
               title={last.text}
               aria-live="off"
             >
@@ -92,7 +98,12 @@ export function DesignProgress({
           ) : null}
         </div>
         {running ? (
-          <Button size="sm" variant="glass" onClick={() => setLogOpen(true)}>
+          <Button
+            size="sm"
+            variant="glass"
+            className="max-lg:h-11"
+            onClick={() => setLogOpen(true)}
+          >
             Show log
           </Button>
         ) : null}

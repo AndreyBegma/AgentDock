@@ -29,6 +29,8 @@ export const metadata: Metadata = {
 // The browser chrome takes the navy palette's ground (glass-ui#109): a meta
 // tag cannot read a CSS variable, so these mirror `--color-ground`.
 export const viewport: Viewport = {
+  // #526: the keyboard resizes the page, so a docked action stays above it.
+  interactiveWidget: 'resizes-content',
   themeColor: [
     { media: '(prefers-color-scheme: dark)', color: '#0a1022' },
     { media: '(prefers-color-scheme: light)', color: '#ffffff' },
