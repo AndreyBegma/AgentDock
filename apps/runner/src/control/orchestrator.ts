@@ -27,6 +27,12 @@ import {
   type TokenSaverLaunch,
   tokenSaverLaunch,
 } from '../launch/token-saver';
+import {
+  permissionModeRefusal,
+  policyFailure,
+  rootRefusal,
+} from '../policy/check';
+import { nodeRealpath } from '../policy/roots';
 import type { ControlDeps } from './deps';
 import { messageFileContent, writeAtomically } from './slot';
 import { watchedProject } from './target';
@@ -126,6 +132,13 @@ export const startOrchestrator = async (
   args: OrchestratorStartArgs,
   deps: ControlDeps,
 ): Promise<OrchestratorStartResult> => {
+  // ADR-0047: the dispatcher checked these too; the start path holds them
+  // itself, so no other caller can start the orchestrator around them.
+  const policy = deps.policy();
+  const refused =
+    permissionModeRefusal('orchestrator.start', args.permissionMode, policy) ??
+    rootRefusal(args.root, policy, deps.realpath ?? nodeRealpath);
+  if (refused) throw policyFailure(refused);
   const project = watchedProject(args, deps.watchedProjects());
   const profile = deps.profiles().find((p) => p.id === args.profileId);
   if (!profile) {

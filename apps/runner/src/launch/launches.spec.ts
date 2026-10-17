@@ -16,6 +16,7 @@ import {
   FILTER_RUN_KIND_ENV,
 } from '../filter/env';
 import { planTurnLaunchSpec, planTurnTokenSaver } from '../planner/launch';
+import { permissivePolicy } from '../policy/testing';
 import { launchSpec, skillTokenSaver } from '../skills/run/launch';
 import { FakeClock } from '../testing/fake-clock';
 import { fakeExec, tempDir } from '../testing/fixtures';
@@ -340,6 +341,7 @@ describe('orchestrator session launch (#445)', () => {
     clock: new FakeClock(),
     watchedProjects: () => [],
     profiles: () => [profile],
+    policy: permissivePolicy,
     home,
     selfCommand: SELF,
     orchestratorDir: join(dir, 'orchestrator'),

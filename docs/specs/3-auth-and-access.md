@@ -52,7 +52,7 @@ taken, with its source.
 | D5 | Sessions are server-side: a random 32-byte token in an httpOnly, `Secure` (when `APP_ENV=production`), `SameSite=Lax` cookie `ad_session`; the database stores only its SHA-256. Idle expiry 7 days, absolute 30 days, refreshed `lastSeenAt` at most once a minute | security.md |
 | D6 | Passwords: argon2id (`argon2` package, library defaults), length 12–256, no composition rules. Emails are trimmed and lower-cased | security.md — length policy is new here |
 | D7 | CSRF: double-submit — a non-httpOnly `ad_csrf` cookie set with the session, and every non-GET request must send the same value in `X-CSRF-Token`. Login and register are exempt (no session yet) but require `Content-Type: application/json` | security.md |
-| D8 | Rate limit: `@nestjs/throttler`, 10 requests / minute per IP on `/auth/login` and `/auth/register`. ~~Lockout: 10 consecutive failed logins for one account → locked 15 minutes~~ — replaced by [ADR-0047](../adr/0047-failed-passwords-slow-the-source-never-lock-the-account.md): failures counted per (email, IP), only that source waits (1 s doubling to 60 s), no account lock | security.md — numbers are new here |
+| D8 | Rate limit: `@nestjs/throttler`, 10 requests / minute per IP on `/auth/login` and `/auth/register`. ~~Lockout: 10 consecutive failed logins for one account → locked 15 minutes~~ — replaced by [ADR-0048](../adr/0048-failed-passwords-slow-the-source-never-lock-the-account.md): failures counted per (email, IP), only that source waits (1 s doubling to 60 s), no account lock | security.md — numbers are new here |
 | D9 | Errors do not reveal account existence: wrong email and wrong password give the same 401 `invalid_credentials`. A correct password on a `pending` account gives 403 `pending_approval`; on `rejected`/`disabled` gives 401 `invalid_credentials` | new |
 | D10 | The last active admin cannot be demoted, disabled or deleted (409 `last_admin`) | new |
 | D11 | Disabling a user, changing their role, or changing a password revokes all of that user's sessions (except the current one for a self password change) | security.md |
@@ -156,7 +156,7 @@ Add each to the matching `.env.example`. `NEXT_PUBLIC_API_URL` is removed from
 - [ ] After an admin opens registration, a new registration returns 201 and the user is `pending`; logging in with the right password returns 403 `pending_approval`.
 - [ ] Approving with role `operator` lets that user log in; `GET /auth/me` returns role `operator`.
 - [ ] Wrong email and wrong password return the same status and body.
-- [ ] ~~10 failed logins lock the account for 15 minutes~~ — superseded by ADR-0047: 5 failed logins make that source wait; other sources are not delayed.
+- [ ] ~~10 failed logins lock the account for 15 minutes~~ — superseded by ADR-0048: 5 failed logins make that source wait; other sources are not delayed.
 - [ ] More than 10 login requests per minute from one IP are throttled (429).
 - [ ] A non-GET request with a valid session but missing or mismatched `X-CSRF-Token` returns 403.
 - [ ] **Authorization:** an `operator` and a `viewer` each get 403 on every `/admin/*` route; an anonymous caller gets 401 on every route except `/health`, `/auth/login`, `/auth/register`, `/auth/registration`.

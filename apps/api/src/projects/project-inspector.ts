@@ -89,6 +89,8 @@ export class ProjectInspector {
             throw projectError(422, 'not_a_repository', detail);
           case 'path_not_allowed':
             throw projectError(403, 'path_not_allowed', detail);
+          case 'policy_refused':
+            throw projectError(403, 'policy_refused', detail);
           default:
             throw projectError(502, 'runner_error', `${name}: ${detail}`);
         }

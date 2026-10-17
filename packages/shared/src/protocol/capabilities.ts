@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { mcpServerNameSchema } from '../token-saver/contracts';
 // Type-only: `./commands` imports this module's schemas.
 import type { CommandName } from './commands';
+import { type RunnerPolicy, runnerPolicySchema } from './policy';
 
 /** At most this many MCP server names on one runtime profile (#445). */
 export const PROFILE_MCP_SERVERS_MAX = 64;
@@ -127,6 +128,13 @@ export const capabilitiesSchema = z.object({
    * sends the command only when this is `true`. Absent means `false`.
    */
   sessionMessage: z.boolean().optional(),
+  /**
+   * ADR-0047: the runner's local security policy as it is now — values only,
+   * no path beyond `allowedRoots`. The server cannot change it; the UI reads
+   * it to explain a `policy_refused` before the person asks. Absent means
+   * unknown: a runner older than the policy, which refuses nothing.
+   */
+  policy: runnerPolicySchema.optional(),
 });
 export type Capabilities = z.infer<typeof capabilitiesSchema>;
 
@@ -156,6 +164,14 @@ export const handoffAvailable = (capabilities: Capabilities): boolean =>
 /** Whether the API may send `session.message` (#489); absent is `false`. */
 export const sessionMessageAvailable = (capabilities: Capabilities): boolean =>
   capabilities.sessionMessage === true;
+
+/** The runner's policy (ADR-0047); null for a runner older than it. */
+export const runnerPolicyOf = (capabilities: unknown): RunnerPolicy | null => {
+  const parsed = z
+    .object({ policy: runnerPolicySchema })
+    .safeParse(capabilities);
+  return parsed.success ? parsed.data.policy : null;
+};
 
 /** What a runner said it serves (#233, ADR-0023): names only, never paths or versions. */
 export interface RunnerCommands {

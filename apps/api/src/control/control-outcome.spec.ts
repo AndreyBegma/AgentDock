@@ -27,6 +27,7 @@ describe('controlOutcome', () => {
     ['unknown_profile', 422, 'unknown_profile'],
     ['unsupported_runtime', 422, 'unsupported_runtime'],
     ['path_not_allowed', 403, 'path_not_allowed'],
+    ['policy_refused', 403, 'policy_refused'],
     ['timeout', 504, 'runner_timeout'],
     ['invalid_args', 502, 'runner_error'],
     ['path_not_found', 502, 'runner_error'],

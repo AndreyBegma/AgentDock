@@ -332,6 +332,13 @@ export const boardFailureOf = (
         BOARD_ERROR.attachmentsUnavailable,
         `${name}: the attachments could not be delivered to the runner${detail}`,
       );
+    // ADR-0047: the runner's local policy; its message names the rule and the fix.
+    case 'policy_refused':
+      return new BoardFailure(
+        403,
+        BOARD_ERROR.policyRefused,
+        `${name}: ${error.message ?? 'refused by the runner policy'}`,
+      );
     case 'unsupported_runtime':
     case 'unknown_profile':
       return new BoardFailure(

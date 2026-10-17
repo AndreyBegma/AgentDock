@@ -1,4 +1,4 @@
-# ADR-0047: Failed passwords slow down the source; they never lock the account
+# ADR-0048: Failed passwords slow down the source; they never lock the account
 
 Status: accepted · Date: 2026-10-17 ·
 Card: C-109 (security audit 2026-10-16, WI-07, decision D-05) ·
