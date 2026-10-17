@@ -1,7 +1,9 @@
 import { resolve } from 'node:path';
 import {
   orchestratorPermissionModeSchema,
+  POLICY_CODE_DENY_MAX,
   POLICY_GATED_COMMANDS,
+  policyCodeDenySchema,
 } from '@agentdock/shared/protocol';
 import { loadConfig, saveConfig } from '../config';
 import { EXIT } from '../service';
@@ -22,6 +24,11 @@ export const POLICY_USAGE = `Usage: agentdock-runner policy <command>
   show                         print the effective policy
   allow-root <dir>…            let projects under <dir> be watched
   deny-root <dir>…             stop allowing <dir>
+  deny-path <pattern>…         never let the assistant's code commands return
+                               files matching <pattern> (a glob over paths in
+                               a checkout; no "/" matches a name at any depth)
+  allow-path <pattern>…        remove a deny-path pattern (secrets such as
+                               .env* and key files stay refused)
   set <key> <value>            change one rule:
         maxPermissionMode manual|acceptEdits|auto|bypassPermissions
         terminal.write true|false
@@ -141,6 +148,27 @@ export const runPolicy = (
       policy = {
         ...config.policy,
         allowedRoots: config.policy.allowedRoots.filter((r) => !named.has(r)),
+      };
+    } else if (verb === 'deny-path' && rest.length > 0) {
+      const patterns = rest.map((pattern) => {
+        const parsed = policyCodeDenySchema.safeParse(pattern);
+        if (!parsed.success) {
+          throw new PolicyUsageError(`not a path pattern: ${pattern}`);
+        }
+        return parsed.data;
+      });
+      const deny = [...new Set([...config.policy.code.deny, ...patterns])];
+      if (deny.length > POLICY_CODE_DENY_MAX) {
+        throw new PolicyUsageError(
+          `at most ${POLICY_CODE_DENY_MAX} deny-path patterns`,
+        );
+      }
+      policy = { ...config.policy, code: { deny } };
+    } else if (verb === 'allow-path' && rest.length > 0) {
+      const named = new Set(rest.map((pattern) => pattern.trim()));
+      policy = {
+        ...config.policy,
+        code: { deny: config.policy.code.deny.filter((p) => !named.has(p)) },
       };
     } else {
       throw new PolicyUsageError(
