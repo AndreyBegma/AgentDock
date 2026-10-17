@@ -4,6 +4,7 @@ import {
   type IssuesSnapshotData,
   type IssuesUnavailableData,
   isFleetEventType,
+  isHttpsGithubUrl,
   parseQueueEvent,
   type QueueEvent,
   type RunnerEvent,
@@ -161,7 +162,7 @@ export class QueueProjector {
         labels: i.labels,
         assignees: i.assignees,
         body: i.body,
-        url: i.url,
+        url: githubUrlOr(i.url, project.repo, 'issues', i.number),
         ghUpdatedAt: new Date(i.updatedAt),
       })),
       ...data.pullRequests.map((p) => ({
@@ -171,7 +172,7 @@ export class QueueProjector {
         labels: [],
         assignees: [],
         body: p.body,
-        url: p.url,
+        url: githubUrlOr(p.url, project.repo, 'pull', p.number),
         ghUpdatedAt: new Date(p.updatedAt),
       })),
     ];
@@ -299,6 +300,17 @@ export class QueueProjector {
     return true;
   }
 }
+
+/** The runner's URL, or the canonical one when it is not an `https://github.com` URL. */
+const githubUrlOr = (
+  url: string | undefined,
+  repo: string,
+  segment: 'issues' | 'pull',
+  number: number,
+): string =>
+  url && isHttpsGithubUrl(url)
+    ? url
+    : `https://github.com/${repo}/${segment}/${number}`;
 
 interface Row {
   number: number;

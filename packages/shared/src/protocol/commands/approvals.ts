@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { CommandDefinition } from '../commands';
 import { prChecksSchema } from '../events/fleet';
+import { httpsGithubUrl } from '../github-url';
 import { absolutePathSchema } from '../projects';
 
 /**
@@ -55,7 +56,14 @@ export type PrInspectState = z.infer<typeof prInspectStateSchema>;
 export const prCheckSchema = z.object({
   name: z.string(),
   state: z.enum(['pass', 'wait', 'fail']),
-  url: z.string().optional(),
+  /**
+   * The check's details page. A CI system runs off github.com, so only the
+   * scheme is pinned (`https`); anything else is dropped, not the check.
+   */
+  url: z
+    .url({ protocol: /^https$/ })
+    .optional()
+    .catch(undefined),
 });
 export type PrCheck = z.infer<typeof prCheckSchema>;
 
@@ -68,7 +76,7 @@ export type PrFile = z.infer<typeof prFileSchema>;
 
 export const prInspectionSchema = z.object({
   number: z.number().int().positive(),
-  url: z.url(),
+  url: httpsGithubUrl,
   title: z.string(),
   /** Trimmed by the runner to `PR_INSPECT_BODY_MAX_BYTES`. */
   body: z.string(),

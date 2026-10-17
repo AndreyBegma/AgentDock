@@ -5,6 +5,7 @@ import {
   requestableActionRequestKindSchema,
 } from '../action-requests/contracts';
 import type { Role } from './commands';
+import { httpsGithubUrl } from './github-url';
 
 /**
  * Runner-initiated requests (ADR-0020 §4, docs/specs/201-claude-code-integration.md
@@ -170,7 +171,7 @@ export const localIssueCreateArgsSchema = z.strictObject({
  */
 export const localIssueResultSchema = z.object({
   number: z.number().int().positive(),
-  url: z.string().min(1),
+  url: httpsGithubUrl,
   queued: z.boolean(),
   actionRequestId: z.string().min(1).optional(),
   waiting: z.string().optional(),

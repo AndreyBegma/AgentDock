@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { stewardRunnerConfigSchema } from '../steward/contracts';
+import { httpsGithubUrl } from './github-url';
 
 /** An absolute POSIX path. Runners run on Linux and macOS only. */
 export const absolutePathSchema = z
@@ -77,7 +78,7 @@ export const docsEvidenceSchema = z.object({
   file: z.string().min(1).optional(),
   /** 1-based line in `file`. */
   line: z.number().int().positive().optional(),
-  url: z.string().min(1).optional(),
+  url: httpsGithubUrl.optional(),
 });
 export type DocsEvidence = z.infer<typeof docsEvidenceSchema>;
 

@@ -29,6 +29,7 @@ export * from './events/sessions';
 export * from './events/skills';
 export * from './events/text';
 export * from './events/uiprofile';
+export * from './github-url';
 export * from './local';
 export * from './messages';
 export * from './pairing';
