@@ -33,7 +33,7 @@ export type IntakeChatPhase =
 
 export const intakeChatPhase = (plan: PlanDetail): IntakeChatPhase => {
   if (plan.status === 'done') return { kind: 'done' };
-  // #592 (ADR-0055): the cards wait in Drafts as candidates.
+  // #592 (ADR-0056): the cards wait in Drafts as candidates.
   if (plan.status === 'reviewing') {
     return { kind: 'review', candidates: plan.intake?.candidates ?? [] };
   }
@@ -381,7 +381,7 @@ export const cardsMessage = (
   ].join('\n');
 
 /**
- * #592 (ADR-0055): the intake wrote candidates — no card exists until the
+ * #592 (ADR-0056): the intake wrote candidates — no card exists until the
  * person accepts them in Drafts on the Board.
  */
 export const candidatesMessage = (

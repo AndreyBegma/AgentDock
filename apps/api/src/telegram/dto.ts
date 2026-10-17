@@ -1,5 +1,8 @@
-import type { TelegramBotTokenUpdate } from '@agentdock/shared';
-import { IsString, Matches, MaxLength } from 'class-validator';
+import type {
+  TelegramBotTokenUpdate,
+  TelegramSignInRequest,
+} from '@agentdock/shared';
+import { IsNotEmpty, IsString, Matches, MaxLength } from 'class-validator';
 
 /**
  * `PUT /admin/integrations/telegram`. The shape of a BotFather token —
@@ -13,4 +16,12 @@ export class TelegramBotTokenDto implements TelegramBotTokenUpdate {
     message: 'token must be a Telegram bot token (<bot id>:<secret>)',
   })
   token!: string;
+}
+
+/** `POST /auth/telegram` (#580): the Mini App's `initData`, checked by its HMAC. */
+export class TelegramSignInDto implements TelegramSignInRequest {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(4096)
+  initData!: string;
 }

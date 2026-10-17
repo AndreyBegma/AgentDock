@@ -90,6 +90,21 @@ describe('board actions', () => {
     ]);
   });
 
+  it('opens the card in the Mini App over https, else by its plain link (#580)', () => {
+    const openOf = (appUrl: string) =>
+      cardKeyboard('p1', card(), false, appUrl)
+        .flat()
+        .find((b) => b.text === 'Open in app');
+    expect(openOf('https://dock.example.com')).toEqual({
+      text: 'Open in app',
+      web_app: { url: `https://dock.example.com/tg?start=p1_${card().number}` },
+    });
+    expect(openOf('http://localhost:3517')).toEqual({
+      text: 'Open in app',
+      url: `http://localhost:3517/projects/p1/board/cards/${card().number}`,
+    });
+  });
+
   it('words the board’s refusals as the web does', () => {
     expect(boardFailureText('move_refused', 'fleet_slot', 'x')).toMatch(
       /follows its slot/,

@@ -290,7 +290,7 @@ export class AcceptCandidateRefDto implements AcceptCandidateRef {
   stage?: number;
 }
 
-/** `POST /projects/:projectId/candidates/accept` (#592, ADR-0055 §3). */
+/** `POST /projects/:projectId/candidates/accept` (#592, ADR-0056 §3). */
 export class AcceptCandidatesDto implements AcceptCandidatesRequest {
   @IsIn(ACCEPT_CANDIDATES_AS)
   as!: AcceptCandidatesAs;

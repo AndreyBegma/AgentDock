@@ -39,6 +39,7 @@ export const createTelegramApp = async (
     apiBase: telegram.url,
     pollTimeoutS: 1,
     appUrl: 'https://dock.example.com',
+    initDataMaxAgeS: 3600,
     autoStart: false,
     deliveryIntervalMs: 60_000,
     idleMs: 50,

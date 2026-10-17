@@ -145,7 +145,7 @@ interface Placed {
 }
 
 /**
- * New work candidates (#592, ADR-0055): the cards an intake writes wait as
+ * New work candidates (#592, ADR-0056): the cards an intake writes wait as
  * `plan_candidates` until the person accepts them — a board card in Todo
  * with the intake as its origin — or rejects them. Every decision locks the
  * plans it touches (in id order), so two tabs deciding one candidate make
@@ -266,7 +266,7 @@ export class PlanCandidatesService {
   }
 
   /**
-   * `POST /projects/:projectId/candidates/accept` (ADR-0055 §3): the named
+   * `POST /projects/:projectId/candidates/accept` (ADR-0056 §3): the named
    * candidates of the caller's intakes become cards in Todo — independent,
    * or one stack made as Confirm of a stack makes it (ADR-0044) — in one
    * transaction. The first card of each intake takes its attachments.
@@ -520,7 +520,7 @@ export class PlanCandidatesService {
     return row;
   }
 
-  /** ADR-0055 §5: an intake with no pending candidate is done; it leaves Drafts. */
+  /** ADR-0056 §5: an intake with no pending candidate is done; it leaves Drafts. */
   private async closeIfDecided(tx: Tx, planId: string): Promise<void> {
     const pending = await tx.planCandidate.count({
       where: { planId, status: 'pending' },

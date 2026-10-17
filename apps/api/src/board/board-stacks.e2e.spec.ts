@@ -99,7 +99,7 @@ describe('card stacks (e2e, #480)', () => {
   };
 
   /**
-   * #592 (ADR-0055): Confirm writes candidates; Accept all makes them as
+   * #592 (ADR-0056): Confirm writes candidates; Accept all makes them as
    * proposed — the stack in its stages, or independent cards.
    */
   const acceptAll = async (planId: string) => {

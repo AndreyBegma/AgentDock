@@ -259,9 +259,12 @@ describe('Telegram Board commands (e2e, #576)', () => {
       expect(text).toContain('Kind: feature · Column: To Do');
       expect(text).toContain('Agent: not started');
       expect(text).toContain('Users sign in. With email.');
+      // #580: an https APP_URL opens the card in the Mini App.
       expect(buttons(body)).toContainEqual({
         text: 'Open in app',
-        url: `https://dock.example.com/projects/${widget}/board/cards/${card.number}`,
+        web_app: {
+          url: `https://dock.example.com/tg?start=${widget}_${card.number}`,
+        },
       });
       expect(labels(body)).toEqual(
         expect.arrayContaining(['Move', 'Run', '‹ To Do']),

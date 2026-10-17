@@ -17,7 +17,7 @@ import { pluralize } from '../../lib/format';
 import { KindChip } from './split-review';
 
 /**
- * #592 (ADR-0055): an intake under review on the Drafts strip — its
+ * #592 (ADR-0056): an intake under review on the Drafts strip — its
  * candidates as rows, each with a checkbox, its kind, title and two lines of
  * its body, and Open / Reject / Accept. A proposed stack numbers its stages
  * on a line; a proposed split or stack has **Accept all** (Accept rest once

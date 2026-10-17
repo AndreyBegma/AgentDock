@@ -2,6 +2,7 @@ import type {
   TelegramIntegrationStatus,
   TelegramLinkCode,
   TelegramLinkStatus,
+  TelegramSignInResponse,
 } from '@agentdock/shared';
 import {
   Body,
@@ -11,13 +12,28 @@ import {
   HttpCode,
   Post,
   Put,
+  Req,
+  Res,
+  UseFilters,
+  UseGuards,
 } from '@nestjs/common';
+import { ThrottlerGuard } from '@nestjs/throttler';
+import type { Request, Response } from 'express';
 import { AuditCtx } from '../audit';
 import type { AuditContext } from '../audit/audit.types';
-import { type AuthUser, CurrentUser, Roles } from '../auth';
-import { TelegramBotTokenDto } from './dto';
+import { requestOrigin } from '../audit/audit-context';
+import {
+  type AuthUser,
+  CurrentUser,
+  Public,
+  Roles,
+  SourceThrottledFilter,
+  setSessionCookies,
+} from '../auth';
+import { TelegramBotTokenDto, TelegramSignInDto } from './dto';
 import { TelegramIntegrationService } from './telegram-integration.service';
 import { TelegramLinkingService } from './telegram-linking.service';
+import { TelegramWebAppService } from './telegram-web-app.service';
 
 /** The caller's own Telegram link (spec 22 D9). No user id in any path. */
 @Controller('notifications/telegram/link')
@@ -74,5 +90,32 @@ export class TelegramAdminController {
   @HttpCode(204)
   test(@CurrentUser() admin: AuthUser): Promise<void> {
     return this.integration.sendTest(admin);
+  }
+}
+
+/**
+ * #580: the Mini App's sign-in. Public — the HMAC of `initData` is the
+ * credential — and throttled per IP like a password sign-in.
+ */
+@Controller('auth/telegram')
+@UseFilters(SourceThrottledFilter)
+export class TelegramWebAppController {
+  constructor(private readonly webApp: TelegramWebAppService) {}
+
+  @Public()
+  @UseGuards(ThrottlerGuard)
+  @Post()
+  @HttpCode(200)
+  async signIn(
+    @Body() dto: TelegramSignInDto,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<TelegramSignInResponse> {
+    const { session, ...signedIn } = await this.webApp.signIn(
+      dto.initData,
+      requestOrigin(request),
+    );
+    setSessionCookies(response, session);
+    return signedIn;
   }
 }

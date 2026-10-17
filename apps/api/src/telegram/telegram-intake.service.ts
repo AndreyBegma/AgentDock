@@ -51,8 +51,9 @@ import {
   splitMessage,
   THINKING_TEXT,
 } from './intake-chat';
+import { openCardsKeyboard } from './mini-app-buttons';
 import {
-  type InlineKeyboardButton,
+  type InlineButton,
   type TelegramCallbackQuery,
   TelegramClient,
   type TelegramMessage,
@@ -618,9 +619,11 @@ export class TelegramIntakeService implements OnModuleInit, OnModuleDestroy {
           select: { number: true, title: true, kind: true },
           orderBy: { number: 'asc' },
         });
+        // #580: each card opens in the Mini App, besides its link.
         await send.replace(
           row.thinkingMessageId,
           cardsMessage(cards, row.projectId, appUrl),
+          openCardsKeyboard(appUrl, row.projectId, cards),
         );
         await this.prisma.telegramIntake.deleteMany({ where: { planId } });
         return;
@@ -653,7 +656,7 @@ export class TelegramIntakeService implements OnModuleInit, OnModuleDestroy {
     chatId: bigint,
     messageId: number,
     text: string,
-    keyboard: InlineKeyboardButton[][],
+    keyboard: InlineButton[][],
   ): Promise<void> {
     const bot = await this.tokens.read();
     if (!bot.ok) return;
@@ -696,10 +699,7 @@ class Sender {
     private readonly chatId: bigint,
   ) {}
 
-  message(
-    text: string,
-    keyboard?: InlineKeyboardButton[][],
-  ): Promise<number | null> {
+  message(text: string, keyboard?: InlineButton[][]): Promise<number | null> {
     return this.client.sendMessage(
       this.token,
       this.chatId,
@@ -712,7 +712,7 @@ class Sender {
   edit(
     messageId: number,
     text: string,
-    keyboard?: InlineKeyboardButton[][],
+    keyboard?: InlineButton[][],
   ): Promise<void> {
     return this.client.editMessageText(
       this.token,
@@ -731,7 +731,7 @@ class Sender {
   async replace(
     thinkingId: number | null,
     text: string,
-    keyboard?: InlineKeyboardButton[][],
+    keyboard?: InlineButton[][],
   ): Promise<number | null> {
     if (thinkingId !== null) {
       try {

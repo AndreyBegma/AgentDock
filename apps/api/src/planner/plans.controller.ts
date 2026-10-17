@@ -297,7 +297,7 @@ export class PlansController {
     return this.planCards.confirmSplit(plan, body);
   }
 
-  /** #592 (ADR-0055): the person edits a candidate by hand. */
+  /** #592 (ADR-0056): the person edits a candidate by hand. */
   @Patch('plans/:planId/candidates/:candidateId')
   @ProjectRole('operator')
   async updateCandidate(

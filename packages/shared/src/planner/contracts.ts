@@ -270,7 +270,7 @@ export interface PlanIntakeView {
    */
   split?: PlanIntakeSplitView | null;
   /**
-   * #592 (ADR-0055): the cards the intake wrote, waiting for the person in
+   * #592 (ADR-0056): the cards the intake wrote, waiting for the person in
    * Drafts, in the proposal's order — decided ones too, until none is
    * pending (optional: absent reads as none).
    */
@@ -281,7 +281,7 @@ export interface PlanIntakeView {
   attachments?: number;
 }
 
-/** #592 (ADR-0055): a card the intake wrote, before the person decides it. */
+/** #592 (ADR-0056): a card the intake wrote, before the person decides it. */
 export interface PlanCandidateView {
   id: string;
   planId: string;
@@ -326,7 +326,7 @@ export const ACCEPT_CANDIDATES_AS = ['cards', 'stack'] as const;
 export type AcceptCandidatesAs = (typeof ACCEPT_CANDIDATES_AS)[number];
 
 /**
- * `POST /projects/:projectId/candidates/accept` (#592, ADR-0055 §3): pending
+ * `POST /projects/:projectId/candidates/accept` (#592, ADR-0056 §3): pending
  * candidates of the caller's intakes — of one intake or several — made into
  * cards in Todo at once: independent (`cards`, in the listed order), or one
  * stack (`stack`), each candidate in the 0-based `stage` the person chose.
@@ -430,7 +430,7 @@ export interface ConfirmSplitCard {
 }
 
 /**
- * #592 (ADR-0055): Confirm writes candidates, not cards — in the confirmed
+ * #592 (ADR-0056): Confirm writes candidates, not cards — in the confirmed
  * order (stage order for a stack); they wait in Drafts.
  */
 export interface ConfirmSplitResponse {

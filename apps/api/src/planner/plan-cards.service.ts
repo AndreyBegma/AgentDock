@@ -181,7 +181,7 @@ export class PlanCardsService {
    * #409: Confirm a split — the cards the person kept, in their order, with
    * the title and kind they left and the model's body. #480 (ADR-0044): with
    * `stack`, in stage order, the stack's title, body, design switch and
-   * stages beside them, whichever the intake proposed. #592 (ADR-0055): they
+   * stages beside them, whichever the intake proposed. #592 (ADR-0056): they
    * become candidates, not cards — the person accepts or rejects each in
    * Drafts, and the intake is `reviewing` until none is pending.
    */

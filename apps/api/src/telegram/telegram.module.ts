@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ApprovalsModule } from '../approvals';
+import { AuthModule } from '../auth';
 import { BoardModule } from '../board';
 import { ControlModule } from '../control';
 import { LocalModule } from '../local';
@@ -10,6 +11,7 @@ import { SettingsModule } from '../settings/settings.module';
 import {
   TelegramAdminController,
   TelegramLinkController,
+  TelegramWebAppController,
 } from './telegram.controller';
 import { TelegramActionRequestService } from './telegram-action-request.service';
 import { TelegramApprovalService } from './telegram-approval.service';
@@ -26,6 +28,7 @@ import { TelegramPoller } from './telegram-poller';
 import { TelegramProjectService } from './telegram-project.service';
 import { TelegramRoutes } from './telegram-routes';
 import { TelegramSessionMessageService } from './telegram-session-message.service';
+import { TelegramWebAppService } from './telegram-web-app.service';
 
 /**
  * The Telegram bot (spec 22 D7–D10): the Bot API client, the one long-polling
@@ -37,6 +40,8 @@ import { TelegramSessionMessageService } from './telegram-session-message.servic
  * current project per chat for the Board commands (ADR-0046). #574: `/new`
  * runs the New work intake (`TelegramIntakeService`). #578: a card's review
  * actions on the card messages and notifications (`TelegramCardService`).
+ * #580: the Mini App signs in with its `initData` (`TelegramWebAppService`)
+ * and gets the web session `AuthModule` issues.
  */
 @Module({
   imports: [
@@ -51,8 +56,14 @@ import { TelegramSessionMessageService } from './telegram-session-message.servic
     PlannerModule,
     // #578: a fleet card's worker messaged through its slot.
     ControlModule,
+    // #580: the Mini App's sign-in issues the ordinary web session.
+    AuthModule,
   ],
-  controllers: [TelegramLinkController, TelegramAdminController],
+  controllers: [
+    TelegramLinkController,
+    TelegramAdminController,
+    TelegramWebAppController,
+  ],
   providers: [
     { provide: TELEGRAM_OPTIONS, useFactory: () => telegramOptionsFromEnv() },
     TelegramClient,
@@ -65,6 +76,7 @@ import { TelegramSessionMessageService } from './telegram-session-message.servic
     TelegramBoardService,
     TelegramIntakeService,
     TelegramCardService,
+    TelegramWebAppService,
     TelegramRoutes,
     TelegramDeliveryService,
     TelegramPoller,

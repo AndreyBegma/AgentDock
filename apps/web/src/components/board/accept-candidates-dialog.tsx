@@ -30,7 +30,7 @@ import { KindChip } from './split-review';
 export type AcceptMode = 'cards' | 'stack';
 
 /**
- * #592 (ADR-0055): the selected candidates — of one intake or several —
+ * #592 (ADR-0056): the selected candidates — of one intake or several —
  * accepted together. As independent cards: each its own card in Todo, no
  * dependencies. As a stack: each in the stage the person orders them in, a
  * stage waiting on the one before it, and a shared design when a

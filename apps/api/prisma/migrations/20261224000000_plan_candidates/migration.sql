@@ -1,4 +1,4 @@
--- #592 (ADR-0055): a New work intake writes candidates; Accept makes the cards.
+-- #592 (ADR-0056): a New work intake writes candidates; Accept makes the cards.
 CREATE TYPE "PlanCandidateStatus" AS ENUM ('pending', 'accepted', 'rejected');
 
 ALTER TABLE "plans" ADD COLUMN "candidateStack" JSONB;

@@ -533,7 +533,7 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
   }
 
   /**
-   * #337 D6, #592 (ADR-0055): the intake's card, as a candidate the person
+   * #337 D6, #592 (ADR-0056): the intake's card, as a candidate the person
    * accepts or rejects in Drafts; the intake is `reviewing`. Nothing when
    * the intake was closed meanwhile.
    */

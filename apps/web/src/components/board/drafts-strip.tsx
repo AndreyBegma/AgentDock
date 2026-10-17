@@ -55,7 +55,7 @@ import { CandidateSheet } from './candidate-sheet';
  * Discard closes the plan (archive); no card is made. Hidden when there is
  * none.
  *
- * #592 (ADR-0055): an intake that wrote its cards shows them as candidates —
+ * #592 (ADR-0056): an intake that wrote its cards shows them as candidates —
  * nothing reaches Todo until the person accepts it. Each opens in a sheet to
  * read and edit; candidates selected across intakes are accepted together
  * from the selection bar, as independent cards or as one stack.

@@ -7,7 +7,7 @@ import type {
 import { api } from '../api';
 import { planApi } from '../planner/href';
 
-/** #592 (ADR-0055): the candidate routes. */
+/** #592 (ADR-0056): the candidate routes. */
 const candidateApi = (
   projectId: string,
   candidate: Pick<PlanCandidateView, 'id' | 'planId'>,

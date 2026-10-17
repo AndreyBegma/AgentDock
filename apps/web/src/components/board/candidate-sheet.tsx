@@ -44,7 +44,7 @@ const KINDS: { kind: PlanTaskKind; label: string }[] = [
 ];
 
 /**
- * #592 (ADR-0055): a candidate, opened from Drafts — its title, kind and
+ * #592 (ADR-0056): a candidate, opened from Drafts — its title, kind and
  * full Markdown body, edited by hand and saved before deciding; **Reject**,
  * or **Accept to Todo**, which saves the edits first. A title with a letter
  * outside ASCII is refused inline, as split titles are. A candidate decided

@@ -521,7 +521,7 @@ export const intakeStackOutputSchema = z.strictObject({
     ),
 });
 /**
- * #592 (ADR-0055): a stack proposal as its candidates keep it on the plan
+ * #592 (ADR-0056): a stack proposal as its candidates keep it on the plan
  * (`plans.candidateStack`) — the candidates name a stage by its index.
  */
 export const planCandidateStackSchema = z.strictObject({

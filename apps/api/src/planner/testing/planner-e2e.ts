@@ -231,7 +231,7 @@ export class PlannerHarness {
   }
 
   /**
-   * #592 (ADR-0055): accepts every pending candidate of an intake as
+   * #592 (ADR-0056): accepts every pending candidate of an intake as
    * proposed — its stack in its stages, else independent cards.
    */
   async acceptAll(planId: string, session: Session = this.author) {

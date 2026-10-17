@@ -219,9 +219,13 @@ describe('Telegram: feedback, accept, finish and message cards (#578, e2e)', () 
     expect(buttons(notification.markup).map((b) => b.text)).toEqual([
       'Accept',
       'Give feedback',
+      // #580: the card opens in the Mini App too, below the card's actions.
+      'Open in app',
     ]);
-    // A viewer gets no review buttons.
-    expect(last(VIEWER_CHAT).markup).toBeUndefined();
+    // A viewer gets no review buttons, only the read-only Mini App.
+    expect(buttons(last(VIEWER_CHAT).markup).map((b) => b.text)).toEqual([
+      'Open in app',
+    ]);
 
     await poll(
       callbackPress(
@@ -491,6 +495,7 @@ describe('Telegram: feedback, accept, finish and message cards (#578, e2e)', () 
       'Dismiss C-1',
       'Accept C-2',
       'Dismiss C-2',
+      'Open in app',
     ]);
 
     await poll(

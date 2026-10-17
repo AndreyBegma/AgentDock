@@ -11,7 +11,7 @@ import { pluralize } from '../format';
 import { draftTitle, splitRowProblem } from './intake';
 
 /**
- * New work candidates (#592, ADR-0055): the cards an intake wrote wait in
+ * New work candidates (#592, ADR-0056): the cards an intake wrote wait in
  * Drafts until the person accepts them — alone, all at once, as independent
  * cards or as one stack — or rejects them. What the Drafts strip, the
  * candidate sheet and the accept dialogs share about them. Pure.

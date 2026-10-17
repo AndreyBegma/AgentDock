@@ -29,6 +29,21 @@ describe('proxy', () => {
     }
   });
 
+  test('the Telegram Mini App entry is public, and nothing under it', () => {
+    expect(redirectOf(visit('/tg?start=p1_2'))).toBeNull();
+    expect(redirectOf(visit('/tg/x'))).toStartWith(`${ORIGIN}/login`);
+  });
+
+  test("only the Mini App entry runs Telegram's script", () => {
+    const scripts = (path: string) =>
+      directives(visit(path).headers.get('content-security-policy') ?? '').get(
+        'script-src',
+      ) ?? '';
+    expect(scripts('/tg')).toContain('https://telegram.org');
+    expect(scripts('/login')).not.toContain('telegram.org');
+    expect(scripts('/projects')).not.toContain('telegram.org');
+  });
+
   test('the routes around /install still need a session', () => {
     for (const path of ['/', '/install/x', '/installer', '/admin/runners']) {
       expect(redirectOf(visit(path))).toStartWith(`${ORIGIN}/login`);
