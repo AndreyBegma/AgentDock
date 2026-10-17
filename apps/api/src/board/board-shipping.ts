@@ -3,9 +3,11 @@ import {
   CARD_CI_FIX_ATTEMPTS_MAX,
   CARD_CI_MISSING_MS,
   CARD_CI_POLL_MS,
+  CARD_ROUND_AT_ONCE_MS,
   type CardCiFixInput,
   type CardCiState,
   type CardCollectOutcome,
+  type CardNeedsPersonReason,
   cardAutoMergeEnabled,
   cardCiStateOf,
   cardLabel,
@@ -35,13 +37,44 @@ export const shippingAutoStart = (env: NodeJS.ProcessEnv = process.env) =>
   env.APP_ENV !== 'test';
 
 /** #359 D6: the reason `needsPerson` is audited with. */
-export const CI_STILL_FAILING = 'ci_still_failing';
+export const CI_STILL_FAILING =
+  'ci_still_failing' satisfies CardNeedsPersonReason;
 
 /**
  * #484: the reason `needsPerson` is audited with when a head of a project
  * with CI got no checks, even after `card.ciRetrigger`.
  */
-export const CI_NOT_REPORTED = 'ci_not_reported';
+export const CI_NOT_REPORTED =
+  'ci_not_reported' satisfies CardNeedsPersonReason;
+
+/**
+ * #542: why auto-merge refuses the head the card's latest round left, or
+ * `null` when it may ship it. A round that failed, that left the PR's head
+ * as it found it — it pushed no commit — or that ended within
+ * `CARD_ROUND_AT_ONCE_MS` of its start did not do the card's work, so the
+ * green CI is the old head's.
+ */
+export const roundUnshippable = (
+  round: Pick<
+    CardWithRounds['rounds'][number],
+    'phase' | 'startHeadSha' | 'startedAt' | 'finishedAt'
+  > | null,
+  headSha: string,
+): CardNeedsPersonReason | null => {
+  if (!round) return null;
+  if (round.phase === 'failed') return 'round_failed';
+  if (round.startHeadSha !== null && round.startHeadSha === headSha) {
+    return 'round_pushed_nothing';
+  }
+  if (
+    round.finishedAt !== null &&
+    round.finishedAt.getTime() - round.startedAt.getTime() <
+      CARD_ROUND_AT_ONCE_MS
+  ) {
+    return 'round_ended_at_once';
+  }
+  return null;
+};
 
 /**
  * #359 D6: the project's own checks, as the fix prompt names them —
@@ -389,7 +422,7 @@ export class BoardShipping
   ): Promise<void> {
     await this.prisma.boardCard.update({
       where: { id: card.id },
-      data: { needsPerson: true },
+      data: { needsPerson: true, needsPersonReason: CI_NOT_REPORTED },
     });
     await this.audit.record({
       actor: SYSTEM_ACTOR,
@@ -463,7 +496,7 @@ export class BoardShipping
     if (card.ciFixAttempts >= CARD_CI_FIX_ATTEMPTS_MAX) {
       await this.prisma.boardCard.update({
         where: { id: card.id },
-        data: { needsPerson: true },
+        data: { needsPerson: true, needsPersonReason: CI_STILL_FAILING },
       });
       await this.audit.record({
         actor: SYSTEM_ACTOR,
@@ -555,7 +588,9 @@ export class BoardShipping
   /**
    * D7: with auto-merge on, the green head is merged through `card.merge`
    * — the project's method, the branch deleted, the card's issue closed
-   * (D4). A refusal is audited and the card waits for Accept.
+   * (D4). A refusal is audited and the card waits for Accept. #542: a head
+   * the latest round did not work on (`roundUnshippable`) is never merged —
+   * the card gets `needsPerson` with the reason and stays in Finished.
    */
   private async autoMerge(
     project: BoardProject,
@@ -573,6 +608,11 @@ export class BoardShipping
     ) {
       return;
     }
+    const unshippable = roundUnshippable(card.rounds[0] ?? null, headSha);
+    if (unshippable !== null) {
+      await this.refuseMerge(project, card, headSha, unshippable);
+      return;
+    }
     try {
       await this.work.mergePr(project, card, headSha, true, BOARD_SYSTEM_ACTOR);
     } catch (error) {
@@ -581,6 +621,38 @@ export class BoardShipping
         `auto-merge of ${cardLabel(card.number)} refused: ${error.message}`,
       );
     }
+    this.work.publish(project.id, card.id);
+  }
+
+  /** #542: the head is not the round's work — `needsPerson`, audited. */
+  private async refuseMerge(
+    project: BoardProject,
+    card: CardWithRounds,
+    headSha: string,
+    reason: CardNeedsPersonReason,
+  ): Promise<void> {
+    const round = card.rounds[0];
+    await this.prisma.boardCard.update({
+      where: { id: card.id },
+      data: { needsPerson: true, needsPersonReason: reason },
+    });
+    await this.audit.record({
+      actor: SYSTEM_ACTOR,
+      action: 'card.auto_run_failed',
+      target: { type: 'board_card', id: card.id },
+      projectId: project.id,
+      after: {
+        number: card.number,
+        reason,
+        pr: card.prNumber,
+        headSha,
+        ...(round ? { round: round.round, phase: round.phase } : {}),
+      },
+      result: 'ok',
+    });
+    this.logger.warn(
+      `auto-merge of ${cardLabel(card.number)} refused: ${reason}`,
+    );
     this.work.publish(project.id, card.id);
   }
 }

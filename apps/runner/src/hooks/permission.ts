@@ -40,11 +40,34 @@ export interface PermissionDeps {
   cwd: string;
   sessionId: string;
   toolName: string;
-  /** The raw tool input; the daemon drops or redacts it (D17). */
+  /** The raw tool input; the daemon redacts it and keeps head and tail (C-114). */
   toolInput?: string;
   sleep: (ms: number) => Promise<void>;
   now: () => number;
 }
+
+/**
+ * The raw tool input the hook hands the daemon, at most: well above the
+ * shown budget, since the daemon redacts, hashes, then keeps head and tail
+ * (C-114), and well inside the local socket's line limit.
+ */
+export const PERMISSION_TOOL_INPUT_MAX = 32 * 1024;
+
+/**
+ * The raw tool input within `PERMISSION_TOOL_INPUT_MAX`: an input above it
+ * keeps its head and its tail, so the end of a long command still reaches
+ * the person (C-114).
+ */
+export const clipToolInput = (
+  raw: string | undefined,
+  max = PERMISSION_TOOL_INPUT_MAX,
+): string | undefined => {
+  if (raw === undefined || raw.length <= max) return raw;
+  const marker = (omitted: number) =>
+    `\n… [${omitted} characters omitted by the hook] …\n`;
+  const half = Math.floor((max - marker(raw.length).length) / 2);
+  return `${raw.slice(0, half)}${marker(raw.length - 2 * half)}${raw.slice(raw.length - half)}`;
+};
 
 const summaryFor = (toolName: string): string =>
   `Allow ${toolName} in an unattended Claude Code session`.slice(
@@ -92,7 +115,7 @@ export const awaitRemoteDecision = async (
       kind: 'tool_use',
       args: {
         toolName: deps.toolName,
-        ...(deps.toolInput ? { input: deps.toolInput } : {}),
+        ...(deps.toolInput ? { input: clipToolInput(deps.toolInput) } : {}),
       },
       summary: summaryFor(deps.toolName),
     },

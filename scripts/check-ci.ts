@@ -1,6 +1,6 @@
 /**
  * Checks the Woodpecker workflows in .woodpecker/ against the trust levels of
- * ADR-0052:
+ * ADR-0053:
  *
  *   - a step or service that can run on a pull request mounts no volume (no
  *     Docker socket, no host cache, no host directory at all), is not
@@ -146,7 +146,7 @@ if (import.meta.main) {
 
   if (violations.length > 0) {
     console.error(
-      `check-ci: ${violations.length} violation(s) of the CI trust levels (ADR-0052):`,
+      `check-ci: ${violations.length} violation(s) of the CI trust levels (ADR-0053):`,
     );
     for (const violation of violations) console.error(`  ${violation}`);
     process.exit(1);

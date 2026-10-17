@@ -50,13 +50,20 @@ export const STATUS_TONE: Record<ActionRequestStatus, Tone> = {
   failed: 'danger',
 };
 
-/** A `tool_use` request's tool and redacted input; null for any other kind or bad args. */
+/**
+ * A `tool_use` request's tool and redacted input; null for any other kind or bad
+ * args. `truncated` is the runner's flag that the input is a head+tail preview
+ * (D-08); it is read apart from the strict schema so an older API still parses.
+ */
 export const toolUseArgs = (
   request: Pick<ActionRequestSummary, 'kind' | 'args'>,
-): { toolName: string; input?: string } | null => {
+): { toolName: string; input?: string; truncated: boolean } | null => {
   if (request.kind !== 'tool_use') return null;
-  const parsed = actionRequestArgsSchemas.tool_use.safeParse(request.args);
-  return parsed.success ? parsed.data : null;
+  const { truncated, ...rest } = request.args;
+  const parsed = actionRequestArgsSchemas.tool_use.safeParse(rest);
+  return parsed.success
+    ? { ...parsed.data, truncated: truncated === true }
+    : null;
 };
 
 /**

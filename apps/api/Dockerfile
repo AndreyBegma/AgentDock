@@ -6,7 +6,7 @@
 # the entrypoint needs the Prisma CLI for `migrate deploy` and ts-node for the
 # seed. A slimmer image is a production concern, not a staging one.
 
-# The base is pinned by digest (ADR-0052): a moved tag cannot change what is
+# The base is pinned by digest (ADR-0053): a moved tag cannot change what is
 # built. Bump it together with deploy/ci-image/Dockerfile and the app
 # Dockerfiles: `docker buildx imagetools inspect node:<version>-bookworm-slim`.
 ARG NODE_IMAGE=node:24.20.0-bookworm-slim@sha256:ba849c60be29959425b8734d57b8b4b7d56f98edd9504c9af091d5281095a71e

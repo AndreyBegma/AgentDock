@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { ACTION_REQUEST_TOOL_INPUT_MAX } from '@agentdock/shared';
 import {
   HOOK_CONTENT_MAX_CHARS,
   type HookContent,
@@ -15,7 +17,7 @@ import { MASK, redact } from '../pane/redact';
 
 /** A secret-sounding name assigned anywhere: `API_KEY=…`, `"DB_PASSWORD": "…"` is left to the JSON rule. */
 const SECRET_ASSIGNMENT =
-  /\b([A-Z][A-Z0-9_]*(?:SECRET|TOKEN|KEY|PASSWORD|PASSWD|PWD|PASS|AUTH|CREDENTIALS?|DSN|PRIVATE)[A-Z0-9_]*)(\s*=\s*)("[^"\n]*"|'[^'\n]*'|[^\s"'\\]+)/g;
+  /\b([A-Z0-9_]*(?:SECRET|TOKEN|KEY|PASSWORD|PASSWD|PWD|PASS|AUTH|CREDENTIALS?|DSN|PRIVATE)[A-Z0-9_]*)(\s*=\s*)("[^"\n]*"|'[^'\n]*'|[^\s"'\\]+)/g;
 
 /** A `.env` line: `[export ]NAME=value` at the start of a real line. */
 const ENV_LINE = /^(\s*(?:export\s+)?[A-Za-z_][A-Za-z0-9_]*\s*=\s*)(\S.*)$/;
@@ -66,4 +68,48 @@ export const toHookContent = (
   // Never end on half a surrogate pair.
   if (/[\uD800-\uDBFF]$/.test(cut)) cut = cut.slice(0, -1);
   return { text: cut, truncated };
+};
+
+/** The redacted tool input of a `tool_use` request (C-114, D-08). */
+export interface ToolInputPreview {
+  input: string;
+  truncated: boolean;
+  fullLength: number;
+  sha256: string;
+}
+
+const omittedMarker = (omitted: number): string =>
+  `\n… [${omitted} characters omitted] …\n`;
+
+/** A cut at `at` would split a surrogate pair. */
+const splitsPair = (text: string, at: number): boolean =>
+  /[\uD800-\uDBFF]/.test(text[at - 1] ?? '') &&
+  /[\uDC00-\uDFFF]/.test(text[at] ?? '');
+
+/**
+ * The whole tool input, redacted, when it fits `max`; else its head and
+ * tail with a marker between them, all three within `max` — the end of a
+ * long command is where a harmful part hides. `fullLength` and `sha256`
+ * describe the full redacted input, so a person can tell what they saw
+ * from what was asked.
+ */
+export const toToolInputPreview = (
+  raw: string,
+  max = ACTION_REQUEST_TOOL_INPUT_MAX,
+): ToolInputPreview => {
+  const redacted = redactText(raw);
+  const fullLength = redacted.length;
+  const sha256 = createHash('sha256').update(redacted, 'utf8').digest('hex');
+  if (fullLength <= max) {
+    return { input: redacted, truncated: false, fullLength, sha256 };
+  }
+  // The marker for the full length is never shorter than the real one.
+  const shown = Math.max(0, max - omittedMarker(fullLength).length);
+  // A cut inside a surrogate pair moves outward: never over the budget.
+  let headEnd = Math.ceil(shown / 2);
+  if (splitsPair(redacted, headEnd)) headEnd -= 1;
+  let tailStart = fullLength - (shown - headEnd);
+  if (splitsPair(redacted, tailStart)) tailStart += 1;
+  const input = `${redacted.slice(0, headEnd)}${omittedMarker(tailStart - headEnd)}${redacted.slice(tailStart)}`;
+  return { input, truncated: true, fullLength, sha256 };
 };

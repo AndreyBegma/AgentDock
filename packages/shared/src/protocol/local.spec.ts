@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import {
   ACTION_REQUEST_KINDS,
+  ACTION_REQUEST_TOOL_INPUT_MAX,
   actionRequestArgsSchemas,
   mayDecideActionRequest,
 } from '../action-requests';
@@ -317,6 +318,33 @@ describe('action requests (spec 201 D18)', () => {
     expect(
       mayDecideActionRequest({ kind: 'issue_queue', ...own, isAdmin: false }),
     ).toBe(true);
+  });
+
+  it('accepts the tool input preview fields and rejects an input over the max (C-114)', () => {
+    const toolUse = actionRequestArgsSchemas.tool_use;
+    const preview = {
+      toolName: 'Bash',
+      input: 'x'.repeat(ACTION_REQUEST_TOOL_INPUT_MAX),
+      truncated: true,
+      fullLength: 2_048,
+      sha256: 'a'.repeat(64),
+    };
+    expect(toolUse.safeParse(preview).success).toBe(true);
+    expect(
+      toolUse.safeParse({ toolName: 'Bash', preview: 'none' }).success,
+    ).toBe(true);
+    expect(
+      toolUse.safeParse({
+        ...preview,
+        input: 'x'.repeat(ACTION_REQUEST_TOOL_INPUT_MAX + 1),
+      }).success,
+    ).toBe(false);
+    expect(toolUse.safeParse({ ...preview, sha256: 'nope' }).success).toBe(
+      false,
+    );
+    expect(toolUse.safeParse({ ...preview, preview: 'none' }).success).toBe(
+      false,
+    );
   });
 
   it('never lets a session ask for issue_queue itself (C-112)', () => {

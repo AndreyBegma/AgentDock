@@ -694,6 +694,9 @@ export class BoardRoundsService {
           authorId: actor.userId,
           phase: 'queued',
           startedAt: now,
+          // #542: the head the round starts on; a follow-up starts a new PR.
+          startHeadSha:
+            !followUp && fresh.prNumber !== null ? fresh.ciHeadSha : null,
           // #449 D3: the session it launches with; a `fresh` start replaces
           // it (`round.restart`), and the earlier rounds keep theirs.
           sessionId,
@@ -725,7 +728,7 @@ export class BoardRoundsService {
           // person acting, so automation resumes.
           ...(trigger === 'ci_fix'
             ? { ciFixAttempts: { increment: 1 } }
-            : { needsPerson: false }),
+            : { needsPerson: false, needsPersonReason: null }),
           // #359 D8: the next PR starts with nothing of the merged one.
           ...(followUp
             ? {

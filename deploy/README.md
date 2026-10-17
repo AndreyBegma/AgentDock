@@ -2,7 +2,7 @@
 
 Decisions: [ADR-0016](../docs/adr/0016-staging-on-the-agent-host-behind-a-cloudflare-tunnel.md),
 [ADR-0018](../docs/adr/0018-pull-requests-test-what-changed.md),
-[ADR-0052](../docs/adr/0052-pull-request-pipelines-are-untrusted.md).
+[ADR-0053](../docs/adr/0053-pull-request-pipelines-are-untrusted.md).
 
 ## CI — what each pipeline runs
 
@@ -23,7 +23,7 @@ full suite. To test everything on a branch, run the pipeline by hand.
 
 ### Trust levels
 
-A pull request is **untrusted** (ADR-0052). Its pipeline runs the pipeline file
+A pull request is **untrusted** (ADR-0053). Its pipeline runs the pipeline file
 and build scripts of its own branch, and anyone who can push a branch, a card
 worker included, can open one. So a step that can run on a pull request gets:
 
@@ -89,7 +89,7 @@ Nothing is published on the host. The stack runs on its own compose network
      itself — every board card's — must not: *Pull requests* or *All events*
      gates those too (#504). Check the live value with
      `curl -s https://ci.luna-realm.com/api/repos/9 | jq .require_approval`.
-     This leaves a known gap (ADR-0052 §7): a same-repository pull request can
+     This leaves a known gap (ADR-0053 §7): a same-repository pull request can
      edit its own pipeline file and mount the Docker socket again, because
      trusted volumes are on for the repository. It stays open until pull
      requests run on a separate Woodpecker agent without the Docker socket and
@@ -104,7 +104,7 @@ Nothing is published on the host. The stack runs on its own compose network
      gets no pipeline (#484, ADR-0043).
 3. **Delete the old CI caches** once, on an existing host:
    `rm -rf /home/archi/ci-cache/agentdock`. No pipeline reads them any more
-   (ADR-0052), and pull requests could write to them before.
+   (ADR-0053), and pull requests could write to them before.
 4. **The first run.** Push to `develop`, or run the pipeline by hand on
    `develop`. `refresh.sh` creates the stack directory, copies the examples in
    and generates `POSTGRES_PASSWORD`, `REDIS_PASSWORD` and
@@ -172,7 +172,7 @@ Nothing is published on the host. The stack runs on its own compose network
 ## Releasing the runner
 
 Decisions: [ADR-0017](../docs/adr/0017-runner-distribution-homebrew-and-npm.md),
-[ADR-0052](../docs/adr/0049-runner-releases-are-signed-and-cut-only-from-protected-tags.md).
+[ADR-0049](../docs/adr/0049-runner-releases-are-signed-and-cut-only-from-protected-tags.md).
 A tag `runner-v<version>` runs `.woodpecker/release-runner.yml`. The workflow
 tests the runner, builds the four binaries, signs `SHA256SUMS` and creates the
 GitHub Release with the tarballs, `SHA256SUMS` and `SHA256SUMS.sig`. It then

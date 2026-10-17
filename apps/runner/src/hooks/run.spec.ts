@@ -8,6 +8,7 @@ import { validNote } from '../handoff/testing';
 import { type LocalHandler, LocalSocketServer } from '../local/server';
 import type { LocalResult } from '../local/types';
 import { fakeExec, memoryLogger, tempDir } from '../testing/fixtures';
+import { clipToolInput, PERMISSION_TOOL_INPUT_MAX } from './permission';
 import { type HookDeps, runHook } from './run';
 
 const fixture = (name: string): string =>
@@ -497,6 +498,15 @@ describe('agentdock-runner hook (spec 201 D11–D17)', () => {
           decision: { behavior: 'allow' },
         },
       });
+    });
+
+    it('keeps head and tail of a tool input above the hook cap (C-114)', () => {
+      const raw = `HEAD${'x'.repeat(PERMISSION_TOOL_INPUT_MAX * 2)}TAIL`;
+      const clipped = clipToolInput(raw) ?? '';
+      expect(clipped.length).toBeLessThanOrEqual(PERMISSION_TOOL_INPUT_MAX);
+      expect(clipped.startsWith('HEAD')).toBe(true);
+      expect(clipped.endsWith('TAIL')).toBe(true);
+      expect(clipToolInput('{"command":"ls"}')).toBe('{"command":"ls"}');
     });
 
     it('denies with the approver note', async () => {

@@ -27,6 +27,7 @@ import {
   isActiveRoundPhase,
   isCaptureModel,
   isCardAutoRunCode,
+  isCardNeedsPersonReason,
   type PendingQuestion,
   pendingQuestionSchema,
   type RestartEstimate,
@@ -360,6 +361,12 @@ export const toCardView = (
   ciChecks: card.ciState === 'red' ? cardCiChecksOf(card.ciChecks) : [],
   ciFixAttempts: card.ciFixAttempts,
   needsPerson: card.needsPerson,
+  needsPersonReason:
+    card.needsPerson &&
+    card.needsPersonReason !== null &&
+    isCardNeedsPersonReason(card.needsPersonReason)
+      ? card.needsPersonReason
+      : null,
   mergedAt: iso(card.mergedAt),
   round: brief(card, card.rounds[0], facts),
   design: designOf(card.design),
