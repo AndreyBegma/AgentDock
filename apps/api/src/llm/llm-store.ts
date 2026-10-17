@@ -122,7 +122,7 @@ export class LlmStore {
       : null;
   }
 
-  /** Spend of the UTC month that holds `now`, per provider (ADR-0057 §5). */
+  /** Spend of the UTC month that holds `now`, per provider (ADR-0058 §5). */
   async monthSpend(
     now: Date = this.now(),
   ): Promise<Record<LlmProviderId, ProviderSpend>> {

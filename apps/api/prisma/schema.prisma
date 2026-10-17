@@ -1470,6 +1470,8 @@ model TelegramIntake {
   questionMessages  Json     @default("{}")
   /// `{ "<question id>": { optionId?, optionIds?, text? } }` picked so far.
   answers           Json     @default("{}")
+  /// #594: photos sent before the description, pending until the plan claims them.
+  attachmentIds     String[] @default([])
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -3735,7 +3737,7 @@ model ProjectRule {
   @@map("project_rules")
 }
 
-// ─── LLM gateway (ADR-0057, #598) ───────────────────────────────────────────
+// ─── LLM gateway (ADR-0058, #598) ───────────────────────────────────────────
 
 /// Mirrors `LLM_PROVIDERS` of the shared contract.
 enum LlmProvider {
@@ -3762,7 +3764,7 @@ enum LlmCallOutcome {
 }
 
 /// One provider's key, monthly cap and enabled models. The migration writes a
-/// row per provider; the key is never stored in the clear (ADR-0057 §3).
+/// row per provider; the key is never stored in the clear (ADR-0058 §3).
 model LlmProviderSetting {
   provider      LlmProvider @id
   /// The key sealed with `LLM_SECRETS_KEY` (`SecretCipher`'s v1 format).

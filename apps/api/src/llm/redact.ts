@@ -3,7 +3,7 @@ export const REDACTED_SECRET = '[redacted]';
 
 /**
  * Shapes of provider keys and bearer tokens, redacted even when the exact key
- * is not at hand (ADR-0057 §3): `sk-…` (Anthropic, OpenAI, OpenRouter),
+ * is not at hand (ADR-0058 §3): `sk-…` (Anthropic, OpenAI, OpenRouter),
  * `xai-…`, and an `Authorization` / `x-api-key` value.
  */
 const KEY_SHAPES = [

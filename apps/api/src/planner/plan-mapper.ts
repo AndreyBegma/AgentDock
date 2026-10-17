@@ -1,4 +1,5 @@
 import {
+  type AttachmentView,
   discussOutputSchema,
   type FrozenTaskRef,
   intakeRoundsAsked,
@@ -244,6 +245,8 @@ export interface DetailParts {
   questions: PlanQuestion[];
   /** #409: an intake's open split proposal. */
   split?: PlanIntakeSplitView | null;
+  /** #594: an intake's attachments, oldest first. */
+  attachments?: AttachmentView[];
 }
 
 export const toDetail = ({
@@ -253,6 +256,7 @@ export const toDetail = ({
   latestTurn,
   questions,
   split,
+  attachments,
 }: DetailParts): PlanDetail => ({
   ...toSummary(plan, tasks, latestTurn),
   brief: plan.brief,
@@ -276,6 +280,7 @@ export const toDetail = ({
           roundsAsked: intakeRoundsAsked(turns),
           maxRounds: PLANNER_INTAKE_MAX_ROUNDS,
           split: split ?? null,
+          attachments: attachments ?? [],
         }
       : null,
   discussion: plan.mode === 'discuss' ? { skills: plan.skills } : null,

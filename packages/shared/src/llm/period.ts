@@ -1,5 +1,5 @@
 /**
- * A provider's cap is per calendar month in UTC (ADR-0057): spend counts from
+ * A provider's cap is per calendar month in UTC (ADR-0058): spend counts from
  * 00:00 UTC on the 1st and resets at 00:00 UTC on the 1st of the next month.
  */
 export const llmMonthStart = (now: Date): Date =>

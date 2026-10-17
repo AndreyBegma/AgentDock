@@ -1,5 +1,5 @@
 /**
- * The LLM providers the API calls directly (ADR-0057). Grok and OpenRouter
+ * The LLM providers the API calls directly (ADR-0058). Grok and OpenRouter
  * speak the OpenAI chat-completions protocol.
  */
 export const LLM_PROVIDERS = [

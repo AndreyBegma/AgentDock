@@ -202,7 +202,7 @@ const parseInput = (text: string): Record<string, unknown> => {
 
 /**
  * OpenAI chat completions over `fetch`, streamed. One class serves OpenAI,
- * xAI Grok and OpenRouter, which speak the same protocol (ADR-0057).
+ * xAI Grok and OpenRouter, which speak the same protocol (ADR-0058).
  */
 export class OpenAiCompatibleAdapter implements LlmAdapter {
   readonly provider: LlmProviderId;

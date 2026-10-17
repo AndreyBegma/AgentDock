@@ -22,7 +22,7 @@ import {
 } from './dto';
 import { LlmSettingsService } from './llm-settings.service';
 
-/** Admin › AI providers (ADR-0057). Every route is admin-only. */
+/** Admin › AI providers (ADR-0058). Every route is admin-only. */
 @Roles('admin')
 @Controller('admin/llm')
 export class LlmController {

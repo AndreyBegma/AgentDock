@@ -1,4 +1,4 @@
-# ADR-0057: The API calls LLM providers directly for assistant features
+# ADR-0058: The API calls LLM providers directly for assistant features
 
 Status: accepted · Date: 2026-10-17 ·
 Card: C-236 (stack S-3, stage 1) ·

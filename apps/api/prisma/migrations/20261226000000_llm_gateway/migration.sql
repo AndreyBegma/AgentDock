@@ -57,7 +57,7 @@ ALTER TABLE "llm_provider_settings" ADD CONSTRAINT "llm_provider_settings_update
 ALTER TABLE "llm_calls" ADD CONSTRAINT "llm_calls_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 
--- ADR-0057: Anthropic starts with a $200 monthly cap; every other provider at
+-- ADR-0058: Anthropic starts with a $200 monthly cap; every other provider at
 -- 0, which is disabled until an admin sets a cap.
 INSERT INTO "llm_provider_settings" ("provider", "capUsd", "updatedAt") VALUES
     ('anthropic', 200, CURRENT_TIMESTAMP),

@@ -1,4 +1,7 @@
 import {
+  ATTACHMENT_ERROR,
+  ATTACHMENT_MAX_BYTES,
+  ATTACHMENTS_PER_CARD_MAX,
   type ConfirmSplitRequest,
   PLANNER_ERROR,
   type PlanDetail,
@@ -18,6 +21,8 @@ import {
 } from '@nestjs/common';
 import type { Plan, Prisma, TelegramIntake } from '@prisma/client';
 import { z } from 'zod';
+import { AttachmentFailure } from '../attachments/attachment-error';
+import { AttachmentsService } from '../attachments/attachments.service';
 import { userActor } from '../audit/audit.types';
 import { PrismaService } from '../database/prisma.service';
 import { httpErrorBody } from '../local/local-error';
@@ -50,9 +55,20 @@ import {
   splitMessage,
   THINKING_TEXT,
 } from './intake-chat';
-import { openCardsKeyboard } from './mini-app-buttons';
 import {
+  heardText,
+  type IntakeMedia,
+  intakeMediaOf,
+  MEDIA_REPLIES,
+  notStoredText,
+  VOICE_MAX_BYTES,
+} from './intake-media';
+import { openCardsKeyboard } from './mini-app-buttons';
+import { SpeechToText, SpeechToTextError } from './speech-to-text';
+import {
+  FileTooLargeError,
   type InlineButton,
+  TelegramApiError,
   type TelegramCallbackQuery,
   TelegramClient,
   type TelegramMessage,
@@ -65,7 +81,11 @@ import {
   projectRefusalText,
   TelegramProjectService,
 } from './telegram-project.service';
-import type { CommandContext, TelegramAnswer } from './telegram-router';
+import {
+  type CommandContext,
+  parseCommand,
+  type TelegramAnswer,
+} from './telegram-router';
 
 export const INTAKE_REPLIES = {
   describe:
@@ -98,9 +118,19 @@ const PLANNER_REFUSALS: Partial<Record<string, string>> = {
 
 const refusalOf = (error: unknown): string | null => {
   if (!(error instanceof HttpException)) return null;
-  const { code } = httpErrorBody(error);
+  const { code, message } = httpErrorBody(error);
+  // #594: a photo the plan could not take — expired, or no room left.
+  if (code === ATTACHMENT_ERROR.attachmentError) return notStoredText(message);
   return (code && PLANNER_REFUSALS[code]) ?? INTAKE_REPLIES.failed;
 };
+
+/** What a step gives back: its value, or the reply that says why not. */
+type Outcome<T> = { ok: true; value: T } | { ok: false; text: string };
+
+const refused = (text: string): { ok: false; text: string } => ({
+  ok: false,
+  text,
+});
 
 const isAnswers = (value: Prisma.JsonValue): value is Prisma.JsonObject =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -114,6 +144,12 @@ const questionMessagesOf = (row: TelegramIntake): Record<string, string> =>
     : {};
 
 type Ready = { row: TelegramIntake & { planId: string }; actor: PlanActor };
+
+/** The force-reply prompt that asks for the description. */
+const DESCRIBE_MARKUP = {
+  force_reply: true,
+  input_field_placeholder: 'What should it do?',
+} as const;
 
 /**
  * #574: `/new` runs the New work intake (#337, #409, #480) from a linked
@@ -129,6 +165,12 @@ type Ready = { row: TelegramIntake & { planId: string }; actor: PlanActor };
  * the plan is read again and, when its phase is new, the thinking message is
  * edited into the round, the proposal, the cards or the failure. The phase
  * shown is claimed in the row first, so two events never show it twice.
+ *
+ * #594: a photo — with `/new` as its caption, before the description, or
+ * while the plan is open — is downloaded and stored as the author's upload,
+ * then claimed by the plan, like the web dialog's `attachmentIds`. A voice
+ * message is transcribed by the configured speech-to-text service and its
+ * transcript, shown back first, is the description or the answer.
  */
 @Injectable()
 export class TelegramIntakeService implements OnModuleInit, OnModuleDestroy {
@@ -147,6 +189,8 @@ export class TelegramIntakeService implements OnModuleInit, OnModuleDestroy {
     private readonly store: PlanStore,
     private readonly tokens: BotTokenStore,
     private readonly client: TelegramClient,
+    private readonly attachments: AttachmentsService,
+    private readonly speech: SpeechToText,
     @Inject(TELEGRAM_OPTIONS) private readonly options: TelegramOptions,
   ) {}
 
@@ -176,32 +220,40 @@ export class TelegramIntakeService implements OnModuleInit, OnModuleDestroy {
       return { chatId, text: projectRefusalText(current.reason) };
     }
     const { project, user } = current;
+    await this.reset(user.id, chatId, project.id, []);
+    if (!context.args) {
+      return {
+        chatId,
+        text: boardReply(project, INTAKE_REPLIES.describe),
+        replyMarkup: DESCRIBE_MARKUP,
+      };
+    }
+    return this.start(chatId, user.id, context.args);
+  }
+
+  /** The chat's intake row, fresh: waiting for its description. */
+  private async reset(
+    userId: string,
+    chatId: number,
+    projectId: string,
+    attachmentIds: string[],
+  ): Promise<void> {
     const fresh = {
       chatId: BigInt(chatId),
-      projectId: project.id,
+      projectId,
       planId: null,
       shown: null,
       thinkingMessageId: null,
       controlsMessageId: null,
       questionMessages: {},
       answers: {},
+      attachmentIds,
     };
     await this.prisma.telegramIntake.upsert({
-      where: { userId: user.id },
-      create: { userId: user.id, ...fresh },
+      where: { userId },
+      create: { userId, ...fresh },
       update: fresh,
     });
-    if (!context.args) {
-      return {
-        chatId,
-        text: boardReply(project, INTAKE_REPLIES.describe),
-        replyMarkup: {
-          force_reply: true,
-          input_field_placeholder: 'What should it do?',
-        },
-      };
-    }
-    return this.start(chatId, user.id, context.args);
   }
 
   /**
@@ -215,6 +267,11 @@ export class TelegramIntakeService implements OnModuleInit, OnModuleDestroy {
   ): Promise<TelegramAnswer | null> {
     const chatId = message.chat.id;
     if (message.chat.type !== 'private') return null;
+    const media = intakeMediaOf(message);
+    const command = media ? parseCommand(message.caption) : null;
+    if (media && command?.name === 'new') {
+      return this.mediaCommand(chatId, media, command.args);
+    }
     const userId = await this.guard.linkedUserId(chatId);
     if (!userId) return null;
     const row = await this.prisma.telegramIntake.findUnique({
@@ -226,12 +283,244 @@ export class TelegramIntakeService implements OnModuleInit, OnModuleDestroy {
       prompt && prompt.from?.id === botId
         ? questionMessagesOf(row)[String(prompt.message_id)]
         : undefined;
+    if (media) {
+      return this.mediaMessage(message, media, userId, row, questionId);
+    }
     if (questionId && row.planId) {
       return this.answerText(chatId, row, questionId, message.text);
     }
     if (row.planId !== null || !message.text?.trim()) return null;
     if (message.text.trim().startsWith('/')) return null;
-    return this.start(chatId, userId, message.text.trim());
+    return this.start(chatId, userId, message.text.trim(), row.attachmentIds);
+  }
+
+  /** #594: a photo or a voice message with `/new` as its caption. */
+  private async mediaCommand(
+    chatId: number,
+    media: IntakeMedia,
+    args: string,
+  ): Promise<TelegramAnswer> {
+    const current = await this.projects.current(chatId, 'write');
+    if (!current.ok) {
+      return { chatId, text: projectRefusalText(current.reason) };
+    }
+    const { project, user } = current;
+    const reply = (text: string): TelegramAnswer => ({
+      chatId,
+      text: boardReply(project, text),
+    });
+    if (media.kind === 'voice') {
+      const heard = await this.hear(chatId, media);
+      if (!heard.ok) return reply(heard.text);
+      await this.reset(user.id, chatId, project.id, []);
+      const brief = [args, heard.value].filter(Boolean).join('\n\n');
+      return this.start(chatId, user.id, brief);
+    }
+    const actor = this.actorOf(user.id, project.role);
+    const stored = await this.storeImage(project.id, actor, media, 0);
+    if (!stored.ok) return reply(stored.text);
+    await this.reset(user.id, chatId, project.id, [stored.value]);
+    if (!args) {
+      return {
+        ...reply(MEDIA_REPLIES.photoWaiting),
+        replyMarkup: DESCRIBE_MARKUP,
+      };
+    }
+    return this.start(chatId, user.id, args, [stored.value]);
+  }
+
+  /**
+   * #594: a photo or a voice message to the chat's intake. Before the
+   * description, a photo waits on the row for it and a voice message is it;
+   * once the plan is open, a photo joins the plan and a voice reply to a
+   * question is its answer. Null for a voice message nothing waits for.
+   */
+  private async mediaMessage(
+    message: TelegramMessage,
+    media: IntakeMedia,
+    userId: string,
+    row: TelegramIntake,
+    questionId: string | undefined,
+  ): Promise<TelegramAnswer | null> {
+    const chatId = message.chat.id;
+    const caption = message.caption?.trim() ?? '';
+    if (row.planId !== null) {
+      if (media.kind === 'voice' && !questionId) return null;
+      const ready = await this.ready(chatId, row.planId);
+      if (!ready.ok) return { chatId, text: ready.text };
+      if (media.kind === 'voice' && questionId) {
+        const heard = await this.hear(chatId, media);
+        if (!heard.ok) return { chatId, text: heard.text };
+        return this.answerText(chatId, row, questionId, heard.value);
+      }
+      return this.addImage(ready, media, questionId, caption);
+    }
+    const current = await this.projects.current(chatId, 'write');
+    if (!current.ok) {
+      return { chatId, text: projectRefusalText(current.reason) };
+    }
+    const { project } = current;
+    if (media.kind === 'voice') {
+      const heard = await this.hear(chatId, media);
+      if (!heard.ok) return { chatId, text: boardReply(project, heard.text) };
+      return this.start(chatId, userId, heard.value, row.attachmentIds);
+    }
+    const stored = await this.storeImage(
+      project.id,
+      this.actorOf(userId, project.role),
+      media,
+      row.attachmentIds.length,
+    );
+    if (!stored.ok) return { chatId, text: boardReply(project, stored.text) };
+    const attachmentIds = [...row.attachmentIds, stored.value];
+    await this.prisma.telegramIntake.updateMany({
+      where: { userId, planId: null },
+      data: { attachmentIds },
+    });
+    if (caption && !caption.startsWith('/')) {
+      return this.start(chatId, userId, caption, attachmentIds);
+    }
+    return {
+      chatId,
+      text: boardReply(project, MEDIA_REPLIES.photoWaiting),
+      replyMarkup: DESCRIBE_MARKUP,
+    };
+  }
+
+  /** #594: a photo joins the open plan; its caption may answer a question. */
+  private async addImage(
+    ready: Ready,
+    media: IntakeMedia,
+    questionId: string | undefined,
+    caption: string,
+  ): Promise<TelegramAnswer> {
+    const { row, actor } = ready;
+    const chatId = Number(row.chatId);
+    const held = await this.attachments.countOfPlan(row.planId);
+    const stored = await this.storeImage(row.projectId, actor, media, held);
+    if (!stored.ok) return { chatId, text: stored.text };
+    try {
+      const plan = await this.store.readable(
+        actor.userId,
+        row.projectId,
+        row.planId,
+      );
+      await this.plans.attach(plan, actor, [stored.value]);
+    } catch (error) {
+      const text = refusalOf(error);
+      if (text === null) throw error;
+      return { chatId, text };
+    }
+    if (questionId && caption) {
+      const answered = await this.answerText(chatId, row, questionId, caption);
+      return {
+        chatId,
+        text: `${MEDIA_REPLIES.photoAdded} ${answered.text ?? ''}`.trim(),
+      };
+    }
+    return { chatId, text: MEDIA_REPLIES.photoAdded };
+  }
+
+  private actorOf(userId: string, role: PlanActor['role']): PlanActor {
+    return { userId, role, ctx: { actor: userActor(userId) } };
+  }
+
+  /**
+   * #594: an image downloaded and stored as the author's pending upload —
+   * the allowlist, size limit and quota of every upload apply — when the
+   * plan, already holding `held`, has room for it. The new attachment's id.
+   */
+  private async storeImage(
+    projectId: string,
+    actor: PlanActor,
+    media: IntakeMedia,
+    held: number,
+  ): Promise<Outcome<string>> {
+    if (media.kind !== 'image') return refused(MEDIA_REPLIES.notImage);
+    if (held + 1 > ATTACHMENTS_PER_CARD_MAX) {
+      return refused(MEDIA_REPLIES.tooMany);
+    }
+    const bytes = await this.download(media, ATTACHMENT_MAX_BYTES);
+    if (!bytes.ok) return bytes;
+    try {
+      const view = await this.attachments.uploadBytes(
+        projectId,
+        media.name,
+        bytes.value,
+        actor,
+      );
+      return { ok: true, value: view.id };
+    } catch (error) {
+      if (!(error instanceof AttachmentFailure)) throw error;
+      return refused(notStoredText(httpErrorBody(error).message));
+    }
+  }
+
+  /**
+   * #594: the transcript of a voice message, shown back to the chat before
+   * anything is done with it. The audio is never stored.
+   */
+  private async hear(
+    chatId: number,
+    media: Extract<IntakeMedia, { kind: 'voice' }>,
+  ): Promise<Outcome<string>> {
+    if (!this.speech.enabled) return refused(MEDIA_REPLIES.voiceOff);
+    const audio = await this.download(media, VOICE_MAX_BYTES);
+    if (!audio.ok) return audio;
+    let transcript: string;
+    try {
+      transcript = await this.speech.transcribe(
+        audio.value,
+        media.name,
+        media.mime,
+      );
+    } catch (error) {
+      if (!(error instanceof SpeechToTextError)) throw error;
+      this.logger.warn(`voice message not transcribed: ${error.message}`);
+      return refused(MEDIA_REPLIES.transcribeFailed);
+    }
+    if (!transcript) return refused(MEDIA_REPLIES.notHeard);
+    const bot = await this.tokens.read();
+    if (bot.ok) {
+      await this.client.sendMessage(
+        bot.token,
+        chatId,
+        heardText(transcript),
+        true,
+      );
+    }
+    return { ok: true, value: transcript };
+  }
+
+  /** #594: a file of the chat, refused past `maxBytes`. */
+  private async download(
+    media: Exclude<IntakeMedia, { kind: 'other' }>,
+    maxBytes: number,
+  ): Promise<Outcome<Uint8Array>> {
+    const tooLarge =
+      media.kind === 'voice'
+        ? MEDIA_REPLIES.voiceTooLarge
+        : MEDIA_REPLIES.tooLarge;
+    if (media.size !== null && media.size > maxBytes) return refused(tooLarge);
+    const bot = await this.tokens.read();
+    if (!bot.ok) return refused(MEDIA_REPLIES.downloadFailed);
+    try {
+      const file = await this.client.getFile(bot.token, media.fileId);
+      if (file.size !== null && file.size > maxBytes) return refused(tooLarge);
+      const bytes = await this.client.downloadFile(
+        bot.token,
+        file.path,
+        maxBytes,
+      );
+      return { ok: true, value: bytes };
+    } catch (error) {
+      if (error instanceof FileTooLargeError) return refused(tooLarge);
+      if (!(error instanceof TelegramApiError)) throw error;
+      // The Bot API serves files up to 20 MB and says so for a bigger one.
+      if (/too big/i.test(error.message)) return refused(tooLarge);
+      this.logger.warn(`file not downloaded: ${error.message}`);
+      return refused(MEDIA_REPLIES.downloadFailed);
+    }
   }
 
   /** A press on an option, Done, or one of the intake's action buttons. */
@@ -280,6 +569,7 @@ export class TelegramIntakeService implements OnModuleInit, OnModuleDestroy {
     chatId: number,
     userId: string,
     brief: string,
+    attachmentIds: readonly string[] = [],
   ): Promise<TelegramAnswer> {
     const current = await this.projects.current(chatId, 'write');
     if (!current.ok) {
@@ -296,6 +586,9 @@ export class TelegramIntakeService implements OnModuleInit, OnModuleDestroy {
       plan = await this.plans.create(project.id, actor, {
         brief,
         mode: 'card',
+        ...(attachmentIds.length > 0
+          ? { attachmentIds: [...attachmentIds] }
+          : {}),
       });
     } catch (error) {
       const text = refusalOf(error);
@@ -313,7 +606,7 @@ export class TelegramIntakeService implements OnModuleInit, OnModuleDestroy {
         projectId: project.id,
         planId: plan.id,
       },
-      update: { projectId: project.id, planId: plan.id },
+      update: { projectId: project.id, planId: plan.id, attachmentIds: [] },
     });
     await this.refresh(plan.id);
     return {
