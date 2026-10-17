@@ -4,10 +4,7 @@ import {
   REGISTRATION_SETTING_KEY,
   SESSION_COOKIE,
 } from '@agentdock/shared';
-import {
-  ThrottlerStorage,
-  type ThrottlerStorageService,
-} from '@nestjs/throttler';
+import { ThrottlerStorage } from '@nestjs/throttler';
 import { AuditService } from '../audit/audit.service';
 import {
   createE2eApp,
@@ -164,9 +161,21 @@ describe('auth (e2e)', () => {
     describe('throttling failed passwords per (account, IP) (C-109)', () => {
       const WRONG = 'wrong password!!';
 
-      /** Forgets the per-IP request limit, so a test can send more than 10 a minute. */
-      const resetRequestLimit = () =>
-        ctx.app.get<ThrottlerStorageService>(ThrottlerStorage).storage.clear();
+      // These tests send far more than 10 requests a minute from one
+      // address; the per-IP request limit is lifted so the per-(account, IP)
+      // wait is what answers. Its own tests are below.
+      let requestLimit: jest.SpyInstance | undefined;
+      beforeEach(() => {
+        requestLimit = jest
+          .spyOn(ctx.app.get<ThrottlerStorage>(ThrottlerStorage), 'increment')
+          .mockResolvedValue({
+            totalHits: 1,
+            timeToExpire: 60,
+            isBlocked: false,
+            timeToBlockExpire: 0,
+          });
+      });
+      afterEach(() => requestLimit?.mockRestore());
 
       /** Ends the wait of every source now, as if its delay had passed. */
       const endWaits = () =>
@@ -182,7 +191,6 @@ describe('auth (e2e)', () => {
         const waits: number[] = [];
         let failures = 0;
         while (failures < count) {
-          resetRequestLimit();
           const response = await attempt('op@example.com', WRONG, ip);
           if (response.status === 429) {
             expect(response.body.error).toBe(AUTH_ERROR.throttled);
@@ -222,7 +230,6 @@ describe('auth (e2e)', () => {
         expect(waits).toEqual([
           1, 2, 4, 8, 16, 32, 60, 60, 60, 60, 60, 60, 60, 60, 60,
         ]);
-        resetRequestLimit();
         const waiting = await attempt('op@example.com', PASSWORD, a);
         expect(waiting.status).toBe(429);
         expect(Number(waiting.headers['retry-after'])).toBe(60);
@@ -287,14 +294,19 @@ describe('auth (e2e)', () => {
           await new Promise((r) => setTimeout(r, 60_500 - intoMinute));
         }
         const ip = nextIp();
-        const records = () =>
-          ctx.prisma.auditRecord.count({
-            where: { action: 'auth.login', targetId: 'op@example.com' },
-          });
+        // The audit log is append-only: earlier tests' records stay.
+        const head = await ctx.prisma.auditRecord.aggregate({
+          _max: { seq: true },
+        });
+        const mine = {
+          action: 'auth.login',
+          targetId: 'op@example.com',
+          seq: { gt: head._max.seq ?? 0n },
+        };
+        const records = () => ctx.prisma.auditRecord.count({ where: mine });
 
         const statuses = new Set<number>();
         for (let i = 0; i < 100; i += 1) {
-          resetRequestLimit();
           statuses.add((await attempt('op@example.com', WRONG, ip)).status);
         }
         expect([...statuses].sort()).toEqual([401, 429]);
@@ -303,7 +315,7 @@ describe('auth (e2e)', () => {
         // The minute is over: the 99 repeats become one record.
         expect(await audit.flushFolds(new Date(Date.now() + 60_000))).toBe(1);
         const rows = await ctx.prisma.auditRecord.findMany({
-          where: { action: 'auth.login', targetId: 'op@example.com' },
+          where: mine,
           orderBy: { seq: 'asc' },
         });
         expect(rows).toHaveLength(2);
