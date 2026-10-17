@@ -15,7 +15,7 @@ import {
   SegmentedControl,
   SegmentedControlItem,
 } from '@andrewbehma/glass-ui/segmented-control';
-import { Crosshair, Minus, Plus } from 'lucide-react';
+import { Crosshair, Minus, Monitor, Plus, Smartphone } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { revisionLabel } from '../../lib/design/format';
 import type { ViewerChange, ViewerState } from '../../lib/design/viewer-state';
@@ -33,6 +33,90 @@ const THEME_LABEL: Record<DesignTheme, string> = {
 };
 
 /**
+ * Theme, variant and revision: the toolbar's review group on a desktop, the
+ * "View" section of the review sheet below `lg`.
+ */
+export function ViewControls({
+  state,
+  variants,
+  revisions,
+  onChange,
+  touch = false,
+}: {
+  state: ViewerState;
+  variants: readonly number[];
+  revisions: readonly DesignRevisionView[];
+  onChange: (change: ViewerChange) => void;
+  /** 44px controls. */
+  touch?: boolean;
+}) {
+  const field = touch ? 'h-11 w-auto text-sm' : 'h-8 w-auto text-xs';
+  return (
+    <>
+      <SegmentedControl
+        size={touch ? 'md' : 'sm'}
+        role="group"
+        aria-label="Theme"
+      >
+        {DESIGN_THEMES.map((theme) => (
+          <SegmentedControlItem
+            key={theme}
+            active={state.theme === theme}
+            layoutId="design-theme"
+          >
+            <button
+              type="button"
+              aria-pressed={state.theme === theme}
+              className={
+                touch ? 'min-h-(--size-tap) px-3 text-sm' : 'px-2 py-1 text-xs'
+              }
+              onClick={() => onChange({ kind: 'theme', theme })}
+            >
+              {THEME_LABEL[theme]}
+            </button>
+          </SegmentedControlItem>
+        ))}
+      </SegmentedControl>
+
+      {variants.length > 1 ? (
+        <Select
+          aria-label="Variant"
+          className={field}
+          value={state.variant}
+          onChange={(e) =>
+            onChange({ kind: 'variant', variant: Number(e.target.value) })
+          }
+        >
+          {variants.map((v) => (
+            <option key={v} value={v}>
+              Variant {v}
+            </option>
+          ))}
+        </Select>
+      ) : null}
+
+      {revisions.length > 0 ? (
+        <Select
+          aria-label="Revision"
+          className={field}
+          value={state.revision?.id ?? ''}
+          onChange={(e) =>
+            onChange({ kind: 'revision', revisionId: e.target.value })
+          }
+        >
+          {revisions.map((r, i) => (
+            <option key={r.id} value={r.id}>
+              {revisionLabel(r.variant, r.revision)}
+              {i === 0 ? ' (latest)' : ''}
+            </option>
+          ))}
+        </Select>
+      ) : null}
+    </>
+  );
+}
+
+/**
  * The viewer's toolbar (spec 223 D11): viewport presets, a typed width,
  * light/dark, the zoom (spec 335), the variant and the revision, and pin
  * mode. Every choice is a `ViewerChange`; the page keeps them in the URL.
@@ -47,6 +131,7 @@ export function ViewerToolbar({
   canPin,
   onChange,
   onPinMode,
+  phone = false,
 }: {
   state: ViewerState;
   /** The scale in effect: what Fit works out to, or the chosen one. */
@@ -60,6 +145,12 @@ export function ViewerToolbar({
   canPin: boolean;
   onChange: (change: ViewerChange) => void;
   onPinMode: (on: boolean) => void;
+  /**
+   * Below `lg` (C-244): the viewport presets and the zoom at the 44px tap
+   * size. The typed width is out, theme, variant and revision live in the
+   * review sheet, and Pin in the action bar.
+   */
+  phone?: boolean;
 }) {
   // The typed width commits on Enter or blur, not on every keystroke.
   const [width, setWidth] = useState(String(state.width));
@@ -72,6 +163,76 @@ export function ViewerToolbar({
       setWidth(String(state.width));
     }
   };
+
+  if (phone) {
+    return (
+      <div
+        role="toolbar"
+        aria-label="Mockup view"
+        className="flex shrink-0 items-center gap-2"
+      >
+        <SegmentedControl role="group" aria-label="Viewport">
+          {viewports.map((vp) => {
+            const active = vp.name === state.viewport.name;
+            const Icon = vp.width < 768 ? Smartphone : Monitor;
+            return (
+              <SegmentedControlItem
+                key={vp.name}
+                active={active}
+                layoutId="design-viewport"
+              >
+                <button
+                  type="button"
+                  aria-pressed={active}
+                  title={`${vp.width} × ${vp.height}`}
+                  className="inline-flex min-h-(--size-tap) items-center gap-1.5 px-3 text-sm whitespace-nowrap"
+                  onClick={() =>
+                    onChange({ kind: 'viewport', viewport: vp, fit: true })
+                  }
+                >
+                  <Icon aria-hidden="true" className="size-4" />
+                  {vp.name}
+                </button>
+              </SegmentedControlItem>
+            );
+          })}
+        </SegmentedControl>
+        <fieldset className="m-0 ml-auto flex items-center border-0 p-0">
+          <legend className="sr-only">Zoom</legend>
+          <Button
+            icon
+            variant="ghost"
+            className="size-11"
+            aria-label="Zoom out"
+            disabled={zoom <= ZOOM_MIN}
+            onClick={() => onChange({ kind: 'zoom', zoom: stepZoom(zoom, -1) })}
+          >
+            <Minus aria-hidden="true" className="size-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            className="h-11 px-1 tabular-nums"
+            aria-label="Fit to screen"
+            aria-pressed={state.zoom === 'fit'}
+            onClick={() => onChange({ kind: 'zoom', zoom: 'fit' })}
+          >
+            {state.zoom === 'fit' ? 'Fit · ' : ''}
+            {zoomPercent(zoom)}
+          </Button>
+          <Button
+            icon
+            variant="ghost"
+            className="size-11"
+            aria-label="Zoom in"
+            disabled={zoom >= ZOOM_MAX}
+            onClick={() => onChange({ kind: 'zoom', zoom: stepZoom(zoom, 1) })}
+          >
+            <Plus aria-hidden="true" className="size-4" />
+          </Button>
+        </fieldset>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -191,59 +352,12 @@ export function ViewerToolbar({
       </fieldset>
 
       <div data-toolbar-group="review" className="flex items-center gap-2">
-        <SegmentedControl size="sm" role="group" aria-label="Theme">
-          {DESIGN_THEMES.map((theme) => (
-            <SegmentedControlItem
-              key={theme}
-              active={state.theme === theme}
-              layoutId="design-theme"
-            >
-              <button
-                type="button"
-                aria-pressed={state.theme === theme}
-                className="px-2 py-1 text-xs"
-                onClick={() => onChange({ kind: 'theme', theme })}
-              >
-                {THEME_LABEL[theme]}
-              </button>
-            </SegmentedControlItem>
-          ))}
-        </SegmentedControl>
-
-        {variants.length > 1 ? (
-          <Select
-            aria-label="Variant"
-            className="h-8 w-auto text-xs"
-            value={state.variant}
-            onChange={(e) =>
-              onChange({ kind: 'variant', variant: Number(e.target.value) })
-            }
-          >
-            {variants.map((v) => (
-              <option key={v} value={v}>
-                Variant {v}
-              </option>
-            ))}
-          </Select>
-        ) : null}
-
-        {revisions.length > 0 ? (
-          <Select
-            aria-label="Revision"
-            className="h-8 w-auto text-xs"
-            value={state.revision?.id ?? ''}
-            onChange={(e) =>
-              onChange({ kind: 'revision', revisionId: e.target.value })
-            }
-          >
-            {revisions.map((r, i) => (
-              <option key={r.id} value={r.id}>
-                {revisionLabel(r.variant, r.revision)}
-                {i === 0 ? ' (latest)' : ''}
-              </option>
-            ))}
-          </Select>
-        ) : null}
+        <ViewControls
+          state={state}
+          variants={variants}
+          revisions={revisions}
+          onChange={onChange}
+        />
 
         <Button
           size="sm"
