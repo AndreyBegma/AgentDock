@@ -2,14 +2,16 @@ import {
   type AuditAction,
   INBOUND_DETAIL_DELIVERIES,
   type InboundDryRunResult,
+  type InboundTriggerAction,
   type InboundTriggerDetail,
   type InboundTriggerView,
   type InboundTriggerWithSecret,
   PREVIOUS_SECRET_GRACE_MS,
+  type Role,
   renderArgsTemplate,
   WEBHOOKS_ERROR,
 } from '@agentdock/shared';
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import type { InboundTrigger, Prisma } from '@prisma/client';
 import { AuditService } from '../../audit/audit.service';
 import type { AuditContext } from '../../audit/audit.types';
@@ -23,8 +25,28 @@ import { auditable, toDeliveryView, toTriggerView } from './trigger-mapper';
 /** Who calls a mutating route, as the route resolved them. */
 export interface TriggerCaller {
   userId: string;
+  role: Role;
   ctx: AuditContext;
 }
+
+/**
+ * C-132 (D-13): a run with no permission prompts needs an admin to set it up.
+ * The routes are admin-only already; this holds if that ever loosens.
+ */
+const assertMayBypass = (
+  action: InboundTriggerAction,
+  caller: TriggerCaller,
+): void => {
+  if (
+    action.kind === 'skill' &&
+    action.permissionMode === 'bypassPermissions' &&
+    caller.role !== 'admin'
+  ) {
+    throw new ForbiddenException(
+      '`bypassPermissions` on a trigger needs the admin role',
+    );
+  }
+};
 
 /** Disabled by an admin through `PATCH { enabled: false }`. */
 export const MANUAL_DISABLE = 'manual';
@@ -82,6 +104,7 @@ export class TriggersService {
     caller: TriggerCaller,
   ): Promise<InboundTriggerWithSecret> {
     const action = parseAction(dto.action);
+    assertMayBypass(action, caller);
     const valuePattern = dto.valuePattern ?? null;
     checkTemplate(action, dto.allowedPaths, valuePattern);
     const project = await this.prisma.project.findUnique({
@@ -123,6 +146,7 @@ export class TriggersService {
       dto.action !== undefined
         ? parseAction(dto.action)
         : parseAction(before.action);
+    if (dto.action !== undefined) assertMayBypass(action, caller);
     const allowedPaths = dto.allowedPaths ?? before.allowedPaths;
     const valuePattern =
       dto.valuePattern !== undefined ? dto.valuePattern : before.valuePattern;

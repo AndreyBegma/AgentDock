@@ -1,9 +1,12 @@
 import {
+  INBOUND_PAYLOAD_NOTICE,
   INBOUND_RATE_PER_HOUR,
   type InboundTriggerWithSecret,
   WEBHOOK_HEADERS,
 } from '@agentdock/shared';
+import { systemActorFor } from '../../audit/audit.types';
 import { BudgetGate } from '../../budgets/budget-gate';
+import { SkillRunService } from '../../skills';
 import {
   createUser,
   type E2eContext,
@@ -25,8 +28,12 @@ const skillAction = {
   kind: 'skill',
   skill: 'estimate',
   args: 'CI failed on {{payload.ref}} ({{payload.run.id}})',
+  permissionMode: 'manual',
   output: 'report',
 };
+
+/** C-132: the default delivery's args, each value fenced as data. */
+const RENDERED = `CI failed on <payload>feat/26-inbound</payload> (<payload>42</payload>)\n\n${INBOUND_PAYLOAD_NOTICE}`;
 
 let deliveryCounter = 0;
 const nextDeliveryId = () => {
@@ -126,15 +133,16 @@ describe('POST /hooks/:publicId (e2e, spec 26 D1–D7)', () => {
     expect(sent[0]).toMatchObject({
       projectId,
       skill: 'estimate',
-      args: 'CI failed on feat/26-inbound (42)',
+      args: RENDERED,
       profileKey: 'claude-main',
+      permissionMode: 'manual',
     });
 
     const [row] = await deliveries(trigger.id);
     expect(row).toMatchObject({
       status: 'started',
       reason: null,
-      renderedArgs: 'CI failed on feat/26-inbound (42)',
+      renderedArgs: RENDERED,
       sourceIp: expect.any(String),
     });
     const runs = await admin.get(`/projects/${projectId}/runs`);
@@ -173,8 +181,62 @@ describe('POST /hooks/:publicId (e2e, spec 26 D1–D7)', () => {
     // …and still reach `skill.run` byte for byte, as the `args` field of the
     // command's JSON — data the runner's `skill.run` handler never interpolates.
     const [args] = runner.sent('skill.run') as { args: unknown }[];
-    expect(args.args).toBe(`msg ${text}`);
-    expect(JSON.parse(JSON.stringify(args)).args).toBe(`msg ${text}`);
+    const rendered = `msg <payload>${text}</payload>\n\n${INBOUND_PAYLOAD_NOTICE}`;
+    expect(args.args).toBe(rendered);
+    expect(JSON.parse(JSON.stringify(args)).args).toBe(rendered);
+  });
+
+  it('starts the run in the trigger’s own mode, never the project’s bypass default (C-132)', async () => {
+    await ctx.prisma.projectOrchestratorSettings.create({
+      data: { projectId, permissionMode: 'bypassPermissions' },
+    });
+    const trigger = await createTrigger();
+    expect((await deliver(trigger)).status).toBe(202);
+    await settle();
+
+    const [sent] = runner.sent('skill.run') as { permissionMode: string }[];
+    expect(sent.permissionMode).toBe('manual');
+    const [row] = await deliveries(trigger.id);
+    expect(row.status).toBe('started');
+    const skillRun = await ctx.prisma.skillRun.findUniqueOrThrow({
+      where: { runId: row.runId as string },
+    });
+    expect(skillRun.permissionMode).toBe('manual');
+  });
+
+  it('never inherits the project’s mode for a stored action that has none (C-132)', async () => {
+    await ctx.prisma.projectOrchestratorSettings.create({
+      data: { projectId, permissionMode: 'bypassPermissions' },
+    });
+    const trigger = await createTrigger();
+    const { permissionMode: _mode, ...legacy } = skillAction;
+    await ctx.prisma.inboundTrigger.update({
+      where: { id: trigger.id },
+      data: { action: legacy },
+    });
+    // The hook refuses the unparseable action before anything is accepted…
+    expect((await deliver(trigger)).status).toBe(400);
+    await settle();
+    expect(runner.sent('skill.run')).toHaveLength(0);
+
+    // …and a webhook run that reaches the skill-run service without a mode is
+    // refused there too, rather than falling back to the bypass default.
+    await expect(
+      ctx.app.get(SkillRunService).start(
+        projectId,
+        { skill: 'estimate', args: '', model: 'opus', output: 'report' },
+        {
+          type: 'webhook',
+          id: trigger.id,
+          role: 'admin',
+          ctx: { actor: systemActorFor(adminId) },
+        },
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'invalid_args' }),
+    });
+    expect(runner.sent('skill.run')).toHaveLength(0);
+    expect(await ctx.prisma.skillRun.count()).toBe(0);
   });
 
   describe('signature (D2)', () => {
