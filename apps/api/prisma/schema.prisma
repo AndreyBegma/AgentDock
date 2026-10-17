@@ -56,6 +56,7 @@ model User {
   skillInstallPreviews        SkillInstallPreview[]
   schedulesCreated            Schedule[]                    @relation("ScheduleCreatedBy")
   schedulesUpdated            Schedule[]                    @relation("ScheduleUpdatedBy")
+  scheduleFirings             ScheduleFiring[]              @relation("ScheduleFiringPrincipal")
   budgets                     Budget[]                      @relation("BudgetUser")
   budgetsCreated              Budget[]                      @relation("BudgetCreatedBy")
   budgetOverrides             BudgetOverride[]              @relation("BudgetOverrideBy")
@@ -2064,11 +2065,15 @@ model ScheduleFiring {
   runId        String?
   /// The `command_runs` row an orchestrator firing wrote (#17).
   commandRunId String?
+  /// D-10: the person the firing ran as — the owner for a timed firing, the
+  /// caller for run now; its spend is theirs. Null until the firing is sent.
+  principalId  String?
   error        Json?
   finishedAt   DateTime?            @db.Timestamptz(3)
 
-  schedule Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
-  run      Run?     @relation(fields: [runId], references: [id], onDelete: SetNull)
+  schedule  Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  run       Run?     @relation(fields: [runId], references: [id], onDelete: SetNull)
+  principal User?    @relation("ScheduleFiringPrincipal", fields: [principalId], references: [id], onDelete: SetNull)
 
   @@unique([scheduleId, scheduledFor, kind])
   @@index([scheduleId, scheduledFor])

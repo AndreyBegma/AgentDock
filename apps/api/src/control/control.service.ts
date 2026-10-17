@@ -124,7 +124,8 @@ export class ControlService {
       prepare: async () => {
         // Spec 28 D7, D11: an exceeded stop budget refuses start and next
         // with 409 `budget_exceeded`, before a run is recorded or sent. A
-        // schedule firing (actor `system`) is project-only (D3).
+        // schedule firing (actor `system`) had its principal's user budget
+        // checked by the pre-fire hook (D-10).
         await this.budgets?.assertAllowed({
           projectId: caller.projectId,
           userId: caller.ctx.actor.type === 'user' ? caller.user.id : null,

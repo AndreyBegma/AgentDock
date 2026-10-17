@@ -22,6 +22,7 @@ import {
   SYSTEM_ACTOR,
   systemActorFor,
 } from '../audit/audit.types';
+import { BudgetExceededError } from '../budgets/budget-error';
 import { ControlService } from '../control/control.service';
 import { PrismaService } from '../database/prisma.service';
 import { ProjectAccessService } from '../projects';
@@ -39,6 +40,8 @@ interface Outcome {
   reason?: ScheduleFiringReason;
   runId?: string;
   commandRunId?: string;
+  /** D-10: whom the sent firing ran as; its spend is theirs. */
+  principalId?: string;
   error?: { code: string; message?: string };
   /** The command reached the runner (or was answered by it). */
   sent: boolean;
@@ -123,22 +126,27 @@ export class ScheduleFirer {
     const { schedule } = firing;
     const { project, createdBy, ...row } = schedule;
 
-    const decision = await this.beforeFire.check(row, firing);
-    if (!decision.allow) {
-      return this.settle(firing, {
-        status: 'skipped',
-        reason: SCHEDULE_FIRING_REASONS.denied,
-        error: { code: 'denied', message: decision.reason },
-        sent: false,
-      });
-    }
-
     const principal = caller
       ? await this.prisma.user.findUniqueOrThrow({
           where: { id: caller.userId },
           ...PRINCIPAL,
         })
       : createdBy;
+
+    // D-10: the principal's user budget holds as well as the project's.
+    const decision = await this.beforeFire.check(row, firing, principal.id);
+    if (!decision.allow) {
+      const settled = await this.settle(firing, {
+        status: 'skipped',
+        reason: SCHEDULE_FIRING_REASONS.denied,
+        error: { code: 'denied', message: decision.reason },
+        sent: false,
+      });
+      // Run now is the caller's own request: refused like any start of theirs.
+      const { budgetId, scope, resetsAt } = decision.budget;
+      if (caller) throw new BudgetExceededError(budgetId, scope, resetsAt);
+      return settled;
+    }
     // D10: the principal's authority now, not when the schedule was saved.
     const role = await this.principalRole(principal, schedule.projectId);
     if (!role) {
@@ -201,7 +209,7 @@ export class ScheduleFirer {
         return this.failure(body);
       },
     );
-    return this.settle(firing, outcome);
+    return this.settle(firing, { ...outcome, principalId: principal.id });
   }
 
   /**
@@ -225,6 +233,7 @@ export class ScheduleFirer {
           ...(outcome.commandRunId
             ? { commandRunId: outcome.commandRunId }
             : {}),
+          ...(outcome.principalId ? { principalId: outcome.principalId } : {}),
           ...(outcome.error ? { error: outcome.error } : {}),
           ...(terminal ? { finishedAt: now } : {}),
         },

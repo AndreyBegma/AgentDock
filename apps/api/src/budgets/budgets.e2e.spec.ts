@@ -643,11 +643,8 @@ describe('budgets (e2e)', () => {
       expect((await start(admin)).status).toBe(201);
     });
 
-    it('keeps a scheduled orchestrator start project-only: neither counted nor gated by its creator’s budget (#25)', async () => {
-      const budget = await createUserBudget(operatorId, {
-        action: 'stop',
-        limitUsd: '1',
-      });
+    it('counts a scheduled orchestrator start toward the firing’s principal (D-10)', async () => {
+      const budget = await createUserBudget(operatorId);
       const schedule = await ctx.prisma.schedule.create({
         data: {
           projectId: a,
@@ -658,7 +655,7 @@ describe('budgets (e2e)', () => {
           createdById: operatorId,
         },
       });
-      // A firing sends the start as the system, with the creator as `user`.
+      // A timed firing sends the start as the system, with the owner as `user`.
       const control = ctx.app.get(ControlService, { strict: false });
       const fired = await control.start(
         {
@@ -676,6 +673,7 @@ describe('budgets (e2e)', () => {
           kind: 'cron',
           status: 'succeeded',
           commandRunId: fired.id,
+          principalId: operatorId,
         },
       });
       const requestedAt = (
@@ -690,36 +688,7 @@ describe('budgets (e2e)', () => {
         feed.spend('orch', 'o1', iso(requestedAt + 6_000)),
       );
       const [row] = await period(budget.id);
-      expect(row.spentUsd.toFixed(6)).toBe('0.000000');
-
-      // Over budget by their own start: the person is refused, the schedule is not.
-      await ctx.prisma.commandRun.create({
-        data: {
-          projectId: a,
-          runnerId,
-          userId: operatorId,
-          command: 'orchestrator.start',
-          args: {},
-          status: 'ok',
-          requestedAt: new Date(NOW + 600_000),
-        },
-      });
-      await arrive(
-        feed.session('mine', ROOT_A, at(605), { projectId: a }),
-        feed.spend('mine', 'm1', at(606)),
-      );
-      expect((await start(operatorOfA)).status).toBe(409);
-      await expect(
-        control.start(
-          {
-            projectId: a,
-            role: 'operator',
-            user: { id: operatorId, email: 'operator-a@example.com' },
-            ctx: { actor: SYSTEM_ACTOR },
-          },
-          { mode: 'next' },
-        ),
-      ).resolves.toMatchObject({ status: 'ok' });
+      expect(row.spentUsd.toFixed(6)).toBe('1.500000');
     });
   });
 

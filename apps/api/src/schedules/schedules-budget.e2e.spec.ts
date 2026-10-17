@@ -1,3 +1,4 @@
+import type { BudgetExceededBody } from '@agentdock/shared';
 import type { CommandName } from '@agentdock/shared/protocol';
 import { Logger } from '@nestjs/common';
 import { BudgetClock } from '../budgets/budget-options';
@@ -14,6 +15,7 @@ import {
   createE2eApp,
   createUser,
   type E2eContext,
+  login,
   resetDatabase,
 } from '../test/e2e-app';
 import { ingest, resetUsage } from '../usage/testing/usage-e2e';
@@ -26,7 +28,10 @@ type Answer = CommandSendResult<CommandName>;
 const NOW = Date.parse('2026-10-09T10:00:00.000Z');
 const at = (s: string) => new Date(s);
 
-/** Issue #106, spec 25 D12: an exceeded `stop` budget skips a firing. */
+/**
+ * Issue #106, spec 25 D12: an exceeded `stop` budget skips a firing — the
+ * project's, or the firing principal's own (C-121, D-10).
+ */
 describe('schedules and budgets (e2e)', () => {
   let ctx: E2eContext;
   let clock: BudgetClock;
@@ -172,6 +177,114 @@ describe('schedules and budgets (e2e)', () => {
     });
     expect(after.enabled).toBe(true);
     expect(after.consecutiveFailures).toBe(0);
+  });
+
+  describe('the principal’s user budget (D-10)', () => {
+    let operatorId: string;
+
+    /** An operator of the project whose own orchestrator spent $1.50 of $1. */
+    const exhaustedOperator = async () => {
+      operatorId = (
+        await createUser(ctx.prisma, 'operator@example.com', 'operator')
+      ).id;
+      await ctx.prisma.projectMember.create({
+        data: { projectId, userId: operatorId },
+      });
+      await ctx.prisma.budget.create({
+        data: {
+          scope: 'user',
+          userId: operatorId,
+          period: 'day',
+          timezone: 'UTC',
+          limitUsd: '1',
+          thresholds: [100],
+          action: 'stop',
+        },
+      });
+      await ctx.prisma.commandRun.create({
+        data: {
+          projectId,
+          runnerId,
+          userId: operatorId,
+          command: 'orchestrator.start',
+          args: {},
+          status: 'ok',
+          requestedAt: new Date(NOW - 60_000),
+        },
+      });
+      const feed = new Feed();
+      await ingest(ctx, runnerId, [
+        feed.session('own', '/srv/a', new Date(NOW - 50_000).toISOString(), {
+          projectId,
+        }),
+        feed.spend('own', 'o1', new Date(NOW - 40_000).toISOString()),
+      ]);
+      await sweep.flush();
+    };
+
+    const ownSchedule = (due: Date | null) =>
+      ctx.prisma.schedule.create({
+        data: {
+          projectId,
+          name: 'Mine',
+          target: { kind: 'orchestrator', mode: 'next' },
+          cron: '0 * * * *',
+          timezone: 'UTC',
+          nextRunAt: due,
+          createdById: operatorId,
+        },
+      });
+
+    it('refuses run now on their own schedule with 409 budget_exceeded, recording the firing skipped', async () => {
+      await exhaustedOperator();
+      const schedule = await ownSchedule(null);
+      const operator = await login(ctx, 'operator@example.com');
+
+      const response = await operator.send(
+        'post',
+        `/projects/${projectId}/schedules/${schedule.id}/run-now`,
+      );
+
+      expect(response.status).toBe(409);
+      expect(response.body as BudgetExceededBody).toMatchObject({
+        error: 'budget_exceeded',
+        scope: 'user',
+      });
+      const [firing] = await ctx.prisma.scheduleFiring.findMany({
+        where: { scheduleId: schedule.id },
+      });
+      expect(firing).toMatchObject({
+        kind: 'manual',
+        status: 'skipped',
+        error: { code: 'denied', message: 'budget' },
+      });
+      expect(send).not.toHaveBeenCalled();
+    });
+
+    it('skips a cron firing of a schedule they own, and fires someone else’s', async () => {
+      await exhaustedOperator();
+      const mine = await ownSchedule(at('2026-10-09T10:00:00Z'));
+      const admins = await scheduleDue(at('2026-10-09T10:00:00Z'));
+
+      await tick(at('2026-10-09T10:00:05Z'));
+
+      const [skipped] = await ctx.prisma.scheduleFiring.findMany({
+        where: { scheduleId: mine.id },
+      });
+      expect(skipped).toMatchObject({
+        kind: 'cron',
+        status: 'skipped',
+        error: { code: 'denied', message: 'budget' },
+      });
+      const [fired] = await ctx.prisma.scheduleFiring.findMany({
+        where: { scheduleId: admins.id },
+      });
+      expect(fired).toMatchObject({
+        status: 'succeeded',
+        principalId: creatorId,
+      });
+      expect(send).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('fires normally without an exceeded budget', async () => {
