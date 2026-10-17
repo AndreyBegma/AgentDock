@@ -142,6 +142,11 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   'attachment.removed': 'Removed an attachment',
   'board.settings_updated': 'Changed board settings',
   'text.settings_updated': 'Changed the text settings',
+  'llm.key_set': 'Set an AI provider key',
+  'llm.key_deleted': 'Removed an AI provider key',
+  'llm.key_tested': 'Tested an AI provider key',
+  'llm.provider_updated': 'Changed an AI provider',
+  'llm.default_model_set': 'Changed the default AI model',
 };
 
 /** The action filter's groups: the prefix before the dot. */
@@ -152,6 +157,7 @@ export const ACTION_GROUP_LABEL: Record<string, string> = {
   'runner.': 'Runners',
   'project.': 'Projects',
   'prices.': 'Prices',
+  'llm.': 'AI providers',
   'issue.': 'Issues',
   'pane.': 'Sessions',
   'orchestrator.': 'Orchestrator',

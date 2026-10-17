@@ -2,6 +2,7 @@ import type { Role } from '@agentdock/shared';
 import {
   Activity,
   BarChart3,
+  BrainCircuit,
   CalendarClock,
   ChartColumn,
   FolderGit2,
@@ -310,6 +311,15 @@ export const NAV: NavSection[] = [
         href: '/admin/audit',
         label: 'Audit',
         icon: ScrollText,
+        minRole: 'admin',
+        enabled: true,
+      },
+      {
+        id: 'ai-providers',
+        wide: true,
+        href: '/admin/ai-providers',
+        label: 'AI providers',
+        icon: BrainCircuit,
         minRole: 'admin',
         enabled: true,
       },
