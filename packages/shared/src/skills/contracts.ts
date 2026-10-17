@@ -108,6 +108,10 @@ export interface SkillRunRequest {
   profileKey?: string;
   /** A model alias or id (`opus`, `sonnet`, `haiku`, `fable`, `claude-opus-5-5`). */
   model: string;
+  /**
+   * The project's orchestrator mode when absent — for a person's run only. A
+   * webhook's run always names its trigger's own mode (C-132, D-13).
+   */
   permissionMode?: OrchestratorPermissionMode;
   output: SkillRunOutput;
   timeoutSec?: number;

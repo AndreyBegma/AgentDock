@@ -37,7 +37,7 @@ export class TriggersController {
     @AuditCtx() ctx: AuditContext,
     @Body() dto: TriggerCreateDto,
   ): Promise<InboundTriggerWithSecret> {
-    return this.triggers.create(dto, { userId: user.id, ctx });
+    return this.triggers.create(dto, { userId: user.id, role: user.role, ctx });
   }
 
   @Get(':id')
@@ -52,7 +52,11 @@ export class TriggersController {
     @Param('id') id: string,
     @Body() dto: TriggerUpdateDto,
   ): Promise<InboundTriggerView> {
-    return this.triggers.update(id, dto, { userId: user.id, ctx });
+    return this.triggers.update(id, dto, {
+      userId: user.id,
+      role: user.role,
+      ctx,
+    });
   }
 
   @Delete(':id')
@@ -62,7 +66,7 @@ export class TriggersController {
     @AuditCtx() ctx: AuditContext,
     @Param('id') id: string,
   ): Promise<void> {
-    return this.triggers.remove(id, { userId: user.id, ctx });
+    return this.triggers.remove(id, { userId: user.id, role: user.role, ctx });
   }
 
   @Post(':id/rotate-secret')
@@ -72,7 +76,11 @@ export class TriggersController {
     @AuditCtx() ctx: AuditContext,
     @Param('id') id: string,
   ): Promise<InboundTriggerWithSecret> {
-    return this.triggers.rotateSecret(id, { userId: user.id, ctx });
+    return this.triggers.rotateSecret(id, {
+      userId: user.id,
+      role: user.role,
+      ctx,
+    });
   }
 
   @Post(':id/dry-run')

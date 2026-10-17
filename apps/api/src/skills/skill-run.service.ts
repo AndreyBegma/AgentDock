@@ -103,6 +103,15 @@ export class SkillRunService {
       );
     }
     const profile = await this.profile(project, spec.profileKey);
+    // C-132 (D-13): a webhook's run never inherits the project's mode — the
+    // project default may be `bypassPermissions`.
+    if (trigger.type === 'webhook' && spec.permissionMode === undefined) {
+      throw skillsError(
+        400,
+        SKILLS_ERROR.invalidArgs,
+        'a webhook run must name its own permission mode',
+      );
+    }
     const permissionMode =
       spec.permissionMode ?? (await this.defaultPermissionMode(projectId));
     if (permissionMode === 'bypassPermissions' && trigger.role !== 'admin') {
