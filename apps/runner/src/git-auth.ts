@@ -14,6 +14,21 @@ export const GITHUB_GIT_CONFIG: readonly (readonly [string, string])[] = [
   ['credential.https://github.com.helper', '!gh auth git-credential'],
 ];
 
+/**
+ * C-126: what every `git` child gets, whatever the auth mode. As `GIT_CONFIG_*`
+ * these are command-scope settings, so a repository's or worktree's own
+ * `.git/config` cannot override them: no repository hook (`post-checkout` of
+ * `worktree add` included), no `core.fsmonitor` program on a collector's
+ * `git status`, no local-path submodule clone (`user`, not `never`: a push to a
+ * local-path remote is the user's own, a submodule's clone is not), no recursion into submodules.
+ */
+export const HARDENED_GIT_CONFIG: readonly (readonly [string, string])[] = [
+  ['core.hooksPath', '/dev/null'],
+  ['core.fsmonitor', 'false'],
+  ['protocol.file.allow', 'user'],
+  ['submodule.recurse', 'false'],
+];
+
 /** `gh auth status` is local: it reads the stored token, nothing slower. */
 const PROBE_TIMEOUT_MS = 10_000;
 
@@ -46,17 +61,19 @@ export class GitAuth {
   }
 
   /**
-   * `exec` with `GITHUB_GIT_CONFIG` added to every `git` call while the mode
-   * is `gh`. Any other binary, and every call in `native`, is passed as is.
+   * `exec` with `HARDENED_GIT_CONFIG` added to every `git` call, and
+   * `GITHUB_GIT_CONFIG` while the mode is `gh`. Any other binary is passed as is.
    */
   wrap(exec: Exec): Exec {
     return (binary, args, options) => {
-      if (binary !== 'git' || this.mode !== 'gh') {
-        return exec(binary, args, options);
-      }
+      if (binary !== 'git') return exec(binary, args, options);
       return exec(binary, args, {
         ...options,
-        gitConfig: [...(options?.gitConfig ?? []), ...GITHUB_GIT_CONFIG],
+        gitConfig: [
+          ...(options?.gitConfig ?? []),
+          ...HARDENED_GIT_CONFIG,
+          ...(this.mode === 'gh' ? GITHUB_GIT_CONFIG : []),
+        ],
       });
     };
   }

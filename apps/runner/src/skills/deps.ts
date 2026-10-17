@@ -73,12 +73,6 @@ export const gitSucceeds = async (
   return result?.code === 0;
 };
 
-/**
- * The runner's own commits (D4, D10): the project's hooks do not run — no
- * third-party code, no hook adding an attribution trailer.
- */
-export const NO_HOOKS = ['-c', 'core.hooksPath=/dev/null'];
-
 const PR_URL = /^https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/pull\/(\d+)\s*$/m;
 
 /** The URL `gh pr create` prints, and the number in it. */

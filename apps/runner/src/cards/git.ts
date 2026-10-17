@@ -30,7 +30,6 @@ import {
   gitOk,
   gitSucceeds,
   NETWORK_TIMEOUT_MS,
-  NO_HOOKS,
   type SkillsDeps,
   stderrLine,
 } from '../skills/deps';
@@ -257,7 +256,6 @@ export const commitFiles = async (
   await gitOk(deps.exec, [
     '-C',
     top,
-    ...NO_HOOKS,
     'commit',
     '--quiet',
     '--no-verify',
@@ -473,7 +471,6 @@ export const collectCard = async (
     await gitOk(deps.exec, [
       '-C',
       wt,
-      ...NO_HOOKS,
       'commit',
       '--quiet',
       '--no-verify',

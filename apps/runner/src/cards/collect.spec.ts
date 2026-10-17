@@ -17,7 +17,7 @@ import {
 import type { CardCollectArgs } from '@agentdock/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import type { Exec, ExecOptions } from '../detect/exec';
-import { GITHUB_GIT_CONFIG, GitAuth } from '../git-auth';
+import { GITHUB_GIT_CONFIG, GitAuth, HARDENED_GIT_CONFIG } from '../git-auth';
 import { REAL_PROCESS_TIMEOUT_MS } from '../testing/projects';
 import {
   collectBranch,
@@ -312,9 +312,15 @@ describe('card.collect without an SSH agent (#329 D1)', () => {
     expect(result.pushed).toBe(true);
     const git = calls.filter((c) => c.binary === 'git');
     const push = git.find((c) => c.args.includes('push'));
-    expect(push?.options?.gitConfig).toEqual(GITHUB_GIT_CONFIG);
+    expect(push?.options?.gitConfig).toEqual([
+      ...HARDENED_GIT_CONFIG,
+      ...GITHUB_GIT_CONFIG,
+    ]);
     for (const call of git) {
-      expect(call.options?.gitConfig).toEqual(GITHUB_GIT_CONFIG);
+      expect(call.options?.gitConfig).toEqual([
+        ...HARDENED_GIT_CONFIG,
+        ...GITHUB_GIT_CONFIG,
+      ]);
     }
     // gh itself is never given git settings.
     for (const call of calls.filter((c) => c.binary === 'gh')) {
@@ -329,8 +335,8 @@ describe('card.collect without an SSH agent (#329 D1)', () => {
     expect(await auth.probe()).toBe('native');
     writeFileSync(join(record.worktree, 'notes.md'), 'work\n');
     await collectCard({ exec: auth.wrap(inner), tempRoot: f.ws }, record, args);
-    for (const call of calls) {
-      expect(call.options?.gitConfig).toBeUndefined();
+    for (const call of calls.filter((c) => c.binary === 'git')) {
+      expect(call.options?.gitConfig).toEqual(HARDENED_GIT_CONFIG);
     }
   });
 });
