@@ -25,6 +25,7 @@ import { PrismaService } from '../database/prisma.service';
 import { httpErrorBody } from '../local/local-error';
 import {
   acceptConfirm,
+  actionOfWord,
   boardErrorText,
   CANCELLED_TEXT,
   CARD_ACTION_CALLBACK,
@@ -40,7 +41,6 @@ import {
   HEAD_MOVED_TEXT,
   headPrefix,
   isConfirmStep,
-  isReviewAction,
   messagePrompt,
   parseCardPrompt,
   resultLine,
@@ -279,9 +279,7 @@ export class TelegramCardService {
     }
     const shortId = press?.card ?? confirm?.card ?? merge?.card;
     const action: CardReviewAction | null = press
-      ? isReviewAction(press.action)
-        ? press.action
-        : null
+      ? actionOfWord(press.action)
       : confirm
         ? isConfirmStep(confirm.step)
           ? (confirm.step as 'accept' | 'finish')

@@ -1,7 +1,11 @@
-import type { CardPullRequestView } from '@agentdock/shared';
+import {
+  CARD_REVIEW_ACTIONS,
+  type CardPullRequestView,
+} from '@agentdock/shared';
 import { CALLBACK_DATA_MAX } from './callback-data';
 import {
   acceptConfirm,
+  actionOfWord,
   CARD_ACTION_CALLBACK,
   CARD_CONFIRM_CALLBACK,
   CARD_MERGE_CALLBACK,
@@ -26,7 +30,7 @@ const pr = (extra: Partial<CardPullRequestView> = {}): CardPullRequestView => ({
   headSha: HEAD,
   mergeable: 'MERGEABLE',
   mergeStateStatus: 'CLEAN',
-  checks: 'pass',
+  checks: 'green',
   method: null,
   canMerge: true,
   ...extra,
@@ -41,6 +45,14 @@ describe('Telegram card actions (#578)', () => {
     ]) {
       expect(codec.maxBytes).toBeLessThanOrEqual(CALLBACK_DATA_MAX);
     }
+  });
+
+  it('every action fits its button, and its word names it back', () => {
+    const rows = cardKeyboard('ab12cd34', [...CARD_REVIEW_ACTIONS]);
+    const decoded = rows
+      .flat()
+      .map((b) => CARD_ACTION_CALLBACK.decode(b.callback_data)?.action ?? '');
+    expect(decoded.map(actionOfWord)).toEqual([...CARD_REVIEW_ACTIONS]);
   });
 
   it('a keyboard has the allowed actions, two to a row, and round-trips', () => {

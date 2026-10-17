@@ -44,17 +44,22 @@ const CONFIRM_STEPS: readonly string[] = ['accept', 'finish', 'cancel'];
 export const isConfirmStep = (word: string): word is ConfirmStep =>
   CONFIRM_STEPS.includes(word);
 
-const ACTIONS: readonly string[] = [
-  'message',
-  'finish',
-  'accept',
-  'feedback',
-  'collect',
-  'accept_suggestion',
-  'dismiss',
-] satisfies CardReviewAction[];
-export const isReviewAction = (word: string): word is CardReviewAction =>
-  ACTIONS.includes(word);
+/** The word an action goes as on a button: a `word` field holds 16 characters. */
+const WIRE: Record<CardReviewAction, string> = {
+  message: 'message',
+  finish: 'finish',
+  accept: 'accept',
+  feedback: 'feedback',
+  collect: 'collect',
+  accept_suggestion: 'accept_inbox',
+  dismiss: 'dismiss',
+};
+export const actionWord = (action: CardReviewAction): string => WIRE[action];
+
+/** The action a button's word names; null for any other word. */
+export const actionOfWord = (word: string): CardReviewAction | null =>
+  (Object.keys(WIRE) as CardReviewAction[]).find((a) => WIRE[a] === word) ??
+  null;
 
 /** The head a merge button carries: its first 12 hex digits. */
 export const headPrefix = (sha: string): string => sha.slice(0, 12);
@@ -76,7 +81,10 @@ export const cardKeyboard = (
 ): InlineKeyboardButton[][] => {
   const buttons = actions.map((action) => ({
     text: LABEL[action],
-    callback_data: CARD_ACTION_CALLBACK.encode({ card: shortId, action }),
+    callback_data: CARD_ACTION_CALLBACK.encode({
+      card: shortId,
+      action: WIRE[action],
+    }),
   }));
   const rows: InlineKeyboardButton[][] = [];
   for (let i = 0; i < buttons.length; i += 2)
@@ -93,7 +101,7 @@ export const suggestionRows = (
       text: `Accept ${cardLabel(card.number)}`,
       callback_data: CARD_ACTION_CALLBACK.encode({
         card: card.shortId,
-        action: 'accept_suggestion',
+        action: WIRE.accept_suggestion,
       }),
     },
     {
