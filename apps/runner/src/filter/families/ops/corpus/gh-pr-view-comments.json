@@ -1,0 +1,8 @@
+{
+  "argv": ["gh", "pr", "view", "482", "--comments"],
+  "exitCode": 0,
+  "category": "other",
+  "outcome": "passing",
+  "expect": "filtered",
+  "maxRatio": 0.5
+}

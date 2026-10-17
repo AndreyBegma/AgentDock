@@ -1,0 +1,7 @@
+{
+  "argv": ["gh", "pr", "view", "609"],
+  "exitCode": 0,
+  "category": "other",
+  "outcome": "passing",
+  "expect": "filtered"
+}

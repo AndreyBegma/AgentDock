@@ -1,0 +1,76 @@
+title:	C-238: Add assistant conversations, streaming chat API and Board tools
+state:	MERGED
+author:	AndreyBegma (Andriy)
+labels:	
+assignees:	
+reviewers:	
+projects:	
+milestone:	
+number:	609
+url:	https://github.com/AndreyBegma/AgentDock/pull/609
+additions:	4013
+deletions:	10
+auto-merge:	disabled
+--
+Spec: https://github.com/AndreyBegma/AgentDock/blob/feat/608-add-assistant-conversations-streaming-ch/docs/specs/608-add-assistant-conversations-streaming-ch.md
+
+Closes #608
+
+## What changed and why
+
+- **Storage (`apps/api/prisma`).** The migration `20261228000000_assistant_conversations` adds three models:
+  - `AssistantConversation`: the owner, a nullable project (null is Auto), the title, the provider and model, and timestamps.
+  - `AssistantMessage`: `role`, the English `content`, `displayContent` in the person's language, `language`, the tool calls and results as JSON, the provider and model, and `llmCallIds` as the usage reference.
+  - `AssistantAttachment`: one of `card`, `session` or `file`. A file links to an ordinary `attachments` row (ADR-0031).
+- **`apps/api/src/assistant/`, the new module.**
+  - **Conversations.** CRUD for conversations, the message list and attachments. Every read is scoped to the owner, so anyone else's conversation, an admin's included, is 404. `GET /assistant/models` lists the enabled models and the default.
+  - **Stream.** `POST /assistant/conversations/:id/stream` is SSE and is throttled to 20 turns a minute per user. It sends:
+    - `delta` events as the provider streams text;
+    - `tool` events, `started` then `done`;
+    - `project` and `title` events;
+    - then `done`, or a typed `error` such as `llm_cap_reached` with `resetsAt`.
+  - **Model and title.** The model is the conversation's pick or the instance default. The title is written by the cheapest enabled model, with the feature tag `title`.
+  - **Auto project.** The message is matched against the projects the person can access. One match binds the conversation. Several matches make the model ask which one, and once the person answers it records the project with `choose_project`.
+  - **Language.** One model call streams the reply in the person's language. It then writes an English trailer after a marker. The trailer is held back from the stream and stored as `content`. DeepL is not called.
+  - **Tool registry.** `AssistantToolRegistry` is exported, and later cards register their tools on it. The Board tools are:
+    - read tools over the projects, Board, card, fleet, queue, budget, activity, sessions and approvals services, behind the web's project and role check;
+    - `draft_card`, which writes nothing;
+    - `queue_card`, which puts the card in To Do as Accept does;
+    - `request_action`, which only creates pending action requests: `orchestrator_stop`, `pr_approve`, or an `issue_queue` for a handoff.
+  - **Attachments.**
+    - A card of a visible project.
+    - A session, only of a project with `shipSessionContent`. Any other is refused with `session_content_off`.
+    - A file, stored and checked by the Board's upload path against the conversation's project. Images go only to vision-capable models.
+- **`apps/api/src/llm/`.** `LlmGateway.stream()` takes an optional `ledger` that receives the `llm_calls` row id and cost, so a message can reference its usage.
+- **Module exports.** `FleetQueryService`, `QueueQueryService`, `ApprovalsQueryService` and `SessionsQueryService` are exported by their modules, so the tools reuse them.
+- **`packages/shared`.**
+  - The assistant contracts: views, requests, stream events, error codes and limits.
+  - `llmModelSeesImages`.
+- **`docs/adr/0060-…`.** Records the decisions, including the exception to ADR-0033 (no DeepL for the assistant) and the mapping of stop, merge and handoff onto the existing action-request kinds.
+
+## Acceptance criteria
+
+- [x] The migration adds the three models. Tests check that another person's conversation is inaccessible. The e2e test "keeps a conversation to its owner" checks every route as another user and as an admin: get, messages, attachments, patch, attach, stream and delete all return 404, and no model is called.
+- [x] The stream emits incremental deltas, not one chunk, and ends with `done` or a typed error. The e2e test asserts at least two `delta` events, that the marker and trailer never appear in them, and that the stream ends with `done`. A provider over its cap ends with `llm_cap_reached`, and nothing is stored.
+- [x] On Auto, a message naming one accessible project binds the conversation to it, and an ambiguous message makes the assistant ask. The e2e tests check:
+  - a `project` event and a stored `projectId`;
+  - that an inaccessible project is never bound;
+  - that for "billing" the prompt lists both billing projects with the instruction to ask, the conversation stays on Auto, and `choose_project` binds it once the person answers.
+  The unit tests in `project-resolver.spec.ts` cover the matching.
+- [x] A Russian message gets a Russian reply, with English `content` and Russian `displayContent`, and no DeepL call. The e2e test sets a DeepL key and spies on the global `fetch`. It asserts:
+  - Russian `displayContent` and English `content` on both messages, with language `ru`;
+  - a single model call;
+  - no request to a DeepL URL;
+  - that the next turn's context is the English text.
+- [x] The read tools return only data from projects the person can access. The e2e test asserts that `list_projects` and `read_board` on the person's own project succeed, and that `read_board` and `read_card` on another person's project are refused. None of that project's names or card titles reach the model.
+- [x] A requested action creates a pending action request instead of running. The e2e test asserts a pending `orchestrator_stop` request by the person, with `ControlService.stop` never called and no command run. A viewer's request is refused because it needs the operator role.
+- [x] Attaching a session from a project without session content opted in is refused. The e2e test asserts 409 `session_content_off`. With content opted in, the attachment succeeds and its content is sent with the next message.
+- [x] Every call is metered and respects the caps. Every model call goes through `LlmGateway`. The e2e tests check:
+  - one `llm_calls` row each for `assistant` and `title`, with the user and model;
+  - that the message's `llmCallIds` references its rows;
+  - that a provider over its cap refuses the turn before any provider call.
+
+Checks run: `bun run check` (Biome), `tsc --noEmit` for the API, every API unit test (893), the `packages/shared` tests, and the e2e suites `assistant/assistant.e2e.spec.ts` (17 tests) and `llm/llm.e2e.spec.ts` (27 tests), since the gateway changed.
+
+AgentDock-Card: C-238
+

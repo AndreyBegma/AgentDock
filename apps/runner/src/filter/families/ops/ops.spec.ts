@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { loadCorpus, runCorpusCase } from '../../corpus';
 import type { Filter } from '../../types';
 import { opsFilters } from '.';
-import { GH_MIN_BYTES } from './forge';
+import { COMMENT_LINES, GH_MIN_BYTES, RUN_LOG_TAIL, runLogText } from './forge';
 import { GIT_MIN_BYTES } from './git';
 
 const run = (argv: string[], output: string, exitCode = 0) => {
@@ -282,10 +282,12 @@ describe('ops filters: what stays', () => {
       'Changes not staged for commit:',
       '  (use "git add <file>..." to update what will be committed)',
       '\tmodified:   src/errors.ts',
+      ...Array.from({ length: 25 }, (_, i) => `\tmodified:   pkg${i}/index.ts`),
       '',
       'Untracked files:',
       '  (use "git add <file>..." to include in what will be committed)',
       ...Array.from({ length: 30 }, (_, i) => `\tgen/file${i}.ts`),
+      ...Array.from({ length: 25 }, (_, i) => `\tdocs/d${i}/`),
       '',
       'no changes added to commit (use "git add" and/or "git commit -a")',
       '',
@@ -293,10 +295,14 @@ describe('ops filters: what stays', () => {
     const result = run(['git', 'status'], output) ?? '';
     expect(result).toContain('On branch feat/x');
     expect(result).toContain('Staged (2):\n  M src/a.ts\n  A src/b.ts\n');
-    expect(result).toContain('Not staged (1):\n  modified:   src/errors.ts\n');
-    expect(result).toContain('Untracked (30):\n  ? gen/file0.ts\n');
-    expect(result).toContain('  ? gen/file19.ts\n  … 10 more\n');
-    expect(result).not.toContain('gen/file20.ts');
+    expect(result).toContain(
+      'Not staged (26):\n  modified:   src/errors.ts\n  M pkg0/index.ts\n',
+    );
+    expect(result).toContain('  M pkg18/index.ts\n  … 6 more\n');
+    expect(result).not.toContain('pkg19/');
+    expect(result).toContain(
+      'Untracked (55):\n  ? gen/{file0.ts, file1.ts, file2.ts, file3.ts, file4.ts, file5.ts, file6.ts, file7.ts, +22 more}\n  ? docs/{d0/, d1/, d2/, d3/, d4/, d5/, d6/, d7/, +17 more}\n',
+    );
     expect(result).not.toContain('  (use "git');
   });
 
@@ -332,6 +338,87 @@ describe('ops filters: what stays', () => {
     expect(result).toContain('d\tpending');
     expect(result).toContain('e\tfail');
     expect(result).toContain('23 checks passing or skipped');
+  });
+
+  it('gh pr view drops empty fields and comment markup, and caps the body', () => {
+    const output = [
+      'title:\tC-1: Fix the cart totals',
+      'state:\tOPEN',
+      'labels:\t',
+      'assignees:\t',
+      'number:\t482',
+      '--',
+      '<!-- Thanks for the PR! Fill in the template below. -->',
+      '## Summary',
+      ...Array.from({ length: 80 }, (_, i) => `- change ${i}: details`),
+      'Known issue: the warning about legacy codes stays.',
+      '<!--',
+      '  reviewer checklist, hidden',
+      '-->',
+      '',
+    ].join('\n');
+    const result = run(['gh', 'pr', 'view', '482'], output) ?? '';
+    expect(result).toContain('title:\tC-1: Fix the cart totals');
+    expect(result).not.toContain('labels:');
+    expect(result).not.toContain('Thanks for the PR');
+    expect(result).not.toContain('reviewer checklist');
+    expect(result).toContain('- change 0: details');
+    expect(result).not.toContain('- change 50: details');
+    expect(result).toContain(
+      'Known issue: the warning about legacy codes stays.',
+    );
+    expect(result).toContain('lines omitted');
+  });
+
+  it('gh pr view --comments caps each comment', () => {
+    const comment = (author: string, lines: number) => [
+      `author:\t${author}`,
+      'association:\tnone',
+      '--',
+      ...Array.from({ length: lines }, (_, i) => `${author} line ${i}`),
+      '--',
+    ];
+    const output = `${[...comment('codecov', 40), ...comment('dkim', 3)].join('\n')}\n`;
+    const result = run(['gh', 'pr', 'view', '482', '--comments'], output) ?? '';
+    expect(result).toContain(`codecov line ${COMMENT_LINES - 1}\n… `);
+    expect(result).not.toContain(`codecov line ${COMMENT_LINES + 5}\n`);
+    expect(result).toContain('author:\tdkim\nassociation:\tnone\n--\n');
+    expect(result).toContain('dkim line 0\ndkim line 1\ndkim line 2\n--\n');
+  });
+
+  it('gh run view --log keeps the failed step and a tail, one line per other step', () => {
+    const at = (s: number) =>
+      `2026-10-17T09:12:${String(s % 60).padStart(2, '0')}.0000000Z`;
+    const log = [
+      ...Array.from(
+        { length: 60 },
+        (_, i) => `build\tRun npm ci\t${at(i)} added package ${i}`,
+      ),
+      ...Array.from(
+        { length: 30 },
+        (_, i) => `build\tRun tests\t${at(i)} PASS suite ${i}`,
+      ),
+      `build\tRun tests\t${at(31)} FAIL src/cart.test.ts`,
+      `build\tRun tests\t${at(32)} ##[error]Process completed with exit code 1.`,
+      ...Array.from(
+        { length: 20 },
+        (_, i) => `build\tPost job cleanup\t${at(i)} cleanup ${i}`,
+      ),
+    ];
+    const result =
+      run(['gh', 'run', 'view', '42', '--log'], `${log.join('\n')}\n`) ?? '';
+    expect(result).toContain('build / Run npm ci: 60 lines\n');
+    expect(result).not.toContain('added package');
+    expect(result).toContain(
+      'build / Run tests: 32 lines, with errors or warnings\n',
+    );
+    expect(result).toContain('  FAIL src/cart.test.ts\n');
+    expect(result).toContain(
+      '  ##[error]Process completed with exit code 1.\n',
+    );
+    expect(result).toContain(`last ${RUN_LOG_TAIL} lines:\n`);
+    expect(result).toContain('  cleanup 19\n');
+    expect(runLogText(log[0] ?? '')).toBe('added package 0');
   });
 
   it('kubectl apply counts unchanged objects', () => {

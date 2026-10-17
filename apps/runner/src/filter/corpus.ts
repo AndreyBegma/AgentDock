@@ -15,7 +15,9 @@ import type { Filter } from './types';
  * `category` is `test` (test runners), `typecheck` (type checkers and
  * linters) or `other`; only the first two count toward the savings medians.
  * `expect: "filtered"` makes a case fail when the filter returns the original
- * — use it for every case a filter is written for.
+ * — use it for every case a filter is written for. `maxRatio` (0–1) makes it
+ * fail when kept/raw, footer included, is above it — for a large case whose
+ * savings a filter promises.
  */
 
 export type CorpusCategory = 'test' | 'typecheck' | 'other';
@@ -28,6 +30,8 @@ export interface CorpusCase {
   category: CorpusCategory;
   outcome: CorpusOutcome;
   expect: 'filtered' | 'any';
+  /** The largest kept/raw this case may come out at, when set. */
+  maxRatio?: number;
   output: string;
 }
 
@@ -60,14 +64,16 @@ export const loadCorpus = (dir: string): CorpusCase[] => {
         string,
         unknown
       >;
-      const { argv, exitCode, category, outcome } = meta;
+      const { argv, exitCode, category, outcome, maxRatio } = meta;
       if (
         !Array.isArray(argv) ||
         argv.length === 0 ||
         !argv.every((a) => typeof a === 'string') ||
         typeof exitCode !== 'number' ||
         !CATEGORIES.has(category as CorpusCategory) ||
-        !OUTCOMES.has(outcome as CorpusOutcome)
+        !OUTCOMES.has(outcome as CorpusOutcome) ||
+        (maxRatio !== undefined &&
+          (typeof maxRatio !== 'number' || maxRatio <= 0 || maxRatio > 1))
       ) {
         throw new Error(`corpus case ${join(dir, file)} is malformed`);
       }
@@ -78,6 +84,7 @@ export const loadCorpus = (dir: string): CorpusCase[] => {
         category: category as CorpusCategory,
         outcome: outcome as CorpusOutcome,
         expect: meta.expect === 'filtered' ? 'filtered' : 'any',
+        ...(typeof maxRatio === 'number' ? { maxRatio } : {}),
         output: readFileSync(join(dir, `${name}.out`), 'utf8'),
       };
     });

@@ -139,7 +139,11 @@ The rules come from the files Claude Code loads:
   warning and stack-frame lines. The rule is deliberately broad: a wrong guess
   only keeps a line that could have gone. After a filter returns, the engine
   checks every marked line of the original against the result (escapes ignored,
-  duplicates counted once). The agent gets the original output, counted
+  duplicates counted once). A filter may name the part of a line the check
+  judges (`protectedPart`, #614): a search hit `src/a.ts:12:  return x;` is a
+  location, not a stack frame, so `lang/search` is judged by the text after
+  `src/a.ts:12:`, and `ops/gh` judges a run-log line by the text after its
+  `job / step / timestamp` prefix. The agent gets the original output, counted
   `passedThrough`, when any of these happens:
   - a marked line is missing;
   - the result is not shorter than the original, footer included;
@@ -255,6 +259,24 @@ export const jestFilter: Filter = {
 - Keep summaries and every marked line. The engine overrules a filter that
   drops one.
 - Return `null` rather than guess.
+- Return `null` below a named size threshold (`GIT_MIN_BYTES`,
+  `GH_MIN_BYTES`, `SEARCH_MIN_BYTES`, …) when the footer (~150 bytes) would
+  eat what the filter could save: such output is counted honestly, with
+  `rawBytes == keptBytes`.
+
+### What git, gh and search do (#614)
+
+| Command | Shape |
+|---|---|
+| `git status` | branch lines, then `Staged (N):` / `Not staged (N):` / `Untracked (N):` with porcelain-like codes, neighbours in one directory on one line, 20 lines per section. `--porcelain` is never reshaped. |
+| `git diff` / `git show` | a stat header, hunks with one line of context (a dropped run of 4+ lines becomes a marker), hunks over 30 lines keep 20 + 5, each file shows at most 40 hunk lines. `--stat` and the other summary modes are only capped. |
+| `git log` | one line per commit; protected body lines stay. |
+| `gh pr view` / `issue view` | empty fields, HTML comments and table rulers go; the body keeps 40 + 10 lines; with `--comments`, each comment its first 10. |
+| `gh pr checks` | passing and skipped rows become a count. |
+| `gh run view --log` | one line per step; steps with an error or warning keep 10 + 40 lines; the last 15 lines. |
+| `grep` / `rg` | hits grouped by file, 8 lines per file and a count of the rest, single-hit files as printed; over 200 lines, head and tail. `-c`, `-l` and `-h` are only capped. `--json` is never reshaped. |
+
+Every protected line survives all of these, whatever the caps.
 
 ### The corpus
 
@@ -268,11 +290,15 @@ case:
 { "argv": ["bun", "test"], "exitCode": 1, "category": "test", "outcome": "failing", "expect": "filtered" }
 ```
 
+An optional `"maxRatio": 0.5` makes the case fail when its kept/raw, footer
+included, is above that — used for the large git, gh and search cases.
+
 `category` is `test`, `typecheck` or `other`. `corpus.spec.ts` runs every family's
 cases through the same checks the engine applies, and asserts these:
 
 - every marked line survives;
 - each case with `expect: "filtered"` really is filtered;
+- each case with a `maxRatio` comes out at or under it;
 - per family, the median kept/raw of `test` and `typecheck` cases is ≤ 0.3 for
   failing runs and ≤ 0.1 for passing ones.
 

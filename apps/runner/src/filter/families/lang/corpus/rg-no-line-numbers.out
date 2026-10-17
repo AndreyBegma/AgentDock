@@ -1,0 +1,167 @@
+apps/runner/src/filter/testing.ts:export const demoFilter: Filter = {
+apps/runner/src/filter/testing.ts:export const lossyFilter: Filter = {
+apps/runner/src/filter/testing.ts:export const throwingFilter: Filter = {
+apps/runner/src/filter/testing.ts:export const tapOutput = (count: number, failures: string[] = []): string => {
+apps/runner/src/filter/stats.ts:export const RUN_KINDS: readonly TokenSaverRunKind[] = [
+apps/runner/src/filter/stats.ts:export const statsTarget = (
+apps/runner/src/filter/stats.ts:export const statRowId = (now: number, random: () => number): string =>
+apps/runner/src/filter/stats.ts:export const writeStat = (
+apps/runner/src/filter/stats-reader.ts:export const FILTER_STATS_OFFSET_FILE = 'filter-stats.offset';
+apps/runner/src/filter/stats-reader.ts:export const FILTER_STATS_POLL_MS = 5_000;
+apps/runner/src/filter/stats-reader.ts:export const findStatsFiles = (roots: readonly string[]): string[] => {
+apps/runner/src/filter/stats-reader.ts:export const readNewLines = (
+apps/runner/src/filter/stats-reader.ts:export const readIdentity = (statsFile: string): RunIdentity | null => {
+apps/runner/src/filter/stats-reader.ts:export const parseLines = (
+apps/runner/src/filter/shell.ts:export const parseSimpleCommand = (input: string): SimpleCommand | null => {
+apps/runner/src/filter/shell.ts:export const parseHookCommand = (input: string): HookCommand | null => {
+apps/runner/src/filter/shell.ts:export const shellQuote = (word: string): string =>
+apps/runner/src/filter/shell.ts:export const quoteAssignment = (assignment: Assignment): string =>
+apps/runner/src/filter/raw-store.ts:export const RAW_CAP_BYTES = 10 * 1024 * 1024;
+apps/runner/src/filter/raw-store.ts:export const RAW_DIR_CAP_BYTES = 200 * 1024 * 1024;
+apps/runner/src/filter/raw-store.ts:export const removeRawDir = (runDir: string): void => {
+apps/runner/src/filter/raw-store.ts:export const RAW_TRUNCATED_MARKER = `\n[agentdock filter: raw output truncated at ${RAW_CAP_BYTES / 1024 / 1024} MB]\n`;
+apps/runner/src/filter/corpus.ts:export const loadCorpus = (dir: string): CorpusCase[] => {
+apps/runner/src/filter/corpus.ts:export const runCorpusCase = (
+apps/runner/src/filter/corpus.ts:export const median = (values: readonly number[]): number => {
+apps/runner/src/filter/corpus.ts:export const SAVINGS_CEILINGS: Record<
+apps/runner/src/filter/corpus.ts:export const SAVINGS_CEILING: Record<CorpusOutcome, number> =
+apps/runner/src/filter/corpus.ts:export const savingsMedian = (
+apps/runner/src/filter/permissions.ts:export const parseBashRule = (rule: unknown): Pattern | 'other' | 'unknown' => {
+apps/runner/src/filter/permissions.ts:export const ruleCandidates = (
+apps/runner/src/filter/permissions.ts:export const permissionFor = (
+apps/runner/src/filter/permissions.ts:export const settingsFiles = (sources: SettingsSources): string[] => {
+apps/runner/src/filter/permissions.ts:export const readRules = (files: readonly string[]): PermissionRules | null => {
+apps/runner/src/filter/classify.ts:export const stripAnsi = (text: string): string => text.replace(ANSI, '');
+apps/runner/src/filter/classify.ts:export const isProtectedLine = (line: string): boolean => {
+apps/runner/src/filter/classify.ts:export const protectedLines = (
+apps/runner/src/filter/classify.ts:export const missingProtectedLines = (
+apps/runner/src/filter/main.ts:export const FILTER_COMMANDS = new Set(['filter', 'filter-hook']);
+apps/runner/src/filter/main.ts:export const processIo = (): FilterIo => {
+apps/runner/src/filter/main.ts:export const runFilterCommand = async (
+apps/runner/src/filter/bench.spec.ts:export const OVERHEAD_P95_MS = 50;
+apps/runner/src/filter/hook.ts:export const isLongRunning = (
+apps/runner/src/filter/hook.ts:export const decideHook = (
+apps/runner/src/filter/hook.ts:export const wrappedCommand = (
+apps/runner/src/filter/hook.ts:export const runFilterHook = (stdin: string, deps: HookDeps): string => {
+apps/runner/src/filter/families/ops/util.ts:export const cleanLines = (output: string): string[] => {
+apps/runner/src/filter/families/ops/util.ts:export const joinLines = (lines: readonly string[]): string =>
+apps/runner/src/filter/families/ops/util.ts:export const collapseRepeats = (lines: readonly string[]): string[] => {
+apps/runner/src/filter/families/ops/util.ts:export const squeezeBlanks = (lines: readonly string[]): string[] =>
+apps/runner/src/filter/families/ops/util.ts:export const elide = (
+apps/runner/src/filter/families/ops/util.ts:export const subcommand = (
+apps/runner/src/filter/families/ops/util.ts:export const positionals = (
+apps/runner/src/filter/families/ops/util.ts:export const hasFlag = (argv: readonly string[], ...flags: string[]): boolean =>
+apps/runner/src/filter/families/ops/util.ts:export const looksLikeJson = (output: string): boolean => {
+apps/runner/src/filter/env.ts:export const FILTER_STATS_ENV = 'AGENTDOCK_FILTER_STATS';
+apps/runner/src/filter/env.ts:export const FILTER_PROJECT_ENV = 'AGENTDOCK_FILTER_PROJECT';
+apps/runner/src/filter/env.ts:export const FILTER_RUN_ENV = 'AGENTDOCK_FILTER_RUN';
+apps/runner/src/filter/env.ts:export const FILTER_RUN_KIND_ENV = 'AGENTDOCK_FILTER_RUN_KIND';
+apps/runner/src/filter/env.ts:export const LAUNCH_SETTINGS_ENV = 'AGENTDOCK_LAUNCH_SETTINGS';
+apps/runner/src/filter/env.ts:export const RAW_ENV = 'AGENTDOCK_RAW';
+apps/runner/src/filter/env.ts:export const FILTER_STATS_FILE = 'filter-stats.jsonl';
+apps/runner/src/filter/env.ts:export const FILTER_RUN_FILE = 'filter-run.json';
+apps/runner/src/filter/env.ts:export const FILTER_RAW_DIR = 'raw';
+apps/runner/src/filter/env.ts:export const FILTER_ORCHESTRATOR_DIR = 'orchestrator';
+apps/runner/src/filter/env.ts:export const filterEnv = (launch: FilterLaunch): Record<string, string> => ({
+apps/runner/src/filter/env.ts:export const orchestratorFilterDir = (stateDir: string, repo: string): string =>
+apps/runner/src/filter/families/ops/terraform.ts:export const terraformFilter: Filter = {
+apps/runner/src/filter/engine.ts:export const FILTER_NONE = 'none';
+apps/runner/src/filter/engine.ts:export const FILTER_NONE_COMPOUND = 'none:compound';
+apps/runner/src/filter/engine.ts:export const FILTER_NONE_UNCOVERED = 'none:uncovered';
+apps/runner/src/filter/engine.ts:export const FILTER_NONE_MODE = 'none:mode';
+apps/runner/src/filter/engine.ts:export const FILTER_BUFFER_BYTES = RAW_CAP_BYTES;
+apps/runner/src/filter/engine.ts:export const filterFooter = (
+apps/runner/src/filter/engine.ts:export const commandArgv = (argv: readonly string[]): string[] =>
+apps/runner/src/filter/engine.ts:export const findFilter = (
+apps/runner/src/filter/engine.ts:export const judge = (
+apps/runner/src/filter/engine.ts:export const linePart =
+apps/runner/src/filter/engine.ts:export const redactShown = (text: string): string =>
+apps/runner/src/filter/engine.ts:export const runFilter = async (
+apps/runner/src/filter/families/ops/ops.spec.ts:        '@@ -1,51 +1,51 @@ export const x = () => {',
+apps/runner/src/filter/families/ops/ops.spec.ts:        '@@ -1,51 +1,51 @@ export const x = () => {',
+apps/runner/src/filter/families/ops/ops.spec.ts:            (_, i) => `+export const e${i} = ${i};`,
+apps/runner/src/filter/eco.ts:export const TRANSCRIPT_RETRY_MS = 60_000;
+apps/runner/src/filter/eco.ts:export const ecoSessionsDir = (
+apps/runner/src/filter/eco.ts:export const findEcoStatsFiles = (dir: string): EcoSessionFile[] => {
+apps/runner/src/filter/eco.ts:export const parseEcoLines = (
+apps/runner/src/filter/eco.ts:export const readTranscriptCwd = (path: string): string | undefined => {
+apps/runner/src/filter/families/ops/make.ts:export const makeFilter: Filter = {
+apps/runner/src/filter/families/ops/kube.ts:export const kubectlFilter: Filter = {
+apps/runner/src/filter/families/ops/kube.ts:export const helmFilter: Filter = {
+apps/runner/src/filter/families/ops/index.ts:export const opsFilters: readonly Filter[] = [
+apps/runner/src/filter/families/ops/cloud.ts:export const awsFilter: Filter = {
+apps/runner/src/filter/families/ops/cloud.ts:export const gcloudFilter: Filter = {
+apps/runner/src/filter/families/ops/git.ts:export const GIT_MIN_BYTES = 512;
+apps/runner/src/filter/families/ops/git.ts:export const GIT_STATUS_FILES = 20;
+apps/runner/src/filter/families/ops/git.ts:export const DIFF_HUNK_LINES = 80;
+apps/runner/src/filter/families/ops/git.ts:export const gitFilter: Filter = {
+apps/runner/src/filter/families/ops/forge.ts:export const GH_MIN_BYTES = 512;
+apps/runner/src/filter/families/ops/forge.ts:export const RUN_LOG_TAIL = 15;
+apps/runner/src/filter/families/ops/forge.ts:export const ghFilter = forgeFilter('ops/gh', 'gh');
+apps/runner/src/filter/families/ops/forge.ts:export const glabFilter = forgeFilter('ops/glab', 'glab');
+apps/runner/src/filter/families/ops/docker.ts:export const dockerFilter: Filter = {
+apps/runner/src/filter/families/lang/util.ts:export const cleanLines = (output: string): string[] => {
+apps/runner/src/filter/families/lang/util.ts:export const joinLines = (lines: readonly string[]): string =>
+apps/runner/src/filter/families/lang/util.ts:export const dropNoise = (lines: readonly string[], noise: RegExp): string[] =>
+apps/runner/src/filter/families/lang/util.ts:export const squeezeBlanks = (lines: readonly string[]): string[] =>
+apps/runner/src/filter/families/lang/util.ts:export const dedupe = (lines: readonly string[]): string[] => {
+apps/runner/src/filter/families/lang/util.ts:export const elideRuns = (
+apps/runner/src/filter/families/lang/util.ts:export const elide = (
+apps/runner/src/filter/families/lang/util.ts:export const positionals = (
+apps/runner/src/filter/families/lang/util.ts:export const hasFlag = (argv: readonly string[], ...flags: string[]): boolean =>
+apps/runner/src/filter/families/lang/util.ts:export const looksLikeJson = (output: string): boolean => {
+apps/runner/src/filter/families/lang/util.ts:export const effective = (argv: readonly string[]): string[] => {
+apps/runner/src/filter/families/ops/curl.ts:export const curlFilter: Filter = {
+apps/runner/src/filter/families/index.ts:export const FAMILIES: Readonly<Record<string, readonly Filter[]>> = {
+apps/runner/src/filter/families/index.ts:export const ALL_FILTERS: readonly Filter[] = Object.values(FAMILIES).flat();
+apps/runner/src/filter/families/lang/rust.ts:export const cargoFilter: Filter = {
+apps/runner/src/filter/families/lang/jvm.ts:export const mavenFilter: Filter = {
+apps/runner/src/filter/families/lang/jvm.ts:export const gradleFilter: Filter = {
+apps/runner/src/filter/families/lang/ruby.ts:export const rspecFilter: Filter = {
+apps/runner/src/filter/families/lang/ruby.ts:export const rubocopFilter: Filter = {
+apps/runner/src/filter/families/lang/ruby.ts:export const bundleFilter: Filter = {
+apps/runner/src/filter/families/lang/files.ts:export const findFilter: Filter = {
+apps/runner/src/filter/families/lang/files.ts:export const lsFilter: Filter = {
+apps/runner/src/filter/families/lang/files.ts:export const treeFilter: Filter = {
+apps/runner/src/filter/families/lang/files.ts:export const SEARCH_MIN_BYTES = 1024;
+apps/runner/src/filter/families/lang/files.ts:export const SEARCH_LINES_PER_FILE = 8;
+apps/runner/src/filter/families/lang/files.ts:export const searchHitText = (line: string): string => {
+apps/runner/src/filter/families/lang/files.ts:export const searchFilter: Filter = {
+apps/runner/src/filter/families/lang/index.ts:export const langFilters: readonly Filter[] = [
+apps/runner/src/filter/families/lang/python.ts:export const pytestFilter: Filter = {
+apps/runner/src/filter/families/lang/python.ts:export const ruffFilter: Filter = {
+apps/runner/src/filter/families/lang/python.ts:export const pipFilter: Filter = {
+apps/runner/src/filter/families/lang/python.ts:export const poetryFilter: Filter = {
+apps/runner/src/filter/families/lang/dotnet.ts:export const dotnetFilter: Filter = {
+apps/runner/src/filter/families/lang/go.ts:export const goTestFilter: Filter = {
+apps/runner/src/filter/families/lang/php.ts:export const phpunitFilter: Filter = {
+apps/runner/src/filter/families/lang/php.ts:export const composerFilter: Filter = {
+apps/runner/src/filter/families/js/index.ts:export const jsFilters: readonly Filter[] = [
+apps/runner/src/filter/families/js/checks.ts:export const compressTsc: Compress = (output) => {
+apps/runner/src/filter/families/js/checks.ts:export const compressBiome: Compress = (output) => {
+apps/runner/src/filter/families/js/checks.ts:export const compressPrettier: Compress = (output) => {
+apps/runner/src/filter/families/js/build.ts:export const compressNextBuild: Compress = (output) => {
+apps/runner/src/filter/families/js/build.ts:export const compressPrisma: Compress = (output) => {
+apps/runner/src/filter/families/js/build.ts:export const compressTurbo: Compress = (output) => {
+apps/runner/src/filter/families/js/util.ts:export const splitLines = (output: string): string[] => {
+apps/runner/src/filter/families/js/util.ts:export const plainLines = (lines: readonly string[]): string[] =>
+apps/runner/src/filter/families/js/util.ts:export const isBlank = (plain: string): boolean => plain.trim().length === 0;
+apps/runner/src/filter/families/js/util.ts:export const indentOf = (plain: string): number =>
+apps/runner/src/filter/families/js/util.ts:export const survivors = (
+apps/runner/src/filter/families/js/util.ts:export const isGone = (
+apps/runner/src/filter/families/js/util.ts:export const dropEmptyHeaders = (
+apps/runner/src/filter/families/js/util.ts:export const squeezeBlank = (lines: readonly string[]): string[] => {
+apps/runner/src/filter/families/js/util.ts:export const finish = (
+apps/runner/src/filter/families/js/util.ts:export const dropMatching = (
+apps/runner/src/filter/families/js/pm.ts:export const compressInstall: Compress = (output) => {
+apps/runner/src/filter/families/js/pm.ts:export const compressOutdated: Compress = (output) => {
+apps/runner/src/filter/families/js/corpus/tsc-pretty-fail.out:14 export const first = (segments: Segment[]): string => segments[0];
+apps/runner/src/filter/families/js/resolve.ts:export const TOOLS: ReadonlySet<string> = new Set([
+apps/runner/src/filter/families/js/resolve.ts:export const invocation = (argv: readonly string[]): Invocation | null => {
+apps/runner/src/filter/families/js/resolve.ts:export const runs = (
+apps/runner/src/filter/families/js/resolve.ts:export const subcommand = (args: readonly string[]): string | undefined =>
+apps/runner/src/filter/families/js/resolve.ts:export const scriptRun = (
+apps/runner/src/filter/families/js/resolve.ts:export const isLongScript = (script: string): boolean =>
+apps/runner/src/filter/families/js/tests.ts:export const compressJest: Compress = (output) => {
+apps/runner/src/filter/families/js/tests.ts:export const compressVitest: Compress = (output) => {
+apps/runner/src/filter/families/js/tests.ts:export const compressBunTest: Compress = (output) => {

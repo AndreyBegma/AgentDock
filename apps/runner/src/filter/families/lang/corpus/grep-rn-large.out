@@ -1,0 +1,320 @@
+apps/runner/src/filter/classify.ts:49: * says otherwise (`Filter.protectedPart`).
+apps/runner/src/filter/corpus.spec.ts:12:import { demoFilter, lossyFilter, tapOutput } from './testing';
+apps/runner/src/filter/corpus.spec.ts:86:      runCorpusCase([demoFilter], c),
+apps/runner/src/filter/corpus.spec.ts:96:    const lossy = { ...lossyFilter, matches: () => true };
+apps/runner/src/filter/corpus.spec.ts:124:    ].map((c) => runCorpusCase([demoFilter], c));
+apps/runner/src/filter/main.ts:2:import { runFilter } from './engine';
+apps/runner/src/filter/main.ts:4:import { runFilterHook } from './hook';
+apps/runner/src/filter/main.ts:5:import type { Filter } from './types';
+apps/runner/src/filter/main.ts:22:export interface FilterIo {
+apps/runner/src/filter/main.ts:34:export const processIo = (): FilterIo => {
+apps/runner/src/filter/main.ts:71:export const runFilterCommand = async (
+apps/runner/src/filter/main.ts:73:  io: FilterIo = processIo(),
+apps/runner/src/filter/main.ts:74:  filters: readonly Filter[] = ALL_FILTERS,
+apps/runner/src/filter/main.ts:80:      output = runFilterHook(await io.stdin(), {
+apps/runner/src/filter/main.ts:96:  const code = await runFilter(args, {
+apps/runner/src/filter/main.ts:109:  process.exit(await runFilterCommand(process.argv.slice(2)));
+apps/runner/src/filter/hook.ts:6:  findFilter,
+apps/runner/src/filter/hook.ts:23:import type { Filter } from './types';
+apps/runner/src/filter/hook.ts:67:  filters: readonly Filter[];
+apps/runner/src/filter/hook.ts:85:  filter: Filter | null,
+apps/runner/src/filter/hook.ts:202:  filters: readonly Filter[],
+apps/runner/src/filter/hook.ts:203:): { stage: Stage; filter: Filter }[] =>
+apps/runner/src/filter/hook.ts:205:    const filter = stage ? findFilter(filters, stage.command.argv) : null;
+apps/runner/src/filter/hook.ts:262:export const runFilterHook = (stdin: string, deps: HookDeps): string => {
+apps/runner/src/filter/types.ts:11:export interface Filter {
+apps/runner/src/filter/types.ts:26:  apply(input: FilterInput): string | null;
+apps/runner/src/filter/types.ts:37:export interface FilterInput {
+apps/runner/src/filter/launch-e2e.spec.ts:4:import type { FilterStatRow } from '@agentdock/shared';
+apps/runner/src/filter/launch-e2e.spec.ts:9:import { runFilter } from './engine';
+apps/runner/src/filter/launch-e2e.spec.ts:10:import { type HookOutput, runFilterHook } from './hook';
+apps/runner/src/filter/launch-e2e.spec.ts:11:import { FilterStatsReader } from './stats-reader';
+apps/runner/src/filter/launch-e2e.spec.ts:12:import { demoFilter, tapOutput } from './testing';
+apps/runner/src/filter/launch-e2e.spec.ts:47:    const out = runFilterHook(
+apps/runner/src/filter/launch-e2e.spec.ts:56:        filters: [demoFilter],
+apps/runner/src/filter/launch-e2e.spec.ts:74:    const code = await runFilter([fixture], {
+apps/runner/src/filter/launch-e2e.spec.ts:76:      filters: [demoFilter],
+apps/runner/src/filter/launch-e2e.spec.ts:89:    const reader = new FilterStatsReader({
+apps/runner/src/filter/launch-e2e.spec.ts:104:    const rows = (events[0]?.data as { rows: FilterStatRow[] }).rows;
+apps/runner/src/filter/launch-e2e.spec.ts:136:    const out = runFilterHook(
+apps/runner/src/filter/launch-e2e.spec.ts:145:        filters: [demoFilter],
+apps/runner/src/filter/launch-e2e.spec.ts:163:    const code = await runFilter([fixture], {
+apps/runner/src/filter/launch-e2e.spec.ts:165:      filters: [demoFilter],
+apps/runner/src/filter/launch-e2e.spec.ts:174:    const reader = new FilterStatsReader({
+apps/runner/src/filter/launch-e2e.spec.ts:187:    const rows = (events[0]?.data as { rows: FilterStatRow[] }).rows;
+apps/runner/src/filter/stats.ts:2:import type { FilterStatRow, TokenSaverRunKind } from '@agentdock/shared';
+apps/runner/src/filter/stats.ts:8:  type FilterLaunch,
+apps/runner/src/filter/stats.ts:17:  row: FilterStatRow;
+apps/runner/src/filter/stats.ts:33:export interface StatsTarget extends Omit<FilterLaunch, 'runDir'> {
+apps/runner/src/filter/testing.ts:1:import type { Filter } from './types';
+apps/runner/src/filter/testing.ts:4: * Filters for the engine's own tests. `demo-test` prints TAP-like lines;
+apps/runner/src/filter/testing.ts:7:export const demoFilter: Filter = {
+apps/runner/src/filter/testing.ts:19:export const lossyFilter: Filter = {
+apps/runner/src/filter/testing.ts:25:export const throwingFilter: Filter = {
+apps/runner/src/filter/engine.spec.ts:14:import { type FilterDeps, judge, runFilter } from './engine';
+apps/runner/src/filter/engine.spec.ts:18:import { demoFilter, lossyFilter, tapOutput, throwingFilter } from './testing';
+apps/runner/src/filter/engine.spec.ts:29:  let deps: FilterDeps;
+apps/runner/src/filter/engine.spec.ts:68:      filters: [demoFilter, lossyFilter, throwingFilter],
+apps/runner/src/filter/engine.spec.ts:87:    const code = await runFilter([demo], deps);
+apps/runner/src/filter/engine.spec.ts:132:    expect(await runFilter([demo], deps)).toBe(1);
+apps/runner/src/filter/engine.spec.ts:146:    await runFilter([demo], deps);
+apps/runner/src/filter/engine.spec.ts:147:    await runFilter([demo], deps);
+apps/runner/src/filter/engine.spec.ts:156:    const code = await runFilter([demo], {
+apps/runner/src/filter/engine.spec.ts:174:    const code = await runFilter(
+apps/runner/src/filter/engine.spec.ts:202:    expect(await runFilter([cmd], deps)).toBe(2);
+apps/runner/src/filter/engine.spec.ts:209:    await runFilter([demo], deps);
+apps/runner/src/filter/engine.spec.ts:216:    const code = await runFilter([demo], {
+apps/runner/src/filter/engine.spec.ts:227:    expect(await runFilter(['/no/such/command'], deps)).toBe(127);
+apps/runner/src/filter/engine.spec.ts:236:    const running = runFilter([sleeper], {
+apps/runner/src/filter/engine.spec.ts:251:    const code = await runFilter([big], deps);
+apps/runner/src/filter/engine.spec.ts:269:    const verdict = judge(demoFilter, ['demo-test'], 'ok 1 - a\n', 0, footer);
+apps/runner/src/filter/engine.spec.ts:275:    const verdict = judge(demoFilter, ['demo-test'], tapOutput(30), 0, (n) => {
+apps/runner/src/filter/corpus.ts:4:import { filterFooter, findFilter, judge, linePart } from './engine';
+apps/runner/src/filter/corpus.ts:5:import type { Filter } from './types';
+apps/runner/src/filter/corpus.ts:95:  filters: readonly Filter[],
+apps/runner/src/filter/corpus.ts:98:  const filter = findFilter(filters, c.argv);
+apps/runner/src/filter/hook.spec.ts:10:  runFilterHook,
+apps/runner/src/filter/hook.spec.ts:14:import { demoFilter } from './testing';
+apps/runner/src/filter/hook.spec.ts:15:import type { Filter } from './types';
+apps/runner/src/filter/hook.spec.ts:18:const bunTest: Filter = {
+apps/runner/src/filter/hook.spec.ts:62:      filters: [bunTest, demoFilter],
+apps/runner/src/filter/hook.spec.ts:87:    const out = runFilterHook(JSON.stringify(preToolUse('bun run test')), deps);
+apps/runner/src/filter/hook.spec.ts:101:    const out = runFilterHook(JSON.stringify(preToolUse('bun test')), {
+apps/runner/src/filter/hook.spec.ts:113:    const out = runFilterHook(
+apps/runner/src/filter/hook.spec.ts:126:      runFilterHook(JSON.stringify(preToolUse('bun run test')), {
+apps/runner/src/filter/hook.spec.ts:163:    expect(runFilterHook(input, deps)).toBe('');
+apps/runner/src/filter/hook.spec.ts:182:      runFilterHook(JSON.stringify(preToolUse(command, {}, mode)), deps);
+apps/runner/src/filter/hook.spec.ts:208:      runFilterHook(JSON.stringify(preToolUse('bun run test')), {
+apps/runner/src/filter/hook.spec.ts:290:      const out = runFilterHook(JSON.stringify(input), {
+apps/runner/src/filter/hook.spec.ts:306:      const out = runFilterHook(
+apps/runner/src/filter/hook.spec.ts:319:    const out = runFilterHook(
+apps/runner/src/filter/hook.spec.ts:334:          runFilterHook(JSON.stringify(preToolUse(command, {}, mode)), deps),
+apps/runner/src/filter/hook.spec.ts:370:      expect(runFilterHook(JSON.stringify(preToolUse(command)), deps)).toBe('');
+apps/runner/src/filter/hook.spec.ts:380:        const out = runFilterHook(
+apps/runner/src/filter/hook.spec.ts:390:    const git: Filter = {
+apps/runner/src/filter/hook.spec.ts:395:    const bunLint: Filter = {
+apps/runner/src/filter/hook.spec.ts:402:      const out = runFilterHook(JSON.stringify(preToolUse(command, {}, mode)), {
+apps/runner/src/filter/hook.spec.ts:404:        filters: [bunTest, bunLint, git, demoFilter],
+apps/runner/src/filter/hook.spec.ts:472:      const out = runFilterHook(
+apps/runner/src/filter/hook.spec.ts:498:        const out = runFilterHook(
+apps/runner/src/filter/hook.spec.ts:518:    expect(runFilterHook(JSON.stringify(preToolUse(command)), deps)).toBe('');
+apps/runner/src/filter/hook.spec.ts:526:    const git: Filter = {
+apps/runner/src/filter/hook.spec.ts:531:    const out = runFilterHook(JSON.stringify(preToolUse('git  push')), {
+apps/runner/src/filter/hook.spec.ts:542:      runFilterHook(JSON.stringify(preToolUse('bun run test')), {
+apps/runner/src/filter/hook.spec.ts:552:      expect(runFilterHook(stdin, deps)).toBe('');
+apps/runner/src/filter/hook.spec.ts:555:      runFilterHook(JSON.stringify(preToolUse('bun test')), {
+apps/runner/src/filter/eco.ts:9:import { type FilterStatRow, filterStatRowSchema } from '@agentdock/shared';
+apps/runner/src/filter/eco.ts:97:): { rows: FilterStatRow[]; rejected: number } => {
+apps/runner/src/filter/eco.ts:99:  const rows: FilterStatRow[] = [];
+apps/runner/src/filter/stats-reader.ts:15:  type FilterStatRow,
+apps/runner/src/filter/stats-reader.ts:76:export interface FilterStatsReaderOptions {
+apps/runner/src/filter/stats-reader.ts:188:): { rows: FilterStatRow[]; rejected: number } => {
+apps/runner/src/filter/stats-reader.ts:189:  const rows: FilterStatRow[] = [];
+apps/runner/src/filter/stats-reader.ts:214:export class FilterStatsReader {
+apps/runner/src/filter/stats-reader.ts:218:  constructor(private readonly options: FilterStatsReaderOptions) {}
+apps/runner/src/filter/stats-reader.ts:268:  private emitRows(project: EnvelopeProject, rows: FilterStatRow[]): void {
+apps/runner/src/filter/families/index.ts:1:import type { Filter } from '../types';
+apps/runner/src/filter/families/index.ts:2:import { jsFilters } from './js';
+apps/runner/src/filter/families/index.ts:3:import { langFilters } from './lang';
+apps/runner/src/filter/families/index.ts:4:import { opsFilters } from './ops';
+apps/runner/src/filter/families/index.ts:10:export const FAMILIES: Readonly<Record<string, readonly Filter[]>> = {
+apps/runner/src/filter/families/index.ts:11:  js: jsFilters,
+apps/runner/src/filter/families/index.ts:12:  ops: opsFilters,
+apps/runner/src/filter/families/index.ts:13:  lang: langFilters,
+apps/runner/src/filter/families/index.ts:17:export const ALL_FILTERS: readonly Filter[] = Object.values(FAMILIES).flat();
+apps/runner/src/filter/eco.spec.ts:12:import { type FilterStatRow, filterStatsDataSchema } from '@agentdock/shared';
+apps/runner/src/filter/eco.spec.ts:26:import { FILTER_STATS_OFFSET_FILE, FilterStatsReader } from './stats-reader';
+apps/runner/src/filter/eco.spec.ts:148:  let reader: FilterStatsReader;
+apps/runner/src/filter/eco.spec.ts:163:    reader = new FilterStatsReader({
+apps/runner/src/filter/eco.spec.ts:209:    ] as FilterStatRow[]);
+apps/runner/src/filter/engine.ts:13:import type { Filter } from './types';
+apps/runner/src/filter/engine.ts:30:export interface FilterDeps {
+apps/runner/src/filter/engine.ts:32:  filters: readonly Filter[];
+apps/runner/src/filter/engine.ts:65:export const findFilter = (
+apps/runner/src/filter/engine.ts:66:  filters: readonly Filter[],
+apps/runner/src/filter/engine.ts:68:): Filter | null => {
+apps/runner/src/filter/engine.ts:90:  filter: Filter,
+apps/runner/src/filter/engine.ts:120:/** How the classifier reads a line of this filter's command (`Filter.protectedPart`). */
+apps/runner/src/filter/engine.ts:122:  (filter: Filter): LinePart =>
+apps/runner/src/filter/engine.ts:163:export const runFilter = async (
+apps/runner/src/filter/engine.ts:165:  deps: FilterDeps,
+apps/runner/src/filter/engine.ts:206:  const filter = target ? findFilter(deps.filters, argv) : null;
+apps/runner/src/filter/engine.ts:284:const record = (deps: FilterDeps, target: StatsTarget, counts: StatsCounts) =>
+apps/runner/src/filter/families/lang/go.ts:1:import type { Filter } from '../../types';
+apps/runner/src/filter/families/lang/go.ts:29:export const goTestFilter: Filter = {
+apps/runner/src/filter/env.ts:41: * Who the run dir belongs to, `FilterLaunch` minus the dir, written by the
+apps/runner/src/filter/env.ts:54:export interface FilterLaunch {
+apps/runner/src/filter/env.ts:64:export const filterEnv = (launch: FilterLaunch): Record<string, string> => ({
+apps/runner/src/filter/env.ts:76:export const orchestratorFilterDir = (stateDir: string, repo: string): string =>
+apps/runner/src/filter/env.spec.ts:14:  orchestratorFilterDir,
+apps/runner/src/filter/env.spec.ts:43:    const runDir = orchestratorFilterDir('/state', 'AndreyBegma/AgentDock');
+apps/runner/src/filter/env.spec.ts:62:      const dir = orchestratorFilterDir('/state', repo);
+apps/runner/src/filter/families/lang/ruby.ts:2:import type { Filter } from '../../types';
+apps/runner/src/filter/families/lang/ruby.ts:25:export const rspecFilter: Filter = {
+apps/runner/src/filter/families/lang/ruby.ts:75:export const rubocopFilter: Filter = {
+apps/runner/src/filter/families/lang/ruby.ts:104:export const bundleFilter: Filter = {
+apps/runner/src/filter/families/js/filters.spec.ts:3:import { findFilter } from '../../engine';
+apps/runner/src/filter/families/js/filters.spec.ts:4:import { jsFilters } from '.';
+apps/runner/src/filter/families/js/filters.spec.ts:6:const find = (...argv: string[]) => findFilter(jsFilters, argv);
+apps/runner/src/filter/families/lang/python.ts:2:import type { Filter } from '../../types';
+apps/runner/src/filter/families/lang/python.ts:133:export const pytestFilter: Filter = {
+apps/runner/src/filter/families/lang/python.ts:149:export const ruffFilter: Filter = {
+apps/runner/src/filter/families/lang/python.ts:173:export const pipFilter: Filter = {
+apps/runner/src/filter/families/lang/python.ts:200:export const poetryFilter: Filter = {
+apps/runner/src/filter/pipeline-e2e.spec.ts:7:import { demoFilter } from './testing';
+apps/runner/src/filter/pipeline-e2e.spec.ts:43:        `import { processIo, runFilterCommand } from '${join(import.meta.dir, 'main.ts')}';`,
+apps/runner/src/filter/pipeline-e2e.spec.ts:44:        `import { demoFilter } from '${join(import.meta.dir, 'testing.ts')}';`,
+apps/runner/src/filter/pipeline-e2e.spec.ts:45:        'process.exit(await runFilterCommand(process.argv.slice(2), processIo(), [demoFilter]));',
+apps/runner/src/filter/pipeline-e2e.spec.ts:59:      filters: [demoFilter],
+apps/runner/src/filter/families/lang/dotnet.ts:1:import type { Filter } from '../../types';
+apps/runner/src/filter/families/lang/dotnet.ts:23:export const dotnetFilter: Filter = {
+apps/runner/src/filter/families/ops/forge.ts:2:import type { Filter } from '../../types';
+apps/runner/src/filter/families/ops/forge.ts:57:const checksFilter = (output: string): string | null => {
+apps/runner/src/filter/families/ops/forge.ts:86:const viewFilter = (output: string): string => {
+apps/runner/src/filter/families/ops/forge.ts:126:const runLogFilter = (output: string): string | null => {
+apps/runner/src/filter/families/ops/forge.ts:176:const forgeFilter = (id: string, program: string): Filter => ({
+apps/runner/src/filter/families/ops/forge.ts:188:    if (verb === 'checks') return checksFilter(output) ?? listing(output);
+apps/runner/src/filter/families/ops/forge.ts:190:      return runLogFilter(output) ?? listing(output);
+apps/runner/src/filter/families/ops/forge.ts:196:      return viewFilter(output);
+apps/runner/src/filter/families/ops/forge.ts:202:export const ghFilter = forgeFilter('ops/gh', 'gh');
+apps/runner/src/filter/families/ops/forge.ts:203:export const glabFilter = forgeFilter('ops/glab', 'glab');
+apps/runner/src/filter/families/lang/index.ts:1:import type { Filter } from '../../types';
+apps/runner/src/filter/families/lang/index.ts:2:import { dotnetFilter } from './dotnet';
+apps/runner/src/filter/families/lang/index.ts:3:import { findFilter, lsFilter, searchFilter, treeFilter } from './files';
+apps/runner/src/filter/families/lang/index.ts:4:import { goTestFilter } from './go';
+apps/runner/src/filter/families/lang/index.ts:5:import { gradleFilter, mavenFilter } from './jvm';
+apps/runner/src/filter/families/lang/index.ts:6:import { composerFilter, phpunitFilter } from './php';
+apps/runner/src/filter/families/lang/index.ts:7:import { pipFilter, poetryFilter, pytestFilter, ruffFilter } from './python';
+apps/runner/src/filter/families/lang/index.ts:8:import { bundleFilter, rspecFilter, rubocopFilter } from './ruby';
+apps/runner/src/filter/families/lang/index.ts:9:import { cargoFilter } from './rust';
+apps/runner/src/filter/families/lang/index.ts:18:export const langFilters: readonly Filter[] = [
+apps/runner/src/filter/families/lang/index.ts:19:  pytestFilter,
+apps/runner/src/filter/families/lang/index.ts:20:  ruffFilter,
+apps/runner/src/filter/families/lang/index.ts:21:  pipFilter,
+apps/runner/src/filter/families/lang/index.ts:22:  poetryFilter,
+apps/runner/src/filter/families/lang/index.ts:23:  goTestFilter,
+apps/runner/src/filter/families/lang/index.ts:24:  cargoFilter,
+apps/runner/src/filter/families/lang/index.ts:25:  rspecFilter,
+apps/runner/src/filter/families/lang/index.ts:26:  rubocopFilter,
+apps/runner/src/filter/families/lang/index.ts:27:  bundleFilter,
+apps/runner/src/filter/families/lang/index.ts:28:  mavenFilter,
+apps/runner/src/filter/families/lang/index.ts:29:  gradleFilter,
+apps/runner/src/filter/families/lang/index.ts:30:  dotnetFilter,
+apps/runner/src/filter/families/lang/index.ts:31:  phpunitFilter,
+apps/runner/src/filter/families/lang/index.ts:32:  composerFilter,
+apps/runner/src/filter/families/lang/index.ts:33:  findFilter,
+apps/runner/src/filter/families/lang/index.ts:34:  lsFilter,
+apps/runner/src/filter/families/lang/index.ts:35:  treeFilter,
+apps/runner/src/filter/families/lang/index.ts:36:  searchFilter,
+apps/runner/src/filter/stats-reader.spec.ts:14:  type FilterStatRow,
+apps/runner/src/filter/stats-reader.spec.ts:25:  FilterStatsReader,
+apps/runner/src/filter/stats-reader.spec.ts:34:  runKind: FilterStatRow['runKind'] = 'card',
+apps/runner/src/filter/stats-reader.spec.ts:35:): FilterStatRow => ({
+apps/runner/src/filter/stats-reader.spec.ts:47:const line = (projectId: string, r: FilterStatRow) =>
+apps/runner/src/filter/stats-reader.spec.ts:52:  (event?.data as { rows: FilterStatRow[] } | undefined)?.rows.map(
+apps/runner/src/filter/stats-reader.spec.ts:60:  let reader: FilterStatsReader;
+apps/runner/src/filter/stats-reader.spec.ts:84:    reader = new FilterStatsReader({
+apps/runner/src/filter/stats-reader.spec.ts:160:        `${e.project?.repo}:${(e.data as { rows: FilterStatRow[] }).rows.map((r) => r.id).join(',')}`,
+apps/runner/src/filter/families/ops/terraform.ts:2:import type { Filter } from '../../types';
+apps/runner/src/filter/families/ops/terraform.ts:37:export const terraformFilter: Filter = {
+apps/runner/src/filter/families/ops/ops.spec.ts:4:import type { Filter } from '../../types';
+apps/runner/src/filter/families/ops/ops.spec.ts:5:import { opsFilters } from '.';
+apps/runner/src/filter/families/ops/ops.spec.ts:10:  const filter = opsFilters.find((f) => f.matches(argv));
+apps/runner/src/filter/families/ops/ops.spec.ts:15:  opsFilters.find((f) => f.matches(argv))?.longRunning?.(argv) ?? false;
+apps/runner/src/filter/families/ops/ops.spec.ts:18:  opsFilters.find((f: Filter) => f.matches(argv))?.id;
+apps/runner/src/filter/families/ops/ops.spec.ts:401:      const r = runCorpusCase(opsFilters, c);
+apps/runner/src/filter/families/ops/curl.ts:2:import type { Filter } from '../../types';
+apps/runner/src/filter/families/ops/curl.ts:23:export const curlFilter: Filter = {
+apps/runner/src/filter/families/lang/rust.ts:1:import type { Filter } from '../../types';
+apps/runner/src/filter/families/lang/rust.ts:46:export const cargoFilter: Filter = {
+apps/runner/src/filter/families/js/index.ts:1:import type { Filter } from '../../types';
+apps/runner/src/filter/families/js/index.ts:22:interface ToolFilter {
+apps/runner/src/filter/families/js/index.ts:31:const toolFilter = ({
+apps/runner/src/filter/families/js/index.ts:37:}: ToolFilter): Filter => {
+apps/runner/src/filter/families/js/index.ts:88:const installFilter: Filter = {
+apps/runner/src/filter/families/js/index.ts:99:const outdatedFilter: Filter = {
+apps/runner/src/filter/families/js/index.ts:123:const scriptFilter: Filter = {
+apps/runner/src/filter/families/js/index.ts:139:export const jsFilters: readonly Filter[] = [
+apps/runner/src/filter/families/js/index.ts:140:  toolFilter({
+apps/runner/src/filter/families/js/index.ts:146:  toolFilter({
+apps/runner/src/filter/families/js/index.ts:152:  toolFilter({
+apps/runner/src/filter/families/js/index.ts:158:  toolFilter({
+apps/runner/src/filter/families/js/index.ts:164:  toolFilter({
+apps/runner/src/filter/families/js/index.ts:171:  toolFilter({
+apps/runner/src/filter/families/js/index.ts:177:  toolFilter({
+apps/runner/src/filter/families/js/index.ts:183:  toolFilter({
+apps/runner/src/filter/families/js/index.ts:189:  toolFilter({
+apps/runner/src/filter/families/js/index.ts:197:  installFilter,
+apps/runner/src/filter/families/js/index.ts:198:  outdatedFilter,
+apps/runner/src/filter/families/js/index.ts:199:  scriptFilter,
+apps/runner/src/filter/families/ops/index.ts:1:import type { Filter } from '../../types';
+apps/runner/src/filter/families/ops/index.ts:2:import { awsFilter, gcloudFilter } from './cloud';
+apps/runner/src/filter/families/ops/index.ts:3:import { curlFilter } from './curl';
+apps/runner/src/filter/families/ops/index.ts:4:import { dockerFilter } from './docker';
+apps/runner/src/filter/families/ops/index.ts:5:import { ghFilter, glabFilter } from './forge';
+apps/runner/src/filter/families/ops/index.ts:6:import { gitFilter } from './git';
+apps/runner/src/filter/families/ops/index.ts:7:import { helmFilter, kubectlFilter } from './kube';
+apps/runner/src/filter/families/ops/index.ts:8:import { makeFilter } from './make';
+apps/runner/src/filter/families/ops/index.ts:9:import { terraformFilter } from './terraform';
+apps/runner/src/filter/families/ops/index.ts:17:export const opsFilters: readonly Filter[] = [
+apps/runner/src/filter/families/ops/index.ts:18:  gitFilter,
+apps/runner/src/filter/families/ops/index.ts:19:  ghFilter,
+apps/runner/src/filter/families/ops/index.ts:20:  glabFilter,
+apps/runner/src/filter/families/ops/index.ts:21:  dockerFilter,
+apps/runner/src/filter/families/ops/index.ts:22:  kubectlFilter,
+apps/runner/src/filter/families/ops/index.ts:23:  helmFilter,
+apps/runner/src/filter/families/ops/index.ts:24:  terraformFilter,
+apps/runner/src/filter/families/ops/index.ts:25:  awsFilter,
+apps/runner/src/filter/families/ops/index.ts:26:  gcloudFilter,
+apps/runner/src/filter/families/ops/index.ts:27:  makeFilter,
+apps/runner/src/filter/families/ops/index.ts:28:  curlFilter,
+apps/runner/src/filter/families/lang/php.ts:1:import type { Filter } from '../../types';
+apps/runner/src/filter/families/lang/php.ts:12:export const phpunitFilter: Filter = {
+apps/runner/src/filter/families/lang/php.ts:32:export const composerFilter: Filter = {
+apps/runner/src/filter/families/lang/files.ts:2:import type { Filter } from '../../types';
+apps/runner/src/filter/families/lang/files.ts:9: * out. Search hits are grouped by file instead (see `searchFilter`).
+apps/runner/src/filter/families/lang/files.ts:48:export const findFilter: Filter = {
+apps/runner/src/filter/families/lang/files.ts:54:export const lsFilter: Filter = {
+apps/runner/src/filter/families/lang/files.ts:60:export const treeFilter: Filter = {
+apps/runner/src/filter/families/lang/files.ts:225:export const searchFilter: Filter = {
+apps/runner/src/filter/families/ops/cloud.ts:1:import type { Filter } from '../../types';
+apps/runner/src/filter/families/ops/cloud.ts:37:const s3Filter = (output: string): string | null => {
+apps/runner/src/filter/families/ops/cloud.ts:55:export const awsFilter: Filter = {
+apps/runner/src/filter/families/ops/cloud.ts:71:    if (service === 's3') return s3Filter(output);
+apps/runner/src/filter/families/ops/cloud.ts:96:export const gcloudFilter: Filter = {
+apps/runner/src/filter/families/ops/docker.ts:2:import type { Filter } from '../../types';
+apps/runner/src/filter/families/ops/docker.ts:88:const buildFilter = (output: string): string | null => {
+apps/runner/src/filter/families/ops/docker.ts:103:const transferFilter = (output: string): string | null => {
+apps/runner/src/filter/families/ops/docker.ts:114:const tableFilter = (output: string): string | null => {
+apps/runner/src/filter/families/ops/docker.ts:121:export const dockerFilter: Filter = {
+apps/runner/src/filter/families/ops/docker.ts:134:        return buildFilter(output);
+apps/runner/src/filter/families/ops/docker.ts:137:        return transferFilter(output) ?? logLines(output);
+apps/runner/src/filter/families/ops/docker.ts:140:        return tableFilter(output);
+apps/runner/src/filter/families/lang/lang.spec.ts:2:import { langFilters } from '.';
+apps/runner/src/filter/families/lang/lang.spec.ts:9:const find = (argv: string[]) => langFilters.find((f) => f.matches(argv));
+apps/runner/src/filter/families/ops/kube.ts:2:import type { Filter } from '../../types';
+apps/runner/src/filter/families/ops/kube.ts:68:const applyFilter = (output: string): string | null => {
+apps/runner/src/filter/families/ops/kube.ts:81:export const kubectlFilter: Filter = {
+apps/runner/src/filter/families/ops/kube.ts:101:        return applyFilter(output) ?? listing(output, 40, 15);
+apps/runner/src/filter/families/ops/kube.ts:145:export const helmFilter: Filter = {
+apps/runner/src/filter/families/lang/jvm.ts:1:import type { Filter } from '../../types';
+apps/runner/src/filter/families/lang/jvm.ts:24:export const mavenFilter: Filter = {
+apps/runner/src/filter/families/lang/jvm.ts:44:export const gradleFilter: Filter = {
+apps/runner/src/filter/families/ops/git.ts:2:import type { Filter } from '../../types';
+apps/runner/src/filter/families/ops/git.ts:102:const statusFilter = (output: string): string | null => {
+apps/runner/src/filter/families/ops/git.ts:156:const logFilter = (output: string): string | null => {
+apps/runner/src/filter/families/ops/git.ts:270:const diffFilter = (output: string): string | null => {
+apps/runner/src/filter/families/ops/git.ts:325:const transferFilter = (output: string): string | null => {
+apps/runner/src/filter/families/ops/git.ts:333:const longFilter = (output: string): string | null =>
+apps/runner/src/filter/families/ops/git.ts:336:export const gitFilter: Filter = {
+apps/runner/src/filter/families/ops/git.ts:346:          ? longFilter(output)
+apps/runner/src/filter/families/ops/git.ts:347:          : statusFilter(output);
+apps/runner/src/filter/families/ops/git.ts:350:          return diffFilter(output) ?? longFilter(output);
+apps/runner/src/filter/families/ops/git.ts:353:          ? longFilter(output)
+apps/runner/src/filter/families/ops/git.ts:354:          : (logFilter(output) ?? longFilter(output));
+apps/runner/src/filter/families/ops/git.ts:357:        if (hasFlag(argv, ...DIFF_SUMMARIES)) return longFilter(output);
+apps/runner/src/filter/families/ops/git.ts:358:        return diffFilter(output) ?? longFilter(output);
+apps/runner/src/filter/families/ops/git.ts:363:        return transferFilter(output);
+apps/runner/src/filter/families/ops/git.ts:365:        return longFilter(output);
+apps/runner/src/filter/families/ops/make.ts:1:import type { Filter } from '../../types';
+apps/runner/src/filter/families/ops/make.ts:31:export const makeFilter: Filter = {

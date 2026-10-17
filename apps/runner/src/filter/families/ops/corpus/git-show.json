@@ -1,0 +1,7 @@
+{
+  "argv": ["git", "show", "9f14cfd8"],
+  "exitCode": 0,
+  "category": "other",
+  "outcome": "passing",
+  "expect": "filtered"
+}

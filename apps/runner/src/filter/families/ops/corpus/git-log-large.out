@@ -1,0 +1,252 @@
+commit 579ad6967cb3a542db5fa2c14fdd535d8ea8d121
+Merge: 319746f5 9f14cfd8
+Author: Andriy <dev@users.noreply.example.com>
+Date:   Sat Oct 17 23:39:07 2026 +0300
+
+    Merge pull request #613 from AndreyBegma/feat/612-rewrite-filtered-commands-in-plan-mode-r
+    
+    C-251: Rewrite filtered commands in plan-mode runner launches
+
+commit 9f14cfd8d9587ff350f45a58cb2da01a1e2f6bb0
+Author: Archi <dev@example.com>
+Date:   Sat Oct 17 22:35:48 2026 +0200
+
+    test(runner): compare pipeline stderr as a multiset of lines in the bash-agreement cases
+
+commit 75d3a185ac1e72a7e7dac7a5d5b9d62e488f7009
+Author: Archi <dev@example.com>
+Date:   Sat Oct 17 22:29:18 2026 +0200
+
+    feat(runner): rewrite filtered commands in plan-mode launches (#612)
+    
+    The hook now rewrites in plan mode with no permissionDecision, as in auto,
+    so planner, design and UI-profile runs are filtered and counted. default,
+    acceptEdits and dontAsk still pass through as none:mode. Amendment 14 of
+    spec #445 and ADR-0039 record the rule.
+
+commit 25ead837847067f7217ae1177965dc4249c094cd
+Author: Archi <dev@example.com>
+Date:   Sat Oct 17 22:26:48 2026 +0200
+
+    docs: add docs/specs/612-rewrite-filtered-commands-in-plan-mode-r.md
+
+commit 319746f54f002c039ed8445c285a92a838075e6d
+Merge: 47fcc8ef 82d7fcc0
+Author: Andriy <dev@users.noreply.example.com>
+Date:   Sat Oct 17 23:24:51 2026 +0300
+
+    Merge pull request #611 from AndreyBegma/fix/610-filter-pipelines-and-command-chains-in-t
+    
+    C-250: Filter pipelines and command chains in the Token saver hook
+
+commit 82d7fcc088372181249c00fb405015fd7f333d65
+Author: Archi <dev@example.com>
+Date:   Sat Oct 17 22:14:35 2026 +0200
+
+    docs(token-saver): amendment 13 — pipelines and lists in the hook (#610)
+
+commit e0d56c79d4f55e278c36cdcc76b76b66fe2509fd
+Author: Archi <dev@example.com>
+Date:   Sat Oct 17 22:14:35 2026 +0200
+
+    fix(runner): filter pipelines and command lists in the Token saver hook
+    
+    parseHookCommand now takes a line apart into pipelines of simple commands
+    joined by &&, || and ;, each command optionally ending in 2>&1. The hook wraps
+    the first command of every pipeline a filter covers and keeps the rest of the
+    pipe and every uncovered command as written. Deny/ask rules are matched on
+    every command of the line. The filter goes quiet and sends its child SIGPIPE
+    when a later stage (| head) closes the pipe early.
+    
+    Refs #610
+
+commit 0f9ba4e573167d3e48044ebd099ccde10778e5d0
+Author: Archi <dev@example.com>
+Date:   Sat Oct 17 22:02:48 2026 +0200
+
+    docs: add docs/specs/610-filter-pipelines-and-command-chains-in-t.md
+
+commit 47fcc8ef57afcba5e310cb2f6aae7445dbd9365f
+Merge: fd236c9c ec28e2fb
+Author: Andriy <dev@users.noreply.example.com>
+Date:   Sat Oct 17 23:01:05 2026 +0300
+
+    Merge pull request #607 from AndreyBegma/feat/606-audit-design-generation-and-fix-the-clea
+    
+    C-249: Audit design generation and fix the clear defects it finds
+
+commit fd236c9c19073e202ea8c5a926315b4a139eda7d
+Merge: c79a4085 dcb3b499
+Author: Andriy <dev@users.noreply.example.com>
+Date:   Sat Oct 17 22:49:41 2026 +0300
+
+    Merge pull request #601 from AndreyBegma/feat/600-add-a-draggable-resizable-floating-windo
+    
+    C-237: Add a draggable, resizable floating window and launcher to glass-ui
+
+commit ec28e2fb4965ce768eac6da6993aed65315d1ec3
+Author: Archi <dev@example.com>
+Date:   Sat Oct 17 21:46:35 2026 +0200
+
+    docs(design): record the #606 review of design generation and the proposed improvements
+
+commit 66f08fe6ce3f91216661a4a3c3759b8ba85b5e4d
+Author: Archi <dev@example.com>
+Date:   Sat Oct 17 21:44:43 2026 +0200
+
+    fix(design): the generate panel reads the profile's status; a busy design with nothing running shows as starting
+    
+    The panel said a project had no UI profile whenever the design had no
+    revision yet, because it read the design's profileId. It now reads the
+    project's profile status: missing, failed rebuild, or building.
+    
+    A design busy between two turns (or whose next turn never started) showed
+    the Generate panel with no progress and no Stop. It now shows a starting
+    state with Stop.
+
+commit 42c71cb55fbf582a831cfe02dd5dd38eac888970
+Author: Archi <dev@example.com>
+Date:   Sat Oct 17 21:43:00 2026 +0200
+
+    fix(design): claim the busy status before the profile check; Stop settles a design left busy with nothing running
+    
+    Two Generates at once both passed the idle check; the loser's failed turn
+    start then settled the design while the winner's turn ran. The busy status
+    is now claimed atomically from the status read at rest.
+    
+    A design left generating or revising with no turn and no build (a batch
+    whose next turn never started) refused Generate as busy and Stop as not
+    running. Stop now puts it back to rest.
+
+commit dcb3b499744f9fa04d176cd28d36aacb28a55db8
+Author: Archi <dev@example.com>
+Date:   Sat Oct 17 21:36:58 2026 +0200
+
+    chore(web): pin glass-ui 0.35.0 with FloatingWindow and Launcher (#600)
+    
+    glass-ui 0.35.0 (glass-ui#161, #162) adds the draggable, resizable FloatingWindow, which is a Sheet below md, and the badged Launcher that the assistant stack (S-3) builds on. docs/ui/glass-ui.md records the release and lists both under overlays.
+
+commit f35e50e2d526e1ae33a23663037797e52f49813d
+Author: Archi <dev@example.com>
+Date:   Sat Oct 17 21:32:48 2026 +0200
+
+    docs: add docs/specs/606-audit-design-generation-and-fix-the-clea.md
+
+commit c79a408579ddfdc008f8d926abe7cc218df6575f
+Merge: 1dcec116 6537229a
+Author: Andriy <dev@users.noreply.example.com>
+Date:   Sat Oct 17 22:31:48 2026 +0300
+
+    Merge pull request #599 from AndreyBegma/feat/598-add-an-llm-provider-gateway-with-encrypt
+    
+    C-236: Add an LLM provider gateway with encrypted keys and per-provider caps
+
+commit 1dcec1160f69406a6b5a01ecee4ca0a52e4e5329
+Merge: c3e0b435 a0742d01
+Author: Andriy <dev@users.noreply.example.com>
+Date:   Sat Oct 17 22:21:48 2026 +0300
+
+    Merge pull request #603 from AndreyBegma/feat/602-fold-rarely-used-sidebar-entries-into-co
+    
+    C-247: Fold rarely used sidebar entries into collapsible More groups
+
+commit 6537229a8c74fbd2c6404cc9725d84f1cd6362c5
+Merge: 6c643b65 c3e0b435
+Author: Archi <dev@example.com>
+Date:   Sat Oct 17 21:09:49 2026 +0200
+
+    Merge origin/develop into feat/598-add-an-llm-provider-gateway-with-encrypt
+    
+    Develop took ADR-0058 (New work candidates) and the 20261226000000
+    migration timestamp, so the gateway's ADR becomes ADR-0059 and its
+    migration 20261227000000_llm_gateway.
+
+commit a0742d0160efd959483e2f288a15df922331fbe1
+Author: Archi <dev@example.com>
+Date:   Sat Oct 17 21:08:53 2026 +0200
+
+    docs: fix rail notes sentence (#602)
+
+commit 480a3ef57361c393fc33f22463779c0df01ef7e7
+Author: Archi <dev@example.com>
+Date:   Sat Oct 17 21:08:50 2026 +0200
+
+    feat(web): fold rarely used rail entries into collapsible More groups (#602)
+
+commit 94428e90b8fb1eb25c278c2ad8735fede1f13f4f
+Author: Archi <dev@example.com>
+Date:   Sat Oct 17 21:06:48 2026 +0200
+
+    docs: add docs/specs/602-fold-rarely-used-sidebar-entries-into-co.md, docs/specs/602-fold-rarely-used-sidebar-entries-into-co/design/1/rail-states-expanded.html, docs/specs/602-fold-rarely-used-sidebar-entries-into-co/design/1/icon-only-rail-c-14.html
+
+commit c3e0b43562ddd5f1dd9b4cd94c7e16b72f3a186b
+Merge: 176c561f 42433326
+Author: Andriy <dev@users.noreply.example.com>
+Date:   Sat Oct 17 22:05:49 2026 +0300
+
+    Merge pull request #593 from AndreyBegma/feat/592-make-new-work-cards-candidates-the-perso
+    
+    C-234: Make New work cards candidates the person reviews in Drafts
+
+commit 6c643b65c57804fa1d52a73c17f44f4515ce6db7
+Merge: 1012d3d3 176c561f
+Author: Archi <dev@example.com>
+Date:   Sat Oct 17 21:04:26 2026 +0200
+
+    Merge origin/develop into feat/598-add-an-llm-provider-gateway-with-encrypt
+    
+    Develop took ADR-0057 (Telegram voice input) and the 20261225000000
+    migration timestamp, so the gateway's ADR becomes ADR-0058 and its
+    migration 20261226000000_llm_gateway.
+
+commit 1012d3d362cf16fec7d144145b8db301794a7505
+Author: Archi <dev@example.com>
+Date:   Sat Oct 17 20:59:22 2026 +0200
+
+    feat(web): add Admin › AI providers — keys, caps, enabled models, default model and this month's spend
+
+commit 532433e0a9e0a73e304bd46420208aa26541c87e
+Author: Archi <dev@example.com>
+Date:   Sat Oct 17 20:54:44 2026 +0200
+
+    docs: record ADR-0057 — the API calls LLM providers directly; document LLM_SECRETS_KEY
+
+commit ced1d61b001a3181f3b11e52ad57cf314d19a528
+Author: Archi <dev@example.com>
+Date:   Sat Oct 17 20:54:06 2026 +0200
+
+    test(api): cover the LLM gateway — admin-only routes, key secrecy, ledger and the UTC cap boundary
+
+commit 42433326940ea94431d7d2c7accd86385005f909
+Merge: f23c40f7 176c561f
+Author: Archi <dev@example.com>
+Date:   Sat Oct 17 20:49:11 2026 +0200
+
+    Merge remote-tracking branch 'origin/develop' into feat/592-make-new-work-cards-candidates-the-perso
+    
+    # Conflicts:
+    #       apps/api/src/planner/plan-mapper.ts
+    #       apps/api/src/planner/plan.service.ts
+    #       docs/adr/README.md
+    #       packages/shared/src/planner/contracts.ts
+
+commit 5c355d1fa97d4f3acc6e5f5d089089a48e644b39
+Author: Archi <dev@example.com>
+Date:   Sat Oct 17 20:46:49 2026 +0200
+
+    feat(api): add the LLM gateway — adapters, caps, usage ledger and admin routes
+
+commit 2806cf9a80b347a901cdf79d911e45c7edf22516
+Author: Archi <dev@example.com>
+Date:   Sat Oct 17 20:44:46 2026 +0200
+
+    docs: add docs/specs/600-add-a-draggable-resizable-floating-windo.md, docs/specs/stacks/S-3-add-a-multi-provider-ai-assistant-to-age/design/1/desktop-assistant-window.html, docs/specs/stacks/S-3-add-a-multi-provider-ai-assistant-to-age/design/1/ai-providers-and-caps.html, docs/specs/stacks/S-3-add-a-multi-provider-ai-assistant-to-age/design/1/phone-sheet-and-telegram.html, docs/specs/stacks/S-3-add-a-multi-provider-ai-assistant-to-age/design/1/board-ai-search-triage-and-digest.html
+
+commit 176c561fea001096c00fc4ec3980c4f5ec53ebfe
+Merge: e7c9a705 5ff194f9
+Author: Andriy <dev@users.noreply.example.com>
+Date:   Sat Oct 17 21:43:07 2026 +0300
+
+    Merge pull request #595 from AndreyBegma/feat/594-accept-photos-and-voice-messages-in-the
+    
+    C-214: Accept photos and voice messages in the Telegram /new intake

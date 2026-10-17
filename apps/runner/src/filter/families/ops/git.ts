@@ -54,8 +54,11 @@ const TRANSFER_PROGRESS =
  */
 export const GIT_MIN_BYTES = 512;
 
-/** Files listed per `git status` section; the rest are counted. */
-export const GIT_STATUS_FILES = 20;
+/** Lines listed per `git status` section; the rest are counted. */
+export const GIT_STATUS_LINES = 20;
+
+/** Names listed on one directory's line; the rest are counted. */
+const GIT_STATUS_NAMES = 8;
 
 /** `git status` section headers, and the short name each is listed under. */
 const STATUS_SECTIONS: Record<string, { name: string; capped: boolean }> = {
@@ -85,18 +88,65 @@ const STATUS_CODES: Record<string, string> = {
 
 const STATUS_ENTRY = /^\t(?:([a-z ]+):\s+)?(.+)$/;
 
+interface StatusEntry {
+  /** `M`, `?`, … or the kind as git wrote it when it has no code. */
+  code: string;
+  path: string;
+  /** The line as git printed it, when the classifier protects it. */
+  kept?: string;
+}
+
 interface StatusSection {
   name: string;
   capped: boolean;
-  entries: string[];
-  /** Entries the classifier protects: never capped. */
-  kept: Set<number>;
+  entries: StatusEntry[];
 }
+
+const dirOf = (path: string): string => {
+  const at = path.replace(/\/$/, '').lastIndexOf('/');
+  return at < 0 ? '' : path.slice(0, at + 1);
+};
+
+/**
+ * A section's entries as lines: neighbours with the same code in the same
+ * directory share one, `M src/cart/{a.ts, b.ts}`. A protected entry stays
+ * as git printed it.
+ */
+const statusLines = (entries: readonly StatusEntry[]) => {
+  const lines: { text: string; files: number; kept: boolean }[] = [];
+  let i = 0;
+  while (i < entries.length) {
+    const entry = entries[i] as StatusEntry;
+    if (entry.kept) {
+      lines.push({ text: `  ${entry.kept}`, files: 1, kept: true });
+      i++;
+      continue;
+    }
+    const dir = dirOf(entry.path);
+    let j = i + 1;
+    while (
+      j < entries.length &&
+      !entries[j]?.kept &&
+      entries[j]?.code === entry.code &&
+      dirOf(entries[j]?.path ?? '') === dir
+    )
+      j++;
+    const names = entries.slice(i, j).map((e) => e.path.slice(dir.length));
+    const more = names.length - GIT_STATUS_NAMES;
+    const listed =
+      more > 1 ? [...names.slice(0, GIT_STATUS_NAMES), `+${more} more`] : names;
+    const text =
+      names.length === 1 ? entry.path : `${dir}{${listed.join(', ')}}`;
+    lines.push({ text: `  ${entry.code} ${text}`, files: j - i, kept: false });
+    i = j;
+  }
+  return lines;
+};
 
 /**
  * `git status` in its long form, summarised (rtk's strategy): each section
- * becomes `Staged (N):` and one short line per file, capped at
- * `GIT_STATUS_FILES`; the `(use "git …")` hints go. The branch lines and
+ * becomes `Staged (N):` and its files grouped by directory, capped at
+ * `GIT_STATUS_LINES`; the `(use "git …")` hints go. The branch lines and
  * anything unrecognised stay as they were.
  */
 const statusFilter = (output: string): string | null => {
@@ -104,12 +154,12 @@ const statusFilter = (output: string): string | null => {
   let section: StatusSection | null = null;
   const flush = () => {
     if (!section) return;
-    const { name, capped, entries, kept } = section;
+    const { name, capped, entries } = section;
     out.push(`${name} (${entries.length}):`);
     let hidden = 0;
-    entries.forEach((entry, i) => {
-      if (!capped || i < GIT_STATUS_FILES || kept.has(i)) out.push(entry);
-      else hidden++;
+    statusLines(entries).forEach((line, i) => {
+      if (!capped || i < GIT_STATUS_LINES || line.kept) out.push(line.text);
+      else hidden += line.files;
     });
     if (hidden > 0) out.push(`  … ${hidden} more`);
     section = null;
@@ -118,20 +168,18 @@ const statusFilter = (output: string): string | null => {
     const header = STATUS_SECTIONS[line.trim()];
     if (header && !line.startsWith('\t')) {
       flush();
-      section = { ...header, entries: [], kept: new Set() };
+      section = { ...header, entries: [] };
       continue;
     }
     if (/^\s+\(use "git /.test(line)) continue;
     const entry = section ? STATUS_ENTRY.exec(line) : null;
     if (section && entry) {
       const [, kind, path = ''] = entry;
-      const code = kind ? STATUS_CODES[kind] : '?';
-      if (isProtectedLine(line)) {
-        section.kept.add(section.entries.length);
-        section.entries.push(`  ${line.trim()}`);
-      } else {
-        section.entries.push(code ? `  ${code} ${path}` : `  ${kind}: ${path}`);
-      }
+      section.entries.push({
+        code: (kind ? STATUS_CODES[kind] : '?') ?? `${kind}:`,
+        path,
+        ...(isProtectedLine(line) ? { kept: line.trim() } : {}),
+      });
       continue;
     }
     if (line.trim() === '') continue;
@@ -221,22 +269,35 @@ const DIFF_CONTEXT = 1;
 const DIFF_CONTEXT_MARKER = 4;
 
 /** A hunk longer than this keeps its head and tail (a new or rewritten file). */
-export const DIFF_HUNK_LINES = 80;
-const DIFF_HUNK_HEAD = 60;
-const DIFF_HUNK_TAIL = 10;
+export const DIFF_HUNK_LINES = 30;
+const DIFF_HUNK_HEAD = 20;
+const DIFF_HUNK_TAIL = 5;
+
+/**
+ * Hunk lines shown per file. Past it, a hunk keeps only its `@@` line and its
+ * protected lines: the stat header still counts every change, and the raw
+ * output has them all.
+ */
+export const DIFF_FILE_LINES = 40;
 
 interface DiffFile {
   path: string;
   added: number;
   removed: number;
   note: string;
+  /** Hunk lines shown so far, against `DIFF_FILE_LINES`. */
+  shown: number;
 }
 
 const isChange = (line: string | undefined): boolean =>
   line !== undefined && /^[-+\\]/.test(line);
 
-/** One hunk's body: context trimmed to `DIFF_CONTEXT`, then capped. */
-const hunkBody = (lines: readonly string[]): string[] => {
+/**
+ * One hunk's body: context trimmed to `DIFF_CONTEXT`, then capped — to
+ * nothing but its protected lines once its file is over `DIFF_FILE_LINES`.
+ */
+const hunkBody = (lines: readonly string[], file: DiffFile): string[] => {
+  if (file.shown >= DIFF_FILE_LINES) return elide(lines, { head: 0, tail: 0 });
   const trimmed: string[] = [];
   let dropped = 0;
   const flushDropped = () => {
@@ -257,13 +318,18 @@ const hunkBody = (lines: readonly string[]): string[] => {
     }
   });
   flushDropped();
-  if (trimmed.length <= DIFF_HUNK_LINES) return trimmed;
-  return elide(trimmed, { head: DIFF_HUNK_HEAD, tail: DIFF_HUNK_TAIL });
+  const body =
+    trimmed.length <= DIFF_HUNK_LINES
+      ? trimmed
+      : elide(trimmed, { head: DIFF_HUNK_HEAD, tail: DIFF_HUNK_TAIL });
+  file.shown += body.length;
+  return body;
 };
 
 /**
  * A unified diff (rtk's strategy): a stat header, then each hunk with its
- * context trimmed to one line around the changes and long hunks capped. The
+ * context trimmed to one line around the changes, long hunks capped and each
+ * file capped at `DIFF_FILE_LINES`. The
  * `index` and `---` / `+++` lines go; everything outside the hunks (a commit
  * header of `git show` or `log -p`) stays.
  */
@@ -275,14 +341,20 @@ const diffFilter = (output: string): string | null => {
   let file: DiffFile | null = null;
   let hunk: string[] | null = null;
   const endHunk = () => {
-    if (hunk) out.push(...hunkBody(hunk));
+    if (hunk && file) out.push(...hunkBody(hunk, file));
     hunk = null;
   };
   for (const line of lines) {
     const start = /^diff --git a\/.+ b\/(.+)$/.exec(line);
     if (start) {
       endHunk();
-      file = { path: start[1] ?? '', added: 0, removed: 0, note: '' };
+      file = {
+        path: start[1] ?? '',
+        added: 0,
+        removed: 0,
+        note: '',
+        shown: 0,
+      };
       files.push(file);
       out.push(line);
       continue;

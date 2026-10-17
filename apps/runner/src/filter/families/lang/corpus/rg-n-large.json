@@ -1,0 +1,8 @@
+{
+  "argv": ["rg", "-n", "useState", "apps/web/src/components"],
+  "exitCode": 0,
+  "category": "other",
+  "outcome": "passing",
+  "expect": "filtered",
+  "maxRatio": 0.5
+}
