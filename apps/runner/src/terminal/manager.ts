@@ -19,6 +19,7 @@ import type { Cancel, Clock } from '../clock';
 import { CommandFailure } from '../commands/failure';
 import type { Exec } from '../detect/exec';
 import { errorMessage, type Logger } from '../log';
+import { policyFailure, policyRefusal } from '../policy/check';
 import { historyArgv, historyChunks } from './history';
 import { attachArgv, type PtyProcess, type SpawnPty } from './pty';
 import { type ResolveDeps, resolveTerminalTarget } from './resolve';
@@ -38,6 +39,12 @@ export interface TerminalManagerOptions {
   send: (message: TerminalOutbound) => boolean;
   spawn: SpawnPty;
   /**
+   * ADR-0047: whether the runner-local policy allows a `write` attach now
+   * (`terminal.write`). Read on attach and on every input frame, so turning
+   * it off ends the input of an attach already open.
+   */
+  writeAllowed: () => boolean;
+  /**
    * Why this machine cannot attach (no PTY API, tmux < 3.2), or null when it
    * can; absent means it can. Answered with `unsupported` (D3).
    */
@@ -56,6 +63,11 @@ export interface TerminalManagerOptions {
   /** How long a client gets to exit after SIGHUP before SIGKILL. */
   killGraceMs?: number;
 }
+
+const WRITE_REFUSED = policyRefusal(
+  'terminal.write',
+  'a write attach is off on this runner',
+);
 
 /** The SIGHUP → SIGKILL grace; well inside the 5 s the spec allows to end a client. */
 export const TERMINAL_KILL_GRACE_MS = 2_000;
@@ -118,6 +130,9 @@ export class TerminalManager {
     const { clock, log } = this.options;
     if (this.attaches.has(id) || this.pending.has(id)) {
       throw new CommandFailure('busy', `stream ${id} is already attached`);
+    }
+    if (mode === 'write' && !this.options.writeAllowed()) {
+      throw policyFailure(WRITE_REFUSED);
     }
     this.ensureCapacity();
     const started = clock.now();
@@ -193,7 +208,7 @@ export class TerminalManager {
     const attach = this.attaches.get(message.id);
     if (!attach) return;
     const bytes = Buffer.from(message.b64, 'base64');
-    if (attach.mode === 'read') {
+    if (attach.mode === 'read' || !this.options.writeAllowed()) {
       // Defence in depth: the API drops input on a read attach too.
       attach.bytesDropped += bytes.length;
       attach.lastActivity = this.options.clock.now();

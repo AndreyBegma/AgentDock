@@ -40,7 +40,7 @@ export const createE2eApp = async (): Promise<E2eContext> => {
 
 export const resetDatabase = (prisma: PrismaService) =>
   prisma.$executeRawUnsafe(
-    'TRUNCATE TABLE user_sessions, settings, users CASCADE',
+    'TRUNCATE TABLE user_sessions, settings, users, login_throttles, audit_folds CASCADE',
   );
 
 export const createUser = async (

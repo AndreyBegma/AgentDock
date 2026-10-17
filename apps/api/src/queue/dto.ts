@@ -1,5 +1,9 @@
 import { QUEUE_STATES, type QueueState } from '@agentdock/shared';
-import { ISSUE_LABELS_MAX, ISSUE_TITLE_MAX } from '@agentdock/shared/protocol';
+import {
+  ISSUE_BODY_MAX_BYTES,
+  ISSUE_LABELS_MAX,
+  ISSUE_TITLE_MAX,
+} from '@agentdock/shared/protocol';
 import {
   ArrayMaxSize,
   IsArray,
@@ -34,6 +38,7 @@ export class CreateIssueDto {
   title!: string;
 
   @IsString()
+  @MaxLength(ISSUE_BODY_MAX_BYTES)
   body!: string;
 
   @IsArray()

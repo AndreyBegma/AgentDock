@@ -12,7 +12,9 @@ schemas fails the build.
 
 1. An admin creates a runner in the UI → the API returns a one-time pairing code
    (10 minutes, single use) and an install command.
-2. `agentdock-runner pair --server https://dock.example --code XXXX-XXXX`
+2. `agentdock-runner pair --server https://dock.example --code XXXX-XXXX [--allow-root <dir>]…`
+   — each `--allow-root` is added to the runner-local policy's `allowedRoots`
+   ([Runner-local policy](#runner-local-policy)).
 3. The runner posts `{ code, hostname, version, protocolVersion }` to
    `POST <server>/runners/pair` (`PAIRING_PATH`). The API exchanges the code
    for a long-lived runner token and the runner id: `{ runnerId, token }`. An
@@ -47,6 +49,17 @@ both sit at the root of that origin.
 | `4400` | `hello.protocolVersion` unsupported; the close reason names the supported version |
 | `4401` | missing, unknown or revoked token |
 | `4409` | a newer connection of the same runner replaced this one |
+
+Every close above is terminal: the runner exits 78 and its service unit does not
+restart it. Before exiting it logs why and writes
+`~/.local/state/agentdock/stopped.json`, which `agentdock-runner status` prints
+(`replaced by another connection at <time>, re-pair if this was not you` for
+`4409`); the next `run` clears it. A `4409` that takes over a socket that was
+still open is audited as `runner.connection_replaced` with both peers' IP and
+user agent, and every active admin gets a `runner.connection_replaced`
+notification (C-108: the token is readable by any process of the runner's user,
+so a takeover may be an impostor). A reconnect after the old socket had already
+closed is not reported.
 
 ## Messages
 
@@ -126,7 +139,14 @@ still connects.
       "slot.message", "slot.stop", "terminal.attach",
       "uiprofile.build", "uiprofile.fingerprint", "worktree.status"
     ],
-    "disabledCommands": ["pr.approve"]
+    "disabledCommands": ["pr.approve"],
+    "policy": {
+      "allowedRoots": ["/home/archi/dev"],
+      "maxPermissionMode": "auto",
+      "terminal": { "write": false },
+      "skills": { "profileInstall": false },
+      "commands": { "orchestrator.message": false, "slot.message": false, "session.message": false }
+    }
   }
 }
 ```
@@ -169,6 +189,14 @@ older than the field. An absent `disabledCommands` means none. Read them with
 `commandsSupport()`: a feature checks the commands it needs, never the runner
 version. `protocolVersion` stays `1`; the fields are additive and optional.
 
+`policy` is the runner's local security policy as it is now
+([Runner-local policy](#runner-local-policy)) — values only, no path beyond
+`allowedRoots` (see the `hello` example above).
+
+Read it with `runnerPolicyOf()`. `commands` has plain string keys, so a runner
+that gates a command the API does not know keeps a valid hello. **Absent means
+a runner older than the policy**, which refuses nothing.
+
 A profile is runtime + optional `binary` (the runtime's own name when absent) +
 `env` + `args` + `authenticated` (ADR-0006).
 
@@ -193,7 +221,11 @@ one.
 `config.projects` is the runner's **watch list**: the projects whose roots it
 may refresh and whose collectors it runs, one instance per collector per
 project. `welcome` carries the authoritative list on every connect; the runner
-caches it in its config file so collectors run before the first connect.
+caches it in its config file so collectors run before the first connect. A
+`root` must be absolute; the runner watches it only when its real path is
+inside the policy's `allowedRoots` and it is a git main checkout (ADR-0047) —
+a refused project is left out and logged, and its commands answer
+`policy_refused` or `path_not_allowed`.
 
 ### `config`
 
@@ -546,12 +578,54 @@ token counts only: no prompt, response, thinking or tool-argument text (D9).
 | `not_runnable` | the skill is refused as a run: the orchestrator or a worker |
 | `too_large` | a skill is over `SKILL_MAX_FILES` (500) or `SKILL_MAX_TOTAL_BYTES` (5 MiB) |
 | `upstream_unavailable` | the catalog (skills.sh) or the forge (GitHub) did not answer |
+| `attachments_unavailable` | `card.run` could not download an attachment, or its size or SHA-256 did not match |
+| `policy_refused` | the runner's local security policy refuses the command ([ADR-0047](../adr/0047-a-runner-local-security-policy-the-server-cannot-change.md)); `message` names the rule and the CLI line that lifts it — see [Runner-local policy](#runner-local-policy) |
 
 The API answers the three path codes with an HTTP error of the same name in
 the body: `path_not_found` and `not_a_repository` → **422** (the request is
 well-formed, the path is not usable), `path_not_allowed` → **403**. On
 `project.refresh`, `path_not_allowed` means the runner's watch list does not
 hold that project: the API resends `config` before the caller retries.
+`policy_refused` → **403** with the API error code `policy_refused` on every
+surface (board, control, terminal close `4407`, skills, projects) and the
+runner's message passed on, so the UI can show the rule and the fix.
+
+An API older than `policy_refused` drops a `command.result` carrying it (the
+code fails its enum) and the caller sees a timeout: deploy the API before the
+runners that send it.
+
+### Runner-local policy
+
+[ADR-0047](../adr/0047-a-runner-local-security-policy-the-server-cannot-change.md)
+(amends ADR-0010). The allowlist says *which* commands exist; it is not a
+boundary against a server that sends a dangerous instance of one. The runner
+therefore keeps a `policy` block in its own `runner.json`. Only the CLI on the
+machine writes it — `agentdock-runner policy show|set|allow-root|deny-root` and
+`pair --allow-root <dir>` — and no message from the server (`welcome`,
+`config`, any command) can change it. A running daemon re-reads it within 5 s.
+
+| Rule | Default | Refuses |
+|---|---|---|
+| `allowedRoots` | none | a `root` anywhere in a command's args, or `project.inspect`'s `path`, whose real path is outside every allowed root (a symlink out included); and every watch-list root that is outside them or is not a git main checkout — that project is not watched |
+| `maxPermissionMode` | `auto` | `card.run`, `card.resume`, `skill.run`, `orchestrator.start` with a `permissionMode` above it (`manual` < `acceptEdits` < `auto` < `bypassPermissions`) |
+| `terminal.write` | `false` | `terminal.attach` with `mode: "write"`, and the input of a write attach already open once it is turned off |
+| `skills.profileInstall` | `false` | `skill.install` with `target.scope: "profile"` |
+| `commands.<name>` | `false` | `orchestrator.message`, `slot.message`, `session.message` — free text into a live agent session whose permission mode the policy may not have set |
+
+The dispatcher checks the policy after the args parse and before any handler;
+`orchestrator.start` checks it again itself, and the terminal manager checks
+`terminal.write` on attach and on every input frame. A refusal is
+
+```json
+{ "type": "command.result", "id": "cmd_9", "ok": false,
+  "error": { "code": "policy_refused",
+    "message": "refused by this runner's policy (maxPermissionMode): card.run asks for bypassPermissions, this runner allows at most auto. On the runner's machine: `agentdock-runner policy set maxPermissionMode bypassPermissions`" } }
+```
+
+The message always has that shape — `refused by this runner's policy
+(<rule>): <why>. On the runner's machine: \`<command>\`` — and the web reads
+the rule and the command out of it. The effective policy rides in `hello`
+capabilities (below).
 
 ### `subscribe`, `unsubscribe`, `pane`, `subscribe.error`
 

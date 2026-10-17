@@ -24,9 +24,12 @@ import {
 } from '../control/orchestrator';
 import { messageSlot, stopSlot } from '../control/slot';
 import type { Exec } from '../detect/exec';
+import type { DocsHandlers } from '../docs';
 import type { HandoffHandlers } from '../handoff';
 import type { NormalizeHandlers } from '../normalize';
 import type { PlannerHandlers } from '../planner';
+import type { Realpath } from '../policy/roots';
+import type { PolicyConfig } from '../policy/schema';
 import type { ProjectFs } from '../projects/fs';
 import { inspectProject, refreshProject } from '../projects/inspect';
 import type { SessionMessenger } from '../session';
@@ -61,6 +64,10 @@ export interface HandlerContext {
   watchedProjects: () => readonly WatchedProject[];
   /** The runtime profiles of the runner config; the orchestrator starts on one. */
   profiles: () => readonly ConfigProfile[];
+  /** The runner-local policy as it is now (ADR-0047). */
+  policy: () => PolicyConfig;
+  /** Resolves a root for the policy; the filesystem's by default. */
+  realpath?: Realpath;
   /** Tests inject a spying filesystem; the daemon uses the real one. */
   fs?: ProjectFs;
   /** The session watcher's backfill; absent when sessions are disabled. */
@@ -85,6 +92,8 @@ export interface HandlerContext {
   normalize?: NormalizeHandlers;
   /** Card model assessment (#322); absent means this runner does not assess cards. */
   assess?: AssessHandlers;
+  /** Docs repositories (#379); absent means this runner does not write to them. */
+  docs?: DocsHandlers;
   /** Steward's actions (#447); absent means this runner does not serve them. */
   steward?: StewardHandlers;
   /** Context handoff (#449); absent means this runner does not serve it. */
@@ -133,6 +142,13 @@ const noSkills = (): never => {
   throw new CommandFailure('unsupported', 'this runner does not serve skills');
 };
 
+const noDocs = (): never => {
+  throw new CommandFailure(
+    'unsupported',
+    'this runner does not write to docs repositories',
+  );
+};
+
 const noPlanner = (): never => {
   throw new CommandFailure('unsupported', 'this runner does not serve plans');
 };
@@ -152,6 +168,8 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
     clock: context.clock,
     watchedProjects: context.watchedProjects,
     profiles: context.profiles,
+    policy: context.policy,
+    realpath: context.realpath,
   };
   const approvals = {
     exec: context.exec,
@@ -275,6 +293,10 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
       context.normalize?.['text.normalize'](args) ?? noNormalize(),
     'card.assess': (args) =>
       context.assess?.['card.assess'](args) ?? noAssess(),
+    'docs.publish_specs': (args) =>
+      context.docs?.['docs.publish_specs'](args) ?? noDocs(),
+    'docs.pr_state': (args) =>
+      context.docs?.['docs.pr_state'](args) ?? noDocs(),
     'session.nudge': (args) =>
       context.steward?.['session.nudge'](args) ?? noSteward(),
     'session.dismiss': (args) =>

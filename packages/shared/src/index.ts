@@ -17,6 +17,7 @@ export * from './live';
 export * from './models';
 export * from './notifications';
 export * from './planner';
+export * from './project-rules';
 export * from './projects';
 export * from './queue';
 export * from './readiness';

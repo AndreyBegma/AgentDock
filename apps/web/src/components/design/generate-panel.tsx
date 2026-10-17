@@ -131,7 +131,10 @@ export function GeneratePanel({
   return (
     <section
       aria-label="Generate the design"
-      className="mx-auto flex w-full max-w-md flex-col gap-4 rounded-lg border border-line bg-content p-6"
+      // #526: below `lg` every control is 44px (the tokens glass-ui reads), the
+      // text inputs are 16px so iOS does not zoom on focus, and Generate sits
+      // in a dock that stays at the foot of the stage.
+      className="mx-auto flex w-full max-w-md flex-col gap-4 rounded-lg border border-line bg-content p-4 max-lg:[--size-control:44px] max-lg:[--size-field:44px] max-lg:[&_input]:text-base max-lg:[&_select]:text-base lg:p-6"
     >
       <div className="flex flex-col gap-1">
         <h2 className="text-base font-semibold">Draw the mockup</h2>
@@ -160,7 +163,7 @@ export function GeneratePanel({
                 type="button"
                 aria-pressed={count === n}
                 disabled={writeBlock !== null}
-                className="w-full min-w-10 px-3 py-1 text-xs"
+                className="w-full min-w-10 px-3 py-1 text-xs max-lg:h-full max-lg:text-sm"
                 onClick={() => setCount(n)}
               >
                 {n}
@@ -202,6 +205,7 @@ export function GeneratePanel({
               variant="ghost"
               size="sm"
               type="button"
+              className="max-lg:h-11"
               disabled={runsOnChanges.length === 0 || writeBlock !== null}
               onClick={() => setRunsOn(launchBaseline(launch, 'design'))}
             >
@@ -251,14 +255,18 @@ export function GeneratePanel({
           exclude={['runner_outdated']}
         />
       ) : null}
-      <Button
-        variant="solid"
-        disabled={blocked || busy}
-        aria-describedby={describedBy}
-        onClick={() => void generate()}
-      >
-        {busy ? 'Starting…' : 'Generate'}
-      </Button>
+      <div aria-hidden="true" className="h-14 lg:hidden" />
+      <div className="max-lg:glass-strong max-lg:fixed max-lg:inset-x-4 max-lg:bottom-[calc(var(--keyboard-inset)+env(safe-area-inset-bottom)+0.5rem)] max-lg:z-chrome max-lg:rounded-sheet max-lg:p-2">
+        <Button
+          variant="solid"
+          full
+          disabled={blocked || busy}
+          aria-describedby={describedBy}
+          onClick={() => void generate()}
+        >
+          {busy ? 'Starting…' : 'Generate'}
+        </Button>
+      </div>
       {launch ? (
         <p className="text-center text-xs text-ink-3">
           {count} {count === 1 ? 'variant' : 'variants'} ·{' '}

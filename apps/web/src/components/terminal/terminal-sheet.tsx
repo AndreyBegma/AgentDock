@@ -33,6 +33,14 @@ const PHASE_TONE = {
   'neutral' | 'warn' | 'ok' | 'danger'
 >;
 
+const TARGET_LABEL: Record<TerminalTarget['kind'], string> = {
+  slot: 'Slot terminal',
+  orchestrator: 'Orchestrator terminal',
+  skill_run: 'Skill run terminal',
+  manual: 'Session terminal',
+  card: 'Card terminal',
+};
+
 /**
  * The full-screen terminal of spec 29 UI. It opens read-only; **Take control**
  * is a separate, explicit second attach. Closing the sheet detaches and the
@@ -109,22 +117,39 @@ export function TerminalSheet({
         <SheetContent
           side="right"
           title={title}
-          description="Terminal attach"
-          className="w-full max-w-none sm:w-[min(100vw,60rem)]"
+          description={TARGET_LABEL[target.kind]}
+          className="w-full max-w-none sm:w-[min(100vw,72rem)]"
+          footer={
+            message && mode === 'read' ? (
+              <div className="flex flex-col gap-2">
+                <p className="text-xs text-ink-3">
+                  Message to the session, not typed into the terminal
+                </p>
+                <SessionMessageLine
+                  send={message.send}
+                  question={message.question}
+                  label={`Message ${title}`}
+                  tone="on-glass"
+                />
+              </div>
+            ) : undefined
+          }
         >
-          <div className="flex h-full flex-col gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge dot tone={PHASE_TONE[status.phase]} aria-hidden />
-              <span className="text-sm" role="status">
-                {TERMINAL_PHASE_LABEL[status.phase]}
-              </span>
-              <Chip size="sm">
-                {mode === 'write' ? 'in control' : 'read-only'}
-              </Chip>
-              <div className="ml-auto flex flex-wrap gap-2">
+          <div className="flex h-full flex-col gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+              <div className="flex items-center gap-2">
+                <Badge dot tone={PHASE_TONE[status.phase]} aria-hidden />
+                <span className="text-sm" role="status">
+                  {TERMINAL_PHASE_LABEL[status.phase]}
+                </span>
+                <Chip size="sm">
+                  {mode === 'write' ? 'in control' : 'read-only'}
+                </Chip>
+              </div>
+              <div className="flex items-center gap-2">
                 {mode === 'read' ? (
                   <Button
-                    variant="glass"
+                    variant="solid"
                     size="sm"
                     onClick={() => switchMode('write')}
                   >
@@ -132,14 +157,14 @@ export function TerminalSheet({
                   </Button>
                 ) : (
                   <Button
-                    variant="glass"
+                    variant="solid"
                     size="sm"
                     onClick={() => switchMode('read')}
                   >
                     Release
                   </Button>
                 )}
-                <Button variant="glass" size="sm" onClick={onClose}>
+                <Button variant="ghost" size="sm" onClick={onClose}>
                   Detach
                 </Button>
               </div>
@@ -176,14 +201,6 @@ export function TerminalSheet({
                 onStatus={setStatus}
               />
             </div>
-            {message && mode === 'read' ? (
-              <SessionMessageLine
-                send={message.send}
-                question={message.question}
-                label={`Message ${title}`}
-                tone="on-glass"
-              />
-            ) : null}
           </div>
         </SheetContent>
       ) : null}

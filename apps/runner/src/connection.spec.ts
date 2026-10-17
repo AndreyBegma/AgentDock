@@ -15,6 +15,7 @@ import {
   RunnerConnection,
   type TerminalHandler,
 } from './connection';
+import { permissivePolicy, sameRealpath } from './policy/testing';
 import { Spool } from './spool';
 import { FakeClock } from './testing/fake-clock';
 import {
@@ -98,7 +99,10 @@ describe('RunnerConnection', () => {
         collectors: {},
       }),
       dispatch: createDispatcher({
+        policy: permissivePolicy,
+        realpath: sameRealpath,
         handlers: createHandlers({
+          policy: permissivePolicy,
           clock,
           runnerVersion: '0.1.0',
           host,

@@ -84,6 +84,15 @@ export interface IntakePromptState {
 /** Actions whose output carries design suggestions under contract v2. */
 const SUGGESTING: readonly PlanTurnAction[] = ['decompose', 'grill', 'revise'];
 
+/**
+ * #524 (ADR-0044 §3): when an intake proposes a split, and when a stack —
+ * several UI changes to one surface share one look, so they are a stack.
+ */
+const SPLIT_WHEN =
+  'several independent tasks (unrelated changes, UI changes to different surfaces, or work with no UI) or too big for one agent';
+const STACK_WHEN =
+  'one larger piece of work whose parts must happen in order and share one look, or several UI changes to one surface or form factor (one screen, one page, "the board on phones") — a stack with `design: true`, staged foundations first: the shared layout and primitives, then the per-feature cards';
+
 const WHAT: Record<PlanTurnAction, (input: PromptInput) => string> = {
   clarify: () =>
     'Ask the next round of plan-level questions about the brief, or report `done: true` when the brief is clear enough to split into tasks.',
@@ -102,19 +111,19 @@ const WHAT: Record<PlanTurnAction, (input: PromptInput) => string> = {
   intake: (i) => {
     const state = i.intake;
     if (!state) {
-      return 'Interview the person about the work they asked for: ask the next round of questions, or — when nothing material is unknown — write the card, or propose a split if it is several independent tasks or too big for one agent, or a stack if it is one larger piece of work whose parts must happen in order and share one look.';
+      return `Interview the person about the work they asked for: ask the next round of questions, or — when nothing material is unknown — write the card, or propose a split if it is ${SPLIT_WHEN}, or a stack if it is ${STACK_WHEN}.`;
     }
     const asked = `Rounds asked so far: ${state.roundsAsked} of ${state.maxRounds}.`;
     if (state.keepOne) {
       return `${asked} The person declined the split and keeps one card: write one \`cardDraft\` now that covers the whole request. Record every default you took under \`## Open questions\`.`;
     }
     if (state.generate) {
-      return `${asked} The person asked to generate: write the card now — or the split if the request is several independent tasks or too big for one agent, or the stack if it is one larger piece of work whose parts must happen in order. Every question they left unanswered takes its recommendation — record those under \`## Open questions\`.`;
+      return `${asked} The person asked to generate: write the card now — or the split if the request is ${SPLIT_WHEN}, or the stack if it is ${STACK_WHEN}. Every question they left unanswered takes its recommendation — record those under \`## Open questions\`.`;
     }
     if (state.mustGenerate) {
-      return `${asked} No more rounds may be asked: write the card now — or the split if the request is several independent tasks or too big for one agent, or the stack if it is one larger piece of work whose parts must happen in order — recording every default you took under \`## Open questions\`.`;
+      return `${asked} No more rounds may be asked: write the card now — or the split if the request is ${SPLIT_WHEN}, or the stack if it is ${STACK_WHEN} — recording every default you took under \`## Open questions\`.`;
     }
-    return `${asked} Ask the next round of questions only if something material is still unknown; otherwise write the card now — or propose the split, if the request is several independent tasks or too big for one agent, or the stack, if it is one larger piece of work whose parts must happen in order and share one look.`;
+    return `${asked} Ask the next round of questions only if something material is still unknown; otherwise write the card now — or propose the split, if the request is ${SPLIT_WHEN}, or the stack, if it is ${STACK_WHEN}.`;
   },
 };
 

@@ -13,16 +13,27 @@ import { type OnGatewayConnection, WebSocketGateway } from '@nestjs/websockets';
 import type { RawData, WebSocket } from 'ws';
 import { bearerToken } from './credentials';
 import { RunnerConnectHooks } from './runner-connect-hooks';
-import { LiveConnection, RunnerConnections } from './runner-connections';
+import {
+  LiveConnection,
+  RunnerConnections,
+  type RunnerPeer,
+} from './runner-connections';
 import { RunnerIngestService } from './runner-ingest.service';
 import { RunnerLocalRequests } from './runner-local-requests';
 import { RUNNER_OPTIONS, type RunnerOptions } from './runner-options';
+import { RunnerReplacements } from './runner-replacements';
 import { RunnerStreams } from './runner-streams';
 import { RunnerWatchList } from './runner-watch-list';
 
 /** Standard close codes the gateway uses besides `RUNNER_CLOSE_CODES`. */
 const POLICY_VIOLATION = 1008;
 const INTERNAL_ERROR = 1011;
+
+/** As the terminal gateway reads it: the socket's peer and its user agent. */
+const peerOf = (request: IncomingMessage): RunnerPeer => ({
+  ip: request.socket.remoteAddress ?? null,
+  userAgent: request.headers['user-agent'] ?? null,
+});
 
 interface Deps {
   ingest: RunnerIngestService;
@@ -31,6 +42,7 @@ interface Deps {
   streams: RunnerStreams;
   localRequests: RunnerLocalRequests;
   connectHooks: RunnerConnectHooks;
+  replacements: RunnerReplacements;
   options: RunnerOptions;
   logger: Logger;
 }
@@ -46,12 +58,14 @@ class RunnerSocket {
   private live: LiveConnection | null = null;
   private closed = false;
   private readonly helloTimer: NodeJS.Timeout;
+  private readonly peer: RunnerPeer;
 
   constructor(
     private readonly socket: WebSocket,
     request: IncomingMessage,
     private readonly deps: Deps,
   ) {
+    this.peer = peerOf(request);
     socket.on('message', (data) => this.enqueue(() => this.receive(data)));
     socket.on('close', () => this.onClose());
     this.helloTimer = setTimeout(
@@ -209,14 +223,16 @@ class RunnerSocket {
       this.socket,
       Date.now(),
       runnerCommandsOf(hello.capabilities),
+      this.peer,
     );
     this.live = live;
+    let replaced: LiveConnection | null = null;
     // Attached and welcomed in one step, queued with the watch-list pushes:
     // a project connected meanwhile is either in this list or pushed as
     // `config` right after the welcome (spec 10 D9).
     await this.deps.watchList.deliver(runnerId, (config) => {
       if (this.closed) return;
-      this.deps.connections.attach(live);
+      replaced = this.deps.connections.attach(live);
       live.send({ type: 'welcome', runnerId, config, ackedSeq: Number(acked) });
     });
     if (this.closed) return;
@@ -226,6 +242,20 @@ class RunnerSocket {
     // Off the frame queue (#329 D4): a hook may send a command, whose result
     // arrives on this same queue.
     void this.deps.connectHooks.connected(runnerId);
+    // C-108: a live socket taken over — audited and told to admins, off the
+    // frame queue like the hooks.
+    const previous = replaced as LiveConnection | null;
+    if (previous) {
+      void this.deps.replacements.replaced({
+        runnerId,
+        previous: {
+          ...previous.peer,
+          connectedAt: new Date(previous.connectedAt),
+        },
+        next: this.peer,
+        at: new Date(live.connectedAt),
+      });
+    }
   }
 
   private close(code: number, reason: string): void {
@@ -274,6 +304,7 @@ export class RunnerGateway implements OnGatewayConnection {
     private readonly streams: RunnerStreams,
     private readonly localRequests: RunnerLocalRequests,
     private readonly connectHooks: RunnerConnectHooks,
+    private readonly replacements: RunnerReplacements,
     @Inject(RUNNER_OPTIONS) private readonly options: RunnerOptions,
   ) {}
 
@@ -285,6 +316,7 @@ export class RunnerGateway implements OnGatewayConnection {
       streams: this.streams,
       localRequests: this.localRequests,
       connectHooks: this.connectHooks,
+      replacements: this.replacements,
       options: this.options,
       logger: this.logger,
     });

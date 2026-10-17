@@ -1,6 +1,7 @@
 import type { ActionRequestKind } from '@agentdock/shared';
-import type { CommandName } from '@agentdock/shared/protocol';
+import type { CommandName, PrInspection } from '@agentdock/shared/protocol';
 import { Logger } from '@nestjs/common';
+import { ApprovalCommands } from '../approvals/approval-commands';
 import { Feed } from '../budgets/testing/budgets-e2e';
 import { seedProject } from '../fleet/testing/fleet-e2e';
 import { seedPrices } from '../prices/seed-prices';
@@ -32,6 +33,29 @@ const OUTPUTS: Partial<Record<CommandName, unknown>> = {
   },
   'orchestrator.stop': { stopped: true },
 };
+
+const PR = 51;
+const H1 = 'a'.repeat(40);
+const H2 = 'b'.repeat(40);
+
+const inspection = (headSha: string): PrInspection => ({
+  number: PR,
+  url: `https://github.com/acme/widget/pull/${PR}`,
+  title: 'feat: harmless',
+  body: '',
+  state: 'open',
+  headSha,
+  additions: 1,
+  deletions: 0,
+  changedFiles: 1,
+  files: [],
+  filesTruncated: false,
+  checks: 'green',
+  checkList: [],
+  mergeable: 'MERGEABLE',
+  mergeStateStatus: 'CLEAN',
+  fetchedAt: '2026-10-17T10:00:00.000Z',
+});
 
 /**
  * Spec 201 D18, acceptance criteria 6 and 7 (API and Telegram half): who may
@@ -80,6 +104,7 @@ describe('action requests (e2e)', () => {
         runnerId,
         sessionId: null,
         requestedById,
+        requesterRole: 'operator',
         kind,
         args,
         summary: `Please ${kind}`,
@@ -337,6 +362,103 @@ describe('action requests (e2e)', () => {
       const response = await decide(approver, request.id, 'approve');
       expect(response.status).toBe(409);
       expect(response.body.error).toBe('not_pending');
+    });
+
+    describe('pr_approve (C-110)', () => {
+      let head: string;
+      let approve: jest.SpyInstance;
+
+      beforeEach(async () => {
+        await ctx.prisma.mergeApproval.create({
+          data: {
+            projectId,
+            prNumber: PR,
+            slot: 'i42-api',
+            issue: 42,
+            source: 'orchestrator',
+            status: 'waiting',
+            waitingSince: new Date(),
+          },
+        });
+        head = H1;
+        const commands = ctx.app.get(ApprovalCommands);
+        jest
+          .spyOn(commands, 'inspect')
+          .mockImplementation(async () => inspection(head));
+        approve = jest
+          .spyOn(commands, 'approve')
+          .mockResolvedValue({ written: true });
+      });
+
+      it('binds the request to the head read at creation', async () => {
+        const request = await create('pr_approve', { pr: PR });
+        expect(request.args).toEqual({
+          pr: PR,
+          headSha: H1,
+          title: 'feat: harmless',
+          url: `https://github.com/acme/widget/pull/${PR}`,
+        });
+        const [notification] = await ctx.prisma.notification.findMany({
+          where: { kind: 'action.requested' },
+        });
+        expect(notification.title).toBe(
+          `A session asks to approve PR #${PR} at aaaaaaa`,
+        );
+        expect(notification.body).toContain('feat: harmless');
+        expect(notification.body).toContain(
+          `https://github.com/acme/widget/pull/${PR}/files/${H1}`,
+        );
+
+        const response = await decide(approver, request.id, 'approve');
+        expect(response.body).toMatchObject({
+          status: 'executed',
+          result: { pr: PR, headSha: H1 },
+          pr: { headSha: H1, title: 'feat: harmless' },
+        });
+        expect(approve).toHaveBeenCalledWith(
+          runnerId,
+          expect.objectContaining({ pr: PR, headSha: H1 }),
+          expect.anything(),
+        );
+      });
+
+      it('fails with head_moved when the head moved before the approval, approving nothing', async () => {
+        const request = await create('pr_approve', { pr: PR });
+        head = H2;
+        const response = await decide(approver, request.id, 'approve');
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({
+          status: 'failed',
+          decidedById: approverId,
+          result: { error: 'head_moved' },
+        });
+        expect(approve).not.toHaveBeenCalled();
+        expect(
+          await ctx.prisma.mergeApproval.count({
+            where: { projectId, status: 'approved' },
+          }),
+        ).toBe(0);
+      });
+
+      it('refuses a head the session supplies itself', async () => {
+        await expect(
+          create('pr_approve', { pr: PR, headSha: H2 }),
+        ).rejects.toMatchObject({ status: 400 });
+      });
+
+      it('fails a request stored without a head', async () => {
+        const request = await create('pr_approve', { pr: PR });
+        await ctx.prisma.actionRequest.update({
+          where: { id: request.id },
+          data: { args: { pr: PR } },
+        });
+        const response = await decide(approver, request.id, 'approve');
+        expect(response.body).toMatchObject({
+          status: 'failed',
+          result: { error: 'invalid_args' },
+        });
+        expect(approve).not.toHaveBeenCalled();
+      });
     });
 
     it('refuses args a kind does not take', async () => {

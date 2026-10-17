@@ -93,6 +93,7 @@ const fixture = async () => {
       exec,
       clock: systemClock,
       log: memoryLogger().log,
+      writeAllowed: () => true,
       watchedProjects: () => [{ id: 'prj_1', root }],
       send: (message) => {
         sent.push(message);
