@@ -172,6 +172,42 @@ The rules come from the files Claude Code loads:
 - **Without the launch env** (no `AGENTDOCK_FILTER_STATS`), the filter runs the
   command and prints its output. It writes no raw file and no stats.
 
+## The read guard (`read-hook`, #616)
+
+The filter sees only Bash, while an agent's largest inputs are whole reads of
+big files and the same file read again. A launch with Token saver on also
+registers `agentdock-runner read-hook` (`filter/read-guard.ts`) as a
+`PreToolUse` and a `PostToolUse` hook for `Read`, and as a `PreCompact` hook.
+
+- **Whole reads.** A `Read` with no `offset`, `limit` or `pages` of a text file
+  over 64 KB or 1,500 lines (`READ_GUARD_BYTES`, `READ_GUARD_LINES`) is
+  refused with `permissionDecision: "deny"` and a hint: `offset`/`limit`,
+  `Grep`, or the `scout` agent. Binary files, images and PDFs are never
+  guarded. Row id `tool/read-guard`.
+- **Repeated reads.** `PostToolUse` remembers every range read, keyed by the
+  path, `offset`, `limit`, `pages` and the file's mtime and size. A
+  `PreToolUse` with the same key — the same range of an unchanged file — is
+  refused with a reminder. A changed file has a new key and is read. Row id
+  `tool/read-dedup`.
+- **Once.** A refusal is remembered; the identical call that follows runs and
+  writes a `bypassed` row of the same id with no bytes.
+- **Compaction** (`PreCompact`) forgets every read: none is in context after it.
+
+The memory is one file per Claude session, `<run dir>/read-guard/<session
+id>.json`. A refusal's row counts `rawBytes` as what the read would have
+returned (the file's size, or its share for a `limit`) and `keptBytes` as the
+message that replaced it, so the dashboard shows the saving as an estimate.
+
+The hook fails open like `filter-hook`: no launch env, input it cannot use, a
+file it cannot stat or memory it cannot write — it prints nothing and exits 0,
+and the read runs. The settings add `|| true` behind the command as well.
+
+Before #616 the launch set `CS_ECO=on` so the code-sentinel plugin's `/cs-eco`
+hooks guarded reads (amendment 12), which only worked in a profile with the
+plugin. The launch now sets `CS_ECO=off`: with the plugin present each read is
+guarded once, by the runner. The plugin's cut of large MCP results goes with
+it.
+
 ## The environment a launch sets
 
 `filter/env.ts` is the only source of the names. `tokenSaverLaunch`
@@ -187,6 +223,7 @@ stats reader.
 | `AGENTDOCK_FILTER_RUN` | the run id; unset for the orchestrator session |
 | `AGENTDOCK_FILTER_RUN_KIND` | a `TokenSaverRunKind` |
 | `AGENTDOCK_LAUNCH_SETTINGS` | the `--settings` file the launch passed |
+| `CS_ECO` | `off`: the code-sentinel plugin's eco hooks stand down (#616) |
 
 The orchestrator session has no run dir. It uses a directory of its own,
 `<state>/agentdock/orchestrator/<session>/`.

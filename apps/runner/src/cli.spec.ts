@@ -911,10 +911,26 @@ describe('agentdock-runner CLI', () => {
       expect(stdout).toEqual([]);
     });
 
-    it('lists both in the usage', async () => {
+    it('read-hook fails open: no decision, exit 0 (#616)', async () => {
+      for (const input of ['', 'not json', '{"tool_name":"Read"}']) {
+        expect(
+          await runCli(
+            ['read-hook'],
+            deps({
+              stdin: () =>
+                new Response(input).body as ReadableStream<Uint8Array>,
+            }),
+          ),
+        ).toBe(EXIT.ok);
+      }
+      expect(stdout).toEqual([]);
+    });
+
+    it('lists all three in the usage', async () => {
       await runCli(['help'], deps());
       expect(stdout.join('')).toContain('filter -- <command>');
       expect(stdout.join('')).toContain('filter-hook');
+      expect(stdout.join('')).toContain('read-hook');
     });
   });
 });
