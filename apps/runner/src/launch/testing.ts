@@ -10,8 +10,9 @@ import {
 } from './token-saver';
 
 /**
- * Amendment 12: a launch with Token saver on compacts at 150k tokens and
- * turns the plugin's eco hooks on; one with it off sets neither.
+ * Amendment 12: a launch with Token saver on compacts at 150k tokens; #616:
+ * it turns the plugin's eco hooks off, since the runner guards reads itself.
+ * One with it off sets neither.
  */
 export const expectEcoEnv = (
   env: Readonly<Record<string, string | undefined>>,
@@ -20,7 +21,7 @@ export const expectEcoEnv = (
   if (on) {
     expect(env[AUTOCOMPACT_WINDOW_ENV]).toBe('183000');
     expect(env[AUTOCOMPACT_PCT_ENV]).toBe('100');
-    expect(env[CS_ECO_ENV]).toBe('on');
+    expect(env[CS_ECO_ENV]).toBe('off');
   } else {
     expect(env[AUTOCOMPACT_WINDOW_ENV]).toBeUndefined();
     expect(env[AUTOCOMPACT_PCT_ENV]).toBeUndefined();

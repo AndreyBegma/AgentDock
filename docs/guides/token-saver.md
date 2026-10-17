@@ -23,11 +23,13 @@ For every Claude launch the runner makes, with the project's setting on:
 - **The history is compacted at about 150k tokens**, on every model. On a 1M
   window a session used to grow to about 600k before compacting, and every
   turn re-reads what it holds.
-- **Reads are trimmed too.** The launch turns on the code-sentinel plugin's
-  `/cs-eco` (`CS_ECO=on`): whole reads of large files are guarded, a repeated
-  read of an unchanged file is refused once, and large MCP results are cut to
-  their head and tail. The runner's filter still handles Bash, so nothing is
-  counted twice.
+- **Reads are trimmed too.** The runner guards `Read` itself, whatever
+  plugins the profile has: a whole read of a file over 64 KB or 1,500 lines is
+  refused once with a hint (read a range with `offset`/`limit`, find the line
+  with `Grep`, or ask the `scout` agent), and a repeated read of an unchanged
+  range is refused once with a reminder. Repeating the same call reads the
+  file. The launch sets `CS_ECO=off`, so the code-sentinel plugin's `/cs-eco`
+  hooks never guard the same read a second time.
 - **Broad searches go to a cheaper helper**, and the worker prompt is ordered
   so the model's cache hits.
 

@@ -2,16 +2,17 @@ import { homedir, platform } from 'node:os';
 import { runFilter } from './engine';
 import { ALL_FILTERS } from './families';
 import { runFilterHook } from './hook';
+import { runReadHook } from './read-guard';
 import type { Filter } from './types';
 
 /**
  * The filter's own entry (#445 D3). `main.ts` imports it before anything
- * else, so `filter` and `filter-hook` start without loading the daemon's
+ * else, so `filter`, `filter-hook` and `read-hook` start without loading the daemon's
  * module graph — they sit on every Bash call of every agent, and the budget
  * is 50 ms (p95) per command.
  */
 
-export const FILTER_COMMANDS = new Set(['filter', 'filter-hook']);
+export const FILTER_COMMANDS = new Set(['filter', 'filter-hook', 'read-hook']);
 
 /** This runner as an argv: the compiled binary, or bun with the entry script. */
 const selfCommand = (): string[] =>
@@ -67,13 +68,24 @@ export const processIo = (): FilterIo => {
   };
 };
 
-/** Runs `filter …` or `filter-hook`; returns the exit code. */
+/** Runs `filter …`, `filter-hook` or `read-hook`; returns the exit code. */
 export const runFilterCommand = async (
   argv: readonly string[],
   io: FilterIo = processIo(),
   filters: readonly Filter[] = ALL_FILTERS,
 ): Promise<number> => {
   const [command, ...rest] = argv;
+  if (command === 'read-hook') {
+    let output = '';
+    try {
+      output = runReadHook(await io.stdin(), { env: io.env, now: Date.now });
+    } catch {
+      // Fail open: no output is "no decision".
+    }
+    if (output) io.stdout(output);
+    await io.flush();
+    return 0;
+  }
   if (command === 'filter-hook') {
     let output = '';
     try {

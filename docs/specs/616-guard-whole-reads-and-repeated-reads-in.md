@@ -25,3 +25,17 @@ Every guard decision writes a stats row with its own filter id (e.g. `tool/read-
 
 ## Open questions
 - Size threshold for a guarded whole read. Default: 64 KB or 1,500 lines, whichever comes first.
+
+## Decisions
+
+- **Threshold.** The card's default: a whole read is guarded over 64 KB or
+  1,500 lines, whichever comes first. Binary files, images and PDFs are never
+  guarded.
+- **No double guard.** The plugin's eco hooks cannot be switched off for
+  `Read` alone, so a launch with Token saver on sets `CS_ECO=off` (not unset,
+  so a machine default of `on` cannot win). This replaces amendment 12's
+  `CS_ECO=on` in `445-token-saver.md`. The plugin's cut of large MCP results
+  is lost with it; compressing MCP results is out of scope here.
+- **Stats.** A refusal writes `rawBytes` = the estimated read, `keptBytes` =
+  the message. The retry it lets through writes a `bypassed` row of the same
+  id with no bytes: the schema does not allow a negative correction.

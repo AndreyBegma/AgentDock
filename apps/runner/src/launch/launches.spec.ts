@@ -171,7 +171,39 @@ describe('card worker launch (#445)', () => {
       { wiring: 'plugin' },
     );
     const settings = JSON.parse(readFileSync(ts?.settingsFile ?? '', 'utf8'));
-    expect(Object.keys(settings.hooks)).toEqual(['PreToolUse']);
+    expect(Object.keys(settings.hooks)).toEqual([
+      'PreToolUse',
+      'PostToolUse',
+      'PreCompact',
+    ]);
+  });
+
+  it('guards reads itself in a profile without the code-sentinel plugin (#616)', () => {
+    const ts = cardTokenSaver(
+      profile,
+      { ...args, tokenSaver: ON },
+      home,
+      dir,
+      SELF,
+      injected,
+    );
+    if (!ts) throw new Error('expected a launch');
+    const spec = cardLaunchSpec(profile, args, '/w', null, injected.files, ts);
+    const settings = JSON.parse(readFileSync(ts.settingsFile, 'utf8'));
+    const readHook = [
+      { type: 'command', command: `${SELF[0]} read-hook || true`, timeout: 10 },
+    ];
+    expect(settings.hooks.PreToolUse).toContainEqual({
+      matcher: 'Read',
+      hooks: readHook,
+    });
+    expect(settings.hooks.PostToolUse).toContainEqual({
+      matcher: 'Read',
+      hooks: readHook,
+    });
+    expect(settings.hooks.PreCompact).toContainEqual({ hooks: readHook });
+    // The plugin, where a profile has it, stands down: one guard per read.
+    expectEcoEnv(spec.env);
   });
 });
 
