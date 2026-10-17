@@ -27,6 +27,7 @@ import { excludeFromGit, type GitDeps } from './git';
 export interface AttachmentSource {
   /** The API origin the runner is paired with. */
   server: string;
+  insecureServer?: boolean;
   /** The runner's own token — sent only to `server`. */
   token: string;
   /** Replaceable in tests. */
@@ -80,7 +81,7 @@ const download = async (
   source: AttachmentSource,
   ref: AttachmentRef,
 ): Promise<Uint8Array> => {
-  const url = `${normalizeServer(source.server)}${runnerAttachmentPath(ref.id)}`;
+  const url = `${normalizeServer(source.server, source.insecureServer)}${runnerAttachmentPath(ref.id)}`;
   let response: Response;
   try {
     response = await (source.fetch ?? fetch)(url, {

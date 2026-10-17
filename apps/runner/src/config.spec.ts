@@ -62,6 +62,15 @@ describe('config', () => {
     expect(config.policy.terminal.write).toBe(true);
   });
 
+  it('never lets the daemon rewrite insecureServer (D-06)', () => {
+    saveConfig(path, { server: 'https://dock.example' });
+    updateConfig(path, { insecureServer: true } as never);
+    expect(loadConfig(path).insecureServer).toBeUndefined();
+    saveConfig(path, { server: 'http://dock.lan', insecureServer: true });
+    updateConfig(path, { insecureServer: false } as never);
+    expect(loadConfig(path).insecureServer).toBe(true);
+  });
+
   it('refuses a relative allowed root and an unknown gated command', () => {
     expect(() =>
       saveConfig(path, { policy: { allowedRoots: ['dev'] } }),

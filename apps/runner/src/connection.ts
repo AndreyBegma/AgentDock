@@ -60,6 +60,8 @@ export type StopReason =
 
 export interface ConnectionOptions {
   server: string;
+  /** `insecureServer` from `runner.json`. */
+  insecureServer?: boolean;
   token: string;
   spool: Spool;
   clock: Clock;
@@ -156,7 +158,7 @@ export class RunnerConnection {
   private readonly createSocket: SocketFactory;
 
   constructor(private readonly options: ConnectionOptions) {
-    this.url = socketUrl(options.server);
+    this.url = socketUrl(options.server, options.insecureServer);
     this.createSocket = options.createSocket ?? bunSocketFactory;
     this.done = new Promise((resolve) => {
       this.resolveDone = resolve;

@@ -121,6 +121,73 @@ describe('agentdock-runner CLI', () => {
       expect(output()).not.toContain(TOKEN);
     });
 
+    describe('cleartext servers (F-20)', () => {
+      const lan = (extra: string[]) =>
+        runCli(
+          [
+            'pair',
+            '--server',
+            'http://dock.lan',
+            '--code',
+            'ABCD-EFGH',
+            ...extra,
+          ],
+          deps({
+            fetch: (async () =>
+              Response.json({
+                runnerId: 'rn_1',
+                token: TOKEN,
+              })) as unknown as typeof fetch,
+          }),
+        );
+
+      it('refuses http://dock.lan without --insecure and writes nothing', async () => {
+        expect(await lan([])).not.toBe(EXIT.ok);
+        expect(() => statSync(paths().configFile)).toThrow();
+      });
+
+      it('pair --insecure persists insecureServer and warns; status and run warn too', async () => {
+        expect(await lan(['--insecure'])).toBe(EXIT.ok);
+        expect(stdout.join('')).toContain('WARNING');
+        expect(
+          JSON.parse(readFileSync(paths().configFile, 'utf8')),
+        ).toMatchObject({ server: 'http://dock.lan', insecureServer: true });
+
+        stdout.length = 0;
+        await runCli(
+          ['status'],
+          deps({
+            fetch: (async () => new Response('')) as unknown as typeof fetch,
+          }),
+        );
+        expect(stdout.join('')).toContain('WARNING');
+
+        stderr.length = 0;
+        const controller = new AbortController();
+        controller.abort();
+        await runCli(
+          ['run'],
+          deps({
+            signal: controller.signal,
+            createSocket: () => {
+              throw new Error('no network in tests');
+            },
+          }),
+        );
+        expect(stderr.join('')).toContain('WARNING');
+      });
+
+      it('run refuses a plain-http config that was not paired with --insecure', async () => {
+        saveConfig(paths().configFile, {
+          server: 'http://dock.lan',
+          runnerId: 'rn_1',
+          token: TOKEN,
+        });
+        expect(await runCli(['run'], deps())).toBe(EXIT.failure);
+        expect(stderr.join('')).toContain('--insecure');
+      });
+    });
+
     it('keeps profiles and disabled commands, and logs the replaced runner id', async () => {
       saveConfig(paths().configFile, {
         server: server.origin,

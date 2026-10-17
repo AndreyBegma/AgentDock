@@ -58,10 +58,12 @@ export interface CliDeps {
 const USAGE = `Usage: agentdock-runner <command>
 
 Commands:
-  pair --server <url> --code <XXXX-XXXX> [--no-detect] [--allow-root <dir>]…
+  pair --server <url> --code <XXXX-XXXX> [--no-detect] [--allow-root <dir>]… [--insecure]
                                            pair this machine with an AgentDock server
                                            (detects runtime profiles unless --no-detect;
-                                           --allow-root lets projects under <dir> be watched)
+                                           --allow-root lets projects under <dir> be watched;
+                                           --insecure allows plain http to a host that is not
+                                           loopback — cleartext, at your own risk)
   run                                      run the daemon in the foreground
   status                                   show config, connectivity and spool
   profiles [--detect [--write]]            list runtime profiles, or detect them
@@ -90,6 +92,9 @@ Used by the runner's launches (Token saver):
 `;
 
 class UsageError extends Error {}
+
+const insecureWarning = (server: string): string =>
+  `WARNING: ${server} is plain http (pair --insecure). The runner token, prompts and session content travel in cleartext; anyone on the network path can read or rewrite them. Use https://.`;
 
 interface Context {
   deps: CliDeps;
@@ -140,14 +145,17 @@ const pairCommand = async ({
     code,
     'no-detect': noDetect,
     'allow-root': allowRoot = [],
+    insecure = false,
   } = flags(args, {
     server: { type: 'string' },
     code: { type: 'string' },
     'no-detect': { type: 'boolean' },
     'allow-root': { type: 'string', multiple: true },
+    insecure: { type: 'boolean' },
   });
   if (!server || !code) throw new UsageError('pair needs --server and --code');
-  const origin = normalizeServer(server);
+  const origin = normalizeServer(server, insecure);
+  const cleartext = insecure && origin.startsWith('http:');
   const config = loadConfig(paths.configFile);
   // ADR-0047: resolved before pairing, so a typo costs no pairing code.
   const allowed = allowRoot.map((dir) => {
@@ -159,6 +167,7 @@ const pairCommand = async ({
 
   const paired = await pair({
     server: origin,
+    insecure,
     code,
     hostname: deps.host.hostname,
     runnerVersion: RUNNER_VERSION,
@@ -178,6 +187,8 @@ const pairCommand = async ({
   saveConfig(paths.configFile, {
     ...config,
     server: origin,
+    // Only `pair` sets it (D-06): a re-pair over https clears it.
+    insecureServer: cleartext ? true : undefined,
     runnerId: paired.runnerId,
     token: paired.token,
     profiles: detected ?? config.profiles,
@@ -193,6 +204,7 @@ const pairCommand = async ({
     },
   });
   log.info('paired', { runnerId: paired.runnerId, server: origin });
+  if (cleartext) out(deps, insecureWarning(origin));
   out(
     deps,
     `Paired as ${paired.runnerId}. Config written to ${paths.configFile}`,
@@ -231,6 +243,17 @@ const runCommand = async ({
     return EXIT.failure;
   }
   log.addSecret(config.token);
+  try {
+    normalizeServer(config.server, config.insecureServer);
+  } catch (error) {
+    deps.stderr(`${errorMessage(error)}\n`);
+    return EXIT.failure;
+  }
+  if (config.insecureServer) {
+    const warning = insecureWarning(config.server);
+    deps.stderr(`${warning}\n`);
+    log.warn(warning);
+  }
   if (config.profiles.length === 0) {
     log.warn(
       'no runtime profiles configured; nothing can be launched. Run `agentdock-runner profiles --detect --write`',
@@ -290,6 +313,9 @@ const statusCommand = async ({
     `paired:   ${isPaired(config) ? `yes, as ${config.runnerId}` : 'no'}`,
   );
   out(deps, `server:   ${config.server ?? '-'}`);
+  if (config.insecureServer && config.server) {
+    out(deps, insecureWarning(config.server));
+  }
   out(deps, `profiles: ${config.profiles.length}`);
   const stopped = readStopStatus(paths.stopStatusFile);
   if (stopped) out(deps, `stopped:  ${stopMessage(stopped)}`);

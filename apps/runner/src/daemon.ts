@@ -347,7 +347,11 @@ export const runDaemon = async (
       emit: (event) => connection?.emit(event),
       log,
       otlpPort: () => otlp?.port ?? null,
-      attachmentSource: { server: config.server, token: config.token },
+      attachmentSource: {
+        server: config.server,
+        insecureServer: config.insecureServer,
+        token: config.token,
+      },
       runNotes,
     });
     const uiProfiles = new UiProfileBuildExecutor({
@@ -389,7 +393,11 @@ export const runDaemon = async (
       deps: skillsDeps,
       cardsDir,
       selfCommand,
-      attachmentSource: { server: config.server, token: config.token },
+      attachmentSource: {
+        server: config.server,
+        insecureServer: config.insecureServer,
+        token: config.token,
+      },
       emit: (event) => connection?.emit(event),
       log,
       otlpPort: () => otlp?.port ?? null,
@@ -589,6 +597,7 @@ export const runDaemon = async (
 
     const live = new RunnerConnection({
       server: config.server,
+      insecureServer: config.insecureServer,
       token: config.token,
       spool,
       clock,

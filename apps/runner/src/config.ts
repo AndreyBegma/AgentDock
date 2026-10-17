@@ -39,6 +39,11 @@ export type ConfigProfile = z.infer<typeof configProfileSchema>;
 export const runnerConfigSchema = z.object({
   /** API origin, `http(s)://host[:port]`. */
   server: z.url({ protocol: /^https?$/ }).optional(),
+  /**
+   * Set only by `pair --insecure`: `server` may be plain http to a host that
+   * is not loopback (D-06). Never written by the daemon or from a server message.
+   */
+  insecureServer: z.boolean().optional(),
   runnerId: z.string().min(1).optional(),
   token: runnerTokenSchema.optional(),
   profiles: z.array(configProfileSchema).default([]),
@@ -178,7 +183,7 @@ export const saveConfig = (
 
 /** What the daemon may rewrite in the file: never the policy (ADR-0047). */
 export type DaemonConfigPatch = Partial<
-  Omit<z.input<typeof runnerConfigSchema>, 'policy'>
+  Omit<z.input<typeof runnerConfigSchema>, 'policy' | 'insecureServer'>
 >;
 
 /**
@@ -187,8 +192,13 @@ export type DaemonConfigPatch = Partial<
  * wrote — is kept as is.
  */
 export const updateConfig = (path: string, patch: DaemonConfigPatch): void => {
-  const { policy: _ignored, ...safe } = patch as DaemonConfigPatch & {
+  const {
+    policy: _policy,
+    insecureServer: _insecure,
+    ...safe
+  } = patch as DaemonConfigPatch & {
     policy?: unknown;
+    insecureServer?: unknown;
   };
   saveConfig(path, { ...loadConfig(path), ...safe });
 };
