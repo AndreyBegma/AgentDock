@@ -1,5 +1,6 @@
-import { createHash } from 'node:crypto';
-import { readFile, rm } from 'node:fs/promises';
+import { createHash, randomBytes } from 'node:crypto';
+import { readFile, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import type { Readable } from 'node:stream';
 import {
   ATTACHMENT_ERROR,
@@ -218,6 +219,29 @@ export class AttachmentsService {
       // Moved into place on success; anything else is not kept.
       await rm(file.path, { force: true });
     }
+  }
+
+  /**
+   * #594: `upload` for bytes that did not come through the upload route — a
+   * Telegram photo. They go through the same temporary file, checks and quota.
+   */
+  async uploadBytes(
+    projectId: string,
+    name: string,
+    bytes: Uint8Array,
+    actor: AttachmentActor,
+  ): Promise<AttachmentView> {
+    if (bytes.byteLength > ATTACHMENT_MAX_BYTES) throw this.tooLarge();
+    const path = join(
+      await this.store.tempDir(),
+      randomBytes(16).toString('hex'),
+    );
+    await writeFile(path, bytes, { flag: 'wx' });
+    return this.upload(
+      projectId,
+      { originalname: name, path, size: bytes.byteLength },
+      actor,
+    );
   }
 
   tooLarge(): AttachmentFailure {
@@ -461,6 +485,21 @@ export class AttachmentsService {
       orderBy: UPLOAD_ORDER,
     });
     return rows.map(toAttachmentRef);
+  }
+
+  /** #594: the plan's attachments as the intake view shows them, oldest first. */
+  async planViews(planId: string): Promise<AttachmentView[]> {
+    const rows = await this.prisma.attachment.findMany({
+      where: { planId },
+      orderBy: UPLOAD_ORDER,
+      include: UPLOADER,
+    });
+    return rows.map(toAttachmentView);
+  }
+
+  /** #594: how many attachments the plan holds — its card's room. */
+  countOfPlan(planId: string): Promise<number> {
+    return this.prisma.attachment.count({ where: { planId } });
   }
 
   /**
