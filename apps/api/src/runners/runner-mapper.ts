@@ -4,7 +4,11 @@ import type {
   AdminRuntimeProfile,
   RunnerStatus,
 } from '@agentdock/shared';
-import type { EventSource } from '@agentdock/shared/protocol';
+import {
+  type Capabilities,
+  type EventSource,
+  scrubProfileEnv,
+} from '@agentdock/shared/protocol';
 import type { Event, Runner, RuntimeProfile } from '@prisma/client';
 
 // Explicit field lists: tokenHash / tokenPrefix never leak by default.
@@ -31,6 +35,27 @@ export const toAdminRunner = (
   awayMode: runner.awayMode,
 });
 
+/**
+ * Stored capabilities as the admin API shows them (C-123): each profile's env
+ * scrubbed, so a blob a runner sent before the fix never shows a value.
+ */
+export const toAdminCapabilities = (stored: unknown): Capabilities | null => {
+  if (typeof stored !== 'object' || stored === null) return null;
+  const { profiles } = stored as { profiles?: unknown };
+  if (!Array.isArray(profiles)) return stored as Capabilities;
+  return {
+    ...stored,
+    profiles: profiles.map((profile: unknown) =>
+      typeof profile === 'object' && profile !== null
+        ? {
+            ...profile,
+            env: scrubProfileEnv((profile as { env?: unknown }).env),
+          }
+        : profile,
+    ),
+  } as Capabilities;
+};
+
 export const toAdminProfile = (
   profile: RuntimeProfile,
 ): AdminRuntimeProfile => ({
@@ -39,7 +64,8 @@ export const toAdminProfile = (
   runtime: profile.runtime,
   label: profile.label,
   binary: profile.binary,
-  env: profile.env as Record<string, string>,
+  // C-123: never a value outside the allowlist, even from an older row.
+  env: scrubProfileEnv(profile.env),
   args: profile.args as string[],
   authenticated: profile.authenticated,
   missing: profile.missing,

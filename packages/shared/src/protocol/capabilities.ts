@@ -97,6 +97,30 @@ export const reportProfileEnv = (
   );
 
 /**
+ * A stored profile env (a JSON column) as it may be shown (C-123): a string
+ * only for an allowlisted name, every other name `{ set: true }`, anything
+ * that is not a name-keyed object `{}`. A row written before the fix never
+ * shows its values.
+ */
+export const scrubProfileEnv = (stored: unknown): ReportedProfileEnv => {
+  if (typeof stored !== 'object' || stored === null || Array.isArray(stored)) {
+    return {};
+  }
+  const names = Object.entries(stored)
+    .filter(([name]) => profileEnvNameSchema.safeParse(name).success)
+    .slice(0, PROFILE_ENV_MAX);
+  return Object.fromEntries(
+    names.map(([name, value]) => [
+      name,
+      PROFILE_ENV_VALUE_NAMES.includes(name) &&
+      profileStringSchema.safeParse(value).success
+        ? (value as string)
+        : { set: true as const },
+    ]),
+  );
+};
+
+/**
  * A runtime profile: runtime + binary + environment + extra args (ADR-0006).
  * Defined in the runner config; the server mirrors it, never edits it. The
  * env is reported names-only (C-123), see `reportedProfileEnvSchema`.

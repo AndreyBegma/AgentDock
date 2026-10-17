@@ -7,10 +7,7 @@ import {
   pairCommand,
   RUNNER_ERROR,
 } from '@agentdock/shared';
-import {
-  type Capabilities,
-  RUNNER_CLOSE_CODES,
-} from '@agentdock/shared/protocol';
+import { RUNNER_CLOSE_CODES } from '@agentdock/shared/protocol';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Prisma, type Runner } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
@@ -20,7 +17,12 @@ import { generatePairingCode, hashPairingCode } from './credentials';
 import { RunnerCommandService } from './runner-command.service';
 import { type LiveConnection, RunnerConnections } from './runner-connections';
 import { runnerError } from './runner-error';
-import { toAdminEvent, toAdminProfile, toAdminRunner } from './runner-mapper';
+import {
+  toAdminCapabilities,
+  toAdminEvent,
+  toAdminProfile,
+  toAdminRunner,
+} from './runner-mapper';
 import { RUNNER_OPTIONS, type RunnerOptions } from './runner-options';
 import { deriveStatus } from './status';
 
@@ -145,7 +147,7 @@ export class RunnersService {
         this.status(runner, live),
         profiles.filter((p) => !p.missing).length,
       ),
-      capabilities: (runner.capabilities ?? null) as Capabilities | null,
+      capabilities: toAdminCapabilities(runner.capabilities),
       profiles,
       events: runner.events.map(toAdminEvent),
       heartbeat: live?.heartbeat ?? null,

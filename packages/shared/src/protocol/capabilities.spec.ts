@@ -12,6 +12,7 @@ import {
   reportProfileEnv,
   runnerCommandsOf,
   runtimeProfileSchema,
+  scrubProfileEnv,
 } from './index';
 
 const advert = (
@@ -201,5 +202,25 @@ describe('runtimeProfileSchema (C-123)', () => {
       CLAUDE_CONFIG_DIR: '/p',
     });
     expect(valid({ env: reported })).toBe(true);
+  });
+});
+
+describe('scrubProfileEnv (C-123)', () => {
+  it('shows a stored env names-only, whatever the row holds', () => {
+    expect(
+      scrubProfileEnv({
+        ANTHROPIC_API_KEY: 'sk-ant-x',
+        CODEX_HOME: '/c',
+        CLAUDE_CONFIG_DIR: { set: true },
+        'not a name': 'x',
+      }),
+    ).toEqual({
+      ANTHROPIC_API_KEY: { set: true },
+      CODEX_HOME: '/c',
+      CLAUDE_CONFIG_DIR: { set: true },
+    });
+    for (const stored of [null, 'KEY=v', ['KEY'], 7]) {
+      expect(scrubProfileEnv(stored)).toEqual({});
+    }
   });
 });
