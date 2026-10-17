@@ -5,6 +5,7 @@ import {
   type BoardStackDetail,
   type BoardStackView,
   type CardStackRef,
+  type CreateBoardStackRequest,
   cardLabel,
   currentStage,
   findDependencyCycle,
@@ -200,6 +201,74 @@ export class BoardStacks {
       result: 'ok',
     });
     this.work.publishStack(stack.projectId, stack.id);
+  }
+
+  /**
+   * `POST /board/stacks` (#588): cards a person groups by hand into a new
+   * stack of one stage, with no dependencies between them — each still runs
+   * on its own. The rules of `addCard` hold for every card; one card that
+   * breaks them refuses the whole request and nothing is made.
+   */
+  async group(
+    projectId: string,
+    request: CreateBoardStackRequest,
+    actor: BoardActor,
+  ): Promise<BoardStackDetail> {
+    const numbers = [...new Set(request.cards)];
+    const design = request.design ?? false;
+    const { stack, cards } = await this.prisma.$transaction(async (tx) => {
+      const found = await tx.boardCard.findMany({
+        where: { projectId, number: { in: numbers } },
+        select: { id: true },
+      });
+      if (found.length > 0) {
+        await tx.$queryRaw`SELECT id FROM board_cards WHERE id IN (${Prisma.join(found.map((c) => c.id))}) FOR UPDATE`;
+      }
+      const rows = await tx.boardCard.findMany({
+        where: { projectId, number: { in: numbers } },
+        select: {
+          id: true,
+          number: true,
+          column: true,
+          stage: { select: { stack: { select: { number: true } } } },
+        },
+      });
+      const byNumber = new Map(rows.map((r) => [r.number, r]));
+      const broken: { number: number; why: string }[] = [];
+      for (const number of numbers) {
+        const row = byNumber.get(number);
+        const why = !row
+          ? 'is not a card of this project'
+          : row.stage
+            ? `is in ${stackLabel(row.stage.stack.number)} already`
+            : row.column === 'inbox'
+              ? 'is a suggestion: it joins a stack once it is accepted'
+              : null;
+        if (why) broken.push({ number, why });
+      }
+      if (broken.length > 0) {
+        throw boardError(
+          409,
+          BOARD_ERROR.stackRefused,
+          `Nothing was grouped: ${broken.map((b) => `${cardLabel(b.number)} ${b.why}`).join('; ')}`,
+          { cards: broken.map((b) => b.number) },
+        );
+      }
+      const ordered = numbers.flatMap((n) => byNumber.get(n) ?? []);
+      const stack = await this.create(tx, {
+        projectId,
+        planId: null,
+        authorId: actor.userId,
+        title: request.title.trim(),
+        body: request.body ?? '',
+        design,
+        stages: [{ title: '', cardIds: ordered.map((c) => c.id) }],
+      });
+      return { stack, cards: ordered };
+    });
+    await this.announce(stack, cards, 1, design, actor);
+    for (const card of cards) this.work.publish(projectId, card.id);
+    return this.detail(projectId, stack.number);
   }
 
   /** Every card's stack, as its face shows it; a card in none is absent. */
