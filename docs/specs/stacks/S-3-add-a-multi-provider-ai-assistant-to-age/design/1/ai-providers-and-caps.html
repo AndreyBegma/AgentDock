@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-scale="desk" data-palette="navy">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AI providers</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{--font-sans:'SF Pro Text','SF Pro Display',Inter,system-ui,-apple-system,'Segoe UI',sans-serif;--font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;--radius-control:6px;--radius-surface:8px;--radius-sheet:12px;--size-row:32px;--size-control:28px;--size-field:28px;--z-raised:10;--z-overlay:60;--glass-blur:26px;--glass-blur-strong:40px}
+:root,:root[data-theme="dark"]{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-paper:#1b2647;--color-content:rgb(27 38 71 / 0.96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246 / 0.62);--color-ink-3:rgb(242 242 246 / 0.53);--color-line:rgb(255 255 255 / 0.1);--color-line-strong:rgb(255 255 255 / 0.18);--color-hover:rgb(255 255 255 / 0.06);--color-focus:#b4b2ff;--color-accent:#5b5bf6;--color-on-accent:#ffffff;--color-accent-soft:rgb(91 91 246 / 0.2);--color-accent-ink:#b4b2ff;--color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;--color-scrim:rgb(10 16 34 / 0.3);--color-hue-1:#5b9cf6;--color-hue-2:#2fbf94;--color-hue-4:#e69f00;--color-hue-5:#e8743b;--color-hue-7:#a68bfa;--color-hue-8:#cc79a7;--glass-sheen:rgb(255 255 255 / 0.06);--glass-scrim:rgb(9 9 12 / 0.55);--glass-scrim-strong:rgb(9 9 12 / 0.64);--glass-brightness:0.85;--glass-brightness-strong:0.7;--glass-edge:rgb(255 255 255 / 0.14);--glass-spec:rgb(255 255 255 / 0.2);--glass-rim:rgb(242 242 246 / 0.8);--glass-rim-shade:rgb(9 9 12 / 0.5);--glass-meniscus:rgb(9 9 12 / 0.55);--glass-refract:rgb(242 242 246 / 0.35);--glass-rim-strong:rgb(242 242 246 / 0.22);--glass-rim-shade-strong:rgb(9 9 12 / 0.2);--glass-shadow:rgb(0 0 0 / 0.35);--glass-shadow-strong:rgb(0 0 0 / 0.45);--glass-shadow-clear:rgb(0 0 0 / 0.15);--canvas-glow:18%}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#ffffff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-paper:#ffffff;--color-content:rgb(255 255 255 / 0.96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27 / 0.72);--color-ink-3:rgb(24 24 27 / 0.64);--color-line:rgb(0 0 0 / 0.1);--color-line-strong:rgb(0 0 0 / 0.23);--color-hover:rgb(0 0 0 / 0.06);--color-focus:#4f46e5;--color-accent:#4f46e5;--color-on-accent:#ffffff;--color-accent-soft:rgb(79 70 229 / 0.12);--color-accent-ink:#4338ca;--color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;--color-scrim:rgb(10 16 34 / 0.22);--color-hue-1:#1f64d6;--color-hue-2:#00805e;--color-hue-4:#b36b00;--color-hue-5:#c24e00;--color-hue-7:#7244e0;--color-hue-8:#b0457f;--glass-sheen:rgb(0 0 0 / 0.06);--glass-scrim:rgb(255 255 255 / 0.52);--glass-scrim-strong:rgb(255 255 255 / 0.64);--glass-brightness:1.15;--glass-brightness-strong:1.3;--glass-edge:rgb(0 0 0 / 0.18);--glass-spec:rgb(0 0 0 / 0.2);--glass-rim:rgb(255 255 255 / 0.9);--glass-rim-shade:rgb(24 24 27 / 0.18);--glass-meniscus:rgb(24 24 27 / 0.12);--glass-refract:rgb(255 255 255 / 0.5);--glass-rim-strong:rgb(255 255 255 / 0.3);--glass-rim-shade-strong:rgb(24 24 27 / 0.08);--glass-shadow:rgb(0 0 0 / 0.12);--glass-shadow-strong:rgb(0 0 0 / 0.16);--glass-shadow-clear:rgb(0 0 0 / 0.08);--canvas-glow:10%}
+:root{--glass-filter:blur(var(--glass-blur)) saturate(180%) brightness(var(--glass-brightness));--glass-filter-strong:blur(var(--glass-blur-strong)) saturate(180%) brightness(var(--glass-brightness-strong))}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground);color:var(--color-ink)}
+body{margin:0;min-height:100vh;font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased;overflow:hidden}
+h1,h2,p{margin:0}code,.mono{font-family:var(--font-mono)}.num,table{font-variant-numeric:tabular-nums}
+:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}
+svg.icon{width:16px;height:16px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}svg.icon.sm{width:14px;height:14px}
+.t-ink-2{color:var(--color-ink-2)}.t-ink-3{color:var(--color-ink-3)}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);backdrop-filter:var(--glass-filter);-webkit-backdrop-filter:var(--glass-filter);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),inset 1px 1px 0 var(--glass-rim),inset -1px -1px 0 var(--glass-rim-shade),inset 0 -3px 3px -1px var(--glass-meniscus),inset 0 0 18px -4px var(--glass-refract),0 12px 32px var(--glass-shadow)}
+.glass-strong{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim-strong);backdrop-filter:var(--glass-filter-strong);-webkit-backdrop-filter:var(--glass-filter-strong);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),inset 1px 1px 0 var(--glass-rim-strong),inset -1px -1px 0 var(--glass-rim-shade-strong),inset 0 -3px 3px -1px var(--glass-meniscus),inset 0 0 18px -4px var(--glass-refract),0 20px 48px var(--glass-shadow-strong)}
+.app-shell{display:flex;gap:12px;padding:12px;height:100vh}
+.app-rail{height:calc(100vh - 24px);width:240px;flex-shrink:0;display:flex;flex-direction:column;gap:8px;padding:8px;border-radius:var(--radius-surface)}
+.app-col{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px;overflow:hidden}
+.topbar{height:56px;flex-shrink:0;display:flex;align-items:center;gap:12px;padding:0 16px;border-radius:var(--radius-surface)}
+.main{width:100%;max-width:80rem;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+.rail-head{display:flex;align-items:center;gap:8px;padding:8px 12px;font-weight:600}
+.rail-scroll{flex:1;display:flex;flex-direction:column;gap:2px}
+.rail-group{padding:8px 12px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--color-ink-3)}
+.rail-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:var(--radius-control);color:var(--color-ink-2);text-decoration:none}
+.rail-item[aria-current='page']{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.crumbs{display:flex;align-items:center;gap:4px;flex:1}.crumbs a{padding:2px 4px;color:var(--color-ink-2);text-decoration:none}.crumbs .sep{color:var(--color-ink-3)}.crumbs [aria-current]{font-weight:500}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font-family:inherit;font-weight:600;cursor:pointer;border:1px solid transparent;background:transparent;color:var(--color-ink);height:var(--size-control);padding:0 16px;font-size:14px;border-radius:var(--radius-control);text-decoration:none}
+.btn-solid{background:var(--color-accent);color:var(--color-on-accent)}
+.btn-glass{background:var(--color-raised);border-color:var(--color-line-strong)}
+.btn-ghost{color:var(--color-ink-2)}.btn-ghost:hover{background:var(--color-hover);color:var(--color-ink)}
+.btn-danger{background:color-mix(in oklab,var(--color-danger) 12%,transparent);color:var(--color-danger);border-color:color-mix(in oklab,var(--color-danger) 30%,transparent)}
+.btn-sm{height:24px;padding:0 10px;font-size:12px}.btn-icon{padding:0;aspect-ratio:1/1}
+.badge{display:inline-flex;align-items:center;white-space:nowrap;font-weight:600;line-height:1;border-radius:999px;height:20px;padding:0 6px;font-size:12px;background:var(--color-hover);color:var(--color-ink-2)}
+.badge-ok{background:color-mix(in oklab,var(--color-ok) 14%,transparent);color:var(--color-ok)}.badge-warn{background:color-mix(in oklab,var(--color-warn) 14%,transparent);color:var(--color-warn)}.badge-danger{background:color-mix(in oklab,var(--color-danger) 14%,transparent);color:var(--color-danger)}
+.avatar{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:999px;background:var(--color-accent-soft);color:var(--color-accent-ink);font-size:11px;font-weight:600}
+.dot{display:inline-block;width:10px;height:10px;border-radius:999px}.dot-ok{background:var(--color-ok)}
+.page-header{display:flex;align-items:flex-end;justify-content:space-between;gap:24px}.page-header .titles{display:flex;flex-direction:column;gap:4px}.page-header .eyebrow{font-size:12px;font-weight:500;color:var(--color-ink-3)}.page-header h1{font-size:28px;line-height:32px;letter-spacing:-.02em;font-weight:600}.page-header .desc{max-width:65ch;color:var(--color-ink-2)}.actions{display:flex;align-items:center;gap:8px}
+.grid-tiles{display:grid;gap:12px;grid-template-columns:repeat(4,1fr)}
+.stat{border-radius:var(--radius-surface);background:var(--color-raised);border:1px solid var(--color-line);padding:12px}.stat .k{font-size:12px;color:var(--color-ink-3)}.stat .v{margin-top:4px;font-size:24px;line-height:28px;font-weight:600}.stat .d{margin-top:4px;font-size:12px;color:var(--color-ink-3)}
+.banner{display:flex;align-items:flex-start;gap:12px;padding:12px;border-radius:var(--radius-surface);border:1px solid color-mix(in oklab,var(--color-danger) 30%,transparent);background:color-mix(in oklab,var(--color-danger) 10%,transparent)}.banner>.icon{color:var(--color-danger)}.banner .body{flex:1}.banner .body span{color:var(--color-ink-2)}
+.section{display:flex;flex-direction:column;gap:12px}.section-header h2{font-size:16px;line-height:24px;font-weight:600}.section-header p{font-size:13px;color:var(--color-ink-2)}
+.table-wrap{overflow:hidden;border-radius:var(--radius-surface);background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.table{width:100%;border-collapse:collapse}
+.table th{height:var(--size-row);padding:0 12px;background:var(--color-paper);text-align:left;font-size:12px;font-weight:500;color:var(--color-ink-3);box-shadow:inset 0 -1px 0 var(--color-line)}
+.table td{height:40px;padding:0 12px;border-bottom:1px solid var(--color-line);white-space:nowrap}
+.table tr:last-child td{border-bottom:0}.table tr[aria-selected='true']{background:var(--color-accent-soft)}
+.table .muted{color:var(--color-ink-2)}.table .id{font-family:var(--font-mono);font-size:12px;color:var(--color-ink-2)}
+.prov{display:flex;align-items:center;gap:10px;font-weight:500}
+.plogo{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font-size:11px;font-weight:700;color:var(--color-on-accent);background:var(--c)}
+.spend{display:flex;align-items:center;gap:10px}.spend .progress{width:120px}
+.progress{height:6px;border-radius:999px;background:var(--color-hover);overflow:hidden}.progress>span{display:block;height:100%;border-radius:inherit;background:var(--color-accent)}
+.progress.warn>span{background:var(--color-warn)}.progress.danger>span{background:var(--color-danger)}
+.input,.select{font-family:inherit;background:var(--color-surface);color:var(--color-ink);border:1px solid var(--color-line-strong);border-radius:var(--radius-control);font-size:14px;height:var(--size-field)}
+.input{padding:0 12px;width:100%}
+.select{padding:0 30px 0 10px;appearance:none;background-repeat:no-repeat;background-image:linear-gradient(45deg,transparent 50%,var(--color-ink-3) 50%),linear-gradient(135deg,var(--color-ink-3) 50%,transparent 50%);background-position:calc(100% - 16px) 55%,calc(100% - 11px) 55%;background-size:5px 5px,5px 5px}
+.field{display:flex;flex-direction:column;gap:6px}.field-label{font-size:12px;font-weight:500;color:var(--color-ink-2)}.field-hint{font-size:12px;color:var(--color-ink-3)}
+.toggle{position:relative;display:inline-flex;align-items:center;width:44px;height:24px;border-radius:999px;background:var(--color-line-strong);border:0;padding:0;cursor:pointer;flex-shrink:0}
+.toggle::after{content:'';width:16px;height:16px;border-radius:999px;background:var(--color-ink);transform:translateX(4px)}
+.toggle[aria-checked='true']{background:var(--color-accent)}.toggle[aria-checked='true']::after{background:var(--color-on-accent);transform:translateX(24px)}
+.chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;font-size:12px;font-weight:500;border-radius:2px;background:var(--color-hover);color:var(--color-ink-2);border:0;font-family:inherit;cursor:pointer}
+.chip[aria-pressed='true']{background:var(--color-ink);color:var(--color-ground)}
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:8px 24px;margin:0}.kv dt{color:var(--color-ink-3)}.kv dd{margin:0}
+.scrim{position:fixed;inset:0;z-index:var(--z-overlay);background:var(--color-scrim);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+.sheet{position:fixed;top:12px;right:12px;bottom:12px;width:min(440px,calc(100vw - 24px));z-index:calc(var(--z-overlay) + 1);border-radius:var(--radius-sheet);padding:20px;display:flex;flex-direction:column;gap:18px;overflow:auto}
+.sheet .sh{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.sheet h2{font-size:16px;line-height:24px;font-weight:600}
+.keyrow{display:flex;gap:8px}
+.note{display:flex;gap:8px;font-size:12px;color:var(--color-ink-3);align-items:flex-start}
+.sfoot{margin-top:auto;display:flex;justify-content:space-between;gap:8px;padding-top:12px;border-top:1px solid var(--color-line)}
+</style></head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+<symbol id="i-key" viewBox="0 0 24 24"><path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4"/><path d="m21 2-9.6 9.6"/><circle cx="7.5" cy="15.5" r="5.5"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></symbol>
+<symbol id="i-server" viewBox="0 0 24 24"><rect width="20" height="8" x="2" y="2" rx="2"/><rect width="20" height="8" x="2" y="14" rx="2"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></symbol>
+<symbol id="i-send" viewBox="0 0 24 24"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></symbol>
+<symbol id="i-layout" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></symbol>
+<symbol id="i-folder" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></symbol>
+<symbol id="i-wallet" viewBox="0 0 24 24"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></symbol>
+</svg>
+<div class="canvas"></div>
+<div class="app-shell">
+ <aside class="app-rail glass" aria-label="Navigation">
+  <div class="rail-head"><span class="avatar" style="border-radius:6px">AD</span>AgentDock</div>
+  <nav class="rail-scroll">
+   <div class="rail-group">Workspace</div>
+   <a class="rail-item" href="#"><svg class="icon" aria-hidden="true"><use href="#i-layout"/></svg>Overview</a>
+   <a class="rail-item" href="#"><svg class="icon" aria-hidden="true"><use href="#i-folder"/></svg>Projects</a>
+   <div class="rail-group">Admin</div>
+   <a class="rail-item" href="#"><svg class="icon" aria-hidden="true"><use href="#i-users"/></svg>Users</a>
+   <a class="rail-item" href="#"><svg class="icon" aria-hidden="true"><use href="#i-server"/></svg>Runners</a>
+   <a class="rail-item" href="#"><svg class="icon" aria-hidden="true"><use href="#i-wallet"/></svg>Budget</a>
+   <a class="rail-item" href="#" aria-current="page"><svg class="icon" aria-hidden="true"><use href="#i-spark"/></svg>AI providers</a>
+   <a class="rail-item" href="#"><svg class="icon" aria-hidden="true"><use href="#i-send"/></svg>Telegram</a>
+  </nav>
+ </aside>
+ <div class="app-col">
+  <header class="topbar glass"><nav class="crumbs" aria-label="Breadcrumb"><a href="#">Admin</a><span class="sep">/</span><span aria-current="page">AI providers</span></nav><span class="dot dot-ok" title="Live"></span><span class="avatar">AR</span></header>
+  <main id="main-content" class="main">
+   <header class="page-header"><div class="titles"><span class="eyebrow">Admin</span><h1>AI providers</h1><p class="desc">Keys and monthly caps for the models AgentDock calls directly: the assistant, the digest, summaries, Board search and triage hints. Spend resets on the 1st at 00:00 UTC.</p></div>
+    <div class="actions"><button class="btn btn-glass" type="button">Usage log</button><button class="btn btn-solid" type="button"><svg class="icon sm" aria-hidden="true"><use href="#i-plus"/></svg>Add provider</button></div></header>
+   <div class="grid-tiles">
+    <div class="stat"><div class="k">Spend in October</div><div class="v num">$200.50</div><div class="d">of $450 across caps</div></div>
+    <div class="stat"><div class="k">Requests</div><div class="v num">1,284</div><div class="d">assistant 71% · features 29%</div></div>
+    <div class="stat"><div class="k">Tokens</div><div class="v num">18.2M</div><div class="d">16.6M in · 1.6M out</div></div>
+    <div class="stat"><div class="k">Next digest</div><div class="v num">09:00</div><div class="d">web + Telegram · Haiku 5.5</div></div>
+   </div>
+   <div class="banner" role="alert"><svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg><div class="body"><b>OpenRouter reached its $50 cap.</b> <span>Calls to OpenRouter are refused until 1 Nov or until you raise the cap. Conversations that use it ask you to pick another model.</span></div><button class="btn btn-glass btn-sm" type="button">Raise cap</button></div>
+   <section class="section">
+    <div class="section-header"><h2>Providers</h2><p>Keys are stored encrypted; only the last four characters are ever shown.</p></div>
+    <div class="table-wrap"><table class="table">
+     <thead><tr><th>Provider</th><th>Status</th><th>Key</th><th>Default model</th><th>October</th><th class="num" style="text-align:right">Cap</th><th><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Actions</span></th></tr></thead>
+     <tbody>
+      <tr aria-selected="true"><td><span class="prov"><span class="plogo" style="--c:var(--color-hue-5)">A</span>Anthropic</span></td><td><span class="badge badge-ok">Connected</span></td><td class="id">sk-ant-…4f2a</td><td>Sonnet 5.5</td><td><span class="spend"><span class="progress"><span style="width:31%"></span></span><span class="num">$62.10</span></span></td><td class="num" style="text-align:right">$200</td><td style="text-align:right"><button class="btn btn-ghost btn-sm" type="button">Edit</button></td></tr>
+      <tr><td><span class="prov"><span class="plogo" style="--c:var(--color-hue-2)">O</span>OpenAI</span></td><td><span class="badge badge-warn">88% of cap</span></td><td class="id">sk-proj-…91bd</td><td>GPT-5.1</td><td><span class="spend"><span class="progress warn"><span style="width:88%"></span></span><span class="num">$88.40</span></span></td><td class="num" style="text-align:right">$100</td><td style="text-align:right"><button class="btn btn-ghost btn-sm" type="button">Edit</button></td></tr>
+      <tr><td><span class="prov"><span class="plogo" style="--c:var(--color-hue-1)">x</span>xAI Grok</span></td><td><span class="badge">No key</span></td><td class="muted">—</td><td class="muted">—</td><td class="muted">—</td><td class="num" style="text-align:right">$100</td><td style="text-align:right"><button class="btn btn-ghost btn-sm" type="button"><svg class="icon sm" aria-hidden="true"><use href="#i-key"/></svg>Add key</button></td></tr>
+      <tr><td><span class="prov"><span class="plogo" style="--c:var(--color-hue-8)">R</span>OpenRouter</span></td><td><span class="badge badge-danger">Cap reached</span></td><td class="id">sk-or-…07ce</td><td>Routed</td><td><span class="spend"><span class="progress danger"><span style="width:100%"></span></span><span class="num">$50.00</span></span></td><td class="num" style="text-align:right">$50</td><td style="text-align:right"><button class="btn btn-ghost btn-sm" type="button">Edit</button></td></tr>
+     </tbody></table></div>
+   </section>
+   <section class="section">
+    <div class="section-header"><h2>Features</h2><p>The model each AI feature uses. The assistant's model is picked per conversation; this is its default.</p></div>
+    <div class="table-wrap"><table class="table">
+     <thead><tr><th>Feature</th><th>Model</th><th>Runs</th><th class="num" style="text-align:right">October</th></tr></thead>
+     <tbody>
+      <tr><td>Assistant chat</td><td><select class="select" aria-label="Assistant default model"><option>Anthropic · Sonnet 5.5</option></select></td><td class="muted">web, Telegram</td><td class="num" style="text-align:right">$141.20</td></tr>
+      <tr><td>Daily digest</td><td><select class="select" aria-label="Digest model"><option>Anthropic · Haiku 5.5</option></select></td><td class="muted">every day 09:00</td><td class="num" style="text-align:right">$0.84</td></tr>
+      <tr><td>Card, PR and session summaries</td><td><select class="select" aria-label="Summary model"><option>Anthropic · Haiku 5.5</option></select></td><td class="muted">on click</td><td class="num" style="text-align:right">$3.10</td></tr>
+      <tr><td>Natural-language Board search</td><td><select class="select" aria-label="Search model"><option>OpenAI · GPT-5.1 mini</option></select></td><td class="muted">on search</td><td class="num" style="text-align:right">$4.96</td></tr>
+     </tbody></table></div>
+   </section>
+  </main>
+ </div>
+</div>
+<div class="scrim"></div>
+<aside class="sheet glass-strong" role="dialog" aria-modal="true" aria-labelledby="sh-t">
+ <div class="sh"><div><h2 id="sh-t">Anthropic</h2><p class="t-ink-2" style="font-size:13px">Connected · last call 2 min ago</p></div><button class="btn btn-ghost btn-icon" type="button" aria-label="Close"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button></div>
+ <div class="field"><label class="field-label" for="k">API key</label><div class="keyrow"><input id="k" class="input mono" type="password" value="sk-ant-xxxxxxxxxxxx4f2a" readonly style="font-size:12px"><button class="btn btn-glass" type="button">Replace</button></div>
+  <span class="note"><svg class="icon sm" aria-hidden="true"><use href="#i-lock"/></svg>Stored encrypted. AgentDock never shows or returns the full key; replacing it overwrites the old one.</span></div>
+ <div class="field"><label class="field-label" for="cap">Monthly cap (USD)</label><input id="cap" class="input num" value="200" inputmode="decimal">
+  <span class="field-hint">Calls stop when October's spend reaches the cap. $62.10 used · resets 1 Nov.</span>
+  <div class="progress"><span style="width:31%"></span></div></div>
+ <div class="field"><label class="field-label" for="warn">Warn me at</label><select id="warn" class="select"><option>80% of cap</option><option>50%</option><option>90%</option></select><span class="field-hint">Notifies in the web app and on Telegram.</span></div>
+ <div class="field"><span class="field-label">Models offered in the picker</span><div class="actions"><button class="chip" type="button" aria-pressed="true">Opus 5.5</button><button class="chip" type="button" aria-pressed="true">Sonnet 5.5</button><button class="chip" type="button" aria-pressed="true">Haiku 5.5</button></div></div>
+ <div style="display:flex;align-items:center;gap:12px"><button class="toggle" role="switch" aria-checked="true" aria-label="Enabled"></button><span>Enabled</span></div>
+ <dl class="kv" style="font-size:13px"><dt>Requests</dt><dd class="num">912</dd><dt>Input tokens</dt><dd class="num">11.4M</dd><dt>Output tokens</dt><dd class="num">1.2M</dd></dl>
+ <div class="sfoot"><button class="btn btn-danger" type="button">Remove key</button><span class="actions"><button class="btn btn-ghost" type="button">Cancel</button><button class="btn btn-solid" type="button">Save</button></span></div>
+</aside>
+</body></html>
