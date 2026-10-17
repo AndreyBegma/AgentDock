@@ -93,24 +93,21 @@ export class TelegramApprovalService {
         where: { id: notificationId },
         select: {
           kind: true,
+          userId: true,
           projectId: true,
           eventId: true,
           lastEventId: true,
         },
       });
-      const eventId = notification?.lastEventId ?? notification?.eventId;
-      if (notification?.kind !== KIND || !notification.projectId || !eventId) {
-        return null;
-      }
-      const event = await this.prisma.event.findUnique({
-        where: { id: eventId },
-        select: { data: true },
-      });
-      const data = event?.data;
-      const pr =
-        typeof data === 'object' && data !== null && !Array.isArray(data)
-          ? positiveInt(data.pr)
-          : null;
+      if (notification?.kind !== KIND || !notification.projectId) return null;
+      // Buttons only for a recipient who could press them: operator or higher.
+      const member = await this.guard.member(
+        notification.userId,
+        notification.projectId,
+        'write',
+      );
+      if (!member.ok) return null;
+      const pr = await this.notificationPr(notification);
       if (pr === null) return null;
       const inspection = await this.approvals.inspect(
         {
@@ -139,6 +136,23 @@ export class TelegramApprovalService {
       );
       return null;
     }
+  }
+
+  /** The PR the notification's latest event is about; null when unknown. */
+  private async notificationPr(notification: {
+    eventId: bigint | null;
+    lastEventId: bigint | null;
+  }): Promise<number | null> {
+    const eventId = notification.lastEventId ?? notification.eventId;
+    if (!eventId) return null;
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+      select: { data: true },
+    });
+    const data = event?.data;
+    return typeof data === 'object' && data !== null && !Array.isArray(data)
+      ? positiveInt(data.pr)
+      : null;
   }
 
   /** A press on Approve or Request changes. */
@@ -260,13 +274,23 @@ export class TelegramApprovalService {
     }
     const notification = await this.prisma.notification.findUnique({
       where: { id: target.notificationId },
-      select: { userId: true, kind: true, projectId: true },
+      select: {
+        userId: true,
+        kind: true,
+        projectId: true,
+        eventId: true,
+        lastEventId: true,
+      },
     });
     if (
       notification?.userId !== userId ||
       notification.kind !== KIND ||
       !notification.projectId
     ) {
+      return { ok: false, reason: 'unknown_message', userId, projectId: null };
+    }
+    // The press must be about the PR this notification was sent for.
+    if ((await this.notificationPr(notification)) !== target.pr) {
       return { ok: false, reason: 'unknown_message', userId, projectId: null };
     }
     const projectId = notification.projectId;

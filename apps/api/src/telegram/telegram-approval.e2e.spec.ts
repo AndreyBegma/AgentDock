@@ -7,7 +7,7 @@ import {
   seedRunnerProject,
   seedUser,
 } from '../notifications/testing/notifications-e2e';
-import { decodeCallback, notePrompt } from './approval-actions';
+import { decodeCallback, encodeCallback, notePrompt } from './approval-actions';
 import type { InlineKeyboardButton } from './telegram-client';
 import { TelegramDeliveryService } from './telegram-delivery.service';
 import { TelegramPoller } from './telegram-poller';
@@ -157,6 +157,16 @@ describe('Telegram approval buttons (e2e, spec 22 D12, #82)', () => {
   });
   afterAll(() => ctx.close());
 
+  let viewerNotificationId: bigint;
+  let operatorNotificationId: bigint;
+  /** What a viewer's message would have carried had it been offered buttons. */
+  const viewerButton = (action: 'approve' | 'request_changes') =>
+    encodeCallback({
+      action,
+      notificationId: viewerNotificationId,
+      pr: PR,
+      headSha: H1,
+    });
   let approveButton: string;
   let changesButton: string;
 
@@ -205,8 +215,8 @@ describe('Telegram approval buttons (e2e, spec 22 D12, #82)', () => {
       source: 'code-sentinel',
       data: { pr: PR },
     });
-    await notify(operatorId, eventId);
-    await notify(viewerId, eventId);
+    operatorNotificationId = await notify(operatorId, eventId);
+    viewerNotificationId = await notify(viewerId, eventId);
     await delivery.deliverOnce();
     const buttons = buttonsSentTo(OPERATOR_CHAT);
     approveButton = buttons[0]?.callback_data ?? '';
@@ -227,10 +237,9 @@ describe('Telegram approval buttons (e2e, spec 22 D12, #82)', () => {
         pr: PR,
         headSha: H1,
       });
-      // Every recipient gets them; a press re-checks the role (orchestrator, Q2).
-      expect(buttonsSentTo(VIEWER_CHAT)).toHaveLength(2);
-      // One `pr.inspect` for both recipients: #20's 60 s cache.
-      expect(commands.inspect).toHaveBeenCalledTimes(1);
+      // A viewer gets the text without buttons (C-117).
+      expect(buttonsSentTo(VIEWER_CHAT)).toHaveLength(0);
+      expect(lastTextTo(VIEWER_CHAT)).toContain('waiting for approval');
     });
 
     it('sends the message without buttons when the runner cannot give the head', async () => {
@@ -264,7 +273,7 @@ describe('Telegram approval buttons (e2e, spec 22 D12, #82)', () => {
 
   describe('Approve', () => {
     it('refuses a viewer with an explanatory reply and a denied audit record', async () => {
-      const viewerApprove = buttonsSentTo(VIEWER_CHAT)[0].callback_data;
+      const viewerApprove = viewerButton('approve');
       await press(VIEWER_CHAT, viewerApprove);
 
       expect(commands.approve).not.toHaveBeenCalled();
@@ -369,6 +378,32 @@ describe('Telegram approval buttons (e2e, spec 22 D12, #82)', () => {
       ]);
     });
 
+    it('refuses a press whose PR differs from the notification’s', async () => {
+      await press(
+        OPERATOR_CHAT,
+        encodeCallback({
+          action: 'approve',
+          notificationId: operatorNotificationId,
+          pr: PR + 1,
+          headSha: H1,
+        }),
+      );
+      expect(lastTextTo(OPERATOR_CHAT)).toBe(
+        'This message is not one AgentDock can act on any more. Decide in AgentDock.',
+      );
+      expect(commands.approve).not.toHaveBeenCalled();
+    });
+
+    it('answers an out-of-range notification id as an invalid button', async () => {
+      await press(
+        OPERATOR_CHAT,
+        `a:9999999999999999999:${PR}:${'A'.repeat(27)}`,
+      );
+      expect(lastTextTo(OPERATOR_CHAT)).toBe(
+        'This button is no longer valid. Decide in AgentDock.',
+      );
+    });
+
     it('refuses a press on another user’s message, and from an unlinked chat', async () => {
       // The operator's button, replayed from the viewer's chat.
       await press(VIEWER_CHAT, approveButton);
@@ -455,7 +490,7 @@ describe('Telegram approval buttons (e2e, spec 22 D12, #82)', () => {
     });
 
     it('refuses a viewer’s press before asking for a note, and a viewer’s note', async () => {
-      const viewerChanges = buttonsSentTo(VIEWER_CHAT)[1].callback_data;
+      const viewerChanges = viewerButton('request_changes');
       await press(VIEWER_CHAT, viewerChanges);
       expect(ctx.fake.sent().at(-1)?.body.reply_markup).toBeUndefined();
 
