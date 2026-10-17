@@ -38,6 +38,7 @@ import type {
   CardCiState,
   CardCollectState,
   CardFinishedBy,
+  CardNeedsPersonReason,
   CardPrState,
   CardRoundPhase,
   CardRoundTrigger,
@@ -181,6 +182,8 @@ export interface BoardCardView {
    * fixes"; nothing is automated until a person acts.
    */
   needsPerson: boolean;
+  /** #542: why `needsPerson` is set; `null` while it is not, or unknown. */
+  needsPersonReason: CardNeedsPersonReason | null;
   /** #359 D8: the latest PR merged (ISO) — the Merged badge; `null` otherwise. */
   mergedAt: string | null;
   /** The latest round; `null` before the first Run. */

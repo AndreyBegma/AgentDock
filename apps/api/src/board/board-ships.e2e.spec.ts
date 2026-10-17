@@ -64,8 +64,24 @@ describe('a card ships itself (e2e, #359)', () => {
     return { card, round: card.rounds[card.rounds.length - 1] };
   };
 
-  /** The round's session ends: the worker is done (#242 D6). */
-  const ended = async (number = 1): Promise<void> => {
+  /**
+   * The round's latest round started `ms` ago: a round that ends at once
+   * did no work (#542), so a worker's round has run a while.
+   */
+  const aged = async (number = 1, ms = 60_000): Promise<void> => {
+    const { round } = await latest(number);
+    await w.ctx.prisma.boardCardRound.update({
+      where: { id: round.id },
+      data: { startedAt: new Date(Date.now() - ms) },
+    });
+  };
+
+  /**
+   * The round's session ends `after` ms past its start: the worker is done
+   * (#242 D6).
+   */
+  const ended = async (number = 1, after = 60_000): Promise<void> => {
+    await aged(number, after);
     const { card, round } = await latest(number);
     await w.deliver('card_run.phase_changed', {
       cardId: card.id,
@@ -220,6 +236,7 @@ describe('a card ships itself (e2e, #359)', () => {
 
     it('the worker finishing — not only the session ending — runs the same gate', async () => {
       const { card } = await started();
+      await aged();
       await w.ctx.app
         .get(BoardService)
         .finishByWorker(
@@ -605,6 +622,109 @@ describe('a card ships itself (e2e, #359)', () => {
       expect(w.sent('card.close')).toEqual([
         expect.objectContaining({ removeWorktree: true }),
       ]);
+    });
+  });
+
+  describe('#542: auto-merge ships only a round that did the work', () => {
+    const NEW_HEAD = 'b'.repeat(40);
+    const settings = (autoMergeCards: boolean | null) =>
+      w.admin.send('put', `${w.path()}/board-settings`, {
+        issueOnRun: false,
+        specOnRun: true,
+        maxRunning: 3,
+        autoMergeCards,
+      });
+
+    /** C-1 waits in Finished, green and unmerged, with auto-merge on again. */
+    const finishedUnmerged = async () => {
+      expect((await settings(false)).status).toBe(200);
+      await started();
+      await ended();
+      expect(await w.card(1)).toMatchObject({
+        column: 'finished',
+        ciHeadSha: HEAD_SHA,
+        mergedAt: null,
+      });
+      expect((await settings(true)).status).toBe(200);
+      expect(
+        (await post(1, 'feedback', { text: 'Implement it.' })).status,
+      ).toBe(200);
+      const { round } = await latest();
+      expect(round).toMatchObject({
+        trigger: 'feedback',
+        startHeadSha: HEAD_SHA,
+      });
+    };
+
+    const refused = async (reason: string) => {
+      await shipping.check((await w.card(1)).id);
+      await w.work.settled();
+      const card = await w.card(1);
+      expect(card).toMatchObject({
+        column: 'finished',
+        mergedAt: null,
+        needsPerson: true,
+        needsPersonReason: reason,
+      });
+      expect(w.sent('card.merge')).toEqual([]);
+      const [record] = await w.audit('card.auto_run_failed');
+      expect(record).toMatchObject({ actorType: 'system' });
+      expect(record.after).toMatchObject({ reason, pr: 77, headSha: HEAD_SHA });
+      expect((await detail()).needsPersonReason).toBe(reason);
+    };
+
+    it('C-218: a feedback round whose session ends 3 s in failed, and its old green head is not merged', async () => {
+      await finishedUnmerged();
+      await ended(1, 3_000);
+      const { card, round } = await latest();
+      expect(round).toMatchObject({
+        phase: 'failed',
+        finishedBy: null,
+        error: expect.stringContaining('ended 3 s after the round started'),
+      });
+      expect(card.column).toBe('in_progress');
+      await refused('round_failed');
+
+      // A person acting resumes automation.
+      expect((await post(1, 'feedback', { text: 'Again.' })).status).toBe(200);
+      expect(await w.card(1)).toMatchObject({
+        needsPerson: false,
+        needsPersonReason: null,
+      });
+    });
+
+    it('a feedback round that pushed no commit leaves the card in Finished for a person', async () => {
+      await finishedUnmerged();
+      await ended();
+      expect((await latest()).round).toMatchObject({ phase: 'finished' });
+      await refused('round_pushed_nothing');
+    });
+
+    it('a round its worker finished within seconds is not merged', async () => {
+      expect((await settings(false)).status).toBe(200);
+      const { card } = await started();
+      await w.ctx.app
+        .get(BoardService)
+        .finishByWorker(
+          { id: w.a, runnerId: w.runnerId },
+          card.sessionId as string,
+          'Done.',
+        );
+      await w.work.settled();
+      expect((await w.card(1)).column).toBe('finished');
+      expect((await settings(true)).status).toBe(200);
+      await refused('round_ended_at_once');
+    });
+
+    it('a feedback round that pushed a new head is merged at it', async () => {
+      await finishedUnmerged();
+      await pushed({ headSha: NEW_HEAD });
+      checksAnswer({ headSha: NEW_HEAD });
+      await ended();
+      const [merge] = w.sent('card.merge');
+      expect(merge).toMatchObject({ pr: 77, headSha: NEW_HEAD });
+      expect(await w.card(1)).toMatchObject({ needsPerson: false });
+      expect((await w.card(1)).mergedAt).not.toBeNull();
     });
   });
 

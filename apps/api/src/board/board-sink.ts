@@ -1,5 +1,6 @@
 import {
   CARD_BACKGROUND_COMMAND_MAX,
+  CARD_ROUND_AT_ONCE_MS,
   CARD_WAITING_EVENT,
   type CardWaitingEventData,
   type CardWaitingReason,
@@ -393,6 +394,14 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
         break;
       }
       case 'ended': {
+        // #542: a feedback round whose session died at start did no work.
+        if (
+          round.trigger === 'feedback' &&
+          at.getTime() - round.startedAt.getTime() < CARD_ROUND_AT_ONCE_MS
+        ) {
+          await this.diedAtStart(data, round, at);
+          break;
+        }
         // D6 (2): the session ended before anything else finished the round.
         const ended = await this.prisma.$transaction(async (tx) => {
           await tx.boardCardRound.updateMany({
@@ -418,6 +427,34 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
       }
     }
     this.work.publish(data.projectId, round.cardId);
+  }
+
+  /**
+   * #542: the session of a `feedback` round ended within
+   * `CARD_ROUND_AT_ONCE_MS` of its start — the round `failed`, not
+   * finished. The card stays where it is; auto-merge never ships the head
+   * a failed round leaves.
+   */
+  private async diedAtStart(
+    data: CardRunPhaseChangedData,
+    round: { id: string; runId: string; startedAt: Date },
+    at: Date,
+  ): Promise<void> {
+    const seconds = Math.max(
+      0,
+      Math.round((at.getTime() - round.startedAt.getTime()) / 1000),
+    );
+    const error = `The worker's session ended ${seconds} s after the round started, before it did any work`;
+    const ended = await this.prisma.$transaction(async (tx) => {
+      const done = await this.work.endRound(tx, round.id, 'failed', at, {
+        error,
+        endedAt: at,
+        ...(data.exitCode !== undefined ? { exitCode: data.exitCode } : {}),
+      });
+      if (done) await this.work.closeRun(tx, round.runId, 'failed', error);
+      return done;
+    });
+    if (ended) this.work.publishRun(data.projectId, round.runId, 'failed');
   }
 
   /** The work moves the card to Finished, which collects (D8). */
