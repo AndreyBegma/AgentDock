@@ -24,6 +24,7 @@ import {
 } from '@andrewbehma/glass-ui/table';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
+import { policyRows } from '@/lib/runners/policy';
 import { DisabledReason } from '../../../components/prerequisites/disabled-reason';
 import { api } from '../../../lib/api';
 import { Time } from '../../../lib/format/time';
@@ -332,6 +333,29 @@ export function RunnerSheet({
                     </p>
                   )}
                 </section>
+                {policyRows(detail.capabilities).length > 0 ? (
+                  <section aria-labelledby="runner-policy">
+                    <h3
+                      id="runner-policy"
+                      className="mb-1 text-sm font-semibold"
+                    >
+                      Security policy
+                    </h3>
+                    <p className="mb-2 text-sm text-ink-3">
+                      Set on the machine with{' '}
+                      <span className="font-mono">agentdock-runner policy</span>
+                      ; AgentDock cannot change it.
+                    </p>
+                    <KeyValueList
+                      dense
+                      items={policyRows(detail.capabilities).map((row) => ({
+                        key: row.label,
+                        label: row.label,
+                        value: row.value,
+                      }))}
+                    />
+                  </section>
+                ) : null}
 
                 <LocalSettings
                   runner={detail}

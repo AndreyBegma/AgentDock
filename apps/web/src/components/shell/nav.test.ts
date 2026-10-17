@@ -203,36 +203,36 @@ describe('tabBarSplit', () => {
     };
   };
 
-  test('outside a project: the workspace five, the rest behind More', () => {
+  test('outside a project: the workspace three, the rest behind More', () => {
     expect(split('admin', '/')).toEqual({
-      tabs: ['Overview', 'Projects', 'Activity', 'Sessions', 'Usage'],
+      tabs: ['Overview', 'Projects', 'Activity'],
       more: [
-        'workspace: Work, Workflows, Skills',
+        'workspace: Work, Sessions, Usage, Workflows, Skills',
         'admin: Runners, Users, Schedules, Budgets, Planner instructions, Audit, Prices, Integrations, Settings',
       ],
     });
   });
 
-  test('inside a project: its home and working pages, the project first in More', () => {
+  test('inside a project: its working pages, the project first in More', () => {
     expect(split('admin', '/projects/p1/queue')).toEqual({
-      tabs: ['Project', 'Fleet', 'Work', 'Queue', 'Approvals'],
+      tabs: ['Work', 'Fleet', 'Approvals'],
       more: [
-        'project: Activity, History, Token saver, Skills, Schedules, Settings',
+        'project: Project, Queue, Activity, History, Token saver, Skills, Schedules, Settings',
         'workspace: Overview, Projects, Activity, Work, Sessions, Usage, Workflows, Skills',
         'admin: Runners, Users, Schedules, Budgets, Planner instructions, Audit, Prices, Integrations, Settings',
       ],
     });
   });
 
-  test('a viewer gets five tabs and no Admin; Work and Workflows wait behind More', () => {
+  test('a viewer gets three tabs and no Admin; the rest waits behind More', () => {
     const { tabs, more } = split('viewer', '/');
-    expect(tabs).toHaveLength(5);
-    expect(more).toEqual(['workspace: Work, Workflows']);
+    expect(tabs).toHaveLength(3);
+    expect(more).toEqual(['workspace: Work, Sessions, Usage, Workflows']);
   });
 
   test('tabs resolve the project id', () => {
     const { tabs } = tabBarSplit(visibleNav('viewer', '/projects/p1'));
-    expect(tabs[0]?.resolvedHref).toBe('/projects/p1');
+    expect(tabs[0]?.resolvedHref).toBe('/projects/p1/board');
   });
 });
 

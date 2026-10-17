@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import type { Host } from '@agentdock/shared/protocol';
 import { runClaude } from './claude';
@@ -19,6 +19,8 @@ import { createLogger, errorMessage, type Logger, parseLogLevel } from './log';
 import { runMcp } from './mcp';
 import { otlpSettings } from './otlp';
 import { PairingError, pair } from './pairing';
+import { runPolicy } from './policy/cli';
+import { nodeRealpath } from './policy/roots';
 import { normalizeServer, ServerUrlError } from './server-url';
 import { EXIT, launchAgentPlist, serviceUnit } from './service';
 import { setupClaude } from './setup/claude';
@@ -56,9 +58,10 @@ export interface CliDeps {
 const USAGE = `Usage: agentdock-runner <command>
 
 Commands:
-  pair --server <url> --code <XXXX-XXXX> [--no-detect]
+  pair --server <url> --code <XXXX-XXXX> [--no-detect] [--allow-root <dir>]…
                                            pair this machine with an AgentDock server
-                                           (detects runtime profiles unless --no-detect)
+                                           (detects runtime profiles unless --no-detect;
+                                           --allow-root lets projects under <dir> be watched)
   run                                      run the daemon in the foreground
   status                                   show config, connectivity and spool
   profiles [--detect [--write]]            list runtime profiles, or detect them
@@ -69,6 +72,8 @@ Commands:
                                            and point telemetry at this runner
   away on|off                              route permission prompts to AgentDock
                                            while you are away
+  policy show|set|allow-root|deny-root     the runner-local security policy; only
+                                           this command changes it (\`policy\` for help)
   version                                  print the version and the target
 
 Used by the agentdock Claude Code plugin:
@@ -95,7 +100,10 @@ interface Context {
 
 const out = (deps: CliDeps, line: string) => deps.stdout(`${line}\n`);
 
-type FlagOptions = Record<string, { type: 'string' | 'boolean' }>;
+type FlagOptions = Record<
+  string,
+  { type: 'string' | 'boolean'; multiple?: boolean }
+>;
 
 const flags = <T extends FlagOptions>(args: string[], options: T) =>
   withPositionals(args, options, 0).values;
@@ -131,14 +139,23 @@ const pairCommand = async ({
     server,
     code,
     'no-detect': noDetect,
+    'allow-root': allowRoot = [],
   } = flags(args, {
     server: { type: 'string' },
     code: { type: 'string' },
     'no-detect': { type: 'boolean' },
+    'allow-root': { type: 'string', multiple: true },
   });
   if (!server || !code) throw new UsageError('pair needs --server and --code');
   const origin = normalizeServer(server);
   const config = loadConfig(paths.configFile);
+  // ADR-0047: resolved before pairing, so a typo costs no pairing code.
+  const allowed = allowRoot.map((dir) => {
+    const real = nodeRealpath(resolve(deps.cwd ?? process.cwd(), dir));
+    if (real === null)
+      throw new UsageError(`--allow-root ${dir} does not exist`);
+    return real;
+  });
 
   const paired = await pair({
     server: origin,
@@ -164,6 +181,10 @@ const pairCommand = async ({
     runnerId: paired.runnerId,
     token: paired.token,
     profiles: detected ?? config.profiles,
+    policy: {
+      ...config.policy,
+      allowedRoots: [...new Set([...config.policy.allowedRoots, ...allowed])],
+    },
     // Sessions are ingested from pairing on, unless a backfill asks (D11).
     sessions: {
       ...config.sessions,
@@ -175,6 +196,13 @@ const pairCommand = async ({
   out(
     deps,
     `Paired as ${paired.runnerId}. Config written to ${paths.configFile}`,
+  );
+  const roots = [...new Set([...config.policy.allowedRoots, ...allowed])];
+  out(
+    deps,
+    roots.length > 0
+      ? `Projects may be watched under: ${roots.join(', ')}`
+      : 'No project root is allowed yet: run `agentdock-runner policy allow-root <dir>` before connecting a project.',
   );
   if (detected) {
     out(deps, `Detected ${detected.length} profiles:`);
@@ -410,6 +438,14 @@ const COMMANDS: Record<string, (context: Context) => Promise<number>> = {
   'install-service': installServiceCommand,
   setup: setupCommand,
   away: ({ deps, paths, args }) => runAway(args, localDeps(deps, paths)),
+  policy: async ({ deps, paths, args }) =>
+    runPolicy(args, {
+      configFile: paths.configFile,
+      cwd: deps.cwd ?? process.cwd(),
+      realpath: nodeRealpath,
+      stdout: deps.stdout,
+      stderr: deps.stderr,
+    }),
   // `mcp` and `claude` take their arguments raw: the wave-3 slots own them.
   mcp: ({ deps, paths, args }) => runMcp(args, localDeps(deps, paths)),
   claude: ({ deps, paths, args }) => runClaude(args, localDeps(deps, paths)),

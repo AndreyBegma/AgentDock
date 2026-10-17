@@ -1,4 +1,4 @@
-# ADR-0047: Runner releases are signed, and their secrets reach only protected tags
+# ADR-0049: Runner releases are signed, and their secrets reach only protected tags
 
 Status: accepted · Date: 2026-10-16 · Amends [ADR-0017](0017-runner-distribution-homebrew-and-npm.md) §3 and §4 ·
 Spec: [`docs/specs/card-106-security-high-release-the-runner-only-fr.md`](../specs/card-106-security-high-release-the-runner-only-fr.md)

@@ -102,6 +102,7 @@ export const plan = (over: Partial<PlanDetail> = {}): PlanDetail => {
     model: 'opus',
     docsPrNumber: null,
     docsPrUrl: null,
+    docsPrRepo: null,
     tasks,
     turns: [turn()],
     graph: {

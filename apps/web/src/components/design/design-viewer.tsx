@@ -2,6 +2,7 @@
 
 import {
   type CardDesignLaunchRequest,
+  type CardStackRef,
   DESIGN_VIEWPORT_MAX_PX,
   DESIGN_VIEWPORT_MIN_PX,
   type DesignCommentRequest,
@@ -27,8 +28,10 @@ import {
   pinMarkers,
   pinNumbers,
   reviseBlock,
+  stackDrawBlock,
 } from '../../lib/design/comments';
 import { framePath } from '../../lib/design/frames';
+import { stackDesignHref } from '../../lib/design/href';
 import type { DesignBusy } from '../../lib/design/use-design';
 import { useElementWidth } from '../../lib/design/use-element-width';
 import {
@@ -83,6 +86,7 @@ export function DesignViewer({
   actions,
   approval,
   launch,
+  stack,
   onChange,
 }: {
   projectId: string;
@@ -102,6 +106,11 @@ export function DesignViewer({
    * its plain buttons.
    */
   launch?: LaunchCard;
+  /**
+   * A card's stack (#527, ADR-0044 §5): while its design is not approved,
+   * Generate and Revise wait for it. A card in no stack leaves it out.
+   */
+  stack?: CardStackRef | null;
   onChange: (change: ViewerChange) => void;
 }) {
   const [pinMode, setPinMode] = useState(false);
@@ -182,7 +191,8 @@ export function DesignViewer({
   };
 
   const writeBlock = designWriteBlock(design, canOperate);
-  const reviseReason = reviseBlock(design, canOperate);
+  const stackBlock = stackDrawBlock(stack);
+  const reviseReason = reviseBlock(design, canOperate, stackBlock);
   const approveReason = approveBlock(design, canOperate);
   const revisionId = state.revision?.id ?? null;
   const frames = state.revision?.frames ?? [];
@@ -455,6 +465,10 @@ export function DesignViewer({
             projectId={projectId}
             design={design}
             writeBlock={writeBlock}
+            stackBlock={stackBlock}
+            stackHref={
+              stack ? stackDesignHref(projectId, stack.number) : undefined
+            }
             busy={busy === 'generate' || busy === 'patch'}
             onPatch={actions.patch}
             onGenerate={actions.generate}

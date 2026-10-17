@@ -12,6 +12,7 @@ import {
   TERMINAL_WS_PATH,
   type TerminalCloseReason,
 } from '@agentdock/shared/protocol';
+import { describePolicyRefusal } from '@/lib/runners/policy';
 import { ApiError } from '../api';
 
 const DEFAULT_LIVE_URL = 'ws://localhost:8180/live';
@@ -106,12 +107,18 @@ const REFUSAL_LABEL: Record<TerminalRefusalCode, string> = {
   unsupported: 'This runner cannot attach a terminal.',
   disabled: 'Terminal attach is disabled on this runner.',
   runner_unavailable: 'The runner is offline or did not answer.',
+  policy_refused:
+    'The runner’s local security policy does not allow typing into a terminal. Open it read-only, or run `agentdock-runner policy set terminal.write true` on that machine.',
 };
 
 export function describeRefusal(
   code: TerminalRefusalCode,
   heldBy?: { email: string },
+  message?: string,
 ): string {
+  if (code === 'policy_refused') {
+    return describePolicyRefusal(message, REFUSAL_LABEL.policy_refused);
+  }
   if (code === 'busy' && heldBy) {
     return `${heldBy.email} holds the read-write attach of this session.`;
   }
@@ -137,6 +144,8 @@ export function describeCloseCode(code: number): string {
       return REFUSAL_LABEL.unsupported;
     case TERMINAL_CLOSE_CODES.runnerUnavailable:
       return REFUSAL_LABEL.runner_unavailable;
+    case TERMINAL_CLOSE_CODES.policyRefused:
+      return REFUSAL_LABEL.policy_refused;
     default:
       return 'The connection was lost. The session keeps running.';
   }

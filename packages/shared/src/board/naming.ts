@@ -146,19 +146,52 @@ export const cardIssueBody = (body: string, number: number): string => {
   return `${kept}${footer}`;
 };
 
+export interface CardSpecPrBodyInput {
+  number: number;
+  title: string;
+  /** `owner/name` of the code repository. */
+  repo: string;
+  issueNumber: number | null;
+}
+
+/**
+ * #379: the body of a card's spec pull request in an external docs
+ * repository. It names the code issue as `owner/name#n`, so GitHub links
+ * the issue back to it.
+ */
+export const cardSpecPrBody = (pr: CardSpecPrBodyInput): string => {
+  const label = cardLabel(pr.number);
+  const lines = [
+    `Specification of AgentDock board card ${label}: ${pr.title}`,
+    '',
+    pr.issueNumber !== null
+      ? `Code: ${pr.repo}#${pr.issueNumber}`
+      : `Code: ${pr.repo}`,
+    '',
+    `${CARD_PR_MARKER}: ${label}`,
+  ];
+  return `${lines.join('\n')}\n`;
+};
+
 export interface CardPullRequestBodyInput {
   number: number;
   /** The latest round's summary; a default line when there is none. */
   summary: string | null;
   issueNumber: number | null;
+  /** #379: the spec's pull request in an external docs repository. */
+  specPrUrl?: string | null;
 }
 
-/** D8: summary, `Closes #n` when there is an issue, and the marker line. */
+/**
+ * D8: summary, the spec's docs pull request (#379), `Closes #n` when there
+ * is an issue, and the marker line.
+ */
 export const cardPullRequestBody = (pr: CardPullRequestBodyInput): string => {
   const summary =
     pr.summary?.trim() ||
     `Work of AgentDock board card ${cardLabel(pr.number)}.`;
   const parts = [summary];
+  if (pr.specPrUrl) parts.push(`Spec: ${pr.specPrUrl}`);
   if (pr.issueNumber !== null) parts.push(`Closes #${pr.issueNumber}`);
   parts.push(`${CARD_PR_MARKER}: ${cardLabel(pr.number)}`);
   return parts.join('\n\n');

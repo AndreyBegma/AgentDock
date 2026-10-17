@@ -3,7 +3,7 @@
 // only its binary, and the `agentdock-runner` wrapper whose
 // optionalDependencies pin them at the same exact version. The wrapper also
 // carries SHA256SUMS and SHA256SUMS.sig, which its shim checks a binary
-// against before running it (ADR-0047).
+// against before running it (ADR-0049).
 //
 //   bun scripts/npm-packages.ts <release dir>
 //

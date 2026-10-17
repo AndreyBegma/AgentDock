@@ -101,7 +101,7 @@ export function useCardDesign(projectId: string, number: number) {
 export function isStackDesignChange(
   event: string,
   data: unknown,
-  stackId: string | undefined,
+  stackId?: string,
 ): boolean {
   if (event !== DESIGN_LIVE_EVENT && event !== BOARD_CHANGED_EVENT) {
     return false;

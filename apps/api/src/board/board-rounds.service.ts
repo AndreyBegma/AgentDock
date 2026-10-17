@@ -20,6 +20,7 @@ import {
   cardNextRoundPrompt,
   cardRecommendationOf,
   cardSpecPath,
+  cardSpecPrBody,
   cardWorkerPrompt,
   isActiveRoundPhase,
   stackDesignPath,
@@ -28,7 +29,9 @@ import {
 import {
   type CardRunArgs,
   type CardRunFile,
+  cardDocsBranch,
   cardRunArgsSchema,
+  ISSUE_TITLE_MAX,
   ORCHESTRATOR_DEFAULTS,
   type OrchestratorPermissionMode,
 } from '@agentdock/shared/protocol';
@@ -54,7 +57,7 @@ import {
   frameNamesOf,
   revisionFrames,
 } from '../design/design-store';
-import { specDirOf } from '../planner/planner-instructions.service';
+import { resolveSpecTarget, type SpecTarget } from '../planner/spec-target';
 import { RuntimeProfileResolver } from '../readiness';
 import { TextNormalizer } from '../text/text-normalizer';
 import { TokenSaverService } from '../token-saver/token-saver.service';
@@ -86,6 +89,30 @@ const specContent = (card: CardWithRounds, issueNumber: number | null) =>
     card.body.trim() || '(no description)',
     '',
   ].join('\n');
+
+/** #379: a card's spec in an external docs repository, and its pull request. */
+interface CardSpecPr {
+  path: string;
+  repo: string;
+  number: number;
+  url: string;
+  branch: string;
+}
+
+/** #379: the spec pull request an earlier Run opened, if any. */
+const cardSpecPrOf = (card: CardWithRounds): CardSpecPr | null =>
+  card.specRepo !== null &&
+  card.specPath !== null &&
+  card.specPrNumber !== null &&
+  card.specPrUrl !== null
+    ? {
+        path: card.specPath,
+        repo: card.specRepo,
+        number: card.specPrNumber,
+        url: card.specPrUrl,
+        branch: cardDocsBranch(card.shortId),
+      }
+    : null;
 
 /**
  * Phases of a round that never started Claude: still queued, or `failed` —
@@ -174,7 +201,7 @@ export class BoardRoundsService {
       );
     }
     // #480 (ADR-0044): no card of a stack runs before its design is approved.
-    await this.stacks.assertRunnable(card.id);
+    await this.stacks.assertStackApproved(card.id);
     // #337 D8: an open dependency warns; the person may run anyway.
     await this.dependencies.assertRunnable(
       card.id,
@@ -399,12 +426,21 @@ export class BoardRoundsService {
     const resume =
       card.sessionId !== null &&
       card.rounds.some((r) => !UNSTARTED_PHASES.has(r.phase));
-    const specDir = specDirOf(project.codeSentinelConfig);
+    // #379: the docs source's Spec folder, else `orchestrator.specDir`.
+    const target = resolveSpecTarget(project);
+    const specDir = target.kind === 'code_repo' ? target.specDir : null;
     const firstStart = !resume;
     // #243 D6: a needed design is approved before the worker starts.
     const design = trigger === 'run' ? await this.approvedDesign(card) : null;
     // #480: the card's stack — its place, and its approved design as reference.
     const stack = firstStart ? await this.stacks.contextOf(card.id) : null;
+    // #359 D4: every card gets its spec file where there is a place for it;
+    // without one (#379: no Spec folder, or a remote docs repository with no
+    // local clone) it runs without, as readiness says.
+    const writesSpec = firstStart && card.specPath === null;
+    if (writesSpec && target.kind === 'docs_repo') {
+      this.commands.assertReady(project.runnerId, 'docs.publish_specs');
+    }
 
     this.commands.assertReady(project.runnerId, 'card.run');
     await this.assertRoom(project.id);
@@ -460,8 +496,14 @@ export class BoardRoundsService {
           title: card.title,
           issueNumber: issue.number,
         }));
-    // #359 D4: every card gets its spec file; `specOnRun` is no longer read.
+    // #379: a spec in an external docs repository goes in through its own
+    // pull request, before the worker starts; the card's branch never holds it.
+    let specPr = cardSpecPrOf(card);
+    if (writesSpec && target.kind === 'docs_repo') {
+      specPr = await this.publishSpec(project, card, target, issue, actor);
+    }
     const specPath =
+      specPr?.path ??
       card.specPath ??
       (specDir
         ? cardSpecPath(specDir, {
@@ -524,6 +566,9 @@ export class BoardRoundsService {
             branch,
             base: project.base,
             specPath,
+            specPr: specPr
+              ? { repo: specPr.repo, url: specPr.url, branch: specPr.branch }
+              : null,
             issueNumber: issue.number,
             design:
               designFrames.length > 0 && design
@@ -558,7 +603,7 @@ export class BoardRoundsService {
             attachments: attachmentBriefs,
           });
     const files: CardRunFile[] = [
-      ...(firstStart && specPath !== null
+      ...(firstStart && specPath !== null && specPr === null
         ? [{ path: specPath, content: specContent(card, issue.number) }]
         : []),
       ...designFrames.map((f) => ({ path: f.path, content: f.content })),
@@ -818,6 +863,69 @@ export class BoardRoundsService {
    * — the review's decisions — each led by its frame's name when the design
    * has several.
    */
+  /**
+   * #379: `docs.publish_specs` — the card's spec on `docs/card-<shortId>` of
+   * the docs repository, as a pull request there. Its body names the code
+   * issue, so GitHub links the two. Stored at once, like the issue: a Run
+   * that fails later does not publish again.
+   */
+  private async publishSpec(
+    project: BoardProject,
+    card: CardWithRounds,
+    target: Extract<SpecTarget, { kind: 'docs_repo' }>,
+    issue: { number: number | null; url: string | null },
+    actor: BoardActor,
+  ): Promise<CardSpecPr> {
+    const path = cardSpecPath(target.specDir, {
+      number: card.number,
+      title: card.title,
+      issueNumber: issue.number,
+    });
+    const branch = cardDocsBranch(card.shortId);
+    const label = cardLabel(card.number);
+    const published = boardOutput(
+      'docs.publish_specs',
+      await this.commands.publishDocsSpecs(
+        project.runnerId,
+        {
+          projectId: project.id,
+          root: project.rootPath,
+          docsRoot: target.docsRoot,
+          specDir: target.specDir,
+          branch,
+          files: [{ path, content: specContent(card, issue.number) }],
+          title: `docs(specs): ${label} ${card.title}`.slice(
+            0,
+            ISSUE_TITLE_MAX,
+          ),
+          body: cardSpecPrBody({
+            number: card.number,
+            title: card.title,
+            repo: project.repo,
+            issueNumber: issue.number,
+          }),
+        },
+        { role: actor.role, ctx: actor.ctx },
+      ),
+    );
+    await this.prisma.boardCard.update({
+      where: { id: card.id },
+      data: {
+        specPath: path,
+        specRepo: published.repo,
+        specPrNumber: published.prNumber,
+        specPrUrl: published.prUrl,
+      },
+    });
+    return {
+      path,
+      repo: published.repo,
+      number: published.prNumber,
+      url: published.prUrl,
+      branch,
+    };
+  }
+
   private async approvedDesign(card: CardWithRounds): Promise<{
     variant: number;
     frames: FrameFile[];

@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
+import { AuthModule } from '../auth';
 import { CryptoModule } from '../common/crypto';
 import { LiveModule } from '../live/live.module';
 import { ProjectsModule } from '../projects';
 import { RunnersModule } from '../runners/runners.module';
 import { SettingsModule } from '../settings/settings.module';
+import { AccountThrottleNotifier } from './account-throttle-notifier';
 import { BlockedCheckpointSweep } from './blocked-checkpoint-sweep';
 import { BotTokenStore } from './bot-token.store';
 import { NotificationMatcher } from './notification-matcher';
@@ -29,6 +31,7 @@ import { TelegramDeliveryLedger } from './telegram-delivery-ledger';
  */
 @Module({
   imports: [
+    AuthModule,
     CryptoModule,
     LiveModule,
     ProjectsModule,
@@ -52,6 +55,7 @@ import { TelegramDeliveryLedger } from './telegram-delivery-ledger';
     RunnerWatcher,
     RunnerReplacedNotifier,
     BlockedCheckpointSweep,
+    AccountThrottleNotifier,
     TelegramDeliveryLedger,
     BotTokenStore,
   ],

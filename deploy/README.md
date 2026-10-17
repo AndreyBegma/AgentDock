@@ -49,7 +49,13 @@ Nothing is published on the host. The stack runs on its own compose network
 2. **Woodpecker.** Activate `AndreyBegma/AgentDock` and apply these settings:
    - *Trusted → volumes*: on. The steps mount the Docker socket, the stack
      directory and the caches, and the postgres service mounts a tmpfs.
-   - *Require approval*: forks. The repository is public.
+   - *Require approval*: forks (`require_approval: "forks"` in the API). The
+     repository is public and the steps reach the host's Docker socket, so a
+     pull request from a fork must wait for a maintainer. A pull request from
+     a branch of `AndreyBegma/AgentDock` itself — every board card's — must
+     not: *Pull requests* or *All events* gates those too (#504). Check the
+     live value with
+     `curl -s https://ci.luna-realm.com/api/repos/9 | jq .require_approval`.
    - *Cancel previous pipelines*: push, pull_request.
    - Timeout: 60 min.
    - Run the Woodpecker server on PostgreSQL
@@ -104,6 +110,19 @@ Nothing is published on the host. The stack runs on its own compose network
   A 500, 502, 530 or a timeout there is a delivery Woodpecker never
   processed; *Redeliver* it, or close and reopen the PR. AgentDock does the
   close/reopen by itself for a board card's PR after 5 minutes (ADR-0043).
+- **A pipeline waits for approval on an own-branch PR** (#504): Woodpecker
+  shows "This pipeline is awaiting approval from a maintainer!" for a pull
+  request whose head is a branch of `AndreyBegma/AgentDock`, such as a board
+  card's. Run `gh pr view <number> --json isCrossRepository`: `false` means
+  the PR is not from a fork, so the gate comes from the repository setting.
+  `curl -s https://ci.luna-realm.com/api/repos/9 | jq .require_approval`
+  then answers `"pull_requests"` or `"all_events"` instead of `"forks"`. Set
+  *Settings → General → Require approval* to *Forks* (an admin of the
+  Woodpecker repository can do it) and approve the pipelines already waiting
+  once; the next pull request starts at once. AgentDock pushes a card's
+  branch to `origin` and opens the PR with `gh pr create --head <branch>` in
+  the same repository, and the close/reopen retrigger (ADR-0043) acts on that
+  same PR, so neither one makes a PR look like a fork.
 - **`530` / error 1033** from the public URL means the hostname exists but no
   cloudflared connector is running. Check that `TUNNEL_TOKEN` is set and look
   at `docker logs agentdock-staging-cloudflared`.
@@ -111,7 +130,7 @@ Nothing is published on the host. The stack runs on its own compose network
 ## Releasing the runner
 
 Decisions: [ADR-0017](../docs/adr/0017-runner-distribution-homebrew-and-npm.md),
-[ADR-0047](../docs/adr/0047-runner-releases-are-signed-and-cut-only-from-protected-tags.md).
+[ADR-0049](../docs/adr/0049-runner-releases-are-signed-and-cut-only-from-protected-tags.md).
 A tag `runner-v<version>` runs `.woodpecker/release-runner.yml`. The workflow
 tests the runner, builds the four binaries, signs `SHA256SUMS` and creates the
 GitHub Release with the tarballs, `SHA256SUMS` and `SHA256SUMS.sig`. It then

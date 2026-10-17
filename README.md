@@ -175,7 +175,7 @@ get a one-time pairing code in the web app: **Admin → Runners → Add runner**
 
 ```sh
 brew install andreybegma/tap/agentdock-runner
-agentdock-runner pair --server <api-origin> --code XXXX-XXXX
+agentdock-runner pair --server <api-origin> --code XXXX-XXXX --allow-root ~/dev
 brew services start agentdock-runner
 ```
 
@@ -183,12 +183,22 @@ brew services start agentdock-runner
 
 ```sh
 npm i -g agentdock-runner
-agentdock-runner pair --server <api-origin> --code XXXX-XXXX
+agentdock-runner pair --server <api-origin> --code XXXX-XXXX --allow-root ~/dev
 agentdock-runner install-service
 ```
 
 `install-service` writes a systemd user unit on Linux or a launchd agent on
 macOS, and prints the command that starts it.
+
+`--allow-root` names the folders your projects live in. The runner keeps a
+local security policy in its own config that the server cannot change
+([ADR-0047](docs/adr/0047-a-runner-local-security-policy-the-server-cannot-change.md)):
+it watches no project outside those folders, launches nothing above `auto`,
+and refuses terminal typing, profile skill installs and messages into running
+sessions until you allow them on the machine. See and change it with
+`agentdock-runner policy show`, `policy allow-root <dir>` and
+`policy set <key> <value>`. An existing runner needs `policy allow-root` once
+after it upgrades.
 
 **From source** (needs Bun): `bun run build` in this repository produces
 `apps/runner/dist/agentdock-runner`.

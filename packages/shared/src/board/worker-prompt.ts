@@ -25,8 +25,9 @@ import type { BoardCardKind } from './types';
  * section. Version 12 (#445 amendment 11): with Token saver, one
  * command per Bash call. Version 13 (#487): never a project's whole e2e
  * suite locally — only the suites the card touched; CI runs the rest.
+ * Version 14 (#379): a spec in an external docs repository.
  */
-export const CARD_WORKER_PROMPT_VERSION = 13;
+export const CARD_WORKER_PROMPT_VERSION = 14;
 
 /** #389: the env the runner sets in the card's session — its short id. */
 export const CARD_ENV_ID = 'AGENTDOCK_CARD';
@@ -118,8 +119,16 @@ export interface CardWorkerPromptInput {
   kind: BoardCardKind;
   branch: string;
   base: string;
-  /** Repository-relative; the spec the runner committed first (D2). */
+  /**
+   * The spec the runner committed first (D2): repository-relative — or,
+   * with `specPr`, relative to the docs repository's root.
+   */
   specPath: string | null;
+  /**
+   * #379: the spec is in an external docs repository, added by this pull
+   * request on `branch`; not on the card's branch. Absent is none.
+   */
+  specPr?: { repo: string; url: string; branch: string } | null;
   issueNumber: number | null;
   /** #243: the approved design; `null` when the card has none. */
   design: CardWorkerDesign | null;
@@ -361,7 +370,12 @@ const pullRequestSection = (card: CardWorkerPromptInput): string[] => {
     `Before you finish, write the pull request's description to \`${CARD_PR_DESCRIPTION_FILE}\` in this worktree. It is git-excluded — do not commit it; AgentDock makes it the pull request's body. Keep it current in later rounds. It holds, in this order:`,
     '',
   ];
-  if (card.specPath !== null) {
+  if (card.specPath !== null && card.specPr) {
+    const design = card.design ? ` · Design: ${designLink(card)}` : '';
+    lines.push(
+      `- \`Spec: ${card.specPr.url}${design}\`${design ? ' — <owner>/<repo> from `git remote get-url origin`' : ''};`,
+    );
+  } else if (card.specPath !== null) {
     const design = card.design ? ` · Design: ${designLink(card)}` : '';
     lines.push(
       `- \`Spec: ${blob}${card.specPath}${design}\` — <owner>/<repo> from \`git remote get-url origin\`;`,
@@ -471,7 +485,11 @@ const assemblePrompt = (
   if (card.issueNumber !== null) {
     lines.push(`GitHub issue: #${card.issueNumber}`);
   }
-  if (card.specPath !== null) {
+  if (card.specPath !== null && card.specPr) {
+    lines.push(
+      `Specification: ${card.specPath} in the docs repository ${card.specPr.repo}, on its branch ${card.specPr.branch} (pull request ${card.specPr.url}) — read it first with \`gh api repos/${card.specPr.repo}/contents/${card.specPath}?ref=${card.specPr.branch} -H "Accept: application/vnd.github.raw"\`. Do not commit to the docs repository.`,
+    );
+  } else if (card.specPath !== null) {
     lines.push(
       `Specification: ${card.specPath} (already committed on this branch — read it first)`,
     );

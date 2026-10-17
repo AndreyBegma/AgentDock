@@ -1,5 +1,6 @@
 import { PLANNER_ERROR, type PlannerSpecOutput } from '@agentdock/shared';
 import {
+  docsPublishSpecsArgsSchema,
   issueCreateArgsSchema,
   PLAN_QUEUE_ISSUES_MAX,
   planDocsBranch,
@@ -31,7 +32,15 @@ import {
 import { type PlanProject, PlanStore } from './plan-store';
 import { PlannerCommands, plannerOutput } from './planner-commands';
 import { PlannerFailure, plannerError } from './planner-error';
-import { defaultSpecOutput, specDirOf } from './planner-instructions.service';
+import {
+  defaultSpecOutput,
+  docsPrRefusal,
+} from './planner-instructions.service';
+import {
+  codeSpecDirOf,
+  resolveSpecTarget,
+  type SpecTarget,
+} from './spec-target';
 
 const asSendTask = (t: PlanTask): SendTask => ({
   key: t.key,
@@ -123,7 +132,15 @@ export class PlanSendService {
     }
 
     const project = await this.store.project(plan.projectId);
-    const { specOutput, specDir } = await this.publication(project);
+    const { specOutput, target } = await this.publication(project);
+    // #379: the specs' directory — in the code repository, or relative to an
+    // external docs repository; designs stay in the code repository.
+    const specDir =
+      target.kind === 'code_repo' || target.kind === 'docs_repo'
+        ? target.specDir
+        : null;
+    const external = target.kind === 'docs_repo' ? target : null;
+    const designDir = codeSpecDirOf(target);
     const designs = await this.approvedDesigns(plan.id);
     // D10, and spec 223 D16: a task with an approved design always goes
     // through the docs pull request, whatever the project's specOutput.
@@ -132,7 +149,13 @@ export class PlanSendService {
     const publishes = sending.some(viaDocs);
     this.commands.assertReady(project.runnerId, 'issue.create');
     this.commands.assertReady(project.runnerId, 'plan.queue_issues');
-    if (publishes) {
+    if (publishes && external) {
+      // #379: specs into the docs repository, designs into this one.
+      this.commands.assertReady(project.runnerId, 'docs.publish_specs');
+      if (sending.some((t) => designs.has(t.key))) {
+        this.commands.assertReady(project.runnerId, 'plan.publish_specs');
+      }
+    } else if (publishes) {
       this.commands.assertReady(project.runnerId, 'plan.publish_specs');
     }
 
@@ -176,18 +199,24 @@ export class PlanSendService {
         const design = designs.get(key) ?? null;
         const body = rewriteDependsOn(
           viaDocs(task) && specDir
-            ? docsPrIssueBody(send, specDir, branch, design?.variant ?? null)
+            ? docsPrIssueBody(
+                send,
+                specDir,
+                branch,
+                design?.variant ?? null,
+                external ? { repo: external.repo } : undefined,
+              )
             : design
               ? withDesignPath(
                   documentOf(send),
                   designDirPath(
-                    specDir,
+                    designDir,
                     ISSUE_PLACEHOLDER,
                     task.title,
                     design.variant,
                   ),
                   designDirPath(
-                    specDir,
+                    designDir,
                     THIS_ISSUE,
                     task.title,
                     design.variant,
@@ -240,7 +269,16 @@ export class PlanSendService {
         plan.docsPrNumber !== null && plan.docsPrUrl !== null
           ? { number: plan.docsPrNumber, url: plan.docsPrUrl }
           : null;
-      if (publishes && !docsPr) {
+      if (publishes && external) {
+        docsPr = await this.publishExternal(
+          plan,
+          project,
+          now.filter(viaDocs),
+          designs,
+          { ...external, branch },
+          options,
+        );
+      } else if (publishes && !docsPr) {
         docsPr = await this.publish(
           plan,
           project,
@@ -288,24 +326,22 @@ export class PlanSendService {
     }
   }
 
-  /** D10 and Q4: `docs_pr` needs a repository-relative `specDir`. */
+  /**
+   * D10, Q4 and #379: `docs_pr` needs a spec target — the code repository,
+   * or an external docs repository with a local clone.
+   */
   private async publication(
     project: PlanProject,
-  ): Promise<{ specOutput: PlannerSpecOutput; specDir: string | null }> {
+  ): Promise<{ specOutput: PlannerSpecOutput; target: SpecTarget }> {
     const settings = await this.prisma.plannerSettings.findUnique({
       where: { projectId: project.id },
       select: { specOutput: true },
     });
-    const specDir = specDirOf(project.codeSentinelConfig);
-    const specOutput = settings?.specOutput ?? defaultSpecOutput(specDir);
-    if (specOutput === 'docs_pr' && !specDir) {
-      throw plannerError(
-        422,
-        PLANNER_ERROR.invalidArgs,
-        'docs_pr needs the project to have a specDir inside the repository',
-      );
-    }
-    return { specOutput, specDir };
+    const target = resolveSpecTarget(project);
+    const specOutput = settings?.specOutput ?? defaultSpecOutput(target);
+    const refusal = specOutput === 'docs_pr' ? docsPrRefusal(target) : null;
+    if (refusal) throw refusal;
+    return { specOutput, target };
   }
 
   /** `plan.queue_issues` in batches of 50; `queuedAt` on each labelled task. */
@@ -489,6 +525,155 @@ export class PlanSendService {
     await this.prisma.plan.update({
       where: { id: plan.id },
       data: { docsPrNumber: output.prNumber, docsPrUrl: output.prUrl },
+    });
+    return { number: output.prNumber, url: output.prUrl };
+  }
+
+  /**
+   * #379: with an external docs repository, one pull request there with a
+   * specification per task that goes through docs (`docs.publish_specs`),
+   * and — when tasks have approved designs — a design pull request in the
+   * code repository, as a project without a `specDir` publishes them (spec
+   * 223 "Open questions"). Each PR is stored as soon as it exists, so a
+   * retry opens only what is missing. Answers the docs pull request.
+   */
+  private async publishExternal(
+    plan: Plan,
+    project: PlanProject,
+    tasks: readonly PlanTask[],
+    designs: ReadonlyMap<string, ApprovedDesignFile>,
+    target: { docsRoot: string; specDir: string; branch: string },
+    options: Parameters<PlannerCommands['send']>[3],
+  ): Promise<{ number: number; url: string }> {
+    const all = await this.store.currentTasks(this.prisma, plan);
+    const numbers = new Map(
+      all
+        .filter((t) => t.issueNumber !== null)
+        .map((t) => [t.key, t.issueNumber as number]),
+    );
+    const issued = tasks.filter((t) => t.issueNumber !== null);
+    const designDir = (t: PlanTask, variant: number) =>
+      designDirPath(null, t.issueNumber as number, t.title, variant);
+
+    if (plan.designPrNumber === null) {
+      const files = issued.flatMap((t) => {
+        const design = designs.get(t.key);
+        return design
+          ? design.frames.map((f) => ({
+              path: `${designDir(t, design.variant)}/${f.slug}.html`,
+              content: f.html,
+            }))
+          : [];
+      });
+      if (files.length > 0) {
+        const args = planPublishSpecsArgsSchema.safeParse({
+          planId: plan.id,
+          projectId: plan.projectId,
+          root: project.rootPath,
+          base: project.base,
+          specDir: DESIGN_FALLBACK_DIR,
+          branch: target.branch,
+          files,
+          title: `docs: designs of plan "${plan.title}"`.slice(0, 256),
+          body: [
+            `Approved designs of the plan "${plan.title}" (version ${plan.version}). Their specifications are in the docs repository's pull request.`,
+            '',
+            ...files.map((f) => `- \`${f.path}\``),
+            '',
+            'Their issues are queued when this pull request and the docs pull request merge.',
+            '',
+          ].join('\n'),
+        });
+        if (!args.success) {
+          throw plannerError(
+            400,
+            PLANNER_ERROR.invalidArgs,
+            z.prettifyError(args.error),
+          );
+        }
+        const output = plannerOutput(
+          'plan.publish_specs',
+          await this.commands.send(
+            project.runnerId,
+            'plan.publish_specs',
+            args.data,
+            options,
+          ),
+        );
+        await this.prisma.plan.update({
+          where: { id: plan.id },
+          data: { designPrNumber: output.prNumber, designPrUrl: output.prUrl },
+        });
+      }
+    }
+
+    if (plan.docsPrNumber !== null && plan.docsPrUrl !== null) {
+      return { number: plan.docsPrNumber, url: plan.docsPrUrl };
+    }
+    const entries = issued.map((t) => {
+      const design = designs.get(t.key) ?? null;
+      return {
+        task: t,
+        path: specFilePath(target.specDir, t.issueNumber as number, t.title),
+        content: rewriteDependsOn(
+          design
+            ? withDesignPath(
+                documentOf(asSendTask(t)),
+                designDirPath(null, ISSUE_PLACEHOLDER, t.title, design.variant),
+                designDir(t, design.variant),
+                design.frames,
+              )
+            : documentOf(asSendTask(t)),
+          t.dependsOn,
+          numbers,
+          // Issue references point at the code repository from the docs one.
+        ).replace(/(^|[\s(])#(\d+)\b/g, `$1${project.repo}#$2`),
+      };
+    });
+    const body = [
+      `Specifications of the plan "${plan.title}" (version ${plan.version}) for ${project.repo}.`,
+      '',
+      ...entries.map(
+        ({ task: t, path }) =>
+          `- ${project.repo}#${t.issueNumber} — ${t.title}: \`${path}\``,
+      ),
+      '',
+      'Their issues are queued when this pull request merges.',
+      '',
+    ].join('\n');
+    const args = docsPublishSpecsArgsSchema.safeParse({
+      projectId: plan.projectId,
+      root: project.rootPath,
+      docsRoot: target.docsRoot,
+      specDir: target.specDir,
+      branch: target.branch,
+      files: entries.map(({ path, content }) => ({ path, content })),
+      title: `docs: specifications of plan "${plan.title}"`.slice(0, 256),
+      body,
+    });
+    if (!args.success) {
+      throw plannerError(
+        400,
+        PLANNER_ERROR.invalidArgs,
+        z.prettifyError(args.error),
+      );
+    }
+    const output = plannerOutput(
+      'docs.publish_specs',
+      await this.commands.sendDocs(
+        project.runnerId,
+        'docs.publish_specs',
+        args.data,
+        options,
+      ),
+    );
+    await this.prisma.plan.update({
+      where: { id: plan.id },
+      data: {
+        docsPrNumber: output.prNumber,
+        docsPrUrl: output.prUrl,
+        docsPrRepo: output.repo,
+      },
     });
     return { number: output.prNumber, url: output.prUrl };
   }

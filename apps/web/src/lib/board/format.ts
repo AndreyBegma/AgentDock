@@ -24,6 +24,7 @@ import type {
   LocalErrorCode,
 } from '@agentdock/shared/protocol';
 import type { Status } from '@andrewbehma/glass-ui/status-pill';
+import { describePolicyRefusal } from '@/lib/runners/policy';
 import { ApiError, describeError } from '../api';
 import { STAGE_LABEL } from '../fleet/graph';
 import { describeNoProfile } from '../readiness/copy';
@@ -405,6 +406,7 @@ export function autoRunReason(
     case BOARD_ERROR.maxRunning:
     case BOARD_ERROR.budgetExceeded:
     case BOARD_ERROR.noSpecDir:
+    case BOARD_ERROR.noDocsClone:
     case BOARD_ERROR.unsupportedRuntime:
     case BOARD_ERROR.cardRunning:
     case BOARD_ERROR.commandUnavailable:
@@ -459,7 +461,9 @@ export function describeBoardError(
     case BOARD_ERROR.wrongColumn:
       return 'The card is not in the column this needs. Refresh the board.';
     case BOARD_ERROR.noSpecDir:
-      return 'This project has no spec directory, so a spec cannot be written. Turn the spec off, or set the docs source in the project settings.';
+      return 'This project has no spec folder, so a spec cannot be written. Set the Spec folder in Settings › Docs source, or turn the spec off.';
+    case BOARD_ERROR.noDocsClone:
+      return 'The docs repository has no local clone, so a spec cannot be written there. Set its local clone path in Settings › Docs source (Override), or turn the spec off.';
     case BOARD_ERROR.unsupportedRuntime:
       return 'The runner refused: card workers run on Claude profiles only.';
     case BOARD_ERROR.noProfile:
@@ -468,6 +472,10 @@ export function describeBoardError(
       return 'This card’s design is on and not approved yet. Open the design and approve it, or approve and run from there.';
     case BOARD_ERROR.designApproved:
       return 'The design is approved, so “Continue after design” can no longer change.';
+    case BOARD_ERROR.policyRefused:
+      return describePolicyRefusal(
+        error instanceof ApiError ? error.message : null,
+      );
     case BOARD_ERROR.commandUnavailable:
       return `The runner${runnerName ? ` ${runnerName}` : ''} is offline or too old to run card workers.`;
     case BOARD_ERROR.invalidMove:

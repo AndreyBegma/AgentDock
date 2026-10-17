@@ -458,6 +458,7 @@ export class LocalHandlers {
         runnerId: call.runnerId,
         sessionId: await this.sessionRowId(call),
         requestedById: call.user.id,
+        requesterRole: call.role,
         kind: args.kind,
         args: args.args,
         summary: args.summary,

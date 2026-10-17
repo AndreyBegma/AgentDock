@@ -25,6 +25,7 @@ import {
   formatCountdown,
   KIND_LABEL,
   pendingRequests,
+  prApproveArgs,
   recentRequests,
   requestTitle,
   resultMessage,
@@ -43,10 +44,28 @@ const TICK_MS = 1_000;
 
 function RequestCell({ request }: { request: ActionRequestSummary }) {
   const tool = toolUseArgs(request);
+  const pr = prApproveArgs(request);
   return (
     <div className="flex min-w-0 flex-col gap-1">
       <span className="font-medium">{requestTitle(request)}</span>
       <span className="text-xs text-ink-3">{KIND_LABEL[request.kind]}</span>
+      {/* C-110: the head an approval binds to, as read when it was asked. */}
+      {pr ? (
+        <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-sm text-ink-2">
+          <span className="break-words">{pr.title}</span>
+          <span className="text-ink-3">
+            at <code className="font-mono">{pr.shortHead}</code>
+          </span>
+          <a
+            href={pr.diffUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="underline underline-offset-2 hover:text-ink"
+          >
+            View the diff
+          </a>
+        </span>
+      ) : null}
       {request.summary ? (
         <span className="line-clamp-3 break-words text-sm text-ink-2">
           {request.summary}
@@ -57,6 +76,18 @@ function RequestCell({ request }: { request: ActionRequestSummary }) {
         <CodeBlock code={tool.input} wrap maxHeight={120} copy={false} />
       ) : null}
     </div>
+  );
+}
+
+/** " at 0b6445a" after a `pr_approve` request's title: the head it was bound to. */
+function HeadSuffix({ request }: { request: ActionRequestSummary }) {
+  const pr = prApproveArgs(request);
+  if (!pr) return null;
+  return (
+    <span className="text-ink-3">
+      {' '}
+      at <code className="font-mono">{pr.shortHead}</code>
+    </span>
   );
 }
 
@@ -226,6 +257,7 @@ export function ActionRequestsPanel({
                 <TableRow key={request.id}>
                   <TableCell>
                     <span className="font-medium">{requestTitle(request)}</span>
+                    <HeadSuffix request={request} />
                   </TableCell>
                   <TableCell>
                     <Badge

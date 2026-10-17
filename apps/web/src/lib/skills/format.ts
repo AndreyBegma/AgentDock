@@ -15,6 +15,7 @@ import {
   type SkillRunPhase,
   type SkillScope,
 } from '@agentdock/shared/protocol';
+import { describePolicyRefusal } from '@/lib/runners/policy';
 import { ApiError, describeError } from '../api';
 import { describeBudgetExceededError } from '../budgets/format';
 import { updateRunnerText } from '../control/format';
@@ -363,6 +364,10 @@ export function describeSkillsError(
       return 'The run already finished.';
     case SKILLS_ERROR.runnerTimeout:
       return 'The runner did not answer in time. Check the run before trying again.';
+    case SKILLS_ERROR.policyRefused:
+      return describePolicyRefusal(
+        error instanceof ApiError ? error.message : null,
+      );
     case SKILLS_ERROR.commandFailed:
       return `The runner could not complete the request: ${error instanceof ApiError ? error.message : 'unknown error'}`;
     default:

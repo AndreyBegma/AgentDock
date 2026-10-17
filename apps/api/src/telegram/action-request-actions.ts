@@ -104,6 +104,9 @@ export const actionRequestDecidedText = (
   failure: string | null,
 ): string => {
   if (action === 'deny') return 'Denied.';
+  if (status === 'failed' && failure === 'head_moved') {
+    return 'Not approved: the pull request has new commits since this request. Ask for a new one.';
+  }
   if (status === 'failed') {
     return `Approved, but it could not be carried out${failure ? `: ${failure}` : ''}.`;
   }
