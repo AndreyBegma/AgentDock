@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-scale="desk" data-palette="navy">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Phone sheet and Telegram</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{--font-sans:'SF Pro Text','SF Pro Display',Inter,system-ui,-apple-system,'Segoe UI',sans-serif;--font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;--radius-control:6px;--radius-surface:8px;--radius-sheet:12px;--size-control:28px;--glass-blur:26px;--glass-blur-strong:40px}
+:root,:root[data-theme="dark"]{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-paper:#1b2647;--color-content:rgb(27 38 71 / 0.96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246 / 0.62);--color-ink-3:rgb(242 242 246 / 0.53);--color-line:rgb(255 255 255 / 0.1);--color-line-strong:rgb(255 255 255 / 0.18);--color-hover:rgb(255 255 255 / 0.06);--color-focus:#b4b2ff;--color-accent:#5b5bf6;--color-on-accent:#ffffff;--color-accent-soft:rgb(91 91 246 / 0.2);--color-accent-ink:#b4b2ff;--color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;--color-scrim:rgb(10 16 34 / 0.3);--color-hue-1:#5b9cf6;--color-hue-2:#2fbf94;--color-hue-2-soft:rgb(47 191 148 / 0.18);--color-hue-2-ink:#7ee0c0;--color-hue-5:#e8743b;--color-hue-5-soft:rgb(232 116 59 / 0.18);--color-hue-5-ink:#f9a77c;--color-hue-7:#a68bfa;--glass-sheen:rgb(255 255 255 / 0.06);--glass-scrim:rgb(9 9 12 / 0.55);--glass-scrim-strong:rgb(9 9 12 / 0.64);--glass-brightness:0.85;--glass-brightness-strong:0.7;--glass-edge:rgb(255 255 255 / 0.14);--glass-spec:rgb(255 255 255 / 0.2);--glass-rim:rgb(242 242 246 / 0.8);--glass-rim-shade:rgb(9 9 12 / 0.5);--glass-meniscus:rgb(9 9 12 / 0.55);--glass-refract:rgb(242 242 246 / 0.35);--glass-rim-strong:rgb(242 242 246 / 0.22);--glass-rim-shade-strong:rgb(9 9 12 / 0.2);--glass-shadow:rgb(0 0 0 / 0.35);--glass-shadow-strong:rgb(0 0 0 / 0.45);--glass-shadow-clear:rgb(0 0 0 / 0.15);--canvas-glow:18%}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#ffffff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-paper:#ffffff;--color-content:rgb(255 255 255 / 0.96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27 / 0.72);--color-ink-3:rgb(24 24 27 / 0.64);--color-line:rgb(0 0 0 / 0.1);--color-line-strong:rgb(0 0 0 / 0.23);--color-hover:rgb(0 0 0 / 0.06);--color-focus:#4f46e5;--color-accent:#4f46e5;--color-on-accent:#ffffff;--color-accent-soft:rgb(79 70 229 / 0.12);--color-accent-ink:#4338ca;--color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;--color-scrim:rgb(10 16 34 / 0.22);--color-hue-1:#1f64d6;--color-hue-2:#00805e;--color-hue-2-soft:rgb(0 128 94 / 0.12);--color-hue-2-ink:#006a4e;--color-hue-5:#c24e00;--color-hue-5-soft:rgb(194 78 0 / 0.12);--color-hue-5-ink:#9c3d00;--color-hue-7:#7244e0;--glass-sheen:rgb(0 0 0 / 0.06);--glass-scrim:rgb(255 255 255 / 0.52);--glass-scrim-strong:rgb(255 255 255 / 0.64);--glass-brightness:1.15;--glass-brightness-strong:1.3;--glass-edge:rgb(0 0 0 / 0.18);--glass-spec:rgb(0 0 0 / 0.2);--glass-rim:rgb(255 255 255 / 0.9);--glass-rim-shade:rgb(24 24 27 / 0.18);--glass-meniscus:rgb(24 24 27 / 0.12);--glass-refract:rgb(255 255 255 / 0.5);--glass-rim-strong:rgb(255 255 255 / 0.3);--glass-rim-shade-strong:rgb(24 24 27 / 0.08);--glass-shadow:rgb(0 0 0 / 0.12);--glass-shadow-strong:rgb(0 0 0 / 0.16);--glass-shadow-clear:rgb(0 0 0 / 0.08);--canvas-glow:10%}
+:root{--color-status-running:var(--color-hue-2);--color-status-running-soft:var(--color-hue-2-soft);--color-status-running-ink:var(--color-hue-2-ink);--color-status-blocked:var(--color-hue-5);--color-status-blocked-soft:var(--color-hue-5-soft);--color-status-blocked-ink:var(--color-hue-5-ink);--glass-filter:blur(var(--glass-blur)) saturate(180%) brightness(var(--glass-brightness));--glass-filter-strong:blur(var(--glass-blur-strong)) saturate(180%) brightness(var(--glass-brightness-strong))}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground);color:var(--color-ink)}
+body{margin:0;min-height:100vh;font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased}
+p{margin:0}code{font-family:var(--font-mono)}.num{font-variant-numeric:tabular-nums}
+:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}
+svg.icon{width:16px;height:16px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}svg.icon.sm{width:14px;height:14px}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);backdrop-filter:var(--glass-filter);-webkit-backdrop-filter:var(--glass-filter);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),inset 1px 1px 0 var(--glass-rim),inset -1px -1px 0 var(--glass-rim-shade),0 12px 32px var(--glass-shadow)}
+.glass-strong{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim-strong);backdrop-filter:var(--glass-filter-strong);-webkit-backdrop-filter:var(--glass-filter-strong);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),inset 1px 1px 0 var(--glass-rim-strong),inset -1px -1px 0 var(--glass-rim-shade-strong),inset 0 0 18px -4px var(--glass-refract),0 -12px 48px var(--glass-shadow-strong)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;font-family:inherit;font-weight:600;cursor:pointer;border:1px solid transparent;background:transparent;color:var(--color-ink);height:var(--size-control);padding:0 12px;font-size:13px;border-radius:var(--radius-control)}
+.btn-solid{background:var(--color-accent);color:var(--color-on-accent)}.btn-glass{background:var(--color-raised);border-color:var(--color-line-strong)}.btn-ghost{color:var(--color-ink-2)}.btn-icon{padding:0;aspect-ratio:1/1}
+.tap{min-width:44px;min-height:44px}
+.pill{display:inline-flex;align-items:center;white-space:nowrap;border-radius:999px;font-weight:500;line-height:1;height:20px;gap:6px;padding:0 8px;font-size:11px;background:var(--color-hover);color:var(--color-ink-2);--pd:var(--color-ink-3)}
+.sdot{position:relative;display:inline-flex;width:8px;height:8px;border-radius:999px;background:var(--pd)}
+.pill-running{background:var(--color-status-running-soft);color:var(--color-status-running-ink);--pd:var(--color-status-running)}.pill-blocked{background:var(--color-status-blocked-soft);color:var(--color-status-blocked-ink);--pd:var(--color-status-blocked)}
+code.inline{font-size:11px;padding:1px 4px;border-radius:4px;background:var(--color-hover)}
+.stage{display:flex;gap:56px;justify-content:center;align-items:flex-start;padding:32px 24px;flex-wrap:wrap}
+.col{display:flex;flex-direction:column;gap:12px;align-items:center}
+.cap{font-size:12px;font-weight:500;color:var(--color-ink-3);text-align:center;max-width:390px}
+.cap b{color:var(--color-ink);font-weight:600;font-size:13px;display:block}
+.device{width:390px;height:800px;border-radius:44px;border:10px solid var(--color-raised);overflow:hidden;position:relative;background:var(--color-ground);box-shadow:0 30px 80px var(--glass-shadow-strong)}
+.device .bg{position:absolute;inset:0;background:radial-gradient(400px 300px at 0% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(400px 300px at 100% 60%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.mtop{position:absolute;top:8px;left:12px;right:12px;height:48px;border-radius:var(--radius-surface);display:flex;align-items:center;padding:0 12px;font-weight:600;font-size:15px}
+.mpage{position:absolute;top:68px;left:12px;right:12px;display:flex;flex-direction:column;gap:8px}
+.mcard{padding:10px 12px;border-radius:var(--radius-surface);background:var(--color-content);border:1px solid var(--color-line);font-size:13px}
+.mscrim{position:absolute;inset:0;background:var(--color-scrim);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+.msheet{position:absolute;left:0;right:0;bottom:0;top:52px;border-radius:16px 16px 0 0;display:flex;flex-direction:column;overflow:hidden}
+.grab{width:36px;height:5px;border-radius:999px;background:var(--color-line-strong);margin:8px auto 2px}
+.mhead{display:flex;align-items:center;gap:4px;padding:0 6px 6px;border-bottom:1px solid var(--color-line)}
+.mhead .ct{flex:1;min-width:0;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mpick{display:flex;gap:6px;padding:8px 12px;border-bottom:1px solid var(--color-line)}
+.select{font-family:inherit;background:var(--color-surface);color:var(--color-ink);border:1px solid var(--color-line-strong);border-radius:var(--radius-control);height:32px;font-size:16px;padding:0 28px 0 10px;appearance:none;flex:1;min-width:0;background-repeat:no-repeat;background-image:linear-gradient(45deg,transparent 50%,var(--color-ink-3) 50%),linear-gradient(135deg,var(--color-ink-3) 50%,transparent 50%);background-position:calc(100% - 15px) 55%,calc(100% - 10px) 55%;background-size:5px 5px,5px 5px}
+.mmsgs{flex:1;overflow:auto;padding:14px 12px;display:flex;flex-direction:column;gap:12px;font-size:14px}
+.ub{align-self:flex-end;max-width:82%;padding:8px 12px;border-radius:12px 12px 4px 12px;background:var(--color-accent-soft)}
+.ab{display:flex;flex-direction:column;gap:8px;max-width:94%}
+.step{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--color-ink-2)}.step .ok{color:var(--color-ok)}
+.mcomp{padding:8px 10px calc(10px + 20px);border-top:1px solid var(--color-line);display:flex;align-items:flex-end;gap:6px}
+.mcomp .box{flex:1;min-height:44px;border:1px solid var(--color-line-strong);border-radius:22px;background:var(--color-surface);display:flex;align-items:center;padding:0 14px;color:var(--color-ink-3);font-size:16px}
+.round{width:44px;height:44px;border-radius:999px}
+/* Telegram (external app, drawn with neutral tokens) */
+.tg{display:flex;flex-direction:column;height:100%;background:var(--color-surface)}
+.tghead{display:flex;align-items:center;gap:10px;padding:14px 12px 10px;background:var(--color-raised);border-bottom:1px solid var(--color-line)}
+.tgav{width:38px;height:38px;border-radius:999px;background:var(--color-accent);color:var(--color-on-accent);display:grid;place-items:center;font-weight:700;font-size:13px}
+.tgname{font-weight:600;font-size:15px}.tgsub{font-size:12px;color:var(--color-ink-3)}
+.tgbody{flex:1;overflow:auto;padding:12px 10px;display:flex;flex-direction:column;gap:8px;font-size:14px}
+.tday{align-self:center;font-size:11px;padding:2px 10px;border-radius:999px;background:var(--color-hover);color:var(--color-ink-2)}
+.tin{align-self:flex-start;max-width:86%;padding:8px 10px 6px;border-radius:12px 12px 12px 4px;background:var(--color-raised);border:1px solid var(--color-line)}
+.tout{align-self:flex-end;max-width:80%;padding:8px 10px 6px;border-radius:12px 12px 4px 12px;background:var(--color-accent);color:var(--color-on-accent)}
+.tt{display:block;text-align:right;font-size:10px;opacity:.6;margin-top:2px}
+.tin ul{margin:4px 0 0;padding-left:16px}.tin li{margin:2px 0}
+.kb{align-self:flex-start;width:86%;display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:-4px}
+.kb button{height:36px;border-radius:8px;border:0;background:var(--color-hover);color:var(--color-ink);font:inherit;font-size:13px;font-weight:500;cursor:pointer}
+.kb .w{grid-column:span 2}
+.tgin{display:flex;align-items:center;gap:8px;padding:8px 10px 24px;background:var(--color-raised);border-top:1px solid var(--color-line)}
+.tgin .box{flex:1;height:40px;border-radius:20px;background:var(--color-surface);display:flex;align-items:center;padding:0 14px;color:var(--color-ink-3);font-size:15px}
+.tgsend{color:var(--color-accent-ink)}
+</style></head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<symbol id="i-spark" viewBox="0 0 24 24"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+<symbol id="i-list" viewBox="0 0 24 24"><path d="M3 12h18"/><path d="M3 6h18"/><path d="M3 18h18"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+<symbol id="i-clip" viewBox="0 0 24 24"><path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+<symbol id="i-term" viewBox="0 0 24 24"><path d="M12 19h8"/><path d="m4 17 6-6-6-6"/></symbol>
+<symbol id="i-back" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></symbol>
+<symbol id="i-send" viewBox="0 0 24 24"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></symbol>
+</svg>
+<div class="canvas"></div>
+<div class="stage">
+ <div class="col">
+  <p class="cap"><b>Web, phone: assistant sheet</b>The launcher in the capsule opens a sheet; the conversation list sits behind the list icon.</p>
+  <div class="device">
+   <div class="bg"></div>
+   <div class="mtop glass">Work</div>
+   <div class="mpage"><div class="mcard">Add a cost column to History</div><div class="mcard">Scroll back through a terminal</div><div class="mcard">Capsule replaces the tab bar</div></div>
+   <div class="mscrim"></div>
+   <section class="msheet glass-strong" role="dialog" aria-label="Assistant">
+    <div class="grab" aria-hidden="true"></div>
+    <div class="mhead">
+     <button class="btn btn-ghost btn-icon tap" type="button" aria-label="Conversations"><svg class="icon" aria-hidden="true"><use href="#i-list"/></svg></button>
+     <span class="ct">Spend this week</span>
+     <button class="btn btn-ghost btn-icon tap" type="button" aria-label="New chat"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg></button>
+     <button class="btn btn-ghost btn-icon tap" type="button" aria-label="Close"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="mpick">
+     <select class="select" aria-label="Project"><option>Auto · all projects</option></select>
+     <select class="select" aria-label="Model"><option>Haiku 5.5</option></select>
+    </div>
+    <div class="mmsgs">
+     <div class="ub">How much did the fleet spend this week, and what was most expensive?</div>
+     <div class="ab">
+      <div class="step"><svg class="icon sm ok" aria-hidden="true"><use href="#i-check"/></svg>Read budget · Read activity</div>
+      <p><b class="num">$214.60</b> since Monday, 12% under last week. The most expensive card was <b>#527 Feed the approved design to every slot</b> at <span class="num">$31.40</span>, after three retries on slot-4.</p>
+      <p>The assistant itself spent <span class="num">$9.80</span>, counted against each provider's cap.</p>
+     </div>
+     <div class="ub">Summarize slot-4's last session</div>
+     <div class="ab">
+      <div class="step"><span class="pill pill-running"><span class="sdot"></span>Summarizing</span>slot-4 · session 3h 12m</div>
+     </div>
+    </div>
+    <div class="mcomp">
+     <button class="btn btn-ghost btn-icon round" type="button" aria-label="Attach"><svg class="icon" aria-hidden="true"><use href="#i-clip"/></svg></button>
+     <div class="box">Ask anything…</div>
+     <button class="btn btn-solid btn-icon round" type="button" aria-label="Send"><svg class="icon" aria-hidden="true"><use href="#i-up"/></svg></button>
+    </div>
+   </section>
+  </div>
+ </div>
+ <div class="col">
+  <p class="cap"><b>Telegram: free text goes to the assistant</b>The digest arrives at 09:00. The assistant replies in the language of the message; the stored conversation stays English. Approvals reuse the existing buttons.</p>
+  <div class="device">
+   <div class="tg">
+    <div class="tghead"><svg class="icon" aria-hidden="true" style="color:var(--color-accent-ink)"><use href="#i-back"/></svg><span class="tgav">AD</span><div><div class="tgname">AgentDock</div><div class="tgsub">bot</div></div></div>
+    <div class="tgbody">
+     <span class="tday">Today</span>
+     <div class="tin"><b>☀ Daily digest · AgentDock</b>
+      <ul><li>9 PRs merged, 2 failed checks (#521, #530)</li><li>slot-1 has waited on a prompt since 08:41</li><li>Spend $41.20 yesterday; Anthropic 31% of its cap</li><li>3 new cards need triage</li></ul><span class="tt">09:00</span></div>
+     <div class="kb"><button type="button" class="w">Open digest in AgentDock</button></div>
+     <div class="tout">что сейчас блокирует очередь?<span class="tt">09:14</span></div>
+     <div class="tin">Две вещи. <b>slot-1</b> ждёт разрешения на <code class="inline">bun run db:migrate</code> уже 33 минуты. <b>#521</b> упал на flaky-тесте <code class="inline">board.spec.ts:88</code>, а карточки на него нет.<br>Разрешить slot-1?<span class="tt">09:14</span></div>
+     <div class="kb"><button type="button">✓ Approve</button><button type="button">✕ Deny</button></div>
+     <div class="tout">да. и заведи карточку на этот тест<span class="tt">09:15</span></div>
+     <div class="tin">Одобрено, slot-1 продолжает работу. Черновик карточки для <b>AgentDock</b>:<br><b>Stabilise the Board drag e2e test</b> · bug · S<span class="tt">09:15</span></div>
+     <div class="kb"><button type="button">Queue card</button><button type="button">Edit in web</button></div>
+    </div>
+    <div class="tgin"><div class="box">Message</div><svg class="icon tgsend" aria-hidden="true" style="width:22px;height:22px"><use href="#i-send"/></svg></div>
+   </div>
+  </div>
+ </div>
+</div>
+</body></html>
