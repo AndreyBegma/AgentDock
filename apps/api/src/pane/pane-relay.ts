@@ -80,6 +80,8 @@ export class PaneRelay
   private readonly byId = new Map<string, LiveTopic>();
   /** `user\0topic` → the audit of a watch that may still resume (C-119). */
   private readonly stopping = new Map<string, PendingStop>();
+  /** Stop writes whose window ran out and that have not landed yet. */
+  private readonly writing = new Set<Promise<void>>();
   private queue: Promise<void> = Promise.resolve();
 
   constructor(
@@ -100,7 +102,10 @@ export class PaneRelay
     const pending = [...this.stopping.values()];
     this.stopping.clear();
     for (const stop of pending) clearTimeout(stop.timer);
-    await Promise.all(pending.map((stop) => stop.write()));
+    await Promise.all([
+      ...pending.map((stop) => stop.write()),
+      ...this.writing,
+    ]);
   }
 
   /** Resolves once every transition queued so far has run (tests). */
@@ -316,7 +321,8 @@ export class PaneRelay
       this.record('pane.watch_stopped', watch, userId, { leftAt });
     const timer = setTimeout(() => {
       this.stopping.delete(key);
-      void write();
+      const written = write().finally(() => this.writing.delete(written));
+      this.writing.add(written);
     }, this.options.auditWindowMs);
     timer.unref();
     this.stopping.set(key, { timer, write });

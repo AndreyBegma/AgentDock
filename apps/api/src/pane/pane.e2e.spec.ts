@@ -11,6 +11,7 @@ import {
   paneTopic,
   type ServerMessage,
 } from '@agentdock/shared/protocol';
+import { LiveConnections } from '../live/live-connections';
 import { allowedLiveOrigin } from '../live/live-options';
 import { TestLiveSocket } from '../live/testing/live-e2e';
 import {
@@ -176,6 +177,12 @@ describe('pane relay (e2e)', () => {
   afterEach(async () => {
     for (const socket of browsers.splice(0)) socket.socket.terminate();
     for (const socket of runners.splice(0)) socket.socket.terminate();
+    // The server sees a terminated socket close a moment later; its leave
+    // (and the stop it defers) must not reach the next test.
+    const connections = ctx.app.get(LiveConnections);
+    await eventually('browsers gone', async () =>
+      connections.all().length === 0 ? true : undefined,
+    );
     await relay.settled();
     // A stop still waiting out its window must not land in the next test.
     await relay.flushStops();
