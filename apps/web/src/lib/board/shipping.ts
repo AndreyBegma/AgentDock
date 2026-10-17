@@ -5,6 +5,7 @@ import {
   CARD_CI_FIX_ATTEMPTS_MAX,
   type CardCiCheck,
   type CardCiState,
+  type CardNeedsPersonReason,
   type CardPullRequestRef,
 } from '@agentdock/shared';
 import { PR_STATE_LABEL } from './pull-request';
@@ -31,9 +32,44 @@ export const CI_STILL_FAILING_TEXT = `CI still failing after ${CARD_CI_FIX_ATTEM
 /** #484: the budget stop's text when CI never reported on the head. */
 export const CI_NOT_REPORTED_TEXT = 'CI reported no checks';
 
-/** Why automation stopped: no checks at all (#484), or red ones (#359 D6). */
-const needsPersonText = (card: Pick<BoardCardView, 'ciState'>): string =>
-  card.ciState === 'none' ? CI_NOT_REPORTED_TEXT : CI_STILL_FAILING_TEXT;
+/**
+ * #542: why auto-merge refused the head the latest round left — the round
+ * did not do the card's work.
+ */
+export const NEEDS_PERSON_ROUND_TEXT: Record<
+  Extract<
+    CardNeedsPersonReason,
+    'round_failed' | 'round_pushed_nothing' | 'round_ended_at_once'
+  >,
+  string
+> = {
+  round_failed: 'Last round failed; not merged',
+  round_pushed_nothing: 'Last round pushed no commit; not merged',
+  round_ended_at_once: 'Last round ended at once; not merged',
+};
+
+/**
+ * Why automation stopped: the stored reason, else — a card marked before
+ * #542 — no checks at all (#484), or red ones (#359 D6).
+ */
+const needsPersonText = (
+  card: Pick<BoardCardView, 'ciState' | 'needsPersonReason'>,
+): string => {
+  switch (card.needsPersonReason) {
+    case 'ci_still_failing':
+      return CI_STILL_FAILING_TEXT;
+    case 'ci_not_reported':
+      return CI_NOT_REPORTED_TEXT;
+    case 'round_failed':
+    case 'round_pushed_nothing':
+    case 'round_ended_at_once':
+      return NEEDS_PERSON_ROUND_TEXT[card.needsPersonReason];
+    case null:
+      return card.ciState === 'none'
+        ? CI_NOT_REPORTED_TEXT
+        : CI_STILL_FAILING_TEXT;
+  }
+};
 
 /** #359 D7/D8: a sub-state badge on the card face. */
 export interface ShippingBadge {
@@ -51,7 +87,12 @@ export interface ShippingBadge {
 export function shippingBadge(
   card: Pick<
     BoardCardView,
-    'column' | 'ciState' | 'ciFixAttempts' | 'needsPerson' | 'mergedAt'
+    | 'column'
+    | 'ciState'
+    | 'ciFixAttempts'
+    | 'needsPerson'
+    | 'needsPersonReason'
+    | 'mergedAt'
   >,
 ): ShippingBadge | null {
   if (card.needsPerson) return { tone: 'danger', label: needsPersonText(card) };
@@ -71,11 +112,15 @@ export function shippingBadge(
 }
 
 /**
- * The sheet's banner when automation stopped on a red CI (#359 D6) or on a
- * head CI never reported on, even after a retrigger (#484); `null` otherwise.
+ * The sheet's banner when automation stopped on a red CI (#359 D6), on a
+ * head CI never reported on, even after a retrigger (#484), or on a head
+ * the latest round did not work on (#542); `null` otherwise.
  */
 export function ciBanner(
-  card: Pick<BoardCardView, 'needsPerson' | 'ciChecks' | 'ciState'>,
+  card: Pick<
+    BoardCardView,
+    'needsPerson' | 'needsPersonReason' | 'ciChecks' | 'ciState'
+  >,
 ): { title: string; checks: CardCiCheck[]; hint: string } | null {
   if (!card.needsPerson) return null;
   return {

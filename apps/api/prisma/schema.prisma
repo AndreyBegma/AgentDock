@@ -2914,6 +2914,9 @@ model BoardCard {
   ciRetriggeredSha        String?
   /// #359 D6: CI still failing after the budget — no automation until a person acts.
   needsPerson             Boolean          @default(false)
+  /// #542: why `needsPerson` is set (shared `CARD_NEEDS_PERSON_REASONS`);
+  /// `null` while it is not, and for a card marked before #542.
+  needsPersonReason       String?
   /// #359 D8: when the latest PR merged; the card stays in Finished as Merged.
   mergedAt                DateTime?
   /// Nullable so deleting a user keeps the card.
@@ -3147,6 +3150,10 @@ model BoardCardRound {
   finishRefusedAt     DateTime?
   finishedAt          DateTime?
   endedAt             DateTime?
+  /// #542: the card PR's head when the round started (`ciHeadSha`); `null`
+  /// when the card had no PR then. Auto-merge refuses a head the round left
+  /// as it found it.
+  startHeadSha        String?
   /// #449 D3: how the round's session started, from `round.restart`; `null`
   /// until that event arrives, and for a runner older than Context handoff.
   restartMode         CardRestartMode?
