@@ -30,7 +30,8 @@
     "react-dom": "19.2.5",
     "react-markdown": "10.1.0",
     "remark-gfm": "4.0.1",
-    "sonner": "2.0.8"
+    "sonner": "2.0.8",
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.2",
