@@ -58,7 +58,8 @@ export const KIND_EXAMPLE: Record<NotificationKind, string> = {
   'cards.suggested': '3 cards suggested in the luna-watch Inbox',
   'steward.incident':
     'C-12 needs you: API error persisted after 2 nudges — open the terminal',
-  'account.throttled': 'admin@example.com: 5 wrong passwords from 203.0.113.7',
+  'account.throttled':
+    'Ana Diaz’s account had 5 wrong passwords from 203.0.113.7',
 };
 
 export type RuleGroup =
