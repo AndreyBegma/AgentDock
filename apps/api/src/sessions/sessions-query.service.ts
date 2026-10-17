@@ -12,7 +12,12 @@ import { PrismaService } from '../database/prisma.service';
 import { ProjectAccessService } from '../projects';
 import type { ListSessionsQuery } from './dto';
 import { sessionError, sessionNotFound } from './session-error';
-import { buildSessionTree, type SessionRow, summaryOf } from './session-tree';
+import {
+  buildSessionTree,
+  MAX_SESSION_TREE_DEPTH,
+  type SessionRow,
+  summaryOf,
+} from './session-tree';
 
 type Caller = Pick<AuthUser, 'id' | 'role'>;
 
@@ -241,15 +246,19 @@ export class SessionsQueryService {
     return (await this.access.resolve(user, projectId)) !== null;
   }
 
-  /** `id` and every session below it. `UNION` ends a cycle of parent links. */
+  /**
+   * `id` and every session below it, `MAX_SESSION_TREE_DEPTH` levels at most
+   * (C-137); the depth also ends a cycle of parent links.
+   */
   private async subtreeIds(id: string): Promise<string[]> {
     const rows = await this.prisma.$queryRaw<{ id: string }[]>`
-      WITH RECURSIVE tree(id) AS (
-        SELECT ${id}::text
-        UNION
-        SELECT s.id FROM sessions s JOIN tree t ON s."parentSessionId" = t.id
+      WITH RECURSIVE tree(id, depth) AS (
+        SELECT ${id}::text, 1
+        UNION ALL
+        SELECT s.id, t.depth + 1 FROM sessions s JOIN tree t ON s."parentSessionId" = t.id
+        WHERE t.depth < ${MAX_SESSION_TREE_DEPTH}
       )
-      SELECT id FROM tree`;
+      SELECT DISTINCT id FROM tree`;
     return rows.map((r) => r.id);
   }
 
@@ -259,11 +268,13 @@ export class SessionsQueryService {
   ): Promise<Map<string, { subagents: number; totals: SessionTotals }>> {
     if (roots.length === 0) return new Map();
     const rows = await this.prisma.$queryRaw<SubtreeTotalsRow[]>`
-      WITH RECURSIVE tree(root, id) AS (
-        SELECT id, id FROM sessions WHERE id IN (${Prisma.join(roots)})
-        UNION
-        SELECT t.root, s.id FROM sessions s JOIN tree t ON s."parentSessionId" = t.id
-      )
+      WITH RECURSIVE walk(root, id, depth) AS (
+        SELECT id, id, 1 FROM sessions WHERE id IN (${Prisma.join(roots)})
+        UNION ALL
+        SELECT w.root, s.id, w.depth + 1 FROM sessions s JOIN walk w ON s."parentSessionId" = w.id
+        WHERE w.depth < ${MAX_SESSION_TREE_DEPTH}
+      ),
+      tree AS (SELECT DISTINCT root, id FROM walk)
       SELECT t.root,
         (COUNT(DISTINCT t.id) - 1)::int AS subagents,
         COUNT(r.id)::int AS requests,

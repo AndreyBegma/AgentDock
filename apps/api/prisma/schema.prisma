@@ -267,9 +267,10 @@ model Event {
   /// Runner rows have positive seqs; server-originated rows (ADR-0014) take
   /// `-nextval('server_event_seq')`, so the two never meet.
   @@unique([runnerId, seq])
-  /// One plugin event per project root. NULLs are distinct in PostgreSQL, so
-  /// this binds plugin events only — a partial index without a `WHERE`.
-  @@unique([projectRoot, pluginEventId])
+  /// One plugin event per runner and project root. NULLs are distinct in
+  /// PostgreSQL, so this binds plugin events only — a partial index without a
+  /// `WHERE`.
+  @@unique([runnerId, projectRoot, pluginEventId])
   /// One server-originated event per key; NULLs are distinct, as above.
   @@unique([source, dedupeKey])
   @@index([type, ts])

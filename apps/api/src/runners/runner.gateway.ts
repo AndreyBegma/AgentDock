@@ -26,8 +26,15 @@ import { RunnerStreams } from './runner-streams';
 import { RunnerWatchList } from './runner-watch-list';
 
 /** Standard close codes the gateway uses besides `RUNNER_CLOSE_CODES`. */
+const PROTOCOL_ERROR = 1002;
 const POLICY_VIOLATION = 1008;
 const INTERNAL_ERROR = 1011;
+
+/** Bytes of a raw frame, whatever shape `ws` hands over. */
+const byteLength = (data: RawData): number =>
+  Array.isArray(data)
+    ? data.reduce((sum, chunk) => sum + chunk.byteLength, 0)
+    : data.byteLength;
 
 /** As the terminal gateway reads it: the socket's peer and its user agent. */
 const peerOf = (request: IncomingMessage): RunnerPeer => ({
@@ -119,6 +126,15 @@ class RunnerSocket {
       return;
     }
     const type = (json as { type?: unknown } | null)?.type;
+    // C-137: `maxPayload` leaves room for other frames; a batch is held to
+    // its own cap on the raw frame, before the schema walks it.
+    if (type === 'events' && byteLength(data) > MAX_EVENTS_BATCH_BYTES) {
+      this.deps.logger.warn(
+        `runner ${this.runnerId}: events frame over ${MAX_EVENTS_BATCH_BYTES} bytes refused`,
+      );
+      this.close(PROTOCOL_ERROR, 'events batch too large');
+      return;
+    }
     const version = (json as { protocolVersion?: unknown } | null)
       ?.protocolVersion;
     // Checked before the schema: another version's hello may not parse at all.
