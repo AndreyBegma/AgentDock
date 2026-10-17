@@ -12,6 +12,7 @@ import type {
   CardRunWiringReason,
   LocalErrorCode,
   OrchestratorPermissionMode,
+  PaneDialog,
   PrChecks,
   PrInspectState,
 } from '../protocol';
@@ -111,6 +112,11 @@ export interface CardRoundBrief {
    * older fixtures stay valid.
    */
   finishRefused?: LocalErrorCode | null;
+  /**
+   * #624: the Claude Code dialog that blocks the waiting round's session;
+   * `null` otherwise. Optional so older fixtures stay valid.
+   */
+  blockingDialog?: PaneDialog | null;
 }
 
 /**
@@ -378,6 +384,8 @@ export interface CardRoundView {
    * older fixtures stay valid.
    */
   finishRefused?: LocalErrorCode | null;
+  /** #624: as on `CardRoundBrief`. Optional so older fixtures stay valid. */
+  blockingDialog?: PaneDialog | null;
   /** The person's text, for a `feedback` round. */
   feedback: string | null;
   author: BoardUserRef | null;
@@ -1050,11 +1058,11 @@ export interface CardFinishedEventData {
 }
 
 /**
- * Why a round waits for the person: its turn ended (`stopped`), or it asks
- * a question in the session (`question`, #473). Absent from events recorded
- * before #473 — a stop.
+ * Why a round waits for the person: its turn ended (`stopped`), it asks a
+ * question in the session (`question`, #473), or a Claude Code dialog blocks
+ * it (`dialog`, #624). Absent from events recorded before #473 — a stop.
  */
-export type CardWaitingReason = 'stopped' | 'question';
+export type CardWaitingReason = 'stopped' | 'question' | 'dialog';
 
 export interface CardWaitingEventData {
   cardId: string;
@@ -1062,6 +1070,8 @@ export interface CardWaitingEventData {
   title: string;
   round: number;
   reason?: CardWaitingReason;
+  /** #624: the dialog, with `reason: 'dialog'`. */
+  dialog?: PaneDialog;
 }
 
 /**

@@ -43,6 +43,7 @@ describe('classifyPane', () => {
 
   it.each([
     ['trust', 'trust'],
+    ['trust-workspace', 'trust'],
     ['bypass', 'bypass'],
     ['credits', 'credits'],
     ['settings', 'settings'],
