@@ -19,7 +19,6 @@ import {
   GH_TIMEOUT_MS,
   gitOk,
   NETWORK_TIMEOUT_MS,
-  NO_HOOKS,
   parsePrUrl,
   type SkillsDeps,
   stderrLine,
@@ -124,7 +123,6 @@ const openPr = async (
     await gitOk(exec, [
       '-C',
       wt,
-      ...NO_HOOKS,
       'commit',
       '--quiet',
       '--no-verify',
@@ -184,15 +182,7 @@ export const pushBranch = async (
 ): Promise<void> => {
   await gitOk(
     deps.exec,
-    [
-      '-C',
-      worktree,
-      ...NO_HOOKS,
-      'push',
-      '--quiet',
-      'origin',
-      `HEAD:refs/heads/${branch}`,
-    ],
+    ['-C', worktree, 'push', '--quiet', 'origin', `HEAD:refs/heads/${branch}`],
     NETWORK_TIMEOUT_MS,
   );
 };

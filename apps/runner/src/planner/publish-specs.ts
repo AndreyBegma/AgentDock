@@ -13,7 +13,6 @@ import {
   GH_TIMEOUT_MS,
   gitOk,
   NETWORK_TIMEOUT_MS,
-  NO_HOOKS,
   parsePrUrl,
   randomShortId,
   type SkillsDeps,
@@ -178,7 +177,6 @@ export const openSpecsPr = async (
     await gitOk(exec, [
       '-C',
       worktree,
-      ...NO_HOOKS,
       'commit',
       '--quiet',
       '--no-verify',
@@ -191,7 +189,6 @@ export const openSpecsPr = async (
       [
         '-C',
         worktree,
-        ...NO_HOOKS,
         'push',
         '--quiet',
         '--force',
