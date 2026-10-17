@@ -1,4 +1,5 @@
 import {
+  PLANNER_DISCUSS_CONTRACT,
   PLANNER_INTAKE_CONTRACT,
   type PlanQuestion,
   plannerOutputContract,
@@ -6,6 +7,7 @@ import {
 import { readCardInstructions } from './plan-intake';
 import {
   assemblePrompt,
+  DISCUSS_INSTRUCTIONS,
   type PromptInput,
   type PromptTask,
 } from './plan-prompt';
@@ -212,5 +214,41 @@ describe('assemblePrompt — the intake stack rule (#524)', () => {
         'several UI changes to one surface or form factor (one screen, one page, "the board on phones") — a stack with `design: true`, staged foundations first',
       );
     }
+  });
+});
+
+describe('assemblePrompt — a discussion turn (#590)', () => {
+  const discuss: PromptInput = {
+    ...base,
+    instructions: 'GLOBAL INSTRUCTIONS',
+    action: 'discuss',
+    brief: 'How are runner tokens checked?',
+    plan: { title: 'Tokens', mode: 'discuss', version: 1 },
+    contractVersion: 3,
+    discussion: { skills: ['code-sentinel:cs-security'] },
+  };
+
+  it('runs on the discussion instructions and contract, read-only, with its skills', () => {
+    const prompt = assemblePrompt(discuss);
+    expect(prompt.startsWith(DISCUSS_INSTRUCTIONS)).toBe(true);
+    expect(prompt).not.toContain('GLOBAL INSTRUCTIONS');
+    expect(prompt).toContain(PLANNER_DISCUSS_CONTRACT.trim());
+    expect(prompt).toContain('The repository is read-only for you.');
+    expect(prompt).toContain('Action: `discuss`');
+    expect(prompt).toContain('`code-sentinel:cs-security`');
+    expect(prompt).toContain('How are runner tokens checked?');
+    expect(prompt).toContain('Answer the opening message above.');
+  });
+
+  it('puts a later message after the opening, and says None without skills', () => {
+    const prompt = assemblePrompt({
+      ...discuss,
+      discussion: { skills: [] },
+      input: { message: 'And the webhook secret?' },
+    });
+    expect(prompt).toContain('## Skills\n\nNone.');
+    expect(prompt.indexOf('And the webhook secret?')).toBeGreaterThan(
+      prompt.indexOf('How are runner tokens checked?'),
+    );
   });
 });

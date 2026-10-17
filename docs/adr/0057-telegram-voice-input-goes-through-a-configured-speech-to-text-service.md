@@ -1,4 +1,4 @@
-# ADR-0056: Telegram voice input goes through a configured speech-to-text service; photos are ordinary uploads
+# ADR-0057: Telegram voice input goes through a configured speech-to-text service; photos are ordinary uploads
 
 Status: accepted · Date: 2026-10-17 ·
 Card: C-214 (stack S-1) ·

@@ -154,12 +154,22 @@ export class PlanService implements OnModuleInit {
     request: CreatePlanRequest,
   ): Promise<PlanDetail> {
     const card = request.mode === 'card';
+    const discuss = request.mode === 'discuss';
     const attachmentIds = request.attachmentIds ?? [];
     if (!card && attachmentIds.length > 0) {
       throw plannerError(
         409,
         PLANNER_ERROR.wrongMode,
         'Attachments belong to a card intake',
+      );
+    }
+    // #590: skills are a discussion's, chosen once, kept in their order.
+    const skills = [...new Set(request.skills ?? [])];
+    if (!discuss && skills.length > 0) {
+      throw plannerError(
+        409,
+        PLANNER_ERROR.wrongMode,
+        'Skills belong to a discussion',
       );
     }
     const project = await this.store.project(projectId);
@@ -194,6 +204,7 @@ export class PlanService implements OnModuleInit {
           contractVersion: PLANNER_CONTRACT_VERSION,
           profileKey: profile.key,
           model,
+          skills,
         },
       });
       await this.attachments.claimForPlan(
@@ -215,14 +226,16 @@ export class PlanService implements OnModuleInit {
         profileKey: plan.profileKey,
         instructionsId: plan.instructionsId,
         ...(attachmentIds.length > 0 ? { attachmentIds } : {}),
+        ...(skills.length > 0 ? { skills } : {}),
       },
       result: 'ok',
     });
     // #271 D3: the first turn reads the brief as stored once the request
     // resolves — English when DeepL answered inside it (#324 D1), else as typed.
     // #337 D5: an intake keeps the person's words as typed — the model asks
-    // in their language and writes the card in English itself.
-    if (!card) {
+    // in their language and writes the card in English itself. #590: so
+    // does a discussion — the model replies in the person's language.
+    if (!card && !discuss) {
       await this.text.request(
         projectId,
         { ownerType: 'plan', ownerId: plan.id },

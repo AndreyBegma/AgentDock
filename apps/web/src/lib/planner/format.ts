@@ -37,11 +37,15 @@ export const PLAN_STATUS_LABEL: Record<PlanStatus, string> = {
   done: 'Done',
 };
 
-/** A plan's mode, as a list row names it; `card` is a New work intake (#337, #409). */
+/**
+ * A plan's mode, as a list row names it; `card` is a New work intake (#337,
+ * #409), `discuss` a discussion (#590).
+ */
 export const PLAN_MODE_LABEL: Record<PlanMode, string> = {
   batch: 'Batch',
   dialogue: 'Dialogue',
   card: 'New work',
+  discuss: 'Discussion',
 };
 
 export const PLAN_STATUS_PILL: Record<PlanStatus, Status> = {
@@ -265,6 +269,7 @@ export function turnActionText(
     revise: 'Revising the plan…',
     design: `Drawing ${task}’s mockup…`,
     intake: 'Thinking about the card…',
+    discuss: 'Reading the repository…',
   };
   return sentence[turn.action];
 }
@@ -318,6 +323,7 @@ export const TURN_ACTION_LABEL: Record<PlanTurnAction, string> = {
   revise: 'Revise the plan',
   design: 'Draw the mockup',
   intake: 'Shape the card',
+  discuss: 'Discuss',
 };
 
 const TURN_PHASE_WORD: Record<PlanTurnPhase, string> = {

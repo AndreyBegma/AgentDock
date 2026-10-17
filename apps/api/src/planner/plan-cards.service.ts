@@ -94,6 +94,14 @@ export class PlanCardsService {
         'A card intake makes its card itself',
       );
     }
+    // #590: a discussion's cards come through New work only.
+    if (plan.mode === 'discuss') {
+      throw plannerError(
+        409,
+        PLANNER_ERROR.wrongMode,
+        'A discussion makes no cards; Make a card opens New work',
+      );
+    }
     if (plan.status === 'done') throw this.cardsExist();
     this.store.assertOpen(plan);
     if (plan.status !== 'reviewing') {

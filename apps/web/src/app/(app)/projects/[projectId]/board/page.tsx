@@ -17,7 +17,7 @@ import {
 } from '@andrewbehma/glass-ui/segmented-control';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { toast } from '@andrewbehma/glass-ui/toast';
-import { SquarePen } from 'lucide-react';
+import { MessagesSquare, SquarePen } from 'lucide-react';
 import Link from 'next/link';
 import {
   useParams,
@@ -42,6 +42,7 @@ import {
   CardSheet,
   type TerminalAccess,
 } from '../../../../../components/board/card-sheet';
+import { DiscussDialog } from '../../../../../components/board/discuss-dialog';
 import { DraftsStrip } from '../../../../../components/board/drafts-strip';
 import { NewCardDialog } from '../../../../../components/board/new-card-dialog';
 import { PlanPanel } from '../../../../../components/board/plan-panel';
@@ -113,6 +114,10 @@ function BoardScreen() {
   const planPanelId = params.get('planPanel') ?? undefined;
   const planPanelOpen = planPanelId !== undefined;
   const newWorkLinked = params.has('newWork') || params.has('newPlan');
+  // #590: a discussion (`?discussion=`) lives in the URL too; Discuss opens
+  // the start panel, which then becomes the discussion.
+  const discussionId = params.get('discussion') ?? undefined;
+  const [discussing, setDiscussing] = useState(false);
   const user = useCurrentUser();
   /** Bumped by a live push or a mutation; the board and the sheet depend on it. */
   const [version, setVersion] = useState(0);
@@ -155,6 +160,13 @@ function BoardScreen() {
       label: 'New work',
       icon: SquarePen,
       onSelect: () => setCreating(true),
+      operatorOnly: true,
+    },
+    {
+      id: 'discuss',
+      label: 'Discuss',
+      icon: MessagesSquare,
+      onSelect: () => setDiscussing(true),
       operatorOnly: true,
     },
   ]);
@@ -246,7 +258,9 @@ function BoardScreen() {
   const resumeDraft = (plan: PlanSummary) =>
     plan.mode === 'card'
       ? setParams({ intake: plan.id })
-      : setParams({ planPanel: plan.id });
+      : plan.mode === 'discuss'
+        ? setParams({ discussion: plan.id })
+        : setParams({ planPanel: plan.id });
 
   const selectPlanTask = (task: BoardPlanTaskView | undefined) => {
     const next = new URLSearchParams(params.toString());
@@ -317,7 +331,11 @@ function BoardScreen() {
           actions={
             <>
               {live.status !== 'connected' ? <LiveStatusBadge /> : null}
-              <SegmentedControl role="group" aria-label="View">
+              <SegmentedControl
+                role="group"
+                aria-label="View"
+                className="max-sm:basis-full"
+              >
                 <SegmentedControlItem active={false} layoutId="work-view">
                   <Link
                     href={`/work?projectId=${encodeURIComponent(projectId)}`}
@@ -337,9 +355,22 @@ function BoardScreen() {
                 </SegmentedControlItem>
               </SegmentedControl>
               {canOperate ? (
-                <Button variant="solid" onClick={() => setCreating(true)}>
-                  New work
-                </Button>
+                <>
+                  <Button
+                    variant="glass"
+                    className="max-sm:flex-1"
+                    onClick={() => setDiscussing(true)}
+                  >
+                    Discuss
+                  </Button>
+                  <Button
+                    variant="solid"
+                    className="max-sm:flex-1"
+                    onClick={() => setCreating(true)}
+                  >
+                    New work
+                  </Button>
+                </>
               ) : null}
             </>
           }
@@ -362,6 +393,9 @@ function BoardScreen() {
             onResume={resumeDraft}
             onDiscarded={(plan) => {
               if (plan.id === intakeId) setParams({ intake: undefined });
+              if (plan.id === discussionId) {
+                setParams({ discussion: undefined });
+              }
               if (plan.id === planPanelId) closePlanPanel();
             }}
           />
@@ -433,6 +467,33 @@ function BoardScreen() {
             onCreated={(number) => {
               setCreating(false);
               setParams({ intake: undefined, card: String(number) });
+            }}
+          />
+          <DiscussDialog
+            projectId={projectId}
+            project={project}
+            open={discussing || discussionId !== undefined}
+            planId={discussionId}
+            onOpenChange={(open) => {
+              setDiscussing(open);
+              // Closing keeps the discussion as a draft.
+              if (!open && discussionId) setParams({ discussion: undefined });
+            }}
+            onStarted={(planId) => {
+              setDiscussing(false);
+              setParams({ discussion: planId });
+              reload();
+            }}
+            onMakeCard={(brief) => {
+              // ADR-0037 §5: New work, What to do prefilled; the
+              // discussion stays in Drafts.
+              setDiscussing(false);
+              setParams({ discussion: undefined, newWork: '1', brief });
+            }}
+            onDiscarded={() => {
+              setDiscussing(false);
+              setParams({ discussion: undefined });
+              reload();
             }}
           />
           <PlanPanel
