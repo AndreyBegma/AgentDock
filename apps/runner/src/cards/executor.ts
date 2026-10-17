@@ -36,6 +36,7 @@ import {
   handoffOn,
   type PreparedRound,
 } from '../handoff/service';
+import type { SessionBinding } from '../local/session-tokens';
 import { errorMessage, type Logger } from '../log';
 import { type DeliveryTmux, deliverText } from '../session/deliver';
 import { profileOf, type SkillsDeps } from '../skills/deps';
@@ -91,6 +92,8 @@ export interface CardExecutorOptions {
   onSessionEnded?: (record: CardRecord, exitCode: number | null) => void;
   /** #449: Context handoff; absent, every round launches as the API asked. */
   handoff?: HandoffService;
+  /** #113: the token a round's session presents to the local socket. */
+  sessionToken?: (binding: SessionBinding) => string;
 }
 
 /**
@@ -307,6 +310,10 @@ export class CardExecutor {
             this.options.otlpPort?.() ?? null,
             wiring.files,
             tokenSaver,
+            this.options.sessionToken?.({
+              sessionId: launch.session.id,
+              cwd: record.worktree,
+            }),
           ),
         );
         const created = await this.tmux.newSession(
@@ -590,6 +597,10 @@ export class CardExecutor {
             this.options.otlpPort?.() ?? null,
             wiring.files,
             tokenSaver,
+            this.options.sessionToken?.({
+              sessionId: launch.session.id,
+              cwd: record.worktree,
+            }),
           ),
         );
         const created = await this.tmux.newSession(

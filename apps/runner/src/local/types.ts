@@ -5,6 +5,7 @@ import {
   localErrorCodeSchema,
 } from '@agentdock/shared/protocol';
 import { z } from 'zod';
+import { SESSION_TOKEN_MAX } from './session-tokens';
 
 /**
  * The daemon's local socket protocol (docs/specs/201-claude-code-integration.md
@@ -44,8 +45,19 @@ export const localLineSchema = z.object({
   id: z.string().min(1).max(128),
   op: localOpSchema,
   args: z.unknown(),
+  /** #113: the caller's session token; only a `SessionStart` may come without. */
+  token: z.string().min(1).max(SESSION_TOKEN_MAX).optional(),
 });
 export type LocalLine = z.infer<typeof localLineSchema>;
+
+/**
+ * #113: who is calling, as the daemon knows it — the token the line carried
+ * and the peer pid the kernel reported (null where it cannot be read).
+ */
+export interface LocalCaller {
+  token?: string;
+  peerPid: number | null;
+}
 
 export interface LocalError {
   code: LocalErrorCode;
@@ -126,6 +138,16 @@ export const localEventArgsSchema = z.object({
   ancestors: z.array(ancestorSchema).max(32).optional(),
 });
 export type LocalEventArgs = z.infer<typeof localEventArgsSchema>;
+
+/**
+ * What an `event` answers. A `SessionStart` also gets the session's token
+ * (#113), which its hook keeps for the session's later calls.
+ */
+export const localEventResultSchema = z.object({
+  queued: z.literal(true),
+  token: z.string().min(1).max(SESSION_TOKEN_MAX).optional(),
+});
+export type LocalEventResult = z.infer<typeof localEventResultSchema>;
 
 /** `op: 'request'` — relayed as `local.request` (D6). */
 export const localRequestArgsSchema = z.object({

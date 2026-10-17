@@ -7,6 +7,7 @@ import type {
 } from '@agentdock/shared/protocol';
 import type { ConfigProfile } from '../config';
 import { type TokenSaverLaunch, tokenSaverLaunch } from '../launch/token-saver';
+import { SESSION_TOKEN_ENV } from '../local/session-tokens';
 import { runEnv } from '../skills/run/launch';
 import type { LaunchSpec } from '../skills/run/record';
 import { cardIssueNumber, finishGuardArgs } from './finish-guard';
@@ -103,7 +104,8 @@ export const cardArgv = (
  * What `exec-run` starts in the card's tmux session. The round's `runId` is
  * in the resource attributes, so the cost of a resumed session is booked to
  * the round that resumed it; the card's own env (#389) is set over the
- * profile's.
+ * profile's, and with it the session's token (#113), which its hooks and its
+ * MCP server present to the daemon.
  */
 export const cardLaunchSpec = (
   profile: ConfigProfile,
@@ -121,12 +123,14 @@ export const cardLaunchSpec = (
   otlpPort: number | null,
   wiring?: CardWiringFiles,
   tokenSaver?: TokenSaverLaunch | null,
+  sessionToken?: string,
 ): LaunchSpec => ({
   ...cardArgv(profile, args, wiring, tokenSaver),
   env: {
     ...runEnv(profile, args, otlpPort),
     ...cardEnv(args.shortId),
     ...(tokenSaver?.env ?? {}),
+    ...(sessionToken ? { [SESSION_TOKEN_ENV]: sessionToken } : {}),
   },
   cwd: worktree,
   interactive: true,

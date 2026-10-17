@@ -16,7 +16,7 @@ interface HookSession {
 }
 
 /** `claude`, or a path or argv0 ending in it, possibly with a version suffix. */
-const isClaude = (comm: string): boolean =>
+export const isClaude = (comm: string): boolean =>
   /^claude(\b|$)/.test(basename(comm.trim()));
 
 /**
@@ -98,6 +98,11 @@ export class HookSessions {
   /** The session whose `claude` process is `ppid`, as `SessionStart` reported it. */
   byParent(ppid: number | undefined): string | null {
     return ppid === undefined ? null : (this.byPid.get(ppid) ?? null);
+  }
+
+  /** #113: the live `claude` process of a session, as `SessionStart` reported it. */
+  claudePidOf(sessionId: string): number | null {
+    return this.sessions.get(sessionId)?.claudePid ?? null;
   }
 
   cwdOf(sessionId: string): string | undefined {
