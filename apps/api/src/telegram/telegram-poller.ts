@@ -15,7 +15,7 @@ import {
   TelegramClient,
   type TelegramUpdate,
 } from './telegram-client';
-import { BOT_COMMANDS } from './telegram-commands';
+import { registerBotMenus } from './telegram-commands';
 import { TelegramDeliveryService } from './telegram-delivery.service';
 import { TELEGRAM_OPTIONS, type TelegramOptions } from './telegram-options';
 import type { TelegramAnswer } from './telegram-router';
@@ -271,20 +271,23 @@ export class TelegramPoller implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   /**
-   * #500: the command menu, once per bot this instance polls for — a bot
+   * #500: the command menu and #580's menu button, once per bot this instance polls for — a bot
    * configured before the menu existed gets it too. A failure is logged and
    * not retried until the bot changes or the API restarts.
    */
   private async registerMenu(token: string): Promise<void> {
     if (this.menuToken === token) return;
     this.menuToken = token;
-    await this.client
-      .setMyCommands(token, [...BOT_COMMANDS])
-      .catch((error: unknown) => {
+    await registerBotMenus(
+      this.client,
+      token,
+      this.options.appUrl,
+      (what, error) => {
         this.logger.warn(
-          `Telegram command menu not set: ${safeMessage(error, token)}`,
+          `Telegram ${what} not set: ${safeMessage(error, token)}`,
         );
-      });
+      },
+    );
   }
 
   private async run(): Promise<void> {

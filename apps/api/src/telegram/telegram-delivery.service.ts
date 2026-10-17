@@ -1,6 +1,8 @@
+import { miniAppTargetOfLink } from '@agentdock/shared';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { BotTokenStore, TelegramDeliveryLedger } from '../notifications';
 import { formatDigest, formatMessage } from './markdown-v2';
+import { withOpenInApp } from './mini-app-buttons';
 import { TelegramActionRequestService } from './telegram-action-request.service';
 import { TelegramApprovalService } from './telegram-approval.service';
 import { TelegramApiError, TelegramClient } from './telegram-client';
@@ -97,10 +99,15 @@ export class TelegramDeliveryService {
             offer?.headSha ?? null,
           ) + (session?.footer ?? ''),
           false,
-          offer?.replyMarkup ??
-            actionMarkup ??
-            session?.replyMarkup ??
-            undefined,
+          // #580: a card's message opens that card in the Mini App too.
+          withOpenInApp(
+            offer?.replyMarkup ??
+              actionMarkup ??
+              session?.replyMarkup ??
+              undefined,
+            this.options.appUrl,
+            miniAppTargetOfLink(message.content.link),
+          ),
         );
         await this.ledger.markSent(message.id, now);
         pass.sent += 1;

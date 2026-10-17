@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ApprovalsModule } from '../approvals';
+import { AuthModule } from '../auth';
 import { BoardModule } from '../board';
 import { LocalModule } from '../local';
 import { NotificationsModule } from '../notifications';
@@ -9,6 +10,7 @@ import { SettingsModule } from '../settings/settings.module';
 import {
   TelegramAdminController,
   TelegramLinkController,
+  TelegramWebAppController,
 } from './telegram.controller';
 import { TelegramActionRequestService } from './telegram-action-request.service';
 import { TelegramApprovalService } from './telegram-approval.service';
@@ -23,6 +25,7 @@ import { TelegramPoller } from './telegram-poller';
 import { TelegramProjectService } from './telegram-project.service';
 import { TelegramRoutes } from './telegram-routes';
 import { TelegramSessionMessageService } from './telegram-session-message.service';
+import { TelegramWebAppService } from './telegram-web-app.service';
 
 /**
  * The Telegram bot (spec 22 D7–D10): the Bot API client, the one long-polling
@@ -32,7 +35,9 @@ import { TelegramSessionMessageService } from './telegram-session-message.servic
  * the local module's `ActionRequestsService`. #500: `TelegramRoutes` routes
  * every update — commands, button prefixes, replies — and `/project` keeps a
  * current project per chat for the Board commands (ADR-0046). #574: `/new`
- * runs the New work intake (`TelegramIntakeService`).
+ * runs the New work intake (`TelegramIntakeService`). #580: the Mini App
+ * signs in with its `initData` (`TelegramWebAppService`) and gets the web
+ * session `AuthModule` issues.
  */
 @Module({
   imports: [
@@ -45,8 +50,14 @@ import { TelegramSessionMessageService } from './telegram-session-message.servic
     BoardModule,
     // #574: `/new` runs the New work intake through the planner's services.
     PlannerModule,
+    // #580: the Mini App's sign-in issues the ordinary web session.
+    AuthModule,
   ],
-  controllers: [TelegramLinkController, TelegramAdminController],
+  controllers: [
+    TelegramLinkController,
+    TelegramAdminController,
+    TelegramWebAppController,
+  ],
   providers: [
     { provide: TELEGRAM_OPTIONS, useFactory: () => telegramOptionsFromEnv() },
     TelegramClient,
@@ -57,6 +68,7 @@ import { TelegramSessionMessageService } from './telegram-session-message.servic
     TelegramSessionMessageService,
     TelegramProjectService,
     TelegramIntakeService,
+    TelegramWebAppService,
     TelegramRoutes,
     TelegramDeliveryService,
     TelegramPoller,

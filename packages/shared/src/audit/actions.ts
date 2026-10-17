@@ -195,11 +195,15 @@ export type AuditResult = (typeof AUDIT_RESULTS)[number];
  * Why a login was refused — `meta.reason` of a denied `auth.login` (D9).
  * `throttled`: the source must wait after its own failures (C-109). `locked`
  * only appears in records written before C-109 removed the account lock.
+ * `telegram_*`: a Mini App sign-in (#580) with unsigned or stale `initData`,
+ * or from a Telegram user no account is linked to.
  */
 export const LOGIN_DENIED_REASONS = [
   'invalid_credentials',
   'throttled',
   'locked',
   'pending_approval',
+  'telegram_invalid',
+  'telegram_not_linked',
 ] as const;
 export type LoginDeniedReason = (typeof LOGIN_DENIED_REASONS)[number];
