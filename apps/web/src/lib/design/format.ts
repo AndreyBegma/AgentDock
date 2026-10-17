@@ -64,6 +64,28 @@ export const PROFILE_STATUS_HINT: Record<UiProfileStatus, string> = {
 };
 
 /**
+ * What Generate does with the project's UI profile before the first turn
+ * (D13), from its status (#606) — not from the design's `profileId`, which
+ * stays null until a revision is drawn. Null when nothing comes first, or
+ * while the status is not known.
+ */
+export function generateProfileNote(
+  status: UiProfileStatus | null,
+): string | null {
+  switch (status) {
+    case 'none':
+      return 'This project has no UI profile yet: Generate builds it first, which takes a few minutes.';
+    case 'stale':
+      return 'The last rebuild of the UI profile failed: Generate tries it again first, which takes a few minutes.';
+    case 'building':
+      return 'The UI profile is being built: Generate waits for it to finish.';
+    case 'fresh':
+    case null:
+      return null;
+  }
+}
+
+/**
  * The Design chip on a task card: off, suggested by the planner and not on,
  * on, approved (spec 223 "UI", D2).
  */

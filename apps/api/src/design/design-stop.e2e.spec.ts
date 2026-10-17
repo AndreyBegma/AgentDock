@@ -131,6 +131,27 @@ describe('design stop (e2e)', () => {
     expect((await h.auditOf('design.stopped')).length).toBe(0);
   });
 
+  it('puts a design left busy with nothing running back to rest (#606)', async () => {
+    const card = await h.designedCard();
+    // A batch whose next turn never started: busy, no turn, no build.
+    await h.ctx.prisma.taskDesign.update({
+      where: { cardId: card.id },
+      data: { status: 'generating', busySince: new Date() },
+    });
+    const before = await h.cardDesign(card.number);
+    expect(before.progress).toBeNull();
+    expect((await cardGenerate(card.number)).status).toBe(409);
+
+    const stopped = await cardStop(card.number);
+    expect(stopped.status).toBe(200);
+    expect((stopped.body as TaskDesignView).status).toBe('idle');
+    expect((stopped.body as TaskDesignView).busySince).toBeNull();
+    expect(h.sentOf('plan.cancel')).toHaveLength(0);
+    const [record] = await h.auditOf('design.stopped');
+    expect(record.after).toMatchObject({ number: card.number, stage: null });
+    expect((await cardGenerate(card.number)).status).toBe(201);
+  });
+
   it('is 403 for a viewer and 404 for a non-member; a viewer reads progress', async () => {
     const card = await h.designedCard();
     expect((await cardGenerate(card.number)).status).toBe(201);

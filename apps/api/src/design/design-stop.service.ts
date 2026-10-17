@@ -43,7 +43,8 @@ const notRunning = () =>
  * design when the runner reports it. On the profile stage the design leaves
  * the build's `args.waiting` and rests at once; the build itself is cancelled
  * (`uiprofile.cancel`) only when no other design waits for it and it is not
- * an admin's Rebuild — one person's Stop never kills another's wait.
+ * an admin's Rebuild — one person's Stop never kills another's wait. A busy
+ * design with neither a turn nor a build rests at once (#606).
  */
 @Injectable()
 export class DesignStopService {
@@ -172,7 +173,14 @@ export class DesignStopService {
       orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
       select: { id: true, args: true },
     });
-    if (!build) throw notRunning();
+    if (!build) {
+      // Busy with nothing running: a batch whose next turn never started
+      // (the API stopped between two). Stop puts it back to rest, or it
+      // would refuse Generate as busy and Stop as not running forever.
+      await settleDesign(this.prisma, owner.key);
+      await this.stopped(owner, actor, { stage: null });
+      return;
+    }
     // Nothing is written when the build would need a cancel the runner
     // cannot take (#233).
     if (this.cancelsBuild(buildArgsOf(build.args), design.id)) {
@@ -236,7 +244,12 @@ export class DesignStopService {
   private async stopped(
     owner: StopOwner,
     actor: PlanActor,
-    meta: { stage: DesignProgressStage; runId: string; turnId?: string },
+    /** `stage` null: nothing was running. */
+    meta: {
+      stage: DesignProgressStage | null;
+      runId?: string;
+      turnId?: string;
+    },
   ): Promise<void> {
     await this.audit.record({
       ...actor.ctx,

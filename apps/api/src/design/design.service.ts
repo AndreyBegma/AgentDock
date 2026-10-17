@@ -44,7 +44,7 @@ import {
 } from './design-rules';
 import { type DesignKey, defaultSkillsOf, designWhere } from './design-store';
 import { loadDesignView } from './design-view';
-import { UiProfileService } from './ui-profile.service';
+import { type ProfileReadiness, UiProfileService } from './ui-profile.service';
 import type { WaitingDesign } from './ui-profile-mapper';
 
 /** A design with a turn or a profile build of it queued or running. */
@@ -728,15 +728,25 @@ export class DesignService implements OnModuleInit {
       project.runnerId,
       RUNNER_FEATURE_COMMANDS.design,
     );
-    const readiness = await this.profiles.ensureFresh(project, caller, {
-      designId: design.id,
-      mode,
-      userId: actor.userId,
-    });
-    await this.prisma.taskDesign.update({
-      where: { id: design.id },
+    // The busy status is claimed before the profile check, from the status
+    // read at rest: of two Generates at once only one passes, and the other's
+    // failure never settles the winner's running turn.
+    const claimed = await this.prisma.taskDesign.updateMany({
+      where: { id: design.id, status: design.status },
       data: { status: busyStatusOf(mode), busySince: new Date() },
     });
+    if (claimed.count === 0) throw busy();
+    let readiness: ProfileReadiness;
+    try {
+      readiness = await this.profiles.ensureFresh(project, caller, {
+        designId: design.id,
+        mode,
+        userId: actor.userId,
+      });
+    } catch (error) {
+      await settleDesign(this.prisma, owner.key);
+      throw error;
+    }
     owner.publish();
     let turnId: string | null = null;
     if (readiness.kind === 'ready') {

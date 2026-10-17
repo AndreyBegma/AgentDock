@@ -2,6 +2,7 @@ import {
   type DesignFailureView,
   type DesignProgressView,
   STALL_AFTER_MS,
+  type TaskDesignView,
 } from '@agentdock/shared';
 
 /** What a queued run says, build or turn alike. */
@@ -14,6 +15,20 @@ const variantOf = (progress: DesignProgressView): string =>
   progress.variant === null
     ? 'a variant'
     : `variant ${progress.variant} of ${progress.variantCount}`;
+
+/** #606: what a busy design with nothing running says. */
+export const STARTING = 'Starting the next turn…';
+
+/**
+ * #606: busy with neither a turn nor a build (D1's `null` progress) — the
+ * gap between two variants of a batch, or a batch whose next turn never
+ * started. It shows as starting, with Stop, never as the Generate panel.
+ */
+export const isStarting = (
+  design: Pick<TaskDesignView, 'status' | 'progress'>,
+): boolean =>
+  (design.status === 'generating' || design.status === 'revising') &&
+  design.progress === null;
 
 /** D1: the stage line of the progress card. */
 export function progressLabel(progress: DesignProgressView): string {

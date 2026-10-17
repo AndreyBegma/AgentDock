@@ -10,6 +10,7 @@ import {
   type ProjectDetail,
   type TaskDesignPatchRequest,
   type TaskDesignView,
+  type UiProfileView,
 } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Combobox } from '@andrewbehma/glass-ui/combobox';
@@ -30,8 +31,11 @@ import {
   launchSavedNote,
   NO_RECOMMENDATION_TEXT,
 } from '../../lib/board/launch';
-import { generateRunnerGate } from '../../lib/design/format';
-import { installedSkillsApi } from '../../lib/design/href';
+import {
+  generateProfileNote,
+  generateRunnerGate,
+} from '../../lib/design/format';
+import { installedSkillsApi, uiProfileApi } from '../../lib/design/href';
 import { runnerGateCopy } from '../../lib/planner/runner-support';
 import { useReadiness } from '../../lib/readiness/use-readiness';
 import { useSection } from '../../lib/section/use-section';
@@ -47,8 +51,8 @@ const VARIANT_COUNTS = Array.from(
 /**
  * Before the first revision (spec 223 D4, D15): how many variants, which
  * design skills — the planner's suggestion and the project's defaults
- * pre-filled — and **Generate**. The first design in a project builds the UI
- * profile first, and says so.
+ * pre-filled — and **Generate**. When Generate builds the UI profile first,
+ * it says so.
  */
 export function GeneratePanel({
   projectId,
@@ -105,6 +109,13 @@ export function GeneratePanel({
   );
   const gate = generateRunnerGate(project.data);
   const runnerCopy = gate ? runnerGateCopy('design', gate) : null;
+  // #606: what Generate does with the UI profile first, from the profile's
+  // own status; one that does not load says nothing.
+  const uiProfile = useSection(
+    () => api<UiProfileView>(uiProfileApi(projectId)),
+    [projectId],
+  );
+  const profileNote = generateProfileNote(uiProfile.data?.status ?? null);
   // #272: no usable profile (or an offline runner) is said before Generate.
   const readiness = useReadiness(projectId);
   const notReady = readiness
@@ -155,11 +166,8 @@ export function GeneratePanel({
             ? `Planner: ${design.suggestionWhy}`
             : 'The planner draws the task as a self-contained HTML mockup in the project’s style.'}
         </p>
-        {design.profileId === null ? (
-          <p className="text-xs text-ink-3">
-            This project has no UI profile yet: Generate builds it first, which
-            takes a few minutes.
-          </p>
+        {profileNote ? (
+          <p className="text-xs text-ink-3">{profileNote}</p>
         ) : null}
       </div>
 
