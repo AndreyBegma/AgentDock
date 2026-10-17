@@ -24,6 +24,7 @@ import type {
   LocalErrorCode,
 } from '@agentdock/shared/protocol';
 import type { Status } from '@andrewbehma/glass-ui/status-pill';
+import { describePolicyRefusal } from '@/lib/runners/policy';
 import { ApiError, describeError } from '../api';
 import { STAGE_LABEL } from '../fleet/graph';
 import { describeNoProfile } from '../readiness/copy';
@@ -468,6 +469,10 @@ export function describeBoardError(
       return 'This card’s design is on and not approved yet. Open the design and approve it, or approve and run from there.';
     case BOARD_ERROR.designApproved:
       return 'The design is approved, so “Continue after design” can no longer change.';
+    case BOARD_ERROR.policyRefused:
+      return describePolicyRefusal(
+        error instanceof ApiError ? error.message : null,
+      );
     case BOARD_ERROR.commandUnavailable:
       return `The runner${runnerName ? ` ${runnerName}` : ''} is offline or too old to run card workers.`;
     case BOARD_ERROR.invalidMove:

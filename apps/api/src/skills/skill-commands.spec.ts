@@ -16,6 +16,7 @@ describe('skill commands', () => {
       ['invalid_args', 400, 'invalid_args'],
       ['upstream_unavailable', 502, 'upstream_unavailable'],
       ['timeout', 504, 'runner_timeout'],
+      ['policy_refused', 403, 'policy_refused'],
       ['internal', 502, 'command_failed'],
     ] as const)('maps %s to %i %s', (code, status, mapped) => {
       const failure = skillFailureOf('skill.install', { code });
