@@ -79,8 +79,9 @@ const listDir: ListDir = (dir) => readdirSync(dir);
 
 /** A name the permission-rule parser may misread is escaped or left out. */
 const ruleName = (name: string): string | null =>
-  // biome-ignore lint/suspicious/noControlCharactersInRegex: the point is to leave them out
-  /[()\u0000-\u001f]/.test(name) ? null : name.replace(/([*?[\]\\])/g, '\\$1');
+  /[()]/.test(name) || [...name].some((c) => c.charCodeAt(0) < 0x20)
+    ? null
+    : name.replace(/([*?[\]\\])/g, '\\$1');
 
 /**
  * Claude Code's Read, Grep and Glob read any path the user can, plan mode
