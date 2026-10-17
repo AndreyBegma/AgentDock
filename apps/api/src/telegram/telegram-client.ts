@@ -363,6 +363,14 @@ export class TelegramClient {
       : null;
   }
 
+  /** #620: "typing…" in the chat, for five seconds or until the next message. */
+  async sendChatAction(token: string, chatId: bigint | number): Promise<void> {
+    await this.call(token, 'sendChatAction', {
+      chat_id: Number(chatId),
+      action: 'typing',
+    });
+  }
+
   /**
    * #574: replaces the text of a message the bot sent, and its buttons —
    * none when `inlineKeyboard` is absent. Same escaping as `sendMessage`.

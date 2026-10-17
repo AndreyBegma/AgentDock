@@ -4,6 +4,7 @@ import {
   seedRunnerProject,
   seedUser,
 } from '../notifications/testing/notifications-e2e';
+import { TelegramAssistantService } from './telegram-assistant.service';
 import type { InlineKeyboardButton } from './telegram-client';
 import { BOT_COMMANDS, HELP_TEXT } from './telegram-commands';
 import { TelegramGuard } from './telegram-guard.service';
@@ -163,7 +164,9 @@ describe('Telegram /project and the guard (e2e, #500)', () => {
       expect(
         ctx.fake.calls.find((c) => c.method === 'answerCallbackQuery')?.body,
       ).toMatchObject({ text: body?.text });
+      // Free text goes to the assistant (#620); its turn ends before the restart.
       expect(await say(CHAT, 'hello')).toBeUndefined();
+      await ctx.app.get(TelegramAssistantService).idle();
 
       await restart();
       const after = await say(CHAT, '/project');
@@ -355,8 +358,8 @@ describe('Telegram /project and the guard (e2e, #500)', () => {
 
     it('the poller sets the menu once for the bot it polls for', async () => {
       await restart();
-      await say(CHAT, 'hello');
-      await say(CHAT, 'hello');
+      await say(CHAT, '/help');
+      await say(CHAT, '/help');
       const menus = fake.calls.filter((c) => c.method === 'setMyCommands');
       expect(menus).toHaveLength(1);
       expect(menus[0].body).toEqual({
