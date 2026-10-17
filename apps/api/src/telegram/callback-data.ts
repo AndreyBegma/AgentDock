@@ -51,6 +51,8 @@ const FIELDS = {
   number: { shape: /^[1-9]\d{0,8}$/, max: 9 },
   /** A page of a list, counted from 0. */
   page: { shape: /^(0|[1-9]\d{0,3})$/, max: 4 },
+  /** #578: a Git head's first 12 hex digits — what a merge button binds to. */
+  sha: { shape: /^[0-9a-f]{12}$/, max: 12 },
 } as const;
 
 /** The kinds whose value is a number, not text. */

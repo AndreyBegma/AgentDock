@@ -28,6 +28,7 @@ import {
   isRoundActive,
   isSessionAlive,
   isTerminalCard,
+  isWorktreeGoneError,
   MOVE_REFUSAL_TEXT,
   ownsWorker,
 } from '@agentdock/shared';
@@ -47,6 +48,14 @@ import {
 } from '../runners/install';
 import { noPrText } from './pull-request';
 
+// #578: the review actions' rules, shared with the bot too.
+export {
+  canAccept,
+  canGiveFeedback,
+  canMarkFinished,
+  isSuggestion,
+  isWorktreeGoneError,
+} from '@agentdock/shared';
 // The rules the Telegram bot offers its buttons by too live in shared.
 export {
   COLUMN_TITLE,
@@ -180,12 +189,6 @@ export const columnsOf = (view: BoardView) =>
       },
   );
 
-export const canGiveFeedback = (card: BoardCardView): boolean =>
-  ownsWorker(card) && card.column === 'finished' && !isRoundActive(card.round);
-
-export const canAccept = (card: BoardCardView): boolean =>
-  card.column === 'finished' && !isRoundActive(card.round);
-
 /** #282 D4: a `fleet` card follows its slot, so a person cannot delete it. */
 export const canDelete = (card: BoardCardView): boolean => !isFleetCard(card);
 
@@ -261,15 +264,6 @@ export function approveRunOffer(card: BoardCardView): ApproveRunOffer | null {
     ? { enabled: true, reason: null }
     : { enabled: false, reason: 'The design is being drawn' };
 }
-
-export const canMarkFinished = (card: BoardCardView): boolean =>
-  ownsWorker(card) &&
-  card.column === 'in_progress' &&
-  isRoundActive(card.round);
-
-/** #244 D9: an Inbox card is accepted or dismissed, never run. */
-export const isSuggestion = (card: BoardCardView): boolean =>
-  card.column === 'inbox';
 
 /** The confidence as a whole percent: `0.74` → `74%`; none for a manual card. */
 export const confidenceLabel = (confidence: number | null): string | null =>
@@ -605,10 +599,6 @@ export const hooksNotice = (
 /** #395: the plain sentence for a collect that found no worktree on the runner. */
 export const WORKTREE_GONE_TEXT =
   "The card's worktree no longer exists on the runner, so a pull request cannot be created from it.";
-
-/** #395: the runner's `not_found` for a card whose worktree is gone (it names internal ids). */
-export const isWorktreeGoneError = (error: string | null): boolean =>
-  /not found on the runner.*has no worktree/.test(error ?? '');
 
 /**
  * #395: the line above Create pull request. A vanished worktree gets a plain

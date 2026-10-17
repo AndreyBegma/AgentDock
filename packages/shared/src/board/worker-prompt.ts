@@ -27,9 +27,10 @@ import type { BoardCardKind } from './types';
  * suite locally — only the suites the card touched; CI runs the rest.
  * Version 14 (#379): a spec in an external docs repository. Version 15
  * (C-131): card-supplied text — title, body, feedback, design text, the
- * project's checks — sits in a `<card>` data fence.
+ * project's checks — sits in a `<card>` data fence. Version 16 (C-227): the
+ * project's `## Project coding rules` section.
  */
-export const CARD_WORKER_PROMPT_VERSION = 15;
+export const CARD_WORKER_PROMPT_VERSION = 16;
 
 /** #389: the env the runner sets in the card's session — its short id. */
 export const CARD_ENV_ID = 'AGENTDOCK_CARD';
@@ -147,6 +148,11 @@ export interface CardWorkerPromptInput {
    * `AGENTDOCK_RAW=1` bypass, which exist only then. Absent is off.
    */
   tokenSaver?: boolean;
+  /**
+   * C-227: the project's `## Project coding rules` section, from
+   * `projectRulesBlock`; absent or `null` is none.
+   */
+  projectRules?: string | null;
 }
 
 const utf8Bytes = (text: string): number =>
@@ -486,6 +492,7 @@ const assemblePrompt = (
     ...(card.tokenSaver ? TOKEN_SAVER_LINES : []),
     '',
     ...(card.tokenSaver ? [...HANDOFF_LINES, ''] : []),
+    ...(card.projectRules ? [card.projectRules, ''] : []),
     '## When you are done',
     '',
     `Write the pull request description the last section of this prompt asks for. Then call the \`${FINISH_CARD_TOOL}\` tool with a summary of what you changed and how you checked it, in at least two full sentences. If it answers with what is missing, write that and call it again.`,

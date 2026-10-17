@@ -366,8 +366,8 @@ describe('next round prompt — card edits reach the worker (#273 D1–D4)', () 
     kind: 'feature',
   };
 
-  it('is version 15', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(15);
+  it('is version 16', () => {
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(16);
   });
 
   it('cardChange is null for identical text, whitespace around it aside', () => {

@@ -124,8 +124,9 @@ export class BoardWorld {
   private seq = 0;
   private auditFrom = 0n;
 
-  async init(): Promise<void> {
-    this.ctx = await createE2eApp();
+  /** `create` builds the app; #578's Telegram suite passes its own. */
+  async init(create: () => Promise<E2eContext> = createE2eApp): Promise<void> {
+    this.ctx = await create();
     this.commands = this.ctx.app.get(BoardCommands);
     this.work = this.ctx.app.get(BoardWork);
     this.sinks = this.ctx.app.get(RunnerEventSinks);

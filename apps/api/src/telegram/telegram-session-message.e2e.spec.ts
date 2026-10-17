@@ -210,9 +210,12 @@ describe('Telegram: a waiting card answered from the chat (#489 M2, e2e)', () =>
   it('the question arrives with one button per option, and a press answers it', async () => {
     await setup(QUESTION);
     const buttons = buttonsSentTo(OPERATOR_CHAT);
+    // #578: the card's own actions follow the options.
     expect(buttons.map((b) => b.text)).toEqual([
       '1. Add it to glass-ui',
       '2. Use a Toolbar',
+      'Message session',
+      'Finish',
     ]);
     expect(lastTextTo(OPERATOR_CHAT)).toContain('SelectionBar is missing');
     const second = buttons[1]?.callback_data ?? '';
@@ -255,7 +258,11 @@ describe('Telegram: a waiting card answered from the chat (#489 M2, e2e)', () =>
 
   it('a reply with no question up is a message to the session', async () => {
     await setup(null);
-    expect(buttonsSentTo(OPERATOR_CHAT)).toEqual([]);
+    // No options; only the card's own actions (#578).
+    expect(buttonsSentTo(OPERATOR_CHAT).map((b) => b.text)).toEqual([
+      'Message session',
+      'Finish',
+    ]);
     expect(lastTextTo(OPERATOR_CHAT)).toContain('Reply to this message');
     outcome = { status: 'ok', output: { outcome: 'sent' }, rttMs: 1 };
     await poll(
