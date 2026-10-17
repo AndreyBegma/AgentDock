@@ -2,6 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { INTAKE_ACTION, INTAKE_DONE, INTAKE_OPTION } from './intake-chat';
 import { TelegramActionRequestService } from './telegram-action-request.service';
 import { TelegramApprovalService } from './telegram-approval.service';
+import {
+  BOARD_CALLBACK_PREFIXES,
+  TelegramBoardService,
+} from './telegram-board.service';
 import { HELP_TEXT, UNKNOWN_COMMAND_TEXT } from './telegram-commands';
 import { TelegramIntakeService } from './telegram-intake.service';
 import {
@@ -31,11 +35,14 @@ export class TelegramRoutes {
     actionRequests: TelegramActionRequestService,
     sessions: TelegramSessionMessageService,
     projects: TelegramProjectService,
+    board: TelegramBoardService,
     intake: TelegramIntakeService,
   ) {
     this.router = new TelegramRouter()
       // Spec 201 D18: `x:`/`y:` are the action-request buttons.
       .callback(['x', 'y'], (query) => actionRequests.handleCallback(query))
+      // #576: the Board's buttons, one prefix per action.
+      .callback(BOARD_CALLBACK_PREFIXES, (query) => board.handleCallback(query))
       // #489: `q:` are a card question's option buttons.
       .callback('q', (query) => sessions.handleCallback(query))
       .callback(PROJECT_CALLBACK.prefix, (query) =>
@@ -60,6 +67,8 @@ export class TelegramRoutes {
         );
       })
       .command('project', (context) => projects.handleCommand(context))
+      .command('board', (context) => board.handleBoardCommand(context))
+      .command('card', (context) => board.handleCardCommand(context))
       .command('new', (context) => intake.handleCommand(context))
       .command('help', async ({ chatId, isPrivate }) =>
         isPrivate ? { chatId, text: HELP_TEXT } : null,

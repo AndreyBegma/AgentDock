@@ -122,6 +122,11 @@ export class FakeTelegram {
     return this.calls.filter((c) => c.method === 'sendMessage');
   }
 
+  /** The messages the bot rewrote in place (#576). */
+  edited(): FakeCall[] {
+    return this.calls.filter((c) => c.method === 'editMessageText');
+  }
+
   close(): Promise<void> {
     return new Promise((resolve) => this.server.close(() => resolve()));
   }

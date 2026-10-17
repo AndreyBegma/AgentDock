@@ -59,6 +59,8 @@ export const AUDIT_ACTIONS = [
   'telegram.unlink',
   'telegram.approval',
   'telegram.project',
+  /** #576: a Move, Run or Stop from the Board in Telegram (`after: { action, number }`, denied when the role fell short). */
+  'telegram.board',
   'terminal.attached',
   'terminal.detached',
   'skill.installed',

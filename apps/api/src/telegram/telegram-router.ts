@@ -16,6 +16,8 @@ export interface TelegramAnswer {
   /** A press: the callback to answer, with `notice` as its short text. */
   callbackQueryId?: string;
   notice?: string;
+  /** #576: the bot's own message to rewrite in place instead of a new one. */
+  editMessageId?: number;
 }
 
 /** `/cmd args` or `/cmd@Bot args`, split. */
