@@ -86,6 +86,28 @@ const setup = async () => {
 };
 
 describe('push and draft PR (#359 D1)', () => {
+  it('pushes after the worker amended the pushed commit: the old head is merged with -s ours (#630)', async () => {
+    const { f, record, deps, originHead, head } = await setup();
+    f.write(record.worktree, { 'a.txt': 'a\n' });
+    const first = await f.commitAll(record.worktree, 'feat: a');
+    await pushCardHead(deps, record);
+    expect(await originHead()).toBe(first);
+    f.write(record.worktree, { 'a.txt': 'a2\n' });
+    await f.run(record.worktree, 'commit', '-q', '-a', '--amend', '--no-edit');
+    const amended = await head();
+
+    const step = await pushCardHead(deps, { ...record, pushedHead: first });
+
+    expect(step?.pushed).toBe(true);
+    expect(step?.headSha).toBe(await head());
+    expect(await originHead()).toBe(await head());
+    expect(
+      (await f.run(record.worktree, 'log', '-1', '--format=%P', 'HEAD')).split(
+        ' ',
+      ),
+    ).toEqual([amended, first]);
+  });
+
   it('nothing ahead of the base: nothing is pushed or opened', async () => {
     const { f, record, deps, originHead } = await setup();
     expect(await pushCardHead(deps, record)).toBeNull();
