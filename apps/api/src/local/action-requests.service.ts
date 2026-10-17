@@ -21,6 +21,7 @@ import { LiveService } from '../live/live.service';
 import { oneLine } from '../notifications/event-mapping';
 import { NotificationWriter } from '../notifications/notification-writer';
 import { NotificationsService } from '../notifications/notifications.service';
+import { QueueService } from '../queue/queue.service';
 import {
   ACTION_REQUESTS_LIVE_EVENT,
   type ActionRequestsLiveChange,
@@ -121,6 +122,7 @@ export class ActionRequestsService {
     private readonly notifications: NotificationsService,
     private readonly control: ControlService,
     private readonly approvals: ApprovalsService,
+    private readonly queue: QueueService,
   ) {}
 
   async create(
@@ -463,6 +465,22 @@ export class ActionRequestsService {
           // with `head_moved` and approves nothing.
           await this.approvals.approve(approvalsCaller, pr, headSha);
           return { ok: true, result: { pr, headSha } };
+        }
+        case 'issue_queue': {
+          // C-112: the ready label, through the queue, as the approver.
+          const { issue } = actionRequestArgsSchemas.issue_queue.parse(
+            row.args,
+          );
+          await this.queue.queueIssue(
+            {
+              projectId: row.projectId,
+              role: decider.role,
+              ctx: decider.ctx,
+              meta: { actionRequestId: row.id, via: decider.via },
+            },
+            issue,
+          );
+          return { ok: true, result: { issue } };
         }
         case 'tool_use':
           return { ok: true, result: {} };

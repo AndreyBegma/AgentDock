@@ -12,6 +12,7 @@ import {
   hookEventDataSchemas,
   hookEventHasContent,
   LOCAL_ROLE_CAP,
+  localActionRequestArgsSchema,
   localMethodNames,
   localMethods,
   localResponseMessageSchema,
@@ -312,6 +313,20 @@ describe('action requests (spec 201 D18)', () => {
         isAdmin: false,
       }),
     ).toBe(true);
+    // C-112: a person must queue a session's issue, but may be its requester.
+    expect(
+      mayDecideActionRequest({ kind: 'issue_queue', ...own, isAdmin: false }),
+    ).toBe(true);
+  });
+
+  it('never lets a session ask for issue_queue itself (C-112)', () => {
+    expect(
+      localActionRequestArgsSchema.safeParse({
+        kind: 'issue_queue',
+        args: { issue: 1, title: 't', url: 'https://x/1', session: null },
+        summary: 'queue it',
+      }).success,
+    ).toBe(false);
   });
 });
 

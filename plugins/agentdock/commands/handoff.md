@@ -1,5 +1,5 @@
 ---
-description: Hand the current work off to the AgentDock fleet as a queued issue
+description: Hand the current work off to the AgentDock fleet as an issue a person approves for the queue
 argument-hint: [short title]
 ---
 
@@ -10,5 +10,7 @@ Hand this work off to the AgentDock fleet by calling the `handoff` tool of the
 2. Body: what is done, what remains, and what a fresh agent must know to continue. Self-contained; no references to this conversation.
 3. Branch: the current git branch (`git rev-parse --abbrev-ref HEAD`).
 
-Call the tool once, then report the issue it created. If the tool returns an error
+Call the tool once, then report the issue it created and that the fleet takes it
+only after a person approves the request it returns (`actionRequestId`) in
+AgentDock or Telegram — do not label or queue it another way. If the tool returns an error
 (`runner_offline`, `no_project`, `forbidden`), say so plainly and do not retry.

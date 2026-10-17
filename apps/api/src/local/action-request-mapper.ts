@@ -2,6 +2,7 @@ import {
   type ActionRequestKind,
   type ActionRequestSummary,
   boundPrOf,
+  issueQueueArgsOf,
   type PrApproveBoundArgs,
   prDiffUrl,
   shortHeadSha,
@@ -71,6 +72,7 @@ const KIND_TITLE: Record<ActionRequestKind, string> = {
   orchestrator_start: 'A session asks to start the orchestrator',
   orchestrator_stop: 'A session asks to stop the orchestrator',
   pr_approve: 'A session asks to approve a PR',
+  issue_queue: 'A session asks to queue an issue for the fleet',
 };
 
 /** The notification's title (spec 22 D10: no prompt or code text). */
@@ -88,12 +90,16 @@ export const actionRequestTitle = (
         : '';
     return `A session asks to approve PR #${args.pr}${head}`;
   }
+  if (kind === 'issue_queue' && typeof args.issue === 'number') {
+    return `A session asks to queue issue #${args.issue} for the fleet`;
+  }
   return KIND_TITLE[kind];
 };
 
 /**
  * The notification's body: a `pr_approve` request's PR title and diff come
- * first, so the person sees what the head they approve holds.
+ * first, so the person sees what the head they approve holds; an
+ * `issue_queue` request's issue title and link, so they can read it first.
  */
 export const actionRequestBody = (
   kind: ActionRequestKind,
@@ -101,9 +107,11 @@ export const actionRequestBody = (
   summary: string,
 ): string => {
   const pr = boundPrOf({ kind, args });
-  return pr
-    ? `${pr.title.slice(0, 120)} · ${prDiffUrl(pr)} · ${summary}`
-    : summary;
+  if (pr) return `${pr.title.slice(0, 120)} · ${prDiffUrl(pr)} · ${summary}`;
+  const issue = issueQueueArgsOf({ kind, args });
+  if (issue)
+    return `#${issue.issue} ${issue.title.slice(0, 120)} · ${issue.url} · ${summary}`;
+  return summary;
 };
 
 /**

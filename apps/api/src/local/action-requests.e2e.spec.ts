@@ -32,6 +32,7 @@ const OUTPUTS: Partial<Record<CommandName, unknown>> = {
     startedAt: '2026-10-09T10:00:00.000Z',
   },
   'orchestrator.stop': { stopped: true },
+  'plan.queue_issues': { labelled: [42] },
 };
 
 const PR = 51;
@@ -598,6 +599,80 @@ describe('action requests (e2e)', () => {
         'Denied.',
       );
       expect(sent).toEqual([]);
+    });
+
+    it('offers Approve and Deny on an issue_queue request with the issue title and number, and queues it as the person (C-112)', async () => {
+      await ctx.prisma.telegramLink.create({
+        data: { userId: requesterId, chatId: BigInt(CHAT) },
+      });
+      const request = await create('issue_queue', {
+        issue: 42,
+        title: 'Fix the flaky pairing test',
+        url: 'https://github.com/acme/widget/issues/42',
+        session: null,
+      });
+      // Operators and admins are told, viewers are not.
+      const rows = await ctx.prisma.notification.findMany({
+        where: { kind: 'action.requested' },
+        select: { userId: true, title: true, body: true },
+      });
+      expect(rows.map((r) => r.userId).sort()).toEqual(
+        [adminId, requesterId, approverId].sort(),
+      );
+      const notification = await notificationOf(requesterId);
+      expect(notification.title).toBe(
+        'A session asks to queue issue #42 for the fleet',
+      );
+      expect(notification.body).toContain('#42 Fix the flaky pairing test');
+      expect(await telegram.offer(notification.id)).toEqual({
+        inline_keyboard: [
+          [
+            {
+              text: 'Approve',
+              callback_data: `x:${notification.id}:${request.id}`,
+            },
+            {
+              text: 'Deny',
+              callback_data: `y:${notification.id}:${request.id}`,
+            },
+          ],
+        ],
+      });
+
+      // The person the session acted for may queue it themselves.
+      expect((await press(`x:${notification.id}:${request.id}`)).text).toBe(
+        'Approved and carried out.',
+      );
+      expect(sent).toEqual([
+        {
+          name: 'plan.queue_issues',
+          args: { projectId, numbers: [42], readyLabel: 'cs:ready' },
+        },
+      ]);
+      const [queued] = await audits('issue.queue');
+      expect(queued).toMatchObject({
+        actorUserId: requesterId,
+        result: 'ok',
+        meta: { actionRequestId: request.id, via: 'telegram' },
+      });
+    });
+
+    it('denies an issue_queue request from Telegram without touching the issue (C-112)', async () => {
+      await ctx.prisma.telegramLink.create({
+        data: { userId: approverId, chatId: BigInt(CHAT) },
+      });
+      const request = await create('issue_queue', {
+        issue: 42,
+        title: 'Fix it',
+        url: 'https://github.com/acme/widget/issues/42',
+        session: null,
+      });
+      const notification = await notificationOf(approverId);
+      expect((await press(`y:${notification.id}:${request.id}`)).text).toBe(
+        'Denied.',
+      );
+      expect(sent).toEqual([]);
+      expect(await audits('issue.queue')).toEqual([]);
     });
   });
 });

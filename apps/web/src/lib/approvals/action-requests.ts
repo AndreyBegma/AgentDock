@@ -4,6 +4,7 @@ import {
   type ActionRequestSummary,
   actionRequestArgsSchemas,
   boundPrOf,
+  issueQueueArgsOf,
   type PrApproveBoundArgs,
   prDiffUrl,
   shortHeadSha,
@@ -26,6 +27,7 @@ export const KIND_LABEL: Record<ActionRequestKind, string> = {
   orchestrator_start: 'Start the orchestrator',
   orchestrator_stop: 'Stop the orchestrator',
   pr_approve: 'Approve a pull request',
+  issue_queue: 'Queue an issue for the fleet',
 };
 
 export const STATUS_LABEL: Record<ActionRequestStatus, string> = {
@@ -71,6 +73,9 @@ export const prApproveArgs = (
     : null;
 };
 
+/** An `issue_queue` request's issue (C-112); null for any other kind or bad args. */
+export const issueQueueArgs = issueQueueArgsOf;
+
 /** What the request asks for, as a short title. */
 export const requestTitle = (request: ActionRequestSummary): string => {
   switch (request.kind) {
@@ -83,6 +88,12 @@ export const requestTitle = (request: ActionRequestSummary): string => {
       return typeof pr === 'number'
         ? `Approve pull request #${pr}`
         : KIND_LABEL.pr_approve;
+    }
+    case 'issue_queue': {
+      const issue = issueQueueArgs(request)?.issue;
+      return issue
+        ? `Queue issue #${issue} for the fleet`
+        : KIND_LABEL.issue_queue;
     }
     case 'orchestrator_start': {
       const start = actionRequestArgsSchemas.orchestrator_start.safeParse(

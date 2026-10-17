@@ -449,6 +449,7 @@ const AUDIT_TITLES: Record<string, string> = {
   'project.docs_source_override': 'Docs source overridden',
   'project.docs_source_reset': 'Docs source reset',
   'issue.create': 'Issue created',
+  'issue.queue': 'Issue queued for the fleet',
   'orchestrator.start': 'Orchestrator start requested',
   'orchestrator.stop': 'Orchestrator stop requested',
   'orchestrator.settings': 'Orchestrator settings changed',
