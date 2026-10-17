@@ -32,6 +32,7 @@ import type { Realpath } from '../policy/roots';
 import type { PolicyConfig } from '../policy/schema';
 import type { ProjectFs } from '../projects/fs';
 import { inspectProject, refreshProject } from '../projects/inspect';
+import { scanProjectRules } from '../projects/rule-scan';
 import type { SessionMessenger } from '../session';
 import type { SkillHandlers } from '../skills';
 import type { StewardHandlers } from '../steward';
@@ -186,6 +187,7 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
     'project.inspect': ({ path }) => inspectProject(path, deps),
     'project.refresh': (args) =>
       refreshProject(args, context.watchedProjects(), deps),
+    'project.scan_rules': ({ path }) => scanProjectRules(path, deps),
     'session.backfill': (args) =>
       sessionBackfill(args, {
         backfill: context.backfillSessions,
