@@ -28,6 +28,22 @@ export const READINESS_ACTIONS = [
 ] as const;
 export type ReadinessAction = (typeof READINESS_ACTIONS)[number];
 
+/**
+ * #379: where a project's specs go. `code_repo` — on a branch of the code
+ * repository; `docs_repo` — a pull request in an external docs repository;
+ * `no_spec_dir` / `no_docs_clone` — nowhere, and why.
+ */
+export const SPEC_TARGET_KINDS = [
+  'code_repo',
+  'docs_repo',
+  'no_spec_dir',
+  'no_docs_clone',
+] as const;
+export type SpecTargetKind = (typeof SPEC_TARGET_KINDS)[number];
+
+/** #379: the command a spec in an external docs repository needs. */
+export const DOCS_SPEC_COMMAND = 'docs.publish_specs' satisfies CommandName;
+
 /** The runner commands each action needs (#233 advert). */
 export const READINESS_ACTION_COMMANDS = {
   design: ['plan.turn', 'uiprofile.build'],
@@ -50,6 +66,7 @@ export const READINESS_BLOCKER_CODES = [
   'runner_offline',
   'runner_outdated',
   'no_spec_dir',
+  'no_docs_clone',
   'content_off',
 ] as const;
 export type ReadinessBlockerCode = (typeof READINESS_BLOCKER_CODES)[number];
@@ -58,7 +75,9 @@ export type ReadinessBlockerCode = (typeof READINESS_BLOCKER_CODES)[number];
  * - `no_profile` — D1 finds no usable profile; D2's `reason` and `source`;
  * - `runner_offline` — the project's runner is not connected;
  * - `runner_outdated` — the runner's advert lacks the action's `commands`;
- * - `no_spec_dir` — the project names no spec directory;
+ * - `no_spec_dir` — the project has no Spec folder and no `specDir`;
+ * - `no_docs_clone` — #379: the Spec folder is in a remote docs repository
+ *   with no local clone path;
  * - `content_off` — the project ships no session content.
  */
 export type ReadinessBlocker =
@@ -66,6 +85,7 @@ export type ReadinessBlocker =
   | { code: 'runner_offline' }
   | { code: 'runner_outdated'; commands: CommandName[] }
   | { code: 'no_spec_dir' }
+  | { code: 'no_docs_clone' }
   | { code: 'content_off' };
 
 export type ProjectReadiness = Record<ReadinessAction, ReadinessBlocker[]>;
@@ -80,8 +100,11 @@ export interface ReadinessFacts {
    * empty when it advertised nothing or is offline.
    */
   missingCommands: readonly CommandName[];
-  /** Whether `specDirOf(codeSentinelConfig)` names a directory. */
-  specDir: boolean;
+  /**
+   * #379: where a spec goes — `resolveSpecTarget` in the API: the code
+   * repository, an external docs repository, or neither and why.
+   */
+  specTarget: SpecTargetKind;
   /** `projects.shipSessionContent`. */
   shipSessionContent: boolean;
 }
@@ -104,8 +127,18 @@ const blockersOf = (
       if (commands.length) blockers.push({ code: 'runner_outdated', commands });
     }
   }
-  if (action === 'spec_on_run' && !facts.specDir) {
-    blockers.push({ code: 'no_spec_dir' });
+  if (action === 'spec_on_run') {
+    if (facts.specTarget === 'no_spec_dir') {
+      blockers.push({ code: 'no_spec_dir' });
+    } else if (facts.specTarget === 'no_docs_clone') {
+      blockers.push({ code: 'no_docs_clone' });
+    } else if (
+      facts.specTarget === 'docs_repo' &&
+      facts.runnerConnected &&
+      facts.missingCommands.includes(DOCS_SPEC_COMMAND)
+    ) {
+      blockers.push({ code: 'runner_outdated', commands: [DOCS_SPEC_COMMAND] });
+    }
   }
   if (action === 'capture' && !facts.shipSessionContent) {
     blockers.push({ code: 'content_off' });

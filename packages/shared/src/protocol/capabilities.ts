@@ -243,6 +243,8 @@ export const RUNNER_FEATURE_COMMANDS = {
   design: ['plan.turn', 'uiprofile.fingerprint', 'uiprofile.build'],
   uiProfileBuild: ['uiprofile.build'],
   worktree: ['worktree.status'],
+  /** #379: specs written into an external docs repository. */
+  docsRepo: ['docs.publish_specs'],
 } as const satisfies Record<string, readonly CommandName[]>;
 
 /** Facts about the host itself, sent next to the capabilities. */

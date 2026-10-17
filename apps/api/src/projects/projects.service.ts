@@ -6,7 +6,10 @@ import {
   type ProjectSummary,
   type Role,
 } from '@agentdock/shared';
-import type { ProjectInspection } from '@agentdock/shared/protocol';
+import {
+  type ProjectInspection,
+  repoRelativeDirSchema,
+} from '@agentdock/shared/protocol';
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
@@ -337,17 +340,33 @@ export class ProjectsService {
     return this.toDetail(updated, role);
   }
 
-  /** Manual override: no disk is read, the admin's word is stored. */
+  /**
+   * Manual override: no disk is read, the admin's word is stored. #379: a
+   * request that restates the detected source changes only its Spec folder,
+   * so detection stays on.
+   */
   async overrideDocsSource(
     projectId: string,
     request: DocsSourceOverrideRequest,
     ctx: AuditContext,
   ): Promise<ProjectDetail> {
     const project = await this.load(projectId);
-    const data = manualDocsData(project.rootPath, request);
+    const manual = manualDocsData(project.rootPath, request);
+    const stored = project.docsSource;
+    const restated =
+      stored !== null &&
+      !stored.manual &&
+      stored.kind === manual.kind &&
+      stored.localPath === manual.localPath &&
+      stored.repo === manual.repo;
+    const data = restated ? { specDir: manual.specDir } : manual;
     const updated = await this.prisma.project.update({
       where: { id: projectId },
-      data: { docsSource: { upsert: { create: data, update: data } } },
+      data: {
+        docsSource: restated
+          ? { update: data }
+          : { upsert: { create: manual, update: manual } },
+      },
       include: withRelations,
     });
     await this.audit.record({
@@ -355,8 +374,8 @@ export class ProjectsService {
       action: 'project.docs_source_override',
       target: { type: 'project', id: projectId },
       projectId,
-      before: project.docsSource ? docsSummary(project.docsSource) : {},
-      after: docsSummary(data),
+      before: stored ? docsSummary(stored) : {},
+      after: updated.docsSource ? docsSummary(updated.docsSource) : {},
       result: 'ok',
     });
     return this.toDetail(updated, 'admin');
@@ -421,11 +440,13 @@ const docsSummary = (docs: {
   localPath: string | null;
   repo: string | null;
   manual: boolean;
+  specDir?: string | null;
 }) => ({
   kind: docs.kind,
   localPath: docs.localPath,
   repo: docs.repo,
   manual: docs.manual,
+  specDir: docs.specDir ?? null,
 });
 
 const invalid = (message: string) =>
@@ -437,7 +458,7 @@ const invalid = (message: string) =>
  */
 export const manualDocsData = (
   rootPath: string,
-  { kind, localPath, repo }: DocsSourceOverrideRequest,
+  { kind, localPath, repo, specDir }: DocsSourceOverrideRequest,
 ) => {
   switch (kind) {
     case 'in_repo':
@@ -452,14 +473,15 @@ export const manualDocsData = (
       if (!localPath) throw invalid('sibling_repo takes a localPath');
       break;
     case 'remote_repo':
-      if (!repo || localPath) {
-        throw invalid('remote_repo takes a repo and no localPath');
-      }
+      // #379: `localPath` is the docs repository's local clone, if there is one.
+      if (!repo) throw invalid('remote_repo takes a repo');
       break;
     case 'none':
       if (localPath || repo) throw invalid('none takes no localPath or repo');
+      if (specDir) throw invalid('none takes no specDir');
       break;
   }
+  const folder = specDir ? specFolderOf(specDir) : null;
   const isGitRepo =
     kind === 'in_repo' ||
     kind === 'remote_repo' ||
@@ -474,5 +496,20 @@ export const manualDocsData = (
     classified: EMPTY_CLASSIFIED,
     candidates: [],
     manual: true,
+    specDir: folder,
   };
+};
+
+/**
+ * #379: the Spec folder as stored — a relative path inside the docs root,
+ * without `.`/`..` segments and a trailing `/`.
+ */
+const specFolderOf = (specDir: string): string => {
+  const parsed = repoRelativeDirSchema.safeParse(specDir.replace(/\/+$/, ''));
+  if (!parsed.success) {
+    throw invalid(
+      'specDir must be a relative path inside the docs root, without "." or ".." segments',
+    );
+  }
+  return parsed.data;
 };

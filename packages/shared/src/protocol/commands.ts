@@ -10,6 +10,7 @@ import {
   cardPrCloseCommands,
 } from './commands/cards';
 import { controlCommands } from './commands/control';
+import { docsCommands } from './commands/docs';
 import { githubCommands } from './commands/github';
 import { handoffCommands } from './commands/handoff';
 import { plannerCommands } from './commands/planner';
@@ -168,6 +169,7 @@ export const commands = {
   ...captureCommands,
   ...textCommands,
   ...assessCommands,
+  ...docsCommands,
   ...stewardCommands,
   ...handoffCommands,
   ...sessionMessageCommands,

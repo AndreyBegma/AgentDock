@@ -12,6 +12,9 @@ import {
   cardCiRetriggerResultSchema,
   cardCommands,
   cardPrCloseResultSchema,
+  type DocsPublishSpecsArgs,
+  type DocsPublishSpecsResult,
+  docsPublishSpecsResultSchema,
   type IssueCreateArgs,
   type IssueCreateResult,
   isCommandName,
@@ -71,7 +74,8 @@ export class BoardCommands {
       | 'card.prClose'
       | 'issue.create'
       | 'plan.close'
-      | 'pr.inspect',
+      | 'pr.inspect'
+      | 'docs.publish_specs',
   ): void {
     const wired: string = name;
     if (!isCommandName(wired)) {
@@ -254,6 +258,29 @@ export class BoardCommands {
       };
     }
     return { status: 'ok', output: output.data as CardCommandOutput<N> };
+  }
+
+  /** #379: a card's spec, as a pull request in an external docs repository. */
+  async publishDocsSpecs(
+    runnerId: string,
+    args: DocsPublishSpecsArgs,
+    options: SendOptions,
+  ): Promise<BoardSendResult<DocsPublishSpecsResult>> {
+    this.assertReady(runnerId, 'docs.publish_specs');
+    const result = await this.commands.send(
+      runnerId,
+      'docs.publish_specs',
+      args,
+      options,
+    );
+    if (result.status !== 'ok') return result;
+    const output = docsPublishSpecsResultSchema.safeParse(result.output);
+    return output.success
+      ? { status: 'ok', output: output.data }
+      : {
+          status: 'error',
+          error: { code: 'internal', message: 'malformed result' },
+        };
   }
 
   async createIssue(

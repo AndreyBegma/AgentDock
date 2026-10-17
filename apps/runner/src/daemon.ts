@@ -35,6 +35,7 @@ import {
 } from './detect/capabilities';
 import type { Exec } from './detect/exec';
 import { claudeConfigDir } from './detect/profiles';
+import { createDocsHandlers } from './docs';
 import type { Env } from './env';
 import { ecoSessionsDir, TranscriptCwds } from './filter/eco';
 import { FILTER_ORCHESTRATOR_DIR } from './filter/env';
@@ -519,6 +520,7 @@ export const runDaemon = async (
       capture: createCaptureHandlers(capture),
       normalize: createNormalizeHandlers(normalize),
       assess: createAssessHandlers(assess),
+      docs: createDocsHandlers(skillsDeps),
       steward: { ...stewardActions.handlers(), ...stewardDigest.handlers() },
       handoff: createHandoffHandlers(handoff),
       sessionMessage: new SessionMessenger({

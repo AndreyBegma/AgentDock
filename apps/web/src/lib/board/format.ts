@@ -406,6 +406,7 @@ export function autoRunReason(
     case BOARD_ERROR.maxRunning:
     case BOARD_ERROR.budgetExceeded:
     case BOARD_ERROR.noSpecDir:
+    case BOARD_ERROR.noDocsClone:
     case BOARD_ERROR.unsupportedRuntime:
     case BOARD_ERROR.cardRunning:
     case BOARD_ERROR.commandUnavailable:
@@ -460,7 +461,9 @@ export function describeBoardError(
     case BOARD_ERROR.wrongColumn:
       return 'The card is not in the column this needs. Refresh the board.';
     case BOARD_ERROR.noSpecDir:
-      return 'This project has no spec directory, so a spec cannot be written. Turn the spec off, or set the docs source in the project settings.';
+      return 'This project has no spec folder, so a spec cannot be written. Set the Spec folder in Settings › Docs source, or turn the spec off.';
+    case BOARD_ERROR.noDocsClone:
+      return 'The docs repository has no local clone, so a spec cannot be written there. Set its local clone path in Settings › Docs source (Override), or turn the spec off.';
     case BOARD_ERROR.unsupportedRuntime:
       return 'The runner refused: card workers run on Claude profiles only.';
     case BOARD_ERROR.noProfile:
