@@ -16,10 +16,11 @@ import {
 } from '@agentdock/shared';
 import { callbackCodec } from './callback-data';
 import { appLink } from './markdown-v2';
+import { OPEN_IN_APP_TEXT, openInAppButton } from './mini-app-buttons';
 import type {
+  InlineButton,
   InlineKeyboard,
   InlineKeyboardButton,
-  InlineKeyboardUrlButton,
 } from './telegram-client';
 
 /**
@@ -284,7 +285,7 @@ export const cardKeyboard = (
   review: InlineKeyboard = [],
 ): InlineKeyboard => {
   const target = { project: projectId, number: card.number };
-  const actions: (InlineKeyboardButton | InlineKeyboardUrlButton)[] = [];
+  const actions: InlineButton[] = [];
   if (canWrite) {
     actions.push({
       text: 'Move',
@@ -303,15 +304,19 @@ export const cardKeyboard = (
       });
     }
   }
+  // #580: the Mini App with an https APP_URL; else the plain web link.
   const link = appLink(
     appUrl,
     `/projects/${projectId}/board/cards/${card.number}`,
   );
+  const open =
+    openInAppButton(appUrl, { projectId, card: card.number }) ??
+    (link ? { text: OPEN_IN_APP_TEXT, url: link } : null);
   return [
     ...(actions.length > 0 ? [actions] : []),
     ...review,
     [
-      ...(link ? [{ text: 'Open in app', url: link }] : []),
+      ...(open ? [open] : []),
       {
         text: `‹ ${COLUMN_TITLE[card.column]}`,
         callback_data: COLUMN_CALLBACK.encode({
