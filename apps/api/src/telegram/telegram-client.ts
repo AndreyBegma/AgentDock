@@ -112,10 +112,27 @@ export interface InlineKeyboardUrlButton {
   url: string;
 }
 
-export type InlineKeyboard = (
+/** #580: a button that opens the Mini App at `web_app.url`, an https URL. */
+export interface WebAppButton {
+  text: string;
+  web_app: { url: string };
+}
+
+/** Any button of an inline keyboard. */
+export type InlineButton =
   | InlineKeyboardButton
   | InlineKeyboardUrlButton
-)[][];
+  | WebAppButton;
+
+export type InlineKeyboard = InlineButton[][];
+
+/**
+ * #580: the button beside the chat's input field — the Mini App, or
+ * Telegram's default (the command list) when it cannot be one.
+ */
+export type MenuButton =
+  | { type: 'default' }
+  | { type: 'web_app'; text: string; web_app: { url: string } };
 
 /** One entry of the bot's command menu (`setMyCommands`). */
 export interface BotCommand {
@@ -205,7 +222,7 @@ const networkError = (error: unknown): TelegramApiError => {
 /**
  * The Bot API over HTTPS (spec 22 D7): `getMe`, the `getUpdates` long poll,
  * `sendMessage`, `editMessageText` (#574), `answerCallbackQuery` (D12) and
- * `setMyCommands` (#500). Stateless — the token is passed per call, read from
+ * `setMyCommands` (#500) and `setChatMenuButton` (#580). Stateless — the token is passed per call, read from
  * `BotTokenStore` by the caller. The base URL is `TELEGRAM_API_BASE`, which
  * tests point at a fake server: nothing here ever reaches the real API in a
  * test.
@@ -328,6 +345,11 @@ export class TelegramClient {
       commands,
       scope: { type: 'all_private_chats' },
     });
+  }
+
+  /** #580: the menu button of every private chat that has none of its own. */
+  async setChatMenuButton(token: string, button: MenuButton): Promise<void> {
+    await this.call(token, 'setChatMenuButton', { menu_button: button });
   }
 
   private async call(

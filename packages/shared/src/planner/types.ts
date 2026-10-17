@@ -102,7 +102,7 @@ export const DISCUSS_SKILLS_MAX = 12;
 /**
  * D2; `card` is #337 D1: a New work intake, ending in one card — or, after a
  * confirmed split, several independent ones (#409). `discuss` is #590
- * (ADR-0055): a free conversation about the project, with no round limit and
+ * (ADR-0056): a free conversation about the project, with no round limit and
  * no required result — it never makes a card.
  */
 export const PLAN_MODES = ['batch', 'dialogue', 'card', 'discuss'] as const;
@@ -556,7 +556,7 @@ export const discussProposalSchema = z.strictObject({
 export type DiscussProposal = z.infer<typeof discussProposalSchema>;
 
 /**
- * #590 (ADR-0055): a discussion turn — a markdown reply and, optionally, the
+ * #590 (ADR-0056): a discussion turn — a markdown reply and, optionally, the
  * cards it proposes. `title` names the discussion; the first turn sets it,
  * a later one may rename it.
  */

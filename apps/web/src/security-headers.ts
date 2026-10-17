@@ -3,6 +3,9 @@ export const NONCE_HEADER = 'x-nonce';
 
 const DEFAULT_LIVE_URL = 'ws://localhost:8180/live';
 
+/** #580: where Telegram's Web App script comes from; allowed on the Mini App's entry only. */
+export const TELEGRAM_SCRIPT_ORIGIN = 'https://telegram.org';
+
 /** 128 random bits, base64: a fresh one for every page request. */
 export function createNonce(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
@@ -27,21 +30,24 @@ function liveOrigin(liveUrl: string): string | null {
  * and the app frames only itself — the design viewer's sandboxed mockups come
  * from `/api` (F-28). Styles stay `'unsafe-inline'`: React renders `style`
  * attributes and the UI kit sets them at runtime; a style cannot run code.
+ * `telegram`: the Mini App's entry (#580) also runs Telegram's script.
  */
 export function contentSecurityPolicy({
   nonce,
   liveUrl = process.env.NEXT_PUBLIC_LIVE_URL ?? DEFAULT_LIVE_URL,
   dev = process.env.NODE_ENV === 'development',
+  telegram = false,
 }: {
   nonce: string;
   liveUrl?: string;
   dev?: boolean;
+  telegram?: boolean;
 }): string {
   const live = liveOrigin(liveUrl);
   const directives = [
     "default-src 'self'",
     // React's development build reconstructs call stacks with `eval`.
-    `script-src 'self' 'nonce-${nonce}'${dev ? " 'unsafe-eval'" : ''}`,
+    `script-src 'self' 'nonce-${nonce}'${telegram ? ` ${TELEGRAM_SCRIPT_ORIGIN}` : ''}${dev ? " 'unsafe-eval'" : ''}`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",

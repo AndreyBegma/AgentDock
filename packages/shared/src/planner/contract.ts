@@ -926,7 +926,7 @@ ${MULTIPLE_RULE}
 `;
 
 /**
- * #590 (ADR-0055): the fixed contract text of a `discuss` plan — a free
+ * #590 (ADR-0056): the fixed contract text of a `discuss` plan — a free
  * conversation about the project. The API appends it after the discussion
  * instructions on every discussion turn, in place of `plannerOutputContract`.
  * A turn always replies; it may propose cards, and never makes one.

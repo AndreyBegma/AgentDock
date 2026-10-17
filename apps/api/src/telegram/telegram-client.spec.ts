@@ -16,6 +16,7 @@ const clientWith = (
     apiBase: 'https://telegram.test/',
     pollTimeoutS: 30,
     appUrl: null,
+    initDataMaxAgeS: 3600,
     autoStart: false,
     deliveryIntervalMs: 1_000,
     idleMs: 10,

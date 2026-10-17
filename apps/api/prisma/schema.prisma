@@ -2305,7 +2305,7 @@ model GitHubProjectHealth {
 // ─── Planner (spec 172) ─────────────────────────────────────────────────────
 
 /// Shared `PLAN_MODES` (D2; `card`: #337 D1, a New Card intake; `discuss`:
-/// #590, a discussion, ADR-0055).
+/// #590, a discussion, ADR-0056).
 enum PlanMode {
   batch
   dialogue

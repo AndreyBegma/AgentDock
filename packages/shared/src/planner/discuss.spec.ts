@@ -10,7 +10,7 @@ import {
   plannerOutputSchemas,
 } from '../index';
 
-/** #590 (ADR-0055): the discussion's contract. */
+/** #590 (ADR-0056): the discussion's contract. */
 
 const fence = (json: unknown): string =>
   `Here is what I found.\n\n\`\`\`agentdock-plan\n${JSON.stringify(json, null, 2)}\n\`\`\``;

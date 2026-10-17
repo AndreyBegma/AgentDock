@@ -106,6 +106,7 @@ describe('Telegram admin integration (e2e)', () => {
     expect(ctx.fake.calls.map((c) => [c.method, c.token])).toEqual([
       ['getMe', BOT_TOKEN],
       ['setMyCommands', BOT_TOKEN],
+      ['setChatMenuButton', BOT_TOKEN],
     ]);
     // #500: the menu is the commands /help lists, for private chats.
     expect(ctx.fake.calls[1].body).toEqual({

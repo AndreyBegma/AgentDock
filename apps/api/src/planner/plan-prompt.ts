@@ -78,7 +78,7 @@ export interface DiscussPromptState {
 }
 
 /**
- * #590 (ADR-0055): what a discussion turn is — the instructions every turn
+ * #590 (ADR-0056): what a discussion turn is — the instructions every turn
  * of a `discuss` plan runs on, in place of the planner's. The turn runs in
  * the plan's read-only worktree (spec 172 D15), so the model reads the
  * repository and cannot change it; the instructions say so as well.
@@ -270,7 +270,7 @@ const assembleIntake = (input: PromptInput): string => {
 };
 
 /**
- * #590 (ADR-0055): a discussion turn — the discussion instructions, the
+ * #590 (ADR-0056): a discussion turn — the discussion instructions, the
  * project's own (as for an intake), the discuss contract, the skills chosen
  * at the start, what the discussion opened with and the person's latest
  * message. The plan session is resumed after the first turn, so the model

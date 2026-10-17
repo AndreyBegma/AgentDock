@@ -41,7 +41,7 @@ import { RunningTurn } from '../planner/running-turn';
 import { DisabledReason } from '../prerequisites/disabled-reason';
 
 /**
- * #590 (ADR-0055, design 1): below `sm` the dialog opens full screen with no
+ * #590 (ADR-0056, design 1): below `sm` the dialog opens full screen with no
  * radius; below `lg` it keeps a 16px gutter and every control is 44px, the
  * text inputs 16px so iOS does not zoom on focus.
  */

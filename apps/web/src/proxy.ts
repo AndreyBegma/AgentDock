@@ -1,4 +1,4 @@
-import { SESSION_COOKIE } from '@agentdock/shared';
+import { MINI_APP_PATH, SESSION_COOKIE } from '@agentdock/shared';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { HOME_PATH, safeNext } from './app/login/safe-next';
@@ -10,8 +10,17 @@ import {
   securityHeaders,
 } from './security-headers';
 
-/** Exact paths only: a prefix would open everything under it. */
-const PUBLIC_PATHS = ['/login', '/register', '/pending', INSTALL_PATH];
+/**
+ * Exact paths only: a prefix would open everything under it. The Telegram
+ * Mini App's entry (#580) signs in with Telegram's `initData`, not a cookie.
+ */
+const PUBLIC_PATHS = [
+  '/login',
+  '/register',
+  '/pending',
+  INSTALL_PATH,
+  MINI_APP_PATH,
+];
 
 /**
  * The app icons (`app/icon.svg`, and `app/apple-icon.tsx`, served at
@@ -30,7 +39,10 @@ export const PUBLIC_FILES = ['/favicon.ico', '/icon.svg', '/apple-icon'];
  */
 export function proxy(request: NextRequest) {
   const nonce = createNonce();
-  const csp = contentSecurityPolicy({ nonce });
+  const csp = contentSecurityPolicy({
+    nonce,
+    telegram: request.nextUrl.pathname === MINI_APP_PATH,
+  });
   const response = route(request, nonce, csp);
   const headers = securityHeaders({
     csp,
