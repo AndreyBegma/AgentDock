@@ -16,7 +16,7 @@ Queue, Approvals, History, Token saver, Skills, Schedules and Settings sit in a
 project it is a plain section). More, Workspace-in-a-project and Admin start
 folded, unfold by themselves on one of their pages (History, Sessions, an
 admin page) and each remembers its state per browser under its own key; with
-storage blocked they stay folded. The icon-only rail shows every entry. per browser. Exactly one item is active: the longest matching href wins, and
+storage blocked they stay folded. The icon-only rail shows every entry. Exactly one item is active: the longest matching href wins, and
 `/` and `/projects` match only exactly. Integrations goes to the hub,
 `/admin/integrations`. The active item is scrolled into view, and the rail
 fades at whichever edge has more. The project switcher is a button with the
