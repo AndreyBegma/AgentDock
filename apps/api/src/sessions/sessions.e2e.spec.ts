@@ -368,6 +368,68 @@ describe('sessions (e2e)', () => {
       expect(await ctx.prisma.toolCall.count()).toBe(1);
     });
 
+    it('clears parentSessionId when a child is re-observed in another project', async () => {
+      const r = await runner();
+      const widget = await project(r.runnerId, 'widget');
+      const gadget = await project(r.runnerId, 'gadget');
+      const e = new Events();
+      await r.send([
+        e.next(
+          'session.observed',
+          'main-m',
+          {
+            cwd: '/srv/dev/widget',
+            startedAt: at(0),
+            parsed: true,
+            projectId: widget.id,
+          },
+          at(0),
+        ),
+        e.next(
+          'session.observed',
+          'agent-m',
+          {
+            cwd: '/srv/dev/widget',
+            startedAt: at(1),
+            parsed: true,
+            parent: { sessionId: 'main-m' },
+          },
+          at(1),
+        ),
+      ]);
+      const parent = await ctx.prisma.agentSession.findFirstOrThrow({
+        where: { externalId: 'main-m' },
+      });
+      const before = await ctx.prisma.agentSession.findFirstOrThrow({
+        where: { externalId: 'agent-m' },
+      });
+      expect(before).toMatchObject({
+        parentSessionId: parent.id,
+        projectId: widget.id,
+      });
+
+      await r.send([
+        e.next(
+          'session.observed',
+          'agent-m',
+          {
+            cwd: '/srv/dev/gadget',
+            startedAt: at(1),
+            parsed: true,
+            projectId: gadget.id,
+          },
+          at(2),
+        ),
+      ]);
+      const after = await ctx.prisma.agentSession.findFirstOrThrow({
+        where: { externalId: 'agent-m' },
+      });
+      expect(after).toMatchObject({
+        parentSessionId: null,
+        projectId: gadget.id,
+      });
+    });
+
     it('links a child that is seen before its parent', async () => {
       const r = await runner();
       const widget = await project(r.runnerId, 'widget');
@@ -578,6 +640,44 @@ describe('sessions (e2e)', () => {
       const unassigned = (await list(admin, '?unassigned=true'))
         .body as SessionListResponse;
       expect(unassigned.items.map((s) => s.externalId)).toEqual(['nowhere']);
+    });
+
+    it('excludes a child that moved to project B from the parent for a member of A', async () => {
+      const { a, b, ids } = await seed();
+      const owner = await ctx.prisma.runner.findFirstOrThrow();
+      const child = await ctx.prisma.agentSession.create({
+        data: {
+          runnerId: owner.id,
+          lastEventAt: new Date(at(1)),
+          runtime: 'claude',
+          externalId: 'moved-child',
+          cwd: '/srv/dev/x',
+          startedAt: new Date(at(1)),
+          projectId: b.id,
+          parentSessionId: ids.a,
+        },
+      });
+      await ctx.prisma.llmRequest.create({
+        data: {
+          sessionId: child.id,
+          requestId: 'req_moved',
+          model: 'm',
+          input: 5,
+          output: 5,
+          querySource: 'subagent',
+          ts: new Date(at(2)),
+        },
+      });
+      const alice = await member(a.id, 'alice@example.com');
+
+      const detail = (await alice.get(`/sessions/${ids.a}`))
+        .body as SessionDetail;
+      expect(detail.subagents).toEqual([]);
+      expect(detail.totals.requests).toBe(0);
+      const page = (await list(alice)).body as SessionListResponse;
+      expect(page.items).toHaveLength(1);
+      expect(page.items[0]).toMatchObject({ subagents: 0 });
+      expect(page.items[0].totals.requests).toBe(0);
     });
 
     it('anonymous gets 401', async () => {

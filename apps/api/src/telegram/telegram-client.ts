@@ -204,7 +204,8 @@ const networkError = (error: unknown): TelegramApiError => {
 
 /**
  * The Bot API over HTTPS (spec 22 D7): `getMe`, the `getUpdates` long poll,
- * `sendMessage`, `answerCallbackQuery` (D12) and `setMyCommands` (#500). Stateless — the token is passed per call, read from
+ * `sendMessage`, `editMessageText` (#574), `answerCallbackQuery` (D12) and
+ * `setMyCommands` (#500). Stateless — the token is passed per call, read from
  * `BotTokenStore` by the caller. The base URL is `TELEGRAM_API_BASE`, which
  * tests point at a fake server: nothing here ever reaches the real API in a
  * test.
@@ -258,15 +259,18 @@ export class TelegramClient {
     return result.map(toUpdate).filter((u): u is TelegramUpdate => u !== null);
   }
 
-  /** Sends `text`, already escaped for `MarkdownV2` unless `plain`. */
+  /**
+   * Sends `text`, already escaped for `MarkdownV2` unless `plain`. The sent
+   * message's id; null when Telegram's answer does not name one.
+   */
   async sendMessage(
     token: string,
     chatId: bigint | number,
     text: string,
     plain = false,
     replyMarkup?: TelegramReplyMarkup,
-  ): Promise<void> {
-    await this.call(token, 'sendMessage', {
+  ): Promise<number | null> {
+    const result = await this.call(token, 'sendMessage', {
       // A chat id fits a double (Telegram documents 52 significant bits).
       chat_id: Number(chatId),
       text,
@@ -274,25 +278,32 @@ export class TelegramClient {
       link_preview_options: { is_disabled: true },
       ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
     });
+    return isObject(result) && typeof result.message_id === 'number'
+      ? result.message_id
+      : null;
   }
 
   /**
-   * Replaces the text and buttons of a message the bot sent (#576). Telegram
-   * answers 400 "message is not modified" when nothing would change.
+   * #574: replaces the text of a message the bot sent, and its buttons —
+   * none when `inlineKeyboard` is absent. Same escaping as `sendMessage`.
    */
   async editMessageText(
     token: string,
     chatId: bigint | number,
     messageId: number,
     text: string,
-    replyMarkup?: TelegramReplyMarkup,
+    plain = false,
+    inlineKeyboard?: InlineKeyboard,
   ): Promise<void> {
     await this.call(token, 'editMessageText', {
       chat_id: Number(chatId),
       message_id: messageId,
       text,
+      ...(plain ? {} : { parse_mode: 'MarkdownV2' }),
       link_preview_options: { is_disabled: true },
-      ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+      ...(inlineKeyboard
+        ? { reply_markup: { inline_keyboard: inlineKeyboard } }
+        : {}),
     });
   }
 

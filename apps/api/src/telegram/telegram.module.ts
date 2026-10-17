@@ -3,6 +3,7 @@ import { ApprovalsModule } from '../approvals';
 import { BoardModule } from '../board';
 import { LocalModule } from '../local';
 import { NotificationsModule } from '../notifications';
+import { PlannerModule } from '../planner';
 import { ProjectsModule } from '../projects';
 import { SettingsModule } from '../settings/settings.module';
 import {
@@ -15,6 +16,7 @@ import { TelegramBoardService } from './telegram-board.service';
 import { TelegramClient } from './telegram-client';
 import { TelegramDeliveryService } from './telegram-delivery.service';
 import { TelegramGuard } from './telegram-guard.service';
+import { TelegramIntakeService } from './telegram-intake.service';
 import { TelegramIntegrationService } from './telegram-integration.service';
 import { TelegramLinkingService } from './telegram-linking.service';
 import { TELEGRAM_OPTIONS, telegramOptionsFromEnv } from './telegram-options';
@@ -30,7 +32,8 @@ import { TelegramSessionMessageService } from './telegram-session-message.servic
  * `ApprovalsService`, and spec 201's Approve / Deny on action requests through
  * the local module's `ActionRequestsService`. #500: `TelegramRoutes` routes
  * every update — commands, button prefixes, replies — and `/project` keeps a
- * current project per chat for the Board commands (ADR-0046).
+ * current project per chat for the Board commands (ADR-0046). #574: `/new`
+ * runs the New work intake (`TelegramIntakeService`).
  */
 @Module({
   imports: [
@@ -41,6 +44,8 @@ import { TelegramSessionMessageService } from './telegram-session-message.servic
     ProjectsModule,
     // #489: a card's question answered, and a reply sent to its session.
     BoardModule,
+    // #574: `/new` runs the New work intake through the planner's services.
+    PlannerModule,
   ],
   controllers: [TelegramLinkController, TelegramAdminController],
   providers: [
@@ -53,6 +58,7 @@ import { TelegramSessionMessageService } from './telegram-session-message.servic
     TelegramSessionMessageService,
     TelegramProjectService,
     TelegramBoardService,
+    TelegramIntakeService,
     TelegramRoutes,
     TelegramDeliveryService,
     TelegramPoller,

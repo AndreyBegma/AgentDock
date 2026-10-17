@@ -34,6 +34,8 @@ export const LEGACY_CALLBACK_PREFIXES = ['a', 'r', 'x', 'y', 'q'] as const;
 const FIELDS = {
   /** A project id (a cuid). */
   project: { shape: /^[A-Za-z0-9_-]{1,32}$/, max: 32 },
+  /** A row's cuid: a plan (#574). */
+  id: { shape: /^[A-Za-z0-9_-]{1,32}$/, max: 32 },
   /** A board card's `shortId`. */
   card: { shape: /^[a-z0-9]{8}$/, max: 8 },
   /** A non-negative integer below 10^15. */

@@ -260,6 +260,7 @@ export class TelegramPoller implements OnApplicationBootstrap, OnModuleDestroy {
         answer.notice ?? '',
       );
     }
+    if (answer.text === undefined) return;
     if (answer.editMessageId !== undefined) {
       try {
         await this.client.editMessageText(
@@ -267,7 +268,10 @@ export class TelegramPoller implements OnApplicationBootstrap, OnModuleDestroy {
           answer.chatId,
           answer.editMessageId,
           answer.text,
-          answer.replyMarkup,
+          true,
+          answer.replyMarkup && 'inline_keyboard' in answer.replyMarkup
+            ? answer.replyMarkup.inline_keyboard
+            : undefined,
         );
         return;
       } catch (error) {
