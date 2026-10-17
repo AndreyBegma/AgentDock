@@ -5,6 +5,7 @@ import {
   type ConfirmSplitRequest,
   type ConfirmStackRequest,
   type CreatePlanRequest,
+  DISCUSS_SKILLS_MAX,
   INTAKE_SPLIT_MAX,
   PLAN_MODES,
   PLAN_REVIEW_DECISIONS,
@@ -69,6 +70,9 @@ const PROFILE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const SHORT_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$/;
 /** `attachmentIdSchema`. */
 const ATTACHMENT_ID = /^[A-Za-z0-9_-]{1,64}$/;
+/** A skill invocation, as the design skills take it. */
+const SKILL_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/;
+const SKILL_MAX_LENGTH = 128;
 
 /** `POST /projects/:projectId/plans`. */
 export class CreatePlanDto implements CreatePlanRequest {
@@ -102,6 +106,18 @@ export class CreatePlanDto implements CreatePlanRequest {
     message: 'attachmentIds must be attachment ids',
   })
   attachmentIds?: string[];
+
+  /** #590: a discussion's installed skills. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(DISCUSS_SKILLS_MAX)
+  @IsString({ each: true })
+  @MaxLength(SKILL_MAX_LENGTH, { each: true })
+  @Matches(SKILL_PATTERN, {
+    each: true,
+    message: 'each skill must be an installed skill invocation',
+  })
+  skills?: string[];
 }
 
 export class PlanAnswerDto {

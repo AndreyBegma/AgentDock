@@ -3,6 +3,7 @@ import {
   designBytes,
   PLANNER_BLOCK_TAG,
   PLANNER_DESIGN_CONTRACT,
+  PLANNER_DISCUSS_CONTRACT,
   PLANNER_INTAKE_CONTRACT,
   type PlanMode,
   type PlannerContractVersion,
@@ -68,7 +69,38 @@ export interface PromptInput {
   projectInstructions?: string | null;
   /** #337 D10: the worktree paths of the files the runner placed for the turn. */
   attachments?: readonly string[];
+  /** #590: a discussion turn's skills — the installed ones of those it chose. */
+  discussion?: DiscussPromptState;
 }
+
+export interface DiscussPromptState {
+  skills: readonly string[];
+}
+
+/**
+ * #590 (ADR-0054): what a discussion turn is — the instructions every turn
+ * of a `discuss` plan runs on, in place of the planner's. The turn runs in
+ * the plan's read-only worktree (spec 172 D15), so the model reads the
+ * repository and cannot change it; the instructions say so as well.
+ */
+export const DISCUSS_INSTRUCTIONS = `# Discussion
+
+You are the project's planning model, in a free conversation with a person
+about this repository. They ask questions about the code and the
+architecture, or ask for an analysis — security, performance, architecture,
+anything about the code.
+
+- Read the repository to answer: open the files, follow the calls, quote the
+  paths and lines you rely on. Say what you checked and what you did not.
+- The repository is read-only for you. Never edit, create or delete a file,
+  never commit, never run a command that changes anything. A discussion
+  changes nothing in the project.
+- Answer what was asked, as a reviewer would: findings first, ordered by
+  risk or importance, each with where it is and what to do about it.
+- Questions about the board, the fleet, budgets or sessions are not yours to
+  answer: say so, and stay with the code.
+- A discussion does not have to end in work. Propose a card only for
+  concrete work your answer found; the person decides whether to make it.`;
 
 export interface IntakePromptState {
   roundsAsked: number;
@@ -94,6 +126,8 @@ const STACK_WHEN =
   'one larger piece of work whose parts must happen in order and share one look, or several UI changes to one surface or form factor (one screen, one page, "the board on phones") — a stack with `design: true`, staged foundations first: the shared layout and primitives, then the per-feature cards';
 
 const WHAT: Record<PlanTurnAction, (input: PromptInput) => string> = {
+  discuss: () =>
+    "Answer the person's latest message in the discussion. Propose cards only for concrete work you found.",
   clarify: () =>
     'Ask the next round of plan-level questions about the brief, or report `done: true` when the brief is clear enough to split into tasks.',
   decompose: () =>
@@ -235,8 +269,47 @@ const assembleIntake = (input: PromptInput): string => {
   return `${sections.join('\n\n')}\n`;
 };
 
+/**
+ * #590 (ADR-0054): a discussion turn — the discussion instructions, the
+ * project's own (as for an intake), the discuss contract, the skills chosen
+ * at the start, what the discussion opened with and the person's latest
+ * message. The plan session is resumed after the first turn, so the model
+ * keeps the conversation; the opening is repeated so a turn that starts the
+ * session late still has it.
+ */
+const assembleDiscuss = (input: PromptInput): string => {
+  const skills = input.discussion?.skills ?? [];
+  const sections = [
+    DISCUSS_INSTRUCTIONS,
+    ...(input.projectInstructions?.trim()
+      ? [
+          '# Project instructions',
+          "The project's own Planner instructions. Where they speak about splitting plans or writing documents, they do not apply to a discussion; everything they say about the project does.",
+          input.projectInstructions.trim(),
+        ]
+      : []),
+    PLANNER_DISCUSS_CONTRACT.trim(),
+    '# This turn',
+    `Action: \`discuss\`. ${WHAT.discuss(input)}`,
+    `Answer with exactly one \`${PLANNER_BLOCK_TAG}\` block whose \`action\` is \`discuss\`.`,
+    '## Skills',
+    skills.length > 0
+      ? `Apply these installed skills to every answer: ${skills.map((s) => `\`${s}\``).join(', ')}. Use them to read and analyse only — never to change the repository.`
+      : 'None.',
+    '## The discussion opened with',
+    fence('text', input.brief),
+  ];
+  if (input.input.message) {
+    sections.push('## Message', fence('text', input.input.message));
+  } else {
+    sections.push('Answer the opening message above.');
+  }
+  return `${sections.join('\n\n')}\n`;
+};
+
 const assembleWith = (input: PromptInput, design: string[]): string => {
   if (input.action === 'intake') return assembleIntake(input);
+  if (input.action === 'discuss') return assembleDiscuss(input);
   const state = {
     title: input.plan.title,
     mode: input.plan.mode,

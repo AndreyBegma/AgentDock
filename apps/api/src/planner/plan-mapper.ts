@@ -1,10 +1,12 @@
 import {
+  discussOutputSchema,
   type FrozenTaskRef,
   intakeRoundsAsked,
   isIntakeRound,
   isPlannedTask,
   PLANNER_INTAKE_MAX_ROUNDS,
   type PlanDetail,
+  type PlanDiscussReply,
   type PlanGraphView,
   type PlanIntakeSplitView,
   type PlannedTask,
@@ -100,6 +102,7 @@ export const roundsOf = (
       );
     case 'write':
     case 'design':
+    case 'discuss':
       return [];
     case 'intake':
       // #337 D4: a round; the card and a split (#409) open none.
@@ -107,6 +110,18 @@ export const roundsOf = (
         ? [{ taskKey: null, questions: out.questions }]
         : [];
   }
+};
+
+/** #590: a discussion turn's reply, read back; any other turn has none. */
+export const replyOf = (
+  action: PlanTurnAction,
+  output: Prisma.JsonValue,
+): PlanDiscussReply | null => {
+  if (action !== 'discuss' || output === null) return null;
+  const parsed = discussOutputSchema.safeParse(output);
+  return parsed.success
+    ? { reply: parsed.data.reply, proposals: parsed.data.proposals ?? [] }
+    : null;
 };
 
 export const turnInclude = {
@@ -134,6 +149,7 @@ export const toTurnView = (row: TurnRow): PlanTurnView => ({
   error: row.error,
   resultText: row.resultText,
   rounds: roundsOf(row.action, row.output, row.task?.key ?? null),
+  reply: replyOf(row.action, row.output),
   createdAt: row.createdAt.toISOString(),
   finishedAt: row.finishedAt?.toISOString() ?? null,
 });
@@ -262,4 +278,5 @@ export const toDetail = ({
           split: split ?? null,
         }
       : null,
+  discussion: plan.mode === 'discuss' ? { skills: plan.skills } : null,
 });

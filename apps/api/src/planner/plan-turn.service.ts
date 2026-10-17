@@ -29,6 +29,7 @@ import { SYSTEM_ACTOR, systemActorFor } from '../audit/audit.types';
 import { BudgetGate } from '../budgets/budget-gate';
 import { PrismaService } from '../database/prisma.service';
 import type { DesignTurnPlan } from '../design/design-rules';
+import { installedOf } from '../design/design-store';
 import { TextNormalizer } from '../text/text-normalizer';
 import { TokenSaverService } from '../token-saver/token-saver.service';
 import { TALKABLE_STATUSES } from './plan-apply';
@@ -140,6 +141,9 @@ export class PlanTurnService {
   ): Promise<string> {
     this.store.assertOpen(plan);
     if (plan.mode === 'card') return this.intakeTurn(plan, input, caller);
+    if (plan.mode === 'discuss') {
+      return this.discussTurn(plan, input, caller);
+    }
     if (intakeOnly(input)) {
       throw plannerError(
         409,
@@ -213,6 +217,47 @@ export class PlanTurnService {
           ...(claim.length > 0 ? { attachmentIds: claim } : {}),
         },
         claim,
+      },
+      caller,
+    );
+  }
+
+  /**
+   * #590 (ADR-0054): a discussion turn answers the person's message — any
+   * number of them, none required to end in a card. The first turn, started
+   * with the discussion, answers its opening (the brief) and takes no
+   * message; every later one needs one. Answers, Enough, Keep one card and
+   * files belong to an intake. The words are kept as typed: the model
+   * replies in the person's language.
+   */
+  private async discussTurn(
+    plan: Plan,
+    input: PlanTurnInput,
+    caller: PlanCaller,
+  ): Promise<string> {
+    if (intakeOnly(input) || input.answers !== undefined) {
+      throw plannerError(
+        409,
+        PLANNER_ERROR.wrongMode,
+        'A discussion takes messages only',
+      );
+    }
+    const asked = await this.prisma.planTurn.count({
+      where: { planId: plan.id },
+    });
+    if (asked > 0 && !input.message) {
+      throw plannerError(
+        400,
+        PLANNER_ERROR.invalidArgs,
+        'A discussion turn needs a message',
+      );
+    }
+    return this.run(
+      plan,
+      {
+        action: 'discuss',
+        task: null,
+        input: input.message ? { message: input.message } : {},
       },
       caller,
     );
@@ -469,6 +514,7 @@ export class PlanTurnService {
 
     const contractVersion = asPlannerContractVersion(plan.contractVersion);
     const intake = spec.action === 'intake';
+    const discuss = spec.action === 'discuss';
     const [instructions, tasks, session, designParts, files] =
       await Promise.all([
         this.prisma.plannerInstructions.findUniqueOrThrow({
@@ -483,6 +529,10 @@ export class PlanTurnService {
           ? this.attachments.planRefs(plan.id, spec.claim)
           : Promise.resolve(null),
       ]);
+    // #590: the skills the discussion chose, those still installed.
+    const discussSkills = discuss
+      ? await installedOf(this.prisma, project, plan.skills)
+      : null;
     const intakeState = intake
       ? await intakeTurnState(this.prisma, plan.id, {
           id: '',
@@ -512,6 +562,17 @@ export class PlanTurnService {
             attachments: (files ?? []).map((f) =>
               attachmentWorktreePath(f.id, f.name),
             ),
+          }
+        : {}),
+      // #590: a discussion runs on its own instructions (in the prompt); a
+      // project's own instructions apply, as to an intake.
+      ...(discussSkills
+        ? {
+            projectInstructions:
+              instructions.projectId !== null ? instructions.body : null,
+            discussion: {
+              skills: plan.skills.filter((s) => discussSkills.has(s)),
+            },
           }
         : {}),
       action: spec.action,
