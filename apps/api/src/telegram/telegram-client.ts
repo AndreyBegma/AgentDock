@@ -106,6 +106,17 @@ export interface InlineKeyboardButton {
   callback_data: string;
 }
 
+/** #576: a button that opens a link instead of sending a press back. */
+export interface InlineKeyboardUrlButton {
+  text: string;
+  url: string;
+}
+
+export type InlineKeyboard = (
+  | InlineKeyboardButton
+  | InlineKeyboardUrlButton
+)[][];
+
 /** One entry of the bot's command menu (`setMyCommands`). */
 export interface BotCommand {
   /** 1–32 characters of `a-z`, `0-9` and `_`, without the slash. */
@@ -116,7 +127,7 @@ export interface BotCommand {
 
 /** What `sendMessage` may attach: buttons, or a prompt to reply to it. */
 export type TelegramReplyMarkup =
-  | { inline_keyboard: InlineKeyboardButton[][] }
+  | { inline_keyboard: InlineKeyboard }
   | { force_reply: true; input_field_placeholder?: string };
 
 type ApiResponse =
@@ -260,6 +271,26 @@ export class TelegramClient {
       chat_id: Number(chatId),
       text,
       ...(plain ? {} : { parse_mode: 'MarkdownV2' }),
+      link_preview_options: { is_disabled: true },
+      ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+    });
+  }
+
+  /**
+   * Replaces the text and buttons of a message the bot sent (#576). Telegram
+   * answers 400 "message is not modified" when nothing would change.
+   */
+  async editMessageText(
+    token: string,
+    chatId: bigint | number,
+    messageId: number,
+    text: string,
+    replyMarkup?: TelegramReplyMarkup,
+  ): Promise<void> {
+    await this.call(token, 'editMessageText', {
+      chat_id: Number(chatId),
+      message_id: messageId,
+      text,
       link_preview_options: { is_disabled: true },
       ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
     });

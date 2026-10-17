@@ -121,6 +121,11 @@ export class FakeTelegram {
     return this.calls.filter((c) => c.method === 'sendMessage');
   }
 
+  /** The messages the bot rewrote in place (#576). */
+  edited(): FakeCall[] {
+    return this.calls.filter((c) => c.method === 'editMessageText');
+  }
+
   close(): Promise<void> {
     return new Promise((resolve) => this.server.close(() => resolve()));
   }
@@ -164,6 +169,7 @@ export class FakeTelegram {
           status: 200,
           body: { ok: true, result: { message_id: this.calls.length } },
         };
+      case 'editMessageText':
       case 'answerCallbackQuery':
       case 'setMyCommands':
         return { status: 200, body: { ok: true, result: true } };
@@ -198,6 +204,7 @@ export const callbackPress = (
   updateId: number,
   chatId: number,
   data: string,
+  messageId = 1,
 ) => ({
   update_id: updateId,
   callback_query: {
@@ -205,7 +212,7 @@ export const callbackPress = (
     from: { id: chatId, is_bot: false },
     chat_instance: '1',
     message: {
-      message_id: 1,
+      message_id: messageId,
       date: 0,
       chat: { id: chatId, type: 'private' },
       from: { id: BOT.id, is_bot: true, username: BOT.username },
