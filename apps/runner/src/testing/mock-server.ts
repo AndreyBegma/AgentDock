@@ -18,11 +18,24 @@ export type PairingHandler = (body: unknown) => Response;
  * endpoint and the `/runner` socket. Every message the runner sends is parsed
  * with the protocol schema, so a malformed one fails the test.
  */
+export interface AccessSeen {
+  id: string | null;
+  secret: string | null;
+}
+
+const accessSeen = (request: Request): AccessSeen => ({
+  id: request.headers.get('cf-access-client-id'),
+  secret: request.headers.get('cf-access-client-secret'),
+});
+
 export class MockServer {
   readonly received: RunnerMessage[] = [];
   readonly invalid: unknown[] = [];
   readonly authorizations: (string | null)[] = [];
   readonly pairingBodies: unknown[] = [];
+  /** The Cloudflare Access headers of each pairing request and socket upgrade. */
+  readonly pairingAccess: AccessSeen[] = [];
+  readonly socketAccess: AccessSeen[] = [];
   connections = 0;
   pairing: PairingHandler = () =>
     Response.json({ error: 'invalid_code' }, { status: 400 });
@@ -46,6 +59,7 @@ export class MockServer {
         const url = new URL(request.url);
         if (url.pathname === RUNNER_SOCKET_PATH) {
           const authorization = request.headers.get('authorization');
+          this.socketAccess.push(accessSeen(request));
           if (server.upgrade(request, { data: { authorization } }))
             return undefined;
           return new Response('upgrade failed', { status: 400 });
@@ -53,6 +67,7 @@ export class MockServer {
         if (url.pathname === PAIRING_PATH && request.method === 'POST') {
           const body: unknown = await request.json();
           this.pairingBodies.push(body);
+          this.pairingAccess.push(accessSeen(request));
           return this.pairing(body);
         }
         return new Response('not found', { status: 404 });

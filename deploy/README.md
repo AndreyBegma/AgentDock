@@ -119,6 +119,54 @@ Nothing is published on the host. The stack runs on its own compose network
    docker exec -it agentdock-staging-api node dist/src/cli/admin-create.js
    ```
 
+### Access layer and the runner (D-07)
+
+Staging is public, so the control plane sits behind **Cloudflare Access**. Only
+a person can set it up (P-04); the repository carries the proxy and the runner
+side.
+
+1. **Zero Trust → Access → Applications.** Create a self-hosted application for
+   `staging-agentdock.luna-realm.com` with a policy that allows the team (an
+   email list or an identity provider group). It covers the web app and the
+   login, register and API pages.
+2. **Service token.** Create a service token (*Access → Service Auth*) and add
+   a *Service Auth* policy to the application that lets it through. Keep the
+   Client ID and Client Secret: the secret is shown once.
+3. **Paths.**
+
+   | Path | Access |
+   |---|---|
+   | `/api/runner` (the runner WebSocket) | service token |
+   | `/api/runners/pair` (pairing) | service token |
+   | `/api/hooks/*` | open — a bypass policy; Claude Code hooks cannot send Access headers and authenticate with their own token |
+   | everything else | the team policy |
+
+   Put the open `/api/hooks/*` bypass application first: Access applies the
+   most specific path.
+4. **Pair a runner behind Access.** The runner sends `CF-Access-Client-Id` and
+   `CF-Access-Client-Secret` on the pairing request and on every WebSocket
+   connect, and keeps them in `runner.json` (mode 600):
+   ```sh
+   agentdock-runner pair --server https://staging-agentdock.luna-realm.com/api \
+     --code XXXX-XXXX --access-client-id <id>.access --access-client-secret-stdin
+   ```
+   Give the secret on stdin (`--access-client-secret-stdin`) or in
+   `AGENTDOCK_ACCESS_CLIENT_SECRET` so that it stays out of the shell history;
+   `--access-client-secret <secret>` also works. `agentdock-runner status`
+   shows `access token: set` and never the secret. A re-pair without the flags
+   clears the stored token. Rotate the token by pairing again.
+
+The proxy also caps request bodies at 10 MB (`413` above it), sets
+`Strict-Transport-Security` and `X-Content-Type-Options: nosniff`, and sends
+`Cache-Control: no-store` for `/api/runners/pair` and `/api/hooks/*`. Check the
+Caddyfile locally:
+
+```sh
+docker run --rm -v "$PWD/deploy/staging/Caddyfile:/etc/caddy/Caddyfile:ro" \
+  "$(grep -o 'caddy:[^ ]*' deploy/staging/docker-compose.yml | head -1)" \
+  caddy validate --config /etc/caddy/Caddyfile
+```
+
 ### Operating
 
 | Command (on the host) | What it does |

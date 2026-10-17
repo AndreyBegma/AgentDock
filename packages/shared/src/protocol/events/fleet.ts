@@ -10,6 +10,7 @@ import {
 } from '../bounded';
 import { SLOT_NAME_MAX_LENGTH } from '../commands/control';
 import type { RunnerEvent } from '../envelope';
+import { droppableGithubUrl } from '../github-url';
 
 /**
  * Fleet events (spec 11 D7): what the runner's collectors observe about a
@@ -196,7 +197,7 @@ export const slotCheckpointDataSchema = z.object({
    */
   position: z.number().int().nonnegative().optional(),
   /** With `pr_open`: the URL from `pull request open — <url>`. */
-  prUrl: z.url().max(TEXT_PATH_MAX).optional(),
+  prUrl: droppableGithubUrl,
   /** The pull request number, when the writer knows it (`events.jsonl`). */
   prNumber: z.number().int().positive().optional(),
 });
@@ -223,7 +224,8 @@ const headShaSchema = z
 
 export const prOpenedDataSchema = z.object({
   ...prFields,
-  url: z.url().max(TEXT_PATH_MAX),
+  /** Dropped when it is not an `https://github.com` URL. */
+  url: droppableGithubUrl,
   title: boundedText(TEXT_LINE_MAX),
   checks: prChecksSchema,
   /** `MERGEABLE` → true, `CONFLICTING` → false, `UNKNOWN` → absent. */
@@ -311,7 +313,7 @@ export const codeSentinelStateSlotSchema = z.object({
     .object({
       number: z.number().int().positive().nullish(),
       rollup: prChecksSchema.nullish(),
-      url: z.url().max(TEXT_PATH_MAX).nullish(),
+      url: droppableGithubUrl,
       closed: z.boolean().nullish(),
     })
     .nullish(),

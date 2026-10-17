@@ -320,6 +320,40 @@ describe('fleet projector (e2e)', () => {
     expect((await slot()).prNumber).toBeNull();
   });
 
+  it('stores a checkpoint and a pull request whose URL is not on github.com without the URL', async () => {
+    await project(appeared());
+    await project(
+      stream.next(
+        'slot.checkpoint',
+        {
+          checkpoint: 'pr_open',
+          summary: 'opened',
+          position: 0,
+          prUrl: 'javascript:alert(1)',
+        },
+        { slot: 'i42', source: 'scraped' },
+      ),
+    );
+    expect(await slot()).toMatchObject({ lastCheckpoint: 'pr_open' });
+    expect((await slot()).prUrl).toBeNull();
+
+    await project(
+      stream.next(
+        'pr.opened',
+        {
+          number: 7,
+          branch: 'feat/42-widget',
+          url: 'https://github.com.evil.example/acme/widget/pull/7',
+          title: 'feat: widget',
+          checks: 'pending',
+        },
+        { slot: 'i42' },
+      ),
+    );
+    expect(await slot()).toMatchObject({ prNumber: 7, prState: 'open' });
+    expect((await slot()).prUrl).toBeNull();
+  });
+
   it('flips prChecks from pending to green, and to red on one failure', async () => {
     await project(
       appeared(),

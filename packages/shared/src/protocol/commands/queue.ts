@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { CommandDefinition } from '../commands';
 import { ISSUE_BODY_MAX_BYTES } from '../events/queue';
+import { httpsGithubUrl } from '../github-url';
 
 /**
  * Queue commands (spec 19 D7, "API"). Defined and exported here, but entered
@@ -44,7 +45,7 @@ export type IssueCreateArgs = z.infer<typeof issueCreateArgsSchema>;
 
 export const issueCreateResultSchema = z.object({
   number: z.number().int().positive(),
-  url: z.url(),
+  url: httpsGithubUrl,
   queued: z.boolean(),
   /** Why `queue: true` did not label it. */
   reason: z.enum(['no_acceptance_criteria', 'no_parallel_plan']).optional(),

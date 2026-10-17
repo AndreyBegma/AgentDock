@@ -1,5 +1,6 @@
 import {
   type CheckpointKind,
+  isHttpsGithubUrl,
   slotNameSchema,
 } from '@agentdock/shared/protocol';
 import { Prisma, type Slot } from '@prisma/client';
@@ -315,7 +316,7 @@ export class SlotProjection {
       sourceOf(applied),
       {
         lastCheckpoint: last.kind,
-        ...(data.prUrl ? { prUrl: data.prUrl } : {}),
+        ...(isHttpsGithubUrl(data.prUrl ?? '') ? { prUrl: data.prUrl } : {}),
         ...(prNumber ? { prNumber } : {}),
       },
       extra,
@@ -378,7 +379,9 @@ export class SlotProjection {
     switch (event.type) {
       case 'pr.opened':
         Object.assign(patch, {
-          prUrl: event.data.url,
+          ...(isHttpsGithubUrl(event.data.url ?? '')
+            ? { prUrl: event.data.url }
+            : {}),
           prState: 'open',
           prChecks: event.data.checks,
           prMergeable: event.data.mergeable ?? null,

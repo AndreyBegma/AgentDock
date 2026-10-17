@@ -1,4 +1,5 @@
 import type { CheckpointKind, PrChecks } from '../protocol';
+import { isHttpsGithubUrl } from '../protocol/github-url';
 
 /**
  * One entry of `gh pr list --json statusCheckRollup`: a check run
@@ -64,5 +65,7 @@ export const checkpointFromHeading = (
   const checkpoint = match[1];
   if (checkpoint !== 'pr_open') return { checkpoint };
   const url = URL_PATTERN.exec(text)?.[0];
-  return url ? { checkpoint, prUrl: url } : { checkpoint };
+  return url && isHttpsGithubUrl(url)
+    ? { checkpoint, prUrl: url }
+    : { checkpoint };
 };

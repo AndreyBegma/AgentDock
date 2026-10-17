@@ -11,6 +11,23 @@
 }
 
 :80 {
+	# Nothing above 10 MB reaches the API or web: Caddy answers 413 itself, so a
+	# large body cannot exhaust the upstreams (C-134, F-32).
+	request_body {
+		max_size 10MB
+	}
+
+	# TLS ends at Cloudflare, so HSTS is set here for the browser.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+	}
+
+	# Pairing and hook responses carry a token or a decision: never cached.
+	# Matched on the original path, before handle_path strips /api.
+	@uncached path /api/runners/pair /api/hooks/*
+	header @uncached Cache-Control "no-store"
+
 	# The API has no /api prefix of its own; the runner pairs with
 	# https://<host>/api and dials wss://<host>/api/runner.
 	#

@@ -6,6 +6,7 @@ import {
   pairingErrorSchema,
   pairingResponseSchema,
 } from '@agentdock/shared/protocol';
+import { type AccessCredentials, accessHeaders } from './access';
 import { errorMessage } from './log';
 import { pairingUrl } from './server-url';
 
@@ -19,6 +20,8 @@ export interface PairOptions {
   code: string;
   hostname: string;
   runnerVersion: string;
+  /** Cloudflare Access service token, when staging sits behind Access. */
+  access?: AccessCredentials;
   fetch: typeof fetch;
 }
 
@@ -43,7 +46,10 @@ export const pair = async (options: PairOptions): Promise<PairingResponse> => {
   try {
     response = await options.fetch(url, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'content-type': 'application/json',
+        ...accessHeaders(options.access),
+      },
       body: JSON.stringify(body),
       redirect: 'error',
     });

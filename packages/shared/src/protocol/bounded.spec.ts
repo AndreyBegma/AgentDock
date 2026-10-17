@@ -367,11 +367,12 @@ describe('approval commands', () => {
       (v) => inspection({ checkList: [{ name: v, state: 'pass' }] }),
       500,
     );
-    bounds(
-      result,
-      (v) => inspection({ checkList: [{ name: 'c', state: 'pass', url: v }] }),
-      4096,
+    // A check URL over the limit is dropped, not the inspection.
+    const longUrl = `https://ci.example/${'a'.repeat(4096)}`;
+    const parsed = result.parse(
+      inspection({ checkList: [{ name: 'c', state: 'pass', url: longUrl }] }),
     );
+    expect(parsed.checkList[0]?.url).toBeUndefined();
     expect(
       result.safeParse(
         inspection({

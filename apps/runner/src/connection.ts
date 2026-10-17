@@ -49,10 +49,20 @@ const TERMINAL_CLOSE_CODES: ReadonlySet<number> = new Set(
 export type HelloPayload = Omit<HelloMessage, 'type' | 'id' | 'lastAckedSeq'>;
 export type HeartbeatPayload = Omit<HeartbeatMessage, 'type' | 'id' | 'ts'>;
 
-export type SocketFactory = (url: string, token: string) => WebSocket;
+export type SocketFactory = (
+  url: string,
+  token: string,
+  extraHeaders?: Record<string, string>,
+) => WebSocket;
 
-export const bunSocketFactory: SocketFactory = (url, token) =>
-  new WebSocket(url, { headers: { Authorization: `Bearer ${token}` } });
+export const bunSocketFactory: SocketFactory = (
+  url,
+  token,
+  extraHeaders = {},
+) =>
+  new WebSocket(url, {
+    headers: { ...extraHeaders, Authorization: `Bearer ${token}` },
+  });
 
 export type StopReason =
   | { kind: 'stopped' }
@@ -63,6 +73,8 @@ export interface ConnectionOptions {
   /** `insecureServer` from `runner.json`. */
   insecureServer?: boolean;
   token: string;
+  /** Cloudflare Access headers sent on every connect (D-07). */
+  accessHeaders?: Record<string, string>;
   spool: Spool;
   clock: Clock;
   backoff: Backoff;
@@ -293,7 +305,11 @@ export class RunnerConnection {
     log.info('connecting', { url: this.url });
     let socket: WebSocket;
     try {
-      socket = this.createSocket(this.url, this.options.token);
+      socket = this.createSocket(
+        this.url,
+        this.options.token,
+        this.options.accessHeaders,
+      );
     } catch (error) {
       log.warn('cannot open the socket', { error: errorMessage(error) });
       this.scheduleReconnect();

@@ -163,6 +163,28 @@ describe('normalizeCodeSentinelLine', () => {
     });
   });
 
+  it('does not take a non-github checkpoint url as the pull request url', () => {
+    expect(
+      fleet(
+        line(
+          'slot.checkpoint',
+          {
+            checkpoint: 'pr_open',
+            summary: 'opened',
+            pr: 51,
+            url: 'https://github.com.evil.example/acme/widget/pull/51',
+          },
+          slotted,
+        ),
+      ).data,
+    ).toEqual({
+      checkpoint: 'pr_open',
+      summary: 'opened',
+      prUrl: undefined,
+      prNumber: 51,
+    });
+  });
+
   it('maps a checkpoint url and pr, and an unknown checkpoint to other', () => {
     expect(
       fleet(
