@@ -28,7 +28,9 @@ export function MockupFrame({
   pinMode,
   pins,
   onPin,
+  onPinOpen,
   onWheel,
+  touchScale,
 }: {
   src: string;
   title: string;
@@ -36,6 +38,13 @@ export function MockupFrame({
   pinMode: boolean;
   pins: MockupPinMarker[];
   onPin: (pin: FramePin) => void;
+  /** A tap on a saved marker (touch screens only, see `touchScale`). */
+  onPinOpen?: (n: number) => void;
+  /**
+   * On a touch screen, the zoom: the helper then draws markers at a 44px tap
+   * size however far the mockup is scaled, and reports a tap on one.
+   */
+  touchScale?: number;
   /** Ctrl/⌘ + wheel over the mockup, forwarded by the helper (it cannot bubble out). */
   onWheel: (deltaY: number) => void;
 }) {
@@ -44,9 +53,25 @@ export function MockupFrame({
   const [readySrc, setReadySrc] = useState<string | null>(null);
   const ready = readySrc === src;
 
-  const latest = useRef({ theme, pinMode, pins, onPin, onWheel });
+  const latest = useRef({
+    theme,
+    pinMode,
+    pins,
+    onPin,
+    onPinOpen,
+    onWheel,
+    touchScale,
+  });
   useEffect(() => {
-    latest.current = { theme, pinMode, pins, onPin, onWheel };
+    latest.current = {
+      theme,
+      pinMode,
+      pins,
+      onPin,
+      onPinOpen,
+      onWheel,
+      touchScale,
+    };
   });
 
   useEffect(() => {
@@ -57,14 +82,18 @@ export function MockupFrame({
       if (message.type === 'ready') {
         setReadySrc(src);
         // A reload of the same `src` says `ready` again: sync it now.
-        const { theme: t, pinMode: p, pins: m } = latest.current;
-        for (const out of frameSync(t, p, m)) {
+        const { theme: t, pinMode: p, pins: m, touchScale: z } = latest.current;
+        for (const out of frameSync(t, p, m, z)) {
           element.contentWindow?.postMessage(out, '*');
         }
         return;
       }
       if (message.type === 'wheel') {
         latest.current.onWheel(message.deltaY);
+        return;
+      }
+      if (message.type === 'pin-open') {
+        latest.current.onPinOpen?.(message.n);
         return;
       }
       latest.current.onPin({
@@ -80,10 +109,10 @@ export function MockupFrame({
     if (!ready) return;
     const target = frame.current?.contentWindow;
     // Opaque origin: there is no origin to name, and the messages hold no secret.
-    for (const out of frameSync(theme, pinMode, pins)) {
+    for (const out of frameSync(theme, pinMode, pins, touchScale)) {
       target?.postMessage(out, '*');
     }
-  }, [ready, theme, pinMode, pins]);
+  }, [ready, theme, pinMode, pins, touchScale]);
 
   return (
     <iframe

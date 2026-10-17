@@ -53,3 +53,15 @@ describe('frameSync', () => {
     }
   });
 });
+
+describe('frameSync on a touch screen', () => {
+  test('the zoom travels with the markers so the helper can size them', () => {
+    const pins = frameSync('dark', false, [{ n: 1, x: 3, y: 4 }], 0.5)[2];
+    expect(viewerMessageSchema.safeParse(pins).success).toBe(true);
+    expect(pins).toMatchObject({ type: 'pins', scale: 0.5 });
+  });
+
+  test('without it the message is as before', () => {
+    expect(frameSync('dark', false, [])[2]).not.toHaveProperty('scale');
+  });
+});

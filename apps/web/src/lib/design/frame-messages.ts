@@ -34,10 +34,14 @@ export const pinModeMessage = (on: boolean): ViewerMessage => ({
   on,
 });
 
-export const pinsMessage = (pins: MockupPinMarker[]): ViewerMessage => ({
+export const pinsMessage = (
+  pins: MockupPinMarker[],
+  scale?: number,
+): ViewerMessage => ({
   source: VIEWER_MESSAGE_SOURCE,
   type: 'pins',
   pins,
+  ...(scale === undefined ? {} : { scale }),
 });
 
 /**
@@ -49,8 +53,9 @@ export const frameSync = (
   theme: DesignTheme,
   pinMode: boolean,
   pins: MockupPinMarker[],
+  scale?: number,
 ): ViewerMessage[] => [
   themeMessage(theme),
   pinModeMessage(pinMode),
-  pinsMessage(pins),
+  pinsMessage(pins, scale),
 ];
