@@ -1,8 +1,10 @@
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
 import type { FleetEmitter, FleetProject } from '../../fleet/project';
 import { ownedSlot } from '../../fleet/session-name';
 import type { SlotBook } from '../../fleet/slots';
+import {
+  AGENT_FILE_MAX_BYTES,
+  readRegularFileInside,
+} from '../../fs/safe-read';
 import { classifyPane } from './classify';
 import { sessionPanes, type TmuxPane } from './tmux';
 import { type PaneChange, PaneTracker } from './tracker';
@@ -75,7 +77,14 @@ export class SlotSessions {
     if (this.first) {
       this.first = false;
       for (const [slot, worktree] of book.worktrees) {
-        if (seen.has(slot) || !existsSync(join(worktree.path, REPLY_FILE))) {
+        if (
+          seen.has(slot) ||
+          readRegularFileInside(
+            worktree.path,
+            REPLY_FILE,
+            AGENT_FILE_MAX_BYTES,
+          ) === null
+        ) {
           continue;
         }
         emit(
