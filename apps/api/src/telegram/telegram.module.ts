@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ApprovalsModule } from '../approvals';
 import { BoardModule } from '../board';
+import { ControlModule } from '../control';
 import { LocalModule } from '../local';
 import { NotificationsModule } from '../notifications';
 import { PlannerModule } from '../planner';
@@ -13,6 +14,7 @@ import {
 import { TelegramActionRequestService } from './telegram-action-request.service';
 import { TelegramApprovalService } from './telegram-approval.service';
 import { TelegramBoardService } from './telegram-board.service';
+import { TelegramCardService } from './telegram-card.service';
 import { TelegramClient } from './telegram-client';
 import { TelegramDeliveryService } from './telegram-delivery.service';
 import { TelegramGuard } from './telegram-guard.service';
@@ -33,7 +35,8 @@ import { TelegramSessionMessageService } from './telegram-session-message.servic
  * the local module's `ActionRequestsService`. #500: `TelegramRoutes` routes
  * every update — commands, button prefixes, replies — and `/project` keeps a
  * current project per chat for the Board commands (ADR-0046). #574: `/new`
- * runs the New work intake (`TelegramIntakeService`).
+ * runs the New work intake (`TelegramIntakeService`). #578: a card's review
+ * actions on the card messages and notifications (`TelegramCardService`).
  */
 @Module({
   imports: [
@@ -46,6 +49,8 @@ import { TelegramSessionMessageService } from './telegram-session-message.servic
     BoardModule,
     // #574: `/new` runs the New work intake through the planner's services.
     PlannerModule,
+    // #578: a fleet card's worker messaged through its slot.
+    ControlModule,
   ],
   controllers: [TelegramLinkController, TelegramAdminController],
   providers: [
@@ -59,6 +64,7 @@ import { TelegramSessionMessageService } from './telegram-session-message.servic
     TelegramProjectService,
     TelegramBoardService,
     TelegramIntakeService,
+    TelegramCardService,
     TelegramRoutes,
     TelegramDeliveryService,
     TelegramPoller,

@@ -25,6 +25,7 @@ import { SlotSessionMessages } from './slot-session-message.service';
     OrchestratorSettingsService,
     { provide: CONTROL_OPTIONS, useValue: defaultControlOptions },
   ],
-  exports: [ControlService],
+  // #578: the Telegram bot messages a fleet card's worker.
+  exports: [ControlService, SlotSessionMessages],
 })
 export class ControlModule {}

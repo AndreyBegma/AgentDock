@@ -1,5 +1,6 @@
 import type {
   SessionMessageInput,
+  SessionMessageVia,
   SessionMessageView,
 } from '@agentdock/shared';
 import { Injectable } from '@nestjs/common';
@@ -25,6 +26,7 @@ export class SlotSessionMessages {
     caller: ControlCaller,
     slot: string,
     input: SessionMessageInput,
+    via: SessionMessageVia = 'web',
   ): Promise<SessionMessageView> {
     const project = await this.prisma.project.findUnique({
       where: { id: caller.projectId },
@@ -38,7 +40,7 @@ export class SlotSessionMessages {
       input,
       role: caller.role,
       ctx: caller.ctx,
-      via: 'web',
+      via,
     });
   }
 }

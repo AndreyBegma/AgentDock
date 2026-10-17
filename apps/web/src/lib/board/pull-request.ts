@@ -1,5 +1,4 @@
 import type {
-  BoardCardDetail,
   BoardCardView,
   CardCollectOutcome,
   CardPrState,
@@ -23,17 +22,8 @@ export function prChipText(
     : `PR #${card.prNumber}`;
 }
 
-/**
- * #329 D5: Create pull request is offered in Finished or Completed, with a
- * `branch`, no `prUrl`, and a collect that did not find "nothing to push".
- */
-export const canCreatePr = (
-  card: Pick<BoardCardDetail, 'column' | 'branch' | 'prUrl' | 'collectState'>,
-): boolean =>
-  (card.column === 'finished' || card.column === 'completed') &&
-  card.branch !== null &&
-  card.prUrl === null &&
-  card.collectState !== 'no_changes';
+/** #329 D5: shared with the bot (#578). */
+export { canCreatePr } from '@agentdock/shared';
 
 /** The sheet's line above Create pull request. */
 export function noPrText(

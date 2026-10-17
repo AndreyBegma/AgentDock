@@ -273,13 +273,15 @@ export const cardText = (card: BoardCardDetail, service?: string): string => {
 
 /**
  * A card's buttons: the actions its state allows by the web's rules, only for
- * a reader who may write; then its link and the way back.
+ * a reader who may write; then `review`, the card's review actions (#578);
+ * then its link and the way back.
  */
 export const cardKeyboard = (
   projectId: string,
   card: BoardCardView,
   canWrite: boolean,
   appUrl: string | null,
+  review: InlineKeyboard = [],
 ): InlineKeyboard => {
   const target = { project: projectId, number: card.number };
   const actions: (InlineKeyboardButton | InlineKeyboardUrlButton)[] = [];
@@ -307,6 +309,7 @@ export const cardKeyboard = (
   );
   return [
     ...(actions.length > 0 ? [actions] : []),
+    ...review,
     [
       ...(link ? [{ text: 'Open in app', url: link }] : []),
       {

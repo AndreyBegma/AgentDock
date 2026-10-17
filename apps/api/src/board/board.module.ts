@@ -72,6 +72,8 @@ import { CollectRetryTimer } from './collect-retry-timer';
   // `BoardSessionMessages`: Telegram answers a card's question (#489).
   // `BoardStacks`: a confirmed intake makes a stack (#480).
   exports: [
+    // #578: the Telegram bot accepts and dismisses suggestions.
+    BoardInboxService,
     BoardPlanCards,
     BoardRoundsService,
     BoardSessionMessages,

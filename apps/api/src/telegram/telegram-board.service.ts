@@ -6,6 +6,7 @@ import {
   canRetry,
   canRun,
   canStop,
+  cardReviewActions,
   type Role,
 } from '@agentdock/shared';
 import { HttpException, Inject, Injectable } from '@nestjs/common';
@@ -45,6 +46,7 @@ import {
   stopAskKeyboard,
   stopAskText,
 } from './board-actions';
+import { reviewKeyboard } from './card-actions';
 import type { InlineKeyboard, TelegramCallbackQuery } from './telegram-client';
 import { type GuardRefusal, TelegramGuard } from './telegram-guard.service';
 import { LINK_REPLIES } from './telegram-linking.service';
@@ -102,7 +104,8 @@ type Reached =
  * actions are the Board's own services, called as the linked user, so their
  * rules, errors and audit rows are the web's; each attempt also writes one
  * `telegram.board` row with `meta.via = "telegram"` (ADR-0046 D7). After an
- * action the card's message is rewritten in place.
+ * action the card's message is rewritten in place. A writer's card message
+ * also carries the card's review actions (#578, `TelegramCardService`).
  */
 @Injectable()
 export class TelegramBoardService {
@@ -253,16 +256,29 @@ export class TelegramBoardService {
     if (!card) {
       return this.text(screen, boardReply(scope, cardMissingText(number)));
     }
+    const canWrite = scope.role !== 'viewer';
     return this.show(
       screen,
       boardReply(scope, cardText(card, service)),
       cardKeyboard(
         scope.projectId,
         card,
-        scope.role !== 'viewer',
+        canWrite,
         this.options.appUrl,
+        canWrite ? await this.reviewRows(card) : [],
       ),
     );
+  }
+
+  /** #578: the review actions the card's state allows, as rows. */
+  private async reviewRows(card: BoardCardDetail): Promise<InlineKeyboard> {
+    const actions = cardReviewActions(card);
+    if (actions.length === 0) return [];
+    const row = await this.prisma.boardCard.findUnique({
+      where: { id: card.id },
+      select: { shortId: true },
+    });
+    return row ? reviewKeyboard(row.shortId, actions) : [];
   }
 
   private async movePick(
