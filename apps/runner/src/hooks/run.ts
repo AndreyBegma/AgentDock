@@ -304,8 +304,8 @@ const handle = async (
       cwd: common.cwd,
       sessionId: common.session_id,
       toolName: request.data.tool_name.slice(0, 200),
-      // Cut well above the 500-character cap: the daemon redacts, then cuts.
-      toolInput: stringify(request.data.tool_input)?.slice(0, 8 * 1024),
+      // Clipped to head and tail by the hook; the daemon redacts, then cuts.
+      toolInput: stringify(request.data.tool_input),
       sleep: deps.sleep ?? ((ms) => Bun.sleep(ms)),
       now: deps.now ?? Date.now,
     });

@@ -66,8 +66,12 @@ export const ACTION_REQUEST_HOOK_WAIT_MS = 280_000;
 
 export const ACTION_REQUEST_SUMMARY_MAX = 500;
 export const ACTION_REQUEST_NOTE_MAX = 1_000;
-/** The redacted tool input shown on a `tool_use` request (D17). */
-export const ACTION_REQUEST_TOOL_INPUT_MAX = 500;
+/**
+ * The shown budget of a `tool_use` request's redacted tool input (D17,
+ * C-114): head and tail together, the truncation marker between them
+ * included, when the input is longer.
+ */
+export const ACTION_REQUEST_TOOL_INPUT_MAX = 1_000;
 
 /** The issue title kept on an `issue_queue` request (GitHub's own limit). */
 export const ACTION_REQUEST_ISSUE_TITLE_MAX = 256;
@@ -78,11 +82,29 @@ export const ACTION_REQUEST_ISSUE_TITLE_MAX = 256;
  * it from the runner's correlation (D9).
  */
 export const actionRequestArgsSchemas = {
-  tool_use: z.strictObject({
-    toolName: z.string().min(1).max(200),
-    /** Redacted; present only when the project ships content (D17). */
-    input: z.string().max(ACTION_REQUEST_TOOL_INPUT_MAX).optional(),
-  }),
+  tool_use: z
+    .strictObject({
+      toolName: z.string().min(1).max(200),
+      /**
+       * The redacted tool input, sent independent of content shipping
+       * (C-114, D-08): whole, or head and tail with a marker between them.
+       */
+      input: z.string().max(ACTION_REQUEST_TOOL_INPUT_MAX).optional(),
+      /** `input` is head and tail of a longer redacted input. */
+      truncated: z.boolean().optional(),
+      /** The full redacted input's length, in UTF-16 code units. */
+      fullLength: z.number().int().nonnegative().optional(),
+      /** SHA-256 (hex) of the full redacted input, UTF-8 encoded. */
+      sha256: z
+        .string()
+        .regex(/^[0-9a-f]{64}$/)
+        .optional(),
+      /** The hook sent no tool input: the person sees the tool name only. */
+      preview: z.literal('none').optional(),
+    })
+    .refine((args) => !(args.preview === 'none' && args.input !== undefined), {
+      message: "a request with preview 'none' carries no input",
+    }),
   orchestrator_start: z.strictObject({
     mode: z.enum(['start', 'next']).default('start'),
   }),
