@@ -2304,11 +2304,13 @@ model GitHubProjectHealth {
 
 // ─── Planner (spec 172) ─────────────────────────────────────────────────────
 
-/// Shared `PLAN_MODES` (D2; `card`: #337 D1, a New Card intake).
+/// Shared `PLAN_MODES` (D2; `card`: #337 D1, a New Card intake; `discuss`:
+/// #590, a discussion, ADR-0054).
 enum PlanMode {
   batch
   dialogue
   card
+  discuss
 }
 
 /// Shared `PLAN_VISIBILITIES` (D12).
@@ -2346,7 +2348,8 @@ enum PlanTaskStatus {
   issued
 }
 
-/// Shared `PLAN_TURN_ACTIONS` (D16; `design`: spec 223 D7; `intake`: #337 D1).
+/// Shared `PLAN_TURN_ACTIONS` (D16; `design`: spec 223 D7; `intake`: #337 D1;
+/// `discuss`: #590).
 enum PlanTurnAction {
   decompose
   clarify
@@ -2355,6 +2358,7 @@ enum PlanTurnAction {
   revise
   design
   intake
+  discuss
 }
 
 /// Shared `PLAN_TURN_PHASES`.
@@ -2447,6 +2451,9 @@ model Plan {
   /// #379: when each PR was seen merged; the issues waiting on it queue then.
   docsPrMergedAt   DateTime?
   designPrMergedAt DateTime?
+  /// #590: a discussion's skills, installed invocations every turn applies;
+  /// empty for any other mode.
+  skills           String[]       @default([])
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   sentAt           DateTime?
