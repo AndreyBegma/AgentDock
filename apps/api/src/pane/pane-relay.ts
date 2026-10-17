@@ -10,7 +10,12 @@ import {
   PANE_MAX_VIEWERS_PER_SLOT,
   type PaneFrame,
 } from '@agentdock/shared/protocol';
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  type OnModuleDestroy,
+} from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import { userActor } from '../audit/audit.types';
 import { PrismaService } from '../database/prisma.service';
@@ -23,6 +28,7 @@ import type {
 } from '../runners/runner-streams';
 import { RunnerStreams } from '../runners/runner-streams';
 import { chunkPaneFrame } from './pane-chunks';
+import { PANE_OPTIONS, type PaneOptions } from './pane-options';
 import { parsePaneTopic } from './pane-topic';
 
 /**
@@ -31,6 +37,12 @@ import { parsePaneTopic } from './pane-topic';
  */
 const ENVELOPE_BYTES = 512;
 const MAX_FRAME_DATA_BYTES = MAX_LIVE_MESSAGE_BYTES - ENVELOPE_BYTES;
+
+/** A user's watch that ended and is audited once `auditWindowMs` passes. */
+interface PendingStop {
+  readonly timer: NodeJS.Timeout;
+  readonly write: () => Promise<void>;
+}
 
 /** One watched slot: its browsers and the runner subscription feeding them. */
 interface PaneWatch {
@@ -58,12 +70,18 @@ interface PaneWatch {
  * overtakes the join or leave before it.
  */
 @Injectable()
-export class PaneRelay implements LiveTopicHooks, RunnerStreamListener {
+export class PaneRelay
+  implements LiveTopicHooks, RunnerStreamListener, OnModuleDestroy
+{
   readonly name = 'pane';
   private readonly logger = new Logger(PaneRelay.name);
   private readonly watches = new Map<LiveTopic, PaneWatch>();
   /** Runner subscription id → topic. Ids of finished subscriptions are removed. */
   private readonly byId = new Map<string, LiveTopic>();
+  /** `user\0topic` → the audit of a watch that may still resume (C-119). */
+  private readonly stopping = new Map<string, PendingStop>();
+  /** Stop writes whose window ran out and that have not landed yet. */
+  private readonly writing = new Set<Promise<void>>();
   private queue: Promise<void> = Promise.resolve();
 
   constructor(
@@ -72,7 +90,23 @@ export class PaneRelay implements LiveTopicHooks, RunnerStreamListener {
     private readonly connections: LiveConnections,
     private readonly streams: RunnerStreams,
     private readonly audit: AuditService,
+    @Inject(PANE_OPTIONS) private readonly options: PaneOptions,
   ) {}
+
+  onModuleDestroy(): Promise<void> {
+    return this.flushStops();
+  }
+
+  /** Watches still waiting to be audited as stopped are written now. */
+  async flushStops(): Promise<void> {
+    const pending = [...this.stopping.values()];
+    this.stopping.clear();
+    for (const stop of pending) clearTimeout(stop.timer);
+    await Promise.all([
+      ...pending.map((stop) => stop.write()),
+      ...this.writing,
+    ]);
+  }
 
   /** Resolves once every transition queued so far has run (tests). */
   settled(): Promise<void> {
@@ -152,7 +186,7 @@ export class PaneRelay implements LiveTopicHooks, RunnerStreamListener {
     }
     if (watch.viewers.has(client)) return;
     if (!this.watching(watch, client.user.id)) {
-      this.record('pane.watch_started', watch, client.user.id);
+      this.started(watch, client.user.id);
     }
     watch.viewers.add(client);
     // First viewer: subscribe. Later ones: resubscribe for a fresh `full`.
@@ -163,7 +197,7 @@ export class PaneRelay implements LiveTopicHooks, RunnerStreamListener {
     const watch = this.watches.get(topic);
     if (!watch?.viewers.delete(client)) return;
     if (!this.watching(watch, client.user.id)) {
-      this.record('pane.watch_stopped', watch, client.user.id);
+      this.stopped(watch, client.user.id);
     }
     if (watch.viewers.size > 0) return;
     this.stop(watch);
@@ -263,14 +297,51 @@ export class PaneRelay implements LiveTopicHooks, RunnerStreamListener {
     return false;
   }
 
+  /**
+   * A user's first tab joined. Back within `auditWindowMs` of leaving, it is
+   * the same watch: the pending stop is dropped and nothing is written.
+   */
+  private started(watch: PaneWatch, userId: string): void {
+    const key = `${userId}\0${watch.topic}`;
+    const pending = this.stopping.get(key);
+    if (pending) {
+      clearTimeout(pending.timer);
+      this.stopping.delete(key);
+      return;
+    }
+    void this.record('pane.watch_started', watch, userId);
+  }
+
+  /** A user's last tab left: audited once they stay away `auditWindowMs`. */
+  private stopped(watch: PaneWatch, userId: string): void {
+    const key = `${userId}\0${watch.topic}`;
+    if (this.stopping.has(key)) return;
+    const leftAt = new Date().toISOString();
+    const write = () =>
+      this.record('pane.watch_stopped', watch, userId, { leftAt });
+    const timer = setTimeout(() => {
+      this.stopping.delete(key);
+      const written = write().finally(() => this.writing.delete(written));
+      this.writing.add(written);
+    }, this.options.auditWindowMs);
+    timer.unref();
+    this.stopping.set(key, { timer, write });
+  }
+
   /** Who watched which slot — never what they saw (D8). */
-  private record(action: AuditAction, watch: PaneWatch, userId: string): void {
-    void this.audit.record({
+  private record(
+    action: AuditAction,
+    watch: PaneWatch,
+    userId: string,
+    meta?: { leftAt: string },
+  ): Promise<void> {
+    return this.audit.record({
       actor: userActor(userId),
       action,
       target: { type: 'slot', id: watch.slot },
       projectId: watch.projectId,
       result: 'ok',
+      ...(meta ? { meta } : {}),
     });
   }
 }

@@ -9,14 +9,19 @@ import {
   MAX_LIVE_SUBSCRIPTIONS,
   SESSION_COOKIE,
 } from '@agentdock/shared';
-import { Logger } from '@nestjs/common';
+import { Inject, Logger } from '@nestjs/common';
 import { type OnGatewayConnection, WebSocketGateway } from '@nestjs/websockets';
 import type { RawData, WebSocket } from 'ws';
 import { SessionService } from '../auth';
 import { cookieFrom, originAllowed } from './handshake';
 import { LiveClient, LiveConnections } from './live-connections';
-import { allowedLiveOrigin } from './live-options';
+import {
+  allowedLiveOrigin,
+  LIVE_OPTIONS,
+  type LiveOptions,
+} from './live-options';
 import { LiveTopicHookRegistry } from './live-topic-hooks';
+import { TokenBucket } from './token-bucket';
 import { TopicAuthorizerRegistry } from './topic-authorizer.registry';
 
 const INTERNAL_ERROR = 1011;
@@ -26,25 +31,33 @@ interface Deps {
   connections: LiveConnections;
   authorizers: TopicAuthorizerRegistry;
   hooks: LiveTopicHookRegistry;
+  options: LiveOptions;
   logger: Logger;
 }
 
 /**
  * One `/live` socket, from upgrade to close. Frames are handled in order —
  * those that arrive while the session is being resolved wait for it — so a
- * refused socket never gets an answer to anything it sent.
+ * refused socket never gets an answer to anything it sent. A socket sending
+ * faster than its frame rate is closed 4429 as the frame arrives, before
+ * anything it queued reaches a runner (C-119).
  */
 class LiveSocket {
   private queue: Promise<void> = Promise.resolve();
   private client: LiveClient | null = null;
   private closed = false;
+  private readonly frames: TokenBucket;
 
   constructor(
     private readonly socket: WebSocket,
     request: IncomingMessage,
     private readonly deps: Deps,
   ) {
-    socket.on('message', (data) => this.enqueue(() => this.receive(data)));
+    this.frames = new TokenBucket(
+      deps.options.frameRate,
+      deps.options.frameBurst,
+    );
+    socket.on('message', (data) => this.arrived(data));
     socket.on('pong', () => this.seen());
     socket.on('close', () => this.onClose());
 
@@ -56,6 +69,15 @@ class LiveSocket {
     }
     const token = cookieFrom(request.headers.cookie, SESSION_COOKIE);
     this.enqueue(() => this.authenticate(token));
+  }
+
+  private arrived(data: RawData): void {
+    if (this.closed) return;
+    if (!this.frames.take()) {
+      this.close(LIVE_CLOSE_CODES.rateLimited, 'too many messages');
+      return;
+    }
+    this.enqueue(() => this.receive(data));
   }
 
   private enqueue(task: () => Promise<void>): void {
@@ -194,6 +216,7 @@ export class LiveGateway implements OnGatewayConnection {
     private readonly connections: LiveConnections,
     private readonly authorizers: TopicAuthorizerRegistry,
     private readonly hooks: LiveTopicHookRegistry,
+    @Inject(LIVE_OPTIONS) private readonly options: LiveOptions,
   ) {}
 
   handleConnection(socket: WebSocket, request: IncomingMessage): void {
@@ -202,6 +225,7 @@ export class LiveGateway implements OnGatewayConnection {
       connections: this.connections,
       authorizers: this.authorizers,
       hooks: this.hooks,
+      options: this.options,
       logger: this.logger,
     });
   }

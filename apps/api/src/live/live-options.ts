@@ -6,6 +6,10 @@ export interface LiveOptions {
   pingIntervalMs: number;
   /** A socket that sent nothing — not even a pong — for this long is dropped. */
   idleTimeoutMs: number;
+  /** Frames a socket may send a second, sustained; past the burst it is closed 4429. */
+  frameRate: number;
+  /** Frames a socket may send at once before `frameRate` applies. */
+  frameBurst: number;
 }
 
 export const LIVE_OPTIONS = Symbol('LIVE_OPTIONS');
@@ -14,6 +18,8 @@ export const defaultLiveOptions: LiveOptions = {
   revalidateMs: 60_000,
   pingIntervalMs: 30_000,
   idleTimeoutMs: 75_000,
+  frameRate: 20,
+  frameBurst: 50,
 };
 
 const DEFAULT_WEB_URL = 'http://localhost:3517';

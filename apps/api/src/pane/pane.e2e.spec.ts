@@ -1,4 +1,5 @@
 import {
+  LIVE_CLOSE_CODES,
   LIVE_SOCKET_PATH,
   type LiveServerMessage,
   MAX_LIVE_MESSAGE_BYTES,
@@ -10,6 +11,7 @@ import {
   paneTopic,
   type ServerMessage,
 } from '@agentdock/shared/protocol';
+import { LiveConnections } from '../live/live-connections';
 import { allowedLiveOrigin } from '../live/live-options';
 import { TestLiveSocket } from '../live/testing/live-e2e';
 import {
@@ -26,10 +28,13 @@ import {
   resetDatabase,
   type Session,
 } from '../test/e2e-app';
+import { PANE_OPTIONS, type PaneOptions } from './pane-options';
 import { PaneRelay } from './pane-relay';
 
 const ROOT_A = '/srv/dev/widget';
 const ROOT_B = '/srv/dev/gadget';
+/** Short enough that a stopped watch is audited within a test. */
+const AUDIT_WINDOW_MS = 1_000;
 /** Something the runner's redaction would mask; here it only marks pane text. */
 const PANE_TEXT = 'counter 41 — pane-text-marker';
 
@@ -146,7 +151,11 @@ describe('pane relay (e2e)', () => {
   };
 
   beforeAll(async () => {
-    ctx = await createRunnerE2eApp();
+    ctx = await createRunnerE2eApp({}, undefined, (builder) =>
+      builder
+        .overrideProvider(PANE_OPTIONS)
+        .useValue({ auditWindowMs: AUDIT_WINDOW_MS } satisfies PaneOptions),
+    );
     relay = ctx.app.get(PaneRelay);
     liveUrl = `${ctx.origin.replace(/^http/, 'ws')}${LIVE_SOCKET_PATH}`;
   });
@@ -168,7 +177,15 @@ describe('pane relay (e2e)', () => {
   afterEach(async () => {
     for (const socket of browsers.splice(0)) socket.socket.terminate();
     for (const socket of runners.splice(0)) socket.socket.terminate();
+    // The server sees a terminated socket close a moment later; its leave
+    // (and the stop it defers) must not reach the next test.
+    const connections = ctx.app.get(LiveConnections);
+    await eventually('browsers gone', async () =>
+      connections.all().length === 0 ? true : undefined,
+    );
     await relay.settled();
+    // A stop still waiting out its window must not land in the next test.
+    await relay.flushStops();
   });
 
   describe('authorization', () => {
@@ -453,6 +470,71 @@ describe('pane relay (e2e)', () => {
         return rows.length >= 2 ? rows.map((r) => r.action) : undefined;
       });
       expect(actions).toEqual(['pane.watch_started', 'pane.watch_stopped']);
+    });
+
+    it('writes one row for a user looping watch and leave, and the stop once they stay away', async () => {
+      const desk = await runner();
+      const viewer = await browser(admin);
+      for (let i = 0; i < 10; i += 1) {
+        expect((await viewer.subscribe(topicA())).type).toBe('subscribed');
+        viewer.send({ type: 'unsubscribe', topic: topicA() });
+      }
+      await desk.next('subscribe');
+      await relay.settled();
+      expect((await paneAudit()).map((r) => r.action)).toEqual([
+        'pane.watch_started',
+      ]);
+
+      const rows = await eventually('stop audited', async () => {
+        const all = await paneAudit();
+        return all.length >= 2 ? all : undefined;
+      });
+      expect(rows.map((r) => r.action)).toEqual([
+        'pane.watch_started',
+        'pane.watch_stopped',
+      ]);
+      expect(rows[1].meta).toMatchObject({ leftAt: expect.any(String) });
+    });
+  });
+
+  describe('frame rate (C-119)', () => {
+    it('closes a socket looping subscribe and unsubscribe 4429 before the runner sees more than the burst', async () => {
+      const desk = await runner();
+      const viewer = await browser(admin);
+      for (let i = 0; i < 250; i += 1) {
+        viewer.send({ type: 'subscribe', topic: topicA() });
+        viewer.send({ type: 'unsubscribe', topic: topicA() });
+      }
+      expect((await viewer.closed).code).toBe(LIVE_CLOSE_CODES.rateLimited);
+      await relay.settled();
+
+      let subscribes = 0;
+      for (;;) {
+        try {
+          await desk.next('subscribe', 300);
+          subscribes += 1;
+        } catch {
+          break;
+        }
+      }
+      // The default burst is 50 frames, the `ping` of `ready` among them.
+      expect(subscribes).toBeLessThanOrEqual(50);
+      expect((await paneAudit()).map((r) => r.action)).toEqual(
+        subscribes > 0 ? ['pane.watch_started'] : [],
+      );
+    });
+
+    it('keeps streaming to a viewer within the rate', async () => {
+      const desk = await runner();
+      const viewer = await browser(admin);
+      await viewer.subscribe(topicA());
+      const { id } = await desk.next('subscribe');
+      for (let i = 0; i < 5; i += 1) {
+        viewer.send({ type: 'ping' });
+        await viewer.next('pong');
+        desk.send({ type: 'pane', id, frame: full([`line ${i}`]) });
+        expect((await frame(viewer)).data).toEqual(full([`line ${i}`]));
+      }
     });
   });
 });

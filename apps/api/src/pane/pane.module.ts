@@ -7,6 +7,7 @@ import { ProjectAccessService, ProjectsModule } from '../projects';
 import { RunnerStreams } from '../runners/runner-streams';
 import { RunnersModule } from '../runners/runners.module';
 import { authorizePane } from './pane-authorizer';
+import { defaultPaneOptions, PANE_OPTIONS } from './pane-options';
 import { PaneRelay } from './pane-relay';
 
 /**
@@ -16,7 +17,10 @@ import { PaneRelay } from './pane-relay';
  */
 @Module({
   imports: [LiveModule, ProjectsModule, RunnersModule],
-  providers: [PaneRelay],
+  providers: [
+    PaneRelay,
+    { provide: PANE_OPTIONS, useValue: defaultPaneOptions },
+  ],
   exports: [PaneRelay],
 })
 export class PaneModule implements OnModuleInit {

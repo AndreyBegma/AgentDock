@@ -18,7 +18,7 @@ import {
 } from '@nestjs/common';
 import { AuditCtx } from '../audit';
 import type { AuditContext } from '../audit/audit.types';
-import { type AuthUser, CurrentUser } from '../auth';
+import { type AuthUser, CurrentUser, RunnerReadThrottle } from '../auth';
 import {
   ProjectAccess,
   ProjectAccessGuard,
@@ -98,7 +98,9 @@ export class ControlController {
     );
   }
 
+  /** Read live from the runner, cached briefly per project (C-119). */
   @Get('orchestrator/status')
+  @RunnerReadThrottle()
   status(
     @ProjectAccess() access: ResolvedProjectAccess,
     @CurrentUser() user: AuthUser,
