@@ -17,6 +17,8 @@ import {
   type CardRoundPhase,
   isActiveRoundPhase,
   isMirroredCardSource,
+  isWorktreeGoneError,
+  ownsWorker,
   PLAN_TASK_MOVE_REFUSAL_TEXT,
 } from '@agentdock/shared';
 import type {
@@ -34,6 +36,16 @@ import {
   SETUP_CLAUDE_COMMAND,
 } from '../runners/install';
 import { noPrText } from './pull-request';
+
+// #578: the action rules live in the shared package; the bot reads them too.
+export {
+  canAccept,
+  canGiveFeedback,
+  canMarkFinished,
+  isSuggestion,
+  isWorktreeGoneError,
+  ownsWorker,
+} from '@agentdock/shared';
 
 export const COLUMN_TITLE: Record<BoardColumn, string> = {
   inbox: 'Inbox',
@@ -188,25 +200,11 @@ export const isFleetCard = (card: BoardCardView): boolean =>
 export const isSessionAlive = (card: BoardCardView): boolean =>
   card.tracking?.alive === true;
 
-/**
- * #282 D1/D4: the board starts, stops and answers a worker only for a card
- * that owns one. A `fleet` card's worker is the orchestrator's; a `terminal`
- * card's is the person's own session while it lives.
- */
-export const ownsWorker = (card: BoardCardView): boolean =>
-  !isFleetCard(card) && !isSessionAlive(card);
-
 export const canRun = (card: BoardCardView): boolean =>
   ownsWorker(card) &&
   (card.column === 'todo' || card.column === 'finished') &&
   !isRoundActive(card.round) &&
   !designBlocksRun(card);
-
-export const canGiveFeedback = (card: BoardCardView): boolean =>
-  ownsWorker(card) && card.column === 'finished' && !isRoundActive(card.round);
-
-export const canAccept = (card: BoardCardView): boolean =>
-  card.column === 'finished' && !isRoundActive(card.round);
 
 /** A retry after a failed, ended or stopped round resumes the same session. */
 export const canRetry = (card: BoardCardView): boolean =>
@@ -294,15 +292,6 @@ export function approveRunOffer(card: BoardCardView): ApproveRunOffer | null {
 
 export const canStop = (card: BoardCardView): boolean =>
   ownsWorker(card) && isRoundActive(card.round);
-
-export const canMarkFinished = (card: BoardCardView): boolean =>
-  ownsWorker(card) &&
-  card.column === 'in_progress' &&
-  isRoundActive(card.round);
-
-/** #244 D9: an Inbox card is accepted or dismissed, never run. */
-export const isSuggestion = (card: BoardCardView): boolean =>
-  card.column === 'inbox';
 
 /** The confidence as a whole percent: `0.74` → `74%`; none for a manual card. */
 export const confidenceLabel = (confidence: number | null): string | null =>
@@ -651,10 +640,6 @@ export const hooksNotice = (
 /** #395: the plain sentence for a collect that found no worktree on the runner. */
 export const WORKTREE_GONE_TEXT =
   "The card's worktree no longer exists on the runner, so a pull request cannot be created from it.";
-
-/** #395: the runner's `not_found` for a card whose worktree is gone (it names internal ids). */
-export const isWorktreeGoneError = (error: string | null): boolean =>
-  /not found on the runner.*has no worktree/.test(error ?? '');
 
 /**
  * #395: the line above Create pull request. A vanished worktree gets a plain
