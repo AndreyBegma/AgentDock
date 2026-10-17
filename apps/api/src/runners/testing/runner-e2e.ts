@@ -140,12 +140,18 @@ export class TestRunnerSocket {
   private waiters: (() => void)[] = [];
   readonly socket: WebSocket;
 
-  constructor(origin: string, token: string | null) {
+  constructor(
+    origin: string,
+    token: string | null,
+    headers: Record<string, string> = {},
+  ) {
     const url = `${origin.replace(/^http/, 'ws')}${RUNNER_SOCKET_PATH}`;
-    this.socket = new WebSocket(
-      url,
-      token ? { headers: { Authorization: `Bearer ${token}` } } : {},
-    );
+    this.socket = new WebSocket(url, {
+      headers: {
+        ...headers,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
     this.socket.on('message', (data) => {
       this.inbox.push(serverMessageSchema.parse(JSON.parse(data.toString())));
       this.wake();

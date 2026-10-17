@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>C-217 · Question round, full screen on phones</title>
+<style>
+:root,:root[data-theme="dark"]{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-paper:#1b2647;--color-content:rgb(27 38 71 / .96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246 / .62);--color-ink-3:rgb(242 242 246 / .53);--color-line:rgb(255 255 255 / .1);--color-line-strong:rgb(255 255 255 / .18);--color-hover:rgb(255 255 255 / .06);--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-soft:rgb(91 91 246 / .2);--color-accent-ink:#b4b2ff;--color-focus:#b4b2ff;--color-ok:#5fd3a0;--color-danger:#ff6b60;--color-hue-1:#5b9cf6;--color-hue-7:#a68bfa;--glass-sheen:rgb(255 255 255 / .06);--glass-scrim-strong:rgb(9 9 12 / .64);--glass-edge:rgb(255 255 255 / .14);--glass-spec:rgb(255 255 255 / .2);--glass-shadow-strong:rgb(0 0 0 / .45);--canvas-glow:18%;--kb:#2b2f3a;--kb-key:#4a4f5c}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-paper:#fff;--color-content:rgb(255 255 255 / .96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27 / .72);--color-ink-3:rgb(24 24 27 / .64);--color-line:rgb(0 0 0 / .1);--color-line-strong:rgb(0 0 0 / .23);--color-hover:rgb(0 0 0 / .06);--color-accent:#4f46e5;--color-on-accent:#fff;--color-accent-soft:rgb(79 70 229 / .12);--color-accent-ink:#4338ca;--color-focus:#4f46e5;--color-ok:#0a8156;--color-danger:#dc2626;--color-hue-1:#1f64d6;--color-hue-7:#7244e0;--glass-sheen:rgb(0 0 0 / .04);--glass-scrim-strong:rgb(255 255 255 / .7);--glass-edge:rgb(0 0 0 / .14);--glass-spec:rgb(255 255 255 / .8);--glass-shadow-strong:rgb(0 0 0 / .16);--canvas-glow:10%;--kb:#d1d4db;--kb-key:#fff}
+:root{--radius-control:6px;--radius-surface:8px;--radius-sheet:12px;--size-tap:44px;--font-sans:"SF Pro Text",Inter,system-ui,-apple-system,"Segoe UI",sans-serif;--font-mono:"JetBrains Mono",ui-monospace,Menlo,monospace}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground);color:var(--color-ink)}
+body{margin:0;font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased;padding:24px}
+h1,h2,h3,p{margin:0}
+.icon{width:16px;height:16px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.glass-strong{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim-strong);backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),0 20px 48px var(--glass-shadow-strong)}
+/* presentation */
+.board-head{display:flex;align-items:center;justify-content:space-between;gap:16px;max-width:1120px;margin:0 auto 20px}
+.board-head p{color:var(--color-ink-2);font-size:13px;max-width:70ch}
+.stage{display:flex;gap:40px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+.caption{margin-top:12px;max-width:375px;font-size:12px;line-height:16px;color:var(--color-ink-3)}
+.caption b{color:var(--color-ink);font-weight:600}
+.phone{position:relative;width:375px;height:812px;border-radius:44px;overflow:hidden;border:1px solid var(--color-line-strong);box-shadow:0 30px 60px rgb(0 0 0 / .35);background:var(--color-surface)}
+.statusbar{height:47px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 28px 6px;font-size:14px;font-weight:600;flex-shrink:0}
+.home{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);width:134px;height:5px;border-radius:99px;background:var(--color-ink);opacity:.8}
+/* full-screen dialog (proposed glass-ui Dialog size="full" below lg) */
+.fs{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--color-surface)}
+.fs-head{display:flex;align-items:center;gap:4px;padding:0 4px 0 16px;height:56px;border-bottom:1px solid var(--color-line);flex-shrink:0}
+.fs-head h2{flex:1;font-size:17px;line-height:22px;font-weight:600}
+.fs-body{flex:1;min-height:0;overflow-y:auto;padding:16px 16px 20px;display:flex;flex-direction:column;gap:16px;-webkit-overflow-scrolling:touch}
+.fs-foot{flex-shrink:0;border-top:1px solid var(--color-line);padding:10px 16px calc(10px + 34px);display:flex;flex-direction:column;gap:8px}
+.fs-foot.kb-open{padding-bottom:10px}
+.scroll-fade{position:relative}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font-family:inherit;font-weight:600;cursor:pointer;border:1px solid transparent;background:none;color:var(--color-ink);height:var(--size-tap);min-width:var(--size-tap);padding:0 16px;font-size:15px;border-radius:var(--radius-control)}
+.btn-icon{padding:0;width:var(--size-tap)}
+.btn-solid{background:var(--color-accent);color:var(--color-on-accent)}
+.btn-glass{background:var(--color-raised);border-color:var(--color-line-strong)}
+.btn-ghost{color:var(--color-ink-2)}
+.btn:disabled{opacity:.4}
+.btn-grow{flex:1}
+.row{display:flex;align-items:center;gap:8px}
+.muted{color:var(--color-ink-3);font-size:12px;line-height:16px}
+.brief{display:flex;flex-direction:column;gap:4px;border-radius:var(--radius-control);background:var(--color-hover);padding:8px 12px}
+.brief .k{font-size:12px;font-weight:500;color:var(--color-ink-3)}
+.brief p{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.steps{display:flex;align-items:center;justify-content:space-between}
+.dots{display:flex;gap:0;list-style:none;margin:0;padding:0}
+.dots li button{width:28px;height:44px;border:0;background:none;display:grid;place-content:center;cursor:pointer;padding:0}
+.dots li span{display:block;width:10px;height:10px;border-radius:99px;background:var(--color-line-strong)}
+.dots li.done span{background:var(--color-accent)}
+.dots li.cur span{box-shadow:0 0 0 2px var(--color-surface),0 0 0 4px color-mix(in oklab,var(--color-accent) 50%,transparent)}
+.q{display:flex;flex-direction:column;gap:12px}
+.q h3{font-size:16px;line-height:22px;font-weight:600}
+.rec{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:var(--radius-surface);background:var(--color-accent-soft)}
+.rec .t{flex:1;font-size:13px;line-height:18px;color:var(--color-ink-2)}
+.rec .t b{color:var(--color-accent-ink);font-weight:600}
+.rec .btn{height:36px;min-height:var(--size-tap);margin:-4px -4px -4px 0;font-size:13px;padding:0 12px}
+.opts{display:flex;flex-direction:column;gap:8px;list-style:none;margin:0;padding:0}
+.opt{display:flex;align-items:center;gap:12px;min-height:var(--size-tap);padding:10px 12px;border-radius:var(--radius-surface);border:1px solid var(--color-line-strong);background:var(--color-content);cursor:pointer}
+.opt[aria-checked="true"]{border-color:var(--color-accent);background:color-mix(in oklab,var(--color-accent) 10%,var(--color-content))}
+.opt .mark{width:20px;height:20px;flex-shrink:0;border:1.5px solid var(--color-line-strong);border-radius:99px;display:grid;place-content:center}
+.opt.multi .mark{border-radius:5px}
+.opt[aria-checked="true"] .mark{border-color:var(--color-accent);background:var(--color-accent)}
+.opt[aria-checked="true"] .mark::after{content:"";width:8px;height:8px;border-radius:99px;background:var(--color-on-accent)}
+.opt.multi[aria-checked="true"] .mark::after{width:9px;height:5px;border-radius:0;background:none;border-left:2px solid var(--color-on-accent);border-bottom:2px solid var(--color-on-accent);transform:rotate(-45deg) translate(1px,-1px)}
+.opt .l{flex:1;display:flex;flex-direction:column;gap:2px}
+.opt .l b{font-weight:500}
+.opt .l small{font-size:12px;line-height:16px;color:var(--color-ink-3)}
+.badge{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:99px;font-size:11px;font-weight:600;background:color-mix(in oklab,var(--color-ok) 14%,transparent);color:var(--color-ok)}
+.field{display:flex;flex-direction:column;gap:4px}
+.field-label{font-size:12px;font-weight:500;color:var(--color-ink-2)}
+.textarea{width:100%;min-height:76px;padding:10px 12px;font-family:inherit;font-size:16px;line-height:22px;color:var(--color-ink);background:var(--color-surface);border:1px solid var(--color-line-strong);border-radius:var(--radius-control);resize:none}
+.textarea.focus{border-color:color-mix(in oklab,var(--color-ink) 70%,transparent);box-shadow:0 0 0 2px color-mix(in oklab,var(--color-ink) 22%,transparent)}
+.caret{display:inline-block;width:2px;height:18px;background:var(--color-accent);vertical-align:-3px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.kb{flex-shrink:0;height:291px;background:var(--kb);padding:8px 3px 34px;display:flex;flex-direction:column;gap:11px}
+.kb .r{display:flex;gap:6px;justify-content:center}
+.kb .r span{height:42px;flex:0 0 31px;border-radius:5px;background:var(--kb-key);box-shadow:0 1px 0 rgb(0 0 0 / .3);display:grid;place-content:center;font-size:16px;color:var(--color-ink)}
+.kb .r span.w{flex:0 0 180px}.kb .r span.m{flex:0 0 42px}
+.note{font-size:11px;line-height:14px;color:var(--color-ink-3);display:flex;gap:6px;align-items:center}
+.pin{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:2px 6px;border-radius:4px;background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.theme-btn{flex-shrink:0}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+<div class="canvas" aria-hidden="true"></div>
+<header class="board-head">
+  <div>
+    <h1 style="font-size:20px;line-height:28px;font-weight:600">New work · question round at 375 × 812</h1>
+    <p>Below <code>lg</code>, the glass-ui Dialog opens edge to edge (<code>h-dvh</code>, opaque surface, no page behind). The header and footer are fixed; only the body scrolls. Safe-area insets pad the top and bottom.</p>
+  </div>
+  <button class="btn btn-glass theme-btn" type="button" id="theme">Toggle theme</button>
+</header>
+
+<div class="stage">
+  <!-- Phone A: keyboard closed -->
+  <div>
+    <div class="phone" role="img" aria-label="Question round, keyboard closed">
+      <div class="fs" role="dialog" aria-modal="true" aria-labelledby="ta">
+        <div class="statusbar"><span>9:41</span><span>●●● ▮</span></div>
+        <div class="fs-head">
+          <h2 id="ta">New work</h2>
+          <button class="btn btn-ghost btn-icon" type="button" aria-label="Close and keep as draft"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+        </div>
+        <div class="fs-body">
+          <div class="brief"><span class="k">What to do</span><p>Make the board usable on a phone: the New work dialog is cramped and the keyboard covers the buttons.</p></div>
+          <div class="steps">
+            <span style="font-weight:600">Round 1 of 3 · Question 2 of 4</span>
+            <ol class="dots" aria-label="Questions">
+              <li class="done"><button type="button" aria-label="Question 1, answered"><span></span></button></li>
+              <li class="cur"><button type="button" aria-label="Question 2, current" aria-current="step"><span></span></button></li>
+              <li><button type="button" aria-label="Question 3"><span></span></button></li>
+              <li><button type="button" aria-label="Question 4"><span></span></button></li>
+            </ol>
+          </div>
+          <section class="q">
+            <h3>Where should the full-screen variant live?</h3>
+            <div class="rec">
+              <div class="t"><b>Recommended: glass-ui Dialog size="full"</b><br>ADR-0011 — a missing component is added to glass-ui.</div>
+              <button class="btn btn-glass" type="button">Accept</button>
+            </div>
+            <ul class="opts" role="radiogroup" aria-label="Options">
+              <li class="opt" role="radio" aria-checked="true" tabindex="0"><span class="mark"></span><span class="l"><b>Dialog, full below lg</b><small>One component, responsive</small></span><span class="badge">Recommended</span></li>
+              <li class="opt" role="radio" aria-checked="false" tabindex="-1"><span class="mark"></span><span class="l"><b>Bottom Sheet</b><small>Slides up, drag to close</small></span></li>
+              <li class="opt" role="radio" aria-checked="false" tabindex="-1"><span class="mark"></span><span class="l"><b>A separate route</b><small>/board/new on phones</small></span></li>
+            </ul>
+            <div class="field">
+              <label class="field-label" for="own-a">Write your own</label>
+              <textarea class="textarea" id="own-a" rows="2" placeholder="Sent with the option, if one is picked."></textarea>
+            </div>
+          </section>
+        </div>
+        <div class="fs-foot">
+          <div class="row">
+            <button class="btn btn-glass btn-icon" type="button" aria-label="Previous question"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+            <button class="btn btn-glass btn-icon" type="button" aria-label="Next question"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+            <span class="muted" style="flex:1;text-align:center">2 of 4 answered</span>
+            <button class="btn btn-ghost" type="button" style="padding:0 10px">Enough — generate</button>
+          </div>
+          <button class="btn btn-solid" type="submit" style="width:100%">Send answers</button>
+        </div>
+        <div class="home"></div>
+      </div>
+    </div>
+    <p class="caption"><b>Keyboard closed.</b> Body scrolls under a fixed 56 px header. Footer: Previous/Next as 44 px icon buttons, the ghost escape hatch, then the one solid CTA full width. Footer bottom padding = <code>max(10px, env(safe-area-inset-bottom))</code>.</p>
+  </div>
+
+  <!-- Phone B: keyboard open -->
+  <div>
+    <div class="phone" role="img" aria-label="Question round, keyboard open">
+      <div class="fs" role="dialog" aria-modal="true" aria-labelledby="tb">
+        <div class="statusbar"><span>9:41</span><span>●●● ▮</span></div>
+        <div class="fs-head">
+          <h2 id="tb">New work</h2>
+          <button class="btn btn-ghost btn-icon" type="button" aria-label="Close and keep as draft"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+        </div>
+        <div class="fs-body" style="padding-top:12px">
+          <section class="q">
+            <h3>Which screens must work at 375 px? <span class="muted" style="font-weight:400">Pick any</span></h3>
+            <ul class="opts" role="group" aria-label="Options">
+              <li class="opt multi" role="checkbox" aria-checked="true" tabindex="0"><span class="mark"></span><span class="l"><b>Question round</b></span></li>
+              <li class="opt multi" role="checkbox" aria-checked="true" tabindex="0"><span class="mark"></span><span class="l"><b>Split and stack review</b></span></li>
+            </ul>
+            <div class="field">
+              <label class="field-label" for="own-b">Write your own</label>
+              <div class="textarea focus" id="own-b" role="textbox" aria-multiline="true">And the accept step, with the card preview<span class="caret"></span></div>
+              <span class="muted">Sent with the options you checked, or on its own.</span>
+            </div>
+          </section>
+        </div>
+        <div class="fs-foot kb-open">
+          <div class="row">
+            <button class="btn btn-glass btn-icon" type="button" aria-label="Previous question"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+            <button class="btn btn-glass btn-icon" type="button" aria-label="Next question"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+            <span class="muted" style="flex:1;text-align:center">3 of 4</span>
+            <button class="btn btn-solid" type="submit">Send answers</button>
+          </div>
+        </div>
+        <div class="kb" aria-hidden="true">
+          <div class="r"><span>q</span><span>w</span><span>e</span><span>r</span><span>t</span><span>y</span><span>u</span><span>i</span><span>o</span><span>p</span></div>
+          <div class="r"><span>a</span><span>s</span><span>d</span><span>f</span><span>g</span><span>h</span><span>j</span><span>k</span><span>l</span></div>
+          <div class="r"><span class="m">⇧</span><span>z</span><span>x</span><span>c</span><span>v</span><span>b</span><span>n</span><span>m</span><span class="m">⌫</span></div>
+          <div class="r"><span class="m">123</span><span class="w">space</span><span class="m">↵</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="caption"><b>Keyboard open.</b> The dialog height follows the visual viewport (<code>100dvh</code>, with <code>interactive-widget=resizes-content</code>). The brief and step dots scroll away. The footer folds into one row, so <b>Send answers</b> stays above the keys and the field being typed in scrolls into view. <span class="pin">pinned</span></p>
+  </div>
+</div>
+<script>
+document.getElementById('theme').addEventListener('click',function(){var r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark';});
+</script>
+</body>
+</html>

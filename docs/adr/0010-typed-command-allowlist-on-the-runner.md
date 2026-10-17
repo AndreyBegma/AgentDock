@@ -1,6 +1,6 @@
 # ADR-0010: Typed command allowlist on the runner
 
-Status: accepted · Date: 2026-10-07
+Status: accepted · Date: 2026-10-07 · Amended by [ADR-0047](0047-a-runner-local-security-policy-the-server-cannot-change.md) (a runner-local policy refuses dangerous instances of allowed commands)
 
 ## Context
 

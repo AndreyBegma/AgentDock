@@ -1,7 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ConfigError, isPaired, loadConfig, saveConfig } from './config';
+import {
+  ConfigError,
+  isPaired,
+  loadConfig,
+  saveConfig,
+  updateConfig,
+} from './config';
 import { TOKEN, tempDir } from './testing/fixtures';
 
 describe('config', () => {
@@ -26,7 +32,46 @@ describe('config', () => {
       queue: { pollSeconds: 60 },
       sessions: { enabled: true },
       skills: { maxConcurrentRuns: 2, maxTimeoutSec: 21_600 },
+      policy: {
+        allowedRoots: [],
+        maxPermissionMode: 'auto',
+        terminal: { write: false },
+        skills: { profileInstall: false },
+        commands: {
+          'orchestrator.message': false,
+          'slot.message': false,
+          'session.message': false,
+        },
+      },
     });
+  });
+
+  it('keeps the policy on disk when the daemon rewrites the file (ADR-0047)', () => {
+    saveConfig(path, {
+      policy: { allowedRoots: ['/srv/dev'], terminal: { write: true } },
+    });
+    // A patch carrying a policy — as a crafted server value would — is ignored.
+    updateConfig(path, {
+      projects: [{ id: 'prj_a', root: '/srv/dev/a' }],
+      policy: { allowedRoots: ['/'], maxPermissionMode: 'bypassPermissions' },
+    } as never);
+    const config = loadConfig(path);
+    expect(config.projects).toEqual([{ id: 'prj_a', root: '/srv/dev/a' }]);
+    expect(config.policy.allowedRoots).toEqual(['/srv/dev']);
+    expect(config.policy.maxPermissionMode).toBe('auto');
+    expect(config.policy.terminal.write).toBe(true);
+  });
+
+  it('refuses a relative allowed root and an unknown gated command', () => {
+    expect(() =>
+      saveConfig(path, { policy: { allowedRoots: ['dev'] } }),
+    ).toThrow();
+    saveConfig(path, {});
+    writeFileSync(
+      path,
+      JSON.stringify({ policy: { commands: { 'shell.exec': true } } }),
+    );
+    expect(() => loadConfig(path)).toThrow(ConfigError);
   });
 
   it('bounds skill runs and refuses a cap of zero', () => {

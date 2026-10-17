@@ -73,6 +73,7 @@ export const toDocsSourceView = (docs: DocsSource): DocsSourceView => ({
   classified: parsed(classified, docs.classified, EMPTY_CLASSIFIED),
   candidates: parsed(candidates, docs.candidates, []),
   manual: docs.manual,
+  specDir: docs.specDir,
   updatedAt: docs.updatedAt.toISOString(),
 });
 

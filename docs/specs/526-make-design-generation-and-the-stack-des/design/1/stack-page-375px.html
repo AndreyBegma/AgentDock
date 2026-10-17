@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Stack page · 375px</title>
+<style>
+:root,:root[data-theme="dark"]{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-paper:#1b2647;--color-content:rgb(27 38 71/.96);--color-scrim:rgb(10 16 34/.5);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246/.62);--color-ink-3:rgb(242 242 246/.53);--color-line:rgb(255 255 255/.1);--color-line-strong:rgb(255 255 255/.18);--color-hover:rgb(255 255 255/.06);--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-soft:rgb(91 91 246/.2);--color-accent-ink:#b4b2ff;--color-focus:#b4b2ff;--color-ok:#5fd3a0;--color-danger:#ff6b60;--color-hue-1:#5b9cf6;--color-hue-1-soft:rgb(91 156 246/.18);--color-hue-1-ink:#a4c8ff;--color-hue-2:#2fbf94;--color-hue-2-soft:rgb(47 191 148/.18);--color-hue-2-ink:#7ee0c0;--color-hue-3:#7cc95a;--color-hue-3-soft:rgb(124 201 90/.18);--color-hue-3-ink:#ade58f;--color-hue-4:#e69f00;--color-hue-4-soft:rgb(230 159 0/.18);--color-hue-4-ink:#f5c25c;--color-hue-7:#a68bfa;--glass-sheen:rgb(255 255 255/.06);--glass-scrim:rgb(9 9 12/.55);--glass-scrim-strong:rgb(9 9 12/.64);--glass-edge:rgb(255 255 255/.14);--glass-spec:rgb(255 255 255/.2);--glass-shadow:rgb(0 0 0/.35);--glass-shadow-clear:rgb(0 0 0/.15);--canvas-glow:18%}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-paper:#fff;--color-content:rgb(255 255 255/.96);--color-scrim:rgb(24 24 27/.3);--color-ink:#18181b;--color-ink-2:rgb(24 24 27/.72);--color-ink-3:rgb(24 24 27/.64);--color-line:rgb(0 0 0/.1);--color-line-strong:rgb(0 0 0/.23);--color-hover:rgb(0 0 0/.08);--color-accent:#4f46e5;--color-accent-soft:rgb(79 70 229/.12);--color-accent-ink:#4338ca;--color-focus:#4f46e5;--color-ok:#0a8156;--color-danger:#dc2626;--color-hue-1:#1f64d6;--color-hue-1-soft:rgb(31 100 214/.12);--color-hue-1-ink:#1550b0;--color-hue-2:#00805e;--color-hue-2-soft:rgb(0 128 94/.12);--color-hue-2-ink:#006a4e;--color-hue-3:#3a7d1c;--color-hue-3-soft:rgb(58 125 28/.12);--color-hue-3-ink:#2f6617;--color-hue-4:#b36b00;--color-hue-4-soft:rgb(179 107 0/.12);--color-hue-4-ink:#8a5200;--color-hue-7:#7244e0;--glass-sheen:rgb(0 0 0/.06);--glass-scrim:rgb(255 255 255/.62);--glass-scrim-strong:rgb(255 255 255/.8);--glass-edge:rgb(0 0 0/.18);--glass-spec:rgb(0 0 0/.12);--glass-shadow:rgb(0 0 0/.12);--glass-shadow-clear:rgb(0 0 0/.08);--canvas-glow:10%}
+:root{--color-status-running:var(--color-hue-2);--color-status-running-soft:var(--color-hue-2-soft);--color-status-running-ink:var(--color-hue-2-ink);--color-status-waiting:var(--color-hue-1);--color-status-waiting-soft:var(--color-hue-1-soft);--color-status-waiting-ink:var(--color-hue-1-ink);--color-status-done:var(--color-hue-3);--color-status-done-soft:var(--color-hue-3-soft);--color-status-done-ink:var(--color-hue-3-ink);--color-status-paused:var(--color-hue-4);--color-status-paused-soft:var(--color-hue-4-soft);--color-status-paused-ink:var(--color-hue-4-ink);--radius-control:6px;--radius-surface:8px;--radius-sheet:12px;--size-tap:44px;--dur-fast:100ms;--font-sans:"SF Pro Text",Inter,system-ui,-apple-system,"Segoe UI",sans-serif;--font-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground);color:var(--color-ink)}
+body{margin:0;font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased}
+h1,h2,h3,p{margin:0}
+button{font-family:inherit}
+:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}
+.icon{width:16px;height:16px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.icon-sm{width:14px;height:14px}
+.glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);backdrop-filter:blur(26px) saturate(180%);-webkit-backdrop-filter:blur(26px) saturate(180%);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),0 12px 32px var(--glass-shadow)}
+.glass-strong{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim-strong);backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),0 -8px 32px var(--glass-shadow)}
+.surface-content{background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font-weight:600;cursor:pointer;border:1px solid transparent;background:none;color:var(--color-ink);height:28px;padding:0 16px;font-size:14px;border-radius:var(--radius-control);transition:transform var(--dur-fast)}
+.btn:active{transform:scale(.97)}
+.btn-solid{background:var(--color-accent);color:var(--color-on-accent)}
+.btn-glass{background:var(--color-raised);border-color:var(--color-line-strong)}
+.btn-ghost{color:var(--color-ink-2)}
+.btn-icon{padding:0;aspect-ratio:1}
+.tap{height:var(--size-tap);min-height:var(--size-tap)}
+.grow{flex:1;min-width:0}
+.pill{display:inline-flex;align-items:center;gap:8px;height:24px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:500;white-space:nowrap;background:var(--s-soft);color:var(--s-ink)}
+.pill-sm{height:20px;gap:6px;padding:0 8px;font-size:11px}
+.dot{width:8px;height:8px;border-radius:999px;background:var(--s);flex-shrink:0}
+[data-status="running"]{--s:var(--color-status-running);--s-soft:var(--color-status-running-soft);--s-ink:var(--color-status-running-ink)}
+[data-status="waiting"]{--s:var(--color-status-waiting);--s-soft:var(--color-status-waiting-soft);--s-ink:var(--color-status-waiting-ink)}
+[data-status="done"]{--s:var(--color-status-done);--s-soft:var(--color-status-done-soft);--s-ink:var(--color-status-done-ink)}
+[data-status="paused"]{--s:var(--color-status-paused);--s-soft:var(--color-status-paused-soft);--s-ink:var(--color-status-paused-ink)}
+.badge{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:500;background:var(--color-hover);color:var(--color-ink-2);white-space:nowrap}
+.swatch{width:10px;height:10px;border-radius:2px;background:var(--color-hue-7);flex-shrink:0}
+.text-xs{font-size:12px;line-height:16px}.text-ink-2{color:var(--color-ink-2)}.text-ink-3{color:var(--color-ink-3)}.mono{font-family:var(--font-mono)}
+.section-header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.section-header h2{font-size:16px;line-height:24px;font-weight:600}
+.meta-bar{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12px;color:var(--color-ink-3)}.meta-bar b{color:var(--color-ink);font-weight:600}
+.card{border-radius:var(--radius-surface);padding:12px;background:var(--color-content);border:1px solid var(--color-line)}
+/* phone */
+.stage{display:flex;flex-wrap:wrap;gap:32px;padding:24px;align-items:flex-start;justify-content:center}
+.phone{position:relative;width:375px;height:812px;border-radius:36px;border:1px solid var(--color-line-strong);overflow:hidden;display:flex;flex-direction:column;flex-shrink:0;background:radial-gradient(60% 40% at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50% 40% at 95% 40%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%),var(--color-ground)}
+.sb{height:28px;flex-shrink:0;display:flex;align-items:flex-end;justify-content:space-between;padding:0 28px;font-size:12px;font-weight:600}
+.pt{display:flex;align-items:center;gap:4px;height:52px;padding:0 4px;margin:8px 8px 0;border-radius:var(--radius-surface);flex-shrink:0}
+.pt .t{flex:1;min-width:0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.scroll{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:16px}
+.dock{flex-shrink:0;display:flex;gap:8px;padding:8px;margin:8px 8px 0;border-radius:var(--radius-sheet)}
+.tabbar{display:flex;height:60px;flex-shrink:0;margin:8px;padding:4px;border-radius:var(--radius-sheet)}
+.tabbar a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;color:var(--color-ink-2);border-radius:8px;text-decoration:none;min-height:44px}
+.tabbar a[aria-current]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.row{display:flex;align-items:center;gap:10px;min-height:56px;padding:8px 12px;border-radius:var(--radius-surface)}
+/* preview */
+.preview{position:relative;display:block;width:100%;height:340px;overflow:hidden;border-radius:var(--radius-surface);border:1px solid var(--color-line-strong);padding:0;background:var(--color-surface);cursor:pointer;text-align:left}
+.preview .page{position:absolute;left:0;top:0;width:390px;height:780px;transform:scale(.8795);transform-origin:0 0;background:var(--color-paper);color:var(--color-ink);display:flex;flex-direction:column;gap:14px;padding:20px}
+.preview::after{content:"";position:absolute;left:0;right:0;bottom:0;height:90px;background:linear-gradient(transparent,var(--color-ground));pointer-events:none}
+.preview .chip{position:absolute;z-index:2;left:50%;bottom:12px;transform:translateX(-50%);display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 14px;border-radius:999px;font-size:12px;font-weight:600;color:var(--color-ink)}
+.fk{border-radius:8px;background:var(--color-hover);border:1px solid var(--color-line)}
+.notes{max-width:340px;display:flex;flex-direction:column;gap:12px}
+.notes ol{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:8px;color:var(--color-ink-2)}
+.notes b{color:var(--color-ink)}
+</style>
+</head>
+<body>
+<div class="stage">
+  <section class="phone" aria-label="Stack page at 375 by 812">
+    <div class="sb"><span>9:41</span><span>LTE ▮▮▮</span></div>
+    <header class="pt glass">
+      <button class="btn btn-ghost btn-icon tap" aria-label="Back to board"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></button>
+      <span class="t">Board / Stack 12</span>
+      <span class="dot" data-status="running" title="Live"></span>
+      <span style="width:12px"></span>
+    </header>
+    <div class="scroll">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div class="text-xs text-ink-3">Checkout redesign · AgentDock</div>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px"><h1 style="font-size:22px;line-height:28px;font-weight:600;letter-spacing:-.02em">Stack 12: Checkout flow</h1><span class="pill" data-status="waiting"><span class="dot"></span>Design ready</span></div>
+        <div class="meta-bar"><span><b>3</b> cards</span><span><b>Variant 1</b> of 2</span><span>Updated <b>4 min ago</b></span></div>
+      </div>
+
+      <section style="display:flex;flex-direction:column;gap:8px" aria-labelledby="pv">
+        <div class="section-header"><h2 id="pv">Design preview</h2><span class="badge">Mobile · 390 px · fit 88%</span></div>
+        <button class="preview" aria-label="Open design in the viewer">
+          <div class="page" aria-hidden="true">
+            <div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:16px">Shop</b><span class="fk" style="width:28px;height:28px"></span></div>
+            <b style="font-size:26px;line-height:30px;letter-spacing:-.02em">Checkout</b>
+            <div class="fk" style="height:44px"></div><div class="fk" style="height:44px"></div>
+            <div style="display:flex;gap:10px"><div class="fk" style="height:44px;flex:1"></div><div class="fk" style="height:44px;width:110px"></div></div>
+            <div class="fk" style="height:120px"></div>
+            <div style="height:48px;border-radius:8px;background:var(--color-accent)"></div>
+            <div class="fk" style="height:90px"></div>
+          </div>
+          <span class="chip glass-strong"><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/></svg>Open in viewer</span>
+        </button>
+      </section>
+
+      <section style="display:flex;flex-direction:column;gap:8px" aria-labelledby="cd">
+        <div class="section-header"><h2 id="cd">Cards in this stack</h2><span class="badge">3</span></div>
+        <article class="row surface-content"><span class="swatch"></span><div class="grow"><div style="font-weight:500">Payment step form</div><div class="text-xs text-ink-3 mono">C-217</div></div><span class="pill pill-sm" data-status="done"><span class="dot"></span>Done</span></article>
+        <article class="row surface-content"><span class="swatch"></span><div class="grow"><div style="font-weight:500">Order summary panel</div><div class="text-xs text-ink-3 mono">C-218</div></div><span class="pill pill-sm" data-status="running"><span class="dot"></span>Running</span></article>
+        <article class="row surface-content"><span class="swatch"></span><div class="grow"><div style="font-weight:500">Phone layout for generation</div><div class="text-xs text-ink-3 mono">C-219</div></div><span class="pill pill-sm" data-status="paused"><span class="dot"></span>Queued</span></article>
+      </section>
+
+      <button class="btn btn-glass tap" style="width:100%;justify-content:space-between"><span style="display:inline-flex;align-items:center;gap:8px"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>Generate another design</span><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+      <div style="height:8px"></div>
+    </div>
+
+    <div class="dock glass-strong" role="group" aria-label="Design actions">
+      <button class="btn btn-solid tap grow"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Approve design</button>
+      <button class="btn btn-glass tap"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/></svg>Open viewer</button>
+    </div>
+    <nav class="tabbar glass" aria-label="Main">
+      <a href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Overview</a>
+      <a href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>Fleet</a>
+      <a href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>Approvals</a>
+      <a href="#" aria-current="page"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v11"/><path d="M12 5v6"/><path d="M18 5v14"/></svg>Board</a>
+      <a href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></svg>Activity</a>
+      <a href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>More</a>
+    </nav>
+  </section>
+
+  <aside class="notes">
+    <h2 style="font-size:16px;font-weight:600">What changes below lg</h2>
+    <ol>
+      <li><b>Preview</b> renders the mockup at the Mobile preset width (390px) and scales it to the 343px container (0.88, fit-to-width). The box is cropped to 340px with a fade, and the whole box is one button that opens the viewer.</li>
+      <li><b>Action dock</b> is sticky above the TabBar. Approve design is the solid CTA and takes the width. Open viewer is a glass button. Both are 44px tall, so no scrolling past the stack.</li>
+      <li><b>Generator</b> is collapsed to one 44px disclosure row. It opens inline (see the next frame).</li>
+      <li><b>At lg and up</b> the header actions and the sticky preview stay exactly as on develop. The dock and the scaling apply only below lg.</li>
+    </ol>
+    <button class="btn btn-glass btn-sm" style="align-self:flex-start;height:32px" onclick="var r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark'">Toggle theme</button>
+  </aside>
+</div>
+</body>
+</html>

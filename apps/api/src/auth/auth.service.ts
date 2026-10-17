@@ -13,15 +13,14 @@ import {
 } from '../audit/audit.types';
 import { PrismaService } from '../database/prisma.service';
 import { SettingsService } from '../settings/settings.service';
-import { authError } from './auth-error';
+import { authError, sourceThrottled } from './auth-error';
 import type { AuthContext } from './auth-request';
 import type { ChangePasswordDto, LoginDto, RegisterDto } from './dto';
+import { LoginThrottle } from './login-throttle';
+import { LoginThrottleAlerts } from './login-throttle-alerts';
 import { hashPassword, verifyPassword } from './password';
 import { type IssuedSession, SessionService } from './session.service';
 import { toPublicUser } from './user-mapper';
-
-export const MAX_FAILED_LOGINS = 10;
-export const LOCKOUT_MS = 15 * 60_000;
 
 const invalidCredentials = () =>
   authError(401, AUTH_ERROR.invalidCredentials, 'Invalid email or password');
@@ -38,6 +37,8 @@ export class AuthService {
     private readonly sessions: SessionService,
     private readonly settings: SettingsService,
     private readonly audit: AuditService,
+    private readonly throttle: LoginThrottle,
+    private readonly alerts: LoginThrottleAlerts,
   ) {}
 
   async register(dto: RegisterDto, origin: RequestOrigin): Promise<void> {
@@ -73,22 +74,19 @@ export class AuthService {
   }
 
   /**
-   * Wrong email, wrong password, a locked account and a rejected or disabled
-   * account all fail the same way (spec D8, D9). Only a correct password on a
-   * pending account says so, because it proves the caller owns the account.
+   * Wrong email, wrong password and a rejected or disabled account all fail
+   * the same way (spec D8, D9). Only a correct password on a pending account
+   * says so, because it proves the caller owns the account.
+   *
+   * Failures are counted per (email, IP) and make only that source wait
+   * (C-109): the owner signing in from elsewhere is never delayed.
    */
   async login(dto: LoginDto, origin: RequestOrigin): Promise<LoginResult> {
-    const user = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-    });
-    const passwordOk = await verifyPassword(
-      user?.passwordHash ?? null,
-      dto.password,
-    );
     // Every refusal is recorded against the email, never the account: the
     // record must not tell an auditor more than the response told the caller.
+    // A flood of them folds into one record per (email, IP, minute).
     const deny = async (reason: LoginDeniedReason, error: HttpException) => {
-      await this.audit.record({
+      await this.audit.recordFolded({
         actor: ANONYMOUS_ACTOR,
         origin,
         action: 'auth.login',
@@ -98,22 +96,22 @@ export class AuthService {
       });
       return error;
     };
-    if (!user) throw await deny('invalid_credentials', invalidCredentials());
+    const wait = await this.throttle.waitMs(dto.email, origin.ip);
+    if (wait > 0) throw await deny('throttled', sourceThrottled(wait));
 
-    const locked = user.lockedUntil !== null && user.lockedUntil > new Date();
-    if (locked) throw await deny('locked', invalidCredentials());
-
-    if (!passwordOk) {
-      await this.recordFailure(user.id);
+    const user = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
+    const passwordOk = await verifyPassword(
+      user?.passwordHash ?? null,
+      dto.password,
+    );
+    if (!user || !passwordOk) {
+      await this.countFailure(dto.email, origin, user?.id ?? null);
       throw await deny('invalid_credentials', invalidCredentials());
     }
+    await this.throttle.clear(dto.email, origin.ip);
 
-    if (user.failedLoginCount > 0 || user.lockedUntil !== null) {
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: { failedLoginCount: 0, lockedUntil: null },
-      });
-    }
     if (user.status === 'pending') {
       throw await deny(
         'pending_approval',
@@ -140,19 +138,25 @@ export class AuthService {
     return { user: toPublicUser(user), session };
   }
 
-  private async recordFailure(userId: string): Promise<void> {
-    const { failedLoginCount } = await this.prisma.user.update({
-      where: { id: userId },
-      data: { failedLoginCount: { increment: 1 } },
-      select: { failedLoginCount: true },
-    });
-    if (failedLoginCount >= MAX_FAILED_LOGINS) {
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: {
-          failedLoginCount: 0,
-          lockedUntil: new Date(Date.now() + LOCKOUT_MS),
-        },
+  /** Counts a wrong password and tells admins when an account becomes throttled. */
+  private async countFailure(
+    email: string,
+    origin: RequestOrigin,
+    userId: string | null,
+  ): Promise<void> {
+    const at = new Date();
+    const { failures, accountThrottled } = await this.throttle.fail(
+      email,
+      origin.ip,
+      at,
+    );
+    if (accountThrottled && userId) {
+      await this.alerts.accountThrottled({
+        userId,
+        email,
+        ip: origin.ip,
+        failures,
+        at,
       });
     }
   }
@@ -166,13 +170,18 @@ export class AuthService {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: auth.user.id },
     });
+    // The login counter (C-109): a stolen session guesses no faster than a stranger.
+    const wait = await this.throttle.waitMs(user.email, origin.ip);
+    if (wait > 0) throw sourceThrottled(wait);
     if (!(await verifyPassword(user.passwordHash, dto.currentPassword))) {
+      await this.countFailure(user.email, origin, user.id);
       throw authError(
         403,
         AUTH_ERROR.invalidCredentials,
         'Current password is wrong',
       );
     }
+    await this.throttle.clear(user.email, origin.ip);
     await this.prisma.user.update({
       where: { id: user.id },
       data: { passwordHash: await hashPassword(dto.newPassword) },

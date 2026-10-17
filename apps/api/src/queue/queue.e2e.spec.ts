@@ -537,6 +537,18 @@ describe('task queue (e2e)', () => {
       ]);
     });
 
+    it('answers 400 to a body over the protocol cap and sends nothing', async () => {
+      const create = jest.spyOn(commands, 'createIssue');
+      const response = await post({
+        title: 'Huge',
+        body: `${AC}${'a'.repeat(64 * 1024)}`,
+        labels: [],
+        queue: true,
+      });
+      expect(response.status).toBe(400);
+      expect(create).not.toHaveBeenCalled();
+    });
+
     it('files an incomplete body unqueued', async () => {
       const create = jest
         .spyOn(commands, 'createIssue')

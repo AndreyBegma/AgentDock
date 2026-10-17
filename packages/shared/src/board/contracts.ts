@@ -463,7 +463,16 @@ export interface BoardCardDetail extends BoardCardView {
   branch: string | null;
   /** Display only: the runner owns the path. */
   worktree: string | null;
+  /**
+   * The spec's path: on the card's branch, or — with `specPr` — relative to
+   * the docs repository's root.
+   */
   specPath: string | null;
+  /**
+   * #379: the docs repository pull request that adds the spec, when the
+   * project's specs live in an external docs repository; else `null`.
+   */
+  specPr: { repo: string; number: number; url: string } | null;
   /** The card's Claude session (D6); `null` before the first Run. */
   sessionId: string | null;
   createdBy: BoardUserRef | null;
@@ -734,8 +743,13 @@ export const BOARD_ERROR = {
   notRunning: 'not_running',
   /** 409: feedback outside Finished, or Accept of a card not in Finished. */
   wrongColumn: 'wrong_column',
-  /** 422: `specOnRun` and the project has no `specDir` (D2). */
+  /** 422: `specOnRun` and the project has no Spec folder nor `specDir` (D2). */
   noSpecDir: 'no_spec_dir',
+  /**
+   * 422 (#379): `specOnRun` and the project's docs are a remote repository
+   * with no local clone path to write the spec in.
+   */
+  noDocsClone: 'no_docs_clone',
   /**
    * 422: the runner refused a non-Claude profile. Profile selection itself
    * answers `no_profile` (#272 D2).
@@ -765,6 +779,11 @@ export const BOARD_ERROR = {
   cardCompleted: 'card_completed',
   /** 502 (#309 D9): the runner could not download or verify an attachment for `card.run`. */
   attachmentsUnavailable: 'attachments_unavailable',
+  /**
+   * 403 (ADR-0047): the runner's local security policy refused the command;
+   * the message names the rule and the CLI line that lifts it.
+   */
+  policyRefused: 'policy_refused',
   /** 409 (#329 D5): Create pull request on a card with no `branch` — it never ran. */
   noBranch: 'no_branch',
   /**

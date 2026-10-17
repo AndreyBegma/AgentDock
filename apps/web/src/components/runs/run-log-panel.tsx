@@ -6,6 +6,7 @@ import { type LogLine, LogViewer } from '@andrewbehma/glass-ui/log-viewer';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { rowText } from '../../lib/skills/run-log';
 import { useRunLog } from '../../lib/skills/use-run-log';
+import { useNarrow } from '../shell/narrow';
 
 /**
  * The run’s rendered log, read-only. Mounted only while the run is active, so
@@ -27,6 +28,8 @@ export function RunLogPanel({
   const [follow, setFollow] = useState(true);
   const [query, setQuery] = useState('');
   const notified = useRef(false);
+  // #526: on a phone the lines wrap, so nothing scrolls sideways.
+  const narrow = useNarrow();
 
   useEffect(() => {
     if (log.endedPhase && !notified.current) {
@@ -62,6 +65,7 @@ export function RunLogPanel({
         <LogViewer
           label="Run log"
           lines={lines}
+          defaultWrap={narrow}
           follow={follow}
           onFollowChange={setFollow}
           query={query}
@@ -69,7 +73,7 @@ export function RunLogPanel({
           emptyState={
             <p className="p-3 text-sm text-ink-2">Waiting for output…</p>
           }
-          className="h-96"
+          className="h-[min(24rem,55dvh)]"
         />
       )}
     </div>

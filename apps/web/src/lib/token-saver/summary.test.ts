@@ -154,7 +154,15 @@ describe('mergeSummaries', () => {
 describe('topFilters', () => {
   test('most saved first, uncovered commands left out, limited', () => {
     const top = topFilters(
-      [filter('b', 1), filter('none', 9), filter('a', 3), filter('c', 2)],
+      [
+        filter('b', 1),
+        filter('none', 9),
+        filter('none:compound', 9),
+        filter('none:uncovered', 9),
+        filter('none:mode', 9),
+        filter('a', 3),
+        filter('c', 2),
+      ],
       2,
     );
     expect(top.map((f) => f.filter)).toEqual(['a', 'c']);

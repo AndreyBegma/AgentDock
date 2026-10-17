@@ -8,6 +8,7 @@ import {
   SKILL_TIMEOUTS_MS,
   TERMINAL_ATTACH_TIMEOUT_MS,
 } from '@agentdock/shared/protocol';
+import { permissivePolicy, sameRealpath } from '../policy/testing';
 import { FakeClock } from '../testing/fake-clock';
 import { fakeExec, memoryLogger } from '../testing/fixtures';
 import { type CommandHandlers, createDispatcher } from './dispatcher';
@@ -24,6 +25,7 @@ const setup = (
   const { log, lines } = memoryLogger();
   const handlers: CommandHandlers = {
     ...createHandlers({
+      policy: permissivePolicy,
       clock,
       runnerVersion: '0.1.0',
       host,
@@ -42,7 +44,14 @@ const setup = (
     }),
     ...overrides,
   };
-  const dispatch = createDispatcher({ handlers, disabledCommands, clock, log });
+  const dispatch = createDispatcher({
+    handlers,
+    disabledCommands,
+    policy: permissivePolicy,
+    realpath: sameRealpath,
+    clock,
+    log,
+  });
   const run = async (name: string, args: unknown = {}) => {
     const result: CommandResultMessage = await dispatch({
       type: 'command',
