@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { createHash } from 'node:crypto';
-import { appendFileSync, utimesSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  symlinkSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { SLOT_MESSAGE_SEEN_MAX_BYTES } from '@agentdock/shared/protocol';
 import { messageFileContent } from '../../control/slot';
@@ -83,6 +88,27 @@ describe('MessageWatcher', () => {
     };
     return { ...f, file, touch, watcher: new MessageWatcher(f) };
   };
+
+  it('ignores a message file that is a symlink to a file outside the worktree', () => {
+    const { watcher, events, file } = setup();
+    const outside = tempDir();
+    try {
+      const target = join(outside.dir, 'secret.txt');
+      writeFileSync(target, 'top secret');
+      symlinkSync(target, file);
+      watcher.scan();
+      expect(events.take()).toEqual([]);
+    } finally {
+      outside.cleanup();
+    }
+  });
+
+  it('ignores a 10 MiB message file', () => {
+    const { watcher, events, file } = setup();
+    writeFileSync(file, 'x'.repeat(10 * 1024 * 1024));
+    watcher.scan();
+    expect(events.take()).toEqual([]);
+  });
 
   it('sends the first message whole, then an appended section as its own entry', () => {
     const { watcher, events, file, touch } = setup();

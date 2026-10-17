@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFileSync, statSync } from 'node:fs';
+import { lstatSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   SLOT_MESSAGE_SEEN_MAX_BYTES,
@@ -8,6 +8,10 @@ import {
 import { MESSAGE_FILE } from '../../control/slot';
 import type { FleetEmitter } from '../../fleet/project';
 import type { SlotBook } from '../../fleet/slots';
+import {
+  AGENT_FILE_MAX_BYTES,
+  readRegularFileInside,
+} from '../../fs/safe-read';
 import { truncateBytes } from './replies';
 
 /** `From: <sender>` — the header AgentDock's `slot.message` writes (spec 17 D7). */
@@ -86,19 +90,19 @@ export class MessageWatcher {
       const path = join(worktree.path, MESSAGE_FILE);
       let stamp: string;
       try {
-        const stat = statSync(path);
+        const stat = lstatSync(path);
         stamp = `${worktree.path}:${stat.mtimeMs}:${stat.size}`;
       } catch {
         continue;
       }
       if (this.stamps.get(slot) === stamp) continue;
       this.stamps.set(slot, stamp);
-      let text: string;
-      try {
-        text = readFileSync(path, 'utf8');
-      } catch {
-        continue;
-      }
+      const text = readRegularFileInside(
+        worktree.path,
+        MESSAGE_FILE,
+        AGENT_FILE_MAX_BYTES,
+      );
+      if (text === null) continue;
       const key = `${worktree.path}\0${slot}`;
       const previous = this.contents.get(key);
       if (previous === text) continue;

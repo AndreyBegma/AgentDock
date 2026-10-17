@@ -1,4 +1,4 @@
-import { readFileSync, statSync } from 'node:fs';
+import { lstatSync } from 'node:fs';
 import { join } from 'node:path';
 import { checkpointFromHeading } from '@agentdock/shared';
 import {
@@ -7,6 +7,10 @@ import {
 } from '@agentdock/shared/protocol';
 import type { FleetEmitter } from '../../fleet/project';
 import type { SlotBook } from '../../fleet/slots';
+import {
+  AGENT_FILE_MAX_BYTES,
+  readRegularFileInside,
+} from '../../fs/safe-read';
 import { REPLY_FILE } from '../tmux/sessions';
 
 export interface ReplySection {
@@ -96,19 +100,19 @@ export class ReplyWatcher {
       const path = join(worktree.path, REPLY_FILE);
       let stamp: string;
       try {
-        const stat = statSync(path);
+        const stat = lstatSync(path);
         stamp = `${worktree.path}:${stat.mtimeMs}:${stat.size}`;
       } catch {
         continue;
       }
       if (this.stamps.get(slot) === stamp) continue;
       this.stamps.set(slot, stamp);
-      let text: string;
-      try {
-        text = readFileSync(path, 'utf8');
-      } catch {
-        continue;
-      }
+      const text = readRegularFileInside(
+        worktree.path,
+        REPLY_FILE,
+        AGENT_FILE_MAX_BYTES,
+      );
+      if (text === null) continue;
       // A file that shrank was started over (a new run of the slot): resend all.
       const previous =
         text.length < (this.lengths.get(slot) ?? 0)
