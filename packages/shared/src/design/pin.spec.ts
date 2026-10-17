@@ -53,8 +53,9 @@ const runHelper = () => {
       source: parent,
       data: { source: VIEWER_MESSAGE_SOURCE, ...data },
     });
-  const click = (at: Record<string, number>) =>
+  const click = (at: Record<string, unknown>) =>
     listeners.click?.({
+      isTrusted: true,
       ...at,
       target: body,
       preventDefault: () => {},
@@ -63,6 +64,7 @@ const runHelper = () => {
   const wheel = (event: Record<string, unknown>) => {
     let prevented = false;
     listeners.wheel?.({
+      isTrusted: true,
       ...event,
       preventDefault: () => {
         prevented = true;
@@ -144,6 +146,12 @@ describe('the pin helper wheel', () => {
     ]);
   });
 
+  it('drops a wheel the mockup dispatched itself (C-130)', () => {
+    const { sent, wheel } = runHelper();
+    wheel({ ctrlKey: true, deltaY: -100, isTrusted: false });
+    expect(sent).toHaveLength(1);
+  });
+
   it('leaves a plain wheel to scroll the mockup', () => {
     const { sent, wheel } = runHelper();
     expect(wheel({ deltaY: 100 })).toBe(false);
@@ -152,6 +160,13 @@ describe('the pin helper wheel', () => {
 });
 
 describe('the pin helper', () => {
+  it('drops a click the mockup dispatched itself (C-130)', () => {
+    const { sent, viewer, click } = runHelper();
+    viewer({ type: 'pin-mode', on: true });
+    click({ pageX: 1, pageY: 1, clientX: 1, clientY: 1, isTrusted: false });
+    expect(sent).toHaveLength(1);
+  });
+
   it('says ready, and sends nothing on a click outside pin mode', () => {
     const { sent, click } = runHelper();
     click({ pageX: 10, pageY: 900, clientX: 10, clientY: 100 });

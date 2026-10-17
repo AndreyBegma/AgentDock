@@ -156,6 +156,8 @@ export const MOCKUP_PIN_HELPER_SCRIPT = `(function () {
     document.body.appendChild(layer);
   }
   document.addEventListener('click', function (e) {
+    // A mockup's own script can dispatch clicks; only a person's counts.
+    if (!e.isTrusted) return;
     var tapped = e.target && e.target.closest ? e.target.closest('[data-pin]') : null;
     if (tapped) {
       e.preventDefault();
@@ -170,7 +172,7 @@ export const MOCKUP_PIN_HELPER_SCRIPT = `(function () {
     send({ type: 'pin', x: Math.max(0, e.pageX), y: Math.max(0, e.pageY), clientX: Math.max(0, e.clientX), clientY: Math.max(0, e.clientY), selector: cssPath(target) });
   }, true);
   document.addEventListener('wheel', function (e) {
-    if (!(e.ctrlKey || e.metaKey)) return;
+    if (!e.isTrusted || !(e.ctrlKey || e.metaKey)) return;
     e.preventDefault();
     send({ type: 'wheel', deltaY: e.deltaY });
   }, { passive: false });

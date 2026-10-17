@@ -129,6 +129,25 @@ describe('validateMockup', () => {
       'design_forbidden_feature',
     ],
     ['<script>window.open("https://x")</script>', 'design_forbidden_feature'],
+    [
+      '<script>location.assign("https://x")</script>',
+      'design_forbidden_feature',
+    ],
+    [
+      '<script>location.replace("https://x")</script>',
+      'design_forbidden_feature',
+    ],
+    ['<script>location.href="https://x"</script>', 'design_forbidden_feature'],
+    ['<script>location = "https://x"</script>', 'design_forbidden_feature'],
+    ['<script>self.location="https://x"</script>', 'design_forbidden_feature'],
+    [
+      '<script>window.location.href = "/x"</script>',
+      'design_forbidden_feature',
+    ],
+    [
+      '<button onclick="location.href=\'/x\'">x</button>',
+      'design_forbidden_feature',
+    ],
     ['<script>document.forms[0].submit()</script>', 'design_forbidden_feature'],
     ['<button onclick="fetch(\'/x\')">x</button>', 'design_forbidden_feature'],
     [
@@ -157,6 +176,14 @@ describe('validateMockup', () => {
     );
     expect(check.ok).toBe(false);
     if (!check.ok) expect(check.reason).toBe('design_host_not_allowed');
+  });
+
+  it('does not mistake a local named location for navigation', () => {
+    const html = doc(
+      '',
+      '<script>const location = "Berlin"; if (location == "x") {}</script>',
+    );
+    expect(validateMockup(html)).toEqual({ ok: true });
   });
 
   it('ignores URLs inside HTML comments and words in text', () => {
