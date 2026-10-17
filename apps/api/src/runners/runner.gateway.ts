@@ -55,6 +55,10 @@ interface Deps {
 class RunnerSocket {
   private queue: Promise<void> = Promise.resolve();
   private runnerId: string | null = null;
+  /** The hash the token was verified against; `hello` must still match it. */
+  private tokenHash: string | null = null;
+  /** Leaves the pre-hello registry (C-118); a no-op once left. */
+  private release: () => void = () => {};
   private live: LiveConnection | null = null;
   private closed = false;
   private readonly helloTimer: NodeJS.Timeout;
@@ -99,6 +103,11 @@ class RunnerSocket {
       return;
     }
     this.runnerId = runner.id;
+    this.tokenHash = runner.tokenHash;
+    // Until hello completes, re-pairing or revoking must still reach it.
+    this.release = this.deps.connections.admit(runner.id, (code, reason) =>
+      this.close(code, reason),
+    );
   }
 
   private async receive(data: RawData): Promise<void> {
@@ -134,14 +143,15 @@ class RunnerSocket {
 
   private async handle(message: RunnerMessage): Promise<void> {
     const runnerId = this.runnerId;
-    if (runnerId === null) return;
+    const tokenHash = this.tokenHash;
+    if (runnerId === null || tokenHash === null) return;
     const live = this.live;
     if (!live) {
       if (message.type !== 'hello') {
         this.close(POLICY_VIOLATION, 'hello expected');
         return;
       }
-      await this.hello(runnerId, message);
+      await this.hello(runnerId, tokenHash, message);
       return;
     }
     switch (message.type) {
@@ -210,9 +220,10 @@ class RunnerSocket {
 
   private async hello(
     runnerId: string,
+    tokenHash: string,
     hello: Extract<RunnerMessage, { type: 'hello' }>,
   ): Promise<void> {
-    const acked = await this.deps.ingest.hello(runnerId, hello);
+    const acked = await this.deps.ingest.hello(runnerId, tokenHash, hello);
     if (acked === null || this.closed) {
       this.close(RUNNER_CLOSE_CODES.unauthorized, 'unauthorized');
       return;
@@ -232,6 +243,7 @@ class RunnerSocket {
     // `config` right after the welcome (spec 10 D9).
     await this.deps.watchList.deliver(runnerId, (config) => {
       if (this.closed) return;
+      this.release();
       replaced = this.deps.connections.attach(live);
       live.send({ type: 'welcome', runnerId, config, ackedSeq: Number(acked) });
     });
@@ -262,6 +274,7 @@ class RunnerSocket {
     if (this.closed) return;
     this.closed = true;
     clearTimeout(this.helloTimer);
+    this.release();
     if (this.live) this.detach(this.live);
     if (this.socket.readyState <= this.socket.OPEN) {
       this.socket.close(code, reason);
@@ -272,6 +285,7 @@ class RunnerSocket {
     const wasLive = this.live !== null;
     this.closed = true;
     clearTimeout(this.helloTimer);
+    this.release();
     if (this.live) this.detach(this.live);
     if (wasLive) this.deps.logger.log(`runner ${this.runnerId} disconnected`);
   }

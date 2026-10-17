@@ -98,6 +98,31 @@ export const pairedRunner = async (
   return response.body as { runnerId: string; token: string };
 };
 
+/** Re-pairs a paired runner over HTTP with a fresh code; returns the new token. */
+export const repairRunner = async (
+  ctx: E2eContext,
+  admin: Session,
+  runnerId: string,
+): Promise<string> => {
+  const renewed = await admin.send(
+    'post',
+    `/admin/runners/${runnerId}/pairing-code`,
+  );
+  if (renewed.status !== 200) {
+    throw new Error(`pairing code → ${renewed.status} ${renewed.text}`);
+  }
+  const { pairingCode } = renewed.body as PairingCodeResponse;
+  const response = await ctx
+    .http()
+    .post('/runners/pair')
+    .set('X-Forwarded-For', nextIp())
+    .send(pairBody(pairingCode));
+  if (response.status !== 200) {
+    throw new Error(`re-pair → ${response.status} ${response.text}`);
+  }
+  return (response.body as { token: string }).token;
+};
+
 export const capabilities: Capabilities = {
   tmux: '3.5a',
   git: '2.55.0',
