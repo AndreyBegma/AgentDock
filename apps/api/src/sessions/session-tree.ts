@@ -78,6 +78,9 @@ export interface ToolRow {
   childSessionId: string | null;
 }
 
+/** C-137: levels, the root's included, that a tree holds; deeper ones are cut. */
+export const MAX_SESSION_TREE_DEPTH = 64;
+
 /** Everything under one root session, as loaded from the database. */
 export interface SubtreeRows {
   sessions: SessionRow[];
@@ -231,8 +234,14 @@ export const buildSessionTree = (
     totals: totals(ofRequest(r)),
   });
 
-  const build = (row: SessionRow): { node: SessionTreeNode; sum: Sum } => {
+  const build = (
+    row: SessionRow,
+    depth: number,
+  ): { node: SessionTreeNode; sum: Sum } => {
     placed.add(row.id);
+    // The last level is kept; what hangs below it is not built.
+    const cut = depth + 1 >= MAX_SESSION_TREE_DEPTH;
+    let truncated = false;
     let subagents = 0;
     const sessionSum = zero();
 
@@ -241,7 +250,8 @@ export const buildSessionTree = (
         t.childSessionId !== null && !placed.has(t.childSessionId)
           ? sessions.get(t.childSessionId)
           : undefined;
-      const child = childRow ? build(childRow) : null;
+      if (childRow && cut) truncated = true;
+      const child = childRow && !cut ? build(childRow, depth + 1) : null;
       if (child) subagents += 1 + child.node.session.subagents;
       const sum = child ? child.sum : zero();
       return {
@@ -315,11 +325,14 @@ export const buildSessionTree = (
         }),
     };
 
-    const unlinked = (childrenOf.get(row.id) ?? [])
-      .filter((c) => !placed.has(c.id))
+    const children = (childrenOf.get(row.id) ?? []).filter(
+      (c) => !placed.has(c.id),
+    );
+    if (cut && children.length > 0) truncated = true;
+    const unlinked = (cut ? [] : children)
       .sort(byTime((c) => c.startedAt))
       .map((c) => {
-        const built = build(c);
+        const built = build(c, depth + 1);
         subagents += 1 + built.node.session.subagents;
         add(sessionSum, built.sum);
         return built.node;
@@ -336,6 +349,7 @@ export const buildSessionTree = (
         turns,
         unattributed,
         subagents: unlinked,
+        ...(truncated ? { truncated: true } : {}),
         totals: sessionTotals,
       },
       sum: sessionSum,
@@ -343,5 +357,5 @@ export const buildSessionTree = (
   };
 
   const root = sessions.get(rootId);
-  return root ? build(root).node : null;
+  return root ? build(root, 0).node : null;
 };

@@ -24,6 +24,9 @@ import { httpsGithubUrl } from './github-url';
 /** The server's and the daemon's deadline for one local request (D6). */
 export const LOCAL_REQUEST_TIMEOUT_MS = 15_000;
 
+/** `local.request`s the server answers at once for one runner; one more is `busy` (C-137). */
+export const LOCAL_MAX_CONCURRENT_PER_RUNNER = 32;
+
 /** A local request never acts with more than this role (D8). */
 export const LOCAL_ROLE_CAP: Role = 'operator';
 
@@ -46,6 +49,8 @@ export const localErrorCodeSchema = z.enum([
   'budget_exceeded',
   /** The id or target does not exist in that project. */
   'not_found',
+  /** The runner already has `LOCAL_MAX_CONCURRENT_PER_RUNNER` requests in flight. */
+  'busy',
   /** The domain service failed; `message` carries no stack trace. */
   'internal',
   /** `card.finish` from a session that is not a board card's worker (issue #242). */
