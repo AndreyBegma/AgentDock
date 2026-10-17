@@ -101,6 +101,9 @@ describe('projects against the runner daemon (e2e)', () => {
         ctx.origin,
         '--code',
         created.pairingCode,
+        // The runner-local policy watches nothing until a root is allowed.
+        '--allow-root',
+        join(home, 'dev'),
       ],
       { env, stdio: 'ignore' },
     );

@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>C-217 · Split and stack review, full screen on phones</title>
+<style>
+:root,:root[data-theme="dark"]{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-content:rgb(27 38 71 / .96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246 / .62);--color-ink-3:rgb(242 242 246 / .53);--color-line:rgb(255 255 255 / .1);--color-line-strong:rgb(255 255 255 / .18);--color-hover:rgb(255 255 255 / .06);--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-soft:rgb(91 91 246 / .2);--color-accent-ink:#b4b2ff;--color-focus:#b4b2ff;--color-danger:#ff6b60;--color-hue-1:#5b9cf6;--color-hue-7:#a68bfa;--glass-sheen:rgb(255 255 255 / .06);--glass-scrim-strong:rgb(9 9 12 / .64);--glass-edge:rgb(255 255 255 / .14);--glass-spec:rgb(255 255 255 / .2);--glass-shadow-strong:rgb(0 0 0 / .45);--color-scrim:rgb(10 16 34 / .3);--canvas-glow:18%}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-content:rgb(255 255 255 / .96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27 / .72);--color-ink-3:rgb(24 24 27 / .64);--color-line:rgb(0 0 0 / .1);--color-line-strong:rgb(0 0 0 / .23);--color-hover:rgb(0 0 0 / .06);--color-accent:#4f46e5;--color-on-accent:#fff;--color-accent-soft:rgb(79 70 229 / .12);--color-accent-ink:#4338ca;--color-focus:#4f46e5;--color-danger:#dc2626;--color-hue-1:#1f64d6;--color-hue-7:#7244e0;--glass-sheen:rgb(0 0 0 / .04);--glass-scrim-strong:rgb(255 255 255 / .7);--glass-edge:rgb(0 0 0 / .14);--glass-spec:rgb(255 255 255 / .8);--glass-shadow-strong:rgb(0 0 0 / .16);--color-scrim:rgb(24 24 27 / .22);--canvas-glow:10%}
+:root{--radius-control:6px;--radius-surface:8px;--radius-sheet:12px;--size-tap:44px;--size-control:28px;--font-sans:"SF Pro Text",Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground);color:var(--color-ink)}
+body{margin:0;font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased;padding:24px}
+h1,h2,h3,p{margin:0}
+.icon{width:16px;height:16px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.glass-strong{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim-strong);backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),0 20px 48px var(--glass-shadow-strong)}
+.board-head{display:flex;align-items:center;justify-content:space-between;gap:16px;max-width:1240px;margin:0 auto 20px}
+.board-head p{color:var(--color-ink-2);font-size:13px;max-width:72ch}
+.stage{display:flex;gap:40px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+.caption{margin-top:12px;max-width:375px;font-size:12px;line-height:16px;color:var(--color-ink-3)}
+.caption b{color:var(--color-ink);font-weight:600}
+.phone{position:relative;width:375px;height:812px;border-radius:44px;overflow:hidden;border:1px solid var(--color-line-strong);box-shadow:0 30px 60px rgb(0 0 0 / .35);background:var(--color-surface)}
+.statusbar{height:47px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 28px 6px;font-size:14px;font-weight:600;flex-shrink:0}
+.home{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);width:134px;height:5px;border-radius:99px;background:var(--color-ink);opacity:.8}
+.fs{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--color-surface)}
+.fs-head{display:flex;align-items:center;gap:4px;padding:0 4px 0 16px;height:56px;border-bottom:1px solid var(--color-line);flex-shrink:0}
+.fs-head h2{flex:1;font-size:17px;line-height:22px;font-weight:600}
+.fs-body{flex:1;min-height:0;overflow-y:auto;padding:16px 16px 20px;display:flex;flex-direction:column;gap:14px}
+.fs-foot{flex-shrink:0;border-top:1px solid var(--color-line);padding:10px 16px 44px;display:flex;flex-direction:column;gap:6px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font-family:inherit;font-weight:600;cursor:pointer;border:1px solid transparent;background:none;color:var(--color-ink);height:var(--size-tap);min-width:var(--size-tap);padding:0 16px;font-size:15px;border-radius:var(--radius-control)}
+.btn-icon{padding:0;width:var(--size-tap)}
+.btn-solid{background:var(--color-accent);color:var(--color-on-accent)}
+.btn-glass{background:var(--color-raised);border-color:var(--color-line-strong)}
+.btn-ghost{color:var(--color-ink-2)}
+.btn:disabled{opacity:.35}
+.row{display:flex;align-items:center;gap:8px}
+.muted{color:var(--color-ink-3);font-size:12px;line-height:16px}
+.seg{display:flex;gap:4px;padding:3px;border-radius:999px;background:var(--color-hover);border:1px solid var(--color-line)}
+.seg button{flex:1;height:38px;border:0;background:none;border-radius:999px;font-family:inherit;font-size:14px;font-weight:500;color:var(--color-ink-2);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.cards{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.c{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:var(--radius-surface);background:var(--color-content);border:1px solid var(--color-line)}
+.c-top{display:flex;align-items:center;gap:8px}
+.c-top .n{flex:1;font-size:12px;font-weight:500;color:var(--color-ink-2)}
+.input,.select{width:100%;height:var(--size-tap);padding:0 12px;font-family:inherit;font-size:16px;color:var(--color-ink);background:var(--color-surface);border:1px solid var(--color-line-strong);border-radius:var(--radius-control)}
+.select{appearance:none;width:auto;min-width:112px;padding-right:30px;font-size:15px;background-image:linear-gradient(45deg,transparent 50%,var(--color-ink-3) 50%),linear-gradient(135deg,var(--color-ink-3) 50%,transparent 50%);background-position:calc(100% - 16px) 50%,calc(100% - 11px) 50%;background-size:5px 5px;background-repeat:no-repeat}
+.sum{font-size:13px;line-height:18px;color:var(--color-ink-3)}
+.chip{display:inline-flex;align-items:center;height:24px;padding:0 8px;border-radius:4px;font-size:12px;font-weight:500;background:var(--color-hover);color:var(--color-ink-2)}
+.chip.bug{background:color-mix(in oklab,var(--color-danger) 14%,transparent);color:var(--color-danger)}
+.stagebox{display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:var(--radius-surface);border:1px dashed var(--color-line-strong)}
+.stagehead{display:flex;align-items:center;gap:8px}
+.stagehead .input{height:var(--size-tap);font-weight:600}
+.sc{display:flex;flex-direction:column;gap:6px;padding:10px 4px 4px 12px;border-radius:var(--radius-control);background:var(--color-hover)}
+.sc .t{display:flex;gap:8px;align-items:center;padding-right:8px}
+.sc .t b{flex:1;font-weight:500;min-width:0}
+.tools{display:flex;justify-content:flex-end;gap:2px;border-top:1px solid var(--color-line);padding-top:2px}
+.tools .btn{color:var(--color-ink-2)}
+.tap-ring{outline:1px dashed color-mix(in oklab,var(--color-accent) 70%,transparent);outline-offset:-1px}
+.legend{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--color-ink-3)}
+.legend i{width:14px;height:14px;border-radius:3px;outline:1px dashed var(--color-accent);display:inline-block}
+/* desktop thumbnail */
+.desk{width:560px;height:420px;border-radius:12px;overflow:hidden;position:relative;border:1px solid var(--color-line-strong);background:var(--color-ground)}
+.desk .page{position:absolute;inset:0;padding:14px;display:flex;gap:10px;opacity:.9}
+.desk .page .rail{width:96px;border-radius:8px;background:var(--color-hover)}
+.desk .page .col{flex:1;display:flex;gap:8px}
+.desk .page .col div{flex:1;border-radius:8px;background:var(--color-hover)}
+.desk .scrim{position:absolute;inset:0;background:var(--color-scrim);backdrop-filter:blur(2px)}
+.desk .dlg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:340px;padding:16px;border-radius:var(--radius-sheet);display:flex;flex-direction:column;gap:10px}
+.desk .dlg .bar{height:8px;border-radius:4px;background:var(--color-line-strong)}
+.desk .dlg .btns{display:flex;justify-content:flex-end;gap:6px}
+.desk .dlg .btns span{height:18px;width:64px;border-radius:4px;background:var(--color-raised);border:1px solid var(--color-line-strong)}
+.desk .dlg .btns span.p{background:var(--color-accent);border:0}
+.dim{position:absolute;left:50%;top:14%;transform:translateX(-50%);font-size:11px;font-weight:600;color:var(--color-accent-ink);background:var(--color-accent-soft);padding:2px 8px;border-radius:4px}
+</style>
+</head>
+<body>
+<div class="canvas" aria-hidden="true"></div>
+<header class="board-head">
+  <div>
+    <h1 style="font-size:20px;line-height:28px;font-weight:600">New work · split and stack review at 375 × 812, and the desktop dialog</h1>
+    <p>Same full-screen shell as the question round. Below <code>lg</code>, row fields stack vertically, and the reorder and remove buttons get their own 44 px toolbar row instead of three 14 px icons crowded next to the title. The dashed outline marks a 44 px hit area.</p>
+  </div>
+  <button class="btn btn-glass" type="button" id="theme">Toggle theme</button>
+</header>
+
+<div class="stage">
+  <!-- Split -->
+  <div>
+    <div class="phone" role="img" aria-label="Split review">
+      <div class="fs" role="dialog" aria-modal="true" aria-labelledby="sa">
+        <div class="statusbar"><span>9:41</span><span>●●● ▮</span></div>
+        <div class="fs-head">
+          <h2 id="sa">New work</h2>
+          <button class="btn btn-ghost btn-icon" type="button" aria-label="Close and keep as draft"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+        </div>
+        <div class="fs-body">
+          <div>
+            <h3 style="font-size:16px;line-height:22px;font-weight:600">The planner proposes 3 cards</h3>
+            <p class="sum" style="margin-top:4px;color:var(--color-ink-2)">glass-ui needs the full-screen variant before the app can use it, and the tap-target pass is independent.</p>
+          </div>
+          <div class="seg" role="group" aria-label="Proposal shape"><button type="button" aria-pressed="true">Split</button><button type="button" aria-pressed="false">Stack</button></div>
+          <p class="muted">Independent cards: no stages, no shared design, no dependencies between them.</p>
+          <ol class="cards">
+            <li class="c">
+              <div class="c-top"><span class="n">Card 1</span><select class="select" aria-label="Kind of card 1"><option>Feature</option><option>Bug</option></select><button class="btn btn-ghost btn-icon tap-ring" type="button" aria-label="Remove card 1"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
+              <input class="input" aria-label="Title of card 1" value="Add a full-screen Dialog size to glass-ui">
+              <p class="sum">Dialog size="full" below lg: h-dvh, safe-area padding, sticky header and footer slots.</p>
+            </li>
+            <li class="c">
+              <div class="c-top"><span class="n">Card 2</span><select class="select" aria-label="Kind of card 2"><option>Feature</option><option>Bug</option></select><button class="btn btn-ghost btn-icon tap-ring" type="button" aria-label="Remove card 2"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
+              <input class="input" aria-label="Title of card 2" value="Open New work full screen on phones">
+              <p class="sum">new-card-dialog adopts the variant; the footers of the intake views move into its slot.</p>
+            </li>
+            <li class="c">
+              <div class="c-top"><span class="n">Card 3</span><select class="select" aria-label="Kind of card 3"><option>Bug</option><option>Feature</option></select><button class="btn btn-ghost btn-icon tap-ring" type="button" aria-label="Remove card 3"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
+              <input class="input" aria-label="Title of card 3" value="Fix the no-op sm:max-w-2xl override">
+              <p class="sum">The base width wins at 1440 px; the override never applies.</p>
+            </li>
+          </ol>
+        </div>
+        <div class="fs-foot">
+          <div class="row">
+            <button class="btn btn-ghost" type="button" style="padding:0 10px">Keep one card</button>
+            <button class="btn btn-solid" type="submit" style="flex:1">Create 3 cards</button>
+          </div>
+          <span class="muted" style="text-align:center">Each card goes to Ready on its own.</span>
+        </div>
+        <div class="home"></div>
+      </div>
+    </div>
+    <p class="caption"><b>Split.</b> The Split/Stack control takes the full width at 44 px. Kind and remove sit on the card's top line; the title field gets the full row. The footer is pinned: ghost Keep one card on the left, the single solid confirm.</p>
+  </div>
+
+  <!-- Stack -->
+  <div>
+    <div class="phone" role="img" aria-label="Stack review">
+      <div class="fs" role="dialog" aria-modal="true" aria-labelledby="sb">
+        <div class="statusbar"><span>9:41</span><span>●●● ▮</span></div>
+        <div class="fs-head">
+          <h2 id="sb">New work</h2>
+          <button class="btn btn-ghost btn-icon" type="button" aria-label="Close and keep as draft"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+        </div>
+        <div class="fs-body" style="gap:12px">
+          <div class="seg" role="group" aria-label="Proposal shape"><button type="button" aria-pressed="false">Split</button><button type="button" aria-pressed="true">Stack</button></div>
+          <ol class="cards" aria-label="Stages">
+            <li class="stagebox">
+              <div class="stagehead"><input class="input" aria-label="Stage 1 name" value="Stage 1 · glass-ui"></div>
+              <div class="sc">
+                <div class="t"><b>Add a full-screen Dialog size</b><span class="chip">Feature</span></div>
+                <span class="sum" style="padding-right:8px">h-dvh, safe-area padding, header and footer slots.</span>
+                <div class="tools">
+                  <button class="btn btn-icon tap-ring" type="button" aria-label="Move to previous stage" disabled><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg></button>
+                  <button class="btn btn-icon tap-ring" type="button" aria-label="Move to next stage"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+                  <button class="btn btn-icon tap-ring" type="button" aria-label="Remove card"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+                </div>
+              </div>
+            </li>
+            <li class="stagebox">
+              <div class="stagehead"><input class="input" aria-label="Stage 2 name" value="Stage 2 · AgentDock"></div>
+              <span class="muted">Waits on every card of Stage 1.</span>
+              <div class="sc">
+                <div class="t"><b>Open New work full screen on phones</b><span class="chip">Feature</span></div>
+                <div class="tools">
+                  <button class="btn btn-icon tap-ring" type="button" aria-label="Move to previous stage"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg></button>
+                  <button class="btn btn-icon tap-ring" type="button" aria-label="Move to next stage" disabled><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+                  <button class="btn btn-icon tap-ring" type="button" aria-label="Remove card"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+                </div>
+              </div>
+              <div class="sc">
+                <div class="t"><b>Fix the no-op width override</b><span class="chip bug">Bug</span></div>
+                <div class="tools">
+                  <button class="btn btn-icon tap-ring" type="button" aria-label="Move to previous stage"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg></button>
+                  <button class="btn btn-icon tap-ring" type="button" aria-label="Move to next stage" disabled><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+                  <button class="btn btn-icon tap-ring" type="button" aria-label="Remove card"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+                </div>
+              </div>
+            </li>
+          </ol>
+          <button class="btn btn-ghost" type="button" style="align-self:flex-start;padding:0 8px"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Add stage</button>
+        </div>
+        <div class="fs-foot">
+          <div class="row">
+            <button class="btn btn-ghost" type="button" style="padding:0 10px">Keep one card</button>
+            <button class="btn btn-solid" type="submit" style="flex:1">Create stack of 3</button>
+          </div>
+          <span class="muted" style="text-align:center">Every card of a stage waits on the stage before it.</span>
+        </div>
+        <div class="home"></div>
+      </div>
+    </div>
+    <p class="caption"><b>Stack.</b> Move up, move down and remove (were <code>size-3.5</code> icons in a 28 px row) become 44 × 44 targets on a tool row under each card. Disabled moves stay in place, so the row never shifts. <span class="legend"><i></i>44 px hit area</span></p>
+  </div>
+
+  <!-- Desktop -->
+  <div>
+    <div class="desk" role="img" aria-label="Desktop at 1440 px, scaled down">
+      <div class="page"><div class="rail"></div><div class="col"><div></div><div></div><div></div></div></div>
+      <div class="scrim"></div>
+      <span class="dim">min(42rem, 100vw − 2rem) · centred</span>
+      <div class="dlg glass-strong">
+        <div class="bar" style="width:30%;height:10px"></div>
+        <div class="bar" style="width:85%"></div>
+        <div class="bar" style="width:70%"></div>
+        <div class="bar" style="width:92%;height:40px;background:var(--color-hover)"></div>
+        <div class="bar" style="width:92%;height:40px;background:var(--color-hover)"></div>
+        <div class="btns"><span></span><span class="p"></span></div>
+      </div>
+    </div>
+    <p class="caption" style="max-width:560px"><b>1440 px, unchanged layout.</b> The centred glass dialog with the scrim and the 28 px desk controls. The only change: the intended 42 rem width actually applies, through a glass-ui <code>size</code> prop instead of a <code>className</code> that loses to the fixed <code>min(32rem, …)</code> base. Coarse-pointer 44 px targets apply only under <code>(pointer: coarse)</code>.</p>
+  </div>
+</div>
+<script>
+document.getElementById('theme').addEventListener('click',function(){var r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark';});
+</script>
+</body>
+</html>

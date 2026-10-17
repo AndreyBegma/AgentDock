@@ -8,6 +8,7 @@ import type {
   OrchestratorMode,
   OrchestratorPermissionMode,
 } from '@agentdock/shared/protocol';
+import { describePolicyRefusal } from '@/lib/runners/policy';
 import { ApiError, describeError, type ErrorHint } from '../api';
 import { describeBudgetExceededError } from '../budgets/format';
 import { RUNNERS_PAGE } from '../prerequisites/copy';
@@ -91,6 +92,8 @@ export const CONTROL_ERROR_SENTENCE: Record<ControlErrorCode, string> = {
     'That path or slot does not belong to this project.',
   [CONTROL_ERROR.runnerError]:
     'The runner failed to carry the command out. Check the runner’s log on its machine.',
+  [CONTROL_ERROR.policyRefused]:
+    'The runner’s local security policy refused this. Only the person on that machine can change it, with `agentdock-runner policy`.',
 };
 
 const isControlErrorCode = (
@@ -143,6 +146,14 @@ export function describeControlErrorHint(
       ...(projectId
         ? { href: orchestratorSettingsHref(projectId), cta: 'Open settings' }
         : {}),
+    };
+  }
+  if (code === CONTROL_ERROR.policyRefused) {
+    return {
+      text: describePolicyRefusal(
+        error.message,
+        CONTROL_ERROR_SENTENCE.policy_refused,
+      ),
     };
   }
   if (code === CONTROL_ERROR.runnerError) {

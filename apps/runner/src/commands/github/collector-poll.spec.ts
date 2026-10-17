@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { commandResultMessageSchema } from '@agentdock/shared/protocol';
 import { CollectorRegistry } from '../../collectors';
+import { permissivePolicy, sameRealpath } from '../../policy/testing';
 import { FakeClock } from '../../testing/fake-clock';
 import { fakeExec, memoryLogger } from '../../testing/fixtures';
 import { createDispatcher } from '../dispatcher';
@@ -64,7 +65,10 @@ describe('collector.poll', () => {
     });
     await registry.setProjects([PROJECT]);
     const dispatch = createDispatcher({
+      policy: permissivePolicy,
+      realpath: sameRealpath,
       handlers: createHandlers({
+        policy: permissivePolicy,
         clock,
         runnerVersion: '0.1.0',
         host: { hostname: 'test-host', os: 'linux', arch: 'x64' },

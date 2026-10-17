@@ -609,9 +609,13 @@ describe('projects (e2e)', () => {
         { kind: 'in_repo', localPath: '/elsewhere/docs' },
         { kind: 'in_repo' },
         { kind: 'remote_repo' },
-        { kind: 'remote_repo', repo: 'acme/docs', localPath: '/srv/docs' },
         { kind: 'none', repo: 'acme/docs' },
+        { kind: 'none', specDir: 'prs' },
         { kind: 'sibling_repo' },
+        // #379: the Spec folder stays inside the docs root.
+        { kind: 'sibling_repo', localPath: '/srv/docs', specDir: '../prs' },
+        { kind: 'sibling_repo', localPath: '/srv/docs', specDir: '/prs' },
+        { kind: 'sibling_repo', localPath: '/srv/docs', specDir: 'a/./b' },
       ];
       for (const body of bad) {
         const response = await admin.send(
@@ -641,6 +645,43 @@ describe('projects (e2e)', () => {
         where: { projectId: a.id },
       });
       expect(stored?.manual).toBe(true);
+    });
+
+    it('stores the Spec folder and a remote docs clone (#379)', async () => {
+      const a = await seedProject('/srv/a');
+      const sibling = await admin.send('put', `/projects/${a.id}/docs-source`, {
+        kind: 'sibling_repo',
+        localPath: '/srv/a-documentation',
+        repo: 'acme/a-documentation',
+        specDir: 'prs/',
+      });
+      expect(sibling.status).toBe(200);
+      expect(sibling.body.docsSource).toMatchObject({
+        kind: 'sibling_repo',
+        specDir: 'prs',
+      });
+      const remote = await admin.send('put', `/projects/${a.id}/docs-source`, {
+        kind: 'remote_repo',
+        repo: 'acme/a-documentation',
+        localPath: '/clones/a-documentation',
+        specDir: 'specs/cards',
+      });
+      expect(remote.status).toBe(200);
+      expect(remote.body.docsSource).toMatchObject({
+        kind: 'remote_repo',
+        localPath: '/clones/a-documentation',
+        specDir: 'specs/cards',
+      });
+      const cleared = await admin.send('put', `/projects/${a.id}/docs-source`, {
+        kind: 'remote_repo',
+        repo: 'acme/a-documentation',
+        specDir: null,
+      });
+      expect(cleared.status).toBe(200);
+      expect(cleared.body.docsSource).toMatchObject({
+        localPath: null,
+        specDir: null,
+      });
     });
   });
 

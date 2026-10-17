@@ -184,7 +184,7 @@ describe('filter -- <argv> (#445 D3, D4)', () => {
     expect(of('out')).toBe('out\n');
     expect(of('err')).toBe('err\n');
     expect(stats()[0]?.row).toMatchObject({
-      filter: 'none',
+      filter: 'none:uncovered',
       rawBytes: 8,
       keptBytes: 8,
       passedThrough: true,

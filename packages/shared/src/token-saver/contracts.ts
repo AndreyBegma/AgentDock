@@ -98,17 +98,43 @@ export const FILTER_STATS_MAX_ROWS = 200;
 /** `rawBytes` / `keptBytes` fit the `INTEGER` columns. */
 const byteCount = z.number().int().nonnegative().max(2_147_483_647);
 
+/** The filter id of a command no family covers — rows before amendment 12. */
+export const FILTER_ID_NONE = 'none';
+
 /**
- * A filter's id: `<family>/<command>` such as `js/jest`, or `none` when no
- * filter matched the command (it passed through).
+ * Amendment 12: why the hook left a command no filter matched. `compound`
+ * — not a single simple command (nor an amendment-11 form); `uncovered` —
+ * simple, but no family covers it; `mode` — a permission mode in which the
+ * hook never rewrites.
+ */
+export const FILTER_ID_NONE_COMPOUND = 'none:compound';
+export const FILTER_ID_NONE_UNCOVERED = 'none:uncovered';
+export const FILTER_ID_NONE_MODE = 'none:mode';
+
+const UNFILTERED_IDS: ReadonlySet<string> = new Set([
+  FILTER_ID_NONE,
+  FILTER_ID_NONE_COMPOUND,
+  FILTER_ID_NONE_UNCOVERED,
+  FILTER_ID_NONE_MODE,
+]);
+
+/** Whether a row's filter id means no filter ran: `none` or a `none:*`. */
+export const isUnfilteredId = (filter: string): boolean =>
+  UNFILTERED_IDS.has(filter);
+
+/**
+ * A filter's id: `<family>/<command>` such as `js/jest`, `none` when no
+ * filter matched the command (it passed through), or one of amendment 12's
+ * `none:*` reasons.
  */
 export const filterIdSchema = z
   .string()
   .max(64)
-  .regex(/^[a-z0-9][a-z0-9_.-]*(\/[a-z0-9][a-z0-9_.-]*)?$/);
-
-/** The filter id of a command no family covers. */
-export const FILTER_ID_NONE = 'none';
+  .refine(
+    (id) =>
+      isUnfilteredId(id) ||
+      /^[a-z0-9][a-z0-9_.-]*(\/[a-z0-9][a-z0-9_.-]*)?$/.test(id),
+  );
 
 /** One filtered command — one `token_saver_stats` row without `projectId`. */
 export const filterStatRowSchema = z

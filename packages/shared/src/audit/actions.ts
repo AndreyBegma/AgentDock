@@ -20,6 +20,11 @@ export const AUDIT_ACTIONS = [
   'runner.rename',
   'runner.revoke',
   'runner.update',
+  /**
+   * C-108: a runner's live socket was closed 4409 by a newer connection with
+   * its token — `meta` holds both peers' IP and user agent.
+   */
+  'runner.connection_replaced',
   'local.request',
   'runner.command',
   'runner.command.result',
@@ -52,6 +57,7 @@ export const AUDIT_ACTIONS = [
   'telegram.link',
   'telegram.unlink',
   'telegram.approval',
+  'telegram.project',
   'terminal.attached',
   'terminal.detached',
   'skill.installed',
@@ -184,9 +190,14 @@ export type AuditActorType = (typeof AUDIT_ACTOR_TYPES)[number];
 export const AUDIT_RESULTS = ['ok', 'denied', 'error', 'requested'] as const;
 export type AuditResult = (typeof AUDIT_RESULTS)[number];
 
-/** Why a login was refused — `meta.reason` of a denied `auth.login` (D9). */
+/**
+ * Why a login was refused — `meta.reason` of a denied `auth.login` (D9).
+ * `throttled`: the source must wait after its own failures (C-109). `locked`
+ * only appears in records written before C-109 removed the account lock.
+ */
 export const LOGIN_DENIED_REASONS = [
   'invalid_credentials',
+  'throttled',
   'locked',
   'pending_approval',
 ] as const;

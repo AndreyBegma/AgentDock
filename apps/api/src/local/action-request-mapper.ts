@@ -1,6 +1,10 @@
-import type {
-  ActionRequestKind,
-  ActionRequestSummary,
+import {
+  type ActionRequestKind,
+  type ActionRequestSummary,
+  boundPrOf,
+  type PrApproveBoundArgs,
+  prDiffUrl,
+  shortHeadSha,
 } from '@agentdock/shared';
 import type { ActionRequest } from '@prisma/client';
 
@@ -22,6 +26,11 @@ export interface ActionRequestsLiveChange {
 export interface ActionRequestView extends ActionRequestSummary {
   /** What executing it returned or why it failed; null until then. */
   result: unknown;
+  /**
+   * A `pr_approve` request's PR as `pr.inspect` read it at creation — the
+   * head an approval binds to — with its diff; null for any other kind.
+   */
+  pr: (PrApproveBoundArgs & { diffUrl: string }) | null;
 }
 
 const asArgs = (value: unknown): Record<string, unknown> =>
@@ -48,10 +57,14 @@ export const toActionRequestSummary = (
   createdAt: row.createdAt.toISOString(),
 });
 
-export const toActionRequestView = (row: ActionRequest): ActionRequestView => ({
-  ...toActionRequestSummary(row),
-  result: row.result ?? null,
-});
+export const toActionRequestView = (row: ActionRequest): ActionRequestView => {
+  const pr = boundPrOf(row);
+  return {
+    ...toActionRequestSummary(row),
+    result: row.result ?? null,
+    pr: pr ? { ...pr, diffUrl: prDiffUrl(pr) } : null,
+  };
+};
 
 const KIND_TITLE: Record<ActionRequestKind, string> = {
   tool_use: 'A session asks to use a tool',
@@ -69,9 +82,28 @@ export const actionRequestTitle = (
     return `A session asks to use ${args.toolName.slice(0, 80)}`;
   }
   if (kind === 'pr_approve' && typeof args.pr === 'number') {
-    return `A session asks to approve PR #${args.pr}`;
+    const head =
+      typeof args.headSha === 'string'
+        ? ` at ${shortHeadSha(args.headSha)}`
+        : '';
+    return `A session asks to approve PR #${args.pr}${head}`;
   }
   return KIND_TITLE[kind];
+};
+
+/**
+ * The notification's body: a `pr_approve` request's PR title and diff come
+ * first, so the person sees what the head they approve holds.
+ */
+export const actionRequestBody = (
+  kind: ActionRequestKind,
+  args: Record<string, unknown>,
+  summary: string,
+): string => {
+  const pr = boundPrOf({ kind, args });
+  return pr
+    ? `${pr.title.slice(0, 120)} · ${prDiffUrl(pr)} · ${summary}`
+    : summary;
 };
 
 /**

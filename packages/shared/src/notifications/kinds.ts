@@ -17,6 +17,11 @@ import type { Role } from '../auth';
  * `steward.incident` comes from Steward escalating an incident (issue #447
  * D13): once per incident and again on a changed reason. Its reason can be
  * haiku's reading of the pane, so it goes to operators and admins only.
+ * `runner.connection_replaced` comes from a runner's live socket being
+ * replaced by another connection with its token (C-108): possibly a stolen
+ * token, so it goes to admins on both channels.
+ * `account.throttled` comes from sign-in throttling (C-109): an account's
+ * failed password checks from one source crossed the threshold.
  */
 export const NOTIFICATION_KINDS = [
   'person.needed',
@@ -27,6 +32,7 @@ export const NOTIFICATION_KINDS = [
   'pr.awaiting_approval',
   'runner.offline',
   'runner.online',
+  'runner.connection_replaced',
   'budget.exceeded',
   'budget.threshold',
   'schedule.disabled',
@@ -36,6 +42,7 @@ export const NOTIFICATION_KINDS = [
   'card.background_stalled',
   'cards.suggested',
   'steward.incident',
+  'account.throttled',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -130,6 +137,12 @@ export const NOTIFICATION_KIND_SPECS: Record<
     channels: ['inApp'],
     defaults: ON_OFF,
   },
+  'runner.connection_replaced': {
+    scope: 'admin',
+    source: 'runner connection replaced (C-108)',
+    channels: BOTH,
+    defaults: ON_ON,
+  },
   'budget.exceeded': {
     scope: 'project',
     source: 'budgets (100 %)',
@@ -190,6 +203,12 @@ export const NOTIFICATION_KIND_SPECS: Record<
     defaults: ON_ON,
     viewerDefaults: { inApp: false, telegram: false },
     operatorsOnly: true,
+  },
+  'account.throttled': {
+    scope: 'admin',
+    source: 'sign-in throttling (C-109)',
+    channels: BOTH,
+    defaults: ON_ON,
   },
 };
 

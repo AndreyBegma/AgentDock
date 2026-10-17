@@ -13,6 +13,18 @@
     monospace;
 }
 
+/* #526: where a docked action sits on a phone. `--keyboard-inset` is what the
+   soft keyboard covers (the shell sets it); a dock rides on it, and above the
+   tab bar, which the shell hides while the keyboard is up. */
+:root {
+  --keyboard-inset: 0px;
+  --dock-bottom: calc(3.5rem + env(safe-area-inset-bottom));
+}
+
+:root[data-keyboard="open"] {
+  --dock-bottom: var(--keyboard-inset);
+}
+
 /* A figure in a column (issue #159, R3): tabular numerals, and right-aligned
    when it is a table cell, so digits line up and do not jitter on update. */
 @layer utilities {

@@ -9,9 +9,11 @@ import type {
 } from '@agentdock/shared';
 import { BudgetGate } from '../budgets/budget-gate';
 import { capabilities } from '../runners/testing/runner-e2e';
+import { PlanDocsSink } from './plan-docs-sink';
 import {
   block,
   decomposed,
+  ok,
   PlannerHarness,
   question,
   ROOT,
@@ -333,6 +335,92 @@ describe('planner (e2e)', () => {
       expect(after.tasks.find((t) => t.key === 't1')?.issue?.liveStatus).toBe(
         'queued',
       );
+    });
+
+    describe('docs_pr with an external docs repository (#379)', () => {
+      const DOCS = '/srv/dev/widget-documentation';
+      const docsSource = (localPath: string | null) =>
+        h.ctx.prisma.docsSource.create({
+          data: {
+            projectId: h.projectId,
+            kind: localPath ? 'sibling_repo' : 'remote_repo',
+            localPath,
+            repo: 'acme/widget-documentation',
+            isGitRepo: true,
+            evidence: [],
+            classified: { specs: [], adr: [], roadmap: [], reports: [] },
+            candidates: [],
+            specDir: 'prs',
+          },
+        });
+
+      it('opens the docs pull request in the docs repository and queues features when it merges', async () => {
+        await docsSource(DOCS);
+        const created = await threeTasks();
+        await talkThroughT2(created.id);
+        await review(created.id, 't1', 'approve');
+        await review(created.id, 't2', 'approve');
+        await review(created.id, 't3', 'reject');
+        const settings = (
+          await h.author.get(`/projects/${h.projectId}/planner/settings`)
+        ).body as PlannerSettingsView;
+        expect(settings.specOutput).toBe('docs_pr');
+
+        const sent = await h.author.send('post', `${h.base(created.id)}/send`);
+        expect(sent.status).toBe(200);
+        const issues = h.sentOf('issue.create');
+        expect(issues[0].body).toContain(
+          '`prs/<this issue>-task-t1.md` in the docs repository acme/widget-documentation',
+        );
+        expect(h.sentOf('plan.publish_specs')).toEqual([]);
+        const [publish] = h.sentOf('docs.publish_specs');
+        expect(publish).toMatchObject({
+          projectId: h.projectId,
+          docsRoot: DOCS,
+          specDir: 'prs',
+          files: [{ path: 'prs/101-task-t1.md' }],
+          body: expect.stringContaining('acme/widget#101') as string,
+        });
+        expect(sent.body as PlanDetail).toMatchObject({
+          docsPrNumber: 3,
+          docsPrRepo: 'acme/widget-documentation',
+        });
+
+        // A PR #3 of the code repository is not the docs PR.
+        await h.sinks.dispatch(h.runnerId, [
+          h.event('pr.closed', { number: 3, branch: 'x', merged: true }),
+        ]);
+        expect(h.sentOf('plan.queue_issues')).toHaveLength(1);
+
+        const sink = h.ctx.app.get(PlanDocsSink);
+        await sink.pollDocsPrs();
+        expect(h.sentOf('plan.queue_issues')).toHaveLength(1);
+        h.handlers['docs.pr_state'] = () => ok({ state: 'merged' });
+        await sink.pollDocsPrs();
+        expect(h.sentOf('docs.pr_state').at(-1)).toMatchObject({
+          docsRoot: DOCS,
+          pr: 3,
+        });
+        expect(h.sentOf('plan.queue_issues')[1]).toEqual({
+          projectId: h.projectId,
+          numbers: [101],
+          readyLabel: 'cs:ready',
+        });
+      });
+
+      it('refuses docs_pr for a remote docs repository without a local clone', async () => {
+        await docsSource(null);
+        const refused = await h.admin.send(
+          'put',
+          `/projects/${h.projectId}/planner/settings`,
+          { specOutput: 'docs_pr' },
+        );
+        expect(refused.status).toBe(422);
+        expect(refused.body).toMatchObject({
+          error: 'no_docs_clone',
+          message: expect.stringContaining('local clone') as string,
+        });
+      });
     });
 
     it('refuses send with dependency_cycle and names the tasks', async () => {

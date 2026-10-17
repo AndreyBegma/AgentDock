@@ -127,6 +127,13 @@ export class DocsSourceOverrideDto implements DocsSourceOverrideRequest {
   @IsString()
   @Matches(REPO_NAME, { message: 'repo must be owner/name' })
   repo?: string;
+
+  /** #379: the Spec folder, relative to the docs root; checked by the service. */
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(256)
+  specDir?: string | null;
 }
 
 export class AddProjectMemberDto implements AddProjectMemberRequest {
