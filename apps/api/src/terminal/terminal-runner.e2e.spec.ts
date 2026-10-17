@@ -190,6 +190,32 @@ describe('terminal relay through the runner socket (e2e)', () => {
     );
   });
 
+  it('a read attach asks the runner for history and gets its chunks back (#522)', async () => {
+    const { r, b, id } = await attached('read');
+    b.socket.send(JSON.stringify({ type: 'history' }));
+    expect(await r.next('terminal.history.request')).toEqual({
+      type: 'terminal.history.request',
+      id,
+    });
+    r.send({
+      type: 'terminal.history',
+      id,
+      lines: ['\u001b[31mred 1'],
+      last: false,
+    });
+    expect(await b.frame('history')).toEqual({
+      type: 'history',
+      lines: ['\u001b[31mred 1'],
+      last: false,
+    });
+    r.send({ type: 'terminal.history', id, lines: ['red 2'], last: true });
+    await waitFor(() =>
+      b.frames.some(
+        (f) => f.type === 'history' && f.last && f.lines[0] === 'red 2',
+      ),
+    );
+  });
+
   it('closing the browser socket detaches on the runner', async () => {
     const { r, b, id } = await attached('read');
     b.socket.close();

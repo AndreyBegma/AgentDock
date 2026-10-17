@@ -645,6 +645,32 @@ describe('terminal attach (e2e)', () => {
       expect(Buffer.concat(socket.data).toString()).toBe('$ ');
     });
 
+    it('a read attach asks for history, gets its chunks as text frames, and an extra field is refused (#522)', async () => {
+      const socket = connect(await issued());
+      const attached = await socket.frame('attached');
+      socket.socket.send(JSON.stringify({ type: 'history' }));
+      await eventually(() =>
+        port.sent.some((m) => m.type === 'terminal.history.request'),
+      );
+      expect(
+        port.sent.filter((m) => m.type === 'terminal.history.request'),
+      ).toEqual([{ type: 'terminal.history.request', id: attached.id }]);
+      ctx.app.get(TerminalRelay).fromRunner(runnerId, {
+        type: 'terminal.history',
+        id: attached.id,
+        lines: ['\u001b[31mred 1', 'red 2'],
+        last: true,
+      });
+      expect(await socket.frame('history')).toEqual({
+        type: 'history',
+        lines: ['\u001b[31mred 1', 'red 2'],
+        last: true,
+      });
+
+      socket.socket.send(JSON.stringify({ type: 'history', session: 'cs-i7' }));
+      expect((await socket.closed).code).toBe(1008);
+    });
+
     it('forwards write input, and a second write attach to the target is busy', async () => {
       const socket = connect(await issued(admin, writeSlot()));
       const attached = await socket.frame('attached');

@@ -3,6 +3,7 @@ import {
   type TerminalServerFrame,
 } from '@agentdock/shared';
 import {
+  TERMINAL_HISTORY_TIMEOUT_MS,
   TERMINAL_MAX_DATA_BYTES,
   type TerminalAttachArgs,
   type TerminalMode,
@@ -378,6 +379,94 @@ describe('TerminalRelay', () => {
       expect(runner.of('terminal.resize')).toEqual([
         { type: 'terminal.resize', id: attach.id, cols: 120, rows: 40 },
       ]);
+    });
+  });
+
+  describe('history (#522)', () => {
+    const chunk = (id: string, lines: string[], last: boolean) =>
+      ({ type: 'terminal.history', id, lines, last }) as const;
+
+    it('a read attach may ask: the request names the attach only, and is not input', async () => {
+      const { attach } = await open('read');
+      if (!attach) throw new Error('no attach');
+      relay.history(attach);
+      expect(runner.of('terminal.history.request')).toEqual([
+        { type: 'terminal.history.request', id: attach.id },
+      ]);
+      expect(runner.of('terminal.data')).toEqual([]);
+      expect(attach.bytesIn).toBe(0);
+      expect(attach.droppedIn).toBe(0);
+    });
+
+    it('relays the chunks to the browser that asked, colours as they are', async () => {
+      const { attach, browser } = await open('write');
+      if (!attach) throw new Error('no attach');
+      relay.history(attach);
+      relay.fromRunner('r1', chunk(attach.id, ['\u001b[31mred 1'], false));
+      relay.fromRunner('r1', chunk(attach.id, ['red 2'], true));
+      expect(browser.frames.filter((f) => f.type === 'history')).toEqual([
+        { type: 'history', lines: ['\u001b[31mred 1'], last: false },
+        { type: 'history', lines: ['red 2'], last: true },
+      ]);
+      expect(browser.data).toEqual([]);
+      expect(attach.bytesOut).toBe(0);
+    });
+
+    it('relays to that attach only: not another viewer, not from another runner, not unasked', async () => {
+      const first = await open('read');
+      const other = await open('read', { id: 'u2', email: 'bo@example.com' });
+      if (!first.attach || !other.attach) throw new Error('no attach');
+      relay.fromRunner('r1', chunk(first.attach.id, ['unasked'], true));
+      relay.history(first.attach);
+      relay.fromRunner('r2', chunk(first.attach.id, ['other runner'], true));
+      relay.fromRunner('r1', chunk(first.attach.id, ['asked'], true));
+      relay.fromRunner('r1', chunk(first.attach.id, ['late'], true));
+      expect(first.browser.frames.filter((f) => f.type === 'history')).toEqual([
+        { type: 'history', lines: ['asked'], last: true },
+      ]);
+      expect(other.browser.frames.filter((f) => f.type === 'history')).toEqual(
+        [],
+      );
+    });
+
+    it('asks once at a time, again after the answer or the timeout', async () => {
+      const { attach } = await open('read');
+      if (!attach) throw new Error('no attach');
+      relay.history(attach);
+      relay.history(attach);
+      expect(runner.of('terminal.history.request')).toHaveLength(1);
+      relay.fromRunner('r1', chunk(attach.id, [], true));
+      relay.history(attach);
+      expect(runner.of('terminal.history.request')).toHaveLength(2);
+      // No answer: refused until the timeout, without running the idle timer.
+      jest.setSystemTime(Date.now() + TERMINAL_HISTORY_TIMEOUT_MS - 1);
+      relay.history(attach);
+      expect(runner.of('terminal.history.request')).toHaveLength(2);
+      jest.setSystemTime(Date.now() + 1);
+      relay.history(attach);
+      expect(runner.of('terminal.history.request')).toHaveLength(3);
+    });
+
+    it('does not ask before the runner attached or after the end', async () => {
+      runner.auto = null;
+      const { attach } = await open('read');
+      if (!attach) throw new Error('no attach');
+      relay.history(attach);
+      expect(runner.of('terminal.history.request')).toEqual([]);
+      runner.answer({ status: 'ok', session: 'cs-i42' });
+      await flush();
+      await relay.detach(attach);
+      relay.history(attach);
+      expect(runner.of('terminal.history.request')).toEqual([]);
+    });
+
+    it('does not keep a write attach from idling: asking is not input', async () => {
+      const { attach, browser } = await open('write');
+      if (!attach) throw new Error('no attach');
+      jest.advanceTimersByTime(IDLE_MS / 2);
+      relay.history(attach);
+      await jest.advanceTimersByTimeAsync(IDLE_MS / 2 + 1);
+      expect(browser.frames.at(-1)).toEqual({ type: 'closed', reason: 'idle' });
     });
   });
 
