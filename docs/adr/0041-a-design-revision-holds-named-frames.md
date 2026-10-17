@@ -28,7 +28,9 @@ one document or leave part of it undrawn.
    one frame named "Mockup"; its comments sit on frame 0.
 4. **A comment is left on a frame**, and the frame's name travels with it to
    the next Revise turn and into the approved design's decisions.
-5. **Revise and Approve act on the whole revision.** Revise redraws every frame
+5. **Revise and Approve act on the whole revision.** (Amended by
+   [ADR-0061](0061-a-design-revise-sends-only-the-frames-it-changes.md): Revise
+   draws only the frames it changes and keeps the rest.) Revise redraws every frame
    of the variant; Approve approves the variant with all its frames, and
    publication commits each as `design/<variant>/<frame-slug>.html` — in the
    card's branch or the plan's docs pull request — and lists every one in the
