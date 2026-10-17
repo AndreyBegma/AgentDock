@@ -48,8 +48,10 @@ import {
 } from '../runners/install';
 import { noPrText } from './pull-request';
 
+// #624: the dialog that blocks a waiting round, as notifications say it too.
 // #578: the review actions' rules, shared with the bot too.
 export {
+  blockingDialogText,
   canAccept,
   canGiveFeedback,
   canMarkFinished,

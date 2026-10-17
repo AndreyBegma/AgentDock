@@ -1,3 +1,4 @@
+import type { PaneDialog } from '../protocol';
 import { PLAN_TASK_MOVE_REFUSAL_TEXT } from '../work/contracts';
 import {
   BOARD_ERROR,
@@ -86,6 +87,23 @@ export const ROUND_PHASE_LABEL: Record<CardRoundPhase, string> = {
   failed: 'Failed',
   cancelled: 'Stopped',
 };
+
+/**
+ * #624: the Claude Code dialog that blocks a waiting round's session, as a
+ * person reads it — the Board, notifications and Telegram say the same.
+ */
+export const BLOCKING_DIALOG_TEXT: Record<PaneDialog, string> = {
+  trust: 'Claude Code’s workspace trust dialog',
+  settings:
+    'Claude Code’s workspace trust dialog (the folder pre-approves tool permissions)',
+  bypass: 'Claude Code’s Bypass Permissions warning',
+  credits: 'Claude Code’s usage credits notice',
+  other: 'A Claude Code dialog',
+};
+
+/** #624: why a round blocked by `dialog` waits, and what to do. */
+export const blockingDialogText = (dialog: PaneDialog): string =>
+  `${BLOCKING_DIALOG_TEXT[dialog]} blocks the worker’s session. Open its terminal and answer it.`;
 
 export const COLUMN_TITLE: Record<BoardColumn, string> = {
   inbox: 'Inbox',

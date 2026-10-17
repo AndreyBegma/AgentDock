@@ -3253,6 +3253,9 @@ model BoardCardRound {
   /// `card_run.finish_refused`; the round needs attention while it is active.
   finishRefusedCode   String?
   finishRefusedAt     DateTime?
+  /// #624: the Claude Code dialog (shared `paneDialogSchema`) that blocks
+  /// the round's session, from `card_run.dialog`; cleared when it runs again.
+  blockingDialog      String?
   finishedAt          DateTime?
   endedAt             DateTime?
   /// #542: the card PR's head when the round started (`ciHeadSha`); `null`

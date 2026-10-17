@@ -63,13 +63,13 @@ import { cardLaunchSpec, cardTokenSaver, cardWorktreePath } from './launch';
 import { type PushStep, pushCardHead } from './push';
 import { matchQuestion, readQuestion } from './question';
 import { type CardRecord, CardStore } from './record';
-import { trustWorktree } from './trust';
 import {
   heldDetail,
   type TrailerCommit,
   TrailerHeld,
   trailerMessage,
 } from './trailer-guard';
+import { trustWorktree } from './trust';
 import { type CardWiring, wireCardRound } from './wiring';
 
 export interface CardExecutorOptions {
@@ -151,7 +151,9 @@ const pushStateOf = (
 const blockingDialogOf = (pane: string): PaneDialog | null => {
   const { signal } = readPane(pane);
   if (signal?.kind !== 'dialog' || signal.dialogId !== undefined) return null;
-  return DIALOG_PATTERNS.find(([pattern]) => pattern.test(pane))?.[1] ?? 'other';
+  return (
+    DIALOG_PATTERNS.find(([pattern]) => pattern.test(pane))?.[1] ?? 'other'
+  );
 };
 
 /** An event's `error`: one line, at most 500 characters, no stack. */

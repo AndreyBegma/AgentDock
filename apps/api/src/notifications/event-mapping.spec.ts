@@ -272,6 +272,35 @@ describe('draftFor (spec 22 D1)', () => {
       });
     });
 
+    it('maps card.waiting on a dialog that blocks the session (#624)', () => {
+      expect(
+        draftFor(
+          card('card.waiting', {
+            number: 4,
+            title: 'Add login',
+            reason: 'dialog',
+            dialog: 'trust',
+          }),
+        ),
+      ).toMatchObject({
+        kind: 'card.waiting',
+        body: 'Claude Code’s workspace trust dialog blocks the worker’s session. Open its terminal and answer it.',
+        card: 4,
+      });
+      expect(
+        draftFor(
+          card('card.waiting', {
+            number: 4,
+            title: 'Add login',
+            reason: 'dialog',
+            dialog: 'nonsense',
+          }),
+        )?.body,
+      ).toBe(
+        'A Claude Code dialog blocks the worker’s session. Open its terminal and answer it.',
+      );
+    });
+
     it('maps card.background_stalled without the title or the command (#390)', () => {
       const draft = draftFor(
         card('card.background_stalled', {
