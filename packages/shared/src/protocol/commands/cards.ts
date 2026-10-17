@@ -296,6 +296,11 @@ export const cardCollectResultSchema = z
      * read as `open`.
      */
     prState: cardCollectPrStateSchema.optional(),
+    /**
+     * C-127: the files a terminal card's collect committed (its own checkout
+     * stages tracked changes only). Absent for a worktree collect.
+     */
+    staged: z.array(z.string()).optional(),
   })
   .refine((r) => (r.prNumber === undefined) === (r.prUrl === undefined), {
     message: 'prNumber and prUrl go together',
