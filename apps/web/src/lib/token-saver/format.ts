@@ -1,5 +1,8 @@
 import {
   FILTER_ID_NONE,
+  FILTER_ID_NONE_COMPOUND,
+  FILTER_ID_NONE_MODE,
+  FILTER_ID_NONE_UNCOVERED,
   type ProjectRuntimeProfile,
   type TokenSavedView,
   type TokenSaverRunKind,
@@ -23,9 +26,20 @@ export const RUN_KIND_LABEL: Record<TokenSaverRunKind, string> = {
 export const runKindLabel = (kind: TokenSaverRunKind): string =>
   RUN_KIND_LABEL[kind] ?? kind;
 
-/** A filter id as a person reads it; `none` is a command no family covers. */
+/**
+ * Amendment 12: why no filter ran, as a person reads it. `none` is a row from
+ * before the reasons were recorded.
+ */
+const UNFILTERED_LABEL: Record<string, string> = {
+  [FILTER_ID_NONE]: 'No filter (uncovered command)',
+  [FILTER_ID_NONE_COMPOUND]: 'Compound command (not filtered)',
+  [FILTER_ID_NONE_UNCOVERED]: 'No filter for this command',
+  [FILTER_ID_NONE_MODE]: 'Not filtered in this permission mode',
+};
+
+/** A filter id as a person reads it. */
 export const filterLabel = (filter: string): string =>
-  filter === FILTER_ID_NONE ? 'No filter (uncovered command)' : filter;
+  UNFILTERED_LABEL[filter] ?? filter;
 
 /** The estimate's dollars, always with "≈" (D12): `≈ $0.41`, `≈ <$0.01`. */
 export function formatSavedUsd(usd: number): string {
