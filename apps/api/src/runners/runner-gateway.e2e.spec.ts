@@ -568,6 +568,36 @@ describe('/runner gateway (e2e)', () => {
       expect(await socket.next('ack')).toEqual({ type: 'ack', seq: 104 });
     });
 
+    it('C-137: refuses a 300 KiB batch and closes with a protocol error', async () => {
+      const { runnerId, token } = await pairedRunner(ctx, admin);
+      const socket = open(token);
+      await socket.connect();
+      socket.send({
+        type: 'events',
+        events: [event(1, { data: { blob: 'x'.repeat(300 * 1024) } })],
+      });
+      expect((await socket.closed).code).toBe(1002);
+      expect(await ctx.prisma.event.count({ where: { runnerId } })).toBe(0);
+    });
+
+    it('C-137 L-06: two runners with the same project root both store their plugin events', async () => {
+      const first = await pairedRunner(ctx, admin, 'one');
+      const second = await pairedRunner(ctx, admin, 'two');
+      const plugin = (seq: number) =>
+        event(seq, { data: { pluginEventId: 'eid-1', n: seq } });
+      for (const { token } of [first, second]) {
+        const socket = open(token);
+        await socket.connect();
+        socket.send({ type: 'events', events: [plugin(1)] });
+        expect(await socket.next('ack')).toEqual({ type: 'ack', seq: 1 });
+      }
+      for (const { runnerId } of [first, second]) {
+        const rows = await ctx.prisma.event.findMany({ where: { runnerId } });
+        expect(rows.map((r) => r.type)).toEqual(['slot.checkpoint']);
+        expect(rows[0].pluginEventId).toBe('eid-1');
+      }
+    });
+
     it('drops an invalid message and keeps the socket', async () => {
       const { token } = await pairedRunner(ctx, admin);
       const socket = open(token);

@@ -17,6 +17,11 @@ import { advanceCursor, type SeqRange } from './ack-cursor';
 import { tokenPrefix, verifyRunnerToken } from './credentials';
 import { RunnerEventSinks } from './runner-event-sinks';
 
+/** C-137: how far past the cursor, in seqs and rows, one `advanceAck` read looks. */
+const ACK_WINDOW_SEQS = 5_000n;
+const ACK_READ_LIMIT = 5_000;
+const ACK_READ_ROUNDS = 8;
+
 const json = (
   value: unknown,
 ): Prisma.InputJsonValue | typeof Prisma.JsonNull =>
@@ -194,7 +199,10 @@ export class RunnerIngestService {
    * before anything is stored: the ack holds and the runner resends it.
    */
   async events(runnerId: string, events: RunnerEvent[]): Promise<bigint> {
-    const { fresh, duplicate } = await this.splitPluginDuplicates(events);
+    const { fresh, duplicate } = await this.splitPluginDuplicates(
+      runnerId,
+      events,
+    );
     if (fresh.length > 0) await this.sinks.dispatch(runnerId, fresh);
     // ADR-0021: the sinks read hook content; `events.data` never holds it.
     // #449 DA-12: nor a handoff note's text.
@@ -236,11 +244,14 @@ export class RunnerIngestService {
 
   /**
    * Code Sentinel events the API already has — stored, or earlier in this
-   * batch — by `(project root, data.pluginEventId)` (spec 16 D5). A re-read of
+   * batch — by `(runner, project root, data.pluginEventId)` (spec 16 D5, C-137). A re-read of
    * `events.jsonl` from offset 0 gives them new seqs; without this they would
    * be projected again.
    */
-  private async splitPluginDuplicates(events: RunnerEvent[]): Promise<{
+  private async splitPluginDuplicates(
+    runnerId: string,
+    events: RunnerEvent[],
+  ): Promise<{
     fresh: RunnerEvent[];
     duplicate: { event: RunnerEvent; pluginEventId: string }[];
   }> {
@@ -257,6 +268,7 @@ export class RunnerIngestService {
     const stored = await this.prisma.event.findMany({
       where: {
         OR: [...ids].map(([projectRoot, set]) => ({
+          runnerId,
           projectRoot,
           pluginEventId: { in: [...set] },
         })),
@@ -290,22 +302,40 @@ export class RunnerIngestService {
       where: { id: runnerId },
       select: { ackedSeq: true },
     });
-    const above = { runnerId, seq: { gt: ackedSeq } };
-    const [stored, truncations] = await Promise.all([
-      this.prisma.event.findMany({ where: above, select: { seq: true } }),
-      this.prisma.event.findMany({
-        where: { ...above, type: SPOOL_TRUNCATED_EVENT, source: 'runner' },
-        select: { data: true },
-      }),
-    ]);
-    const filled: SeqRange[] = stored.map(({ seq }) => [seq, seq]);
-    for (const { data } of truncations) {
-      const range = spoolTruncatedDataSchema.safeParse(data);
-      if (range.success) {
-        filled.push([BigInt(range.data.fromSeq), BigInt(range.data.toSeq)]);
+    // Bounded (C-137): each read covers a window of seqs and at most
+    // `ACK_READ_LIMIT` rows, and only a few windows are walked, so a runner
+    // that stored a long run of events cannot make one batch load them all;
+    // the next batch continues from the cursor.
+    let next = ackedSeq;
+    for (let round = 0; round < ACK_READ_ROUNDS; round += 1) {
+      const above = {
+        runnerId,
+        seq: { gt: next, lte: next + ACK_WINDOW_SEQS },
+      };
+      const [stored, truncations] = await Promise.all([
+        this.prisma.event.findMany({
+          where: above,
+          select: { seq: true },
+          orderBy: { seq: 'asc' },
+          take: ACK_READ_LIMIT,
+        }),
+        this.prisma.event.findMany({
+          where: { ...above, type: SPOOL_TRUNCATED_EVENT, source: 'runner' },
+          select: { data: true },
+          take: ACK_READ_LIMIT,
+        }),
+      ]);
+      const filled: SeqRange[] = stored.map(({ seq }) => [seq, seq]);
+      for (const { data } of truncations) {
+        const range = spoolTruncatedDataSchema.safeParse(data);
+        if (range.success) {
+          filled.push([BigInt(range.data.fromSeq), BigInt(range.data.toSeq)]);
+        }
       }
+      const advanced = advanceCursor(next, filled);
+      if (advanced === next) break;
+      next = advanced;
     }
-    const next = advanceCursor(ackedSeq, filled);
     if (next === ackedSeq) return ackedSeq;
     // GREATEST: a replaced connection finishing late never moves it back.
     const rows = await this.prisma.$queryRaw<{ ackedSeq: bigint }[]>`

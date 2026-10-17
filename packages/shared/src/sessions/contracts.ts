@@ -170,6 +170,8 @@ export interface SessionTreeNode {
     tools: SessionToolNode[];
   };
   subagents: SessionTreeNode[];
+  /** Subagents below this node were left out: the tree is capped at 64 levels (C-137). */
+  truncated?: boolean;
   totals: SessionTotals;
 }
 

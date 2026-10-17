@@ -1,4 +1,5 @@
 import {
+  LOCAL_MAX_CONCURRENT_PER_RUNNER,
   LOCAL_REQUEST_TIMEOUT_MS,
   type LocalErrorCode,
   type LocalRequestMessage,
@@ -36,12 +37,15 @@ export const localFailure = (
 /**
  * Where the gateway hands `local.request` frames. Never throws: every frame
  * gets exactly one `local.response`, at the latest after
- * `LOCAL_REQUEST_TIMEOUT_MS` (`timeout`), the daemon's own deadline too.
+ * `LOCAL_REQUEST_TIMEOUT_MS` (`timeout`), the daemon's own deadline too. A
+ * runner with `LOCAL_MAX_CONCURRENT_PER_RUNNER` requests in flight gets `busy`.
  */
 @Injectable()
 export class RunnerLocalRequests {
   private readonly logger = new Logger(RunnerLocalRequests.name);
   private handler: LocalRequestHandler | null = null;
+  /** Requests in flight per runner (C-137). */
+  private readonly inFlight = new Map<string, number>();
 
   /** The deadline; a field so tests can shorten it. */
   timeoutMs = LOCAL_REQUEST_TIMEOUT_MS;
@@ -58,6 +62,11 @@ export class RunnerLocalRequests {
     if (!handler) {
       return localFailure(request.id, 'internal', 'local requests are off');
     }
+    const running = this.inFlight.get(runnerId) ?? 0;
+    if (running >= LOCAL_MAX_CONCURRENT_PER_RUNNER) {
+      return localFailure(request.id, 'busy', 'too many requests in flight');
+    }
+    this.inFlight.set(runnerId, running + 1);
     let timer: NodeJS.Timeout | undefined;
     const timeout = new Promise<LocalResponseMessage>((resolve) => {
       timer = setTimeout(
@@ -83,6 +92,9 @@ export class RunnerLocalRequests {
       ]);
     } finally {
       clearTimeout(timer);
+      const left = (this.inFlight.get(runnerId) ?? 1) - 1;
+      if (left > 0) this.inFlight.set(runnerId, left);
+      else this.inFlight.delete(runnerId);
     }
   }
 }

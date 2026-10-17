@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import {
   buildSessionTree,
+  MAX_SESSION_TREE_DEPTH,
   type RequestRow,
   type SessionRow,
   type ToolRow,
@@ -128,5 +129,39 @@ describe('buildSessionTree', () => {
         tools: [],
       }),
     ).toBeNull();
+  });
+
+  it('C-137: a 1000-deep chain returns 64 levels with a cut marker', () => {
+    const ids = Array.from({ length: 1000 }, (_, i) => `s${i}`);
+    const tree = buildSessionTree('s0', {
+      sessions: ids.map((id, i) => session(id, i === 0 ? null : ids[i - 1])),
+      turns: [],
+      requests: [],
+      tools: [],
+    });
+    let levels = 0;
+    let node = tree;
+    let last = tree;
+    while (node) {
+      levels += 1;
+      last = node;
+      node = node.subagents[0] ?? null;
+    }
+    expect(levels).toBe(MAX_SESSION_TREE_DEPTH);
+    expect(MAX_SESSION_TREE_DEPTH).toBe(64);
+    expect(last?.truncated).toBe(true);
+    expect(tree?.truncated).toBeUndefined();
+  });
+
+  it('C-137: a chain of exactly 64 levels is not cut', () => {
+    const ids = Array.from({ length: 64 }, (_, i) => `s${i}`);
+    const tree = buildSessionTree('s0', {
+      sessions: ids.map((id, i) => session(id, i === 0 ? null : ids[i - 1])),
+      turns: [],
+      requests: [],
+      tools: [],
+    });
+    expect(tree?.session.subagents).toBe(63);
+    expect(JSON.stringify(tree)).not.toContain('"truncated"');
   });
 });
