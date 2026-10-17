@@ -84,6 +84,14 @@ export class PlanCardsService {
         'A card intake makes its card itself',
       );
     }
+    // #590: a discussion's cards come through New work only.
+    if (plan.mode === 'discuss') {
+      throw plannerError(
+        409,
+        PLANNER_ERROR.wrongMode,
+        'A discussion makes no cards; Make a card opens New work',
+      );
+    }
     if (plan.status === 'done') throw this.cardsExist();
     this.store.assertOpen(plan);
     if (plan.status !== 'reviewing') {
@@ -181,7 +189,7 @@ export class PlanCardsService {
    * #409: Confirm a split — the cards the person kept, in their order, with
    * the title and kind they left and the model's body. #480 (ADR-0044): with
    * `stack`, in stage order, the stack's title, body, design switch and
-   * stages beside them, whichever the intake proposed. #592 (ADR-0056): they
+   * stages beside them, whichever the intake proposed. #592 (ADR-0057): they
    * become candidates, not cards — the person accepts or rejects each in
    * Drafts, and the intake is `reviewing` until none is pending.
    */

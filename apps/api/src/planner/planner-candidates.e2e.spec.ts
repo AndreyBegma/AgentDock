@@ -7,7 +7,7 @@ import { block, PlannerHarness } from './testing/planner-e2e';
 
 /**
  * #592 (docs/specs/592-make-new-work-cards-candidates-the-perso.md,
- * ADR-0056): New work writes candidates; the person edits, rejects or
+ * ADR-0057): New work writes candidates; the person edits, rejects or
  * accepts them — alone, as independent cards, or as one stack — and only
  * Accept makes board cards.
  */

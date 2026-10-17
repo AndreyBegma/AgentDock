@@ -38,7 +38,7 @@ export type IntakePhase =
   | { kind: 'round'; round: number; maxRounds: number }
   /** #409: the intake proposes several cards; the person confirms or declines. */
   | { kind: 'split'; split: PlanIntakeSplitView }
-  /** #592 (ADR-0056): the cards wait in Drafts as candidates to accept or reject. */
+  /** #592 (ADR-0057): the cards wait in Drafts as candidates to accept or reject. */
   | { kind: 'review'; candidates: PlanCandidateView[] }
   /** The cards exist; `cards` are those the board shows so far. */
   | { kind: 'done'; cards: BoardCardView[] }

@@ -1,4 +1,4 @@
-# ADR-0056: New work cards are candidates until the person accepts them
+# ADR-0057: New work cards are candidates until the person accepts them
 
 Status: accepted · Date: 2026-10-17 · Amends [ADR-0037](0037-new-work-is-one-intake-that-can-split.md) §3, §4,
 [ADR-0044](0044-stacks-staged-cards-under-one-shared-design.md) §3 ·

@@ -4,6 +4,7 @@ import {
   type ClarifyOutput,
   type DecomposeOutput,
   type DesignOutput,
+  type DiscussOutput,
   type GrillOutput,
   type IntakeOutput,
   isIntakeCard,
@@ -376,6 +377,11 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
         tx,
       );
       if (!settled) return false;
+      if (parsed.output.action === 'discuss') {
+        // #590: the reply is the stored output; only a new title is applied.
+        await this.retitleDiscussion(tx, turn.planId, parsed.output);
+        return true;
+      }
       if (parsed.output.action === 'intake') {
         // #337 D4: a round waits for the person; #592: the card is a candidate.
         if (isIntakeCard(parsed.output)) {
@@ -533,7 +539,7 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
   }
 
   /**
-   * #337 D6, #592 (ADR-0056): the intake's card, as a candidate the person
+   * #337 D6, #592 (ADR-0057): the intake's card, as a candidate the person
    * accepts or rejects in Drafts; the intake is `reviewing`. Nothing when
    * the intake was closed meanwhile.
    */
@@ -551,6 +557,23 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
       [{ title: draft.title, body: draft.body, kind: draft.kind }],
       null,
     );
+  }
+
+  /**
+   * #590: a discussion turn that names the discussion retitles it; the
+   * reply and the proposals stay in the turn's output. Nothing when the
+   * discussion was discarded meanwhile.
+   */
+  private async retitleDiscussion(
+    tx: Tx,
+    planId: string,
+    output: DiscussOutput,
+  ): Promise<void> {
+    if (!output.title) return;
+    await tx.plan.updateMany({
+      where: { id: planId, mode: 'discuss', status: 'clarifying' },
+      data: { title: output.title },
+    });
   }
 
   /** Validates against the contract with what only the API knows (D17). */
@@ -585,6 +608,7 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
         });
       case 'clarify':
       case 'decompose':
+      case 'discuss':
         return parsePlannerOutput(body, action, { contractVersion });
       case 'grill':
         return parsePlannerOutput(body, 'grill', {
@@ -632,11 +656,19 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
       | WriteOutput
       | ReviseOutput
       | DesignOutput
-      | IntakeOutput,
+      | IntakeOutput
+      | DiscussOutput,
   ): Promise<Chain | null> {
     // A design turn is applied by `applyDesignOutput`, an intake by
-    // `writeCard`, before this is reached.
-    if (output.action === 'design' || output.action === 'intake') return null;
+    // `writeCard`, a discussion turn by `retitleDiscussion`, before this is
+    // reached.
+    if (
+      output.action === 'design' ||
+      output.action === 'intake' ||
+      output.action === 'discuss'
+    ) {
+      return null;
+    }
     // The turn may have been started on an older row; read the plan now.
     const plan = await tx.plan.findUniqueOrThrow({ where: { id: planRow.id } });
     switch (output.action) {

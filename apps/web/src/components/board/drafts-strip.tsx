@@ -15,7 +15,7 @@ import { Card } from '@andrewbehma/glass-ui/card';
 import { Chip } from '@andrewbehma/glass-ui/chip';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { toast } from '@andrewbehma/glass-ui/toast';
-import { Layers } from 'lucide-react';
+import { Layers, MessagesSquare } from 'lucide-react';
 import { useState } from 'react';
 import { api } from '../../lib/api';
 import {
@@ -32,6 +32,11 @@ import {
   pendingOf,
   waitingText,
 } from '../../lib/board/candidates';
+import {
+  discussionSkills,
+  discussStateText,
+  isDiscussion,
+} from '../../lib/board/discuss';
 import {
   DRAFTS_SHOWN_MAX,
   draftStateText,
@@ -52,8 +57,10 @@ import { CandidateSheet } from './candidate-sheet';
  * Drafts (#337 D2), above the columns: the person's open New work intakes
  * and earlier plans, each with where it stands — "2 questions waiting",
  * "thinking…", "split into 3 cards?" (#409) — and **Resume** / **Discard**.
- * Discard closes the plan (archive); no card is made. Hidden when there is
- * none.
+ * Discard closes the plan (archive); no card is made. #590: discussions sit
+ * among them, with their skills and "6 messages · 2 cards proposed". Below
+ * `sm` the strip is a scroll-snap rail whose next draft peeks in. Hidden
+ * when there is none.
  *
  * #592 (ADR-0056): an intake that wrote its cards shows them as candidates —
  * nothing reaches Todo until the person accepts it. Each opens in a sheet to
@@ -162,7 +169,9 @@ export function DraftsStrip({
       await api(`${planApi(projectId, discarding.id)}/archive`, {
         method: 'POST',
       });
-      toast.success('Draft discarded.');
+      toast.success(
+        isDiscussion(discarding) ? 'Discussion discarded.' : 'Draft discarded.',
+      );
       onDiscarded(discarding);
       setDiscarding(undefined);
       drafts.retry();
@@ -196,12 +205,12 @@ export function DraftsStrip({
           </span>
         ) : null}
       </div>
-      <ul className="flex min-w-0 items-start gap-3 overflow-x-auto pb-1">
+      <ul className="flex min-w-0 snap-x snap-mandatory items-start gap-3 overflow-x-auto pb-1">
         {items.map(({ summary, detail }) =>
           detail && isUnderReview(detail) ? (
             <li
               key={summary.id}
-              className={`shrink-0 ${detail.intake?.candidateStack ? 'w-[400px]' : 'w-[340px]'} max-w-[calc(100vw-2rem)]`}
+              className={`shrink-0 snap-start ${detail.intake?.candidateStack ? 'w-[400px]' : 'w-[340px]'} max-w-[calc(100vw-2rem)]`}
             >
               <CandidateGroup
                 plan={detail}
@@ -216,24 +225,41 @@ export function DraftsStrip({
               />
             </li>
           ) : (
-            <li key={summary.id} className="w-72 shrink-0">
+            <li
+              key={summary.id}
+              className="w-72 shrink-0 snap-start max-sm:w-[84%]"
+            >
               <Card
                 variant="content"
                 pad="sm"
                 className="flex h-full min-w-0 flex-col gap-2"
               >
                 <div className="flex min-w-0 items-center gap-2">
-                  <Chip size="sm">
-                    {summary.mode === 'card' ? 'New work' : 'Plan'}
+                  <Chip size="sm" className="shrink-0 gap-1">
+                    {isDiscussion(summary) ? (
+                      <MessagesSquare className="size-3" aria-hidden="true" />
+                    ) : null}
+                    {draftKind(summary)}
                   </Chip>
                   <span className="truncate text-sm font-medium text-ink">
                     {draftTitle(summary)}
                   </span>
                 </div>
+                {discussionSkills(detail).length > 0 ? (
+                  <ul aria-label="Skills" className="flex flex-wrap gap-1">
+                    {discussionSkills(detail).map((s) => (
+                      <li key={s}>
+                        <Chip size="sm">{s}</Chip>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
                 <span className="text-xs text-ink-2" aria-live="polite">
-                  {draftStateText(detail) ?? '…'}
+                  {(isDiscussion(summary)
+                    ? discussStateText(detail)
+                    : draftStateText(detail)) ?? '…'}
                 </span>
-                <div className="mt-auto flex gap-2">
+                <div className="mt-auto flex gap-2 max-lg:[--size-control:44px]">
                   <Button size="sm" onClick={() => onResume(summary)}>
                     Resume
                   </Button>
@@ -311,7 +337,9 @@ export function DraftsStrip({
         consequence={
           discarding?.mode === 'card'
             ? 'The interview is closed and no card is made from it.'
-            : 'The plan is closed and no cards are made from it.'
+            : discarding?.mode === 'discuss'
+              ? 'The discussion is archived and leaves Drafts. Cards already made from its proposals stay on the Board.'
+              : 'The plan is closed and no cards are made from it.'
         }
         verb="Discard"
         tone="danger"
@@ -321,3 +349,11 @@ export function DraftsStrip({
     </section>
   );
 }
+
+/** The chip of a draft: what kind of draft it is. */
+const draftKind = (plan: PlanSummary): string =>
+  plan.mode === 'card'
+    ? 'New work'
+    : plan.mode === 'discuss'
+      ? 'Discussion'
+      : 'Plan';

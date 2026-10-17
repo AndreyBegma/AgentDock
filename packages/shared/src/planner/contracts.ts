@@ -1,5 +1,6 @@
 import type { TaskDesignSummary } from '../design/contracts';
 import type {
+  DiscussProposal,
   PlanAnswer,
   PlanCandidateStack,
   PlanCandidateStatus,
@@ -32,6 +33,11 @@ import type {
  * the first intake turn starts at once. `attachmentIds` (D10): pending
  * uploads of the caller in this project, claimed by the plan and passed to
  * `plan.turn`; the generated card claims them in turn.
+ *
+ * #590: `mode: 'discuss'` is a discussion — `brief` is the person's opening
+ * message, and the first turn answers it at once. `skills` (discussions
+ * only, at most `DISCUSS_SKILLS_MAX`): installed skill invocations every turn
+ * of the discussion applies; another mode refuses them (409 `wrong_mode`).
  */
 export interface CreatePlanRequest {
   brief: string;
@@ -39,6 +45,7 @@ export interface CreatePlanRequest {
   model?: string;
   profileKey?: string;
   attachmentIds?: string[];
+  skills?: string[];
 }
 
 /**
@@ -113,8 +120,22 @@ export interface PlanTurnView {
    * stored output no longer parses.
    */
   rounds: PlanTurnRound[];
+  /**
+   * #590: a discussion turn's reply and proposed cards, from its stored
+   * output. Null for any other turn, and for one with no valid output
+   * (running, failed). Optional: absent reads as null.
+   */
+  reply?: PlanDiscussReply | null;
   createdAt: string;
   finishedAt: string | null;
+}
+
+/** #590: what one discussion turn answered. */
+export interface PlanDiscussReply {
+  /** Markdown, in the person's language. */
+  reply: string;
+  /** Cards worth making; **Make a card** opens New work with the brief. */
+  proposals: DiscussProposal[];
 }
 
 /** An issued task's GitHub side, derived on read (spec "Data / Schema"). */
@@ -255,6 +276,17 @@ export interface PlanDetail extends PlanSummary {
   activeTurnId: string | null;
   /** #337 D4: a `card` plan's progress; null for any other mode. */
   intake: PlanIntakeView | null;
+  /**
+   * #590: a `discuss` plan's settings; null for any other mode. Optional:
+   * absent reads as null.
+   */
+  discussion?: PlanDiscussionView | null;
+}
+
+/** #590: a discussion's settings, fixed when it starts. */
+export interface PlanDiscussionView {
+  /** The skills every turn applies, as chosen; an uninstalled one is skipped. */
+  skills: string[];
 }
 
 /** #337 D3, D4: where a card intake stands. */
@@ -270,7 +302,7 @@ export interface PlanIntakeView {
    */
   split?: PlanIntakeSplitView | null;
   /**
-   * #592 (ADR-0056): the cards the intake wrote, waiting for the person in
+   * #592 (ADR-0057): the cards the intake wrote, waiting for the person in
    * Drafts, in the proposal's order — decided ones too, until none is
    * pending (optional: absent reads as none).
    */
@@ -281,7 +313,7 @@ export interface PlanIntakeView {
   attachments?: number;
 }
 
-/** #592 (ADR-0056): a card the intake wrote, before the person decides it. */
+/** #592 (ADR-0057): a card the intake wrote, before the person decides it. */
 export interface PlanCandidateView {
   id: string;
   planId: string;
@@ -326,7 +358,7 @@ export const ACCEPT_CANDIDATES_AS = ['cards', 'stack'] as const;
 export type AcceptCandidatesAs = (typeof ACCEPT_CANDIDATES_AS)[number];
 
 /**
- * `POST /projects/:projectId/candidates/accept` (#592, ADR-0056 §3): pending
+ * `POST /projects/:projectId/candidates/accept` (#592, ADR-0057 §3): pending
  * candidates of the caller's intakes — of one intake or several — made into
  * cards in Todo at once: independent (`cards`, in the listed order), or one
  * stack (`stack`), each candidate in the 0-based `stage` the person chose.
@@ -430,7 +462,7 @@ export interface ConfirmSplitCard {
 }
 
 /**
- * #592 (ADR-0056): Confirm writes candidates, not cards — in the confirmed
+ * #592 (ADR-0057): Confirm writes candidates, not cards — in the confirmed
  * order (stage order for a stack); they wait in Drafts.
  */
 export interface ConfirmSplitResponse {
@@ -570,7 +602,8 @@ export const PLANNER_ERROR = {
   splitStale: 'split_stale',
   /**
    * 409 (#337): a route that does not fit the plan's mode — Create cards or
-   * Send on a `card` plan, an intake turn on any other.
+   * Send on a `card` plan, an intake turn on any other; #590: Create cards,
+   * Send or a split on a `discuss` plan, skills on any other.
    */
   wrongMode: 'wrong_mode',
   /**
