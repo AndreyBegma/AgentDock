@@ -94,7 +94,7 @@ export const commandErrorCodeSchema = z.enum([
    */
   'attachments_unavailable',
   /**
-   * ADR-0046: the runner's local security policy refuses the command — a
+   * ADR-0047: the runner's local security policy refuses the command — a
    * permission mode above `maxPermissionMode`, a root outside
    * `allowedRoots`, a terminal write, a profile skill install, or a gated
    * command. `message` names the rule and the CLI line that lifts it.

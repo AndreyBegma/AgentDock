@@ -14,7 +14,7 @@ export interface ControlDeps {
   /** The runtime profiles of the runner config (ADR-0006). */
   profiles: () => readonly ConfigProfile[];
   /**
-   * ADR-0046: the runner-local policy as it is now. `orchestrator.start`
+   * ADR-0047: the runner-local policy as it is now. `orchestrator.start`
    * checks it itself, beside the dispatcher, before it starts anything.
    */
   policy: () => PolicyConfig;

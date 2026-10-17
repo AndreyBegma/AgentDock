@@ -9,7 +9,7 @@ export interface WatchListOptions {
   /** Writes the list to the runner config as the next boot's cache. */
   persist: (projects: WatchedProject[]) => void;
   /**
-   * ADR-0046: why the runner-local policy refuses a project's root (outside
+   * ADR-0047: why the runner-local policy refuses a project's root (outside
    * `allowedRoots`, a symlink out of them, not a git main checkout), or null
    * to watch it. Every list — the cached one and each the server sends — goes
    * through it; a refused project is left out, not watched.
@@ -25,7 +25,7 @@ const same = (a: readonly WatchedProject[], b: readonly WatchedProject[]) =>
 /**
  * The projects this runner watches (D9). The server's list — `welcome` on
  * every connect, `config` after — is authoritative within the runner-local
- * policy (ADR-0046): a root the policy refuses is never watched. The config
+ * policy (ADR-0047): a root the policy refuses is never watched. The config
  * file only caches the admitted list so collectors run before the first
  * connect.
  */

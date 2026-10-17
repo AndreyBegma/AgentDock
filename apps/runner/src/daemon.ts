@@ -132,7 +132,7 @@ export interface DaemonOptions {
   filterStatsPollMs?: number;
   /** `/cs-eco`'s sessions (#475); `${XDG_STATE_HOME:-~/.local/state}/cs-eco/sessions` by default. */
   ecoSessionsDir?: string;
-  /** Resolves roots for the policy (ADR-0046); the filesystem's by default. */
+  /** Resolves roots for the policy (ADR-0047); the filesystem's by default. */
   realpath?: Realpath;
   /** Called once the connection exists — tests reach it to emit events. */
   onStart?: (connection: RunnerConnection) => void;
@@ -144,7 +144,7 @@ export const defaultSelfCommand = (): string[] =>
     ? [process.execPath]
     : [process.execPath, Bun.main];
 
-/** How often the daemon looks for a policy the CLI changed (ADR-0046). */
+/** How often the daemon looks for a policy the CLI changed (ADR-0047). */
 export const POLICY_REFRESH_MS = 5_000;
 
 /** Counts tmux sessions; no tmux or no server means zero. */
@@ -177,7 +177,7 @@ export const runDaemon = async (
     });
     log.info('spool opened', { ...spool.stats() });
 
-    // ADR-0046: the runner-local policy, read from the file the CLI writes.
+    // ADR-0047: the runner-local policy, read from the file the CLI writes.
     const policy = new PolicyStore({ configFile: options.configFile, log });
     const realpath = options.realpath ?? nodeRealpath;
     if (policy.current().allowedRoots.length === 0) {
@@ -596,7 +596,7 @@ export const runDaemon = async (
       runLog,
       onConfig: (server) => {
         awayMode = server.awayMode === true;
-        // Sessions follow the admitted list only (ADR-0046).
+        // Sessions follow the admitted list only (ADR-0047).
         watchList
           .apply(server.projects)
           .then(() => sessions?.setProjects(watchList.current))

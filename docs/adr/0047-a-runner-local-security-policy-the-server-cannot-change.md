@@ -1,12 +1,12 @@
-# ADR-0046: A runner-local security policy the server cannot change
+# ADR-0047: A runner-local security policy the server cannot change
 
 Status: accepted · Date: 2026-10-16 ·
 Card: C-107 (security audit 2026-10-16, WI-05, finding F-06, decision D-01) ·
 Spec: [`docs/specs/card-107-security-high-add-a-runner-local-securit.md`](../specs/card-107-security-high-add-a-runner-local-securit.md) ·
 Amends [ADR-0010](0010-typed-command-allowlist-on-the-runner.md) · Scopes [ADR-0045](0045-a-person-may-message-a-running-session-the-orchestrator-is-told.md) §1
 
-The card and the audit named this decision ADR-0044. That number was taken by
-the time it landed, so the decision is ADR-0046.
+The card and the audit named this decision ADR-0044. That number (and 0046) was taken by
+the time it landed, so the decision is ADR-0047.
 
 ## Context
 

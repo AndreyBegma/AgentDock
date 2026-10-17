@@ -6,7 +6,7 @@ import {
 } from '@agentdock/shared/protocol';
 
 /**
- * ADR-0046: a runner's local security policy refusal, as the runner words it:
+ * ADR-0047: a runner's local security policy refusal, as the runner words it:
  * "refused by this runner's policy (<rule>): <why>. On the runner's machine:
  * `<command>`". The API passes that text on in the error message (prefixed
  * with the command name on the board), and a failed round stores it.

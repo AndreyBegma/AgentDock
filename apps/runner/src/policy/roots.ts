@@ -19,7 +19,7 @@ const isWithin = (path: string, dir: string): boolean =>
   path.startsWith(dir.endsWith(sep) ? dir : `${dir}${sep}`);
 
 /**
- * ADR-0046: why `root` is outside `allowedRoots`, or null when it is inside.
+ * ADR-0047: why `root` is outside `allowedRoots`, or null when it is inside.
  * Both sides are compared as real paths, so a symlink into an allowed root
  * that points elsewhere is refused, and a path that does not exist is too.
  */

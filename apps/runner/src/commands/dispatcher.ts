@@ -28,7 +28,7 @@ export type CommandHandlers = {
 export interface DispatcherOptions {
   handlers: CommandHandlers;
   disabledCommands: readonly string[];
-  /** The runner-local policy as it is now (ADR-0046); read per command. */
+  /** The runner-local policy as it is now (ADR-0047); read per command. */
   policy: () => PolicyConfig;
   /** Resolves a root for the policy; the filesystem's by default. */
   realpath?: Realpath;
@@ -55,7 +55,7 @@ class CommandTimeout extends Error {}
 
 /**
  * Typed command dispatch (ADR-0010, D8). Order: unknown → disabled →
- * invalid args → the runner-local policy (ADR-0046) → handler under a
+ * invalid args → the runner-local policy (ADR-0047) → handler under a
  * timeout → result checked against its schema. Every outcome is a
  * `command.result`; nothing here throws.
  */

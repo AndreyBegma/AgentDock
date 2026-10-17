@@ -1,7 +1,7 @@
 import { POLICY_RULE_LABEL, parsePolicyRefusal } from '@/lib/runners/policy';
 
 /**
- * ADR-0046: why a runner's local security policy refused a command — the rule,
+ * ADR-0047: why a runner's local security policy refused a command — the rule,
  * the runner's reason and the command that allows it on that machine. Text
  * that is no policy refusal renders as it is.
  */

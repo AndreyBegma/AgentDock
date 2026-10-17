@@ -766,7 +766,7 @@ export const BOARD_ERROR = {
   /** 502 (#309 D9): the runner could not download or verify an attachment for `card.run`. */
   attachmentsUnavailable: 'attachments_unavailable',
   /**
-   * 403 (ADR-0046): the runner's local security policy refused the command;
+   * 403 (ADR-0047): the runner's local security policy refused the command;
    * the message names the rule and the CLI line that lifts it.
    */
   policyRefused: 'policy_refused',

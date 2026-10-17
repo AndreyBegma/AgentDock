@@ -33,7 +33,7 @@ export interface TerminalManagerOptions {
   send: (message: TerminalOutbound) => boolean;
   spawn: SpawnPty;
   /**
-   * ADR-0046: whether the runner-local policy allows a `write` attach now
+   * ADR-0047: whether the runner-local policy allows a `write` attach now
    * (`terminal.write`). Read on attach and on every input frame, so turning
    * it off ends the input of an attach already open.
    */

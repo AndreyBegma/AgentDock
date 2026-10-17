@@ -109,7 +109,7 @@ const showPolicy = (deps: PolicyCliDeps): void => {
 };
 
 /**
- * `agentdock-runner policy …` (ADR-0046): the one writer of the policy. It
+ * `agentdock-runner policy …` (ADR-0047): the one writer of the policy. It
  * rewrites `runner.json` with only the policy changed.
  */
 export const runPolicy = (

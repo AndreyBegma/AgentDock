@@ -132,7 +132,7 @@ export const startOrchestrator = async (
   args: OrchestratorStartArgs,
   deps: ControlDeps,
 ): Promise<OrchestratorStartResult> => {
-  // ADR-0046: the dispatcher checked these too; the start path holds them
+  // ADR-0047: the dispatcher checked these too; the start path holds them
   // itself, so no other caller can start the orchestrator around them.
   const policy = deps.policy();
   const refused =

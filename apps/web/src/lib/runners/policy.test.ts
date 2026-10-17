@@ -9,7 +9,7 @@ import {
 const RUNNER_TEXT =
   "card.run: refused by this runner's policy (maxPermissionMode): card.run asks for bypassPermissions, this runner allows at most auto. On the runner's machine: `agentdock-runner policy set maxPermissionMode bypassPermissions`";
 
-describe('runner policy refusals (ADR-0046)', () => {
+describe('runner policy refusals (ADR-0047)', () => {
   it('reads the rule, the reason and the fix out of the runner text', () => {
     expect(parsePolicyRefusal(RUNNER_TEXT)).toEqual({
       rule: 'maxPermissionMode',

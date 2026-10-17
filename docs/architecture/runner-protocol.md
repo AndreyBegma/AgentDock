@@ -50,6 +50,17 @@ both sit at the root of that origin.
 | `4401` | missing, unknown or revoked token |
 | `4409` | a newer connection of the same runner replaced this one |
 
+Every close above is terminal: the runner exits 78 and its service unit does not
+restart it. Before exiting it logs why and writes
+`~/.local/state/agentdock/stopped.json`, which `agentdock-runner status` prints
+(`replaced by another connection at <time>, re-pair if this was not you` for
+`4409`); the next `run` clears it. A `4409` that takes over a socket that was
+still open is audited as `runner.connection_replaced` with both peers' IP and
+user agent, and every active admin gets a `runner.connection_replaced`
+notification (C-108: the token is readable by any process of the runner's user,
+so a takeover may be an impostor). A reconnect after the old socket had already
+closed is not reported.
+
 ## Messages
 
 | Direction | Type | Payload |
@@ -210,7 +221,7 @@ may refresh and whose collectors it runs, one instance per collector per
 project. `welcome` carries the authoritative list on every connect; the runner
 caches it in its config file so collectors run before the first connect. A
 `root` must be absolute; the runner watches it only when its real path is
-inside the policy's `allowedRoots` and it is a git main checkout (ADR-0046) —
+inside the policy's `allowedRoots` and it is a git main checkout (ADR-0047) —
 a refused project is left out and logged, and its commands answer
 `policy_refused` or `path_not_allowed`.
 
@@ -566,7 +577,7 @@ token counts only: no prompt, response, thinking or tool-argument text (D9).
 | `too_large` | a skill is over `SKILL_MAX_FILES` (500) or `SKILL_MAX_TOTAL_BYTES` (5 MiB) |
 | `upstream_unavailable` | the catalog (skills.sh) or the forge (GitHub) did not answer |
 | `attachments_unavailable` | `card.run` could not download an attachment, or its size or SHA-256 did not match |
-| `policy_refused` | the runner's local security policy refuses the command ([ADR-0046](../adr/0046-a-runner-local-security-policy-the-server-cannot-change.md)); `message` names the rule and the CLI line that lifts it — see [Runner-local policy](#runner-local-policy) |
+| `policy_refused` | the runner's local security policy refuses the command ([ADR-0047](../adr/0047-a-runner-local-security-policy-the-server-cannot-change.md)); `message` names the rule and the CLI line that lifts it — see [Runner-local policy](#runner-local-policy) |
 
 The API answers the three path codes with an HTTP error of the same name in
 the body: `path_not_found` and `not_a_repository` → **422** (the request is
@@ -583,7 +594,7 @@ runners that send it.
 
 ### Runner-local policy
 
-[ADR-0046](../adr/0046-a-runner-local-security-policy-the-server-cannot-change.md)
+[ADR-0047](../adr/0047-a-runner-local-security-policy-the-server-cannot-change.md)
 (amends ADR-0010). The allowlist says *which* commands exist; it is not a
 boundary against a server that sends a dangerous instance of one. The runner
 therefore keeps a `policy` block in its own `runner.json`. Only the CLI on the

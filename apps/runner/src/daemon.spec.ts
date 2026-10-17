@@ -127,7 +127,7 @@ describe('daemon — OTLP receiver (spec 13)', () => {
         (await server.waitFor('hello', hellos)) as HelloMessage[]
       ).at(-1);
       expect(hello?.capabilities.gitAuth).toEqual({ github });
-      // ADR-0046: the policy as runner.json holds it, values only.
+      // ADR-0047: the policy as runner.json holds it, values only.
       expect(hello?.capabilities.policy).toEqual(
         reportedPolicy(permissivePolicy()),
       );

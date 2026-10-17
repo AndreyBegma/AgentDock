@@ -25,6 +25,12 @@ import { normalizeServer, ServerUrlError } from './server-url';
 import { EXIT, launchAgentPlist, serviceUnit } from './service';
 import { setupClaude } from './setup/claude';
 import { Spool } from './spool';
+import {
+  clearStopStatus,
+  readStopStatus,
+  stopMessage,
+  writeStopStatus,
+} from './stop-status';
 import { RUNNER_VERSION } from './version';
 
 export interface CliDeps {
@@ -143,7 +149,7 @@ const pairCommand = async ({
   if (!server || !code) throw new UsageError('pair needs --server and --code');
   const origin = normalizeServer(server);
   const config = loadConfig(paths.configFile);
-  // ADR-0046: resolved before pairing, so a typo costs no pairing code.
+  // ADR-0047: resolved before pairing, so a typo costs no pairing code.
   const allowed = allowRoot.map((dir) => {
     const real = nodeRealpath(resolve(deps.cwd ?? process.cwd(), dir));
     if (real === null)
@@ -230,6 +236,7 @@ const runCommand = async ({
       'no runtime profiles configured; nothing can be launched. Run `agentdock-runner profiles --detect --write`',
     );
   }
+  clearStopStatus(paths.stopStatusFile);
   const reason = await runDaemon({
     config,
     configFile: paths.configFile,
@@ -247,7 +254,24 @@ const runCommand = async ({
     signal: deps.signal,
     onStart: deps.onStart,
   });
-  return reason.kind === 'terminal' ? EXIT.terminalClose : EXIT.ok;
+  if (reason.kind !== 'terminal') return EXIT.ok;
+  // The process is about to end and the unit will not restart it: leave the
+  // why where `status` finds it (C-108).
+  const stopped = {
+    code: reason.code,
+    reason: reason.reason,
+    at: new Date(deps.clock.now()).toISOString(),
+  };
+  try {
+    writeStopStatus(paths.stopStatusFile, stopped);
+  } catch (error) {
+    log.error('cannot write the stop status', {
+      file: paths.stopStatusFile,
+      error: errorMessage(error),
+    });
+  }
+  log.error(`stopped: ${stopMessage(stopped)}`, { code: reason.code });
+  return EXIT.terminalClose;
 };
 
 const statusCommand = async ({
@@ -267,6 +291,8 @@ const statusCommand = async ({
   );
   out(deps, `server:   ${config.server ?? '-'}`);
   out(deps, `profiles: ${config.profiles.length}`);
+  const stopped = readStopStatus(paths.stopStatusFile);
+  if (stopped) out(deps, `stopped:  ${stopMessage(stopped)}`);
   out(
     deps,
     `spool:    ${spool.segments} segment(s), ${spool.bytes} bytes, last seq ${spool.lastSeq}, acked ${spool.ackedSeq}`,

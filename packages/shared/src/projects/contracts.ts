@@ -27,7 +27,7 @@ export const PROJECT_ERROR = {
   notARepository: 'not_a_repository',
   /** The path is outside what the runner allows (a symlink out, an unwatched root). */
   pathNotAllowed: 'path_not_allowed',
-  /** ADR-0046: the path is outside the runner policy's `allowedRoots`. */
+  /** ADR-0047: the path is outside the runner policy's `allowedRoots`. */
   policyRefused: 'policy_refused',
   /** A linked worktree or subdirectory; `suggestedPath` is the main checkout. */
   notMainCheckout: 'not_main_checkout',

@@ -29,7 +29,7 @@ const base = {
   otlp: null,
 };
 
-describe('runner policy (ADR-0046)', () => {
+describe('runner policy (ADR-0047)', () => {
   it('rides in hello capabilities; a gated command the API does not know keeps the hello valid', () => {
     const parsed = capabilitiesSchema.parse({ ...base, policy });
     expect(parsed.policy).toEqual(policy);

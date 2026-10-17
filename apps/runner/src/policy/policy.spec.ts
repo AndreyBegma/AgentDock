@@ -24,7 +24,7 @@ import { PolicyStore } from './store';
 
 const host = { hostname: 'test-host', os: 'linux', arch: 'x64' };
 
-describe('runner-local policy (ADR-0046)', () => {
+describe('runner-local policy (ADR-0047)', () => {
   let dir = '';
   let cleanup = () => {};
   let configFile = '';

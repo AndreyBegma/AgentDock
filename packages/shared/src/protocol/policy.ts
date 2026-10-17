@@ -8,7 +8,7 @@ import {
 import { absolutePathSchema } from './projects';
 
 /**
- * The runner-local security policy (ADR-0046). It lives in the runner's own
+ * The runner-local security policy (ADR-0047). It lives in the runner's own
  * `runner.json`, written only by `agentdock-runner policy …` on the machine;
  * no server command or `hello` response changes it. The runner reports it in
  * `hello` so the UI can explain a refusal before the person asks.

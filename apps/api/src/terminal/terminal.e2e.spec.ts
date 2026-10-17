@@ -607,7 +607,7 @@ describe('terminal attach (e2e)', () => {
       ]);
     });
 
-    it('passes a runner policy refusal on with its reason (ADR-0046)', async () => {
+    it('passes a runner policy refusal on with its reason (ADR-0047)', async () => {
       const message =
         "refused by this runner's policy (terminal.write): a write attach is off on this runner. On the runner's machine: `agentdock-runner policy set terminal.write true`";
       port.outcome = { status: 'error', code: 'policy_refused', message };

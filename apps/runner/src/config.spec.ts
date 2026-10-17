@@ -46,7 +46,7 @@ describe('config', () => {
     });
   });
 
-  it('keeps the policy on disk when the daemon rewrites the file (ADR-0046)', () => {
+  it('keeps the policy on disk when the daemon rewrites the file (ADR-0047)', () => {
     saveConfig(path, {
       policy: { allowedRoots: ['/srv/dev'], terminal: { write: true } },
     });

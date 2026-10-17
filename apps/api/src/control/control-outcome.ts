@@ -55,7 +55,7 @@ export const controlOutcome = <T>(
         case 'path_not_allowed':
           return failure(403, 'path_not_allowed');
         case 'policy_refused':
-          // ADR-0046: the runner's own policy; its message names the rule.
+          // ADR-0047: the runner's own policy; its message names the rule.
           return failure(403, 'policy_refused');
         case 'timeout':
           // The runner answered: its handler gave up. The outcome is known.

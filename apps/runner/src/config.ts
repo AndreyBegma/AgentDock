@@ -113,7 +113,7 @@ export const runnerConfigSchema = z.object({
     })
     .prefault({}),
   /**
-   * The runner-local security policy (ADR-0046). Written only by
+   * The runner-local security policy (ADR-0047). Written only by
    * `agentdock-runner policy …` and `pair --allow-root`; the daemon reads it
    * and keeps it as it is when it rewrites the file (`updateConfig`).
    */
@@ -176,7 +176,7 @@ export const saveConfig = (
   renameSync(tmp, path);
 };
 
-/** What the daemon may rewrite in the file: never the policy (ADR-0046). */
+/** What the daemon may rewrite in the file: never the policy (ADR-0047). */
 export type DaemonConfigPatch = Partial<
   Omit<z.input<typeof runnerConfigSchema>, 'policy'>
 >;

@@ -63,7 +63,7 @@ export interface HandlerContext {
   watchedProjects: () => readonly WatchedProject[];
   /** The runtime profiles of the runner config; the orchestrator starts on one. */
   profiles: () => readonly ConfigProfile[];
-  /** The runner-local policy as it is now (ADR-0046). */
+  /** The runner-local policy as it is now (ADR-0047). */
   policy: () => PolicyConfig;
   /** Resolves a root for the policy; the filesystem's by default. */
   realpath?: Realpath;

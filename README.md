@@ -192,7 +192,7 @@ macOS, and prints the command that starts it.
 
 `--allow-root` names the folders your projects live in. The runner keeps a
 local security policy in its own config that the server cannot change
-([ADR-0046](docs/adr/0046-a-runner-local-security-policy-the-server-cannot-change.md)):
+([ADR-0047](docs/adr/0047-a-runner-local-security-policy-the-server-cannot-change.md)):
 it watches no project outside those folders, launches nothing above `auto`,
 and refuses terminal typing, profile skill installs and messages into running
 sessions until you allow them on the machine. See and change it with

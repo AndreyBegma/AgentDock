@@ -74,7 +74,7 @@ export const permissionModeRefusal = (
 };
 
 /**
- * ADR-0046: why the runner-local policy refuses this command, or null. Runs
+ * ADR-0047: why the runner-local policy refuses this command, or null. Runs
  * on validated args, before any handler, whatever the server sent:
  * a gated command, a permission mode above the cap, a terminal write, a
  * profile skill install, a root (or `project.inspect` path) outside
@@ -123,7 +123,7 @@ export const commandRefusal = (
 };
 
 /**
- * ADR-0046: why a watch-list root from the server is refused, or null — an
+ * ADR-0047: why a watch-list root from the server is refused, or null — an
  * absolute path whose real path is inside `allowedRoots` and is a git main
  * checkout.
  */

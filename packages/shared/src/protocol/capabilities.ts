@@ -129,7 +129,7 @@ export const capabilitiesSchema = z.object({
    */
   sessionMessage: z.boolean().optional(),
   /**
-   * ADR-0046: the runner's local security policy as it is now — values only,
+   * ADR-0047: the runner's local security policy as it is now — values only,
    * no path beyond `allowedRoots`. The server cannot change it; the UI reads
    * it to explain a `policy_refused` before the person asks. Absent means
    * unknown: a runner older than the policy, which refuses nothing.
@@ -165,7 +165,7 @@ export const handoffAvailable = (capabilities: Capabilities): boolean =>
 export const sessionMessageAvailable = (capabilities: Capabilities): boolean =>
   capabilities.sessionMessage === true;
 
-/** The runner's policy (ADR-0046); null for a runner older than it. */
+/** The runner's policy (ADR-0047); null for a runner older than it. */
 export const runnerPolicyOf = (capabilities: unknown): RunnerPolicy | null => {
   const parsed = z
     .object({ policy: runnerPolicySchema })

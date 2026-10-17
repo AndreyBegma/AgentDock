@@ -13,7 +13,7 @@ const SAME = (a: PolicyConfig, b: PolicyConfig) =>
   JSON.stringify(a) === JSON.stringify(b);
 
 /**
- * The daemon's view of the runner-local policy (ADR-0046). It re-reads
+ * The daemon's view of the runner-local policy (ADR-0047). It re-reads
  * `runner.json` when the file changed, so `agentdock-runner policy …` takes
  * effect without a restart. It never writes: the policy has one writer, the
  * CLI. A file that cannot be read gives the safe defaults, never the last

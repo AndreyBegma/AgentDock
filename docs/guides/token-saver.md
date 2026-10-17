@@ -20,8 +20,16 @@ For every Claude launch the runner makes, with the project's setting on:
   `[agentdock filter: 412 lines hidden · full output: <path> · AGENTDOCK_RAW=1 to bypass]`.
 - **Only the MCP servers you allow are loaded.** Every other server's tool
   schemas cost no tokens (see [the allowlist](#the-mcp-allowlist)).
-- **Broad searches go to a cheaper helper**, the history is compacted earlier,
-  and the worker prompt is ordered so the model's cache hits.
+- **The history is compacted at about 150k tokens**, on every model. On a 1M
+  window a session used to grow to about 600k before compacting, and every
+  turn re-reads what it holds.
+- **Reads are trimmed too.** The launch turns on the code-sentinel plugin's
+  `/cs-eco` (`CS_ECO=on`): whole reads of large files are guarded, a repeated
+  read of an unchanged file is refused once, and large MCP results are cut to
+  their head and tail. The runner's filter still handles Bash, so nothing is
+  counted twice.
+- **Broad searches go to a cheaper helper**, and the worker prompt is ordered
+  so the model's cache hits.
 
 The setting is per project, **on by default**, and an administrator of the
 project can switch it off under **Settings › Token saver**. Off launches every
@@ -50,7 +58,17 @@ command a hook *returns*, so a rewrite could hide `git push` from a
   that is not in the background, a dev server or a watch mode.
 
 In any other session the command runs unfiltered, and the dashboard counts it
-as "returned the original". The exact rules are in
+as "returned the original". When no filter matched, the dashboard and the card
+sheet say why:
+
+| Label | Means |
+|---|---|
+| Compound command (not filtered) | a pipe, a list, a redirect or a substitution — not a single simple command |
+| No filter for this command | a simple command no filter family covers |
+| Not filtered in this permission mode | the session's mode is neither `bypassPermissions` nor `auto` |
+| No filter (uncovered command) | recorded before the reasons above existed |
+
+The exact rules are in
 [the filter guide](token-saver-filter.md#permissions-the-rewrite-never-changes-what-is-allowed).
 
 ## Reading the raw output

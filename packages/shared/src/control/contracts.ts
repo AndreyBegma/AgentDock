@@ -144,7 +144,7 @@ export const CONTROL_ERROR = {
   pathNotAllowed: 'path_not_allowed',
   /** The runner answered with an error not mapped to its own code. */
   runnerError: 'runner_error',
-  /** ADR-0046: the runner's local security policy refused it; the message says which rule. */
+  /** ADR-0047: the runner's local security policy refused it; the message says which rule. */
   policyRefused: 'policy_refused',
 } as const;
 export type ControlErrorCode =

@@ -14,7 +14,7 @@ const gatedCommandsShape = Object.fromEntries(
 ) as Record<PolicyGatedCommand, z.ZodDefault<z.ZodBoolean>>;
 
 /**
- * The `policy` block of `runner.json` (ADR-0046). Every field defaults to the
+ * The `policy` block of `runner.json` (ADR-0047). Every field defaults to the
  * safe value: no allowed root, nothing above `auto`, no terminal write, no
  * profile skill install, no gated command. Only `agentdock-runner policy …`
  * and `pair --allow-root` write it; the daemon only reads it.
