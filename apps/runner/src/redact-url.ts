@@ -1,5 +1,10 @@
-/** `scheme://userinfo@` — userinfo is anything up to the first `@` before a path, space or quote. */
-const URL_USERINFO = /([a-z][a-z0-9+.-]*:\/\/)[^\s/@'"<>]+@/gi;
+/**
+ * `scheme://userinfo@` — userinfo is anything up to the first `@` before a
+ * path, space or quote. A scheme starts only where a scheme character does
+ * not precede it, so a long run of letters is scanned once, not once per
+ * letter (C-128: the runner's redactor runs this over whole patches).
+ */
+const URL_USERINFO = /(?<![a-z0-9+.-])([a-z][a-z0-9+.-]*:\/\/)[^\s/@'"<>]+@/gi;
 
 export const USERINFO_MASK = '***';
 

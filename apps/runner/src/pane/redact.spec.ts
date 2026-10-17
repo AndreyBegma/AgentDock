@@ -61,7 +61,11 @@ describe('redact', () => {
 describe('redactText — one redactor for every channel (C-128)', () => {
   const cases: readonly [name: string, input: string, secret: string][] = [
     ['ghp_', `push ${`ghp_${'a1B2'.repeat(9)}`} now`, 'a1B2a1B2'],
-    ['github_pat_', `pat github_pat_11ABCDEFG0${'x'.repeat(40)} ok`, 'xxxxxxxx'],
+    [
+      'github_pat_',
+      `pat github_pat_11ABCDEFG0${'x'.repeat(40)} ok`,
+      'xxxxxxxx',
+    ],
     ['glpat-', 'token glpat-AbCdEfGhIjKlMnOpQrSt12 ok', 'AbCdEfGh'],
     ['sk_live_', 'stripe sk_live_51HabcdefGHIJKLmnop ok', 'abcdefGH'],
     ['sk-', 'key sk-ant-api03-abcdefghijklmnopqrstuv end', 'abcdefghij'],
@@ -76,7 +80,11 @@ describe('redactText — one redactor for every channel (C-128)', () => {
     ['xoxe.xoxp-', 'rotate xoxe.xoxp-1-Mi0yLTEyMzQ1Njc ok', 'Mi0yLTEy'],
     ['AKIA', 'aws AKIAIOSFODNN7EXAMPLE ok', 'IOSFODNN'],
     ['secret assignment', 'run with API_KEY=abc123secret now', 'abc123secret'],
-    ['DATABASE_URL assignment', '$ DATABASE_URL=mysql://h/db?pw=x1 app', 'pw=x1'],
+    [
+      'DATABASE_URL assignment',
+      '$ DATABASE_URL=mysql://h/db?pw=x1 app',
+      'pw=x1',
+    ],
     ['.env line', 'STRIPE_WEBHOOK=whsec_abcdef', 'whsec_abcdef'],
     ['added .env line in a diff', '+REDIS=redis-secret-host', 'redis-secret'],
     [
@@ -108,7 +116,9 @@ describe('redactText — one redactor for every channel (C-128)', () => {
 
   it('masks a private-key block across lines', () => {
     expect(
-      redactText('a\n-----BEGIN EC PRIVATE KEY-----\nMHcCAQEE\n-----END EC PRIVATE KEY-----\nb'),
+      redactText(
+        'a\n-----BEGIN EC PRIVATE KEY-----\nMHcCAQEE\n-----END EC PRIVATE KEY-----\nb',
+      ),
     ).toBe(`a\n${MASK}\n${MASK}\n${MASK}\nb`);
   });
 
@@ -121,5 +131,17 @@ describe('redactText — one redactor for every channel (C-128)', () => {
       'see https://github.com/acme/x/pull/1',
     ].join('\n');
     expect(redactText(text)).toBe(text);
+  });
+});
+
+describe('redactText — cost on a whole patch (C-128)', () => {
+  it.each([
+    ['an upper-case run', 'KEY'.repeat(170_000)],
+    ['a lower-case run', 'a'.repeat(512 * 1024)],
+    ['a quoted secret-ish run', `"${'secret'.repeat(85_000)}`],
+  ])('stays linear on %s', (_name, text) => {
+    const start = performance.now();
+    redactText(text);
+    expect(performance.now() - start).toBeLessThan(1000);
   });
 });

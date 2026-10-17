@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { createHash } from 'node:crypto';
 import {
   SKILL_RUN_FINISHED_MAX_BYTES,
   SKILL_RUN_PATCH_MAX_BYTES,
@@ -101,5 +102,54 @@ describe('finishedData', () => {
     expect(data.error).toHaveLength(500);
     expect(data.reportText).toBeUndefined();
     expect(data.patch).toBeUndefined();
+  });
+});
+
+describe('finishedData — patch redaction (C-128, D-15)', () => {
+  const envPatch = [
+    'diff --git a/.env b/.env',
+    'new file mode 100644',
+    '--- /dev/null',
+    '+++ b/.env',
+    '@@ -0,0 +1,2 @@',
+    '+DATABASE_URL=postgres://u:pw@h/db',
+    '+PORT=3000',
+    '',
+  ].join('\n');
+  const files = [{ status: 'A ', path: '.env' }];
+
+  it('ships a patch that adds .env with DATABASE_URL masked', () => {
+    const data = finishedData({
+      ...base,
+      changedFiles: files,
+      patch: envPatch,
+    });
+    expect(data.patch).toBeDefined();
+    expect(data.patch).not.toContain('pw@h');
+    expect(data.patch).toContain('+DATABASE_URL=•••');
+    expect(data.patch).toContain('+++ b/.env');
+    expect(data.patchSha256).toBeUndefined();
+  });
+
+  it('with keepPatchLocal sends the file list and the hash, never the body', () => {
+    const data = finishedData({
+      ...base,
+      changedFiles: files,
+      changedFilesTotal: 1,
+      patch: envPatch,
+      keepPatchLocal: true,
+    });
+    expect(data.patch).toBeUndefined();
+    expect(data.patchTruncated).toBe(false);
+    expect(data.changedFiles).toEqual(files);
+    expect(data.patchSha256).toBe(
+      createHash('sha256').update(envPatch).digest('hex'),
+    );
+    expect(JSON.stringify(data)).not.toContain('DATABASE_URL');
+  });
+
+  it('with keepPatchLocal and no patch sends no hash', () => {
+    const data = finishedData({ ...base, patch: null, keepPatchLocal: true });
+    expect(data.patchSha256).toBeUndefined();
   });
 });

@@ -54,6 +54,8 @@ export interface ExecutorOptions {
    */
   slots?: RunSlots;
   maxTimeoutSec: number;
+  /** `skills.keepPatchesLocal` (C-128): the patch never leaves the runner. */
+  keepPatchesLocal?: boolean;
   emit: (event: UnsequencedEvent) => void;
   log: Logger;
   /** The OTLP receiver's bound port, null when it is off (D9). */
@@ -501,6 +503,7 @@ export class SkillRunExecutor {
         changedFiles: collected.changedFiles,
         changedFilesTotal: collected.changedFilesTotal,
         patch: collected.patch,
+        keepPatchLocal: this.options.keepPatchesLocal === true,
         ...(collected.pr ? { pr: collected.pr } : {}),
         ...(collected.error ? { error: collected.error } : {}),
       });

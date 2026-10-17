@@ -191,6 +191,13 @@ copying (never `npx`, never a symlink), and run them headless.
 |---|---|---|
 | `maxConcurrentRuns` | `2` | runs over the cap wait in `queued`, oldest first |
 | `maxTimeoutSec` | `21600` | a run's `timeoutSec` above it is cut to it |
+| `keepPatchesLocal` | `false` | the patch stays in the run's directory; `skill_run.finished` carries only the changed-file list and the patch's SHA-256. Set by hand — the daemon and the server never change it |
+
+Every text the runner sends the server — pane frames, run logs, reports,
+checkpoints, messages, PR bodies, skill-run patches, hook content — passes
+one redactor (`src/pane/redact.ts`): token shapes, private-key blocks,
+`.env` and secret-named assignments, `Authorization` headers, secret JSON
+members and URL userinfo. It is pattern-based and best-effort.
 
 ## Development
 

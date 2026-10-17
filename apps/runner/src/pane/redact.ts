@@ -29,9 +29,13 @@ const TOKENS: readonly RegExp[] = [
 const KEY_BEGIN = /-----BEGIN [A-Z ]*PRIVATE KEY-----/;
 const KEY_END = /-----END [A-Z ]*PRIVATE KEY-----/;
 
-/** A secret-sounding name assigned anywhere: `API_KEY=…`, `"DB_PASSWORD": "…"` is left to the JSON rule. */
+/**
+ * A secret-sounding name assigned anywhere: `API_KEY=…`, `"DB_PASSWORD": "…"`
+ * is left to the JSON rule. Name parts are bounded: an unbounded one makes a
+ * long upper-case run quadratic, and this rule runs over whole patches.
+ */
 const SECRET_ASSIGNMENT =
-  /\b([A-Z0-9_]*(?:SECRET|TOKEN|KEY|PASSWORD|PASSWD|PWD|PASS|AUTH|CREDENTIALS?|DSN|PRIVATE|DATABASE_URL|CONNECTION_STRING)[A-Z0-9_]*)(\s*=\s*)("[^"\n]*"|'[^'\n]*'|[^\s"'\\]+)/g;
+  /\b([A-Z0-9_]{0,64}(?:SECRET|TOKEN|KEY|PASSWORD|PASSWD|PWD|PASS|AUTH|CREDENTIALS?|DSN|PRIVATE|DATABASE_URL|CONNECTION_STRING)[A-Z0-9_]{0,64})(\s*=\s*)("[^"\n]*"|'[^'\n]*'|[^\s"'\\]+)/g;
 
 /**
  * A `.env` line: `[export ]NAME=value` at the start of a real line, or of an
@@ -51,7 +55,7 @@ const AUTHORIZATION =
 
 /** A JSON member whose key sounds secret: `"api_key": "…"`. */
 const SECRET_MEMBER =
-  /("[A-Za-z0-9_-]*(?:secret|token|password|passwd|api[_-]?key|private[_-]?key|credentials?)[A-Za-z0-9_-]*"\s*:\s*)"(?:[^"\\]|\\.)*"/gi;
+  /("[A-Za-z0-9_-]{0,64}(?:secret|token|password|passwd|api[_-]?key|private[_-]?key|credentials?)[A-Za-z0-9_-]{0,64}"\s*:\s*)"(?:[^"\\]|\\.)*"/gi;
 
 /** Every single-line rule, on a part of a line outside a private-key block. */
 const redactPart = (text: string): string => {

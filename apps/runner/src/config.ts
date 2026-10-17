@@ -104,6 +104,9 @@ export const runnerConfigSchema = z.object({
    * Skill runs (spec 24 D11). A run over `maxConcurrentRuns` waits in
    * `queued`; a `timeoutSec` above `maxTimeoutSec` is cut to it. The catalog
    * host is not configurable: it is fixed in the runner (D1).
+   * `keepPatchesLocal` (C-128, D-15): the patch stays in the run's directory
+   * and `skill_run.finished` carries only the file list and the patch's
+   * SHA-256. Set by hand in `runner.json`; the daemon never rewrites it.
    */
   skills: z
     .object({
@@ -119,6 +122,7 @@ export const runnerConfigSchema = z.object({
         .min(SKILL_RUN_MIN_TIMEOUT_SEC)
         .max(SKILL_RUN_MAX_TIMEOUT_SEC)
         .default(SKILL_RUN_MAX_TIMEOUT_SEC),
+      keepPatchesLocal: z.boolean().default(false),
     })
     .prefault({}),
   /**
@@ -185,9 +189,15 @@ export const saveConfig = (
   renameSync(tmp, path);
 };
 
-/** What the daemon may rewrite in the file: never the policy (ADR-0047). */
+/**
+ * What the daemon may rewrite in the file: never the policy (ADR-0047),
+ * `insecureServer` (D-06) or the skill-run settings (C-128).
+ */
 export type DaemonConfigPatch = Partial<
-  Omit<z.input<typeof runnerConfigSchema>, 'policy' | 'insecureServer'>
+  Omit<
+    z.input<typeof runnerConfigSchema>,
+    'policy' | 'insecureServer' | 'skills'
+  >
 >;
 
 /**
@@ -199,10 +209,12 @@ export const updateConfig = (path: string, patch: DaemonConfigPatch): void => {
   const {
     policy: _policy,
     insecureServer: _insecure,
+    skills: _skills,
     ...safe
   } = patch as DaemonConfigPatch & {
     policy?: unknown;
     insecureServer?: unknown;
+    skills?: unknown;
   };
   saveConfig(path, { ...loadConfig(path), ...safe });
 };

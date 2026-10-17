@@ -316,6 +316,7 @@ export const runDaemon = async (
       maxConcurrentRuns: config.skills.maxConcurrentRuns,
       slots,
       maxTimeoutSec: config.skills.maxTimeoutSec,
+      keepPatchesLocal: config.skills.keepPatchesLocal,
       emit: (event) => connection?.emit(event),
       log,
       otlpPort: () => otlp?.port ?? null,

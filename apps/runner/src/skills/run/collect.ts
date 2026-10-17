@@ -14,7 +14,7 @@ import type {
   SkillRunTerminalPhase,
 } from '@agentdock/shared/protocol';
 import { resolveFleetProject } from '../../fleet/project';
-import { redact } from '../../pane/redact';
+import { redact, redactText } from '../../pane/redact';
 import {
   GH_TIMEOUT_MS,
   gitOk,
@@ -155,9 +155,7 @@ const openPr = async (
     body: [
       `Skill run \`${record.runId}\`: \`/${record.skill}\` on \`${record.base}\`.`,
       '',
-      report
-        ? redact(report.split('\n')).join('\n')
-        : 'The run left no report.',
+      report ? redactText(report) : 'The run left no report.',
       '',
     ].join('\n'),
   });

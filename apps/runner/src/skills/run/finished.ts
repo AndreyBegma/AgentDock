@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   SKILL_RUN_CHANGED_FILES_MAX,
   SKILL_RUN_FINISHED_MAX_BYTES,
@@ -9,7 +10,7 @@ import {
   skillRunChangedFileSchema,
   skillRunFinishedDataSchema,
 } from '@agentdock/shared/protocol';
-import { redact } from '../../pane/redact';
+import { redactText } from '../../pane/redact';
 
 const bytes = (text: string): number => Buffer.byteLength(text, 'utf8');
 
@@ -64,25 +65,38 @@ export interface FinishedParts {
   changedFiles?: SkillRunChangedFile[];
   changedFilesTotal?: number;
   patch?: string | null;
+  /** `skills.keepPatchesLocal`: send the patch's hash, never its body. */
+  keepPatchLocal?: boolean;
   pr?: { number: number; url: string };
   error?: string;
 }
 
 /**
+ * The patch redacted, then cut to its cap. A patch far above the cap is cut
+ * to four times it first, which bounds the regex work.
+ */
+const redactedPatch = (raw: string): { text: string; truncated: boolean } => {
+  const pre = truncateUtf8(raw, SKILL_RUN_PATCH_MAX_BYTES * 4);
+  const cut = truncateUtf8(redactText(pre.text), SKILL_RUN_PATCH_MAX_BYTES);
+  return { text: cut.text, truncated: pre.truncated || cut.truncated };
+};
+
+/**
  * `skill_run.finished` within its caps (spec 24, notes): report 32 KiB,
  * patch 128 KiB, 200 files, 224 KiB serialized — each cut flagged. The
- * report is redacted: it is the one stream text stored in the database.
+ * report and the patch are redacted before the cut (C-128); with
+ * `keepPatchLocal` the patch is replaced by its SHA-256 (D-15).
  */
 export const finishedData = (parts: FinishedParts): SkillRunFinishedData => {
   const report = parts.reportText
-    ? truncateUtf8(
-        redact(parts.reportText.split('\n')).join('\n'),
-        SKILL_RUN_REPORT_MAX_BYTES,
-      )
+    ? truncateUtf8(redactText(parts.reportText), SKILL_RUN_REPORT_MAX_BYTES)
     : null;
-  let patch = parts.patch
-    ? truncateUtf8(parts.patch, SKILL_RUN_PATCH_MAX_BYTES)
-    : null;
+  const keptSha256 =
+    parts.keepPatchLocal && parts.patch
+      ? createHash('sha256').update(parts.patch, 'utf8').digest('hex')
+      : null;
+  let patch =
+    parts.patch && !parts.keepPatchLocal ? redactedPatch(parts.patch) : null;
   const changedFiles = parts.changedFiles ?? [];
   const build = (): SkillRunFinishedData => ({
     runId: parts.runId,
@@ -99,6 +113,7 @@ export const finishedData = (parts: FinishedParts): SkillRunFinishedData => {
     ),
     ...(patch?.text ? { patch: patch.text } : {}),
     patchTruncated: patch?.truncated ?? false,
+    ...(keptSha256 ? { patchSha256: keptSha256 } : {}),
     ...(parts.pr ? { prNumber: parts.pr.number, prUrl: parts.pr.url } : {}),
     ...(parts.error ? { error: parts.error.slice(0, 500) } : {}),
   });
