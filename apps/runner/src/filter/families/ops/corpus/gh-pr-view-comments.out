@@ -1,0 +1,161 @@
+author:	vercel
+association:	none
+edited:	false
+status:	none
+--
+[vc]: #Zm9vYmFyYmF6cXV4cXV1eA==:eyJpc01vbm9yZXBvIjp0cnVlLCJ0eXBlIjoiZ2l0aHViIn0=
+**The latest updates on your projects**. Learn more about [Vercel for Git ↗︎](https://vercel.link/github-learn-more)
+
+| Name | Status | Preview | Comments | Updated (UTC) |
+| :--- | :----- | :------ | :------- | :------ |
+| **storefront** | ✅ Ready ([Inspect](https://vercel.com/acme/storefront/8Kq3vXbN2)) | [Visit Preview](https://storefront-git-feat-discounts-acme.vercel.app) | 💬 [**Add feedback**](https://vercel.live/open-feedback/storefront-git-feat-discounts-acme.vercel.app?via=pr-comment-feedback-link) | Oct 17, 2026 9:41am |
+| **storefront-admin** | ✅ Ready ([Inspect](https://vercel.com/acme/storefront-admin/3Hn8mWcP1)) | [Visit Preview](https://storefront-admin-git-feat-discounts-acme.vercel.app) | 💬 [**Add feedback**](https://vercel.live/open-feedback/storefront-admin-git-feat-discounts-acme.vercel.app?via=pr-comment-feedback-link) | Oct 17, 2026 9:41am |
+
+<!-- vercel-deployment-status -->
+<!--
+  {"projects":[{"name":"storefront","id":"prj_8Kq3vXbN2","inspectorUrl":"https://vercel.com/acme/storefront/8Kq3vXbN2","previewUrl":"storefront-git-feat-discounts-acme.vercel.app","nextCommitStatus":"DEPLOYED"},
+   {"name":"storefront-admin","id":"prj_3Hn8mWcP1","inspectorUrl":"https://vercel.com/acme/storefront-admin/3Hn8mWcP1","previewUrl":"storefront-admin-git-feat-discounts-acme.vercel.app","nextCommitStatus":"DEPLOYED"}]}
+-->
+--
+author:	codecov
+association:	none
+edited:	true
+status:	none
+--
+## [Codecov](https://app.codecov.io/gh/acme/storefront/pull/482?dropdown=coverage&src=pr&el=h1) Report
+<!-- codecov-comment-start -->
+Attention: Patch coverage is `87.50000%` with `3 lines` in your changes missing coverage. Please review.
+> Project coverage is 81.42%. Comparing base [(`1a2b3c4`)](https://app.codecov.io/gh/acme/storefront/commit/1a2b3c4) to head [(`9d8e7f6`)](https://app.codecov.io/gh/acme/storefront/commit/9d8e7f6).
+
+| [Files with missing lines](https://app.codecov.io/gh/acme/storefront/pull/482?dropdown=coverage&src=pr&el=tree) | Patch % | Lines |
+|---|---|---|
+| [src/checkout/discount.ts](https://app.codecov.io/gh/acme/storefront/pull/482?src=pr&el=tree&filepath=src%2Fcheckout%2Fdiscount.ts) | 85.71% | [2 Missing :warning: ](https://app.codecov.io/gh/acme/storefront/pull/482?src=pr&el=tree) |
+| [src/cart/totals.ts](https://app.codecov.io/gh/acme/storefront/pull/482?src=pr&el=tree&filepath=src%2Fcart%2Ftotals.ts) | 90.00% | [1 Missing :warning: ](https://app.codecov.io/gh/acme/storefront/pull/482?src=pr&el=tree) |
+
+<details><summary>Additional details and impacted files</summary>
+
+```diff
+@@            Coverage Diff             @@
+##             main     #482      +/-   ##
+==========================================
++ Coverage   81.37%   81.42%   +0.05%     
+==========================================
+  Files         214      216       +2     
+  Lines        9873     9897      +24     
+  Branches     1702     1708       +6     
+==========================================
++ Hits         8034     8059      +25     
++ Misses       1611     1610       -1     
+  Partials      228      228              
+```
+
+| [Files with missing lines](https://app.codecov.io/gh/acme/storefront/pull/482?dropdown=coverage&src=pr&el=tree) | Coverage Δ | |
+|---|---|---|
+| [src/cart/cart.ts](https://app.codecov.io/gh/acme/storefront/pull/482?src=pr&el=tree&filepath=src%2Fcart%2Fcart.ts) | `80.29% <92.00%> (+0.19%)` | :arrow_up: |
+| [src/cart/totals.ts](https://app.codecov.io/gh/acme/storefront/pull/482?src=pr&el=tree&filepath=src%2Fcart%2Ftotals.ts) | `96.78% <83.00%> (+5.84%)` | :arrow_up: |
+| [src/checkout/discount.ts](https://app.codecov.io/gh/acme/storefront/pull/482?src=pr&el=tree&filepath=src%2Fcheckout%2Fdiscount.ts) | `71.74% <86.00%> (+0.21%)` | :arrow_up: |
+| [src/checkout/payment.tsx](https://app.codecov.io/gh/acme/storefront/pull/482?src=pr&el=tree&filepath=src%2Fcheckout%2Fpayment.tsx) | `83.63% <82.00%> (+3.21%)` | :arrow_up: |
+| [src/checkout/address.tsx](https://app.codecov.io/gh/acme/storefront/pull/482?src=pr&el=tree&filepath=src%2Fcheckout%2Faddress.tsx) | `87.64% <81.00%> (+9.25%)` | :arrow_up: |
+| [src/catalog/search.ts](https://app.codecov.io/gh/acme/storefront/pull/482?src=pr&el=tree&filepath=src%2Fcatalog%2Fsearch.ts) | `100.38% <100.00%> (+9.17%)` | :arrow_up: |
+| [src/lib/money.ts](https://app.codecov.io/gh/acme/storefront/pull/482?src=pr&el=tree&filepath=src%2Flib%2Fmoney.ts) | `88.84% <92.00%> (+0.38%)` | :arrow_up: |
+| [src/api/orders.ts](https://app.codecov.io/gh/acme/storefront/pull/482?src=pr&el=tree&filepath=src%2Fapi%2Forders.ts) | `71.81% <84.00%> (+4.63%)` | :arrow_up: |
+| [src/api/products.ts](https://app.codecov.io/gh/acme/storefront/pull/482?src=pr&el=tree&filepath=src%2Fapi%2Fproducts.ts) | `74.79% <83.00%> (+9.49%)` | :arrow_up: |
+| [src/hooks/use-cart.ts](https://app.codecov.io/gh/acme/storefront/pull/482?src=pr&el=tree&filepath=src%2Fhooks%2Fuse-cart.ts) | `87.97% <85.00%> (+1.84%)` | :arrow_up: |
+| [src/components/price.tsx](https://app.codecov.io/gh/acme/storefront/pull/482?src=pr&el=tree&filepath=src%2Fcomponents%2Fprice.tsx) | `88.91% <86.00%> (+5.22%)` | :arrow_up: |
+| [src/components/coupon-input.tsx](https://app.codecov.io/gh/acme/storefront/pull/482?src=pr&el=tree&filepath=src%2Fcomponents%2Fcoupon-input.tsx) | `87.18% <98.00%> (+0.89%)` | :arrow_up: |
+
+... and [3 files with indirect coverage changes](https://app.codecov.io/gh/acme/storefront/pull/482/indirect-changes?src=pr&el=tree-more)
+
+------
+
+[Continue to review full report in Codecov by Sentry](https://app.codecov.io/gh/acme/storefront/pull/482?dropdown=coverage&src=pr&el=continue).
+> **Legend** - [Click here to learn more](https://docs.codecov.io/docs/codecov-delta)
+> `Δ = absolute <relative> (impact)`, `ø = not affected`, `? = missing data`
+> Powered by [Codecov](https://app.codecov.io/gh/acme/storefront/pull/482?dropdown=coverage&src=pr&el=footer). Last update [1a2b3c4...9d8e7f6](https://app.codecov.io/gh/acme/storefront/pull/482?dropdown=coverage&src=pr&el=lastupdated). Read the [comment docs](https://docs.codecov.io/docs/pull-request-comments).
+</details>
+<!-- codecov-comment-end -->
+--
+author:	mkowalski
+association:	member
+edited:	false
+status:	COMMENTED
+--
+Thanks, this reads well. Two things before I approve:
+
+1. `applyDiscount` rounds after tax in `src/checkout/discount.ts:58`, so a 10% code on 1320 gives 1200 instead of 1188 — the failing payment test is right.
+2. Can we keep the percentage codes and the fixed-amount codes in one table? Two lookups on every keystroke in the coupon field is going to show up on slow phones.
+
+Nit: `CouponInput` re-renders on every cart change; `useMemo` on the parsed code would help.
+--
+author:	dkim
+association:	contributor
+edited:	false
+status:	none
+--
+Fixed the rounding (tax is applied last now) and merged the two tables into `DISCOUNTS`.
+The coupon field debounces at 150 ms.
+--
+author:	sonarcloud
+association:	none
+edited:	false
+status:	none
+--
+<!-- sonarcloud-quality-gate -->
+## [![Quality Gate Passed](https://sonarsource.github.io/sonarcloud-github-static-resources/v2/checks/QualityGateBadge/qg-passed-20px.png 'Quality Gate Passed')](https://sonarcloud.io/dashboard?id=acme_storefront&pullRequest=482) **Quality Gate passed**
+Issues  
+![](https://sonarsource.github.io/sonarcloud-github-static-resources/v2/common/passed-16px.png '') [0 New issues](https://sonarcloud.io/project/issues?id=acme_storefront&pullRequest=482&issueStatuses=OPEN,CONFIRMED&sinceLeakPeriod=true)  
+![](https://sonarsource.github.io/sonarcloud-github-static-resources/v2/common/accepted-16px.png '') [0 Accepted issues](https://sonarcloud.io/project/issues?id=acme_storefront&pullRequest=482&issueStatuses=ACCEPTED)
+
+Measures  
+![](https://sonarsource.github.io/sonarcloud-github-static-resources/v2/common/passed-16px.png '') [0 Security Hotspots](https://sonarcloud.io/project/security_hotspots?id=acme_storefront&pullRequest=482&issueStatuses=OPEN,CONFIRMED&sinceLeakPeriod=true)  
+![](https://sonarsource.github.io/sonarcloud-github-static-resources/v2/common/passed-16px.png '') [87.5% Coverage on New Code](https://sonarcloud.io/component_measures?id=acme_storefront&pullRequest=482&metric=new_coverage&view=list)  
+![](https://sonarsource.github.io/sonarcloud-github-static-resources/v2/common/passed-16px.png '') [0.0% Duplication on New Code](https://sonarcloud.io/component_measures?id=acme_storefront&pullRequest=482&metric=new_duplicated_lines_density&view=list)  
+  
+[See analysis details on SonarCloud](https://sonarcloud.io/dashboard?id=acme_storefront&pullRequest=482)
+
+<!-- sonarcloud-quality-gate-end -->
+--
+author:	mkowalski
+association:	member
+edited:	false
+status:	APPROVED
+--
+LGTM 🚢
+--
+author:	github-actions
+association:	none
+edited:	true
+status:	none
+--
+<!-- bundle-size-report -->
+### 📦 Next.js Bundle Analysis for storefront
+
+This analysis was generated by the [Next.js Bundle Analysis action](https://github.com/hashicorp/nextjs-bundle-analysis). 🤖
+
+#### Eight Pages Changed Size
+
+The following pages changed size from the code in this PR compared to its base branch:
+
+| Page | Size (compressed) | First Load |
+|---|---|---|
+| `/` | 15.64 KB (🟡 +697 B) | 158.55 KB |
+| `/cart` | 22.60 KB (🟡 +600 B) | 148.47 KB |
+| `/checkout` | 21.32 KB (🟡 +814 B) | 113.90 KB |
+| `/checkout/payment` | 17.11 KB (🟡 +589 B) | 128.68 KB |
+| `/checkout/address` | 33.44 KB (🟡 +747 B) | 147.37 KB |
+| `/account` | 40.10 KB (🟡 +121 B) | 155.54 KB |
+| `/account/orders` | 12.97 KB (🟡 +351 B) | 109.63 KB |
+| `/products/[slug]` | 28.6 KB (🟡 +685 B) | 99.98 KB |
+| `/search` | 37.74 KB (🟡 +809 B) | 130.44 KB |
+| `/category/[slug]` | 24.77 KB (🟡 +509 B) | 164.59 KB |
+| `/wishlist` | 6.12 KB (🟡 +277 B) | 150.90 KB |
+| `/help` | 6.8 KB (🟡 +749 B) | 179.40 KB |
+
+<details>
+<summary>Details</summary>
+<p>Only the gzipped size is provided here based on <a href="https://twitter.com/slightlylate/status/1412851269211811845">an expert tip</a>.</p>
+<p><strong>First Load</strong> is the size of the global bundle plus the bundle for the individual page. If a user were to show up to your website and land on a given page, the first load size represents the amount of javascript that user would need to download. If <code>next/link</code> is used, subsequent page loads would only need to download that page's bundle (the number in the "Size" column), since the global bundle has already been downloaded.</p>
+<p>Any third party scripts you have added directly to your app using the <code>&lt;script&gt;</code> tag are not accounted for in this analysis</p>
+<p>Next to the size is how much the size has increased or decreased compared with the base branch of this PR. If this percentage has increased by 10% or more, there will be a red status indicator applied, indicating that special attention should be given to this.</p>
+</details>
+--

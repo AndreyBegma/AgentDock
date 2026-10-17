@@ -44,11 +44,23 @@ export const isProtectedLine = (line: string): boolean => {
   );
 };
 
+/**
+ * The part of a line the classifier judges — the whole line unless a filter
+ * says otherwise (`Filter.protectedPart`).
+ */
+export type LinePart = (line: string) => string;
+
+const wholeLine: LinePart = (line) => line;
+
 /** The distinct protected lines of an output, trimmed, without escapes. */
-export const protectedLines = (output: string): string[] => {
+export const protectedLines = (
+  output: string,
+  part: LinePart = wholeLine,
+): string[] => {
   const seen = new Set<string>();
   for (const line of output.split('\n')) {
-    if (isProtectedLine(line)) seen.add(stripAnsi(line).trim());
+    const text = part(stripAnsi(line));
+    if (isProtectedLine(text)) seen.add(text.trim());
   }
   return [...seen];
 };
@@ -56,12 +68,16 @@ export const protectedLines = (output: string): string[] => {
 /**
  * The protected lines of `original` that `kept` lost. A line survives when
  * its text appears in the kept output (escapes ignored), so a filter may
- * re-indent, recolour or deduplicate it but not drop or shorten it.
+ * re-indent, recolour or deduplicate it but not drop or shorten it. With a
+ * `part`, only that part of each line is judged and has to survive.
  */
 export const missingProtectedLines = (
   original: string,
   kept: string,
+  part: LinePart = wholeLine,
 ): string[] => {
   const haystack = stripAnsi(kept);
-  return protectedLines(original).filter((line) => !haystack.includes(line));
+  return protectedLines(original, part).filter(
+    (line) => !haystack.includes(line),
+  );
 };

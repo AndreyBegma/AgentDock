@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'bun:test';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   type CorpusCase,
@@ -39,6 +41,15 @@ describe.each(Object.keys(FAMILIES))('corpus: %s family', (family) => {
         case: r.case.name,
         filtered: true,
       });
+    }
+  });
+
+  it('keeps every case with a `maxRatio` at or under it', () => {
+    for (const r of results.filter((x) => x.case.maxRatio !== undefined)) {
+      expect({
+        case: r.case.name,
+        within: r.ratio <= (r.case.maxRatio ?? 1),
+      }).toEqual({ case: r.case.name, within: true });
     }
   });
 
@@ -90,6 +101,33 @@ describe('the corpus harness itself', () => {
     const [failing] = fixtures.map((c) => runCorpusCase([lossy], c));
     expect(failing?.filtered).toBe(false);
     expect(failing?.missing).toEqual([]);
+  });
+
+  it('reads `maxRatio`, and refuses one outside (0, 1]', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'corpus-'));
+    try {
+      const write = (maxRatio: unknown) => {
+        writeFileSync(
+          join(dir, 'c.json'),
+          JSON.stringify({
+            argv: ['demo-test'],
+            exitCode: 0,
+            category: 'other',
+            outcome: 'passing',
+            maxRatio,
+          }),
+        );
+        writeFileSync(join(dir, 'c.out'), 'ok\n');
+      };
+      write(0.5);
+      expect(loadCorpus(dir)[0]?.maxRatio).toBe(0.5);
+      write(1.5);
+      expect(() => loadCorpus(dir)).toThrow('malformed');
+      write('0.5');
+      expect(() => loadCorpus(dir)).toThrow('malformed');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('computes the savings medians the acceptance criteria name', () => {

@@ -1,0 +1,354 @@
+diff --git a/apps/runner/src/filter/hook.spec.ts b/apps/runner/src/filter/hook.spec.ts
+index 2066c571..26540c23 100644
+--- a/apps/runner/src/filter/hook.spec.ts
++++ b/apps/runner/src/filter/hook.spec.ts
+@@ -184,14 +184,14 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
+     };
+ 
+     it('is the mode in a mode that never rewrites, whatever the command', () => {
+-      for (const mode of ['default', 'acceptEdits', 'plan', 'dontAsk']) {
++      for (const mode of ['default', 'acceptEdits', 'dontAsk']) {
+         expect(filterOf('bun test > out.log', mode)).toBe('none:mode');
+         expect(filterOf('ls', mode)).toBe('none:mode');
+       }
+     });
+ 
+-    it('is compound or uncovered in bypass and auto', () => {
+-      for (const mode of ['bypassPermissions', 'auto']) {
++    it('is compound or uncovered in bypass, auto and plan', () => {
++      for (const mode of ['bypassPermissions', 'auto', 'plan']) {
+         expect(filterOf('bun test > out; ls', mode)).toBe('none:compound');
+         expect(filterOf('ls -la', mode)).toBe('none:uncovered');
+       }
+@@ -269,10 +269,11 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
+       ['acceptEdits', covered, null],
+       ['acceptEdits', denied, null],
+       ['acceptEdits', compound, null],
+-      ['plan', covered, null],
++      ['plan', covered, undecided(covered)],
++      ['plan', chain, undecided(chain)],
+       ['plan', denied, null],
++      ['plan', asked, null],
+       ['plan', compound, null],
+-      ['plan', chain, null],
+       ['dontAsk', covered, null],
+       ['some-later-mode', covered, null],
+       ['Auto', covered, null],
+diff --git a/apps/runner/src/filter/hook.ts b/apps/runner/src/filter/hook.ts
+index 67c8e504..95e2d722 100644
+--- a/apps/runner/src/filter/hook.ts
++++ b/apps/runner/src/filter/hook.ts
+@@ -25,8 +25,8 @@ import type { Filter } from './types';
+ /**
+  * `agentdock-runner filter-hook` (#445 D3): Claude Code's PreToolUse hook for
+  * Bash. It turns `bun run test` into `<runner> filter -- bun run test` when —
+- * and only when — the session is in `bypassPermissions` (amendment 9) or
+- * `auto` (amendment 10), the call is a list of pipelines of simple commands
++ * and only when — the session is in `bypassPermissions` (amendment 9),
++ * `auto` (amendment 10) or `plan` (amendment 14), the call is a list of pipelines of simple commands
+  * (#610) and a filter covers the first command of at least one pipeline, the
+  * call is not in the background, that command is not a dev/watch mode, and
+  * the rewrite changes nothing about what the session asks or denies (see
+@@ -36,9 +36,9 @@ import type { Filter } from './types';
+  * `passedThrough`.
+  *
+  * In bypass mode the rewrite carries `permissionDecision: "allow"`. In auto
+- * mode it carries no decision at all: Claude Code's own permission rules and
+- * auto-mode classifier judge the wrapped command, so the hook never skips
+- * them.
++ * and plan mode it carries no decision at all: Claude Code's own permission
++ * rules (and, in auto, its classifier) judge the wrapped command, so the hook
++ * never skips them.
+  *
+  * It fails open: any error prints nothing and exits 0, which Claude Code
+  * reads as "no decision" — the command runs as written.
+@@ -55,7 +55,7 @@ interface HookInput {
+ export interface HookOutput {
+   hookSpecificOutput: {
+     hookEventName: 'PreToolUse';
+-    /** Bypass mode only; in auto mode Claude Code decides (amendment 10). */
++    /** Bypass mode only; in auto and plan mode Claude Code decides (amendments 10, 14). */
+     permissionDecision?: 'allow';
+     permissionDecisionReason?: string;
+     updatedInput: Record<string, unknown>;
+@@ -132,8 +132,10 @@ export const decideHook = (
+     typeof input.permission_mode === 'string'
+       ? input.permission_mode
+       : undefined;
+-  // Amendments 9 and 10: only bypass and auto rewrite; elsewhere, never.
+-  const rewrites = mode === 'bypassPermissions' || mode === 'auto';
++  // Amendments 9, 10 and 14: only bypass, auto and plan rewrite; elsewhere,
++  // never.
++  const rewrites =
++    mode === 'bypassPermissions' || mode === 'auto' || mode === 'plan';
+   // Amendment 12: a matched filter keeps its id; otherwise the row says why
+   // none ran — the mode first, since in it nothing would ever be rewritten.
+   const id =
+@@ -152,7 +154,7 @@ export const decideHook = (
+   if (toolInput.run_in_background === true) return leave('background');
+   if (!first) return leave('no filter');
+   if (wrapped.size === 0) return leave('long-running');
+-  if (!rewrites) return leave('not bypassPermissions or auto');
++  if (!rewrites) return leave('not bypassPermissions, auto or plan');
+ 
+   const cwd = typeof input.cwd === 'string' ? input.cwd : process.cwd();
+   const sources: SettingsSources = {
+@@ -172,9 +174,9 @@ export const decideHook = (
+       wrapped.has(stage),
+     ),
+   };
+-  // Amendment 10: in auto mode no decision, so the classifier and the rules
+-  // judge the wrapped command exactly as they would any other.
+-  if (mode === 'auto') {
++  // Amendments 10 and 14: in auto and plan mode no decision, so the rules (and
++  // the classifier) judge the wrapped command exactly as any other.
++  if (mode === 'auto' || mode === 'plan') {
+     return {
+       rewrite: {
+         hookSpecificOutput: { hookEventName: 'PreToolUse', updatedInput },
+diff --git a/apps/runner/src/filter/launch-e2e.spec.ts b/apps/runner/src/filter/launch-e2e.spec.ts
+index 6f66e6dc..823ba66c 100644
+--- a/apps/runner/src/filter/launch-e2e.spec.ts
++++ b/apps/runner/src/filter/launch-e2e.spec.ts
+@@ -110,4 +110,86 @@ describe('Token saver, launch to stats row (#445 DR-02)', () => {
+       passedThrough: false,
+     });
+   });
++
++  // #612: planner and design runs launch with `--permission-mode plan`.
++  it.each([
++    'plan',
++    'ui_profile',
++  ] as const)('rewrites and records a real filter id for a %s run in plan mode', async (runKind) => {
++    const runDir = join(home, 'cards', 'card_1', 'rounds', 'run_1');
++    mkdirSync(runDir, { recursive: true });
++    const launch = tokenSaverLaunch({
++      config: { enabled: true, mcpAllow: [] },
++      profile: { id: 'p', runtime: 'claude', env: {}, args: [] },
++      home,
++      dir: runDir,
++      selfCommand: ['/opt/agentdock-runner'],
++      runKind,
++      projectId: 'prj_a',
++      runId: 'run_1',
++      agentdock: false,
++      scout: false,
++    });
++    if (!launch) throw new Error('expected a launch');
++    const env = { PATH: process.env.PATH, ...launch.env };
++
++    const out = runFilterHook(
++      JSON.stringify({
++        tool_name: 'Bash',
++        permission_mode: 'plan',
++        cwd: home,
++        tool_input: { command: 'demo-test --all' },
++      }),
++      {
++        env,
++        filters: [demoFilter],
++        selfCommand: ['/opt/agentdock-runner'],
++        home,
++        os: 'linux',
++        now: Date.now,
++        rules: () => ({ allow: [], deny: [], ask: [] }),
++      },
++    );
++    const output = (JSON.parse(out) as HookOutput).hookSpecificOutput;
++    expect(output.permissionDecision).toBeUndefined();
++    expect(output.updatedInput.command).toBe(
++      '/opt/agentdock-runner filter -- demo-test --all',
++    );
++
++    const fixture = join(home, 'demo.sh');
++    writeFileSync(join(home, 'out.txt'), tapOutput(100, ['not ok 101 - x']));
++    writeFileSync(fixture, `#!/bin/sh\ncat "${join(home, 'out.txt')}"\n`);
++    chmodSync(fixture, 0o755);
++    const code = await runFilter([fixture], {
++      env,
++      filters: [demoFilter],
++      stdout: () => {},
++      stderr: () => {},
++      now: Date.now,
++      onSignal: () => () => {},
++    });
++    expect(code).toBe(0);
++
++    const events: UnsequencedEvent[] = [];
++    const reader = new FilterStatsReader({
++      roots: () => [join(home, 'cards')],
++      resolve: async (ids) =>
++        new Map(ids.map((id) => [id, { repo: `acme/${id}`, root: home }])),
++      emit: (event) => events.push(event),
++      log: createLogger({
++        level: 'error',
++        write: () => {},
++        now: () => new Date(0),
++      }),
++      now: () => new Date(),
++    });
++    await reader.poll();
++    const rows = (events[0]?.data as { rows: FilterStatRow[] }).rows;
++    expect(rows).toHaveLength(1);
++    expect(rows[0]).toMatchObject({
++      runKind,
++      filter: 'fixture/demo',
++      passedThrough: false,
++    });
++  });
+ });
+diff --git a/apps/runner/src/filter/permissions.spec.ts b/apps/runner/src/filter/permissions.spec.ts
+index b4f18d67..f18af982 100644
+--- a/apps/runner/src/filter/permissions.spec.ts
++++ b/apps/runner/src/filter/permissions.spec.ts
+@@ -60,7 +60,8 @@ const table: Row[] = [
+   { name: 'auto with an unknown deny syntax', rules: { deny: ['Bash(git push'] }, mode: 'auto', command: 'bun test', rewrite: false },
+   { name: 'default mode with an allow rule', rules: { allow: ['Bash(bun test:*)'] }, mode: 'default', command: 'bun test', rewrite: false },
+   { name: 'acceptEdits with an allow rule', rules: { allow: ['Bash'] }, mode: 'acceptEdits', command: 'bun test', rewrite: false },
+-  { name: 'plan mode with an allow rule', rules: { allow: ['Bash(*)'] }, mode: 'plan', command: 'bun test', rewrite: false },
++  { name: 'plan mode with an allow rule', rules: { allow: ['Bash(*)'] }, mode: 'plan', command: 'bun test', rewrite: true },
++  { name: 'plan mode with a deny rule', rules: { deny: ['Bash(git push:*)'] }, mode: 'plan', command: 'git push', rewrite: false },
+   { name: 'dontAsk mode with an allow rule', rules: { allow: ['Bash'] }, mode: 'dontAsk', command: 'bun test', rewrite: false },
+   { name: 'an unknown mode', rules: {}, mode: 'Auto', command: 'bun test', rewrite: false },
+   { name: 'no mode given', rules: { allow: ['Bash'] }, command: 'bun test', rewrite: false },
+diff --git a/apps/runner/src/filter/permissions.ts b/apps/runner/src/filter/permissions.ts
+index 3ea175e5..563d4d4e 100644
+--- a/apps/runner/src/filter/permissions.ts
++++ b/apps/runner/src/filter/permissions.ts
+@@ -6,15 +6,15 @@ import type { HookCommand } from './shell';
+ /**
+  * The hook must never change what a session allows, asks or denies (#445,
+  * decision on the hook's permissions, narrowed by amendment 9, widened to
+- * auto mode by amendment 10). Claude Code matches its permission rules
++ * auto mode by amendment 10 and plan mode by amendment 14). Claude Code matches its permission rules
+  * against the command a PreToolUse hook returns, so a rewritten
+  * `agentdock-runner filter -- git push` would slip past `Bash(git push:*)`.
+  * The hook therefore rewrites only when:
+  *
+- * - the session is in `bypassPermissions`, or in `auto`, where the hook
+- *   returns no decision and the classifier judges the wrapped command. In
+- *   every other mode Claude Code (its prompt, plan mode) decides and the
+- *   command is left as written; and
++ * - the session is in `bypassPermissions`, or in `auto` or `plan`, where the
++ *   hook returns no decision and Claude Code's rules (and, in auto, its
++ *   classifier) judge the wrapped command. In every other mode Claude Code
++ *   (its prompt) decides and the command is left as written; and
+  * - no `deny` or `ask` `Bash(…)` rule matches the line, at any word of any
+  *   of its commands (#610), wrapped or not.
+  *
+@@ -151,8 +151,12 @@ export const permissionFor = (
+   original: string,
+   parsed: HookCommand,
+ ): PermissionVerdict => {
+-  if (permissionMode !== 'bypassPermissions' && permissionMode !== 'auto') {
+-    return { rewrite: false, reason: 'not bypassPermissions or auto' };
++  if (
++    permissionMode !== 'bypassPermissions' &&
++    permissionMode !== 'auto' &&
++    permissionMode !== 'plan'
++  ) {
++    return { rewrite: false, reason: 'not bypassPermissions, auto or plan' };
+   }
+   const candidates = ruleCandidates(original, parsed);
+   for (const list of ['deny', 'ask'] as const) {
+diff --git a/docs/adr/0039-token-saver.md b/docs/adr/0039-token-saver.md
+index 782aff98..6ca46e45 100644
+--- a/docs/adr/0039-token-saver.md
++++ b/docs/adr/0039-token-saver.md
+@@ -33,7 +33,8 @@ Only the card launch passes `--settings` and `--mcp-config` today. The other sev
+ 4. **Two registers for card workers.** Work is terse. Anything a person reads is written in full: questions, PR description, `finish_card` summary, specs, reply files, design. A guard on `finish_card` returns an incomplete artifact up to twice, then accepts it with a visible **Description incomplete** flag.
+ 5. **A project setting, on by default.** Off means exactly today's launches.
+ 6. **Savings are shown honestly:** the filter's estimate (labelled ≈) next to the measured cost per round before and after (ADR-0003, ADR-0009), on the card, on Usage and on a Token saver dashboard.
+-7. **Fleet slots stay the plugin's (ADR-0005).** A follow-up in the plugin repository wires the same hook when the runner is installed.
++7. **The hook rewrites only where it cannot widen a decision.** In `bypassPermissions` it allows the wrapped command; in `auto` and `plan` it returns no decision, so Claude Code's own rules (and classifier) judge the wrapped command; in `default`, `acceptEdits` and `dontAsk` it never rewrites, because a person would see the wrapped command in a prompt (spec #445, amendments 9, 10 and 14).
++8. **Fleet slots stay the plugin's (ADR-0005).** A follow-up in the plugin repository wires the same hook when the runner is installed.
+ 
+ ## Consequences
+ 
+diff --git a/docs/guides/token-saver-filter.md b/docs/guides/token-saver-filter.md
+index abf653df..add6c884 100644
+--- a/docs/guides/token-saver-filter.md
++++ b/docs/guides/token-saver-filter.md
+@@ -15,8 +15,8 @@ the bypass, the raw files and the MCP allowlist.
+    session's environment (`filter/env.ts`).
+ 2. The hook reads Claude Code's PreToolUse JSON. It rewrites `tool_input.command`
+    to `<runner> filter -- <command>` only when **all** of these hold:
+-   - the session's `permission_mode` is `bypassPermissions` (spec amendment 9)
+-     or `auto` (amendment 10);
++   - the session's `permission_mode` is `bypassPermissions` (spec amendment 9),
++     `auto` (amendment 10) or `plan` (amendment 14);
+    - the command is a **list of pipelines of simple commands** (#610): simple
+      commands `[NAME=value …] program args…`, joined by `|` into pipelines,
+      and pipelines joined by `&&`, `||` and `;`. Each command may end in
+@@ -84,15 +84,15 @@ saver is off.
+ Claude Code matches its permission rules against the command a hook *returns*.
+ A rewritten `agentdock-runner filter -- git push` would therefore slip past
+ `Bash(git push:*)`. The hook (`permissionFor` in `filter/permissions.ts`)
+-applies these rules in order (spec #445 amendments 9, 10 and 11):
++applies these rules in order (spec #445 amendments 9, 10, 11 and 14):
+ 
+ | Situation | Result |
+ |---|---|
+-| The session is neither `bypassPermissions` nor `auto` (`default`, `acceptEdits`, `plan`, `dontAsk`, missing, …) | no rewrite, whatever the allow rules say |
++| The session is not `bypassPermissions`, `auto` or `plan` (`default`, `acceptEdits`, `dontAsk`, missing, …) | no rewrite, whatever the allow rules say |
+ | A `deny` or `ask` `Bash(…)` rule matches any command of the line, wrapped or not, or the whole line, at any word | no rewrite (`passedThrough`) |
+ | A settings file that exists but does not parse, or a `Bash(…)` rule this parser does not understand | no rewrite |
+ | Anything else, in `bypassPermissions` | rewrite, with `permissionDecision: "allow"` |
+-| Anything else, in `auto` | rewrite, with **no** `permissionDecision`: only `updatedInput` |
++| Anything else, in `auto` or `plan` | rewrite, with **no** `permissionDecision`: only `updatedInput` |
+ 
+ In auto mode the hook returns no decision, so Claude Code's own permission rules
+ and auto-mode classifier judge the wrapped `agentdock-runner filter -- <argv>`,
+diff --git a/docs/guides/token-saver.md b/docs/guides/token-saver.md
+index 1ab850e0..747a695a 100644
+--- a/docs/guides/token-saver.md
++++ b/docs/guides/token-saver.md
+@@ -50,9 +50,10 @@ the session is allowed to run. Claude Code checks permission rules against the
+ command a hook *returns*, so a rewrite could hide `git push` from a
+ `Bash(git push:*)` rule. The runner therefore rewrites only when:
+ 
+-- the session runs in `bypassPermissions`, or in `auto` (Board card sessions
+-  do). In `auto` the hook makes no decision, and Claude Code's classifier
+-  still judges the wrapped command; **and**
++- the session runs in `bypassPermissions`, in `auto` (Board card sessions do)
++  or in `plan` (planner and design runs do). In `auto` and `plan` the hook
++  makes no decision, and Claude Code's own rules still judge the wrapped
++  command; **and**
+ - no `deny` or `ask` rule matches it; **and**
+ - the call is made of simple commands joined by `|`, `&&`, `||` or `;` — no
+   redirect other than `2>&1`, no subshell, heredoc or substitution — and is
+@@ -69,7 +70,7 @@ sheet say why:
+ |---|---|
+ | Compound command (not filtered) | a redirect, a subshell, a heredoc, a substitution or a background `&` — something other than simple commands joined by `\|`, `&&`, `\|\|` or `;` |
+ | No filter for this command | no filter family covers the first command of any of its pipelines |
+-| Not filtered in this permission mode | the session's mode is neither `bypassPermissions` nor `auto` |
++| Not filtered in this permission mode | the session's mode is not `bypassPermissions`, `auto` or `plan` |
+ | No filter (uncovered command) | recorded before the reasons above existed |
+ 
+ The exact rules are in
+diff --git a/docs/specs/445-token-saver.md b/docs/specs/445-token-saver.md
+index fa1d7013..aabf9d3e 100644
+--- a/docs/specs/445-token-saver.md
++++ b/docs/specs/445-token-saver.md
+@@ -215,7 +215,7 @@ Settled by the person (1–3) and by the orchestrator (4–7) while the contract
+     - **Compaction threshold.** One constant, `COMPACT_AT_TOKENS = 150000` (`apps/runner/src/launch/token-saver.ts`). Checked against Claude Code 2.1.302: `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` is a percentage of the effective window, and an absolute setting exists, `CLAUDE_CODE_AUTO_COMPACT_WINDOW` (tokens, clamped to the model's window, floor 100k, and it beats `/autocompact` and settings). Claude Code compacts at that window less the output reserve (`min(maxOutputTokens, 20000)`) less a 13000-token summary buffer. The launch therefore sets `CLAUDE_CODE_AUTO_COMPACT_WINDOW = COMPACT_AT_TOKENS + 33000` (183000) and `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE = 100`. The 100 neutralises any percentage a profile carries, which would otherwise lower the threshold further. Compaction then lands at 150k on a 1M window and on a 200k window alike, with no model lookup. A per-model percentage was rejected: the absolute setting needs no table of windows, and the two settings cannot be combined, because the percentage applies to the configured window. An older Claude Code without the variable ignores it and compacts at its default.
+     - **`CS_ECO=on`.** Every launch with Token saver on (all eight run kinds) sets `CS_ECO=on`, so the code-sentinel plugin's eco hooks guard whole reads of large files, drop repeated reads and cut large MCP results. The plugin's own Bash rewrite stands down when `AGENTDOCK_FILTER_STATS` is set, so a command is filtered and counted once. With Token saver off the launch sets neither variable, as before.
+     - **Why a command passed through.** When the hook does not rewrite and no filter matched, the row's `filter` is a reason instead of `none`:
+-      - `none:mode` — the permission mode is not `bypassPermissions` or `auto`, so the hook never rewrites. It takes precedence over the other two.
++      - `none:mode` — the permission mode is not `bypassPermissions`, `auto` or `plan`, so the hook never rewrites. It takes precedence over the other two.
+       - `none:compound` — not a single simple command, nor one of amendment 11's forms.
+       - `none:uncovered` — a simple command no family covers. `agentdock-runner filter` records it too for a command it runs without a filter.
+ 
+@@ -230,6 +230,12 @@ Settled by the person (1–3) and by the orchestrator (4–7) while the contract
+     - **Overhead.** `bench.spec.ts` (`RUN_BENCH=1`) also holds `filter-hook` on a pipeline-and-list line to p95 ≤ 50 ms.
+     - **Worker prompt.** Amendment 11's prompt lines (one command per Bash call) are unchanged. They are still the shortest output, and now a line that ignores them is filtered too.
+ 
++14. **The hook also rewrites in plan mode, with no decision** (#612, 2026-10-17). The planner, design and UI-profile runs, and other headless launches, run with `--permission-mode plan`, so every one of their Bash calls was recorded `none:mode`: the dashboard showed about $0.00 saved for Planner (159 commands) and Design (68). This widens amendment 9 by one more mode, the way amendment 10 did for `auto`, and changes nothing else.
++    - When the PreToolUse input's `permission_mode` is `plan`, the hook rewrites and returns only `hookEventName` and `updatedInput`: no `permissionDecision` and no reason, exactly as in auto. Claude Code's own permission rules judge the wrapped `agentdock-runner filter -- <argv>`, so the hook skips nothing and plan mode's read-only guarantee is Claude Code's, not the hook's.
++    - Every amendment-9 and amendment-13 pass-through rule holds in plan as in the other two modes: only commands whose rewrite `permissions.ts` proves equivalent are rewritten, and a matching `deny` or `ask` rule, or any doubt, keeps the line as written.
++    - `default`, `acceptEdits`, `dontAsk`, a missing mode and any later one still never rewrite and are recorded `none:mode`: a person would see the wrapped command in the prompt there. `bypassPermissions` and `auto` are unchanged.
++    - Out of scope: no launch changes its permission mode, and compound-command parsing is untouched.
++
+ ## Open questions
+ 
+ - The exact Claude Code setting for an earlier autocompact threshold, and the shape for defining the `scout` subagent with a model in `--settings`, are [Unknown]. The launch slot confirms both against the installed Claude Code. Default: if no documented setting exists, skip that half of D10 and say so in the PR.

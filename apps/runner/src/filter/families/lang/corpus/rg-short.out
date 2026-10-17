@@ -1,0 +1,14 @@
+apps/runner/src/filter/hook.ts:3:  FILTER_NONE_COMPOUND,
+apps/runner/src/filter/hook.ts:4:  FILTER_NONE_MODE,
+apps/runner/src/filter/hook.ts:5:  FILTER_NONE_UNCOVERED,
+apps/runner/src/filter/hook.ts:144:      ? FILTER_NONE_MODE
+apps/runner/src/filter/hook.ts:146:        ? FILTER_NONE_UNCOVERED
+apps/runner/src/filter/hook.ts:147:        : FILTER_NONE_COMPOUND);
+apps/runner/src/filter/env.spec.ts:7:import { FILTER_NONE } from './engine';
+apps/runner/src/filter/env.spec.ts:22:    expect(FILTER_NONE).toBe(FILTER_ID_NONE);
+apps/runner/src/filter/engine.ts:16:export const FILTER_NONE = 'none';
+apps/runner/src/filter/engine.ts:23:export const FILTER_NONE_COMPOUND = 'none:compound';
+apps/runner/src/filter/engine.ts:24:export const FILTER_NONE_UNCOVERED = 'none:uncovered';
+apps/runner/src/filter/engine.ts:25:export const FILTER_NONE_MODE = 'none:mode';
+apps/runner/src/filter/engine.ts:186:        filter: FILTER_NONE,
+apps/runner/src/filter/engine.ts:246:      filter: filter?.id ?? FILTER_NONE_UNCOVERED,
