@@ -9,9 +9,14 @@ sections: Workspace (Overview, Projects, Activity, Work, Sessions, Usage,
 Workflows, Skills), then the open project's pages under its name (its
 Board entry is labelled Work, #270; the Planner left it with #337 — New work
 is on the Board, #409),
-then Admin (its "Planner instructions" entry opens the instructions editor), folded into one
-group. That group unfolds by itself on an admin page and remembers its state
-per browser. Exactly one item is active: the longest matching href wins, and
+then Admin (its "Planner instructions" entry opens the instructions editor). Inside a
+project the project's section keeps only Project, Work and Activity; Fleet,
+Queue, Approvals, History, Token saver, Skills, Schedules and Settings sit in a
+**More** group under it, and Workspace folds into one group too (outside a
+project it is a plain section). More, Workspace-in-a-project and Admin start
+folded, unfold by themselves on one of their pages (History, Sessions, an
+admin page) and each remembers its state per browser under its own key; with
+storage blocked they stay folded. The icon-only rail shows every entry. Exactly one item is active: the longest matching href wins, and
 `/` and `/projects` match only exactly. Integrations goes to the hub,
 `/admin/integrations`. The active item is scrolled into view, and the rail
 fades at whichever edge has more. The project switcher is a button with the

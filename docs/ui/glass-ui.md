@@ -41,10 +41,16 @@ process state.
 
 ## Navigation
 
-- From `lg` (1024 px) up: `NavRail` — Workspace, the current project's pages
-  (titled with its name), and Admin as a `collapsible` group that unfolds by
-  itself while an admin page is open. Badges: the waiting-approvals count on
-  Approvals, the slots that wait on a person on Fleet.
+- From `lg` (1024 px) up: `NavRail` — Workspace, the current project's working
+  pages (titled with its name: Project, Work, Activity), a **More** group under
+  them (Fleet, Queue, Approvals, History, Token saver, Skills, Schedules,
+  Settings) and Admin. More and Admin are `collapsible` groups; inside a
+  project Workspace is one too. Each folds by default, unfolds by itself while
+  one of its pages is open and remembers its state per browser under its own
+  `localStorage` key (`railGroups` in `nav.ts` models the split, C-247).
+  Badges: the waiting-approvals count on Approvals, the slots that wait on a
+  person on Fleet; while More is folded Fleet's count rides More's title
+  ("More · 2").
 - Below `lg`: `BottomCapsule` (#521), floating clear of the screen's edges,
   with `tabSizing="content"` so no label is truncated. Three places — Overview
   · Projects · Activity outside a project, Work (the Board) · Fleet · Approvals
@@ -126,6 +132,7 @@ Until then AgentDock does without it rather than drawing it here (ADR-0011).
 
 | Gap | Effect in AgentDock |
 |---|---|
+| `NavRailGroup` has no `badge` | A folded group cannot carry a count on its heading; the shell appends Fleet's count to More's title ("More · 2") until glass-ui adds a group badge (C-247). |
 | `Board` has no `canDrop(card, column)` | The Board page checks `boardMoveRule` in `onMove` and declines there; a refused card snaps back, and the menu's "Move to" items still list every column. |
 | `Board`'s card `li` sets `min-h-(--size-row)` without `shrink-0` | In a height-bounded column the cards squash to one row instead of scrolling; `components/board/board-view.tsx` adds `[&_[data-board-card]]:shrink-0` on the board's wrapper (#384, glass-ui#147). |
 | `Board`'s card menu always lists one "Move to <column>" item per other column, and `ActionList` rows are 40 px with no current mark | The card menu gets one "Move…" item that opens `components/board/move-picker.tsx` (a bottom `Sheet` of `Button` rows, 52 px, current column marked), also behind the card sheet's and the card page's Move button (#515). glass-ui's own per-column items stay in the menu until `Board` can hide them. |

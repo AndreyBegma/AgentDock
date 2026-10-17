@@ -53,6 +53,12 @@ export interface NavEntry {
    * page drops the width cap and scrolls its own regions, not the window.
    */
   fill?: boolean;
+  /**
+   * Stays in view in the desktop rail (C-247). Inside a section that has any
+   * primary entry, the others fold into its More group. The phone's capsule
+   * ignores it (`tabBarSplit`).
+   */
+  primary?: boolean;
 }
 
 export interface NavSection {
@@ -63,6 +69,8 @@ export interface NavSection {
   projectScoped?: boolean;
   /** Folded into one expandable group unless one of its pages is open. */
   collapsible?: boolean;
+  /** Folded into one expandable group of the rail while inside a project (C-247). */
+  foldedInProject?: boolean;
   entries: NavEntry[];
 }
 
@@ -70,6 +78,7 @@ export const NAV: NavSection[] = [
   {
     id: 'workspace',
     title: 'Workspace',
+    foldedInProject: true,
     entries: [
       {
         id: 'overview',
@@ -152,6 +161,7 @@ export const NAV: NavSection[] = [
       // The project's home (card C-6): its figures, then the orchestrator.
       {
         id: 'project-home',
+        primary: true,
         wide: true,
         href: '/projects/:projectId',
         label: 'Project',
@@ -173,6 +183,7 @@ export const NAV: NavSection[] = [
       // `/projects/:id/planner` stays reachable, read-only, off the nav.
       {
         id: 'board',
+        primary: true,
         wide: true,
         fill: true,
         href: '/projects/:projectId/board',
@@ -201,6 +212,7 @@ export const NAV: NavSection[] = [
       },
       {
         id: 'project-activity',
+        primary: true,
         wide: true,
         href: '/projects/:projectId/activity',
         label: 'Activity',
@@ -379,6 +391,54 @@ export function visibleNav(role: Role, pathname: string): VisibleSection[] {
     if (entries.length > 0) sections.push({ ...section, entries });
   }
   return sections;
+}
+
+/** One block of the desktop rail: a section, or a section's More. */
+export interface RailGroupSpec {
+  id: 'workspace' | 'project' | 'project-more' | 'admin';
+  title: string;
+  entries: VisibleEntry[];
+  /** The heading folds the entries; the rail unfolds it for the active page. */
+  collapsible: boolean;
+}
+
+/**
+ * The desktop rail's blocks (C-247): the project section keeps its `primary`
+ * entries and the rest go to a "More" group right under it; inside a project
+ * Workspace and Admin fold, outside a project Workspace is a plain section.
+ * An empty block is not drawn.
+ */
+export function railGroups(
+  sections: readonly VisibleSection[],
+): RailGroupSpec[] {
+  const inProject = sections.some((section) => section.id === 'project');
+  const groups: RailGroupSpec[] = [];
+  for (const section of sections) {
+    if (section.id === 'project') {
+      const primary = section.entries.filter((entry) => entry.primary);
+      const rest = section.entries.filter((entry) => !entry.primary);
+      if (rest.length === 0 || primary.length === 0) {
+        groups.push({ ...section, collapsible: false });
+        continue;
+      }
+      groups.push({ ...section, entries: primary, collapsible: false });
+      groups.push({
+        id: 'project-more',
+        title: 'More',
+        entries: rest,
+        collapsible: true,
+      });
+      continue;
+    }
+    groups.push({
+      id: section.id,
+      title: section.title,
+      entries: section.entries,
+      collapsible:
+        !!section.collapsible || (inProject && !!section.foldedInProject),
+    });
+  }
+  return groups;
 }
 
 /**
