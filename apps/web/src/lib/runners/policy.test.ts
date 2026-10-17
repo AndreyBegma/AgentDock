@@ -59,4 +59,28 @@ describe('runner policy refusals (ADR-0047)', () => {
       'slot.message',
     ]);
   });
+
+  it('shows code.deny when the runner reports it, and reads its refusal (#622)', () => {
+    const base = {
+      allowedRoots: ['/srv'],
+      maxPermissionMode: 'auto',
+      terminal: { write: false },
+      skills: { profileInstall: false },
+      commands: {},
+    };
+    expect(
+      policyRows({ policy: { ...base, code: { deny: ['internal'] } } }).at(-1),
+    ).toEqual({
+      label: 'Files the assistant may not read',
+      value: 'secrets, internal',
+    });
+    expect(
+      policyRows({ policy: { ...base, code: { deny: [] } } }).at(-1)?.value,
+    ).toBe('secrets only');
+    expect(
+      parsePolicyRefusal(
+        "refused by this runner's policy (code.deny): internal/a.ts matches the deny-path pattern internal. On the runner's machine: `agentdock-runner policy allow-path internal`",
+      )?.rule,
+    ).toBe('code.deny');
+  });
 });
