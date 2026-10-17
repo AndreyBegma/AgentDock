@@ -19,6 +19,7 @@ import {
   type LlmAdapter,
   type LlmCallInput,
   type LlmCompletion,
+  type LlmLedger,
   type LlmStopReason,
   type LlmStreamEvent,
   type LlmToolCall,
@@ -54,14 +55,20 @@ export class LlmGateway {
     private readonly adapters: Record<LlmProviderId, LlmAdapter>,
   ) {}
 
-  /** Streams one call; the ledger row is written when the stream ends. */
-  stream(input: LlmCallInput): AsyncIterable<LlmStreamEvent> {
-    return this.run(input, {});
+  /**
+   * Streams one call; the ledger row is written when the stream ends, and
+   * `ledger` then holds its id and cost.
+   */
+  stream(
+    input: LlmCallInput,
+    ledger: LlmLedger = {},
+  ): AsyncIterable<LlmStreamEvent> {
+    return this.run(input, ledger);
   }
 
   /** One call, collected: the text, the tool calls, the usage and the cost. */
   async complete(input: LlmCallInput): Promise<LlmCompletion> {
-    const ledger: { costUsd?: string } = {};
+    const ledger: LlmLedger = {};
     let text = '';
     const toolCalls: LlmToolCall[] = [];
     let usage = emptyUsage();
@@ -81,10 +88,10 @@ export class LlmGateway {
     };
   }
 
-  /** `ledger.costUsd` is set to the cost written once the row is. */
+  /** `ledger` is set to the row's id and cost once the row is written. */
   private async *run(
     input: LlmCallInput,
-    ledger: { costUsd?: string },
+    ledger: LlmLedger,
   ): AsyncIterable<LlmStreamEvent> {
     const { provider, request } = input;
     const label = LLM_PROVIDER_INFO[provider].label;
@@ -152,7 +159,7 @@ export class LlmGateway {
     } finally {
       const priced = pricer.price(request.model, usage);
       const costUsd = priced.costUsd ?? 0;
-      await this.prisma.llmCall.create({
+      const call = await this.prisma.llmCall.create({
         data: {
           ts: now,
           userId: input.userId,
@@ -167,6 +174,7 @@ export class LlmGateway {
           durationMs: Date.now() - started,
         },
       });
+      ledger.callId = call.id;
       ledger.costUsd = costUsd.toString();
     }
   }
