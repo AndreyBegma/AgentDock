@@ -6,6 +6,7 @@ import type {
 import { z } from 'zod';
 import { watchedProject } from '../control/target';
 import type { Exec } from '../detect/exec';
+import { redactUrlUserinfo } from '../redact-url';
 import { githubOf } from '../skills/run/collect';
 import {
   type BranchOutcome,
@@ -52,7 +53,7 @@ export const closeCardPr = async (
     return {
       closed: false,
       error: 'gh_failed',
-      message: (message.split('\n')[0] ?? '').slice(0, 500),
+      message: redactUrlUserinfo((message.split('\n')[0] ?? '').slice(0, 500)),
     };
   }
   const viewed = await gh([

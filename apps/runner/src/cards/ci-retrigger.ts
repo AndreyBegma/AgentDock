@@ -6,6 +6,7 @@ import type {
 import { z } from 'zod';
 import { watchedProject } from '../control/target';
 import type { Exec } from '../detect/exec';
+import { redactUrlUserinfo } from '../redact-url';
 import { githubOf } from '../skills/run/collect';
 import { firstLine, type Gh, ghOf, parsed } from './github';
 
@@ -53,7 +54,7 @@ export const retriggerCardCi = async (
     return {
       retriggered: false,
       error: 'gh_failed',
-      message: (message.split('\n')[0] ?? '').slice(0, 500),
+      message: redactUrlUserinfo((message.split('\n')[0] ?? '').slice(0, 500)),
     };
   }
   const viewed = await gh([
