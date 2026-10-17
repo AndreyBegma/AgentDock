@@ -4,6 +4,7 @@ import { BudgetGate } from '../budgets/budget-gate';
 import { capabilities } from '../runners/testing/runner-e2e';
 import { CardDesignHarness } from './testing/card-design-e2e';
 import { designResult, profileResult } from './testing/design-e2e';
+import { UiProfileService } from './ui-profile.service';
 
 /** A card's design turns answer the contract under this key (#243 D2). */
 const KEY = 'card-1';
@@ -152,6 +153,31 @@ describe('card design (e2e, #243)', () => {
     expect(view.status).toBe('idle');
     // At rest again: Generate takes a new turn.
     expect((await generate(card.number)).status).toBe(201);
+  });
+
+  it('#606: of two Generates at once one starts, and the other leaves the running turn alone', async () => {
+    await h.seedProfile();
+    const card = await h.designedCard(1);
+    const profiles = h.ctx.app.get(UiProfileService);
+    const ensureFresh = profiles.ensureFresh.bind(profiles);
+    let second: { status: number; body: { error?: string } } | null = null;
+    // The second Generate arrives while the first checks the profile.
+    jest
+      .spyOn(profiles, 'ensureFresh')
+      .mockImplementationOnce(async (...args) => {
+        second = await generate(card.number);
+        return ensureFresh(...args);
+      });
+
+    expect((await generate(card.number)).status).toBe(201);
+    expect(second).toMatchObject({
+      status: 409,
+      body: { error: 'design_busy' },
+    });
+    expect(h.sentOf('plan.turn')).toHaveLength(1);
+    const design = await h.cardDesign(card.number);
+    expect(design.status).toBe('generating');
+    expect(design.activeTurnId).not.toBeNull();
   });
 
   it('approving chains no write turn, sends plan.close, and with the switch off starts nothing', async () => {
