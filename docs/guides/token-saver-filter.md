@@ -17,19 +17,19 @@ the bypass, the raw files and the MCP allowlist.
    to `<runner> filter -- <command>` only when **all** of these hold:
    - the session's `permission_mode` is `bypassPermissions` (spec amendment 9)
      or `auto` (amendment 10);
-   - the command is a **single simple command**: `[NAME=value …] program args…`,
-     optionally in one of two forms around it (amendment 11):
-     - after `cd <path> &&`, with exactly one literal path word, quoted or not,
-       not empty and not starting with `-`;
-     - followed by `2>&1`, as the very last token, after an unquoted blank.
+   - the command is a **list of pipelines of simple commands** (#610): simple
+     commands `[NAME=value …] program args…`, joined by `|` into pipelines,
+     and pipelines joined by `&&`, `||` and `;`. Each command may end in
+     `2>&1`, after an unquoted blank. A single simple command and
+     `cd <path> && <command>` (amendment 11) are the smallest cases.
 
      `filter/shell.ts` (`parseHookCommand`) is a whitelist, not a shell.
-     Anything it does not understand exactly makes the command not simple:
-     - an unquoted `|`, `&`, `;`, `<`, `>`, `(` or `)` other than the two forms
-       above: lists, pipes, redirects, heredocs, subshells, process
-       substitution. `cd x && y && z`, `cd x; y`, `cd x && y | z`, `cd a b && y`,
-       `cd -- x && y`, `y 2>&1 >f`, `y 2>&3`, `y &>f` and `y 1>&2` all pass
-       through;
+     Anything it does not understand exactly makes the line pass through:
+     - an unquoted `&`, `<`, `>`, `(` or `)`, and `|&`, `;;`, `;&`: background
+       calls, redirects, heredocs, subshells, process substitution. So do an
+       empty command (`a &&`, `| a`, `a ;`, `a && && b`) and every redirect
+       but a command's own trailing `2>&1`: `y 2>&1 >f`, `y 2>&3`, `y &>f`,
+       `y 1>&2`, `y 2>&1 z`;
      - `$`, a backtick, `#` or `!` anywhere, quoted or not. That covers every
        expansion and substitution, `$'…'` and `$"…"` quoting, comments and
        history expansion;
@@ -40,8 +40,12 @@ the bypass, the raw files and the MCP allowlist.
        the words `exec`, `eval`, `source`, `.`, `command`, `builtin`, `env`,
        `sudo`, `nohup`, `xargs` and the compound keywords as the program;
    - the call is not `run_in_background: true`;
-   - a filter in the registry matches the program;
-   - the command is not a dev server or a watch mode. These count as one:
+   - a filter in the registry matches the program of the **first** command of
+     at least one pipeline. Only those commands are wrapped; a covered command
+     later in a pipe (`ls | bun test`) and every uncovered command run as
+     written;
+   - that command is not a dev server or a watch mode (it is then left as
+     written, and the others are still wrapped). These count as one:
      `--watch`, `--watchAll`, `--hot` and `--serve`; `npm|pnpm|yarn|bun run dev|start|serve|watch|preview`;
      and anything the filter's own `longRunning` reports;
    - the rewrite changes nothing about the session's permissions (next section).
@@ -51,9 +55,16 @@ the bypass, the raw files and the MCP allowlist.
 3. The rewrite is built from the parsed words, each re-quoted
    (`wrappedCommand` in `filter/hook.ts`), never from the original text. Bash
    therefore runs exactly the argv the parser saw. `shell.spec.ts` checks this
-   against a real `bash`, for the original and for the rewrite. A `cd` target
-   is re-quoted the same way and kept in front:
-   `cd '/a b' && CI=1 <runner> filter -- bun test 2>&1`. A trailing `2>&1` is
+   against a real `bash`, for the original and for the rewrite. The line keeps
+   its shape: the same pipelines, joined by the same operators, which the hook
+   writes as constants. Unwrapped commands are re-quoted the same way:
+   `cd '/a b' && CI=1 <runner> filter -- bun test 2>&1 | tail -50 ; git log`.
+   A wrapped command is still one simple command and the filter returns its
+   command's exit code, so `&&` and `||` short-circuit as before and `$?` and
+   `PIPESTATUS` are the original's (`shell.spec.ts`, `pipeline-e2e.spec.ts`).
+   When `| head` closes the pipe early, the filter stops writing without an
+   error, and sends its command the `SIGPIPE` it would have got writing there
+   itself. A `2>&1` is
    kept, written by the hook as a constant. When the filter does not compress
    (the bypass, output past the buffer, no filter), it forwards the child's
    stdout and stderr separately, so keeping the redirect gives the wrapped
@@ -78,7 +89,7 @@ applies these rules in order (spec #445 amendments 9, 10 and 11):
 | Situation | Result |
 |---|---|
 | The session is neither `bypassPermissions` nor `auto` (`default`, `acceptEdits`, `plan`, `dontAsk`, missing, …) | no rewrite, whatever the allow rules say |
-| A `deny` or `ask` `Bash(…)` rule matches the command, at any word | no rewrite (`passedThrough`) |
+| A `deny` or `ask` `Bash(…)` rule matches any command of the line, wrapped or not, or the whole line, at any word | no rewrite (`passedThrough`) |
 | A settings file that exists but does not parse, or a `Bash(…)` rule this parser does not understand | no rewrite |
 | Anything else, in `bypassPermissions` | rewrite, with `permissionDecision: "allow"` |
 | Anything else, in `auto` | rewrite, with **no** `permissionDecision`: only `updatedInput` |
@@ -285,4 +296,7 @@ Measured on a developer machine (Linux x64), median / p95 of 30 runs:
 is set (`RUN_BENCH=1 bun test src/filter/bench.spec.ts` in `apps/runner`), because
 a wall-clock gate is not deterministic on a shared CI host. It measures the bun
 entry (`bun src/main.ts filter -- true`) against `true` and fails above 50 ms at
-p95.
+p95. Since #610 it also measures `bun src/main.ts filter-hook` deciding a
+pipeline-and-list line (`cd … && bun run lint 2>&1 | tail -50 && git status; …`)
+against `true`, with the same ceiling; on the developer machine it measured
+31.2 / 35.5 ms (median / p95 of 40 runs, bun entry).
