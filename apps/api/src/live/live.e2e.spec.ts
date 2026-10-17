@@ -11,6 +11,8 @@ import {
   type Session,
 } from '../test/e2e-app';
 import { LiveService } from './live.service';
+import { LiveConnections } from './live-connections';
+import { LiveMonitor } from './live-monitor';
 import { allowedLiveOrigin } from './live-options';
 import {
   createLiveE2eApp,
@@ -295,24 +297,48 @@ describe('/live gateway (e2e)', () => {
   });
 
   describe('keepalive', () => {
+    // Its own app whose timers never fire in a test's lifetime: the sweep is
+    // driven by hand with a synthetic clock, so host load cannot drop a socket.
+    const HOUR_MS = 3_600_000;
+    let quiet: LiveE2eContext;
+
+    beforeAll(async () => {
+      quiet = await createLiveE2eApp({
+        revalidateMs: HOUR_MS,
+        pingIntervalMs: HOUR_MS,
+        idleTimeoutMs: IDLE_TIMEOUT_MS,
+      });
+    });
+    afterAll(() => quiet.app.close());
+
     it('drops a socket that stops answering pings', async () => {
       const { session } = await signIn('ada@example.com', 'viewer');
-      const socket = await open(session.token).ready();
+      const connect = (autoPong: boolean) => {
+        const socket = new TestLiveSocket(quiet.liveUrl, {
+          token: session.token,
+          origin: allowedLiveOrigin(),
+          autoPong,
+        });
+        sockets.push(socket);
+        return socket;
+      };
       // Sends nothing more and, with autoPong off, never answers a ping.
-      const silent = new TestLiveSocket(ctx.liveUrl, {
-        token: session.token,
-        origin: allowedLiveOrigin(),
-        autoPong: false,
-      });
-      sockets.push(silent);
-      await silent.ready();
-      const started = Date.now();
+      const silent = await connect(false).ready();
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      const answering = await connect(true).ready();
+
+      const monitor = quiet.app.get(LiveMonitor);
+      const lastSeen = quiet.app
+        .get(LiveConnections)
+        .all()
+        .map((client) => client.lastSeenAt);
+      expect(lastSeen).toHaveLength(2);
+      // Idle past the timeout for the older socket only.
+      monitor.keepalive(Math.min(...lastSeen) + IDLE_TIMEOUT_MS + 1);
+
       expect((await silent.closed).code).toBe(1006);
-      expect(Date.now() - started).toBeGreaterThanOrEqual(
-        IDLE_TIMEOUT_MS - PING_INTERVAL_MS * 2,
-      );
       // A socket that answers pings stays.
-      await socket.ready();
+      await answering.ready();
     });
   });
 });
