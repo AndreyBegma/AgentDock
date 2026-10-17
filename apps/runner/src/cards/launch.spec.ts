@@ -91,6 +91,23 @@ describe('card worker launch (#242 D5)', () => {
     expect(spec.env.OTEL_EXPORTER_OTLP_ENDPOINT).toContain(':4318');
   });
 
+  it('#113: carries the session token in the env when the runner minted one', () => {
+    expect(
+      cardLaunchSpec(profile, args(false), '/wt', null).env
+        .AGENTDOCK_SESSION_TOKEN,
+    ).toBeUndefined();
+    const spec = cardLaunchSpec(
+      profile,
+      args(false),
+      '/wt',
+      null,
+      undefined,
+      null,
+      'tok-round',
+    );
+    expect(spec.env.AGENTDOCK_SESSION_TOKEN).toBe('tok-round');
+  });
+
   // #367 D1: checked against Claude Code 2.1.301 — hooks from `--settings`
   // and the server from `--mcp-config` load on `--session-id` and `--resume`.
   it('#367 D1: injected wiring adds --settings and --mcp-config before the model, on both rounds', () => {

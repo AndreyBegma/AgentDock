@@ -1,11 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { readAncestors } from '../hooks/ancestors';
 import { memoryLogger, tempDir } from '../testing/fixtures';
 import { connectLocal, localRequest } from './client';
 import { localSocketPath } from './paths';
 import { type LocalHandler, LocalSocketServer } from './server';
-import { LOCAL_LINE_MAX_BYTES } from './types';
+import { LocalService } from './service';
+import { SessionTokens } from './session-tokens';
+import { HookSessions } from './sessions';
+import { LOCAL_LINE_MAX_BYTES, type LocalCaller } from './types';
 
 describe('localSocketPath (spec 201 D5)', () => {
   it('uses $XDG_RUNTIME_DIR on Linux, the state dir otherwise', () => {
@@ -73,7 +77,7 @@ describe('LocalSocketServer + client', () => {
     const path = start(async (op, args) => {
       const delay = (args as { delay: number }).delay;
       await Bun.sleep(delay);
-      return { ok: true, data: { op, delay } };
+      return { ok: true, data: { queued: true, token: `${op}-${delay}` } };
     });
     const client = await connectLocal(path);
     if (!client) throw new Error('no client');
@@ -81,8 +85,14 @@ describe('LocalSocketServer + client', () => {
       client.event({ delay: 30 } as never),
       client.event({ delay: 1 } as never),
     ]);
-    expect(slow).toEqual({ ok: true, data: { op: 'event', delay: 30 } });
-    expect(fast).toEqual({ ok: true, data: { op: 'event', delay: 1 } });
+    expect(slow).toEqual({
+      ok: true,
+      data: { queued: true, token: 'event-30' },
+    });
+    expect(fast).toEqual({
+      ok: true,
+      data: { queued: true, token: 'event-1' },
+    });
     client.close();
   });
 
@@ -113,6 +123,87 @@ describe('LocalSocketServer + client', () => {
       { method: 'fleet.status', args: {}, via: 'mcp', cwd: '/w', ppid: 42 },
     ]);
   });
+
+  it('passes the token and the peer pid the kernel reports (#113)', async () => {
+    const callers: LocalCaller[] = [];
+    const path = start(async (_op, _args, caller) => {
+      callers.push(caller);
+      return { ok: true, data: { text: '' } };
+    });
+    await localRequest(
+      path,
+      'context.sessionStart',
+      {},
+      { via: 'hook' },
+      { token: 'tok-1' },
+    );
+    await localRequest(path, 'context.sessionStart', {}, { via: 'hook' });
+    const peerPid =
+      process.platform === 'linux' || process.platform === 'darwin'
+        ? process.pid
+        : null;
+    expect(callers).toEqual([{ token: 'tok-1', peerPid }, { peerPid }]);
+  });
+
+  describe.if(process.platform === 'linux')(
+    'the peer check over a real socket (#113, Linux)',
+    () => {
+      const ROOT = '/home/person/dev/app';
+      const tokens = new SessionTokens(Buffer.alloc(32, 3));
+      const serve = (sessions: HookSessions) => {
+        const service = new LocalService({
+          projects: () => [{ id: 'prj_app', root: ROOT }],
+          awayMode: () => false,
+          online: () => true,
+          emit: () => {},
+          relay: async () => ({ ok: true, data: { text: 'ctx' } }),
+          envelope: async () => undefined,
+          sessions,
+          tokens,
+          ancestorsOf: (pid) =>
+            readAncestors(pid, {
+              os: 'linux',
+              exec: async () => null,
+            }),
+          now: () => '2026-10-17T10:00:00.000Z',
+          log: memoryLogger().log,
+        });
+        return start((op, args, caller) => service.handle(op, args, caller));
+      };
+      const ask = (path: string) =>
+        localRequest(
+          path,
+          'context.sessionStart',
+          {},
+          { via: 'hook', cwd: ROOT, sessionId: 's-1' },
+          { token: tokens.mint({ sessionId: 's-1', cwd: ROOT }) },
+        );
+
+      it('answers a peer that descends from the session’s claude', async () => {
+        const sessions = new HookSessions();
+        // This test process stands for the session's claude.
+        sessions.started('s-1', ROOT, [{ pid: process.pid, comm: 'claude' }]);
+        expect(await ask(serve(sessions))).toEqual({
+          ok: true,
+          data: { text: 'ctx' },
+        });
+      });
+
+      it('refuses a peer that does not, with the session’s own token', async () => {
+        const other = Bun.spawn(['sleep', '30']);
+        try {
+          const sessions = new HookSessions();
+          sessions.started('s-1', ROOT, [{ pid: other.pid, comm: 'claude' }]);
+          expect(await ask(serve(sessions))).toMatchObject({
+            ok: false,
+            error: { code: 'forbidden' },
+          });
+        } finally {
+          other.kill();
+        }
+      });
+    },
+  );
 
   it('refuses a line over 256 KiB and closes the connection', async () => {
     const path = start(pong);
