@@ -14,6 +14,7 @@ export * from './github-app';
 export * from './handoff';
 export * from './history';
 export * from './live';
+export * from './llm';
 export * from './models';
 export * from './notifications';
 export * from './planner';
