@@ -1446,12 +1446,17 @@ model TelegramLink {
   /// #500: the project the chat's Board commands act on (`/project`). Null
   /// until chosen; a deleted project clears it.
   currentProjectId String?
+  /// #620: the assistant conversation the chat's free text continues. Null
+  /// until the chat's first message, after `/newchat`, and once it is deleted.
+  assistantConversationId String?
 
-  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  currentProject Project?        @relation(fields: [currentProjectId], references: [id], onDelete: SetNull)
-  intake         TelegramIntake?
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentProject        Project?               @relation(fields: [currentProjectId], references: [id], onDelete: SetNull)
+  assistantConversation AssistantConversation? @relation(fields: [assistantConversationId], references: [id], onDelete: SetNull)
+  intake                TelegramIntake?
 
   @@index([currentProjectId])
+  @@index([assistantConversationId])
   @@map("telegram_links")
 }
 
@@ -3912,8 +3917,9 @@ model AssistantConversation {
 
   user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   project     Project?              @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  messages    AssistantMessage[]
-  attachments AssistantAttachment[]
+  messages      AssistantMessage[]
+  attachments   AssistantAttachment[]
+  telegramLinks TelegramLink[]
 
   @@index([userId, updatedAt])
   @@map("assistant_conversations")

@@ -1,4 +1,4 @@
-# ADR-0061: A design revise sends only the frames it changes
+# ADR-0062: A design revise sends only the frames it changes
 
 Status: accepted · Date: 2026-10-18 ·
 Issue: [#628](https://github.com/AndreyBegma/AgentDock/issues/628) ·

@@ -56,6 +56,12 @@ import { AssistantToolRegistry } from './tools/registry';
     AssistantConversations,
     AssistantChat,
   ],
-  exports: [AssistantToolRegistry],
+  // #620: the Telegram bot runs a chat's turns as its linked user.
+  exports: [
+    AssistantToolRegistry,
+    AssistantConversations,
+    AssistantAttachments,
+    AssistantChat,
+  ],
 })
 export class AssistantModule {}
