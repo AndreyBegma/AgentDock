@@ -34,6 +34,7 @@ export const policyRuleSchema = z.enum([
   'terminal.write',
   'skills.profileInstall',
   'commands',
+  'code.deny',
 ]);
 export type PolicyRule = z.infer<typeof policyRuleSchema>;
 
@@ -53,6 +54,24 @@ export const permissionModeAllowed = (
 /** At most this many allowed roots; a person lists directories, not projects. */
 export const POLICY_ALLOWED_ROOTS_MAX = 64;
 
+/** At most this many `code.deny` patterns. */
+export const POLICY_CODE_DENY_MAX = 64;
+
+/**
+ * A `code.deny` pattern (#622): a glob over checkout-relative paths — `*`
+ * and `?` within a segment, `**` across segments. A pattern without `/`
+ * matches a file or directory name at any depth, as in `.gitignore`.
+ */
+export const policyCodeDenySchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(200)
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: the point is to refuse them
+  .refine((p) => !/[\u0000-\u001f\u007f]/.test(p), {
+    message: 'must not contain control characters',
+  });
+
 /** The effective policy as `hello` reports it: values only, no other paths. */
 export const runnerPolicySchema = z.object({
   /** Real paths; a watched root must be inside one of them. */
@@ -70,6 +89,15 @@ export const runnerPolicySchema = z.object({
     .refine((c) => Object.keys(c).length <= LIST_MAX, {
       message: `at most ${LIST_MAX} commands`,
     }),
+  /**
+   * #622: paths `repo.search`, `repo.read` and `code.ask` never return, on
+   * top of the secrets every runner refuses. Absent on a runner older than it.
+   */
+  code: z
+    .object({
+      deny: z.array(policyCodeDenySchema).max(POLICY_CODE_DENY_MAX),
+    })
+    .optional(),
 });
 export type RunnerPolicy = z.infer<typeof runnerPolicySchema>;
 
@@ -94,5 +122,7 @@ export const policyFixHint = (rule: PolicyRule, detail?: string): string => {
       return 'agentdock-runner policy set skills.profileInstall true';
     case 'commands':
       return `agentdock-runner policy set commands.${detail ?? '<command>'} true`;
+    case 'code.deny':
+      return `agentdock-runner policy allow-path ${detail ?? '<pattern>'}`;
   }
 };

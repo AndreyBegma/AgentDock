@@ -40,6 +40,7 @@ export const POLICY_RULE_LABEL: Record<PolicyRule, string> = {
   'terminal.write': 'Typing into a terminal',
   'skills.profileInstall': 'Installing skills into a Claude profile',
   commands: 'Messages into running sessions',
+  'code.deny': 'Files the assistant may not read',
 };
 
 /**
@@ -91,5 +92,16 @@ export function policyRows(
           .map(([name]) => name)
           .join(', ') || 'off',
     },
+    ...(policy.code
+      ? [
+          {
+            label: POLICY_RULE_LABEL['code.deny'],
+            value:
+              policy.code.deny.length > 0
+                ? `secrets, ${policy.code.deny.join(', ')}`
+                : 'secrets only',
+          },
+        ]
+      : []),
   ];
 }
