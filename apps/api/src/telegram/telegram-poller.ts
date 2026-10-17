@@ -260,6 +260,7 @@ export class TelegramPoller implements OnApplicationBootstrap, OnModuleDestroy {
         answer.notice ?? '',
       );
     }
+    if (answer.text === undefined) return;
     await this.client.sendMessage(
       token,
       answer.chatId,

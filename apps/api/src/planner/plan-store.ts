@@ -65,10 +65,14 @@ export interface PlanProject {
   runnerVersion: string | null;
 }
 
+/** #574: told a plan changed; reads it again itself. */
+export type PlanWatcher = (projectId: string, planId: string) => void;
+
 /** Reads shared by the planner services, and the one live push (spec "Live"). */
 @Injectable()
 export class PlanStore {
   private readonly logger = new Logger(PlanStore.name);
+  private readonly watchers = new Set<PlanWatcher>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -332,8 +336,27 @@ export class PlanStore {
     }
   }
 
+  /**
+   * #574: called on every plan's live event in this process, as a socket
+   * would be — the Telegram intake follows its plans with it. A watcher
+   * reads the plan again itself; it must not throw.
+   */
+  watch(watcher: PlanWatcher): () => void {
+    this.watchers.add(watcher);
+    return () => this.watchers.delete(watcher);
+  }
+
   /** Ids only: a client refetches, and the refetch is authorized. Best effort. */
   publish(projectId: string, planId: string): void {
+    for (const watcher of this.watchers) {
+      try {
+        watcher(projectId, planId);
+      } catch (error) {
+        this.logger.warn(
+          `planner ${planId} watcher failed: ${(error as Error).message}`,
+        );
+      }
+    }
     try {
       this.live.publish(`project:${projectId}`, PLANNER_LIVE_EVENT, {
         kind: 'planner',
