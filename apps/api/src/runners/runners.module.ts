@@ -9,6 +9,7 @@ import { RunnerIngestService } from './runner-ingest.service';
 import { RunnerLocalRequests } from './runner-local-requests';
 import { defaultRunnerOptions, RUNNER_OPTIONS } from './runner-options';
 import { RunnerPresence } from './runner-presence';
+import { RunnerReplacements } from './runner-replacements';
 import { RunnerSettingsService } from './runner-settings.service';
 import { RunnerStreams } from './runner-streams';
 import { RunnerWatchList } from './runner-watch-list';
@@ -29,6 +30,7 @@ import { RunnersService } from './runners.service';
     { provide: RUNNER_OPTIONS, useValue: defaultRunnerOptions },
     RunnerConnections,
     RunnerConnectHooks,
+    RunnerReplacements,
     RunnerEventSinks,
     RunnerIngestService,
     RunnerCommandService,
@@ -51,6 +53,8 @@ import { RunnersService } from './runners.service';
     RunnerEventSinks,
     // #329 D4: the board retries failed collects when a runner connects.
     RunnerConnectHooks,
+    // C-108: notifications tells admins when a live connection is replaced.
+    RunnerReplacements,
     RunnerStreams,
     // Spec 201: the local module registers its router and sets away mode.
     RunnerLocalRequests,

@@ -439,6 +439,7 @@ const AUDIT_TITLES: Record<string, string> = {
   'runner.rename': 'Runner renamed',
   'runner.revoke': 'Runner revoked',
   'runner.update': 'Runner settings changed',
+  'runner.connection_replaced': 'Runner connection replaced',
   'project.connect': 'Project connected',
   'project.delete': 'Project deleted',
   'project.update': 'Project settings changed',

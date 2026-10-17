@@ -23,7 +23,8 @@ import {
   uiProfileLaunchSpec,
   uiProfileTokenSaver,
 } from '../uiprofile/executor';
-import { AUTOCOMPACT_ENV, type TokenSaverLaunch } from './token-saver';
+import { expectEcoEnv } from './testing';
+import type { TokenSaverLaunch } from './token-saver';
 
 /**
  * #445 acceptance: every launch passes `--settings` and `--strict-mcp-config`
@@ -114,9 +115,18 @@ describe('card worker launch (#445)', () => {
         injected,
       );
       expect(ts).toBeNull();
-      expect(
-        cardLaunchSpec(profile, args, '/w', null, injected.files, ts),
-      ).toEqual(cardLaunchSpec(profile, args, '/w', null, injected.files));
+      const spec = cardLaunchSpec(
+        profile,
+        args,
+        '/w',
+        null,
+        injected.files,
+        ts,
+      );
+      expect(spec).toEqual(
+        cardLaunchSpec(profile, args, '/w', null, injected.files),
+      );
+      expectEcoEnv(spec.env, false);
     }
   });
 
@@ -145,7 +155,7 @@ describe('card worker launch (#445)', () => {
       },
       playwright: { command: 'pw' },
     });
-    expect(spec.env[AUTOCOMPACT_ENV]).toBe('60');
+    expectEcoEnv(spec.env);
     expect(spec.env[FILTER_RUN_ENV]).toBe('run_1');
     expect(spec.env.AGENTDOCK_CARD).toBe('abcd1234');
   });
@@ -189,9 +199,9 @@ describe('skill run launch (#445)', () => {
         SELF,
       );
       expect(ts).toBeNull();
-      expect(launchSpec(profile, args, '/w', null, ts)).toEqual(
-        launchSpec(profile, args, '/w', null),
-      );
+      const spec = launchSpec(profile, args, '/w', null, ts);
+      expect(spec).toEqual(launchSpec(profile, args, '/w', null));
+      expectEcoEnv(spec.env, false);
     }
   });
 
@@ -213,6 +223,7 @@ describe('skill run launch (#445)', () => {
       'playwright',
     ]);
     expect(spec.env[FILTER_RUN_KIND_ENV]).toBe('skill');
+    expectEcoEnv(spec.env);
   });
 });
 
@@ -234,9 +245,18 @@ describe('plan turn launch (#445)', () => {
         SELF,
       );
       expect(ts).toBeNull();
-      expect(
-        planTurnLaunchSpec(profile, args, '/w', '/r/prompt.md', null, ts),
-      ).toEqual(planTurnLaunchSpec(profile, args, '/w', '/r/prompt.md', null));
+      const spec = planTurnLaunchSpec(
+        profile,
+        args,
+        '/w',
+        '/r/prompt.md',
+        null,
+        ts,
+      );
+      expect(spec).toEqual(
+        planTurnLaunchSpec(profile, args, '/w', '/r/prompt.md', null),
+      );
+      expectEcoEnv(spec.env, false);
     }
   });
 
@@ -253,6 +273,7 @@ describe('plan turn launch (#445)', () => {
     expectWired(spec.args, ts);
     expect(Object.keys(serversOf(ts))).toContain('agentdock');
     expect(spec.env[FILTER_RUN_KIND_ENV]).toBe('plan');
+    expectEcoEnv(spec.env);
   });
 });
 
@@ -304,6 +325,7 @@ describe('design build launch (#445)', () => {
     expectWired(spec.args, ts);
     expect(Object.keys(serversOf(ts))).toEqual(['playwright']);
     expect(spec.env[FILTER_RUN_KIND_ENV]).toBe('ui_profile');
+    expectEcoEnv(spec.env);
   });
 });
 
@@ -359,5 +381,6 @@ describe('orchestrator session launch (#445)', () => {
     expect(ts.env[FILTER_RUN_KIND_ENV]).toBe('orchestrator');
     expect(ts.env[FILTER_PROJECT_ENV]).toBe('prj_a');
     expect(ts.env[FILTER_RUN_ENV]).toBeUndefined();
+    expectEcoEnv(ts.env);
   });
 });

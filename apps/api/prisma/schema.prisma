@@ -451,6 +451,7 @@ model Project {
   stewardIncidents     StewardIncident[]
   stewardDigests       StewardDigest[]
   handoffNotes         HandoffNote[]
+  telegramLinks        TelegramLink[]
 
   @@unique([runnerId, rootPath])
   @@map("projects")
@@ -1428,9 +1429,14 @@ model TelegramLink {
   chatId   BigInt   @unique
   username String?
   linkedAt DateTime @default(now())
+  /// #500: the project the chat's Board commands act on (`/project`). Null
+  /// until chosen; a deleted project clears it.
+  currentProjectId String?
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentProject Project? @relation(fields: [currentProjectId], references: [id], onDelete: SetNull)
 
+  @@index([currentProjectId])
   @@map("telegram_links")
 }
 

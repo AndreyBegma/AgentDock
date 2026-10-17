@@ -9,26 +9,17 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { Client } from 'pg';
 import { PrismaService } from '../database/prisma.service';
 import { BotTokenStore } from '../notifications';
-import { isActionRequestCallback } from './action-request-actions';
-import { isSessionOptionCallback } from './session-message-actions';
-import { TelegramActionRequestService } from './telegram-action-request.service';
-import {
-  type ApprovalAnswer,
-  TelegramApprovalService,
-} from './telegram-approval.service';
 import {
   redactToken,
   TelegramApiError,
   TelegramClient,
   type TelegramUpdate,
 } from './telegram-client';
+import { BOT_COMMANDS } from './telegram-commands';
 import { TelegramDeliveryService } from './telegram-delivery.service';
-import {
-  LINK_REPLIES,
-  TelegramLinkingService,
-} from './telegram-linking.service';
 import { TELEGRAM_OPTIONS, type TelegramOptions } from './telegram-options';
-import { TelegramSessionMessageService } from './telegram-session-message.service';
+import type { TelegramAnswer } from './telegram-router';
+import { TelegramRoutes } from './telegram-routes';
 
 /** Session advisory lock: held by the one API instance that talks to Telegram. */
 const LOCK_KEY = 'telegram:poller';
@@ -90,8 +81,8 @@ const sleep = (ms: number, signal: AbortSignal): Promise<void> =>
  * The lock lives exactly as long as that connection, so a crashed instance
  * frees it, and a 30 s long poll never pins a pooled Prisma connection.
  *
- * The leader runs two loops: `getUpdates` for `/start`, `/stop` and the
- * approval buttons and note replies (D12), with the
+ * The leader runs two loops: `getUpdates` for the commands, buttons and
+ * replies `TelegramRoutes` routes (D9, D12, #500), with the
  * offset in `notification_matcher_state.telegramUpdateOffset`, and the
  * delivery timer. Neither starts under `APP_ENV=test`; suites call
  * `acquire()`, `pollOnce()` and `TelegramDeliveryService.deliverOnce()`.
@@ -111,15 +102,14 @@ export class TelegramPoller implements OnApplicationBootstrap, OnModuleDestroy {
   private polls = 0;
   private lastError: string | null = null;
   private lastPollAt: Date | null = null;
+  /** The bot whose command menu this instance has set. */
+  private menuToken: string | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly tokens: BotTokenStore,
     private readonly client: TelegramClient,
-    private readonly linking: TelegramLinkingService,
-    private readonly approvals: TelegramApprovalService,
-    private readonly actionRequests: TelegramActionRequestService,
-    private readonly sessions: TelegramSessionMessageService,
+    private readonly routes: TelegramRoutes,
     private readonly delivery: TelegramDeliveryService,
     private readonly scheduler: SchedulerRegistry,
     @Inject(TELEGRAM_OPTIONS) private readonly options: TelegramOptions,
@@ -204,6 +194,7 @@ export class TelegramPoller implements OnApplicationBootstrap, OnModuleDestroy {
       return { status: 'idle', waitMs: this.options.idleMs };
     }
     const generation = this.generation;
+    await this.registerMenu(bot.token);
     try {
       const offset = await this.currentOffset();
       const updates = await this.client.getUpdates(
@@ -242,50 +233,19 @@ export class TelegramPoller implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   /**
-   * One update: a button press or a note reply (D12), else `/start` / `/stop`.
-   * A reply that cannot be sent is logged; the update is still consumed.
+   * One update, through the router (#500): a button press, a reply to one of
+   * the bot's prompts, or a command. A reply that cannot be sent is logged;
+   * the update is still consumed.
    */
   private async handle(update: TelegramUpdate, token: string): Promise<void> {
-    const warn = (error: unknown) => {
+    const answer = await this.routes.router.dispatch(update, botIdOf(token));
+    if (!answer) return;
+    await this.send(token, answer).catch((error: unknown) => {
       this.logger.warn(`Telegram reply failed: ${safeMessage(error, token)}`);
-    };
-    if (update.callback_query) {
-      // Spec 201 D18: `x:`/`y:` are the action-request buttons.
-      // #489: `q:` are a card question's option buttons.
-      const { data } = update.callback_query;
-      const answer = isActionRequestCallback(data)
-        ? await this.actionRequests.handleCallback(update.callback_query)
-        : isSessionOptionCallback(data)
-          ? await this.sessions.handleCallback(update.callback_query)
-          : await this.approvals.handleCallback(update.callback_query);
-      await this.sendApprovalAnswer(token, answer).catch(warn);
-      return;
-    }
-    if (update.message) {
-      const answer =
-        (await this.approvals.handleNoteReply(
-          update.message,
-          botIdOf(token),
-        )) ??
-        // #489: a reply to a waiting card's message goes to its session.
-        (await this.sessions.handleReply(update.message, botIdOf(token)));
-      if (answer) {
-        await this.sendApprovalAnswer(token, answer).catch(warn);
-        return;
-      }
-    }
-    const reply = await this.linking.handleUpdate(update);
-    if (reply) {
-      await this.client
-        .sendMessage(token, reply.chatId, LINK_REPLIES[reply.reply], true)
-        .catch(warn);
-    }
+    });
   }
 
-  private async sendApprovalAnswer(
-    token: string,
-    answer: ApprovalAnswer,
-  ): Promise<void> {
+  private async send(token: string, answer: TelegramAnswer): Promise<void> {
     if (answer.callbackQueryId) {
       await this.client.answerCallbackQuery(
         token,
@@ -300,6 +260,23 @@ export class TelegramPoller implements OnApplicationBootstrap, OnModuleDestroy {
       true,
       answer.replyMarkup,
     );
+  }
+
+  /**
+   * #500: the command menu, once per bot this instance polls for — a bot
+   * configured before the menu existed gets it too. A failure is logged and
+   * not retried until the bot changes or the API restarts.
+   */
+  private async registerMenu(token: string): Promise<void> {
+    if (this.menuToken === token) return;
+    this.menuToken = token;
+    await this.client
+      .setMyCommands(token, [...BOT_COMMANDS])
+      .catch((error: unknown) => {
+        this.logger.warn(
+          `Telegram command menu not set: ${safeMessage(error, token)}`,
+        );
+      });
   }
 
   private async run(): Promise<void> {

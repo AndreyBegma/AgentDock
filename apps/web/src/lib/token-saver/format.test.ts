@@ -43,9 +43,16 @@ describe('formatRate', () => {
 });
 
 describe('labels', () => {
-  test('a filter id and the uncovered one', () => {
+  test('a filter id, the legacy `none` and the amendment-12 reasons', () => {
     expect(filterLabel('js/jest')).toBe('js/jest');
-    expect(filterLabel('none')).toContain('uncovered');
+    expect(filterLabel('none')).toBe('No filter (uncovered command)');
+    expect(filterLabel('none:compound')).toBe(
+      'Compound command (not filtered)',
+    );
+    expect(filterLabel('none:uncovered')).toBe('No filter for this command');
+    expect(filterLabel('none:mode')).toBe(
+      'Not filtered in this permission mode',
+    );
   });
 
   test('every run kind has a name', () => {

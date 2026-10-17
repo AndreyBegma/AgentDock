@@ -1,4 +1,10 @@
-import { commandArgv, FILTER_NONE, findFilter } from './engine';
+import {
+  commandArgv,
+  FILTER_NONE_COMPOUND,
+  FILTER_NONE_MODE,
+  FILTER_NONE_UNCOVERED,
+  findFilter,
+} from './engine';
 import {
   type PermissionRules,
   permissionFor,
@@ -111,7 +117,21 @@ export const decideHook = (
   const parsed = parseHookCommand(command);
   const argv = parsed ? commandArgv(parsed.command.argv) : [];
   const filter = parsed ? findFilter(deps.filters, parsed.command.argv) : null;
-  const id = filter?.id ?? FILTER_NONE;
+  const mode =
+    typeof input.permission_mode === 'string'
+      ? input.permission_mode
+      : undefined;
+  // Amendments 9 and 10: only bypass and auto rewrite; elsewhere, never.
+  const rewrites = mode === 'bypassPermissions' || mode === 'auto';
+  // Amendment 12: a matched filter keeps its id; otherwise the row says why
+  // none ran — the mode first, since in it nothing would ever be rewritten.
+  const id =
+    filter?.id ??
+    (!rewrites
+      ? FILTER_NONE_MODE
+      : parsed
+        ? FILTER_NONE_UNCOVERED
+        : FILTER_NONE_COMPOUND);
   const leave = (reason: string): HookDecision => ({
     passThrough: reason,
     filter: id,
@@ -121,14 +141,7 @@ export const decideHook = (
   if (toolInput.run_in_background === true) return leave('background');
   if (!filter) return leave('no filter');
   if (isLongRunning(argv, filter)) return leave('long-running');
-  const mode =
-    typeof input.permission_mode === 'string'
-      ? input.permission_mode
-      : undefined;
-  // Amendments 9 and 10: only bypass and auto rewrite; elsewhere, never.
-  if (mode !== 'bypassPermissions' && mode !== 'auto') {
-    return leave('not bypassPermissions or auto');
-  }
+  if (!rewrites) return leave('not bypassPermissions or auto');
 
   const cwd = typeof input.cwd === 'string' ? input.cwd : process.cwd();
   const sources: SettingsSources = {
