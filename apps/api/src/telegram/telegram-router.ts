@@ -62,8 +62,9 @@ export const parseCommand = (
  * #500: where an update goes. A button press goes to the handler of its
  * `callback_data` prefix (`<prefix>:…`), else to the fallback; a message
  * goes first to the reply handlers, in the order they were added — a reply
- * to one of the bot's prompts — and then to its command's handler. Any other
- * text, and a command no handler took, gets `unknownCommand` or nothing.
+ * to one of the bot's prompts — and then to its command's handler. A command
+ * no handler took gets `unknownCommand` or nothing; any other message goes
+ * to `freeText` (#620), or nowhere.
  */
 export class TelegramRouter {
   private readonly commands = new Map<string, CommandHandler>();
@@ -71,6 +72,7 @@ export class TelegramRouter {
   private readonly replies: ReplyHandler[] = [];
   private fallback: CallbackHandler | null = null;
   private unknown: CommandHandler | null = null;
+  private free: ReplyHandler | null = null;
 
   command(names: string | string[], handler: CommandHandler): this {
     for (const name of [names].flat()) {
@@ -109,6 +111,12 @@ export class TelegramRouter {
     return this;
   }
 
+  /** #620: a message that is neither a reply a handler took nor a command. */
+  freeText(handler: ReplyHandler): this {
+    this.free = handler;
+    return this;
+  }
+
   /** The routed command names, in the order they were added. */
   commandNames(): string[] {
     return [...this.commands.keys()];
@@ -134,7 +142,7 @@ export class TelegramRouter {
       if (answer) return answer;
     }
     const command = parseCommand(message.text);
-    if (!command) return null;
+    if (!command) return this.free ? this.free(message, botId) : null;
     const context: CommandContext = {
       ...command,
       message,

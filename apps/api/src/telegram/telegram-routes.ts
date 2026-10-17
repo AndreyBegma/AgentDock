@@ -7,6 +7,7 @@ import {
 import { INTAKE_ACTION, INTAKE_DONE, INTAKE_OPTION } from './intake-chat';
 import { TelegramActionRequestService } from './telegram-action-request.service';
 import { TelegramApprovalService } from './telegram-approval.service';
+import { TelegramAssistantService } from './telegram-assistant.service';
 import {
   BOARD_CALLBACK_PREFIXES,
   TelegramBoardService,
@@ -44,6 +45,7 @@ export class TelegramRoutes {
     board: TelegramBoardService,
     intake: TelegramIntakeService,
     cards: TelegramCardService,
+    assistant: TelegramAssistantService,
   ) {
     this.router = new TelegramRouter()
       // Spec 201 D18: `x:`/`y:` are the action-request buttons.
@@ -88,11 +90,15 @@ export class TelegramRoutes {
       .command('board', (context) => board.handleBoardCommand(context))
       .command('card', (context) => board.handleCardCommand(context))
       .command('new', (context) => intake.handleCommand(context))
+      // #620: a new assistant conversation for the chat's free text.
+      .command('newchat', (context) => assistant.handleNewChat(context))
       .command('help', async ({ chatId, isPrivate }) =>
         isPrivate ? { chatId, text: HELP_TEXT } : null,
       )
       .unknownCommand(async ({ chatId, isPrivate }) =>
         isPrivate ? { chatId, text: UNKNOWN_COMMAND_TEXT } : null,
-      );
+      )
+      // #620 (ADR-0061): any other text goes to the AI assistant.
+      .freeText((message) => assistant.handleMessage(message));
   }
 }
