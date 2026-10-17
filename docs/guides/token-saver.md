@@ -50,9 +50,10 @@ the session is allowed to run. Claude Code checks permission rules against the
 command a hook *returns*, so a rewrite could hide `git push` from a
 `Bash(git push:*)` rule. The runner therefore rewrites only when:
 
-- the session runs in `bypassPermissions`, or in `auto` (Board card sessions
-  do). In `auto` the hook makes no decision, and Claude Code's classifier
-  still judges the wrapped command; **and**
+- the session runs in `bypassPermissions`, in `auto` (Board card sessions do)
+  or in `plan` (planner and design runs do). In `auto` and `plan` the hook
+  makes no decision, and Claude Code's own rules still judge the wrapped
+  command; **and**
 - no `deny` or `ask` rule matches it; **and**
 - the call is made of simple commands joined by `|`, `&&`, `||` or `;` — no
   redirect other than `2>&1`, no subshell, heredoc or substitution — and is
@@ -69,7 +70,7 @@ sheet say why:
 |---|---|
 | Compound command (not filtered) | a redirect, a subshell, a heredoc, a substitution or a background `&` — something other than simple commands joined by `\|`, `&&`, `\|\|` or `;` |
 | No filter for this command | no filter family covers the first command of any of its pipelines |
-| Not filtered in this permission mode | the session's mode is neither `bypassPermissions` nor `auto` |
+| Not filtered in this permission mode | the session's mode is not `bypassPermissions`, `auto` or `plan` |
 | No filter (uncovered command) | recorded before the reasons above existed |
 
 The exact rules are in

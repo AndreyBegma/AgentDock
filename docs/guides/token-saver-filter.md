@@ -15,8 +15,8 @@ the bypass, the raw files and the MCP allowlist.
    session's environment (`filter/env.ts`).
 2. The hook reads Claude Code's PreToolUse JSON. It rewrites `tool_input.command`
    to `<runner> filter -- <command>` only when **all** of these hold:
-   - the session's `permission_mode` is `bypassPermissions` (spec amendment 9)
-     or `auto` (amendment 10);
+   - the session's `permission_mode` is `bypassPermissions` (spec amendment 9),
+     `auto` (amendment 10) or `plan` (amendment 14);
    - the command is a **list of pipelines of simple commands** (#610): simple
      commands `[NAME=value …] program args…`, joined by `|` into pipelines,
      and pipelines joined by `&&`, `||` and `;`. Each command may end in
@@ -84,15 +84,15 @@ saver is off.
 Claude Code matches its permission rules against the command a hook *returns*.
 A rewritten `agentdock-runner filter -- git push` would therefore slip past
 `Bash(git push:*)`. The hook (`permissionFor` in `filter/permissions.ts`)
-applies these rules in order (spec #445 amendments 9, 10 and 11):
+applies these rules in order (spec #445 amendments 9, 10, 11 and 14):
 
 | Situation | Result |
 |---|---|
-| The session is neither `bypassPermissions` nor `auto` (`default`, `acceptEdits`, `plan`, `dontAsk`, missing, …) | no rewrite, whatever the allow rules say |
+| The session is not `bypassPermissions`, `auto` or `plan` (`default`, `acceptEdits`, `dontAsk`, missing, …) | no rewrite, whatever the allow rules say |
 | A `deny` or `ask` `Bash(…)` rule matches any command of the line, wrapped or not, or the whole line, at any word | no rewrite (`passedThrough`) |
 | A settings file that exists but does not parse, or a `Bash(…)` rule this parser does not understand | no rewrite |
 | Anything else, in `bypassPermissions` | rewrite, with `permissionDecision: "allow"` |
-| Anything else, in `auto` | rewrite, with **no** `permissionDecision`: only `updatedInput` |
+| Anything else, in `auto` or `plan` | rewrite, with **no** `permissionDecision`: only `updatedInput` |
 
 In auto mode the hook returns no decision, so Claude Code's own permission rules
 and auto-mode classifier judge the wrapped `agentdock-runner filter -- <argv>`,

@@ -25,8 +25,8 @@ import type { Filter } from './types';
 /**
  * `agentdock-runner filter-hook` (#445 D3): Claude Code's PreToolUse hook for
  * Bash. It turns `bun run test` into `<runner> filter -- bun run test` when —
- * and only when — the session is in `bypassPermissions` (amendment 9) or
- * `auto` (amendment 10), the call is a list of pipelines of simple commands
+ * and only when — the session is in `bypassPermissions` (amendment 9),
+ * `auto` (amendment 10) or `plan` (amendment 14), the call is a list of pipelines of simple commands
  * (#610) and a filter covers the first command of at least one pipeline, the
  * call is not in the background, that command is not a dev/watch mode, and
  * the rewrite changes nothing about what the session asks or denies (see
@@ -36,9 +36,9 @@ import type { Filter } from './types';
  * `passedThrough`.
  *
  * In bypass mode the rewrite carries `permissionDecision: "allow"`. In auto
- * mode it carries no decision at all: Claude Code's own permission rules and
- * auto-mode classifier judge the wrapped command, so the hook never skips
- * them.
+ * and plan mode it carries no decision at all: Claude Code's own permission
+ * rules (and, in auto, its classifier) judge the wrapped command, so the hook
+ * never skips them.
  *
  * It fails open: any error prints nothing and exits 0, which Claude Code
  * reads as "no decision" — the command runs as written.
@@ -55,7 +55,7 @@ interface HookInput {
 export interface HookOutput {
   hookSpecificOutput: {
     hookEventName: 'PreToolUse';
-    /** Bypass mode only; in auto mode Claude Code decides (amendment 10). */
+    /** Bypass mode only; in auto and plan mode Claude Code decides (amendments 10, 14). */
     permissionDecision?: 'allow';
     permissionDecisionReason?: string;
     updatedInput: Record<string, unknown>;
@@ -132,8 +132,10 @@ export const decideHook = (
     typeof input.permission_mode === 'string'
       ? input.permission_mode
       : undefined;
-  // Amendments 9 and 10: only bypass and auto rewrite; elsewhere, never.
-  const rewrites = mode === 'bypassPermissions' || mode === 'auto';
+  // Amendments 9, 10 and 14: only bypass, auto and plan rewrite; elsewhere,
+  // never.
+  const rewrites =
+    mode === 'bypassPermissions' || mode === 'auto' || mode === 'plan';
   // Amendment 12: a matched filter keeps its id; otherwise the row says why
   // none ran — the mode first, since in it nothing would ever be rewritten.
   const id =
@@ -152,7 +154,7 @@ export const decideHook = (
   if (toolInput.run_in_background === true) return leave('background');
   if (!first) return leave('no filter');
   if (wrapped.size === 0) return leave('long-running');
-  if (!rewrites) return leave('not bypassPermissions or auto');
+  if (!rewrites) return leave('not bypassPermissions, auto or plan');
 
   const cwd = typeof input.cwd === 'string' ? input.cwd : process.cwd();
   const sources: SettingsSources = {
@@ -172,9 +174,9 @@ export const decideHook = (
       wrapped.has(stage),
     ),
   };
-  // Amendment 10: in auto mode no decision, so the classifier and the rules
-  // judge the wrapped command exactly as they would any other.
-  if (mode === 'auto') {
+  // Amendments 10 and 14: in auto and plan mode no decision, so the rules (and
+  // the classifier) judge the wrapped command exactly as any other.
+  if (mode === 'auto' || mode === 'plan') {
     return {
       rewrite: {
         hookSpecificOutput: { hookEventName: 'PreToolUse', updatedInput },
