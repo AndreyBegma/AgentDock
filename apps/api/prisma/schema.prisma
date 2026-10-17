@@ -20,16 +20,16 @@ enum UserStatus {
 }
 
 model User {
-  id           String     @id @default(cuid())
-  email        String     @unique
-  name         String?
-  passwordHash String
-  role         Role       @default(viewer)
-  status       UserStatus @default(pending)
-  approvedById String?
-  approvedAt   DateTime?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id               String     @id @default(cuid())
+  email            String     @unique
+  name             String?
+  passwordHash     String
+  role             Role       @default(viewer)
+  status           UserStatus @default(pending)
+  approvedById     String?
+  approvedAt       DateTime?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
 
   approvedBy                  User?                         @relation("UserApprovals", fields: [approvedById], references: [id], onDelete: SetNull)
   approvedUsers               User[]                        @relation("UserApprovals")
@@ -330,20 +330,20 @@ model AuditRecord {
 /// at once, the rest are counted here and written as one record when the
 /// minute is over. Not part of the chain; rows are deleted once written.
 model AuditFold {
-  action     String
+  action    String
   targetType String
   /// `''` for no target id.
-  targetId   String
+  targetId  String
   /// `''` for no address.
-  ip         String
-  minute     DateTime
-  actor      Json
-  result     AuditResult
-  userAgent  String?
+  ip        String
+  minute    DateTime
+  actor     Json
+  result    AuditResult
+  userAgent String?
   /// Repeats after the first.
-  count      Int         @default(0)
+  count     Int        @default(0)
   /// `meta.reason` of each repeat → how many.
-  reasons    Json        @default("{}")
+  reasons   Json       @default("{}")
 
   @@id([action, targetType, targetId, ip, minute])
   @@index([minute])
@@ -1433,10 +1433,10 @@ model NotificationDelivery {
 
 /// The Telegram private chat a user linked (D9). One chat per user, one user per chat.
 model TelegramLink {
-  userId           String   @id
-  chatId           BigInt   @unique
-  username         String?
-  linkedAt         DateTime @default(now())
+  userId   String   @id
+  chatId   BigInt   @unique
+  username String?
+  linkedAt DateTime @default(now())
   /// #500: the project the chat's Board commands act on (`/project`). Null
   /// until chosen; a deleted project clears it.
   currentProjectId String?

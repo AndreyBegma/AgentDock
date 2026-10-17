@@ -111,12 +111,15 @@ const SPLIT = {
   },
 };
 
+const STACK_BODY =
+  'The export of the board comes in two parts: first the service that writes the file, then the button that people press.';
+
 const STACK = {
   action: 'intake',
   stack: {
     reason: 'SECRET REASON PROSE',
     title: 'Board export',
-    body: 'SECRET STACK BODY',
+    body: STACK_BODY,
     design: false,
     stages: [
       { title: 'Foundations', cards: [splitCard('Add the export service')] },
@@ -581,7 +584,7 @@ describe('Telegram /new: the New work intake (e2e, #574)', () => {
       'Here is the result',
       'PANE TEXT',
       'SECRET REASON PROSE',
-      'SECRET STACK BODY',
+      STACK_BODY,
       PLANNER_BLOCK_TAG,
     ]) {
       expect(all).not.toContain(secret);
