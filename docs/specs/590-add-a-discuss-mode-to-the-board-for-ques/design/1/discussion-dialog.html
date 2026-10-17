@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-scale="desk" data-palette="navy">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Discussion dialog (responsive)</title>
+<style>
+:root{--radius-control:6px;--radius-surface:8px;--radius-sheet:12px;--size-control:28px;--dur-fast:100ms;--ease-sheet:cubic-bezier(0.32,0.72,0,1);--press-scale:0.97;--font-sans:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;--font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;--glass-filter-strong:blur(40px) saturate(180%) brightness(var(--glass-brightness-strong));--color-status-running:var(--color-hue-2);--color-status-running-soft:var(--color-hue-2-soft);--color-status-running-ink:var(--color-hue-2-ink);--canvas-aurora-1:var(--color-hue-1);--canvas-aurora-2:var(--color-hue-7)}
+:root[data-theme="dark"]{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-content:rgb(27 38 71/0.96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246/0.62);--color-ink-3:rgb(242 242 246/0.53);--color-line:rgb(255 255 255/0.1);--color-line-strong:rgb(255 255 255/0.18);--color-hover:rgb(255 255 255/0.06);--color-focus:#b4b2ff;--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-soft:rgb(91 91 246/0.2);--color-accent-ink:#b4b2ff;--color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;--color-scrim:rgb(10 16 34/0.3);--canvas-glow:18%;--color-hue-1:#5b9cf6;--color-hue-2:#2fbf94;--color-hue-2-soft:rgb(47 191 148/0.18);--color-hue-2-ink:#7ee0c0;--color-hue-7:#a68bfa;--glass-sheen:rgb(255 255 255/0.06);--glass-scrim-strong:rgb(9 9 12/0.64);--glass-brightness-strong:0.7;--glass-edge:rgb(255 255 255/0.14);--glass-spec:rgb(255 255 255/0.2);--glass-rim-strong:rgb(242 242 246/0.22);--glass-rim-shade-strong:rgb(9 9 12/0.2);--glass-meniscus:rgb(9 9 12/0.55);--glass-refract:rgb(242 242 246/0.35);--glass-shadow-strong:rgb(0 0 0/0.45);--glass-shadow-clear:rgb(0 0 0/0.15);--control-spec:rgb(255 255 255/0.05)}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-content:rgb(255 255 255/0.96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27/0.72);--color-ink-3:rgb(24 24 27/0.64);--color-line:rgb(0 0 0/0.1);--color-line-strong:rgb(0 0 0/0.23);--color-hover:rgb(0 0 0/0.06);--color-focus:#4f46e5;--color-accent:#4f46e5;--color-on-accent:#fff;--color-accent-soft:rgb(79 70 229/0.12);--color-accent-ink:#4338ca;--color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;--color-scrim:rgb(10 16 34/0.22);--canvas-glow:10%;--color-hue-1:#1f64d6;--color-hue-2:#00805e;--color-hue-2-soft:rgb(0 128 94/0.12);--color-hue-2-ink:#006a4e;--color-hue-7:#7244e0;--glass-sheen:rgb(0 0 0/0.06);--glass-scrim-strong:rgb(255 255 255/0.64);--glass-brightness-strong:1.3;--glass-edge:rgb(0 0 0/0.18);--glass-spec:rgb(0 0 0/0.2);--glass-rim-strong:rgb(255 255 255/0.3);--glass-rim-shade-strong:rgb(24 24 27/0.08);--glass-meniscus:rgb(24 24 27/0.12);--glass-refract:rgb(255 255 255/0.5);--glass-shadow-strong:rgb(0 0 0/0.16);--glass-shadow-clear:rgb(0 0 0/0.08);--control-spec:rgb(255 255 255/0.05)}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground);color:var(--color-ink)}
+body{margin:0;height:100vh;font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased;overflow:hidden}
+h1,h2,h3,h4,p{margin:0}
+:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}
+code,.ad-mono{font-family:var(--font-mono);font-size:12px}
+.ad-ink-2{color:var(--color-ink-2)}.ad-ink-3{color:var(--color-ink-3)}
+.ad-icon{width:16px;height:16px;flex-shrink:0}
+.ad-row{display:flex;align-items:center;gap:8px}
+.ad-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.ad-canvas{position:fixed;inset:0;z-index:-1;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--canvas-aurora-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--canvas-aurora-2) var(--canvas-glow),transparent),transparent 70%)}
+.ad-glass-strong{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim-strong);backdrop-filter:var(--glass-filter-strong);-webkit-backdrop-filter:var(--glass-filter-strong);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),inset 1px 1px 0 var(--glass-rim-strong),inset -1px -1px 0 var(--glass-rim-shade-strong),inset 0 -3px 3px -1px var(--glass-meniscus),inset 0 0 18px -4px var(--glass-refract),0 20px 48px var(--glass-shadow-strong)}
+.ad-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font:inherit;font-weight:600;font-size:14px;height:var(--size-control);padding:0 16px;border-radius:var(--radius-control);border:1px solid transparent;background:none;color:var(--color-ink);cursor:pointer;transition:background-color var(--dur-fast),transform 100ms var(--ease-sheet)}
+.ad-btn:active{transform:scale(var(--press-scale))}
+.ad-btn:disabled{opacity:.4;pointer-events:none}
+.ad-btn--solid{background:var(--color-accent);color:var(--color-on-accent)}
+.ad-btn--glass{background:var(--color-raised);border-color:var(--color-line-strong);box-shadow:inset 0 1px 0 var(--control-spec)}
+.ad-btn--glass:hover{background:linear-gradient(var(--color-hover),var(--color-hover)),var(--color-raised)}
+.ad-btn--ghost{color:var(--color-ink-2)}
+.ad-btn--ghost:hover{color:var(--color-ink);background:var(--color-hover)}
+.ad-btn--sm{height:32px;padding:0 12px;font-size:12px;border-radius:2px}
+.ad-btn--icon{padding:0;aspect-ratio:1}
+.ad-seg{display:inline-flex;gap:2px;padding:2px;height:28px;border:1px solid var(--color-line);border-radius:var(--radius-control)}
+.ad-seg button{min-width:64px;padding:0 10px;border:0;border-radius:4px;background:none;font:inherit;font-size:12px;font-weight:500;color:var(--color-ink-2);cursor:pointer}
+.ad-seg button[aria-pressed="true"]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.ad-badge{display:inline-flex;align-items:center;white-space:nowrap;font-weight:600;line-height:1;border-radius:9999px;height:18px;padding:0 6px;font-size:10px;background:var(--color-hover);color:var(--color-ink-2);flex-shrink:0}
+.ad-badge--warn{background:color-mix(in oklab,var(--color-warn) 14%,transparent);color:var(--color-warn)}
+.ad-badge--danger{background:color-mix(in oklab,var(--color-danger) 14%,transparent);color:var(--color-danger)}
+.ad-spinner{width:16px;height:16px;border-radius:9999px;border:2px solid var(--color-line-strong);border-top-color:var(--color-ink-2);animation:spin .8s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ad-textarea{width:100%;font:inherit;color:var(--color-ink);background:var(--color-surface);border:1px solid var(--color-line-strong);border-radius:var(--radius-control);padding:10px 14px;resize:none;min-height:64px}
+.ad-textarea::placeholder{color:var(--color-ink-3)}
+.ad-textarea:focus{outline:none;border-color:color-mix(in oklab,var(--color-ink) 70%,transparent);box-shadow:0 0 0 2px color-mix(in oklab,var(--color-ink) 22%,transparent)}
+.ad-kbd{display:inline-flex;align-items:center;height:18px;padding:0 5px;border-radius:4px;border:1px solid var(--color-line-strong);font-family:var(--font-mono);font-size:11px;color:var(--color-ink-3)}
+/* behind */
+.behind{padding:36px 40px;opacity:.9}
+.behind h1{font-size:28px;line-height:32px;font-weight:600;letter-spacing:-.02em}
+.ad-scrim{position:fixed;inset:0;z-index:60;background:var(--color-scrim);backdrop-filter:blur(2px)}
+/* dialog */
+.dlg{position:fixed;left:50%;top:50%;z-index:61;transform:translate(-50%,-50%);width:min(56rem,calc(100% - 2rem));height:calc(100% - 48px);display:flex;flex-direction:column;border-radius:var(--radius-sheet);overflow:hidden}
+.dlg-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:16px 20px 14px;border-bottom:1px solid var(--color-line)}
+.dlg-head__main{min-width:0;flex:1}
+.dlg-title{font-size:20px;line-height:28px;font-weight:600;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dlg-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin-top:6px;font-size:12px;color:var(--color-ink-3)}
+.dlg-skills{display:flex;align-items:center;gap:4px;min-width:0}
+.skill{font-family:var(--font-mono);font-weight:500}
+.dlg-body{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:20px 24px;display:flex;flex-direction:column;gap:24px}
+.dlg-foot{padding:12px 20px 16px;padding-bottom:max(16px,env(safe-area-inset-bottom));border-top:1px solid var(--color-line);display:flex;flex-direction:column;gap:8px}
+.composer{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end}
+.msg-me{align-self:flex-end;max-width:72%;padding:10px 14px;border-radius:12px 12px 4px 12px;background:var(--color-raised);border:1px solid var(--color-line);overflow-wrap:anywhere}
+.msg-me time{display:block;margin-top:4px;font-size:11px;color:var(--color-ink-3);text-align:right}
+.msg-ai{display:grid;grid-template-columns:28px minmax(0,1fr);gap:12px}
+.who{display:grid;place-content:center;width:28px;height:28px;border-radius:8px;background:var(--color-hover);color:var(--color-ink-2)}
+.who .ad-icon{width:15px;height:15px}
+.prose{display:flex;flex-direction:column;gap:10px;min-width:0;overflow-wrap:anywhere}
+.prose h3{font-size:16px;line-height:24px;font-weight:600}
+.prose code{padding:1px 5px;border-radius:4px;background:var(--color-hover)}
+.prose ol{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px}
+.finding{display:grid;grid-template-columns:64px minmax(0,1fr);gap:10px;padding:10px 12px;border-radius:var(--radius-surface);border:1px solid var(--color-line);background:var(--color-content)}
+.finding b{font-weight:600}
+.finding p{margin-top:2px;color:var(--color-ink-2)}
+.reply-meta{font-size:11px;color:var(--color-ink-3)}
+.proposals{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+.proposals-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 12px}
+.proposals-head h4{font-size:13px;font-weight:600}
+.proposal{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:start;padding:12px;border-radius:var(--radius-surface);background:var(--color-raised);border:1px solid var(--color-line)}
+.proposal__title{font-weight:600}
+.proposal__brief{margin-top:4px;color:var(--color-ink-2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.running{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:var(--radius-surface);border:1px dashed var(--color-line-strong)}
+.running__text{flex:1;min-width:0}
+.running__text b{font-weight:600}
+.running__text span{display:block;font-size:12px;color:var(--color-ink-3)}
+.foot-hint{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;color:var(--color-ink-3)}
+/* preview chrome (not product UI) */
+.pv{position:fixed;top:0;left:0;right:0;height:48px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 12px;z-index:100;border-bottom:1px solid var(--color-line);background:var(--color-surface);font-size:12px;color:var(--color-ink-3)}
+.stage{margin:56px auto 0;width:100%;height:calc(100vh - 64px);overflow:hidden;position:relative;transform:translateZ(0);container:app/inline-size}
+.stage[data-w="tablet"]{width:834px;border:1px solid var(--color-line-strong);border-radius:16px}
+.stage[data-w="phone"]{width:390px;border:1px solid var(--color-line-strong);border-radius:24px}
+/* tablet */
+@container app (max-width:1023px){
+  .dlg{width:calc(100% - 32px);height:calc(100% - 32px);--size-control:44px}
+  .ad-btn--sm{height:40px;padding:0 14px}
+  .dlg-head__actions .ad-btn--icon{width:44px}
+  .kbd-hint{display:none}
+}
+/* phone: full screen */
+@container app (max-width:639px){
+  .dlg{left:0;top:0;transform:none;width:100%;height:100%;border-radius:0;border:0}
+  .dlg-head{padding:10px 8px 10px 16px;align-items:center}
+  .dlg-title{font-size:16px;line-height:24px}
+  .dlg-meta{flex-wrap:nowrap;margin-top:2px}
+  .dlg-skills{overflow-x:auto;scrollbar-width:none}
+  .meta-started,.ro-long,.skills-label{display:none}
+  .discard-label{display:none}
+  .discard-btn{width:44px;padding:0}
+  .dlg-body{padding:16px;gap:20px}
+  .msg-me{max-width:88%}
+  .msg-ai{grid-template-columns:minmax(0,1fr)}
+  .who{display:none}
+  .finding{grid-template-columns:minmax(0,1fr);gap:6px}
+  .proposal{grid-template-columns:minmax(0,1fr)}
+  .proposal .ad-btn{width:100%}
+  .dlg-foot{padding:8px 12px;padding-bottom:max(8px,env(safe-area-inset-bottom))}
+  .ad-textarea{font-size:16px;min-height:44px;padding:10px 12px}
+  .send-label,.foot-hint{display:none}
+  .send-btn{width:44px;padding:0}
+}
+</style>
+</head>
+<body>
+<div class="pv" role="toolbar" aria-label="Mockup preview">
+  <span>Mockup preview width</span>
+  <div class="ad-row">
+    <div class="ad-seg" role="group" aria-label="Preview width" id="pvw"><button type="button" data-w="fit" aria-pressed="true">Fit</button><button type="button" data-w="tablet" aria-pressed="false">Tablet 834</button><button type="button" data-w="phone" aria-pressed="false">Phone 390</button></div>
+    <button class="ad-btn ad-btn--glass ad-btn--sm" type="button" id="pvt">Theme</button>
+  </div>
+</div>
+<div class="stage" id="stage" data-w="fit">
+<div class="ad-canvas"></div>
+<div class="behind" aria-hidden="true"><h1>Work</h1><p class="ad-ink-2">3 of 6 workers running · 14 cards</p></div>
+<div class="ad-scrim"></div>
+
+<section class="dlg ad-glass-strong" role="dialog" aria-modal="true" aria-labelledby="dlg-title">
+  <header class="dlg-head">
+    <div class="dlg-head__main">
+      <h2 class="dlg-title" id="dlg-title">Security review of runner tokens</h2>
+      <div class="dlg-meta">
+        <span class="dlg-skills"><span class="skills-label">Skills</span><span class="ad-badge skill">cs-security</span><span class="ad-badge skill">cs-arch</span></span>
+        <span class="ad-row" style="gap:4px;flex-shrink:0"><svg class="ad-icon" style="width:13px;height:13px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Read-only<span class="ro-long">&nbsp;· no file in the project changes</span></span>
+        <span class="meta-started">Started 17 Oct, 13:40</span>
+      </div>
+    </div>
+    <div class="ad-row dlg-head__actions" style="gap:4px">
+      <button class="ad-btn ad-btn--ghost ad-btn--sm discard-btn" type="button" aria-label="Discard discussion"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg><span class="discard-label">Discard</span></button>
+      <button class="ad-btn ad-btn--ghost ad-btn--icon" type="button" aria-label="Close — the discussion stays in Drafts"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+    </div>
+  </header>
+
+  <div class="dlg-body" aria-live="polite">
+    <div class="msg-me">Review how runner tokens are issued, stored and checked on the API side. Anything we should fix before opening registration to other teams?<time>13:40</time></div>
+
+    <article class="msg-ai">
+      <span class="who" aria-hidden="true"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8L20 10l-6.1 1.2L12 17l-1.9-5.8L4 10l6.1-1.2z"/></svg></span>
+      <div class="prose">
+        <div class="reply-meta">Planner · cs-security, cs-arch · 13:43</div>
+        <h3>Runner tokens: security review</h3>
+        <p>Tokens are minted once at registration, stored as a SHA-256 hash and checked by a guard on every runner request. The model is sound. Three things are worth fixing, ordered by risk:</p>
+        <ol>
+          <li class="finding"><span><span class="ad-badge ad-badge--danger">High</span></span><div><b>Hash compared with <code>===</code></b><p>The guard compares the stored hash with a plain string equality. Use a constant-time comparison so response timing does not leak the prefix.</p></div></li>
+          <li class="finding"><span><span class="ad-badge ad-badge--warn">Medium</span></span><div><b>Tokens never expire or rotate</b><p>A leaked token is valid until someone deletes the runner. Add rotation and a last-used timestamp shown on the runner page.</p></div></li>
+          <li class="finding"><span><span class="ad-badge">Low</span></span><div><b>No rate limit on failed runner auth</b><p>Failed attempts are not throttled per IP, unlike password checks (C-109).</p></div></li>
+        </ol>
+        <p class="ad-ink-2">Issuance and storage look right: the plaintext token is shown once and never logged.</p>
+
+        <section class="proposals" aria-label="Proposed cards">
+          <div class="proposals-head"><h4>Proposed cards · 2</h4><span class="reply-meta">Make a card opens New work with What to do filled in</span></div>
+          <div class="proposal">
+            <div><div class="proposal__title">Compare runner token hashes in constant time</div><p class="proposal__brief">Replace the string equality in the runner auth guard with a constant-time comparison, and add a spec that pins it.</p></div>
+            <button class="ad-btn ad-btn--glass ad-btn--sm" type="button"><svg class="ad-icon" style="width:14px;height:14px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Make a card</button>
+          </div>
+          <div class="proposal">
+            <div><div class="proposal__title">Rotate runner tokens and show when each was last used</div><p class="proposal__brief">Add a rotate action on the runner page that mints a new token and revokes the old one after a grace window, and record last-used time on every authenticated request.</p></div>
+            <button class="ad-btn ad-btn--glass ad-btn--sm" type="button"><svg class="ad-icon" style="width:14px;height:14px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Make a card</button>
+          </div>
+        </section>
+      </div>
+    </article>
+
+    <div class="msg-me">Is the token hash column indexed? And does the guard hit the database on every heartbeat?<time>13:47</time></div>
+
+    <article class="msg-ai">
+      <span class="who" aria-hidden="true"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8L20 10l-6.1 1.2L12 17l-1.9-5.8L4 10l6.1-1.2z"/></svg></span>
+      <div class="running" role="status">
+        <span class="ad-spinner" aria-hidden="true"></span>
+        <div class="running__text"><b>Thinking…</b><span>Reading the repository on archi-desktop · 0:18</span></div>
+        <button class="ad-btn ad-btn--ghost ad-btn--sm" type="button">Cancel</button>
+      </div>
+    </article>
+  </div>
+
+  <footer class="dlg-foot">
+    <div class="composer">
+      <label class="ad-sr" for="composer">Message</label>
+      <textarea class="ad-textarea" id="composer" rows="2" placeholder="Ask a follow-up, or ask for another analysis…">Also check the webhook secret the same way.</textarea>
+      <button class="ad-btn ad-btn--solid send-btn" type="button" disabled aria-label="Send"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg><span class="send-label">Send</span></button>
+    </div>
+    <div class="foot-hint"><span>You can keep writing; Send waits for the planner's reply.</span><span class="kbd-hint ad-row"><span class="ad-kbd">⌘↵</span> to send</span></div>
+  </footer>
+</section>
+</div>
+<script>
+(function(){var s=document.getElementById('stage');document.querySelectorAll('#pvw button').forEach(function(b){b.addEventListener('click',function(){s.dataset.w=b.dataset.w;document.querySelectorAll('#pvw button').forEach(function(o){o.setAttribute('aria-pressed',String(o===b))})})});document.getElementById('pvt').addEventListener('click',function(){var r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark'})})();
+</script>
+</body>
+</html>
