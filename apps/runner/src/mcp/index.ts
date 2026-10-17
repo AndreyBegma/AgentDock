@@ -17,6 +17,18 @@ const RETRY_CALL_MS =
   LOCAL_RETRY_WINDOW_MS + 2 * LOCAL_REQUEST_TIMEOUT_MS + 1_000;
 
 /**
+ * #113: the token of this MCP server's session — from the env of a session
+ * the runner launched, else the one the session's `SessionStart` hook kept
+ * for its `claude` process, this process's parent.
+ */
+export const mcpSessionToken = (
+  deps: Pick<LocalCommandDeps, 'env' | 'socketPath' | 'ppid'>,
+): string | undefined =>
+  deps.env[SESSION_TOKEN_ENV] ||
+  (readSessionToken(sessionTokenDir(deps.socketPath), { pid: deps.ppid }) ??
+    undefined);
+
+/**
  * `agentdock-runner mcp` (spec 201 D20): the `agentdock` MCP server over
  * stdio. Every tool call is one request to the daemon's local socket (D5),
  * carrying the session's token (#113): from the env of a session the runner
@@ -35,10 +47,6 @@ export const runMcp = async (
   const finishGuard = guard
     ? new FinishGuard({ ...guard, worktree: cwd })
     : undefined;
-  const tokens = sessionTokenDir(deps.socketPath);
-  const token = (): string | undefined =>
-    deps.env[SESSION_TOKEN_ENV] ||
-    (readSessionToken(tokens, { pid: deps.ppid }) ?? undefined);
   const request: McpRequest = (method, args) =>
     // The daemon and the server check `args` against the method's schema.
     localRequest(
@@ -47,7 +55,7 @@ export const runMcp = async (
       args as never,
       { via: 'mcp', cwd, ppid: deps.ppid },
       {
-        token: token(),
+        token: mcpSessionToken(deps),
         ...(LOCAL_RETRY_METHODS.has(method)
           ? { callTimeoutMs: RETRY_CALL_MS }
           : {}),

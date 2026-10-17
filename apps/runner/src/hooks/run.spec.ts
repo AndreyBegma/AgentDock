@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ActionRequestSummary } from '@agentdock/shared';
 import { CardStore } from '../cards/record';
@@ -36,6 +36,7 @@ const summary = (
 interface Call {
   op: string;
   args: Record<string, unknown>;
+  token?: string;
 }
 
 describe('agentdock-runner hook (spec 201 D11–D17)', () => {
@@ -63,8 +64,12 @@ describe('agentdock-runner hook (spec 201 D11–D17)', () => {
       call: Call,
     ) => LocalResult<unknown> | Promise<LocalResult<unknown>>,
   ) => {
-    const handle: LocalHandler = async (op, args) => {
-      const call = { op, args: args as Record<string, unknown> };
+    const handle: LocalHandler = async (op, args, caller) => {
+      const call = {
+        op,
+        args: args as Record<string, unknown>,
+        ...(caller.token ? { token: caller.token } : {}),
+      };
       calls.push(call);
       return answer(call);
     };
@@ -302,6 +307,56 @@ describe('agentdock-runner hook (spec 201 D11–D17)', () => {
     );
     await runHook(['session-start'], deps(fixture('session-start')));
     expect(stdout).toEqual([]);
+  });
+
+  describe('the session token (#113)', () => {
+    const SESSION = '0c9e2f4a-5b1d-4e8a-9c3f-2a7b6d1e8f90';
+    const tokens = () => join(dir, 'session-tokens');
+
+    it('registers at SessionStart, keeps the token it is given and presents it on the session’s later hooks', async () => {
+      daemon(({ op, args }) =>
+        op === 'request'
+          ? { ok: true, data: { text: '' } }
+          : args.type === 'hook.session_started'
+            ? { ok: true, data: { queued: true, token: 'tok-1' } }
+            : { ok: true, data: { queued: true } },
+      );
+      await runHook(['session-start'], deps(fixture('session-start')));
+      expect(calls.map((c) => [c.op, c.token])).toEqual([
+        ['event', undefined],
+        ['request', 'tok-1'],
+      ]);
+      // By session id for its hooks, by its claude pid (300) for its MCP.
+      expect(existsSync(join(tokens(), `s-${SESSION}.json`))).toBe(true);
+      expect(existsSync(join(tokens(), 'p-300.json'))).toBe(true);
+
+      calls = [];
+      await runHook(['post-tool-use'], deps(fixture('post-tool-use')));
+      expect(calls.map((c) => c.token)).toEqual(['tok-1']);
+
+      await runHook(['session-end'], deps(fixture('session-end')));
+      expect(existsSync(join(tokens(), `s-${SESSION}.json`))).toBe(false);
+      expect(existsSync(join(tokens(), 'p-300.json'))).toBe(false);
+    });
+
+    it('presents the token a launched session has in its env from the first hook', async () => {
+      daemon(({ op }) =>
+        op === 'request'
+          ? { ok: true, data: { text: '' } }
+          : { ok: true, data: { queued: true, token: 'tok-env' } },
+      );
+      const env = {
+        AGENTDOCK_SESSION_TOKEN: 'tok-env',
+        AGENTDOCK_TMUX_SESSION: 'agentdock-manual-0a1b2c3d',
+      };
+      await runHook(['session-start'], deps(fixture('session-start'), { env }));
+      await runHook(['stop'], deps(fixture('stop'), { env }));
+      expect(calls.map((c) => c.token)).toEqual([
+        'tok-env',
+        'tok-env',
+        'tok-env',
+      ]);
+    });
   });
 
   it('an async hook only reports its event', async () => {

@@ -14,6 +14,7 @@ import type { Exec } from './detect/exec';
 import { FILTER_RUN_FILE, FILTER_STATS_FILE } from './filter/env';
 import { type HookDeps, runHook } from './hooks/run';
 import { localRequest } from './local/client';
+import { loadSessionTokenSecret, SessionTokens } from './local/session-tokens';
 import { FORBIDDEN, fixtureProtobuf, PROTOBUF_SESSION } from './otlp/testing';
 import { reportedPolicy } from './policy/schema';
 import {
@@ -388,28 +389,9 @@ describe('daemon — local socket (spec 201)', () => {
     await live();
     expect(statSync(join(dir, 'runner.sock')).mode & 0o777).toBe(0o600);
 
+    // #113: the session registers at its start; its later hooks present
+    // the token it was given.
     const stdout: string[] = [];
-    await runHook(
-      ['user-prompt-submit'],
-      hookDeps({ session_id: 's-1', cwd: ROOT, prompt: `use ${GHP}` }, stdout),
-    );
-    await until(() =>
-      server
-        .of('events')
-        .some((m) => m.events.some((e) => e.type === 'hook.prompt_submitted')),
-    );
-    const event = server
-      .of('events')
-      .flatMap((m) => m.events)
-      .find((e) => e.type === 'hook.prompt_submitted');
-    expect(event).toMatchObject({
-      source: 'hook',
-      project: { repo: 'fixture', root: ROOT },
-      session: { runtime: 'claude', id: 's-1' },
-      data: { chars: GHP.length + 4, content: { truncated: false } },
-    });
-    expect(JSON.stringify(event)).not.toContain(GHP);
-
     const pending = runHook(
       ['session-start'],
       hookDeps({ session_id: 's-1', cwd: ROOT, source: 'startup' }, stdout),
@@ -434,6 +416,27 @@ describe('daemon — local socket (spec 201)', () => {
         additionalContext: 'Project fixture.',
       },
     });
+
+    await runHook(
+      ['user-prompt-submit'],
+      hookDeps({ session_id: 's-1', cwd: ROOT, prompt: `use ${GHP}` }, []),
+    );
+    await until(() =>
+      server
+        .of('events')
+        .some((m) => m.events.some((e) => e.type === 'hook.prompt_submitted')),
+    );
+    const event = server
+      .of('events')
+      .flatMap((m) => m.events)
+      .find((e) => e.type === 'hook.prompt_submitted');
+    expect(event).toMatchObject({
+      source: 'hook',
+      project: { repo: 'fixture', root: ROOT },
+      session: { runtime: 'claude', id: 's-1' },
+      data: { chars: GHP.length + 4, content: { truncated: false } },
+    });
+    expect(JSON.stringify(event)).not.toContain(GHP);
 
     controller.abort();
     await done;
@@ -477,8 +480,14 @@ describe('daemon — local socket (spec 201)', () => {
       sessionId: session,
       startedAt: '2026-10-16T18:00:00.000Z',
     });
+    // #113: the runner put the round's token in its env; it is signed with
+    // the secret beside the spool, so it outlives the restart.
+    const token = new SessionTokens(
+      loadSessionTokenSecret(join(dir, 'session-token.key')),
+    ).mint({ sessionId: session, cwd: worktree });
     await runHook(['user-prompt-submit'], {
       ...hookDeps({ session_id: session, cwd: worktree, prompt: 'go' }, []),
+      env: { AGENTDOCK_SESSION_TOKEN: token },
       cwd: worktree,
     });
     first.controller.abort();
@@ -492,6 +501,7 @@ describe('daemon — local socket (spec 201)', () => {
       'card.finish',
       { summary: 'Changed the thing. Tested it.' },
       { via: 'mcp', cwd: worktree, ppid: 4242 },
+      { token },
     );
     const [request] = await server.waitFor('local.request');
     expect(request).toMatchObject({
