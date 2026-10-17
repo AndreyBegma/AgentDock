@@ -230,6 +230,29 @@ export class PlannerHarness {
     return response.body as PlanDetail;
   }
 
+  /**
+   * #592 (ADR-0055): accepts every pending candidate of an intake as
+   * proposed — its stack in its stages, else independent cards.
+   */
+  async acceptAll(planId: string, session: Session = this.author) {
+    const intake = (await this.detail(planId, session)).intake;
+    const stack = intake?.candidateStack ?? null;
+    return session.send(
+      'post',
+      `/projects/${this.projectId}/candidates/accept`,
+      {
+        as: stack ? 'stack' : 'cards',
+        candidates: (intake?.candidates ?? [])
+          .filter((c) => c.status === 'pending')
+          .map((c) => ({
+            id: c.id,
+            version: c.version,
+            ...(stack ? { stage: c.stage } : {}),
+          })),
+      },
+    );
+  }
+
   detail(planId: string, session: Session = this.author) {
     return session.get(this.base(planId)).then((r) => r.body as PlanDetail);
   }

@@ -29,6 +29,12 @@ import { UserSettingsService } from '../settings/user-settings.service';
 import { TextNormalizer } from '../text/text-normalizer';
 import { TextOwners } from '../text/text-owners';
 import { readablePlanWhere } from './plan-access';
+import {
+  candidateStackOf,
+  candidatesOf,
+  pendingAttachments,
+  toCandidateView,
+} from './plan-candidates.service';
 import { intakeRound, intakeSplit, toSplitView } from './plan-intake';
 import {
   blockingOpen,
@@ -294,7 +300,14 @@ export class PlanService implements OnModuleInit {
       include: { ...planInclude, instructions: { select: { version: true } } },
     });
     const intakeOpen = plan.mode === 'card' && plan.status === 'clarifying';
-    const [tasks, turns, questions, split] = await Promise.all([
+    const review =
+      plan.mode === 'card'
+        ? Promise.all([
+            candidatesOf(this.prisma, planId),
+            pendingAttachments(this.prisma, planId),
+          ])
+        : Promise.resolve(null);
+    const [tasks, turns, questions, split, reviewed] = await Promise.all([
       this.store.currentTasks(this.prisma, plan),
       this.prisma.planTurn.findMany({
         where: { planId },
@@ -307,6 +320,7 @@ export class PlanService implements OnModuleInit {
           ? intakeRound(this.prisma, planId)
           : this.store.planRound(planId),
       intakeOpen ? intakeSplit(this.prisma, planId) : Promise.resolve(null),
+      review,
     ]);
     const [issueOf, designs] = await Promise.all([
       loadIssueViews(this.prisma, projectId, tasks),
@@ -322,6 +336,13 @@ export class PlanService implements OnModuleInit {
       latestTurn: turns.at(-1) ?? null,
       questions,
       split: split ? toSplitView(split) : null,
+      review: reviewed
+        ? {
+            candidates: reviewed[0].map(toCandidateView),
+            candidateStack: candidateStackOf(plan.candidateStack),
+            attachments: reviewed[1],
+          }
+        : null,
     });
   }
 

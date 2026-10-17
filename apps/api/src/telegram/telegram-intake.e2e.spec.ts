@@ -455,23 +455,24 @@ describe('Telegram /new: the New work intake (e2e, #574)', () => {
     });
   });
 
-  it('Enough — generate writes one card, announced with its kind and a working link', async () => {
+  it('Enough — generate writes one candidate, announced with its kind and a link to Drafts (#592)', async () => {
     const { plan, controls } = await startRound();
     await press(button(controls.body, 'Enough — generate'), controls.id);
     expect((await activeTurn(plan.id)).input).toMatchObject({ generate: true });
     const calls = await finish(plan.id, CARD);
-    const card = await ctx.prisma.boardCard.findFirstOrThrow({
-      where: { planId: plan.id },
-    });
+    expect(
+      await ctx.prisma.boardCard.count({ where: { planId: plan.id } }),
+    ).toBe(0);
     const [shown] = edits(calls);
-    expect(shown?.text).toContain('*Card created*');
+    expect(shown?.text).toContain('*A card waits for you*');
+    expect(shown?.text).toContain('Export the board as CSV · feature');
     expect(shown?.text).toContain(
-      `[C\\-${card.number} Export the board as CSV · feature](https://dock.example.com/projects/${projectId}/board?card=${card.number})`,
+      `(https://dock.example.com/projects/${projectId}/board)`,
     );
     expect(await ctx.prisma.telegramIntake.count()).toBe(0);
   });
 
-  it('lists a split with summaries, creates all its cards, and offers Open in app', async () => {
+  it('lists a split with summaries, sends all its cards to Drafts, and offers Open in app', async () => {
     await say(CHAT, `/new ${BRIEF}`);
     const plan = await planOf();
     const calls = await finish(plan.id, SPLIT);
@@ -490,35 +491,40 @@ describe('Telegram /new: the New work intake (e2e, #574)', () => {
       'Discard',
     ]);
     const created = await press(button(shown, 'Create all'), thinkingId);
-    expect(notices(created)).toEqual(['Creating the cards.']);
-    const cards = await ctx.prisma.boardCard.findMany({
+    expect(notices(created)).toEqual(['Sending the cards to Drafts.']);
+    const candidates = await ctx.prisma.planCandidate.findMany({
       where: { planId: plan.id },
-      orderBy: { number: 'asc' },
+      orderBy: { position: 'asc' },
     });
-    expect(cards.map((c) => c.title)).toEqual([
+    expect(candidates.map((c) => c.title)).toEqual([
       'Export the board as CSV',
       'Fix the sign-in button on mobile',
     ]);
+    expect(
+      await ctx.prisma.boardCard.count({ where: { planId: plan.id } }),
+    ).toBe(0);
     const announced = sends(created).map((b) => String(b.text));
-    expect(announced.at(-1)).toContain('*2 cards created*');
+    expect(announced.at(-1)).toContain('*2 cards wait for you*');
   });
 
-  it('creates a proposed stack with its stages', async () => {
+  it('sends a proposed stack to Drafts with its stages', async () => {
     await say(CHAT, `/new ${BRIEF}`);
     const plan = await planOf();
     const [shown] = edits(await finish(plan.id, STACK));
     expect(shown?.text).toContain('*A stack of 2 cards: Board export*');
     expect(shown?.text).toContain('_Stage 1: Foundations_');
     await press(button(shown, 'Create all'), Number(shown?.message_id));
+    const candidates = await ctx.prisma.planCandidate.findMany({
+      where: { planId: plan.id },
+      orderBy: { position: 'asc' },
+    });
+    expect(candidates.map((c) => c.stage)).toEqual([0, 1]);
     expect(
       await ctx.prisma.boardStack.count({ where: { planId: plan.id } }),
-    ).toBe(1);
-    expect(
-      await ctx.prisma.boardCard.count({ where: { planId: plan.id } }),
-    ).toBe(2);
+    ).toBe(0);
   });
 
-  it('Keep one card on a split yields one card', async () => {
+  it('Keep one card on a split yields one candidate', async () => {
     await say(CHAT, `/new ${BRIEF}`);
     const plan = await planOf();
     const [shown] = edits(await finish(plan.id, SPLIT));
@@ -526,7 +532,7 @@ describe('Telegram /new: the New work intake (e2e, #574)', () => {
     expect((await activeTurn(plan.id)).input).toEqual({ keepOne: true });
     await finish(plan.id, CARD);
     expect(
-      await ctx.prisma.boardCard.count({ where: { planId: plan.id } }),
+      await ctx.prisma.planCandidate.count({ where: { planId: plan.id } }),
     ).toBe(1);
   });
 

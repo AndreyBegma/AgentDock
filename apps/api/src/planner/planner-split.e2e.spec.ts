@@ -8,7 +8,7 @@ import { block, PlannerHarness } from './testing/planner-e2e';
 /**
  * #409 (docs/specs/409-new-work-intake-can-split.md): New work decides how
  * many cards a request makes — one card as before, or a split the person
- * confirms, edits or declines.
+ * confirms, edits or declines. #592: what it writes are candidates.
  */
 
 const SEVERAL =
@@ -121,7 +121,7 @@ describe('New work intake splits (e2e, #409)', () => {
     expect(await cardsOf(plan.id)).toHaveLength(0);
   });
 
-  it('Confirm creates every kept card at once — edited, in order, independent, from the model’s bodies', async () => {
+  it('Confirm writes every kept card as a candidate — edited, in order, from the model’s bodies — and makes no card', async () => {
     const plan = await proposed();
     const turnId = plan.intake?.split?.turnId;
     const response = await confirm(plan.id, {
@@ -132,24 +132,46 @@ describe('New work intake splits (e2e, #409)', () => {
       ],
     });
     expect(response.status).toBe(201);
-    expect(response.body.cards).toHaveLength(2);
+    expect(response.body.candidates).toHaveLength(2);
+    expect(await cardsOf(plan.id)).toHaveLength(0);
 
+    const review = await h.detail(plan.id);
+    expect(review.status).toBe('reviewing');
+    expect(review.title).toBe('Add a dark theme');
+    expect(review.intake?.split).toBeNull();
+    expect(review.intake?.candidateStack).toBeNull();
+    const candidates = review.intake?.candidates ?? [];
+    expect(candidates.map((c) => [c.title, c.kind, c.status])).toEqual([
+      ['Add a dark theme', 'feature', 'pending'],
+      ['Export the board as CSV', 'bug', 'pending'],
+    ]);
+    // The dark-theme candidate keeps the model's body for the third proposal.
+    expect(candidates[0].body).toContain('Add a dark theme to the board');
+    for (const candidate of candidates) {
+      expect(candidate.stage).toBeNull();
+      for (const section of CARD_DRAFT_SECTIONS) {
+        expect(candidate.body).toContain(`## ${section}`);
+      }
+    }
+    // Once only.
+    const again = await confirm(plan.id, {
+      turnId,
+      cards: [{ index: 1, title: 'Fix it', kind: 'bug' }],
+    });
+    expect(again.status).toBe(409);
+    expect(again.body.error).toBe('split_stale');
+
+    // Accept all makes them independent, in order, and closes the intake.
+    const accepted = await h.acceptAll(plan.id);
+    expect(accepted.status).toBe(200);
     const cards = await cardsOf(plan.id);
     expect(cards.map((c) => [c.title, c.kind, c.column])).toEqual([
       ['Add a dark theme', 'feature', 'todo'],
       ['Export the board as CSV', 'bug', 'todo'],
     ]);
-    expect(
-      response.body.cards.map((c: { number: number }) => c.number),
-    ).toEqual(cards.map((c) => c.number));
-    // The dark-theme card keeps the model's body for the third proposal.
-    expect(cards[0].body).toContain('Add a dark theme to the board');
     for (const card of cards) {
       expect(card.planId).toBe(plan.id);
       expect(card.createdById).toBe(h.authorId);
-      for (const section of CARD_DRAFT_SECTIONS) {
-        expect(card.body).toContain(`## ${section}`);
-      }
     }
     expect(
       await h.ctx.prisma.boardCardDependency.count({
@@ -157,18 +179,7 @@ describe('New work intake splits (e2e, #409)', () => {
       }),
     ).toBe(0);
     expect(await h.auditOf('card.created')).toHaveLength(2);
-
-    const done = await h.detail(plan.id);
-    expect(done.status).toBe('done');
-    expect(done.title).toBe('Add a dark theme');
-    expect(done.intake?.split).toBeNull();
-    // Once only.
-    const again = await confirm(plan.id, {
-      turnId,
-      cards: [{ index: 1, title: 'Fix it', kind: 'bug' }],
-    });
-    expect(again.status).toBe(409);
-    expect(again.body.error).toBe('cards_exist');
+    expect((await h.detail(plan.id)).status).toBe('done');
   });
 
   it('hands the intake’s attachments to the first confirmed card', async () => {
@@ -202,6 +213,7 @@ describe('New work intake splits (e2e, #409)', () => {
       ],
     });
     expect(response.status).toBe(201);
+    expect((await h.acceptAll(planId)).status).toBe(200);
     const [first] = await cardsOf(planId);
     const row = await h.ctx.prisma.attachment.findUniqueOrThrow({
       where: { id: shot.id },
@@ -230,19 +242,22 @@ describe('New work intake splits (e2e, #409)', () => {
       `${h.base(plan.id)}/turns/${failed.turns.at(-1)?.id}/retry`,
     );
     await h.finish(plan.id, block(ONE_CARD));
-    const done = await h.detail(plan.id);
-    expect(done.status).toBe('done');
-    const cards = await cardsOf(plan.id);
-    expect(cards.map((c) => c.title)).toEqual([ONE_CARD.cardDraft.title]);
+    const review = await h.detail(plan.id);
+    expect(review.status).toBe('reviewing');
+    expect(review.intake?.candidates?.map((c) => c.title)).toEqual([
+      ONE_CARD.cardDraft.title,
+    ]);
+    expect(await cardsOf(plan.id)).toHaveLength(0);
   });
 
-  it('a single clear task still makes one card with no proposal', async () => {
+  it('a single clear task is one candidate with no proposal, and no card', async () => {
     const plan = await start();
     await h.finish(plan.id, block(ONE_CARD));
-    const done = await h.detail(plan.id);
-    expect(done.status).toBe('done');
-    expect(done.intake?.split).toBeNull();
-    expect(await cardsOf(plan.id)).toHaveLength(1);
+    const review = await h.detail(plan.id);
+    expect(review.status).toBe('reviewing');
+    expect(review.intake?.split).toBeNull();
+    expect(review.intake?.candidates).toHaveLength(1);
+    expect(await cardsOf(plan.id)).toHaveLength(0);
   });
 
   it('refuses a stale proposal, a running turn, a repeated or unknown index, and a non-English title', async () => {

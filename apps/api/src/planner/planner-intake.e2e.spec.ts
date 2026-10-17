@@ -105,6 +105,10 @@ describe('card intake (e2e, #337)', () => {
   const prompts = () =>
     h.sentOf('plan.turn').map((args) => String(args.prompt));
 
+  /** #592: the intake writes a candidate; Accept makes the card. */
+  const candidateOf = (planId: string) =>
+    h.ctx.prisma.planCandidate.findFirst({ where: { planId } });
+
   const cardOf = (planId: string) =>
     h.ctx.prisma.boardCard.findFirst({ where: { planId } });
 
@@ -179,10 +183,15 @@ describe('card intake (e2e, #337)', () => {
     expect(prompt).toContain('Rounds asked so far: 1 of 4.');
 
     await h.finish(plan.id, block(card()));
-    const done = await h.detail(plan.id);
-    expect(done.status).toBe('done');
-    expect(done.title).toBe('Export the board as CSV');
+    const review = await h.detail(plan.id);
+    expect(review.status).toBe('reviewing');
+    expect(review.title).toBe('Export the board as CSV');
+    expect(await cardOf(plan.id)).toBeNull();
+    // A reviewed intake takes no more turns.
+    expect((await turn(plan.id, { message: 'ещё' })).status).toBe(409);
 
+    expect((await h.acceptAll(plan.id)).status).toBe(200);
+    expect((await h.detail(plan.id)).status).toBe('done');
     const made = await cardOf(plan.id);
     expect(made).toMatchObject({
       title: 'Export the board as CSV',
@@ -197,8 +206,6 @@ describe('card intake (e2e, #337)', () => {
       expect(made?.body).toContain(`## ${section}`);
     }
     expect(await h.auditOf('card.created')).toHaveLength(1);
-    // A done intake takes no more turns.
-    expect((await turn(plan.id, { message: 'ещё' })).status).toBe(409);
   });
 
   it('refuses two options on a single-choice question, and an option the question lacks (400)', async () => {
@@ -273,7 +280,7 @@ describe('card intake (e2e, #337)', () => {
     });
     expect(failed.phase).toBe('failed');
     expect(failed.error).toContain('must_generate');
-    expect(await cardOf(plan.id)).toBeNull();
+    expect(await candidateOf(plan.id)).toBeNull();
   });
 
   it('Enough — generate before the first round is answered is a turn on its own', async () => {
@@ -281,7 +288,7 @@ describe('card intake (e2e, #337)', () => {
     await h.finish(plan.id, block(roundOf(ruQuestion('q1'))));
     expect((await turn(plan.id, { generate: true })).status).toBe(201);
     await h.finish(plan.id, block(card()));
-    expect(await cardOf(plan.id)).not.toBeNull();
+    expect(await candidateOf(plan.id)).not.toBeNull();
   });
 
   it('never asks a fifth round: after four, the next turn must write the card', async () => {
@@ -307,14 +314,14 @@ describe('card intake (e2e, #337)', () => {
     });
     expect(turns.map((t) => t.phase)).toEqual(['failed', 'queued']);
     expect(turns[0].error).toContain('not_english');
-    expect(await cardOf(plan.id)).toBeNull();
+    expect(await candidateOf(plan.id)).toBeNull();
 
     await h.finish(plan.id, block(card({ body: RUSSIAN_BODY })));
     turns = await h.ctx.prisma.planTurn.findMany({
       where: { planId: plan.id },
     });
     expect(turns).toHaveLength(2);
-    expect((await cardOf(plan.id))?.body).toBe(RUSSIAN_BODY);
+    expect((await candidateOf(plan.id))?.body).toBe(RUSSIAN_BODY);
   });
 
   it('Discard archives the intake: no card, and its attachments go back to the sweep', async () => {
@@ -373,6 +380,7 @@ describe('card intake (e2e, #337)', () => {
       ).toEqual([shot, more]);
 
       await h.finish(plan.id, block(card()));
+      expect((await h.acceptAll(plan.id)).status).toBe(200);
       const made = await cardOf(plan.id);
       expect(
         (

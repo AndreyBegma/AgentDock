@@ -1,8 +1,8 @@
 import {
+  type AcceptCandidatesResponse,
   BOARD_ERROR,
   type BoardStackDetail,
   type BoardView,
-  type ConfirmSplitResponse,
   type PlanDetail,
   STACK_GATE_REASON,
   stackDesignPath,
@@ -98,8 +98,40 @@ describe('card stacks (e2e, #480)', () => {
     return h.detail(plan.id);
   };
 
-  const confirm = (planId: string, request: object) =>
-    h.author.send('post', `${h.base(planId)}/split`, request);
+  /**
+   * #592 (ADR-0055): Confirm writes candidates; Accept all makes them as
+   * proposed — the stack in its stages, or independent cards.
+   */
+  const acceptAll = async (planId: string) => {
+    const intake = (await h.detail(planId)).intake;
+    const stack = intake?.candidateStack ?? null;
+    const response = await h.author.send(
+      'post',
+      `/projects/${h.projectId}/candidates/accept`,
+      {
+        as: stack ? 'stack' : 'cards',
+        candidates: (intake?.candidates ?? []).map((c) => ({
+          id: c.id,
+          version: c.version,
+          ...(stack ? { stage: c.stage } : {}),
+        })),
+      },
+    );
+    if (response.status !== 200) throw new Error(response.text);
+    return response.body as AcceptCandidatesResponse;
+  };
+
+  const confirm = async (planId: string, request: object) => {
+    const response = await h.author.send(
+      'post',
+      `${h.base(planId)}/split`,
+      request,
+    );
+    if (response.status === 201) {
+      return Object.assign(response, { accepted: await acceptAll(planId) });
+    }
+    return Object.assign(response, { accepted: null });
+  };
 
   const stackPath = (number = 1) =>
     `/projects/${h.projectId}/board/stacks/${number}`;
@@ -129,8 +161,8 @@ describe('card stacks (e2e, #480)', () => {
       ]),
       stack: stackRequest(design),
     });
-    if (response.status !== 201) throw new Error(response.text);
-    return { plan, response: response.body as ConfirmSplitResponse };
+    if (!response.accepted) throw new Error(response.text);
+    return { plan, response: response.accepted };
   };
 
   const run = (number: number) =>
@@ -330,7 +362,7 @@ describe('card stacks (e2e, #480)', () => {
         ]),
       });
       expect(response.status).toBe(201);
-      expect((response.body as ConfirmSplitResponse).stack).toBeNull();
+      expect(response.accepted?.stack).toBeNull();
       expect(await h.ctx.prisma.boardStack.count()).toBe(0);
       expect(await h.ctx.prisma.boardCardDependency.count()).toBe(0);
     });

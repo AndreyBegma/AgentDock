@@ -1,5 +1,11 @@
 import {
+  ACCEPT_CANDIDATES_AS,
+  ACCEPT_CANDIDATES_MAX,
+  type AcceptCandidateRef,
+  type AcceptCandidatesAs,
+  type AcceptCandidatesRequest,
   ATTACHMENTS_PER_CARD_MAX,
+  CARD_DRAFT_BODY_MAX,
   CARD_DRAFT_TITLE_MAX,
   type ConfirmSplitCard,
   type ConfirmSplitRequest,
@@ -32,6 +38,7 @@ import {
   STACK_STAGE_TITLE_MAX,
   STACK_TITLE_MAX,
   type TasksQuery,
+  type UpdatePlanCandidateRequest,
 } from '@agentdock/shared';
 import { Type } from 'class-transformer';
 import {
@@ -242,6 +249,58 @@ export class ConfirmSplitDto implements ConfirmSplitRequest {
   @ValidateNested()
   @Type(() => ConfirmStackDto)
   stack?: ConfirmStackDto;
+}
+
+/** `PATCH …/plans/:planId/candidates/:candidateId` (#592): an edit by hand. */
+export class UpdatePlanCandidateDto implements UpdatePlanCandidateRequest {
+  @IsInt()
+  @Min(1)
+  version!: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(CARD_DRAFT_TITLE_MAX)
+  title?: string;
+
+  @IsOptional()
+  @IsIn(PLAN_TASK_KINDS)
+  kind?: PlanTaskKind;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(CARD_DRAFT_BODY_MAX)
+  body?: string;
+}
+
+/** #592: one candidate of an accept, at the version the person saw. */
+export class AcceptCandidateRefDto implements AcceptCandidateRef {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(ID_MAX_LENGTH)
+  id!: string;
+
+  @IsInt()
+  @Min(1)
+  version!: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(ACCEPT_CANDIDATES_MAX - 1)
+  stage?: number;
+}
+
+/** `POST /projects/:projectId/candidates/accept` (#592, ADR-0055 §3). */
+export class AcceptCandidatesDto implements AcceptCandidatesRequest {
+  @IsIn(ACCEPT_CANDIDATES_AS)
+  as!: AcceptCandidatesAs;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(ACCEPT_CANDIDATES_MAX)
+  @ValidateNested({ each: true })
+  @Type(() => AcceptCandidateRefDto)
+  candidates!: AcceptCandidateRefDto[];
 }
 
 /** `POST …/tasks/:key/review`. */

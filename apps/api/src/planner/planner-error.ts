@@ -1,9 +1,14 @@
 import type {
+  CandidateDecidedDetails,
   NoProfileDetails,
   PlannerErrorBody,
   PlannerErrorCode,
 } from '@agentdock/shared';
 import { HttpException } from '@nestjs/common';
+
+/** A refusal's details: `no_profile`'s (#272 D2), `candidate_decided`'s (#592). */
+type PlannerErrorExtra = Partial<NoProfileDetails> &
+  Partial<CandidateDecidedDetails>;
 
 /**
  * An HTTP error of the planner routes, shaped like every other API error. Its
@@ -15,9 +20,9 @@ export class PlannerFailure extends HttpException {
     readonly statusCode: number,
     readonly code: PlannerErrorCode,
     message: string,
-    extra: Partial<NoProfileDetails> = {},
+    extra: PlannerErrorExtra = {},
   ) {
-    const body: PlannerErrorBody & Partial<NoProfileDetails> = {
+    const body: PlannerErrorBody & PlannerErrorExtra = {
       statusCode,
       error: code,
       message,
@@ -31,7 +36,7 @@ export const plannerError = (
   statusCode: number,
   code: PlannerErrorCode,
   message: string,
-  extra: Partial<NoProfileDetails> = {},
+  extra: PlannerErrorExtra = {},
 ): PlannerFailure => new PlannerFailure(statusCode, code, message, extra);
 
 /** A plan the caller cannot read is indistinguishable from one that does not exist (D12). */
