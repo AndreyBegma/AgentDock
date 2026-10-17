@@ -338,7 +338,12 @@ export class SessionsIngestService implements RunnerEventSink, OnModuleInit {
         startedAt: new Date(data.startedAt),
         projectId,
         slotName,
-        ...(parentSessionId !== null ? { parentSessionId } : {}),
+        ...(parentSessionId !== null
+          ? { parentSessionId }
+          : // Re-observed in another project without its parent: no longer a child.
+            before.projectId !== projectId
+            ? { parentSessionId: null }
+            : {}),
       },
     });
     session.projectId = projectId;

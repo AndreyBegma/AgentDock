@@ -148,7 +148,10 @@ export class SessionsQueryService {
       },
     });
     const page = rows.slice(0, limit);
-    const totals = await this.subtreeTotals(page.map((r) => r.id));
+    const totals = await this.subtreeTotals(
+      page.map((r) => r.id),
+      user.role !== 'admin',
+    );
     const withContent = await this.readableContent(user, page);
 
     return {
@@ -176,7 +179,7 @@ export class SessionsQueryService {
     if (!session || !(await this.visible(user, session.projectId))) {
       throw sessionNotFound();
     }
-    const ids = await this.subtreeIds(id);
+    const ids = await this.subtreeIds(id, user.role !== 'admin');
     const where = { sessionId: { in: ids } };
     const [sessions, turns, requests, tools] = await Promise.all([
       this.prisma.agentSession.findMany({
@@ -241,13 +244,22 @@ export class SessionsQueryService {
     return (await this.access.resolve(user, projectId)) !== null;
   }
 
-  /** `id` and every session below it. `UNION` ends a cycle of parent links. */
-  private async subtreeIds(id: string): Promise<string[]> {
+  /**
+   * `id` and every session below it. `UNION` ends a cycle of parent links.
+   * `sameProject` (a non-admin caller) drops descendants outside the root's
+   * project, so a child that moved to another project never leaks through.
+   */
+  private async subtreeIds(
+    id: string,
+    sameProject: boolean,
+  ): Promise<string[]> {
     const rows = await this.prisma.$queryRaw<{ id: string }[]>`
       WITH RECURSIVE tree(id) AS (
         SELECT ${id}::text
         UNION
         SELECT s.id FROM sessions s JOIN tree t ON s."parentSessionId" = t.id
+        WHERE NOT ${sameProject}
+          OR s."projectId" IS NOT DISTINCT FROM (SELECT "projectId" FROM sessions WHERE id = ${id})
       )
       SELECT id FROM tree`;
     return rows.map((r) => r.id);
@@ -256,13 +268,15 @@ export class SessionsQueryService {
   /** Totals of each root and every session below it, with its subagent count. */
   private async subtreeTotals(
     roots: string[],
+    sameProject: boolean,
   ): Promise<Map<string, { subagents: number; totals: SessionTotals }>> {
     if (roots.length === 0) return new Map();
     const rows = await this.prisma.$queryRaw<SubtreeTotalsRow[]>`
-      WITH RECURSIVE tree(root, id) AS (
-        SELECT id, id FROM sessions WHERE id IN (${Prisma.join(roots)})
+      WITH RECURSIVE tree(root, id, "projectId") AS (
+        SELECT id, id, "projectId" FROM sessions WHERE id IN (${Prisma.join(roots)})
         UNION
-        SELECT t.root, s.id FROM sessions s JOIN tree t ON s."parentSessionId" = t.id
+        SELECT t.root, s.id, t."projectId" FROM sessions s JOIN tree t ON s."parentSessionId" = t.id
+        WHERE NOT ${sameProject} OR s."projectId" IS NOT DISTINCT FROM t."projectId"
       )
       SELECT t.root,
         (COUNT(DISTINCT t.id) - 1)::int AS subagents,
