@@ -43,7 +43,9 @@ import {
   cardRunWiringSchema,
   type LocalErrorCode,
   localErrorCodeSchema,
+  type PaneDialog,
   type ProfileAgentdock,
+  paneDialogSchema,
 } from '@agentdock/shared/protocol';
 import {
   type BoardCard,
@@ -277,6 +279,15 @@ export const finishRefusedOf = (
   return code.success ? code.data : null;
 };
 
+/** #624: the dialog that blocks a round counts only while it waits. */
+export const blockingDialogOf = (
+  round: Pick<BoardCardRound, 'phase' | 'blockingDialog'>,
+): PaneDialog | null => {
+  if (round.phase !== 'waiting') return null;
+  const dialog = paneDialogSchema.safeParse(round.blockingDialog);
+  return dialog.success ? dialog.data : null;
+};
+
 const brief = (
   card: BoardCard,
   round: BoardCardRound | undefined,
@@ -296,6 +307,7 @@ const brief = (
         autoRunAfter: round.autoRunAfter,
         pendingQuestion: pendingQuestionOf(round),
         finishRefused: finishRefusedOf(round),
+        blockingDialog: blockingDialogOf(round),
       }
     : null;
 
@@ -449,6 +461,7 @@ const toRoundView = (
   ...wiringOf(round),
   autoRunAfter: round.autoRunAfter,
   finishRefused: finishRefusedOf(round),
+  blockingDialog: blockingDialogOf(round),
   costUsd: facts.costs.get(round.runId) ?? null,
   tokenSaved: facts.tokenSaver.tokenSaved.get(round.runId) ?? null,
   tokenSaverFilters: facts.tokenSaver.tokenSaverFilters.get(round.runId) ?? [],

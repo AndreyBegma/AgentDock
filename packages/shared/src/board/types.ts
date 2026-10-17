@@ -242,3 +242,9 @@ export const CARD_HOOKS_GRACE_MS = 2 * 60 * 1000;
 
 /** D6: how often the runner checks that a card's tmux session is alive. */
 export const CARD_SESSION_POLL_MS = 10_000;
+
+/**
+ * #624: a dialog still blocking a card's session after this long — one the
+ * runner does not answer — makes the round wait for the person.
+ */
+export const CARD_DIALOG_WAIT_MS = 30_000;

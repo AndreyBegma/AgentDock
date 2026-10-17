@@ -4,6 +4,7 @@ import { headShaSchema } from '../commands/approvals';
 import { cardIdSchema, cardTmuxSessionSchema } from '../commands/cards';
 import { gitRefSchema, skillRunIdSchema } from '../commands/skills';
 import { localErrorCodeSchema } from '../local';
+import { paneDialogSchema } from './fleet';
 
 /**
  * Card worker events (issue #242 "Runner"). A round outlives the `card.run`
@@ -165,6 +166,34 @@ export const isCardQuestionEventType = (
   type: string,
 ): type is CardQuestionEventType =>
   Object.hasOwn(cardQuestionEventDataSchemas, type);
+
+/**
+ * #624: a Claude Code dialog has blocked the round's session for
+ * `CARD_DIALOG_WAIT_MS` — the workspace trust dialog, or any other the
+ * runner does not answer itself. Sent once per dialog shown; the API moves
+ * the round to `waiting`, names the dialog on the card and tells the person.
+ * The answer's next hook event moves the round back to `running`. Names the
+ * dialog only, never pane text.
+ */
+export const cardRunDialogDataSchema = z.object({
+  cardId: cardIdSchema,
+  runId: skillRunIdSchema,
+  projectId: z.string().min(1),
+  at: z.iso.datetime(),
+  dialog: paneDialogSchema,
+});
+export type CardRunDialogData = z.infer<typeof cardRunDialogDataSchema>;
+
+export const cardDialogEventDataSchemas = {
+  'card_run.dialog': cardRunDialogDataSchema,
+} as const;
+
+export type CardDialogEventType = keyof typeof cardDialogEventDataSchemas;
+
+export const isCardDialogEventType = (
+  type: string,
+): type is CardDialogEventType =>
+  Object.hasOwn(cardDialogEventDataSchemas, type);
 
 /**
  * #489 M4: the question selector a round's pane shows now — its text and
