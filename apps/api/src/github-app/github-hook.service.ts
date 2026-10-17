@@ -29,6 +29,7 @@ import {
 } from './github-routing';
 import { verifyGitHubSignature } from './github-signature';
 import { type DebouncedPoll, PollDebouncer } from './poll-debouncer';
+import { SignatureFailureTracker } from './signature-failure-tracker';
 
 /** `X-GitHub-Delivery` is a GUID; anything visible up to 100 characters is kept. */
 const DELIVERY_ID = /^[\x21-\x7e]{1,100}$/;
@@ -80,6 +81,7 @@ export class GitHubHookService implements OnApplicationShutdown {
     private readonly store: GitHubAppStore,
     private readonly installations: GitHubInstallationsService,
     private readonly health: GitHubHealthService,
+    private readonly failures: SignatureFailureTracker,
     private readonly sender: CollectorPollSender,
     @Inject(GITHUB_APP_OPTIONS) options: GitHubAppOptions,
   ) {
@@ -100,17 +102,25 @@ export class GitHubHookService implements OnApplicationShutdown {
     const secret = this.store.webhookSecret(app);
     const rawBody = input.rawBody ?? Buffer.alloc(0);
     if (!secret || !verifyGitHubSignature(input.signature, rawBody, secret)) {
-      // D6: 401 with no detail; only a counter and its time are kept.
-      await this.prisma.gitHubApp.update({
-        where: { id: GITHUB_APP_ROW_ID },
-        data: {
-          signatureFailures: { increment: 1 },
-          lastSignatureFailureAt: new Date(),
-        },
-      });
-      this.logger.warn(
-        `delivery ${safeId(input.deliveryId)}: signature refused`,
-      );
+      // D6: 401 with no detail; only a counter and its time are kept. C-116:
+      // counted in memory, the row written at most once a minute.
+      const now = new Date();
+      this.failures.record(now);
+      const flush = this.failures.takeUnflushed(now);
+      if (flush) {
+        await this.prisma.gitHubApp.update({
+          where: { id: GITHUB_APP_ROW_ID },
+          data: {
+            signatureFailures: { increment: flush.count },
+            lastSignatureFailureAt: flush.at,
+          },
+        });
+      }
+      const logged = this.failures.takeUnlogged(now);
+      if (logged > 0)
+        this.logger.warn(
+          `${logged} deliveries refused for signature in the last minute`,
+        );
       this.health.recomputeSoon();
       throw new UnauthorizedException();
     }
@@ -131,6 +141,7 @@ export class GitHubHookService implements OnApplicationShutdown {
       routing.kind === 'poll' ? await this.projectsFor(routing.fullName) : [];
     const polls = routing.kind === 'poll' ? pollsFor(routing, matched) : [];
     const now = new Date();
+    this.failures.clear();
 
     try {
       await this.prisma.$transaction(async (tx) => {
@@ -247,7 +258,3 @@ const pollsFor = (
         routing.branch === (project.baseOverride ?? project.baseBranch),
     )
     .map((project) => ({ project, collectors: routing.collectors }));
-
-/** A delivery id fit for a log line. */
-const safeId = (id: string | undefined): string =>
-  id && DELIVERY_ID.test(id) ? id : '(none)';

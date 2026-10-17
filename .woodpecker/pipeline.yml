@@ -18,13 +18,35 @@
 # (https://staging-agentdock.luna-realm.com). No registry, no ssh: the agents
 # run on the staging host, and the steps that need it get the Docker socket.
 #
+# Trust levels (ADR-0053). A pull request is untrusted: it runs the pipeline
+# file and the build scripts of its own branch, and anyone who can push a
+# branch, a card worker included, can open one. So a step that can run on a
+# pull request gets no Docker socket, no host volume and no secret.
+#   - `ci-image`, `build-staging` and `deploy-staging` mount the socket and run
+#     on push and manual events only. A pull request runs on the
+#     agentdock-ci:node-bun image the last push built; a change to
+#     deploy/ci-image/ reaches CI once it is merged. (Not by digest: the image
+#     never leaves the host, and a local image has no repository digest.)
+#   - No step mounts a host cache. bun's install cache lives in the step's
+#     container, turbo's in the pipeline's workspace; both die with the
+#     pipeline, so nothing one pipeline writes is reused by another, a release
+#     or a staging build in particular.
+# scripts/check-ci.ts (`bun run check`) fails when a step that can run on a
+# pull request mounts a volume or reads a secret. It guards against mistakes;
+# a pull request can edit it too. Until pull requests run on an agent without
+# the Docker socket, a same-repository pull request that edits this file can
+# still reach it: only forks wait for approval (#504). That gap is open and
+# recorded in ADR-0053 §7 and deploy/README.md.
+#
 # The CI Postgres holds throwaway data. It runs on tmpfs, with fsync,
 # synchronous_commit and full_page_writes off.
 #
-# The repository is public. Host mounts need it "trusted → volumes" in
-# Woodpecker, and pull requests from forks must wait for approval
-# (require_approval: forks) — an unapproved fork would otherwise reach the
-# Docker socket of the host. deploy/README.md lists the repository settings.
+# The repository is public. The socket and staging mounts need it
+# "trusted → volumes" in Woodpecker, and pull requests from forks must wait
+# for approval (require_approval: forks). Pull requests from the repository's
+# own branches, board cards' included, start at once (#504); pull_requests or
+# all_events would gate them too. deploy/README.md lists the repository
+# settings.
 
 when:
   - event: pull_request
@@ -42,13 +64,9 @@ variables:
   - &socket_and_staging
     - /var/run/docker.sock:/var/run/docker.sock
     - /home/archi/stacks/agentdock-staging:/home/archi/stacks/agentdock-staging
-  # Caches that outlive a run: the workspace volume dies with the pipeline.
-  - &caches
-    - /home/archi/ci-cache/agentdock/bun:/ci-cache/bun
-    - /home/archi/ci-cache/agentdock/turbo:/ci-cache/turbo
-  - &cache_env
-    BUN_INSTALL_CACHE_DIR: /ci-cache/bun
-    TURBO_CACHE_DIR: /ci-cache/turbo
+  # turbo's cache in the workspace (.turbo/cache, its default) is shared by the
+  # steps of one pipeline and dies with it.
+  - &turbo_env
     TURBO_TELEMETRY_DISABLED: '1'
   # A pull request that touches only these skips `build` and `test`.
   - &docs_only
@@ -74,17 +92,19 @@ services:
       - redis-server --requirepass ci --maxmemory-policy noeviction
 
 steps:
+  # Never on a pull request: the socket is root on the host (ADR-0053).
   - name: ci-image
     image: *docker_image
+    when:
+      - event: [push, manual]
     volumes: *socket
     commands:
-      - docker build -t agentdock-ci:node-bun deploy/ci-image
+      - docker build --pull -t agentdock-ci:node-bun deploy/ci-image
 
   - name: install
     image: *ci_image
-    depends_on: [ci-image]
-    volumes: *caches
-    environment: *cache_env
+    depends_on: [{ name: ci-image, optional: true }]
+    environment: *turbo_env
     commands:
       - bun --version
       - bun install --frozen-lockfile
@@ -105,8 +125,7 @@ steps:
       - event: pull_request
         path: *docs_only
       - event: [push, manual]
-    volumes: *caches
-    environment: *cache_env
+    environment: *turbo_env
     commands:
       - bun run typecheck --filter=@agentdock/web
 
@@ -117,8 +136,7 @@ steps:
       - event: pull_request
         path: *docs_only
       - event: [push, manual]
-    volumes: *caches
-    environment: *cache_env
+    environment: *turbo_env
     commands:
       - bun run build -- --concurrency=2
 
@@ -133,9 +151,8 @@ steps:
       - event: push
         branch: main
       - event: manual
-    volumes: *caches
     environment:
-      <<: *cache_env
+      <<: *turbo_env
       TEST_DATABASE_URL: postgresql://postgres:ci@postgres:5432/agentdock_test?schema=public
       TEST_REDIS_URL: redis://:ci@redis:6379/1
       DATABASE_URL: postgresql://postgres:ci@postgres:5432/agentdock?schema=public

@@ -1,6 +1,9 @@
 import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import type { RuntimeProfile } from '@agentdock/shared/protocol';
+import {
+  type RuntimeProfile,
+  reportProfileEnv,
+} from '@agentdock/shared/protocol';
 import type { ConfigProfile } from '../config';
 import { type Env, expandHome } from '../env';
 
@@ -47,11 +50,19 @@ export const isAuthenticated = (
   return isFile(join(codexHome(profile, home), 'auth.json')) !== null;
 };
 
+/**
+ * The profiles as `hello` and `runner.describe` report them: env names only,
+ * a value only for an allowlisted path (C-123, ADR-0006).
+ */
 export const withAuthentication = (
   profiles: readonly ConfigProfile[],
   home: string,
 ): RuntimeProfile[] =>
-  profiles.map((p) => ({ ...p, authenticated: isAuthenticated(p, home) }));
+  profiles.map((p) => ({
+    ...p,
+    env: reportProfileEnv(p.env),
+    authenticated: isAuthenticated(p, home),
+  }));
 
 /** A directory name as a profile id: `[A-Za-z0-9][A-Za-z0-9._-]*`, or null. */
 const toIdPart = (name: string): string | null => {

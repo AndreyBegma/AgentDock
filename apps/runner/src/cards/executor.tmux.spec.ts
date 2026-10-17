@@ -8,6 +8,7 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import {
+  CARD_DIALOG_WAIT_MS,
   CARD_PUSH_MIN_INTERVAL_MS,
   cardDraftPullRequest,
   STEWARD_ACTED_EVENT,
@@ -92,6 +93,10 @@ if [ "$FAKE_MODE" = question-tall ]; then
   printf '\\033[2J\\033[H'; cat "$FIXTURES/ask-user-question-answered.txt"
   sleep 60
 fi
+if [ "$FAKE_MODE" = trust ]; then
+  printf '\\033[2J\\033[H'; cat "$FIXTURES/../../collectors/tmux/__fixtures__/trust.txt"
+  sleep 60
+fi
 if [ "$FAKE_MODE" = permission ]; then
   printf 'Do you want to proceed?\\n 1. Yes\\n 2. No\\n'
   sleep 60
@@ -137,6 +142,7 @@ const setup = async (
     profile('claude-slow', 'sleep'),
     profile('claude-dialog', 'dialog'),
     profile('claude-permission', 'permission'),
+    profile('claude-trust', 'trust'),
     profile('claude-prompt', 'prompt'),
     profile('claude-quoted', 'quoted'),
     profile('claude-question', 'question'),
@@ -412,6 +418,46 @@ describe.skipIf(!tmuxInstalled)(
         expect(screens()[1]).toBeNull();
         await t.tmux('kill-session', '-t', `=${session}:`);
       }
+    });
+
+    it('#624: trusts the worktree before the launch; a dialog still up after the wait is reported once, never answered', async () => {
+      const t = await setup();
+      await t.executor.run(
+        t.args({
+          cardId: 'card_t',
+          runId: 'run_t',
+          profileKey: 'claude-trust',
+        }),
+      );
+      const worktree = join(t.f.ws, '.wt-widget-card-ab12cd34');
+      const config = JSON.parse(
+        readFileSync(join(t.f.profileDir, '.claude.json'), 'utf8'),
+      );
+      expect(config.projects[worktree]).toEqual({
+        hasTrustDialogAccepted: true,
+      });
+
+      const session = 'agentdock-card-ab12cd34';
+      const dialogs = () =>
+        t.events.filter((e) => e.type === 'card_run.dialog');
+      await t.paneShows(session, 'Do you trust the files');
+      await t.executor.poll();
+      t.clock.advance(CARD_DIALOG_WAIT_MS - 1);
+      await t.executor.poll();
+      expect(dialogs()).toEqual([]);
+      t.clock.advance(1);
+      for (let i = 0; i < 3; i++) await t.executor.poll();
+      expect(dialogs().map((e) => e.data)).toEqual([
+        {
+          cardId: 'card_t',
+          runId: 'run_t',
+          projectId: expect.any(String),
+          at: expect.any(String),
+          dialog: 'trust',
+        },
+      ]);
+      expect(t.tmuxCalls.some((c) => c.includes('send-keys'))).toBe(false);
+      await t.tmux('kill-session', '-t', `=${session}:`);
     });
 
     it('never answers a permission prompt (#435)', async () => {

@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C-231 · Capsule on a phone</title>
+<style>
+:root{--radius-control:6px;--radius-surface:8px;--radius-sheet:12px;--size-tap:44px;--dur-fast:100ms;--dur-sheet:260ms;--ease-sheet:cubic-bezier(.32,.72,0,1);--font-sans:'SF Pro Text','Inter',system-ui,-apple-system,'Segoe UI',sans-serif;--font-mono:'JetBrains Mono',ui-monospace,Menlo,monospace;--glass-blur:26px;--glass-blur-strong:40px;--glass-filter:blur(var(--glass-blur)) saturate(180%) brightness(var(--glass-brightness));--glass-filter-strong:blur(var(--glass-blur-strong)) saturate(180%) brightness(var(--glass-brightness-strong))}
+:root,:root[data-theme="dark"]{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-paper:#1b2647;--color-content:rgb(27 38 71/.96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246/.62);--color-ink-3:rgb(242 242 246/.53);--color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;--color-line:rgb(255 255 255/.1);--color-line-strong:rgb(255 255 255/.18);--color-hover:rgb(255 255 255/.06);--color-focus:#b4b2ff;--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-soft:rgb(91 91 246/.2);--color-accent-ink:#b4b2ff;--color-hue-1:#5b9cf6;--color-hue-1-ink:#a4c8ff;--color-hue-2:#2fbf94;--color-hue-2-ink:#7ee0c0;--color-hue-4:#e69f00;--color-hue-4-ink:#f5c25c;--color-hue-7:#a68bfa;--a-soft:18%;--canvas-glow:18%;--glass-sheen:rgb(255 255 255/.06);--glass-scrim:rgb(9 9 12/.55);--glass-scrim-strong:rgb(9 9 12/.64);--glass-brightness:.85;--glass-brightness-strong:.7;--glass-edge:rgb(255 255 255/.14);--glass-spec:rgb(255 255 255/.2);--glass-rim:rgb(242 242 246/.8);--glass-rim-shade:rgb(9 9 12/.5);--glass-rim-strong:rgb(242 242 246/.22);--glass-rim-shade-strong:rgb(9 9 12/.2);--glass-meniscus:rgb(9 9 12/.55);--glass-refract:rgb(242 242 246/.35);--glass-shadow:rgb(0 0 0/.35);--glass-shadow-strong:rgb(0 0 0/.45);--glass-shadow-clear:rgb(0 0 0/.15)}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-paper:#fff;--color-content:rgb(255 255 255/.96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27/.72);--color-ink-3:rgb(24 24 27/.64);--color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;--color-line:rgb(0 0 0/.1);--color-line-strong:rgb(0 0 0/.23);--color-hover:rgb(0 0 0/.06);--color-focus:#4f46e5;--color-accent:#4f46e5;--color-on-accent:#fff;--color-accent-soft:rgb(79 70 229/.12);--color-accent-ink:#4338ca;--color-hue-1:#1f64d6;--color-hue-1-ink:#1550b0;--color-hue-2:#00805e;--color-hue-2-ink:#006a4e;--color-hue-4:#b36b00;--color-hue-4-ink:#8a5200;--color-hue-7:#7244e0;--a-soft:12%;--canvas-glow:10%;--glass-sheen:rgb(0 0 0/.06);--glass-scrim:rgb(255 255 255/.52);--glass-scrim-strong:rgb(255 255 255/.64);--glass-brightness:1.15;--glass-brightness-strong:1.3;--glass-edge:rgb(0 0 0/.18);--glass-spec:rgb(0 0 0/.2);--glass-rim:rgb(255 255 255/.9);--glass-rim-shade:rgb(24 24 27/.18);--glass-rim-strong:rgb(255 255 255/.3);--glass-rim-shade-strong:rgb(24 24 27/.08);--glass-meniscus:rgb(24 24 27/.12);--glass-refract:rgb(255 255 255/.5);--glass-shadow:rgb(0 0 0/.12);--glass-shadow-strong:rgb(0 0 0/.16);--glass-shadow-clear:rgb(0 0 0/.08)}
+:root{--color-hue-1-soft:color-mix(in srgb,var(--color-hue-1) var(--a-soft),transparent);--color-hue-2-soft:color-mix(in srgb,var(--color-hue-2) var(--a-soft),transparent);--color-hue-4-soft:color-mix(in srgb,var(--color-hue-4) var(--a-soft),transparent)}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground);color:var(--color-ink)}
+body{margin:0;font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased;padding:24px}
+h1,h2,p{margin:0}
+:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}
+svg.i{width:16px;height:16px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);backdrop-filter:var(--glass-filter);-webkit-backdrop-filter:var(--glass-filter);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),inset 1px 1px 0 var(--glass-rim),inset -1px -1px 0 var(--glass-rim-shade),inset 0 -3px 3px -1px var(--glass-meniscus),inset 0 0 18px -4px var(--glass-refract),0 12px 32px var(--glass-shadow)}
+.ink-2{color:var(--color-ink-2)}.ink-3{color:var(--color-ink-3)}
+.frame-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:20px;flex-wrap:wrap}
+.frame-head h1{font-size:20px;line-height:28px;font-weight:600}
+.frame-head p{color:var(--color-ink-2);max-width:70ch}
+.theme-btn{height:28px;padding:0 12px;border-radius:var(--radius-control);border:1px solid var(--color-line-strong);background:var(--color-raised);color:var(--color-ink);font:inherit;font-weight:600;cursor:pointer}
+.phones{display:flex;gap:32px;flex-wrap:wrap;align-items:flex-start}
+.spec{width:375px;display:flex;flex-direction:column;gap:10px}
+.spec-cap{font-size:12px;line-height:16px;color:var(--color-ink-3)}
+.spec-cap b{color:var(--color-ink);font-weight:600}
+.phone{position:relative;width:375px;height:760px;overflow:hidden;border-radius:28px;border:1px solid var(--color-line-strong);background:var(--color-ground);isolation:isolate}
+.canvas{position:absolute;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.scroll{position:absolute;inset:0;overflow:hidden;padding:8px 16px 0;display:flex;flex-direction:column;gap:16px}
+.topbar{display:flex;align-items:center;gap:10px;height:56px;padding:0 12px;border-radius:var(--radius-surface);flex-shrink:0}
+.topbar .t{flex:1;font-size:15px;font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iconbtn{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border:0;background:transparent;color:var(--color-ink-2);border-radius:var(--radius-control)}
+.avatar{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:999px;background:var(--color-accent-soft);color:var(--color-accent-ink);font-size:12px;font-weight:600}
+.live{width:8px;height:8px;border-radius:999px;background:var(--color-hue-2)}
+.eyebrow{font-size:12px;font-weight:500;color:var(--color-ink-3)}
+.h1{font-size:28px;line-height:32px;letter-spacing:-.02em;font-weight:600}
+.desc{font-size:14px;color:var(--color-ink-2)}
+.card{border-radius:var(--radius-surface);padding:12px;background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.col-head{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600}
+.badge{display:inline-flex;align-items:center;justify-content:center;height:18px;min-width:18px;padding:0 5px;border-radius:999px;font-size:10px;font-weight:600;background:var(--color-hover);color:var(--color-ink-2);font-variant-numeric:tabular-nums}
+.badge-danger{background:var(--color-danger);color:var(--color-ground)}
+.badge-warn{background:color-mix(in srgb,var(--color-warn) 14%,transparent);color:var(--color-warn)}
+.bcard{display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:var(--radius-control);background:var(--color-content);border:1px solid var(--color-line)}
+.meta{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--color-ink-3)}
+.pill{display:inline-flex;align-items:center;gap:6px;height:20px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:500;background:var(--s-soft);color:var(--s-ink)}
+.pill .dot{width:6px;height:6px;border-radius:999px;background:var(--s)}
+.running{--s:var(--color-hue-2);--s-soft:var(--color-hue-2-soft);--s-ink:var(--color-hue-2-ink)}
+.waiting{--s:var(--color-hue-1);--s-soft:var(--color-hue-1-soft);--s-ink:var(--color-hue-1-ink)}
+.paused{--s:var(--color-hue-4);--s-soft:var(--color-hue-4-soft);--s-ink:var(--color-hue-4-ink)}
+.stat{padding:12px;border-radius:var(--radius-surface);background:var(--color-raised);border:1px solid var(--color-line)}
+.stat-l{font-size:12px;color:var(--color-ink-3)}.stat-v{margin-top:4px;font-size:24px;line-height:28px;font-weight:600;font-variant-numeric:tabular-nums}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.row{display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid var(--color-line)}
+.row:last-child{border-bottom:0}
+.row .grow{flex:1;min-width:0}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 12px;border-radius:4px;border:1px solid var(--color-line-strong);background:var(--color-raised);color:var(--color-ink);font:inherit;font-size:12px;font-weight:600}
+/* BottomCapsule — mirrors glass-ui 0.34.0 bottom-capsule.js */
+.cap-dock{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:stretch;justify-content:center;gap:8px;padding:0 12px 12px;z-index:5}
+.cap{flex:1;min-width:0;display:flex;align-items:stretch;padding:4px;border-radius:999px}
+.cap-item{position:relative;flex:1 1 auto;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:8px 6px;min-height:52px;border-radius:999px;font-size:11px;font-weight:500;color:var(--color-ink-3);text-decoration:none;border:0;background:transparent;font-family:inherit;cursor:pointer;transition:color var(--dur-fast)}
+.cap-item svg.i{width:19px;height:19px;position:relative}
+.cap-item span{position:relative;text-align:center;white-space:nowrap}
+.cap-item[aria-current=page],.cap-item[aria-expanded=true]{color:var(--color-ink)}
+.cap-pill{position:absolute;inset:0;border-radius:999px;background:var(--color-hover)}
+.fab{width:64px;height:64px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-radius:9999px;color:var(--color-ink);cursor:pointer;font:inherit}
+.fab svg.i{width:21px;height:21px}
+.spacer{height:96px;flex-shrink:0;border:1px dashed color-mix(in srgb,var(--color-ink-3) 40%,transparent);border-radius:var(--radius-control);display:flex;align-items:flex-start;justify-content:center;padding-top:6px;font-size:11px;color:var(--color-ink-3)}
+.tag{position:absolute;font-size:11px;font-weight:600;line-height:14px;padding:2px 6px;border-radius:4px;background:var(--color-accent);color:var(--color-on-accent);z-index:6;white-space:nowrap}
+@media (prefers-reduced-transparency:reduce){.glass{background:var(--color-raised);backdrop-filter:none}}
+</style>
+</head>
+<body>
+<div class="frame-head">
+  <div>
+    <h1>The floating capsule below 1024 px</h1>
+    <p>glass-ui <code>BottomCapsule</code> with <code>tabSizing="content"</code>: three places, More, and the page-driven <code>+</code> circle beside it. The travelling pill is glass-ui's <code>bg-hover</code> capsule. The active tab also carries <code>aria-current="page"</code>.</p>
+  </div>
+  <button class="theme-btn" type="button" onclick="var r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark'">Toggle theme</button>
+</div>
+
+<div class="phones">
+  <!-- 1. Inside a project, operator, Board -->
+  <section class="spec">
+    <div class="phone">
+      <div class="canvas"></div>
+      <div class="scroll">
+        <header class="topbar glass"><span class="t">Work</span><span class="live" title="Live"></span><button class="iconbtn" aria-label="Notifications"><svg class="i" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></button><span class="avatar">AB</span></header>
+        <div style="display:flex;flex-direction:column;gap:4px"><div class="eyebrow">agentdock-web</div><h2 class="h1">Work</h2><p class="desc">Cards move from intake to merged. The page's own New work button stays in the header above lg.</p></div>
+        <div class="card" style="display:flex;flex-direction:column;gap:8px">
+          <div class="col-head">In progress<span class="badge" style="margin-left:auto">3</span></div>
+          <article class="bcard"><div style="font-weight:500">Token saver: compress reads</div><div class="meta"><span class="pill running"><span class="dot"></span>slot-1</span><span style="margin-left:auto">$2.10</span></div></article>
+          <article class="bcard"><div style="font-weight:500">Detect stuck agent work</div><div class="meta"><span class="pill waiting"><span class="dot"></span>slot-5</span><span style="margin-left:auto">$1.80</span></div></article>
+          <article class="bcard"><div style="font-weight:500">Make board faces touch-friendly</div><div class="meta"><span class="pill running"><span class="dot"></span>slot-2</span><span style="margin-left:auto">$4.12</span></div></article>
+          <article class="bcard"><div style="font-weight:500">Floating capsule on phones</div><div class="meta"><span class="pill paused"><span class="dot"></span>slot-3</span><span style="margin-left:auto">$0.64</span></div></article>
+        </div>
+        <div class="spacer">6rem spacer — the page ends above the capsule</div>
+      </div>
+      <div class="cap-dock">
+        <nav class="cap glass" aria-label="Main">
+          <a class="cap-item" href="#" aria-current="page"><span class="cap-pill" aria-hidden="true"></span><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 7v7M12 7v4M16 7v9"/></svg><span>Work</span></a>
+          <a class="cap-item" href="#"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="15" width="6" height="6" rx="1"/><path d="M21 9V7a2 2 0 0 0-2-2h-6M3 15v2a2 2 0 0 0 2 2h6"/></svg><span>Fleet</span></a>
+          <a class="cap-item" href="#"><svg class="i" viewBox="0 0 24 24"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg><span>Approvals</span></a>
+          <button class="cap-item" type="button" aria-haspopup="dialog" aria-expanded="false"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg><span>More</span></button>
+        </nav>
+        <button class="fab glass" type="button" aria-label="New work"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></svg></button>
+      </div>
+    </div>
+    <p class="spec-cap"><b>Inside a project, operator.</b> The tabs are Work · Fleet · Approvals · More. The Board registers one action, so <code>+</code> is labelled "New work" and opens the same intake as the page's button. Pages that register nothing get the same New work fallback.</p>
+  </section>
+
+  <!-- 2. Outside a project -->
+  <section class="spec">
+    <div class="phone">
+      <div class="canvas"></div>
+      <div class="scroll">
+        <header class="topbar glass"><span class="t">Overview</span><span class="live" title="Live"></span><button class="iconbtn" aria-label="Notifications"><svg class="i" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></button><span class="avatar">AB</span></header>
+        <div style="display:flex;flex-direction:column;gap:4px"><div class="eyebrow">Workspace</div><h2 class="h1">Overview</h2><p class="desc">Every project's fleet at a glance.</p></div>
+        <div class="grid2">
+          <div class="stat"><div class="stat-l">Active slots</div><div class="stat-v">5 / 7</div></div>
+          <div class="stat"><div class="stat-l">Spend today</div><div class="stat-v">$38.40</div></div>
+          <div class="stat"><div class="stat-l">Waiting on you</div><div class="stat-v">3</div></div>
+          <div class="stat"><div class="stat-l">Ready issues</div><div class="stat-v">0</div></div>
+        </div>
+        <div class="card" style="padding:0">
+          <div class="row"><span class="grow" style="font-weight:500">agentdock-web</span><span class="pill running"><span class="dot"></span>Running</span></div>
+          <div class="row"><span class="grow" style="font-weight:500">glass-ui</span><span class="pill waiting"><span class="dot"></span>Waiting</span></div>
+          <div class="row"><span class="grow" style="font-weight:500">luna-watch</span><span class="pill paused"><span class="dot"></span>Paused</span></div>
+        </div>
+        <div class="spacer">6rem spacer</div>
+      </div>
+      <div class="cap-dock">
+        <nav class="cap glass" aria-label="Main">
+          <a class="cap-item" href="#" aria-current="page"><span class="cap-pill" aria-hidden="true"></span><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg><span>Overview</span></a>
+          <a class="cap-item" href="#"><svg class="i" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9l-.8-1.2A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg><span>Projects</span></a>
+          <a class="cap-item" href="#"><svg class="i" viewBox="0 0 24 24"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5M19.1 4.9C23 8.8 23 15.1 19.1 19"/><circle cx="12" cy="12" r="2"/></svg><span>Activity</span></a>
+          <button class="cap-item" type="button" aria-haspopup="dialog" aria-expanded="false"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg><span>More</span></button>
+        </nav>
+      </div>
+    </div>
+    <p class="spec-cap"><b>Outside a project.</b> Overview · Projects · Activity · More. Nothing is registered and there is no project to fall back to, so <code>+</code> is not rendered and the capsule takes the full width.</p>
+  </section>
+
+  <!-- 3. Viewer inside a project -->
+  <section class="spec">
+    <div class="phone">
+      <div class="canvas"></div>
+      <div class="scroll">
+        <header class="topbar glass"><span class="t">Approvals</span><span class="live" title="Live"></span><button class="iconbtn" aria-label="Notifications"><svg class="i" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></button><span class="avatar">VK</span></header>
+        <div style="display:flex;flex-direction:column;gap:4px"><div class="eyebrow">agentdock-web</div><h2 class="h1">Approvals</h2><p class="desc">Pull requests and permission prompts waiting on a person.</p></div>
+        <div class="card" style="padding:0">
+          <div class="row"><div class="grow"><div style="font-weight:500">#497 Touch-friendly board cards</div><div class="meta">slot-2 · checks green</div></div><span class="pill waiting"><span class="dot"></span>Review</span></div>
+          <div class="row"><div class="grow"><div style="font-weight:500">Bash: git push</div><div class="meta">slot-5 · 2 min ago</div></div><span class="pill waiting"><span class="dot"></span>Prompt</span></div>
+          <div class="row"><div class="grow"><div style="font-weight:500">#499 Steward stuck-work</div><div class="meta">slot-5 · checks running</div></div><span class="pill paused"><span class="dot"></span>Pending</span></div>
+        </div>
+        <p class="ink-3" style="font-size:12px">You can view this project. Only an operator can approve.</p>
+        <div class="spacer">6rem spacer</div>
+      </div>
+      <div class="cap-dock">
+        <nav class="cap glass" aria-label="Main">
+          <a class="cap-item" href="#"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 7v7M12 7v4M16 7v9"/></svg><span>Work</span></a>
+          <a class="cap-item" href="#"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="15" width="6" height="6" rx="1"/><path d="M21 9V7a2 2 0 0 0-2-2h-6M3 15v2a2 2 0 0 0 2 2h6"/></svg><span>Fleet</span></a>
+          <a class="cap-item" href="#" aria-current="page"><span class="cap-pill" aria-hidden="true"></span><svg class="i" viewBox="0 0 24 24"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg><span>Approvals</span></a>
+          <button class="cap-item" type="button" aria-haspopup="dialog" aria-expanded="false"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg><span>More</span></button>
+        </nav>
+      </div>
+    </div>
+    <p class="spec-cap"><b>Inside a project, viewer.</b> The fallback New work is operator-only, so once it is filtered out nothing remains and there is no <code>+</code>. Tabs never change per page or per role.</p>
+  </section>
+</div>
+</body>
+</html>

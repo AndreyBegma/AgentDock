@@ -88,6 +88,16 @@ describe('checkpointFromHeading', () => {
       checkpoint: 'pr_open',
     });
   });
+
+  it.each([
+    'http://github.com/acme/widget/pull/7',
+    'https://github.com.evil.example/acme/widget/pull/7',
+    'https://evil.example/acme/widget/pull/7',
+  ])('does not take %s as the pull request URL', (url) => {
+    expect(checkpointFromHeading(`pull request open — ${url}`)).toEqual({
+      checkpoint: 'pr_open',
+    });
+  });
 });
 
 describe('fleet events', () => {

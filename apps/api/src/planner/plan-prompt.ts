@@ -3,6 +3,7 @@ import {
   designBytes,
   PLANNER_BLOCK_TAG,
   PLANNER_DESIGN_CONTRACT,
+  PLANNER_DISCUSS_CONTRACT,
   PLANNER_INTAKE_CONTRACT,
   type PlanMode,
   type PlannerContractVersion,
@@ -68,7 +69,38 @@ export interface PromptInput {
   projectInstructions?: string | null;
   /** #337 D10: the worktree paths of the files the runner placed for the turn. */
   attachments?: readonly string[];
+  /** #590: a discussion turn's skills — the installed ones of those it chose. */
+  discussion?: DiscussPromptState;
 }
+
+export interface DiscussPromptState {
+  skills: readonly string[];
+}
+
+/**
+ * #590 (ADR-0056): what a discussion turn is — the instructions every turn
+ * of a `discuss` plan runs on, in place of the planner's. The turn runs in
+ * the plan's read-only worktree (spec 172 D15), so the model reads the
+ * repository and cannot change it; the instructions say so as well.
+ */
+export const DISCUSS_INSTRUCTIONS = `# Discussion
+
+You are the project's planning model, in a free conversation with a person
+about this repository. They ask questions about the code and the
+architecture, or ask for an analysis — security, performance, architecture,
+anything about the code.
+
+- Read the repository to answer: open the files, follow the calls, quote the
+  paths and lines you rely on. Say what you checked and what you did not.
+- The repository is read-only for you. Never edit, create or delete a file,
+  never commit, never run a command that changes anything. A discussion
+  changes nothing in the project.
+- Answer what was asked, as a reviewer would: findings first, ordered by
+  risk or importance, each with where it is and what to do about it.
+- Questions about the board, the fleet, budgets or sessions are not yours to
+  answer: say so, and stay with the code.
+- A discussion does not have to end in work. Propose a card only for
+  concrete work your answer found; the person decides whether to make it.`;
 
 export interface IntakePromptState {
   roundsAsked: number;
@@ -84,7 +116,18 @@ export interface IntakePromptState {
 /** Actions whose output carries design suggestions under contract v2. */
 const SUGGESTING: readonly PlanTurnAction[] = ['decompose', 'grill', 'revise'];
 
+/**
+ * #524 (ADR-0044 §3): when an intake proposes a split, and when a stack —
+ * several UI changes to one surface share one look, so they are a stack.
+ */
+const SPLIT_WHEN =
+  'several independent tasks (unrelated changes, UI changes to different surfaces, or work with no UI) or too big for one agent';
+const STACK_WHEN =
+  'one larger piece of work whose parts must happen in order and share one look, or several UI changes to one surface or form factor (one screen, one page, "the board on phones") — a stack with `design: true`, staged foundations first: the shared layout and primitives, then the per-feature cards';
+
 const WHAT: Record<PlanTurnAction, (input: PromptInput) => string> = {
+  discuss: () =>
+    "Answer the person's latest message in the discussion. Propose cards only for concrete work you found.",
   clarify: () =>
     'Ask the next round of plan-level questions about the brief, or report `done: true` when the brief is clear enough to split into tasks.',
   decompose: () =>
@@ -102,19 +145,19 @@ const WHAT: Record<PlanTurnAction, (input: PromptInput) => string> = {
   intake: (i) => {
     const state = i.intake;
     if (!state) {
-      return 'Interview the person about the work they asked for: ask the next round of questions, or — when nothing material is unknown — write the card, or propose a split if it is several independent tasks or too big for one agent, or a stack if it is one larger piece of work whose parts must happen in order and share one look.';
+      return `Interview the person about the work they asked for: ask the next round of questions, or — when nothing material is unknown — write the card, or propose a split if it is ${SPLIT_WHEN}, or a stack if it is ${STACK_WHEN}.`;
     }
     const asked = `Rounds asked so far: ${state.roundsAsked} of ${state.maxRounds}.`;
     if (state.keepOne) {
       return `${asked} The person declined the split and keeps one card: write one \`cardDraft\` now that covers the whole request. Record every default you took under \`## Open questions\`.`;
     }
     if (state.generate) {
-      return `${asked} The person asked to generate: write the card now — or the split if the request is several independent tasks or too big for one agent, or the stack if it is one larger piece of work whose parts must happen in order. Every question they left unanswered takes its recommendation — record those under \`## Open questions\`.`;
+      return `${asked} The person asked to generate: write the card now — or the split if the request is ${SPLIT_WHEN}, or the stack if it is ${STACK_WHEN}. Every question they left unanswered takes its recommendation — record those under \`## Open questions\`.`;
     }
     if (state.mustGenerate) {
-      return `${asked} No more rounds may be asked: write the card now — or the split if the request is several independent tasks or too big for one agent, or the stack if it is one larger piece of work whose parts must happen in order — recording every default you took under \`## Open questions\`.`;
+      return `${asked} No more rounds may be asked: write the card now — or the split if the request is ${SPLIT_WHEN}, or the stack if it is ${STACK_WHEN} — recording every default you took under \`## Open questions\`.`;
     }
-    return `${asked} Ask the next round of questions only if something material is still unknown; otherwise write the card now — or propose the split, if the request is several independent tasks or too big for one agent, or the stack, if it is one larger piece of work whose parts must happen in order and share one look.`;
+    return `${asked} Ask the next round of questions only if something material is still unknown; otherwise write the card now — or propose the split, if the request is ${SPLIT_WHEN}, or the stack, if it is ${STACK_WHEN}.`;
   },
 };
 
@@ -226,8 +269,47 @@ const assembleIntake = (input: PromptInput): string => {
   return `${sections.join('\n\n')}\n`;
 };
 
+/**
+ * #590 (ADR-0056): a discussion turn — the discussion instructions, the
+ * project's own (as for an intake), the discuss contract, the skills chosen
+ * at the start, what the discussion opened with and the person's latest
+ * message. The plan session is resumed after the first turn, so the model
+ * keeps the conversation; the opening is repeated so a turn that starts the
+ * session late still has it.
+ */
+const assembleDiscuss = (input: PromptInput): string => {
+  const skills = input.discussion?.skills ?? [];
+  const sections = [
+    DISCUSS_INSTRUCTIONS,
+    ...(input.projectInstructions?.trim()
+      ? [
+          '# Project instructions',
+          "The project's own Planner instructions. Where they speak about splitting plans or writing documents, they do not apply to a discussion; everything they say about the project does.",
+          input.projectInstructions.trim(),
+        ]
+      : []),
+    PLANNER_DISCUSS_CONTRACT.trim(),
+    '# This turn',
+    `Action: \`discuss\`. ${WHAT.discuss(input)}`,
+    `Answer with exactly one \`${PLANNER_BLOCK_TAG}\` block whose \`action\` is \`discuss\`.`,
+    '## Skills',
+    skills.length > 0
+      ? `Apply these installed skills to every answer: ${skills.map((s) => `\`${s}\``).join(', ')}. Use them to read and analyse only — never to change the repository.`
+      : 'None.',
+    '## The discussion opened with',
+    fence('text', input.brief),
+  ];
+  if (input.input.message) {
+    sections.push('## Message', fence('text', input.input.message));
+  } else {
+    sections.push('Answer the opening message above.');
+  }
+  return `${sections.join('\n\n')}\n`;
+};
+
 const assembleWith = (input: PromptInput, design: string[]): string => {
   if (input.action === 'intake') return assembleIntake(input);
+  if (input.action === 'discuss') return assembleDiscuss(input);
   const state = {
     title: input.plan.title,
     mode: input.plan.mode,

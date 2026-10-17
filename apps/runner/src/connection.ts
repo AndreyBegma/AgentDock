@@ -15,6 +15,7 @@ import {
   serverMessageSchema,
   type TerminalCloseMessage,
   type TerminalDataMessage,
+  type TerminalHistoryRequestMessage,
   type TerminalResizeMessage,
   type UnsequencedEvent,
 } from '@agentdock/shared/protocol';
@@ -48,10 +49,20 @@ const TERMINAL_CLOSE_CODES: ReadonlySet<number> = new Set(
 export type HelloPayload = Omit<HelloMessage, 'type' | 'id' | 'lastAckedSeq'>;
 export type HeartbeatPayload = Omit<HeartbeatMessage, 'type' | 'id' | 'ts'>;
 
-export type SocketFactory = (url: string, token: string) => WebSocket;
+export type SocketFactory = (
+  url: string,
+  token: string,
+  extraHeaders?: Record<string, string>,
+) => WebSocket;
 
-export const bunSocketFactory: SocketFactory = (url, token) =>
-  new WebSocket(url, { headers: { Authorization: `Bearer ${token}` } });
+export const bunSocketFactory: SocketFactory = (
+  url,
+  token,
+  extraHeaders = {},
+) =>
+  new WebSocket(url, {
+    headers: { ...extraHeaders, Authorization: `Bearer ${token}` },
+  });
 
 export type StopReason =
   | { kind: 'stopped' }
@@ -59,7 +70,11 @@ export type StopReason =
 
 export interface ConnectionOptions {
   server: string;
+  /** `insecureServer` from `runner.json`. */
+  insecureServer?: boolean;
   token: string;
+  /** Cloudflare Access headers sent on every connect (D-07). */
+  accessHeaders?: Record<string, string>;
   spool: Spool;
   clock: Clock;
   backoff: Backoff;
@@ -100,6 +115,7 @@ export interface TerminalHandler {
   data(message: TerminalDataMessage): void;
   resize(message: TerminalResizeMessage): void;
   close(message: TerminalCloseMessage): void;
+  history(message: TerminalHistoryRequestMessage): Promise<void>;
   /** The socket closed: every attach ends with it (spec 29 D7). */
   reset(): void;
 }
@@ -154,7 +170,7 @@ export class RunnerConnection {
   private readonly createSocket: SocketFactory;
 
   constructor(private readonly options: ConnectionOptions) {
-    this.url = socketUrl(options.server);
+    this.url = socketUrl(options.server, options.insecureServer);
     this.createSocket = options.createSocket ?? bunSocketFactory;
     this.done = new Promise((resolve) => {
       this.resolveDone = resolve;
@@ -289,7 +305,11 @@ export class RunnerConnection {
     log.info('connecting', { url: this.url });
     let socket: WebSocket;
     try {
-      socket = this.createSocket(this.url, this.options.token);
+      socket = this.createSocket(
+        this.url,
+        this.options.token,
+        this.options.accessHeaders,
+      );
     } catch (error) {
       log.warn('cannot open the socket', { error: errorMessage(error) });
       this.scheduleReconnect();
@@ -403,6 +423,9 @@ export class RunnerConnection {
         return;
       case 'terminal.close':
         this.options.terminal?.close(message);
+        return;
+      case 'terminal.history.request':
+        void this.options.terminal?.history(message);
         return;
       case 'local.response':
         this.localResponse(message);

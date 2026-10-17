@@ -9,6 +9,7 @@ import {
   type UnsequencedEvent,
 } from '@agentdock/shared/protocol';
 import { LocalService } from '../local/service';
+import { SessionTokens } from '../local/session-tokens';
 import { HookSessions } from '../local/sessions';
 import { memoryLogger } from '../testing/fixtures';
 import { parseProcStat, readAncestors } from './ancestors';
@@ -29,6 +30,7 @@ const ROOT = '/home/person/dev/app';
 
 const spool = async (shipContent: boolean, names = NAMES) => {
   const emitted: UnsequencedEvent[] = [];
+  const tokens = new SessionTokens(Buffer.alloc(32, 1));
   const service = new LocalService({
     projects: () => [{ id: 'prj_app', root: ROOT, shipContent }],
     awayMode: () => false,
@@ -37,6 +39,7 @@ const spool = async (shipContent: boolean, names = NAMES) => {
     relay: async () => ({ ok: true, data: null }),
     envelope: async () => ({ repo: 'acme/app', root: ROOT }),
     sessions: new HookSessions(),
+    tokens,
     now: () => '2026-10-14T10:00:00.000Z',
     log: memoryLogger().log,
   });
@@ -47,7 +50,11 @@ const spool = async (shipContent: boolean, names = NAMES) => {
       ancestors: [{ pid: 10, comm: 'claude' }],
     });
     if (!event) throw new Error(`${name} built nothing`);
-    const result = await service.handle('event', event);
+    const token = tokens.mint({ sessionId: event.sessionId, cwd: event.cwd });
+    const result = await service.handle('event', event, {
+      token,
+      peerPid: null,
+    });
     if (!result.ok) throw new Error(`${name}: ${result.error.message}`);
   }
   return emitted;

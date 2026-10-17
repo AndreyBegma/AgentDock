@@ -1,4 +1,5 @@
 import {
+  FileTooLargeError,
   REDACTED,
   redactToken,
   TelegramApiError,
@@ -16,6 +17,7 @@ const clientWith = (
     apiBase: 'https://telegram.test/',
     pollTimeoutS: 30,
     appUrl: null,
+    initDataMaxAgeS: 3600,
     autoStart: false,
     deliveryIntervalMs: 1_000,
     idleMs: 10,
@@ -189,5 +191,63 @@ describe('TelegramClient', () => {
       },
       { update_id: 2 },
     ]);
+  });
+});
+
+describe('TelegramClient files (#594)', () => {
+  it('names a file with getFile and downloads it from the file route', async () => {
+    const { client, urls } = clientWith((url) =>
+      url.endsWith('/getFile')
+        ? json(200, {
+            ok: true,
+            result: {
+              file_id: 'f1',
+              file_path: 'photos/f 1.jpg',
+              file_size: 3,
+            },
+          })
+        : Promise.resolve(new Response(new Uint8Array([1, 2, 3]))),
+    );
+    const file = await client.getFile(TOKEN, 'f1');
+    expect(file).toEqual({ path: 'photos/f 1.jpg', size: 3 });
+    const bytes = await client.downloadFile(TOKEN, file.path, 10);
+    expect([...bytes]).toEqual([1, 2, 3]);
+    expect(urls[1]).toBe(
+      `https://telegram.test/file/bot${TOKEN}/photos/f%201.jpg`,
+    );
+  });
+
+  it('refuses a download past the limit, by its length or as it streams', async () => {
+    const { client } = clientWith(() =>
+      Promise.resolve(new Response(new Uint8Array(11))),
+    );
+    await expect(client.downloadFile(TOKEN, 'a', 10)).rejects.toBeInstanceOf(
+      FileTooLargeError,
+    );
+    const streamed = clientWith(() =>
+      Promise.resolve(
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(new Uint8Array(6));
+              controller.enqueue(new Uint8Array(6));
+              controller.close();
+            },
+          }),
+        ),
+      ),
+    );
+    await expect(
+      streamed.client.downloadFile(TOKEN, 'a', 10),
+    ).rejects.toBeInstanceOf(FileTooLargeError);
+  });
+
+  it('fails a download Telegram refuses without naming the URL', async () => {
+    const { client } = clientWith(() =>
+      Promise.resolve(new Response('no', { status: 404 })),
+    );
+    const error = await failureOf(client.downloadFile(TOKEN, 'a', 10));
+    expect(error.status).toBe(404);
+    expect(error.message).not.toContain(TOKEN);
   });
 });

@@ -1,10 +1,13 @@
 import { z } from 'zod';
 import { stewardRunnerConfigSchema } from '../steward/contracts';
+import { TEXT_PATH_MAX } from './bounded';
+import { httpsGithubUrl } from './github-url';
 
 /** An absolute POSIX path. Runners run on Linux and macOS only. */
 export const absolutePathSchema = z
   .string()
   .min(1)
+  .max(TEXT_PATH_MAX)
   .refine((p) => p.startsWith('/'), { message: 'must be an absolute path' });
 
 /**
@@ -17,7 +20,7 @@ export type GitHubAppHealth = z.infer<typeof githubAppHealthSchema>;
 /** A project the runner watches (`welcome.config.projects`). */
 export const watchedProjectSchema = z.object({
   id: z.string().min(1),
-  root: z.string().min(1),
+  root: absolutePathSchema,
   /** Spec 27 D12. Absent means `unhealthy`: poll every 60 s. */
   githubApp: githubAppHealthSchema.optional(),
   /**
@@ -77,7 +80,7 @@ export const docsEvidenceSchema = z.object({
   file: z.string().min(1).optional(),
   /** 1-based line in `file`. */
   line: z.number().int().positive().optional(),
-  url: z.string().min(1).optional(),
+  url: httpsGithubUrl.optional(),
 });
 export type DocsEvidence = z.infer<typeof docsEvidenceSchema>;
 

@@ -5,7 +5,7 @@ import { design, revision } from '../../lib/design/fixtures';
 import { resolveViewerState } from '../../lib/design/viewer-state';
 import { ViewerToolbar } from './viewer-toolbar';
 
-const render = () => {
+const render = (phone = false) => {
   const d = design({ revisions: [revision()] });
   const state = resolveViewerState(
     new URLSearchParams(),
@@ -23,6 +23,7 @@ const render = () => {
       canPin
       onChange={() => {}}
       onPinMode={() => {}}
+      phone={phone}
     />,
   );
 };
@@ -41,5 +42,22 @@ describe('ViewerToolbar', () => {
     const html = render();
     expect(html).toContain('data-toolbar-group="view"');
     expect(html).toContain('data-toolbar-group="zoom"');
+  });
+
+  // C-244: below `lg` only the presets and the zoom stay, at the tap size.
+  test('on a phone: presets and zoom, no typed width, theme or Pin', () => {
+    const html = render(true);
+    expect(html).toContain('aria-label="Viewport"');
+    expect(html).toContain('aria-label="Zoom in"');
+    expect(html).toContain('aria-label="Fit to screen"');
+    expect(html).not.toContain('Width in pixels');
+    expect(html).not.toContain('aria-label="Theme"');
+    expect(html).not.toContain('Pin');
+  });
+
+  test('on a desktop the typed width and Pin are there', () => {
+    const html = render();
+    expect(html).toContain('Width in pixels');
+    expect(html).toContain('Pin');
   });
 });

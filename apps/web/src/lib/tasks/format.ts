@@ -83,7 +83,7 @@ export const SPEC_OUTPUT_LABEL: Record<PlannerSpecOutput, string> = {
 
 export const SPEC_OUTPUT_HINT: Record<PlannerSpecOutput, string> = {
   docs_pr:
-    'One docs pull request carries every feature specification into the project’s spec directory. Feature issues are queued once it merges; bugs are queued at once. Needs a spec directory in the project’s docs source.',
+    'One docs pull request carries every feature specification into the Spec folder — in this repository, or in the docs repository when the docs live there. Feature issues are queued once it merges; bugs are queued at once. Needs the Spec folder in Settings › Docs source (and a local clone of a remote docs repository).',
   issue_body:
     'The issue body is the whole specification, and every issue is queued at once.',
 };

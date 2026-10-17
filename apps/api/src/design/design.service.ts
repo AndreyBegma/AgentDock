@@ -21,6 +21,7 @@ import { CardAssessor } from '../assess/card-assessor';
 import { AuditService } from '../audit/audit.service';
 import { autoRunFailureOf, cardNotFound } from '../board/board-error';
 import { BoardRoundsService } from '../board/board-rounds.service';
+import { BoardStacks } from '../board/board-stacks';
 import { PrismaService } from '../database/prisma.service';
 import { CardDesignTurnService } from '../planner/card-design-turn.service';
 import { callerOf, type PlanActor } from '../planner/plan.service';
@@ -41,9 +42,14 @@ import {
   type DesignTurnPlan,
   withDesign,
 } from './design-rules';
-import { type DesignKey, defaultSkillsOf, designWhere } from './design-store';
+import {
+  type DesignKey,
+  defaultSkillsOf,
+  designWhere,
+  followsDefaultSkills,
+} from './design-store';
 import { loadDesignView } from './design-view';
-import { UiProfileService } from './ui-profile.service';
+import { type ProfileReadiness, UiProfileService } from './ui-profile.service';
 import type { WaitingDesign } from './ui-profile-mapper';
 
 /** A design with a turn or a profile build of it queued or running. */
@@ -85,6 +91,7 @@ export class DesignService implements OnModuleInit {
     private readonly cardTurns: CardDesignTurnService,
     private readonly stackTurns: StackDesignTurnService,
     private readonly rounds: BoardRoundsService,
+    private readonly stacks: BoardStacks,
     private readonly profiles: UiProfileService,
     private readonly audit: AuditService,
     private readonly commands: DesignCommands,
@@ -227,6 +234,7 @@ export class DesignService implements OnModuleInit {
     launch: CardDesignLaunchRequest = {},
   ): Promise<void> {
     const owner = await this.cardOwner(projectId, number);
+    await this.stacks.assertStackApproved(owner.target.id);
     await this.rememberLaunch(owner, projectId, number, launch);
     await this.generateOf(owner, actor);
   }
@@ -238,6 +246,7 @@ export class DesignService implements OnModuleInit {
     launch: CardDesignLaunchRequest = {},
   ): Promise<void> {
     const owner = await this.cardOwner(projectId, number);
+    await this.stacks.assertStackApproved(owner.target.id);
     await this.rememberLaunch(owner, projectId, number, launch);
     await this.reviseOf(owner, actor);
   }
@@ -367,23 +376,42 @@ export class DesignService implements OnModuleInit {
   /**
    * The switch, the variant count, the skills (D2, D4, D15). An owner without
    * a design row gets one. A task moves between `ready` and `needs_design`
-   * (D1).
+   * (D1). Skills sent here are a hand edit the design keeps; `useDefaultSkills`
+   * drops it, and the design follows the project default again (#604).
    */
   private async patchOf(
     owner: DesignOwner,
     request: TaskDesignPatchRequest,
     actor: PlanActor,
   ): Promise<void> {
+    if (request.useDefaultSkills && request.skills !== undefined) {
+      throw designError(
+        400,
+        DESIGN_ERROR.invalidArgs,
+        'Send skills or useDefaultSkills, not both',
+      );
+    }
     const existing = await this.prisma.taskDesign.findUnique({
       where: designWhere(owner.key),
     });
     if (existing && isBusy(existing)) throw busy();
     if (
       existing?.status === 'approved' &&
-      (request.variantCount !== undefined || request.skills !== undefined)
+      (request.variantCount !== undefined ||
+        request.skills !== undefined ||
+        request.useDefaultSkills)
     ) {
       throw approvedAlready();
     }
+    const skills =
+      request.skills !== undefined
+        ? { skills: request.skills, skillsEdited: true }
+        : request.useDefaultSkills || !existing
+          ? {
+              skills: await defaultSkillsOf(this.prisma, owner.projectId),
+              skillsEdited: false,
+            }
+          : {};
     const design = existing
       ? await this.prisma.taskDesign.update({
           where: { id: existing.id },
@@ -392,7 +420,7 @@ export class DesignService implements OnModuleInit {
             ...(request.variantCount !== undefined
               ? { variantCount: request.variantCount }
               : {}),
-            ...(request.skills !== undefined ? { skills: request.skills } : {}),
+            ...skills,
           },
         })
       : await this.prisma.taskDesign.create({
@@ -400,9 +428,7 @@ export class DesignService implements OnModuleInit {
             ...owner.key,
             needed: request.needed ?? false,
             variantCount: request.variantCount ?? 1,
-            skills:
-              request.skills ??
-              (await defaultSkillsOf(this.prisma, owner.projectId)),
+            ...skills,
           },
         });
     await owner.gate(design);
@@ -430,18 +456,28 @@ export class DesignService implements OnModuleInit {
     owner: DesignOwner,
     actor: PlanActor,
   ): Promise<void> {
-    const design = await this.drawable(owner);
+    const drawable = await this.drawable(owner);
     const revisions = await this.prisma.designRevision.findMany({
-      where: { designId: design.id },
+      where: { designId: drawable.id },
       select: { variant: true, archived: true },
     });
-    if (!batchOf('generate', design.variantCount, revisions, [], null)) {
+    if (!batchOf('generate', drawable.variantCount, revisions, [], null)) {
       throw designError(
         409,
         DESIGN_ERROR.invalidArgs,
         'Every variant is drawn; leave comments and revise it',
       );
     }
+    // #604: a design that follows the default takes today's default; its
+    // turns, and every later one, read that copy.
+    const design = followsDefaultSkills(drawable, revisions.length > 0)
+      ? await this.prisma.taskDesign.update({
+          where: { id: drawable.id },
+          data: {
+            skills: await defaultSkillsOf(this.prisma, owner.projectId),
+          },
+        })
+      : drawable;
     await this.start(owner, design, 'generate', [], actor);
   }
 
@@ -724,15 +760,25 @@ export class DesignService implements OnModuleInit {
       project.runnerId,
       RUNNER_FEATURE_COMMANDS.design,
     );
-    const readiness = await this.profiles.ensureFresh(project, caller, {
-      designId: design.id,
-      mode,
-      userId: actor.userId,
-    });
-    await this.prisma.taskDesign.update({
-      where: { id: design.id },
+    // The busy status is claimed before the profile check, from the status
+    // read at rest: of two Generates at once only one passes, and the other's
+    // failure never settles the winner's running turn.
+    const claimed = await this.prisma.taskDesign.updateMany({
+      where: { id: design.id, status: design.status },
       data: { status: busyStatusOf(mode), busySince: new Date() },
     });
+    if (claimed.count === 0) throw busy();
+    let readiness: ProfileReadiness;
+    try {
+      readiness = await this.profiles.ensureFresh(project, caller, {
+        designId: design.id,
+        mode,
+        userId: actor.userId,
+      });
+    } catch (error) {
+      await settleDesign(this.prisma, owner.key);
+      throw error;
+    }
     owner.publish();
     let turnId: string | null = null;
     if (readiness.kind === 'ready') {

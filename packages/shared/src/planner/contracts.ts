@@ -1,6 +1,10 @@
+import type { AttachmentView } from '../attachments/contracts';
 import type { TaskDesignSummary } from '../design/contracts';
 import type {
+  DiscussProposal,
   PlanAnswer,
+  PlanCandidateStack,
+  PlanCandidateStatus,
   PlanMode,
   PlannerSpecOutput,
   PlanQuestion,
@@ -30,6 +34,11 @@ import type {
  * the first intake turn starts at once. `attachmentIds` (D10): pending
  * uploads of the caller in this project, claimed by the plan and passed to
  * `plan.turn`; the generated card claims them in turn.
+ *
+ * #590: `mode: 'discuss'` is a discussion — `brief` is the person's opening
+ * message, and the first turn answers it at once. `skills` (discussions
+ * only, at most `DISCUSS_SKILLS_MAX`): installed skill invocations every turn
+ * of the discussion applies; another mode refuses them (409 `wrong_mode`).
  */
 export interface CreatePlanRequest {
   brief: string;
@@ -37,6 +46,7 @@ export interface CreatePlanRequest {
   model?: string;
   profileKey?: string;
   attachmentIds?: string[];
+  skills?: string[];
 }
 
 /**
@@ -111,8 +121,22 @@ export interface PlanTurnView {
    * stored output no longer parses.
    */
   rounds: PlanTurnRound[];
+  /**
+   * #590: a discussion turn's reply and proposed cards, from its stored
+   * output. Null for any other turn, and for one with no valid output
+   * (running, failed). Optional: absent reads as null.
+   */
+  reply?: PlanDiscussReply | null;
   createdAt: string;
   finishedAt: string | null;
+}
+
+/** #590: what one discussion turn answered. */
+export interface PlanDiscussReply {
+  /** Markdown, in the person's language. */
+  reply: string;
+  /** Cards worth making; **Make a card** opens New work with the brief. */
+  proposals: DiscussProposal[];
 }
 
 /** An issued task's GitHub side, derived on read (spec "Data / Schema"). */
@@ -241,6 +265,11 @@ export interface PlanDetail extends PlanSummary {
   model: string;
   docsPrNumber: number | null;
   docsPrUrl: string | null;
+  /**
+   * #379: `owner/name` of the docs repository the docs PR is in; `null` when
+   * it is the project's own repository.
+   */
+  docsPrRepo: string | null;
   tasks: PlanTaskView[];
   turns: PlanTurnView[];
   graph: PlanGraphView;
@@ -248,6 +277,17 @@ export interface PlanDetail extends PlanSummary {
   activeTurnId: string | null;
   /** #337 D4: a `card` plan's progress; null for any other mode. */
   intake: PlanIntakeView | null;
+  /**
+   * #590: a `discuss` plan's settings; null for any other mode. Optional:
+   * absent reads as null.
+   */
+  discussion?: PlanDiscussionView | null;
+}
+
+/** #590: a discussion's settings, fixed when it starts. */
+export interface PlanDiscussionView {
+  /** The skills every turn applies, as chosen; an uninstalled one is skipped. */
+  skills: string[];
 }
 
 /** #337 D3, D4: where a card intake stands. */
@@ -262,6 +302,96 @@ export interface PlanIntakeView {
    * as null).
    */
   split?: PlanIntakeSplitView | null;
+  /**
+   * #594: the files the plan holds so far, oldest first — the web dialog's
+   * and those a Telegram `/new` sent (optional: absent reads as none).
+   */
+  attachments?: AttachmentView[];
+  /**
+   * #592 (ADR-0058): the cards the intake wrote, waiting for the person in
+   * Drafts, in the proposal's order — decided ones too, until none is
+   * pending (optional: absent reads as none).
+   */
+  candidates?: PlanCandidateView[];
+  /** #592: the stack the intake proposed; candidates name its stages by index. */
+  candidateStack?: PlanCandidateStack | null;
+  /** #592: how many of the intake's attachments no card has taken yet. */
+  attachmentsLeft?: number;
+}
+
+/** #592 (ADR-0058): a card the intake wrote, before the person decides it. */
+export interface PlanCandidateView {
+  id: string;
+  planId: string;
+  /** 0-based, in the proposal's order (stage order for a stack). */
+  position: number;
+  title: string;
+  kind: PlanTaskKind;
+  /** Markdown, the full card body. */
+  body: string;
+  /** The 0-based stage of `candidateStack` it was proposed in; null outside a stack. */
+  stage: number | null;
+  status: PlanCandidateStatus;
+  /** Named by an edit or an accept: an older one is `candidate_stale`. */
+  version: number;
+  /** The card Accept made; null until then, and for a rejected one. */
+  card: { number: number; label: string } | null;
+  /** How many of the intake's attachments its card took. */
+  attachments: number;
+}
+
+/**
+ * `PATCH /projects/:projectId/plans/:planId/candidates/:candidateId` (#592):
+ * the person edits a pending candidate by hand. The title stays English
+ * (ASCII letters only, as a split title). 409 `candidate_stale` when
+ * `version` is not the candidate's; 409 `candidate_decided` once decided.
+ */
+export interface UpdatePlanCandidateRequest {
+  version: number;
+  title?: string;
+  kind?: PlanTaskKind;
+  body?: string;
+}
+
+/**
+ * #592: the candidates one accept names at most — the Drafts strip's
+ * intakes (`DRAFTS_SHOWN_MAX`, 8) of at most `INTAKE_SPLIT_MAX` cards each.
+ */
+export const ACCEPT_CANDIDATES_MAX = 64;
+
+/** #592: how the person accepts several candidates at once. */
+export const ACCEPT_CANDIDATES_AS = ['cards', 'stack'] as const;
+export type AcceptCandidatesAs = (typeof ACCEPT_CANDIDATES_AS)[number];
+
+/**
+ * `POST /projects/:projectId/candidates/accept` (#592, ADR-0058 §3): pending
+ * candidates of the caller's intakes — of one intake or several — made into
+ * cards in Todo at once: independent (`cards`, in the listed order), or one
+ * stack (`stack`), each candidate in the 0-based `stage` the person chose.
+ */
+export interface AcceptCandidatesRequest {
+  as: AcceptCandidatesAs;
+  candidates: AcceptCandidateRef[];
+}
+
+export interface AcceptCandidateRef {
+  id: string;
+  version: number;
+  /** Required with `as: 'stack'`; empty stages close up. */
+  stage?: number;
+}
+
+export interface AcceptCandidatesResponse {
+  /** In the order made: the listed order, or stage order for a stack. */
+  cards: { candidateId: string; number: number; label: string }[];
+  stack: { number: number; label: string } | null;
+}
+
+/** #592: a `candidate_decided` refusal names what the candidate became. */
+export interface CandidateDecidedDetails {
+  candidateId: string;
+  status: PlanCandidateStatus;
+  card: { number: number; label: string } | null;
 }
 
 /** #409: a split proposal as the person reviews it. */
@@ -337,11 +467,12 @@ export interface ConfirmSplitCard {
   kind: PlanTaskKind;
 }
 
+/**
+ * #592 (ADR-0058): Confirm writes candidates, not cards — in the confirmed
+ * order (stage order for a stack); they wait in Drafts.
+ */
 export interface ConfirmSplitResponse {
-  /** In the confirmed order. */
-  cards: { number: number; label: string }[];
-  /** #480: the stack made, when the request named one. */
-  stack?: { number: number; label: string } | null;
+  candidates: PlanCandidateView[];
 }
 
 /** `GET /tasks` query. */
@@ -463,6 +594,11 @@ export const PLANNER_ERROR = {
   runnerTimeout: 'runner_timeout',
   /** 409: the runner's advert does not list the command (#233); nothing was sent or written. */
   runnerOutdated: 'runner_outdated',
+  /**
+   * 422 (#379): `docs_pr` and the project's docs are a remote repository
+   * with no local clone path to write the specs in.
+   */
+  noDocsClone: 'no_docs_clone',
   /** 409 (#337 D7): Create cards on a plan whose cards exist. */
   cardsExist: 'cards_exist',
   /**
@@ -472,9 +608,20 @@ export const PLANNER_ERROR = {
   splitStale: 'split_stale',
   /**
    * 409 (#337): a route that does not fit the plan's mode — Create cards or
-   * Send on a `card` plan, an intake turn on any other.
+   * Send on a `card` plan, an intake turn on any other; #590: Create cards,
+   * Send or a split on a `discuss` plan, skills on any other.
    */
   wrongMode: 'wrong_mode',
+  /**
+   * 409 (#592): an edit or accept names a candidate version that is no
+   * longer its own — it was edited in another tab.
+   */
+  candidateStale: 'candidate_stale',
+  /**
+   * 409 (#592): the candidate was accepted or rejected already; the body
+   * names it (`CandidateDecidedDetails`).
+   */
+  candidateDecided: 'candidate_decided',
 } as const;
 export type PlannerErrorCode =
   (typeof PLANNER_ERROR)[keyof typeof PLANNER_ERROR];

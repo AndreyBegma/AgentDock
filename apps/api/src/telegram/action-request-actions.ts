@@ -1,3 +1,4 @@
+import { fitsInt8 } from './callback-data';
 import type { InlineKeyboardButton } from './telegram-client';
 
 /**
@@ -30,7 +31,7 @@ export const decodeActionRequestCallback = (
   data: string | undefined,
 ): ActionRequestPress | null => {
   const match = data ? CALLBACK.exec(data) : null;
-  if (!match) return null;
+  if (!match || !fitsInt8(match[2])) return null;
   return {
     action: match[1] === 'x' ? 'approve' : 'deny',
     notificationId: BigInt(match[2]),
@@ -104,6 +105,9 @@ export const actionRequestDecidedText = (
   failure: string | null,
 ): string => {
   if (action === 'deny') return 'Denied.';
+  if (status === 'failed' && failure === 'head_moved') {
+    return 'Not approved: the pull request has new commits since this request. Ask for a new one.';
+  }
   if (status === 'failed') {
     return `Approved, but it could not be carried out${failure ? `: ${failure}` : ''}.`;
   }

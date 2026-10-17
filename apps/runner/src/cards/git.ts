@@ -30,7 +30,6 @@ import {
   gitOk,
   gitSucceeds,
   NETWORK_TIMEOUT_MS,
-  NO_HOOKS,
   type SkillsDeps,
   stderrLine,
 } from '../skills/deps';
@@ -257,7 +256,6 @@ export const commitFiles = async (
   await gitOk(deps.exec, [
     '-C',
     top,
-    ...NO_HOOKS,
     'commit',
     '--quiet',
     '--no-verify',
@@ -433,6 +431,21 @@ const markPullRequestReady = async (
   }
 };
 
+/** C-127: `.env*` except `.env.example`, `*.pem`, `id_*`, `*.key`. */
+export const isSecretPath = (path: string): boolean => {
+  const name = path.split('/').at(-1) ?? path;
+  if (name.startsWith('.env')) return name !== '.env.example';
+  return (
+    name.endsWith('.pem') || name.endsWith('.key') || name.startsWith('id_')
+  );
+};
+
+/** The paths in the index that differ from HEAD. */
+const stagedFiles = async (deps: GitDeps, wt: string): Promise<string[]> =>
+  (await gitOk(deps.exec, ['-C', wt, 'diff', '--cached', '--name-only', '-z']))
+    .split('\0')
+    .filter((path) => path !== '');
+
 /**
  * D8: commit the leftovers, push, and open a PR into the base unless one is
  * open for the branch already — then it is only pushed. Nothing ahead of
@@ -445,7 +458,7 @@ export const collectCard = async (
   record: Pick<CardRecord, 'projectId' | 'root' | 'worktree' | 'branch'> &
     Partial<Pick<CardRecord, 'specFiles' | 'pushPr'>>,
   args: CardCollectArgs,
-  options: { trailerGuard?: boolean } = {},
+  options: { trailerGuard?: boolean; trackedOnly?: boolean } = {},
 ): Promise<CardCollectResult> => {
   const wt = record.worktree;
   const head = await deps.exec('git', [
@@ -466,14 +479,27 @@ export const collectCard = async (
   // #359 D3: the description is the PR's body, never a commit — also in a
   // worktree from before `card.run` excluded `.agentdock/` on every round.
   await excludeFromGit(deps, wt, `${AGENTDOCK_WORKTREE_DIR}/`);
-  await gitOk(deps.exec, ['-C', wt, 'add', '-A']);
+  // C-127: the person's own checkout holds files the card never wrote
+  // (`.env.local`, scratch notes) — only tracked changes are staged there.
+  await gitOk(deps.exec, ['-C', wt, 'add', options.trackedOnly ? '-u' : '-A']);
+  let staged: string[] | undefined;
+  if (options.trackedOnly) {
+    staged = await stagedFiles(deps, wt);
+    const secrets = staged.filter(isSecretPath);
+    if (secrets.length > 0) {
+      await gitOk(deps.exec, ['-C', wt, 'reset', '--quiet']);
+      throw new CommandFailure(
+        'invalid_args',
+        `refusing to commit files that look like secrets: ${secrets.join(', ')}`,
+      );
+    }
+  }
   if (
     !(await gitSucceeds(deps.exec, ['-C', wt, 'diff', '--cached', '--quiet']))
   ) {
     await gitOk(deps.exec, [
       '-C',
       wt,
-      ...NO_HOOKS,
       'commit',
       '--quiet',
       '--no-verify',
@@ -493,7 +519,8 @@ export const collectCard = async (
       ])
     ).trim(),
   );
-  if (!(ahead > 0)) return { ahead: 0, pushed: false };
+  const listed = staged ? { staged } : {};
+  if (!(ahead > 0)) return { ahead: 0, pushed: false, ...listed };
   // #447 D7: a commit with a Claude trailer holds the push and the PR.
   if (options.trailerGuard) {
     const held = await commitsWithTrailer(deps, wt, record.branch, args.base);
@@ -550,6 +577,7 @@ export const collectCard = async (
     prNumber: pr.number,
     prUrl: pr.url,
     prState: pr.state,
+    ...listed,
   };
 };
 

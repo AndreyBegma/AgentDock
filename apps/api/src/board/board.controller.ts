@@ -53,6 +53,7 @@ import {
   BulkBoardCardsDto,
   CardFeedbackDto,
   CreateBoardCardDto,
+  CreateBoardStackDto,
   MoveBoardCardDto,
   RunBoardCardDto,
   UpdateBoardCardDto,
@@ -100,6 +101,17 @@ export class BoardController {
   ) {}
 
   // ─── Stacks (#480, ADR-0044) ───────────────────────────────────────────────
+
+  @Post('board/stacks')
+  @ProjectRole('operator')
+  groupStack(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Body() dto: CreateBoardStackDto,
+  ): Promise<BoardStackDetail> {
+    return this.stacks.group(access.projectId, dto, actorOf(access, user, ctx));
+  }
 
   @Get('board/stacks/:number')
   stack(

@@ -6,6 +6,7 @@ import {
   pairingErrorSchema,
   pairingResponseSchema,
 } from '@agentdock/shared/protocol';
+import { type AccessCredentials, accessHeaders } from './access';
 import { errorMessage } from './log';
 import { pairingUrl } from './server-url';
 
@@ -13,10 +14,14 @@ export class PairingError extends Error {}
 
 export interface PairOptions {
   server: string;
+  /** `pair --insecure`: plain http to a non-loopback host is allowed. */
+  insecure?: boolean;
   /** As typed by a person: trimmed and upper-cased before it is checked. */
   code: string;
   hostname: string;
   runnerVersion: string;
+  /** Cloudflare Access service token, when staging sits behind Access. */
+  access?: AccessCredentials;
   fetch: typeof fetch;
 }
 
@@ -29,7 +34,7 @@ export const pair = async (options: PairOptions): Promise<PairingResponse> => {
   if (!code.success) {
     throw new PairingError('pairing code must look like XXXX-XXXX');
   }
-  const url = pairingUrl(options.server);
+  const url = pairingUrl(options.server, options.insecure);
   const body: PairingRequest = {
     code: code.data,
     hostname: options.hostname,
@@ -41,7 +46,10 @@ export const pair = async (options: PairOptions): Promise<PairingResponse> => {
   try {
     response = await options.fetch(url, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'content-type': 'application/json',
+        ...accessHeaders(options.access),
+      },
       body: JSON.stringify(body),
       redirect: 'error',
     });

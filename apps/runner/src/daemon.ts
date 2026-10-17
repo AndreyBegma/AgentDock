@@ -6,6 +6,7 @@ import {
   type Host,
   PROTOCOL_VERSION,
 } from '@agentdock/shared/protocol';
+import { accessHeaders, accessOf } from './access';
 import { adapters, SessionWatcher } from './adapters';
 import { resolveIngestSince } from './adapters/ingest-since';
 import { AssessExecutor, createAssessHandlers } from './assess';
@@ -16,7 +17,7 @@ import type { Clock } from './clock';
 import { CollectorRegistry, collectors } from './collectors';
 import { type CommandHandlers, createDispatcher } from './commands/dispatcher';
 import { createHandlers } from './commands/handlers';
-import { loadConfig, type PairedConfig, saveConfig } from './config';
+import { type PairedConfig, updateConfig } from './config';
 import {
   type HeartbeatPayload,
   RunnerConnection,
@@ -35,6 +36,7 @@ import {
 } from './detect/capabilities';
 import type { Exec } from './detect/exec';
 import { claudeConfigDir } from './detect/profiles';
+import { createDocsHandlers } from './docs';
 import type { Env } from './env';
 import { ecoSessionsDir, TranscriptCwds } from './filter/eco';
 import { FILTER_ORCHESTRATOR_DIR } from './filter/env';
@@ -48,8 +50,10 @@ import {
   RunNotes,
 } from './handoff';
 import { cardAtWorktree } from './handoff/context';
+import { readAncestors } from './hooks/ancestors';
 import { LocalSocketServer } from './local/server';
 import { LocalService } from './local/service';
+import { loadSessionTokenSecret, SessionTokens } from './local/session-tokens';
 import { HookSessions } from './local/sessions';
 import { acquireLock } from './lock';
 import { errorMessage, type Logger } from './log';
@@ -61,6 +65,10 @@ import {
   PlanTurnExecutor,
   SharedRunSlots,
 } from './planner';
+import { watchedRootRefusal } from './policy/check';
+import { nodeRealpath, type Realpath } from './policy/roots';
+import { reportedPolicy } from './policy/schema';
+import { PolicyStore } from './policy/store';
 import { WatchList } from './projects/watch-list';
 import { SessionMessenger } from './session';
 import {
@@ -128,6 +136,8 @@ export interface DaemonOptions {
   filterStatsPollMs?: number;
   /** `/cs-eco`'s sessions (#475); `${XDG_STATE_HOME:-~/.local/state}/cs-eco/sessions` by default. */
   ecoSessionsDir?: string;
+  /** Resolves roots for the policy (ADR-0047); the filesystem's by default. */
+  realpath?: Realpath;
   /** Called once the connection exists — tests reach it to emit events. */
   onStart?: (connection: RunnerConnection) => void;
 }
@@ -137,6 +147,9 @@ export const defaultSelfCommand = (): string[] =>
   Bun.main.startsWith('/$bunfs/')
     ? [process.execPath]
     : [process.execPath, Bun.main];
+
+/** How often the daemon looks for a policy the CLI changed (ADR-0047). */
+export const POLICY_REFRESH_MS = 5_000;
 
 /** Counts tmux sessions; no tmux or no server means zero. */
 const countTmuxSessions = async (exec: Exec): Promise<number> => {
@@ -168,6 +181,15 @@ export const runDaemon = async (
     });
     log.info('spool opened', { ...spool.stats() });
 
+    // ADR-0047: the runner-local policy, read from the file the CLI writes.
+    const policy = new PolicyStore({ configFile: options.configFile, log });
+    const realpath = options.realpath ?? nodeRealpath;
+    if (policy.current().allowedRoots.length === 0) {
+      log.warn(
+        'the policy allows no project root: no project is watched. Run `agentdock-runner policy allow-root <dir>`',
+      );
+    }
+
     const redetect = async (): Promise<Capabilities> => {
       const [capabilities, github] = await Promise.all([
         detectCapabilities({
@@ -196,6 +218,7 @@ export const runDaemon = async (
         terminal,
         gitAuth: { github },
         ...commandsCapability(handlers(), config.disabledCommands),
+        policy: reportedPolicy(policy.current()),
       };
     };
 
@@ -222,11 +245,9 @@ export const runDaemon = async (
     const watchList = new WatchList({
       initial: config.projects,
       registry,
-      persist: (projects) =>
-        saveConfig(options.configFile, {
-          ...loadConfig(options.configFile),
-          projects,
-        }),
+      persist: (projects) => updateConfig(options.configFile, { projects }),
+      admit: (project) =>
+        watchedRootRefusal(project.root, policy.current(), exec, realpath),
       log,
     });
 
@@ -259,6 +280,7 @@ export const runDaemon = async (
       watchedProjects: () => watchList.current,
       send: (message) => connection?.sendMessage(message) ?? false,
       spawn: options.spawnPty ?? bunSpawnPty(process.env),
+      writeAllowed: () => policy.current().terminal.write,
       // The executor is built below; it exists by the time a command arrives.
       runSession: (projectId, root, runId) =>
         runs.runSession(projectId, root, runId),
@@ -295,6 +317,7 @@ export const runDaemon = async (
       maxConcurrentRuns: config.skills.maxConcurrentRuns,
       slots,
       maxTimeoutSec: config.skills.maxTimeoutSec,
+      keepPatchesLocal: config.skills.keepPatchesLocal,
       emit: (event) => connection?.emit(event),
       log,
       otlpPort: () => otlp?.port ?? null,
@@ -326,7 +349,11 @@ export const runDaemon = async (
       emit: (event) => connection?.emit(event),
       log,
       otlpPort: () => otlp?.port ?? null,
-      attachmentSource: { server: config.server, token: config.token },
+      attachmentSource: {
+        server: config.server,
+        insecureServer: config.insecureServer,
+        token: config.token,
+      },
       runNotes,
     });
     const uiProfiles = new UiProfileBuildExecutor({
@@ -344,6 +371,13 @@ export const runDaemon = async (
     // warm-up. `cards` is built right below; nothing here runs before it.
     const cardsDir =
       options.cardsDir ?? join(dirname(options.spoolDir), 'cards');
+    // #113: the capability tokens of the local socket, signed with a secret
+    // kept beside the spool, so a card round's token outlives a restart.
+    const sessionTokens = new SessionTokens(
+      loadSessionTokenSecret(
+        join(dirname(options.spoolDir), 'session-token.key'),
+      ),
+    );
     const handoff: HandoffService = new HandoffService({
       deps: skillsDeps,
       state: new HandoffStateStore((cardId) => join(cardsDir, cardId)),
@@ -361,10 +395,15 @@ export const runDaemon = async (
       deps: skillsDeps,
       cardsDir,
       selfCommand,
-      attachmentSource: { server: config.server, token: config.token },
+      attachmentSource: {
+        server: config.server,
+        insecureServer: config.insecureServer,
+        token: config.token,
+      },
       emit: (event) => connection?.emit(event),
       log,
       otlpPort: () => otlp?.port ?? null,
+      sessionToken: (binding) => sessionTokens.mint(binding),
       // `steward` is built right below; a poll runs only after `start`.
       onSessionEnded: (record, exitCode) =>
         steward.sessionEnded(record, exitCode),
@@ -488,6 +527,8 @@ export const runDaemon = async (
       pollCollectors: (projectId, targets) =>
         registry.pollNow(projectId, targets),
       profiles: () => config.profiles,
+      policy: () => policy.current(),
+      realpath,
       backfillSessions: sessions
         ? (scope) => sessions.backfill(scope)
         : undefined,
@@ -499,6 +540,7 @@ export const runDaemon = async (
       capture: createCaptureHandlers(capture),
       normalize: createNormalizeHandlers(normalize),
       assess: createAssessHandlers(assess),
+      docs: createDocsHandlers(skillsDeps),
       steward: { ...stewardActions.handlers(), ...stewardDigest.handlers() },
       handoff: createHandoffHandlers(handoff),
       sessionMessage: new SessionMessenger({
@@ -516,6 +558,8 @@ export const runDaemon = async (
     const dispatch = createDispatcher({
       handlers: builtHandlers,
       disabledCommands: config.disabledCommands,
+      policy: () => policy.current(),
+      realpath,
       clock,
       log,
     });
@@ -555,7 +599,9 @@ export const runDaemon = async (
 
     const live = new RunnerConnection({
       server: config.server,
+      insecureServer: config.insecureServer,
       token: config.token,
+      accessHeaders: accessHeaders(accessOf(config)),
       spool,
       clock,
       backoff: new Backoff({ random: options.random }),
@@ -574,12 +620,15 @@ export const runDaemon = async (
       runLog,
       onConfig: (server) => {
         awayMode = server.awayMode === true;
-        sessions?.setProjects(server.projects).catch(() => {});
-        watchList.apply(server.projects).catch((error) => {
-          log.error('cannot apply the watch list', {
-            error: errorMessage(error),
+        // Sessions follow the admitted list only (ADR-0047).
+        watchList
+          .apply(server.projects)
+          .then(() => sessions?.setProjects(watchList.current))
+          .catch((error) => {
+            log.error('cannot apply the watch list', {
+              error: errorMessage(error),
+            });
           });
-        });
       },
       createSocket: options.createSocket,
     });
@@ -659,6 +708,26 @@ export const runDaemon = async (
       envelope: async (projectId) =>
         (await directory.resolve([projectId])).get(projectId),
       sessions: hookSessions,
+      tokens: sessionTokens,
+      // #113: the daemon reads a peer's ancestors itself, never the hook's word.
+      ancestorsOf: (pid) =>
+        readAncestors(pid, { os: process.platform, exec: options.exec }),
+      alive: (pid) => {
+        try {
+          process.kill(pid, 0);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      launchedSession: (sessionId) =>
+        cards.store
+          .all()
+          .some(
+            (r) =>
+              r.sessionId === sessionId &&
+              (r.phase === 'starting' || r.phase === 'running'),
+          ),
       // #482: a round's session is known from its record after a restart.
       liveRound: (cwd) =>
         cardAtWorktree(
@@ -678,7 +747,7 @@ export const runDaemon = async (
     if (socketPath) {
       const server = new LocalSocketServer({
         path: socketPath,
-        handle: (op, args) => localService.handle(op, args),
+        handle: (op, args, caller) => localService.handle(op, args, caller),
         log,
       });
       try {
@@ -723,11 +792,26 @@ export const runDaemon = async (
       log.error('sessions: cannot start', { error: errorMessage(error) });
     });
     steward.start();
+    // A policy the CLI changed takes effect without a restart.
+    let policySeen = policy.version;
+    const cancelPolicyRefresh = clock.setInterval(() => {
+      if (policy.version === policySeen) return;
+      policySeen = policy.version;
+      watchList
+        .reapply()
+        .then(() => sessions?.setProjects(watchList.current))
+        .catch((error) => {
+          log.error('cannot re-apply the watch list', {
+            error: errorMessage(error),
+          });
+        });
+    }, POLICY_REFRESH_MS);
     live.start();
     filterStats.start();
     options.onStart?.(live);
     const reason = await live.done;
     options.signal?.removeEventListener('abort', onAbort);
+    cancelPolicyRefresh();
     filterStats.stop();
     // What the last commands wrote goes to the spool, sent on the next start.
     await filterStats.poll();

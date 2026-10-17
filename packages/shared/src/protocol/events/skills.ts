@@ -79,6 +79,14 @@ export const skillRunFinishedDataSchema = z
     /** `git diff` against the base. */
     patch: maxBytes(SKILL_RUN_PATCH_MAX_BYTES).optional(),
     patchTruncated: z.boolean(),
+    /**
+     * SHA-256 of the patch the runner kept on its own disk
+     * (`skills.keepPatchesLocal`, C-128); set only when `patch` is not sent.
+     */
+    patchSha256: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/)
+      .optional(),
     prNumber: z.number().int().positive().optional(),
     prUrl: z.url({ protocol: /^https$/ }).optional(),
     /** Why a `failed` run failed, without a stack trace. */

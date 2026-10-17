@@ -2,6 +2,7 @@
 
 import {
   type CardDesignLaunchRequest,
+  type CardStackRef,
   DESIGN_VIEWPORT_MAX_PX,
   DESIGN_VIEWPORT_MIN_PX,
   type DesignCommentRequest,
@@ -16,6 +17,7 @@ import { ResizableFrame } from '@andrewbehma/glass-ui/resizable-frame';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import { SidePanel } from '@andrewbehma/glass-ui/side-panel';
 import { TabGroup, TabPanel } from '@andrewbehma/glass-ui/tabs';
+import { Crosshair, MessageSquare } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { LaunchCard } from '../../lib/board/launch';
 import {
@@ -27,8 +29,11 @@ import {
   pinMarkers,
   pinNumbers,
   reviseBlock,
+  stackDrawBlock,
 } from '../../lib/design/comments';
 import { framePath } from '../../lib/design/frames';
+import { stackDesignHref } from '../../lib/design/href';
+import { isStarting } from '../../lib/design/progress';
 import type { DesignBusy } from '../../lib/design/use-design';
 import { useElementWidth } from '../../lib/design/use-element-width';
 import {
@@ -47,17 +52,18 @@ import {
   wheelZoom,
   zoomKey,
 } from '../../lib/design/zoom';
+import { useWide } from '../../lib/slot/use-wide';
 import { LaunchPopover } from '../board/launch-popover';
 import { ApproveDialog } from './approve-dialog';
 import { CommentsPanel } from './comments-panel';
 import { DesignFailure } from './design-failure';
-import { DesignProgress } from './design-progress';
+import { DesignProgress, DesignStarting } from './design-progress';
 import { FrameStrip, frameKey } from './frame-strip';
 import { GeneratePanel } from './generate-panel';
 import { MockupBanner } from './mockup-banner';
 import { type FramePin, MockupFrame } from './mockup-frame';
 import { PinComposer } from './pin-composer';
-import { ViewerToolbar } from './viewer-toolbar';
+import { ViewControls, ViewerToolbar } from './viewer-toolbar';
 
 export interface DesignViewerActions {
   patch: (body: TaskDesignPatchRequest) => Promise<unknown>;
@@ -83,6 +89,7 @@ export function DesignViewer({
   actions,
   approval,
   launch,
+  stack,
   onChange,
 }: {
   projectId: string;
@@ -102,8 +109,15 @@ export function DesignViewer({
    * its plain buttons.
    */
   launch?: LaunchCard;
+  /**
+   * A card's stack (#527, ADR-0044 §5): while its design is not approved,
+   * Generate and Revise wait for it. A card in no stack leaves it out.
+   */
+  stack?: CardStackRef | null;
   onChange: (change: ViewerChange) => void;
 }) {
+  // Below `lg` (C-244): the touch layout, with the review controls moved off the toolbar.
+  const phone = useWide() === false;
   const [pinMode, setPinMode] = useState(false);
   // The scale a pin was placed at travels with it: `frame` is the scaled box.
   const [draft, setDraft] = useState<(FramePin & { zoom: number }) | null>(
@@ -182,7 +196,8 @@ export function DesignViewer({
   };
 
   const writeBlock = designWriteBlock(design, canOperate);
-  const reviseReason = reviseBlock(design, canOperate);
+  const stackBlock = stackDrawBlock(stack);
+  const reviseReason = reviseBlock(design, canOperate, stackBlock);
   const approveReason = approveBlock(design, canOperate);
   const revisionId = state.revision?.id ?? null;
   const frames = state.revision?.frames ?? [];
@@ -233,6 +248,20 @@ export function DesignViewer({
 
   const panel = (
     <div className="flex flex-col gap-4 p-4">
+      {phone && state.revision ? (
+        <section aria-label="View" className="flex flex-col gap-2">
+          <h3 className="text-xs font-semibold text-ink-3">View</h3>
+          <div className="flex flex-wrap items-center gap-2">
+            <ViewControls
+              touch
+              state={state}
+              variants={variants}
+              revisions={revisionsOf(design.revisions, state.variant)}
+              onChange={onChange}
+            />
+          </div>
+        </section>
+      ) : null}
       <div className="flex flex-wrap gap-2">
         {launch ? (
           <LaunchPopover
@@ -352,6 +381,12 @@ export function DesignViewer({
             stopping={busy === 'stop'}
             onStop={() => void actions.stop().catch(() => {})}
           />
+        ) : isStarting(design) ? (
+          <DesignStarting
+            canStop={canOperate}
+            stopping={busy === 'stop'}
+            onStop={() => void actions.stop().catch(() => {})}
+          />
         ) : design.lastFailure ? (
           <DesignFailure
             failure={design.lastFailure}
@@ -379,6 +414,7 @@ export function DesignViewer({
               revisions={revisionsOf(design.revisions, state.variant)}
               pinMode={pinMode}
               canPin={writeBlock === null}
+              phone={phone}
               onChange={onChange}
               onPinMode={(on) => {
                 setPinMode(on);
@@ -393,21 +429,26 @@ export function DesignViewer({
               pinned={framesWithOpenPins(design.comments, revisionId)}
               onFrame={selectFrame}
             />
-            {/* Below `lg` the panel is a sheet; its way in sits above the frame. */}
-            <Button
-              variant="glass"
-              className="shrink-0 self-start lg:hidden"
-              onClick={() => setSheetOpen(true)}
-            >
-              Comments and review ({openCount} open)
-            </Button>
+            {phone && pinMode && writeBlock === null ? (
+              <p
+                role="status"
+                className="shrink-0 self-start rounded-full border border-line bg-raised px-3 py-1 text-xs text-ink-2"
+              >
+                Tap the mockup to place a pin
+              </p>
+            ) : null}
             {/* #441: one panel per frame; only the one in view renders its mockup. */}
             {frames.map((f) => (
               <TabPanel key={f.position} value={String(f.position)}>
                 {/* D1: the box is the scaled size, the mockup inside keeps its layout size. */}
                 <div ref={measure} className="w-full min-w-0 shrink-0">
                   <ResizableFrame
-                    className="shrink-0"
+                    // The drag edges are pointer-only: gone on a phone, where the presets and zoom size the mockup.
+                    className={`shrink-0 max-lg:[&_[role=separator]]:hidden ${
+                      phone && pinMode
+                        ? 'outline-2 outline-dashed outline-offset-2 outline-accent'
+                        : ''
+                    }`}
                     width={boxSize(view.width, zoom)}
                     height={boxSize(state.viewport.height, zoom)}
                     min={boxSize(DESIGN_VIEWPORT_MIN_PX, zoom)}
@@ -440,8 +481,11 @@ export function DesignViewer({
                         pinMode={pinMode && writeBlock === null}
                         pins={markers}
                         onWheel={zoomByWheel}
+                        touchScale={phone ? zoom : undefined}
+                        onPinOpen={() => setSheetOpen(true)}
                         onPin={(pin) => {
-                          if (writeBlock === null) setDraft({ ...pin, zoom });
+                          if (writeBlock === null && pinMode)
+                            setDraft({ ...pin, zoom });
                         }}
                       />
                     </div>
@@ -450,17 +494,61 @@ export function DesignViewer({
               </TabPanel>
             ))}
           </TabGroup>
-        ) : design.progress ? null : (
+        ) : design.progress || isStarting(design) ? null : (
           <GeneratePanel
             projectId={projectId}
             design={design}
             writeBlock={writeBlock}
+            stackBlock={stackBlock}
+            stackHref={
+              stack ? stackDesignHref(projectId, stack.number) : undefined
+            }
             busy={busy === 'generate' || busy === 'patch'}
             onPatch={actions.patch}
             onGenerate={actions.generate}
             launch={launch}
           />
         )}
+        {phone && state.revision ? (
+          <div
+            role="toolbar"
+            aria-label="Review actions"
+            className="glass sticky bottom-0 z-10 mt-auto flex shrink-0 gap-2 rounded-sheet p-2"
+          >
+            <Button
+              variant="glass"
+              className="h-11 px-3 text-sm"
+              aria-pressed={pinMode}
+              disabled={writeBlock !== null}
+              title={writeBlock ?? undefined}
+              onClick={() => {
+                setPinMode(!pinMode);
+                if (pinMode) setDraft(null);
+              }}
+            >
+              <Crosshair aria-hidden="true" className="size-4" />
+              Pin
+            </Button>
+            <Button
+              variant="glass"
+              className="h-11 px-3 text-sm"
+              onClick={() => setSheetOpen(true)}
+            >
+              <MessageSquare aria-hidden="true" className="size-4" />
+              Comments
+              {openCount > 0 ? <Badge count={openCount} /> : null}
+            </Button>
+            <Button
+              variant="solid"
+              className="h-11 flex-1 text-sm"
+              disabled={approveReason !== null || busy !== null}
+              title={approveReason ?? undefined}
+              onClick={() => setApproveOpen(true)}
+            >
+              Approve
+            </Button>
+          </div>
+        ) : null}
       </section>
 
       {state.revision ? (
@@ -494,6 +582,8 @@ export function DesignViewer({
         number={draftNumber}
         screen={`${screen.viewport} · ${screen.theme}`}
         busy={busy === 'comment'}
+        phone={phone}
+        frameName={frames[state.frame]?.name ?? null}
         onCancel={() => setDraft(null)}
         onSave={async (body) => {
           if (!draft || !revisionId) return;

@@ -73,6 +73,8 @@ export const design = (over: Partial<TaskDesignView> = {}): TaskDesignView => ({
   status: 'reviewing',
   approvedRevisionId: null,
   skills: [],
+  skillsEdited: false,
+  defaultSkills: [],
   profileId: 'profile-1',
   approvedBy: null,
   approvedAt: null,

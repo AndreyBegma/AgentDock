@@ -13,6 +13,14 @@ export type CommandOutcome =
   | { kind: 'result'; message: CommandResultMessage }
   | { kind: 'lost' };
 
+/** Where a runner socket came from: its IP and user agent at upgrade. */
+export interface RunnerPeer {
+  ip: string | null;
+  userAgent: string | null;
+}
+
+const UNKNOWN_PEER: RunnerPeer = { ip: null, userAgent: null };
+
 /** One authenticated runner socket that has completed `hello`. */
 export class LiveConnection {
   lastBeatAt: number;
@@ -25,6 +33,7 @@ export class LiveConnection {
     readonly connectedAt: number,
     /** What its hello advertised (#233); null = unknown, an older runner. */
     readonly commands: RunnerCommands | null = null,
+    readonly peer: RunnerPeer = UNKNOWN_PEER,
   ) {
     this.lastBeatAt = connectedAt;
   }
@@ -73,24 +82,54 @@ export class LiveConnection {
   }
 }
 
+/** Closes a socket that authenticated but has not completed `hello`. */
+export type EvictPending = (code: number, reason: string) => void;
+
 /**
- * The live socket of each runner, in this process (spec D4: one per runner).
+ * The live socket of each runner, in this process (spec D4: one per runner),
+ * and the sockets that authenticated as it but have not sent `hello` yet —
+ * re-pairing or revoking closes those too (C-118).
  * A single API instance is assumed; several would need a shared registry.
  */
 @Injectable()
 export class RunnerConnections {
   private readonly live = new Map<string, LiveConnection>();
+  private readonly pending = new Map<string, Set<EvictPending>>();
 
-  /** Makes `connection` the runner's socket; an older one is closed 4409. */
-  attach(connection: LiveConnection): void {
+  /**
+   * Tracks an authenticated socket until its `hello` completes; returns the
+   * release to call once it is attached or closed.
+   */
+  admit(runnerId: string, evict: EvictPending): () => void {
+    let sockets = this.pending.get(runnerId);
+    if (!sockets) {
+      sockets = new Set();
+      this.pending.set(runnerId, sockets);
+    }
+    sockets.add(evict);
+    return () => {
+      const current = this.pending.get(runnerId);
+      if (!current?.delete(evict)) return;
+      if (current.size === 0) this.pending.delete(runnerId);
+    };
+  }
+
+  /**
+   * Makes `connection` the runner's socket; an older one is closed 4409.
+   * Returns that older one when it was still open — a live socket taken over,
+   * which C-108 reports — and null otherwise: none, or one already closing on
+   * its own (a normal reconnect).
+   */
+  attach(connection: LiveConnection): LiveConnection | null {
     const previous = this.live.get(connection.runnerId);
     this.live.set(connection.runnerId, connection);
-    if (previous && previous !== connection) {
-      previous.close(
-        RUNNER_CLOSE_CODES.replaced,
-        'replaced by a newer connection',
-      );
-    }
+    if (!previous || previous === connection) return null;
+    const wasOpen = previous.isOpen;
+    previous.close(
+      RUNNER_CLOSE_CODES.replaced,
+      'replaced by a newer connection',
+    );
+    return wasOpen ? previous : null;
   }
 
   /** Removes `connection` if it is still the runner's current one. */
@@ -111,8 +150,11 @@ export class RunnerConnections {
     return connection?.isOpen ? connection : undefined;
   }
 
-  /** Closes the runner's socket, if any, with `code`. */
+  /** Closes the runner's sockets, live and pre-hello, with `code`. */
   disconnect(runnerId: string, code: number, reason: string): void {
+    const pending = this.pending.get(runnerId);
+    this.pending.delete(runnerId);
+    for (const evict of pending ?? []) evict(code, reason);
     const connection = this.live.get(runnerId);
     if (!connection) return;
     this.live.delete(runnerId);

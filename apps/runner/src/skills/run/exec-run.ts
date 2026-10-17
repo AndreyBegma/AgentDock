@@ -61,7 +61,8 @@ export const execRun = async (
     return 127;
   }
 
-  const label = spec.interactive ? 'agentdock card' : 'agentdock skill run';
+  const label =
+    spec.label ?? (spec.interactive ? 'agentdock card' : 'agentdock skill run');
   io.stdout(`${label} · ${spec.binary} in ${spec.cwd}\n`);
   const command = [binary, ...spec.args];
   const child = spec.interactive

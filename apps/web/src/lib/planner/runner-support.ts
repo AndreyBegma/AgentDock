@@ -111,6 +111,8 @@ const FEATURE_VERB: Record<RunnerFeature, string> = {
   design: 'draw mockups',
   uiProfileBuild: 'build the UI profile',
   worktree: 'read worktrees',
+  docsRepo: 'write specs to a docs repository',
+  ruleScan: 'scan a project for coding rules',
 };
 
 const DISABLED_BODY =

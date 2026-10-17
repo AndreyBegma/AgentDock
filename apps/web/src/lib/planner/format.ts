@@ -37,11 +37,15 @@ export const PLAN_STATUS_LABEL: Record<PlanStatus, string> = {
   done: 'Done',
 };
 
-/** A plan's mode, as a list row names it; `card` is a New work intake (#337, #409). */
+/**
+ * A plan's mode, as a list row names it; `card` is a New work intake (#337,
+ * #409), `discuss` a discussion (#590).
+ */
 export const PLAN_MODE_LABEL: Record<PlanMode, string> = {
   batch: 'Batch',
   dialogue: 'Dialogue',
   card: 'New work',
+  discuss: 'Discussion',
 };
 
 export const PLAN_STATUS_PILL: Record<PlanStatus, Status> = {
@@ -197,7 +201,7 @@ export const KIND_HUE: Record<PlanTaskKind, Hue> = {
 
 export const SPEC_OUTPUT_LABEL: Record<PlannerSpecOutput, string> = {
   docs_pr:
-    'Specifications go to one docs pull request; features are queued when it merges, bugs at once.',
+    'Specifications go to one docs pull request — in the docs repository when the docs live there; features are queued when it merges, bugs at once.',
   issue_body:
     'Each issue body is the whole specification; every issue is queued at once.',
 };
@@ -265,6 +269,7 @@ export function turnActionText(
     revise: 'Revising the plan…',
     design: `Drawing ${task}’s mockup…`,
     intake: 'Thinking about the card…',
+    discuss: 'Reading the repository…',
   };
   return sentence[turn.action];
 }
@@ -318,6 +323,7 @@ export const TURN_ACTION_LABEL: Record<PlanTurnAction, string> = {
   revise: 'Revise the plan',
   design: 'Draw the mockup',
   intake: 'Shape the card',
+  discuss: 'Discuss',
 };
 
 const TURN_PHASE_WORD: Record<PlanTurnPhase, string> = {

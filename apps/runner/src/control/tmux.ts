@@ -65,13 +65,14 @@ export class TmuxControl {
   }
 
   /**
-   * `new-session -d -s <name> -c <cwd> -e K=V … <argv…>`. tmux runs a command
-   * given as several arguments directly, without `sh -c`.
+   * `new-session -d -s <name> -c <cwd> <argv…>`. tmux runs a command given as
+   * several arguments directly, without `sh -c`. There is no env argument
+   * (C-123): `-e K=V` would put a value in the process list, so a session's
+   * env goes through a 0600 launch file that `exec-run` reads.
    */
   async newSession(
     name: string,
     cwd: string,
-    env: Readonly<Record<string, string>>,
     argv: readonly string[],
   ): Promise<{ ok: true } | { ok: false; stderr: string }> {
     const result = await this.run([
@@ -81,10 +82,6 @@ export class TmuxControl {
       name,
       '-c',
       cwd,
-      ...Object.entries(env).flatMap(([key, value]) => [
-        '-e',
-        `${key}=${value}`,
-      ]),
       ...argv,
     ]);
     return result.code === 0

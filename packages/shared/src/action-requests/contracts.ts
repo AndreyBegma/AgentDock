@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { headShaSchema } from '../protocol/commands/approvals';
 
 /**
  * Action requests (docs/specs/201-claude-code-integration.md D18): something a
@@ -13,9 +14,21 @@ export const actionRequestKindSchema = z.enum([
   'orchestrator_start',
   'orchestrator_stop',
   'pr_approve',
+  'issue_queue',
 ]);
 export type ActionRequestKind = z.infer<typeof actionRequestKindSchema>;
 export const ACTION_REQUEST_KINDS = actionRequestKindSchema.options;
+
+/**
+ * The kinds a session may ask for with `action.request`. `issue_queue` is not
+ * one: the API creates it itself when a session files an issue for the fleet
+ * (C-112), bound to the issue it just created.
+ */
+export const requestableActionRequestKindSchema =
+  actionRequestKindSchema.exclude(['issue_queue']);
+export type RequestableActionRequestKind = z.infer<
+  typeof requestableActionRequestKindSchema
+>;
 
 /** `pending → approved | denied | expired`, then `approved → executed | failed`. */
 export const actionRequestStatusSchema = z.enum([
@@ -42,6 +55,8 @@ export const ACTION_REQUEST_TTL_MS: Record<ActionRequestKind, number> = {
   orchestrator_start: 24 * 60 * 60_000,
   orchestrator_stop: 24 * 60 * 60_000,
   pr_approve: 24 * 60 * 60_000,
+  /** Expiring only leaves the issue unqueued; a week covers a weekend away. */
+  issue_queue: 7 * 24 * 60 * 60_000,
 };
 
 /** The `PermissionRequest` hook polls `action.status` this often… */
@@ -51,8 +66,15 @@ export const ACTION_REQUEST_HOOK_WAIT_MS = 280_000;
 
 export const ACTION_REQUEST_SUMMARY_MAX = 500;
 export const ACTION_REQUEST_NOTE_MAX = 1_000;
-/** The redacted tool input shown on a `tool_use` request (D17). */
-export const ACTION_REQUEST_TOOL_INPUT_MAX = 500;
+/**
+ * The shown budget of a `tool_use` request's redacted tool input (D17,
+ * C-114): head and tail together, the truncation marker between them
+ * included, when the input is longer.
+ */
+export const ACTION_REQUEST_TOOL_INPUT_MAX = 1_000;
+
+/** The issue title kept on an `issue_queue` request (GitHub's own limit). */
+export const ACTION_REQUEST_ISSUE_TITLE_MAX = 256;
 
 /**
  * `args` per kind. Strict: the API executes the non-`tool_use` kinds, so
@@ -60,11 +82,29 @@ export const ACTION_REQUEST_TOOL_INPUT_MAX = 500;
  * it from the runner's correlation (D9).
  */
 export const actionRequestArgsSchemas = {
-  tool_use: z.strictObject({
-    toolName: z.string().min(1).max(200),
-    /** Redacted; present only when the project ships content (D17). */
-    input: z.string().max(ACTION_REQUEST_TOOL_INPUT_MAX).optional(),
-  }),
+  tool_use: z
+    .strictObject({
+      toolName: z.string().min(1).max(200),
+      /**
+       * The redacted tool input, sent independent of content shipping
+       * (C-114, D-08): whole, or head and tail with a marker between them.
+       */
+      input: z.string().max(ACTION_REQUEST_TOOL_INPUT_MAX).optional(),
+      /** `input` is head and tail of a longer redacted input. */
+      truncated: z.boolean().optional(),
+      /** The full redacted input's length, in UTF-16 code units. */
+      fullLength: z.number().int().nonnegative().optional(),
+      /** SHA-256 (hex) of the full redacted input, UTF-8 encoded. */
+      sha256: z
+        .string()
+        .regex(/^[0-9a-f]{64}$/)
+        .optional(),
+      /** The hook sent no tool input: the person sees the tool name only. */
+      preview: z.literal('none').optional(),
+    })
+    .refine((args) => !(args.preview === 'none' && args.input !== undefined), {
+      message: "a request with preview 'none' carries no input",
+    }),
   orchestrator_start: z.strictObject({
     mode: z.enum(['start', 'next']).default('start'),
   }),
@@ -72,11 +112,61 @@ export const actionRequestArgsSchemas = {
   pr_approve: z.strictObject({
     pr: z.number().int().positive(),
   }),
+  issue_queue: z.strictObject({
+    issue: z.number().int().positive(),
+    title: z.string().max(ACTION_REQUEST_ISSUE_TITLE_MAX),
+    url: z.url({ protocol: /^https?$/ }),
+    /** The session that filed it (its AgentDock id), when the API knows it. */
+    session: z.string().min(1).max(64).nullable(),
+  }),
 } as const satisfies Record<ActionRequestKind, z.ZodType>;
 
 export type ActionRequestArgs<K extends ActionRequestKind> = z.infer<
   (typeof actionRequestArgsSchemas)[K]
 >;
+
+/** The PR title kept on a `pr_approve` request, at most this long. */
+export const ACTION_REQUEST_PR_TITLE_MAX = 300;
+
+/**
+ * The stored `args` of a `pr_approve` request: what the session asked for
+ * plus what `pr.inspect` read when it was created — the head the person is
+ * shown and approves. Never taken from the session.
+ */
+export const prApproveBoundArgsSchema = z.strictObject({
+  pr: z.number().int().positive(),
+  headSha: headShaSchema,
+  title: z.string().max(ACTION_REQUEST_PR_TITLE_MAX),
+  url: z.url({ protocol: /^https?$/ }),
+});
+export type PrApproveBoundArgs = z.infer<typeof prApproveBoundArgsSchema>;
+
+/** The bound PR of a `pr_approve` request; null for another kind or old args. */
+export const boundPrOf = (request: {
+  kind: ActionRequestKind;
+  args: unknown;
+}): PrApproveBoundArgs | null => {
+  if (request.kind !== 'pr_approve') return null;
+  const parsed = prApproveBoundArgsSchema.safeParse(request.args);
+  return parsed.success ? parsed.data : null;
+};
+
+/** The issue of an `issue_queue` request; null for another kind or bad args. */
+export const issueQueueArgsOf = (request: {
+  kind: ActionRequestKind;
+  args: unknown;
+}): ActionRequestArgs<'issue_queue'> | null => {
+  if (request.kind !== 'issue_queue') return null;
+  const parsed = actionRequestArgsSchemas.issue_queue.safeParse(request.args);
+  return parsed.success ? parsed.data : null;
+};
+
+/** A commit id as people read it: its first 7 characters. */
+export const shortHeadSha = (sha: string): string => sha.slice(0, 7);
+
+/** The PR's diff at `headSha` — what the approver reviews. */
+export const prDiffUrl = (args: Pick<PrApproveBoundArgs, 'url' | 'headSha'>) =>
+  `${args.url.replace(/\/+$/, '')}/files/${args.headSha}`;
 
 /** A request as the API lists it to the web and answers `action.status` with. */
 export const actionRequestSummarySchema = z.object({
@@ -106,7 +196,8 @@ export type ActionRequestDecision = z.infer<typeof actionRequestDecisionSchema>;
 /**
  * Whether `userId` may decide a request of `kind` that `requestedById` made.
  * Only operators reach this; a requester cannot approve their own
- * non-`tool_use` request unless they are an admin (D18).
+ * `orchestrator_*` or `pr_approve` request unless they are an admin (D18).
+ * `issue_queue` (C-112) only needs a person, not a second one.
  */
 export const mayDecideActionRequest = (args: {
   kind: ActionRequestKind;
@@ -115,6 +206,8 @@ export const mayDecideActionRequest = (args: {
   isAdmin: boolean;
 }): boolean =>
   args.kind === 'tool_use' ||
+  // The person who would self-approve could have queued it from the web.
+  args.kind === 'issue_queue' ||
   args.isAdmin ||
   args.requestedById === null ||
   args.requestedById !== args.userId;

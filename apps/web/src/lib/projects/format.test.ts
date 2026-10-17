@@ -9,6 +9,8 @@ import {
   docsOverrideRequest,
   githubAppState,
   noOnlineRunnerCopy,
+  specFolderError,
+  specFolderOf,
   suggestedPathOf,
 } from './format';
 
@@ -223,14 +225,78 @@ describe('docsOverrideRequest', () => {
     });
   });
 
-  test('remote_repo needs owner/name and sends no path', () => {
+  test('remote_repo needs owner/name and takes an optional local clone (#379)', () => {
     expect(docsOverrideRequest(form('remote_repo'), '/w/app').ok).toBe(false);
     expect(
       docsOverrideRequest(
-        { kind: 'remote_repo', localPath: '/ignored', repo: 'o/docs' },
+        { kind: 'remote_repo', localPath: '', repo: 'o/docs' },
         '/w/app',
       ),
     ).toEqual({ ok: true, body: { kind: 'remote_repo', repo: 'o/docs' } });
+    expect(
+      docsOverrideRequest(
+        { kind: 'remote_repo', localPath: '/clones/docs', repo: 'o/docs' },
+        '/w/app',
+      ),
+    ).toEqual({
+      ok: true,
+      body: { kind: 'remote_repo', repo: 'o/docs', localPath: '/clones/docs' },
+    });
+    expect(
+      docsOverrideRequest(
+        { kind: 'remote_repo', localPath: 'clones/docs', repo: 'o/docs' },
+        '/w/app',
+      ).ok,
+    ).toBe(false);
+  });
+
+  test('carries the Spec folder, blank clearing it (#379)', () => {
+    const sibling = {
+      kind: 'sibling_repo' as const,
+      localPath: '/w/app-docs',
+      repo: '',
+    };
+    expect(
+      docsOverrideRequest({ ...sibling, specDir: ' prs/ ' }, '/w/app'),
+    ).toEqual({
+      ok: true,
+      body: { kind: 'sibling_repo', localPath: '/w/app-docs', specDir: 'prs' },
+    });
+    expect(docsOverrideRequest({ ...sibling, specDir: '' }, '/w/app')).toEqual({
+      ok: true,
+      body: { kind: 'sibling_repo', localPath: '/w/app-docs', specDir: null },
+    });
+    expect(
+      docsOverrideRequest({ ...sibling, specDir: '../prs' }, '/w/app').ok,
+    ).toBe(false);
+  });
+});
+
+describe('Spec folder (#379)', () => {
+  test('is a relative path inside the docs root', () => {
+    expect(specFolderError('prs')).toBeNull();
+    expect(specFolderError('docs/specs/')).toBeNull();
+    expect(specFolderError('')).toBeNull();
+    for (const bad of ['/prs', '../prs', 'a/./b', 'a//b', 'a\\b']) {
+      expect(specFolderError(bad)).not.toBeNull();
+    }
+  });
+
+  test('starts from the stored folder, else the classified specs folder', () => {
+    const docs = {
+      specDir: null,
+      classified: {
+        specs: ['specs', 'old/specs'],
+        adr: [],
+        roadmap: [],
+        reports: [],
+      },
+    } as unknown as Parameters<typeof specFolderOf>[0];
+    expect(specFolderOf(docs)).toBe('specs');
+    expect(specFolderOf({ ...docs, specDir: 'prs' } as typeof docs)).toBe(
+      'prs',
+    );
+    expect(specFolderOf(null)).toBe('');
   });
 });
 

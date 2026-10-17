@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { createHash } from 'node:crypto';
-import { appendFileSync, utimesSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  symlinkSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { SLOT_MESSAGE_SEEN_MAX_BYTES } from '@agentdock/shared/protocol';
 import { messageFileContent } from '../../control/slot';
@@ -83,6 +88,27 @@ describe('MessageWatcher', () => {
     };
     return { ...f, file, touch, watcher: new MessageWatcher(f) };
   };
+
+  it('ignores a message file that is a symlink to a file outside the worktree', () => {
+    const { watcher, events, file } = setup();
+    const outside = tempDir();
+    try {
+      const target = join(outside.dir, 'secret.txt');
+      writeFileSync(target, 'top secret');
+      symlinkSync(target, file);
+      watcher.scan();
+      expect(events.take()).toEqual([]);
+    } finally {
+      outside.cleanup();
+    }
+  });
+
+  it('ignores a 10 MiB message file', () => {
+    const { watcher, events, file } = setup();
+    writeFileSync(file, 'x'.repeat(10 * 1024 * 1024));
+    watcher.scan();
+    expect(events.take()).toEqual([]);
+  });
 
   it('sends the first message whole, then an appended section as its own entry', () => {
     const { watcher, events, file, touch } = setup();
@@ -172,5 +198,18 @@ describe('MessageWatcher', () => {
     expect(new TextEncoder().encode(data.body).length).toBe(
       SLOT_MESSAGE_SEEN_MAX_BYTES,
     );
+  });
+
+  it('redacts the body (C-128)', () => {
+    const { watcher, events, file } = setup();
+    writeFileSync(
+      file,
+      `# From the orchestrator\n\nuse token ghp_${'a'.repeat(36)} and\nDATABASE_URL=postgres://u:pw@h/db\n`,
+    );
+    watcher.scan();
+    const [event] = events.take();
+    const data = event.data as { body: string };
+    expect(data.body).not.toContain('ghp_');
+    expect(data.body).not.toContain('pw@h');
   });
 });

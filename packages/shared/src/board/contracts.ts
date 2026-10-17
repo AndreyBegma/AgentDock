@@ -12,6 +12,7 @@ import type {
   CardRunWiringReason,
   LocalErrorCode,
   OrchestratorPermissionMode,
+  PaneDialog,
   PrChecks,
   PrInspectState,
 } from '../protocol';
@@ -38,6 +39,7 @@ import type {
   CardCiState,
   CardCollectState,
   CardFinishedBy,
+  CardNeedsPersonReason,
   CardPrState,
   CardRoundPhase,
   CardRoundTrigger,
@@ -110,6 +112,11 @@ export interface CardRoundBrief {
    * older fixtures stay valid.
    */
   finishRefused?: LocalErrorCode | null;
+  /**
+   * #624: the Claude Code dialog that blocks the waiting round's session;
+   * `null` otherwise. Optional so older fixtures stay valid.
+   */
+  blockingDialog?: PaneDialog | null;
 }
 
 /**
@@ -181,6 +188,8 @@ export interface BoardCardView {
    * fixes"; nothing is automated until a person acts.
    */
   needsPerson: boolean;
+  /** #542: why `needsPerson` is set; `null` while it is not, or unknown. */
+  needsPersonReason: CardNeedsPersonReason | null;
   /** #359 D8: the latest PR merged (ISO) — the Merged badge; `null` otherwise. */
   mergedAt: string | null;
   /** The latest round; `null` before the first Run. */
@@ -375,6 +384,8 @@ export interface CardRoundView {
    * older fixtures stay valid.
    */
   finishRefused?: LocalErrorCode | null;
+  /** #624: as on `CardRoundBrief`. Optional so older fixtures stay valid. */
+  blockingDialog?: PaneDialog | null;
   /** The person's text, for a `feedback` round. */
   feedback: string | null;
   author: BoardUserRef | null;
@@ -463,7 +474,16 @@ export interface BoardCardDetail extends BoardCardView {
   branch: string | null;
   /** Display only: the runner owns the path. */
   worktree: string | null;
+  /**
+   * The spec's path: on the card's branch, or — with `specPr` — relative to
+   * the docs repository's root.
+   */
   specPath: string | null;
+  /**
+   * #379: the docs repository pull request that adds the spec, when the
+   * project's specs live in an external docs repository; else `null`.
+   */
+  specPr: { repo: string; number: number; url: string } | null;
   /** The card's Claude session (D6); `null` before the first Run. */
   sessionId: string | null;
   createdBy: BoardUserRef | null;
@@ -734,8 +754,13 @@ export const BOARD_ERROR = {
   notRunning: 'not_running',
   /** 409: feedback outside Finished, or Accept of a card not in Finished. */
   wrongColumn: 'wrong_column',
-  /** 422: `specOnRun` and the project has no `specDir` (D2). */
+  /** 422: `specOnRun` and the project has no Spec folder nor `specDir` (D2). */
   noSpecDir: 'no_spec_dir',
+  /**
+   * 422 (#379): `specOnRun` and the project's docs are a remote repository
+   * with no local clone path to write the spec in.
+   */
+  noDocsClone: 'no_docs_clone',
   /**
    * 422: the runner refused a non-Claude profile. Profile selection itself
    * answers `no_profile` (#272 D2).
@@ -765,6 +790,11 @@ export const BOARD_ERROR = {
   cardCompleted: 'card_completed',
   /** 502 (#309 D9): the runner could not download or verify an attachment for `card.run`. */
   attachmentsUnavailable: 'attachments_unavailable',
+  /**
+   * 403 (ADR-0047): the runner's local security policy refused the command;
+   * the message names the rule and the CLI line that lifts it.
+   */
+  policyRefused: 'policy_refused',
   /** 409 (#329 D5): Create pull request on a card with no `branch` — it never ran. */
   noBranch: 'no_branch',
   /**
@@ -811,6 +841,8 @@ export interface BoardErrorBody {
   code?: AttachmentRefusal;
   /** `dependency_open` (#337 D8): the open dependencies — "C-12 is not completed yet". */
   dependencies?: CardDependencyRef[];
+  /** `stack_refused` of a grouping (#588): the cards that cannot join, by number. */
+  cards?: number[];
 }
 
 /**
@@ -1026,11 +1058,11 @@ export interface CardFinishedEventData {
 }
 
 /**
- * Why a round waits for the person: its turn ended (`stopped`), or it asks
- * a question in the session (`question`, #473). Absent from events recorded
- * before #473 — a stop.
+ * Why a round waits for the person: its turn ended (`stopped`), it asks a
+ * question in the session (`question`, #473), or a Claude Code dialog blocks
+ * it (`dialog`, #624). Absent from events recorded before #473 — a stop.
  */
-export type CardWaitingReason = 'stopped' | 'question';
+export type CardWaitingReason = 'stopped' | 'question' | 'dialog';
 
 export interface CardWaitingEventData {
   cardId: string;
@@ -1038,6 +1070,8 @@ export interface CardWaitingEventData {
   title: string;
   round: number;
   reason?: CardWaitingReason;
+  /** #624: the dialog, with `reason: 'dialog'`. */
+  dialog?: PaneDialog;
 }
 
 /**

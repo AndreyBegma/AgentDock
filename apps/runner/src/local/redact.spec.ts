@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'bun:test';
+import { createHash } from 'node:crypto';
 import { HOOK_CONTENT_MAX_CHARS } from '@agentdock/shared/protocol';
 import { MASK } from '../pane/redact';
-import { redactText, toHookContent } from './redact';
+import { redactText, toHookContent, toToolInputPreview } from './redact';
 
 const GHP = `ghp_${'a'.repeat(36)}`;
 const KEY_BLOCK = [
@@ -83,5 +84,62 @@ describe('toHookContent', () => {
     const text = `${'x'.repeat(HOOK_CONTENT_MAX_CHARS - 10)}${GHP}`;
     const content = toHookContent(text);
     expect(content.text).not.toContain('ghp_aaaa');
+  });
+});
+
+describe('redactText — bare secret names', () => {
+  it('masks a bare TOKEN= or PASSWORD= assignment (C-114)', () => {
+    expect(redactText('echo TOKEN=hunter2 && PASSWORD=x ls')).toBe(
+      `echo TOKEN=${MASK} && PASSWORD=${MASK} ls`,
+    );
+  });
+});
+
+describe('toToolInputPreview (C-114)', () => {
+  const sha = (text: string) => createHash('sha256').update(text).digest('hex');
+
+  it('keeps a short input whole', () => {
+    expect(toToolInputPreview('{"command":"ls"}', 100)).toEqual({
+      input: '{"command":"ls"}',
+      truncated: false,
+      fullLength: 16,
+      sha256: sha('{"command":"ls"}'),
+    });
+  });
+
+  it('keeps head and tail of a long input within the budget', () => {
+    const raw = `HEAD${'x'.repeat(5_000)}TAIL`;
+    const preview = toToolInputPreview(raw, 200);
+    expect(preview.truncated).toBe(true);
+    expect(preview.fullLength).toBe(raw.length);
+    expect(preview.sha256).toBe(sha(raw));
+    expect(preview.input.length).toBeLessThanOrEqual(200);
+    expect(preview.input.startsWith('HEAD')).toBe(true);
+    expect(preview.input.endsWith('TAIL')).toBe(true);
+    const shown = preview.input.replace(
+      /\n… \[\d+ characters omitted\] …\n/,
+      '',
+    );
+    const omitted = Number(/\[(\d+) characters/.exec(preview.input)?.[1]);
+    expect(shown.length + omitted).toBe(raw.length);
+  });
+
+  it('redacts before it hashes and cuts: a secret in the tail is masked', () => {
+    const raw = `${'x'.repeat(3_000)} ${GHP}`;
+    const preview = toToolInputPreview(raw, 200);
+    expect(preview.input).not.toContain('ghp_');
+    expect(preview.input.endsWith(MASK)).toBe(true);
+    expect(preview.sha256).toBe(sha(redactText(raw)));
+    expect(preview.fullLength).toBe(redactText(raw).length);
+  });
+
+  it('never splits a surrogate pair at either cut', () => {
+    const raw = '😀'.repeat(1_000);
+    for (const max of [199, 200, 201, 202]) {
+      const { input } = toToolInputPreview(raw, max);
+      expect(input.length).toBeLessThanOrEqual(max);
+      expect(input).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
+      expect(input).not.toMatch(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/);
+    }
   });
 });

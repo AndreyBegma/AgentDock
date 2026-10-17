@@ -2,7 +2,7 @@ import {
   RUN_LOG_LINE_MAX_CHARS,
   type RunLogLine,
 } from '@agentdock/shared/protocol';
-import { redact } from '../../pane/redact';
+import { redactText } from '../../pane/redact';
 
 /** A tool call is summarised in at most this many characters. */
 const TOOL_SUMMARY_MAX = 200;
@@ -25,9 +25,9 @@ const parseLine = (line: string): Json | null => {
 const cut = (text: string, max: number): string =>
   text.length > max ? `${text.slice(0, max - 1)}…` : text;
 
-/** Secrets masked (the pane's redactor), then capped. */
+/** Secrets masked (the runner's one redactor, C-128), then capped. */
 const safe = (text: string, max = RUN_LOG_LINE_MAX_CHARS): string =>
-  cut(redact(text.split('\n')).join('\n'), max);
+  cut(redactText(text), max);
 
 const SUMMARY_KEYS = [
   'command',

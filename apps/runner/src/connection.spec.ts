@@ -15,6 +15,7 @@ import {
   RunnerConnection,
   type TerminalHandler,
 } from './connection';
+import { permissivePolicy, sameRealpath } from './policy/testing';
 import { Spool } from './spool';
 import { FakeClock } from './testing/fake-clock';
 import {
@@ -76,12 +77,14 @@ describe('RunnerConnection', () => {
     pane?: PaneHandler,
     terminal?: TerminalHandler,
     runLog?: RunLogHandler,
+    access?: Record<string, string>,
   ) => {
     const { log, lines } = memoryLogger();
     const spool = Spool.open({ dir, log });
     connection = new RunnerConnection({
       server: origin,
       token: TOKEN,
+      accessHeaders: access,
       spool,
       clock,
       backoff: new Backoff({ random: () => 0.5 }),
@@ -98,7 +101,10 @@ describe('RunnerConnection', () => {
         collectors: {},
       }),
       dispatch: createDispatcher({
+        policy: permissivePolicy,
+        realpath: sameRealpath,
         handlers: createHandlers({
+          policy: permissivePolicy,
           clock,
           runnerVersion: '0.1.0',
           host,
@@ -126,6 +132,29 @@ describe('RunnerConnection', () => {
     expect(hello.lastAckedSeq).toBe(0);
     expect(s.authorizations).toEqual([`Bearer ${TOKEN}`]);
     await until(() => connection.isLive);
+  });
+
+  it('sends the Cloudflare Access headers on the upgrade only when configured', async () => {
+    const s = server();
+    const { connection } = connect(
+      s.origin,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        'CF-Access-Client-Id': 'id.access',
+        'CF-Access-Client-Secret': 'sekret',
+      },
+    );
+    await until(() => connection.isLive);
+    expect(s.socketAccess).toEqual([{ id: 'id.access', secret: 'sekret' }]);
+    expect(s.authorizations).toEqual([`Bearer ${TOKEN}`]);
+
+    const plain = server();
+    const { connection: other } = connect(plain.origin);
+    await until(() => other.isLive);
+    expect(plain.socketAccess).toEqual([{ id: null, secret: null }]);
   });
 
   it('reconnects with backoff and resends exactly the events above welcome.ackedSeq', async () => {
@@ -333,6 +362,9 @@ describe('RunnerConnection', () => {
       close: (m) => {
         calls.push(`close ${m.id} ${m.reason}`);
       },
+      history: async (m) => {
+        calls.push(`history ${m.id}`);
+      },
       reset: () => {
         calls.push('reset');
       },
@@ -348,11 +380,14 @@ describe('RunnerConnection', () => {
     s.send({ type: 'terminal.data', id: 't1', b64: 'bHM=', session: 'x' });
     s.send({ type: 'terminal.data', id: 't1', b64: 'bHM=' });
     s.send({ type: 'terminal.resize', id: 't1', cols: 120, rows: 40 });
+    s.send({ type: 'terminal.history.request', id: 't1', session: 'cs-i7' });
+    s.send({ type: 'terminal.history.request', id: 't1' });
     s.send({ type: 'terminal.close', id: 't1', reason: 'client' });
-    await until(() => calls.length === 3);
+    await until(() => calls.length === 4);
     expect(calls).toEqual([
       'data t1 bHM=',
       'resize t1 120x40',
+      'history t1',
       'close t1 client',
     ]);
 

@@ -1,11 +1,9 @@
 import type { AuditResult } from '@agentdock/shared';
-import { roleAtLeast } from '@agentdock/shared/protocol';
 import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { type ApprovalsCaller, ApprovalsService } from '../approvals';
 import { AuditService } from '../audit';
 import { SYSTEM_ACTOR, userActor } from '../audit/audit.types';
 import { PrismaService } from '../database/prisma.service';
-import { ProjectAccessService } from '../projects';
 import {
   type ApprovalAction,
   type ApprovalRefusal,
@@ -24,18 +22,13 @@ import type {
   TelegramMessage,
   TelegramReplyMarkup,
 } from './telegram-client';
+import { TelegramGuard } from './telegram-guard.service';
+import type { TelegramAnswer } from './telegram-router';
 
 const KIND = 'pr.awaiting_approval';
 
 /** What the poller sends back for a press or a note. */
-export interface ApprovalAnswer {
-  chatId: number;
-  text: string;
-  replyMarkup?: TelegramReplyMarkup;
-  /** A press: the callback to answer, with `notice` as its short text. */
-  callbackQueryId?: string;
-  notice?: string;
-}
+export type ApprovalAnswer = TelegramAnswer;
 
 /** The buttons a `pr.awaiting_approval` message goes out with. */
 export interface ApprovalOffer {
@@ -84,7 +77,7 @@ export class TelegramApprovalService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly approvals: ApprovalsService,
-    private readonly access: ProjectAccessService,
+    private readonly guard: TelegramGuard,
     private readonly audit: AuditService,
   ) {}
 
@@ -100,24 +93,21 @@ export class TelegramApprovalService {
         where: { id: notificationId },
         select: {
           kind: true,
+          userId: true,
           projectId: true,
           eventId: true,
           lastEventId: true,
         },
       });
-      const eventId = notification?.lastEventId ?? notification?.eventId;
-      if (notification?.kind !== KIND || !notification.projectId || !eventId) {
-        return null;
-      }
-      const event = await this.prisma.event.findUnique({
-        where: { id: eventId },
-        select: { data: true },
-      });
-      const data = event?.data;
-      const pr =
-        typeof data === 'object' && data !== null && !Array.isArray(data)
-          ? positiveInt(data.pr)
-          : null;
+      if (notification?.kind !== KIND || !notification.projectId) return null;
+      // Buttons only for a recipient who could press them: operator or higher.
+      const member = await this.guard.member(
+        notification.userId,
+        notification.projectId,
+        'write',
+      );
+      if (!member.ok) return null;
+      const pr = await this.notificationPr(notification);
       if (pr === null) return null;
       const inspection = await this.approvals.inspect(
         {
@@ -146,6 +136,23 @@ export class TelegramApprovalService {
       );
       return null;
     }
+  }
+
+  /** The PR the notification's latest event is about; null when unknown. */
+  private async notificationPr(notification: {
+    eventId: bigint | null;
+    lastEventId: bigint | null;
+  }): Promise<number | null> {
+    const eventId = notification.lastEventId ?? notification.eventId;
+    if (!eventId) return null;
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+      select: { data: true },
+    });
+    const data = event?.data;
+    return typeof data === 'object' && data !== null && !Array.isArray(data)
+      ? positiveInt(data.pr)
+      : null;
   }
 
   /** A press on Approve or Request changes. */
@@ -261,17 +268,19 @@ export class TelegramApprovalService {
     chatId: number,
     target: ApprovalTarget,
   ): Promise<Authorized> {
-    const link = await this.prisma.telegramLink.findUnique({
-      where: { chatId: BigInt(chatId) },
-      select: { userId: true },
-    });
-    if (!link) {
+    const userId = await this.guard.linkedUserId(chatId);
+    if (!userId) {
       return { ok: false, reason: 'not_linked', userId: null, projectId: null };
     }
-    const userId = link.userId;
     const notification = await this.prisma.notification.findUnique({
       where: { id: target.notificationId },
-      select: { userId: true, kind: true, projectId: true },
+      select: {
+        userId: true,
+        kind: true,
+        projectId: true,
+        eventId: true,
+        lastEventId: true,
+      },
     });
     if (
       notification?.userId !== userId ||
@@ -280,31 +289,19 @@ export class TelegramApprovalService {
     ) {
       return { ok: false, reason: 'unknown_message', userId, projectId: null };
     }
+    // The press must be about the PR this notification was sent for.
+    if ((await this.notificationPr(notification)) !== target.pr) {
+      return { ok: false, reason: 'unknown_message', userId, projectId: null };
+    }
     const projectId = notification.projectId;
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, role: true, status: true },
-    });
-    if (user?.status !== 'active') {
-      return { ok: false, reason: 'inactive_user', userId, projectId };
-    }
-    const access = await this.access.resolve(user, projectId);
-    if (!access) return { ok: false, reason: 'not_member', userId, projectId };
-    if (!roleAtLeast(access.role, 'operator')) {
-      return {
-        ok: false,
-        reason: 'role',
-        userId,
-        projectId,
-        role: access.role,
-      };
-    }
+    const check = await this.guard.member(userId, projectId, 'write');
+    if (!check.ok) return { ...check, userId, projectId };
     return {
       ok: true,
       userId,
       caller: {
         projectId,
-        role: access.role,
+        role: check.role,
         ctx: { actor: userActor(userId) },
       },
     };

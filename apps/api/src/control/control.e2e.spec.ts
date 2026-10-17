@@ -12,6 +12,7 @@ import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { AppModule } from '../app.module';
+import { RUNNER_READ_LIMIT } from '../auth/runner-read-throttle';
 import { configureApp } from '../configure-app';
 import { PrismaService } from '../database/prisma.service';
 import { seedProject } from '../fleet/testing/fleet-e2e';
@@ -32,7 +33,11 @@ import {
   resetDatabase,
   type Session,
 } from '../test/e2e-app';
-import { CONTROL_OPTIONS, type ControlOptions } from './control-options';
+import {
+  CONTROL_OPTIONS,
+  type ControlOptions,
+  defaultControlOptions,
+} from './control-options';
 
 const ROOT_A = '/srv/dev/widget';
 const ROOT_B = '/srv/dev/gadget';
@@ -51,6 +56,7 @@ const options: ControlOptions = {
     'slot.stop': TIMEOUT_MS,
     'slot.message': TIMEOUT_MS,
   },
+  statusCacheMs: defaultControlOptions.statusCacheMs,
 };
 
 type Answer =
@@ -619,6 +625,63 @@ describe('orchestrator and slot control (e2e)', () => {
         startedAt: STARTED_AT,
       });
       expect(await runs()).toEqual([]);
+    });
+
+    const statusCommands = () =>
+      runner.control().filter((r) => r.name === 'orchestrator.status');
+
+    it('answers 100 reads within 2 s with one runner command (C-119)', async () => {
+      const startedAt = Date.now();
+      const path = `/projects/${a}/orchestrator/status`;
+      const concurrent = await Promise.all(
+        Array.from({ length: 50 }, () => viewerOfA.get(path)),
+      );
+      const sequential = [];
+      for (let i = 0; i < 50; i += 1)
+        sequential.push(await viewerOfA.get(path));
+      expect(Date.now() - startedAt).toBeLessThan(2_000);
+      for (const response of [...concurrent, ...sequential]) {
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({ state: 'running' });
+      }
+      expect(statusCommands()).toHaveLength(1);
+    });
+
+    it('asks the runner again once a command changed the orchestrator', async () => {
+      const path = `/projects/${a}/orchestrator/status`;
+      expect((await viewerOfA.get(path)).status).toBe(200);
+      expect((await viewerOfA.get(path)).status).toBe(200);
+      expect(statusCommands()).toHaveLength(1);
+      runner.answer = (command) =>
+        command.name === 'orchestrator.status'
+          ? {
+              ok: true,
+              output: { present: false, state: 'absent' },
+            }
+          : defaultAnswer(command);
+      const stop = await operatorOfA.send(
+        'post',
+        `/projects/${a}/orchestrator/stop`,
+      );
+      expect(stop.status).toBe(201);
+      const after = await viewerOfA.get(path);
+      expect(after.body).toMatchObject({ present: false, state: 'absent' });
+      expect(statusCommands()).toHaveLength(2);
+    });
+
+    it('throttles one user past the limit with 429', async () => {
+      const path = `/projects/${a}/orchestrator/status`;
+      const codes: number[] = [];
+      for (let i = 0; i < RUNNER_READ_LIMIT + 1; i += 1) {
+        codes.push((await viewerOfA.get(path)).status);
+      }
+      expect(codes.slice(0, RUNNER_READ_LIMIT).every((c) => c === 200)).toBe(
+        true,
+      );
+      expect(codes[RUNNER_READ_LIMIT]).toBe(429);
+      // Another user keeps their own budget.
+      expect((await operatorOfA.get(path)).status).toBe(200);
+      expect(statusCommands()).toHaveLength(1);
     });
   });
 

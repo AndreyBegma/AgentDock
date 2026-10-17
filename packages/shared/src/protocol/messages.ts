@@ -1,4 +1,11 @@
 import { z } from 'zod';
+import {
+  boundedName,
+  boundedText,
+  LIST_MAX,
+  TEXT_MESSAGE_MAX,
+  TEXT_NAME_MAX,
+} from './bounded';
 import { capabilitiesSchema, profileAgentdockSchema } from './capabilities';
 import { commandErrorCodeSchema } from './commands';
 import { eventSchema, seqCursorSchema } from './envelope';
@@ -14,6 +21,8 @@ import { watchedProjectSchema } from './projects';
 import {
   terminalCloseMessageSchema,
   terminalDataMessageSchema,
+  terminalHistoryMessageSchema,
+  terminalHistoryRequestMessageSchema,
   terminalResizeMessageSchema,
 } from './terminal';
 
@@ -23,7 +32,7 @@ export const MAX_EVENTS_PER_BATCH = 500;
 export const MAX_EVENTS_BATCH_BYTES = 256 * 1024;
 
 /** Every message may carry an `id`; `command` and its replies require one. */
-const messageId = z.string().min(1);
+const messageId = boundedName(TEXT_NAME_MAX);
 const base = { id: messageId.optional() };
 
 // Runner → server
@@ -31,11 +40,11 @@ const base = { id: messageId.optional() };
 export const helloMessageSchema = z.object({
   ...base,
   type: z.literal('hello'),
-  runnerVersion: z.string().min(1),
+  runnerVersion: boundedName(TEXT_NAME_MAX),
   protocolVersion: z.number().int().positive(),
-  hostname: z.string().min(1),
-  os: z.string().min(1),
-  arch: z.string().min(1),
+  hostname: boundedName(TEXT_NAME_MAX),
+  os: boundedName(TEXT_NAME_MAX),
+  arch: boundedName(TEXT_NAME_MAX),
   capabilities: capabilitiesSchema,
   /** Highest seq the runner has seen acked, `0` when none. */
   lastAckedSeq: seqCursorSchema,
@@ -48,12 +57,24 @@ export const heartbeatMessageSchema = z.object({
   /** 1, 5 and 15 minute load averages. */
   load: z.tuple([z.number(), z.number(), z.number()]),
   tmuxSessions: z.number().int().nonnegative(),
-  collectors: z.record(
-    z.string().min(1),
-    z.object({ ok: z.boolean(), error: z.string().optional() }),
-  ),
+  collectors: z
+    .record(
+      boundedName(TEXT_NAME_MAX),
+      z.object({
+        ok: z.boolean(),
+        error: boundedText(TEXT_MESSAGE_MAX).optional(),
+      }),
+    )
+    .refine((c) => Object.keys(c).length <= LIST_MAX, {
+      message: `at most ${LIST_MAX} collectors`,
+    }),
   /** #348 D4: each Claude profile's agentdock state, read this heartbeat. */
-  profiles: z.record(z.string().min(1), profileAgentdockSchema).optional(),
+  profiles: z
+    .record(boundedName(TEXT_NAME_MAX), profileAgentdockSchema)
+    .refine((p) => Object.keys(p).length <= LIST_MAX, {
+      message: `at most ${LIST_MAX} profiles`,
+    })
+    .optional(),
 });
 
 export const eventsMessageSchema = z.object({
@@ -71,7 +92,7 @@ export const commandResultMessageSchema = z
     error: z
       .object({
         code: commandErrorCodeSchema,
-        message: z.string().optional(),
+        message: boundedText(TEXT_MESSAGE_MAX).optional(),
       })
       .optional(),
   })
@@ -103,7 +124,7 @@ export type RunnerServerConfig = z.infer<typeof runnerServerConfigSchema>;
 export const welcomeMessageSchema = z.object({
   ...base,
   type: z.literal('welcome'),
-  runnerId: z.string().min(1),
+  runnerId: boundedName(TEXT_NAME_MAX),
   config: runnerServerConfigSchema,
   /** Highest contiguous seq persisted; the runner resends everything above it. */
   ackedSeq: seqCursorSchema,
@@ -154,6 +175,7 @@ const runnerMessages = [
   subscribeErrorMessageSchema,
   runLogMessageSchema,
   localRequestMessageSchema,
+  terminalHistoryMessageSchema,
   ...bothWayMessages,
 ] as const;
 
@@ -165,6 +187,7 @@ const serverOnlyMessages = [
   anySubscribeMessageSchema,
   unsubscribeMessageSchema,
   terminalResizeMessageSchema,
+  terminalHistoryRequestMessageSchema,
   localResponseMessageSchema,
 ] as const;
 

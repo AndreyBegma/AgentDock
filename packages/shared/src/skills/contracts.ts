@@ -108,6 +108,10 @@ export interface SkillRunRequest {
   profileKey?: string;
   /** A model alias or id (`opus`, `sonnet`, `haiku`, `fable`, `claude-opus-5-5`). */
   model: string;
+  /**
+   * The project's orchestrator mode when absent — for a person's run only. A
+   * webhook's run always names its trigger's own mode (C-132, D-13).
+   */
   permissionMode?: OrchestratorPermissionMode;
   output: SkillRunOutput;
   timeoutSec?: number;
@@ -197,6 +201,8 @@ export const SKILLS_ERROR = {
   commandUnavailable: 'command_unavailable',
   /** The runner answered with an error not mapped to its own code. */
   commandFailed: 'command_failed',
+  /** 403 (ADR-0047): the runner's local security policy refused it (a profile install). */
+  policyRefused: 'policy_refused',
   /** The command was sent and no result came back in time. */
   runnerTimeout: 'runner_timeout',
 } as const;

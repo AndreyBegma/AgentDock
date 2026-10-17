@@ -1,5 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { issueFromBranch } from '@agentdock/shared';
+import {
+  ACTION_REQUEST_ISSUE_TITLE_MAX,
+  ACTION_REQUEST_SUMMARY_MAX,
+  issueFromBranch,
+} from '@agentdock/shared';
 import {
   API_EVENT_SOURCE,
   type LocalMethodArgs,
@@ -17,6 +21,7 @@ import {
 } from '../board/board-terminal.service';
 import { type BudgetRemaining, BudgetsService } from '../budgets';
 import { PrismaService } from '../database/prisma.service';
+import type { CreateIssueDto } from '../queue/dto';
 import { QueueService } from '../queue/queue.service';
 import { RunnerSettingsService } from '../runners/runner-settings.service';
 import { recordServerEvent } from '../server-events/server-events';
@@ -401,16 +406,79 @@ export class LocalHandlers {
     args: LocalMethodArgs<'issue.create'>,
     call: LocalCall,
   ): Promise<LocalMethodResult<'issue.create'>> {
-    const created = await this.queue.createIssue(
-      { projectId: projectOf(call).id, role: call.role, ctx: call.ctx },
+    return this.fileIssue(
+      call,
       {
         title: args.title,
         body: args.body,
         labels: args.labels ?? [],
         queue: args.queue,
       },
+      await this.sessionRowId(call),
+      'The session asks to queue this issue for the fleet.',
     );
-    return { number: created.number, url: created.url, queued: created.queued };
+  }
+
+  /**
+   * C-112: a session never queues an issue itself. Asked to, it is filed
+   * without the ready label, checked as a queued one, with an `issue_queue`
+   * request a person approves — text the agent read cannot reach the fleet
+   * on its own. The audit row of the create names whom the runner acted for.
+   */
+  private async fileIssue(
+    call: LocalCall,
+    dto: CreateIssueDto,
+    sessionId: string | null,
+    summary: string,
+  ): Promise<LocalMethodResult<'issue.create'>> {
+    const project = projectOf(call);
+    const created = await this.queue.createIssue(
+      {
+        projectId: project.id,
+        role: call.role,
+        ctx: call.ctx,
+        meta: {
+          ...call.meta,
+          onBehalfOf: {
+            userId: call.user.id,
+            runnerId: call.runnerId,
+            sessionId: sessionId ?? call.session?.id ?? null,
+          },
+        },
+      },
+      dto,
+      { holdForApproval: true },
+    );
+    const result = {
+      number: created.number,
+      url: created.url,
+      queued: created.queued,
+    };
+    if (!dto.queue) return result;
+    const request = await this.requests.create(
+      {
+        projectId: project.id,
+        runnerId: call.runnerId,
+        sessionId,
+        requestedById: call.user.id,
+        requesterRole: call.role,
+        kind: 'issue_queue',
+        args: {
+          issue: created.number,
+          title: dto.title.slice(0, ACTION_REQUEST_ISSUE_TITLE_MAX),
+          url: created.url,
+          session: sessionId,
+        },
+        summary,
+      },
+      { ctx: call.ctx, meta: call.meta },
+    );
+    return {
+      ...result,
+      queued: false,
+      actionRequestId: request.id,
+      waiting: `Issue #${created.number} is not queued yet: it waits for a person to approve it in AgentDock (Approvals) or Telegram. Do not queue it another way.`,
+    };
   }
 
   private async note(
@@ -425,27 +493,35 @@ export class LocalHandlers {
     return { recorded: true };
   }
 
-  /** D19: an issue queued for the fleet, with the fixed footer, and `manual.handoff`. */
+  /**
+   * D19: an issue for the fleet, with the fixed footer, and `manual.handoff`.
+   * C-112: it is queued only once a person approves its `issue_queue` request.
+   */
   private async handoff(
     args: LocalMethodArgs<'handoff.create'>,
     call: LocalCall,
   ): Promise<LocalMethodResult<'handoff.create'>> {
     const sessionId = await this.sessionRowId(call);
-    const created = await this.queue.createIssue(
-      { projectId: projectOf(call).id, role: call.role, ctx: call.ctx },
+    const filed = await this.fileIssue(
+      call,
       {
         title: args.title,
         body: `${args.body}\n${handoffFooter(args.branch, sessionId ?? call.session?.id ?? null)}`,
         labels: [],
         queue: true,
       },
+      sessionId,
+      `The session hands work on branch ${args.branch} off to the fleet.`.slice(
+        0,
+        ACTION_REQUEST_SUMMARY_MAX,
+      ),
     );
     await this.serverEvent(call, MANUAL_HANDOFF_EVENT, {
-      issue: created.number,
+      issue: filed.number,
       branch: args.branch,
       ...(sessionId ? { sessionId } : {}),
     });
-    return { number: created.number, url: created.url, queued: created.queued };
+    return filed;
   }
 
   private async actionRequest(
@@ -458,6 +534,7 @@ export class LocalHandlers {
         runnerId: call.runnerId,
         sessionId: await this.sessionRowId(call),
         requestedById: call.user.id,
+        requesterRole: call.role,
         kind: args.kind,
         args: args.args,
         summary: args.summary,

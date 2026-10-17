@@ -1,4 +1,4 @@
-import { readFileSync, statSync } from 'node:fs';
+import { lstatSync } from 'node:fs';
 import { join } from 'node:path';
 import { checkpointFromHeading } from '@agentdock/shared';
 import {
@@ -7,6 +7,11 @@ import {
 } from '@agentdock/shared/protocol';
 import type { FleetEmitter } from '../../fleet/project';
 import type { SlotBook } from '../../fleet/slots';
+import {
+  AGENT_FILE_MAX_BYTES,
+  readRegularFileInside,
+} from '../../fs/safe-read';
+import { redactText } from '../../pane/redact';
 import { REPLY_FILE } from '../tmux/sessions';
 
 export interface ReplySection {
@@ -49,17 +54,21 @@ export const parseReply = (text: string): ReplySection[] => {
   }));
 };
 
-/** The `slot.checkpoint` data of one section at its position. */
+/** The `slot.checkpoint` data of one section at its position, redacted (C-128). */
 export const checkpointData = (
   section: ReplySection,
   position: number,
 ): SlotCheckpointData => {
-  const heading = truncateBytes(section.heading, HEADING_MAX);
-  const { checkpoint, prUrl } = checkpointFromHeading(section.heading);
+  const redacted = redactText(section.heading);
+  const heading = truncateBytes(redacted, HEADING_MAX);
+  const { checkpoint, prUrl } = checkpointFromHeading(redacted);
   return {
     checkpoint,
     heading,
-    summary: truncateBytes(section.body, CHECKPOINT_SUMMARY_MAX_BYTES),
+    summary: truncateBytes(
+      redactText(section.body),
+      CHECKPOINT_SUMMARY_MAX_BYTES,
+    ),
     position,
     ...(prUrl && URL.canParse(prUrl) ? { prUrl } : {}),
   };
@@ -96,19 +105,19 @@ export class ReplyWatcher {
       const path = join(worktree.path, REPLY_FILE);
       let stamp: string;
       try {
-        const stat = statSync(path);
+        const stat = lstatSync(path);
         stamp = `${worktree.path}:${stat.mtimeMs}:${stat.size}`;
       } catch {
         continue;
       }
       if (this.stamps.get(slot) === stamp) continue;
       this.stamps.set(slot, stamp);
-      let text: string;
-      try {
-        text = readFileSync(path, 'utf8');
-      } catch {
-        continue;
-      }
+      const text = readRegularFileInside(
+        worktree.path,
+        REPLY_FILE,
+        AGENT_FILE_MAX_BYTES,
+      );
+      if (text === null) continue;
       // A file that shrank was started over (a new run of the slot): resend all.
       const previous =
         text.length < (this.lengths.get(slot) ?? 0)

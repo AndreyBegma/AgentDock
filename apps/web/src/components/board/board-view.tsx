@@ -8,20 +8,15 @@ import type {
 import { Board, type BoardColumn } from '@andrewbehma/glass-ui/board';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Checkbox } from '@andrewbehma/glass-ui/checkbox';
-import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
-import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { MenuItem, MenuSeparator } from '@andrewbehma/glass-ui/menu';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { useRouter } from 'next/navigation';
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
-import { moveCard } from '../../lib/board/actions';
 import {
   applyDrop,
   clampDropIndex,
-  type DropDecision,
   type DropMove,
   decideDrop,
-  moveRequest,
 } from '../../lib/board/board-state';
 import {
   type BoardFilter,
@@ -41,7 +36,6 @@ import {
   canRun,
   canStop,
   columnsOf,
-  describeBoardError,
   isSuggestion,
 } from '../../lib/board/format';
 import { boardStackPageHref } from '../../lib/board/href';
@@ -68,12 +62,13 @@ import { planHref } from '../../lib/planner/href';
 import { boardColumnWidth, usePhone, visibleColumns } from './board-layout';
 import { BulkActionBar } from './bulk-action-bar';
 import { CardFace } from './card-face';
+import { GroupStackDialog } from './group-stack-dialog';
+import { MovePicker } from './move-picker';
 import { PlanTaskFace } from './plan-task-face';
 import { StackFace } from './stack-face';
 import { useBulkActions } from './use-bulk-actions';
 import type { CardActions } from './use-card-actions';
-
-type Asking = Extract<DropDecision, { kind: 'confirm-stop' | 'offer-run' }>;
+import { useCardMove } from './use-card-move';
 
 /** C-29: Completed starts folded to a strip; the work in flight gets the width. */
 const FOLDED_AT_START = ['completed'];
@@ -128,15 +123,30 @@ export function BoardColumns({
   const router = useRouter();
   // The drop shown before the server answers.
   const [optimistic, setOptimistic] = useState<BoardView>();
-  const [asking, setAsking] = useState<Asking>();
-  const [busy, setBusy] = useState(false);
+  const [moving, setMoving] = useState<BoardCardView>();
   const [collapsed, setCollapsed] = useState<string[]>(FOLDED_AT_START);
   const shown = optimistic ?? view;
+
+  const move = useCardMove({
+    projectId,
+    runnerName,
+    canOperate,
+    actions,
+    onStart: (m) => setOptimistic(applyDrop(view, m)),
+    // Server truth either way: on a refusal this is the rollback.
+    onSettled: () => {
+      setOptimistic(undefined);
+      onReload();
+    },
+  });
+  const busy = move.busy;
 
   const phone = usePhone();
 
   // #452: cards selected for a bulk action, across columns.
   const [selection, setSelection] = useState<CardSelection>(NO_SELECTION);
+  // #588: the Group into stack dialog, over the selection.
+  const [grouping, setGrouping] = useState(false);
   const anchor = useRef<{ number: number; column: string } | undefined>(
     undefined,
   );
@@ -287,34 +297,11 @@ export function BoardColumns({
     };
   });
 
+  const columnCounts = Object.fromEntries(
+    shown.columns.map((c) => [c.column, c.cards.length]),
+  );
   const columns = visibleColumns(allColumns, phone);
   const folded = columns.filter((c) => collapsed.includes(c.id)).length;
-
-  /** Resolves `true` when the move landed. */
-  const send = async (
-    move: DropMove,
-    number: number,
-    options: { stopWorker?: boolean } = {},
-  ): Promise<boolean> => {
-    setOptimistic(applyDrop(view, move));
-    setBusy(true);
-    try {
-      await moveCard(
-        projectId,
-        number,
-        moveRequest(move, options.stopWorker === true),
-      );
-      return true;
-    } catch (err) {
-      toast.error(describeBoardError(err, runnerName));
-      return false;
-    } finally {
-      // Server truth either way: on a refusal this is the rollback.
-      setOptimistic(undefined);
-      setBusy(false);
-      onReload();
-    }
-  };
 
   /**
    * Under a filter — or beside a folded stack (#480) — the board reports an
@@ -340,38 +327,7 @@ export function BoardColumns({
       toast.error('Only operators can move cards.');
       return;
     }
-    const move = clampDropIndex(view, withFullIndex(dropped));
-    const decision = decideDrop(view, move);
-    switch (decision.kind) {
-      case 'ignore':
-        return;
-      case 'refused':
-        toast.error(decision.text);
-        return;
-      case 'confirm-stop':
-      case 'offer-run':
-        setAsking(decision);
-        return;
-      case 'move':
-        void send(move, decision.card.number);
-    }
-  };
-
-  const answerRun = (run: boolean) => {
-    if (asking?.kind !== 'offer-run') return;
-    const { move, card } = asking;
-    setAsking(undefined);
-    // Run goes through the card actions, so an open dependency asks first (#337 D8).
-    void send(move, card.number).then((moved) => {
-      if (moved && run) void actions.run(card);
-    });
-  };
-
-  const confirmStop = () => {
-    if (asking?.kind !== 'confirm-stop') return;
-    const { move, card } = asking;
-    setAsking(undefined);
-    void send(move, card.number, { stopWorker: true });
+    move.decide(decideDrop(view, clampDropIndex(view, withFullIndex(dropped))));
   };
 
   return (
@@ -512,6 +468,9 @@ export function BoardColumns({
               <>
                 <MenuSeparator />
                 <MenuItem onSelect={() => onOpen(card)}>Open</MenuItem>
+                {canOperate ? (
+                  <MenuItem onSelect={() => setMoving(card)}>Move…</MenuItem>
+                ) : null}
                 {canOperate && (canRun(card) || canRetry(card)) ? (
                   <MenuItem
                     // #480: the stack's design holds Run; the label says why.
@@ -581,48 +540,41 @@ export function BoardColumns({
           busy={bulk.busy || busy}
           onClear={clearSelection}
           onAction={(action) => bulk.run(action, selectedCards)}
+          onGroup={() => setGrouping(true)}
         />
       ) : null}
-
-      <DialogRoot
-        open={asking?.kind === 'offer-run'}
-        onOpenChange={(open) => {
-          if (!open) setAsking(undefined);
+      <GroupStackDialog
+        projectId={projectId}
+        cards={selectedCards}
+        open={grouping}
+        onOpenChange={setGrouping}
+        onGrouped={(stack) => {
+          setGrouping(false);
+          clearSelection();
+          onReload();
+          toast.success(`Grouped ${stack.total} cards into ${stack.label}`, {
+            description: `${stack.title} · one stage, ${stack.design ? 'shared design waits for approval' : 'no shared design'}. Each card still runs on its own.`,
+            action: {
+              label: 'Open stack',
+              onClick: () =>
+                router.push(boardStackPageHref(projectId, stack.number)),
+            },
+          });
         }}
-      >
-        <DialogContent
-          title="Run the worker?"
-          description={`${asking?.card.label ?? 'The card'} is moving to In progress. A drag never starts a worker by itself.`}
-          footer={
-            <>
-              <Button variant="glass" onClick={() => setAsking(undefined)}>
-                Cancel
-              </Button>
-              <Button variant="glass" onClick={() => answerRun(false)}>
-                Just move
-              </Button>
-              <Button onClick={() => answerRun(true)}>Run</Button>
-            </>
-          }
-        >
-          <p className="text-sm text-ink-2">
-            Run starts a dedicated Claude Code worker in its own worktree. “Just
-            move” only changes the column.
-          </p>
-        </DialogContent>
-      </DialogRoot>
-
-      <ConfirmDialog
-        open={asking?.kind === 'confirm-stop'}
-        onOpenChange={(open) => {
-          if (!open) setAsking(undefined);
-        }}
-        title={`Stop the worker of ${asking?.card.label ?? 'the card'}?`}
-        consequence="Moving the card out of In progress kills its tmux session. What it committed stays in the worktree."
-        verb="Stop worker and move"
-        tone="danger"
-        onConfirm={confirmStop}
       />
+
+      {move.dialogs}
+      {moving ? (
+        <MovePicker
+          card={moving}
+          counts={columnCounts}
+          open
+          onOpenChange={(open) => {
+            if (!open) setMoving(undefined);
+          }}
+          onPick={(column) => move.moveTo(moving, column)}
+        />
+      ) : null}
     </>
   );
 }

@@ -8,11 +8,12 @@ import { HttpException } from '@nestjs/common';
 
 /**
  * A refusal's details beside its message: `reason`, `no_profile`'s source and
- * key (#272 D2), and `dependency_open`'s open dependencies (#337 D8).
+ * key (#272 D2), `dependency_open`'s open dependencies (#337 D8), and
+ * `stack_refused`'s cards that cannot join (#588).
  */
 type BoardErrorExtra = Pick<
   BoardErrorBody,
-  'reason' | 'source' | 'profileKey' | 'dependencies'
+  'reason' | 'source' | 'profileKey' | 'dependencies' | 'cards'
 >;
 
 /**

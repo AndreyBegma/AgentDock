@@ -7,15 +7,17 @@ import {
   cardLabel,
   PLANNER_ERROR,
   type PlanQuestion,
-  stackLabel,
 } from '@agentdock/shared';
 import { Injectable } from '@nestjs/common';
-import type { BoardCard, Plan, PlanTask } from '@prisma/client';
-import { AttachmentsService } from '../attachments/attachments.service';
+import type { Plan, PlanTask } from '@prisma/client';
 import { BoardPlanCards } from '../board/board-plan-cards';
-import { BoardStacks } from '../board/board-stacks';
 import { PrismaService } from '../database/prisma.service';
 import type { PlanActor } from './plan.service';
+import {
+  isPlainTitle,
+  PlanCandidatesService,
+  toCandidateView,
+} from './plan-candidates.service';
 import { intakeSplit } from './plan-intake';
 import { questionsOf } from './plan-mapper';
 import { findCycle } from './plan-send';
@@ -24,17 +26,6 @@ import { plannerError } from './planner-error';
 
 const notReady = (message: string) =>
   plannerError(409, PLANNER_ERROR.notSendable, message);
-
-const NON_ASCII_LETTER = /[^\p{ASCII}]/u;
-
-/**
- * #409: a title the person edited in a split stays English (ADR-0027 §6) —
- * it is stored as typed, with no normalization. A letter outside ASCII
- * (Cyrillic, CJK, accents) is another language; a short English title is
- * not held to the function-word share `isReliablyEnglish` applies to prose.
- */
-export const isPlainTitle = (title: string): boolean =>
-  ![...title].some((ch) => /\p{L}/u.test(ch) && NON_ASCII_LETTER.test(ch));
 
 const openQuestion = (q: PlanQuestion): string =>
   `- ${q.title}: ${q.question} Default taken: ${q.recommendation.text}`;
@@ -82,8 +73,7 @@ export class PlanCardsService {
     private readonly prisma: PrismaService,
     private readonly store: PlanStore,
     private readonly planCards: BoardPlanCards,
-    private readonly stacks: BoardStacks,
-    private readonly attachments: AttachmentsService,
+    private readonly candidates: PlanCandidatesService,
   ) {}
 
   async create(plan: Plan, actor: PlanActor): Promise<CreatePlanCardsResponse> {
@@ -92,6 +82,14 @@ export class PlanCardsService {
         409,
         PLANNER_ERROR.wrongMode,
         'A card intake makes its card itself',
+      );
+    }
+    // #590: a discussion's cards come through New work only.
+    if (plan.mode === 'discuss') {
+      throw plannerError(
+        409,
+        PLANNER_ERROR.wrongMode,
+        'A discussion makes no cards; Make a card opens New work',
       );
     }
     if (plan.status === 'done') throw this.cardsExist();
@@ -189,18 +187,15 @@ export class PlanCardsService {
 
   /**
    * #409: Confirm a split — the cards the person kept, in their order, with
-   * the title and kind they left. All land in Todo at once, with no
-   * dependency links, the plan as their origin and the model's body; the
-   * intake is `done` after it. The plan's attachments go to the first card.
-   * #480 (ADR-0044): with `stack`, the same cards are made in stage order as
-   * one stack — its stages, a dependency from every card of a stage on every
-   * card of the stage before, and its design when asked — in the same
-   * transaction, whichever the intake proposed.
+   * the title and kind they left and the model's body. #480 (ADR-0044): with
+   * `stack`, in stage order, the stack's title, body, design switch and
+   * stages beside them, whichever the intake proposed. #592 (ADR-0058): they
+   * become candidates, not cards — the person accepts or rejects each in
+   * Drafts, and the intake is `reviewing` until none is pending.
    */
   async confirmSplit(
     plan: Plan,
     request: ConfirmSplitRequest,
-    actor: PlanActor,
   ): Promise<ConfirmSplitResponse> {
     if (plan.mode !== 'card') {
       throw plannerError(
@@ -240,6 +235,11 @@ export class PlanCardsService {
           ),
         )
       : request.cards;
+    const stageOf = new Map(
+      (stack?.stages ?? []).flatMap((stage, i) =>
+        stage.cards.map((index) => [index, i] as const),
+      ),
+    );
 
     const made = await this.prisma.$transaction(async (tx) => {
       // Serializes with the intake's turns and a second Confirm.
@@ -247,6 +247,14 @@ export class PlanCardsService {
       const fresh = await tx.plan.findUniqueOrThrow({ where: { id: plan.id } });
       if (fresh.status === 'done') throw this.cardsExist();
       this.store.assertOpen(fresh);
+      if (fresh.status !== 'clarifying') {
+        // #592: confirmed already — its candidates wait in Drafts.
+        throw plannerError(
+          409,
+          PLANNER_ERROR.splitStale,
+          'This split was confirmed already',
+        );
+      }
       const active = await tx.planTurn.count({
         where: { planId: plan.id, phase: { in: ['queued', 'running'] } },
       });
@@ -278,74 +286,25 @@ export class PlanCardsService {
           title: kept.title.trim(),
           kind: kept.kind,
           body: proposed.body,
+          stage: stageOf.get(kept.index),
         };
       });
-      const cards = await this.planCards.create(tx, {
-        projectId: plan.projectId,
-        planId: plan.id,
-        authorId: plan.authorId,
-        drafts,
-      });
-      const byIndex = new Map(order.map((kept, i) => [kept.index, cards[i]]));
-      const made = stack
-        ? await this.stacks.create(tx, {
-            projectId: plan.projectId,
-            planId: plan.id,
-            authorId: plan.authorId,
-            title: stack.title.trim(),
-            body: stack.body.trim(),
-            design: stack.design,
-            stages: stack.stages.map((stage) => ({
-              title: stage.title.trim(),
-              cardIds: stage.cards.map(
-                (index) => (byIndex.get(index) as BoardCard).id,
-              ),
-            })),
-          })
-        : null;
-      const attachmentIds = await this.attachments.claimPlanOntoCard(
+      return this.candidates.write(
         tx,
         plan.id,
-        cards[0].id,
+        drafts,
+        stack
+          ? {
+              title: stack.title.trim(),
+              body: stack.body.trim(),
+              design: stack.design,
+              stages: stack.stages.map((stage) => stage.title.trim()),
+            }
+          : null,
       );
-      await tx.plan.update({
-        where: { id: plan.id },
-        data: {
-          status: 'done',
-          title: made ? made.title : drafts[0].title,
-        },
-      });
-      return { cards, attachmentIds, stack: made };
     });
-    await this.planCards.announce(made.cards, actor);
-    if (made.stack && stack) {
-      await this.stacks.announce(
-        made.stack,
-        made.cards,
-        stack.stages.length,
-        stack.design,
-        actor,
-      );
-    }
-    await this.attachments.recordClaim(
-      plan.projectId,
-      { cardId: made.cards[0].id },
-      made.attachmentIds,
-      actor,
-    );
     this.store.publish(plan.projectId, plan.id);
-    return {
-      cards: made.cards.map((card) => ({
-        number: card.number,
-        label: cardLabel(card.number),
-      })),
-      stack: made.stack
-        ? {
-            number: made.stack.number,
-            label: stackLabel(made.stack.number),
-          }
-        : null,
-    };
+    return { candidates: made.map(toCandidateView) };
   }
 
   /**

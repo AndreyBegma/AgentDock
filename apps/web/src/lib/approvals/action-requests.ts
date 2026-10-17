@@ -3,6 +3,11 @@ import {
   type ActionRequestStatus,
   type ActionRequestSummary,
   actionRequestArgsSchemas,
+  boundPrOf,
+  issueQueueArgsOf,
+  type PrApproveBoundArgs,
+  prDiffUrl,
+  shortHeadSha,
 } from '@agentdock/shared';
 import { ApiError, describeError } from '../api';
 
@@ -22,6 +27,7 @@ export const KIND_LABEL: Record<ActionRequestKind, string> = {
   orchestrator_start: 'Start the orchestrator',
   orchestrator_stop: 'Stop the orchestrator',
   pr_approve: 'Approve a pull request',
+  issue_queue: 'Queue an issue for the fleet',
 };
 
 export const STATUS_LABEL: Record<ActionRequestStatus, string> = {
@@ -44,14 +50,38 @@ export const STATUS_TONE: Record<ActionRequestStatus, Tone> = {
   failed: 'danger',
 };
 
-/** A `tool_use` request's tool and redacted input; null for any other kind or bad args. */
+/**
+ * A `tool_use` request's tool and redacted input; null for any other kind or bad
+ * args. `truncated` is the runner's flag that the input is a head+tail preview
+ * (D-08); it is read apart from the strict schema so an older API still parses.
+ */
 export const toolUseArgs = (
   request: Pick<ActionRequestSummary, 'kind' | 'args'>,
-): { toolName: string; input?: string } | null => {
+): { toolName: string; input?: string; truncated: boolean } | null => {
   if (request.kind !== 'tool_use') return null;
-  const parsed = actionRequestArgsSchemas.tool_use.safeParse(request.args);
-  return parsed.success ? parsed.data : null;
+  const { truncated, ...rest } = request.args;
+  const parsed = actionRequestArgsSchemas.tool_use.safeParse(rest);
+  return parsed.success
+    ? { ...parsed.data, truncated: truncated === true }
+    : null;
 };
+
+/**
+ * A `pr_approve` request's PR as the API read it at creation: the head an
+ * approval binds to (C-110), shortened, and its diff. Null for any other kind
+ * and for a request stored without a head.
+ */
+export const prApproveArgs = (
+  request: Pick<ActionRequestSummary, 'kind' | 'args'>,
+): (PrApproveBoundArgs & { shortHead: string; diffUrl: string }) | null => {
+  const pr = boundPrOf(request);
+  return pr
+    ? { ...pr, shortHead: shortHeadSha(pr.headSha), diffUrl: prDiffUrl(pr) }
+    : null;
+};
+
+/** An `issue_queue` request's issue (C-112); null for any other kind or bad args. */
+export const issueQueueArgs = issueQueueArgsOf;
 
 /** What the request asks for, as a short title. */
 export const requestTitle = (request: ActionRequestSummary): string => {
@@ -61,10 +91,16 @@ export const requestTitle = (request: ActionRequestSummary): string => {
       return toolName ? `Use ${toolName}` : KIND_LABEL.tool_use;
     }
     case 'pr_approve': {
-      const pr = actionRequestArgsSchemas.pr_approve.safeParse(request.args);
-      return pr.success
-        ? `Approve pull request #${pr.data.pr}`
+      const pr = request.args.pr;
+      return typeof pr === 'number'
+        ? `Approve pull request #${pr}`
         : KIND_LABEL.pr_approve;
+    }
+    case 'issue_queue': {
+      const issue = issueQueueArgs(request)?.issue;
+      return issue
+        ? `Queue issue #${issue} for the fleet`
+        : KIND_LABEL.issue_queue;
     }
     case 'orchestrator_start': {
       const start = actionRequestArgsSchemas.orchestrator_start.safeParse(

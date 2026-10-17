@@ -2,9 +2,13 @@ import {
   type BoardCardDetail,
   CARD_CONTINUE_PROMPT,
   CARD_WORKER_PROMPT_VERSION,
+  cardFeedbackPrompt,
 } from '@agentdock/shared';
 import { BudgetGate } from '../budgets/budget-gate';
-import { BoardWorld, failed } from './testing/board-e2e';
+import { Feed } from '../budgets/testing/budgets-e2e';
+import { seedPrices } from '../prices/seed-prices';
+import { ingest } from '../usage/testing/usage-e2e';
+import { BoardWorld, failed, ROOT_A } from './testing/board-e2e';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -133,6 +137,47 @@ describe('board rounds (e2e)', () => {
       }
     });
 
+    it('counts a round toward the operator who started it, and refuses their next one once their user budget is spent (D-10)', async () => {
+      await seedPrices(w.ctx.prisma);
+      await w.createCard();
+      await w.createCard();
+      expect((await w.runCard(1)).status).toBe(200);
+      const card = await w.card(1);
+      const run = await w.ctx.prisma.run.findUniqueOrThrow({
+        where: { id: card.rounds[0].runId },
+      });
+      // Round 1's Claude session spends $1.50.
+      const feed = new Feed();
+      const ts = (ms: number) =>
+        new Date(run.startedAt.getTime() + ms).toISOString();
+      await ingest(w.ctx, w.runnerId, [
+        feed.session(card.sessionId as string, `${ROOT_A}-card`, ts(1000), {
+          projectId: w.a,
+        }),
+        feed.spend(card.sessionId as string, 'r1', ts(2000)),
+      ]);
+      await w.ctx.prisma.budget.create({
+        data: {
+          scope: 'user',
+          userId: w.operatorId,
+          period: 'day',
+          timezone: 'UTC',
+          limitUsd: '1',
+          thresholds: [100],
+          action: 'stop',
+        },
+      });
+
+      const refused = await w.runCard(2);
+      expect(refused.status).toBe(409);
+      expect(refused.body).toMatchObject({
+        error: 'budget_exceeded',
+        scope: 'user',
+      });
+      expect((await w.card(2)).rounds).toEqual([]);
+      expect(w.sent('card.run')).toHaveLength(1);
+    });
+
     it('a 4th concurrent run → 409 max_running', async () => {
       for (let i = 0; i < 4; i += 1) await w.createCard();
       const responses = await Promise.all(
@@ -217,8 +262,7 @@ describe('board rounds (e2e)', () => {
       expect(w.sent('card.run')[1]).toMatchObject({
         session: { id: card.sessionId, resume: true },
         branch: card.branch,
-        prompt:
-          'Review feedback: Rename the button.\n\nAddress it on the same branch, commit, then call finish_card.',
+        prompt: cardFeedbackPrompt('Rename the button.'),
       });
       expect(w.sent('card.run')[1]).not.toHaveProperty('files');
     });
@@ -258,8 +302,10 @@ describe('board rounds (e2e)', () => {
       const prompt = promptOf(1);
       expect(prompt).toContain('## Card changed');
       expect(prompt).toContain('Title: Add SSO (was: Add login)');
-      expect(prompt).toContain('### What to do\n\nSign in with Google.');
-      expect(prompt).toContain('## Review feedback\n\nRename the button.');
+      expect(prompt).toContain('### What to do\n\n');
+      expect(prompt).toContain('<card>\nSign in with Google.\n</card>');
+      expect(prompt).toContain('## Review feedback\n\n');
+      expect(prompt).toContain('<card>\nRename the button.\n</card>');
 
       const card = await w.card(1);
       expect(card.rounds[0]).toMatchObject({
@@ -282,9 +328,7 @@ describe('board rounds (e2e)', () => {
       // A second feedback without edits: the plain feedback prompt.
       await post(1, 'finish');
       await post(1, 'feedback', { text: 'Now the colour.' });
-      expect(promptOf(2)).toBe(
-        'Review feedback: Now the colour.\n\nAddress it on the same branch, commit, then call finish_card.',
-      );
+      expect(promptOf(2)).toBe(cardFeedbackPrompt('Now the colour.'));
     });
 
     it('edits made while a round runs reach the round after it', async () => {
@@ -389,6 +433,128 @@ describe('board rounds (e2e)', () => {
       ]);
       expect(sent.prompt).toContain('docs/specs/card-1-add-login.md');
       expect((await w.card(1)).specPath).toBe('docs/specs/card-1-add-login.md');
+      expect((await w.card(1)).specPrUrl).toBeNull();
+    });
+
+    describe('a spec in an external docs repository (#379)', () => {
+      const DOCS = '/srv/dev/widget-documentation';
+      const docsSource = (data: {
+        kind: 'sibling_repo' | 'remote_repo' | 'in_repo';
+        localPath: string | null;
+        specDir: string | null;
+      }) =>
+        w.ctx.prisma.docsSource.upsert({
+          where: { projectId: w.a },
+          create: {
+            projectId: w.a,
+            repo: 'acme/widget-documentation',
+            isGitRepo: true,
+            evidence: [],
+            classified: { specs: [], adr: [], roadmap: [], reports: [] },
+            candidates: [],
+            ...data,
+          },
+          update: data,
+        });
+
+      it('opens a docs pull request and starts the worker without the spec on the branch', async () => {
+        await docsSource({
+          kind: 'sibling_repo',
+          localPath: DOCS,
+          specDir: 'prs',
+        });
+        await w.createCard({ specOnRun: true, issueOnRun: true });
+        const response = await w.runCard(1);
+        expect(response.status).toBe(200);
+        const [published] = w.docsSpecs();
+        expect(published).toMatchObject({
+          projectId: w.a,
+          root: ROOT_A,
+          docsRoot: DOCS,
+          specDir: 'prs',
+          files: [
+            {
+              path: 'prs/41-add-login.md',
+              content: expect.stringContaining('# C-1: Add login'),
+            },
+          ],
+          body: expect.stringContaining('acme/widget#41'),
+        });
+        expect(String(published.branch)).toMatch(/^docs\/card-[a-z0-9]{8}$/);
+        const [sent] = w.sent('card.run');
+        expect(sent.files).toBeUndefined();
+        expect(sent.prompt).toContain(
+          'Specification: prs/41-add-login.md in the docs repository acme/widget-documentation',
+        );
+        const card = await w.card(1);
+        expect(card.specPath).toBe('prs/41-add-login.md');
+        expect(card).toMatchObject({
+          specRepo: 'acme/widget-documentation',
+          specPrNumber: 5,
+          specPrUrl: 'https://github.com/acme/widget-documentation/pull/5',
+        });
+      });
+
+      it('keeps in-repo docs on the card branch, under the docs root', async () => {
+        await docsSource({
+          kind: 'in_repo',
+          localPath: `${ROOT_A}/docs`,
+          specDir: 'specs',
+        });
+        await w.createCard({ specOnRun: true });
+        await w.runCard(1);
+        expect(w.docsSpecs()).toEqual([]);
+        const [sent] = w.sent('card.run');
+        expect(sent.files).toEqual([
+          {
+            path: 'docs/specs/card-1-add-login.md',
+            content: expect.any(String),
+          },
+        ]);
+      });
+
+      it('runs without a spec file for a remote docs repository with no local clone', async () => {
+        await docsSource({
+          kind: 'remote_repo',
+          localPath: null,
+          specDir: 'prs',
+        });
+        await w.createCard({ specOnRun: true });
+        const response = await w.runCard(1);
+        expect(response.status).toBe(200);
+        expect(w.docsSpecs()).toEqual([]);
+        const [sent] = w.sent('card.run');
+        expect(sent.files).toBeUndefined();
+        expect((await w.card(1)).specPath).toBeNull();
+      });
+
+      it('refuses a runner without docs.publish_specs before it writes anything', async () => {
+        await docsSource({
+          kind: 'sibling_repo',
+          localPath: DOCS,
+          specDir: 'prs',
+        });
+        w.unserved.add('docs.publish_specs');
+        await w.createCard({ specOnRun: true, issueOnRun: true });
+        const response = await w.runCard(1);
+        expect(response.status).toBe(503);
+        expect(response.body.error).toBe('command_unavailable');
+        expect(jest.mocked(w.commands.createIssue)).not.toHaveBeenCalled();
+        expect(w.sent('card.run')).toEqual([]);
+      });
+
+      it('runs without a spec file for a docs repository with no Spec folder', async () => {
+        await docsSource({
+          kind: 'sibling_repo',
+          localPath: DOCS,
+          specDir: null,
+        });
+        await w.createCard({ specOnRun: true });
+        const response = await w.runCard(1);
+        expect(response.status).toBe(200);
+        expect(w.docsSpecs()).toEqual([]);
+        expect((await w.card(1)).specPath).toBeNull();
+      });
     });
   });
 

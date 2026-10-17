@@ -10,12 +10,17 @@ import { SecretCipher } from '../common/crypto';
 import { RunnerIngestService } from '../runners/runner-ingest.service';
 import { RunnerWatchList } from '../runners/runner-watch-list';
 import { createUser, login, type Session } from '../test/e2e-app';
+import { HookFailureThrottle } from '../webhooks/common';
 import { CollectorPollSender } from './collector-poll-sender';
 import { GitHubHookController } from './github-app.controller';
 import { GitHubHealthService } from './github-health.service';
 import { GitHubHookService } from './github-hook.service';
 import { GitHubRetentionJob } from './github-retention.job';
 import { signGitHubDelivery } from './github-signature';
+import {
+  SIGNATURE_FAILURE_THRESHOLD,
+  SignatureFailureTracker,
+} from './signature-failure-tracker';
 import {
   APP_ID,
   APP_PEM,
@@ -69,6 +74,8 @@ describe('GitHub App (e2e, spec 27)', () => {
     ctx.sender.sent = [];
     ctx.sender.delayMs = 0;
     ctx.app.get(GitHubHookService).debouncer.clear();
+    ctx.app.get(SignatureFailureTracker).reset();
+    new HookFailureThrottle().reset();
     adminId = (await createUser(ctx.prisma, 'ada@example.com', 'admin')).id;
     admin = await login(ctx, 'ada@example.com');
     auditFrom =
@@ -338,11 +345,61 @@ describe('GitHub App (e2e, spec 27)', () => {
       const app = await ctx.prisma.gitHubApp.findUniqueOrThrow({
         where: { id: 'app' },
       });
-      expect(app.signatureFailures).toBe(3);
+      // C-116: counted in memory, the row written at most once a minute.
+      expect(app.signatureFailures).toBe(1);
 
       await ctx.app.get(GitHubHookService).debouncer.flushAll();
       expect(ctx.sender.sent).toHaveLength(1);
       expect(await ctx.prisma.gitHubDelivery.count()).toBe(1);
+    });
+
+    it('100 unsigned deliveries write lastSignatureFailureAt once, and health stays healthy beside valid ones (C-116)', async () => {
+      const hooks = ctx.app.get(GitHubHookService);
+      const update = jest.spyOn(ctx.prisma.gitHubApp, 'update');
+      for (let i = 0; i < 100; i += 1) {
+        await expect(
+          hooks.receive({
+            rawBody: Buffer.from('{}'),
+            signature: 'sha256=bad',
+            deliveryId: `junk-${i}`,
+            event: 'issues',
+          }),
+        ).rejects.toThrow();
+      }
+      const failureWrites = update.mock.calls.filter(
+        ([args]) => 'lastSignatureFailureAt' in args.data,
+      );
+      update.mockRestore();
+      expect(failureWrites).toHaveLength(1);
+
+      const ok = await deliver(ctx, 'issues', issuesLabeled());
+      expect(ok.status).toBe(200);
+      await ctx.app.get(GitHubHealthService).recompute();
+      const project = await ctx.prisma.project.findFirstOrThrow();
+      const health = await ctx.prisma.gitHubProjectHealth.findUniqueOrThrow({
+        where: { projectId: project.id },
+      });
+      expect(health.reason).not.toBe('signature_failure');
+    });
+
+    it('throttles the 11th refused delivery in a minute from one address; valid ones still pass (C-116)', async () => {
+      for (let i = 0; i < 10; i += 1) {
+        const res = await deliver(ctx, 'issues', issuesLabeled(), {
+          secret: 'wrong',
+        });
+        expect(res.status).toBe(401);
+      }
+      const eleventh = await deliver(ctx, 'issues', issuesLabeled(), {
+        secret: 'wrong',
+      });
+      expect(eleventh.status).toBe(429);
+    });
+
+    it('a valid delivery before any refusal is never counted (C-116)', async () => {
+      for (let i = 0; i < 15; i += 1) {
+        const res = await deliver(ctx, 'issues', issuesLabeled());
+        expect(res.status).toBe(200);
+      }
     });
 
     it('answers 200 duplicate to a redelivery, and polls once in total', async () => {
@@ -549,7 +606,9 @@ describe('GitHub App (e2e, spec 27)', () => {
       expect((await watch.configFor(runnerId)).projects[0].githubApp).toBe(
         'healthy',
       );
-      await deliver(ctx, 'issues', issuesLabeled(), { secret: 'wrong' });
+      const tracker = ctx.app.get(SignatureFailureTracker);
+      for (let i = 0; i <= SIGNATURE_FAILURE_THRESHOLD; i += 1)
+        tracker.record(new Date());
       await health.recompute();
       // Absent on the wire means unhealthy (D12).
       expect(

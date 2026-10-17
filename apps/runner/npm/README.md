@@ -20,6 +20,12 @@ in one of `agentdock-runner-darwin-arm64`, `-darwin-x64`, `-linux-x64` or
 machine. Nothing is downloaded at install time, so it works with npm, bun and
 pnpm. Installing with optional dependencies turned off leaves no binary to run.
 
+Before it runs the binary, the shim checks that the binary's SHA-256 is listed
+in the release's `SHA256SUMS`, shipped in this package, and that the file is
+signed by the AgentDock release key
+([`release-key.pub`](https://github.com/AndreyBegma/AgentDock/blob/main/apps/runner/release-key.pub)).
+It refuses a binary that fails either check.
+
 On macOS, Homebrew is the other way in:
 
 ```sh

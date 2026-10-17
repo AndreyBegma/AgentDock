@@ -14,39 +14,48 @@ import { useCallback, useEffect, useState } from 'react';
 import { approvalsBadge } from '../../lib/approvals/format';
 import { attentionBadge } from '../../lib/fleet/format';
 import { Logomark, Wordmark } from '../brand';
-import type { VisibleSection } from './nav';
+import { railGroups, type VisibleSection } from './nav';
 import { ProjectSwitcher } from './project-switcher';
 import { railToggleLabel } from './rail-collapse';
 
-const ADMIN_OPEN_KEY = 'agentdock.nav.admin-open';
+/** One key per foldable group, so each remembers its own state. */
+const OPEN_KEYS = {
+  admin: 'agentdock.nav.admin-open',
+  workspace: 'agentdock.nav.workspace.open',
+  'project-more': 'agentdock.nav.projectMore.open',
+} as const;
 
-/** Whether the Admin group is unfolded, remembered per browser. */
-function useAdminOpen(): [boolean, (open: boolean) => void] {
+/** Whether a group is unfolded, remembered per browser; folded when storage is blocked. */
+function useRememberedOpen(key: string): [boolean, (open: boolean) => void] {
   const [open, setOpen] = useState(false);
   useEffect(() => {
     try {
-      setOpen(window.localStorage.getItem(ADMIN_OPEN_KEY) === '1');
+      setOpen(window.localStorage.getItem(key) === '1');
     } catch {
       // Storage blocked: the group starts folded.
     }
-  }, []);
-  const change = useCallback((next: boolean) => {
-    setOpen(next);
-    try {
-      window.localStorage.setItem(ADMIN_OPEN_KEY, next ? '1' : '0');
-    } catch {
-      // Not remembered; the toggle still works for this page.
-    }
-  }, []);
+  }, [key]);
+  const change = useCallback(
+    (next: boolean) => {
+      setOpen(next);
+      try {
+        window.localStorage.setItem(key, next ? '1' : '0');
+      } catch {
+        // Not remembered; the toggle still works for this page.
+      }
+    },
+    [key],
+  );
   return [open, change];
 }
 
 /**
  * The left rail (#159, #163), from `lg` up: Workspace, the project's own
- * section titled with its name, then Admin as a collapsible group that NavRail
- * unfolds by itself while one of its pages is open. Exactly one item is active
- * (`activeId`, from `activeEntryId`). Below `lg` the shell draws a TabBar
- * instead.
+ * section titled with its name (its working pages, then a More group), then
+ * Admin. Inside a project Workspace folds too (C-247). A folded group is
+ * unfolded by NavRail itself while one of its pages is open. Exactly one item is active
+ * (`activeId`, from `activeEntryId`). Below `lg` the shell draws a
+ * BottomCapsule instead.
  *
  * `collapsed` (C-14) narrows it to NavRail's icon column; the toggle sits in
  * the head, right of the wordmark, and under the mark once collapsed.
@@ -70,7 +79,11 @@ export function Rail({
   collapsed: boolean;
   onCollapsedChange: (collapsed: boolean) => void;
 }) {
-  const [adminOpen, setAdminOpen] = useAdminOpen();
+  const openState = {
+    admin: useRememberedOpen(OPEN_KEYS.admin),
+    workspace: useRememberedOpen(OPEN_KEYS.workspace),
+    'project-more': useRememberedOpen(OPEN_KEYS['project-more']),
+  };
   const projectName = projects.find(
     (project) => project.id === projectId,
   )?.displayName;
@@ -80,8 +93,8 @@ export function Rail({
     fleet: attentionBadge(slotsNeedingAttention),
   };
 
-  const groups: NavRailGroup[] = sections.map((section) => {
-    const items = section.entries.map((entry) => ({
+  const groups: NavRailGroup[] = railGroups(sections).map((group) => {
+    const items = group.entries.map((entry) => ({
       id: entry.id,
       label: entry.label,
       icon: entry.icon,
@@ -90,15 +103,21 @@ export function Rail({
       badge: badges[entry.id],
     }));
     const title =
-      section.id === 'project' && projectName ? projectName : section.title;
-    if (!section.collapsible) return { id: section.id, title, items };
+      group.id === 'project' && projectName ? projectName : group.title;
+    if (!group.collapsible || group.id === 'project') {
+      return { id: group.id, title, items };
+    }
+    const [open, setOpen] = openState[group.id];
+    // NavRailGroup has no badge slot: while folded, Fleet's count rides the title.
+    const flagged =
+      group.id === 'project-more' && !open && slotsNeedingAttention > 0;
     return {
-      id: section.id,
-      title,
+      id: group.id,
+      title: flagged ? `${title} · ${slotsNeedingAttention}` : title,
       items,
       collapsible: true,
-      open: adminOpen,
-      onOpenChange: setAdminOpen,
+      open,
+      onOpenChange: setOpen,
     };
   });
 

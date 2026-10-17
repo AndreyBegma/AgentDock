@@ -133,6 +133,22 @@ describe('project.inspect', () => {
     });
   });
 
+  it('strips credentials from the origin and warns', async () => {
+    ws = workspace();
+    const root = await ws.repo(
+      'tok',
+      'https://user:ghp_secret@github.com/o/r.git',
+    );
+    const result = await inspect(root);
+    expect(result.remote).toEqual({
+      url: 'https://github.com/o/r.git',
+      forge: 'github',
+      repo: 'o/r',
+    });
+    expect(result.warnings).toContain('origin_url_had_credentials');
+    expect(JSON.stringify(result)).not.toContain('ghp_secret');
+  });
+
   it('reports a non-GitHub origin as unsupported', async () => {
     ws = workspace();
     const root = await ws.repo(

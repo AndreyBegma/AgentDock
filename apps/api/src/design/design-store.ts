@@ -7,7 +7,7 @@ import {
   type UiProfileSnippet,
   uiProfileSnippetSchema,
 } from '@agentdock/shared';
-import type { Prisma, UiProfile } from '@prisma/client';
+import type { Prisma, TaskDesignStatus, UiProfile } from '@prisma/client';
 import { z } from 'zod';
 import type { PrismaService } from '../database/prisma.service';
 import {
@@ -98,6 +98,31 @@ export const defaultSkillsOf = async (
   });
   return settings?.defaultSkills ?? [];
 };
+
+/** #604: the fields of a design that decide where its skills come from. */
+export interface DesignSkillsSource {
+  skills: string[];
+  skillsEdited: boolean;
+  status: TaskDesignStatus;
+}
+
+/**
+ * #604: a design follows the project's default skills until they are edited
+ * by hand on its panel, and until it is first generated — Generate copies the
+ * default in, and that batch and every later turn keep the copy.
+ */
+export const followsDefaultSkills = (
+  design: Omit<DesignSkillsSource, 'skills'>,
+  drawn: boolean,
+): boolean => !design.skillsEdited && !drawn && design.status === 'idle';
+
+/** #604: the skills the next turn of `design` applies, before the installed check. */
+export const designSkillsOf = (
+  design: DesignSkillsSource,
+  drawn: boolean,
+  defaults: readonly string[],
+): string[] =>
+  followsDefaultSkills(design, drawn) ? [...defaults] : design.skills;
 
 /**
  * D15: the skills of `invocations` installed where the project's runs see

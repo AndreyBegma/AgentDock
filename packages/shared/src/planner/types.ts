@@ -89,13 +89,23 @@ export const CARD_DRAFT_SECTIONS = [
   'Open questions',
 ] as const;
 
+/**
+ * #590: the cards one discussion turn may propose, a proposal's brief, and
+ * the skills a discussion is started with (the design skills' limit).
+ */
+export const DISCUSS_PROPOSALS_MAX = 8;
+export const DISCUSS_PROPOSAL_BRIEF_MAX = PLANNER_SUMMARY_MAX;
+export const DISCUSS_SKILLS_MAX = 12;
+
 // Plans
 
 /**
  * D2; `card` is #337 D1: a New work intake, ending in one card — or, after a
- * confirmed split, several independent ones (#409).
+ * confirmed split, several independent ones (#409). `discuss` is #590
+ * (ADR-0058): a free conversation about the project, with no round limit and
+ * no required result — it never makes a card.
  */
-export const PLAN_MODES = ['batch', 'dialogue', 'card'] as const;
+export const PLAN_MODES = ['batch', 'dialogue', 'card', 'discuss'] as const;
 export const planModeSchema = z.enum(PLAN_MODES);
 export type PlanMode = z.infer<typeof planModeSchema>;
 
@@ -176,7 +186,8 @@ export type PlanTaskKey = z.infer<typeof planTaskKeySchema>;
 
 /**
  * D1, D16; `design` is spec 223 D7; `intake` is #337 D1 — every turn of a
- * `card` plan, which opens a round or writes the card.
+ * `card` plan, which opens a round or writes the card. `discuss` is #590 —
+ * every turn of a `discuss` plan: a reply, and maybe proposed cards.
  */
 export const PLAN_TURN_ACTIONS = [
   'decompose',
@@ -186,6 +197,7 @@ export const PLAN_TURN_ACTIONS = [
   'revise',
   'design',
   'intake',
+  'discuss',
 ] as const;
 export const planTurnActionSchema = z.enum(PLAN_TURN_ACTIONS);
 export type PlanTurnAction = z.infer<typeof planTurnActionSchema>;
@@ -207,6 +219,9 @@ const idSchema = z
   .regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$/, 'must be a short id');
 
 const text = (max: number) => z.string().trim().min(1).max(max);
+/** A title is one line: a newline would start a section of a prompt. */
+const lineText = (max: number) =>
+  text(max).refine((title) => !/[\r\n]/.test(title), 'title must be one line');
 
 export const planQuestionOptionSchema = z.strictObject({
   id: idSchema,
@@ -431,7 +446,7 @@ export type DesignOutput = z.infer<typeof designOutputSchema>;
  * parser. It lands in Todo with `kindSource = auto`.
  */
 export const cardDraftSchema = z.strictObject({
-  title: text(CARD_DRAFT_TITLE_MAX),
+  title: lineText(CARD_DRAFT_TITLE_MAX),
   kind: planTaskKindSchema,
   body: text(CARD_DRAFT_BODY_MAX),
 });
@@ -454,7 +469,7 @@ export const intakeCardOutputSchema = z.strictObject({
  * one, and a one-line summary the person reads in the proposal.
  */
 export const splitCardDraftSchema = z.strictObject({
-  title: text(CARD_DRAFT_TITLE_MAX),
+  title: lineText(CARD_DRAFT_TITLE_MAX),
   kind: planTaskKindSchema,
   summary: text(INTAKE_SPLIT_SUMMARY_MAX),
   body: text(CARD_DRAFT_BODY_MAX),
@@ -463,7 +478,8 @@ export type SplitCardDraft = z.infer<typeof splitCardDraftSchema>;
 
 /**
  * #409: the intake proposes several independent cards — the request was
- * several tasks, or one too big for one agent. Nothing is made until the
+ * several tasks, or one too big for one agent. Never UI cards for one surface:
+ * those share one look and are a stack (#524). Nothing is made until the
  * person confirms; they may decline and keep one card.
  */
 export const intakeSplitOutputSchema = z.strictObject({
@@ -488,7 +504,8 @@ export type StackStageDraft = z.infer<typeof stackStageDraftSchema>;
 
 /**
  * #480 (ADR-0044): the intake proposes a stack — one larger piece of work
- * whose parts must happen in order and share one look. `design` suggests a
+ * whose parts must happen in order and share one look, or several UI changes
+ * to one surface, staged foundations first (#524). `design` suggests a
  * shared design of the whole result, drawn and approved before any card runs.
  * 2–8 cards in all, in 2 or more stages.
  */
@@ -515,6 +532,26 @@ export const intakeStackOutputSchema = z.strictObject({
       },
     ),
 });
+/**
+ * #592 (ADR-0058): a stack proposal as its candidates keep it on the plan
+ * (`plans.candidateStack`) — the candidates name a stage by its index.
+ */
+export const planCandidateStackSchema = z.strictObject({
+  title: z.string(),
+  body: z.string(),
+  design: z.boolean(),
+  stages: z.array(z.string()),
+});
+export type PlanCandidateStack = z.infer<typeof planCandidateStackSchema>;
+
+/** #592: a candidate is decided once — accepted (a card is made) or rejected. */
+export const PLAN_CANDIDATE_STATUSES = [
+  'pending',
+  'accepted',
+  'rejected',
+] as const;
+export type PlanCandidateStatus = (typeof PLAN_CANDIDATE_STATUSES)[number];
+
 export const intakeOutputSchema = z.union([
   intakeRoundOutputSchema,
   intakeCardOutputSchema,
@@ -526,6 +563,33 @@ export type IntakeRoundOutput = z.infer<typeof intakeRoundOutputSchema>;
 export type IntakeCardOutput = z.infer<typeof intakeCardOutputSchema>;
 export type IntakeSplitOutput = z.infer<typeof intakeSplitOutputSchema>;
 export type IntakeStackOutput = z.infer<typeof intakeStackOutputSchema>;
+
+/**
+ * #590: one card a discussion turn proposes — a short title and a brief, in
+ * the person's language. Nothing is made from it: **Make a card** opens New
+ * work with the brief as What to do, and the intake writes the card.
+ */
+export const discussProposalSchema = z.strictObject({
+  title: lineText(CARD_DRAFT_TITLE_MAX),
+  brief: text(DISCUSS_PROPOSAL_BRIEF_MAX),
+});
+export type DiscussProposal = z.infer<typeof discussProposalSchema>;
+
+/**
+ * #590 (ADR-0056): a discussion turn — a markdown reply and, optionally, the
+ * cards it proposes. `title` names the discussion; the first turn sets it,
+ * a later one may rename it.
+ */
+export const discussOutputSchema = z.strictObject({
+  action: z.literal('discuss'),
+  title: lineText(PLANNER_TITLE_MAX).optional(),
+  reply: text(PLANNER_DOCUMENT_MAX),
+  proposals: z
+    .array(discussProposalSchema)
+    .max(DISCUSS_PROPOSALS_MAX)
+    .optional(),
+});
+export type DiscussOutput = z.infer<typeof discussOutputSchema>;
 
 /** An intake output that wrote the card. */
 export const isIntakeCard = (
@@ -560,6 +624,7 @@ export const plannerOutputSchemasV1 = {
   revise: reviseOutputSchemaV1,
   design: designOutputSchema,
   intake: intakeOutputSchema,
+  discuss: discussOutputSchema,
 } as const satisfies Record<PlanTurnAction, z.ZodType>;
 
 /**
@@ -574,6 +639,7 @@ export const plannerOutputSchemasV2 = {
   revise: reviseOutputSchemaV2,
   design: designOutputSchema,
   intake: intakeOutputSchema,
+  discuss: discussOutputSchema,
 } as const satisfies Record<PlanTurnAction, z.ZodType>;
 
 /** The schemas a turn of a plan of `version` is validated against. */
@@ -589,6 +655,7 @@ export const plannerOutputSchemas = {
   revise: reviseOutputSchema,
   design: designOutputSchema,
   intake: intakeOutputSchema,
+  discuss: discussOutputSchema,
 } as const satisfies Record<PlanTurnAction, z.ZodType>;
 
 export type PlannerOutput<A extends PlanTurnAction = PlanTurnAction> = z.infer<

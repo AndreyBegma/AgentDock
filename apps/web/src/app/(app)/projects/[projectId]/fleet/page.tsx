@@ -12,6 +12,7 @@ import { Button } from '@andrewbehma/glass-ui/button';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import { CirclePlus } from 'lucide-react';
 import Link from 'next/link';
 import {
   useParams,
@@ -30,6 +31,7 @@ import {
 import { BudgetExceededBanner } from '../../../../../components/budgets/exceeded-banner';
 import { AsyncSection } from '../../../../../components/prerequisites/async-section';
 import { RunnerOfflineBanner } from '../../../../../components/prerequisites/prerequisite-banner';
+import { usePageActions } from '../../../../../components/shell/use-page-actions';
 import { TerminalSheet } from '../../../../../components/terminal/terminal-sheet';
 import type { TerminalTarget } from '../../../../../components/terminal/terminal-view';
 import { api } from '../../../../../lib/api';
@@ -121,6 +123,17 @@ function FleetWorkspace() {
   const role = project?.role ?? 'viewer';
   const isAdmin = role === 'admin';
   const canOperate = projectRoleAtLeast(role, 'operator');
+
+  // The capsule's `+` below `lg` (#521) opens what the header's button opens.
+  usePageActions([
+    {
+      id: 'new-issue',
+      label: 'New issue',
+      icon: CirclePlus,
+      onSelect: () => setCreating(true),
+      operatorOnly: true,
+    },
+  ]);
   const control = useControl(projectId, isAdmin);
   const canAttach = useTerminalAvailable(project?.runnerId, isAdmin);
 

@@ -14,19 +14,20 @@ import { Roles } from '../auth/decorators';
 import {
   ProjectAccess,
   ProjectAccessGuard,
-  ProjectRole,
   type ResolvedProjectAccess,
 } from '../projects';
 import { SessionContentQuery } from './dto';
 import { SessionContentService } from './session-content.service';
 
-/** ADR-0021 reads and purge. Project-scoped: non-members get 404, below-role members 403. */
+/**
+ * ADR-0021 reads and purge; any member reads (ADR-0050). Project-scoped:
+ * non-members get 404, below-role members 403.
+ */
 @Controller('projects/:projectId')
 export class SessionContentController {
   constructor(private readonly content: SessionContentService) {}
 
   @Get('sessions/:id/content')
-  @ProjectRole('operator')
   @UseGuards(ProjectAccessGuard)
   page(
     @ProjectAccess() access: ResolvedProjectAccess,

@@ -163,6 +163,15 @@ describe('PaneStreamer', () => {
     expect(t.framesOf('a')[0]).toMatchObject({ lines: ['token •••'] });
   });
 
+  it('masks a DATABASE_URL= line in a frame (C-128)', async () => {
+    const t = setup();
+    t.text('DATABASE_URL=postgres://u:pw@h/db\n');
+    await t.sub('a');
+    await settle();
+    expect(JSON.stringify(t.sent)).not.toContain('pw@h');
+    expect(t.framesOf('a')[0]).toMatchObject({ lines: ['DATABASE_URL=•••'] });
+  });
+
   it('truncates a frame from the top to the byte cap', async () => {
     const t = setup({ maxFrameBytes: 2000 });
     t.text(

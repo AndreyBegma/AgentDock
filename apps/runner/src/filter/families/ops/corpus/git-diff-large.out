@@ -1,0 +1,622 @@
+diff --git a/apps/web/src/components/shell/nav.test.ts b/apps/web/src/components/shell/nav.test.ts
+index a98f379e..e20e7c58 100644
+--- a/apps/web/src/components/shell/nav.test.ts
++++ b/apps/web/src/components/shell/nav.test.ts
+@@ -5,6 +5,7 @@ import {
+   isFillEntry,
+   isWideEntry,
+   projectIdOf,
++  railGroups,
+   tabBarSplit,
+   visibleNav,
+ } from './nav';
+@@ -290,3 +291,69 @@ describe('isFillEntry', () => {
+     expect(fillAt('/projects/p1/fleet')).toBe(false);
+   });
+ });
++
++describe('railGroups (C-247)', () => {
++  const groups = (role: 'admin' | 'viewer', path: string) =>
++    railGroups(visibleNav(role, path)).map((group) => ({
++      id: group.id,
++      collapsible: group.collapsible,
++      entries: group.entries.map((entry) => entry.label),
++    }));
++
++  test('inside a project only Project, Work and Activity stay in view', () => {
++    const [, project, more] = groups('viewer', '/projects/p1/fleet');
++    expect(project).toEqual({
++      id: 'project',
++      collapsible: false,
++      entries: ['Project', 'Work', 'Activity'],
++    });
++    expect(more).toEqual({
++      id: 'project-more',
++      collapsible: true,
++      entries: [
++        'Fleet',
++        'Queue',
++        'Approvals',
++        'History',
++        'Token saver',
++        'Skills',
++        'Schedules',
++        'Settings',
++      ],
++    });
++  });
++
++  test('More sits right under the project section; Workspace and Admin fold', () => {
++    expect(
++      groups('admin', '/projects/p1').map((g) => [g.id, g.collapsible]),
++    ).toEqual([
++      ['workspace', true],
++      ['project', false],
++      ['project-more', true],
++      ['admin', true],
++    ]);
++  });
++
++  test('outside a project Workspace is plain and there is no More', () => {
++    expect(
++      groups('admin', '/sessions').map((g) => [g.id, g.collapsible]),
++    ).toEqual([
++      ['workspace', false],
++      ['admin', true],
++    ]);
++  });
++
++  test('a viewer gets no Admin group and no operator-only Workspace entry', () => {
++    const all = groups('viewer', '/projects/p1');
++    expect(all.map((g) => g.id)).not.toContain('admin');
++    expect(all[0]?.entries).not.toContain('Skills');
++  });
++
++  test('every entry stays in exactly one group', () => {
++    const sections = visibleNav('admin', '/projects/p1');
++    const ids = railGroups(sections).flatMap((g) => g.entries.map((e) => e.id));
++    expect(ids.sort()).toEqual(
++      sections.flatMap((s) => s.entries.map((e) => e.id)).sort(),
++    );
++  });
++});
+diff --git a/apps/web/src/components/shell/nav.ts b/apps/web/src/components/shell/nav.ts
+index 05af84c7..e2abdac3 100644
+--- a/apps/web/src/components/shell/nav.ts
++++ b/apps/web/src/components/shell/nav.ts
+@@ -53,6 +53,12 @@ export interface NavEntry {
+    * page drops the width cap and scrolls its own regions, not the window.
+    */
+   fill?: boolean;
++  /**
++   * Stays in view in the desktop rail (C-247). Inside a section that has any
++   * primary entry, the others fold into its More group. The phone's capsule
++   * ignores it (`tabBarSplit`).
++   */
++  primary?: boolean;
+ }
+ 
+ export interface NavSection {
+@@ -63,6 +69,8 @@ export interface NavSection {
+   projectScoped?: boolean;
+   /** Folded into one expandable group unless one of its pages is open. */
+   collapsible?: boolean;
++  /** Folded into one expandable group of the rail while inside a project (C-247). */
++  foldedInProject?: boolean;
+   entries: NavEntry[];
+ }
+ 
+@@ -70,6 +78,7 @@ export const NAV: NavSection[] = [
+   {
+     id: 'workspace',
+     title: 'Workspace',
++    foldedInProject: true,
+     entries: [
+       {
+         id: 'overview',
+@@ -152,6 +161,7 @@ export const NAV: NavSection[] = [
+       // The project's home (card C-6): its figures, then the orchestrator.
+       {
+         id: 'project-home',
++        primary: true,
+         wide: true,
+         href: '/projects/:projectId',
+         label: 'Project',
+@@ -173,6 +183,7 @@ export const NAV: NavSection[] = [
+       // `/projects/:id/planner` stays reachable, read-only, off the nav.
+       {
+         id: 'board',
++        primary: true,
+         wide: true,
+         fill: true,
+         href: '/projects/:projectId/board',
+@@ -201,6 +212,7 @@ export const NAV: NavSection[] = [
+       },
+       {
+         id: 'project-activity',
++        primary: true,
+         wide: true,
+         href: '/projects/:projectId/activity',
+         label: 'Activity',
+@@ -381,6 +393,54 @@ export function visibleNav(role: Role, pathname: string): VisibleSection[] {
+   return sections;
+ }
+ 
++/** One block of the desktop rail: a section, or a section's More. */
++export interface RailGroupSpec {
++  id: 'workspace' | 'project' | 'project-more' | 'admin';
++  title: string;
++  entries: VisibleEntry[];
++  /** The heading folds the entries; the rail unfolds it for the active page. */
++  collapsible: boolean;
++}
++
++/**
++ * The desktop rail's blocks (C-247): the project section keeps its `primary`
++ * entries and the rest go to a "More" group right under it; inside a project
++ * Workspace and Admin fold, outside a project Workspace is a plain section.
++ * An empty block is not drawn.
++ */
++export function railGroups(
++  sections: readonly VisibleSection[],
++): RailGroupSpec[] {
++  const inProject = sections.some((section) => section.id === 'project');
++  const groups: RailGroupSpec[] = [];
++  for (const section of sections) {
++    if (section.id === 'project') {
++      const primary = section.entries.filter((entry) => entry.primary);
++      const rest = section.entries.filter((entry) => !entry.primary);
++      if (rest.length === 0 || primary.length === 0) {
++        groups.push({ ...section, collapsible: false });
++        continue;
++      }
++      groups.push({ ...section, entries: primary, collapsible: false });
++      groups.push({
++        id: 'project-more',
++        title: 'More',
++        entries: rest,
++        collapsible: true,
++      });
++      continue;
++    }
++    groups.push({
++      id: section.id,
++      title: section.title,
++      entries: section.entries,
++      collapsible:
++        !!section.collapsible || (inProject && !!section.foldedInProject),
++    });
++  }
++  return groups;
++}
++
+ /**
+  * The phone's capsule (#163, #521): three places, the rest behind More.
+  * Outside a project the workspace's three; inside one, the project's working
+diff --git a/apps/web/src/components/shell/rail.tsx b/apps/web/src/components/shell/rail.tsx
+index 8a8c7ca1..999e2fd8 100644
+--- a/apps/web/src/components/shell/rail.tsx
++++ b/apps/web/src/components/shell/rail.tsx
+@@ -14,37 +14,46 @@ import { useCallback, useEffect, useState } from 'react';
+ import { approvalsBadge } from '../../lib/approvals/format';
+ import { attentionBadge } from '../../lib/fleet/format';
+ import { Logomark, Wordmark } from '../brand';
+-import type { VisibleSection } from './nav';
++import { railGroups, type VisibleSection } from './nav';
+ import { ProjectSwitcher } from './project-switcher';
+ import { railToggleLabel } from './rail-collapse';
+ 
+-const ADMIN_OPEN_KEY = 'agentdock.nav.admin-open';
++/** One key per foldable group, so each remembers its own state. */
++const OPEN_KEYS = {
++  admin: 'agentdock.nav.admin-open',
++  workspace: 'agentdock.nav.workspace.open',
++  'project-more': 'agentdock.nav.projectMore.open',
++} as const;
+ 
+-/** Whether the Admin group is unfolded, remembered per browser. */
+-function useAdminOpen(): [boolean, (open: boolean) => void] {
++/** Whether a group is unfolded, remembered per browser; folded when storage is blocked. */
++function useRememberedOpen(key: string): [boolean, (open: boolean) => void] {
+   const [open, setOpen] = useState(false);
+   useEffect(() => {
+     try {
+-      setOpen(window.localStorage.getItem(ADMIN_OPEN_KEY) === '1');
++      setOpen(window.localStorage.getItem(key) === '1');
+     } catch {
+       // Storage blocked: the group starts folded.
+     }
+-  }, []);
+-  const change = useCallback((next: boolean) => {
+-    setOpen(next);
+-    try {
+-      window.localStorage.setItem(ADMIN_OPEN_KEY, next ? '1' : '0');
+-    } catch {
+-      // Not remembered; the toggle still works for this page.
+-    }
+-  }, []);
++  }, [key]);
++  const change = useCallback(
++    (next: boolean) => {
++      setOpen(next);
++      try {
++        window.localStorage.setItem(key, next ? '1' : '0');
++      } catch {
++        // Not remembered; the toggle still works for this page.
++      }
++    },
++    [key],
++  );
+   return [open, change];
+ }
+ 
+ /**
+  * The left rail (#159, #163), from `lg` up: Workspace, the project's own
+- * section titled with its name, then Admin as a collapsible group that NavRail
+- * unfolds by itself while one of its pages is open. Exactly one item is active
++ * section titled with its name (its working pages, then a More group), then
++ * Admin. Inside a project Workspace folds too (C-247). A folded group is
++ * unfolded by NavRail itself while one of its pages is open. Exactly one item is active
+  * (`activeId`, from `activeEntryId`). Below `lg` the shell draws a
+  * BottomCapsule instead.
+  *
+@@ -70,7 +79,11 @@ export function Rail({
+   collapsed: boolean;
+   onCollapsedChange: (collapsed: boolean) => void;
+ }) {
+-  const [adminOpen, setAdminOpen] = useAdminOpen();
++  const openState = {
++    admin: useRememberedOpen(OPEN_KEYS.admin),
++    workspace: useRememberedOpen(OPEN_KEYS.workspace),
++    'project-more': useRememberedOpen(OPEN_KEYS['project-more']),
++  };
+   const projectName = projects.find(
+     (project) => project.id === projectId,
+   )?.displayName;
+@@ -80,8 +93,8 @@ export function Rail({
+     fleet: attentionBadge(slotsNeedingAttention),
+   };
+ 
+-  const groups: NavRailGroup[] = sections.map((section) => {
+-    const items = section.entries.map((entry) => ({
++  const groups: NavRailGroup[] = railGroups(sections).map((group) => {
++    const items = group.entries.map((entry) => ({
+       id: entry.id,
+       label: entry.label,
+       icon: entry.icon,
+@@ -90,15 +103,21 @@ export function Rail({
+       badge: badges[entry.id],
+     }));
+     const title =
+-      section.id === 'project' && projectName ? projectName : section.title;
+-    if (!section.collapsible) return { id: section.id, title, items };
++      group.id === 'project' && projectName ? projectName : group.title;
++    if (!group.collapsible || group.id === 'project') {
++      return { id: group.id, title, items };
++    }
++    const [open, setOpen] = openState[group.id];
++    // NavRailGroup has no badge slot: while folded, Fleet's count rides the title.
++    const flagged =
++      group.id === 'project-more' && !open && slotsNeedingAttention > 0;
+     return {
+-      id: section.id,
+-      title,
++      id: group.id,
++      title: flagged ? `${title} · ${slotsNeedingAttention}` : title,
+       items,
+       collapsible: true,
+-      open: adminOpen,
+-      onOpenChange: setAdminOpen,
++      open,
++      onOpenChange: setOpen,
+     };
+   });
+ 
+diff --git a/docs/specs/602-fold-rarely-used-sidebar-entries-into-co.md b/docs/specs/602-fold-rarely-used-sidebar-entries-into-co.md
+new file mode 100644
+index 00000000..d4cf6e81
+--- /dev/null
++++ b/docs/specs/602-fold-rarely-used-sidebar-entries-into-co.md
+@@ -0,0 +1,36 @@
++# C-247: Fold rarely used sidebar entries into collapsible More groups
++
++Issue: #602
++
++## What to do
++The desktop sidebar (`NavRail`) shows 28 entries inside a project (see the attached screenshot), and most of them are rarely opened. Shorten it so only the working pages stay visible. Reuse the mechanism Admin already uses: a collapsible `NavRailGroup` whose open state is remembered in `localStorage`.
++
++Changes, in `apps/web/src/components/shell/nav.ts` and `apps/web/src/components/shell/rail.tsx`:
++- **Project section:** only **Project** (`project-home`), **Work** (`board`) and **Activity** (`project-activity`) stay always visible. Fleet, Queue, Approvals, History, Token saver, Skills, Schedules and Settings move into a collapsible **More** group placed directly under the project section. The order inside More stays as today.
++- **Workspace section inside a project:** when the URL is under `/projects/[projectId]`, render the whole Workspace section as one collapsible group, folded by default, as Admin is. Outside a project, Workspace renders exactly as it does today.
++- **Auto-open:** a folded group (project More, Workspace in a project, Admin) opens on its own when the active page is one of its entries. Use `activeEntryId` so the active entry is never hidden.
++- **Remembered state:** each group's open/closed state is stored in `localStorage` under its own key (e.g. `agentdock.nav.projectMore.open`, `agentdock.nav.workspace.open`). Follow `ADMIN_OPEN_KEY` in `rail.tsx`, including the fallback to folded when storage is blocked. Pull the Admin hook into a small reusable hook rather than copying it.
++- Model the split in `nav.ts` as data (for example a `primary` flag or a list of primary ids per section) so `visibleNav` and its tests describe it. Keep `tabBarSplit` and the phone `BottomCapsule` unchanged.
++- Update the navigation notes in `docs/ui/glass-ui.md` / `docs/ui/screens.md` to describe the new rail.
++
++## Acceptance criteria
++- [ ] Inside a project, with every group folded, the project section shows exactly Project, Work and Activity, followed by a folded More group.
++- [ ] Unfolding More shows Fleet, Queue, Approvals, History, Token saver, Skills, Schedules and Settings, each linking to its existing page; the Fleet badge (slots needing attention) still shows on Fleet. While More is folded, the badge is still visible on the More group header or the folded group.
++- [ ] Inside a project, the Workspace section is one folded group by default; outside a project it is unchanged and not collapsible.
++- [ ] Opening a page that lives in a folded group (e.g. `/projects/:id/history`, `/sessions` while inside a project, `/admin/users`) shows that group unfolded with the entry marked active.
++- [ ] Each group's fold state persists across reloads in the same browser and is independent of the other groups; with `localStorage` blocked the rail still renders, with groups folded.
++- [ ] The icon-only collapsed rail (C-14) still works and every entry stays reachable.
++- [ ] Role filtering is unchanged: a viewer never sees operator- or admin-only entries in any group, and a group with no visible entries is not rendered.
++- [ ] The phone `BottomCapsule` tabs and its More sheet are unchanged (`tabBarSplit` tests still pass).
++- [ ] `nav.test.ts` covers the primary/More split and Workspace collapsing inside vs. outside a project; `bun run check` and `bun run test` pass.
++- [ ] Only glass-ui components are used (ADR-0011); if `NavRail` cannot render a group this way, the gap is raised as a glass-ui change rather than built locally.
++
++## Out of scope
++- Removing or renaming any page, route or nav entry, or merging pages into tabs.
++- Per-user pinned or favourite entries stored on the server.
++- Changes to the phone navigation (`BottomCapsule`, `tabBarSplit`).
++- Reordering or regrouping the Admin section (it is already collapsible).
++- The command palette (⌘K) and breadcrumbs.
++
++## Open questions
++None.
+diff --git a/docs/specs/602-fold-rarely-used-sidebar-entries-into-co/design/1/icon-only-rail-c-14.html b/docs/specs/602-fold-rarely-used-sidebar-entries-into-co/design/1/icon-only-rail-c-14.html
+new file mode 100644
+index 00000000..ea86bc7b
+--- /dev/null
++++ b/docs/specs/602-fold-rarely-used-sidebar-entries-into-co/design/1/icon-only-rail-c-14.html
+@@ -0,0 +1,81 @@
++<!doctype html>
++<html lang="en" data-theme="dark">
++<head>
++<meta charset="utf-8">
++<meta name="viewport" content="width=device-width,initial-scale=1">
++<title>C-247 icon-only rail</title>
++<style>
++:root,:root[data-theme="dark"]{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246 / 0.62);--color-ink-3:rgb(242 242 246 / 0.53);--color-line:rgb(255 255 255 / 0.1);--color-line-strong:rgb(255 255 255 / 0.18);--color-hover:rgb(255 255 255 / 0.06);--color-focus:#b4b2ff;--color-accent-soft:rgb(91 91 246 / 0.2);--color-accent-ink:#b4b2ff;--color-warn:#e3b341;--color-danger:#ff6b60;--color-hue-2:#2fbf94;--color-hue-1:#5b9cf6;--color-hue-7:#a68bfa;--glass-sheen:rgb(255 255 255 / 0.06);--glass-scrim:rgb(9 9 12 / 0.55);--glass-edge:rgb(255 255 255 / 0.14);--glass-spec:rgb(255 255 255 / 0.2);--glass-shadow:rgb(0 0 0 / 0.35);--canvas-glow:18%;--radius-control:6px;--radius-surface:8px}
++:root[data-theme="light"]{color-scheme:light;--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-ink:#18181b;--color-ink-2:rgb(24 24 27 / 0.72);--color-ink-3:rgb(24 24 27 / 0.64);--color-line:rgb(0 0 0 / 0.1);--color-line-strong:rgb(0 0 0 / 0.23);--color-hover:rgb(0 0 0 / 0.06);--color-focus:#4f46e5;--color-accent-soft:rgb(79 70 229 / 0.12);--color-accent-ink:#4338ca;--color-warn:#b45309;--color-danger:#dc2626;--color-hue-2:#00805e;--color-hue-1:#1f64d6;--color-hue-7:#7244e0;--glass-sheen:rgb(0 0 0 / 0.06);--glass-scrim:rgb(255 255 255 / 0.52);--glass-edge:rgb(0 0 0 / 0.18);--glass-spec:rgb(0 0 0 / 0.2);--glass-shadow:rgb(0 0 0 / 0.12);--canvas-glow:10%}
++*{box-sizing:border-box}
++body{margin:0;min-height:100vh;font-family:'SF Pro Text',Inter,system-ui,sans-serif;font-size:14px;line-height:20px;color:var(--color-ink);background:var(--color-ground);-webkit-font-smoothing:antialiased}
++.canvas{position:fixed;inset:0;z-index:-1;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
++.glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);backdrop-filter:blur(26px) saturate(180%);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),0 12px 32px var(--glass-shadow)}
++.wrap{padding:20px;display:flex;flex-direction:column;gap:16px}
++h1{margin:0;font-size:15px;font-weight:600}
++.sub0{margin:2px 0 0;font-size:12px;color:var(--color-ink-3)}
++.row{display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start}
++.col{display:flex;flex-direction:column;gap:8px;width:200px}
++.cap{font-size:12px;font-weight:600}
++.cap span{display:block;font-weight:400;color:var(--color-ink-3);margin-top:2px}
++.rail{width:56px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 8px;border-radius:var(--radius-surface)}
++.sw{width:24px;height:24px;border-radius:6px;background:var(--color-hue-2);margin:4px 0 6px}
++.sep{height:1px;width:28px;background:var(--color-line);margin:6px 0}
++.ib{position:relative;display:flex;align-items:center;justify-content:center;width:40px;height:36px;border-radius:var(--radius-control);color:var(--color-ink-2);border:0;background:transparent;cursor:pointer}
++.ib:hover{background:var(--color-hover)}
++.ib[aria-current=page]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
++.ib[aria-expanded=true]{color:var(--color-ink);background:var(--color-hover)}
++.ib:focus-visible{outline:3px solid var(--color-focus);outline-offset:-2px}
++.dot{position:absolute;top:5px;right:6px;width:8px;height:8px;border-radius:999px;background:var(--color-warn);box-shadow:0 0 0 2px var(--color-surface)}
++.dot.d{background:var(--color-danger)}
++.grp{display:flex;flex-direction:column;align-items:center;gap:2px;width:100%}
++.grp[hidden]{display:none}
++.grp.in{padding:2px 0;border-radius:var(--radius-control);background:color-mix(in oklab,var(--color-ink) 4%,transparent)}
++.chip{position:absolute;right:4px;bottom:4px;width:6px;height:6px;border-top:1.5px solid currentColor;border-right:1.5px solid currentColor;transform:rotate(135deg);opacity:.6;transition:transform 150ms}
++.ib[aria-expanded=true] .chip{transform:rotate(-45deg)}
++svg.i{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
++.tip{display:inline-block;padding:4px 8px;border-radius:var(--radius-control);font-size:12px;background:var(--color-ink);color:var(--color-ground);margin-left:8px;white-space:nowrap}
++.pair{display:flex;align-items:flex-start}
++.btn{height:28px;padding:0 12px;border-radius:var(--radius-control);border:1px solid var(--color-line-strong);background:var(--color-raised);color:var(--color-ink);font:inherit;font-size:12px;font-weight:600;cursor:pointer;align-self:flex-start}
++.top{display:flex;justify-content:space-between}
++</style>
++</head>
++<body>
++<div class="canvas"></div>
++<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
++<symbol id="project" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></symbol>
++<symbol id="work" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M8 7v7M12 7v4M16 7v9"/></symbol>
++<symbol id="activity" viewBox="0 0 24 24"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></symbol>
++<symbol id="fleet" viewBox="0 0 24 24"><rect width="20" height="8" x="2" y="2" rx="2"/><rect width="20" height="8" x="2" y="14" rx="2"/><path d="M6 6h.01M6 18h.01"/></symbol>
++<symbol id="queue" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
++<symbol id="approvals" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></symbol>
++<symbol id="history" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
++<symbol id="saver" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></symbol>
++<symbol id="skills" viewBox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></symbol>
++<symbol id="sched" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
++<symbol id="settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></symbol>
++<symbol id="workspace" viewBox="0 0 24 24"><path d="m12 2 10 5-10 5L2 7zM2 12l10 5 10-5M2 17l10 5 10-5"/></symbol>
++<symbol id="admin" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
++<symbol id="more" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
++</defs></svg>
++
++<div class="wrap">
++  <div class="top"><div><h1>C-247 · Icon-only rail (C-14)</h1><p class="sub0">Each group becomes one toggle icon with a chevron corner mark. Its entries appear inline as icons when open; the Fleet attention dot shows on the folded toggle.</p></div><button class="btn" id="theme" type="button">Toggle theme</button></div>
++  <div class="row" id="r"></div>
++</div>
++
++<script>
++const I=n=>`<svg class="i" aria-hidden="true"><use href="#${n}"/></svg>`;
++const ib=(n,l,a)=>`<button class="ib" type="button" aria-label="${l}" title="${l}" ${a?'aria-current="page"':''}>${I(n)}${a==='fleet'?'':''}</button>`;
++let u=0;
++const tog=(n,l,open,inner,dot)=>{const id='k'+(u++);return `<button class="ib" type="button" aria-label="${l}" aria-expanded="${open}" aria-controls="${id}" data-t="${id}">${I(n)}<span class="chip"></span>${dot?`<span class="dot" data-d ${open?'hidden':''}></span>`:''}</button><div class="grp in" id="${id}" ${open?'':'hidden'}>${inner}</div>`;};
++const moreInner=(a)=>`<button class="ib" type="button" aria-label="Fleet — 1 needs attention">${I('fleet')}<span class="dot"></span></button>`+ib('queue','Queue')+`<button class="ib" type="button" aria-label="Approvals — 2 waiting">${I('approvals')}<span class="dot d"></span></button>`+ib('history','History',a==='history')+ib('saver','Token saver')+ib('skills','Skills')+ib('sched','Schedules')+ib('settings','Settings');
++const base=(open,a)=>`<span class="sw"></span>`+ib('project','Project')+ib('work','Work')+ib('activity','Activity')+tog('more','More',open,moreInner(a),true)+`<div class="sep"></div>`+tog('workspace','Workspace',false,ib('project','Overview')+ib('activity','Sessions'))+`<div class="sep"></div>`+tog('admin','Admin',false,ib('settings','Users'));
++const cols=[['Folded (default)','Only the three working pages plus one toggle per group. Dot = something in More needs attention.',base(false)],
++['More open, History active','Auto-opened. Entries are icons with labels in aria-label and native tooltips; dots sit on Fleet and Approvals.',base(true,'history')]];
++document.getElementById('r').innerHTML=cols.map(c=>`<div class="col"><div class="cap">${c[0]}<span>${c[1]}</span></div><nav class="rail glass" aria-label="Navigation">${c[2]}</nav></div>`).join('');
++document.addEventListener('click',e=>{const b=e.target.closest('[data-t]');if(!b)return;const o=b.getAttribute('aria-expanded')!=='true';b.setAttribute('aria-expanded',o);document.getElementById(b.dataset.t).hidden=!o;const d=b.querySelector('[data-d]');if(d)d.hidden=o;});
++document.getElementById('theme').onclick=()=>{const r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark'};
++</script>
++</body>
++</html>
+\ No newline at end of file
+diff --git a/docs/specs/602-fold-rarely-used-sidebar-entries-into-co/design/1/rail-states-expanded.html b/docs/specs/602-fold-rarely-used-sidebar-entries-into-co/design/1/rail-states-expanded.html
+new file mode 100644
+index 00000000..0238e8a9
+--- /dev/null
++++ b/docs/specs/602-fold-rarely-used-sidebar-entries-into-co/design/1/rail-states-expanded.html
+@@ -0,0 +1,116 @@
++<!doctype html>
++<html lang="en" data-theme="dark">
++<head>
++<meta charset="utf-8">
++<meta name="viewport" content="width=device-width,initial-scale=1">
++<title>C-247 rail states</title>
++<style>
++:root,:root[data-theme="dark"]{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246 / 0.62);--color-ink-3:rgb(242 242 246 / 0.53);--color-line:rgb(255 255 255 / 0.1);--color-line-strong:rgb(255 255 255 / 0.18);--color-hover:rgb(255 255 255 / 0.06);--color-focus:#b4b2ff;--color-accent:#5b5bf6;--color-accent-soft:rgb(91 91 246 / 0.2);--color-accent-ink:#b4b2ff;--color-warn:#e3b341;--color-danger:#ff6b60;--color-hue-2:#2fbf94;--color-hue-1:#5b9cf6;--color-hue-7:#a68bfa;--glass-sheen:rgb(255 255 255 / 0.06);--glass-scrim:rgb(9 9 12 / 0.55);--glass-edge:rgb(255 255 255 / 0.14);--glass-spec:rgb(255 255 255 / 0.2);--glass-shadow:rgb(0 0 0 / 0.35);--canvas-glow:18%;--radius-control:6px;--radius-surface:8px}
++:root[data-theme="light"]{color-scheme:light;--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-ink:#18181b;--color-ink-2:rgb(24 24 27 / 0.72);--color-ink-3:rgb(24 24 27 / 0.64);--color-line:rgb(0 0 0 / 0.1);--color-line-strong:rgb(0 0 0 / 0.23);--color-hover:rgb(0 0 0 / 0.06);--color-focus:#4f46e5;--color-accent:#4f46e5;--color-accent-soft:rgb(79 70 229 / 0.12);--color-accent-ink:#4338ca;--color-warn:#b45309;--color-danger:#dc2626;--color-hue-2:#00805e;--color-hue-1:#1f64d6;--color-hue-7:#7244e0;--glass-sheen:rgb(0 0 0 / 0.06);--glass-scrim:rgb(255 255 255 / 0.52);--glass-edge:rgb(0 0 0 / 0.18);--glass-spec:rgb(0 0 0 / 0.2);--glass-shadow:rgb(0 0 0 / 0.12);--canvas-glow:10%}
++*{box-sizing:border-box}
++body{margin:0;min-height:100vh;font-family:'SF Pro Text',Inter,system-ui,sans-serif;font-size:14px;line-height:20px;color:var(--color-ink);background:var(--color-ground);-webkit-font-smoothing:antialiased}
++.canvas{position:fixed;inset:0;z-index:-1;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
++.glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);backdrop-filter:blur(26px) saturate(180%);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),0 12px 32px var(--glass-shadow)}
++.wrap{padding:20px;display:flex;flex-direction:column;gap:16px}
++.bar{display:flex;justify-content:space-between;align-items:center}
++.bar h1{margin:0;font-size:15px;font-weight:600}
++.bar p{margin:2px 0 0;font-size:12px;color:var(--color-ink-3)}
++.btn{height:28px;padding:0 12px;border-radius:var(--radius-control);border:1px solid var(--color-line-strong);background:var(--color-raised);color:var(--color-ink);font:inherit;font-size:12px;font-weight:600;cursor:pointer}
++.row{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
++.col{display:flex;flex-direction:column;gap:8px;width:240px}
++.cap{font-size:12px;font-weight:600}
++.cap span{display:block;font-weight:400;color:var(--color-ink-3);margin-top:2px}
++.rail{width:240px;display:flex;flex-direction:column;gap:2px;padding:8px;border-radius:var(--radius-surface)}
++.rail.icon{width:56px;align-items:center}
++.head{display:flex;align-items:center;gap:8px;padding:8px 12px;font-weight:600}
++.sw{width:10px;height:10px;border-radius:2px;background:var(--color-hue-2);flex-shrink:0}
++.sec{padding:8px 12px 4px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--color-ink-3)}
++.item,.tog{position:relative;display:flex;align-items:center;gap:12px;width:100%;padding:8px 12px;border-radius:var(--radius-control);font:inherit;font-size:14px;color:var(--color-ink-2);text-decoration:none;border:0;background:transparent;cursor:pointer;text-align:left}
++.item:hover,.tog:hover{background:var(--color-hover)}
++.item[aria-current=page]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
++.item .l,.tog .l{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
++.tog{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--color-ink-3);padding:8px 12px}
++.tog .chev{transition:transform 150ms}
++.tog[aria-expanded=true] .chev{transform:rotate(180deg)}
++.tog[aria-expanded=true]{color:var(--color-ink-2)}
++.tog:focus-visible,.item:focus-visible{outline:3px solid var(--color-focus);outline-offset:-2px}
++.sub{display:flex;flex-direction:column;gap:2px;margin-left:18px;padding-left:6px;border-left:1px solid var(--color-line)}
++.sub[hidden]{display:none}
++.rail.icon .sub{margin-left:0;padding-left:0;border-left:0;align-items:center}
++.sep{height:1px;background:var(--color-line);margin:6px 4px}
++.badge{display:inline-flex;align-items:center;justify-content:center;height:18px;min-width:18px;padding:0 5px;border-radius:999px;font-size:10px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--color-ground)}
++.b-warn{background:var(--color-warn)}.b-danger{background:var(--color-danger)}
++.tog .badge{letter-spacing:0}
++svg.i{width:16px;height:16px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
++svg.i.s{width:14px;height:14px}
++.ib{position:relative;display:flex;align-items:center;justify-content:center;width:40px;height:36px;border-radius:var(--radius-control);color:var(--color-ink-2);border:0;background:transparent;cursor:pointer}
++.ib:hover{background:var(--color-hover)}
++.ib[aria-current=page]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
++.ib .dot{position:absolute;top:5px;right:7px;width:8px;height:8px;border-radius:999px;background:var(--color-warn);box-shadow:0 0 0 2px var(--color-surface)}
++.ib[aria-expanded=true]{color:var(--color-ink)}
++.note{font-size:12px;color:var(--color-ink-3);max-width:240px}
++.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
++</style>
++</head>
++<body>
++<div class="canvas"></div>
++<svg width="0" height="0" style="position:absolute" aria-hidden="true">
++<defs>
++<symbol id="project" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></symbol>
++<symbol id="work" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M8 7v7M12 7v4M16 7v9"/></symbol>
++<symbol id="activity" viewBox="0 0 24 24"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></symbol>
++<symbol id="fleet" viewBox="0 0 24 24"><rect width="20" height="8" x="2" y="2" rx="2"/><rect width="20" height="8" x="2" y="14" rx="2"/><path d="M6 6h.01M6 18h.01"/></symbol>
++<symbol id="queue" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
++<symbol id="approvals" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></symbol>
++<symbol id="history" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
++<symbol id="saver" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></symbol>
++<symbol id="skills" viewBox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></symbol>
++<symbol id="sched" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
++<symbol id="settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></symbol>
++<symbol id="overview" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></symbol>
++<symbol id="sessions" viewBox="0 0 24 24"><path d="m4 17 6-6-6-6M12 19h8"/></symbol>
++<symbol id="users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
++<symbol id="runners" viewBox="0 0 24 24"><rect width="18" height="12" x="3" y="4" rx="2"/><path d="M2 20h20M12 16v4"/></symbol>
++<symbol id="workspace" viewBox="0 0 24 24"><path d="m12 2 10 5-10 5L2 7zM2 12l10 5 10-5M2 17l10 5 10-5"/></symbol>
++<symbol id="admin" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
++<symbol id="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
++<symbol id="more" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
++</defs>
++</svg>
++
++<div class="wrap">
++  <div class="bar">
++    <div><h1>C-247 · Project rail states</h1><p>Group headers are clickable. Folded state is the default; a group opens itself when the active page lives in it.</p></div>
++    <button class="btn" id="theme" type="button">Toggle theme</button>
++  </div>
++  <div class="row" id="expanded"></div>
++</div>
++
++<script>
++const I=(n,c='')=>`<svg class="i ${c}" aria-hidden="true"><use href="#${n}"/></svg>`;
++const item=(ic,l,o={})=>`<a class="item" href="#" ${o.a?'aria-current="page"':''}>${I(ic)}<span class="l">${l}</span>${o.b?`<span class="badge b-${o.bt||'warn'}">${o.b}</span>`:''}</a>`;
++let uid=0;
++const group=(title,ic,open,inner,o={})=>{const id='g'+(uid++);
++ return `<div><button class="tog" type="button" aria-expanded="${open}" aria-controls="${id}" data-t="${id}">${I(ic,'s')}<span class="l">${title}</span><span class="badge b-warn" data-fb ${o.fb&&!open?'':'hidden'}>${o.fb||''}</span>${I('chev','s chev')}</button><div class="sub" id="${id}" ${open?'':'hidden'}>${inner}</div></div>`;};
++const more=(open,active)=>group('More','more',open,
++ item('fleet','Fleet',{b:1})+item('queue','Queue')+item('approvals','Approvals',{b:2,bt:'danger'})+item('history','History',{a:active==='history'})+item('saver','Token saver')+item('skills','Skills')+item('sched','Schedules')+item('settings','Settings'),{fb:1});
++const wsItems=(a)=>item('overview','Overview')+item('project','Projects')+item('sessions','Sessions',{a:a==='sessions'})+item('activity','Activity');
++const admin=(open)=>`<div class="sep"></div>`+group('Admin','admin',open,item('users','Users')+item('runners','Runners')+item('settings','System'));
++const head=`<div class="head"><span class="sw"></span>AgentDock</div>`;
++const proj=(m,a)=>`<div class="sec">Project</div>`+item('project','Project',{a:a==='project'})+item('work','Work')+item('activity','Activity')+m;
++const rails=[
++ ['A · Inside a project, everything folded','Default. Fleet’s warn badge rides on the More header.',
++  head+proj(more(false))+`<div class="sep"></div>`+group('Workspace','workspace',false,wsItems())+admin(false)],
++ ['B · /projects/:id/history','More auto-opens, History active. Badge moves onto Fleet.',
++  head+proj(more(true,'history'))+`<div class="sep"></div>`+group('Workspace','workspace',false,wsItems())+admin(false)],
++ ['C · /sessions while inside a project','Workspace auto-opens; More stays folded and independent.',
++  head+proj(more(false))+`<div class="sep"></div>`+group('Workspace','workspace',true,wsItems('sessions'))+admin(false)],
++ ['D · Outside a project','Workspace is a plain section, not collapsible. Admin as today.',
++  `<div class="sec">Workspace</div>`+wsItems('x').replace('Overview','Overview').replace('<a class="item" href="#">','<a class="item" href="#" aria-current="page">')+admin(false)]
++];
++document.getElementById('expanded').innerHTML=rails.map(r=>`<div class="col"><div class="cap">${r[0]}<span>${r[1]}</span></div><nav class="rail glass" aria-label="Navigation">${r[2]}</nav></div>`).join('');
++document.addEventListener('click',e=>{const b=e.target.closest('.tog');if(!b)return;const open=b.getAttribute('aria-expanded')!=='true';b.setAttribute('aria-expanded',open);document.getElementById(b.dataset.t).hidden=!open;const fb=b.querySelector('[data-fb]');if(fb&&fb.textContent)fb.hidden=open;});
++document.getElementById('theme').onclick=()=>{const r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark'};
++</script>
++</body>
++</html>
+\ No newline at end of file
+diff --git a/docs/ui/glass-ui.md b/docs/ui/glass-ui.md
+index db5cf498..75ee2c1f 100644
+--- a/docs/ui/glass-ui.md
++++ b/docs/ui/glass-ui.md
+@@ -41,10 +41,16 @@ process state.
+ 
+ ## Navigation
+ 
+-- From `lg` (1024 px) up: `NavRail` — Workspace, the current project's pages
+-  (titled with its name), and Admin as a `collapsible` group that unfolds by
+-  itself while an admin page is open. Badges: the waiting-approvals count on
+-  Approvals, the slots that wait on a person on Fleet.
++- From `lg` (1024 px) up: `NavRail` — Workspace, the current project's working
++  pages (titled with its name: Project, Work, Activity), a **More** group under
++  them (Fleet, Queue, Approvals, History, Token saver, Skills, Schedules,
++  Settings) and Admin. More and Admin are `collapsible` groups; inside a
++  project Workspace is one too. Each folds by default, unfolds by itself while
++  one of its pages is open and remembers its state per browser under its own
++  `localStorage` key (`railGroups` in `nav.ts` models the split, C-247).
++  Badges: the waiting-approvals count on Approvals, the slots that wait on a
++  person on Fleet; while More is folded Fleet's count rides More's title
++  ("More · 2").
+ - Below `lg`: `BottomCapsule` (#521), floating clear of the screen's edges,
+   with `tabSizing="content"` so no label is truncated. Three places — Overview
+   · Projects · Activity outside a project, Work (the Board) · Fleet · Approvals
+@@ -126,6 +132,7 @@ Until then AgentDock does without it rather than drawing it here (ADR-0011).
+ 
+ | Gap | Effect in AgentDock |
+ |---|---|
++| `NavRailGroup` has no `badge` | A folded group cannot carry a count on its heading; the shell appends Fleet's count to More's title ("More · 2") until glass-ui adds a group badge (C-247). |
+ | `Board` has no `canDrop(card, column)` | The Board page checks `boardMoveRule` in `onMove` and declines there; a refused card snaps back, and the menu's "Move to" items still list every column. |
+ | `Board`'s card `li` sets `min-h-(--size-row)` without `shrink-0` | In a height-bounded column the cards squash to one row instead of scrolling; `components/board/board-view.tsx` adds `[&_[data-board-card]]:shrink-0` on the board's wrapper (#384, glass-ui#147). |
+ | `Board`'s card menu always lists one "Move to <column>" item per other column, and `ActionList` rows are 40 px with no current mark | The card menu gets one "Move…" item that opens `components/board/move-picker.tsx` (a bottom `Sheet` of `Button` rows, 52 px, current column marked), also behind the card sheet's and the card page's Move button (#515). glass-ui's own per-column items stay in the menu until `Board` can hide them. |
+diff --git a/docs/ui/screens.md b/docs/ui/screens.md
+index 7b82bbcb..16569dc0 100644
+--- a/docs/ui/screens.md
++++ b/docs/ui/screens.md
+@@ -9,9 +9,14 @@ sections: Workspace (Overview, Projects, Activity, Work, Sessions, Usage,
+ Workflows, Skills), then the open project's pages under its name (its
+ Board entry is labelled Work, #270; the Planner left it with #337 — New work
+ is on the Board, #409),
+-then Admin (its "Planner instructions" entry opens the instructions editor), folded into one
+-group. That group unfolds by itself on an admin page and remembers its state
+-per browser. Exactly one item is active: the longest matching href wins, and
++then Admin (its "Planner instructions" entry opens the instructions editor). Inside a
++project the project's section keeps only Project, Work and Activity; Fleet,
++Queue, Approvals, History, Token saver, Skills, Schedules and Settings sit in a
++**More** group under it, and Workspace folds into one group too (outside a
++project it is a plain section). More, Workspace-in-a-project and Admin start
++folded, unfold by themselves on one of their pages (History, Sessions, an
++admin page) and each remembers its state per browser under its own key; with
++storage blocked they stay folded. The icon-only rail shows every entry. Exactly one item is active: the longest matching href wins, and
+ `/` and `/projects` match only exactly. Integrations goes to the hub,
+ `/admin/integrations`. The active item is scrolled into view, and the rail
+ fades at whichever edge has more. The project switcher is a button with the

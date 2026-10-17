@@ -1,0 +1,7 @@
+{
+  "argv": ["git", "diff", "25ead837", "75d3a185"],
+  "exitCode": 0,
+  "category": "other",
+  "outcome": "passing",
+  "expect": "filtered"
+}

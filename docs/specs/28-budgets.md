@@ -50,7 +50,7 @@ taken, with its source.
 |---|---|---|
 | D1 | **Shape.** A budget is `scope` (`project` \| `user`), `scopeId`, `period` (`day` \| `week` \| `month`), `timezone` (IANA, default the server's `APP_TIMEZONE`, else `UTC`), `limitUsd` Decimal, `thresholds` (sorted percent list, default `[50, 80, 100]`; 100 is always present), `action` (`alert` \| `stop`), `enabled`. At most one enabled budget per `(scope, scopeId, period)`. Weeks start on Monday | data-model.md `Budget`; thresholds and timezone are new |
 | D2 | **Unit.** Spend is the API-equivalent `costUsd` from #13. Unpriced requests (`costUsd = null`) count as zero toward the budget and are shown next to it as "N unpriced requests". A budget never estimates a price | ADR-0009, cost-model.md |
-| D3 | **Attribution.**<br>• **Project spend** = every priced request whose session maps to the project (#12 correlation by cwd / worktree): fleet workers, orchestrator sessions, skill runs, sessions a person started in the project.<br>• **User spend** = requests of runs the user started:<br>&nbsp;&nbsp;– skill runs with `runs.triggeredByType = user` and `triggeredById = user` (#21, #24);<br>&nbsp;&nbsp;– an orchestrator session started through #17. It is matched as the #12 session whose cwd is the project root (not a worktree), on that runner, starting within 120 s after an `orchestrator.start` `command_run` of that user. Ties go to the latest start.<br>• Fleet workers (`orchestrator_slot` runs) are **project-only**: the orchestrator chose to dispatch them, not the user.<br>• Scheduled and webhook-triggered runs are project-only.<br>• A request counts toward at most one user budget and its project budget. | directive; the orchestrator-session match is a heuristic [Unknown — verify against real #12 data in i28-api; if the match proves unreliable, orchestrator sessions become project-only and the spec is amended] |
+| D3 | **Attribution.**<br>• **Project spend** = every priced request whose session maps to the project (#12 correlation by cwd / worktree): fleet workers, orchestrator sessions, skill runs, sessions a person started in the project.<br>• **User spend** = requests of runs the user started:<br>&nbsp;&nbsp;– skill runs with `runs.triggeredByType = user` and `triggeredById = user` (#21, #24);<br>&nbsp;&nbsp;– an orchestrator session started through #17. It is matched as the #12 session whose cwd is the project root (not a worktree), on that runner, starting within 120 s after an `orchestrator.start` `command_run` of that user. Ties go to the latest start.<br>&nbsp;&nbsp;– board card rounds, plan turns, card and stack design turns and UI profile builds the user started (C-121, D-10);<br>&nbsp;&nbsp;– a schedule firing's run, toward the firing's principal: the owner for a timed firing, the caller for run now (C-121, D-10).<br>• Fleet workers (`orchestrator_slot` runs) are **project-only**: the orchestrator chose to dispatch them, not the user.<br>• Webhook-triggered runs are project-only.<br>• A request counts toward at most one user budget and its project budget. | directive; the orchestrator-session match is a heuristic [Unknown — verify against real #12 data in i28-api; if the match proves unreliable, orchestrator sessions become project-only and the spec is amended] |
 | D4 | **Where the numbers come from.**<br>• Project spend is summed from #13's `usage_rollups` (`projectId`, hour range).<br>• User spend needs request-level attribution, so `budget_periods` keeps a running `spentUsd` updated incrementally (D5).<br>• Both are recomputable from scratch. The recompute job also rebuilds periods after #13's price recompute changes past costs. | #13 D7; new |
 | D5 | **Evaluation.**<br>• #13's rollup service calls `BudgetService.onUsage(batch)` after each rollup upsert. This is one call site in `apps/api/src/usage/**`, owned by this item's lead.<br>• It updates the affected `budget_periods`, debounced to at most once per 30 s per budget.<br>• A sweep every 5 min reconciles every open period against the from-scratch sum and closes periods whose end has passed. The sweep is the safety net; the call is the fast path.<br>• Worst-case detection lag is about the rollup latency plus 30 s. | #13 rollups; new |
 | D6 | **Thresholds.** Each threshold fires once per period: a `budget.threshold` notification (percent, spent, limit), and at 100 % `budget.exceeded`. Both go through #22, which adds them to its closed kinds union; #22 already reserves `budget.exceeded`. Recipients: for a project budget, the project's operators and admins; for a user budget, the user and admins. Default channels are in-app plus Telegram | #22 D1, D2 |
@@ -209,15 +209,23 @@ i28-api, decided with the orchestrator on 2026-10-09:
     (`ok` or `unknown`).
   - Subagent sessions count with their parent.
 - **Schedules (#25) go through the same gate.** A firing calls
-  `SkillRunService.start` or `ControlService.start`, so a stop budget refuses
-  it with the same 409. Spec 25 D12's `beforeFire` hook still allows
-  everything.
-  - A firing is project-only (D3). For a skill run, `triggeredByType` is
-    `schedule`.
-  - For an orchestrator start, the actor is `system`, so the gate checks
-    no user budget. A session started by a `command_runs` row that a
-    `schedule_firings.commandRunId` points to is nobody's, although the row
-    carries the creator's id.
+  `SkillRunService.start` or `ControlService.start`, so a project stop budget
+  refuses it with the same 409.
+  - C-121 (D-10) amends this: spec 25 D12's `beforeFire` hook asks the gate
+    for the firing's principal — the owner for a timed firing, the caller for
+    run now — so their user budget holds too. A timed firing it refuses is
+    recorded `skipped` (reason `budget`); run now answers the caller 409
+    `budget_exceeded` as well.
+  - The firing records its principal (`schedule_firings.principalId`). Its
+    skill run's sessions are the principal's; so is an orchestrator session
+    its `orchestrator.start` started (the row's `userId` is the principal).
+- **Every run kind is a user's (C-121, D-10).** A board round, a plan turn,
+  a card or stack design turn and a UI profile build count toward the user in
+  `runs.triggeredById`, and each start asks the gate for that user. A round
+  or a turn resumes a Claude session other runs share, so only the requests
+  inside the run's window are its starter's. A UI profile build's session is
+  the project's slot-less session in a `.wt-<repo>-uiprofile-*` worktree
+  that began in the run's window.
 - **Gate freshness.** A gate check evaluates the budget itself, so the gate
   has no detection lag. The lag in D5 applies to notifications and indicators
   only.

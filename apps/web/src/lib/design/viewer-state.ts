@@ -142,7 +142,12 @@ export type ViewerChange =
   | { kind: 'variant'; variant: number }
   | { kind: 'revision'; revisionId: string }
   | { kind: 'frame'; frame: number }
-  | { kind: 'viewport'; viewport: ViewportPreset }
+  | {
+      kind: 'viewport';
+      viewport: ViewportPreset;
+      /** Back to Fit too: a phone's preset switch refits the mockup (C-244). */
+      fit?: boolean;
+    }
   | { kind: 'theme'; theme: DesignTheme }
   | { kind: 'width'; width: number }
   | { kind: 'zoom'; zoom: Zoom };
@@ -175,6 +180,7 @@ export function applyViewerChange(
     case 'viewport':
       next.set(VIEWER_PARAM.viewport, change.viewport.name);
       next.delete(VIEWER_PARAM.width);
+      if (change.fit) next.delete(VIEWER_PARAM.zoom);
       if (change.viewport.theme) {
         next.set(VIEWER_PARAM.theme, change.viewport.theme);
       }

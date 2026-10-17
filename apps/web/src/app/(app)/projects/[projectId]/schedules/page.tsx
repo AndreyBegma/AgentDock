@@ -13,12 +13,15 @@ import { Button } from '@andrewbehma/glass-ui/button';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import { CalendarPlus } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PageHeader } from '../../../../../components/page-header/page-header';
 import { AsyncSection } from '../../../../../components/prerequisites/async-section';
 import { RunnerOfflineBanner } from '../../../../../components/prerequisites/prerequisite-banner';
+import { usePageActions } from '../../../../../components/shell/use-page-actions';
+import { useCurrentUser } from '../../../../../components/shell/user-context';
 import { api } from '../../../../../lib/api';
 import { useLive } from '../../../../../lib/live/use-live';
 import {
@@ -62,6 +65,7 @@ function DeleteDialog({
 export default function ProjectSchedulesPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const project = useProjectDetail(projectId).data;
+  const user = useCurrentUser();
   const [skills, setSkills] = useState<string[]>([]);
   const [profiles, setProfiles] = useState<ProfileChoice[]>([]);
   /** Bumped by a live push; the open sheet refetches on it. */
@@ -96,6 +100,17 @@ export default function ProjectSchedulesPage() {
 
   const canOperate = project !== undefined && project.role !== 'viewer';
   const isAdmin = project?.role === 'admin';
+
+  // The capsule's `+` below `lg` (#521) opens what the header's button opens.
+  usePageActions([
+    {
+      id: 'new-schedule',
+      label: 'New schedule',
+      icon: CalendarPlus,
+      onSelect: () => setCreating(true),
+      operatorOnly: true,
+    },
+  ]);
   const runnerId = project?.runnerId;
 
   // Skill suggestions for the dialog; a failure only costs the suggestions.
@@ -164,7 +179,12 @@ export default function ProjectSchedulesPage() {
                     method: 'PATCH',
                     body: { enabled },
                   }),
-                enabled ? 'Schedule enabled.' : 'Schedule disabled.',
+                // D-09: toggling someone else's schedule makes it yours.
+                `${enabled ? 'Schedule enabled.' : 'Schedule disabled.'}${
+                  schedule.createdById === user.id
+                    ? ''
+                    : ' It now runs with your authority.'
+                }`,
               ),
             onEdit: setEditing,
             onRunNow: (schedule: ScheduleView) =>
@@ -180,7 +200,7 @@ export default function ProjectSchedulesPage() {
             onDelete: setDeleting,
           }
         : undefined,
-    [canOperate, act, projectId],
+    [canOperate, act, projectId, user.id],
   );
 
   const confirmDelete = async () => {
@@ -269,6 +289,7 @@ export default function ProjectSchedulesPage() {
         projectId={projectId}
         open={creating || editing !== null}
         schedule={editing}
+        userId={user.id}
         skills={skills}
         profiles={profiles}
         onClose={() => {

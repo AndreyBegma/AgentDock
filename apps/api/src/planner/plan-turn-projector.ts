@@ -4,6 +4,7 @@ import {
   type ClarifyOutput,
   type DecomposeOutput,
   type DesignOutput,
+  type DiscussOutput,
   type GrillOutput,
   type IntakeOutput,
   isIntakeCard,
@@ -22,16 +23,7 @@ import {
   type RunnerEvent,
 } from '@agentdock/shared/protocol';
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
-import type {
-  BoardCard,
-  Plan,
-  PlanTask,
-  PlanTurn,
-  Prisma,
-} from '@prisma/client';
-import { AttachmentsService } from '../attachments/attachments.service';
-import { SYSTEM_ACTOR, systemActorFor } from '../audit/audit.types';
-import { BoardPlanCards } from '../board/board-plan-cards';
+import type { Plan, PlanTask, PlanTurn, Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { applyDesignOutput, settleDesign } from '../design/design-apply';
 import { CARD_DESIGN_CONTRACT_VERSION } from '../design/design-prompt';
@@ -60,6 +52,7 @@ import {
   revisedTasks,
   type TaskDraft,
 } from './plan-apply';
+import { PlanCandidatesService } from './plan-candidates.service';
 import { intakeTurnState } from './plan-intake';
 import { inputOf, questionsOf } from './plan-mapper';
 import { PlanStore } from './plan-store';
@@ -90,12 +83,6 @@ interface DesignHost {
 type OwnedTurn =
   | { kind: 'plan'; turn: PlanOwnedTurn }
   | { kind: 'host'; turn: PlanTurn; host: DesignHost };
-
-/** #337 D6: the card an intake wrote, and the attachments it took from the plan. */
-interface MadeCard {
-  card: BoardCard;
-  attachmentIds: string[];
-}
 
 /** A turn the API starts once this one is applied (D7; spec 223 D4). */
 type Chain =
@@ -159,8 +146,7 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
     private readonly turns: PlanTurnService,
     private readonly cardTurns: CardDesignTurnService,
     private readonly stackTurns: StackDesignTurnService,
-    private readonly planCards: BoardPlanCards,
-    private readonly attachments: AttachmentsService,
+    private readonly candidates: PlanCandidatesService,
   ) {}
 
   onModuleInit(): void {
@@ -289,8 +275,6 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
     const at = new Date(data.at);
     const resultText = data.resultText ?? null;
     let chain: Chain | null = null;
-    /** #337 D6: the card an intake wrote, announced once committed. */
-    let made: MadeCard | null = null;
     /** #337: the intake's card was not English — asked once more. */
     let reask = false;
 
@@ -393,11 +377,16 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
         tx,
       );
       if (!settled) return false;
+      if (parsed.output.action === 'discuss') {
+        // #590: the reply is the stored output; only a new title is applied.
+        await this.retitleDiscussion(tx, turn.planId, parsed.output);
+        return true;
+      }
       if (parsed.output.action === 'intake') {
-        // #337 D4: a round waits for the person; the card closes the intake.
-        made = isIntakeCard(parsed.output)
-          ? await this.writeCard(tx, turn.planId, parsed.output.cardDraft)
-          : null;
+        // #337 D4: a round waits for the person; #592: the card is a candidate.
+        if (isIntakeCard(parsed.output)) {
+          await this.writeCard(tx, turn.planId, parsed.output.cardDraft);
+        }
         return true;
       }
       chain = await this.apply(tx, turn.plan, turn.task, parsed.output);
@@ -405,8 +394,6 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
     });
     if (!applied) return;
     await this.publish(turn.plan, turn.runId);
-    const card = made as MadeCard | null;
-    if (card) await this.announceCard(card, turn.authorId);
     if (reask) {
       await this.turns.chainIntake(
         turn.planId,
@@ -552,53 +539,41 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
   }
 
   /**
-   * #337 D6: the intake's card, in Todo with the plan as its origin, its
-   * attachments re-claimed from the plan; the plan is `done`. Nothing when
+   * #337 D6, #592 (ADR-0058): the intake's card, as a candidate the person
+   * accepts or rejects in Drafts; the intake is `reviewing`. Nothing when
    * the intake was closed meanwhile.
    */
   private async writeCard(
     tx: Tx,
     planId: string,
     draft: CardDraft,
-  ): Promise<MadeCard | null> {
+  ): Promise<void> {
     await tx.$queryRaw`SELECT id FROM plans WHERE id = ${planId} FOR UPDATE`;
     const plan = await tx.plan.findUniqueOrThrow({ where: { id: planId } });
-    if (plan.mode !== 'card' || plan.status !== 'clarifying') return null;
-    const [card] = await this.planCards.create(tx, {
-      projectId: plan.projectId,
-      planId: plan.id,
-      authorId: plan.authorId,
-      drafts: [{ title: draft.title, body: draft.body, kind: draft.kind }],
-    });
-    const attachmentIds = await this.attachments.claimPlanOntoCard(
+    if (plan.mode !== 'card' || plan.status !== 'clarifying') return;
+    await this.candidates.write(
       tx,
       plan.id,
-      card.id,
+      [{ title: draft.title, body: draft.body, kind: draft.kind }],
+      null,
     );
-    await tx.plan.update({
-      where: { id: plan.id },
-      data: { status: 'done', title: draft.title },
-    });
-    return { card, attachmentIds };
   }
 
-  /** After commit: the card's audit, live event and assessment, for the intake's author. */
-  private async announceCard(
-    made: MadeCard,
-    authorId: string | null,
+  /**
+   * #590: a discussion turn that names the discussion retitles it; the
+   * reply and the proposals stay in the turn's output. Nothing when the
+   * discussion was discarded meanwhile.
+   */
+  private async retitleDiscussion(
+    tx: Tx,
+    planId: string,
+    output: DiscussOutput,
   ): Promise<void> {
-    const actor = {
-      userId: authorId,
-      role: 'operator' as const,
-      ctx: { actor: authorId ? systemActorFor(authorId) : SYSTEM_ACTOR },
-    };
-    await this.planCards.announce([made.card], actor);
-    await this.attachments.recordClaim(
-      made.card.projectId,
-      { cardId: made.card.id },
-      made.attachmentIds,
-      actor,
-    );
+    if (!output.title) return;
+    await tx.plan.updateMany({
+      where: { id: planId, mode: 'discuss', status: 'clarifying' },
+      data: { title: output.title },
+    });
   }
 
   /** Validates against the contract with what only the API knows (D17). */
@@ -633,6 +608,7 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
         });
       case 'clarify':
       case 'decompose':
+      case 'discuss':
         return parsePlannerOutput(body, action, { contractVersion });
       case 'grill':
         return parsePlannerOutput(body, 'grill', {
@@ -680,11 +656,19 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
       | WriteOutput
       | ReviseOutput
       | DesignOutput
-      | IntakeOutput,
+      | IntakeOutput
+      | DiscussOutput,
   ): Promise<Chain | null> {
     // A design turn is applied by `applyDesignOutput`, an intake by
-    // `writeCard`, before this is reached.
-    if (output.action === 'design' || output.action === 'intake') return null;
+    // `writeCard`, a discussion turn by `retitleDiscussion`, before this is
+    // reached.
+    if (
+      output.action === 'design' ||
+      output.action === 'intake' ||
+      output.action === 'discuss'
+    ) {
+      return null;
+    }
     // The turn may have been started on an older row; read the plan now.
     const plan = await tx.plan.findUniqueOrThrow({ where: { id: planRow.id } });
     switch (output.action) {

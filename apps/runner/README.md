@@ -39,8 +39,10 @@ apps/runner/dist/agentdock-runner version
 ```
 
 `sh apps/runner/scripts/build-release.sh` builds all four targets, the
-tarballs, `SHA256SUMS`, the npm packages and the Homebrew formula into
-`apps/runner/release/`, and publishes nothing. It builds `@agentdock/shared`
+tarballs, `SHA256SUMS` and its signature `SHA256SUMS.sig`, the npm packages
+and the Homebrew formula into `apps/runner/release/`, and publishes nothing.
+Without `RUNNER_SIGNING_KEY` it signs with a throwaway key, so what it builds
+does not install ([ADR-0049](../../docs/adr/0049-runner-releases-are-signed-and-cut-only-from-protected-tags.md)). It builds `@agentdock/shared`
 first, so it works on a clean checkout. Releasing is in
 [deploy/README.md](../../deploy/README.md#releasing-the-runner).
 
@@ -48,7 +50,7 @@ first, so it works on a clean checkout. Releasing is in
 
 | Command | What it does |
 |---|---|
-| `pair --server <api-origin> --code XXXX-XXXX [--no-detect]` | exchanges a pairing code for a runner id and token; when the config has no profiles yet, also detects and writes them (`--no-detect` skips it, existing profiles are never overwritten) |
+| `pair --server <api-origin> --code XXXX-XXXX [--no-detect] [--insecure]` | exchanges a pairing code for a runner id and token; when the config has no profiles yet, also detects and writes them (`--no-detect` skips it, existing profiles are never overwritten) |
 | `run` | the daemon, in the foreground |
 | `status` | config, spool and whether the server answers |
 | `profiles [--detect [--write]]` | configured profiles; `--detect` proposes them, `--write` stores the proposal |
@@ -80,6 +82,13 @@ The project comes from `CLAUDE_PROJECT_DIR` (else the working directory), the
 session from the parent pid. A failure is an MCP tool error whose text starts
 with the local error code (`runner_offline`, `no_project`, `daemon_unavailable`,
 `forbidden`, …) and whose `structuredContent.error.code` carries it.
+
+`<api-origin>` must be `https://`. Plain `http://` is accepted only for a
+loopback host (`localhost`, `127.0.0.0/8`, `::1`). Any other `http://` host is
+refused unless `pair --insecure` is given; that sets `insecureServer: true` in
+`runner.json` (only `pair` writes it — the server cannot), and `run` and `status`
+print a warning on every start, because the token and session content then travel
+in cleartext.
 
 `<api-origin>` is the API, not the web app: pairing is `POST <api-origin>/runners/pair`,
 the socket `<api-origin>/runner`.
@@ -182,6 +191,13 @@ copying (never `npx`, never a symlink), and run them headless.
 |---|---|---|
 | `maxConcurrentRuns` | `2` | runs over the cap wait in `queued`, oldest first |
 | `maxTimeoutSec` | `21600` | a run's `timeoutSec` above it is cut to it |
+| `keepPatchesLocal` | `false` | the patch stays in the run's directory; `skill_run.finished` carries only the changed-file list and the patch's SHA-256. Set by hand — the daemon and the server never change it |
+
+Every text the runner sends the server — pane frames, run logs, reports,
+checkpoints, messages, PR bodies, skill-run patches, hook content — passes
+one redactor (`src/pane/redact.ts`): token shapes, private-key blocks,
+`.env` and secret-named assignments, `Authorization` headers, secret JSON
+members and URL userinfo. It is pattern-based and best-effort.
 
 ## Development
 

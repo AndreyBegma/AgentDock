@@ -5,6 +5,8 @@ import type {
   SubscribeErrorMessage,
   TerminalCloseMessage,
   TerminalDataMessage,
+  TerminalHistoryMessage,
+  TerminalHistoryRequestMessage,
   TerminalResizeMessage,
   UnsubscribeMessage,
 } from '@agentdock/shared/protocol';
@@ -22,9 +24,13 @@ export type RunnerStreamRequest =
   | UnsubscribeMessage
   | TerminalDataMessage
   | TerminalResizeMessage
-  | TerminalCloseMessage;
+  | TerminalCloseMessage
+  | TerminalHistoryRequestMessage;
 /** Runner → server messages of a terminal attach (#29). */
-export type RunnerTerminalMessage = TerminalDataMessage | TerminalCloseMessage;
+export type RunnerTerminalMessage =
+  | TerminalDataMessage
+  | TerminalCloseMessage
+  | TerminalHistoryMessage;
 
 /**
  * A consumer of runner streams — the pane relay (#18), the skill run log

@@ -132,10 +132,10 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
   });
 
   it.each([
-    ['a pipe', 'bun test | tail -5', {}, 'none'],
-    ['a list', 'bun test && echo ok', {}, 'none'],
-    ['a redirect', 'bun test > out.log', {}, 'none'],
-    ['a substitution', 'bun test $(git diff --name-only)', {}, 'none'],
+    ['a pipe into a file', 'bun test | tail -5 > out.log', {}, 'none:compound'],
+    ['a background list', 'bun test && echo ok &', {}, 'none:compound'],
+    ['a redirect', 'bun test > out.log', {}, 'none:compound'],
+    ['a substitution', 'bun test $(git diff --name-only)', {}, 'none:compound'],
     [
       'a background call',
       'bun test',
@@ -144,8 +144,20 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
     ],
     ['a watch mode', 'bun test --watch', {}, 'js/bun-test'],
     ['a family long-running mode', 'demo-test --forever', {}, 'fixture/demo'],
-    ['an uncovered command', 'cd apps/runner', {}, 'none'],
-    ['an uncovered command after cd', 'cd apps && ls', {}, 'none'],
+    ['an uncovered command', 'cd apps/runner', {}, 'none:uncovered'],
+    ['an uncovered command after cd', 'cd apps && ls', {}, 'none:uncovered'],
+    [
+      'a covered command later in a pipe',
+      'ls | bun test',
+      {},
+      'none:uncovered',
+    ],
+    [
+      'a background pipeline',
+      'bun test | tail -5',
+      { run_in_background: true },
+      'js/bun-test',
+    ],
   ])('leaves %s alone and counts it passedThrough', (_, command, extra, filter) => {
     const input = JSON.stringify(preToolUse(command, extra));
     expect(runFilterHook(input, deps)).toBe('');
@@ -161,8 +173,34 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
       passedThrough: true,
       at: '2026-10-16T12:00:00.000Z',
     });
-    // The filter that matched a simple command, else `none`.
+    // The filter that matched a simple command, else why none did.
     expect(rows[0]?.row.filter).toBe(filter);
+  });
+
+  describe('the reason no filter ran (amendment 12)', () => {
+    const filterOf = (command: string, mode?: string) => {
+      runFilterHook(JSON.stringify(preToolUse(command, {}, mode)), deps);
+      return stats().at(-1)?.row.filter;
+    };
+
+    it('is the mode in a mode that never rewrites, whatever the command', () => {
+      for (const mode of ['default', 'acceptEdits', 'dontAsk']) {
+        expect(filterOf('bun test > out.log', mode)).toBe('none:mode');
+        expect(filterOf('ls', mode)).toBe('none:mode');
+      }
+    });
+
+    it('is compound or uncovered in bypass, auto and plan', () => {
+      for (const mode of ['bypassPermissions', 'auto', 'plan']) {
+        expect(filterOf('bun test > out; ls', mode)).toBe('none:compound');
+        expect(filterOf('ls -la', mode)).toBe('none:uncovered');
+      }
+    });
+
+    it('keeps a matched filter’s id in any mode', () => {
+      expect(filterOf('bun test', 'default')).toBe('js/bun-test');
+      expect(filterOf('bun test --watch', 'auto')).toBe('js/bun-test');
+    });
   });
 
   it('leaves the command alone when a deny rule matches it, even in bypass mode', () => {
@@ -209,7 +247,8 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
     const covered = 'bun run test';
     const denied = 'bun test';
     const asked = 'bun run test --ci';
-    const compound = 'bun run test && echo ok';
+    const compound = 'bun run test > out.log';
+    const chain = 'bun run test 2>&1 | tail -50 && echo ok';
 
     // biome-ignore format: one row per line reads as the table it is
     const table: [string | undefined, string, string | null][] = [
@@ -217,18 +256,23 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
       ['bypassPermissions', denied, null],
       ['bypassPermissions', asked, null],
       ['bypassPermissions', compound, null],
+      ['bypassPermissions', chain, allowed(chain)],
       ['auto', covered, undecided(covered)],
+      ['auto', chain, undecided(chain)],
       ['auto', denied, null],
       ['auto', asked, null],
       ['auto', compound, null],
       ['default', covered, null],
       ['default', denied, null],
       ['default', compound, null],
+      ['default', chain, null],
       ['acceptEdits', covered, null],
       ['acceptEdits', denied, null],
       ['acceptEdits', compound, null],
-      ['plan', covered, null],
+      ['plan', covered, undecided(covered)],
+      ['plan', chain, undecided(chain)],
       ['plan', denied, null],
+      ['plan', asked, null],
       ['plan', compound, null],
       ['dontAsk', covered, null],
       ['some-later-mode', covered, null],
@@ -314,18 +358,13 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
     });
 
     it.each([
-      ['cd a b && bun test', 'none'],
-      ['cd -- x && bun test', 'none'],
-      ['cd $HOME && bun test', 'none'],
-      ['cd x && bun test && bun test', 'none'],
-      ['cd x; bun test', 'none'],
-      ['cd x && bun test | tail -5', 'none'],
-      ['bun test 2>&1 > out.log', 'none'],
-      ['bun test 2>&3', 'none'],
-      ['bun test &> out.log', 'none'],
-      ['bun test 1>&2', 'none'],
-      ['cd x && bun test 2>&1\ntouch /tmp/pwned', 'none'],
-      ['cd x && cd y', 'none'],
+      ['cd $HOME && bun test', 'none:compound'],
+      ['bun test 2>&1 > out.log', 'none:compound'],
+      ['bun test 2>&3', 'none:compound'],
+      ['bun test &> out.log', 'none:compound'],
+      ['bun test 1>&2', 'none:compound'],
+      ['cd x && bun test 2>&1\ntouch /tmp/pwned', 'none:compound'],
+      ['cd x && cd y', 'none:uncovered'],
       ['cd x && bun test --watch 2>&1', 'js/bun-test'],
     ])('leaves %p alone', (command, filter) => {
       expect(runFilterHook(JSON.stringify(preToolUse(command)), deps)).toBe('');
@@ -347,6 +386,130 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
     });
   });
 
+  describe('pipelines and lists (#610)', () => {
+    const git: Filter = {
+      id: 'ops/git',
+      matches: (argv) => argv[0] === 'git',
+      apply: () => null,
+    };
+    const bunLint: Filter = {
+      id: 'js/biome',
+      matches: (argv) => argv.join(' ') === 'bun run lint',
+      apply: () => null,
+    };
+    const self = '/opt/agentdock/agentdock-runner filter --';
+    const rewritten = (command: string, mode = 'auto') => {
+      const out = runFilterHook(JSON.stringify(preToolUse(command, {}, mode)), {
+        ...deps,
+        filters: [bunTest, bunLint, git, demoFilter],
+      });
+      return out === ''
+        ? null
+        : (JSON.parse(out) as HookOutput).hookSpecificOutput.updatedInput
+            .command;
+    };
+
+    it.each([
+      // the first stage of a pipe runs through the filter; the rest reads its output
+      ['bun run test 2>&1 | tail -50', `${self} bun run test 2>&1 | tail -50`],
+      ['git log --oneline | head -20', `${self} git log --oneline | head -20`],
+      [
+        'git diff | grep -n foo | wc -l',
+        `${self} git diff | grep -n foo | wc -l`,
+      ],
+      // every covered command of a list on its own; the rest as written
+      [
+        'cd apps/api && bun run lint && git status',
+        `cd apps/api && ${self} bun run lint && ${self} git status`,
+      ],
+      [
+        'bun test; ls -la || git status | sort',
+        `${self} bun test ; ls -la || ${self} git status | sort`,
+      ],
+      // only first stages: a covered command later in a pipe runs as written
+      ['ls | bun test && git status', `ls | bun test && ${self} git status`],
+      // a dev/watch mode is left as written, the rest still wrapped
+      [
+        'bun test --watch; demo-test --forever && bun test',
+        `bun test --watch ; demo-test --forever && ${self} bun test`,
+      ],
+      [
+        `CI=1  bun   run test 'a b'&&git  "status"`,
+        `CI=1 ${self} bun run test 'a b' && ${self} git status`,
+      ],
+    ])('rewrites %p', (command, expected) => {
+      expect(rewritten(command)).toBe(expected);
+      expect(rewritten(command, 'bypassPermissions')).toBe(expected);
+      expect(rewritten(command, 'default')).toBeNull();
+      expect(stats().every((s) => s.row.filter !== 'none:compound')).toBe(true);
+    });
+
+    it.each([
+      'bun test <<EOF\nx\nEOF',
+      'bun test <<< x | tail',
+      '(bun test) | tail -5',
+      'bun test | (tail -5)',
+      '{ bun test; } | tail -5',
+      'bun test $(git diff --name-only) | tail',
+      'git status && bun test `ls`',
+      'bun test <(ls) && git status',
+      'bun test & git status',
+      'bun test | tail -5 &',
+      'bun test && git status &',
+      'bun test > out.log; git status',
+      'git status 2>/dev/null | head',
+      'bun test |& tail',
+      'bun test | xargs echo',
+    ])('leaves %p alone', (command) => {
+      expect(rewritten(command)).toBeNull();
+      expect(stats().at(-1)?.row).toMatchObject({
+        filter: 'none:compound',
+        passedThrough: true,
+      });
+    });
+
+    it('leaves a whole background call alone', () => {
+      const out = runFilterHook(
+        JSON.stringify(
+          preToolUse('bun test | tail && git status', {
+            run_in_background: true,
+          }),
+        ),
+        { ...deps, filters: [bunTest, git] },
+      );
+      expect(out).toBe('');
+      expect(stats()[0]?.row.filter).toBe('js/bun-test');
+    });
+
+    it('counts a line with no covered first stage under the first filter it meets', () => {
+      expect(rewritten('bun test --watch | tail; ls')).toBeNull();
+      expect(stats()[0]?.row.filter).toBe('js/bun-test');
+      expect(rewritten('ls | bun test; cd x')).toBeNull();
+      expect(stats()[1]?.row.filter).toBe('none:uncovered');
+    });
+
+    it('leaves the line alone when a rule matches any of its commands', () => {
+      for (const rule of [
+        { deny: ['Bash(git push:*)'] },
+        { ask: ['Bash(tail:*)'] },
+        { deny: ['Bash(cd:*)'] },
+        { ask: ['Bash(bun test)'] },
+      ]) {
+        const out = runFilterHook(
+          JSON.stringify(
+            preToolUse('cd x && bun test 2>&1 | tail -5; git push', {}, 'auto'),
+          ),
+          {
+            ...deps,
+            filters: [bunTest, git],
+            rules: () => ({ ...NO_RULES, ...rule }),
+          },
+        );
+        expect(out).toBe('');
+      }
+    });
+  });
+
   it.each([
     `bun test $'\\'; touch /tmp/pwned; \\''`,
     'bun test # x\ntouch /tmp/pwned',
@@ -354,7 +517,7 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
   ])('leaves %p alone (DR-01, DR-09)', (command) => {
     expect(runFilterHook(JSON.stringify(preToolUse(command)), deps)).toBe('');
     expect(stats()[0]?.row).toMatchObject({
-      filter: 'none',
+      filter: 'none:compound',
       passedThrough: true,
     });
   });

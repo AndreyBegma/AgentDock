@@ -13,16 +13,34 @@ import { type OnGatewayConnection, WebSocketGateway } from '@nestjs/websockets';
 import type { RawData, WebSocket } from 'ws';
 import { bearerToken } from './credentials';
 import { RunnerConnectHooks } from './runner-connect-hooks';
-import { LiveConnection, RunnerConnections } from './runner-connections';
+import {
+  LiveConnection,
+  RunnerConnections,
+  type RunnerPeer,
+} from './runner-connections';
 import { RunnerIngestService } from './runner-ingest.service';
 import { RunnerLocalRequests } from './runner-local-requests';
 import { RUNNER_OPTIONS, type RunnerOptions } from './runner-options';
+import { RunnerReplacements } from './runner-replacements';
 import { RunnerStreams } from './runner-streams';
 import { RunnerWatchList } from './runner-watch-list';
 
 /** Standard close codes the gateway uses besides `RUNNER_CLOSE_CODES`. */
+const PROTOCOL_ERROR = 1002;
 const POLICY_VIOLATION = 1008;
 const INTERNAL_ERROR = 1011;
+
+/** Bytes of a raw frame, whatever shape `ws` hands over. */
+const byteLength = (data: RawData): number =>
+  Array.isArray(data)
+    ? data.reduce((sum, chunk) => sum + chunk.byteLength, 0)
+    : data.byteLength;
+
+/** As the terminal gateway reads it: the socket's peer and its user agent. */
+const peerOf = (request: IncomingMessage): RunnerPeer => ({
+  ip: request.socket.remoteAddress ?? null,
+  userAgent: request.headers['user-agent'] ?? null,
+});
 
 interface Deps {
   ingest: RunnerIngestService;
@@ -31,6 +49,7 @@ interface Deps {
   streams: RunnerStreams;
   localRequests: RunnerLocalRequests;
   connectHooks: RunnerConnectHooks;
+  replacements: RunnerReplacements;
   options: RunnerOptions;
   logger: Logger;
 }
@@ -43,15 +62,21 @@ interface Deps {
 class RunnerSocket {
   private queue: Promise<void> = Promise.resolve();
   private runnerId: string | null = null;
+  /** The hash the token was verified against; `hello` must still match it. */
+  private tokenHash: string | null = null;
+  /** Leaves the pre-hello registry (C-118); a no-op once left. */
+  private release: () => void = () => {};
   private live: LiveConnection | null = null;
   private closed = false;
   private readonly helloTimer: NodeJS.Timeout;
+  private readonly peer: RunnerPeer;
 
   constructor(
     private readonly socket: WebSocket,
     request: IncomingMessage,
     private readonly deps: Deps,
   ) {
+    this.peer = peerOf(request);
     socket.on('message', (data) => this.enqueue(() => this.receive(data)));
     socket.on('close', () => this.onClose());
     this.helloTimer = setTimeout(
@@ -85,6 +110,11 @@ class RunnerSocket {
       return;
     }
     this.runnerId = runner.id;
+    this.tokenHash = runner.tokenHash;
+    // Until hello completes, re-pairing or revoking must still reach it.
+    this.release = this.deps.connections.admit(runner.id, (code, reason) =>
+      this.close(code, reason),
+    );
   }
 
   private async receive(data: RawData): Promise<void> {
@@ -96,6 +126,15 @@ class RunnerSocket {
       return;
     }
     const type = (json as { type?: unknown } | null)?.type;
+    // C-137: `maxPayload` leaves room for other frames; a batch is held to
+    // its own cap on the raw frame, before the schema walks it.
+    if (type === 'events' && byteLength(data) > MAX_EVENTS_BATCH_BYTES) {
+      this.deps.logger.warn(
+        `runner ${this.runnerId}: events frame over ${MAX_EVENTS_BATCH_BYTES} bytes refused`,
+      );
+      this.close(PROTOCOL_ERROR, 'events batch too large');
+      return;
+    }
     const version = (json as { protocolVersion?: unknown } | null)
       ?.protocolVersion;
     // Checked before the schema: another version's hello may not parse at all.
@@ -120,14 +159,15 @@ class RunnerSocket {
 
   private async handle(message: RunnerMessage): Promise<void> {
     const runnerId = this.runnerId;
-    if (runnerId === null) return;
+    const tokenHash = this.tokenHash;
+    if (runnerId === null || tokenHash === null) return;
     const live = this.live;
     if (!live) {
       if (message.type !== 'hello') {
         this.close(POLICY_VIOLATION, 'hello expected');
         return;
       }
-      await this.hello(runnerId, message);
+      await this.hello(runnerId, tokenHash, message);
       return;
     }
     switch (message.type) {
@@ -166,6 +206,7 @@ class RunnerSocket {
         return;
       case 'terminal.data':
       case 'terminal.close':
+      case 'terminal.history':
         this.deps.streams.deliverTerminal(runnerId, message);
         return;
       case 'local.request':
@@ -195,9 +236,10 @@ class RunnerSocket {
 
   private async hello(
     runnerId: string,
+    tokenHash: string,
     hello: Extract<RunnerMessage, { type: 'hello' }>,
   ): Promise<void> {
-    const acked = await this.deps.ingest.hello(runnerId, hello);
+    const acked = await this.deps.ingest.hello(runnerId, tokenHash, hello);
     if (acked === null || this.closed) {
       this.close(RUNNER_CLOSE_CODES.unauthorized, 'unauthorized');
       return;
@@ -208,14 +250,17 @@ class RunnerSocket {
       this.socket,
       Date.now(),
       runnerCommandsOf(hello.capabilities),
+      this.peer,
     );
     this.live = live;
+    let replaced: LiveConnection | null = null;
     // Attached and welcomed in one step, queued with the watch-list pushes:
     // a project connected meanwhile is either in this list or pushed as
     // `config` right after the welcome (spec 10 D9).
     await this.deps.watchList.deliver(runnerId, (config) => {
       if (this.closed) return;
-      this.deps.connections.attach(live);
+      this.release();
+      replaced = this.deps.connections.attach(live);
       live.send({ type: 'welcome', runnerId, config, ackedSeq: Number(acked) });
     });
     if (this.closed) return;
@@ -225,12 +270,27 @@ class RunnerSocket {
     // Off the frame queue (#329 D4): a hook may send a command, whose result
     // arrives on this same queue.
     void this.deps.connectHooks.connected(runnerId);
+    // C-108: a live socket taken over — audited and told to admins, off the
+    // frame queue like the hooks.
+    const previous = replaced as LiveConnection | null;
+    if (previous) {
+      void this.deps.replacements.replaced({
+        runnerId,
+        previous: {
+          ...previous.peer,
+          connectedAt: new Date(previous.connectedAt),
+        },
+        next: this.peer,
+        at: new Date(live.connectedAt),
+      });
+    }
   }
 
   private close(code: number, reason: string): void {
     if (this.closed) return;
     this.closed = true;
     clearTimeout(this.helloTimer);
+    this.release();
     if (this.live) this.detach(this.live);
     if (this.socket.readyState <= this.socket.OPEN) {
       this.socket.close(code, reason);
@@ -241,6 +301,7 @@ class RunnerSocket {
     const wasLive = this.live !== null;
     this.closed = true;
     clearTimeout(this.helloTimer);
+    this.release();
     if (this.live) this.detach(this.live);
     if (wasLive) this.deps.logger.log(`runner ${this.runnerId} disconnected`);
   }
@@ -273,6 +334,7 @@ export class RunnerGateway implements OnGatewayConnection {
     private readonly streams: RunnerStreams,
     private readonly localRequests: RunnerLocalRequests,
     private readonly connectHooks: RunnerConnectHooks,
+    private readonly replacements: RunnerReplacements,
     @Inject(RUNNER_OPTIONS) private readonly options: RunnerOptions,
   ) {}
 
@@ -284,6 +346,7 @@ export class RunnerGateway implements OnGatewayConnection {
       streams: this.streams,
       localRequests: this.localRequests,
       connectHooks: this.connectHooks,
+      replacements: this.replacements,
       options: this.options,
       logger: this.logger,
     });

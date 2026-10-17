@@ -13,11 +13,17 @@ import { Field, Input, Select, Textarea } from '@andrewbehma/glass-ui/field';
 import { useEffect, useState } from 'react';
 import { DisabledReason } from '../../../../components/prerequisites/disabled-reason';
 import { api } from '../../../../lib/api';
+import {
+  PERMISSION_MODE_LABEL,
+  PERMISSION_MODES,
+} from '../../../../lib/control/format';
 import type { Section } from '../../../../lib/section/use-section';
+import { permissionWarning } from '../../../../lib/skills/format';
 import {
   describeWebhooksError,
   emptyTriggerForm,
   formFromTrigger,
+  TRIGGER_BYPASS_WARNING,
   type TriggerForm,
   toTriggerCreateRequest,
   toTriggerUpdateRequest,
@@ -234,6 +240,40 @@ export function TriggerDialog({
                   />
                 </Field>
               </div>
+              <Field
+                label="Permission mode"
+                htmlFor="trigger-mode"
+                hint="The run’s own mode — the project’s orchestrator setting is never used."
+              >
+                <Select
+                  id="trigger-mode"
+                  value={form.permissionMode}
+                  onChange={(e) =>
+                    set(
+                      'permissionMode',
+                      PERMISSION_MODES.find(
+                        (mode) => mode === e.target.value,
+                      ) ?? form.permissionMode,
+                    )
+                  }
+                >
+                  {PERMISSION_MODES.map((mode) => (
+                    <option key={mode} value={mode}>
+                      {PERMISSION_MODE_LABEL[mode]}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              {form.permissionMode === 'bypassPermissions' ? (
+                <Banner tone="danger" title="No permission checks">
+                  {permissionWarning(form.permissionMode)}{' '}
+                  {TRIGGER_BYPASS_WARNING}
+                </Banner>
+              ) : permissionWarning(form.permissionMode) ? (
+                <Banner tone="warn" title="Check the permission mode">
+                  {permissionWarning(form.permissionMode)}
+                </Banner>
+              ) : null}
             </>
           ) : null}
 
@@ -253,7 +293,7 @@ export function TriggerDialog({
           <Field
             label="Value pattern"
             htmlFor="trigger-pattern"
-            hint={`Every rendered value must match. Empty = ${DEFAULT_INBOUND_VALUE_PATTERN}`}
+            hint={`Every rendered value must match. Empty = ${DEFAULT_INBOUND_VALUE_PATTERN} (one token, no spaces). Values reach the skill fenced as data inside <payload>…</payload>.`}
           >
             <Input
               id="trigger-pattern"

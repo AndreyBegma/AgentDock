@@ -202,7 +202,15 @@ export interface TaskDesignView extends TaskDesignSummary {
   planId: string | null;
   /** The task owner's; `null` for a card's design. Prefer `owner`. */
   taskKey: string | null;
+  /**
+   * The skills the next Generate applies: the project default while the
+   * design follows it (#604), else the design's own set.
+   */
   skills: string[];
+  /** #604: the skills were edited by hand; a change of the default no longer reaches them. */
+  skillsEdited: boolean;
+  /** #604: the project's default skills (Settings → Design), for "Use defaults". */
+  defaultSkills: string[];
   /** The profile version the latest revisions were drawn from. */
   profileId: string | null;
   approvedBy: DesignUserRef | null;
@@ -262,7 +270,10 @@ export interface DesignFailureView {
 export interface TaskDesignPatchRequest {
   needed?: boolean;
   variantCount?: number;
+  /** Edits the skills by hand: the design keeps this set (#604). */
   skills?: string[];
+  /** #604: drop a hand edit; the design follows the project default again. Not with `skills`. */
+  useDefaultSkills?: boolean;
 }
 
 /** `POST /plans/:planId/tasks/:key/design/comments` (operator). */

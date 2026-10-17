@@ -13,10 +13,13 @@ export interface FaceSelection {
 }
 
 /**
- * Where a face's own boxes sit: over the card's `p-3` padding and border, so
- * the face's layout never shifts. The card is glass-ui's `li`.
+ * Where a face's own boxes sit: a permanent 16 px slot at the start of the
+ * header row, inside the card's `p-3` padding and border. It is always in the
+ * row and only its opacity changes, so the face's layout never shifts. On a
+ * coarse pointer the row grows and the slot centres in it. The card is
+ * glass-ui's `li`.
  */
-const BOX_PLACE = 'absolute -start-[22px] -top-[3px] z-10 size-5';
+const BOX_SLOT = 'relative grid size-4 shrink-0 place-items-center';
 
 /** A click on a face while selecting, or with ⌘/Ctrl/Shift, selects instead of opening. */
 export function toggleOnClick(
@@ -45,7 +48,7 @@ export function SelectionBox({
   return (
     <span
       data-selection-box=""
-      className={`${BOX_PLACE} grid place-items-center rounded-md bg-surface opacity-0 transition-opacity [li:focus-within_&]:opacity-100 [li:hover_&]:opacity-100 ${selection.selecting ? 'opacity-100' : ''}`}
+      className={`${BOX_SLOT} opacity-0 transition-opacity [li:focus-within_&]:opacity-100 [li:hover_&]:opacity-100 ${selection.selecting ? 'opacity-100' : ''}`}
     >
       <Checkbox
         aria-label={`Select ${label}`}
@@ -60,10 +63,19 @@ export function SelectionBox({
   );
 }
 
-/** Stands where the box would, while selecting, on what cannot be selected. */
-export function UnselectableMark({ text }: { text: string }) {
+/**
+ * Stands in the box's slot on what cannot be selected. The slot is reserved
+ * always; the lock shows while `shown` (something is selected).
+ */
+export function UnselectableMark({
+  text,
+  shown,
+}: {
+  text: string;
+  shown: boolean;
+}) {
   return (
-    <span className={`${BOX_PLACE} grid place-items-center`}>
+    <span className={`${BOX_SLOT} ${shown ? '' : 'invisible'}`}>
       <Tooltip content={text}>
         <span className="grid place-items-center text-ink-3">
           <Lock aria-label={text} role="img" className="size-3" />

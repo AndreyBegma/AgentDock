@@ -1,7 +1,8 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import type { Host } from '@agentdock/shared/protocol';
+import { accessHeaders, accessOf } from './access';
 import { runClaude } from './claude';
 import type { Clock } from './clock';
 import { ConfigError, isPaired, loadConfig, saveConfig } from './config';
@@ -19,10 +20,18 @@ import { createLogger, errorMessage, type Logger, parseLogLevel } from './log';
 import { runMcp } from './mcp';
 import { otlpSettings } from './otlp';
 import { PairingError, pair } from './pairing';
+import { runPolicy } from './policy/cli';
+import { nodeRealpath } from './policy/roots';
 import { normalizeServer, ServerUrlError } from './server-url';
 import { EXIT, launchAgentPlist, serviceUnit } from './service';
 import { setupClaude } from './setup/claude';
 import { Spool } from './spool';
+import {
+  clearStopStatus,
+  readStopStatus,
+  stopMessage,
+  writeStopStatus,
+} from './stop-status';
 import { RUNNER_VERSION } from './version';
 
 export interface CliDeps {
@@ -50,9 +59,17 @@ export interface CliDeps {
 const USAGE = `Usage: agentdock-runner <command>
 
 Commands:
-  pair --server <url> --code <XXXX-XXXX> [--no-detect]
+  pair --server <url> --code <XXXX-XXXX> [--no-detect] [--allow-root <dir>]… [--insecure]
+       [--access-client-id <id> (--access-client-secret <secret> | --access-client-secret-stdin)]
                                            pair this machine with an AgentDock server
-                                           (detects runtime profiles unless --no-detect)
+                                           (detects runtime profiles unless --no-detect;
+                                           --allow-root lets projects under <dir> be watched;
+                                           --insecure allows plain http to a host that is not
+                                           loopback — cleartext, at your own risk;
+                                           --access-client-* store a Cloudflare Access
+                                           service token, sent on pairing and every connect;
+                                           the secret may also come from
+                                           AGENTDOCK_ACCESS_CLIENT_SECRET)
   run                                      run the daemon in the foreground
   status                                   show config, connectivity and spool
   profiles [--detect [--write]]            list runtime profiles, or detect them
@@ -63,6 +80,8 @@ Commands:
                                            and point telemetry at this runner
   away on|off                              route permission prompts to AgentDock
                                            while you are away
+  policy show|set|allow-root|deny-root     the runner-local security policy; only
+                                           this command changes it (\`policy\` for help)
   version                                  print the version and the target
 
 Used by the agentdock Claude Code plugin:
@@ -76,9 +95,15 @@ Used by the runner's launches (Token saver):
                                            AGENTDOCK_RAW=1 leaves it unfiltered
   filter-hook                              the PreToolUse hook that routes Bash
                                            calls through filter (JSON on stdin)
+  read-hook                                the Read hook that refuses a whole read
+                                           of a big file and a repeated read once
+                                           (JSON on stdin)
 `;
 
 class UsageError extends Error {}
+
+const insecureWarning = (server: string): string =>
+  `WARNING: ${server} is plain http (pair --insecure). The runner token, prompts and session content travel in cleartext; anyone on the network path can read or rewrite them. Use https://.`;
 
 interface Context {
   deps: CliDeps;
@@ -89,7 +114,10 @@ interface Context {
 
 const out = (deps: CliDeps, line: string) => deps.stdout(`${line}\n`);
 
-type FlagOptions = Record<string, { type: 'string' | 'boolean' }>;
+type FlagOptions = Record<
+  string,
+  { type: 'string' | 'boolean'; multiple?: boolean }
+>;
 
 const flags = <T extends FlagOptions>(args: string[], options: T) =>
   withPositionals(args, options, 0).values;
@@ -125,18 +153,58 @@ const pairCommand = async ({
     server,
     code,
     'no-detect': noDetect,
+    'allow-root': allowRoot = [],
+    insecure = false,
+    'access-client-id': accessClientId,
+    'access-client-secret': secretFlag,
+    'access-client-secret-stdin': secretStdin,
   } = flags(args, {
     server: { type: 'string' },
     code: { type: 'string' },
     'no-detect': { type: 'boolean' },
+    'allow-root': { type: 'string', multiple: true },
+    insecure: { type: 'boolean' },
+    'access-client-id': { type: 'string' },
+    'access-client-secret': { type: 'string' },
+    'access-client-secret-stdin': { type: 'boolean' },
   });
   if (!server || !code) throw new UsageError('pair needs --server and --code');
-  const origin = normalizeServer(server);
+  if (secretFlag !== undefined && secretStdin) {
+    throw new UsageError(
+      'use either --access-client-secret or --access-client-secret-stdin',
+    );
+  }
+  const accessSecret = secretStdin
+    ? (
+        await new Response((deps.stdin ?? (() => Bun.stdin.stream()))()).text()
+      ).trim()
+    : (secretFlag ?? deps.env.AGENTDOCK_ACCESS_CLIENT_SECRET);
+  if (accessSecret) log.addSecret(accessSecret);
+  if (Boolean(accessClientId) !== Boolean(accessSecret)) {
+    throw new UsageError(
+      'a Cloudflare Access service token needs both --access-client-id and the secret',
+    );
+  }
+  const access =
+    accessClientId && accessSecret
+      ? { clientId: accessClientId, clientSecret: accessSecret }
+      : undefined;
+  const origin = normalizeServer(server, insecure);
+  const cleartext = insecure && origin.startsWith('http:');
   const config = loadConfig(paths.configFile);
+  // ADR-0047: resolved before pairing, so a typo costs no pairing code.
+  const allowed = allowRoot.map((dir) => {
+    const real = nodeRealpath(resolve(deps.cwd ?? process.cwd(), dir));
+    if (real === null)
+      throw new UsageError(`--allow-root ${dir} does not exist`);
+    return real;
+  });
 
   const paired = await pair({
     server: origin,
+    insecure,
     code,
+    access,
     hostname: deps.host.hostname,
     runnerVersion: RUNNER_VERSION,
     fetch: deps.fetch,
@@ -155,9 +223,18 @@ const pairCommand = async ({
   saveConfig(paths.configFile, {
     ...config,
     server: origin,
+    // Only `pair` sets it (D-06): a re-pair over https clears it.
+    insecureServer: cleartext ? true : undefined,
+    // Only `pair` sets it: a re-pair without a token clears it.
+    accessClientId: access?.clientId,
+    accessClientSecret: access?.clientSecret,
     runnerId: paired.runnerId,
     token: paired.token,
     profiles: detected ?? config.profiles,
+    policy: {
+      ...config.policy,
+      allowedRoots: [...new Set([...config.policy.allowedRoots, ...allowed])],
+    },
     // Sessions are ingested from pairing on, unless a backfill asks (D11).
     sessions: {
       ...config.sessions,
@@ -166,9 +243,17 @@ const pairCommand = async ({
     },
   });
   log.info('paired', { runnerId: paired.runnerId, server: origin });
+  if (cleartext) out(deps, insecureWarning(origin));
   out(
     deps,
     `Paired as ${paired.runnerId}. Config written to ${paths.configFile}`,
+  );
+  const roots = [...new Set([...config.policy.allowedRoots, ...allowed])];
+  out(
+    deps,
+    roots.length > 0
+      ? `Projects may be watched under: ${roots.join(', ')}`
+      : 'No project root is allowed yet: run `agentdock-runner policy allow-root <dir>` before connecting a project.',
   );
   if (detected) {
     out(deps, `Detected ${detected.length} profiles:`);
@@ -197,11 +282,24 @@ const runCommand = async ({
     return EXIT.failure;
   }
   log.addSecret(config.token);
+  if (config.accessClientSecret) log.addSecret(config.accessClientSecret);
+  try {
+    normalizeServer(config.server, config.insecureServer);
+  } catch (error) {
+    deps.stderr(`${errorMessage(error)}\n`);
+    return EXIT.failure;
+  }
+  if (config.insecureServer) {
+    const warning = insecureWarning(config.server);
+    deps.stderr(`${warning}\n`);
+    log.warn(warning);
+  }
   if (config.profiles.length === 0) {
     log.warn(
       'no runtime profiles configured; nothing can be launched. Run `agentdock-runner profiles --detect --write`',
     );
   }
+  clearStopStatus(paths.stopStatusFile);
   const reason = await runDaemon({
     config,
     configFile: paths.configFile,
@@ -219,7 +317,24 @@ const runCommand = async ({
     signal: deps.signal,
     onStart: deps.onStart,
   });
-  return reason.kind === 'terminal' ? EXIT.terminalClose : EXIT.ok;
+  if (reason.kind !== 'terminal') return EXIT.ok;
+  // The process is about to end and the unit will not restart it: leave the
+  // why where `status` finds it (C-108).
+  const stopped = {
+    code: reason.code,
+    reason: reason.reason,
+    at: new Date(deps.clock.now()).toISOString(),
+  };
+  try {
+    writeStopStatus(paths.stopStatusFile, stopped);
+  } catch (error) {
+    log.error('cannot write the stop status', {
+      file: paths.stopStatusFile,
+      error: errorMessage(error),
+    });
+  }
+  log.error(`stopped: ${stopMessage(stopped)}`, { code: reason.code });
+  return EXIT.terminalClose;
 };
 
 const statusCommand = async ({
@@ -231,6 +346,7 @@ const statusCommand = async ({
   flags(args, {});
   const config = loadConfig(paths.configFile);
   if (config.token) log.addSecret(config.token);
+  if (config.accessClientSecret) log.addSecret(config.accessClientSecret);
   const spool = Spool.inspect(paths.spoolDir);
   out(deps, `config:   ${paths.configFile}`);
   out(
@@ -238,7 +354,13 @@ const statusCommand = async ({
     `paired:   ${isPaired(config) ? `yes, as ${config.runnerId}` : 'no'}`,
   );
   out(deps, `server:   ${config.server ?? '-'}`);
+  if (config.insecureServer && config.server) {
+    out(deps, insecureWarning(config.server));
+  }
   out(deps, `profiles: ${config.profiles.length}`);
+  if (accessOf(config)) out(deps, 'access token: set');
+  const stopped = readStopStatus(paths.stopStatusFile);
+  if (stopped) out(deps, `stopped:  ${stopMessage(stopped)}`);
   out(
     deps,
     `spool:    ${spool.segments} segment(s), ${spool.bytes} bytes, last seq ${spool.lastSeq}, acked ${spool.ackedSeq}`,
@@ -247,6 +369,7 @@ const statusCommand = async ({
     try {
       const response = await deps.fetch(config.server, {
         method: 'GET',
+        headers: accessHeaders(accessOf(config)),
         redirect: 'manual',
         signal: AbortSignal.timeout(5_000),
       });
@@ -384,6 +507,14 @@ const COMMANDS: Record<string, (context: Context) => Promise<number>> = {
   'install-service': installServiceCommand,
   setup: setupCommand,
   away: ({ deps, paths, args }) => runAway(args, localDeps(deps, paths)),
+  policy: async ({ deps, paths, args }) =>
+    runPolicy(args, {
+      configFile: paths.configFile,
+      cwd: deps.cwd ?? process.cwd(),
+      realpath: nodeRealpath,
+      stdout: deps.stdout,
+      stderr: deps.stderr,
+    }),
   // `mcp` and `claude` take their arguments raw: the wave-3 slots own them.
   mcp: ({ deps, paths, args }) => runMcp(args, localDeps(deps, paths)),
   claude: ({ deps, paths, args }) => runClaude(args, localDeps(deps, paths)),
@@ -405,7 +536,11 @@ export const runCli = async (
   }
   // `main.ts` serves these before loading the CLI (#445 D3); this path is for
   // callers of `runCli` itself.
-  if (command === 'filter' || command === 'filter-hook') {
+  if (
+    command === 'filter' ||
+    command === 'filter-hook' ||
+    command === 'read-hook'
+  ) {
     const { runFilterCommand } = await import('./filter/main');
     // One decoder per stream: a character may span two chunks.
     const writer = (write: (text: string) => void) => {

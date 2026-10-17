@@ -19,6 +19,8 @@ export const LIVE_CLOSE_CODES = {
   forbiddenOrigin: 4403,
   /** The session already holds `MAX_LIVE_CONNECTIONS_PER_SESSION` sockets; the new one is refused. */
   tooManyConnections: 4429,
+  /** The socket sent frames faster than the server's rate (20/s, burst 50 by default). */
+  rateLimited: 4429,
 } as const;
 
 export type LiveCloseCode =

@@ -50,6 +50,20 @@ describe('shippingBadge (#359 D6–D8)', () => {
     expect(shippingBadge(c)?.label).toBe('CI reported no checks');
     expect(ciBanner(c)?.title).toBe('CI reported no checks');
   });
+  test('needsPerson on a head the latest round did not work on names the round (#542)', () => {
+    const c = card(1, 'finished', {
+      needsPerson: true,
+      needsPersonReason: 'round_pushed_nothing',
+      ciState: 'green',
+    });
+    expect(shippingBadge(c)?.label).toBe(
+      'Last round pushed no commit; not merged',
+    );
+    expect(ciBanner(c)?.title).toBe('Last round pushed no commit; not merged');
+    expect(
+      shippingBadge({ ...c, needsPersonReason: 'round_failed' })?.label,
+    ).toBe('Last round failed; not merged');
+  });
   test('a plain card has no badge', () => {
     expect(shippingBadge(card(1, 'in_progress'))).toBeNull();
   });

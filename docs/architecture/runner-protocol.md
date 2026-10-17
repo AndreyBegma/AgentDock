@@ -12,7 +12,9 @@ schemas fails the build.
 
 1. An admin creates a runner in the UI → the API returns a one-time pairing code
    (10 minutes, single use) and an install command.
-2. `agentdock-runner pair --server https://dock.example --code XXXX-XXXX`
+2. `agentdock-runner pair --server https://dock.example --code XXXX-XXXX [--allow-root <dir>]…`
+   — each `--allow-root` is added to the runner-local policy's `allowedRoots`
+   ([Runner-local policy](#runner-local-policy)).
 3. The runner posts `{ code, hostname, version, protocolVersion }` to
    `POST <server>/runners/pair` (`PAIRING_PATH`). The API exchanges the code
    for a long-lived runner token and the runner id: `{ runnerId, token }`. An
@@ -48,6 +50,17 @@ both sit at the root of that origin.
 | `4401` | missing, unknown or revoked token |
 | `4409` | a newer connection of the same runner replaced this one |
 
+Every close above is terminal: the runner exits 78 and its service unit does not
+restart it. Before exiting it logs why and writes
+`~/.local/state/agentdock/stopped.json`, which `agentdock-runner status` prints
+(`replaced by another connection at <time>, re-pair if this was not you` for
+`4409`); the next `run` clears it. A `4409` that takes over a socket that was
+still open is audited as `runner.connection_replaced` with both peers' IP and
+user agent, and every active admin gets a `runner.connection_replaced`
+notification (C-108: the token is readable by any process of the runner's user,
+so a takeover may be an impostor). A reconnect after the old socket had already
+closed is not reported.
+
 ## Messages
 
 | Direction | Type | Payload |
@@ -70,6 +83,8 @@ both sit at the root of that origin.
 | S ↔ R | `terminal.data` | `{ id, b64 }` — PTY bytes of an attach, ≤ 64 KiB decoded; S → R only on a `write` attach |
 | S → R | `terminal.resize` | `{ id, cols, rows }` |
 | S ↔ R | `terminal.close` | `{ id, reason: "client" \| "idle" \| "max_duration" \| "session_ended" \| "socket" }` |
+| S → R | `terminal.history.request` | `{ id }` — capture the attached pane's history; allowed on a `read` attach |
+| R → S | `terminal.history` | `{ id, lines, last }` — the captured lines with ANSI, oldest first, in chunks |
 | R → S | `local.request` | `{ id, method, args, projectId?, session?, via }` — a runner-initiated request from the `agentdock` plugin, see below |
 | S → R | `local.response` | `{ id, ok, data?, error? }` |
 
@@ -106,7 +121,8 @@ still connects.
     },
     "profiles": [
       { "id": "claude-blacktoorroot", "runtime": "claude",
-        "env": { "CLAUDE_CONFIG_DIR": "~/.claude-profiles/blacktoorroot" },
+        "env": { "CLAUDE_CONFIG_DIR": "~/.claude-profiles/blacktoorroot",
+                 "ANTHROPIC_API_KEY": { "set": true } },
         "args": [], "authenticated": true }
     ],
     "codeSentinel": { "version": "1.23.0", "path": "~/.claude-profiles/blacktoorroot/plugins/code-sentinel" },
@@ -117,17 +133,32 @@ still connects.
       "orchestrator.message", "orchestrator.start", "orchestrator.status", "orchestrator.stop",
       "plan.cancel", "plan.close", "plan.turn",
       "pr.approve", "pr.inspect", "pr.requestChanges", "pr.voidApproval",
-      "project.inspect", "project.refresh",
+      "project.inspect", "project.refresh", "project.scan_rules",
       "runner.describe", "runner.ping", "session.backfill",
       "skill.cancel", "skill.inspect", "skill.install", "skill.list",
       "skill.run", "skill.search", "skill.uninstall",
       "slot.message", "slot.stop", "terminal.attach",
       "uiprofile.build", "uiprofile.fingerprint", "worktree.status"
     ],
-    "disabledCommands": ["pr.approve"]
+    "disabledCommands": ["pr.approve"],
+    "policy": {
+      "allowedRoots": ["/home/archi/dev"],
+      "maxPermissionMode": "auto",
+      "terminal": { "write": false },
+      "skills": { "profileInstall": false },
+      "commands": { "orchestrator.message": false, "slot.message": false, "session.message": false }
+    }
   }
 }
 ```
+
+A profile's `env` is reported names only (C-123, ADR-0006): only
+`CLAUDE_CONFIG_DIR` and `CODEX_HOME` — paths, never credentials — carry their
+value; every other name is `{ "set": true }` and its value stays in the runner
+config. The schema rejects a value for any other name, more than 64 env entries
+or args, and a `binary`, arg or path longer than 4096 characters. The runner
+never puts an env value on a command line either: the orchestrator session
+reads its env from a 0600 launch file through `exec-run`, as card rounds do.
 
 `terminal` says whether the runner serves `terminal.attach`: it has Bun's PTY
 API (Bun ≥ 1.3.5, POSIX), tmux ≥ 3.2, and the command is not in
@@ -167,6 +198,14 @@ older than the field. An absent `disabledCommands` means none. Read them with
 `commandsSupport()`: a feature checks the commands it needs, never the runner
 version. `protocolVersion` stays `1`; the fields are additive and optional.
 
+`policy` is the runner's local security policy as it is now
+([Runner-local policy](#runner-local-policy)) — values only, no path beyond
+`allowedRoots` (see the `hello` example above).
+
+Read it with `runnerPolicyOf()`. `commands` has plain string keys, so a runner
+that gates a command the API does not know keeps a valid hello. **Absent means
+a runner older than the policy**, which refuses nothing.
+
 A profile is runtime + optional `binary` (the runtime's own name when absent) +
 `env` + `args` + `authenticated` (ADR-0006).
 
@@ -191,7 +230,11 @@ one.
 `config.projects` is the runner's **watch list**: the projects whose roots it
 may refresh and whose collectors it runs, one instance per collector per
 project. `welcome` carries the authoritative list on every connect; the runner
-caches it in its config file so collectors run before the first connect.
+caches it in its config file so collectors run before the first connect. A
+`root` must be absolute; the runner watches it only when its real path is
+inside the policy's `allowedRoots` and it is a git main checkout (ADR-0047) —
+a refused project is left out and logged, and its commands answer
+`policy_refused` or `path_not_allowed`.
 
 ### `config`
 
@@ -544,12 +587,54 @@ token counts only: no prompt, response, thinking or tool-argument text (D9).
 | `not_runnable` | the skill is refused as a run: the orchestrator or a worker |
 | `too_large` | a skill is over `SKILL_MAX_FILES` (500) or `SKILL_MAX_TOTAL_BYTES` (5 MiB) |
 | `upstream_unavailable` | the catalog (skills.sh) or the forge (GitHub) did not answer |
+| `attachments_unavailable` | `card.run` could not download an attachment, or its size or SHA-256 did not match |
+| `policy_refused` | the runner's local security policy refuses the command ([ADR-0047](../adr/0047-a-runner-local-security-policy-the-server-cannot-change.md)); `message` names the rule and the CLI line that lifts it — see [Runner-local policy](#runner-local-policy) |
 
 The API answers the three path codes with an HTTP error of the same name in
 the body: `path_not_found` and `not_a_repository` → **422** (the request is
 well-formed, the path is not usable), `path_not_allowed` → **403**. On
 `project.refresh`, `path_not_allowed` means the runner's watch list does not
 hold that project: the API resends `config` before the caller retries.
+`policy_refused` → **403** with the API error code `policy_refused` on every
+surface (board, control, terminal close `4407`, skills, projects) and the
+runner's message passed on, so the UI can show the rule and the fix.
+
+An API older than `policy_refused` drops a `command.result` carrying it (the
+code fails its enum) and the caller sees a timeout: deploy the API before the
+runners that send it.
+
+### Runner-local policy
+
+[ADR-0047](../adr/0047-a-runner-local-security-policy-the-server-cannot-change.md)
+(amends ADR-0010). The allowlist says *which* commands exist; it is not a
+boundary against a server that sends a dangerous instance of one. The runner
+therefore keeps a `policy` block in its own `runner.json`. Only the CLI on the
+machine writes it — `agentdock-runner policy show|set|allow-root|deny-root` and
+`pair --allow-root <dir>` — and no message from the server (`welcome`,
+`config`, any command) can change it. A running daemon re-reads it within 5 s.
+
+| Rule | Default | Refuses |
+|---|---|---|
+| `allowedRoots` | none | a `root` anywhere in a command's args, or `project.inspect`'s / `project.scan_rules`'s `path`, whose real path is outside every allowed root (a symlink out included); and every watch-list root that is outside them or is not a git main checkout — that project is not watched |
+| `maxPermissionMode` | `auto` | `card.run`, `card.resume`, `skill.run`, `orchestrator.start` with a `permissionMode` above it (`manual` < `acceptEdits` < `auto` < `bypassPermissions`) |
+| `terminal.write` | `false` | `terminal.attach` with `mode: "write"`, and the input of a write attach already open once it is turned off |
+| `skills.profileInstall` | `false` | `skill.install` with `target.scope: "profile"` |
+| `commands.<name>` | `false` | `orchestrator.message`, `slot.message`, `session.message` — free text into a live agent session whose permission mode the policy may not have set |
+
+The dispatcher checks the policy after the args parse and before any handler;
+`orchestrator.start` checks it again itself, and the terminal manager checks
+`terminal.write` on attach and on every input frame. A refusal is
+
+```json
+{ "type": "command.result", "id": "cmd_9", "ok": false,
+  "error": { "code": "policy_refused",
+    "message": "refused by this runner's policy (maxPermissionMode): card.run asks for bypassPermissions, this runner allows at most auto. On the runner's machine: `agentdock-runner policy set maxPermissionMode bypassPermissions`" } }
+```
+
+The message always has that shape — `refused by this runner's policy
+(<rule>): <why>. On the runner's machine: \`<command>\`` — and the web reads
+the rule and the command out of it. The effective policy rides in `hello`
+capabilities (below).
 
 ### `subscribe`, `unsubscribe`, `pane`, `subscribe.error`
 
@@ -686,7 +771,7 @@ never persists frames: the D10 report fields arrive in `skill_run.finished`.
 { "type": "run_log", "id": "run_91c2", "frame": { "type": "ended", "phase": "succeeded" } }
 ```
 
-### `terminal.data`, `terminal.resize`, `terminal.close`
+### `terminal.data`, `terminal.resize`, `terminal.close`, `terminal.history`
 
 The byte stream of an interactive attach ([spec 29](../specs/29-terminal-attach.md)).
 The `terminal.attach` command opens it (see [Terminal](#terminal)), and its
@@ -733,6 +818,37 @@ therefore capped by the runner.
 
 ```json
 { "type": "terminal.close", "id": "term_4c1d", "reason": "idle" }
+```
+
+`terminal.history.request` asks for the history of an attach's pane (issue
+#522): tmux redraws the whole screen of an attach, so the browser's own
+scrollback never fills. It carries the attach `id` and nothing else — no
+session name, no line count, no argument. The runner captures the session it
+already holds for that `id`, and ignores an `id` it does not hold. It is
+allowed on a `read` attach, because asking is not input, and it neither
+writes to the PTY nor puts the session into copy-mode, so other clients of the
+session see nothing. One request per attach is answered at a time; the
+runner ignores another while one is being captured, and the API refuses one
+for `TERMINAL_HISTORY_TIMEOUT_MS` (10 s) while it waits for an answer.
+
+The runner answers with
+`tmux capture-pane -p -e -J -t =<session>: -S -5000` (argv, `=` exact
+target) and replies with `terminal.history`: the last
+`TERMINAL_HISTORY_LINES` (5,000) lines, oldest first, with their ANSI
+sequences. A line longer than `TERMINAL_HISTORY_LINE_MAX_CHARS` (16,384) is
+cut, and when the whole reply would serialize to more than
+`TERMINAL_HISTORY_MAX_BYTES` (2 MiB) the oldest lines are dropped. The reply
+is split into messages of at most `TERMINAL_HISTORY_CHUNK_BYTES` (128 KiB) of
+serialized lines; `last: true` marks the final one. A capture that fails
+answers one empty `last` chunk. The API relays the chunks to that attach's
+browser only, as `history` frames, and drops a chunk nobody asked for.
+
+```json
+{ "type": "terminal.history.request", "id": "term_4c1d" }
+```
+
+```json
+{ "type": "terminal.history", "id": "term_4c1d", "lines": ["\u001b[32m$\u001b[39m bun test", "12 pass"], "last": true }
 ```
 
 ### `local.request`, `local.response`
@@ -811,6 +927,7 @@ handler.
 | `runner.describe` | — | viewer | implemented: → `{ runnerVersion, hostname, os, arch, capabilities }` |
 | `project.inspect` | `path` | admin | implemented: → `ProjectInspection`, timeout 45 s |
 | `project.refresh` | `projectId, root` | operator | implemented: → `ProjectInspection`, timeout 45 s |
+| `project.scan_rules` | `path` | admin | implemented (#584, `commands/project-rules.ts`): → `{ candidates: [{ title, description, source }], scanned, warnings }`, timeout 15 s |
 | `orchestrator.start` | `projectId, root, profileId, model, permissionMode, mode: start\|next` | operator | implemented (`commands/control.ts`): → `{ session, startedAt }`, timeout 30 s |
 | `orchestrator.stop` | `projectId, root` | operator | implemented: → `{ stopped }`, timeout 10 s |
 | `orchestrator.status` | `projectId, root` | viewer | implemented: → `{ present, state, session?, startedAt? }`, timeout 5 s |
@@ -851,6 +968,16 @@ D2–D8 and D10.
   `409 not_main_checkout`.
 - `project.refresh { projectId, root }` re-inspects a root only when the
   watch list holds it under that `projectId`.
+- `project.scan_rules { path }` (#584) reads a fixed list of files at the
+  root — `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md` (also under `.github/`
+  and `docs/`), Biome, ESLint and Prettier configs, `.editorconfig`,
+  `tsconfig.json` — and answers coding-rule candidates: one per top-level
+  list item of a guide, and one per tool from a small mapping of well-known
+  config options. No model call. A file over 256 KB, a binary file, or a
+  symlink out of the root is skipped with a warning and never read whole; no
+  other file is read. Admin-only, like `project.inspect`, and checked against
+  the policy's `allowedRoots` the same way. Nothing is stored: the API
+  creates rules only from the candidates a person accepts.
 - `remote.forge` is `github` for an `origin` on github.com, else
   `unsupported` (also when there is no `origin`, `url: null`). The API refuses
   to connect `unsupported` (`422 unsupported_forge`).
@@ -1047,7 +1174,7 @@ A run outlives `skill.run`. Its progress is two event types (`source: "runner"`)
 | Type | `data` | Sent |
 |---|---|---|
 | `skill_run.phase_changed` | `runId, projectId, phase, at, tmuxSession?, worktree?, branch?` | on every phase transition, `queued` included |
-| `skill_run.finished` | `runId, projectId, phase (terminal), finishedAt, exitCode, reportText?, reportTruncated, changedFiles[] { status, path }, changedFilesTotal, patch?, patchTruncated, prNumber?, prUrl?, error?` | once, at a terminal phase |
+| `skill_run.finished` | `runId, projectId, phase (terminal), finishedAt, exitCode, reportText?, reportTruncated, changedFiles[] { status, path }, changedFilesTotal, patch?, patchTruncated, patchSha256?, prNumber?, prUrl?, error?` | once, at a terminal phase |
 
 `skill_run.finished` must fit an `events` batch:
 
@@ -1091,7 +1218,9 @@ How the runner serves them:
 - **Run log.** `run_log` subscriptions are refused `not_found` for a run of
   another project. Each one replays at most `RUN_LOG_BACKLOG_LINES` and
   then tails `stream.jsonl` every 500 ms. Lines are redacted like pane
-  frames, and so is `reportText`.
+  frames, and so are `reportText` and `patch` (C-128: one redactor for every
+  runner-to-server text). With the runner-local `skills.keepPatchesLocal`,
+  `patch` is never sent: `patchSha256` names the patch kept on the runner.
 
 ### Board cards
 

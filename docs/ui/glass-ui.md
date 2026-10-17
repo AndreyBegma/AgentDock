@@ -1,7 +1,7 @@
 # glass-ui in AgentDock
 
 [glass-ui](https://github.com/AndreyBegma/glass-ui) is the only component
-library (ADR-0011), consumed from npm as `@andrewbehma/glass-ui`. Releases are tags on `main`, cut from `develop` through a release PR and published to npm; `v0.21.0` ships the M1 desk primitives (glass-ui#67), `v0.22.0` the M2 activity primitives (#70), `0.23.0` the npm package with compiled `dist/` (#89), `0.24.0` the look from the UI audit (canvas, accent, two surface levels, `Select`/`DateInput`, `TabBar` — #93), `0.27.0` the workspace patterns and NavRail groups (#94), `0.28.0` the navy palette, identity hues and status tokens (#109), `0.28.1` the flat navy glass button (glass-ui#127), `0.29.0` the style-system components (glass-ui#130–#135), `0.30.0` `ResizableFrame` (glass-ui#139–#141). AgentDock is on **0.30.0**.
+library (ADR-0011), consumed from npm as `@andrewbehma/glass-ui`. Releases are tags on `main`, cut from `develop` through a release PR and published to npm; `v0.21.0` ships the M1 desk primitives (glass-ui#67), `v0.22.0` the M2 activity primitives (#70), `0.23.0` the npm package with compiled `dist/` (#89), `0.24.0` the look from the UI audit (canvas, accent, two surface levels, `Select`/`DateInput`, `TabBar` — #93), `0.27.0` the workspace patterns and NavRail groups (#94), `0.28.0` the navy palette, identity hues and status tokens (#109), `0.28.1` the flat navy glass button (glass-ui#127), `0.29.0` the style-system components (glass-ui#130–#135), `0.30.0` `ResizableFrame` (glass-ui#139–#141). `0.34.0` the floating `BottomCapsule` the shell uses below `lg` (#521), `0.35.0` `FloatingWindow` and `Launcher` (glass-ui#161, for the assistant, #600). AgentDock is on **0.35.0**.
 
 ## Consumption
 
@@ -41,29 +41,52 @@ process state.
 
 ## Navigation
 
-- From `lg` (1024 px) up: `NavRail` — Workspace, the current project's pages
-  (titled with its name), and Admin as a `collapsible` group that unfolds by
-  itself while an admin page is open. Badges: the waiting-approvals count on
-  Approvals, the slots that wait on a person on Fleet.
-- Below `lg`: `TabBar` with five places (the workspace's outside a project,
-  the project's working pages inside one) and `More`, a sheet with the project
-  switcher and the remaining pages as `ActionList`s. The top bar shows the
-  page title and a way up. The split is `tabBarSplit` in
-  `components/shell/nav.ts`.
+- From `lg` (1024 px) up: `NavRail` — Workspace, the current project's working
+  pages (titled with its name: Project, Work, Activity), a **More** group under
+  them (Fleet, Queue, Approvals, History, Token saver, Skills, Schedules,
+  Settings) and Admin. More and Admin are `collapsible` groups; inside a
+  project Workspace is one too. Each folds by default, unfolds by itself while
+  one of its pages is open and remembers its state per browser under its own
+  `localStorage` key (`railGroups` in `nav.ts` models the split, C-247).
+  Badges: the waiting-approvals count on Approvals, the slots that wait on a
+  person on Fleet; while More is folded Fleet's count rides More's title
+  ("More · 2").
+- Below `lg`: `BottomCapsule` (#521), floating clear of the screen's edges,
+  with `tabSizing="content"` so no label is truncated. Three places — Overview
+  · Projects · Activity outside a project, Work (the Board) · Fleet · Approvals
+  inside one — and `More`, a bottom sheet with the project switcher, a "Needs
+  you" `ActionList` carrying the waiting-approvals and Fleet-attention counts
+  (while `BottomCapsuleTab` has no `badge`), and the remaining pages as
+  `ActionList`s; a navigation closes it. The split is `tabBarSplit` in
+  `components/shell/nav.ts`. The tabs never change per page or per role.
+- The round `+` beside the capsule is the page's create action. A page
+  registers its actions with `usePageActions` (`components/shell/use-page-actions.tsx`);
+  `capsuleAction` (`components/shell/page-actions.ts`) decides: one action
+  runs directly, two or more open a bottom `Sheet` listing them as an
+  `ActionList` (the sheet grows out of the circle through `morphFrom`, and the
+  circle is removed while it is open), none inside a project falls back to
+  New work on the Board, none outside a project draws no `+`. Operator-only
+  actions are dropped for a viewer first; with nothing left there is no `+`.
+  Today the Board registers New work, Fleet and Queue New issue, and Schedules
+  New schedule.
+- The capsule's built-in spacer (6 rem plus the safe area) keeps a page's end
+  clear of it; a sticky bottom bar (the planner composer's controls) sits at
+  `bottom-[calc(6rem+env(safe-area-inset-bottom))]`, above it. The top bar
+  shows the page title and a way up.
 
 ## What exists and where it is used
 
 | Need | glass-ui |
 |---|---|
 | page backdrop | `Canvas` (the aurora, root layout) |
-| app navigation | `NavRail` (groups, collapsible, badges, scroll fade), `TabBar` (below `lg`), `ActionList` (More's sheet), `Breadcrumb`, `CommandPalette` (⌘K) |
+| app navigation | `NavRail` (groups, collapsible, badges, scroll fade), `BottomCapsule` (below `lg`, `tabSizing="content"`, the page-driven `+`), `ActionList` (More's sheet, the `+` sheet), `Breadcrumb`, `CommandPalette` (⌘K) |
 | lists / tables | `Table*`, `DataTable`, `Toolbar`, `RowActions` |
 | queue board, project Board | `Board` (kanban); the Board page is controlled and declines a move in `onMove` |
 | status | `StatusPill` / `StatusDot` (process state), `Badge` (tone, `dot`, `hue`), `Progress`, `Spinner`, `Skeleton`, `EmptyState`, `SectionUnavailable`, `Banner` |
 | dashboards | `StatTile` (`hue`), `Sparkline`, `Chart`, `KeyValueList` |
 | activity / agents | `Timeline`, `LogViewer`, `TraceTree`, `CodeBlock`, `Terminal`, `CronInput` |
 | forms | `Field`, `Input`, `Select`, `Combobox`, `Toggle`, `Checkbox`, `RadioGroup`, `NumberInput`, `DateInput`, `Textarea` |
-| overlays | `DialogRoot`, `SheetRoot`, `Menu*`, `ContextMenu*`, `Popover*`, `Tooltip`, `toast` |
+| overlays | `DialogRoot`, `SheetRoot`, `Menu*`, `ContextMenu*`, `Popover*`, `Tooltip`, `toast`, `FloatingWindow` (0.35.0: a non-modal window dragged by its bar, resized from every edge and corner, minimized by Escape, its geometry persisted under `storageKey`; a bottom `Sheet` below `md`), `Launcher` (0.35.0: the round floating button with a badge that opens it, above the `BottomCapsule` below `lg`) |
 | misc | `Card` (`hue`), `Tabs`, `SegmentedControl`, `Disclosure`, `Tree`, `Avatar`, `KeyHint`, `Separator`, `SplitPane`, `ResizableFrame` (0.30.0: a controlled-width frame with splitter edges — the design viewer's mockup) |
 
 ## Added in 0.29.0
@@ -81,7 +104,7 @@ markup.
 | `Badge` axes | `size="md"` (a word, sentence case), `shape="square"` with `hue` (identity swatch), solid fill on `ok` / `warn` / `danger` counts |
 | `Toolbar` | `activeFilters` + `onClearAll` draw removable chips; `collapseBelow` folds `filters` into "Filters (n)" and a Sheet |
 | `EmptyState` `action` | data form `{ label, onClick }` or `{ label, href }` renders a Button |
-| `TabBar` `badge` | a count or dot on a tab-bar item, like the rail's |
+| `TabBar` `badge` | a count or dot on a tab-bar item, like the rail's (the shell moved to `BottomCapsule` in #521) |
 
 ## The style system (canonical choice per pattern)
 
@@ -109,14 +132,17 @@ Until then AgentDock does without it rather than drawing it here (ADR-0011).
 
 | Gap | Effect in AgentDock |
 |---|---|
+| `NavRailGroup` has no `badge` | A folded group cannot carry a count on its heading; the shell appends Fleet's count to More's title ("More · 2") until glass-ui adds a group badge (C-247). |
 | `Board` has no `canDrop(card, column)` | The Board page checks `boardMoveRule` in `onMove` and declines there; a refused card snaps back, and the menu's "Move to" items still list every column. |
 | `Board`'s card `li` sets `min-h-(--size-row)` without `shrink-0` | In a height-bounded column the cards squash to one row instead of scrolling; `components/board/board-view.tsx` adds `[&_[data-board-card]]:shrink-0` on the board's wrapper (#384, glass-ui#147). |
+| `Board`'s card menu always lists one "Move to <column>" item per other column, and `ActionList` rows are 40 px with no current mark | The card menu gets one "Move…" item that opens `components/board/move-picker.tsx` (a bottom `Sheet` of `Button` rows, 52 px, current column marked), also behind the card sheet's and the card page's Move button (#515). glass-ui's own per-column items stay in the menu until `Board` can hide them. |
 | `Button`'s coarse-pointer touch target is as wide as the button | An icon button narrower than 44 px stays narrower to a finger; on the Board, the inline card-menu trigger is 20 × 44 px on a phone while every other face control is at least 44 × 44 (#497, glass-ui#160). |
+| `BottomCapsuleTab` has no `badge` | The capsule's Approvals and Fleet tabs cannot carry the rail's counts; below `lg` the waiting approvals and the slots that need a person are rows of a "Needs you" `ActionList` at the top of More's sheet (`components/shell/capsule.tsx`, #521). |
 | `Toggle` has no `disabled` | `components/board/card-options.tsx` makes a locked toggle inert and dimmed and drops its change handler. |
 
 `Board` was checked at 390 px for #242: its columns scroll sideways inside the
 board and the page does not, so it needs no release for the phone. Below
-`lg` the Board lays out for a phone, at the same breakpoint as the tab bar
+`lg` the Board lays out for a phone, at the same breakpoint as the capsule
 (`components/shell/narrow.ts`, #497), and on a coarse pointer each control on a
 card, stack or plan-task face is a 44 px touch target (`components/board/tap.ts`)
 while a fine pointer sees the face unchanged.

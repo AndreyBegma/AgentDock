@@ -1,6 +1,14 @@
 import { z } from 'zod';
+import {
+  boundedText,
+  LIST_MAX,
+  TEXT_LINE_MAX,
+  TEXT_NAME_MAX,
+  TEXT_PATH_MAX,
+} from '../bounded';
 import type { CommandDefinition } from '../commands';
 import { prChecksSchema } from '../events/fleet';
+import { httpsGithubUrl } from '../github-url';
 import { absolutePathSchema } from '../projects';
 
 /**
@@ -53,14 +61,22 @@ export type PrInspectState = z.infer<typeof prInspectStateSchema>;
 
 /** One check of `statusCheckRollup`, classified like `rollupChecks`. */
 export const prCheckSchema = z.object({
-  name: z.string(),
+  name: boundedText(TEXT_LINE_MAX),
   state: z.enum(['pass', 'wait', 'fail']),
-  url: z.string().optional(),
+  /**
+   * The check's details page. A CI system runs off github.com, so only the
+   * scheme is pinned (`https`); anything else is dropped, not the check.
+   */
+  url: z
+    .url({ protocol: /^https$/ })
+    .max(TEXT_PATH_MAX)
+    .optional()
+    .catch(undefined),
 });
 export type PrCheck = z.infer<typeof prCheckSchema>;
 
 export const prFileSchema = z.object({
-  path: z.string().min(1),
+  path: boundedText(TEXT_PATH_MAX).min(1),
   additions: z.number().int().nonnegative(),
   deletions: z.number().int().nonnegative(),
 });
@@ -68,10 +84,10 @@ export type PrFile = z.infer<typeof prFileSchema>;
 
 export const prInspectionSchema = z.object({
   number: z.number().int().positive(),
-  url: z.url(),
-  title: z.string(),
+  url: httpsGithubUrl,
+  title: boundedText(TEXT_LINE_MAX),
   /** Trimmed by the runner to `PR_INSPECT_BODY_MAX_BYTES`. */
-  body: z.string(),
+  body: boundedText(PR_INSPECT_BODY_MAX_BYTES),
   state: prInspectStateSchema,
   /** `headRefOid` — what a decision binds to (D6). */
   headSha: headShaSchema,
@@ -83,11 +99,11 @@ export const prInspectionSchema = z.object({
   filesTruncated: z.boolean(),
   /** The rollup of `checkList` (`rollupChecks`). */
   checks: prChecksSchema,
-  checkList: z.array(prCheckSchema),
+  checkList: z.array(prCheckSchema).max(LIST_MAX),
   /** GitHub's `mergeable`: `MERGEABLE`, `CONFLICTING` or `UNKNOWN`. */
-  mergeable: z.string(),
+  mergeable: boundedText(TEXT_NAME_MAX),
   /** GitHub's `mergeStateStatus`: `CLEAN`, `BEHIND`, `BLOCKED`, … */
-  mergeStateStatus: z.string(),
+  mergeStateStatus: boundedText(TEXT_NAME_MAX),
   fetchedAt: z.iso.datetime({ offset: true }),
 });
 export type PrInspection = z.infer<typeof prInspectionSchema>;

@@ -1,5 +1,5 @@
 import type { TelegramIntegrationStatus } from '@agentdock/shared';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AuditService } from '../audit';
 import type { AuditContext } from '../audit/audit.types';
 import type { AuthUser } from '../auth';
@@ -12,12 +12,14 @@ import {
 import { SettingsService } from '../settings/settings.service';
 import { escapeMarkdownV2 } from './markdown-v2';
 import { TelegramApiError, TelegramClient } from './telegram-client';
+import { registerBotMenus } from './telegram-commands';
 import {
   telegramNotConfigured,
   telegramNotLinked,
   telegramTokenInvalid,
   telegramUnavailable,
 } from './telegram-error';
+import { TELEGRAM_OPTIONS, type TelegramOptions } from './telegram-options';
 import { TelegramPoller } from './telegram-poller';
 
 /**
@@ -50,6 +52,8 @@ const asHttpError = (error: unknown): never => {
  */
 @Injectable()
 export class TelegramIntegrationService {
+  private readonly logger = new Logger(TelegramIntegrationService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly tokens: BotTokenStore,
@@ -57,6 +61,7 @@ export class TelegramIntegrationService {
     private readonly client: TelegramClient,
     private readonly poller: TelegramPoller,
     private readonly audit: AuditService,
+    @Inject(TELEGRAM_OPTIONS) private readonly options: TelegramOptions,
   ) {}
 
   async status(): Promise<TelegramIntegrationStatus> {
@@ -88,6 +93,21 @@ export class TelegramIntegrationService {
     const bot = await this.client.getMe(token).catch(asHttpError);
     const linksBot = await this.linksBot();
     await this.tokens.set(token, bot.username, admin.id, ctx);
+    // #500 / #580: the command menu and the menu button. The token is already stored, so a menu Telegram
+    // refused is only logged; the poller sets it once more for a bot it has
+    // not polled for yet, and after a restart.
+    await registerBotMenus(
+      this.client,
+      token,
+      this.options.appUrl,
+      (what, error) => {
+        this.logger.warn(
+          `Telegram ${what} not set: ${
+            error instanceof TelegramApiError ? error.message : 'internal error'
+          }`,
+        );
+      },
+    );
 
     let unlinkedUsers = 0;
     if (linksBot !== null && linksBot !== bot.username) {

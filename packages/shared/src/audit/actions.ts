@@ -20,6 +20,11 @@ export const AUDIT_ACTIONS = [
   'runner.rename',
   'runner.revoke',
   'runner.update',
+  /**
+   * C-108: a runner's live socket was closed 4409 by a newer connection with
+   * its token — `meta` holds both peers' IP and user agent.
+   */
+  'runner.connection_replaced',
   'local.request',
   'runner.command',
   'runner.command.result',
@@ -34,6 +39,7 @@ export const AUDIT_ACTIONS = [
   'prices.version_create',
   'prices.recompute',
   'issue.create',
+  'issue.queue',
   'pane.watch_started',
   'pane.watch_stopped',
   'orchestrator.start',
@@ -52,6 +58,11 @@ export const AUDIT_ACTIONS = [
   'telegram.link',
   'telegram.unlink',
   'telegram.approval',
+  'telegram.project',
+  /** #576: a Move, Run or Stop from the Board in Telegram (`after: { action, number }`, denied when the role fell short). */
+  'telegram.board',
+  /** #578: a card's review action from Telegram (`after: { number, action }`). */
+  'telegram.card',
   'terminal.attached',
   'terminal.detached',
   'skill.installed',
@@ -92,6 +103,10 @@ export const AUDIT_ACTIONS = [
   'plan.revised',
   'plan.sent',
   'plan.task_reviewed',
+  /** #592 (ADR-0058): a New work candidate edited by hand (`meta.candidateId`). */
+  'plan.candidate_edited',
+  /** #592: a New work candidate rejected; no card was made. */
+  'plan.candidate_rejected',
   'planner.instructions_updated',
   'planner.settings_updated',
   'design.toggled',
@@ -169,6 +184,19 @@ export const AUDIT_ACTIONS = [
   'board.settings_updated',
   /** #271 D13: the per-project "Store text in English" switch (`after: { normalizeEnabled }`). */
   'text.settings_updated',
+  /**
+   * ADR-0059: a provider key set or replaced — `after: { suffix }`, never the
+   * key; `before` holds the replaced key's suffix.
+   */
+  'llm.key_set',
+  /** ADR-0059: a provider key deleted (`before: { suffix }`). */
+  'llm.key_deleted',
+  /** ADR-0059: a stored provider key tested (`result`, `meta.error`). */
+  'llm.key_tested',
+  /** ADR-0059: a provider's cap or enabled models changed. */
+  'llm.provider_updated',
+  /** ADR-0059: the instance default model changed. */
+  'llm.default_model_set',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
@@ -184,10 +212,19 @@ export type AuditActorType = (typeof AUDIT_ACTOR_TYPES)[number];
 export const AUDIT_RESULTS = ['ok', 'denied', 'error', 'requested'] as const;
 export type AuditResult = (typeof AUDIT_RESULTS)[number];
 
-/** Why a login was refused — `meta.reason` of a denied `auth.login` (D9). */
+/**
+ * Why a login was refused — `meta.reason` of a denied `auth.login` (D9).
+ * `throttled`: the source must wait after its own failures (C-109). `locked`
+ * only appears in records written before C-109 removed the account lock.
+ * `telegram_*`: a Mini App sign-in (#580) with unsigned or stale `initData`,
+ * or from a Telegram user no account is linked to.
+ */
 export const LOGIN_DENIED_REASONS = [
   'invalid_credentials',
+  'throttled',
   'locked',
   'pending_approval',
+  'telegram_invalid',
+  'telegram_not_linked',
 ] as const;
 export type LoginDeniedReason = (typeof LOGIN_DENIED_REASONS)[number];

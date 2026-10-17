@@ -9,7 +9,7 @@ import {
   serverMessageSchema,
 } from '@agentdock/shared/protocol';
 import type { INestApplication, LoggerService } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
+import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { WebSocket } from 'ws';
@@ -38,11 +38,14 @@ export interface RunnerE2eContext extends E2eContext {
 export const createRunnerE2eApp = async (
   options: Partial<RunnerOptions> = {},
   logger?: LoggerService,
+  /** Further provider overrides, e.g. another module's timings. */
+  override: (builder: TestingModuleBuilder) => TestingModuleBuilder = (b) => b,
 ): Promise<RunnerE2eContext> => {
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
-    .overrideProvider(RUNNER_OPTIONS)
-    .useValue({ ...defaultRunnerOptions, ...options })
-    .compile();
+  const moduleRef = await override(
+    Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(RUNNER_OPTIONS)
+      .useValue({ ...defaultRunnerOptions, ...options }),
+  ).compile();
   const app = moduleRef.createNestApplication<INestApplication<App>>();
   if (logger) app.useLogger(logger);
   configureApp(app);
@@ -98,6 +101,31 @@ export const pairedRunner = async (
   return response.body as { runnerId: string; token: string };
 };
 
+/** Re-pairs a paired runner over HTTP with a fresh code; returns the new token. */
+export const repairRunner = async (
+  ctx: E2eContext,
+  admin: Session,
+  runnerId: string,
+): Promise<string> => {
+  const renewed = await admin.send(
+    'post',
+    `/admin/runners/${runnerId}/pairing-code`,
+  );
+  if (renewed.status !== 200) {
+    throw new Error(`pairing code → ${renewed.status} ${renewed.text}`);
+  }
+  const { pairingCode } = renewed.body as PairingCodeResponse;
+  const response = await ctx
+    .http()
+    .post('/runners/pair')
+    .set('X-Forwarded-For', nextIp())
+    .send(pairBody(pairingCode));
+  if (response.status !== 200) {
+    throw new Error(`re-pair → ${response.status} ${response.text}`);
+  }
+  return (response.body as { token: string }).token;
+};
+
 export const capabilities: Capabilities = {
   tmux: '3.5a',
   git: '2.55.0',
@@ -140,12 +168,18 @@ export class TestRunnerSocket {
   private waiters: (() => void)[] = [];
   readonly socket: WebSocket;
 
-  constructor(origin: string, token: string | null) {
+  constructor(
+    origin: string,
+    token: string | null,
+    headers: Record<string, string> = {},
+  ) {
     const url = `${origin.replace(/^http/, 'ws')}${RUNNER_SOCKET_PATH}`;
-    this.socket = new WebSocket(
-      url,
-      token ? { headers: { Authorization: `Bearer ${token}` } } : {},
-    );
+    this.socket = new WebSocket(url, {
+      headers: {
+        ...headers,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
     this.socket.on('message', (data) => {
       this.inbox.push(serverMessageSchema.parse(JSON.parse(data.toString())));
       this.wake();

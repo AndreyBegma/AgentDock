@@ -20,18 +20,16 @@ enum UserStatus {
 }
 
 model User {
-  id               String     @id @default(cuid())
-  email            String     @unique
-  name             String?
-  passwordHash     String
-  role             Role       @default(viewer)
-  status           UserStatus @default(pending)
-  approvedById     String?
-  approvedAt       DateTime?
-  failedLoginCount Int        @default(0)
-  lockedUntil      DateTime?
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
+  id           String     @id @default(cuid())
+  email        String     @unique
+  name         String?
+  passwordHash String
+  role         Role       @default(viewer)
+  status       UserStatus @default(pending)
+  approvedById String?
+  approvedAt   DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
   approvedBy                  User?                         @relation("UserApprovals", fields: [approvedById], references: [id], onDelete: SetNull)
   approvedUsers               User[]                        @relation("UserApprovals")
@@ -47,6 +45,9 @@ model User {
   membersAdded                ProjectMember[]               @relation("ProjectMemberAddedBy")
   priceVersions               PriceVersion[]
   priceRecomputes             PriceRecompute[]
+  llmProvidersUpdated         LlmProviderSetting[]
+  llmCalls                    LlmCall[]
+  assistantConversations      AssistantConversation[]
   commandRuns                 CommandRun[]
   orchestratorSettingsUpdated ProjectOrchestratorSettings[]
   mergeApprovalsDecided       MergeApproval[]
@@ -58,6 +59,7 @@ model User {
   skillInstallPreviews        SkillInstallPreview[]
   schedulesCreated            Schedule[]                    @relation("ScheduleCreatedBy")
   schedulesUpdated            Schedule[]                    @relation("ScheduleUpdatedBy")
+  scheduleFirings             ScheduleFiring[]              @relation("ScheduleFiringPrincipal")
   budgets                     Budget[]                      @relation("BudgetUser")
   budgetsCreated              Budget[]                      @relation("BudgetCreatedBy")
   budgetOverrides             BudgetOverride[]              @relation("BudgetOverrideBy")
@@ -86,6 +88,7 @@ model User {
   tokenSaverSettingsUpdated   TokenSaverSettings[]
   stewardSettingsUpdated      StewardSettings[]
   settings                    UserSettings?
+  planCandidatesDecided       PlanCandidate[]               @relation("PlanCandidateDecidedBy")
 
   @@map("users")
 }
@@ -101,6 +104,22 @@ model UserSettings {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_settings")
+}
+
+/// Failed password checks of one source against one account (C-109, D-05):
+/// keyed by the email as typed, so an unknown address is throttled exactly
+/// like a real one. A source waits only for its own failures; no row, no wait.
+model LoginThrottle {
+  email         String
+  ip            String
+  failures      Int
+  lastFailureAt DateTime
+  /// The source may not try again before this.
+  blockedUntil  DateTime?
+
+  @@id([email, ip])
+  @@index([lastFailureAt])
+  @@map("login_throttles")
 }
 
 /// A login session. Named `UserSession` because `Session` is reserved for agent
@@ -252,9 +271,10 @@ model Event {
   /// Runner rows have positive seqs; server-originated rows (ADR-0014) take
   /// `-nextval('server_event_seq')`, so the two never meet.
   @@unique([runnerId, seq])
-  /// One plugin event per project root. NULLs are distinct in PostgreSQL, so
-  /// this binds plugin events only — a partial index without a `WHERE`.
-  @@unique([projectRoot, pluginEventId])
+  /// One plugin event per runner and project root. NULLs are distinct in
+  /// PostgreSQL, so this binds plugin events only — a partial index without a
+  /// `WHERE`.
+  @@unique([runnerId, projectRoot, pluginEventId])
   /// One server-originated event per key; NULLs are distinct, as above.
   @@unique([source, dedupeKey])
   @@index([type, ts])
@@ -308,6 +328,30 @@ model AuditRecord {
   @@index([projectId, ts])
   @@index([targetType, targetId])
   @@map("audit_records")
+}
+
+/// Repeats of one audit record within a minute (C-109): the first is written
+/// at once, the rest are counted here and written as one record when the
+/// minute is over. Not part of the chain; rows are deleted once written.
+model AuditFold {
+  action     String
+  targetType String
+  /// `''` for no target id.
+  targetId   String
+  /// `''` for no address.
+  ip         String
+  minute     DateTime
+  actor      Json
+  result     AuditResult
+  userAgent  String?
+  /// Repeats after the first.
+  count      Int         @default(0)
+  /// `meta.reason` of each repeat → how many.
+  reasons    Json        @default("{}")
+
+  @@id([action, targetType, targetId, ip, minute])
+  @@index([minute])
+  @@map("audit_folds")
 }
 
 /// Where a project's base branch came from (docs/specs/10 D4).
@@ -407,12 +451,16 @@ model Project {
   textNormalizations   TextNormalization[]
   textSettings         TextSettings?
   attachments          Attachment[]
+  assistantConversations AssistantConversation[]
   tokenSaverSettings   TokenSaverSettings?
   tokenSaverStats      TokenSaverStat[]
   stewardSettings      StewardSettings?
   stewardIncidents     StewardIncident[]
   stewardDigests       StewardDigest[]
   handoffNotes         HandoffNote[]
+  rules                ProjectRule[]
+  telegramLinks        TelegramLink[]
+  telegramIntakes      TelegramIntake[]
 
   @@unique([runnerId, rootPath])
   @@map("projects")
@@ -452,6 +500,9 @@ model DocsSource {
   classified Json
   candidates Json
   manual     Boolean        @default(false)
+  /// #379: where specs go, relative to the docs root. Set in Settings ›
+  /// Docs source; detection and a refresh leave it alone.
+  specDir    String?
   updatedAt  DateTime       @updatedAt
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -703,6 +754,7 @@ model AgentSession {
   workflowMark   SessionWorkflowMark?
   contents       SessionContent[]
   actionRequests ActionRequest[]
+  assistantAttachments AssistantAttachment[]
   cardCaptures   CardCapture[]
   capturedCards  BoardCard[]          @relation("BoardCardSourceSession")
   trackedCard    BoardCard?           @relation("BoardCardTrackedSession")
@@ -920,6 +972,7 @@ enum ActionRequestKind {
   orchestrator_start
   orchestrator_stop
   pr_approve
+  issue_queue
 }
 
 enum ActionRequestStatus {
@@ -1386,14 +1439,57 @@ model NotificationDelivery {
 
 /// The Telegram private chat a user linked (D9). One chat per user, one user per chat.
 model TelegramLink {
-  userId   String   @id
-  chatId   BigInt   @unique
-  username String?
-  linkedAt DateTime @default(now())
+  userId           String   @id
+  chatId           BigInt   @unique
+  username         String?
+  linkedAt         DateTime @default(now())
+  /// #500: the project the chat's Board commands act on (`/project`). Null
+  /// until chosen; a deleted project clears it.
+  currentProjectId String?
+  /// #620: the assistant conversation the chat's free text continues. Null
+  /// until the chat's first message, after `/newchat`, and once it is deleted.
+  assistantConversationId String?
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentProject        Project?               @relation(fields: [currentProjectId], references: [id], onDelete: SetNull)
+  assistantConversation AssistantConversation? @relation(fields: [assistantConversationId], references: [id], onDelete: SetNull)
+  intake                TelegramIntake?
 
+  @@index([currentProjectId])
+  @@index([assistantConversationId])
   @@map("telegram_links")
+}
+
+/// #574: the New work intake a linked chat runs with `/new` — one per link.
+/// `planId` is null while the bot waits for the description. The rest is
+/// what the chat shows of the plan: `shown` is the last state sent
+/// (`<turn id>:<phase>`), the thinking message edited when a turn ends, and
+/// the open round's question messages and the answers picked on them.
+/// Deleted once the intake made its cards or was discarded.
+model TelegramIntake {
+  userId            String   @id
+  chatId            BigInt
+  projectId         String
+  planId            String?  @unique
+  shown             String?
+  thinkingMessageId Int?
+  /// The message with the open round's or proposal's buttons.
+  controlsMessageId Int?
+  /// `{ "<message id>": "<question id>" }` of the open round.
+  questionMessages  Json     @default("{}")
+  /// `{ "<question id>": { optionId?, optionIds?, text? } }` picked so far.
+  answers           Json     @default("{}")
+  /// #594: photos sent before the description, pending until the plan claims them.
+  attachmentIds     String[] @default([])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  link    TelegramLink @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  project Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  plan    Plan?        @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("telegram_intakes")
 }
 
 /// A one-time `/start <code>` link code (D9): 10 minutes, single use. Only the
@@ -2015,11 +2111,15 @@ model ScheduleFiring {
   runId        String?
   /// The `command_runs` row an orchestrator firing wrote (#17).
   commandRunId String?
+  /// D-10: the person the firing ran as — the owner for a timed firing, the
+  /// caller for run now; its spend is theirs. Null until the firing is sent.
+  principalId  String?
   error        Json?
   finishedAt   DateTime?            @db.Timestamptz(3)
 
-  schedule Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
-  run      Run?     @relation(fields: [runId], references: [id], onDelete: SetNull)
+  schedule  Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  run       Run?     @relation(fields: [runId], references: [id], onDelete: SetNull)
+  principal User?    @relation("ScheduleFiringPrincipal", fields: [principalId], references: [id], onDelete: SetNull)
 
   @@unique([scheduleId, scheduledFor, kind])
   @@index([scheduleId, scheduledFor])
@@ -2217,11 +2317,13 @@ model GitHubProjectHealth {
 
 // ─── Planner (spec 172) ─────────────────────────────────────────────────────
 
-/// Shared `PLAN_MODES` (D2; `card`: #337 D1, a New Card intake).
+/// Shared `PLAN_MODES` (D2; `card`: #337 D1, a New Card intake; `discuss`:
+/// #590, a discussion, ADR-0056).
 enum PlanMode {
   batch
   dialogue
   card
+  discuss
 }
 
 /// Shared `PLAN_VISIBILITIES` (D12).
@@ -2259,7 +2361,8 @@ enum PlanTaskStatus {
   issued
 }
 
-/// Shared `PLAN_TURN_ACTIONS` (D16; `design`: spec 223 D7; `intake`: #337 D1).
+/// Shared `PLAN_TURN_ACTIONS` (D16; `design`: spec 223 D7; `intake`: #337 D1;
+/// `discuss`: #590).
 enum PlanTurnAction {
   decompose
   clarify
@@ -2268,6 +2371,7 @@ enum PlanTurnAction {
   revise
   design
   intake
+  discuss
 }
 
 /// Shared `PLAN_TURN_PHASES`.
@@ -2330,29 +2434,46 @@ model PlannerSettings {
 /// A plan: a brief and its tasks, across versions (D1, D9). One Claude
 /// session per plan (`sessionId`, D3); its read-only worktree (D15).
 model Plan {
-  id              String         @id @default(cuid())
-  projectId       String
+  id               String         @id @default(cuid())
+  projectId        String
   /// Nullable so deleting the author keeps a sent plan's record; a private
   /// plan without an author is readable by nobody (D12).
-  authorId        String?
-  title           String
-  brief           String
-  mode            PlanMode
-  visibility      PlanVisibility @default(private)
-  status          PlanStatus
-  version         Int            @default(1)
-  sessionId       String         @db.Uuid
+  authorId         String?
+  title            String
+  brief            String
+  mode             PlanMode
+  visibility       PlanVisibility @default(private)
+  status           PlanStatus
+  version          Int            @default(1)
+  sessionId        String         @db.Uuid
   /// The instructions version the plan runs with (D11).
-  instructionsId  String
-  contractVersion Int
-  profileKey      String
-  model           String
-  worktree        String?
-  docsPrNumber    Int?
-  docsPrUrl       String?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  sentAt          DateTime?
+  instructionsId   String
+  contractVersion  Int
+  profileKey       String
+  model            String
+  worktree         String?
+  docsPrNumber     Int?
+  docsPrUrl        String?
+  /// #379: `owner/name` of the docs repository the docs PR is in; null when
+  /// it is the project's own repository.
+  docsPrRepo       String?
+  /// #379: with an external docs repository, the approved designs stay in the
+  /// code repository, in a PR of their own (spec 223 D16 fallback directory).
+  designPrNumber   Int?
+  designPrUrl      String?
+  /// #379: when each PR was seen merged; the issues waiting on it queue then.
+  docsPrMergedAt   DateTime?
+  designPrMergedAt DateTime?
+  /// #592 (ADR-0058): the stack the intake proposed — `{title, body, design,
+  /// stages: string[]}` (shared `planCandidateStackSchema`); its candidates
+  /// name their stage by index. Null for one card or a split.
+  candidateStack   Json?
+  /// #590: a discussion's skills, installed invocations every turn applies;
+  /// empty for any other mode.
+  skills           String[]       @default([])
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  sentAt           DateTime?
 
   project            Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
   author             User?               @relation(fields: [authorId], references: [id], onDelete: SetNull)
@@ -2367,6 +2488,10 @@ model Plan {
   attachments        Attachment[]
   /// #480: the stacks a confirmed intake made.
   stacks             BoardStack[]
+  /// #574: the Telegram chat running this intake.
+  telegramIntake     TelegramIntake?
+  /// #592 (ADR-0058): the cards the intake wrote, waiting for the person.
+  candidates         PlanCandidate[]
 
   @@index([projectId, updatedAt])
   @@index([authorId])
@@ -2415,6 +2540,47 @@ model PlanTask {
 
 /// One headless turn (D3, D17): a `runs` row of kind `plan` (D14). A turn
 /// whose output fails the contract keeps `resultText` and applies nothing.
+/// Shared `PLAN_CANDIDATE_STATUSES` (#592, ADR-0058).
+enum PlanCandidateStatus {
+  pending
+  accepted
+  rejected
+}
+
+/// #592 (ADR-0058): a card a New work intake wrote, waiting in Drafts until
+/// the person accepts it (a board card is made) or rejects it.
+model PlanCandidate {
+  id          String              @id @default(cuid())
+  planId      String
+  /// 0-based, in the proposal's order (stage order for a stack).
+  position    Int
+  /// English, at most `CARD_DRAFT_TITLE_MAX` characters.
+  title       String
+  kind        PlanTaskKind
+  /// Markdown, at most `CARD_DRAFT_BODY_MAX` characters.
+  body        String
+  /// The 0-based stage of `plans.candidateStack` it was proposed in.
+  stage       Int?
+  status      PlanCandidateStatus @default(pending)
+  /// Bumped by every edit: an edit or accept naming an older one is stale.
+  version     Int                 @default(1)
+  /// The card Accept made.
+  cardId      String?             @unique
+  /// How many of the intake's attachments its card took (ADR-0037 §4).
+  attachments Int                 @default(0)
+  decidedById String?
+  decidedAt   DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  plan      Plan       @relation(fields: [planId], references: [id], onDelete: Cascade)
+  card      BoardCard? @relation(fields: [cardId], references: [id], onDelete: SetNull)
+  decidedBy User?      @relation("PlanCandidateDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+
+  @@unique([planId, position])
+  @@map("plan_candidates")
+}
+
 model PlanTurn {
   id         String         @id @default(cuid())
   /// Exactly one of `planId` / `cardId` / `stackId` (CHECK `plan_turns_owner_check`, ADR-0025, ADR-0044).
@@ -2554,7 +2720,13 @@ model TaskDesign {
   suggestionWhy      String?
   /// 1–3 (D4), checked by the DTO and the contract.
   variantCount       Int              @default(1)
+  /// What the latest turns applied, or the project default when it was
+  /// copied. While `skillsEdited` is false and nothing is drawn, the design
+  /// follows `design_settings.defaultSkills` instead (#604).
   skills             String[]         @default([])
+  /// #604: the skills were chosen by hand on this design's panel; a change of
+  /// the project default no longer reaches it.
+  skillsEdited       Boolean          @default(false)
   /// The profile version the latest revisions were drawn from.
   profileId          String?
   status             TaskDesignStatus @default(idle)
@@ -2818,6 +2990,11 @@ model BoardCard {
   issueNumber             Int?
   issueUrl                String?
   specPath                String?
+  /// #379: a spec written to an external docs repository — its `owner/name`
+  /// and pull request. Null when the spec is on the card's branch.
+  specRepo                String?
+  specPrNumber            Int?
+  specPrUrl               String?
   prNumber                Int?
   prUrl                   String?
   /// #329 D6: from the PR poll, else the last `card.collect` / `card.merge`;
@@ -2850,6 +3027,9 @@ model BoardCard {
   ciRetriggeredSha        String?
   /// #359 D6: CI still failing after the budget — no automation until a person acts.
   needsPerson             Boolean          @default(false)
+  /// #542: why `needsPerson` is set (shared `CARD_NEEDS_PERSON_REASONS`);
+  /// `null` while it is not, and for a card marked before #542.
+  needsPersonReason       String?
   /// #359 D8: when the latest PR merged; the card stays in Finished as Merged.
   mergedAt                DateTime?
   /// Nullable so deleting a user keeps the card.
@@ -2923,6 +3103,7 @@ model BoardCard {
   designTurns        PlanTurn[]
   textNormalizations TextNormalization[]
   attachments        Attachment[]
+  assistantAttachments AssistantAttachment[]
   /// #337 D7: the plan task Create cards made this card from.
   planTasks          PlanTask[]             @relation("PlanTaskCard")
   /// #337 D8: the cards this one runs after.
@@ -2931,6 +3112,8 @@ model BoardCard {
   dependants         BoardCardDependency[]  @relation("BoardCardDependant")
   /// #359 D8: every PR the card opened; `prUrl` is the latest.
   pullRequests       BoardCardPullRequest[]
+  /// #592: the intake candidate accepted as this card.
+  candidate          PlanCandidate?
 
   @@unique([projectId, number])
   @@unique([projectId, fleetIssue, fleetSlot])
@@ -3081,8 +3264,15 @@ model BoardCardRound {
   /// `card_run.finish_refused`; the round needs attention while it is active.
   finishRefusedCode   String?
   finishRefusedAt     DateTime?
+  /// #624: the Claude Code dialog (shared `paneDialogSchema`) that blocks
+  /// the round's session, from `card_run.dialog`; cleared when it runs again.
+  blockingDialog      String?
   finishedAt          DateTime?
   endedAt             DateTime?
+  /// #542: the card PR's head when the round started (`ciHeadSha`); `null`
+  /// when the card had no PR then. Auto-merge refuses a head the round left
+  /// as it found it.
+  startHeadSha        String?
   /// #449 D3: how the round's session started, from `round.restart`; `null`
   /// until that event arrives, and for a runner older than Context handoff.
   restartMode         CardRestartMode?
@@ -3145,6 +3335,7 @@ model Attachment {
   round    BoardCardRound? @relation(fields: [roundId], references: [id], onDelete: Cascade)
   plan     Plan?           @relation(fields: [planId], references: [id], onDelete: SetNull)
   uploader User?           @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
+  assistant AssistantAttachment?
 
   @@index([cardId, createdAt])
   @@index([planId])
@@ -3275,6 +3466,8 @@ enum TextOwnerType {
   plan
   plan_task
   plan_turn
+  /// #584: a rule created from a scanned candidate.
+  project_rule
 }
 
 /// Shared `TEXT_NORMALIZATION_STATUSES`.
@@ -3319,6 +3512,7 @@ model TextNormalization {
   planId        String?
   taskId        String?
   turnId        String?
+  ruleId        String?
   /// `[{field, original, sourceHash, english?, outcome?}]` (shared `textFieldsSchema`).
   fields        Json
   /// D9: the request also asks for the card's kind.
@@ -3351,6 +3545,7 @@ model TextNormalization {
   plan    Plan?           @relation(fields: [planId], references: [id], onDelete: Cascade)
   task    PlanTask?       @relation(fields: [taskId], references: [id], onDelete: Cascade)
   turn    PlanTurn?       @relation(fields: [turnId], references: [id], onDelete: Cascade)
+  rule    ProjectRule?    @relation(fields: [ruleId], references: [id], onDelete: Cascade)
   run     Run?            @relation(fields: [runId], references: [id], onDelete: SetNull)
   author  User?           @relation(fields: [authorId], references: [id], onDelete: SetNull)
 
@@ -3360,6 +3555,7 @@ model TextNormalization {
   @@index([planId, createdAt])
   @@index([taskId, createdAt])
   @@index([turnId, createdAt])
+  @@index([ruleId, createdAt])
   @@index([projectId, status])
   @@map("text_normalizations")
 }
@@ -3578,4 +3774,208 @@ model HandoffNote {
   @@unique([subjectKind, subjectId])
   @@index([projectId])
   @@map("handoff_notes")
+}
+
+/// Mirrors `PROJECT_RULE_SOURCES` of the shared contract (#528).
+enum ProjectRuleSource {
+  manual
+  imported
+  scanned
+}
+
+/// A per-project coding rule a card worker follows (#528, stack S-2). Stored
+/// here, never in a file of the project's repository. `position` orders the
+/// list, 0-based and dense; a reorder rewrites it.
+model ProjectRule {
+  id          String            @id @default(cuid())
+  projectId   String
+  /// At most `PROJECT_RULE_TITLE_MAX` characters, checked by the DTO.
+  title       String
+  /// At most `PROJECT_RULE_DESCRIPTION_MAX` characters, checked by the DTO.
+  description String            @default("")
+  enabled     Boolean           @default(true)
+  position    Int
+  source      ProjectRuleSource @default(manual)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  project            Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  textNormalizations TextNormalization[]
+
+  @@index([projectId, position])
+  @@map("project_rules")
+}
+
+// ─── LLM gateway (ADR-0059, #598) ───────────────────────────────────────────
+
+/// Mirrors `LLM_PROVIDERS` of the shared contract.
+enum LlmProvider {
+  anthropic
+  openai
+  xai
+  openrouter
+}
+
+/// Mirrors `LLM_FEATURES` of the shared contract: what a call was for.
+enum LlmFeature {
+  assistant
+  digest
+  summary
+  search
+  triage
+  title
+}
+
+enum LlmCallOutcome {
+  ok
+  error
+  aborted
+}
+
+/// One provider's key, monthly cap and enabled models. The migration writes a
+/// row per provider; the key is never stored in the clear (ADR-0059 §3).
+model LlmProviderSetting {
+  provider      LlmProvider @id
+  /// The key sealed with `LLM_SECRETS_KEY` (`SecretCipher`'s v1 format).
+  keyCiphertext String?
+  /// The key's last four characters — the only part the API returns.
+  keySuffix     String?
+  keyUpdatedAt  DateTime?
+  /// USD per UTC calendar month; 0 disables the provider.
+  capUsd        Decimal     @db.Decimal(12, 2)
+  /// Model ids offered for this provider; each priced by the price table.
+  models        String[]    @default([])
+  updatedAt     DateTime    @updatedAt
+  updatedById   String?
+
+  updatedBy User? @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@map("llm_provider_settings")
+}
+
+/// The usage ledger: one row per gateway call, priced from the price table
+/// (ADR-0009) when it ends. A provider's month spend is the sum of `costUsd`.
+model LlmCall {
+  id           String         @id @default(cuid())
+  ts           DateTime       @default(now()) @db.Timestamptz(3)
+  /// Who the call was made for; null for the system or a deleted user.
+  userId       String?
+  provider     LlmProvider
+  model        String
+  feature      LlmFeature
+  outcome      LlmCallOutcome
+  /// An `LlmErrorCode` when `outcome` is not `ok`.
+  errorCode    String?
+  input        Int            @default(0)
+  output       Int            @default(0)
+  cacheRead    Int            @default(0)
+  cacheWrite5m Int            @default(0)
+  cacheWrite1h Int            @default(0)
+  /// Counted inside `output`, as in `llm_requests`.
+  reasoning    Int            @default(0)
+  costUsd      Decimal        @db.Decimal(14, 6)
+  /// `price_versions.number` the cost was computed with.
+  priceVersion Int
+  durationMs   Int
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([provider, ts])
+  @@index([ts])
+  @@map("llm_calls")
+}
+
+// ─── Assistant (ADR-0060, #608) ─────────────────────────────────────────────
+
+/// Mirrors `ASSISTANT_MESSAGE_ROLES` of the shared contract.
+enum AssistantMessageRole {
+  user
+  assistant
+}
+
+/// Mirrors `ASSISTANT_ATTACHMENT_KINDS` of the shared contract.
+enum AssistantAttachmentKind {
+  card
+  session
+  file
+}
+
+/// One person's chat with the assistant. Personal: only `userId` reads it.
+model AssistantConversation {
+  id        String       @id @default(cuid())
+  userId    String
+  /// Null is Auto: the assistant works the project out from the message and
+  /// records it here once resolved.
+  projectId String?
+  /// Null until the first reply; written by the cheapest enabled model.
+  title     String?
+  /// The model picked for the conversation; null is the instance default.
+  provider  LlmProvider?
+  model     String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project     Project?              @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  messages      AssistantMessage[]
+  attachments   AssistantAttachment[]
+  telegramLinks TelegramLink[]
+
+  @@index([userId, updatedAt])
+  @@map("assistant_conversations")
+}
+
+model AssistantMessage {
+  id             String               @id @default(cuid())
+  conversationId String
+  role           AssistantMessageRole
+  /// English, canonical: what later turns send the model and what search reads.
+  content        String
+  /// The text in the person's language, as shown.
+  displayContent String
+  /// BCP 47 primary language of `displayContent`, e.g. `en`, `ru`.
+  language       String
+  /// The model's tool calls of the turn: `[{id, name, input}]`.
+  toolCalls      Json?
+  /// Their results, by call id: `[{id, name, ok, summary}]`.
+  toolResults    Json?
+  provider       LlmProvider?
+  model          String?
+  /// The `llm_calls` rows of the turn (the title call excluded).
+  llmCallIds     String[]             @default([])
+  createdAt      DateTime             @default(now())
+
+  conversation AssistantConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  attachments  AssistantAttachment[]
+
+  @@index([conversationId, createdAt])
+  @@map("assistant_messages")
+}
+
+/// A card, a session or a file attached to a conversation. Pending while
+/// `messageId` is null; the next message sent takes every pending one.
+model AssistantAttachment {
+  id             String                  @id @default(cuid())
+  conversationId String
+  messageId      String?
+  kind           AssistantAttachmentKind
+  /// `card`: the Board card.
+  cardId         String?
+  /// `session`: the agent session (its project ships content, ADR-0021).
+  sessionId      String?
+  /// `file`: the stored upload (ADR-0031), claimed for the assistant.
+  attachmentId   String?                 @unique
+  /// What the chip shows: `C-12 Title`, the session's title, the file name.
+  label          String
+  createdAt      DateTime                @default(now())
+
+  conversation AssistantConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  message      AssistantMessage?     @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  card         BoardCard?            @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  session      AgentSession?         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  attachment   Attachment?           @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@index([messageId])
+  @@map("assistant_attachments")
 }

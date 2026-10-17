@@ -16,6 +16,7 @@ import {
   FILTER_RUN_KIND_ENV,
 } from '../filter/env';
 import { planTurnLaunchSpec, planTurnTokenSaver } from '../planner/launch';
+import { permissivePolicy } from '../policy/testing';
 import { launchSpec, skillTokenSaver } from '../skills/run/launch';
 import { FakeClock } from '../testing/fake-clock';
 import { fakeExec, tempDir } from '../testing/fixtures';
@@ -23,7 +24,8 @@ import {
   uiProfileLaunchSpec,
   uiProfileTokenSaver,
 } from '../uiprofile/executor';
-import { AUTOCOMPACT_ENV, type TokenSaverLaunch } from './token-saver';
+import { expectEcoEnv } from './testing';
+import type { TokenSaverLaunch } from './token-saver';
 
 /**
  * #445 acceptance: every launch passes `--settings` and `--strict-mcp-config`
@@ -114,9 +116,18 @@ describe('card worker launch (#445)', () => {
         injected,
       );
       expect(ts).toBeNull();
-      expect(
-        cardLaunchSpec(profile, args, '/w', null, injected.files, ts),
-      ).toEqual(cardLaunchSpec(profile, args, '/w', null, injected.files));
+      const spec = cardLaunchSpec(
+        profile,
+        args,
+        '/w',
+        null,
+        injected.files,
+        ts,
+      );
+      expect(spec).toEqual(
+        cardLaunchSpec(profile, args, '/w', null, injected.files),
+      );
+      expectEcoEnv(spec.env, false);
     }
   });
 
@@ -145,7 +156,7 @@ describe('card worker launch (#445)', () => {
       },
       playwright: { command: 'pw' },
     });
-    expect(spec.env[AUTOCOMPACT_ENV]).toBe('60');
+    expectEcoEnv(spec.env);
     expect(spec.env[FILTER_RUN_ENV]).toBe('run_1');
     expect(spec.env.AGENTDOCK_CARD).toBe('abcd1234');
   });
@@ -160,7 +171,39 @@ describe('card worker launch (#445)', () => {
       { wiring: 'plugin' },
     );
     const settings = JSON.parse(readFileSync(ts?.settingsFile ?? '', 'utf8'));
-    expect(Object.keys(settings.hooks)).toEqual(['PreToolUse']);
+    expect(Object.keys(settings.hooks)).toEqual([
+      'PreToolUse',
+      'PostToolUse',
+      'PreCompact',
+    ]);
+  });
+
+  it('guards reads itself in a profile without the code-sentinel plugin (#616)', () => {
+    const ts = cardTokenSaver(
+      profile,
+      { ...args, tokenSaver: ON },
+      home,
+      dir,
+      SELF,
+      injected,
+    );
+    if (!ts) throw new Error('expected a launch');
+    const spec = cardLaunchSpec(profile, args, '/w', null, injected.files, ts);
+    const settings = JSON.parse(readFileSync(ts.settingsFile, 'utf8'));
+    const readHook = [
+      { type: 'command', command: `${SELF[0]} read-hook || true`, timeout: 10 },
+    ];
+    expect(settings.hooks.PreToolUse).toContainEqual({
+      matcher: 'Read',
+      hooks: readHook,
+    });
+    expect(settings.hooks.PostToolUse).toContainEqual({
+      matcher: 'Read',
+      hooks: readHook,
+    });
+    expect(settings.hooks.PreCompact).toContainEqual({ hooks: readHook });
+    // The plugin, where a profile has it, stands down: one guard per read.
+    expectEcoEnv(spec.env);
   });
 });
 
@@ -189,9 +232,9 @@ describe('skill run launch (#445)', () => {
         SELF,
       );
       expect(ts).toBeNull();
-      expect(launchSpec(profile, args, '/w', null, ts)).toEqual(
-        launchSpec(profile, args, '/w', null),
-      );
+      const spec = launchSpec(profile, args, '/w', null, ts);
+      expect(spec).toEqual(launchSpec(profile, args, '/w', null));
+      expectEcoEnv(spec.env, false);
     }
   });
 
@@ -213,6 +256,7 @@ describe('skill run launch (#445)', () => {
       'playwright',
     ]);
     expect(spec.env[FILTER_RUN_KIND_ENV]).toBe('skill');
+    expectEcoEnv(spec.env);
   });
 });
 
@@ -234,9 +278,18 @@ describe('plan turn launch (#445)', () => {
         SELF,
       );
       expect(ts).toBeNull();
-      expect(
-        planTurnLaunchSpec(profile, args, '/w', '/r/prompt.md', null, ts),
-      ).toEqual(planTurnLaunchSpec(profile, args, '/w', '/r/prompt.md', null));
+      const spec = planTurnLaunchSpec(
+        profile,
+        args,
+        '/w',
+        '/r/prompt.md',
+        null,
+        ts,
+      );
+      expect(spec).toEqual(
+        planTurnLaunchSpec(profile, args, '/w', '/r/prompt.md', null),
+      );
+      expectEcoEnv(spec.env, false);
     }
   });
 
@@ -253,6 +306,7 @@ describe('plan turn launch (#445)', () => {
     expectWired(spec.args, ts);
     expect(Object.keys(serversOf(ts))).toContain('agentdock');
     expect(spec.env[FILTER_RUN_KIND_ENV]).toBe('plan');
+    expectEcoEnv(spec.env);
   });
 });
 
@@ -304,6 +358,7 @@ describe('design build launch (#445)', () => {
     expectWired(spec.args, ts);
     expect(Object.keys(serversOf(ts))).toEqual(['playwright']);
     expect(spec.env[FILTER_RUN_KIND_ENV]).toBe('ui_profile');
+    expectEcoEnv(spec.env);
   });
 });
 
@@ -318,6 +373,7 @@ describe('orchestrator session launch (#445)', () => {
     clock: new FakeClock(),
     watchedProjects: () => [],
     profiles: () => [profile],
+    policy: permissivePolicy,
     home,
     selfCommand: SELF,
     orchestratorDir: join(dir, 'orchestrator'),
@@ -359,5 +415,6 @@ describe('orchestrator session launch (#445)', () => {
     expect(ts.env[FILTER_RUN_KIND_ENV]).toBe('orchestrator');
     expect(ts.env[FILTER_PROJECT_ENV]).toBe('prj_a');
     expect(ts.env[FILTER_RUN_ENV]).toBeUndefined();
+    expectEcoEnv(ts.env);
   });
 });

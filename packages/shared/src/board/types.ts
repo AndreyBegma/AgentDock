@@ -178,6 +178,33 @@ export const CARD_CI_POLL_MS = 60_000;
  */
 export const CARD_CI_MISSING_MS = 5 * 60_000;
 
+/**
+ * Why a card is marked `needsPerson` — nothing is automated until a person
+ * acts: CI still red after the fix budget (#359 D6), CI never reported on
+ * the head (#484), or auto-merge refused the head the latest round left
+ * (#542) — the round failed, pushed no commit, or ended at once.
+ */
+export const CARD_NEEDS_PERSON_REASONS = [
+  'ci_still_failing',
+  'ci_not_reported',
+  'round_failed',
+  'round_pushed_nothing',
+  'round_ended_at_once',
+] as const;
+export type CardNeedsPersonReason = (typeof CARD_NEEDS_PERSON_REASONS)[number];
+
+export const isCardNeedsPersonReason = (
+  value: string,
+): value is CardNeedsPersonReason =>
+  (CARD_NEEDS_PERSON_REASONS as readonly string[]).includes(value);
+
+/**
+ * #542: a round that ended this soon after it started did no work — its
+ * session died at start. A `feedback` round that does is `failed`, and
+ * auto-merge never ships the head such a round leaves.
+ */
+export const CARD_ROUND_AT_ONCE_MS = 15_000;
+
 /** #359 D1: the runner pushes a card's committed HEAD at most this often. */
 export const CARD_PUSH_MIN_INTERVAL_MS = 30_000;
 
@@ -215,3 +242,9 @@ export const CARD_HOOKS_GRACE_MS = 2 * 60 * 1000;
 
 /** D6: how often the runner checks that a card's tmux session is alive. */
 export const CARD_SESSION_POLL_MS = 10_000;
+
+/**
+ * #624: a dialog still blocking a card's session after this long — one the
+ * runner does not answer — makes the round wait for the person.
+ */
+export const CARD_DIALOG_WAIT_MS = 30_000;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import type { CardCommandName } from '@agentdock/shared/protocol';
 import type { CardHandlers } from '../cards';
+import { permissivePolicy } from '../policy/testing';
 import { FakeClock } from '../testing/fake-clock';
 import { fakeExec } from '../testing/fixtures';
 import { CommandFailure } from './failure';
@@ -22,6 +23,7 @@ const context = (over: Partial<HandlerContext> = {}): HandlerContext => ({
   exec: fakeExec({}),
   watchedProjects: () => [],
   profiles: () => [],
+  policy: permissivePolicy,
   ...over,
 });
 

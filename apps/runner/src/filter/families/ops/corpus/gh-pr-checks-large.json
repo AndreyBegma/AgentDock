@@ -1,0 +1,8 @@
+{
+  "argv": ["gh", "pr", "checks", "482"],
+  "exitCode": 1,
+  "category": "other",
+  "outcome": "failing",
+  "expect": "filtered",
+  "maxRatio": 0.5
+}

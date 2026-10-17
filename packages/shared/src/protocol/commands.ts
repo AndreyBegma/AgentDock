@@ -10,9 +10,11 @@ import {
   cardPrCloseCommands,
 } from './commands/cards';
 import { controlCommands } from './commands/control';
+import { docsCommands } from './commands/docs';
 import { githubCommands } from './commands/github';
 import { handoffCommands } from './commands/handoff';
 import { plannerCommands } from './commands/planner';
+import { projectRuleCommands } from './commands/project-rules';
 import { queueCommands } from './commands/queue';
 import { sessionMessageCommands } from './commands/session-message';
 import { skillCommands } from './commands/skills';
@@ -93,6 +95,13 @@ export const commandErrorCodeSchema = z.enum([
    * not match (#309 D9); the worker was not started.
    */
   'attachments_unavailable',
+  /**
+   * ADR-0047: the runner's local security policy refuses the command — a
+   * permission mode above `maxPermissionMode`, a root outside
+   * `allowedRoots`, a terminal write, a profile skill install, or a gated
+   * command. `message` names the rule and the CLI line that lifts it.
+   */
+  'policy_refused',
 ]);
 export type CommandErrorCode = z.infer<typeof commandErrorCodeSchema>;
 
@@ -161,9 +170,11 @@ export const commands = {
   ...captureCommands,
   ...textCommands,
   ...assessCommands,
+  ...docsCommands,
   ...stewardCommands,
   ...handoffCommands,
   ...sessionMessageCommands,
+  ...projectRuleCommands,
 } as const satisfies Record<string, CommandDefinition>;
 
 export type CommandName = keyof typeof commands;

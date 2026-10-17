@@ -1,4 +1,8 @@
-import type { CheckpointKind } from '@agentdock/shared/protocol';
+import {
+  type CheckpointKind,
+  isHttpsGithubUrl,
+  slotNameSchema,
+} from '@agentdock/shared/protocol';
 import { Prisma, type Slot } from '@prisma/client';
 import {
   guardGroups,
@@ -44,6 +48,9 @@ const prNumberOf = (url: string | undefined): number | undefined => {
   }
 };
 
+const isSlotName = (name: string): boolean =>
+  slotNameSchema.safeParse(name).success;
+
 export type SlotEvent = EventOf<
   | 'session.appeared'
   | 'session.vanished'
@@ -81,6 +88,9 @@ export class SlotProjection {
 
   async apply(applied: Applied<SlotEvent>): Promise<void> {
     const { event } = applied;
+    // The envelope already holds a slot to `slotNameSchema`; an event that
+    // reaches here by another road is skipped, never stored (C-136).
+    if (event.slot !== undefined && !isSlotName(event.slot)) return;
     switch (event.type) {
       case 'session.appeared':
         return this.sessionAppeared(applied as Applied<typeof event>);
@@ -228,6 +238,7 @@ export class SlotProjection {
     options: { patch: SlotPatch; create?: boolean },
   ): Promise<void> {
     const { patch } = options;
+    if (!isSlotName(name)) return;
     const row = await this.covering(name, source.ts);
     if (row && source.seq <= row.lastSeq) return;
     const prior = row
@@ -305,7 +316,7 @@ export class SlotProjection {
       sourceOf(applied),
       {
         lastCheckpoint: last.kind,
-        ...(data.prUrl ? { prUrl: data.prUrl } : {}),
+        ...(isHttpsGithubUrl(data.prUrl ?? '') ? { prUrl: data.prUrl } : {}),
         ...(prNumber ? { prNumber } : {}),
       },
       extra,
@@ -368,7 +379,9 @@ export class SlotProjection {
     switch (event.type) {
       case 'pr.opened':
         Object.assign(patch, {
-          prUrl: event.data.url,
+          ...(isHttpsGithubUrl(event.data.url ?? '')
+            ? { prUrl: event.data.url }
+            : {}),
           prState: 'open',
           prChecks: event.data.checks,
           prMergeable: event.data.mergeable ?? null,

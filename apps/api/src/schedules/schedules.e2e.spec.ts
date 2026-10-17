@@ -502,6 +502,125 @@ describe('schedules (e2e)', () => {
     });
   });
 
+  describe('principal (D-09)', () => {
+    const adminId = async () =>
+      (
+        await ctx.prisma.user.findUniqueOrThrow({
+          where: { email: 'admin@example.com' },
+        })
+      ).id;
+    const bypassByDefault = () =>
+      ctx.prisma.projectOrchestratorSettings.create({
+        data: { projectId: a, permissionMode: 'bypassPermissions' },
+      });
+
+    it("an operator who retargets an admin's schedule and runs it now gets operator authority", async () => {
+      await bypassByDefault();
+      const created = await create(
+        { cron: '0 * * * *', timezone: 'UTC' },
+        admin,
+      );
+      expect(created.status).toBe(201);
+      const view = created.body as ScheduleView;
+      const owner = await adminId();
+      // The admin's own schedule takes the bypass default.
+      await dueAt(view.id, at('2026-10-09T10:00:00Z'));
+      await tick(at('2026-10-09T10:00:05Z'));
+      expect(sent('skill.run')).toHaveLength(1);
+      await ctx.prisma.run.updateMany({
+        where: { projectId: a },
+        data: { status: 'succeeded' },
+      });
+
+      const path = `/projects/${a}/schedules/${view.id}`;
+      const patch = await operatorOfA.send('patch', path, {
+        target: { ...skillTarget, args: 'something else' },
+      });
+      expect(patch.status).toBe(200);
+      expect((await schedule(view.id)).createdById).toBe(operatorOfAId);
+      const [update] = await auditOf('schedule.update');
+      expect(update).toMatchObject({
+        actorType: 'user',
+        actorUserId: operatorOfAId,
+        meta: { reowned: true, previousOwnerId: owner },
+      });
+
+      const response = await operatorOfA.send('post', `${path}/run-now`);
+      expect(response.status).toBe(201);
+      expect(response.body as ScheduleFiringView).toMatchObject({
+        kind: 'manual',
+        status: 'failed',
+        error: { code: 'forbidden' },
+      });
+      const denied = await ctx.prisma.auditRecord.findMany({
+        where: {
+          seq: { gt: auditFrom },
+          action: 'skill.run_started',
+          result: 'denied',
+        },
+      });
+      expect(denied).toHaveLength(1);
+      expect(denied[0]).toMatchObject({
+        actorType: 'user',
+        actorUserId: operatorOfAId,
+        after: { permissionMode: 'bypassPermissions' },
+      });
+      // A timed firing now runs as the operator too.
+      await dueAt(view.id, at('2026-10-09T11:00:00Z'));
+      await tick(at('2026-10-09T11:00:05Z'));
+      expect((await firings(view.id)).at(-1)).toMatchObject({
+        kind: 'cron',
+        status: 'failed',
+      });
+      expect(sent('skill.run')).toHaveLength(1);
+    });
+
+    it("run now on an admin's untouched schedule runs as the caller", async () => {
+      await bypassByDefault();
+      const view = (await create({}, admin)).body as ScheduleView;
+      const response = await operatorOfA.send(
+        'post',
+        `/projects/${a}/schedules/${view.id}/run-now`,
+      );
+      expect(response.body).toMatchObject({
+        status: 'failed',
+        error: { code: 'forbidden' },
+      });
+      expect(sent('skill.run')).toHaveLength(0);
+      // The caller's lack of the role does not disable the owner's schedule.
+      expect(await schedule(view.id)).toMatchObject({
+        enabled: true,
+        createdById: await adminId(),
+      });
+    });
+
+    it('a rename or a missed policy does not re-own; the owner editing never does', async () => {
+      const view = (await create({}, admin)).body as ScheduleView;
+      const owner = await adminId();
+      const path = `/projects/${a}/schedules/${view.id}`;
+      for (const body of [{ name: 'Renamed' }, { missedPolicy: 'catch_up' }]) {
+        expect((await operatorOfA.send('patch', path, body)).status).toBe(200);
+      }
+      expect(
+        (await admin.send('patch', path, { cron: '0 4 * * *' })).status,
+      ).toBe(200);
+      expect((await schedule(view.id)).createdById).toBe(owner);
+      for (const row of await auditOf('schedule.update')) {
+        expect(row.meta).not.toMatchObject({ reowned: true });
+      }
+    });
+
+    it("disabling or changing the cron of someone else's schedule re-owns it", async () => {
+      for (const body of [{ enabled: false }, { cron: '0 4 * * *' }]) {
+        const view = (await create({}, admin)).body as ScheduleView;
+        const path = `/projects/${a}/schedules/${view.id}`;
+        expect((await operatorOfA.send('patch', path, body)).status).toBe(200);
+        expect((await schedule(view.id)).createdById).toBe(operatorOfAId);
+      }
+      expect(await auditOf('schedule.update')).toHaveLength(2);
+    });
+  });
+
   describe('no leader (spec 123 B2, B11)', () => {
     it('one occurrence processed twice at once, then replayed: one firing, one command', async () => {
       const view = await createOk({ cron: '0 * * * *', timezone: 'UTC' });

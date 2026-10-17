@@ -70,6 +70,12 @@ New file `packages/shared/src/protocol/terminal.ts`; the `terminal.*` message ty
 | S ↔ R | `terminal.data` | `{ id, b64 }` |
 | S → R | `terminal.resize` | `{ id, cols, rows }` |
 | S ↔ R | `terminal.close` | `{ id, reason: "client" \| "idle" \| "max_duration" \| "session_ended" \| "socket" }` |
+| S → R | `terminal.history.request` | `{ id }` — capture this attach's pane history (#522) |
+| R → S | `terminal.history` | `{ id, lines, last }` — the captured lines with ANSI, oldest first, in chunks (#522) |
+
+Browser ↔ API text frames on `/terminal` gain `{ type: "history" }` (browser
+→ API) and `{ type: "history", lines, last }` (API → browser); see "From
+#522" below.
 
 Capabilities (#5 D5) gain `terminal: boolean`.
 
@@ -92,6 +98,7 @@ Capabilities (#5 D5) gain `terminal: boolean`.
   - a danger `Banner` while in control: "Your keystrokes go to a live agent session";
   - **Detach**.
 - When another admin holds control, the button reads "Attached by <name>" and only read-only attach is allowed.
+- Scrollback (#522): scrolling up on the terminal — the wheel, or a swipe down on a phone — shows the pane's last 5,000 lines in a read-only history view over the live one, marked **History**, with **Back to live**. See "From #522".
 
 ## Configuration
 
@@ -365,6 +372,50 @@ Cross-repository: this item prefers glass-ui `Terminal` from AndreyBegma/glass-u
   when the run ends closes with `session_ended`.
 - **API.** No change: the DTO, ticket target and relay already carried
   `skill_run` from i29-api.
+
+### From #522
+
+Scrollback inside an attach. tmux redraws the whole screen of an attach, so
+xterm's own `scrollback` never fills and a wheel or a swipe moved nothing.
+
+- **Protocol.** The browser sends the text frame `{ type: "history" }`; it is
+  strict like the others, so a frame with any other field closes the socket
+  with 1008. The API sends `terminal.history.request { id }` to the runner
+  for that attach. The runner answers `terminal.history { id, lines, last }`
+  in chunks of at most `TERMINAL_HISTORY_CHUNK_BYTES` (128 KiB) of serialized
+  lines, and the API relays each one as `{ type: "history", lines, last }` to
+  the browser of that attach only. The lines and byte limits are in
+  `protocol/terminal.ts`; [runner-protocol.md](../architecture/runner-protocol.md)
+  has the message details.
+- **Runner.** `TerminalManager.history` captures the session it already
+  holds for that `id` with `tmux capture-pane -p -e -J -t =<session>: -S -5000`
+  (`terminal/history.ts`), the pane streamer's approach with the `=` exact
+  target. The request carries no session name, no line count and no
+  argument (ADR-0010), and an `id` the runner does not hold is ignored. The
+  reply is the last 5,000 lines with their ANSI colours, each line cut at
+  16,384 characters, the oldest dropped past 2 MiB. A failed capture answers
+  one empty `last` chunk. One capture per attach runs at a time.
+- **Read-only by construction.** `capture-pane` reads the pane: nothing is
+  written to the PTY, the session is never put into copy-mode, and other
+  clients of the session see no change. A `read` attach may ask, because
+  asking is not input. On the API a request does not count as input for a
+  `write` attach's idle timeout; on a `read` attach it is traffic. The API
+  sends one request at a time per attach, and another only after the last
+  chunk or `TERMINAL_HISTORY_TIMEOUT_MS` (10 s). A chunk nobody asked for is
+  dropped.
+- **Web.** `TerminalView` — and so every surface that mounts it: the Board
+  card, Fleet slots, the orchestrator, manual sessions and skill runs —
+  handles wheel and touch on the live view itself, so xterm never turns them
+  into arrow keys for the PTY. A wheel up, or a swipe down of 24 px, asks
+  once (`lib/terminal/history.ts`). The answer opens a second, read-only
+  xterm layered over the live one, with a **History** badge, "Earlier output,
+  not the live screen" and a **Back to live** button. Live output keeps being
+  written to the live xterm underneath. Scrolling the history view down to
+  its bottom, or **Back to live**, disposes it and shows the live view, which
+  has everything printed meanwhile. Keystrokes are not forwarded while the
+  history is open. A request that has no answer within 10 s stays live.
+- **Out of scope.** tmux `mouse on`, copy-mode and `history-limit` stay as
+  they are; there is no search or export, and the API stores nothing.
 
 Depends on #8
 

@@ -14,6 +14,14 @@ import {
   sessionNoteContext,
 } from '../handoff/context';
 import { connectLocal, type LocalClient } from '../local/client';
+import {
+  forgetSessionToken,
+  readSessionToken,
+  SESSION_TOKEN_ENV,
+  saveSessionToken,
+  sessionTokenDir,
+} from '../local/session-tokens';
+import { isClaude } from '../local/sessions';
 import type { LocalCommandDeps } from '../local/subcommand';
 import { LOCAL_LINE_MAX_BYTES, type LocalEventArgs } from '../local/types';
 import { readAncestors } from './ancestors';
@@ -147,17 +155,37 @@ const fitEvent = (
   name: HookCliName,
   input: unknown,
   extras: HookExtras,
+  token: string | undefined,
 ): LocalEventArgs | null => {
   for (const cap of [HOOK_RAW_CONTENT_CHARS, 8 * 1024, 1024, 0]) {
     const event = buildHookEvent(name, input, extras, cap);
     if (!event) return null;
     const fitted = cap === 0 ? { ...event, content: undefined } : event;
     const size = Buffer.byteLength(
-      JSON.stringify({ id: 'l1', op: 'event', args: fitted }),
+      JSON.stringify({ id: 'l1', op: 'event', args: fitted, token }),
     );
     if (size < LOCAL_LINE_MAX_BYTES) return fitted;
   }
   return null;
+};
+
+/**
+ * #113: the session's token — from the env of a session the runner
+ * launched, else the one its `SessionStart` was given and this machine kept.
+ * A `SessionStart` outside a launch has none yet: it registers.
+ */
+const sessionToken = (
+  name: HookCliName,
+  sessionId: string,
+  deps: HookDeps,
+): string | undefined => {
+  const launched = deps.env[SESSION_TOKEN_ENV];
+  if (launched) return launched;
+  if (name === 'session-start') return undefined;
+  return (
+    readSessionToken(sessionTokenDir(deps.socketPath), { sessionId }) ??
+    undefined
+  );
 };
 
 /**
@@ -192,13 +220,14 @@ export const runHook = async (
     name.data === 'session-start'
       ? await sessionNote(input, common.data.cwd, deps)
       : '';
-  const client = await connectLocal(deps.socketPath);
+  const token = sessionToken(name.data, common.data.session_id, deps);
+  const client = await connectLocal(deps.socketPath, { token });
   if (!client) {
     if (note) printSessionContext(deps, note);
     return 0;
   }
   try {
-    await handle(name.data, input, common.data, client, deps, note);
+    await handle(name.data, input, common.data, client, deps, note, token);
   } finally {
     client.close();
   }
@@ -212,6 +241,7 @@ const handle = async (
   client: LocalClient,
   deps: HookDeps,
   note: string,
+  token: string | undefined,
 ): Promise<void> => {
   const extras: HookExtras = {};
   if (name === 'session-start') {
@@ -233,8 +263,22 @@ const handle = async (
     if (background) extras.background = background;
   }
 
-  const event = fitEvent(name, input, extras);
-  if (event) await client.event(event);
+  const event = fitEvent(name, input, extras, token);
+  const reported = event ? await client.event(event) : null;
+  const tokens = sessionTokenDir(deps.socketPath);
+  if (name === 'session-start' && reported?.ok && reported.data.token) {
+    // #113: kept for the session's later hooks and, by its `claude` pid,
+    // for its MCP server.
+    const token = reported.data.token;
+    client.useToken(token);
+    const claude = extras.ancestors?.find((a) => isClaude(a.comm));
+    saveSessionToken(
+      tokens,
+      { sessionId: common.session_id, claudePid: claude?.pid },
+      token,
+    );
+  }
+  if (name === 'session-end') forgetSessionToken(tokens, common.session_id);
 
   if (name === 'session-start') {
     const context = await client.request(
@@ -260,8 +304,8 @@ const handle = async (
       cwd: common.cwd,
       sessionId: common.session_id,
       toolName: request.data.tool_name.slice(0, 200),
-      // Cut well above the 500-character cap: the daemon redacts, then cuts.
-      toolInput: stringify(request.data.tool_input)?.slice(0, 8 * 1024),
+      // Clipped to head and tail by the hook; the daemon redacts, then cuts.
+      toolInput: stringify(request.data.tool_input),
       sleep: deps.sleep ?? ((ms) => Bun.sleep(ms)),
       now: deps.now ?? Date.now,
     });

@@ -132,6 +132,8 @@ export class TriggerFirer {
           args: delivery.renderedArgs,
           ...(action.profileKey ? { profileKey: action.profileKey } : {}),
           model: action.model ?? ORCHESTRATOR_DEFAULTS.model,
+          // C-132: the trigger's own mode, never the project's default.
+          permissionMode: action.permissionMode,
           output: action.output,
         },
         { type: 'webhook', id: trigger.id, role: 'admin', ctx },

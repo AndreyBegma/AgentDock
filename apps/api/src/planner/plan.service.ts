@@ -29,6 +29,12 @@ import { UserSettingsService } from '../settings/user-settings.service';
 import { TextNormalizer } from '../text/text-normalizer';
 import { TextOwners } from '../text/text-owners';
 import { readablePlanWhere } from './plan-access';
+import {
+  candidateStackOf,
+  candidatesOf,
+  pendingAttachments,
+  toCandidateView,
+} from './plan-candidates.service';
 import { intakeRound, intakeSplit, toSplitView } from './plan-intake';
 import {
   blockingOpen,
@@ -154,12 +160,22 @@ export class PlanService implements OnModuleInit {
     request: CreatePlanRequest,
   ): Promise<PlanDetail> {
     const card = request.mode === 'card';
+    const discuss = request.mode === 'discuss';
     const attachmentIds = request.attachmentIds ?? [];
     if (!card && attachmentIds.length > 0) {
       throw plannerError(
         409,
         PLANNER_ERROR.wrongMode,
         'Attachments belong to a card intake',
+      );
+    }
+    // #590: skills are a discussion's, chosen once, kept in their order.
+    const skills = [...new Set(request.skills ?? [])];
+    if (!discuss && skills.length > 0) {
+      throw plannerError(
+        409,
+        PLANNER_ERROR.wrongMode,
+        'Skills belong to a discussion',
       );
     }
     const project = await this.store.project(projectId);
@@ -194,6 +210,7 @@ export class PlanService implements OnModuleInit {
           contractVersion: PLANNER_CONTRACT_VERSION,
           profileKey: profile.key,
           model,
+          skills,
         },
       });
       await this.attachments.claimForPlan(
@@ -215,14 +232,16 @@ export class PlanService implements OnModuleInit {
         profileKey: plan.profileKey,
         instructionsId: plan.instructionsId,
         ...(attachmentIds.length > 0 ? { attachmentIds } : {}),
+        ...(skills.length > 0 ? { skills } : {}),
       },
       result: 'ok',
     });
     // #271 D3: the first turn reads the brief as stored once the request
     // resolves — English when DeepL answered inside it (#324 D1), else as typed.
     // #337 D5: an intake keeps the person's words as typed — the model asks
-    // in their language and writes the card in English itself.
-    if (!card) {
+    // in their language and writes the card in English itself. #590: so
+    // does a discussion — the model replies in the person's language.
+    if (!card && !discuss) {
       await this.text.request(
         projectId,
         { ownerType: 'plan', ownerId: plan.id },
@@ -294,20 +313,33 @@ export class PlanService implements OnModuleInit {
       include: { ...planInclude, instructions: { select: { version: true } } },
     });
     const intakeOpen = plan.mode === 'card' && plan.status === 'clarifying';
-    const [tasks, turns, questions, split] = await Promise.all([
-      this.store.currentTasks(this.prisma, plan),
-      this.prisma.planTurn.findMany({
-        where: { planId },
-        include: turnInclude,
-        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-      }),
-      plan.status !== 'clarifying'
-        ? Promise.resolve([])
-        : plan.mode === 'card'
-          ? intakeRound(this.prisma, planId)
-          : this.store.planRound(planId),
-      intakeOpen ? intakeSplit(this.prisma, planId) : Promise.resolve(null),
-    ]);
+    const review =
+      plan.mode === 'card'
+        ? Promise.all([
+            candidatesOf(this.prisma, planId),
+            pendingAttachments(this.prisma, planId),
+          ])
+        : Promise.resolve(null);
+    const [tasks, turns, questions, split, attachments, reviewed] =
+      await Promise.all([
+        this.store.currentTasks(this.prisma, plan),
+        this.prisma.planTurn.findMany({
+          where: { planId },
+          include: turnInclude,
+          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        }),
+        plan.status !== 'clarifying'
+          ? Promise.resolve([])
+          : plan.mode === 'card'
+            ? intakeRound(this.prisma, planId)
+            : this.store.planRound(planId),
+        intakeOpen ? intakeSplit(this.prisma, planId) : Promise.resolve(null),
+        // #594: what the intake holds, from the web dialog or Telegram.
+        plan.mode === 'card'
+          ? this.attachments.planViews(planId)
+          : Promise.resolve([]),
+        review,
+      ]);
     const [issueOf, designs] = await Promise.all([
       loadIssueViews(this.prisma, projectId, tasks),
       designSummaries(this.prisma, planId),
@@ -322,6 +354,14 @@ export class PlanService implements OnModuleInit {
       latestTurn: turns.at(-1) ?? null,
       questions,
       split: split ? toSplitView(split) : null,
+      attachments,
+      review: reviewed
+        ? {
+            candidates: reviewed[0].map(toCandidateView),
+            candidateStack: candidateStackOf(plan.candidateStack),
+            attachmentsLeft: reviewed[1],
+          }
+        : null,
     });
   }
 
@@ -522,6 +562,57 @@ export class PlanService implements OnModuleInit {
       result: 'ok',
     });
     this.store.publish(plan.projectId, plan.id);
+  }
+
+  /**
+   * #594: pending uploads of the author join their open card intake between
+   * turns — a photo sent to the Telegram intake. The plan holds them as a
+   * turn's claim does (#337 D10): each later turn carries them, and the
+   * generated card takes them.
+   */
+  async attach(
+    plan: Plan,
+    actor: PlanActor,
+    ids: readonly string[],
+  ): Promise<void> {
+    if (plan.mode !== 'card') {
+      throw plannerError(
+        409,
+        PLANNER_ERROR.wrongMode,
+        'Attachments belong to a card intake',
+      );
+    }
+    if (plan.authorId !== actor.userId) {
+      throw plannerError(
+        403,
+        PLANNER_ERROR.forbidden,
+        'Only the author adds files to an intake',
+      );
+    }
+    const closed = (status: string) =>
+      plannerError(409, PLANNER_ERROR.planClosed, `The intake is ${status}`);
+    if (plan.status !== 'clarifying') throw closed(plan.status);
+    await this.attachments.assertPlanClaimable(
+      plan.projectId,
+      plan.id,
+      ids,
+      actor,
+    );
+    await this.prisma.$transaction(async (tx) => {
+      // As a turn start does: one claim at a time per plan.
+      await tx.$queryRaw`SELECT id FROM plans WHERE id = ${plan.id} FOR UPDATE`;
+      const { status } = await tx.plan.findUniqueOrThrow({
+        where: { id: plan.id },
+        select: { status: true },
+      });
+      if (status !== 'clarifying') throw closed(status);
+      await this.attachments.claimForPlan(
+        tx,
+        { projectId: plan.projectId, planId: plan.id },
+        ids,
+        actor,
+      );
+    });
   }
 
   /**

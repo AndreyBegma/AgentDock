@@ -7,6 +7,8 @@ import type { PaneDialog } from '@agentdock/shared/protocol';
  */
 export const DIALOG_PATTERNS: readonly (readonly [RegExp, PaneDialog])[] = [
   [/Do you trust the files in this folder/, 'trust'],
+  // #624: the newer trust dialog, with or without pre-approved permissions.
+  [/Accessing workspace:/, 'trust'],
   [/Quick safety check/, 'settings'],
   [/pre-approves/, 'settings'],
   [/Bypass Permissions mode, Claude Code will not ask/, 'bypass'],

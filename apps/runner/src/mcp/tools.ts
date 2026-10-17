@@ -1,6 +1,6 @@
 import {
   ACTION_REQUEST_SUMMARY_MAX,
-  actionRequestKindSchema,
+  requestableActionRequestKindSchema,
 } from '@agentdock/shared';
 import {
   LOCAL_CARD_BODY_MAX,
@@ -78,7 +78,7 @@ export const MCP_TOOLS = [
   {
     name: 'create_issue',
     description:
-      'Create a GitHub issue in this project. With queue: true it is also labelled for the orchestrator to pick up.',
+      'Create a GitHub issue in this project. With queue: true it is not queued yet: AgentDock asks a person to approve queuing it for the orchestrator, and the result carries that request (actionRequestId, poll it with action_status).',
     method: 'issue.create',
     input: {
       title: z.string().min(1).max(256),
@@ -86,7 +86,9 @@ export const MCP_TOOLS = [
       labels: z.array(z.string().min(1).max(50)).max(10).optional(),
       queue: z
         .boolean()
-        .describe('True to queue the issue for the orchestrator.'),
+        .describe(
+          'True to ask a person to queue the issue for the orchestrator.',
+        ),
     },
   },
   {
@@ -98,7 +100,7 @@ export const MCP_TOOLS = [
   {
     name: 'handoff',
     description:
-      'Hand this work off: records an issue with the state of a branch so another agent or a person can continue it.',
+      'Hand this work off: records an issue with the state of a branch so another agent or a person can continue it. The fleet takes it only once a person approves it; the result carries that request (actionRequestId, poll it with action_status).',
     method: 'handoff.create',
     input: {
       title: z.string().min(1).max(256),
@@ -112,7 +114,7 @@ export const MCP_TOOLS = [
       'Ask a person to approve something you may not do yourself: starting or stopping the orchestrator, or approving a pull request. Returns a request; poll it with action_status.',
     method: 'action.request',
     input: {
-      kind: actionRequestKindSchema,
+      kind: requestableActionRequestKindSchema,
       args: z
         .record(z.string(), z.unknown())
         .describe(

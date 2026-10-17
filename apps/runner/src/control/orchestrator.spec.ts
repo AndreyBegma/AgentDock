@@ -5,6 +5,7 @@ import {
   readdirSync,
   readFileSync,
   realpathSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
@@ -12,6 +13,7 @@ import type { OrchestratorState } from '@agentdock/shared/protocol';
 import { createDispatcher } from '../commands/dispatcher';
 import { createHandlers } from '../commands/handlers';
 import type { ConfigProfile } from '../config';
+import { permissivePolicy, sameRealpath } from '../policy/testing';
 import { FakeClock } from '../testing/fake-clock';
 import { memoryLogger, tempDir } from '../testing/fixtures';
 import {
@@ -23,7 +25,7 @@ import {
   startOrchestrator,
   stopOrchestrator,
 } from './orchestrator';
-import { CREATED, fakeTmux } from './testing';
+import { CREATED, FAKE_SELF_COMMAND, fakeTmux } from './testing';
 
 const SESSION = 'agentdock-orch-acme-widget';
 const target = { projectId: 'prj_1', root: '/srv/widget' };
@@ -52,13 +54,14 @@ const codex: ConfigProfile = {
 const startedIso = new Date(CREATED * 1000).toISOString();
 
 describe('orchestrator.start', () => {
-  it('creates agentdock-orch-<slug> in the root with exactly D2 argv and the profile env', async () => {
+  it('creates agentdock-orch-<slug> in the root, running exec-run on a 0600 launch file with D2 argv and the profile env', async () => {
     const fake = fakeTmux({ profiles: [claudeWork] });
 
     expect(await startOrchestrator(start, fake.deps)).toEqual({
       session: SESSION,
       startedAt: startedIso,
     });
+    const dir = join(fake.deps.orchestratorDir ?? '', SESSION);
     const created = fake.tmuxCalls().find((c) => c[0] === 'new-session');
     expect(created).toEqual([
       'new-session',
@@ -67,20 +70,58 @@ describe('orchestrator.start', () => {
       SESSION,
       '-c',
       '/srv/widget',
-      '-e',
-      'CLAUDE_CONFIG_DIR=/home/dev/.claude-profiles/work',
-      '/opt/bin/claude-wrapper',
-      '--verbose',
-      '--remote-control',
-      SESSION,
-      '-n',
-      SESSION,
-      '--model',
-      'opus',
-      '--permission-mode',
-      'auto',
-      '/code-sentinel:orchestrator start',
+      ...FAKE_SELF_COMMAND,
+      'exec-run',
+      dir,
     ]);
+    const launch = join(dir, 'run.json');
+    expect(statSync(launch).mode & 0o777).toBe(0o600);
+    expect(statSync(dir).mode & 0o777).toBe(0o700);
+    expect(JSON.parse(readFileSync(launch, 'utf8'))).toEqual({
+      binary: '/opt/bin/claude-wrapper',
+      args: [
+        '--verbose',
+        '--remote-control',
+        SESSION,
+        '-n',
+        SESSION,
+        '--model',
+        'opus',
+        '--permission-mode',
+        'auto',
+        '/code-sentinel:orchestrator start',
+      ],
+      env: { CLAUDE_CONFIG_DIR: '/home/dev/.claude-profiles/work' },
+      cwd: '/srv/widget',
+      interactive: true,
+      label: 'agentdock orchestrator',
+    });
+    await stopOrchestrator(target, fake.deps);
+  });
+
+  it('C-123: never puts a profile env value on the tmux argv', async () => {
+    const secret = 'sk-ant-x';
+    const fake = fakeTmux({
+      profiles: [
+        {
+          ...claudeWork,
+          env: { ...claudeWork.env, ANTHROPIC_API_KEY: secret },
+        },
+      ],
+    });
+    await startOrchestrator(start, fake.deps);
+    const created = fake.tmuxCalls().find((c) => c[0] === 'new-session') ?? [];
+    expect(created).not.toContain('-e');
+    expect(created.some((arg) => arg.includes('='))).toBe(false);
+    expect(created.some((arg) => arg.includes(secret))).toBe(false);
+
+    const launch = join(fake.deps.orchestratorDir ?? '', SESSION, 'run.json');
+    expect(JSON.parse(readFileSync(launch, 'utf8')).env.ANTHROPIC_API_KEY).toBe(
+      secret,
+    );
+    // Stopping takes the env file with the session.
+    await stopOrchestrator(target, fake.deps);
+    expect(existsSync(launch)).toBe(false);
   });
 
   it('never involves a shell', async () => {
@@ -91,9 +132,16 @@ describe('orchestrator.start', () => {
       new Set(['git', 'tmux']),
     );
     const created = fake.tmuxCalls().find((c) => c[0] === 'new-session');
-    expect(created?.at(-1)).toBe('/code-sentinel:orchestrator next');
     expect(created).not.toContain('sh');
+    const launch = JSON.parse(
+      readFileSync(
+        join(fake.deps.orchestratorDir ?? '', SESSION, 'run.json'),
+        'utf8',
+      ),
+    );
+    expect(launch.args.at(-1)).toBe('/code-sentinel:orchestrator next');
     expect(fake.sessions.has(SESSION)).toBe(true);
+    await stopOrchestrator(target, fake.deps);
   });
 
   it('maps the manual permission mode to the CLI default and uses the runtime as binary', () => {
@@ -367,7 +415,10 @@ describe('orchestrator.message', () => {
     const fake = fakeTmux({ sessions: { [SESSION]: '> ' } });
     const clock = new FakeClock();
     const dispatch = createDispatcher({
+      policy: permissivePolicy,
+      realpath: sameRealpath,
       handlers: createHandlers({
+        policy: permissivePolicy,
         clock,
         runnerVersion: '0.0.0-test',
         host: { hostname: 'h', os: 'linux', arch: 'x64' },

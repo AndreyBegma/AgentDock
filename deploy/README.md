@@ -1,7 +1,8 @@
 # Deployment
 
 Decisions: [ADR-0016](../docs/adr/0016-staging-on-the-agent-host-behind-a-cloudflare-tunnel.md),
-[ADR-0018](../docs/adr/0018-pull-requests-test-what-changed.md).
+[ADR-0018](../docs/adr/0018-pull-requests-test-what-changed.md),
+[ADR-0053](../docs/adr/0053-pull-request-pipelines-are-untrusted.md).
 
 ## CI — what each pipeline runs
 
@@ -19,6 +20,39 @@ Which tests run depends on the event:
 The `test` step prints the mode it took (`test mode: affected (…)` or
 `test mode: full (<reason>)`). When it cannot find the merge base, it runs the
 full suite. To test everything on a branch, run the pipeline by hand.
+
+### Trust levels
+
+A pull request is **untrusted** (ADR-0053). Its pipeline runs the pipeline file
+and build scripts of its own branch, and anyone who can push a branch, a card
+worker included, can open one. So a step that can run on a pull request gets:
+
+- **no Docker socket**: `ci-image`, `build-staging` and `deploy-staging` run on
+  push and manual events only. A pull request runs on the
+  `agentdock-ci:node-bun` image the last push built, so a change to
+  `deploy/ci-image/` reaches CI once it is merged;
+- **no host volume**: no step of any pipeline mounts a host cache. bun's
+  install cache lives in the step's container and turbo's in the pipeline's
+  workspace; both die with the pipeline;
+- **no secret** and no privileged container.
+
+A push to `develop` or `main`, a tag and a manual run are **trusted**: the code
+was merged, or a person started the run. The runner release
+(`release-runner.yml`) still starts clean: no cache, `bun install
+--frozen-lockfile`, and `build-release` ignores turbo's cache. The Node base
+image is pinned by digest in `apps/api`, `apps/web` and `deploy/ci-image`, and
+every `docker build` runs with `--pull`.
+
+`bun run check` runs `scripts/check-ci.ts`, which fails when a pull-request
+step mounts a volume, is privileged or reads a secret, when a tag step mounts
+anything but the Docker socket, or when `bun install` lacks
+`--frozen-lockfile`. A pull request can edit the check along with the
+pipeline, so it stops mistakes, not an attacker. The real boundary is on the
+CI server: a separate Woodpecker agent for pull requests, without the Docker
+socket and trusted volumes, or *Require approval: pull requests* — settings
+only a person can change (P-01). Neither is in place yet: same-repository pull
+requests start without approval (#504), so a pull request that edits its
+pipeline file can still reach the Docker socket. See the setup below.
 
 The CI PostgreSQL is throwaway. Its data directory is on tmpfs, and it runs
 with `fsync`, `synchronous_commit` and `full_page_writes` off. The `test` step
@@ -47,9 +81,20 @@ Nothing is published on the host. The stack runs on its own compose network
    Save the token as `~/.agentdock/cloudflared-staging.env`, mode 600, with one
    line: `TUNNEL_TOKEN=...`.
 2. **Woodpecker.** Activate `AndreyBegma/AgentDock` and apply these settings:
-   - *Trusted → volumes*: on. The steps mount the Docker socket, the stack
-     directory and the caches, and the postgres service mounts a tmpfs.
-   - *Require approval*: forks. The repository is public.
+   - *Trusted → volumes*: on. The trusted steps mount the Docker socket and
+     the stack directory, and the postgres service mounts a tmpfs.
+   - *Require approval*: forks (`require_approval: "forks"` in the API). The
+     repository is public, so a pull request from a fork must wait for a
+     maintainer. A pull request from a branch of `AndreyBegma/AgentDock`
+     itself — every board card's — must not: *Pull requests* or *All events*
+     gates those too (#504). Check the live value with
+     `curl -s https://ci.luna-realm.com/api/repos/9 | jq .require_approval`.
+     This leaves a known gap (ADR-0053 §7): a same-repository pull request can
+     edit its own pipeline file and mount the Docker socket again, because
+     trusted volumes are on for the repository. It stays open until pull
+     requests run on a separate Woodpecker agent without the Docker socket and
+     without trusted volumes. To close it before then, set *Pull requests*
+     and accept that every card's pipeline waits for an Approve.
    - *Cancel previous pipelines*: push, pull_request.
    - Timeout: 60 min.
    - Run the Woodpecker server on PostgreSQL
@@ -57,19 +102,70 @@ Nothing is published on the host. The stack runs on its own compose network
      busy fleet SQLite answers GitHub's webhooks with HTTP 500
      `database is locked`, and GitHub never redelivers them: the pull request
      gets no pipeline (#484, ADR-0043).
-3. **The first run.** Push to `develop`, or run the pipeline by hand on
+3. **Delete the old CI caches** once, on an existing host:
+   `rm -rf /home/archi/ci-cache/agentdock`. No pipeline reads them any more
+   (ADR-0053), and pull requests could write to them before.
+4. **The first run.** Push to `develop`, or run the pipeline by hand on
    `develop`. `refresh.sh` creates the stack directory, copies the examples in
    and generates `POSTGRES_PASSWORD`, `REDIS_PASSWORD` and
    `APP_ENCRYPTION_KEY`. It then stops, because the tunnel token is missing.
-4. **Add the token and start the stack:**
+5. **Add the token and start the stack:**
    ```sh
    cp ~/.agentdock/cloudflared-staging.env /home/archi/stacks/agentdock-staging/env/cloudflared.env
    /home/archi/stacks/agentdock-staging/up.sh
    ```
-5. **Create the first admin.** The seed creates no users.
+6. **Create the first admin.** The seed creates no users.
    ```sh
    docker exec -it agentdock-staging-api node dist/src/cli/admin-create.js
    ```
+
+### Access layer and the runner (D-07)
+
+Staging is public, so the control plane sits behind **Cloudflare Access**. Only
+a person can set it up (P-04); the repository carries the proxy and the runner
+side.
+
+1. **Zero Trust → Access → Applications.** Create a self-hosted application for
+   `staging-agentdock.luna-realm.com` with a policy that allows the team (an
+   email list or an identity provider group). It covers the web app and the
+   login, register and API pages.
+2. **Service token.** Create a service token (*Access → Service Auth*) and add
+   a *Service Auth* policy to the application that lets it through. Keep the
+   Client ID and Client Secret: the secret is shown once.
+3. **Paths.**
+
+   | Path | Access |
+   |---|---|
+   | `/api/runner` (the runner WebSocket) | service token |
+   | `/api/runners/pair` (pairing) | service token |
+   | `/api/hooks/*` | open — a bypass policy; Claude Code hooks cannot send Access headers and authenticate with their own token |
+   | everything else | the team policy |
+
+   Put the open `/api/hooks/*` bypass application first: Access applies the
+   most specific path.
+4. **Pair a runner behind Access.** The runner sends `CF-Access-Client-Id` and
+   `CF-Access-Client-Secret` on the pairing request and on every WebSocket
+   connect, and keeps them in `runner.json` (mode 600):
+   ```sh
+   agentdock-runner pair --server https://staging-agentdock.luna-realm.com/api \
+     --code XXXX-XXXX --access-client-id <id>.access --access-client-secret-stdin
+   ```
+   Give the secret on stdin (`--access-client-secret-stdin`) or in
+   `AGENTDOCK_ACCESS_CLIENT_SECRET` so that it stays out of the shell history;
+   `--access-client-secret <secret>` also works. `agentdock-runner status`
+   shows `access token: set` and never the secret. A re-pair without the flags
+   clears the stored token. Rotate the token by pairing again.
+
+The proxy also caps request bodies at 10 MB (`413` above it), sets
+`Strict-Transport-Security` and `X-Content-Type-Options: nosniff`, and sends
+`Cache-Control: no-store` for `/api/runners/pair` and `/api/hooks/*`. Check the
+Caddyfile locally:
+
+```sh
+docker run --rm -v "$PWD/deploy/staging/Caddyfile:/etc/caddy/Caddyfile:ro" \
+  "$(grep -o 'caddy:[^ ]*' deploy/staging/docker-compose.yml | head -1)" \
+  caddy validate --config /etc/caddy/Caddyfile
+```
 
 ### Operating
 
@@ -104,50 +200,97 @@ Nothing is published on the host. The stack runs on its own compose network
   A 500, 502, 530 or a timeout there is a delivery Woodpecker never
   processed; *Redeliver* it, or close and reopen the PR. AgentDock does the
   close/reopen by itself for a board card's PR after 5 minutes (ADR-0043).
+- **A pipeline waits for approval on an own-branch PR** (#504): Woodpecker
+  shows "This pipeline is awaiting approval from a maintainer!" for a pull
+  request whose head is a branch of `AndreyBegma/AgentDock`, such as a board
+  card's. Run `gh pr view <number> --json isCrossRepository`: `false` means
+  the PR is not from a fork, so the gate comes from the repository setting.
+  `curl -s https://ci.luna-realm.com/api/repos/9 | jq .require_approval`
+  then answers `"pull_requests"` or `"all_events"` instead of `"forks"`. Set
+  *Settings → General → Require approval* to *Forks* (an admin of the
+  Woodpecker repository can do it) and approve the pipelines already waiting
+  once; the next pull request starts at once. AgentDock pushes a card's
+  branch to `origin` and opens the PR with `gh pr create --head <branch>` in
+  the same repository, and the close/reopen retrigger (ADR-0043) acts on that
+  same PR, so neither one makes a PR look like a fork.
 - **`530` / error 1033** from the public URL means the hostname exists but no
   cloudflared connector is running. Check that `TUNNEL_TOKEN` is set and look
   at `docker logs agentdock-staging-cloudflared`.
 
 ## Releasing the runner
 
-Decision: [ADR-0017](../docs/adr/0017-runner-distribution-homebrew-and-npm.md).
+Decisions: [ADR-0017](../docs/adr/0017-runner-distribution-homebrew-and-npm.md),
+[ADR-0049](../docs/adr/0049-runner-releases-are-signed-and-cut-only-from-protected-tags.md).
 A tag `runner-v<version>` runs `.woodpecker/release-runner.yml`. The workflow
-tests the runner, builds the four binaries and creates the GitHub Release with
-the tarballs and `SHA256SUMS`. It then publishes the npm packages, the four
-platform packages before `agentdock-runner`. Last, it pushes
-`Formula/agentdock-runner.rb` to `AndreyBegma/homebrew-tap`.
+tests the runner, builds the four binaries, signs `SHA256SUMS` and creates the
+GitHub Release with the tarballs, `SHA256SUMS` and `SHA256SUMS.sig`. It then
+publishes the npm packages, the four platform packages before
+`agentdock-runner`. Last, it pushes `Formula/agentdock-runner.rb` to
+`AndreyBegma/homebrew-tap`. The npm shim and the formula refuse a binary whose
+checksum is not in a `SHA256SUMS` signed by `apps/runner/release-key.pub`.
+
+The workflow file is not what keeps the secrets safe: anyone who pushes a
+commit can edit it. Two settings that only an administrator can change do
+that, and both must be in place before the first release.
 
 ### One-time setup
 
 1. Create the public repository `AndreyBegma/homebrew-tap` with a `Formula/`
    directory.
-2. Add two Woodpecker secrets to `AndreyBegma/AgentDock`, each restricted to the
-   **tag** and **manual** events:
+2. **Signing key.** The key pair is Ed25519, and its public half is
+   `apps/runner/release-key.pub`. Keep the private half offline, outside the
+   repository, with mode 600. To rotate it, generate a new pair with
+   `openssl genpkey -algorithm ed25519 -out runner-release-signing-key.pem` and
+   `openssl pkey -in runner-release-signing-key.pem -pubout`. Put the public half in
+   `release-key.pub` and in the copies the npm shim and the formula template
+   embed, which the runner's tests keep equal. The change lands in a pull
+   request before the next tag.
+3. **Woodpecker secrets (P-02).** Add three secrets to `AndreyBegma/AgentDock`,
+   each restricted to the **tag** event only. Do not tick **manual** or any
+   other event; a manual run is a dry run and gets no secret.
    - `github_release_token`: a GitHub token with *contents: write* on
      `AgentDock` and on `homebrew-tap`;
    - `npm_token`: an npm automation token for the account that owns
-     `agentdock-runner` and `agentdock-runner-{darwin,linux}-{arm64,x64}`.
+     `agentdock-runner` and `agentdock-runner-{darwin,linux}-{arm64,x64}`;
+   - `runner_signing_key`: the PEM private key whose public half is
+     `apps/runner/release-key.pub`. A tag run without it fails in
+     `build-release`, and a different key is refused.
+4. **GitHub tag ruleset (P-03).** In `AndreyBegma/AgentDock` → Settings →
+   Rules → Rulesets, add a tag ruleset, *Active*, that targets the tag pattern
+   `runner-v*`. Turn on *Restrict creations*, *Restrict updates* and *Restrict
+   deletions*, and give the bypass list only the repository administrators.
+   Collaborators and fleet identities then cannot push a `runner-v*` tag, so
+   they cannot start a run that sees the secrets.
 
 ### Each release
 
-1. **Bump** `version` in `apps/runner/package.json` and merge it. The tag must
-   match it exactly, or `build-release` fails.
+1. **Bump** `version` in `apps/runner/package.json` and merge it into `main`.
+   The tag must match it exactly, or `build-release` fails.
 2. **Rehearse** (optional). Run the pipeline by hand with a message that
    contains `[runner-release]`, for example `runner dry run [runner-release]`.
-   It builds everything and stops before every publish step. Without that
-   marker in the message, a manual run does not start the release workflow.
-   Use a branch other than `develop`: a manual run on `develop` also deploys
-   staging through `pipeline.yml`. The marker is in the message, not a
-   variable, because Woodpecker 3.x does not pass a manual run's variables to
-   a workflow's `when`. Locally, `sh apps/runner/scripts/build-release.sh` does
-   the same.
-3. **Tag and push** the merged commit:
+   It builds everything, signs `SHA256SUMS` with a throwaway key and stops
+   before every publish step. It sees no secret. Without that marker in the
+   message, a manual run does not start the release workflow. Use a branch
+   other than `develop`: a manual run on `develop` also deploys staging
+   through `pipeline.yml`. The marker is in the message, not a variable,
+   because Woodpecker 3.x does not pass a manual run's variables to a
+   workflow's `when`. Locally, `sh apps/runner/scripts/build-release.sh` does
+   the same; with `RUNNER_SIGNING_KEY` set to the private key it signs with
+   the release key.
+3. **Tag and push** a commit on `main`, as an administrator:
    ```sh
-   git tag runner-v0.1.0 <commit>
+   git fetch origin main
+   git merge-base --is-ancestor <commit> origin/main && git tag runner-v0.1.0 <commit>
    git push origin runner-v0.1.0
    ```
 4. **Verify:**
-   - the Release `runner-v<version>` has four tarballs and `SHA256SUMS`;
+   - the Release `runner-v<version>` has four tarballs, `SHA256SUMS` and
+     `SHA256SUMS.sig`, and the signature verifies:
+     ```sh
+     openssl pkeyutl -verify -pubin -inkey apps/runner/release-key.pub \
+       -rawin -in SHA256SUMS -sigfile SHA256SUMS.sig
+     sha256sum -c --ignore-missing SHA256SUMS
+     ```
    - `npm view agentdock-runner@<version> optionalDependencies` names the four
      platform packages at that version;
    - `brew update && brew install andreybegma/tap/agentdock-runner` then
@@ -158,4 +301,4 @@ platform packages before `agentdock-runner`. Last, it pushes
 A step that fails can be re-run. The Release assets are replaced, a version
 already on npm is skipped, and an unchanged formula is not committed again.
 `RUNNER_RELEASE_DRY_RUN=1` in the environment stops a tag run before it
-publishes.
+publishes; it is the way to rehearse the signature with the real key.

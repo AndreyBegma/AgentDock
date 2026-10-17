@@ -1,4 +1,3 @@
-import { ACTION_REQUEST_TOOL_INPUT_MAX } from '@agentdock/shared';
 import {
   cardRunFinishRefusedDataSchema,
   EVENT_SCHEMA_VERSION,
@@ -6,7 +5,9 @@ import {
   HOOK_SESSION_STARTED_EVENT,
   type HookEventType,
   hookEventDataSchemas,
+  isLocalMethodName,
   type LocalErrorCode,
+  localMethods,
   manualTmuxSessionSchema,
   type UnsequencedEvent,
   type WatchedProject,
@@ -16,11 +17,19 @@ import { correlateCwd } from '../adapters/correlate';
 import type { CardRecord } from '../cards/record';
 import { errorMessage, type Logger } from '../log';
 import type { EnvelopeProject } from '../otlp/map';
-import { toHookContent } from './redact';
-import type { HookSessions } from './sessions';
+import { toHookContent, toToolInputPreview } from './redact';
 import {
+  cwdWithin,
+  type SessionBinding,
+  type SessionTokens,
+} from './session-tokens';
+import { type HookSessions, isClaude } from './sessions';
+import {
+  type Ancestor,
   type ContentField,
+  type LocalCaller,
   type LocalEventArgs,
+  type LocalEventResult,
   type LocalOp,
   type LocalPingResult,
   type LocalRelayRequest,
@@ -44,6 +53,20 @@ export interface LocalServiceDeps {
   /** The envelope `project` of a watched project id, resolved through git. */
   envelope: (projectId: string) => Promise<EnvelopeProject | undefined>;
   sessions: HookSessions;
+  /** #113: mints and checks the session tokens every caller presents. */
+  tokens: SessionTokens;
+  /**
+   * #113: a process and its ancestors, nearest first, read by the daemon —
+   * absent where it cannot read them; the peer check is then skipped.
+   */
+  ancestorsOf?: (pid: number) => Promise<Ancestor[]>;
+  /** #113: the process exists; a registered session's `claude` is still alive. */
+  alive?: (pid: number) => boolean;
+  /**
+   * #113: the session is a live card round the runner launched. Its token
+   * came with its env, so a `SessionStart` without one is not it.
+   */
+  launchedSession?: (sessionId: string) => boolean;
   /**
    * #482: the live card round whose worktree holds `cwd`, from the card
    * store on disk — it outlives a daemon restart, the hook sessions do not.
@@ -75,33 +98,51 @@ const shipsContent = (
 
 const toolUseArgsSchema = z.looseObject({
   kind: z.literal('tool_use'),
-  args: z.looseObject({ input: z.unknown().optional() }),
+  args: z.looseObject({
+    input: z.unknown().optional(),
+    truncated: z.unknown().optional(),
+    fullLength: z.unknown().optional(),
+    sha256: z.unknown().optional(),
+    preview: z.unknown().optional(),
+  }),
 });
 
-/** Cuts a redacted tool input to the action request's limit (D17). */
-const capToolInput = (text: string): string =>
-  text.length > ACTION_REQUEST_TOOL_INPUT_MAX
-    ? `${text.slice(0, ACTION_REQUEST_TOOL_INPUT_MAX - 1)}…`
-    : text;
+/** A caller the daemon will not act for (#113). */
+const refused = (
+  message: string,
+): { ok: false; error: { code: 'forbidden'; message: string } } => ({
+  ok: false,
+  error: { code: 'forbidden', message },
+});
 
 /**
  * The daemon's side of the local socket (spec 201 D5, D6, D9, D10, D13).
  * Everything that leaves the machine passes the content gate here, before
  * the spool or the WSS: hook processes send raw text, never trusted to
  * redact it themselves.
+ *
+ * #113: a caller is never trusted for its `cwd` or `sessionId`. Each call
+ * carries the session token, whose binding is the session and the project;
+ * a claim outside it is refused, and so is a peer that does not descend from
+ * the session's `claude` where the kernel names the peer. Only a
+ * `SessionStart` registers without a token — and is answered with one.
  */
 export class LocalService {
   constructor(private readonly deps: LocalServiceDeps) {}
 
-  async handle(op: LocalOp, args: unknown): Promise<LocalResult<unknown>> {
+  async handle(
+    op: LocalOp,
+    args: unknown,
+    caller: LocalCaller = { peerPid: null },
+  ): Promise<LocalResult<unknown>> {
     try {
       switch (op) {
         case 'ping':
-          return this.ping(args);
+          return this.ping(args, caller);
         case 'event':
-          return await this.event(args);
+          return await this.event(args, caller);
         case 'request':
-          return await this.request(args);
+          return await this.request(args, caller);
       }
     } catch (error) {
       this.deps.log.error('local: request failed', {
@@ -112,13 +153,22 @@ export class LocalService {
     }
   }
 
-  private ping(args: unknown): LocalResult<LocalPingResult> {
+  /**
+   * Liveness answers anyone; the project only a caller whose token binds
+   * the `cwd` it asks about.
+   */
+  private ping(
+    args: unknown,
+    caller: LocalCaller,
+  ): LocalResult<LocalPingResult> {
     const parsed = localPingArgsSchema.safeParse(args ?? {});
     if (!parsed.success) return localFail('invalid_args', 'bad ping args');
     const cwd = parsed.data.cwd;
-    const projectId = cwd
-      ? (correlateCwd(cwd, this.deps.projects()).projectId ?? null)
-      : null;
+    const binding = caller.token ? this.deps.tokens.verify(caller.token) : null;
+    const projectId =
+      cwd && binding && cwdWithin(cwd, binding.cwd)
+        ? (correlateCwd(binding.cwd, this.deps.projects()).projectId ?? null)
+        : null;
     return {
       ok: true,
       data: {
@@ -130,16 +180,26 @@ export class LocalService {
     };
   }
 
-  /** A hook event: correlated, gated, redacted, validated, spooled. */
-  private async event(args: unknown): Promise<LocalResult<{ queued: true }>> {
+  /** A hook event: authenticated, correlated, gated, redacted, validated, spooled. */
+  private async event(
+    args: unknown,
+    caller: LocalCaller,
+  ): Promise<LocalResult<LocalEventResult>> {
     const parsed = localEventArgsSchema.safeParse(args);
     if (!parsed.success) {
       return localFail('invalid_args', z.prettifyError(parsed.error));
     }
     const input = parsed.data;
+    const starting = input.type === HOOK_SESSION_STARTED_EVENT;
+    const auth =
+      starting && !caller.token
+        ? await this.register(input, caller)
+        : await this.authenticate(caller, input);
+    if (!auth.ok) return auth;
+    const { binding, ancestors } = auth.data;
     const projects = this.deps.projects();
-    const { projectId, slot } = correlateCwd(input.cwd, projects);
-    this.track(input);
+    const { projectId, slot } = correlateCwd(binding.cwd, projects);
+    this.track(input, ancestors);
 
     const data: Record<string, unknown> = { ...input.data };
     for (const field of CONTENT_OF[input.type]) delete data[field];
@@ -161,13 +221,106 @@ export class LocalService {
       source: 'hook',
       ...(project ? { project } : {}),
       ...(slot ? { slot } : {}),
-      session: { runtime: 'claude', id: input.sessionId },
+      session: { runtime: 'claude', id: binding.sessionId },
       data: valid.data,
     });
-    return { ok: true, data: { queued: true } };
+    if (!starting) return { ok: true, data: { queued: true } };
+    // The hook keeps it for the session's later hooks and its MCP server.
+    const token = caller.token ?? this.deps.tokens.mint(binding);
+    return { ok: true, data: { queued: true, token } };
   }
 
-  private track(input: LocalEventArgs): void {
+  /**
+   * #113: the caller's token, checked — the binding it stands for, else a
+   * refusal. A claimed `sessionId` must be the binding's, a claimed `cwd`
+   * inside its cwd, and the peer, where the kernel names it, a descendant
+   * of the session's `claude`. The ancestors the daemon read on the way
+   * are returned, for a `SessionStart`.
+   */
+  private async authenticate(
+    caller: LocalCaller,
+    claim: { sessionId?: string; cwd?: string },
+  ): Promise<
+    LocalResult<{ binding: SessionBinding; ancestors: Ancestor[] | null }>
+  > {
+    if (!caller.token) return refused('no session token');
+    const binding = this.deps.tokens.verify(caller.token);
+    if (!binding) return refused('the session token is not valid');
+    if (
+      claim.sessionId !== undefined &&
+      claim.sessionId !== binding.sessionId
+    ) {
+      return refused('the session token is another session’s');
+    }
+    if (claim.cwd !== undefined && !cwdWithin(claim.cwd, binding.cwd)) {
+      return refused('the cwd is outside the session’s');
+    }
+    const ancestors = await this.peerAncestors(caller);
+    const claudePid = this.deps.sessions.claudePidOf(binding.sessionId);
+    if (
+      ancestors !== null &&
+      claudePid !== null &&
+      !ancestors.some((a) => a.pid === claudePid)
+    ) {
+      this.deps.log.warn('local: a peer outside the session was refused', {
+        sessionId: binding.sessionId,
+        peerPid: caller.peerPid,
+      });
+      return refused('the caller is not a process of the session');
+    }
+    return { ok: true, data: { binding, ancestors } };
+  }
+
+  /**
+   * #113: a `SessionStart` without a token — a session the runner did not
+   * launch. Refused for a session the runner launched (its token is in its
+   * env) and for one whose live `claude` is another process than the
+   * caller's.
+   */
+  private async register(
+    input: LocalEventArgs,
+    caller: LocalCaller,
+  ): Promise<
+    LocalResult<{ binding: SessionBinding; ancestors: Ancestor[] | null }>
+  > {
+    if (this.deps.launchedSession?.(input.sessionId)) {
+      return refused('a launched session registers with its own token');
+    }
+    const ancestors = await this.peerAncestors(caller);
+    const known = this.deps.sessions.claudePidOf(input.sessionId);
+    if (known !== null && (this.deps.alive?.(known) ?? true)) {
+      const claude = (ancestors ?? input.ancestors ?? []).find((a) =>
+        isClaude(a.comm),
+      );
+      if (claude?.pid !== known) {
+        return refused('the session is registered to another process');
+      }
+    }
+    return {
+      ok: true,
+      data: {
+        binding: { sessionId: input.sessionId, cwd: input.cwd },
+        ancestors,
+      },
+    };
+  }
+
+  /** The peer and its ancestors as the daemon reads them; null when it cannot. */
+  private async peerAncestors(caller: LocalCaller): Promise<Ancestor[] | null> {
+    const { ancestorsOf } = this.deps;
+    if (caller.peerPid === null || !ancestorsOf) return null;
+    try {
+      return await ancestorsOf(caller.peerPid);
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * A session's processes as the daemon read them win over those its hook
+   * reported (D10): a hook could name any pid.
+   */
+  private track(input: LocalEventArgs, read: Ancestor[] | null): void {
     const { sessions } = this.deps;
     if (input.type === HOOK_SESSION_STARTED_EVENT) {
       const tmux = manualTmuxSessionSchema.safeParse(
@@ -176,7 +329,7 @@ export class LocalService {
       sessions.started(
         input.sessionId,
         input.cwd,
-        input.ancestors ?? [],
+        read ?? input.ancestors ?? [],
         tmux.success ? tmux.data : undefined,
       );
     } else {
@@ -187,56 +340,47 @@ export class LocalService {
     }
   }
 
-  /** A request relayed as `local.request`; never spooled (D6). */
-  private async request(args: unknown): Promise<LocalResult<unknown>> {
+  /**
+   * A request relayed as `local.request`; never spooled (D6). The project
+   * and the session are the token's (#113). A runner-wide method (`away.set`)
+   * may come without one, and then goes with neither.
+   */
+  private async request(
+    args: unknown,
+    caller: LocalCaller,
+  ): Promise<LocalResult<unknown>> {
     const parsed = localRequestArgsSchema.safeParse(args);
     if (!parsed.success) {
       return localFail('invalid_args', z.prettifyError(parsed.error));
     }
     const input = parsed.data;
+    if (!caller.token && runnerWide(input.method)) {
+      return this.deps.relay({
+        method: input.method,
+        args: input.args,
+        via: input.via,
+      });
+    }
+    const auth = await this.authenticate(caller, input);
+    if (!auth.ok) return auth;
+    const { binding } = auth.data;
     const projects = this.deps.projects();
-    const projectId = input.cwd
-      ? correlateCwd(input.cwd, projects).projectId
-      : undefined;
-    let round: CardRecord | null | undefined;
-    const roundAt = (): CardRecord | null => {
-      if (round === undefined) {
-        round = input.cwd ? (this.deps.liveRound?.(input.cwd) ?? null) : null;
-      }
-      return round;
-    };
-    const sessionId = input.sessionId ?? this.sessionOf(input, roundAt);
+    const projectId = correlateCwd(binding.cwd, projects).projectId;
     const result = await this.deps.relay({
       method: input.method,
-      args: this.gate(input, shipsContent(projectId, projects)),
+      args: this.gate(input),
       ...(projectId ? { projectId } : {}),
-      ...(sessionId ? { session: { runtime: 'claude', id: sessionId } } : {}),
+      session: { runtime: 'claude', id: binding.sessionId },
       via: input.via,
     });
     if (input.method === 'card.finish' && !result.ok) {
-      const refused = roundAt();
-      if (refused) this.finishRefused(refused, result.error.code);
+      // #482: the round of the session's worktree, from the card store.
+      const round = this.deps.liveRound?.(binding.cwd) ?? null;
+      if (round?.sessionId === binding.sessionId) {
+        this.finishRefused(round, result.error.code);
+      }
     }
     return result;
-  }
-
-  /**
-   * The session of a caller that knows only its parent pid and cwd (D10):
-   * the pid a `SessionStart` reported, else (#482) the session of the live
-   * card round whose worktree holds the cwd — the card store survives a
-   * daemon restart, the hook sessions do not — else the one live session
-   * in that cwd.
-   */
-  private sessionOf(
-    input: LocalRequestArgs,
-    roundAt: () => CardRecord | null,
-  ): string | null {
-    const { sessions } = this.deps;
-    return (
-      sessions.byParent(input.ppid) ??
-      roundAt()?.sessionId ??
-      sessions.resolve(undefined, input.cwd)
-    );
   }
 
   /**
@@ -267,21 +411,32 @@ export class LocalService {
   }
 
   /**
-   * A `tool_use` action request carries the tool input only for a project
-   * that ships content, redacted and cut to 500 characters (D17).
+   * A `tool_use` action request always carries the redacted tool input —
+   * a security control, not content, so independent of content shipping
+   * (C-114, D-08): whole, or head and tail with `fullLength` and `sha256`
+   * of the full redacted input. Without one it is marked `preview: 'none'`.
+   * What the caller claims about the preview is dropped and recomputed.
    */
-  private gate(input: LocalRequestArgs, ships: boolean): unknown {
+  private gate(input: LocalRequestArgs): unknown {
     if (input.method !== 'action.request') return input.args;
     const toolUse = toolUseArgsSchema.safeParse(input.args);
     if (!toolUse.success) return input.args;
-    const { input: raw, ...rest } = toolUse.data.args;
-    const keep =
-      ships && typeof raw === 'string' && raw.length > 0
-        ? { input: capToolInput(toolHookText(raw)) }
-        : {};
-    return { ...toolUse.data, args: { ...rest, ...keep } };
+    const {
+      input: raw,
+      truncated: _truncated,
+      fullLength: _fullLength,
+      sha256: _sha256,
+      preview: _preview,
+      ...rest
+    } = toolUse.data.args;
+    const preview =
+      typeof raw === 'string' && raw.length > 0
+        ? toToolInputPreview(raw)
+        : { preview: 'none' as const };
+    return { ...toolUse.data, args: { ...rest, ...preview } };
   }
 }
 
-const toolHookText = (raw: string): string =>
-  toHookContent(raw, false, ACTION_REQUEST_TOOL_INPUT_MAX * 4).text;
+/** A method that acts for the runner, not a project or a session (D17). */
+const runnerWide = (method: string): boolean =>
+  isLocalMethodName(method) && !localMethods[method].needsProject;

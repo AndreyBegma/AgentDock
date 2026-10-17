@@ -1,4 +1,5 @@
 import {
+  DOCS_SPEC_COMMAND,
   type ProjectReadinessView,
   projectReadiness,
   READINESS_ACTION_COMMANDS,
@@ -7,14 +8,17 @@ import {
 import type { CommandName } from '@agentdock/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import { specDirOf } from '../planner/planner-instructions.service';
+import { resolveSpecTarget } from '../planner/spec-target';
 import { projectNotFound } from '../projects';
 import { RunnerPresence } from '../runners/runner-presence';
 import { RuntimeProfileResolver } from './runtime-profile.resolver';
 
-/** Every command an action of D3 needs, once. */
+/** Every command an action of D3 needs, once — and #379's docs-repo write. */
 const ACTION_COMMANDS: readonly CommandName[] = [
-  ...new Set<CommandName>(Object.values(READINESS_ACTION_COMMANDS).flat()),
+  ...new Set<CommandName>([
+    ...Object.values(READINESS_ACTION_COMMANDS).flat(),
+    DOCS_SPEC_COMMAND,
+  ]),
 ];
 
 /**
@@ -37,8 +41,12 @@ export class ReadinessService {
         id: true,
         runnerId: true,
         defaultProfileId: true,
+        rootPath: true,
         codeSentinelConfig: true,
         shipSessionContent: true,
+        docsSource: {
+          select: { kind: true, localPath: true, repo: true, specDir: true },
+        },
       },
     });
     if (!project) throw projectNotFound();
@@ -77,7 +85,7 @@ export class ReadinessService {
         profile: pick,
         runnerConnected,
         missingCommands,
-        specDir: specDirOf(project.codeSentinelConfig) !== null,
+        specTarget: resolveSpecTarget(project).kind,
         shipSessionContent: project.shipSessionContent,
       }),
     };

@@ -26,6 +26,7 @@ import {
   type WebhookUpdateRequest,
   type WebhookView,
 } from '@agentdock/shared';
+import type { OrchestratorPermissionMode } from '@agentdock/shared/protocol';
 import { ApiError, describeError } from '../api';
 import { ENCRYPTION_KEY_REMEDY } from '../prerequisites/copy';
 
@@ -224,11 +225,21 @@ export interface TriggerForm {
   args: string;
   profileKey: string;
   model: string;
+  /** C-132: the trigger's own mode — never the project's default. */
+  permissionMode: OrchestratorPermissionMode;
   output: 'report' | 'pr';
   /** One path per line (commas also split). */
   allowedPaths: string;
   valuePattern: string;
 }
+
+/** C-132: a new trigger's mode, the one the migration gave existing triggers. */
+export const TRIGGER_DEFAULT_PERMISSION_MODE: OrchestratorPermissionMode =
+  'manual';
+
+/** C-132: shown in the trigger dialog when the mode is `bypassPermissions`. */
+export const TRIGGER_BYPASS_WARNING =
+  'Anyone who can get a signed payload to this trigger — a GitHub issue or comment author whose text the sender forwards — starts a run with no permission checks. Pick another mode unless the sender is fully trusted.';
 
 export const emptyTriggerForm = (): TriggerForm => ({
   name: '',
@@ -238,6 +249,7 @@ export const emptyTriggerForm = (): TriggerForm => ({
   args: '',
   profileKey: '',
   model: '',
+  permissionMode: TRIGGER_DEFAULT_PERMISSION_MODE,
   output: 'report',
   allowedPaths: '',
   valuePattern: '',
@@ -260,6 +272,7 @@ export function formFromTrigger(trigger: InboundTriggerView): TriggerForm {
     args: action.args,
     profileKey: action.profileKey ?? '',
     model: action.model ?? '',
+    permissionMode: action.permissionMode,
     output: action.output,
   };
 }
@@ -313,6 +326,7 @@ function actionFromForm(form: TriggerForm): InboundTriggerAction {
     args: form.args,
     ...(profileKey ? { profileKey } : {}),
     ...(model ? { model } : {}),
+    permissionMode: form.permissionMode,
     output: form.output,
   };
 }

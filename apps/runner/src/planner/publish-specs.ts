@@ -13,7 +13,6 @@ import {
   GH_TIMEOUT_MS,
   gitOk,
   NETWORK_TIMEOUT_MS,
-  NO_HOOKS,
   parsePrUrl,
   randomShortId,
   type SkillsDeps,
@@ -74,7 +73,7 @@ const writeSpecFiles = (
 
 /** An open pull request from `branch`, when a previous attempt already opened it. */
 const openPr = async (
-  deps: SkillsDeps,
+  deps: Pick<SkillsDeps, 'exec'>,
   github: string,
   branch: string,
 ): Promise<PlanPublishSpecsResult | null> => {
@@ -100,98 +99,106 @@ const openPr = async (
   }
 };
 
+/** Where a docs pull request is opened: a checkout, its GitHub repo and base. */
+export interface SpecsPrTarget {
+  /** The main checkout the docs worktree is added to. */
+  root: string;
+  /** `owner/name` on GitHub. */
+  github: string;
+  base: string;
+}
+
+/** What one docs pull request carries. */
+export interface SpecsPrContent {
+  specDir: string;
+  branch: string;
+  files: PlanPublishSpecsArgs['files'];
+  title: string;
+  body: string;
+}
+
 /**
- * `plan.publish_specs` (D10): one docs pull request into `base` with exactly
- * `files`. The commit is the runner's own: the project's hooks do not run and
- * the message is the title alone — no `Co-Authored-By`, no `Claude-Session`.
- * A retry after the PR was opened answers that PR (send is idempotent).
+ * One docs pull request into `target.base` with exactly `content.files`.
+ * The commit is the runner's own: the checkout's hooks do not run and the
+ * message is the title alone — no `Co-Authored-By`, no `Claude-Session`. A
+ * retry after the PR was opened answers that PR. Shared by
+ * `plan.publish_specs` (the code repository) and `docs.publish_specs` (an
+ * external docs repository, #379).
  */
-export const publishSpecs = async (
-  args: PlanPublishSpecsArgs,
-  deps: SkillsDeps,
+export const openSpecsPr = async (
+  target: SpecsPrTarget,
+  content: SpecsPrContent,
+  deps: Pick<SkillsDeps, 'exec' | 'shortId' | 'tempRoot'>,
 ): Promise<PlanPublishSpecsResult> => {
   const { exec } = deps;
-  const project = watchedProject(args, deps.watchedProjects());
-  const fleet = await resolveFleetProject(exec, project);
-  if (!fleet.github) {
-    throw new CommandFailure(
-      'not_a_repository',
-      `${project.root} has no GitHub remote`,
-    );
-  }
-  const github = fleet.github;
-  const existing = await openPr(deps, github, args.branch);
+  const { root, github } = target;
+  const existing = await openPr(deps, github, content.branch);
   if (existing) return existing;
 
   await gitOk(
     exec,
-    ['-C', project.root, 'fetch', '--quiet', 'origin', args.base],
+    ['-C', root, 'fetch', '--quiet', 'origin', target.base],
     NETWORK_TIMEOUT_MS,
   );
   const base = (
     await gitOk(exec, [
       '-C',
-      project.root,
+      root,
       'rev-parse',
       '--verify',
       '--quiet',
-      `refs/remotes/origin/${args.base}^{commit}`,
+      `refs/remotes/origin/${target.base}^{commit}`,
     ])
   ).trim();
-  const worktree = docsWorktreePath(
-    project.root,
-    (deps.shortId ?? randomShortId)(),
-  );
+  const worktree = docsWorktreePath(root, (deps.shortId ?? randomShortId)());
   // `-B`: a local branch an earlier, failed attempt left is reset, not refused.
   await gitOk(exec, [
     '-C',
-    project.root,
+    root,
     'worktree',
     'add',
     '--quiet',
     '--no-track',
     '-B',
-    args.branch,
+    content.branch,
     worktree,
     base,
   ]);
   const temp = await mkdtemp(join(deps.tempRoot ?? tmpdir(), 'agentdock-pr-'));
   try {
-    writeSpecFiles(worktree, args.specDir, args.files);
+    writeSpecFiles(worktree, content.specDir, content.files);
     await gitOk(exec, [
       '-C',
       worktree,
       'add',
       '--',
-      ...args.files.map((f) => f.path),
+      ...content.files.map((f) => f.path),
     ]);
     await gitOk(exec, [
       '-C',
       worktree,
-      ...NO_HOOKS,
       'commit',
       '--quiet',
       '--no-verify',
       '-m',
-      args.title,
+      content.title,
     ]);
-    // `--force`: the branch is this plan's alone; an earlier attempt may have pushed it.
+    // `--force`: the branch is this plan's or card's alone; an earlier attempt may have pushed it.
     await gitOk(
       exec,
       [
         '-C',
         worktree,
-        ...NO_HOOKS,
         'push',
         '--quiet',
         '--force',
         'origin',
-        `HEAD:refs/heads/${args.branch}`,
+        `HEAD:refs/heads/${content.branch}`,
       ],
       NETWORK_TIMEOUT_MS,
     );
     const bodyFile = join(temp, 'body.md');
-    await writeFile(bodyFile, args.body, { mode: 0o600 });
+    await writeFile(bodyFile, content.body, { mode: 0o600 });
     const created = await exec(
       'gh',
       [
@@ -200,11 +207,11 @@ export const publishSpecs = async (
         '--repo',
         github,
         '--base',
-        args.base,
+        target.base,
         '--head',
-        args.branch,
+        content.branch,
         '--title',
-        args.title,
+        content.title,
         '--body-file',
         bodyFile,
       ],
@@ -218,22 +225,28 @@ export const publishSpecs = async (
     return { prNumber: pr.number, prUrl: pr.url };
   } finally {
     await rm(temp, { recursive: true, force: true });
-    await exec('git', [
-      '-C',
-      project.root,
-      'worktree',
-      'remove',
-      '--force',
-      worktree,
-    ]);
+    await exec('git', ['-C', root, 'worktree', 'remove', '--force', worktree]);
     // The pushed branch stays for its PR; the local one is not needed.
-    await exec('git', [
-      '-C',
-      project.root,
-      'branch',
-      '--quiet',
-      '-D',
-      args.branch,
-    ]);
+    await exec('git', ['-C', root, 'branch', '--quiet', '-D', content.branch]);
   }
+};
+
+/** `plan.publish_specs` (D10): one docs pull request into the project's `base`. */
+export const publishSpecs = async (
+  args: PlanPublishSpecsArgs,
+  deps: SkillsDeps,
+): Promise<PlanPublishSpecsResult> => {
+  const project = watchedProject(args, deps.watchedProjects());
+  const fleet = await resolveFleetProject(deps.exec, project);
+  if (!fleet.github) {
+    throw new CommandFailure(
+      'not_a_repository',
+      `${project.root} has no GitHub remote`,
+    );
+  }
+  return openSpecsPr(
+    { root: project.root, github: fleet.github, base: args.base },
+    args,
+    deps,
+  );
 };

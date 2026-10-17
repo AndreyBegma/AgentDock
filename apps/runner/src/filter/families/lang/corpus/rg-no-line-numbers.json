@@ -1,0 +1,7 @@
+{
+  "argv": ["rg", "export const", "apps/runner/src/filter"],
+  "exitCode": 0,
+  "category": "other",
+  "outcome": "passing",
+  "expect": "filtered"
+}

@@ -1,0 +1,196 @@
+test (20.x)	Set up job	2026-10-17T09:12:00.2604787Z Current runner version: '2.320.0'
+test (20.x)	Set up job	2026-10-17T09:12:00.8774178Z Operating System
+test (20.x)	Set up job	2026-10-17T09:12:00.9642872Z   Ubuntu
+test (20.x)	Set up job	2026-10-17T09:12:01.5432679Z   22.04.5
+test (20.x)	Set up job	2026-10-17T09:12:01.5743399Z   LTS
+test (20.x)	Set up job	2026-10-17T09:12:01.7723139Z Runner Image
+test (20.x)	Set up job	2026-10-17T09:12:02.1818520Z   Image: ubuntu-22.04
+test (20.x)	Set up job	2026-10-17T09:12:02.3497383Z   Version: 20261013.1.0
+test (20.x)	Set up job	2026-10-17T09:12:02.9226201Z   Included Software: https://github.com/actions/runner-images/blob/ubuntu22/20261013.1/images/ubuntu/Ubuntu2204-Readme.md
+test (20.x)	Set up job	2026-10-17T09:12:03.2997717Z   Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu22%2F20261013.1
+test (20.x)	Set up job	2026-10-17T09:12:03.7887420Z Runner Image Provisioner
+test (20.x)	Set up job	2026-10-17T09:12:04.5447117Z   2.0.384.1
+test (20.x)	Set up job	2026-10-17T09:12:04.7563689Z GITHUB_TOKEN Permissions
+test (20.x)	Set up job	2026-10-17T09:12:04.8369689Z   Contents: read
+test (20.x)	Set up job	2026-10-17T09:12:05.0197071Z   Metadata: read
+test (20.x)	Set up job	2026-10-17T09:12:05.5419870Z   PullRequests: read
+test (20.x)	Set up job	2026-10-17T09:12:06.0105312Z Secret source: Actions
+test (20.x)	Set up job	2026-10-17T09:12:06.2337751Z Prepare workflow directory
+test (20.x)	Set up job	2026-10-17T09:12:06.3368642Z Prepare all required actions
+test (20.x)	Set up job	2026-10-17T09:12:07.1058072Z Getting action download info
+test (20.x)	Set up job	2026-10-17T09:12:07.5019257Z Download action repository 'actions/checkout@v4' (SHA:11bd71901bbe5b1630ceea73d27597364c9af683)
+test (20.x)	Set up job	2026-10-17T09:12:07.8921043Z Download action repository 'actions/setup-node@v4' (SHA:39370e3970a6d050c480ffad4ff0ed4d3fdee5af)
+test (20.x)	Set up job	2026-10-17T09:12:08.0274270Z Download action repository 'actions/cache@v4' (SHA:6849a6489940f00c2f30c0fb92c6274307ccb58a)
+test (20.x)	Set up job	2026-10-17T09:12:08.5129570Z Complete job name: test (20.x)
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:09.0363961Z ##[group]Run actions/checkout@v4
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:09.2425056Z with:
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:09.6072838Z   repository: acme/storefront
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:09.8099048Z   token: ***
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:10.6292623Z   ssh-strict: true
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:11.5296743Z   ssh-user: git
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:11.6668225Z   persist-credentials: true
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:12.2411137Z   clean: true
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:12.3578718Z   sparse-checkout-cone-mode: true
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:13.2337517Z   fetch-depth: 1
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:13.6884231Z   fetch-tags: false
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:13.7496567Z   show-progress: true
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:14.2042093Z   lfs: false
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:14.3384111Z   submodules: false
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:14.9243162Z   set-safe-directory: true
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:15.4517555Z ##[endgroup]
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:15.8536274Z Syncing repository: acme/storefront
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:16.6895984Z ##[group]Getting Git version info
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:16.9055389Z Working directory is '/home/runner/work/storefront/storefront'
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:17.3413336Z [command]/usr/bin/git version
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:18.0689312Z git version 2.47.0
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:18.7837667Z ##[endgroup]
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:19.4124479Z Temporarily overriding HOME='/home/runner/work/_temp/3b0c' before making global git config changes
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:19.6237955Z Adding repository directory to the temporary git global config as a safe directory
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:20.0799194Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/storefront/storefront
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:20.6463548Z Deleting the contents of '/home/runner/work/storefront/storefront'
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:20.9898387Z ##[group]Initializing the repository
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:21.5814120Z [command]/usr/bin/git init /home/runner/work/storefront/storefront
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:22.4549428Z Initialized empty Git repository in /home/runner/work/storefront/storefront/.git/
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:22.5912658Z [command]/usr/bin/git remote add origin https://github.com/acme/storefront
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:22.8199796Z ##[endgroup]
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:22.9305849Z ##[group]Fetching the repository
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:23.2456574Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +3f1c2a9e8b7d6c5f4e3a2b1c0d9e8f7a6b5c4d3e:refs/remotes/pull/482/merge
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:23.2819782Z From https://github.com/acme/storefront
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:24.0081678Z  * [new ref]         3f1c2a9e8b7d6c5f4e3a2b1c0d9e8f7a6b5c4d3e -> pull/482/merge
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:24.8348953Z ##[endgroup]
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:25.7123023Z ##[group]Determining the checkout info
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:26.2922811Z ##[endgroup]
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:26.6706333Z [command]/usr/bin/git sparse-checkout disable
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:26.8064736Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:27.4217997Z ##[group]Checking out the ref
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:27.7311357Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/482/merge
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:27.7869616Z HEAD is now at 3f1c2a9 Merge 9d8e7f6 into 1a2b3c4
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:28.1492849Z ##[endgroup]
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:28.3183910Z [command]/usr/bin/git log -1 --format=%H
+test (20.x)	Run actions/checkout@v4	2026-10-17T09:12:28.6051048Z 3f1c2a9e8b7d6c5f4e3a2b1c0d9e8f7a6b5c4d3e
+test (20.x)	Run actions/setup-node@v4	2026-10-17T09:12:29.0193244Z ##[group]Run actions/setup-node@v4
+test (20.x)	Run actions/setup-node@v4	2026-10-17T09:12:29.2608280Z with:
+test (20.x)	Run actions/setup-node@v4	2026-10-17T09:12:29.9842595Z   node-version: 20.x
+test (20.x)	Run actions/setup-node@v4	2026-10-17T09:12:30.5688513Z   cache: npm
+test (20.x)	Run actions/setup-node@v4	2026-10-17T09:12:30.9732811Z   always-auth: false
+test (20.x)	Run actions/setup-node@v4	2026-10-17T09:12:31.8234902Z   check-latest: false
+test (20.x)	Run actions/setup-node@v4	2026-10-17T09:12:31.8827917Z   token: ***
+test (20.x)	Run actions/setup-node@v4	2026-10-17T09:12:31.9185281Z ##[endgroup]
+test (20.x)	Run actions/setup-node@v4	2026-10-17T09:12:32.5638672Z Found in cache @ /opt/hostedtoolcache/node/20.18.0/x64
+test (20.x)	Run actions/setup-node@v4	2026-10-17T09:12:32.8511895Z ##[group]Environment details
+test (20.x)	Run actions/setup-node@v4	2026-10-17T09:12:33.1582084Z node: v20.18.0
+test (20.x)	Run actions/setup-node@v4	2026-10-17T09:12:33.6254544Z npm: 10.8.2
+test (20.x)	Run actions/setup-node@v4	2026-10-17T09:12:33.9217330Z yarn: 1.22.22
+test (20.x)	Run actions/setup-node@v4	2026-10-17T09:12:34.0748356Z ##[endgroup]
+test (20.x)	Run actions/setup-node@v4	2026-10-17T09:12:34.1777650Z [command]/opt/hostedtoolcache/node/20.18.0/x64/bin/npm config get cache
+test (20.x)	Run actions/setup-node@v4	2026-10-17T09:12:34.4719172Z /home/runner/.npm
+test (20.x)	Run actions/setup-node@v4	2026-10-17T09:12:34.5235198Z Cache hit for: node-cache-Linux-x64-npm-5b7f0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b
+test (20.x)	Run actions/setup-node@v4	2026-10-17T09:12:35.0567223Z Received 54525952 of 187413504 (29.1%), 51.9 MBs/sec
+test (20.x)	Run actions/setup-node@v4	2026-10-17T09:12:35.3124315Z Received 146800640 of 187413504 (78.3%), 69.9 MBs/sec
+test (20.x)	Run actions/setup-node@v4	2026-10-17T09:12:35.4986997Z Received 187413504 of 187413504 (100.0%), 72.4 MBs/sec
+test (20.x)	Run actions/setup-node@v4	2026-10-17T09:12:35.8198862Z Cache Size: ~179 MB (187413504 B)
+test (20.x)	Run actions/setup-node@v4	2026-10-17T09:12:36.0247604Z [command]/usr/bin/tar -xf /home/runner/work/_temp/9a8b7c6d/cache.tzst -P -C /home/runner/work/storefront/storefront --use-compress-program unzstd
+test (20.x)	Run actions/setup-node@v4	2026-10-17T09:12:36.7409719Z Cache restored successfully
+test (20.x)	Run actions/setup-node@v4	2026-10-17T09:12:37.2042287Z Cache restored from key: node-cache-Linux-x64-npm-5b7f0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b
+test (20.x)	Run npm ci	2026-10-17T09:12:37.5736628Z ##[group]Run npm ci
+test (20.x)	Run npm ci	2026-10-17T09:12:37.7666890Z [36;1mnpm ci[0m
+test (20.x)	Run npm ci	2026-10-17T09:12:38.4412722Z shell: /usr/bin/bash -e {0}
+test (20.x)	Run npm ci	2026-10-17T09:12:39.3253503Z ##[endgroup]
+test (20.x)	Run npm ci	2026-10-17T09:12:39.6509362Z npm http fetch GET 200 https://registry.npmjs.org/@babel/core 154ms (cache hit)
+test (20.x)	Run npm ci	2026-10-17T09:12:40.3077762Z npm http fetch GET 200 https://registry.npmjs.org/@babel/preset-env 121ms (cache hit)
+test (20.x)	Run npm ci	2026-10-17T09:12:40.9874329Z npm http fetch GET 200 https://registry.npmjs.org/@testing-library/react 171ms (cache hit)
+test (20.x)	Run npm ci	2026-10-17T09:12:41.0214136Z npm http fetch GET 200 https://registry.npmjs.org/@types/node 317ms (cache hit)
+test (20.x)	Run npm ci	2026-10-17T09:12:41.2329116Z npm http fetch GET 200 https://registry.npmjs.org/@types/react 260ms (cache hit)
+test (20.x)	Run npm ci	2026-10-17T09:12:41.9671518Z npm http fetch GET 200 https://registry.npmjs.org/autoprefixer 271ms (cache hit)
+test (20.x)	Run npm ci	2026-10-17T09:12:42.0014914Z npm http fetch GET 200 https://registry.npmjs.org/esbuild 278ms (cache hit)
+test (20.x)	Run npm ci	2026-10-17T09:12:42.8411603Z npm http fetch GET 200 https://registry.npmjs.org/jest 139ms (cache hit)
+test (20.x)	Run npm ci	2026-10-17T09:12:42.8793744Z npm http fetch GET 200 https://registry.npmjs.org/jest-environment-jsdom 347ms (cache hit)
+test (20.x)	Run npm ci	2026-10-17T09:12:42.9467085Z npm http fetch GET 200 https://registry.npmjs.org/next 394ms (cache hit)
+test (20.x)	Run npm ci	2026-10-17T09:12:43.0255027Z npm http fetch GET 200 https://registry.npmjs.org/postcss 32ms (cache hit)
+test (20.x)	Run npm ci	2026-10-17T09:12:43.8585709Z npm http fetch GET 200 https://registry.npmjs.org/react 324ms (cache hit)
+test (20.x)	Run npm ci	2026-10-17T09:12:44.0707590Z npm http fetch GET 200 https://registry.npmjs.org/react-dom 294ms (cache hit)
+test (20.x)	Run npm ci	2026-10-17T09:12:44.1569170Z npm http fetch GET 200 https://registry.npmjs.org/tailwindcss 96ms (cache hit)
+test (20.x)	Run npm ci	2026-10-17T09:12:44.5077304Z npm http fetch GET 200 https://registry.npmjs.org/ts-jest 129ms (cache hit)
+test (20.x)	Run npm ci	2026-10-17T09:12:44.8613874Z npm http fetch GET 200 https://registry.npmjs.org/typescript 194ms (cache hit)
+test (20.x)	Run npm ci	2026-10-17T09:12:45.4487441Z npm http fetch GET 200 https://registry.npmjs.org/zod 385ms (cache hit)
+test (20.x)	Run npm ci	2026-10-17T09:12:45.9784114Z npm http fetch GET 200 https://registry.npmjs.org/eslint 253ms (cache hit)
+test (20.x)	Run npm ci	2026-10-17T09:12:46.0831081Z npm http fetch GET 200 https://registry.npmjs.org/prettier 346ms (cache hit)
+test (20.x)	Run npm ci	2026-10-17T09:12:46.5126058Z npm http fetch GET 200 https://registry.npmjs.org/husky 318ms (cache hit)
+test (20.x)	Run npm ci	2026-10-17T09:12:47.1121275Z 
+test (20.x)	Run npm ci	2026-10-17T09:12:47.4292345Z added 1284 packages, and audited 1285 packages in 21s
+test (20.x)	Run npm ci	2026-10-17T09:12:47.6522215Z 
+test (20.x)	Run npm ci	2026-10-17T09:12:47.9821853Z 231 packages are looking for funding
+test (20.x)	Run npm ci	2026-10-17T09:12:48.7955168Z   run `npm fund` for details
+test (20.x)	Run npm ci	2026-10-17T09:12:49.3769883Z 
+test (20.x)	Run npm ci	2026-10-17T09:12:49.7543772Z found 0 vulnerabilities
+test (20.x)	Run npm run lint	2026-10-17T09:12:50.4878887Z ##[group]Run npm run lint
+test (20.x)	Run npm run lint	2026-10-17T09:12:51.1376418Z [36;1mnpm run lint[0m
+test (20.x)	Run npm run lint	2026-10-17T09:12:51.6072260Z shell: /usr/bin/bash -e {0}
+test (20.x)	Run npm run lint	2026-10-17T09:12:52.0669062Z ##[endgroup]
+test (20.x)	Run npm run lint	2026-10-17T09:12:52.6052163Z 
+test (20.x)	Run npm run lint	2026-10-17T09:12:52.7855802Z > storefront@1.42.0 lint
+test (20.x)	Run npm run lint	2026-10-17T09:12:52.9223757Z > next lint
+test (20.x)	Run npm run lint	2026-10-17T09:12:53.0266068Z 
+test (20.x)	Run npm run lint	2026-10-17T09:12:53.8065238Z ✔ No ESLint warnings or errors
+test (20.x)	Run npm test -- --ci	2026-10-17T09:12:53.8307677Z ##[group]Run npm test -- --ci
+test (20.x)	Run npm test -- --ci	2026-10-17T09:12:54.6706158Z [36;1mnpm test -- --ci[0m
+test (20.x)	Run npm test -- --ci	2026-10-17T09:12:55.0441836Z shell: /usr/bin/bash -e {0}
+test (20.x)	Run npm test -- --ci	2026-10-17T09:12:55.2741717Z ##[endgroup]
+test (20.x)	Run npm test -- --ci	2026-10-17T09:12:55.2841257Z 
+test (20.x)	Run npm test -- --ci	2026-10-17T09:12:56.0804488Z > storefront@1.42.0 test
+test (20.x)	Run npm test -- --ci	2026-10-17T09:12:56.2035998Z > jest --ci
+test (20.x)	Run npm test -- --ci	2026-10-17T09:12:56.4302798Z 
+test (20.x)	Run npm test -- --ci	2026-10-17T09:12:56.7915909Z PASS src/cart/cart.test.ts (0.97 s)
+test (20.x)	Run npm test -- --ci	2026-10-17T09:12:57.3088307Z PASS src/cart/totals.test.ts (0.09 s)
+test (20.x)	Run npm test -- --ci	2026-10-17T09:12:57.9218987Z PASS src/checkout/address.test.tsx (1.37 s)
+test (20.x)	Run npm test -- --ci	2026-10-17T09:12:58.0673512Z FAIL src/checkout/payment.test.tsx (2.41 s)
+test (20.x)	Run npm test -- --ci	2026-10-17T09:12:58.1172281Z   ● Payment › applies the discount before tax
+test (20.x)	Run npm test -- --ci	2026-10-17T09:12:58.3758931Z 
+test (20.x)	Run npm test -- --ci	2026-10-17T09:12:59.0268779Z     expect(received).toBe(expected) // Object.is equality
+test (20.x)	Run npm test -- --ci	2026-10-17T09:12:59.1831919Z 
+test (20.x)	Run npm test -- --ci	2026-10-17T09:12:59.8208446Z     Expected: 1188
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:00.1497845Z     Received: 1200
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:00.2272017Z 
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:00.7137598Z       42 |     const total = applyDiscount(cart, code);
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:01.4614900Z       43 |     render(<Payment total={total} />);
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:01.7389573Z     > 44 |     expect(screen.getByTestId("total").textContent).toBe("1188");
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:02.3335439Z          |                                                      ^
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:03.1889502Z       45 |   });
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:04.0359420Z 
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:04.5373025Z       at Object.<anonymous> (src/checkout/payment.test.tsx:44:54)
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:04.5941408Z 
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:05.1186971Z PASS src/catalog/search.test.ts (1.05 s)
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:05.6795838Z PASS src/catalog/filters.test.ts (1.95 s)
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:05.9518761Z PASS src/catalog/product-card.test.tsx (0.72 s)
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:05.9706539Z PASS src/account/orders.test.tsx (0.72 s)
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:06.5239385Z PASS src/account/profile.test.tsx (0.15 s)
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:07.2432348Z PASS src/lib/money.test.ts (2.19 s)
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:07.5497300Z PASS src/lib/dates.test.ts (1.72 s)
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:08.0392612Z PASS src/lib/http.test.ts (2.13 s)
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:08.4003929Z PASS src/api/products.test.ts (2.20 s)
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:08.6924920Z PASS src/api/orders.test.ts (0.06 s)
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:08.7381579Z PASS src/api/auth.test.ts (1.06 s)
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:09.5755396Z PASS src/components/header.test.tsx (1.34 s)
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:10.4543909Z PASS src/components/footer.test.tsx (1.76 s)
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:11.3417889Z PASS src/components/modal.test.tsx (1.47 s)
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:11.8083229Z PASS src/hooks/use-cart.test.ts (1.90 s)
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:12.3672216Z PASS src/hooks/use-debounce.test.ts (1.86 s)
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:13.2135323Z 
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:13.9178880Z Test Suites: 1 failed, 19 passed, 20 total
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:14.4173192Z Tests:       1 failed, 211 passed, 212 total
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:14.4663545Z Snapshots:   4 passed, 4 total
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:15.1041650Z Time:        14.873 s
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:15.3477699Z Ran all test suites.
+test (20.x)	Run npm test -- --ci	2026-10-17T09:13:16.1347803Z ##[error]Process completed with exit code 1.
+test (20.x)	Post Run actions/checkout@v4	2026-10-17T09:13:16.6383277Z Post job cleanup.
+test (20.x)	Post Run actions/checkout@v4	2026-10-17T09:13:17.4837375Z [command]/usr/bin/git version
+test (20.x)	Post Run actions/checkout@v4	2026-10-17T09:13:18.1661908Z git version 2.47.0
+test (20.x)	Post Run actions/checkout@v4	2026-10-17T09:13:18.4909797Z Temporarily overriding HOME='/home/runner/work/_temp/7c1d' before making global git config changes
+test (20.x)	Post Run actions/checkout@v4	2026-10-17T09:13:19.3568774Z Adding repository directory to the temporary git global config as a safe directory
+test (20.x)	Post Run actions/checkout@v4	2026-10-17T09:13:19.4325649Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/storefront/storefront
+test (20.x)	Post Run actions/checkout@v4	2026-10-17T09:13:19.6394450Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+test (20.x)	Post Run actions/checkout@v4	2026-10-17T09:13:19.9996323Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+test (20.x)	Post Run actions/checkout@v4	2026-10-17T09:13:20.4035748Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+test (20.x)	Post Run actions/checkout@v4	2026-10-17T09:13:20.7206456Z http.https://github.com/.extraheader
+test (20.x)	Post Run actions/checkout@v4	2026-10-17T09:13:21.5894637Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+test (20.x)	Complete job	2026-10-17T09:13:21.6882998Z Cleaning up orphan processes

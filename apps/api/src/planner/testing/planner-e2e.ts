@@ -1,6 +1,7 @@
 import { PLANNER_BLOCK_TAG, type PlanDetail } from '@agentdock/shared';
 import {
   commandSupport,
+  type DocsCommandName,
   type IssueCreateArgs,
   type IssueCreateResult,
   type PlannerCommandName,
@@ -45,7 +46,7 @@ type Handler = (args: unknown) => PlannerSendResult<unknown>;
 export const ok = <T>(output: T) => ({ status: 'ok' as const, output });
 
 export interface SentCommand {
-  name: PlannerCommandName | 'issue.create';
+  name: PlannerCommandName | DocsCommandName | 'issue.create';
   args: Record<string, unknown>;
 }
 
@@ -71,7 +72,7 @@ export class PlannerHarness {
   admin!: Session;
   authorId!: string;
   sent: SentCommand[] = [];
-  handlers: Partial<Record<PlannerCommandName, Handler>> = {};
+  handlers: Partial<Record<PlannerCommandName | DocsCommandName, Handler>> = {};
   private seq = 0;
   private issue = 100;
   private auditFrom = 0n;
@@ -155,6 +156,13 @@ export class PlannerHarness {
         ok({ labelled: (args as { numbers: number[] }).numbers }),
       'plan.publish_specs': () =>
         ok({ prNumber: 7, prUrl: `https://github.com/${REPO}/pull/7` }),
+      'docs.publish_specs': () =>
+        ok({
+          repo: 'acme/widget-documentation',
+          prNumber: 3,
+          prUrl: 'https://github.com/acme/widget-documentation/pull/3',
+        }),
+      'docs.pr_state': () => ok({ state: 'open' }),
     };
     // The real `assertReady` runs against a stubbed presence: connected, and
     // advertising `advert` (null = unknown, as from an older runner).
@@ -166,6 +174,15 @@ export class PlannerHarness {
     jest
       .spyOn(this.commands, 'send')
       .mockImplementation(async (_runner, name, args) => {
+        this.sent.push({ name, args: args as Record<string, unknown> });
+        const handler = this.handlers[name];
+        if (!handler) throw new Error(`no handler for ${name}`);
+        return handler(args) as never;
+      });
+    jest
+      .spyOn(this.commands, 'sendDocs')
+      .mockImplementation(async (runner, name, args) => {
+        this.commands.assertReady(runner, name);
         this.sent.push({ name, args: args as Record<string, unknown> });
         const handler = this.handlers[name];
         if (!handler) throw new Error(`no handler for ${name}`);
@@ -211,6 +228,29 @@ export class PlannerHarness {
       throw new Error(`create plan → ${response.status} ${response.text}`);
     }
     return response.body as PlanDetail;
+  }
+
+  /**
+   * #592 (ADR-0058): accepts every pending candidate of an intake as
+   * proposed — its stack in its stages, else independent cards.
+   */
+  async acceptAll(planId: string, session: Session = this.author) {
+    const intake = (await this.detail(planId, session)).intake;
+    const stack = intake?.candidateStack ?? null;
+    return session.send(
+      'post',
+      `/projects/${this.projectId}/candidates/accept`,
+      {
+        as: stack ? 'stack' : 'cards',
+        candidates: (intake?.candidates ?? [])
+          .filter((c) => c.status === 'pending')
+          .map((c) => ({
+            id: c.id,
+            version: c.version,
+            ...(stack ? { stage: c.stage } : {}),
+          })),
+      },
+    );
   }
 
   detail(planId: string, session: Session = this.author) {

@@ -5,6 +5,7 @@ import {
   describeActionRequestError,
   formatCountdown,
   pendingRequests,
+  prApproveArgs,
   recentRequests,
   requestTitle,
   resultMessage,
@@ -53,16 +54,69 @@ describe('toolUseArgs', () => {
   test('reads the tool and the redacted input', () => {
     expect(
       toolUseArgs(row({ args: { toolName: 'Bash', input: 'ls -la' } })),
-    ).toEqual({ toolName: 'Bash', input: 'ls -la' });
+    ).toEqual({ toolName: 'Bash', input: 'ls -la', truncated: false });
     expect(toolUseArgs(row({ args: { toolName: 'Read' } }))).toEqual({
       toolName: 'Read',
+      truncated: false,
     });
+  });
+  test('reads the runner’s truncated flag apart from the strict schema', () => {
+    expect(
+      toolUseArgs(
+        row({ args: { toolName: 'Bash', input: 'ls', truncated: true } }),
+      )?.truncated,
+    ).toBe(true);
   });
   test('is null for other kinds and for malformed args', () => {
     expect(
       toolUseArgs(row({ kind: 'pr_approve', args: { pr: 1 } })),
     ).toBeNull();
     expect(toolUseArgs(row({ args: { extra: 1 } }))).toBeNull();
+  });
+});
+
+describe('prApproveArgs (C-110)', () => {
+  const HEAD = '0b6445a1'.padEnd(40, 'c');
+  test('reads the bound head, its short form and the diff', () => {
+    expect(
+      prApproveArgs(
+        row({
+          kind: 'pr_approve',
+          args: {
+            pr: 12,
+            headSha: HEAD,
+            title: 'feat: widget',
+            url: 'https://github.com/acme/widget/pull/12',
+          },
+        }),
+      ),
+    ).toEqual({
+      pr: 12,
+      headSha: HEAD,
+      title: 'feat: widget',
+      url: 'https://github.com/acme/widget/pull/12',
+      shortHead: '0b6445a',
+      diffUrl: `https://github.com/acme/widget/pull/12/files/${HEAD}`,
+    });
+  });
+  test('is null without a head, for other kinds, and for a non-http url', () => {
+    expect(
+      prApproveArgs(row({ kind: 'pr_approve', args: { pr: 12 } })),
+    ).toBeNull();
+    expect(prApproveArgs(row({}))).toBeNull();
+    expect(
+      prApproveArgs(
+        row({
+          kind: 'pr_approve',
+          args: {
+            pr: 12,
+            headSha: HEAD,
+            title: 't',
+            url: 'javascript:alert(1)',
+          },
+        }),
+      ),
+    ).toBeNull();
   });
 });
 
@@ -79,6 +133,22 @@ describe('requestTitle', () => {
       'Stop the orchestrator',
     );
     expect(requestTitle(row({ args: {} }))).toBe('Use a tool');
+    expect(
+      requestTitle(
+        row({
+          kind: 'issue_queue',
+          args: {
+            issue: 42,
+            title: 'Fix it',
+            url: 'https://github.com/o/r/issues/42',
+            session: null,
+          },
+        }),
+      ),
+    ).toBe('Queue issue #42 for the fleet');
+    expect(requestTitle(row({ kind: 'issue_queue', args: {} }))).toBe(
+      'Queue an issue for the fleet',
+    );
   });
 });
 

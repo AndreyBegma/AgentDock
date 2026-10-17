@@ -60,9 +60,11 @@ const readBody = (req: IncomingMessage): Promise<Record<string, unknown>> =>
 /**
  * A stand-in for the Bot API on 127.0.0.1 (spec 22: "Telegram is tested only
  * against the mock base URL"). It records every call, answers `getMe`,
- * `getUpdates`, `sendMessage` and `answerCallbackQuery` like Telegram does,
- * refuses unknown tokens
- * with 401, and plays scripted replies per method first.
+ * `getUpdates`, `sendMessage` (each with a new `message_id`),
+ * `editMessageText`, `answerCallbackQuery`, `sendChatAction`, `setMyCommands`,
+ * `setChatMenuButton` and `getFile` like Telegram does, serves the files it
+ * was given at `/file/bot<token>/<path>` (#594), refuses unknown tokens with 401,
+ * and plays scripted replies per method first.
  */
 export class FakeTelegram {
   readonly calls: FakeCall[] = [];
@@ -70,6 +72,10 @@ export class FakeTelegram {
   updates: { update_id: number; [key: string]: unknown }[] = [];
   readonly tokens = new Set<string>([BOT_TOKEN]);
   bot: typeof BOT = { ...BOT };
+  /** #594: what `getFile` names and the file route serves, by `file_id`. */
+  readonly files = new Map<string, { bytes: Buffer; size?: number }>();
+  /** #594: the files the bot downloaded, by `file_id`. */
+  readonly downloads: string[] = [];
   private readonly scripted = new Map<string, FakeReply[]>();
 
   private constructor(
@@ -80,6 +86,17 @@ export class FakeTelegram {
   static async start(): Promise<FakeTelegram> {
     let fake: FakeTelegram | null = null;
     const server = createServer((req, res) => {
+      const file = fake?.file(req.url ?? '');
+      if (file !== undefined) {
+        if (file === null) {
+          res.writeHead(404);
+          res.end();
+        } else {
+          res.writeHead(200, { 'content-type': 'application/octet-stream' });
+          res.end(file);
+        }
+        return;
+      }
       void fake?.handle(req).then(
         (reply) => {
           res.writeHead(reply.status, { 'content-type': 'application/json' });
@@ -107,8 +124,15 @@ export class FakeTelegram {
     ]);
   }
 
+  /** #594: a file the chat sent, for `getFile` and the download route. */
+  addFile(fileId: string, bytes: Buffer, size?: number): void {
+    this.files.set(fileId, { bytes, size });
+  }
+
   reset(): void {
     this.calls.length = 0;
+    this.files.clear();
+    this.downloads.length = 0;
     this.updates = [];
     this.scripted.clear();
     this.tokens.clear();
@@ -120,8 +144,27 @@ export class FakeTelegram {
     return this.calls.filter((c) => c.method === 'sendMessage');
   }
 
+  /** The messages the bot rewrote in place (#576). */
+  edited(): FakeCall[] {
+    return this.calls.filter((c) => c.method === 'editMessageText');
+  }
+
   close(): Promise<void> {
     return new Promise((resolve) => this.server.close(() => resolve()));
+  }
+
+  /**
+   * `/file/bot<token>/<file_path>`: the bytes, null for an unknown file or
+   * token; undefined for any other path.
+   */
+  private file(url: string): Buffer | null | undefined {
+    const match = /^\/file\/bot([^/]+)\/files\/([^/]+)$/.exec(url);
+    if (!match) return undefined;
+    const [, token, fileId] = match;
+    const file = this.files.get(decodeURIComponent(fileId));
+    if (!this.tokens.has(decodeURIComponent(token)) || !file) return null;
+    this.downloads.push(decodeURIComponent(fileId));
+    return file.bytes;
   }
 
   private async handle(req: IncomingMessage): Promise<FakeReply> {
@@ -163,7 +206,43 @@ export class FakeTelegram {
           status: 200,
           body: { ok: true, result: { message_id: this.calls.length } },
         };
+      case 'editMessageText':
+        return {
+          status: 200,
+          body: {
+            ok: true,
+            result: { message_id: body.message_id, text: body.text },
+          },
+        };
+      case 'getFile': {
+        const fileId = String(body.file_id);
+        const file = this.files.get(fileId);
+        if (!file) {
+          return {
+            status: 400,
+            body: {
+              ok: false,
+              error_code: 400,
+              description: 'Bad Request: invalid file_id',
+            },
+          };
+        }
+        return {
+          status: 200,
+          body: {
+            ok: true,
+            result: {
+              file_id: fileId,
+              file_size: file.size ?? file.bytes.length,
+              file_path: `files/${fileId}`,
+            },
+          },
+        };
+      }
       case 'answerCallbackQuery':
+      case 'sendChatAction':
+      case 'setMyCommands':
+      case 'setChatMenuButton':
         return { status: 200, body: { ok: true, result: true } };
       default:
         return {
@@ -191,11 +270,45 @@ export const privateMessage = (
   },
 });
 
+/**
+ * #594: a private message with media — a photo, a document, a voice message —
+ * and maybe a caption, maybe replying to the bot's message `replyToId`.
+ */
+export const mediaMessage = (
+  updateId: number,
+  chatId: number,
+  media: Record<string, unknown>,
+  caption?: string,
+  replyToId?: number,
+) => ({
+  update_id: updateId,
+  message: {
+    message_id: updateId,
+    date: 0,
+    chat: { id: chatId, type: 'private' },
+    from: { id: chatId, is_bot: false },
+    ...media,
+    ...(caption === undefined ? {} : { caption }),
+    ...(replyToId === undefined
+      ? {}
+      : {
+          reply_to_message: {
+            message_id: replyToId,
+            date: 0,
+            chat: { id: chatId, type: 'private' },
+            from: { id: BOT.id, is_bot: true },
+            text: 'question',
+          },
+        }),
+  },
+});
+
 /** A press on an inline button of a message the bot sent to a private chat. */
 export const callbackPress = (
   updateId: number,
   chatId: number,
   data: string,
+  messageId = 1,
 ) => ({
   update_id: updateId,
   callback_query: {
@@ -203,7 +316,7 @@ export const callbackPress = (
     from: { id: chatId, is_bot: false },
     chat_instance: '1',
     message: {
-      message_id: 1,
+      message_id: messageId,
       date: 0,
       chat: { id: chatId, type: 'private' },
       from: { id: BOT.id, is_bot: true, username: BOT.username },
@@ -220,6 +333,7 @@ export const replyMessage = (
   text: string | undefined,
   replyTo: string,
   from: { id: number; is_bot: boolean } = { id: BOT.id, is_bot: true },
+  replyToId = 1,
 ) => ({
   update_id: updateId,
   message: {
@@ -229,7 +343,7 @@ export const replyMessage = (
     from: { id: chatId, is_bot: false },
     ...(text === undefined ? { sticker: { file_id: 'x' } } : { text }),
     reply_to_message: {
-      message_id: 1,
+      message_id: replyToId,
       date: 0,
       chat: { id: chatId, type: 'private' },
       from,

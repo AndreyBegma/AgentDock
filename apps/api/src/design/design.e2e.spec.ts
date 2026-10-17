@@ -254,6 +254,29 @@ describe('design stage (e2e)', () => {
     ]);
   });
 
+  it('refuses a manual edit whose snippet navigates the frame', async () => {
+    await h.seedProfile();
+    const res = await h.admin.send(
+      'put',
+      `/projects/${h.projectId}/ui-profile`,
+      {
+        summary: 'summary',
+        kit: ':root{--edited:1}',
+        snippets: [
+          {
+            name: 'button',
+            html: '<button onclick="location.href=\'https://evil.test\'">Go</button><script>location.href = "https://evil.test"</script>',
+          },
+        ],
+      },
+    );
+    expect(res.status).toBe(400);
+    const versions = await h.viewer.get(
+      `/projects/${h.projectId}/ui-profile/versions`,
+    );
+    expect(versions.body.items).toHaveLength(1);
+  });
+
   it('draws three variants as three turns, one after another', async () => {
     const plan = await drawn(3);
     const view = await design(plan.id);
@@ -867,6 +890,21 @@ describe('design stage (e2e)', () => {
     ]);
     expect(view.warnings).toEqual([
       expect.objectContaining({ skill: 'gone-skill' }),
+    ]);
+    // #604: a plan task's design follows a later change of the default.
+    await h.admin.send('put', `/projects/${h.projectId}/design-settings`, {
+      viewports: [{ name: 'Desktop', width: 1440, height: 900 }],
+      defaultSkills: ['design-kit:frontend-design', 'gone-skill', 'gone-too'],
+    });
+    const followed = await design(plan.id);
+    expect(followed.skills).toEqual([
+      'design-kit:frontend-design',
+      'gone-skill',
+      'gone-too',
+    ]);
+    expect(followed.warnings.map((w) => w.skill)).toEqual([
+      'gone-skill',
+      'gone-too',
     ]);
     await generate(plan.id);
     const prompt = h.turnPrompts().at(-1) ?? '';

@@ -8,6 +8,7 @@ import type {
 import { z } from 'zod';
 import { watchedProject } from '../control/target';
 import type { Exec } from '../detect/exec';
+import { redactUrlUserinfo } from '../redact-url';
 import { githubOf } from '../skills/run/collect';
 import {
   type BranchOutcome,
@@ -168,13 +169,17 @@ export const mergeCard = async (
     };
   } catch (error) {
     if (error instanceof Refused) {
-      return { merged: false, error: error.reason, message: error.message };
+      return {
+        merged: false,
+        error: error.reason,
+        message: redactUrlUserinfo(error.message),
+      };
     }
     const message = error instanceof Error ? error.message : String(error);
     return {
       merged: false,
       error: 'gh_failed',
-      message: (message.split('\n')[0] ?? '').slice(0, 500),
+      message: redactUrlUserinfo((message.split('\n')[0] ?? '').slice(0, 500)),
     };
   }
 };

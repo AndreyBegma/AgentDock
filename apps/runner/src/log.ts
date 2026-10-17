@@ -1,4 +1,5 @@
 import type { Env } from './env';
+import { redactUrlUserinfo } from './redact-url';
 
 export const LOG_LEVELS = ['debug', 'info', 'warn', 'error'] as const;
 export type LogLevel = (typeof LOG_LEVELS)[number];
@@ -67,5 +68,5 @@ export const createLogger = (options: LoggerOptions): Logger => {
 /** The message of anything thrown, first line only — never a stack trace. */
 export const errorMessage = (error: unknown): string => {
   const text = error instanceof Error ? error.message : String(error);
-  return text.split('\n')[0].slice(0, 500);
+  return redactUrlUserinfo(text.split('\n')[0]).slice(0, 500);
 };

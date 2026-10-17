@@ -1,7 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ConfigError, isPaired, loadConfig, saveConfig } from './config';
+import {
+  ConfigError,
+  isPaired,
+  loadConfig,
+  saveConfig,
+  updateConfig,
+} from './config';
 import { TOKEN, tempDir } from './testing/fixtures';
 
 describe('config', () => {
@@ -25,8 +31,71 @@ describe('config', () => {
       fleet: { pollSeconds: 15, prPollSeconds: 60, eventsPollSeconds: 5 },
       queue: { pollSeconds: 60 },
       sessions: { enabled: true },
-      skills: { maxConcurrentRuns: 2, maxTimeoutSec: 21_600 },
+      skills: {
+        maxConcurrentRuns: 2,
+        maxTimeoutSec: 21_600,
+        keepPatchesLocal: false,
+      },
+      policy: {
+        allowedRoots: [],
+        maxPermissionMode: 'auto',
+        terminal: { write: false },
+        skills: { profileInstall: false },
+        commands: {
+          'orchestrator.message': false,
+          'slot.message': false,
+          'session.message': false,
+        },
+      },
     });
+  });
+
+  it('keeps the policy on disk when the daemon rewrites the file (ADR-0047)', () => {
+    saveConfig(path, {
+      policy: { allowedRoots: ['/srv/dev'], terminal: { write: true } },
+    });
+    // A patch carrying a policy — as a crafted server value would — is ignored.
+    updateConfig(path, {
+      projects: [{ id: 'prj_a', root: '/srv/dev/a' }],
+      policy: { allowedRoots: ['/'], maxPermissionMode: 'bypassPermissions' },
+    } as never);
+    const config = loadConfig(path);
+    expect(config.projects).toEqual([{ id: 'prj_a', root: '/srv/dev/a' }]);
+    expect(config.policy.allowedRoots).toEqual(['/srv/dev']);
+    expect(config.policy.maxPermissionMode).toBe('auto');
+    expect(config.policy.terminal.write).toBe(true);
+  });
+
+  it('never lets the daemon rewrite insecureServer (D-06)', () => {
+    saveConfig(path, { server: 'https://dock.example' });
+    updateConfig(path, { insecureServer: true } as never);
+    expect(loadConfig(path).insecureServer).toBeUndefined();
+    saveConfig(path, { server: 'http://dock.lan', insecureServer: true });
+    updateConfig(path, { insecureServer: false } as never);
+    expect(loadConfig(path).insecureServer).toBe(true);
+  });
+
+  it('never lets the daemon rewrite skills.keepPatchesLocal (C-128)', () => {
+    saveConfig(path, { skills: { keepPatchesLocal: true } });
+    updateConfig(path, {
+      projects: [{ id: 'prj_a', root: '/srv/dev/a' }],
+      skills: { keepPatchesLocal: false },
+    } as never);
+    const config = loadConfig(path);
+    expect(config.projects).toEqual([{ id: 'prj_a', root: '/srv/dev/a' }]);
+    expect(config.skills.keepPatchesLocal).toBe(true);
+  });
+
+  it('refuses a relative allowed root and an unknown gated command', () => {
+    expect(() =>
+      saveConfig(path, { policy: { allowedRoots: ['dev'] } }),
+    ).toThrow();
+    saveConfig(path, {});
+    writeFileSync(
+      path,
+      JSON.stringify({ policy: { commands: { 'shell.exec': true } } }),
+    );
+    expect(() => loadConfig(path)).toThrow(ConfigError);
   });
 
   it('bounds skill runs and refuses a cap of zero', () => {
@@ -34,6 +103,7 @@ describe('config', () => {
     expect(loadConfig(path).skills).toEqual({
       maxConcurrentRuns: 1,
       maxTimeoutSec: 21_600,
+      keepPatchesLocal: false,
     });
     expect(() =>
       saveConfig(path, { skills: { maxConcurrentRuns: 0 } }),

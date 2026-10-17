@@ -1,12 +1,16 @@
 import {
+  type AttachmentView,
+  discussOutputSchema,
   type FrozenTaskRef,
   intakeRoundsAsked,
   isIntakeRound,
   isPlannedTask,
   PLANNER_INTAKE_MAX_ROUNDS,
   type PlanDetail,
+  type PlanDiscussReply,
   type PlanGraphView,
   type PlanIntakeSplitView,
+  type PlanIntakeView,
   type PlannedTask,
   type PlannerInstructionsVersion,
   type PlanQuestion,
@@ -100,6 +104,7 @@ export const roundsOf = (
       );
     case 'write':
     case 'design':
+    case 'discuss':
       return [];
     case 'intake':
       // #337 D4: a round; the card and a split (#409) open none.
@@ -107,6 +112,18 @@ export const roundsOf = (
         ? [{ taskKey: null, questions: out.questions }]
         : [];
   }
+};
+
+/** #590: a discussion turn's reply, read back; any other turn has none. */
+export const replyOf = (
+  action: PlanTurnAction,
+  output: Prisma.JsonValue,
+): PlanDiscussReply | null => {
+  if (action !== 'discuss' || output === null) return null;
+  const parsed = discussOutputSchema.safeParse(output);
+  return parsed.success
+    ? { reply: parsed.data.reply, proposals: parsed.data.proposals ?? [] }
+    : null;
 };
 
 export const turnInclude = {
@@ -134,6 +151,7 @@ export const toTurnView = (row: TurnRow): PlanTurnView => ({
   error: row.error,
   resultText: row.resultText,
   rounds: roundsOf(row.action, row.output, row.task?.key ?? null),
+  reply: replyOf(row.action, row.output),
   createdAt: row.createdAt.toISOString(),
   finishedAt: row.finishedAt?.toISOString() ?? null,
 });
@@ -228,6 +246,13 @@ export interface DetailParts {
   questions: PlanQuestion[];
   /** #409: an intake's open split proposal. */
   split?: PlanIntakeSplitView | null;
+  /** #594: an intake's attachments, oldest first. */
+  attachments?: AttachmentView[];
+  /** #592: an intake's candidates, the stack they came in, its attachments left. */
+  review?: Pick<
+    PlanIntakeView,
+    'candidates' | 'candidateStack' | 'attachmentsLeft'
+  > | null;
 }
 
 export const toDetail = ({
@@ -237,6 +262,8 @@ export const toDetail = ({
   latestTurn,
   questions,
   split,
+  attachments,
+  review,
 }: DetailParts): PlanDetail => ({
   ...toSummary(plan, tasks, latestTurn),
   brief: plan.brief,
@@ -247,6 +274,7 @@ export const toDetail = ({
   model: plan.model,
   docsPrNumber: plan.docsPrNumber,
   docsPrUrl: plan.docsPrUrl,
+  docsPrRepo: plan.docsPrRepo,
   tasks,
   turns,
   graph: graphOf(tasks),
@@ -259,6 +287,11 @@ export const toDetail = ({
           roundsAsked: intakeRoundsAsked(turns),
           maxRounds: PLANNER_INTAKE_MAX_ROUNDS,
           split: split ?? null,
+          attachments: attachments ?? [],
+          candidates: review?.candidates ?? [],
+          candidateStack: review?.candidateStack ?? null,
+          attachmentsLeft: review?.attachmentsLeft ?? 0,
         }
       : null,
+  discussion: plan.mode === 'discuss' ? { skills: plan.skills } : null,
 });

@@ -14,13 +14,17 @@
  * client.close();
  * ```
  *
- * - `connectLocal(path, { timeoutMs? })` → `LocalClient | null`.
+ * - `connectLocal(path, { timeoutMs?, token? })` → `LocalClient | null`.
+ *   `token` is the session's (#113): every line carries it, and the daemon
+ *   refuses a call without it — but a `SessionStart` event, which is
+ *   answered with one, and a runner-wide method such as `away.set`.
  * - `client.request(method, args, ctx)` → `LocalResult<LocalMethodResult<method>>`.
- *   `ctx` is `{ via: 'mcp'|'hook'|'cli', cwd?, ppid?, sessionId? }`: the daemon
- *   correlates `cwd` to the project (D9) and `sessionId`, else `ppid`, else
- *   the single live session in `cwd`, to the session (D10). The result is
- *   checked against the method's result schema; a mismatch is `internal`.
- * - `client.event(args)` → a hook event for the spool (`LocalEventArgs`).
+ *   `ctx` is `{ via: 'mcp'|'hook'|'cli', cwd?, ppid?, sessionId? }`: the
+ *   session and the project come from the token's binding; a `cwd` outside
+ *   it or another `sessionId` is refused (#113). The result is checked
+ *   against the method's result schema; a mismatch is `internal`.
+ * - `client.event(args)` → a hook event for the spool (`LocalEventArgs`);
+ *   `{ queued, token? }`.
  * - `client.ping({ cwd? })` → `{ pong, online, awayMode, projectId }`.
  * - Every call resolves, never throws. A lost daemon is `daemon_unavailable`;
  *   no answer within `LOCAL_REQUEST_TIMEOUT_MS` + 1 s is `timeout`.
@@ -39,10 +43,12 @@ import {
   LOCAL_CONNECT_TIMEOUT_MS,
   LOCAL_LINE_MAX_BYTES,
   type LocalEventArgs,
+  type LocalEventResult,
   type LocalOp,
   type LocalPingResult,
   type LocalResult,
   type LocalVia,
+  localEventResultSchema,
   localFail,
   localPingResultSchema,
   localReplySchema,
@@ -62,6 +68,8 @@ export interface LocalRequestContext {
 
 export interface ConnectOptions {
   timeoutMs?: number;
+  /** #113: the session token every call carries. */
+  token?: string;
   /** Per call; the daemon's own relay deadline plus a margin by default. */
   callTimeoutMs?: number;
 }
@@ -86,7 +94,13 @@ export class LocalClient {
   constructor(
     private readonly socket: Socket<ClientState>,
     private readonly callTimeoutMs: number,
+    private token?: string,
   ) {}
+
+  /** #113: the token a `SessionStart` was answered with, for the calls after it. */
+  useToken(token: string): void {
+    this.token = token;
+  }
 
   request<N extends LocalMethodName>(
     method: N,
@@ -102,8 +116,14 @@ export class LocalClient {
     });
   }
 
-  event(args: LocalEventArgs): Promise<LocalResult<unknown>> {
-    return this.call('event', args);
+  event(args: LocalEventArgs): Promise<LocalResult<LocalEventResult>> {
+    return this.call('event', args).then((result) => {
+      if (!result.ok) return result;
+      const parsed = localEventResultSchema.safeParse(result.data);
+      return parsed.success
+        ? { ok: true, data: parsed.data }
+        : localFail('internal', 'unexpected event result');
+    });
   }
 
   ping(args: { cwd?: string } = {}): Promise<LocalResult<LocalPingResult>> {
@@ -167,7 +187,8 @@ export class LocalClient {
   private call(op: LocalOp, args: unknown): Promise<LocalResult<unknown>> {
     if (this.closed) return Promise.resolve(UNAVAILABLE);
     const id = `l${this.nextId++}`;
-    const line = `${JSON.stringify({ id, op, args })}\n`;
+    const token = this.token ? { token: this.token } : {};
+    const line = `${JSON.stringify({ id, op, args, ...token })}\n`;
     if (Buffer.byteLength(line) > LOCAL_LINE_MAX_BYTES) {
       return Promise.resolve(localFail('invalid_args', 'line over 256 KiB'));
     }
@@ -237,7 +258,7 @@ export const connectLocal = async (
     void connecting.then((late) => late?.end());
     return null;
   }
-  client = new LocalClient(socket, callTimeoutMs);
+  client = new LocalClient(socket, callTimeoutMs, options.token);
   return client;
 };
 

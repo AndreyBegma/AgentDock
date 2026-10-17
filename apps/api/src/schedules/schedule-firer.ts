@@ -17,7 +17,12 @@ import type {
   ScheduleFiringStatus,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
-import { SYSTEM_ACTOR, systemActorFor } from '../audit/audit.types';
+import {
+  type AuditContext,
+  SYSTEM_ACTOR,
+  systemActorFor,
+} from '../audit/audit.types';
+import { BudgetExceededError } from '../budgets/budget-error';
 import { ControlService } from '../control/control.service';
 import { PrismaService } from '../database/prisma.service';
 import { ProjectAccessService } from '../projects';
@@ -35,10 +40,22 @@ interface Outcome {
   reason?: ScheduleFiringReason;
   runId?: string;
   commandRunId?: string;
+  /** D-10: whom the sent firing ran as; its spend is theirs. */
+  principalId?: string;
   error?: { code: string; message?: string };
   /** The command reached the runner (or was answered by it). */
   sent: boolean;
 }
+
+/** A person firing a schedule by hand (run now): the run's principal (D-09). */
+export interface FiringCaller {
+  userId: string;
+  ctx: AuditContext;
+}
+
+const PRINCIPAL = {
+  select: { id: true, email: true, role: true, status: true },
+} as const;
 
 /** The body of an API error the fired service threw, read structurally. */
 const errorBody = (
@@ -66,8 +83,8 @@ const errorBody = (
 };
 
 /**
- * Fires one `due` firing (D7–D11, D15): the pre-fire hook, the creator's
- * authority at fire time, overlap, the runner's presence, then the target's
+ * Fires one `due` firing (D7–D11, D15): the pre-fire hook, the principal's
+ * authority at fire time (the owner's, or run now's caller — D-09), overlap, the runner's presence, then the target's
  * command through the same service a person's click goes through —
  * `SkillRunService.start` (#24) or `ControlService.start` (#17). Never a new
  * path to the runner.
@@ -88,17 +105,19 @@ export class ScheduleFirer {
     private readonly timers: ScheduleTimers,
   ) {}
 
-  /** Fires `firingId` if it is still `due`; returns the firing as it ends. */
-  async fire(firingId: bigint): Promise<ScheduleFiring> {
+  /**
+   * Fires `firingId` if it is still `due`; returns the firing as it ends.
+   * Without `caller` it runs as the schedule's owner (`createdBy`, its last
+   * editor of what it runs); with one — run now — as that person (D-09).
+   */
+  async fire(firingId: bigint, caller?: FiringCaller): Promise<ScheduleFiring> {
     const firing = await this.prisma.scheduleFiring.findUniqueOrThrow({
       where: { id: firingId },
       include: {
         schedule: {
           include: {
             project: { select: { runnerId: true } },
-            createdBy: {
-              select: { id: true, email: true, role: true, status: true },
-            },
+            createdBy: PRINCIPAL,
           },
         },
       },
@@ -107,25 +126,39 @@ export class ScheduleFirer {
     const { schedule } = firing;
     const { project, createdBy, ...row } = schedule;
 
-    const decision = await this.beforeFire.check(row, firing);
+    const principal = caller
+      ? await this.prisma.user.findUniqueOrThrow({
+          where: { id: caller.userId },
+          ...PRINCIPAL,
+        })
+      : createdBy;
+
+    // D-10: the principal's user budget holds as well as the project's.
+    const decision = await this.beforeFire.check(row, firing, principal.id);
     if (!decision.allow) {
-      return this.settle(firing, {
+      const settled = await this.settle(firing, {
         status: 'skipped',
         reason: SCHEDULE_FIRING_REASONS.denied,
         error: { code: 'denied', message: decision.reason },
         sent: false,
       });
+      // Run now is the caller's own request: refused like any start of theirs.
+      const { budgetId, scope, resetsAt } = decision.budget;
+      if (caller) throw new BudgetExceededError(budgetId, scope, resetsAt);
+      return settled;
     }
-
-    // D10: the creator's authority now, not when the schedule was saved.
-    const role = await this.creatorRole(createdBy, schedule.projectId);
+    // D10: the principal's authority now, not when the schedule was saved.
+    const role = await this.principalRole(principal, schedule.projectId);
     if (!role) {
       const settled = await this.settle(firing, {
         status: 'failed',
         reason: SCHEDULE_FIRING_REASONS.creatorNotAuthorized,
         sent: false,
       });
-      await this.disable(schedule, 'creator_not_authorized', firing.id);
+      // A caller without the role says nothing about the owner's schedule.
+      if (!caller) {
+        await this.disable(schedule, 'creator_not_authorized', firing.id);
+      }
       return settled;
     }
 
@@ -166,14 +199,17 @@ export class ScheduleFirer {
     }
 
     const target = parseTarget(schedule.target);
-    const outcome = await this.send(row, target, role, createdBy).catch(
+    // D8: a timed firing is sent as the system on the owner's behalf; run
+    // now is the caller's own request.
+    const ctx = caller?.ctx ?? { actor: systemActorFor(principal.id) };
+    const outcome = await this.send(row, target, role, principal, ctx).catch(
       (error: unknown): Outcome => {
         const body = errorBody(error);
         if (!body) throw error;
         return this.failure(body);
       },
     );
-    return this.settle(firing, outcome);
+    return this.settle(firing, { ...outcome, principalId: principal.id });
   }
 
   /**
@@ -197,6 +233,7 @@ export class ScheduleFirer {
           ...(outcome.commandRunId
             ? { commandRunId: outcome.commandRunId }
             : {}),
+          ...(outcome.principalId ? { principalId: outcome.principalId } : {}),
           ...(outcome.error ? { error: outcome.error } : {}),
           ...(terminal ? { finishedAt: now } : {}),
         },
@@ -287,13 +324,13 @@ export class ScheduleFirer {
     }
   }
 
-  /** The creator's effective role if they may still fire it (operator+, active); else null. */
-  private async creatorRole(
-    creator: { id: string; role: Role; status: string },
+  /** The principal's effective role if they may still fire it (operator+, active); else null. */
+  private async principalRole(
+    principal: { id: string; role: Role; status: string },
     projectId: string,
   ): Promise<Role | null> {
-    if (creator.status !== 'active') return null;
-    const access = await this.access.resolve(creator, projectId);
+    if (principal.status !== 'active') return null;
+    const access = await this.access.resolve(principal, projectId);
     if (!access || !projectRoleAtLeast(access.role, 'operator')) return null;
     return access.role;
   }
@@ -302,10 +339,9 @@ export class ScheduleFirer {
     schedule: Schedule,
     target: ScheduleTarget,
     role: Role,
-    creator: { id: string; email: string },
+    principal: { id: string; email: string },
+    ctx: AuditContext,
   ): Promise<Outcome> {
-    // D8: sent as the system on the creator's behalf, with the creator's role.
-    const ctx = { actor: systemActorFor(creator.id) };
     if (target.kind === 'skill') {
       const profileKey = await this.profileKey(target.profileId);
       const run = await this.skillRuns.start(
@@ -322,7 +358,7 @@ export class ScheduleFirer {
       return { status: 'started', runId: run.runId, sent: true };
     }
     const commandRun = await this.control.start(
-      { projectId: schedule.projectId, role, user: creator, ctx },
+      { projectId: schedule.projectId, role, user: principal, ctx },
       { mode: target.mode },
     );
     // The orchestrator's own rounds are runs of their own (spec 25 notes, Q1).

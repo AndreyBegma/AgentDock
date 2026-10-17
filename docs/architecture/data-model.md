@@ -31,7 +31,7 @@ the two never share a name.
 
 | Entity | Key fields |
 |---|---|
-| `User` | email, passwordHash (argon2id), name, `status: pending\|active\|rejected\|disabled`, `role: admin\|operator\|viewer`, approvedBy, approvedAt, failedLoginCount, lockedUntil — the Telegram chat is a `TelegramLink` row |
+| `User` | email, passwordHash (argon2id), name, `status: pending\|active\|rejected\|disabled`, `role: admin\|operator\|viewer`, approvedBy, approvedAt (failed logins live in `LoginThrottle`, per email and IP — ADR-0048) — the Telegram chat is a `TelegramLink` row |
 | `UserSession` | userId, tokenHash (sha256 of the cookie token), createdAt, lastSeenAt, expiresAt, ip, userAgent — table `user_sessions` |
 | `Setting` | key (primary key), value (json), updatedBy — table `settings` |
 | `ProjectMember` | userId (cascade), projectId (cascade), roleOverride? — effective role is `min(global role, override)`, so an override only lowers it; admins need no row — addedBy? (`SET NULL` when that user is deleted), createdAt; unique `(projectId, userId)` — table `project_members` ([spec 10](../specs/10-projects.md)) |
@@ -57,7 +57,7 @@ the two never share a name.
 | `NotificationRule` | userId (cascade), kind, inApp, telegram, updatedAt — primary key `(userId, kind)`; no row means the D1 default — table `notification_rules` |
 | `NotificationMute` | userId (cascade), projectId (cascade), until? (null: until removed), createdAt — primary key `(userId, projectId)` — table `notification_mutes` |
 | `NotificationDelivery` | notificationId (cascade), userId (for the per-user rate limit), channel `telegram`, status `pending\|sent\|digested\|failed\|skipped`, attempts, nextAttemptAt? (due time, claim lease, 429 `retry_after`, or the digest's window end), lastError? (a skip reason `muted\|rule_off\|unlinked`, or the last send error), digestId?, sentAt?, createdAt — index `(status, nextAttemptAt)`, `(userId, channel, sentAt)`, `(digestId)` — table `notification_deliveries` |
-| `TelegramLink` | userId (primary key, cascade), chatId (BigInt, unique), username?, linkedAt — one private chat per user — table `telegram_links` |
+| `TelegramLink` | userId (primary key, cascade), chatId (BigInt, unique), username?, linkedAt, currentProjectId? (#500, the chat's `/project`; set null when the project is deleted), assistantConversationId? (#620, the assistant conversation the chat's free text continues; null until the first message and after `/newchat`, set null when the conversation is deleted) — one private chat per user — table `telegram_links` |
 | `TelegramLinkCode` | userId (cascade), codeHash (sha256, unique), expiresAt, usedAt? — single use, 10 minutes — table `telegram_link_codes` |
 | `NotificationMatcherState` | one row (`id = 1`, checked): eventsCursor (every event with `id <=` it is matched), telegramUpdateOffset, updatedAt — table `notification_matcher_state` |
 | `RunnerIncident` | runnerId (cascade), openedAt, resolvedAt? — at most one open per runner (spec 22 D5) — table `runner_incidents` |

@@ -1,5 +1,4 @@
 import type { AuditResult } from '@agentdock/shared';
-import { roleAtLeast } from '@agentdock/shared/protocol';
 import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { AuditService } from '../audit';
 import { ANONYMOUS_ACTOR, userActor } from '../audit/audit.types';
@@ -10,7 +9,6 @@ import {
   actionRequestIdOfLink,
 } from '../local';
 import { httpErrorBody } from '../local/local-error';
-import { ProjectAccessService } from '../projects';
 import {
   type ActionRequestPress,
   type ActionRequestRefusal,
@@ -25,6 +23,7 @@ import type {
   TelegramCallbackQuery,
   TelegramReplyMarkup,
 } from './telegram-client';
+import { TelegramGuard } from './telegram-guard.service';
 
 const KIND = 'action.requested';
 
@@ -55,7 +54,7 @@ export class TelegramActionRequestService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly requests: ActionRequestsService,
-    private readonly access: ProjectAccessService,
+    private readonly guard: TelegramGuard,
     private readonly audit: AuditService,
   ) {}
 
@@ -66,10 +65,18 @@ export class TelegramActionRequestService {
   async offer(notificationId: bigint): Promise<TelegramReplyMarkup | null> {
     const notification = await this.prisma.notification.findUnique({
       where: { id: notificationId },
-      select: { kind: true, projectId: true, link: true },
+      select: { kind: true, userId: true, projectId: true, link: true },
     });
     const actionRequestId = actionRequestIdOfLink(notification?.link ?? null);
     if (notification?.kind !== KIND || !actionRequestId) return null;
+    if (!notification.projectId) return null;
+    // Buttons only for a recipient who could press them: operator or higher.
+    const member = await this.guard.member(
+      notification.userId,
+      notification.projectId,
+      'write',
+    );
+    if (!member.ok) return null;
     const row = await this.prisma.actionRequest.findFirst({
       where: {
         id: actionRequestId,
@@ -134,14 +141,10 @@ export class TelegramActionRequestService {
     chatId: number,
     press: ActionRequestPress,
   ): Promise<Authorized> {
-    const link = await this.prisma.telegramLink.findUnique({
-      where: { chatId: BigInt(chatId) },
-      select: { userId: true },
-    });
-    if (!link) {
+    const userId = await this.guard.linkedUserId(chatId);
+    if (!userId) {
       return { ok: false, reason: 'not_linked', userId: null, projectId: null };
     }
-    const userId = link.userId;
     const notification = await this.prisma.notification.findUnique({
       where: { id: press.notificationId },
       select: { userId: true, kind: true, projectId: true, link: true },
@@ -155,29 +158,14 @@ export class TelegramActionRequestService {
       return { ok: false, reason: 'unknown_message', userId, projectId: null };
     }
     const projectId = notification.projectId;
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, email: true, role: true, status: true },
-    });
-    if (user?.status !== 'active') {
-      return { ok: false, reason: 'inactive_user', userId, projectId };
-    }
-    const access = await this.access.resolve(user, projectId);
-    if (!access) return { ok: false, reason: 'not_member', userId, projectId };
-    if (!roleAtLeast(access.role, 'operator')) {
-      return {
-        ok: false,
-        reason: 'role',
-        userId,
-        projectId,
-        role: access.role,
-      };
-    }
+    const check = await this.guard.member(userId, projectId, 'write');
+    if (!check.ok) return { ...check, userId, projectId };
+    const { user } = check;
     return {
       ok: true,
       decider: {
         projectId,
-        role: access.role,
+        role: check.role,
         user: { id: user.id, email: user.email, role: user.role },
         ctx: { actor: userActor(userId) },
         via: 'telegram',

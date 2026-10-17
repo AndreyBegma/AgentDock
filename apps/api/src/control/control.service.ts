@@ -44,6 +44,11 @@ export interface ControlCaller {
   ctx: AuditContext;
 }
 
+interface CachedStatus {
+  view: OrchestratorStatusView;
+  expiresAt: number;
+}
+
 interface ProjectTarget {
   runnerId: string;
   rootPath: string;
@@ -99,6 +104,11 @@ export const redactOrchestratorMessage = (
 @Injectable()
 export class ControlService {
   private readonly logger = new Logger(ControlService.name);
+  private readonly statuses = new Map<string, CachedStatus>();
+  private readonly pendingStatuses = new Map<
+    string,
+    Promise<OrchestratorStatusView>
+  >();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -124,7 +134,8 @@ export class ControlService {
       prepare: async () => {
         // Spec 28 D7, D11: an exceeded stop budget refuses start and next
         // with 409 `budget_exceeded`, before a run is recorded or sent. A
-        // schedule firing (actor `system`) is project-only (D3).
+        // schedule firing (actor `system`) had its principal's user budget
+        // checked by the pre-fire hook (D-10).
         await this.budgets?.assertAllowed({
           projectId: caller.projectId,
           userId: caller.ctx.actor.type === 'user' ? caller.user.id : null,
@@ -259,12 +270,44 @@ export class ControlService {
     });
   }
 
-  /** D5: presence and pane state, read live; no run row (a read). */
+  /**
+   * D5: presence and pane state, read from the runner; no run row (a read).
+   * One answer serves a project for `statusCacheMs`, and callers that ask
+   * while it is being fetched share that one command (C-119).
+   */
   async status(caller: ControlCaller): Promise<OrchestratorStatusView> {
     const project = await this.project(caller.projectId);
     if (!this.presence.isConnected(project.runnerId)) {
       throw controlError(409, 'runner_offline', 'The runner is not connected');
     }
+    const cached = this.statuses.get(caller.projectId);
+    if (cached && cached.expiresAt > Date.now()) return cached.view;
+    const running = this.pendingStatuses.get(caller.projectId);
+    if (running) return running;
+    const current = () =>
+      this.pendingStatuses.get(caller.projectId) === request;
+    const request = this.fetchStatus(caller, project)
+      .then((view) => {
+        // A command sent meanwhile forgot this read: it may predate it.
+        if (current()) {
+          this.statuses.set(caller.projectId, {
+            view,
+            expiresAt: Date.now() + this.options.statusCacheMs,
+          });
+        }
+        return view;
+      })
+      .finally(() => {
+        if (current()) this.pendingStatuses.delete(caller.projectId);
+      });
+    this.pendingStatuses.set(caller.projectId, request);
+    return request;
+  }
+
+  private async fetchStatus(
+    caller: ControlCaller,
+    project: ProjectTarget,
+  ): Promise<OrchestratorStatusView> {
     const outcome = controlOutcome(
       'orchestrator.status',
       await this.commands.send(
@@ -288,6 +331,12 @@ export class ControlService {
     };
   }
 
+  /** A command changed what `status` reads: the next read asks the runner. */
+  private forgetStatus(projectId: string): void {
+    this.statuses.delete(projectId);
+    this.pendingStatuses.delete(projectId);
+  }
+
   /** A `:slot` route param, checked before anything is recorded or sent. */
   parseSlot(slot: string): string {
     const parsed = slotNameSchema.safeParse(slot);
@@ -306,6 +355,7 @@ export class ControlService {
     action: Action<N>,
   ): Promise<CommandRunView> {
     const project = await this.project(caller.projectId);
+    this.forgetStatus(caller.projectId);
     let prepared = await action.prepare(project);
     // The command's args once they are complete — redacted for the audit log
     // even when the action is refused afterwards (offline).
@@ -397,6 +447,8 @@ export class ControlService {
       throw failure.toHttp(run.id);
     }
 
+    // A status read sent while the command ran may predate it.
+    this.forgetStatus(caller.projectId);
     const finished = await this.runs.finish(run.id, {
       status: 'ok',
       result: outcome.output as object,

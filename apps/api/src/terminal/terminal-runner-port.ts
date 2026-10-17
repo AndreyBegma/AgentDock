@@ -3,6 +3,8 @@ import type {
   TerminalAttachArgs,
   TerminalCloseMessage,
   TerminalDataMessage,
+  TerminalHistoryMessage,
+  TerminalHistoryRequestMessage,
   TerminalResizeMessage,
 } from '@agentdock/shared/protocol';
 import { Injectable, Logger } from '@nestjs/common';
@@ -20,9 +22,13 @@ export type TerminalAttachOutcome =
 export type TerminalToRunner =
   | TerminalDataMessage
   | TerminalResizeMessage
-  | TerminalCloseMessage;
+  | TerminalCloseMessage
+  | TerminalHistoryRequestMessage;
 /** Runner → server messages of an open attach. */
-export type TerminalFromRunner = TerminalDataMessage | TerminalCloseMessage;
+export type TerminalFromRunner =
+  | TerminalDataMessage
+  | TerminalCloseMessage
+  | TerminalHistoryMessage;
 
 /**
  * What the relay needs from the runner side: send the admin-only

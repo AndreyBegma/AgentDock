@@ -5,6 +5,7 @@ import {
   isFillEntry,
   isWideEntry,
   projectIdOf,
+  railGroups,
   tabBarSplit,
   visibleNav,
 } from './nav';
@@ -46,6 +47,7 @@ describe('visibleNav', () => {
       'admin/Budgets',
       'admin/Planner instructions',
       'admin/Audit',
+      'admin/AI providers',
       'admin/Prices',
       'admin/Integrations',
       'admin/Settings',
@@ -203,36 +205,36 @@ describe('tabBarSplit', () => {
     };
   };
 
-  test('outside a project: the workspace five, the rest behind More', () => {
+  test('outside a project: the workspace three, the rest behind More', () => {
     expect(split('admin', '/')).toEqual({
-      tabs: ['Overview', 'Projects', 'Activity', 'Sessions', 'Usage'],
+      tabs: ['Overview', 'Projects', 'Activity'],
       more: [
-        'workspace: Work, Workflows, Skills',
-        'admin: Runners, Users, Schedules, Budgets, Planner instructions, Audit, Prices, Integrations, Settings',
+        'workspace: Work, Sessions, Usage, Workflows, Skills',
+        'admin: Runners, Users, Schedules, Budgets, Planner instructions, Audit, AI providers, Prices, Integrations, Settings',
       ],
     });
   });
 
-  test('inside a project: its home and working pages, the project first in More', () => {
+  test('inside a project: its working pages, the project first in More', () => {
     expect(split('admin', '/projects/p1/queue')).toEqual({
-      tabs: ['Project', 'Fleet', 'Work', 'Queue', 'Approvals'],
+      tabs: ['Work', 'Fleet', 'Approvals'],
       more: [
-        'project: Activity, History, Token saver, Skills, Schedules, Settings',
+        'project: Project, Queue, Activity, History, Token saver, Skills, Schedules, Settings',
         'workspace: Overview, Projects, Activity, Work, Sessions, Usage, Workflows, Skills',
-        'admin: Runners, Users, Schedules, Budgets, Planner instructions, Audit, Prices, Integrations, Settings',
+        'admin: Runners, Users, Schedules, Budgets, Planner instructions, Audit, AI providers, Prices, Integrations, Settings',
       ],
     });
   });
 
-  test('a viewer gets five tabs and no Admin; Work and Workflows wait behind More', () => {
+  test('a viewer gets three tabs and no Admin; the rest waits behind More', () => {
     const { tabs, more } = split('viewer', '/');
-    expect(tabs).toHaveLength(5);
-    expect(more).toEqual(['workspace: Work, Workflows']);
+    expect(tabs).toHaveLength(3);
+    expect(more).toEqual(['workspace: Work, Sessions, Usage, Workflows']);
   });
 
   test('tabs resolve the project id', () => {
     const { tabs } = tabBarSplit(visibleNav('viewer', '/projects/p1'));
-    expect(tabs[0]?.resolvedHref).toBe('/projects/p1');
+    expect(tabs[0]?.resolvedHref).toBe('/projects/p1/board');
   });
 });
 
@@ -288,5 +290,71 @@ describe('isFillEntry', () => {
     expect(fillAt('/projects/p1/board/')).toBe(true);
     expect(fillAt('/projects/p1/board/cards/3/design')).toBe(false);
     expect(fillAt('/projects/p1/fleet')).toBe(false);
+  });
+});
+
+describe('railGroups (C-247)', () => {
+  const groups = (role: 'admin' | 'viewer', path: string) =>
+    railGroups(visibleNav(role, path)).map((group) => ({
+      id: group.id,
+      collapsible: group.collapsible,
+      entries: group.entries.map((entry) => entry.label),
+    }));
+
+  test('inside a project only Project, Work and Activity stay in view', () => {
+    const [, project, more] = groups('viewer', '/projects/p1/fleet');
+    expect(project).toEqual({
+      id: 'project',
+      collapsible: false,
+      entries: ['Project', 'Work', 'Activity'],
+    });
+    expect(more).toEqual({
+      id: 'project-more',
+      collapsible: true,
+      entries: [
+        'Fleet',
+        'Queue',
+        'Approvals',
+        'History',
+        'Token saver',
+        'Skills',
+        'Schedules',
+        'Settings',
+      ],
+    });
+  });
+
+  test('More sits right under the project section; Workspace and Admin fold', () => {
+    expect(
+      groups('admin', '/projects/p1').map((g) => [g.id, g.collapsible]),
+    ).toEqual([
+      ['workspace', true],
+      ['project', false],
+      ['project-more', true],
+      ['admin', true],
+    ]);
+  });
+
+  test('outside a project Workspace is plain and there is no More', () => {
+    expect(
+      groups('admin', '/sessions').map((g) => [g.id, g.collapsible]),
+    ).toEqual([
+      ['workspace', false],
+      ['admin', true],
+    ]);
+  });
+
+  test('a viewer gets no Admin group and no operator-only Workspace entry', () => {
+    const all = groups('viewer', '/projects/p1');
+    expect(all.map((g) => g.id)).not.toContain('admin');
+    expect(all[0]?.entries).not.toContain('Skills');
+  });
+
+  test('every entry stays in exactly one group', () => {
+    const sections = visibleNav('admin', '/projects/p1');
+    const ids = railGroups(sections).flatMap((g) => g.entries.map((e) => e.id));
+    expect(ids.sort()).toEqual(
+      sections.flatMap((s) => s.entries.map((e) => e.id)).sort(),
+    );
   });
 });

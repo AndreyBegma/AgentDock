@@ -1,5 +1,5 @@
 import { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
+import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { AppModule } from '../../app.module';
@@ -28,24 +28,29 @@ export interface TelegramE2e extends E2eContext {
  * The app wired to a `FakeTelegram`: notification timers off, the poller not
  * started (tests call `pollOnce` / `deliverOnce`), `APP_URL` fixed, and
  * `cipher` as the `SecretCipher` (default: `TEST_ENCRYPTION_KEY`).
+ * `customize` overrides more providers (#620: the LLM adapters).
  */
 export const createTelegramApp = async (
   cipher = SecretCipher.fromKeyText(TEST_ENCRYPTION_KEY),
   fake?: FakeTelegram,
   overrides: Partial<TelegramOptions> = {},
+  customize: (builder: TestingModuleBuilder) => TestingModuleBuilder = (b) => b,
 ): Promise<TelegramE2e> => {
   const telegram = fake ?? (await FakeTelegram.start());
   const options: TelegramOptions = {
     apiBase: telegram.url,
     pollTimeoutS: 1,
     appUrl: 'https://dock.example.com',
+    initDataMaxAgeS: 3600,
     autoStart: false,
     deliveryIntervalMs: 60_000,
     idleMs: 50,
     fetch: (input, init) => fetch(input, init),
     ...overrides,
   };
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+  const moduleRef = await customize(
+    Test.createTestingModule({ imports: [AppModule] }),
+  )
     .overrideProvider(NOTIFICATION_OPTIONS)
     .useValue({ ...defaultNotificationOptions, autoStart: false })
     .overrideProvider(SecretCipher)

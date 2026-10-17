@@ -15,21 +15,21 @@ the bypass, the raw files and the MCP allowlist.
    session's environment (`filter/env.ts`).
 2. The hook reads Claude Code's PreToolUse JSON. It rewrites `tool_input.command`
    to `<runner> filter -- <command>` only when **all** of these hold:
-   - the session's `permission_mode` is `bypassPermissions` (spec amendment 9)
-     or `auto` (amendment 10);
-   - the command is a **single simple command**: `[NAME=value …] program args…`,
-     optionally in one of two forms around it (amendment 11):
-     - after `cd <path> &&`, with exactly one literal path word, quoted or not,
-       not empty and not starting with `-`;
-     - followed by `2>&1`, as the very last token, after an unquoted blank.
+   - the session's `permission_mode` is `bypassPermissions` (spec amendment 9),
+     `auto` (amendment 10) or `plan` (amendment 14);
+   - the command is a **list of pipelines of simple commands** (#610): simple
+     commands `[NAME=value …] program args…`, joined by `|` into pipelines,
+     and pipelines joined by `&&`, `||` and `;`. Each command may end in
+     `2>&1`, after an unquoted blank. A single simple command and
+     `cd <path> && <command>` (amendment 11) are the smallest cases.
 
      `filter/shell.ts` (`parseHookCommand`) is a whitelist, not a shell.
-     Anything it does not understand exactly makes the command not simple:
-     - an unquoted `|`, `&`, `;`, `<`, `>`, `(` or `)` other than the two forms
-       above: lists, pipes, redirects, heredocs, subshells, process
-       substitution. `cd x && y && z`, `cd x; y`, `cd x && y | z`, `cd a b && y`,
-       `cd -- x && y`, `y 2>&1 >f`, `y 2>&3`, `y &>f` and `y 1>&2` all pass
-       through;
+     Anything it does not understand exactly makes the line pass through:
+     - an unquoted `&`, `<`, `>`, `(` or `)`, and `|&`, `;;`, `;&`: background
+       calls, redirects, heredocs, subshells, process substitution. So do an
+       empty command (`a &&`, `| a`, `a ;`, `a && && b`) and every redirect
+       but a command's own trailing `2>&1`: `y 2>&1 >f`, `y 2>&3`, `y &>f`,
+       `y 1>&2`, `y 2>&1 z`;
      - `$`, a backtick, `#` or `!` anywhere, quoted or not. That covers every
        expansion and substitution, `$'…'` and `$"…"` quoting, comments and
        history expansion;
@@ -40,8 +40,12 @@ the bypass, the raw files and the MCP allowlist.
        the words `exec`, `eval`, `source`, `.`, `command`, `builtin`, `env`,
        `sudo`, `nohup`, `xargs` and the compound keywords as the program;
    - the call is not `run_in_background: true`;
-   - a filter in the registry matches the program;
-   - the command is not a dev server or a watch mode. These count as one:
+   - a filter in the registry matches the program of the **first** command of
+     at least one pipeline. Only those commands are wrapped; a covered command
+     later in a pipe (`ls | bun test`) and every uncovered command run as
+     written;
+   - that command is not a dev server or a watch mode (it is then left as
+     written, and the others are still wrapped). These count as one:
      `--watch`, `--watchAll`, `--hot` and `--serve`; `npm|pnpm|yarn|bun run dev|start|serve|watch|preview`;
      and anything the filter's own `longRunning` reports;
    - the rewrite changes nothing about the session's permissions (next section).
@@ -51,9 +55,16 @@ the bypass, the raw files and the MCP allowlist.
 3. The rewrite is built from the parsed words, each re-quoted
    (`wrappedCommand` in `filter/hook.ts`), never from the original text. Bash
    therefore runs exactly the argv the parser saw. `shell.spec.ts` checks this
-   against a real `bash`, for the original and for the rewrite. A `cd` target
-   is re-quoted the same way and kept in front:
-   `cd '/a b' && CI=1 <runner> filter -- bun test 2>&1`. A trailing `2>&1` is
+   against a real `bash`, for the original and for the rewrite. The line keeps
+   its shape: the same pipelines, joined by the same operators, which the hook
+   writes as constants. Unwrapped commands are re-quoted the same way:
+   `cd '/a b' && CI=1 <runner> filter -- bun test 2>&1 | tail -50 ; git log`.
+   A wrapped command is still one simple command and the filter returns its
+   command's exit code, so `&&` and `||` short-circuit as before and `$?` and
+   `PIPESTATUS` are the original's (`shell.spec.ts`, `pipeline-e2e.spec.ts`).
+   When `| head` closes the pipe early, the filter stops writing without an
+   error, and sends its command the `SIGPIPE` it would have got writing there
+   itself. A `2>&1` is
    kept, written by the hook as a constant. When the filter does not compress
    (the bypass, output past the buffer, no filter), it forwards the child's
    stdout and stderr separately, so keeping the redirect gives the wrapped
@@ -73,15 +84,15 @@ saver is off.
 Claude Code matches its permission rules against the command a hook *returns*.
 A rewritten `agentdock-runner filter -- git push` would therefore slip past
 `Bash(git push:*)`. The hook (`permissionFor` in `filter/permissions.ts`)
-applies these rules in order (spec #445 amendments 9, 10 and 11):
+applies these rules in order (spec #445 amendments 9, 10, 11 and 14):
 
 | Situation | Result |
 |---|---|
-| The session is neither `bypassPermissions` nor `auto` (`default`, `acceptEdits`, `plan`, `dontAsk`, missing, …) | no rewrite, whatever the allow rules say |
-| A `deny` or `ask` `Bash(…)` rule matches the command, at any word | no rewrite (`passedThrough`) |
+| The session is not `bypassPermissions`, `auto` or `plan` (`default`, `acceptEdits`, `dontAsk`, missing, …) | no rewrite, whatever the allow rules say |
+| A `deny` or `ask` `Bash(…)` rule matches any command of the line, wrapped or not, or the whole line, at any word | no rewrite (`passedThrough`) |
 | A settings file that exists but does not parse, or a `Bash(…)` rule this parser does not understand | no rewrite |
 | Anything else, in `bypassPermissions` | rewrite, with `permissionDecision: "allow"` |
-| Anything else, in `auto` | rewrite, with **no** `permissionDecision`: only `updatedInput` |
+| Anything else, in `auto` or `plan` | rewrite, with **no** `permissionDecision`: only `updatedInput` |
 
 In auto mode the hook returns no decision, so Claude Code's own permission rules
 and auto-mode classifier judge the wrapped `agentdock-runner filter -- <argv>`,
@@ -128,7 +139,11 @@ The rules come from the files Claude Code loads:
   warning and stack-frame lines. The rule is deliberately broad: a wrong guess
   only keeps a line that could have gone. After a filter returns, the engine
   checks every marked line of the original against the result (escapes ignored,
-  duplicates counted once). The agent gets the original output, counted
+  duplicates counted once). A filter may name the part of a line the check
+  judges (`protectedPart`, #614): a search hit `src/a.ts:12:  return x;` is a
+  location, not a stack frame, so `lang/search` is judged by the text after
+  `src/a.ts:12:`, and `ops/gh` judges a run-log line by the text after its
+  `job / step / timestamp` prefix. The agent gets the original output, counted
   `passedThrough`, when any of these happens:
   - a marked line is missing;
   - the result is not shorter than the original, footer included;
@@ -161,6 +176,42 @@ The rules come from the files Claude Code loads:
 - **Without the launch env** (no `AGENTDOCK_FILTER_STATS`), the filter runs the
   command and prints its output. It writes no raw file and no stats.
 
+## The read guard (`read-hook`, #616)
+
+The filter sees only Bash, while an agent's largest inputs are whole reads of
+big files and the same file read again. A launch with Token saver on also
+registers `agentdock-runner read-hook` (`filter/read-guard.ts`) as a
+`PreToolUse` and a `PostToolUse` hook for `Read`, and as a `PreCompact` hook.
+
+- **Whole reads.** A `Read` with no `offset`, `limit` or `pages` of a text file
+  over 64 KB or 1,500 lines (`READ_GUARD_BYTES`, `READ_GUARD_LINES`) is
+  refused with `permissionDecision: "deny"` and a hint: `offset`/`limit`,
+  `Grep`, or the `scout` agent. Binary files, images and PDFs are never
+  guarded. Row id `tool/read-guard`.
+- **Repeated reads.** `PostToolUse` remembers every range read, keyed by the
+  path, `offset`, `limit`, `pages` and the file's mtime and size. A
+  `PreToolUse` with the same key — the same range of an unchanged file — is
+  refused with a reminder. A changed file has a new key and is read. Row id
+  `tool/read-dedup`.
+- **Once.** A refusal is remembered; the identical call that follows runs and
+  writes a `bypassed` row of the same id with no bytes.
+- **Compaction** (`PreCompact`) forgets every read: none is in context after it.
+
+The memory is one file per Claude session, `<run dir>/read-guard/<session
+id>.json`. A refusal's row counts `rawBytes` as what the read would have
+returned (the file's size, or its share for a `limit`) and `keptBytes` as the
+message that replaced it, so the dashboard shows the saving as an estimate.
+
+The hook fails open like `filter-hook`: no launch env, input it cannot use, a
+file it cannot stat or memory it cannot write — it prints nothing and exits 0,
+and the read runs. The settings add `|| true` behind the command as well.
+
+Before #616 the launch set `CS_ECO=on` so the code-sentinel plugin's `/cs-eco`
+hooks guarded reads (amendment 12), which only worked in a profile with the
+plugin. The launch now sets `CS_ECO=off`: with the plugin present each read is
+guarded once, by the runner. The plugin's cut of large MCP results goes with
+it.
+
 ## The environment a launch sets
 
 `filter/env.ts` is the only source of the names. `tokenSaverLaunch`
@@ -176,6 +227,7 @@ stats reader.
 | `AGENTDOCK_FILTER_RUN` | the run id; unset for the orchestrator session |
 | `AGENTDOCK_FILTER_RUN_KIND` | a `TokenSaverRunKind` |
 | `AGENTDOCK_LAUNCH_SETTINGS` | the `--settings` file the launch passed |
+| `CS_ECO` | `off`: the code-sentinel plugin's eco hooks stand down (#616) |
 
 The orchestrator session has no run dir. It uses a directory of its own,
 `<state>/agentdock/orchestrator/<session>/`.
@@ -244,6 +296,24 @@ export const jestFilter: Filter = {
 - Keep summaries and every marked line. The engine overrules a filter that
   drops one.
 - Return `null` rather than guess.
+- Return `null` below a named size threshold (`GIT_MIN_BYTES`,
+  `GH_MIN_BYTES`, `SEARCH_MIN_BYTES`, …) when the footer (~150 bytes) would
+  eat what the filter could save: such output is counted honestly, with
+  `rawBytes == keptBytes`.
+
+### What git, gh and search do (#614)
+
+| Command | Shape |
+|---|---|
+| `git status` | branch lines, then `Staged (N):` / `Not staged (N):` / `Untracked (N):` with porcelain-like codes, neighbours in one directory on one line, 20 lines per section. `--porcelain` is never reshaped. |
+| `git diff` / `git show` | a stat header, hunks with one line of context (a dropped run of 4+ lines becomes a marker), hunks over 30 lines keep 20 + 5, each file shows at most 40 hunk lines. `--stat` and the other summary modes are only capped. |
+| `git log` | one line per commit; protected body lines stay. |
+| `gh pr view` / `issue view` | empty fields, HTML comments and table rulers go; the body keeps 40 + 10 lines; with `--comments`, each comment its first 10. |
+| `gh pr checks` | passing and skipped rows become a count. |
+| `gh run view --log` | one line per step; steps with an error or warning keep 10 + 40 lines; the last 15 lines. |
+| `grep` / `rg` | hits grouped by file, 8 lines per file and a count of the rest, single-hit files as printed; over 200 lines, head and tail. `-c`, `-l` and `-h` are only capped. `--json` is never reshaped. |
+
+Every protected line survives all of these, whatever the caps.
 
 ### The corpus
 
@@ -257,11 +327,15 @@ case:
 { "argv": ["bun", "test"], "exitCode": 1, "category": "test", "outcome": "failing", "expect": "filtered" }
 ```
 
+An optional `"maxRatio": 0.5` makes the case fail when its kept/raw, footer
+included, is above that — used for the large git, gh and search cases.
+
 `category` is `test`, `typecheck` or `other`. `corpus.spec.ts` runs every family's
 cases through the same checks the engine applies, and asserts these:
 
 - every marked line survives;
 - each case with `expect: "filtered"` really is filtered;
+- each case with a `maxRatio` comes out at or under it;
 - per family, the median kept/raw of `test` and `typecheck` cases is ≤ 0.3 for
   failing runs and ≤ 0.1 for passing ones.
 
@@ -281,5 +355,11 @@ Measured on a developer machine (Linux x64), median / p95 of 30 runs:
 | `agentdock-runner filter -- true` | — | 21.9 / 25.9 ms |
 | `agentdock-runner filter-hook` | — | 14.4 / 15.8 ms |
 
-`filter/bench.spec.ts` runs in CI before the build. It measures the bun entry
-(`bun src/main.ts filter -- true`) against `true` and fails above 50 ms at p95.
+`filter/bench.spec.ts` is a local benchmark: it is skipped unless `RUN_BENCH=1`
+is set (`RUN_BENCH=1 bun test src/filter/bench.spec.ts` in `apps/runner`), because
+a wall-clock gate is not deterministic on a shared CI host. It measures the bun
+entry (`bun src/main.ts filter -- true`) against `true` and fails above 50 ms at
+p95. Since #610 it also measures `bun src/main.ts filter-hook` deciding a
+pipeline-and-list line (`cd … && bun run lint 2>&1 | tail -50 && git status; …`)
+against `true`, with the same ceiling; on the developer machine it measured
+31.2 / 35.5 ms (median / p95 of 40 runs, bun entry).

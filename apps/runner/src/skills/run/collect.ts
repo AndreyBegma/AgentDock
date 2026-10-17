@@ -14,12 +14,11 @@ import type {
   SkillRunTerminalPhase,
 } from '@agentdock/shared/protocol';
 import { resolveFleetProject } from '../../fleet/project';
-import { redact } from '../../pane/redact';
+import { redact, redactText } from '../../pane/redact';
 import {
   GH_TIMEOUT_MS,
   gitOk,
   NETWORK_TIMEOUT_MS,
-  NO_HOOKS,
   parsePrUrl,
   type SkillsDeps,
   stderrLine,
@@ -124,7 +123,6 @@ const openPr = async (
     await gitOk(exec, [
       '-C',
       wt,
-      ...NO_HOOKS,
       'commit',
       '--quiet',
       '--no-verify',
@@ -157,9 +155,7 @@ const openPr = async (
     body: [
       `Skill run \`${record.runId}\`: \`/${record.skill}\` on \`${record.base}\`.`,
       '',
-      report
-        ? redact(report.split('\n')).join('\n')
-        : 'The run left no report.',
+      report ? redactText(report) : 'The run left no report.',
       '',
     ].join('\n'),
   });
@@ -184,15 +180,7 @@ export const pushBranch = async (
 ): Promise<void> => {
   await gitOk(
     deps.exec,
-    [
-      '-C',
-      worktree,
-      ...NO_HOOKS,
-      'push',
-      '--quiet',
-      'origin',
-      `HEAD:refs/heads/${branch}`,
-    ],
+    ['-C', worktree, 'push', '--quiet', 'origin', `HEAD:refs/heads/${branch}`],
     NETWORK_TIMEOUT_MS,
   );
 };

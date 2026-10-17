@@ -6,10 +6,14 @@ const compiled = Bun.main.startsWith('/$bunfs/');
 
 const argv = process.argv.slice(2);
 
-// `filter` and `filter-hook` run on every Bash call of every agent (#445 D3):
-// they load only their own modules. Everything else is imported lazily below,
+// `filter` and `filter-hook` run on every Bash call of every agent (#445 D3),
+// `read-hook` on every Read (#616): they load only their own modules. Everything else is imported lazily below,
 // and the build splits chunks, so the daemon's graph is never parsed here.
-if (argv[0] === 'filter' || argv[0] === 'filter-hook') {
+if (
+  argv[0] === 'filter' ||
+  argv[0] === 'filter-hook' ||
+  argv[0] === 'read-hook'
+) {
   const { runFilterCommand } = await import('./filter/main');
   process.exit(await runFilterCommand(argv));
 }

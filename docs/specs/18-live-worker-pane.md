@@ -218,7 +218,10 @@ not a blocking dependency.
   `left` for every way a socket gets on or off a topic.
 - **Audit**: `pane.watch_started` / `pane.watch_stopped`, actor the user,
   target `{ type: 'slot', id: <slot name> }`, `projectId`; once per user per
-  slot however many tabs. No frame content is logged or stored.
+  slot however many tabs. No frame content is logged or stored. A user back
+  on the slot within a minute of leaving it continues the same watch (C-119):
+  `pane.watch_stopped` is written only once they stay away that long, with
+  `meta.leftAt` the time they left, so looping watch and leave writes one row.
 - **Follow-up:** the UI header's viewer count has no event (`PANE_LIVE_EVENTS`
   has only `frame` and `ended`); a `pane.viewers` event is a protocol change
   for a later item.

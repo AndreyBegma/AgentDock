@@ -110,4 +110,86 @@ describe('Token saver, launch to stats row (#445 DR-02)', () => {
       passedThrough: false,
     });
   });
+
+  // #612: planner and design runs launch with `--permission-mode plan`.
+  it.each([
+    'plan',
+    'ui_profile',
+  ] as const)('rewrites and records a real filter id for a %s run in plan mode', async (runKind) => {
+    const runDir = join(home, 'cards', 'card_1', 'rounds', 'run_1');
+    mkdirSync(runDir, { recursive: true });
+    const launch = tokenSaverLaunch({
+      config: { enabled: true, mcpAllow: [] },
+      profile: { id: 'p', runtime: 'claude', env: {}, args: [] },
+      home,
+      dir: runDir,
+      selfCommand: ['/opt/agentdock-runner'],
+      runKind,
+      projectId: 'prj_a',
+      runId: 'run_1',
+      agentdock: false,
+      scout: false,
+    });
+    if (!launch) throw new Error('expected a launch');
+    const env = { PATH: process.env.PATH, ...launch.env };
+
+    const out = runFilterHook(
+      JSON.stringify({
+        tool_name: 'Bash',
+        permission_mode: 'plan',
+        cwd: home,
+        tool_input: { command: 'demo-test --all' },
+      }),
+      {
+        env,
+        filters: [demoFilter],
+        selfCommand: ['/opt/agentdock-runner'],
+        home,
+        os: 'linux',
+        now: Date.now,
+        rules: () => ({ allow: [], deny: [], ask: [] }),
+      },
+    );
+    const output = (JSON.parse(out) as HookOutput).hookSpecificOutput;
+    expect(output.permissionDecision).toBeUndefined();
+    expect(output.updatedInput.command).toBe(
+      '/opt/agentdock-runner filter -- demo-test --all',
+    );
+
+    const fixture = join(home, 'demo.sh');
+    writeFileSync(join(home, 'out.txt'), tapOutput(100, ['not ok 101 - x']));
+    writeFileSync(fixture, `#!/bin/sh\ncat "${join(home, 'out.txt')}"\n`);
+    chmodSync(fixture, 0o755);
+    const code = await runFilter([fixture], {
+      env,
+      filters: [demoFilter],
+      stdout: () => {},
+      stderr: () => {},
+      now: Date.now,
+      onSignal: () => () => {},
+    });
+    expect(code).toBe(0);
+
+    const events: UnsequencedEvent[] = [];
+    const reader = new FilterStatsReader({
+      roots: () => [join(home, 'cards')],
+      resolve: async (ids) =>
+        new Map(ids.map((id) => [id, { repo: `acme/${id}`, root: home }])),
+      emit: (event) => events.push(event),
+      log: createLogger({
+        level: 'error',
+        write: () => {},
+        now: () => new Date(0),
+      }),
+      now: () => new Date(),
+    });
+    await reader.poll();
+    const rows = (events[0]?.data as { rows: FilterStatRow[] }).rows;
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      runKind,
+      filter: 'fixture/demo',
+      passedThrough: false,
+    });
+  });
 });

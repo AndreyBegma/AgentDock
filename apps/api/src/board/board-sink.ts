@@ -1,16 +1,19 @@
 import {
   CARD_BACKGROUND_COMMAND_MAX,
+  CARD_ROUND_AT_ONCE_MS,
   CARD_WAITING_EVENT,
   type CardWaitingEventData,
   type CardWaitingReason,
   isActiveRoundPhase,
 } from '@agentdock/shared';
 import {
+  type CardRunDialogData,
   type CardRunFinishRefusedData,
   type CardRunPendingQuestionData,
   type CardRunPhaseChangedData,
   type CardRunPushedData,
   type CardRunQuestionData,
+  cardDialogEventDataSchemas,
   cardFinishRefusedEventDataSchemas,
   cardPendingQuestionEventDataSchemas,
   cardPushEventDataSchemas,
@@ -21,11 +24,13 @@ import {
   HOOK_STOPPED_EVENT,
   HOOK_TOOL_FINISHED_EVENT,
   type HookEvent,
+  isCardDialogEventType,
   isCardFinishRefusedEventType,
   isCardPendingQuestionEventType,
   isCardPushEventType,
   isCardQuestionEventType,
   isCardRunEventType,
+  type PaneDialog,
   parseHookEvent,
   type RunnerEvent,
 } from '@agentdock/shared/protocol';
@@ -125,6 +130,19 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
           continue;
         }
         await this.question(runnerId, event.seq, parsed.data);
+        continue;
+      }
+      if (isCardDialogEventType(event.type)) {
+        const parsed = cardDialogEventDataSchemas[event.type].safeParse(
+          event.data,
+        );
+        if (!parsed.success) {
+          this.logger.warn(
+            `runner ${runnerId}: malformed ${event.type} (seq ${event.seq}), skipped`,
+          );
+          continue;
+        }
+        await this.dialog(runnerId, event.seq, parsed.data);
         continue;
       }
       if (isCardPendingQuestionEventType(event.type)) {
@@ -239,6 +257,35 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
     seq: number,
     data: CardRunQuestionData,
   ): Promise<void> {
+    await this.toWaitingOnScreen(runnerId, seq, data, 'question');
+  }
+
+  /**
+   * #624: a Claude Code dialog has blocked the round's session for
+   * `CARD_DIALOG_WAIT_MS` — the round waits for the person, the card names
+   * the dialog, and `card.waiting` tells them. The answer's next hook event
+   * moves it back to `running`.
+   */
+  private async dialog(
+    runnerId: string,
+    seq: number,
+    data: CardRunDialogData,
+  ): Promise<void> {
+    await this.toWaitingOnScreen(runnerId, seq, data, 'dialog', data.dialog);
+  }
+
+  /**
+   * What the runner saw on an active round's screen — a question (#473) or
+   * a blocking dialog (#624) — moves it to `waiting`; only for the card's
+   * current run.
+   */
+  private async toWaitingOnScreen(
+    runnerId: string,
+    seq: number,
+    data: CardRunQuestionData,
+    reason: 'question' | 'dialog',
+    dialog?: PaneDialog,
+  ): Promise<void> {
     const card = await this.prisma.boardCard.findFirst({
       where: {
         id: data.cardId,
@@ -253,12 +300,12 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
     const round = card?.rounds[0];
     if (!card || !round || round.runId !== data.runId) {
       this.logger.warn(
-        `runner ${runnerId}: question for unknown card round ${data.runId}, skipped`,
+        `runner ${runnerId}: ${reason} for unknown card round ${data.runId}, skipped`,
       );
       return;
     }
     if (!isActiveRoundPhase(round.phase)) return;
-    if (await this.toWaiting(runnerId, seq, card, round, 'question')) {
+    if (await this.toWaiting(runnerId, seq, card, round, reason, dialog)) {
       this.work.publish(card.projectId, card.id);
     }
   }
@@ -393,6 +440,14 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
         break;
       }
       case 'ended': {
+        // #542: a feedback round whose session died at start did no work.
+        if (
+          round.trigger === 'feedback' &&
+          at.getTime() - round.startedAt.getTime() < CARD_ROUND_AT_ONCE_MS
+        ) {
+          await this.diedAtStart(data, round, at);
+          break;
+        }
         // D6 (2): the session ended before anything else finished the round.
         const ended = await this.prisma.$transaction(async (tx) => {
           await tx.boardCardRound.updateMany({
@@ -418,6 +473,34 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
       }
     }
     this.work.publish(data.projectId, round.cardId);
+  }
+
+  /**
+   * #542: the session of a `feedback` round ended within
+   * `CARD_ROUND_AT_ONCE_MS` of its start — the round `failed`, not
+   * finished. The card stays where it is; auto-merge never ships the head
+   * a failed round leaves.
+   */
+  private async diedAtStart(
+    data: CardRunPhaseChangedData,
+    round: { id: string; runId: string; startedAt: Date },
+    at: Date,
+  ): Promise<void> {
+    const seconds = Math.max(
+      0,
+      Math.round((at.getTime() - round.startedAt.getTime()) / 1000),
+    );
+    const error = `The worker's session ended ${seconds} s after the round started, before it did any work`;
+    const ended = await this.prisma.$transaction(async (tx) => {
+      const done = await this.work.endRound(tx, round.id, 'failed', at, {
+        error,
+        endedAt: at,
+        ...(data.exitCode !== undefined ? { exitCode: data.exitCode } : {}),
+      });
+      if (done) await this.work.closeRun(tx, round.runId, 'failed', error);
+      return done;
+    });
+    if (ended) this.work.publishRun(data.projectId, round.runId, 'failed');
   }
 
   /** The work moves the card to Finished, which collects (D8). */
@@ -508,7 +591,7 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
             id: round.id,
             phase: { in: ACTIVE_PHASES.filter((p) => p !== 'running') },
           },
-          data: { phase: 'running', ...NO_BACKGROUND },
+          data: { phase: 'running', blockingDialog: null, ...NO_BACKGROUND },
         });
         if (count === 0) return false;
         await this.work.runStatus(tx, round.runId, 'running');
@@ -519,9 +602,10 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
   }
 
   /**
-   * D6: the turn ended, or (#473) the worker asks a question — it waits for
-   * the person. Only a round not yet waiting moves, so `card.waiting` is
-   * recorded once per stop or question.
+   * D6: the turn ended, (#473) the worker asks a question, or (#624) a
+   * dialog blocks its session — it waits for the person. Only a round not
+   * yet waiting moves, so `card.waiting` is recorded once per stop, question
+   * or dialog.
    */
   private toWaiting(
     runnerId: string,
@@ -531,6 +615,7 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
     },
     round: Pick<BoardCardRound, 'id' | 'runId' | 'round'>,
     reason: CardWaitingReason,
+    dialog?: PaneDialog,
   ): Promise<boolean> {
     return this.prisma.$transaction(async (tx) => {
       const { count } = await tx.boardCardRound.updateMany({
@@ -538,7 +623,12 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
           id: round.id,
           phase: { in: ['queued', 'starting', 'running', 'background'] },
         },
-        data: { phase: 'waiting', waitingAt: new Date(), ...NO_BACKGROUND },
+        data: {
+          phase: 'waiting',
+          waitingAt: new Date(),
+          blockingDialog: dialog ?? null,
+          ...NO_BACKGROUND,
+        },
       });
       if (count === 0) return false;
       await this.work.runStatus(tx, round.runId, 'waiting_person');
@@ -548,6 +638,7 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
         title: card.title,
         round: round.round,
         reason,
+        ...(dialog ? { dialog } : {}),
       };
       await this.work.serverEvent(
         tx,

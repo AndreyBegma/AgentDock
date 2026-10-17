@@ -86,11 +86,11 @@ describe('audit log (e2e)', () => {
     return since(before);
   };
 
-  const rawLogin = (email: string, password: string) =>
+  const rawLogin = (email: string, password: string, ip = nextIp()) =>
     ctx
       .http()
       .post('/auth/login')
-      .set('X-Forwarded-For', nextIp())
+      .set('X-Forwarded-For', ip)
       .set('User-Agent', 'audit-e2e')
       .send({ email, password });
 
@@ -168,20 +168,24 @@ describe('audit log (e2e)', () => {
         meta: expect.objectContaining({ reason: 'pending_approval' }),
       });
 
-      await ctx.prisma.user.update({
-        where: { id: user.id },
-        data: { lockedUntil: new Date(Date.now() + 60_000) },
+      const throttledIp = nextIp();
+      await ctx.prisma.loginThrottle.create({
+        data: {
+          email: 'user@example.com',
+          ip: throttledIp,
+          failures: 5,
+          lastFailureAt: new Date(),
+          blockedUntil: new Date(Date.now() + 60_000),
+        },
       });
-      const [locked] = await recordsOf(() =>
-        rawLogin('user@example.com', PASSWORD),
-      );
-      expect(locked).toMatchObject({
+      const [throttled] = await recordsOf(async () => {
+        expect(
+          (await rawLogin('user@example.com', PASSWORD, throttledIp)).status,
+        ).toBe(429);
+      });
+      expect(throttled).toMatchObject({
         result: 'denied',
-        meta: expect.objectContaining({ reason: 'locked' }),
-      });
-      await ctx.prisma.user.update({
-        where: { id: user.id },
-        data: { lockedUntil: null, failedLoginCount: 0 },
+        meta: expect.objectContaining({ reason: 'throttled', count: 1 }),
       });
 
       const session = await login(ctx, 'user@example.com');

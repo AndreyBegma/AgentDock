@@ -24,6 +24,9 @@ export interface ListQuery {
   limit?: number;
 }
 
+/** The largest PostgreSQL `int8`: a longer id names no notification. */
+const INT8_MAX = 9223372036854775807n;
+
 /** `<lastAt ms>:<id>` — the keyset of the newest-first order. */
 const encodeCursor = (lastAt: Date, id: bigint): string =>
   Buffer.from(`${lastAt.getTime()}:${id}`).toString('base64url');
@@ -97,7 +100,8 @@ export class NotificationsService {
   }
 
   async markRead(userId: string, id: string): Promise<NotificationReadResult> {
-    if (!/^\d{1,19}$/.test(id)) throw notificationNotFound();
+    if (!/^\d{1,19}$/.test(id) || BigInt(id) > INT8_MAX)
+      throw notificationNotFound();
     const { count } = await this.prisma.notification.updateMany({
       where: { id: BigInt(id), userId },
       data: { readAt: new Date() },

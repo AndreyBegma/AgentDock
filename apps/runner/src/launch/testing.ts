@@ -2,7 +2,32 @@ import { expect } from 'bun:test';
 import { join } from 'node:path';
 import type { TokenSaverRunKind } from '@agentdock/shared';
 import { FILTER_RUN_KIND_ENV, LAUNCH_SETTINGS_ENV } from '../filter/env';
-import { AUTOCOMPACT_ENV, TOKEN_SAVER_FILES } from './token-saver';
+import {
+  AUTOCOMPACT_PCT_ENV,
+  AUTOCOMPACT_WINDOW_ENV,
+  CS_ECO_ENV,
+  TOKEN_SAVER_FILES,
+} from './token-saver';
+
+/**
+ * Amendment 12: a launch with Token saver on compacts at 150k tokens; #616:
+ * it turns the plugin's eco hooks off, since the runner guards reads itself.
+ * One with it off sets neither.
+ */
+export const expectEcoEnv = (
+  env: Readonly<Record<string, string | undefined>>,
+  on = true,
+): void => {
+  if (on) {
+    expect(env[AUTOCOMPACT_WINDOW_ENV]).toBe('183000');
+    expect(env[AUTOCOMPACT_PCT_ENV]).toBe('100');
+    expect(env[CS_ECO_ENV]).toBe('off');
+  } else {
+    expect(env[AUTOCOMPACT_WINDOW_ENV]).toBeUndefined();
+    expect(env[AUTOCOMPACT_PCT_ENV]).toBeUndefined();
+    expect(env[CS_ECO_ENV]).toBeUndefined();
+  }
+};
 
 /** One launch as a test saw it: its argv and env. */
 export interface SeenLaunch {
@@ -32,7 +57,7 @@ export const expectTextCallWired = (
   ]);
   expect(at).toBeLessThan(launch.command.indexOf('-p'));
   expect(launch.command).not.toContain('--agents');
-  expect(launch.env[AUTOCOMPACT_ENV]).toBe('60');
+  expectEcoEnv(launch.env);
   expect(launch.env[LAUNCH_SETTINGS_ENV]).toBe(settings);
   expect(launch.env[FILTER_RUN_KIND_ENV]).toBe(runKind);
 };

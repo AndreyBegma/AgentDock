@@ -44,15 +44,39 @@ type Preview =
   | { state: 'error'; text: string };
 
 /**
+ * D-09: shown when editing a schedule someone else owns — changing what it
+ * runs, when, or whether it is enabled makes the editor its owner.
+ */
+export function OwnerNotice({
+  schedule,
+  userId,
+}: {
+  schedule: ScheduleView | null;
+  userId: string;
+}) {
+  if (!schedule || schedule.createdById === userId) return null;
+  return (
+    <Banner tone="info" title="Someone else set this schedule up">
+      If you change what it runs, when, or whether it is enabled, the schedule
+      will run with your authority from then on — your role on this project, not
+      theirs.
+    </Banner>
+  );
+}
+
+/**
  * Creates or edits a schedule (spec 25 UI). The cron field is a plain `Input`
  * until glass-ui ships `CronInput` (D18): below it, the API's description and
  * the next five fire times in the chosen timezone. The API's 422 codes are
- * shown as sentences and the form stays open.
+ * shown as sentences and the form stays open. A schedule fires with its
+ * owner's authority; changing what someone else's runs, when, or whether it
+ * is enabled makes the editor its owner (D-09), and the dialog says so.
  */
 export function ScheduleDialog({
   projectId,
   open,
   schedule,
+  userId,
   skills,
   profiles,
   onClose,
@@ -62,6 +86,8 @@ export function ScheduleDialog({
   open: boolean;
   /** The schedule to edit; null creates a new one. */
   schedule: ScheduleView | null;
+  /** The signed-in person: editing a schedule they do not own warns them. */
+  userId: string;
   /** Invocations of the project's runnable skills, for suggestions. */
   skills: string[];
   /** Runtime profiles the person may pick; empty = "Project default" only. */
@@ -168,7 +194,11 @@ export function ScheduleDialog({
     <DialogRoot open={open} onOpenChange={(next) => !next && close()}>
       <DialogContent
         title={schedule ? `Edit ${schedule.name}` : 'New schedule'}
-        description="Runs a skill or the orchestrator on this project at fixed times, with your authority."
+        description={
+          schedule
+            ? 'Once you save it, the schedule will run with your authority.'
+            : 'Runs a skill or the orchestrator on this project at fixed times, with your authority.'
+        }
         footer={
           <>
             <Button variant="glass" disabled={busy} onClick={close}>
@@ -187,6 +217,7 @@ export function ScheduleDialog({
             void submit();
           }}
         >
+          <OwnerNotice schedule={schedule} userId={userId} />
           <Field label="Name" htmlFor="schedule-name" required>
             <Input
               id="schedule-name"

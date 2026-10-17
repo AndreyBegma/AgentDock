@@ -103,6 +103,15 @@ export class SkillRunService {
       );
     }
     const profile = await this.profile(project, spec.profileKey);
+    // C-132 (D-13): a webhook's run never inherits the project's mode — the
+    // project default may be `bypassPermissions`.
+    if (trigger.type === 'webhook' && spec.permissionMode === undefined) {
+      throw skillsError(
+        400,
+        SKILLS_ERROR.invalidArgs,
+        'a webhook run must name its own permission mode',
+      );
+    }
     const permissionMode =
       spec.permissionMode ?? (await this.defaultPermissionMode(projectId));
     if (permissionMode === 'bypassPermissions' && trigger.role !== 'admin') {
@@ -142,7 +151,8 @@ export class SkillRunService {
     }
     this.commands.assertReady(project.runnerId, 'skill.run');
     // Spec 28 D7, D11: an exceeded stop budget refuses with 409
-    // `budget_exceeded`; only a person's run counts toward their budget (D3).
+    // `budget_exceeded`. A schedule firing's principal had their user budget
+    // checked by the pre-fire hook (D-10); a webhook's run is project-only.
     await this.budgets?.assertAllowed({
       projectId,
       userId: trigger.type === 'user' ? trigger.id : null,

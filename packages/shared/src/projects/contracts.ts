@@ -21,12 +21,16 @@ export const PROJECT_ERROR = {
   runnerTimeout: 'runner_timeout',
   /** The runner answered with an error not mapped to its own code. */
   runnerError: 'runner_error',
+  /** The runner's hello says it does not serve the command (ADR-0023). */
+  runnerOutdated: 'runner_outdated',
   /** The path does not exist, or is not a directory. */
   pathNotFound: 'path_not_found',
   /** The path is not inside a git working tree. */
   notARepository: 'not_a_repository',
   /** The path is outside what the runner allows (a symlink out, an unwatched root). */
   pathNotAllowed: 'path_not_allowed',
+  /** ADR-0047: the path is outside the runner policy's `allowedRoots`. */
+  policyRefused: 'policy_refused',
   /** A linked worktree or subdirectory; `suggestedPath` is the main checkout. */
   notMainCheckout: 'not_main_checkout',
   /** `origin` is not on GitHub, or there is no `origin` (ADR-0004). */
@@ -90,6 +94,11 @@ export interface DocsSourceView {
   candidates: DocsCandidate[];
   /** Set by `PUT /projects/:id/docs-source`; a refresh leaves it alone. */
   manual: boolean;
+  /**
+   * #379: the Spec folder, relative to the docs root — where card and plan
+   * specs are written. `null` until it is set; a refresh leaves it alone.
+   */
+  specDir: string | null;
   updatedAt: string;
 }
 
@@ -197,12 +206,15 @@ export interface UpdateProjectRequest {
 /**
  * `PUT /projects/:id/docs-source` (admin). `in_repo` and `sibling_repo` need
  * an absolute `localPath` (`in_repo`: under the project root); `remote_repo`
- * needs `repo`; `none` takes neither.
+ * needs `repo` and takes the `localPath` of a local clone (#379); `none`
+ * takes neither. `specDir` (#379) is the Spec folder, relative to the docs
+ * root; absent or `null` clears it.
  */
 export interface DocsSourceOverrideRequest {
   kind: DocsSourceKind;
   localPath?: string;
   repo?: string;
+  specDir?: string | null;
 }
 
 /** `POST /projects/:id/members` (admin). */

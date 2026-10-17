@@ -1,10 +1,13 @@
 import {
+  PLANNER_DISCUSS_CONTRACT,
   PLANNER_INTAKE_CONTRACT,
   type PlanQuestion,
   plannerOutputContract,
 } from '@agentdock/shared';
+import { readCardInstructions } from './plan-intake';
 import {
   assemblePrompt,
+  DISCUSS_INSTRUCTIONS,
   type PromptInput,
   type PromptTask,
 } from './plan-prompt';
@@ -146,5 +149,106 @@ describe('assemblePrompt — the New work intake (#409)', () => {
       intake({ generate: true, mustGenerate: true }),
     );
     expect(prompt).toContain('write the card now — or the split');
+  });
+});
+
+/** #524 (ADR-0044 §3): UI cards for one surface are a stack, not a split. */
+describe('assemblePrompt — the intake stack rule (#524)', () => {
+  const intake = (
+    state: Partial<NonNullable<PromptInput['intake']>> = {},
+  ): PromptInput => ({
+    ...base,
+    instructions: readCardInstructions(),
+    action: 'intake',
+    plan: { title: '', mode: 'card', version: 1 },
+    contractVersion: 3,
+    brief:
+      'The Board on phones: Move action, full-screen intake, design viewer',
+    intake: {
+      roundsAsked: 0,
+      maxRounds: 4,
+      generate: false,
+      mustGenerate: false,
+      ...state,
+    },
+  });
+
+  it('states the rule: one surface → a stack with a design, foundations first', () => {
+    const prompt = assemblePrompt(intake());
+    expect(prompt).toContain(
+      'Several UI changes to one surface or form factor — one screen, one page, "the board on phones" — share one look: propose a `stack` with `design: true`, never a split',
+    );
+    expect(prompt).toContain('Stage it foundations first');
+    expect(prompt).toContain(
+      '**Several UI changes to one surface or form factor**',
+    );
+    expect(prompt).toContain('Stage them **foundations first**');
+  });
+
+  it('keeps the split for unrelated or non-UI tasks, never one surface', () => {
+    const prompt = assemblePrompt(intake());
+    expect(prompt).toContain(
+      'unrelated changes, UI changes to different surfaces, or work with no UI',
+    );
+    expect(prompt).toContain('never UI cards for one surface');
+    expect(prompt).toContain('neither are UI cards for one\n  surface');
+  });
+
+  it('carries the worked example of phone fixes to the Board as a stack', () => {
+    const prompt = assemblePrompt(intake());
+    expect(prompt).toContain('### Example: several phone fixes to the Board');
+    expect(prompt).toContain(
+      '`title`: "Make the Board usable on phones"; `design`: true.',
+    );
+    expect(prompt).toContain('Stage 1 "Foundations"');
+    expect(prompt).toContain('Stage 2 "Features"');
+  });
+
+  it('tells every turn — ask, generate, last round — when a stack is due', () => {
+    for (const state of [
+      {},
+      { generate: true, mustGenerate: true },
+      { mustGenerate: true },
+    ]) {
+      expect(assemblePrompt(intake(state))).toContain(
+        'several UI changes to one surface or form factor (one screen, one page, "the board on phones") — a stack with `design: true`, staged foundations first',
+      );
+    }
+  });
+});
+
+describe('assemblePrompt — a discussion turn (#590)', () => {
+  const discuss: PromptInput = {
+    ...base,
+    instructions: 'GLOBAL INSTRUCTIONS',
+    action: 'discuss',
+    brief: 'How are runner tokens checked?',
+    plan: { title: 'Tokens', mode: 'discuss', version: 1 },
+    contractVersion: 3,
+    discussion: { skills: ['code-sentinel:cs-security'] },
+  };
+
+  it('runs on the discussion instructions and contract, read-only, with its skills', () => {
+    const prompt = assemblePrompt(discuss);
+    expect(prompt.startsWith(DISCUSS_INSTRUCTIONS)).toBe(true);
+    expect(prompt).not.toContain('GLOBAL INSTRUCTIONS');
+    expect(prompt).toContain(PLANNER_DISCUSS_CONTRACT.trim());
+    expect(prompt).toContain('The repository is read-only for you.');
+    expect(prompt).toContain('Action: `discuss`');
+    expect(prompt).toContain('`code-sentinel:cs-security`');
+    expect(prompt).toContain('How are runner tokens checked?');
+    expect(prompt).toContain('Answer the opening message above.');
+  });
+
+  it('puts a later message after the opening, and says None without skills', () => {
+    const prompt = assemblePrompt({
+      ...discuss,
+      discussion: { skills: [] },
+      input: { message: 'And the webhook secret?' },
+    });
+    expect(prompt).toContain('## Skills\n\nNone.');
+    expect(prompt.indexOf('And the webhook secret?')).toBeGreaterThan(
+      prompt.indexOf('How are runner tokens checked?'),
+    );
   });
 });

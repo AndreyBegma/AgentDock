@@ -15,7 +15,6 @@ import {
   gitOk,
   gitSucceeds,
   NETWORK_TIMEOUT_MS,
-  NO_HOOKS,
   parsePrUrl,
   randomShortId,
   type SkillsDeps,
@@ -159,7 +158,6 @@ export const installProjectSkill = async (
     await gitOk(exec, [
       '-C',
       worktree,
-      ...NO_HOOKS,
       'commit',
       '--quiet',
       '--no-verify',
@@ -171,7 +169,6 @@ export const installProjectSkill = async (
       [
         '-C',
         worktree,
-        ...NO_HOOKS,
         'push',
         '--quiet',
         'origin',

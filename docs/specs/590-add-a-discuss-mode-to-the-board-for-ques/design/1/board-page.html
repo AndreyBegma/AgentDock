@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-scale="desk" data-palette="navy">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Board — Discuss entry point (responsive)</title>
+<style>
+:root{--radius-control:6px;--radius-surface:8px;--radius-sheet:12px;--size-control:28px;--dur-fast:100ms;--ease-sheet:cubic-bezier(0.32,0.72,0,1);--press-scale:0.97;--font-sans:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;--font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;--glass-filter:blur(26px) saturate(180%) brightness(var(--glass-brightness));--color-status-running:var(--color-hue-2);--color-status-running-soft:var(--color-hue-2-soft);--color-status-running-ink:var(--color-hue-2-ink);--color-status-waiting:var(--color-hue-1);--color-status-waiting-soft:var(--color-hue-1-soft);--color-status-waiting-ink:var(--color-hue-1-ink);--color-status-blocked:var(--color-hue-5);--color-status-blocked-soft:var(--color-hue-5-soft);--color-status-blocked-ink:var(--color-hue-5-ink);--color-status-done:var(--color-hue-3);--color-status-done-soft:var(--color-hue-3-soft);--color-status-done-ink:var(--color-hue-3-ink);--canvas-aurora-1:var(--color-hue-1);--canvas-aurora-2:var(--color-hue-7)}
+:root[data-theme="dark"]{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-content:rgb(27 38 71/0.96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246/0.62);--color-ink-3:rgb(242 242 246/0.53);--color-line:rgb(255 255 255/0.1);--color-line-strong:rgb(255 255 255/0.18);--color-hover:rgb(255 255 255/0.06);--color-focus:#b4b2ff;--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-soft:rgb(91 91 246/0.2);--color-accent-ink:#b4b2ff;--color-warn:#e3b341;--color-danger:#ff6b60;--canvas-glow:18%;--color-hue-1:#5b9cf6;--color-hue-1-soft:rgb(91 156 246/0.18);--color-hue-1-ink:#a4c8ff;--color-hue-2:#2fbf94;--color-hue-2-soft:rgb(47 191 148/0.18);--color-hue-2-ink:#7ee0c0;--color-hue-3:#7cc95a;--color-hue-3-soft:rgb(124 201 90/0.18);--color-hue-3-ink:#ade58f;--color-hue-4:#e69f00;--color-hue-5:#e8743b;--color-hue-5-soft:rgb(232 116 59/0.18);--color-hue-5-ink:#f9a77c;--color-hue-6:#f0606e;--color-hue-7:#a68bfa;--glass-sheen:rgb(255 255 255/0.06);--glass-scrim:rgb(9 9 12/0.55);--glass-brightness:0.85;--glass-edge:rgb(255 255 255/0.14);--glass-spec:rgb(255 255 255/0.2);--glass-rim:rgb(242 242 246/0.8);--glass-rim-shade:rgb(9 9 12/0.5);--glass-meniscus:rgb(9 9 12/0.55);--glass-refract:rgb(242 242 246/0.35);--glass-shadow:rgb(0 0 0/0.35);--glass-shadow-clear:rgb(0 0 0/0.15);--control-spec:rgb(255 255 255/0.05)}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-content:rgb(255 255 255/0.96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27/0.72);--color-ink-3:rgb(24 24 27/0.64);--color-line:rgb(0 0 0/0.1);--color-line-strong:rgb(0 0 0/0.23);--color-hover:rgb(0 0 0/0.06);--color-focus:#4f46e5;--color-accent:#4f46e5;--color-on-accent:#fff;--color-accent-soft:rgb(79 70 229/0.12);--color-accent-ink:#4338ca;--color-warn:#b45309;--color-danger:#dc2626;--canvas-glow:10%;--color-hue-1:#1f64d6;--color-hue-1-soft:rgb(31 100 214/0.12);--color-hue-1-ink:#1550b0;--color-hue-2:#00805e;--color-hue-2-soft:rgb(0 128 94/0.12);--color-hue-2-ink:#006a4e;--color-hue-3:#3a7d1c;--color-hue-3-soft:rgb(58 125 28/0.12);--color-hue-3-ink:#2f6617;--color-hue-4:#b36b00;--color-hue-5:#c24e00;--color-hue-5-soft:rgb(194 78 0/0.12);--color-hue-5-ink:#9c3d00;--color-hue-6:#d02a3e;--color-hue-7:#7244e0;--glass-sheen:rgb(0 0 0/0.06);--glass-scrim:rgb(255 255 255/0.52);--glass-brightness:1.15;--glass-edge:rgb(0 0 0/0.18);--glass-spec:rgb(0 0 0/0.2);--glass-rim:rgb(255 255 255/0.9);--glass-rim-shade:rgb(24 24 27/0.18);--glass-meniscus:rgb(24 24 27/0.12);--glass-refract:rgb(255 255 255/0.5);--glass-shadow:rgb(0 0 0/0.12);--glass-shadow-clear:rgb(0 0 0/0.08);--control-spec:rgb(255 255 255/0.05)}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground);color:var(--color-ink)}
+body{margin:0;height:100vh;font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased;overflow:hidden}
+h1,h2,h3,p{margin:0}
+:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}
+.ad-mono{font-family:var(--font-mono);font-size:12px}
+.ad-ink-2{color:var(--color-ink-2)}.ad-ink-3{color:var(--color-ink-3)}
+.ad-icon{width:16px;height:16px;flex-shrink:0}
+.ad-row{display:flex;align-items:center;gap:8px}
+.ad-canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--canvas-aurora-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--canvas-aurora-2) var(--canvas-glow),transparent),transparent 70%)}
+.ad-glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);backdrop-filter:var(--glass-filter);-webkit-backdrop-filter:var(--glass-filter);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),inset 1px 1px 0 var(--glass-rim),inset -1px -1px 0 var(--glass-rim-shade),inset 0 -3px 3px -1px var(--glass-meniscus),inset 0 0 18px -4px var(--glass-refract),0 12px 32px var(--glass-shadow)}
+.ad-hue-1{--hue:var(--color-hue-1)}.ad-hue-2{--hue:var(--color-hue-2)}.ad-hue-4{--hue:var(--color-hue-4)}.ad-hue-6{--hue:var(--color-hue-6)}.ad-hue-7{--hue:var(--color-hue-7)}
+.ad-swatch{display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--hue);flex-shrink:0}
+.ad-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font:inherit;font-weight:600;font-size:14px;line-height:20px;height:var(--size-control);padding:0 16px;border-radius:var(--radius-control);border:1px solid transparent;background:none;color:var(--color-ink);cursor:pointer;transition:background-color var(--dur-fast),transform 100ms var(--ease-sheet)}
+.ad-btn:active{transform:scale(var(--press-scale))}
+.ad-btn--solid{background:var(--color-accent);color:var(--color-on-accent)}
+.ad-btn--glass{background:var(--color-raised);border-color:var(--color-line-strong);box-shadow:inset 0 1px 0 var(--control-spec)}
+.ad-btn--glass:hover{background:linear-gradient(var(--color-hover),var(--color-hover)),var(--color-raised)}
+.ad-btn--ghost{color:var(--color-ink-2)}
+.ad-btn--ghost:hover{color:var(--color-ink);background:var(--color-hover)}
+.ad-btn--sm{height:32px;padding:0 12px;font-size:12px;line-height:16px;border-radius:2px}
+.ad-btn--icon{padding:0;aspect-ratio:1}
+.ad-badge{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;font-weight:600;line-height:1;border-radius:9999px;height:18px;min-width:18px;padding:0 6px;font-size:10px;background:var(--color-hover);color:var(--color-ink-2)}
+.ad-badge--solid.ad-badge--danger{background:var(--color-danger);color:var(--color-ground)}
+.ad-badge--solid.ad-badge--warn{background:var(--color-warn);color:var(--color-ground)}
+[data-status="running"]{--s:var(--color-status-running);--s-soft:var(--color-status-running-soft);--s-ink:var(--color-status-running-ink)}
+[data-status="waiting"]{--s:var(--color-status-waiting);--s-soft:var(--color-status-waiting-soft);--s-ink:var(--color-status-waiting-ink)}
+[data-status="blocked"]{--s:var(--color-status-blocked);--s-soft:var(--color-status-blocked-soft);--s-ink:var(--color-status-blocked-ink)}
+[data-status="done"]{--s:var(--color-status-done);--s-soft:var(--color-status-done-soft);--s-ink:var(--color-status-done-ink)}
+.ad-pill{display:inline-flex;flex-shrink:0;align-items:center;gap:6px;height:20px;padding:0 8px;border-radius:9999px;white-space:nowrap;font-size:11px;font-weight:500;line-height:1;background:var(--s-soft);color:var(--s-ink)}
+.ad-dot{position:relative;display:inline-flex;width:6px;height:6px;flex-shrink:0}
+.ad-dot::before{content:'';width:100%;height:100%;border-radius:9999px;background:var(--s)}
+[data-status="running"] .ad-dot::after{content:'';position:absolute;inset:0;border-radius:9999px;background:var(--s);opacity:.6;animation:ad-ping 1s cubic-bezier(0,0,.2,1) infinite}
+@keyframes ad-ping{75%,100%{transform:scale(2);opacity:0}}
+.ad-shell{display:flex;gap:12px;padding:12px;min-height:100%}
+.ad-rail{position:sticky;top:12px;height:calc(100vh - 88px);width:240px;flex-shrink:0;display:flex;flex-direction:column;gap:8px;padding:8px;border-radius:var(--radius-surface)}
+.ad-rail__brand{display:flex;align-items:center;gap:8px;padding:8px 12px;font-weight:600;font-size:15px}
+.ad-rail__group{display:flex;flex-direction:column;gap:2px}
+.ad-rail__group+.ad-rail__group{margin-top:12px}
+.ad-rail__heading{padding:8px 12px 4px;font-size:12px;font-weight:500;color:var(--color-ink-3)}
+.ad-rail__item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:var(--radius-control);color:var(--color-ink-2);text-decoration:none}
+.ad-rail__item:hover{background:var(--color-hover)}
+.ad-rail__item[aria-current="page"]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.ad-rail__item .ad-icon{width:18px;height:18px}
+.ad-rail__label{flex:1}
+.ad-col{display:flex;flex:1;flex-direction:column;gap:12px;min-width:0}
+.ad-topbar{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;border-radius:var(--radius-surface)}
+.ad-crumbs{display:flex;align-items:center;gap:4px;flex:1;min-width:0;color:var(--color-ink-3)}
+.ad-crumbs a{color:var(--color-ink-2);text-decoration:none}
+.ad-crumbs [aria-current]{color:var(--color-ink);font-weight:600}
+.ad-avatar{display:inline-grid;place-content:center;width:28px;height:28px;border-radius:9999px;background:var(--color-raised);border:1px solid var(--color-line);font-size:12px;font-weight:600;color:var(--color-ink-2);flex-shrink:0}
+.ad-kbd{display:inline-flex;align-items:center;height:18px;padding:0 5px;border-radius:4px;border:1px solid var(--color-line-strong);font-family:var(--font-mono);font-size:11px;color:var(--color-ink-3)}
+.ad-main{width:100%;display:flex;flex-direction:column;gap:12px;min-width:0}
+.ad-page-header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px}
+.ad-page-header__main{display:flex;flex-direction:column;gap:4px;min-width:0}
+.ad-page-header h1{font-size:28px;line-height:32px;letter-spacing:-0.02em;font-weight:600}
+.ad-page-header__desc{font-size:14px;color:var(--color-ink-2)}
+.ad-page-header__actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.ad-seg{display:inline-flex;gap:2px;padding:2px;height:var(--size-control);border:1px solid var(--color-line);border-radius:var(--radius-control)}
+.ad-seg button{flex:1;min-width:64px;padding:0 10px;border:0;border-radius:4px;background:none;font:inherit;font-size:12px;font-weight:500;color:var(--color-ink-2);cursor:pointer}
+.ad-seg button[aria-pressed="true"]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.ad-card{border-radius:var(--radius-surface);padding:12px;background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.ad-board{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px}
+.ad-board__col{flex:0 0 272px;display:flex;flex-direction:column;gap:8px;padding:8px;border-radius:var(--radius-surface);background:var(--color-hover)}
+.ad-board__head{display:flex;align-items:center;justify-content:space-between;padding:4px 6px;font-size:12px;font-weight:600;color:var(--color-ink-2)}
+.ad-board__card{display:flex;flex-direction:column;gap:8px;padding:10px 12px;border-radius:var(--radius-control);background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.ad-tabbar{display:none;position:sticky;bottom:8px;margin:0 8px 8px;justify-content:space-around;height:56px;padding:4px;border-radius:var(--radius-sheet);z-index:40}
+.ad-tabbar a{display:flex;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:2px;border-radius:var(--radius-control);font-size:11px;color:var(--color-ink-2);text-decoration:none;position:relative}
+.ad-tabbar a[aria-current="page"]{color:var(--color-accent-ink);background:var(--color-accent-soft)}
+.ad-tabbar .ad-badge{position:absolute;top:2px;left:calc(50% + 4px)}
+/* drafts */
+.drafts{display:flex;flex-direction:column;gap:8px;min-width:0}
+.drafts h2{font-size:14px;font-weight:600}
+.drafts ul{list-style:none;margin:0;padding:0 0 4px;display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;overscroll-behavior-x:contain}
+.drafts li{width:288px;flex-shrink:0;scroll-snap-align:start}
+.draft{display:flex;flex-direction:column;gap:8px;height:100%}
+.draft__title{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.draft__status{font-size:12px;color:var(--color-ink-2)}
+.draft__actions{margin-top:auto;display:flex;gap:8px}
+.kind{display:inline-flex;align-items:center;gap:4px;height:18px;padding:0 6px;border-radius:9999px;background:var(--color-hover);color:var(--color-ink-2);font-size:10px;font-weight:600;flex-shrink:0}
+.kind .ad-icon{width:12px;height:12px}
+.skills{display:flex;flex-wrap:wrap;gap:4px}
+.skills .ad-badge{font-family:var(--font-mono);font-weight:500}
+.mark{outline:2px dashed var(--color-accent-ink);outline-offset:3px;border-radius:8px}
+/* mockup preview chrome (not product UI) */
+.pv{position:fixed;top:0;left:0;right:0;height:48px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 12px;z-index:100;border-bottom:1px solid var(--color-line);background:var(--color-surface);font-size:12px;color:var(--color-ink-3)}
+.stage{margin:56px auto 0;width:100%;height:calc(100vh - 64px);overflow:auto;position:relative;transform:translateZ(0);container:app/inline-size}
+.stage[data-w="tablet"]{width:834px;border:1px solid var(--color-line-strong);border-radius:16px}
+.stage[data-w="phone"]{width:390px;border:1px solid var(--color-line-strong);border-radius:24px}
+/* tablet and below: tab bar, touch targets */
+@container app (max-width:1023px){
+  .ad-shell{padding:8px 16px 12px;gap:8px;--size-control:44px}
+  .ad-rail{display:none}
+  .ad-tabbar{display:flex}
+  .ad-btn--sm{height:40px;padding:0 14px}
+  .ad-topbar{padding:0 12px}
+  .search-label,.search-kbd{display:none}
+  .search-btn{width:44px;padding:0}
+  .ad-seg button{font-size:13px}
+}
+/* phone */
+@container app (max-width:639px){
+  .ad-topbar{height:52px}
+  .crumb-parent,.crumb-sep{display:none}
+  .ad-page-header h1{font-size:24px;line-height:28px}
+  .ad-page-header__desc{font-size:13px}
+  .ad-page-header__actions{width:100%}
+  .ad-page-header__actions .ad-seg{flex:1 0 100%}
+  .act{flex:1}
+  .drafts li{width:82cqw}
+  .draft__actions .ad-btn{flex:1}
+  .ad-board{scroll-snap-type:x mandatory;margin:0 -16px;padding:0 16px 8px;scroll-padding:0 16px}
+  .ad-board__col{flex-basis:85cqw;scroll-snap-align:start}
+}
+</style>
+</head>
+<body>
+<div class="pv" role="toolbar" aria-label="Mockup preview">
+  <span>Mockup preview width</span>
+  <div class="ad-row">
+    <div class="ad-seg" role="group" aria-label="Preview width" id="pvw"><button type="button" data-w="fit" aria-pressed="true">Fit</button><button type="button" data-w="tablet" aria-pressed="false">Tablet 834</button><button type="button" data-w="phone" aria-pressed="false">Phone 390</button></div>
+    <button class="ad-btn ad-btn--glass ad-btn--sm" type="button" id="pvt">Theme</button>
+  </div>
+</div>
+<div class="stage" id="stage" data-w="fit">
+<div class="ad-canvas"></div>
+<div class="ad-shell">
+  <nav class="ad-rail ad-glass" aria-label="Main">
+    <div class="ad-rail__brand"><span class="ad-swatch ad-hue-1" style="width:18px;height:18px;border-radius:5px"></span>AgentDock</div>
+    <div class="ad-rail__group">
+      <div class="ad-rail__heading">Workspace</div>
+      <a class="ad-rail__item" href="#"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg><span class="ad-rail__label">Overview</span></a>
+      <a class="ad-rail__item" href="#"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg><span class="ad-rail__label">Fleet</span><span class="ad-badge ad-badge--solid ad-badge--warn">1</span></a>
+      <a class="ad-rail__item" href="#"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span class="ad-rail__label">Approvals</span><span class="ad-badge ad-badge--solid ad-badge--danger">3</span></a>
+    </div>
+    <div class="ad-rail__group">
+      <div class="ad-rail__heading">AgentDock</div>
+      <a class="ad-rail__item" href="#" aria-current="page"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="M15 3v18"/></svg><span class="ad-rail__label">Board</span></a>
+      <a class="ad-rail__item" href="#"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17 10 11 4 5"/><path d="M12 19h8"/></svg><span class="ad-rail__label">Sessions</span></a>
+    </div>
+  </nav>
+  <div class="ad-col">
+    <header class="ad-topbar ad-glass">
+      <nav class="ad-crumbs" aria-label="Breadcrumb"><a class="crumb-parent" href="#">AgentDock</a><svg class="ad-icon crumb-sep" style="width:14px;height:14px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg><span aria-current="page">Board</span></nav>
+      <button class="ad-btn ad-btn--glass search-btn" type="button" aria-label="Search"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span class="ad-ink-3 search-label" style="font-weight:500">Search</span><span class="ad-kbd search-kbd">⌘K</span></button>
+      <span class="ad-avatar">AB</span>
+    </header>
+    <main id="main-content" class="ad-main">
+      <header class="ad-page-header">
+        <div class="ad-page-header__main">
+          <h1>Work</h1>
+          <p class="ad-page-header__desc">3 of 6 workers running · 14 cards · 3 running · 1 waiting on you</p>
+        </div>
+        <div class="ad-page-header__actions">
+          <div class="ad-seg" role="group" aria-label="View"><button type="button" aria-pressed="false">List</button><button type="button" aria-pressed="true">Board</button></div>
+          <button class="ad-btn ad-btn--glass act mark" type="button" title="Ask about the code or request an analysis"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/></svg>Discuss</button>
+          <button class="ad-btn ad-btn--solid act" type="button"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>New work</button>
+        </div>
+      </header>
+
+      <section class="drafts" aria-labelledby="board-drafts">
+        <h2 id="board-drafts">Drafts</h2>
+        <ul>
+          <li><article class="ad-card draft mark">
+            <div class="ad-row" style="min-width:0"><span class="kind"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/></svg>Discussion</span><span class="draft__title">Security review of runner tokens</span></div>
+            <div class="skills"><span class="ad-badge">cs-security</span><span class="ad-badge">cs-arch</span></div>
+            <span class="draft__status" aria-live="polite">6 messages · 2 cards proposed · 12 min ago</span>
+            <div class="draft__actions"><button class="ad-btn ad-btn--glass ad-btn--sm" type="button">Resume</button><button class="ad-btn ad-btn--ghost ad-btn--sm" type="button">Discard</button></div>
+          </article></li>
+          <li><article class="ad-card draft">
+            <div class="ad-row" style="min-width:0"><span class="kind"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/></svg>Discussion</span><span class="draft__title">Why does the board re-render on every event?</span></div>
+            <div class="skills"><span class="ad-badge">cs-perf</span></div>
+            <span class="draft__status ad-row" aria-live="polite"><span class="ad-pill" data-status="running"><span class="ad-dot"></span>Thinking…</span></span>
+            <div class="draft__actions"><button class="ad-btn ad-btn--glass ad-btn--sm" type="button">Resume</button><button class="ad-btn ad-btn--ghost ad-btn--sm" type="button">Discard</button></div>
+          </article></li>
+          <li><article class="ad-card draft">
+            <div class="ad-row" style="min-width:0"><span class="kind">New work</span><span class="draft__title">Throttle password checks</span></div>
+            <span class="draft__status" aria-live="polite">Waiting on your answers · round 2</span>
+            <div class="draft__actions"><button class="ad-btn ad-btn--glass ad-btn--sm" type="button">Resume</button><button class="ad-btn ad-btn--ghost ad-btn--sm" type="button">Discard</button></div>
+          </article></li>
+          <li><article class="ad-card draft">
+            <div class="ad-row" style="min-width:0"><span class="kind"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/></svg>Discussion</span><span class="draft__title">How does the runner pick a worktree?</span></div>
+            <span class="draft__status" aria-live="polite">2 messages · no skills · yesterday</span>
+            <div class="draft__actions"><button class="ad-btn ad-btn--glass ad-btn--sm" type="button">Resume</button><button class="ad-btn ad-btn--ghost ad-btn--sm" type="button">Discard</button></div>
+          </article></li>
+        </ul>
+      </section>
+
+      <div class="ad-board">
+        <section class="ad-board__col"><div class="ad-board__head"><span>Ready</span><span class="ad-badge">2</span></div>
+          <article class="ad-board__card"><div class="ad-row"><span class="ad-swatch ad-hue-7"></span><span class="ad-mono ad-ink-3">C-231</span></div><div>Add cost column to sessions</div></article>
+          <article class="ad-board__card"><div class="ad-row"><span class="ad-swatch ad-hue-2"></span><span class="ad-mono ad-ink-3">C-232</span></div><div>Retry webhook deliveries</div></article>
+        </section>
+        <section class="ad-board__col"><div class="ad-board__head"><span>In progress</span><span class="ad-badge">2</span></div>
+          <article class="ad-board__card"><div class="ad-row" style="justify-content:space-between"><span class="ad-row"><span class="ad-swatch ad-hue-7"></span><span class="ad-mono ad-ink-3">C-109</span></span><span class="ad-pill" data-status="running"><span class="ad-dot"></span>slot-1</span></div><div>Throttle password checks</div></article>
+          <article class="ad-board__card"><div class="ad-row" style="justify-content:space-between"><span class="ad-row"><span class="ad-swatch ad-hue-4"></span><span class="ad-mono ad-ink-3">C-226</span></span><span class="ad-pill" data-status="blocked"><span class="ad-dot"></span>Needs you</span></div><div>Stack design generation</div></article>
+        </section>
+        <section class="ad-board__col"><div class="ad-board__head"><span>Review</span><span class="ad-badge">1</span></div>
+          <article class="ad-board__card"><div class="ad-row" style="justify-content:space-between"><span class="ad-row"><span class="ad-swatch ad-hue-1"></span><span class="ad-mono ad-ink-3">C-224</span></span><span class="ad-pill" data-status="waiting"><span class="ad-dot"></span>PR #530</span></div><div>Intake proposes a stack</div></article>
+        </section>
+        <section class="ad-board__col"><div class="ad-board__head"><span>Done</span><span class="ad-badge">8</span></div>
+          <article class="ad-board__card"><div class="ad-row" style="justify-content:space-between"><span class="ad-row"><span class="ad-swatch ad-hue-6"></span><span class="ad-mono ad-ink-3">C-219</span></span><span class="ad-pill" data-status="done"><span class="ad-dot"></span>Merged</span></div><div>Bind PR approve action</div></article>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
+<nav class="ad-tabbar ad-glass" aria-label="Main">
+  <a href="#"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>Overview</a>
+  <a href="#"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/></svg>Fleet<span class="ad-badge ad-badge--solid ad-badge--warn">1</span></a>
+  <a href="#" aria-current="page"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>Board</a>
+  <a href="#"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Approvals<span class="ad-badge ad-badge--solid ad-badge--danger">3</span></a>
+  <a href="#"><svg class="ad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>More</a>
+</nav>
+</div>
+<script>
+(function(){var s=document.getElementById('stage');document.querySelectorAll('#pvw button').forEach(function(b){b.addEventListener('click',function(){s.dataset.w=b.dataset.w;document.querySelectorAll('#pvw button').forEach(function(o){o.setAttribute('aria-pressed',String(o===b))})})});document.getElementById('pvt').addEventListener('click',function(){var r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark'})})();
+</script>
+</body>
+</html>

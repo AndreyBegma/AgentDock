@@ -1,0 +1,8 @@
+{
+  "argv": ["git", "diff", "1dcec116^1", "1dcec116^2"],
+  "exitCode": 0,
+  "category": "other",
+  "outcome": "passing",
+  "expect": "filtered",
+  "maxRatio": 0.5
+}

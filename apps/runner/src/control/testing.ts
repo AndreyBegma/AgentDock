@@ -1,6 +1,11 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { WatchedProject } from '@agentdock/shared/protocol';
 import type { ConfigProfile } from '../config';
 import type { Exec, ExecResult } from '../detect/exec';
+import type { PolicyConfig } from '../policy/schema';
+import { permissivePolicy, sameRealpath } from '../policy/testing';
 import { FakeClock } from '../testing/fake-clock';
 import type { ControlDeps } from './deps';
 
@@ -20,7 +25,26 @@ export interface FakeTmuxOptions {
   profiles?: ConfigProfile[];
   /** `new-session` answers this failure instead of creating the session. */
   newSessionFails?: ExecResult;
+  /** The runner-local policy; one that refuses nothing by default. */
+  policy?: () => PolicyConfig;
 }
+
+/**
+ * C-123: where a fake orchestrator start writes its launch file — never the
+ * real `<state>/agentdock/orchestrator`. One per test process.
+ */
+let orchestratorDir: string | undefined;
+const fakeOrchestratorDir = (): string => {
+  if (!orchestratorDir) {
+    const dir = mkdtempSync(join(tmpdir(), 'agentdock-orch-'));
+    process.on('exit', () => rmSync(dir, { recursive: true, force: true }));
+    orchestratorDir = dir;
+  }
+  return orchestratorDir;
+};
+
+/** The runner's argv in a fake start: `exec-run <dir>` is appended. */
+export const FAKE_SELF_COMMAND = ['/opt/agentdock-runner'] as const;
 
 const ok = (stdout = ''): ExecResult => ({ code: 0, stdout, stderr: '' });
 const fail = (stderr: string): ExecResult => ({ code: 1, stdout: '', stderr });
@@ -104,6 +128,10 @@ export const fakeTmux = (options: FakeTmuxOptions = {}) => {
     clock: new FakeClock(Date.parse('2026-10-08T10:00:00.000Z')),
     watchedProjects: () => [project],
     profiles: () => options.profiles ?? [],
+    policy: options.policy ?? permissivePolicy,
+    realpath: sameRealpath,
+    selfCommand: FAKE_SELF_COMMAND,
+    orchestratorDir: fakeOrchestratorDir(),
   };
   return {
     project,

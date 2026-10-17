@@ -164,9 +164,10 @@ export function Composer({
             {MODES.find((m) => m.value === mode)?.hint}
           </span>
         </fieldset>
-        {/* The sticky footer below `md`: the TabBar floats over the last
-            6 rem of a phone screen, so it sits just above it. */}
-        <div className="sticky bottom-24 z-10 -mx-4 flex flex-col gap-3 border-t border-line bg-content px-4 py-3 md:static md:mx-0 md:border-0 md:bg-transparent md:p-0">
+        {/* The sticky footer below `md`: the BottomCapsule floats over the
+            last 6 rem of a phone screen and its safe area, so it sits just
+            above it. */}
+        <div className="sticky bottom-[calc(6rem+env(safe-area-inset-bottom))] z-10 -mx-4 flex flex-col gap-3 border-t border-line bg-content px-4 py-3 md:static md:mx-0 md:border-0 md:bg-transparent md:p-0">
           <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-end gap-3 md:grid-cols-[minmax(0,12rem)_minmax(0,16rem)_1fr]">
             <Field label="Model" htmlFor="planner-model">
               <Select

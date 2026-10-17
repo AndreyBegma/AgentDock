@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import {
   ACTION_REQUEST_KINDS,
+  ACTION_REQUEST_TOOL_INPUT_MAX,
   actionRequestArgsSchemas,
   mayDecideActionRequest,
 } from '../action-requests';
@@ -12,6 +13,7 @@ import {
   hookEventDataSchemas,
   hookEventHasContent,
   LOCAL_ROLE_CAP,
+  localActionRequestArgsSchema,
   localMethodNames,
   localMethods,
   localResponseMessageSchema,
@@ -312,6 +314,47 @@ describe('action requests (spec 201 D18)', () => {
         isAdmin: false,
       }),
     ).toBe(true);
+    // C-112: a person must queue a session's issue, but may be its requester.
+    expect(
+      mayDecideActionRequest({ kind: 'issue_queue', ...own, isAdmin: false }),
+    ).toBe(true);
+  });
+
+  it('accepts the tool input preview fields and rejects an input over the max (C-114)', () => {
+    const toolUse = actionRequestArgsSchemas.tool_use;
+    const preview = {
+      toolName: 'Bash',
+      input: 'x'.repeat(ACTION_REQUEST_TOOL_INPUT_MAX),
+      truncated: true,
+      fullLength: 2_048,
+      sha256: 'a'.repeat(64),
+    };
+    expect(toolUse.safeParse(preview).success).toBe(true);
+    expect(
+      toolUse.safeParse({ toolName: 'Bash', preview: 'none' }).success,
+    ).toBe(true);
+    expect(
+      toolUse.safeParse({
+        ...preview,
+        input: 'x'.repeat(ACTION_REQUEST_TOOL_INPUT_MAX + 1),
+      }).success,
+    ).toBe(false);
+    expect(toolUse.safeParse({ ...preview, sha256: 'nope' }).success).toBe(
+      false,
+    );
+    expect(toolUse.safeParse({ ...preview, preview: 'none' }).success).toBe(
+      false,
+    );
+  });
+
+  it('never lets a session ask for issue_queue itself (C-112)', () => {
+    expect(
+      localActionRequestArgsSchema.safeParse({
+        kind: 'issue_queue',
+        args: { issue: 1, title: 't', url: 'https://x/1', session: null },
+        summary: 'queue it',
+      }).success,
+    ).toBe(false);
   });
 });
 
@@ -329,5 +372,14 @@ describe('the manual terminal target (spec 201 D23)', () => {
 
   it('is a kind the attach command accepts', () => {
     expect(terminalTargetSchema.safeParse(target).success).toBe(true);
+  });
+});
+
+describe('card.track title (C-131)', () => {
+  it('is one line', () => {
+    expect(parseLocalRequest('card.track', { title: 'Fix it' }).ok).toBe(true);
+    for (const title of ['Fix it\n## How to work', 'Fix it\r\nnow']) {
+      expect(parseLocalRequest('card.track', { title }).ok).toBe(false);
+    }
   });
 });

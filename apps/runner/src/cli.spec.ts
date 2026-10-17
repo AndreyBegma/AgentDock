@@ -1,12 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import {
   type HelloMessage,
   runtimeProfileSchema,
 } from '@agentdock/shared/protocol';
 import { type CliDeps, runCli } from './cli';
-import { saveConfig } from './config';
+import { type ConfigProfile, saveConfig } from './config';
 import type { RunnerConnection } from './connection';
 import type { Exec } from './detect/exec';
 import { resolvePaths } from './env';
@@ -64,6 +70,24 @@ describe('agentdock-runner CLI', () => {
     expect(await runCli([], deps())).toBe(EXIT.usage);
   });
 
+  describe('policy', () => {
+    it('show prints the effective policy; set changes it in runner.json', async () => {
+      expect(await runCli(['policy', 'show'], deps())).toBe(EXIT.ok);
+      expect(JSON.parse(stdout.join('')).maxPermissionMode).toBe('auto');
+      expect(stderr.join('')).toContain('No root is allowed');
+      expect(
+        await runCli(['policy', 'set', 'terminal.write', 'true'], deps()),
+      ).toBe(EXIT.ok);
+      const config = JSON.parse(readFileSync(paths().configFile, 'utf8'));
+      expect(config.policy.terminal).toEqual({ write: true });
+    });
+
+    it('prints its usage for an unknown verb', async () => {
+      expect(await runCli(['policy', 'grant'], deps())).toBe(EXIT.usage);
+      expect(stderr.join('')).toContain('Usage: agentdock-runner policy');
+    });
+  });
+
   describe('pair', () => {
     const pairWith = (code: string) =>
       runCli(['pair', '--server', server.origin, '--code', code], deps());
@@ -97,6 +121,73 @@ describe('agentdock-runner CLI', () => {
       expect(output()).not.toContain(TOKEN);
     });
 
+    describe('cleartext servers (F-20)', () => {
+      const lan = (extra: string[]) =>
+        runCli(
+          [
+            'pair',
+            '--server',
+            'http://dock.lan',
+            '--code',
+            'ABCD-EFGH',
+            ...extra,
+          ],
+          deps({
+            fetch: (async () =>
+              Response.json({
+                runnerId: 'rn_1',
+                token: TOKEN,
+              })) as unknown as typeof fetch,
+          }),
+        );
+
+      it('refuses http://dock.lan without --insecure and writes nothing', async () => {
+        expect(await lan([])).not.toBe(EXIT.ok);
+        expect(() => statSync(paths().configFile)).toThrow();
+      });
+
+      it('pair --insecure persists insecureServer and warns; status and run warn too', async () => {
+        expect(await lan(['--insecure'])).toBe(EXIT.ok);
+        expect(stdout.join('')).toContain('WARNING');
+        expect(
+          JSON.parse(readFileSync(paths().configFile, 'utf8')),
+        ).toMatchObject({ server: 'http://dock.lan', insecureServer: true });
+
+        stdout.length = 0;
+        await runCli(
+          ['status'],
+          deps({
+            fetch: (async () => new Response('')) as unknown as typeof fetch,
+          }),
+        );
+        expect(stdout.join('')).toContain('WARNING');
+
+        stderr.length = 0;
+        const controller = new AbortController();
+        controller.abort();
+        await runCli(
+          ['run'],
+          deps({
+            signal: controller.signal,
+            createSocket: () => {
+              throw new Error('no network in tests');
+            },
+          }),
+        );
+        expect(stderr.join('')).toContain('WARNING');
+      });
+
+      it('run refuses a plain-http config that was not paired with --insecure', async () => {
+        saveConfig(paths().configFile, {
+          server: 'http://dock.lan',
+          runnerId: 'rn_1',
+          token: TOKEN,
+        });
+        expect(await runCli(['run'], deps())).toBe(EXIT.failure);
+        expect(stderr.join('')).toContain('--insecure');
+      });
+    });
+
     it('keeps profiles and disabled commands, and logs the replaced runner id', async () => {
       saveConfig(paths().configFile, {
         server: server.origin,
@@ -120,6 +211,126 @@ describe('agentdock-runner CLI', () => {
       expect(config.profiles).toHaveLength(1);
       expect(stderr.join('')).toContain('"previousRunnerId":"rn_old"');
       expect(output()).not.toContain(fresh);
+    });
+
+    it('allows the --allow-root directories as real paths, and says so (ADR-0047)', async () => {
+      server.pairing = () => Response.json({ runnerId: 'rn_1', token: TOKEN });
+      const dev = join(home, 'dev');
+      mkdirSync(dev, { recursive: true });
+      const code = await runCli(
+        [
+          'pair',
+          '--server',
+          server.origin,
+          '--code',
+          'ABCD-EFGH',
+          '--allow-root',
+          dev,
+        ],
+        deps(),
+      );
+      expect(code).toBe(EXIT.ok);
+      const config = JSON.parse(readFileSync(paths().configFile, 'utf8'));
+      expect(config.policy.allowedRoots).toEqual([realpathSync(dev)]);
+      expect(config.policy.maxPermissionMode).toBe('auto');
+      expect(stdout.join('')).toContain('Projects may be watched under:');
+    });
+
+    it('refuses a missing --allow-root before pairing', async () => {
+      const code = await runCli(
+        [
+          'pair',
+          '--server',
+          server.origin,
+          '--code',
+          'ABCD-EFGH',
+          '--allow-root',
+          join(home, 'missing'),
+        ],
+        deps(),
+      );
+      expect(code).toBe(EXIT.usage);
+      expect(server.pairingBodies).toEqual([]);
+    });
+
+    describe('Cloudflare Access service token', () => {
+      const SECRET = 'cf-secret-value-123';
+      const ID = 'abc.access';
+      const pairAccess = (
+        extra: string[],
+        env: Record<string, string> = {},
+      ) => {
+        server.pairing = () =>
+          Response.json({ runnerId: 'rn_1', token: TOKEN });
+        return runCli(
+          ['pair', '--server', server.origin, '--code', 'ABCD-EFGH', ...extra],
+          deps({
+            env: { HOME: home, PATH: '', AGENTDOCK_LOG: 'debug', ...env },
+          }),
+        );
+      };
+
+      it('sends both headers on pairing, stores them 0600, and never prints the secret', async () => {
+        const code = await pairAccess([
+          '--access-client-id',
+          ID,
+          '--access-client-secret',
+          SECRET,
+        ]);
+        expect(code).toBe(EXIT.ok);
+        expect(server.pairingAccess).toEqual([{ id: ID, secret: SECRET }]);
+        const file = paths().configFile;
+        expect(statSync(file).mode & 0o777).toBe(0o600);
+        expect(JSON.parse(readFileSync(file, 'utf8'))).toMatchObject({
+          accessClientId: ID,
+          accessClientSecret: SECRET,
+        });
+        expect(output()).not.toContain(SECRET);
+
+        stdout.length = 0;
+        stderr.length = 0;
+        await runCli(['status'], deps());
+        expect(stdout.join('')).toContain('access token: set');
+        expect(output()).not.toContain(SECRET);
+      });
+
+      it('reads the secret from stdin or the environment', async () => {
+        const stdin = () =>
+          new Response(`${SECRET}\n`).body as ReadableStream<Uint8Array>;
+        server.pairing = () =>
+          Response.json({ runnerId: 'rn_1', token: TOKEN });
+        await runCli(
+          [
+            'pair',
+            '--server',
+            server.origin,
+            '--code',
+            'ABCD-EFGH',
+            '--access-client-id',
+            ID,
+            '--access-client-secret-stdin',
+          ],
+          deps({ stdin }),
+        );
+        expect(server.pairingAccess).toEqual([{ id: ID, secret: SECRET }]);
+
+        await pairAccess(['--access-client-id', ID], {
+          AGENTDOCK_ACCESS_CLIENT_SECRET: 'from-env',
+        });
+        expect(server.pairingAccess[1]).toEqual({ id: ID, secret: 'from-env' });
+      });
+
+      it('sends neither header without credentials, and rejects half a token', async () => {
+        expect(await pairAccess([])).toBe(EXIT.ok);
+        expect(server.pairingAccess).toEqual([{ id: null, secret: null }]);
+        expect(await pairAccess(['--access-client-id', ID])).toBe(EXIT.usage);
+      });
+    });
+
+    it('without --allow-root, says no project root is allowed yet', async () => {
+      server.pairing = () => Response.json({ runnerId: 'rn_1', token: TOKEN });
+      expect(await pairWith('ABCD-EFGH')).toBe(EXIT.ok);
+      expect(stdout.join('')).toContain('No project root is allowed yet');
     });
 
     describe('profile detection', () => {
@@ -314,17 +525,21 @@ describe('agentdock-runner CLI', () => {
   });
 
   describe('run', () => {
-    const paired = (disabledCommands: string[] = []) =>
+    const paired = (
+      disabledCommands: string[] = [],
+      profiles: ConfigProfile[] = [
+        { id: 'claude-default', runtime: 'claude', env: {}, args: [] },
+      ],
+    ) =>
       saveConfig(paths().configFile, {
         server: server.origin,
         runnerId: 'rn_1',
         token: TOKEN,
-        profiles: [
-          { id: 'claude-default', runtime: 'claude', env: {}, args: [] },
-        ],
+        profiles,
         projects: [],
         disabledCommands,
         otlp: null,
+        policy: { allowedRoots: ['/'] },
       });
 
     const start = (exec: Exec = machineWithoutCodex()) => {
@@ -396,6 +611,33 @@ describe('agentdock-runner CLI', () => {
       controller.abort();
       expect(await exit).toBe(EXIT.ok);
       expect(output()).not.toContain(TOKEN);
+      expect(server.invalid).toEqual([]);
+    });
+
+    it('C-123: sends a profile env secret in hello as set, never its value', async () => {
+      paired(
+        [],
+        [
+          {
+            id: 'claude-work',
+            runtime: 'claude',
+            env: {
+              ANTHROPIC_API_KEY: 'sk-ant-x',
+              CLAUDE_CONFIG_DIR: '/home/dev/.claude-profiles/work',
+            },
+            args: [],
+          },
+        ],
+      );
+      const { controller, exit } = start();
+      const [hello] = (await server.waitFor('hello')) as HelloMessage[];
+      expect(hello.capabilities.profiles[0]?.env).toEqual({
+        ANTHROPIC_API_KEY: { set: true },
+        CLAUDE_CONFIG_DIR: '/home/dev/.claude-profiles/work',
+      });
+      expect(JSON.stringify(hello)).not.toContain('sk-ant-x');
+      controller.abort();
+      expect(await exit).toBe(EXIT.ok);
       expect(server.invalid).toEqual([]);
     });
 
@@ -506,6 +748,7 @@ describe('agentdock-runner CLI', () => {
         projects: [],
         disabledCommands: [],
         otlp: null,
+        policy: { allowedRoots: ['/'] },
       });
       const { controller, exit, live } = start();
       await live();
@@ -534,6 +777,37 @@ describe('agentdock-runner CLI', () => {
       await live();
       server.close(4401, 'revoked');
       expect(await exit).toBe(EXIT.terminalClose);
+    });
+
+    it('a replaced connection (4409) leaves the status `status` prints, then exits 78 (C-108)', async () => {
+      paired();
+      const { exit, live } = start();
+      await live();
+      server.close(4409, 'replaced by a newer connection');
+      expect(await exit).toBe(EXIT.terminalClose);
+      const expected =
+        'replaced by another connection at 2026-10-07T18:00:00.000Z, re-pair if this was not you';
+      expect(stderr.join('')).toContain(`stopped: ${expected}`);
+
+      stdout = [];
+      expect(await runCli(['status'], deps())).toBe(EXIT.ok);
+      expect(stdout.join('')).toContain(`stopped:  ${expected}\n`);
+    });
+
+    it('a new run clears the last stop from `status`', async () => {
+      paired();
+      const first = start();
+      await first.live();
+      server.close(4409, 'replaced');
+      expect(await first.exit).toBe(EXIT.terminalClose);
+
+      const second = start();
+      await second.live();
+      stdout = [];
+      await runCli(['status'], deps());
+      expect(stdout.join('')).not.toContain('stopped:');
+      second.controller.abort();
+      expect(await second.exit).toBe(EXIT.ok);
     });
   });
 
@@ -637,10 +911,26 @@ describe('agentdock-runner CLI', () => {
       expect(stdout).toEqual([]);
     });
 
-    it('lists both in the usage', async () => {
+    it('read-hook fails open: no decision, exit 0 (#616)', async () => {
+      for (const input of ['', 'not json', '{"tool_name":"Read"}']) {
+        expect(
+          await runCli(
+            ['read-hook'],
+            deps({
+              stdin: () =>
+                new Response(input).body as ReadableStream<Uint8Array>,
+            }),
+          ),
+        ).toBe(EXIT.ok);
+      }
+      expect(stdout).toEqual([]);
+    });
+
+    it('lists all three in the usage', async () => {
       await runCli(['help'], deps());
       expect(stdout.join('')).toContain('filter -- <command>');
       expect(stdout.join('')).toContain('filter-hook');
+      expect(stdout.join('')).toContain('read-hook');
     });
   });
 });

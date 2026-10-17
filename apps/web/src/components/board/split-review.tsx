@@ -26,6 +26,7 @@ import {
   type ProposalShape,
   proposalTitle,
   proposedShape,
+  SPLIT_HINT,
   type SplitRow,
   type StackDraft,
   splitRowProblem,
@@ -138,10 +139,7 @@ export function SplitReview({
         />
       ) : (
         <div className="flex flex-col gap-2">
-          <p className="text-xs text-ink-3">
-            Independent cards: no stages, no shared design, no dependencies
-            between them.
-          </p>
+          <p className="text-xs text-ink-3">{SPLIT_HINT}</p>
           <ol className="flex flex-col gap-3">
             {rows.map((row, position) => (
               <li
@@ -420,7 +418,8 @@ function KindField({
   );
 }
 
-function KindChip({ kind }: { kind: PlanTaskKind }) {
+/** A card's kind as a chip: a bug reads as danger. Also on candidates (#592). */
+export function KindChip({ kind }: { kind: PlanTaskKind }) {
   return (
     <Chip size="sm" tone={kind === 'bug' ? 'danger' : undefined}>
       {KIND_LABEL[kind]}
