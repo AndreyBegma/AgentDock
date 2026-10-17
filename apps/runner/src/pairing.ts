@@ -13,6 +13,8 @@ export class PairingError extends Error {}
 
 export interface PairOptions {
   server: string;
+  /** `pair --insecure`: plain http to a non-loopback host is allowed. */
+  insecure?: boolean;
   /** As typed by a person: trimmed and upper-cased before it is checked. */
   code: string;
   hostname: string;
@@ -29,7 +31,7 @@ export const pair = async (options: PairOptions): Promise<PairingResponse> => {
   if (!code.success) {
     throw new PairingError('pairing code must look like XXXX-XXXX');
   }
-  const url = pairingUrl(options.server);
+  const url = pairingUrl(options.server, options.insecure);
   const body: PairingRequest = {
     code: code.data,
     hostname: options.hostname,

@@ -50,7 +50,7 @@ first, so it works on a clean checkout. Releasing is in
 
 | Command | What it does |
 |---|---|
-| `pair --server <api-origin> --code XXXX-XXXX [--no-detect]` | exchanges a pairing code for a runner id and token; when the config has no profiles yet, also detects and writes them (`--no-detect` skips it, existing profiles are never overwritten) |
+| `pair --server <api-origin> --code XXXX-XXXX [--no-detect] [--insecure]` | exchanges a pairing code for a runner id and token; when the config has no profiles yet, also detects and writes them (`--no-detect` skips it, existing profiles are never overwritten) |
 | `run` | the daemon, in the foreground |
 | `status` | config, spool and whether the server answers |
 | `profiles [--detect [--write]]` | configured profiles; `--detect` proposes them, `--write` stores the proposal |
@@ -82,6 +82,13 @@ The project comes from `CLAUDE_PROJECT_DIR` (else the working directory), the
 session from the parent pid. A failure is an MCP tool error whose text starts
 with the local error code (`runner_offline`, `no_project`, `daemon_unavailable`,
 `forbidden`, …) and whose `structuredContent.error.code` carries it.
+
+`<api-origin>` must be `https://`. Plain `http://` is accepted only for a
+loopback host (`localhost`, `127.0.0.0/8`, `::1`). Any other `http://` host is
+refused unless `pair --insecure` is given; that sets `insecureServer: true` in
+`runner.json` (only `pair` writes it — the server cannot), and `run` and `status`
+print a warning on every start, because the token and session content then travel
+in cleartext.
 
 `<api-origin>` is the API, not the web app: pairing is `POST <api-origin>/runners/pair`,
 the socket `<api-origin>/runner`.
