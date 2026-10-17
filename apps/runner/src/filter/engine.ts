@@ -17,7 +17,8 @@ export const FILTER_NONE = 'none';
 
 /**
  * Amendment 12: why no filter ran, mirroring `FILTER_ID_NONE_*` — not a
- * single simple command, simple but uncovered, or a mode that never rewrites.
+ * line the hook parses (amendment 13), no pipeline head covered, or a mode
+ * that never rewrites.
  */
 export const FILTER_NONE_COMPOUND = 'none:compound';
 export const FILTER_NONE_UNCOVERED = 'none:uncovered';
@@ -35,6 +36,12 @@ export interface FilterDeps {
   random?: () => number;
   /** Signals forwarded to the child; the process's own by default. */
   onSignal?: (handler: (signal: NodeJS.Signals) => void) => () => void;
+  /**
+   * Calls `handler` once stdout is closed — `| head` has read all it wants
+   * (#610). The child then gets the SIGPIPE it would have got writing there
+   * itself.
+   */
+  onStdoutClosed?: (handler: () => void) => void;
 }
 
 type Stream = 'out' | 'err';
@@ -176,6 +183,9 @@ export const runFilter = async (
   }
   const unhook = (deps.onSignal ?? processSignals)((signal) => {
     child.kill(signal);
+  });
+  deps.onStdoutClosed?.(() => {
+    child.kill('SIGPIPE');
   });
 
   // Without a target there is nowhere to keep the raw output: stay out of the way.

@@ -54,8 +54,12 @@ command a hook *returns*, so a rewrite could hide `git push` from a
   do). In `auto` the hook makes no decision, and Claude Code's classifier
   still judges the wrapped command; **and**
 - no `deny` or `ask` rule matches it; **and**
-- the call is a single simple command — no pipe, `&&`, redirect or subshell —
-  that is not in the background, a dev server or a watch mode.
+- the call is made of simple commands joined by `|`, `&&`, `||` or `;` — no
+  redirect other than `2>&1`, no subshell, heredoc or substitution — and is
+  not in the background. In a pipeline only the first command is filtered
+  (`bun run test 2>&1 | tail -50` filters `bun run test`, and `tail` reads the
+  filtered output); in a list each covered command is filtered on its own. A
+  dev server or a watch mode runs as written.
 
 In any other session the command runs unfiltered, and the dashboard counts it
 as "returned the original". When no filter matched, the dashboard and the card
@@ -63,8 +67,8 @@ sheet say why:
 
 | Label | Means |
 |---|---|
-| Compound command (not filtered) | a pipe, a list, a redirect or a substitution — not a single simple command |
-| No filter for this command | a simple command no filter family covers |
+| Compound command (not filtered) | a redirect, a subshell, a heredoc, a substitution or a background `&` — something other than simple commands joined by `\|`, `&&`, `\|\|` or `;` |
+| No filter for this command | no filter family covers the first command of any of its pipelines |
 | Not filtered in this permission mode | the session's mode is neither `bypassPermissions` nor `auto` |
 | No filter (uncovered command) | recorded before the reasons above existed |
 
