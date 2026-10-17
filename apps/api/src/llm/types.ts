@@ -83,6 +83,13 @@ export interface LlmCallInput {
   signal?: AbortSignal;
 }
 
+/** The `llm_calls` row of a streamed call, set once the stream ends. */
+export interface LlmLedger {
+  callId?: string;
+  /** Decimal string, USD. */
+  costUsd?: string;
+}
+
 /** A finished call, collected from its stream. */
 export interface LlmCompletion {
   text: string;

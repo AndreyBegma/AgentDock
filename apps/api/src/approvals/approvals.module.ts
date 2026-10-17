@@ -28,6 +28,6 @@ import { ApprovalsSink } from './approvals-sink';
     ApprovalsService,
     ApprovalsSink,
   ],
-  exports: [ApprovalsService],
+  exports: [ApprovalsService, ApprovalsQueryService],
 })
 export class ApprovalsModule {}

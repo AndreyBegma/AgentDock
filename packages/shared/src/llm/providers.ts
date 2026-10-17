@@ -74,3 +74,12 @@ export const llmKeySuffix = (key: string): string | null =>
   key.length > LLM_KEY_SUFFIX_LENGTH * 2
     ? key.slice(-LLM_KEY_SUFFIX_LENGTH)
     : null;
+
+/**
+ * Whether a model takes image input. Every current Claude, GPT-4o/4.1/5 and
+ * Grok 4 model does; a model this cannot tell gets text only.
+ */
+export const llmModelSeesImages = (model: string): boolean =>
+  /claude|gpt-4o|gpt-4\.1|gpt-5|grok-4|grok-2-vision|vision|gemini/i.test(
+    model,
+  );
