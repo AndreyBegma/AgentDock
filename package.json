@@ -20,7 +20,7 @@
     "db:setup": "sh scripts/db-start-docker.sh",
     "admin:create": "bun run --cwd apps/api admin:create",
     "format": "biome format --write .",
-    "check": "biome check . && bun scripts/check-ci.ts && bun test ./scripts"
+    "check": "biome check . && bun scripts/check-ci.ts && bun scripts/check-images.ts && bun test ./scripts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.10",

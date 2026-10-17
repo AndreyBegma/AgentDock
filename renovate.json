@@ -1,8 +1,9 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Only @andrewbehma/glass-ui, pinned, as pull requests into develop (#171). Every other dependency is updated by hand.",
+  "description": "@andrewbehma/glass-ui, pinned, and the docker image digests (F-31), as pull requests into develop (#171). Every other dependency is updated by hand.",
   "baseBranchPatterns": ["develop"],
-  "enabledManagers": ["bun"],
+  "enabledManagers": ["bun", "dockerfile", "docker-compose"],
+  "pinDigests": true,
   "dependencyDashboard": false,
   "semanticCommits": "enabled",
   "packageRules": [
@@ -17,6 +18,15 @@
       "semanticCommitType": "chore",
       "semanticCommitScope": "web",
       "labels": ["glass-ui"],
+      "automerge": false
+    },
+    {
+      "matchDatasources": ["docker"],
+      "enabled": true,
+      "pinDigests": true,
+      "semanticCommitType": "chore",
+      "semanticCommitScope": "deploy",
+      "labels": ["docker"],
       "automerge": false
     }
   ]

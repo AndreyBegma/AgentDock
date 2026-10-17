@@ -19,7 +19,7 @@ x-logging: &logging
 
 services:
   postgres:
-    image: postgres:16.5-alpine
+    image: postgres:16.5-alpine@sha256:0366402213df5db03c47ff80bcc697e92c8be0c213d03c941df1fc42d1ba9560
     container_name: agentdock-staging-postgres
     restart: unless-stopped
     environment:
@@ -39,7 +39,7 @@ services:
 
   # BullMQ backend (ADR-0015). AOF keeps pending timers over a restart.
   redis:
-    image: redis:7.4.11-alpine
+    image: redis:7.4.11-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
     container_name: agentdock-staging-redis
     restart: unless-stopped
     environment:
@@ -95,7 +95,7 @@ services:
     networks: [staging]
 
   proxy:
-    image: caddy:2.10.2-alpine
+    image: caddy:2.10.2-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
     container_name: agentdock-staging-proxy
     restart: unless-stopped
     volumes:
@@ -110,7 +110,7 @@ services:
   # Token-based, remote-managed tunnel `agentdock-staging`: the public hostname
   # and its target (http://proxy:80) are set in the Zero Trust dashboard.
   cloudflared:
-    image: cloudflare/cloudflared:2025.9.1
+    image: cloudflare/cloudflared:2025.9.1@sha256:4604b477520dc8322af5427da68b44f0bf814938e9d2e4814f2249ee4b03ffdf
     container_name: agentdock-staging-cloudflared
     restart: unless-stopped
     command: tunnel --no-autoupdate run
