@@ -4,6 +4,8 @@ import {
   type BoardStackView,
   type BoardView,
   isStackGated,
+  isSuggestion,
+  MANUAL_STACK_CARDS_MIN,
   stackStageText,
   stageName,
 } from '@agentdock/shared';
@@ -138,3 +140,44 @@ export function stackStages(item: StackItem): StackStageGroup[] {
     };
   });
 }
+
+/** #588: why a selected card cannot join a stack made by hand; null when it can. */
+export const groupBlock = (card: BoardCardView): string | null =>
+  card.stack
+    ? `it is already in ${card.stack.label}`
+    : isSuggestion(card)
+      ? 'it is a suggestion in Inbox'
+      : null;
+
+/** What Group into stack does with a selection: who joins, who is left out and why. */
+export interface GroupPlan {
+  joins: BoardCardView[];
+  left: { card: BoardCardView; why: string }[];
+  /** At least `MANUAL_STACK_CARDS_MIN` cards join. */
+  ready: boolean;
+}
+
+/**
+ * The selected cards that can join a new stack, with the rule the API runs.
+ * `refused` are the cards a 409 named (they changed while the dialog was
+ * open): they are left out too, so a second press groups the rest.
+ */
+export function planGroup(
+  cards: readonly BoardCardView[],
+  refused: ReadonlySet<number> = new Set(),
+): GroupPlan {
+  const plan: GroupPlan = { joins: [], left: [], ready: false };
+  for (const card of cards) {
+    const why = refused.has(card.number)
+      ? 'it changed while this was open'
+      : groupBlock(card);
+    if (why) plan.left.push({ card, why });
+    else plan.joins.push(card);
+  }
+  plan.ready = plan.joins.length >= MANUAL_STACK_CARDS_MIN;
+  return plan;
+}
+
+/** "4 cards". */
+export const cardCountText = (n: number): string =>
+  `${n} card${n === 1 ? '' : 's'}`;

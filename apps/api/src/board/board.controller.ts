@@ -110,11 +110,7 @@ export class BoardController {
     @AuditCtx() ctx: AuditContext,
     @Body() dto: CreateBoardStackDto,
   ): Promise<BoardStackDetail> {
-    return this.stacks.group(
-      access.projectId,
-      dto,
-      actorOf(access, user, ctx),
-    );
+    return this.stacks.group(access.projectId, dto, actorOf(access, user, ctx));
   }
 
   @Get('board/stacks/:number')

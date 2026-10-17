@@ -250,7 +250,7 @@ export class BoardStacks {
         throw boardError(
           409,
           BOARD_ERROR.stackRefused,
-          `Nothing was grouped: ${broken.map((b) => `${cardLabel(b.number)} ${b.why}`).join('; ')}`,
+          broken.map((b) => `${cardLabel(b.number)} ${b.why}`).join('; '),
           { cards: broken.map((b) => b.number) },
         );
       }

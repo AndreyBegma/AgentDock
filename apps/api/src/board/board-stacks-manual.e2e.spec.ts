@@ -160,8 +160,9 @@ describe('manual stacks (e2e, #588)', () => {
     const both = [a.number, b.number];
     expect((await group({ title: 'One', cards: [a.number] })).status).toBe(400);
     expect((await group({ title: '   ', cards: both })).status).toBe(400);
-    expect((await group({ title: 'Dup', cards: [a.number, a.number] })).status)
-      .toBe(400);
+    expect(
+      (await group({ title: 'Dup', cards: [a.number, a.number] })).status,
+    ).toBe(400);
     expect((await group({ title: 'X', cards: both }, w.viewer)).status).toBe(
       403,
     );
