@@ -433,7 +433,6 @@ export class UiProfileBuildExecutor {
       const created = await this.tmux.newSession(
         build.tmuxSession,
         build.worktree,
-        {},
         [...this.options.selfCommand, 'exec-run', this.dir(build.runId)],
       );
       if (!created.ok) {

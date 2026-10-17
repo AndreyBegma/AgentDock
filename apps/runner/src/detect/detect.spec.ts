@@ -200,6 +200,38 @@ describe('capability detection', () => {
     expect(parsed.tokenSaver).toBe(true);
   });
 
+  it('C-123: reports profile env names, a value only for an allowlisted path', async () => {
+    const dir = join(home, '.claude-profiles', 'work');
+    const capabilities = await detectCapabilities({
+      exec: fakeExec({}),
+      home,
+      config: {
+        profiles: [
+          {
+            id: 'claude-work',
+            runtime: 'claude',
+            env: { CLAUDE_CONFIG_DIR: dir, ANTHROPIC_API_KEY: 'sk-ant-x' },
+            args: [],
+          },
+          {
+            id: 'codex',
+            runtime: 'codex',
+            env: { CODEX_HOME: '/srv/codex', OPENAI_API_KEY: 'sk-proj-y' },
+            args: [],
+          },
+        ],
+        otlp: null,
+      },
+    });
+    const parsed = capabilitiesSchema.parse(capabilities);
+    expect(parsed.profiles.map((p) => p.env)).toEqual([
+      { CLAUDE_CONFIG_DIR: dir, ANTHROPIC_API_KEY: { set: true } },
+      { CODEX_HOME: '/srv/codex', OPENAI_API_KEY: { set: true } },
+    ]);
+    expect(JSON.stringify(parsed)).not.toContain('sk-ant-x');
+    expect(JSON.stringify(parsed)).not.toContain('sk-proj-y');
+  });
+
   it('reports gh unauthenticated without a user', async () => {
     const capabilities = await detectCapabilities({
       exec: fakeExec({

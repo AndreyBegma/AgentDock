@@ -76,6 +76,8 @@ export const launchSpecSchema = z.object({
    * terminal instead of writing to `stream.jsonl` and `stderr.log`.
    */
   interactive: z.boolean().optional(),
+  /** What `exec-run` calls the session in its pane; by `interactive` when absent. */
+  label: z.string().min(1).optional(),
 });
 export type LaunchSpec = z.infer<typeof launchSpecSchema>;
 

@@ -82,7 +82,11 @@ const fixture = async () => {
     id: 'claude-fake',
     runtime: 'claude',
     binary,
-    env: { CLAUDE_CONFIG_DIR: join(ws.ws, 'profile'), RECORD: record },
+    env: {
+      CLAUDE_CONFIG_DIR: join(ws.ws, 'profile'),
+      RECORD: record,
+      ANTHROPIC_API_KEY: 'sk-ant-x',
+    },
     args: ['--fake-flag'],
   };
 
@@ -115,13 +119,25 @@ const fixture = async () => {
     profiles: () => [profile],
     policy: permissivePolicy,
     tmuxServer: server,
+    // C-123: the session runs `exec-run` on its launch file, in the workspace.
+    selfCommand: [process.execPath, join(import.meta.dir, '..', 'main.ts')],
+    orchestratorDir: join(ws.ws, 'orchestrator'),
   };
   const sessions = async () =>
     ((await tmux('list-sessions', '-F', '#{session_name}'))?.stdout ?? '')
       .split('\n')
       .filter(Boolean)
       .sort();
-  return { root, record, binary, deps, sessions, ws: ws.ws, run: ws.run };
+  return {
+    root,
+    record,
+    binary,
+    deps,
+    sessions,
+    tmux,
+    ws: ws.ws,
+    run: ws.run,
+  };
 };
 
 describe.skipIf(!tmuxInstalled)('control commands on a real tmux', () => {
@@ -156,6 +172,17 @@ describe.skipIf(!tmuxInstalled)('control commands on a real tmux', () => {
     ]);
     const env = readFileSync(`${f.record}.env`, 'utf8');
     expect(env).toContain(`CLAUDE_CONFIG_DIR=${join(f.ws, 'profile')}\n`);
+    expect(env).toContain('ANTHROPIC_API_KEY=sk-ant-x\n');
+    // C-123: the env reached the binary, but never the tmux argv.
+    const panes = await f.tmux(
+      'list-panes',
+      '-t',
+      `=${SESSION}`,
+      '-F',
+      '#{pane_start_command}',
+    );
+    expect(panes?.stdout).toContain('exec-run');
+    expect(panes?.stdout).not.toContain('sk-ant-x');
     // Started in the project root.
     expect(env).toContain(`PWD=${f.root}\n`);
 

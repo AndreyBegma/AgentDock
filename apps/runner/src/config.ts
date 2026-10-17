@@ -12,6 +12,7 @@ import {
 } from 'node:fs';
 import { dirname } from 'node:path';
 import {
+  profileConfigEnvSchema,
   runnerTokenSchema,
   runtimeProfileSchema,
   SKILL_RUN_MAX_TIMEOUT_SEC,
@@ -29,10 +30,13 @@ export const QUEUE_POLL_MIN_SECONDS = 15;
 
 const portSchema = z.number().int().min(1).max(65_535);
 
-/** A profile as stored: `authenticated` is a machine fact, re-detected, never stored. */
-export const configProfileSchema = runtimeProfileSchema.omit({
-  authenticated: true,
-});
+/**
+ * A profile as stored: `authenticated` is a machine fact, re-detected, never
+ * stored. The env holds values here; they are reported names-only (C-123).
+ */
+export const configProfileSchema = runtimeProfileSchema
+  .omit({ authenticated: true })
+  .extend({ env: profileConfigEnvSchema });
 export type ConfigProfile = z.infer<typeof configProfileSchema>;
 
 /** `~/.config/agentdock/runner.json` (D3). Unpaired until `pair` fills the first three. */

@@ -24,17 +24,93 @@ export const profileAgentdockSchema = z.object({
 });
 export type ProfileAgentdock = z.infer<typeof profileAgentdockSchema>;
 
+/** At most this many env entries, and this many args, on one runtime profile (C-123). */
+export const PROFILE_ENV_MAX = 64;
+export const PROFILE_ARGS_MAX = 64;
+/** The longest `binary`, arg or env value a profile may carry (C-123). */
+export const PROFILE_STRING_MAX = 4096;
+
+/**
+ * C-123 (ADR-0006): the only env names whose values a profile reports — paths,
+ * never credentials. Every other name is reported as `{ set: true }`.
+ */
+export const PROFILE_ENV_VALUE_NAMES: readonly string[] = [
+  'CLAUDE_CONFIG_DIR',
+  'CODEX_HOME',
+];
+
+export const profileEnvNameSchema = z
+  .string()
+  .max(128)
+  .regex(/^[A-Za-z_][A-Za-z0-9_]*$/);
+const profileStringSchema = z.string().max(PROFILE_STRING_MAX);
+const profileArgsSchema = z.array(profileStringSchema).max(PROFILE_ARGS_MAX);
+const profileBinarySchema = z.string().min(1).max(PROFILE_STRING_MAX);
+
+const envSizeCheck = (env: Record<string, unknown>) =>
+  Object.keys(env).length <= PROFILE_ENV_MAX;
+
+/** A profile's env as the runner config holds it: names to values. Never sent. */
+export const profileConfigEnvSchema = z
+  .record(profileEnvNameSchema, profileStringSchema)
+  .refine(envSizeCheck, { message: `at most ${PROFILE_ENV_MAX} entries` });
+
+/** A reported env entry: the value of an allowlisted path, else only that it is set. */
+const reportedEnvEntrySchema = z.union([
+  profileStringSchema,
+  z.strictObject({ set: z.literal(true) }),
+]);
+
+/**
+ * A profile's env as the runner reports it (C-123): a value only for a name in
+ * `PROFILE_ENV_VALUE_NAMES`; any other name is `{ set: true }`, its value
+ * never leaves the runner.
+ */
+export const reportedProfileEnvSchema = z
+  .record(profileEnvNameSchema, reportedEnvEntrySchema)
+  .refine(envSizeCheck, { message: `at most ${PROFILE_ENV_MAX} entries` })
+  .superRefine((env, ctx) => {
+    for (const [name, entry] of Object.entries(env)) {
+      if (
+        typeof entry === 'string' &&
+        !PROFILE_ENV_VALUE_NAMES.includes(name)
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [name],
+          message: `${name} may be reported as set, never with its value`,
+        });
+      }
+    }
+  });
+export type ReportedProfileEnv = z.infer<typeof reportedProfileEnvSchema>;
+
+/** The env a profile reports for its config env: allowlisted paths keep their value. */
+export const reportProfileEnv = (
+  env: Readonly<Record<string, string>>,
+): ReportedProfileEnv =>
+  Object.fromEntries(
+    Object.entries(env).map(([name, value]) => [
+      name,
+      PROFILE_ENV_VALUE_NAMES.includes(name) ? value : { set: true as const },
+    ]),
+  );
+
 /**
  * A runtime profile: runtime + binary + environment + extra args (ADR-0006).
- * Defined in the runner config; the server mirrors it, never edits it.
+ * Defined in the runner config; the server mirrors it, never edits it. The
+ * env is reported names-only (C-123), see `reportedProfileEnvSchema`.
  */
 export const runtimeProfileSchema = z.object({
-  id: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/),
+  id: z
+    .string()
+    .max(128)
+    .regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/),
   runtime: runtimeSchema,
   /** Executable to launch; the runtime's own name when absent. */
-  binary: z.string().min(1).optional(),
-  env: z.record(z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/), z.string()),
-  args: z.array(z.string()),
+  binary: profileBinarySchema.optional(),
+  env: reportedProfileEnvSchema,
+  args: profileArgsSchema,
   authenticated: z.boolean(),
   /**
    * Claude profiles only (#281 D1). Absent means unknown — a runner older than
