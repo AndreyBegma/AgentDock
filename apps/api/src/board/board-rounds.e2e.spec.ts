@@ -4,6 +4,9 @@ import {
   CARD_WORKER_PROMPT_VERSION,
 } from '@agentdock/shared';
 import { BudgetGate } from '../budgets/budget-gate';
+import { Feed } from '../budgets/testing/budgets-e2e';
+import { seedPrices } from '../prices/seed-prices';
+import { ingest } from '../usage/testing/usage-e2e';
 import { BoardWorld, failed, ROOT_A } from './testing/board-e2e';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -131,6 +134,47 @@ describe('board rounds (e2e)', () => {
       } finally {
         check.mockRestore();
       }
+    });
+
+    it('counts a round toward the operator who started it, and refuses their next one once their user budget is spent (D-10)', async () => {
+      await seedPrices(w.ctx.prisma);
+      await w.createCard();
+      await w.createCard();
+      expect((await w.runCard(1)).status).toBe(200);
+      const card = await w.card(1);
+      const run = await w.ctx.prisma.run.findUniqueOrThrow({
+        where: { id: card.rounds[0].runId },
+      });
+      // Round 1's Claude session spends $1.50.
+      const feed = new Feed();
+      const ts = (ms: number) =>
+        new Date(run.startedAt.getTime() + ms).toISOString();
+      await ingest(w.ctx, w.runnerId, [
+        feed.session(card.sessionId as string, `${ROOT_A}-card`, ts(1000), {
+          projectId: w.a,
+        }),
+        feed.spend(card.sessionId as string, 'r1', ts(2000)),
+      ]);
+      await w.ctx.prisma.budget.create({
+        data: {
+          scope: 'user',
+          userId: w.operatorId,
+          period: 'day',
+          timezone: 'UTC',
+          limitUsd: '1',
+          thresholds: [100],
+          action: 'stop',
+        },
+      });
+
+      const refused = await w.runCard(2);
+      expect(refused.status).toBe(409);
+      expect(refused.body).toMatchObject({
+        error: 'budget_exceeded',
+        scope: 'user',
+      });
+      expect((await w.card(2)).rounds).toEqual([]);
+      expect(w.sent('card.run')).toHaveLength(1);
     });
 
     it('a 4th concurrent run → 409 max_running', async () => {

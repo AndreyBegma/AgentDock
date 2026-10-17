@@ -6,7 +6,10 @@ import { BudgetEvaluator } from './budget-evaluator';
 
 export interface BudgetGateInput {
   projectId: string;
-  /** The person starting it; null for a schedule or a webhook (D3). */
+  /**
+   * The person starting it — for a schedule firing, its principal (D-10);
+   * null for a webhook or AgentDock's own work (D3).
+   */
   userId: string | null;
 }
 
@@ -16,10 +19,11 @@ export type BudgetGateResult =
 
 /**
  * The D11 contract: whether new spend may start for a project and a user.
- * #17's orchestrator start/next and #24's skill run start each call it once
- * before a runner command is sent. Only enabled `stop` budgets refuse, and
- * only while their current period has reached 100 % with no active override
- * (D7, D8). Each budget is evaluated fresh, so the gate has no detection lag.
+ * Every start that spends calls it once before a runner command is sent:
+ * #17's orchestrator start/next, #24's skill runs, schedule firings, board
+ * rounds, plan and design turns and UI profile builds (D-10). Only enabled
+ * `stop` budgets refuse, and only while their current period has reached
+ * 100 % with no active override (D7, D8). Each budget is evaluated fresh, so the gate has no detection lag.
  * It never stops, kills or messages anything that is already running.
  */
 @Injectable()
