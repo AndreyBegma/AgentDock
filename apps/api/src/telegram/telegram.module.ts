@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ApprovalsModule } from '../approvals';
 import { BoardModule } from '../board';
+import { ControlModule } from '../control';
 import { LocalModule } from '../local';
 import { NotificationsModule } from '../notifications';
 import { ProjectsModule } from '../projects';
@@ -11,6 +12,7 @@ import {
 } from './telegram.controller';
 import { TelegramActionRequestService } from './telegram-action-request.service';
 import { TelegramApprovalService } from './telegram-approval.service';
+import { TelegramCardService } from './telegram-card.service';
 import { TelegramClient } from './telegram-client';
 import { TelegramDeliveryService } from './telegram-delivery.service';
 import { TelegramGuard } from './telegram-guard.service';
@@ -29,7 +31,8 @@ import { TelegramSessionMessageService } from './telegram-session-message.servic
  * `ApprovalsService`, and spec 201's Approve / Deny on action requests through
  * the local module's `ActionRequestsService`. #500: `TelegramRoutes` routes
  * every update — commands, button prefixes, replies — and `/project` keeps a
- * current project per chat for the Board commands (ADR-0046).
+ * current project per chat for the Board commands (ADR-0046). #578: a
+ * card's review actions — `/card <n>` and the card notifications' buttons.
  */
 @Module({
   imports: [
@@ -40,6 +43,8 @@ import { TelegramSessionMessageService } from './telegram-session-message.servic
     ProjectsModule,
     // #489: a card's question answered, and a reply sent to its session.
     BoardModule,
+    // #578: a fleet card's worker messaged through its slot.
+    ControlModule,
   ],
   controllers: [TelegramLinkController, TelegramAdminController],
   providers: [
@@ -51,6 +56,7 @@ import { TelegramSessionMessageService } from './telegram-session-message.servic
     TelegramActionRequestService,
     TelegramSessionMessageService,
     TelegramProjectService,
+    TelegramCardService,
     TelegramRoutes,
     TelegramDeliveryService,
     TelegramPoller,

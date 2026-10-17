@@ -37,6 +37,8 @@ const FIELDS = {
   int: { shape: /^(0|[1-9]\d{0,14})$/, max: 15 },
   /** A short fixed word: an action, a column. */
   word: { shape: /^[a-z0-9_]{1,16}$/, max: 16 },
+  /** #578: a Git head's first 12 hex digits — what a merge button binds to. */
+  sha: { shape: /^[0-9a-f]{12}$/, max: 12 },
 } as const;
 
 export type CallbackFieldKind = keyof typeof FIELDS;

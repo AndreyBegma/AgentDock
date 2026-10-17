@@ -48,7 +48,9 @@ describe('cardReviewActions (#578)', () => {
 
   it('a running card is messaged or marked finished', () => {
     expect(
-      cardReviewActions(card({ column: 'in_progress', round: round('running') })),
+      cardReviewActions(
+        card({ column: 'in_progress', round: round('running') }),
+      ),
     ).toEqual(['message', 'finish']);
   });
 

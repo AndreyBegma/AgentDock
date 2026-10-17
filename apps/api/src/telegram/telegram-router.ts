@@ -13,6 +13,11 @@ export interface TelegramAnswer {
   /** A press: the callback to answer, with `notice` as its short text. */
   callbackQueryId?: string;
   notice?: string;
+  /**
+   * #578: edit this message of the chat in place instead of sending a new
+   * one; `replyMarkup` must then be an inline keyboard, or none.
+   */
+  editMessageId?: number;
 }
 
 /** `/cmd args` or `/cmd@Bot args`, split. */

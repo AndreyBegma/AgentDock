@@ -193,7 +193,8 @@ const networkError = (error: unknown): TelegramApiError => {
 
 /**
  * The Bot API over HTTPS (spec 22 D7): `getMe`, the `getUpdates` long poll,
- * `sendMessage`, `answerCallbackQuery` (D12) and `setMyCommands` (#500). Stateless — the token is passed per call, read from
+ * `sendMessage`, `editMessageText` (#578), `answerCallbackQuery` (D12) and
+ * `setMyCommands` (#500). Stateless — the token is passed per call, read from
  * `BotTokenStore` by the caller. The base URL is `TELEGRAM_API_BASE`, which
  * tests point at a fake server: nothing here ever reaches the real API in a
  * test.
@@ -262,6 +263,27 @@ export class TelegramClient {
       ...(plain ? {} : { parse_mode: 'MarkdownV2' }),
       link_preview_options: { is_disabled: true },
       ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+    });
+  }
+
+  /**
+   * #578: replaces the text and buttons of a message the bot sent — a card
+   * message edited in place to an action's result. Plain text.
+   */
+  async editMessageText(
+    token: string,
+    chatId: bigint | number,
+    messageId: number,
+    text: string,
+    replyMarkup?: { inline_keyboard: InlineKeyboardButton[][] },
+  ): Promise<void> {
+    await this.call(token, 'editMessageText', {
+      chat_id: Number(chatId),
+      message_id: messageId,
+      text,
+      link_preview_options: { is_disabled: true },
+      // Without one, Telegram keeps the old buttons.
+      reply_markup: replyMarkup ?? { inline_keyboard: [] },
     });
   }
 

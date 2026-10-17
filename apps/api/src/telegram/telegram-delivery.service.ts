@@ -3,7 +3,13 @@ import { BotTokenStore, TelegramDeliveryLedger } from '../notifications';
 import { formatDigest, formatMessage } from './markdown-v2';
 import { TelegramActionRequestService } from './telegram-action-request.service';
 import { TelegramApprovalService } from './telegram-approval.service';
-import { TelegramApiError, TelegramClient } from './telegram-client';
+import { TelegramCardService } from './telegram-card.service';
+import {
+  type InlineKeyboardButton,
+  TelegramApiError,
+  TelegramClient,
+  type TelegramReplyMarkup,
+} from './telegram-client';
 import { TELEGRAM_OPTIONS, type TelegramOptions } from './telegram-options';
 import { TelegramSessionMessageService } from './telegram-session-message.service';
 
@@ -35,6 +41,18 @@ const failure = (
     : // Not Telegram's answer: a bug here. Never its text — it could hold anything.
       { message: 'internal error while sending', options: {} };
 
+/** `markup`'s inline keyboard with `rows` added under it. */
+const withRows = (
+  markup: TelegramReplyMarkup | null | undefined,
+  rows: InlineKeyboardButton[][] | null,
+): TelegramReplyMarkup | undefined => {
+  if (!rows || rows.length === 0) return markup ?? undefined;
+  if (!markup) return { inline_keyboard: rows };
+  return 'inline_keyboard' in markup
+    ? { inline_keyboard: [...markup.inline_keyboard, ...rows] }
+    : markup;
+};
+
 /**
  * Sends what `TelegramDeliveryLedger` hands out (spec 22 D6, D10): each
  * claimed message, then each due digest, and reports every result back. A 429
@@ -54,6 +72,7 @@ export class TelegramDeliveryService {
     private readonly approvals: TelegramApprovalService,
     private readonly actionRequests: TelegramActionRequestService,
     private readonly sessions: TelegramSessionMessageService,
+    private readonly cards: TelegramCardService,
     @Inject(TELEGRAM_OPTIONS) private readonly options: TelegramOptions,
   ) {}
 
@@ -87,6 +106,9 @@ export class TelegramDeliveryService {
         message.content.kind === 'card.waiting'
           ? await this.sessions.offer(message.notificationId)
           : null;
+      // #578: a card's notification carries the actions its state allows,
+      // under the buttons above (which stay as they are).
+      const cardRows = await this.cards.offer(message.notificationId);
       try {
         await this.client.sendMessage(
           bot.token,
@@ -97,10 +119,10 @@ export class TelegramDeliveryService {
             offer?.headSha ?? null,
           ) + (session?.footer ?? ''),
           false,
-          offer?.replyMarkup ??
-            actionMarkup ??
-            session?.replyMarkup ??
-            undefined,
+          withRows(
+            offer?.replyMarkup ?? actionMarkup ?? session?.replyMarkup,
+            cardRows,
+          ),
         );
         await this.ledger.markSent(message.id, now);
         pass.sent += 1;

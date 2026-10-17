@@ -8,6 +8,7 @@ import type { BotCommand } from './telegram-client';
  */
 export const BOT_COMMANDS: readonly BotCommand[] = [
   { command: 'project', description: 'Pick the project for this chat' },
+  { command: 'card', description: 'Open a card by its number: /card 12' },
   { command: 'help', description: 'List the commands' },
   { command: 'stop', description: 'Unlink this chat from AgentDock' },
 ];

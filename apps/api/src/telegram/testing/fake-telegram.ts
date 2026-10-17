@@ -60,7 +60,8 @@ const readBody = (req: IncomingMessage): Promise<Record<string, unknown>> =>
 /**
  * A stand-in for the Bot API on 127.0.0.1 (spec 22: "Telegram is tested only
  * against the mock base URL"). It records every call, answers `getMe`,
- * `getUpdates`, `sendMessage`, `answerCallbackQuery` and `setMyCommands`
+ * `getUpdates`, `sendMessage`, `editMessageText`, `answerCallbackQuery` and
+ * `setMyCommands`
  * like Telegram does,
  * refuses unknown tokens
  * with 401, and plays scripted replies per method first.
@@ -121,6 +122,11 @@ export class FakeTelegram {
     return this.calls.filter((c) => c.method === 'sendMessage');
   }
 
+  /** #578: the messages edited in place. */
+  edited(): FakeCall[] {
+    return this.calls.filter((c) => c.method === 'editMessageText');
+  }
+
   close(): Promise<void> {
     return new Promise((resolve) => this.server.close(() => resolve()));
   }
@@ -165,6 +171,7 @@ export class FakeTelegram {
           body: { ok: true, result: { message_id: this.calls.length } },
         };
       case 'answerCallbackQuery':
+      case 'editMessageText':
       case 'setMyCommands':
         return { status: 200, body: { ok: true, result: true } };
       default:
@@ -198,6 +205,8 @@ export const callbackPress = (
   updateId: number,
   chatId: number,
   data: string,
+  /** #578: the id of the message that carried the button. */
+  messageId = 1,
 ) => ({
   update_id: updateId,
   callback_query: {
@@ -205,7 +214,7 @@ export const callbackPress = (
     from: { id: chatId, is_bot: false },
     chat_instance: '1',
     message: {
-      message_id: 1,
+      message_id: messageId,
       date: 0,
       chat: { id: chatId, type: 'private' },
       from: { id: BOT.id, is_bot: true, username: BOT.username },
