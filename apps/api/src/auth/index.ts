@@ -9,4 +9,8 @@ export { CurrentUser, Public, Roles } from './decorators';
 export { CsrfGuard } from './guards/csrf.guard';
 export { RolesGuard } from './guards/roles.guard';
 export { SessionGuard } from './guards/session.guard';
+export {
+  type AccountThrottled,
+  LoginThrottleAlerts,
+} from './login-throttle-alerts';
 export { SessionService } from './session.service';

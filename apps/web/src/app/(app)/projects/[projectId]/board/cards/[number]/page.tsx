@@ -89,6 +89,7 @@ export default function CardPage() {
           canOperate={canOperate}
           actions={actions}
           terminal={terminal}
+          runnerName={project?.runnerName}
           onSaved={card.retry}
         />
       ) : card.error ? (

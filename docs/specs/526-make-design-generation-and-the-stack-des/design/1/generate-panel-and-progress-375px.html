@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Generate panel and progress · 375px</title>
+<style>
+:root,:root[data-theme="dark"]{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-paper:#1b2647;--color-content:rgb(27 38 71/.96);--color-scrim:rgb(10 16 34/.6);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246/.62);--color-ink-3:rgb(242 242 246/.53);--color-line:rgb(255 255 255/.1);--color-line-strong:rgb(255 255 255/.18);--color-hover:rgb(255 255 255/.06);--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-soft:rgb(91 91 246/.2);--color-accent-ink:#b4b2ff;--color-focus:#b4b2ff;--color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;--color-hue-1:#5b9cf6;--color-hue-1-soft:rgb(91 156 246/.18);--color-hue-1-ink:#a4c8ff;--color-hue-2:#2fbf94;--color-hue-2-soft:rgb(47 191 148/.18);--color-hue-2-ink:#7ee0c0;--color-hue-3:#7cc95a;--color-hue-3-soft:rgb(124 201 90/.18);--color-hue-3-ink:#ade58f;--color-hue-7:#a68bfa;--glass-sheen:rgb(255 255 255/.06);--glass-scrim:rgb(9 9 12/.55);--glass-scrim-strong:rgb(9 9 12/.64);--glass-edge:rgb(255 255 255/.14);--glass-spec:rgb(255 255 255/.2);--glass-shadow:rgb(0 0 0/.35);--glass-shadow-clear:rgb(0 0 0/.15);--canvas-glow:18%;--kb:#2b2f3f;--key:#4a4f63}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-paper:#fff;--color-content:rgb(255 255 255/.96);--color-scrim:rgb(24 24 27/.35);--color-ink:#18181b;--color-ink-2:rgb(24 24 27/.72);--color-ink-3:rgb(24 24 27/.64);--color-line:rgb(0 0 0/.1);--color-line-strong:rgb(0 0 0/.23);--color-hover:rgb(0 0 0/.08);--color-accent:#4f46e5;--color-accent-soft:rgb(79 70 229/.12);--color-accent-ink:#4338ca;--color-focus:#4f46e5;--color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;--color-hue-1:#1f64d6;--color-hue-1-soft:rgb(31 100 214/.12);--color-hue-1-ink:#1550b0;--color-hue-2:#00805e;--color-hue-2-soft:rgb(0 128 94/.12);--color-hue-2-ink:#006a4e;--color-hue-3:#3a7d1c;--color-hue-3-soft:rgb(58 125 28/.12);--color-hue-3-ink:#2f6617;--color-hue-7:#7244e0;--glass-sheen:rgb(0 0 0/.06);--glass-scrim:rgb(255 255 255/.62);--glass-scrim-strong:rgb(255 255 255/.85);--glass-edge:rgb(0 0 0/.18);--glass-spec:rgb(0 0 0/.12);--glass-shadow:rgb(0 0 0/.12);--glass-shadow-clear:rgb(0 0 0/.08);--canvas-glow:10%;--kb:#d3d6de;--key:#fff}
+:root{--color-status-running:var(--color-hue-2);--color-status-running-soft:var(--color-hue-2-soft);--color-status-running-ink:var(--color-hue-2-ink);--color-status-waiting:var(--color-hue-1);--color-status-waiting-soft:var(--color-hue-1-soft);--color-status-waiting-ink:var(--color-hue-1-ink);--color-status-done:var(--color-hue-3);--color-status-done-soft:var(--color-hue-3-soft);--color-status-done-ink:var(--color-hue-3-ink);--radius-control:6px;--radius-surface:8px;--radius-sheet:12px;--size-tap:44px;--dur-fast:100ms;--font-sans:"SF Pro Text",Inter,system-ui,-apple-system,"Segoe UI",sans-serif;--font-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground);color:var(--color-ink)}
+body{margin:0;font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased}
+h1,h2,h3,p{margin:0}
+button,input,select,textarea{font-family:inherit}
+:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}
+.icon{width:16px;height:16px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.icon-sm{width:14px;height:14px}
+.glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);backdrop-filter:blur(26px) saturate(180%);-webkit-backdrop-filter:blur(26px) saturate(180%);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),0 12px 32px var(--glass-shadow)}
+.glass-strong{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim-strong);backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),0 -8px 32px var(--glass-shadow)}
+.surface-content{background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font-weight:600;cursor:pointer;border:1px solid transparent;background:none;color:var(--color-ink);height:28px;padding:0 16px;font-size:14px;border-radius:var(--radius-control)}
+.btn:active{transform:scale(.97)}
+.btn-solid{background:var(--color-accent);color:var(--color-on-accent)}
+.btn-glass{background:var(--color-raised);border-color:var(--color-line-strong)}
+.btn-ghost{color:var(--color-ink-2)}
+.btn-danger{background:color-mix(in oklab,var(--color-danger) 12%,transparent);color:var(--color-danger);border-color:color-mix(in oklab,var(--color-danger) 30%,transparent)}
+.btn-icon{padding:0;aspect-ratio:1}
+.tap{height:var(--size-tap);min-height:var(--size-tap)}
+.grow{flex:1;min-width:0}
+.pill{display:inline-flex;align-items:center;gap:8px;height:24px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:500;white-space:nowrap;background:var(--s-soft);color:var(--s-ink)}
+.pill-sm{height:20px;gap:6px;padding:0 8px;font-size:11px}
+.dot{width:8px;height:8px;border-radius:999px;background:var(--s);flex-shrink:0}
+[data-status="running"]{--s:var(--color-status-running);--s-soft:var(--color-status-running-soft);--s-ink:var(--color-status-running-ink)}
+[data-status="waiting"]{--s:var(--color-status-waiting);--s-soft:var(--color-status-waiting-soft);--s-ink:var(--color-status-waiting-ink)}
+[data-status="done"]{--s:var(--color-status-done);--s-soft:var(--color-status-done-soft);--s-ink:var(--color-status-done-ink)}
+[data-status="idle"]{--s:var(--color-ink-3);--s-soft:var(--color-hover);--s-ink:var(--color-ink-2)}
+[data-status="running"].dot{animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.4}}
+.text-xs{font-size:12px;line-height:16px}.text-ink-2{color:var(--color-ink-2)}.text-ink-3{color:var(--color-ink-3)}.mono{font-family:var(--font-mono)}
+.section-header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.section-header h2{font-size:16px;line-height:24px;font-weight:600}
+.card{border-radius:var(--radius-surface);padding:12px;background:var(--color-content);border:1px solid var(--color-line)}
+.field{display:flex;flex-direction:column;gap:6px}
+.field-label{font-size:12px;font-weight:500;color:var(--color-ink-2)}
+.field-hint{font-size:12px;color:var(--color-ink-3)}
+.input,.select,.textarea{width:100%;height:var(--size-tap);padding:0 12px;font-size:16px;color:var(--color-ink);background:var(--color-surface);border:1px solid var(--color-line-strong);border-radius:var(--radius-control)}
+.textarea{height:auto;min-height:120px;padding:10px 12px;line-height:22px;resize:none}
+.textarea:focus,.input:focus{outline:none;border-color:color-mix(in oklab,var(--color-ink) 70%,transparent);box-shadow:0 0 0 2px color-mix(in oklab,var(--color-ink) 22%,transparent)}
+.select{appearance:none;padding-right:32px;background-image:linear-gradient(45deg,transparent 50%,var(--color-ink-3) 50%),linear-gradient(135deg,var(--color-ink-3) 50%,transparent 50%);background-position:calc(100% - 17px) 50%,calc(100% - 12px) 50%;background-size:5px 5px;background-repeat:no-repeat}
+.segmented{display:flex;gap:4px;padding:3px;height:var(--size-tap);border-radius:999px}
+.segmented button{flex:1;border:0;background:none;border-radius:999px;font-size:14px;font-weight:500;color:var(--color-ink-2);cursor:pointer}
+.segmented button[aria-pressed="true"]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.toggle{position:relative;display:inline-flex;width:44px;height:24px;flex-shrink:0;border-radius:999px;border:0;padding:0;background:var(--color-line-strong)}
+.toggle::after{content:"";position:absolute;top:4px;left:0;width:16px;height:16px;border-radius:999px;background:var(--color-ink);transform:translateX(4px)}
+.toggle[aria-checked="true"]{background:var(--color-accent)}
+.toggle[aria-checked="true"]::after{background:var(--color-on-accent);transform:translateX(24px)}
+.trow{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:var(--size-tap)}
+.progress{height:6px;width:100%;border-radius:999px;background:var(--color-hover);overflow:hidden}.progress>span{display:block;height:100%;border-radius:inherit;background:var(--color-accent)}
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.steps li{position:relative;display:flex;align-items:center;gap:12px;min-height:44px;padding-left:28px}
+.steps li::before{content:"";position:absolute;left:9px;top:0;bottom:0;width:1px;background:var(--color-line)}
+.steps .mk{position:absolute;left:0;width:20px;height:20px;border-radius:999px;display:grid;place-items:center;background:var(--s-soft);color:var(--s-ink)}
+.steps .mk .dot{width:8px;height:8px}
+.steps time{margin-left:auto;font-size:12px;color:var(--color-ink-3);font-variant-numeric:tabular-nums}
+/* phone */
+.stage{display:flex;flex-wrap:wrap;gap:32px;padding:24px;align-items:flex-start;justify-content:center}
+.cap{width:375px;display:flex;flex-direction:column;gap:12px}
+.cap h3{font-size:13px;font-weight:600;color:var(--color-ink-2)}
+.phone{position:relative;width:375px;height:812px;border-radius:36px;border:1px solid var(--color-line-strong);overflow:hidden;display:flex;flex-direction:column;flex-shrink:0;background:radial-gradient(60% 40% at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50% 40% at 95% 40%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%),var(--color-ground)}
+.sb{height:28px;flex-shrink:0;display:flex;align-items:flex-end;justify-content:space-between;padding:0 28px;font-size:12px;font-weight:600}
+.pt{display:flex;align-items:center;gap:4px;height:52px;padding:0 4px;margin:8px 8px 0;border-radius:var(--radius-surface);flex-shrink:0}
+.pt .t{flex:1;min-width:0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.scroll{flex:1;min-height:0;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:16px}
+.dock{flex-shrink:0;display:flex;gap:8px;padding:8px;margin:8px 8px 0;border-radius:var(--radius-sheet)}
+.dock.last{margin-bottom:8px}
+.tabbar{display:flex;height:60px;flex-shrink:0;margin:8px;padding:4px;border-radius:var(--radius-sheet)}
+.tabbar a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;color:var(--color-ink-2);border-radius:8px;text-decoration:none;min-height:44px}
+.tabbar a[aria-current]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.kb{flex-shrink:0;height:291px;background:var(--kb);padding:8px 4px;display:flex;flex-direction:column;gap:10px}
+.kr{display:flex;gap:5px;justify-content:center}
+.k{flex:1;max-width:34px;height:42px;border-radius:5px;background:var(--key);display:grid;place-items:center;font-size:18px;color:var(--color-ink);box-shadow:0 1px 0 rgb(0 0 0/.3)}
+.k.wide{max-width:none;flex:4}
+.caret{display:inline-block;width:2px;height:18px;background:var(--color-accent-ink);vertical-align:middle;margin-left:1px}
+.scrim{position:absolute;inset:0;background:var(--color-scrim);z-index:5}
+.bsheet{position:absolute;left:0;right:0;bottom:0;height:600px;z-index:6;border-radius:var(--radius-sheet) var(--radius-sheet) 0 0;display:flex;flex-direction:column;gap:12px;padding:8px 16px 16px}
+.grab{width:36px;height:4px;border-radius:2px;background:var(--color-line-strong);align-self:center;flex-shrink:0}
+.log{flex:1;min-height:0;overflow-y:auto;margin:0;padding:10px 12px;border-radius:var(--radius-surface);background:var(--color-surface);border:1px solid var(--color-line);font-family:var(--font-mono);font-size:12px;line-height:18px;list-style:none;display:flex;flex-direction:column;gap:8px}
+.log li{overflow-wrap:anywhere;white-space:pre-wrap}
+.log time{color:var(--color-ink-3);margin-right:6px}
+.log .ok{color:var(--color-ok)}.log .warn{color:var(--color-warn)}
+</style>
+</head>
+<body>
+<div class="stage">
+
+<!-- A: idle -->
+<div class="cap">
+<h3>A · Generator open, idle. Every control is 44px, Start sits in the dock.</h3>
+<section class="phone" aria-label="Generate panel">
+  <div class="sb"><span>9:41</span><span>LTE ▮▮▮</span></div>
+  <header class="pt glass"><button class="btn btn-ghost btn-icon tap" aria-label="Back"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></button><span class="t">Stack 12 · Generate design</span><span style="width:12px"></span></header>
+  <div class="scroll">
+    <section class="card" style="display:flex;flex-direction:column;gap:14px">
+      <div class="section-header"><h2>Generate design</h2><span class="pill pill-sm" data-status="idle"><span class="dot"></span>Idle</span></div>
+      <div class="field"><label class="field-label" for="a-p">Prompt</label><textarea class="textarea" id="a-p" placeholder="Describe the screen, e.g. a one-column checkout with a sticky pay button"></textarea><span class="field-hint">Mention layout, tone and anything to keep from the last version.</span></div>
+      <div class="field"><span class="field-label" id="a-v">Variants</span><div class="segmented glass" role="group" aria-labelledby="a-v"><button aria-pressed="true">1</button><button aria-pressed="false">2</button><button aria-pressed="false">3</button></div></div>
+      <div class="field"><label class="field-label" for="a-vp">Viewport preset</label><select class="select" id="a-vp"><option>Mobile · 390 px</option><option>Tablet · 820 px</option><option>Desktop · 1440 px</option></select></div>
+      <div class="field"><label class="field-label" for="a-m">Model</label><select class="select" id="a-m"><option>claude-opus-5-5</option><option>claude-sonnet-5-5</option></select></div>
+      <div class="trow"><span id="a-t">Use approved mockups as reference</span><button class="toggle" role="switch" aria-checked="true" aria-labelledby="a-t"></button></div>
+    </section>
+    <div style="height:8px"></div>
+  </div>
+  <div class="dock glass-strong"><button class="btn btn-solid tap grow"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>Start generation</button></div>
+  <nav class="tabbar glass"><a href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Overview</a><a href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/></svg>Fleet</a><a href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>Approvals</a><a href="#" aria-current="page"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v11"/><path d="M12 5v6"/><path d="M18 5v14"/></svg>Board</a><a href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></svg>Activity</a><a href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>More</a></nav>
+</section>
+</div>
+
+<!-- B: keyboard -->
+<div class="cap">
+<h3>B · Keyboard open. The TabBar hides and Start stays right above the keyboard.</h3>
+<section class="phone" aria-label="Generate panel with keyboard">
+  <div class="sb"><span>9:41</span><span>LTE ▮▮▮</span></div>
+  <header class="pt glass"><button class="btn btn-ghost btn-icon tap" aria-label="Back"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></button><span class="t">Stack 12 · Generate design</span><span style="width:12px"></span></header>
+  <div class="scroll">
+    <section class="card" style="display:flex;flex-direction:column;gap:14px">
+      <div class="field"><label class="field-label" for="b-p">Prompt</label>
+        <div class="textarea" id="b-p" style="border-color:color-mix(in oklab,var(--color-ink) 70%,transparent);box-shadow:0 0 0 2px color-mix(in oklab,var(--color-ink) 22%,transparent);min-height:150px">A one-column checkout with a sticky pay button, large touch targets and a short order summary above the card form<span class="caret"></span></div>
+        <span class="field-hint">118 / 2000</span></div>
+      <div class="field"><span class="field-label">Variants</span><div class="segmented glass"><button aria-pressed="true">1</button><button aria-pressed="false">2</button><button aria-pressed="false">3</button></div></div>
+    </section>
+  </div>
+  <div class="dock glass-strong last"><button class="btn btn-glass tap" aria-label="Dismiss keyboard"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>Done</button><button class="btn btn-solid tap grow">Start generation</button></div>
+  <div class="kb" aria-hidden="true">
+    <div class="kr"><span class="k">q</span><span class="k">w</span><span class="k">e</span><span class="k">r</span><span class="k">t</span><span class="k">y</span><span class="k">u</span><span class="k">i</span><span class="k">o</span><span class="k">p</span></div>
+    <div class="kr"><span class="k">a</span><span class="k">s</span><span class="k">d</span><span class="k">f</span><span class="k">g</span><span class="k">h</span><span class="k">j</span><span class="k">k</span><span class="k">l</span></div>
+    <div class="kr"><span class="k">z</span><span class="k">x</span><span class="k">c</span><span class="k">v</span><span class="k">b</span><span class="k">n</span><span class="k">m</span></div>
+    <div class="kr"><span class="k" style="max-width:70px;flex:1">123</span><span class="k wide">space</span><span class="k" style="max-width:90px;flex:1">return</span></div>
+  </div>
+</section>
+</div>
+
+<!-- C: running -->
+<div class="cap">
+<h3>C · Running. Status, bar and steps fit one screen; Cancel and View log are in the dock.</h3>
+<section class="phone" aria-label="Run progress">
+  <div class="sb"><span>9:41</span><span>LTE ▮▮▮</span></div>
+  <header class="pt glass"><button class="btn btn-ghost btn-icon tap" aria-label="Back"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></button><span class="t">Stack 12 · Generating</span><span class="dot" data-status="running"></span><span style="width:12px"></span></header>
+  <div class="scroll">
+    <section class="card" style="display:flex;flex-direction:column;gap:14px" aria-live="polite">
+      <div class="section-header"><h2>Design run</h2><span class="pill" data-status="running"><span class="dot"></span>Generating</span></div>
+      <div style="display:flex;flex-direction:column;gap:6px"><div class="progress" role="progressbar" aria-valuenow="62" aria-valuemin="0" aria-valuemax="100"><span style="width:62%"></span></div><div class="text-xs text-ink-3" style="display:flex;justify-content:space-between"><span>Step 3 of 4 · Render mockup</span><span class="mono">01:42</span></div></div>
+      <ol class="steps">
+        <li data-status="done"><span class="mk"><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span>Read project and stack<time>00:08</time></li>
+        <li data-status="done"><span class="mk"><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span>Draft layout<time>00:51</time></li>
+        <li data-status="running"><span class="mk"><span class="dot"></span></span>Render mockup<time>00:43</time></li>
+        <li data-status="idle"><span class="mk"><span class="dot"></span></span>Check at 375 px<time>—</time></li>
+      </ol>
+      <p class="text-xs text-ink-3">You can leave this page. The run keeps going and the card shows the result.</p>
+    </section>
+    <section class="card surface-content" style="display:flex;flex-direction:column;gap:6px">
+      <div class="text-xs text-ink-3">Latest log line</div>
+      <div class="mono text-xs" style="overflow-wrap:anywhere"><span class="text-ink-3">12:04:51</span> Rendering frame 1 of 1 at 390 px…</div>
+    </section>
+  </div>
+  <div class="dock glass-strong"><button class="btn btn-danger tap">Cancel run</button><button class="btn btn-glass tap grow"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/></svg>View run log</button></div>
+  <nav class="tabbar glass"><a href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Overview</a><a href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/></svg>Fleet</a><a href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>Approvals</a><a href="#" aria-current="page"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v11"/><path d="M12 5v6"/><path d="M18 5v14"/></svg>Board</a><a href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></svg>Activity</a><a href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>More</a></nav>
+</section>
+</div>
+
+<!-- D: log sheet -->
+<div class="cap">
+<h3>D · Run log bottom sheet. Mono 12px lines wrap, so there is no sideways scroll at 375px.</h3>
+<section class="phone" aria-label="Run log sheet">
+  <div class="sb"><span>9:41</span><span>LTE ▮▮▮</span></div>
+  <header class="pt glass"><button class="btn btn-ghost btn-icon tap" aria-label="Back"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></button><span class="t">Stack 12 · Generating</span><span class="dot" data-status="running"></span><span style="width:12px"></span></header>
+  <div class="scroll"><section class="card" style="height:300px"></section></div>
+  <div class="scrim"></div>
+  <div class="bsheet glass-strong" role="dialog" aria-modal="true" aria-label="Run log">
+    <div class="grab"></div>
+    <div class="section-header"><h2>Run log</h2><button class="btn btn-ghost btn-icon tap" aria-label="Close"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
+    <div class="segmented glass" role="group" aria-label="Filter"><button aria-pressed="true">All</button><button aria-pressed="false">Warnings</button><button aria-pressed="false">Errors</button></div>
+    <ul class="log" tabindex="0" aria-label="Log lines">
+      <li><time>12:03:09</time>Reading stack 12 and 3 cards</li>
+      <li><time>12:03:17</time><span class="ok">ok</span> Loaded Mobile preset 390 × 844</li>
+      <li><time>12:03:58</time>Drafting layout: one column, sticky pay button</li>
+      <li><time>12:04:08</time><span class="warn">warn</span> Reference mockup C-218 has no mobile frame, using desktop</li>
+      <li><time>12:04:41</time><span class="ok">ok</span> Layout draft accepted</li>
+      <li><time>12:04:51</time>Rendering frame 1 of 1 at 390 px…</li>
+      <li><time>12:05:02</time>Writing /mockups/stack-12/v1/index.html (48 KB)</li>
+    </ul>
+    <div style="display:flex;gap:8px"><button class="btn btn-glass tap grow">Follow live</button><button class="btn btn-glass tap grow"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>Copy log</button></div>
+  </div>
+</section>
+</div>
+
+</div>
+<div style="padding:0 24px 24px;text-align:center"><button class="btn btn-glass" style="height:32px;font-size:12px" onclick="var r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark'">Toggle theme</button></div>
+</body>
+</html>

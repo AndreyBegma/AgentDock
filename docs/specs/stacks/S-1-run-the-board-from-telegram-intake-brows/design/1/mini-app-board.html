@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-scale="desk" data-palette="navy">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S-1 · Telegram Mini App board</title>
+<style>
+:root,:root[data-theme="dark"]{color-scheme:dark;--color-ground:#0a1022;--color-canvas:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-paper:#1b2647;--color-content:rgb(27 38 71 / 0.96);--color-scrim:rgb(10 16 34 / 0.3);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246 / 0.62);--color-ink-3:rgb(242 242 246 / 0.53);--color-line:rgb(255 255 255 / 0.1);--color-line-strong:rgb(255 255 255 / 0.18);--color-hover:rgb(255 255 255 / 0.06);--color-accent:#5b5bf6;--color-on-accent:#ffffff;--color-accent-soft:rgb(91 91 246 / 0.2);--color-accent-ink:#b4b2ff;--color-focus:#b4b2ff;--color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;
+--color-hue-1:#5b9cf6;--color-hue-1-soft:rgb(91 156 246 / 0.18);--color-hue-1-ink:#a4c8ff;
+--color-hue-2:#2fbf94;--color-hue-2-soft:rgb(47 191 148 / 0.18);--color-hue-2-line:rgb(47 191 148 / 0.5);--color-hue-2-ink:#7ee0c0;
+--color-hue-3:#7cc95a;--color-hue-3-soft:rgb(124 201 90 / 0.18);--color-hue-3-ink:#ade58f;
+--color-hue-5:#e8743b;--color-hue-5-soft:rgb(232 116 59 / 0.18);--color-hue-5-ink:#f9a77c;
+--color-hue-7:#a68bfa;--color-hue-7-soft:rgb(166 139 250 / 0.18);--color-hue-7-line:rgb(166 139 250 / 0.5);--color-hue-7-ink:#cbbcff;
+--glass-sheen:rgb(255 255 255 / 0.06);--glass-scrim:rgb(9 9 12 / 0.55);--glass-scrim-strong:rgb(9 9 12 / 0.64);--glass-brightness:0.85;--glass-brightness-strong:0.7;--glass-edge:rgb(255 255 255 / 0.14);--glass-spec:rgb(255 255 255 / 0.2);--glass-rim:rgb(242 242 246 / 0.8);--glass-rim-shade:rgb(9 9 12 / 0.5);--glass-rim-strong:rgb(242 242 246 / 0.22);--glass-rim-shade-strong:rgb(9 9 12 / 0.2);--glass-meniscus:rgb(9 9 12 / 0.55);--glass-refract:rgb(242 242 246 / 0.35);--glass-shadow:rgb(0 0 0 / 0.35);--glass-shadow-strong:rgb(0 0 0 / 0.45);--glass-shadow-clear:rgb(0 0 0 / 0.15);--canvas-glow:18%}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#ffffff;--color-canvas:#e9eef8;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-paper:#ffffff;--color-content:rgb(255 255 255 / 0.96);--color-scrim:rgb(24 24 27 / 0.22);--color-ink:#18181b;--color-ink-2:rgb(24 24 27 / 0.72);--color-ink-3:rgb(24 24 27 / 0.64);--color-line:rgb(0 0 0 / 0.1);--color-line-strong:rgb(0 0 0 / 0.23);--color-hover:rgb(0 0 0 / 0.1);--color-accent:#4f46e5;--color-on-accent:#ffffff;--color-accent-soft:rgb(79 70 229 / 0.12);--color-accent-ink:#4338ca;--color-focus:#4f46e5;--color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;
+--color-hue-1:#1f64d6;--color-hue-1-soft:rgb(31 100 214 / 0.12);--color-hue-1-ink:#1550b0;
+--color-hue-2:#00805e;--color-hue-2-soft:rgb(0 128 94 / 0.12);--color-hue-2-line:rgb(0 128 94 / 0.45);--color-hue-2-ink:#006a4e;
+--color-hue-3:#3a7d1c;--color-hue-3-soft:rgb(58 125 28 / 0.12);--color-hue-3-ink:#2f6617;
+--color-hue-5:#c24e00;--color-hue-5-soft:rgb(194 78 0 / 0.12);--color-hue-5-ink:#9c3d00;
+--color-hue-7:#7244e0;--color-hue-7-soft:rgb(114 68 224 / 0.12);--color-hue-7-line:rgb(114 68 224 / 0.45);--color-hue-7-ink:#5b30c4;
+--glass-sheen:rgb(0 0 0 / 0.06);--glass-scrim:rgb(255 255 255 / 0.52);--glass-scrim-strong:rgb(255 255 255 / 0.64);--glass-brightness:1.15;--glass-brightness-strong:1.3;--glass-edge:rgb(0 0 0 / 0.18);--glass-spec:rgb(0 0 0 / 0.2);--glass-rim:rgb(255 255 255 / 0.9);--glass-rim-shade:rgb(24 24 27 / 0.18);--glass-rim-strong:rgb(255 255 255 / 0.3);--glass-rim-shade-strong:rgb(24 24 27 / 0.08);--glass-meniscus:rgb(24 24 27 / 0.12);--glass-refract:rgb(255 255 255 / 0.5);--glass-shadow:rgb(0 0 0 / 0.12);--glass-shadow-strong:rgb(0 0 0 / 0.16);--glass-shadow-clear:rgb(0 0 0 / 0.08);--canvas-glow:10%}
+:root{--color-status-running:var(--color-hue-2);--color-status-running-soft:var(--color-hue-2-soft);--color-status-running-ink:var(--color-hue-2-ink);--color-status-waiting:var(--color-hue-1);--color-status-waiting-soft:var(--color-hue-1-soft);--color-status-waiting-ink:var(--color-hue-1-ink);--color-status-blocked:var(--color-hue-5);--color-status-blocked-soft:var(--color-hue-5-soft);--color-status-blocked-ink:var(--color-hue-5-ink);--color-status-done:var(--color-hue-3);--color-status-done-soft:var(--color-hue-3-soft);--color-status-done-ink:var(--color-hue-3-ink);
+--canvas-aurora-1:var(--color-hue-1);--canvas-aurora-2:var(--color-hue-7);--canvas-aurora-3:var(--color-hue-1);--glass-filter:blur(26px) saturate(180%) brightness(var(--glass-brightness));--glass-filter-strong:blur(40px) saturate(180%) brightness(var(--glass-brightness-strong));
+--radius-control:6px;--radius-surface:8px;--radius-sheet:12px;--size-control:28px;--size-field:28px;--size-tap:44px;--dur-fast:100ms;--dur-base:150ms;--ease-sheet:cubic-bezier(0.32,0.72,0,1);--press-scale:0.97;
+--font-sans:"SF Pro Text","SF Pro Display",Inter,system-ui,-apple-system,"Segoe UI",sans-serif;--font-mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+*,*::before,*::after{box-sizing:border-box}
+html{font-size:16px;background:var(--color-ground);color:var(--color-ink)}
+body{margin:0;min-height:100vh;font-family:var(--font-sans);font-size:14px;line-height:20px;color:var(--color-ink);-webkit-font-smoothing:antialiased}
+h1,h2,h3,p{margin:0}
+h1{font-size:28px;line-height:32px;font-weight:600;letter-spacing:-0.02em}
+h2{font-size:16px;line-height:24px;font-weight:600}
+.text-heading{font-size:20px;line-height:28px;font-weight:600;letter-spacing:-0.01em}
+.text-xs{font-size:12px;line-height:16px}.text-ink-2{color:var(--color-ink-2)}.text-ink-3{color:var(--color-ink-3)}
+.mono{font-family:var(--font-mono)}
+:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}
+.icon{width:16px;height:16px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.icon-sm{width:14px;height:14px}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--canvas-aurora-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--canvas-aurora-2) var(--canvas-glow),transparent),transparent 70%)}
+.glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);backdrop-filter:var(--glass-filter);-webkit-backdrop-filter:var(--glass-filter);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),inset 1px 1px 0 var(--glass-rim),inset -1px -1px 0 var(--glass-rim-shade),inset 0 -3px 3px -1px var(--glass-meniscus),inset 0 0 18px -4px var(--glass-refract),0 12px 32px var(--glass-shadow)}
+.glass-strong{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim-strong);backdrop-filter:var(--glass-filter-strong);-webkit-backdrop-filter:var(--glass-filter-strong);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),inset 1px 1px 0 var(--glass-rim-strong),inset -1px -1px 0 var(--glass-rim-shade-strong),0 20px 48px var(--glass-shadow-strong)}
+.surface-content{background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font-family:inherit;font-weight:600;cursor:pointer;border:1px solid transparent;background:none;color:var(--color-ink);height:var(--size-control);padding:0 16px;font-size:14px;border-radius:var(--radius-control);transition:background-color var(--dur-fast),transform var(--dur-fast) var(--ease-sheet)}
+.btn:active{transform:scale(var(--press-scale))}
+.btn-sm{height:32px;padding:0 12px;font-size:12px;border-radius:calc(var(--radius-control) - 4px)}
+.btn-solid{background:var(--color-accent);color:var(--color-on-accent)}
+.btn-glass{background:var(--color-raised);border-color:var(--color-line-strong);color:var(--color-ink)}
+.btn-ghost{color:var(--color-ink-2)}.btn-ghost:hover{background:var(--color-hover);color:var(--color-ink)}
+.btn-danger{background:color-mix(in oklab,var(--color-danger) 12%,transparent);color:var(--color-danger);border-color:color-mix(in oklab,var(--color-danger) 30%,transparent)}
+.btn-icon{padding:0;aspect-ratio:1}
+[data-hue="2"]{--hue:var(--color-hue-2);--hue-line:var(--color-hue-2-line)}[data-hue="7"]{--hue:var(--color-hue-7);--hue-soft:var(--color-hue-7-soft);--hue-line:var(--color-hue-7-line);--hue-ink:var(--color-hue-7-ink)}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--hue);flex-shrink:0}
+.page-header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px}
+.ph-text{display:flex;flex-direction:column;gap:4px}.ph-eyebrow{font-size:12px;font-weight:500;color:var(--color-ink-3)}.ph-desc{max-width:72ch;color:var(--color-ink-2)}
+.badge{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;font-weight:600;line-height:1;border-radius:999px;height:18px;min-width:18px;padding:0 4px;font-size:10px;background:var(--color-hover);color:var(--color-ink-2);font-variant-numeric:tabular-nums}
+.badge-md{height:20px;padding:0 8px;font-size:12px;font-weight:500}
+.badge-ok{background:color-mix(in oklab,var(--color-ok) 14%,transparent);color:var(--color-ok)}
+.badge-hue{background:var(--hue-soft);color:var(--hue-ink)}
+.pill{display:inline-flex;flex-shrink:0;align-items:center;gap:6px;height:20px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:500;line-height:1;white-space:nowrap;background:var(--s-soft);color:var(--s-ink)}
+.dot{position:relative;display:inline-flex;width:6px;height:6px;flex-shrink:0;border-radius:999px;background:var(--s)}
+[data-status="running"]{--s:var(--color-status-running);--s-soft:var(--color-status-running-soft);--s-ink:var(--color-status-running-ink)}
+[data-status="waiting"]{--s:var(--color-status-waiting);--s-soft:var(--color-status-waiting-soft);--s-ink:var(--color-status-waiting-ink)}
+[data-status="blocked"]{--s:var(--color-status-blocked);--s-soft:var(--color-status-blocked-soft);--s-ink:var(--color-status-blocked-ink)}
+[data-status="done"]{--s:var(--color-status-done);--s-soft:var(--color-status-done-soft);--s-ink:var(--color-status-done-ink)}
+[data-status="idle"]{--s:var(--color-ink-3);--s-soft:var(--color-hover);--s-ink:var(--color-ink-2)}
+[data-status="running"] .dot::after{content:"";position:absolute;inset:0;border-radius:999px;background:inherit;opacity:.6;animation:ping 1s cubic-bezier(0,0,.2,1) infinite}
+@keyframes ping{75%,100%{transform:scale(2);opacity:0}}
+.field{display:flex;flex-direction:column;gap:4px}.field-label{font-size:12px;font-weight:500;color:var(--color-ink-2)}.field-hint{font-size:12px;color:var(--color-ink-3)}
+.input,.select,.textarea{width:100%;height:var(--size-field);padding:0 10px;font-family:inherit;font-size:14px;color:var(--color-ink);background:var(--color-surface);border:1px solid var(--color-line-strong);border-radius:var(--radius-control)}
+.textarea{height:auto;min-height:80px;padding:6px 10px;resize:none;line-height:20px}
+.select{appearance:none;padding-right:28px;background-image:linear-gradient(45deg,transparent 50%,var(--color-ink-3) 50%),linear-gradient(135deg,var(--color-ink-3) 50%,transparent 50%);background-position:calc(100% - 14px) 50%,calc(100% - 10px) 50%;background-size:4px 4px;background-repeat:no-repeat}
+.segmented{display:inline-flex;gap:4px;padding:2px;height:var(--size-control);border-radius:999px}
+.segmented button{flex-shrink:0;border:0;background:none;padding:0 12px;border-radius:999px;font-family:inherit;font-size:12px;font-weight:500;color:var(--color-ink-2);cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.segmented button[aria-pressed="true"]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;font-size:12px;font-weight:500;line-height:1;white-space:nowrap;border-radius:calc(var(--radius-control) - 4px);background:var(--color-hover);color:var(--color-ink-2);border:0;font-family:inherit}
+.progress{height:6px;width:100%;border-radius:999px;background:var(--color-hover);overflow:hidden}.progress>span{display:block;height:100%;border-radius:inherit;background:var(--color-accent)}
+.scrim{position:absolute;inset:0;background:var(--color-scrim);backdrop-filter:blur(2px)}
+.dialog{position:absolute;left:16px;right:16px;top:50%;transform:translateY(-50%);padding:20px;border-radius:var(--radius-sheet);display:flex;flex-direction:column;gap:14px}
+.dialog-actions{display:flex;justify-content:space-between;gap:8px}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+/* ---- mockup ---- */
+.page{max-width:1240px;margin:0 auto;padding:24px;display:flex;flex-direction:column;gap:24px}
+.phones{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+.col{display:flex;flex-direction:column;gap:10px;width:360px}
+.cap{display:flex;flex-direction:column;gap:2px}.cap b{font-size:15px;line-height:22px}
+.lbl{font-family:var(--font-mono);font-size:11px;color:var(--color-ink-3)}
+.phone{position:relative;width:360px;height:780px;border-radius:28px;border:1px solid var(--color-line-strong);background:var(--color-ground);overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 48px var(--glass-shadow-strong)}
+.tg-bar{display:flex;align-items:center;gap:8px;height:48px;padding:0 8px;border-width:0 0 1px 0;border-radius:0;flex-shrink:0}
+.tg-bar .title{flex:1;text-align:center;display:flex;flex-direction:column;line-height:16px}
+.tg-bar .title b{font-size:14px}.tg-bar .title span{font-size:11px;color:var(--color-ink-3)}
+.app{flex:1;overflow:hidden;display:flex;flex-direction:column;gap:12px;padding:12px}
+.proj{display:flex;align-items:center;gap:8px;height:var(--size-tap);padding:0 12px;border-radius:var(--radius-surface)}
+.proj b{flex:1}
+.cols{display:flex;gap:4px;overflow:hidden;max-width:100%;border-radius:999px}
+.stack{display:flex;flex-direction:column;gap:8px;padding:10px 12px;border-radius:var(--radius-surface);border:1px solid var(--hue-line);background:var(--hue-soft)}
+.stack .row{display:flex;align-items:center;gap:8px}
+.cardlist{display:flex;flex-direction:column;gap:8px}
+.bcard{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-radius:var(--radius-surface);min-height:var(--size-tap)}
+.bcard .row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.bcard b{font-size:14px;font-weight:500}
+.bcard .more{margin-left:auto}
+.main-btn{flex-shrink:0;padding:8px 12px 14px;border-top:1px solid var(--color-line);background:var(--color-surface)}
+.main-btn .btn{width:100%;height:var(--size-tap);font-size:15px;border-radius:10px}
+.bsheet{position:absolute;left:0;right:0;bottom:0;top:96px;border-radius:var(--radius-sheet) var(--radius-sheet) 0 0;padding:8px 16px 0;display:flex;flex-direction:column;gap:14px;overflow:hidden}
+.grab{align-self:center;width:36px;height:4px;border-radius:2px;background:var(--color-line-strong)}
+.sheet-head{display:flex;align-items:center;gap:8px}
+.deps{display:flex;flex-wrap:wrap;gap:6px}
+.dim{opacity:.55;filter:saturate(.7)}
+.theme-switch{position:fixed;top:16px;right:16px;z-index:5}
+.note{font-size:12px;line-height:16px;color:var(--color-ink-2);max-width:360px}
+</style>
+</head>
+<body>
+<div class="canvas" aria-hidden="true"></div>
+<div class="theme-switch segmented glass" role="group" aria-label="Theme">
+  <button aria-pressed="true" data-t="dark">Dark</button><button aria-pressed="false" data-t="light">Light</button>
+</div>
+
+<div class="page">
+  <header class="page-header">
+    <div class="ph-text">
+      <div class="ph-eyebrow">Stack S-1 · C-213 · Telegram Mini App</div>
+      <h1>The Board inside Telegram</h1>
+      <p class="ph-desc">For the work a chat does badly: editing a card, its dependencies, its stack, and deleting it. It is the web Board's mobile layout, built from the same glass-ui parts, with one column on screen at a time. Telegram's theme sets <span class="mono">data-theme</span>, and Telegram's Main Button is the screen's one solid action.</p>
+    </div>
+  </header>
+
+  <div class="phones">
+
+    <!-- Board -->
+    <section class="col">
+      <div class="cap"><span class="lbl">Board</span><b>One column at a time</b><span class="text-xs text-ink-2">Swipe or tap the column capsules. The project is the one chosen in the chat (C-209) and can be switched here.</span></div>
+      <div class="phone">
+        <div class="tg-bar glass"><button class="btn btn-ghost btn-sm">Close</button><div class="title"><b>AgentDock</b><span>mini app</span></div><button class="btn btn-ghost btn-icon" aria-label="More"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button></div>
+        <div class="app">
+          <div class="proj surface-content"><span class="swatch" data-hue="2"></span><b>AgentDock</b><span class="badge badge-md">maintainer</span><svg class="icon text-ink-3" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+          <div class="cols segmented glass" role="group" aria-label="Column">
+            <button aria-pressed="false">Inbox <span class="badge">3</span></button>
+            <button aria-pressed="false">To do <span class="badge">5</span></button>
+            <button aria-pressed="true">In progress <span class="badge">2</span></button>
+            <button aria-pressed="false">Finished <span class="badge">1</span></button>
+            <button aria-pressed="false">Completed</button>
+          </div>
+          <div class="stack" data-hue="7">
+            <div class="row"><span class="badge badge-md badge-hue">S-1</span><b class="text-xs" style="flex:1">Run the Board from Telegram</b><span class="text-xs text-ink-2">stage 2 of 3</span></div>
+            <div class="progress"><span style="width:38%"></span></div>
+          </div>
+          <div class="cardlist">
+            <article class="bcard surface-content"><div class="row"><span class="lbl">C-211</span><span class="pill" data-status="running"><span class="dot"></span>Running</span><button class="btn btn-ghost btn-icon btn-sm more" aria-label="Card actions"><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button></div><b>Browse, move and run Board cards from Telegram</b><div class="row text-xs text-ink-3"><span class="mono">slot-1</span>·<span>PR #512</span>·<span class="swatch" data-hue="7"></span>S-1</div></article>
+            <article class="bcard surface-content"><div class="row"><span class="lbl">C-212</span><span class="pill" data-status="waiting"><span class="dot"></span>Waiting on you</span><button class="btn btn-ghost btn-icon btn-sm more" aria-label="Card actions"><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button></div><b>Give feedback, accept, finish and message sessions</b><div class="row text-xs text-ink-3"><span class="mono">slot-2</span>·<span>asks 1 question</span>·<span class="swatch" data-hue="7"></span>S-1</div></article>
+            <article class="bcard surface-content dim"><div class="row"><span class="lbl">C-214</span><span class="pill" data-status="blocked"><span class="dot"></span>Blocked</span></div><b>Accept photos and voice messages in /new</b><div class="row text-xs text-ink-3"><span>needs C-210</span>·<span class="swatch" data-hue="7"></span>S-1 · stage 3</div></article>
+          </div>
+        </div>
+        <div class="main-btn"><button class="btn btn-solid"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>New work</button></div>
+      </div>
+    </section>
+
+    <!-- Card editor -->
+    <section class="col">
+      <div class="cap"><span class="lbl">Card sheet</span><b>Edit, dependencies, stack</b><span class="text-xs text-ink-2">Tapping a card opens it as a bottom sheet. The edits go through the same API and role checks as the web.</span></div>
+      <div class="phone">
+        <div class="tg-bar glass"><button class="btn btn-ghost btn-sm">Close</button><div class="title"><b>AgentDock</b><span>mini app</span></div><span style="width:28px"></span></div>
+        <div class="app dim" aria-hidden="true">
+          <div class="proj surface-content"><span class="swatch" data-hue="2"></span><b>AgentDock</b></div>
+        </div>
+        <div class="scrim" style="top:48px"></div>
+        <aside class="bsheet glass-strong" role="dialog" aria-label="Card C-213">
+          <span class="grab" aria-hidden="true"></span>
+          <div class="sheet-head"><span class="lbl">C-213</span><span class="pill" data-status="idle"><span class="dot"></span>To do</span><button class="btn btn-ghost btn-icon" style="margin-left:auto" aria-label="Close"><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
+          <div class="field"><label class="field-label" for="t">Title</label><input class="input" id="t" value="Add a Telegram Mini App that opens the Board"></div>
+          <div class="field"><label class="field-label" for="d">Description</label><textarea class="textarea" id="d" rows="3">A Telegram Web App with the Board's mobile layout, for editing, deleting, dependencies and stacks.</textarea></div>
+          <div class="field"><span class="field-label">Kind</span><div class="segmented glass" role="group" aria-label="Kind" style="align-self:flex-start"><button aria-pressed="true">Feature</button><button aria-pressed="false">Bug</button></div></div>
+          <div class="field"><span class="field-label">Depends on</span>
+            <div class="deps"><span class="chip"><span class="mono">C-209</span> command router <svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span><button class="chip" style="color:var(--color-accent-ink)"><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Add</button></div>
+            <span class="field-hint">C-213 waits until these are merged.</span></div>
+          <div class="field"><label class="field-label" for="s">Stack</label><select class="select" id="s"><option>S-1 · Run the Board from Telegram · stage 2</option><option>No stack</option></select></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding-top:4px;border-top:1px solid var(--color-line)">
+            <span class="text-xs text-ink-3">Edited 2 min ago in the web</span>
+            <button class="btn btn-danger btn-sm"><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete card</button>
+          </div>
+          <div class="main-btn" style="margin:auto -16px 0"><button class="btn btn-solid">Save changes</button></div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- Delete confirm -->
+    <section class="col">
+      <div class="cap"><span class="lbl">Confirm</span><b>Delete, with the cost spelled out</b><span class="text-xs text-ink-2">The ConfirmDialog as on the web: a ghost Cancel on the left, the danger verb on the right. Telegram's Main Button is hidden while it is open.</span></div>
+      <div class="phone">
+        <div class="tg-bar glass"><button class="btn btn-ghost btn-sm">Close</button><div class="title"><b>AgentDock</b><span>mini app</span></div><span style="width:28px"></span></div>
+        <div class="app dim" aria-hidden="true">
+          <div class="proj surface-content"><span class="swatch" data-hue="2"></span><b>AgentDock</b></div>
+          <article class="bcard surface-content"><b>Add a Telegram Mini App that opens the Board</b></article>
+        </div>
+        <div class="scrim" style="top:48px"></div>
+        <div class="dialog glass-strong" role="dialog" aria-modal="true" aria-labelledby="dt">
+          <h2 id="dt" class="text-heading">Delete C-213?</h2>
+          <p class="text-ink-2">The card and its issue are closed. C-214 depends on it and loses that dependency. Stack S-1 keeps its other cards.</p>
+          <div class="dialog-actions"><button class="btn btn-ghost">Cancel</button><button class="btn btn-danger">Delete</button></div>
+        </div>
+      </div>
+      <p class="note">If the person's role does not allow a delete, the button is not drawn at all. A role that changes while the app is open is still refused by the API, and the refusal shows as a toast.</p>
+    </section>
+
+  </div>
+</div>
+<script>
+document.querySelectorAll('.theme-switch button').forEach(function(b){b.addEventListener('click',function(){document.documentElement.setAttribute('data-theme',b.dataset.t);document.querySelectorAll('.theme-switch button').forEach(function(x){x.setAttribute('aria-pressed',String(x===b))});});});
+</script>
+</body>
+</html>

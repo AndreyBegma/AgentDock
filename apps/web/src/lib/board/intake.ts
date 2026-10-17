@@ -148,8 +148,17 @@ export const proposedShape = (split: PlanIntakeSplitView): ProposalShape =>
   split.stack ? 'stack' : 'split';
 
 /**
+ * #524: what the split view says about its cards — they are independent, so
+ * UI cards for one surface, which share one look, belong in a stack.
+ */
+export const SPLIT_HINT =
+  'Independent cards: no stages, no shared design, no dependencies between them. UI changes to one surface share one look — switch to Stack to give them one design.';
+
+/**
  * The stack the review starts from: the intake's, or — for a split the
- * person turns into a stack — every card in one stage, to be ordered.
+ * person turns into a stack — staged foundations first (#524, ADR-0044 §3):
+ * an empty "Foundations" stage for the shared pieces the person moves up,
+ * every card in "Features", and one shared design of the whole result.
  */
 export function stackDraft(split: PlanIntakeSplitView): StackDraft {
   if (split.stack) {
@@ -166,8 +175,11 @@ export function stackDraft(split: PlanIntakeSplitView): StackDraft {
   return {
     title: '',
     body: '',
-    design: false,
-    stages: [{ title: 'Stage 1', cards: split.cards.map((c) => c.index) }],
+    design: true,
+    stages: [
+      { title: 'Foundations', cards: [] },
+      { title: 'Features', cards: split.cards.map((c) => c.index) },
+    ],
   };
 }
 

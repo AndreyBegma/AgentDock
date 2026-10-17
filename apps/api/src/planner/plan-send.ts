@@ -213,20 +213,32 @@ export const docsPrIssueBody = (
   specDir: string,
   branch: string,
   designVariant: number | null = null,
-): string =>
-  [
+  /**
+   * #379: the spec is in an external docs repository (`owner/name`, or null
+   * when it is not known before the PR opens); the design then stays in this
+   * repository, in the plan's design pull request on the same branch name.
+   */
+  docsRepo?: { repo: string | null },
+): string => {
+  const spec = `\`${specDir}/${THIS_ISSUE}-${slugOf(task.title)}.md\``;
+  const specLine = docsRepo
+    ? `The full specification is ${spec} in the docs repository ${docsRepo.repo ?? '(see the docs source)'}, added by this plan's docs pull request there (branch \`${branch}\`).`
+    : `The full specification is ${spec}, added by this plan's docs pull request (branch \`${branch}\`).`;
+  const designLine =
+    designVariant === null
+      ? null
+      : docsRepo
+        ? `Its approved design is in \`${designDirPath(null, THIS_ISSUE, task.title, designVariant)}/\`, added to this repository by the plan's design pull request (branch \`${branch}\`).`
+        : `Its approved design is in \`${designDirPath(specDir, THIS_ISSUE, task.title, designVariant)}/\`, in the same pull request.`;
+  return [
     '## Summary',
     '',
     task.summary,
     '',
     '## Specification',
     '',
-    `The full specification is \`${specDir}/${THIS_ISSUE}-${slugOf(task.title)}.md\`, added by this plan's docs pull request (branch \`${branch}\`).`,
-    ...(designVariant !== null
-      ? [
-          '',
-          `Its approved design is in \`${designDirPath(specDir, THIS_ISSUE, task.title, designVariant)}/\`, in the same pull request.`,
-        ]
-      : []),
+    specLine,
+    ...(designLine ? ['', designLine] : []),
     '',
   ].join('\n');
+};
